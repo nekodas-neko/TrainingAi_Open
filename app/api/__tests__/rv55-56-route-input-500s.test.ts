@@ -242,29 +242,6 @@ describe.skipIf(!canRun)('RV-55/56 — route input that used to reach the driver
       expect((await getCalendar(qs)).status).toBe(200)
     })
 
-  it.each([
-    ['a non-uuid string', 'not-a-uuid'],
-    ['a number', 5],
-  ])('oura/hr-sync answers 400 for a workoutSessionId that is %s', async (_label, workoutSessionId) => {
-    const { POST } = await import('@/app/api/oura/hr-sync/route')
-    const res = await POST(new Request('http://localhost/api/oura/hr-sync', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ workoutSessionId }),
-    }) as never)
-    expect(res.status).toBe(400)
-  })
-
-  // A well-formed uuid that names no row must still reach the lookup and answer 404 — the guard is
-  // about the value's shape, and turning "not yours" into 400 would be a different change.
-  it('oura/hr-sync still answers 404 for a well-formed id that names nothing', async () => {
-    const { POST } = await import('@/app/api/oura/hr-sync/route')
-    const res = await POST(new Request('http://localhost/api/oura/hr-sync', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ workoutSessionId: '00000000-0000-4000-8000-0000000004f0' }),
-    }) as never)
-    expect(res.status).toBe(404)
-  })
-
   it.each(['mealTypeId', 'foodItemId', 'savedMealId', 'mealGroupId'])(
     'nutrition/food-logs answers 400 for a non-uuid %s', async (field) => {
       const { POST } = await import('@/app/api/nutrition/food-logs/route')

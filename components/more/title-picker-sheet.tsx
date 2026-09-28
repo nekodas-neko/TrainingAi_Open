@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { TITLES } from "@trainingai/shared/types/friends";
+import { invalidateUserProfile } from "@/lib/cache-groups";
 
 interface TitlePickerSheetProps {
   open: boolean
@@ -30,6 +31,13 @@ export function TitlePickerSheet({ open, onOpenChange, unlockedAchievementIds, c
         body: JSON.stringify({ titleId }),
       });
       if (!res.ok) throw new Error('Failed to equip');
+      // The PATCH writes `users.equipped_title`, which is part of `/api/user/profile`'s payload, so
+      // this is a writer of `more-user-profile` and has to clear it. `onEquip` only updates local
+      // state — the cached profile kept the old title, and `/more/details` reads the same key through
+      // `useCachedValue`, so its seed was stale too. Masked until now because `cachedFetch` always
+      // revalidates; the moment any read path takes `freshWithinTtl` it becomes 30 minutes of a wrong
+      // title (RV-183).
+      await invalidateUserProfile().catch(() => {});
       onEquip(titleId);
       toast.success(titleId ? `Equipped "${TITLES[titleId].display}"` : 'Title removed');
     } catch {

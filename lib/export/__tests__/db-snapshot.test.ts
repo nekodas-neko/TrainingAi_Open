@@ -65,9 +65,14 @@ describe('checkDrift', () => {
 
 describe('resolveRequestedTables', () => {
   const c = cols({
+    publicTables: new Map([
+      ['workout_sessions', ['id']],
+      ['oura_raw_samples', ['id']],
+    ]),
     views: new Map([
       ['workout_sessions', ['id']],
       ['oura_raw_samples', ['id']],
+      ['pg_stat_statements', ['queryid']],
     ]),
     excludedTables: new Set(['rate_limits']),
   })
@@ -76,6 +81,12 @@ describe('resolveRequestedTables', () => {
     const { toExport, omitted } = resolveRequestedTables(c, null, null)
     expect(toExport).toEqual(['workout_sessions'])
     expect(omitted.find(o => o.table === 'oura_raw_samples')?.reason).toMatch(/bulk table/)
+  })
+
+  it('omits a view with no base table instead of streaming it, so later tables are not lost', () => {
+    const { toExport, omitted } = resolveRequestedTables(c, null, 'all')
+    expect(toExport).not.toContain('pg_stat_statements')
+    expect(omitted.find(o => o.table === 'pg_stat_statements')?.reason).toMatch(/not an app table/)
   })
 
   it('includes a bulk table when bulk=all', () => {

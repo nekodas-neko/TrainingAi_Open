@@ -7,6 +7,7 @@ import { formatTimeOfDay } from "@trainingai/shared/date-utils";
 import type { DayLogResult, DayExercise, DayBodyMeta, DaySleep, DayHrPoint } from "@/app/api/day-log/route";
 import type { ActivityLog } from "@trainingai/shared/types";
 import { shortSessionName } from "@trainingai/shared/utils";
+import { exerciseWeight } from "./exercise-weight";
 import type { EnergyBalanceResponse } from "@/app/api/nutrition/energy-balance/route";
 import { energyDaySummary, type SessionKcal } from "@/components/health/day-detail/energy-summary";
 import { displayBodyFat } from "@/components/health/body-fat-display";
@@ -17,6 +18,16 @@ import { formatKg } from '@trainingai/shared/format/units'
 export function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <p className="pb-2 text-[9px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">{children}</p>
+  );
+}
+
+function WeightCell({ ex }: { ex: DayExercise }) {
+  const { value, unit } = exerciseWeight(ex);
+  return (
+    <span className="min-w-[46px] flex-none text-right text-[0.82rem] font-bold tabular-nums">
+      {value}
+      {unit && <i className="ml-0.5 text-[9px] font-semibold not-italic text-muted-foreground">{unit}</i>}
+    </span>
   );
 }
 
@@ -162,10 +173,7 @@ export const TrainingSection = memo(function TrainingSection(
                 <span className="flex-none text-[10.5px] tabular-nums text-muted-foreground">
                   {ex.sets ?? 0} × {ex.reps?.[0] ?? 0}
                 </span>
-                <span className="min-w-[46px] flex-none text-right text-[0.82rem] font-bold tabular-nums">
-                  {ex.weightKg ?? "—"}
-                  <i className="ml-0.5 text-[9px] font-semibold not-italic text-muted-foreground">kg</i>
-                </span>
+                <WeightCell ex={ex} />
                 {onEditExercise && (
                   <button
                     type="button"

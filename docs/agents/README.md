@@ -55,13 +55,27 @@ picking up the issues and PRs I raise … so they're never getting touched/revie
 priority with a lane → move the watermark** in the baton. **An issue is never answered by replying
 to it**; it becomes a queue entry, or it is recorded as not-a-defect with the reason.
 
-**⚑ BugFix MONITORS all of it — issues and inbound pull requests both** (owner, 2026-09-27,
-OR-185: *"make that part of our rules that we are monitoring github from bugfix"*). It reads
-`list_pull_requests` (open) beside `list_issues` and files an entry for every PR not authored by the
-agent account. **It does not read the diff** — that goes to Review with a `Lane:`, because reviewing
-a patch against this repo's rules is Review's competence. **One watcher, two readers**: a channel
-watched by two roles is a channel where each assumes the other looked, which is the failure this
-whole section exists to fix.
+**⚑ BugFix OWNS GitHub end to end — it monitors, reviews, and answers** (owner, 2026-09-27
+OR-185 for the monitoring; **extended 2026-09-28**: *"I think bugfix should be able to review PR's
+right? and update the PR/issue in github without sending to Review"*). It reads
+`list_pull_requests` (open) beside `list_issues`, files an entry for every PR not authored by the
+agent account, **reads the diff, and posts the review itself.**
+
+**⚠ IT USED TO HAND THE DIFF TO REVIEW, AND THAT HANDOFF WAS THE DEFECT.** The split — BugFix
+watches, Review reads — meant the first visible response waited on a *weekly sweep*, so a
+contributor saw nothing for days. He said so: *"from his end it just goes silent."* **One role, one
+channel, one response.** BugFix already traces a symptom to `file:line` and already knows the
+recurring bug classes; reading a patch against the same rules is the same competence, not a new one.
+
+**⛔ IT DOES NOT ESCALATE, INCLUDING ON AUTH — struck by the owner 2026-09-28** the same day it was
+proposed: *"bugfix can be enough to review PR's as they are technically 'bugfixes'"*. BugFix's
+review is the review, on every inbound PR without exception. **Do not re-add a second-reader rule**
+for auth, sessions, secrets or migrations; the Orchestrator suggested exactly that and it was
+declined, and a handoff re-introduced anywhere is the thing that made a contributor wait.
+**Run `/security-review` inside the BugFix session** when a diff warrants it — that is a tool this
+role already has, not a handoff — and post the findings in the same response.
+**What does NOT change:** the merge is still never ours (below), and auth remains the owner's
+carve-out **for merging**, which is his call and not a routing step.
 
 **It does not fix.** The temptation to fix a one-line bug in the intake session is exactly how
 intake stops being reliable — the queue is the record, and a fix that skipped the queue is a fix
@@ -99,15 +113,23 @@ writes the findings up in `docs/reviews/YYYY-MM-DD-<topic>.md`, and files each o
 entry. Findings without a backlog entry do not count — `CLAUDE.md`'s **No orphaned findings** rule
 is the whole point of this role.
 
-**Review also owns INBOUND pull requests — PRs opened by anyone other than an agent (added
-2026-09-27, OR-183).** Nothing owned them before: the CI/CD section of `CLAUDE.md` is written
-end-to-end for *our own* PRs (*"when the user pushes a feature branch and opens a PR"*), so a
-collaborator's PR arrived into a channel with no reader. Two sat from 2026-09-25 and were noticed
-only sideways, by `TN-80`, while it was doing something else.
+**⚠ REVIEW NO LONGER OWNS INBOUND PULL REQUESTS — BugFix does, end to end (owner, 2026-09-28).**
+This section assigned them to Review on 2026-09-27 (OR-183) because nothing owned them at all: the
+CI/CD section of `CLAUDE.md` is written for *our own* PRs (*"when the user pushes a feature branch
+and opens a PR"*), so a collaborator's arrived into a channel with no reader, and two sat from
+2026-09-25 noticed only sideways by `TN-80`.
 
-**Review does not watch the channel; BugFix does** (OR-185) and hands each inbound PR over with a
-`Lane:`. Review's job starts at the diff: **read it against this repo's rules and post a review on
-the PR.** Then file what it needs as a backlog entry, the same as any other finding.
+**Fixing the ownership did not fix the silence, because the handoff replaced it.** BugFix watched
+and Review read, so the first visible response waited on a weekly sweep. See §1 — BugFix now reads
+the diff and posts the review itself.
+
+**What Review keeps here: NOTHING.** An escalation path for auth/secret/migration PRs was proposed
+and **struck by the owner on 2026-09-28** — *"bugfix can be enough to review PR's as they are
+technically 'bugfixes'"*. Review has no role in an inbound PR at all. Where a diff warrants deeper
+scrutiny, BugFix runs `/security-review` in its own session; that is a tool, not a handoff.
+
+**The rules below apply to whoever is posting** — they were written for Review and are now BugFix's
+in the ordinary case.
 
 **⚑ THE REVIEW COMMENT IS VERY CONCISE — no fluff** (owner, 2026-09-27). He asked for comments to be
 posted *and* for them to be short, which are two instructions and the second is the one that gets
@@ -123,7 +145,8 @@ lost:
 the rule rather than assuming it, and never imply their approach was careless when it is simply not
 what this repo does.
 
-**Review MAY APPROVE an inbound PR; it may NEVER MERGE one** (owner, 2026-09-27). Approving says
+**The reviewing agent MAY APPROVE an inbound PR; it may NEVER MERGE one** (owner, 2026-09-27 —
+and since 2026-09-28 the reviewing agent is normally BugFix). Approving says
 *we read it and nothing blocks* — the useful half, and the thing an author is actually waiting on.
 **Merging is the author's or the owner's, always**: no exception for a green CI run or a one-line
 diff, and the *"merge a tested, CI-green PR without asking"* authority covers **our own** PRs only.

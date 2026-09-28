@@ -28,17 +28,38 @@ import { movementBalance, PATTERN_LABEL, type MovementBalanceRow } from "./movem
 const WINDOW_DAYS = 60;
 
 /**
+ * ONE hue for every pattern — RV-208 ③.
+ *
+ * **Why not four hues: the wheel is over-subscribed, and this was measured rather than judged.**
+ * A category hue has to stay clear of two separate systems. `SESSION_PALETTE`
+ * (`packages/shared/src/session-palette.ts`) is indexed by session POSITION over six Tailwind hues
+ * — red ≈27°, amber ≈70°, green ≈145°, blue ≈255°, indigo ≈275°, purple ≈305° — and this app's own
+ * accent tokens hold four more. Nine constraints on a 360° wheel. The previous map collided with
+ * both: **`legs` was `--accent-green`, 0° from session green**, and `pull` was `--accent-purple`,
+ * **10°** from session purple — so on Health → Training the same three words carried two different
+ * colour maps within a thumb's scroll, transposed rather than merely different.
+ *
+ * Scanning the wheel for replacements, the only band clear of all nine at a comfortable 40°
+ * separation is ~345–347°. That is room for **one** hue, not the two the entry assumed, and a
+ * three-hue set only exists if you accept 30° gaps — one of which sits wedged exactly between amber
+ * and green. There is no good four-colour answer while sessions own six hues by position.
+ *
+ * **So the colour stops carrying the identity, because it never had to.** Every row already renders
+ * `PATTERN_LABEL[row.pattern]` beside its bar; the rows are stacked and individually labelled, so
+ * hue was redundant encoding. One accent for all of them cannot collide with a session colour, and
+ * it stays correct if the owner reorders his sessions — which the previous map could not.
+ *
+ * **`other` stays muted**, and no row is green or red: these are four CATEGORIES, not a scale, and
+ * nothing here means "good" or "bad". A lightness ramp would imply exactly the ordering this card
+ * refuses to assert, which is why the fix is one flat hue rather than three shades of one.
+ *
  * Theme tokens, not hex — the palette is defined once in `app/globals.css` and checked for WCAG AA
  * contrast there, which a literal in this file would quietly sit outside of.
- *
- * These are four CATEGORIES, not a scale, so the hues are chosen to be distinguishable rather than
- * ordered: nothing here means "good" or "bad", and colouring push green would imply a verdict the
- * card deliberately does not make.
  */
 const PATTERN_COLOR: Record<string, string> = {
   push: "var(--accent-cyan)",
-  pull: "var(--accent-purple)",
-  legs: "var(--accent-green)",
+  pull: "var(--accent-cyan)",
+  legs: "var(--accent-cyan)",
   other: "var(--color-muted-foreground)",
 };
 

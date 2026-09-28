@@ -825,7 +825,7 @@ export async function runOuraRollup(
   const WORKOUT_PAD_MS = 10 * 60 * 1000
   const anchorUtcMsForWindows = anchor.anchorUtc.getTime()
   const workoutWindows = (await io.readWorkoutWindows(
-    new Date(measuredAtMs(hrSeriesCutoffDs, anchor.anchorDs, anchorUtcMsForWindows)),
+    new Date(measuredAtMs(hrSeriesCutoffDs, anchor.anchorDs, anchorUtcMsForWindows) - WORKOUT_PAD_MS),
   ))
     .map(w => ({
       fromMs: w.startedAt.getTime() - WORKOUT_PAD_MS,

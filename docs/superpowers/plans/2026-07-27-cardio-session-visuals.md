@@ -840,7 +840,7 @@ git commit -m "feat: wire the hero chart, pace bars, zone donut and dense splits
 
 **Files:**
 - Modify: `package.json`, `lib/changelog.ts`, `projectOverview.md`
-- Create: `docs/overview/entries/2026-07-27-cardio-session-visuals.md`
+- Create: `docs/overview/history-2026-07-23.md#2026-07-27-cardio-session-visuals`
 - Modify: `docs/implementation-backlog.md` (remove this item, renumber remaining cardio-batch items)
 
 - [ ] **Step 1: Run the full local gate**
@@ -876,9 +876,9 @@ Bump `package.json`'s `version` (minor bump — new user-visible feature) and ad
 
 - [ ] **Step 4: Write the session journal entry**
 
-Create `docs/overview/entries/2026-07-27-cardio-session-visuals.md` following the convention in
+Create `docs/overview/history-2026-07-23.md#2026-07-27-cardio-session-visuals` following the convention in
 `docs/overview/entries/README.md` (mirror the shape of
-`docs/overview/entries/2026-07-27-cardio-session-picker.md`): what shipped, the elevation-profile scope
+`docs/overview/history-2026-07-23.md#2026-07-27-cardio-session-picker`): what shipped, the elevation-profile scope
 cut and why, and an explicit "not verified" section — real Samsung WebView touch-drag scrubbing (the
 sandbox is desktop Chromium pointer events, not a verified on-device touch gesture), and whether the
 `touch-none` class fully prevents scroll-hijack on the S25 (flag as APK-unverified per the Canonical

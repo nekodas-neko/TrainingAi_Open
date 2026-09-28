@@ -1,5 +1,6 @@
 import type { StyleSet } from '@trainingai/shared/types/progression';
 import type { WorkoutExercise } from '@/app/api/workout-data/route';
+import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role';
 import type {
   LocalProgram, LocalProgramSession, LocalSessionExercise,
   LocalProgressionStyle, LocalStyleSet, LocalExerciseLibraryEntry,
@@ -103,7 +104,7 @@ function buildWorkoutExercise(
     progressionStyle,
     styleName:            ex.styleId ? styleNameById.get(ex.styleId) ?? null : null,
     styleId:              ex.styleId ?? undefined,
-    exerciseRole:         ex.exerciseRole || 'primary',
+    exerciseRole:         ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE,
     muscleGroups:         ex.muscleGroups,
     mainMuscles:          lib?.muscles.filter(m => m.role === 'main').map(m => m.muscle) ?? ex.muscleGroups,
     secondaryMuscles:     lib?.muscles.filter(m => m.role === 'secondary').map(m => m.muscle) ?? [],

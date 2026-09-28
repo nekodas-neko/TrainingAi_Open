@@ -268,6 +268,7 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
 - [`docs/reviews/2026-08-18-ai-double-trips.md`](../../reviews/2026-08-18-ai-double-trips.md) — **the AI-usage screen's double-trips traced to cause, 2026-08-18** (Q-471 — the meal-plan reroll path is correctly guarded; its double-trip count is a fingerprint artefact, not tap-spam). Findings Q-469…Q-471; corroborates **Q-295** exactly and confirms **Q-170's latency fix is holding** (7-day Coach average 2,307 ms).
 
 - [`docs/reviews/2026-08-18-nutrition-tdee-calibration.md`](../../reviews/2026-08-18-nutrition-tdee-calibration.md) — **the TDEE outcome check, 2026-08-18** (Q-517 — the food log captures **~45%** of actual intake, so taking it at face value implies a maintenance *below the owner's own BMR*. `adaptive-tdee.ts` already anticipated this and its gates refuse **75%** of windows — but `MIN_PLAUSIBLE_MAINTENANCE = 1000` sits **52 kcal below** where the artefact lands (1,052), and `MIN_LOGGED_FRACTION` counts logged *days* rather than log *completeness*, so a 45%-complete record passes a 70% gate. Proposed: floor at the user's own BMR — blocks every harmful value, tightening the range to 1,902–2,219).
+- [Shared food library plan (BF-77)](../../superpowers/plans/2026-09-28-shared-food-library.md) — browse an opted-in friend's meals and copy them; why not a group library or a share code.
 
 ## Open issues
 
@@ -338,15 +339,11 @@ Live at the time of writing (2026-07-30):
 - The quick-edit sheet fixes and the NUT-10/11 hygiene pass shipped, but interactive verification
   was blocked in the sandbox.
 - Supplement reminders and meal-type reminder cancellation are unverified on device.
-- ⚠️ **The empty meal's header `+` is a 36 px tap target** (`LB-169`, found 2026-09-27,
-  `meal-card.tsx:72`) — under the 48 px floor the rest of the screen holds to. Easy to miss
-  today because an empty meal also shows a full "Add food" card beside it; **it becomes the
-  only way in if `RV-213`'s collapse is taken**, so fix it before or with that entry. `RV-213`
-  itself is mocked up at 384 px dark and waiting on the owner's answer —
-  [`journal`](../../overview/entries/2026-09-27-mockups-home-nutrition-sitting.md).
-
-## History
-
+- ✅ **The empty meal's header `+` is NOT undersized** — retracted 2026-09-27, the same day it was
+  filed. `meal-card.tsx` gives it `h-9 w-9`, but `app/globals.css` floors every `button` and
+  `[role="button"]` at 48 px, so it renders at 48 × 48 (measured). **A Tailwind size class is not the
+  rendered size here** — check the global floor before filing one of these. `RV-213`'s collapse is
+  unblocked by it; the entry carries the retraction.
 - [`2026-09-15-bf74-photo-remove-confirm`](../../overview/history-2026-09-17-folded-1.md#2026-09-15-bf74-photo-remove-confirm)
   — **BF-74 round two (2026-09-15): removing a meal photo asks first.** Round one moved the ✕ out of
   the dismiss corner and made it a bin; the device pass still found it destroyed the photo on one
@@ -524,12 +521,12 @@ Live at the time of writing (2026-07-30):
   with a three-step instrumented probe instead of a third speculative fix.
 - Handoffs: `ls docs/handoffs/handoff-*-nutrition-*.md`
 - Journal: `grep -rl 'nutrition\|food\|supplement' docs/overview/entries/`
-  [`2026-09-27-rv218-nutrition-copy.md`](../../overview/entries/2026-09-27-rv218-nutrition-copy.md)
+  [`2026-09-27-rv218-nutrition-copy.md`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv218-nutrition-copy)
   (RV-218's copy bugs: "205 workouts" was 205 kcal, and a signed `net` printed "−1,694 deficit" —
   sign and word both meaning "under". Also why items ①②④ are Lane A's, established from the route
   rather than assumed),
   — including
-  [`2026-09-27-rv212-nutrition-tone.md`](../../overview/entries/2026-09-27-rv212-nutrition-tone.md)
+  [`2026-09-27-rv212-nutrition-tone.md`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv212-nutrition-tone)
   (RV-212 ①②: the energy-balance headline stops reading a partial day as a fault, following
   `energy-card.tsx`'s own earlier split which keeps the colour on the " so far"-qualified label; a
   taken supplement is muted rather than struck through, while the manage sheet's `!s.active`
@@ -537,6 +534,28 @@ Live at the time of writing (2026-07-30):
   `meal-thumb.tsx` records his instruction for the placeholder it asked to remove).
 
 ## Decided, and deliberately not built
+
+- **⛔ ON THE DIARY, VERTICAL SPACE BETWEEN MEAL CARDS IS THE GROUPING MECHANISM — a density change
+  needs a NEW argument (owner, 2026-09-27 — RV-213, declined and struck).** A sweep measured four
+  (really six) empty meal slots at roughly 320 px of mostly-blank card and proposed collapsing each
+  to a single name-plus-`+` row, taking ~1,400 px to ~800 px and pulling two below-the-fold cards
+  onto the screen. A before/after was rendered at 384 px dark and shown. **He said no:**
+  *"I like the original look; it shows the grouping nicely with the space."*
+  - **So the empty height is doing work.** It is what separates one meal from the next, and the
+    saving was real but paid for in the thing the screen exists to show.
+  - **This is a principle, not a one-off no.** Any future sweep measuring blank space on the diary
+    will reach the same finding and should stop here. Re-opening it takes a **new entry with a new
+    reason** — not a second run at this one.
+  - **The finding's other half is on the record and is also not a to-do:** in
+    `components/nutrition/meal-card.tsx`, an empty meal renders a header `+` **and** a body
+    `+ Add food`. Two affordances, one action — but the header `+` is the control that is present in
+    **every** meal state and the body row is the empty-state one, so the pair is consistency rather
+    than duplication. Filing it separately would be re-opening a declined entry through a side door.
+    (Named without line numbers deliberately: `check-index-doc-paths` reads a `file:line` suffix as
+    part of the path, and a pinned line in an orientation doc goes stale on the next edit anyway.)
+  - The declined mockup is kept at
+    [`docs/design/2026-09-27-four-screen-mockups.html`](../../design/2026-09-27-four-screen-mockups.html),
+    so the next person can see what was rejected rather than re-drawing it.
 
 - **A plan meal's `suggestedTime` stays a LABEL — it schedules nothing (owner, 2026-08-24 — Q-201,
   removed from the queue).** *"For now it can stay as a label; we already have the notification

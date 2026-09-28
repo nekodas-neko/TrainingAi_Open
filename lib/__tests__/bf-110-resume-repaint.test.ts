@@ -182,3 +182,24 @@ describe('where it is wired', () => {
       .toMatch(/removeEventListener\('visibilitychange', onVisible\)/)
   })
 })
+
+describe('the native heights on the recheck (BF-110 native relayout)', () => {
+  it('appends the native view and parent heights when the APK exposes them', async () => {
+    const { resumeRecheckMessage } = await import('../resume-repaint')
+    const s = (h: number, w = 384, c = 1) => ({ width: w, height: h, childCount: c })
+    expect(resumeRecheckMessage(s(667), s(667), 'view=667 parent=826'))
+      .toBe('bf110 resume recheck stuck h1=667 h2=667 w2=384 children2=1 native view=667 parent=826')
+    expect(resumeRecheckMessage(s(667), s(667), null)).toBe('bf110 resume recheck stuck h1=667 h2=667 w2=384 children2=1')
+  })
+
+  it('reads the bridge when present, and never throws when it is absent or broken', async () => {
+    const { readNativeHeights } = await import('../resume-repaint')
+    const g = globalThis as { AndroidRenderer?: unknown }
+    expect(readNativeHeights()).toBeNull()
+    g.AndroidRenderer = { viewHeights: () => 'view=826 parent=826' }
+    expect(readNativeHeights()).toBe('view=826 parent=826')
+    g.AndroidRenderer = { viewHeights: () => { throw new Error('bridge gone') } }
+    expect(readNativeHeights()).toBeNull()
+    delete g.AndroidRenderer
+  })
+})

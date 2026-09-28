@@ -109,6 +109,32 @@ describe('DV-6 — when the status-bar scrim shows', () => {
     expect(shown, 'the offset survived the flip, so the scrim must too').toBe(true)
   })
 
+  it('a pushed route scrolls the DOCUMENT, whose scroll target is not an Element', () => {
+    // Measured at 412 px on `/health/sleep`: no inner scroller, no panel, `documentScrolls: true`
+    // and the event target is the Document. The old handler returned early on exactly that, so the
+    // scrim could not have worked there even once it was mounted.
+    const c = controller()
+    // jsdom leaves `document.scrollingElement` null; a browser does not — the 412 px probe read the
+    // document's offset through it. Stubbed rather than given a fallback in the controller, which
+    // would be error handling for a case the canonical runtime cannot produce.
+    const html = document.documentElement
+    Object.defineProperty(document, 'scrollingElement', { value: html, configurable: true })
+    Object.defineProperty(html, 'scrollTop', { value: 200, configurable: true })
+    document.dispatchEvent(new Event('scroll', { bubbles: false }))
+    expect(shown, 'a document scroll with no panels on the page must show the scrim').toBe(true)
+    c.reevaluate()
+    expect(shown, 'and must survive a re-evaluate').toBe(true)
+  })
+
+  it('a hidden panel still loses, which is the rule the pushed-route case had to not break', () => {
+    // The scoping is stated as "not inside a panel that is off show" rather than "inside the panel
+    // on show" — the positive form excluded a pushed route along with the hidden panels.
+    controller()
+    const { scroller } = panel(false)
+    scrollTo(scroller, 400)
+    expect(shown).toBe(false)
+  })
+
   it('forgets a scroller whose screen was torn down', () => {
     const c = controller()
     const { p, scroller } = panel(true)
@@ -139,7 +165,21 @@ describe('DV-6 — the component wires the controller correctly', () => {
 
   it('re-evaluates on activation, which is the tab-flip case', () => {
     expect(src()).toMatch(/controller\.reevaluate\(\)/)
-    expect(src(), 'the effect must re-run per tab').toMatch(/\},\s*\[activeKey\]\)/)
+    // DV-22 removed the `activeKey` prop when the mount moved to the root layout, so the two
+    // no-scroll-event cases need two signals. Losing either is silent: the scrim simply stays as
+    // whatever the last screen left it.
+    expect(src(), 'a route change must re-run the effect').toMatch(/\},\s*\[pathname\]\)/)
+    expect(src(), 'a tab flip fires no scroll event and does not move the router')
+      .toMatch(/attributeFilter:\s*\['data-tab-active'\]/)
+  })
+
+  it('is mounted once, in the only layout every route shares', () => {
+    // The DV-22 defect itself: DV-6 mounted it in `tab-shell.tsx`, so a pushed route got nothing.
+    // A second mount would be two gradients stacked on the tab routes.
+    const root = path.join(__dirname, '../../../app/layout.tsx')
+    expect(readFileSync(root, 'utf8')).toContain('<StatusBarScrim />')
+    const shell = readFileSync(path.join(__dirname, '../../../components/shell/tab-shell.tsx'), 'utf8')
+    expect(shell, 'the shell mount is what DV-22 removed').not.toContain('<StatusBarScrim')
   })
 
   it('fades from --background, never --page-bg', () => {

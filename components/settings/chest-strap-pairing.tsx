@@ -91,7 +91,15 @@ export function ChestStrapPairing() {
       try {
         await BleClient.connect(device.deviceId)
         const batt = await BleClient.read(device.deviceId, BATTERY_SERVICE, BATTERY_LEVEL)
-        const level = new Uint8Array(batt.buffer)[0] ?? null
+        // BF-216: read through the VIEW, never `.buffer`. `.buffer` is the whole backing
+        // ArrayBuffer and discards `byteOffset`/`byteLength`, so a view into a pooled or offset
+        // buffer would hand back a byte belonging to something else — and store it as a battery
+        // percentage in the same place the Home chip reads. Latent today only because
+        // `@capacitor-community/bluetooth-le` happens to build each DataView on a fresh buffer,
+        // which is its implementation rather than its contract.
+        // `byteLength` guarded because `getUint8(0)` throws on an empty view, where the old
+        // `[0] ?? null` yielded null.
+        const level = batt.byteLength > 0 ? batt.getUint8(0) : null
         setBattery(level)
         // Q-111: the same store the Home chip reads. At pairing time the native service is not
         // running, so `PolarBleStatus.battery` has nothing yet and this direct characteristic read
@@ -100,7 +108,9 @@ export function ChestStrapPairing() {
         // value from the first pairing onward instead of waiting for a workout.
         writeStrapBattery(level)
         const fw = await BleClient.read(device.deviceId, DEVICE_INFO_SERVICE, FIRMWARE_REVISION)
-        setFirmware(new TextDecoder().decode(fw.buffer).replace(/\0+$/, ''))
+        // Same shape: decode the view, not its buffer. `TextDecoder.decode` takes a BufferSource
+        // and honours a DataView's offset and length.
+        setFirmware(new TextDecoder().decode(fw).replace(/\0+$/, ''))
         await BleClient.disconnect(device.deviceId)
       } catch { /* readout is cosmetic — pairing already succeeded */ }
     } catch (e) {

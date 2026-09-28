@@ -9,6 +9,7 @@ import { accessoryTargetRpe } from "@trainingai/shared/ai-periodization/goal-ran
 import { pctForExpectedRpe } from "@trainingai/shared/ai-periodization/expected-rpe";
 import { resolveBodyweightStyle, resolveWorkingBasis, resolveWorkingBasisWithSource } from "@trainingai/shared/1rm";
 import { toAestDateStr } from "@trainingai/shared/date-utils";
+import { UNCLASSIFIED_EXERCISE_ROLE } from './exercise-role';
 
 export interface PerSessionPhaseStatus {
   sessionId: string
@@ -191,7 +192,7 @@ export function buildWorkoutExercises(
       let effectiveStyleId: string | null = ex.styleId ?? null
       if (styleResolutionPhase && allPhases.length > 0) {
         const resolved = resolveStyleForExercise(styleResolutionPhase, allPhases, {
-          exerciseRole: ex.exerciseRole ?? 'primary',
+          exerciseRole: ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE,
           styleId: ex.styleId,
         })
         if (resolved !== 'own') effectiveStyleId = resolved
@@ -295,11 +296,13 @@ export function buildWorkoutExercises(
       // trap worth naming: a clause proven unreachable is only unreachable against the code that
       // proved it. Anyone deleting this one should re-run that mutation rather than trust either
       // comment.
-      if (
-        !deloaded && isAiDynamic && !isBaselinePhase &&
-        (aiDeload || isDeloadActive) &&
-        progressionStyle && progressionStyle.length > 0
-      ) {
+      //
+      // BF-200: no requirement on `progressionStyle` here. It used to demand a non-empty one, but
+      // the deload style comes from the goal alone, and the only thing that demand still excluded
+      // was an exercise with NO style — which then kept its full working weight through a deload
+      // week (the owner's Skull Crusher, 3 × 30 kg beside four lifts at 52%). A style-less
+      // exercise has nothing to revert to, so `preDeloadStyle` stays null for it.
+      if (!deloaded && isAiDynamic && !isBaselinePhase && (aiDeload || isDeloadActive)) {
         const override = deloadOverrideForGoal(trainingGoal)
         preDeloadStyle = progressionStyle
         preDeloadSets = defaultSets
@@ -314,7 +317,7 @@ export function buildWorkoutExercises(
       // session before the first prescription is generated). Keep fatigue sane: only the main
       // lift goes AMRAP; secondary compounds and accessories take a controlled +1 rep.
       if (isAiDynamic && !isBaselinePhase && progressionStyle && progressionStyle.length > 0) {
-        lastSetMode = (ex.exerciseRole ?? 'primary') === 'primary' ? 'amrap' : 'plus1'
+        lastSetMode = (ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE) === 'primary' ? 'amrap' : 'plus1'
       }
 
       const libEntry = libByName.get(ex.exerciseName.toLowerCase())
@@ -332,7 +335,7 @@ export function buildWorkoutExercises(
       // skipped on baseline/deload and when the AI prescription already set the load.
       if (
         isAiDynamic && !isBaselinePhase && !aiDeload && !isDeloadActive && !aiStyleApplied &&
-        bwType === 'weighted' && (ex.exerciseRole ?? 'primary') === 'accessory' &&
+        bwType === 'weighted' && (ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE) === 'accessory' &&
         progressionStyle && progressionStyle.length > 0
       ) {
         const targetRpe = accessoryTargetRpe(trainingGoal);
@@ -385,7 +388,7 @@ export function buildWorkoutExercises(
         progressionStyle,
         styleName,
         styleId: effectiveStyleId ?? undefined,
-        exerciseRole: ex.exerciseRole ?? 'primary',
+        exerciseRole: ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE,
         muscleGroups: ex.muscleGroups,
         mainMuscles: libEntry?.muscles.filter(m => m.role === "main").map(m => m.muscle) ?? ex.muscleGroups,
         secondaryMuscles: libEntry?.muscles.filter(m => m.role === "secondary").map(m => m.muscle) ?? [],

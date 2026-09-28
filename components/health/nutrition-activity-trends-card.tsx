@@ -18,16 +18,19 @@ export const NutritionActivityTrendsCard = memo(function NutritionActivityTrends
     () => trendsProp ?? readTodayCacheSync<HealthTrendsResponse>("health-trends-summary")?.trends ?? [],
   );
   const [loading, setLoading] = useState(trendsProp === undefined);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    if (trendsProp !== undefined) { setTrends(trendsProp); setLoading(false); return; }
-    // cachedFetch swallows fetch failures internally (never rejects), so a failed request
-    // and "nothing logged yet" both leave `trends` empty — can't distinguish them, so
-    // this renders an empty-state line either way instead of vanishing (self-fetching-card
-    // failure-state rule), same treatment as Task 2.5's HR chart fix.
+    if (trendsProp !== undefined) { setTrends(trendsProp); setLoading(false); setFailed(false); return; }
+    // LB-176. The comment here used to say a failed request and "nothing logged yet" could not be
+    // told apart, so it printed the empty line for both — a reasonable call when `onError` was not
+    // being used, and the self-fetch IS the live path on failure: the parent leaves `trends`
+    // `undefined` unless its own read succeeded. `cachedFetch` still swallows `!res.ok`, but it
+    // reports it through `onError` (RV-150), so the two are now distinguishable and the card says
+    // which happened.
     cachedFetchToday<HealthTrendsResponse>("health-trends-summary", "/api/health/trends", HEALTH_TRENDS_SUMMARY_TTL, d => {
-      if (d?.trends) setTrends(d.trends);
-    }).finally(() => setLoading(false));
+      if (d?.trends) { setTrends(d.trends); setFailed(false); }
+    }, { onError: () => setFailed(true) }).finally(() => setLoading(false));
   }, [trendsProp]);
 
   const hasProtein = trends.some(t => t.proteinPerKg != null);
@@ -35,7 +38,9 @@ export const NutritionActivityTrendsCard = memo(function NutritionActivityTrends
   const hasWater = trends.some(t => t.waterMl != null);
   if (!hasProtein && !hasSteps && !hasWater) {
     if (loading) return null;
-    return <p className="text-xs text-muted-foreground">No nutrition/activity trends yet.</p>;
+    return failed
+      ? <p className="text-xs text-muted-foreground">Couldn&apos;t load your nutrition and activity trends.</p>
+      : <p className="text-xs text-muted-foreground">No nutrition/activity trends yet.</p>;
   }
 
   return (

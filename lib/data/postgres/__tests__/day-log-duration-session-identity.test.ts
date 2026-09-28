@@ -92,8 +92,8 @@ describe.skipIf(!canRun)('day-log workout durations key on session identity (Q-3
 
     // The earlier session is the one the name-keyed record dropped. Assert its actual window, not
     // just its presence — presence alone would pass if both keys held the later session. The times
-    // are `fmtAest` output ("9:00am"), which is why they are compared as exact strings rather than
-    // ordered: "5:00pm" sorts before "9:00am".
+    // are `fmtAest` output ("9:00 am"), which is why they are compared as exact strings rather than
+    // ordered: "5:00 pm" sorts before "9:00 am".
     //
     // BF-155 moved these from 41 to 45 minutes, and the fixture is why: it sets `completed_at` to
     // start + 45 min while logging its one exercise at + 40 min with a 60 s duration. The route used
@@ -101,8 +101,8 @@ describe.skipIf(!canRun)('day-log workout durations key on session identity (Q-3
     // `completed_at` and gets 45. The fixture was never written for this — it just happens to carry
     // a real end four minutes past its last exercise, which is what a real session looks like.
     // Nothing this test guards changed: still two keys, still one window each.
-    expect(workoutDurationsById[earlyId]).toEqual({ start: '9:00am', end: '9:45am', minutes: 45 })
-    expect(workoutDurationsById[lateId]).toEqual({ start: '5:00pm', end: '5:45pm', minutes: 45 })
+    expect(workoutDurationsById[earlyId]).toEqual({ start: '9:00 am', end: '9:45 am', minutes: 45 })
+    expect(workoutDurationsById[lateId]).toEqual({ start: '5:00 pm', end: '5:45 pm', minutes: 45 })
   })
 
   // LA-15: the legacy name-keyed record is GONE. It was emitted beside the id-keyed one only so the

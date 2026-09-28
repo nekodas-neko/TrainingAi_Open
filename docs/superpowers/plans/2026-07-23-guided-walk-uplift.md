@@ -188,7 +188,7 @@ loop (live BLE HR + GPS + notification firing) is on-device only.
 > `docs/implementation-backlog.md` — baseline anchors are the beat-your-best mechanism). The
 > detail-view/map steps below also substantially overlap with that redesign's shared
 > execution/history screens (the now-shipped per-session visual system,
-> `docs/overview/entries/2026-07-27-cardio-session-visuals.md`, and cardio batch item 3,
+> `docs/overview/history-2026-07-23.md#2026-07-27-cardio-session-visuals`, and cardio batch item 3,
 > explicitly scoped to serve run/walk/activity from one surface) — check those first before
 > building a walk-specific detail view here, to avoid building the same map/chart twice.
 

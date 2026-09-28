@@ -33,6 +33,7 @@ export function PerformanceOverviewSection({ userId }: { userId?: string }) {
   // standing rule is that such a domain is READ locally — a test recorded offline must not vanish
   // from a screen that claims to list what the app has measured.
   const [tests, setTests] = useState<FitnessTestRow[]>([]);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
     let alive = true;
     const store = userId ? getLocalStore(userId) : null;
@@ -49,15 +50,19 @@ export function PerformanceOverviewSection({ userId }: { userId?: string }) {
       d => { if (alive) setTests(d.fitnessTests ?? []) },
       // RV-84: the `.catch` here could never fire — `cachedFetch` resolves a boolean rather than
       // rejecting, so a failed load left the section on its loading state.
-      { onError: () => { if (alive) setTests([]) } },
+      // RV-150: `setTests([])` makes a failure look like "no tests recorded", which the empty
+      // branch below turns into `return null`. The flag is what separates the two.
+      { onError: () => { if (alive) { setTests([]); setFailed(true) } } },
     );
     return () => { alive = false };
   }, [userId]);
 
   // The same two keys and the same TTL expression the DEXA & RMR screen fetches them with — one
   // canonical TTL per key, or freshness becomes last-writer-wins between the two screens.
-  const rmr = useCachedValue<{ tests: MeasuredRmrRow[] }>('measured-rmr', '/api/measured-rmr', TTL_LONG);
-  const dexa = useCachedValue<{ scans: DexaScanRow[] }>('dexa-scans', '/api/dexa-scans', TTL_LONG);
+  const rmr = useCachedValue<{ tests: MeasuredRmrRow[] }>('measured-rmr', '/api/measured-rmr', TTL_LONG,
+    { onError: () => setFailed(true) });
+  const dexa = useCachedValue<{ scans: DexaScanRow[] }>('dexa-scans', '/api/dexa-scans', TTL_LONG,
+    { onError: () => setFailed(true) });
 
   const groups = performanceGroups({
     fitnessTests: tests,
@@ -67,7 +72,19 @@ export function PerformanceOverviewSection({ userId }: { userId?: string }) {
 
   // Nothing recorded is not an error state and not an empty card — it is a section that has no
   // reason to exist yet. The invitation to record one lives on the screen that takes the entry.
-  if (groups.length === 0) return null;
+  // A failed load is a different thing and says so (RV-150): measured on a cold start with the
+  // routes down, this section and the one above it were both absent with nothing explaining it.
+  if (groups.length === 0) {
+    if (!failed) return null;
+    return (
+      <section className="space-y-1">
+        <h2 className="text-sm font-semibold">Tests and scans</h2>
+        <p className="text-xs text-muted-foreground">
+          Couldn&rsquo;t load your tests and scans. Check your connection and reopen this screen.
+        </p>
+      </section>
+    );
+  }
 
   const clinical = groups.some(g => g.title === 'Body scan' || g.title === 'Metabolic test');
 

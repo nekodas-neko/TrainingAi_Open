@@ -136,7 +136,7 @@ third PR landed mid-merge. This is normal, not a problem — see Gotchas below.
 - `lib/cache-groups.ts` — touched by Q-117 (already done) and Q-126 (Agent 2); the established
   pattern (invalidate-before-refetch, `clearLegacyHomeSeeds()` after any `'workout-data'`
   prefix-drop) is documented inline and in `CLAUDE.md`'s Cache Invalidation section.
-- `docs/overview/entries/2026-08-07-deload-injury-invalidation.md` — the most recent example of
+- `docs/overview/history-2026-08-04.md#2026-08-07-deload-injury-invalidation` — the most recent example of
   this session's PR-writeup format (root cause → fix → verification → what wasn't exercised); a
   good template for either agent's own journal entries.
 

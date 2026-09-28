@@ -34,6 +34,7 @@ const getZoneMinutesRange = vi.fn(async (..._a: unknown[]) => [] as Day[])
 const listActivityLogs = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getHrForWindow = vi.fn(async (..._a: unknown[]) => [] as { bpm: number; timestamp: Date; source: string | null }[])
 const getObservedHrProfile = vi.fn(async (..._a: unknown[]) => computeObservedHr([]))
+const getUserGoals = vi.fn(async (_u: string) => ({ stepsGoal: null as number | null }))
 const getUserById = vi.fn(async (_u: string) => ({ dateOfBirth: '1990-01-01', heightCm: 180, sex: 'male', activityLevel: 'moderate' }) as Row | null)
 const listBodyMetrics = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getActiveRunningPlan = vi.fn(async (_u: string) => null as Row | null)
@@ -44,7 +45,7 @@ vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser 
 vi.mock('@/lib/data', () => {
   // Built inside the factory: `vi.mock` is hoisted above the consts above.
   const repo = async () => ({
-    getZoneMinutesRange, listActivityLogs, getHrForWindow, getObservedHrProfile, getUserById,
+    getZoneMinutesRange, listActivityLogs, getHrForWindow, getObservedHrProfile, getUserById, getUserGoals,
     listBodyMetrics, getActiveRunningPlan, getDayExerciseNames,
   })
   return { getRepository: repo, getRepositoryAsync: repo }
@@ -135,18 +136,21 @@ describe('/api/cardio-week', () => {
     expect(body.trainedToday).toBe(false)
   })
 
-  // LA-82, pinned as CURRENT BEHAVIOUR rather than endorsed. `resolveHrProfile` runs before the
-  // Promise.all and guards only one of its own three reads, so these two take the whole route down
-  // — which also makes the route's four `.catch`es on `listBodyMetrics` unreachable. Whether the
-  // fix is to guard them or to keep failing loudly is a design question, not an obvious bug: a hub
-  // painting a default resting HR as though it were measured may be worse than an error.
-  it('is NOT resilient to the two reads the HR profile makes unguarded', async () => {
+  // LA-82. These two reads used to take the whole hub down. They degrade now, and the payload
+  // names what the zones were computed from, so a default is never presented as a measurement.
+  it('still answers when the age read fails, and marks the max as an estimate without an age', async () => {
     getUserById.mockRejectedValue(new Error('db down'))
-    await expect(getWeek()).rejects.toThrow('db down')
+    const res = await getWeek()
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.heart.maxHrSource).toBe('estimated-age-unread')
+  })
 
-    getUserById.mockResolvedValue({ dateOfBirth: '1990-01-01' })
+  it('still answers when the resting-HR read fails, and marks resting HR as unavailable', async () => {
     listBodyMetrics.mockRejectedValue(new Error('db down'))
-    await expect(getWeek()).rejects.toThrow('db down')
+    const res = await getWeek()
+    expect(res.status).toBe(200)
+    expect((await res.json()).heart.restingHrSource).toBe('unavailable')
   })
 
   // A delta between a corroborated max and an uncorroborated one is noise wearing a number.
@@ -247,6 +251,14 @@ describe('/api/cardio-week', () => {
 
     expect(body.steps.weekGoal).toBe(body.steps.todayGoal * 7)
     expect(body.steps.weekGoalSoFar).toBe(body.steps.todayGoal * 3)
+  })
+
+  // Q-524: the steps target is the user's own goal when they set one.
+  it('uses the step goal the user set for today and the week', async () => {
+    getUserGoals.mockResolvedValueOnce({ stepsGoal: 7000 })
+    const body = await (await getWeek()).json()
+    expect(body.steps.todayGoal).toBe(7000)
+    expect(body.steps.weekGoal).toBe(49000)
   })
 
   // Q-88: either a lifting session or any logged cardio means today was not a lazy day.

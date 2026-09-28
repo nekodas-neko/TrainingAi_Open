@@ -14,7 +14,8 @@
  */
 import { getRepository } from '@/lib/data'
 import type { OuraDailyDerivedPatch } from '@/lib/data/repository'
-import { todayInTz, todayMidnightUtc, toAestDay, ageFromDob } from '@trainingai/shared/date-utils'
+import { todayInTz, todayMidnightUtc, toAestDay, ageFromDob, shiftDateStr } from '@trainingai/shared/date-utils'
+import { recentDoses, withDoseContext, DOSE_EFFECT_LOOKBACK_DAYS, type RecentDose } from '@trainingai/shared/health/dose-context'
 import { getCurrentPhase } from '@trainingai/shared/phase-engine'
 import { computeVolumeAcwr, ACWR_THRESHOLDS } from '@trainingai/shared/ai-periodization/acwr'
 import { scoreBand } from '@trainingai/shared/health/score-band'
@@ -238,6 +239,10 @@ export interface ReadinessScoreResponse {
   illnessBiomarkers: Partial<Record<IllnessBiomarkerKey, IllnessBiomarker>> | null
   illnessSuppression: number         // readiness points subtracted by the radar (0 unless elevated/fever)
   illnessAdvisory: string | null     // inline copy for the readiness surface, null when nothing to say
+  /** TN-46: vial-dosed administrations in the last few days, newest first. Optional because a cached
+   *  payload from before it existed does not carry it. Context only: no score
+   *  reads it. The advisory above names the latest when a flag is up. */
+  recentDoses?: RecentDose[]
   // Our own derived stress-resilience (stress_resilience_2_2_1) — supersedes the frozen Oura Cloud
   // resilience string. null until enough history accrues (never fabricated).
   ownResilienceLevel: number | null                                          // 1.0-5.0
@@ -341,7 +346,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   const from28dIso  = toAestDay(from28dDate, tz)
   const from7dIso   = toAestDay(new Date(todayMid.getTime() - 7 * 86_400_000), tz)
 
-  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, todayMood, userProfile] = await Promise.all([
+  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, todayMood, userProfile, userGoals, doseEvents] = await Promise.all([
     repo.listBodyMetrics(userId, from28dIso, todayIso),
     repo.listSleepSessions(userId, from28dIso, todayIso),
     repo.getWorkoutSessionsFrom(userId, from28dDate),
@@ -353,6 +358,10 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     repo.getLatestOuraCloudVitals(userId),
     repo.getMoodLog(userId, todayIso),
     repo.getUserById(userId),
+    // Q-524: the step goal the user set, which wins over the activity-level default.
+    repo.getUserGoals(userId).catch(() => null),
+    // TN-46: context for a flagged day, never an input to the score. A failure costs the context only.
+    (async () => repo.listDoseEvents(userId, shiftDateStr(todayIso, -DOSE_EFFECT_LOOKBACK_DAYS), todayIso))().catch(() => []),
   ])
 
   const derivedToday = derivedTodayRows.find(r => r.day === todayIso) ?? null
@@ -451,12 +460,14 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     ageYears,
     sex: userProfile?.sex ?? null,
     activityLevel: userProfile?.activityLevel ?? null,
+    stepsGoal: userGoals?.stepsGoal ?? null,
   })
   // Rolling 7-day strength window (inclusive of today).
   const sessions7dRows = recentSessions.filter(ws => new Date(ws.startedAt).getTime() >= todayMid.getTime() - 7 * 86_400_000)
   const sessions7d = sessions7dRows.length
   const strengthSessionToday = recentSessions.some(ws => new Date(ws.startedAt).getTime() >= todayMid.getTime())
   const volume7dKg = sessions7dRows.reduce((s, ws) => s + ws.exercises.reduce((s2, ex) => s2 + (ex.volume ?? 0), 0), 0)
+  const recentDoseList = recentDoses(doseEvents, todayIso)
   const todayMetrics = bodyMetrics.find(m => m.date === todayIso) ?? null
 
   // Zone-minutes + move-every-hour, from the SAME intraday HR series already fetched above for
@@ -970,7 +981,8 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     illnessScore:             illness?.score                         ?? null,
     illnessBiomarkers:        illness?.biomarkers                    ?? null,
     illnessSuppression:       illness?.readinessSuppression          ?? 0,
-    illnessAdvisory:          illness ? illnessAdvisory(illness.flag) : null,
+    illnessAdvisory:          illness ? withDoseContext(illnessAdvisory(illness.flag), recentDoseList) : null,
+    recentDoses:              recentDoseList,
     ownResilienceLevel:       latestResilience?.resilienceLevel ?? null,
     ownResilienceBand:        latestResilience?.resilienceLevel != null ? resilienceLevelToBand(latestResilience.resilienceLevel) : null,
     ownResilienceConfidence:  latestResilience?.resilienceConfidence ?? null,
