@@ -6,7 +6,32 @@
 > Nothing here was rewritten, reordered or archived: the section moved whole.
 >
 > **The domain-tag grep is unchanged and is why this is ONE file rather than one per pillar.**
-> `grep -n '^### [platform][workouts][readiness] ⚠️ Two sync-pull fields now reach the phone, and no phone has pulled them (LA-137, 2026-09-28)
+> `grep -n '^### .*\[sleep\]' docs/overview/known-issues.md` works exactly as it did against
+> `projectOverview.md`, and the standing rule depends on it. Per-pillar files would have forced an
+> issue tagged `[sleep][platform]` to live in one and go missing from the other.
+>
+> **Resolved issues are NOT here** — they live in
+> [`known-issues-resolved.md`](known-issues-resolved.md). **Grep the archive before concluding
+> something has never been looked at.** An entry moves there only when nothing is still owed: no
+> open work, no pending owner or device check, no un-run follow-up. A fix that shipped but is not
+> device-verified stays in this file, because that check is the outstanding thing.
+>
+> **Adding one:** a new heading carries its `[domain]` tag(s), primary first.
+
+> **This section is the OPEN issues. Resolved ones live in
+> [`docs/overview/known-issues-resolved.md`](../overview/known-issues-resolved.md)** — 53 entries,
+> 1,092 lines, moved out 2026-08-13. **Grep the archive before concluding something has never been
+> looked at**; "we already fixed that, and here is what it turned out to be" is why they are kept.
+>
+> **Striking an issue means MOVING it there, not marking it ✅ in place** (`CLAUDE.md`, Session
+> Wrap-Up step 2). Without that rule this regrows — 72 ✅ entries had accumulated before the first
+> sweep, and 53 of them had nothing outstanding at all.
+>
+> An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
+> check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
+> below.
+
+### [platform][workouts][readiness] ⚠️ Two sync-pull fields now reach the phone, and no phone has pulled them (LA-137, 2026-09-28)
 
 LA-137's pull guard found two fields the client's pull mapper lost:
 - `workout_sessions.session_id`. The server sends it as `programSessionId` and the mapper read
@@ -20,6 +45,14 @@ pull. No device reads the session link today (the push omits it when null, so th
 was never harmed). **Pass test on the S25:** after a pull, a synced workout's local row carries its
 `session_id`, readable through the admin local-DB view, or via any screen that lists workouts
 without error.
+
+### [nutrition][devices] ⚠️ The device's food reads now return the stored picture, and no phone has run them (LA-36, 2026-09-28)
+
+`searchFoodItems`, the recent-foods read and the day's logs now select and map `image_data_uri` on
+the device's SQLite. Nothing renders it yet, so the screen should look the same. What could break is
+the read itself. The queries are plain SQLite and pass on `node:sqlite`, but the Capacitor plugin
+is not that engine. **Pass test on the S25:** open Nutrition, search foods, open Recent, and scroll a
+logged day. All three must list as before, with no error toast and no empty list.
 
 ### [workouts] ⚠️ Offline edits and deletes of logged work now queue, and only a phone can prove it (LA-166, 2026-09-28)
 
@@ -81,31 +114,6 @@ percent by `onBattery`) and nothing in this change is native, but it is the thin
 The 14-day window is a judgement, not a measurement — it is long enough to span several workouts and
 short enough that a replaced cell clears itself, and nothing can detect a cell change because a
 fresh CR2025 and a dying one both read 100 at rest.
-
-### .*\[sleep\]' docs/overview/known-issues.md` works exactly as it did against
-> `projectOverview.md`, and the standing rule depends on it. Per-pillar files would have forced an
-> issue tagged `[sleep][platform]` to live in one and go missing from the other.
->
-> **Resolved issues are NOT here** — they live in
-> [`known-issues-resolved.md`](known-issues-resolved.md). **Grep the archive before concluding
-> something has never been looked at.** An entry moves there only when nothing is still owed: no
-> open work, no pending owner or device check, no un-run follow-up. A fix that shipped but is not
-> device-verified stays in this file, because that check is the outstanding thing.
->
-> **Adding one:** a new heading carries its `[domain]` tag(s), primary first.
-
-> **This section is the OPEN issues. Resolved ones live in
-> [`docs/overview/known-issues-resolved.md`](../overview/known-issues-resolved.md)** — 53 entries,
-> 1,092 lines, moved out 2026-08-13. **Grep the archive before concluding something has never been
-> looked at**; "we already fixed that, and here is what it turned out to be" is why they are kept.
->
-> **Striking an issue means MOVING it there, not marking it ✅ in place** (`CLAUDE.md`, Session
-> Wrap-Up step 2). Without that rule this regrows — 72 ✅ entries had accumulated before the first
-> sweep, and 53 of them had nothing outstanding at all.
->
-> An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
-> check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
-> below.
 
 ### [workouts][platform] ⚠️ A session given an RPE now returns to "synced" on the phone, and only the phone runs it (LA-165, 2026-09-28)
 
@@ -2623,10 +2631,9 @@ sleep. Joined against `sleep_sessions` directly — no clock-hour inference:
   carries little signal — **not** a reason to re-wire the override.
 - **Two further findings from the same measurement are queued, not open issues:** **LA-113** (the
   imputation reads ~⅓ of measured HRV — real but confounded, owner-gated) and **LA-114**
-  (`bucket_start` stores the bucket midpoint — **documented, not fixed**: the rename was attempted
-  and reverted because every historical `claude_ro` view migration names the old column and CI
-  replays them all. `claude_ro` still says `bucket_start`, so a join on the :00/:30 grid needs 15
-  minutes added).
+  (the stress bucket column holds the midpoint; **renamed to `bucket_mid` on 2026-09-28** once
+  BF-214 had removed the view migrations that blocked it. A join on the :00/:30 grid still subtracts
+  15 minutes, but the name now says so).
 - **What shipped (v1.457.2).** `buildDaytimeStressSeriesFromModel` drops sleeping buckets **before**
   `scoreStressPoints`, so they reach neither the levels nor the day-median baseline. The ordering is
   the fix: filtering only the summary would drop them from the count and leave the waking buckets

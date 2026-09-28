@@ -7763,128 +7763,52 @@ drift.
   drifted apart.
 
 
-### [workouts] RV-184 — the AI prescription regenerates at workout open on days the completion already generated it
+### [workouts] LA-177 — the completion-time prescription is generated as if the lifter had trained 0 hours ago
 
-- **Lane: A** — `packages/shared/src/ai-periodization/generate-prescription.ts:303`.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
-- **From `ai_call_log` joined to workouts:** 35 prescription calls, 23 fingerprints.
-  - 10 of the 12 repeats are by design: generation at open, then at completion for the next run.
-  - **On 8 of 20 workout days an open-time generation ran although the previous completion had
-    already produced one.** That is ~2.1 s of *"Preparing your AI workout"* the owner waits through.
-  - Two near-duplicates came within the 30 s cooldown (09-06, 09-16).
-- **Why it cannot be diagnosed today:** the fingerprint is only `{programSessionId, today}`. It
-  leaves out `durationPreset`, `excludeSessionId` and which trigger fired.
-- **Fix:** add those three to the fingerprint, then find why the slot reads pending at open.
-- **⚠ RE-VERIFIED 2026-09-28 (Lane A): the premise is out of date, and the fix above would not find
-  anything.** Three facts against current `main`:
-  ① **Completion no longer generates a prescription.** `packages/shared/src/workout/complete-workout.ts`
-  only marks the slot `consumed`; the old `lib/workout/complete-workout.ts` that regenerated in-process
-  is gone. So the next open MUST regenerate, and "an open-time generation after the completion
-  produced one" describes a design that no longer exists. The only generators today are
-  `workout-data` at open (two call sites, `route.ts:552` and `:572`) and baseline completion.
-  ② **`excludeSessionId` is passed by nothing.** The `/prescribe` route accepts it and no client or
-  server caller sends it, so "which trigger fired" cannot be recovered from it either.
-  ③ **`ai_call_log.fingerprint` is stored as a 16-hex hash.** Adding fields splits the hashes; it
-  cannot make a trigger readable.
-- **What production actually shows (owner's rows, last 14 days, 19 calls):** one call per workout day,
-  plus a second for the same session 35-60 min later on 09-14, 09-15, 09-16 and 09-22, which fits
-  "open, train, reopen", now by design. **The one real anomaly is 09-16: two identical calls 7 s
-  apart**, which the 30 s cooldown exists to collapse. Candidates, unexamined: both `workout-data`
-  call sites firing in one request, or two replicas each missing the other's per-process cache.
-- **Revised next step:** find the 7-second pair's cause before instrumenting. If trigger names are
-  still wanted, they need a plain column (a schema change, so Lane A and after BF-214), not the
-  hashed fingerprint. Separately, `excludeSessionId` is a dead parameter: either wire it to a real
-  completion trigger or delete it with the comments that still describe one.
+- **Lane: B** — `components/workout-screen.tsx`, the post-completion `/prescribe` call (~line 1547).
+  A one-line body on a `components/` call; nothing on the engine side changes.
+- **Added:** 2026-09-28 · Lane A, found while working RV-184 (closed the same day; see its journal entry).
+- **What:** after a workout completes, the client POSTs `/prescribe` with **no body**, so
+  `excludeSessionId` is never sent. `signals.ts` measures `hoursSinceLastSession` from the newest
+  completed session, which is the one that just finished, so it reads about **0 hours**.
+  `shouldTriggerEmergencyDeload` fires on `hoursSinceLastSession < 36 && soreMusclesInSession ≥ 3`.
+  **A lifter who logged three sore muscles that morning is offered an emergency deload for their
+  NEXT session**, built without the model (so no `ai_call_log` row shows it). The parameter exists
+  for exactly this. `generate-prescription.ts` documents it, and the server's old completion path
+  passed it. It was lost when the trigger moved client-side.
+- **Fix:** `body: JSON.stringify({ excludeSessionId: wsId })` with the JSON content type. The route's
+  Zod schema already accepts it. It also puts the call on its own dedup key, which is correct: a
+  completion-path plan is not interchangeable with an open-path one.
+- **Not measured:** whether a spurious deload has actually been offered. That would need
+  `session_periodization` history, which is overwritten in place.
+- **Reversal cost:** none.
 
 ### [app-shell][platform] RV-183 — requests the client sends for data it already has
 
-- **Lane: A** — was `B (callers)`, corrected 2026-09-25 once the caller half was done and the
-  remainder proved to need `lib/sqlite/cache.ts`. Nothing here is Lane B's any more; the lane field
-  is changed so the next B session does not re-derive that from scratch.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Counted from code; RV-186 counts them on the phone.
-- **Every launch and every resume sends 6 reminder-reconcile GETs** (`sync-provider.tsx:253-383`):
-  meal-types, today's food logs, next-session, supplements, readiness-score and body-battery.
-  - Two of them are local-first domains whose data is already on the device.
-  - Three duplicate Home's own fetches.
-  - Readiness alone is 11 parallel reads.
-- **After a food log, the first refetch round is wasted when online.** `logFoodEntries`
-  (`log-food.ts:296-297`) invalidates 13 prefixes before the push, so every server aggregate
-  refetches pre-write data, then refetches again after the push. That is 2N+1 requests where N+1
-  would do; sweep 1 saw 3×2+1. **Offline, and when the push fails, keep the immediate round**
-  (LB-4/LB-132's reason still holds).
-- **⚠ THE EXERCISE-CATALOGUE CLAIM IS WRONG AND IS RETRACTED (LB-147, 2026-09-25).** It is **not**
-  refetched on every Workout tab show. `workout-select-content.tsx:176` passes
-  **`freshWithinTtl: true`** with `TTL_LONG` (6 h), and `cachedFetchCore` returns before any network
-  call when the entry is fresh (`lib/sqlite/cache.ts:306`). The flag has been there since the
-  initial snapshot, and `invalidateExerciseLibrary` — the key's only invalidator — fires on
-  catalogue edits alone. So the ceiling is ~4 fetches a day per device, not one per show. **The
-  3,040 server reads are real and are explained by that ceiling across many days and cold starts,
-  not by a defect.** Read counts do not localise a cause.
-- **`app/more/more-content.tsx`'s comment was false and is FIXED (LB-147).** It claimed
-  *"cachedFetch honours TTL_MEDIUM, so a re-show inside the window costs nothing"*; the TTL governs
-  whether the cached PAINT is used, never whether the request is sent, so a re-show did send 2 GETs.
-  The comment now says so. **The requests themselves remain** — `freshWithinTtl` on
-  `more-user-profile`/`more-seasons` needs the written invalidation proof, which nobody has done.
-- **✅ THE SUPPLEMENT HALF SHIPPED (LB-147), and it was a CORRECTNESS bug, not only waste.**
-  Supplements are CLAUDE.md's named reference for offline-first, so the device holds the truth —
-  yet `sync-provider.tsx` reconciled its reminder notifications from `/api/supplements`. **A
-  supplement added or stopped offline scheduled the wrong reminder until the next pull.** It now
-  reads the local store first, with the API kept as the fallback for the web and for a store that
-  failed to open; an empty local table falls through rather than cancelling live reminders.
-  The local→`SupplementWithStatus` mapping was extracted to `lib/supplements/local-status.ts`
-  because a second copy is precisely BF-112, where the inline one dropped the dose fields and a
-  prompt that worked on the web never fired on the APK.
-- **✅ THE MEAL HALF SHIPPED TOO (LB-147, 2026-09-25) — and "it needs a join" was WRONG.** The
-  previous amendment deferred this saying `reconcileMealReminders` needed a join nobody had built.
-  Reading it rather than assuming: it takes `Pick<FoodLog, 'mealTypeId'>[]` and reads exactly six
-  fields off a meal type, **all of which `LocalFoodLog` and `LocalMealType` already carry**. There
-  is no join. What blocked it was the declared parameter type — `MealType[]` demanded `userId`,
-  `sortOrder`, `timeStartHour` and `createdAt` that the file never reads, so the local row could not
-  be passed without inventing them. Narrowed to `MealTypeForReminders`, and the reconcile now reads
-  the device first. Same correctness point as the supplements: **a meal logged offline kept nagging
-  you to log it** until the next pull.
-  An empty meal-type table falls through to the API (an unhydrated store, not a user with no meals);
-  zero food logs deliberately does NOT, because that is the case the reminder exists for.
-- **⚠ THE REMAINING FETCH HALF IS LANE A's, NOT LANE B's — established 2026-09-25 (LB-149's
-  sibling read), and this entry said the opposite.** All four remaining reads
-  (`next-session`, `readiness-score`, `body-battery`, plus the warm list's own) are
-  **`cachedFetchToday`**, and plain `cachedFetch*` ALWAYS revalidates, so each resume spends a GET
-  on an entry that is already fresh. The one-line fix is `freshWithinTtl` — **and
-  `cachedFetchToday` passes `undefined` for it** (`lib/sqlite/cache.ts:604`, the 7th positional
-  arg), so the flag is unreachable from every today-envelope key. Exposing it is a one-line change
-  in Lane A's file and composes correctly: the today-check lives in the unwrap, the TTL check in
-  `isFreshWithinTtl`.
-  **The two Lane-B-only shapes were both examined and both are wrong.** `getCached()` respects the
-  TTL but returns the raw `{date, data}` envelope, and neither `unwrapToday` nor `TodayEnvelope` is
-  exported — so three call sites would hand-roll a date comparison that is **itself defective**
-  (LB-150). `readTodayCacheSync()` keeps the unwrap in one place but is not TTL-aware, so a
-  health-alert reconcile would act on a reading up to a Brisbane day old. **Do not hand-roll it at
-  the call sites to keep the item in Lane B.**
-- **⚠ THE "ONE-LINE ENABLER" HAS AT MOST ONE LEGITIMATE CALLER — checked 2026-09-28 (Lane A)
-  against CLAUDE.md's RV-67 rule**, which disqualifies `freshWithinTtl` on any payload that is not a
-  pure function of stored rows the client can see being written:
-  - **`body-battery`: disqualified.** It drains with the clock, so its value changes with no writer
-    at all, and no invalidation group could ever catch that.
-  - **`readiness-score`: disqualified.** Its inputs are written server-side by the BLE rollup (sleep,
-    HRV, the derived scores). The client never observes those writes, so no proof can list them.
-  - **`next-session`: possible, not proven.** It is `getNextSession` (program, schedule, logs, rest
-    days, phase) **plus** the stored AI prescription (`getSessionPeriodization`) **plus** muscle
-    assignments. A proof has to show every one of those writers invalidates the key. The
-    prescription is written by the prescribe route and consumed at completion, which makes it the
-    one to check first.
-  - **The warm list's own read** inherits whichever of the above it warms.
-  **So do not expose the parameter on its own.** Ship it only in the PR that writes the
-  `next-session` proof. A flag with no qualifying caller is an invitation to add a disqualified one.
-- **Still open:** `next-session`'s proof (above), and the other Lane A halves
-  (`push-then-revalidate.ts`, `cache-groups.ts`, the 2N+1 post-write round). **On the 2N+1 round,
-  keep the immediate invalidate unless a change also handles a push that moves nothing.**
-  `pushThenRevalidate` revalidates only when `pushed > 0`. With LB-151's single-flight push, a
-  concurrent drain can carry this write and report 0 here, and dropping the immediate round would
-  then leave the screen stale for the key's TTL. One wasted request a log is the cheaper side of
-  that trade.
-- **✅ `LB-148` SHIPPED (2026-09-25):** the three reminder modules timed every notification in
-  Brisbane or in the phone's zone. RV-176's sweep was `.tsx`-only and missed `lib/*.ts`; all 8 sites
-  across the 3 modules now take the user's zone.
+- **Lane: B** — `app/more/more-content.tsx`. Re-laned 2026-09-28: every Lane A half is now shipped
+  or closed with a reason (below), and what is left is two callers on the More screen.
+- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
+- **What is left:** `more-user-profile` and `more-seasons` send 2 GETs on every More re-show.
+  `freshWithinTtl` would stop that, **but only with the written invalidation proof** CLAUDE.md
+  requires. Run the RV-67 purity check first. It has disqualified every other candidate here.
+- **Closed 2026-09-28 (Lane A): the today-envelope keys cannot take `freshWithinTtl`, so the
+  "one-line enabler" in `cachedFetchToday` is NOT to be built.** All three fail RV-67:
+  - `body-battery` drains with the clock.
+  - `readiness-score` is fed by the BLE rollup's server-side writes.
+  - `next-session` fails for the same reason in `ai_dynamic` mode. There, `getNextSession` scores
+    from Oura rows, sleep, body metrics and derived scores over a `Date.now()` window
+    (`adapter.ts`, the `phaseMode === 'ai_dynamic'` branch). The prescription half WAS provable:
+    every client writer (prescribe, respond, transition, check-in) calls
+    `invalidatePrescriptionChanged`, and workout-review apply calls `invalidateProgramStructure` +
+    `invalidateWorkoutSummaries`. But a proof has to hold for every user, and one mode breaks it.
+  A flag with no qualifying caller invites a disqualified one, so the parameter stays unexposed.
+- **Closed: the 2N+1 post-write round stays.** `pushThenRevalidate` revalidates only when
+  `pushed > 0`. Under LB-151's single-flight push, a concurrent drain can carry this write and report
+  0, and dropping the immediate invalidate would then leave the screen stale for the key's TTL. One
+  wasted request per log is the cheaper side.
+- **Shipped earlier:** the supplement and meal reminder reconciles read local-first (LB-147; both
+  were correctness bugs offline), `LB-148`'s reminder time zones, and the exercise-catalogue claim
+  was retracted (it is already `freshWithinTtl` with a proof).
 
 ### [app-shell] RV-185 — every tab downloads 457 kB of JavaScript before first paint; two libraries load eagerly that the first paint may not need
 
@@ -12195,41 +12119,6 @@ Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/202
 - **Verification:** on device, open a session whose prescription has any `deloaded: true` exercise and
   confirm the toggle reads *Deload — As prescribed* with Full offered as *Override*; then a normal
   session and confirm the labels are unchanged from today.
-
-### [readiness][platform] LA-114 — the stress bucket column is named `bucket_start` and holds the MIDPOINT; renaming it is blocked
-
-- **Lane: A** · **Added:** 2026-09-16 · Lane A, from TN-39's validation. **Re-filed the same day**
-  after the rename was attempted and reverted — read the ⛔ below before touching this.
-- **Journal:** [`the attempt and why it failed`](overview/history-2026-09-18-folded-1.md#2026-09-16-lane-a-la114-bucket-mid).
-- **Half-done, deliberately.** `daytimeHrvEstimatesPerBucket` emits `t = bStart + bucketMs / 2` and
-  `run.ts` writes it straight into `bucket_start`, so stored timestamps sit on a :15/:45 grid.
-  **Shipped:** migration 275 (a `COMMENT ON COLUMN`) and the Drizzle property renamed to `bucketMid`,
-  so TypeScript no longer lies. **Not fixed:** `claude_ro` still exposes `bucket_start`, and that is
-  the surface where the defect actually bit.
-- **⛔ DO NOT RE-ATTEMPT THE `ALTER TABLE ... RENAME COLUMN`.** It was written, applied, pushed, and
-  reverted on 2026-09-16; CI's Migration Check rejected it and was right to. The job replays every
-  migration against a schema that already has everything (LA-13), and **every historical `claude_ro`
-  view migration — 213, 215, 218, 221 … 274 — selects `t.bucket_start`**, because each regenerates
-  the full view set. All of them fail after a rename. Editing them is not available: `ensureSchema`
-  tracks by FILENAME, so an edited already-applied migration is skipped forever.
-  - `migrate.js` has a `REPLAY_EXEMPT` map whose single entry is a rename (*"002 renamed the column
-    its `cardio_sessions` FK references"*), so the hatch exists — but using it here means exempting
-    **a dozen** view migrations from the check that caught this, to land a cosmetic fix. That is not
-    a trade worth making, and it is why this entry is not simply "rename it properly".
-  - **The general constraint, which is the reusable part:** a column an earlier migration names by
-    hand cannot be renamed in this repo without exempting every such migration from the replay check.
-- **The one live idea that would reach the surface that matters:** teach
-  `scripts/generate-claude-ro-views.js` an alias map so the view emits `t.bucket_start AS bucket_mid`.
-  Replay-safe — the base table keeps its name, so no historical migration breaks. **Cost:** `public`
-  and `claude_ro` would disagree about the column's name, which is a second naming confusion bought
-  to fix the first. Not obviously right; that is the decision this entry is waiting on, and it is
-  small enough to prototype before proposing.
-- **Until then, the caller adds 15 minutes.** A join against another 30-minute series on the epoch
-  grid returns ZERO rows, which reads as "no overlapping data" rather than "the join is 15 minutes
-  out". It cost an hour on 2026-09-16.
-- **Pass test:** a join written the obvious way against `claude_ro` lands on the right bucket, or the
-  read surface names the column for what it holds.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** the alias decision is a structural call and Lane A's own (owner, 2026-09-22). Prototype the alias map and decide. **Do not retry the RENAME**; it was tried and reverted once.
 
 ### [readiness][devices] LA-113 — the daytime-HRV imputation reads ~⅓ of measured HRV, and its heart-rate slope is ~2× too steep
 
@@ -20564,37 +20453,17 @@ whether or not anyone draws them first.
 
 ### [nutrition][devices] LA-36 — `food_items.image_data_uri` is written to the device and read back by nothing
 
-- **📱 Measured, S25 · web v1.465.10 · APK 1.460.4 · gesture nav · sweep 1, 2026-09-23:** 1 of 339 local `food_items` carries an `image_data_uri` (4.5 KB). The
-  column is real and unread, but the cost on this device is negligible.
-
-- **Lane:** A (the engine) — the miss is in the local-store read mappers; the visible half is Lane B.
-- **Added:** 2026-08-30, found while extracting the local food-item row mapper for BF-38
-
-BF-35 stores a food's picture as bytes rather than a URL, and the reason is in its own comment:
-*"this table is read local-first and mirrored into on-device SQLite, where a URL renders nothing
-offline."* The bytes get there — `upsertFoodItem` writes `image_data_uri` on every create and the
-pull mapping keeps it. **Nothing reads it back.** All three local read paths omit the column:
-
-| read | returns the image? |
-|---|---|
-| `searchFoodItems` (Food Library, ingredient picker, food list) | no |
-| `getRecentFoodItemsForMeal` | no |
-| the item embedded in `getFoodLogs` | no |
-
-The server's `rowToFoodItem` returns it, so **`GET /api/nutrition/food-items` carries the picture and
-the local-first read that supersedes it does not** — which is the device-versus-web divergence the
-Canonical Runtime rule exists to prevent, pointing the wrong way: the canonical runtime is the one
-losing the feature. `saved_meals` is the counter-example in the same file — it stores and reads its
-image (`sqlite-backend.ts` ~2481), which is why saved meals show pictures and foods do not.
-
-**The work is three column reads**, one of them in the shared `foodItemRowToItem` helper BF-38 just
-extracted, which is where the deliberate omission is commented. Deliberately NOT folded into BF-38:
-it is a visible change on two Lane B screens with a memory cost worth stating (20 rows at the
-`FOOD_ITEM_IMAGE_MAX_BYTES` 16 KB cap is ~320 KB per search), and a de-duplication PR is the wrong
-place to start rendering pictures.
-
-- **Device check once it ships** (Review, 2026-09-24): the device gate is removed, because it parked unbuilt work behind a check that can only happen afterwards. Sweep 1 already read the pre-fix state: 1 of 339 rows carries a picture, so the fix is cheap to verify and cheap in memory on this device. After it ships, DV opens the Food Library and confirms that food's picture renders.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** the `saved_meals` counter-example is now at `sqlite-backend.ts:2549/2613`.
+- **Lane: B** — the render. Re-laned 2026-09-28: the engine half is done (below).
+- **✔ ENGINE SHIPPED 2026-09-28 (Lane A):** every local food read now returns `imageDataUri`:
+  `searchFoodItems` (through `foodItemRowToItem`), the recent-foods read, and the item embedded in
+  `getFoodLogsWithItems`. The server's `rowToFoodItem` always did.
+  `la36-food-item-image-local-read.test.ts` runs on an in-memory SQLite and fails on all three with
+  the fix reverted.
+- **What is left (Lane B):** nothing renders a food item's picture in a list yet.
+  `diary-meal-group.tsx`'s `MealThumb` is the saved-meal shape to copy. Mind the memory: at the
+  16 KB `FOOD_ITEM_IMAGE_MAX_BYTES` cap, 20 search rows are ~320 KB. The device measured 1 of 339
+  local foods carrying a picture on 2026-09-23, so today's cost is negligible.
+- **Added:** 2026-08-30, found while extracting the local food-item row mapper for BF-38.
 
 ### [nutrition] LB-18 — `Recent` on Log Food is scoped to a meal bucket; it may want to be global
 

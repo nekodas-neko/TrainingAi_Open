@@ -940,7 +940,7 @@ CREATE VIEW claude_ro.oura_daytime_stress_buckets AS
 SELECT
   t.user_id,
   t.day,
-  t.bucket_start,
+  t.bucket_mid,
   t.level,
   t.updated_at
 FROM public.oura_daytime_stress_buckets t
