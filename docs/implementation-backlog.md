@@ -6629,6 +6629,10 @@ drift.
     per page life, from a **module-level** guard (`reset()` remounts the boundary, so a state or ref
     guard would reload forever). The first, transient failure is deliberately not reported; a
     persistent one comes back with the retry spent and is.
+  - **⚠ ITS EFFECT IS UNMEASURED AND CANNOT BE MEASURED YET (2026-09-28).** Both runs since it
+    landed hit the 45-minute cap (`LB-166`, updated with the figures), and **a capped run uploads no
+    `playwright-report` artifact** — so the retained first attempts this entry's whole method depends
+    on do not exist. The next census waits on `LB-166`.
   - **This does NOT close the entry.** It removes the cause's *effect* on a spec run, and the other
     two candidates remain open — building for E2E is still the structural answer to `next dev`
     compiling on demand, and it is `.github/` rather than this lane's. Whether the churn drops is
@@ -8923,6 +8927,33 @@ drift.
   a separate entry, conditional on this pass test** — file it then, with the measurement in hand.
 
 ### [platform] LB-166 — the full E2E suite no longer fits its 45-minute job limit, and it reports as `cancelled`
+- **⚠ BACK OVER THE CAP, MEASURED 2026-09-28 — and the margin `LA-176` bought back has been spent,
+  partly by me.** Two consecutive runs hit it: **#1926's head — 17:12:55 → 17:59:36, 46m41s**, and
+  **#1927's — 17:32:01 → 18:17:18, 45m17s**. Both report `cancelled`. Against the three censuses
+  taken earlier the same day at **35.5 / 36.3 / 36.6 min**, that is a ~9–10 minute regression inside
+  one day.
+- **⛔ AND THE CONSEQUENCE IS WORSE THAN A SLOW JOB: a run killed at the cap uploads NO artifact.**
+  Run `36458784138` has **zero** artifacts, because the cancel lands before the upload step. So the
+  `playwright-report` that `LB-178`'s whole method now depends on — it holds the retained FIRST
+  attempt of every flaky test — does not exist for a capped run. **E2E is not merely advisory now;
+  it produces no signal at all**, and the census that would measure `LB-184`'s effect cannot be
+  taken until this is fixed.
+- **Where the time went, honestly: this lane added four spec files on 2026-09-28** —
+  `lb163-log-tiles-three-column` (1 test), `la136-home-sleep-feel-line` (2),
+  `tn82-checkin-announce-and-correct` (3), `rv119-home-banner-strip` (1). Seven tests, each driving
+  a full Home load, measured locally at roughly **1.2–1.6 min per file**. That is most of the
+  regression. Each is justified on its own entry; the suite has no budget line, so nothing stopped
+  them collectively crossing the ceiling.
+- **`LB-178`'s own note is what dates the margin:** *"at 36.3 min the suite finished UNDER the
+  45-minute cap, where it had been hitting it. Six specs that each burned a timeout before failing
+  were most of the difference, so clearing `LA-176` bought back roughly the margin the cap was
+  eating."* That margin is gone, and it was about nine minutes wide.
+- **⚑ THE REAL LESSON IS THAT A SUITE WITH NO BUDGET GROWS UNTIL IT BREAKS.** Raising the cap buys
+  another few months of the same. Sharding E2E the way `Tests` is already sharded (four jobs, a
+  rollup) is the structural answer and is what this entry should build; it also makes a capped run
+  impossible rather than merely less likely. Whichever is chosen, **a per-PR check on total E2E
+  wall-clock belongs with it**, or this recurs silently — the tell is a `cancelled` that ran ~45
+  minutes, which looks exactly like the harmless superseded-push kind.
 - **Lane: B** (`.github/workflows/ci.yml`'s E2E job, `playwright.config.ts`, the `e2e/` suite).
 - **Added:** 2026-09-27 · measured on PR #1760, which was waiting for the advisory E2E it touched.
 - **Measured, run 36297501624:** E2E started **05:32:32Z**, killed **06:17:48Z** — **45m16s** —
