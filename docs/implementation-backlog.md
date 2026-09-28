@@ -828,6 +828,193 @@ below threshold and left in place for next time.
   its session, or block the save with a message naming the style-less exercises. The server
   already accepts either shape.
 - **Evidence it is not a save-path loss:** see the 2026-09-29 journal entry for BF-217.
+### [workouts] BF-219 — Cable Preacher Curl has been prescribed 13.75 kg four times and returned RPE 10 three of them, with the reps falling 9 → 8 → 7 → 6
+- **Lane:** T — a load-selection calibration, so a Tuning proposal is owed before anyone builds it. Implementation lane afterwards is A (`packages/shared/src/1rm.ts`, `packages/shared/src/ai-periodization/`).
+- **Added:** 2026-09-29 · BugFix intake. Owner, mid-set on Pull: *"This was too heavy for me. What is the role of this exercise? Should be accessory."*
+- **Needs:** — nothing.
+
+- **The role is already `accessory`, so that is not it.** Confirmed in production
+  (`session_exercises.exercise_role = 'accessory'`, position 3, style `Hypertrophy 3-set`). The
+  badge on his card was correct. The load is what is wrong, and the history says so plainly.
+
+- **13.75 kg is not a new load. It is a load he has failed at, three times.** Every
+  `Cable Preacher Curl` set on record:
+
+  | date | sets | RPE | prescribed pct |
+  |---|---|---|---|
+  | 2026-08-21 | 13.75 × 9, 13.75 × 8 | 9, **10** | 70.5 |
+  | 2026-08-27 | 15 × 5, 15 × 4 | 9, 9 | 75 |
+  | 2026-09-04 | 10 × 8, 10 × 8 | 6, 6 | 52 (deload) |
+  | 2026-09-06 | 13.75 × 7 | **10** | — |
+  | 2026-09-13 | 12.5 × 9, 10 × 13 | **10**, 9 | 70.5 |
+  | 2026-09-21 | 11.25 × 12, 11.25 × 12 | **6**, **6** | 66 |
+  | **2026-09-29** | **13.75 × 6** | **10** | **77.5** |
+
+  **The reps at 13.75 kg go 9 → 8 → 7 → 6 across five weeks, at RPE 9–10 every time.** Nothing in
+  the prescriber consults that. It resolves a pct against a stored 1RM and rounds.
+
+- **Autoregulation did NOT cause the jump, and this is worth stating because it is the obvious
+  suspect.** The push branch returns `pctMultiplier: 1` on **every** path
+  (`autoregulation.ts:86–107`) — it adds a rep or a set, never load. So the 66 → 77.5 move came
+  from the plan, not from his easy 09-21 session.
+
+- **It corrected itself in NINE MINUTES, not next week — this entry said next week and that was
+  wrong** (corrected 2026-09-29 08:20, same session). Today is RPE 10 *and* 6 of 7 reps, so
+  `missedReps` is true and `rpeDelta ≥ 1.5` and the back-off fires (`:65–77`) — but completing the
+  workout regenerates the next prescription in-process (`lib/workout/complete-workout.ts`), so it
+  ran at **`22:16:34Z`**, nine minutes after his screenshot. **Cable Preacher Curl now reads
+  `66% × 12`**, back at the accessory band's light edge. The correction loop is faster than
+  described and the description should not have been written from the autoregulation code alone
+  without checking when it runs.
+  **What stands is the oscillation, and the table is still the evidence**: 66% → RPE 6 (too light)
+  → plan raises to 77.5% → RPE 10 (too heavy) → back to 66%. That is a return to the load he
+  already found too easy, not a settling, and five weeks of this have produced no intermediate
+  value. **What the swing has never visited is the middle of the band** — see BF-221, which is why
+  the heavy end was reachable at all.
+
+- **The 1RM is the number to examine first.** Stored `estimated_1rm` was **17** after 09-21, and
+  the card showed **17.25**. But 09-21 was `11.25 × 12 at RPE 6` — a set he stopped because 12
+  reps was the prescription, not because he was near failure, and `prescriptionFactor`
+  (`1rm.ts:54`) exists precisely to make "hit the prescription exactly" reproduce the previous
+  1RM. So an RPE-6 capped set carried the estimate forward unchanged. Read back from today's
+  genuine failure set instead — `13.75 × 6` at RPE 10 is a true 6RM, giving `repFactor(6) = 1.181`
+  → **≈ 16.2 kg**. The stored figure is ~6% high, and 6% at 77.5% is most of the gap between
+  RPE 8 and RPE 10 on an accessory.
+
+- **The question for Tuning, stated as a proposal brief.** RPE is logged, dense and here clearly
+  informative (6 versus 10 on the same exercise three weeks apart) — which is itself worth noting
+  against **Q-290**'s finding that logged RPE carries almost no information (sd 0.87, effectively
+  two values). On *this* exercise it separates cleanly. Candidate directions, none chosen here:
+  ① let a **capped set at low RPE** move the 1RM estimate less than a set taken near failure, so an
+  RPE-6 prescription-matched set stops anchoring it; ② give load selection a **memory of loads
+  that have previously returned RPE 10**, which is the thing a human coach would obviously use and
+  nothing currently does; ③ widen `RPE_DEAD_BAND` or damp the plan's pct moves so the oscillation
+  decays instead of alternating.
+  **A proposal must state how many other days it moves**, per the standing rule — this exercise is
+  one of 25 and the same estimator feeds all of them.
+
+- **Not diagnosed here.** Whether the 66 → 77.5 change came from the model or the rules prescriber.
+  The stored plan is the AI one (`Accumulation`, confidence 80%), but which component chose the pct
+  was not traced, and it decides whether this is a prompt problem or a formula problem.
+
+### [workouts] BF-220 — he told the app the set was too heavy and the next set did not move: RPE reaches nothing until the following week's prescription
+- **Lane:** B — `components/workout-screen.tsx`, `components/workout/active-workout-screen.tsx`. The shared decision function already exists; nothing new is needed in the engine for the minimal version.
+- **Added:** 2026-09-29 · BugFix intake. Owner, mid-rest on Pull: *"This was too heavy for me … would be nice to be able to tell coach then and there if thats on the list of possibilities."*
+- **Needs:** — nothing. Shares a cause with BF-219 but is separately buildable and separately useful.
+
+- **He already told it, which is the part that makes this worth building.** He logged set 1 as
+  `13.75 kg × 6` at **RPE 10 · Maximum** against a prescribed 7. The next card on the same screen
+  still read **`2 · 13.75 kg × 7 reps · ↑ up next`** — unchanged. The signal he is asking to send
+  is one the app already captured and then did nothing with for a week.
+
+- **Confirmed: there is no within-session reaction to RPE at all.** `computeRpeAdjustment`
+  (`autoregulation.ts:56`) has exactly **two** call sites in the repo — its own definition and
+  `autoregulation.ts:141` — and that runs at prescription-generation time. No workout-screen path
+  consults RPE for anything. So the answer to *"is that on the list of possibilities?"* is that it
+  is not currently possible, not that it is hard.
+
+- **The rule that would fire is already written and already agrees with him.** Today's set meets
+  the back-off condition exactly — `rpeDelta ≥ RPE_DEAD_BAND` **and** `missedReps` (6 of 7) — and
+  would return *"−N% load — RPE ran high and you fell short of the prescribed reps"*
+  (`:65–77`), sized 5–10% by how far the reps fell short. **The app knows the set was too heavy the
+  moment he logs it.** It just waits until next week to say so.
+
+- **⭐ Recommend the smallest version: offer, do not apply.** After a logged set whose RPE and rep
+  completion trip the existing back-off condition, show a one-tap suggestion on the next set card —
+  *"That was RPE 10 and 6 of 7. Drop set 2 to 12.5 kg?"* — pre-filling the weight dial rather than
+  changing the plan. Why this shape:
+  - It reuses `computeRpeAdjustment` unchanged, so the in-session answer and the next-week answer
+    can never disagree — which they would the moment a second rule was written for the same job.
+  - It never silently rewrites a session he is in the middle of. A suggestion he ignores costs him
+    one glance; an automatic change he did not want costs him the set.
+  - It is a client-side read of data already on screen. No route, no schema, no model call, works
+    offline — which matters, because this fires in a gym.
+- **Alternatives, with what each is better at:**
+  - **Apply it automatically.** Better at getting the load right for someone who will not tap.
+    It loses because the first time it drops a load he wanted to keep, he stops trusting the
+    number on the card — and this is the screen he cannot afford to distrust.
+  - **A free-text "tell the coach" box mid-workout.** Better at capturing *why* (an injury, bad
+    sleep, a machine at a different setting) which RPE alone cannot express. It loses as the
+    FIRST thing to build: it needs a model call in a gym with bad signal, and it asks him to type
+    between sets to say something the RPE picker already said in one tap. Worth its own entry
+    later, not this one.
+  - **Feed it into the NEXT exercise too, not just the next set.** A reasonable extension, and
+    deliberately out of scope until the single-exercise case has been used for a few sessions —
+    one exercise feeling heavy is weak evidence about the next one.
+- **Reversal cost: low.** A suggestion chip behind a condition that already exists; deleting it
+  removes the feature and nothing else.
+
+- **Done when** a set logged at high RPE that misses its prescribed reps produces a visible,
+  dismissible load suggestion on the next set card of the same exercise, the number matches what
+  `computeRpeAdjustment` would apply next week, and declining it leaves the session untouched.
+  **Device look owed** — this is a screen he reads mid-set with a rest timer running, so the
+  suggestion must not shift the layout or compete with `Start Set 2`.
+
+### [workouts] BF-221 — the accessory rep band is advice to the model and a constraint on nothing: 7 reps at 77.5% is outside it on both axes
+- **Lane:** A — `packages/shared/src/ai-periodization/generate-prescription.ts:591` and the accessory branch at `:594–598`.
+- **Added:** 2026-09-29 · BugFix intake. Owner, reading his own Pull card: *"If its accessory shouldn't it have reps towards the 12+ rep range?"*
+- **Needs:** — nothing. Shares a symptom with BF-219; this is the code half and is buildable now.
+
+- **He is right, and the band is explicit.** His active program `Bankai` is `powerbuilding`, and
+  `goalRange('powerbuilding', 'accessory')` returns **66–75% · 8–12 reps** (run, not read —
+  `ACCESSORY_SPEC` is `{ repMin: 8, repMax: 12, targetRpe: 8.0 }`, `goal-ranges.ts:35`). He was
+  prescribed **77.5% × 7**: below the rep floor AND above the pct ceiling.
+
+- **The two violations are ONE violation, and that is the insight.** The accessory branch derives
+  load from the target effort at whatever reps it was handed:
+  `pct = pctForExpectedRpe(accessoryTargetRpe(goal), a.reps)` (`:597`). Holding RPE 8 constant,
+  fewer reps means heavier — so **dropping below the rep floor mechanically pushes the load above
+  the pct ceiling**. Fixing the reps fixes the load for free; fixing the load alone would leave
+  the rep count wrong and reintroduce the same pct next time.
+
+- **Nothing enforces the band on this path. Measured, by following every consumer of
+  `goalRange`** — there are three:
+  | consumer | what it does |
+  |---|---|
+  | `prompt.ts:96` | puts the range in the **prompt**. A request to the model, not a constraint. |
+  | `autoregulation.ts:150` | `clamp(ex.reps + adj.repDelta, band.repMin, …)` — **only when `adj.repDelta !== 0`**, i.e. only when an autoregulation adjustment actually fires. |
+  | `builder-review.tsx:566` | display only. |
+  Otherwise `ex.reps = a.reps` (`:591`) takes the model's number **unchecked**, and the accessory
+  pct clamp is `Math.min(85, Math.max(40, pct))` — **40–85, not the band's 66–75**.
+
+- **The primary and secondary branches DO clamp; the accessory branch is the only one that does
+  not.** Both others call `clampPrescribedPct(a.pct, exZone)` against
+  `intensityZoneForRole(...)` (`:605–620`) — whose own comment calls it "this clamp". The
+  accessory branch skips it by design, because accessories float to an RPE target rather than a
+  fixed band. **That design is sound and is not what this entry argues against.** The gap is that
+  floating the LOAD was implemented without ever constraining the REPS it floats against.
+
+- **It is live on a second exercise right now.** Read at 2026-09-29 08:20 from the prescription
+  regenerated at `22:16:34Z`: **Pull-Up, accessory, 77.5% × 7** — the same out-of-band pair, still
+  pending. Face Pull sits at `66% × 12`, the band's light edge, and is in band.
+
+- **⭐ Recommend clamping reps to the band at `:591`, before the pct is derived.** One line, the
+  same `clamp(a.reps, band.repMin, band.repMax)` that `autoregulation.ts:150` already applies on
+  its own path — so the constraint reads identically wherever it appears, and the accessory pct
+  then lands inside 66–75 on its own with no second clamp to keep in sync.
+- **Alternatives, with what each is better at:**
+  - **Tighten the accessory pct clamp to the band** instead. Better at bounding the load directly,
+    which is what the lifter feels. It loses because it treats the symptom: the reps stay wrong,
+    the derived pct gets overridden, and the prescription then claims an effort it is not
+    delivering — worse than the current state, which is at least self-consistent.
+  - **Strengthen the prompt.** Cheapest, and better if the model is usually right and rarely
+    strays. It loses because a prompt cannot be a guarantee, and this band is the kind of thing
+    that should hold whatever the model returns — the primary and secondary branches already made
+    that judgement.
+  - **Reject and re-ask the model on an out-of-band plan.** Better at preserving the model's
+    intent. It loses on cost (a second call, in a gym) to reach a number a clamp produces for free.
+- **Reversal cost: low.** One clamp, removable in a line; the band already exists and is already
+  the authority elsewhere.
+
+- **Done when** an accessory in a `powerbuilding` program cannot be prescribed outside 8–12 reps,
+  the derived pct consequently lands inside 66–75 with no additional clamp, and a regression test
+  feeds a deliberately out-of-band model response through and asserts both.
+
+- **Not diagnosed here.** Why the model chose 7 for two accessories while giving Face Pull 12. All
+  three are accessories in the same session and the prompt carries the same band for each; Face
+  Pull is also the one with **no progression style** (BF-217), so the difference may be a style
+  effect rather than a model whim. Worth one look before assuming the prompt is at fault.
+
 ### [platform] BF-214 — the `claude_ro` twin is 92% of the migration corpus, and it is why migration numbers collide twice as fast as they need to
 
 - **✅ BOTH HALVES SHIPPED.** ① (2026-09-27, owner's yes): the views are one generated file,
@@ -2128,77 +2315,6 @@ below threshold and left in place for next time.
 - **Shipped:** `scripts/e2e-ui-touched.js`, `scripts/__tests__/e2e-ui-touched.test.ts` (17 tests, 4
   new). `Ran 78 of 78` Custom Rules steps.
 
-### [platform][app-shell] RV-221 — what Review sweeps 60–64 need from the owner before or while they are built
-- **✅ ITEMS 1 AND 2 CLOSED 2026-09-28. Only the merge-time yes remains.**
-  **① RV-213's mockup is no longer owed** — it was drawn on 2026-09-27 and the owner **DECLINED**
-  the change (*"I like the original look; it shows the grouping nicely with the space"*), which is
-  recorded on `RV-213` as a Nutrition design principle rather than a bare no. Nothing further.
-  **② The calorie target is answered** by rejecting the three-number premise; it is `OR-191` now.
-  **③ Unchanged and still the only live item:** a merge-time yes on the six security fixes
-  (`RV-191`, `RV-190`, `RV-192`, `RV-193`, `RV-195`, `RV-196`) **as each PR goes green — not now.**
-- **✅ STANDING YES GIVEN 2026-09-28 — the four built security PRs merge on green WITHOUT coming
-  back to him.** `#1912` (RV-191, feedback-screenshot validation), `#1914` (RV-190, rolled-back
-  admin queries), `#1916` (RV-193, refresh token in the encrypted JWT) and `#1915` (RV-197,
-  dev-only WebSocket CSP).
-  **⛔ The yes is CONDITIONAL on two things, and neither is the merge button.** Each PR merges only
-  when its required checks are green **and** the pre-merge check it names in its own body is done —
-  `#1912` still owes an authenticated `pnpm dev` pass of the admin panel, which no CI job covers.
-  **It does not extend to `RV-192`, `RV-195` or `RV-196`, which are not built**; those come back
-  when they are, and `RV-192` additionally carries a product option (dropping password sign-up)
-  that is a separate question.
-  **This is the security carve-out being spent deliberately, not bypassed** — he was shown the four
-  and what each changes, and chose a standing yes over four interruptions.
-- **⚑ ALL SEVEN ARE BUILT. ONE PR EACH; review these (corrected 2026-09-29):**
-  - **RV-190** → **#1672**: every read-only query runs in a rolled-back transaction, reset on the way
-    in, and mutation-tested;
-  - **RV-191** → **#1671**: images are validated by their bytes (feedback and avatar), and the admin
-    thumbnail zooms in place;
-  - **RV-192** → **#1779**: an invite is not proof of the inbox, and linking Google clears the
-    password;
-  - **RV-193** → **#1781**: the refresh token is read server-side, never from the session;
-  - **RV-195** → **#1784** (② deleted users) **+ #1930** (① mobile sign-in bound to its tab, ③
-    pending friend requests masked);
-  - **RV-196 + OR-159** → **#1755**: native dialogs for the ring key (now including `setKey`),
-    uploads limited to the app's origin, and the cookie **and ring key** kept out of backup. Needs an
-    APK;
-  - **RV-197** → **#1789**: WebSockets are allowed by the CSP only in dev.
-- **⚠ DUPLICATES, DO NOT REVIEW: #1912, #1914, #1915, #1916 and #1931.** A Lane A session on
-  2026-09-28/29 rebuilt RV-190/191/193/197/192 without noticing the PRs above, and listed its own
-  here. Each is a strictly weaker copy of the original, compared diff by diff. They should be
-  closed; closing waits on the owner's OK, per the PR-closing rule. The session's two genuine
-  additions were folded into #1930 and #1755 instead.
-- **✅ PARTLY ANSWERED 2026-09-27 — item 2 is answered by rejecting its premise; item 1 is routed; item 3 is unchanged.**
-  - **② the daily calorie target: he wants ONE number, and it is none of the three offered.**
-    Verbatim: *"I just want one number the correct one - the one thats rmr + live activty +/-
-    deficit for weight goal"*. **Filed as `OR-191`** with the measurement and the blocking input
-    (`RV-164`'s 1,618-vs-1,660). This item is closed here; do not re-ask it.
-  - **① RV-213's mockup: still owed, and it is now UNGATED** — the mockup is the work, and the gate
-    was parking it. **It ships in one sitting with `LB-163` and `LA-136`**, three Home/Nutrition
-    mockups owed to one person.
-  - **③ the six security fixes: unchanged** — still a merge-time yes as each PR goes green, not now.
-
-- **Lane: O** — the Orchestrator collects these. Nothing here blocks an implementer from starting; each item says when it is needed.
-- **Added:** 2026-09-26 · Review, closing out sweeps 60–64 at the owner's instruction: *"if anything requires me for building, mark it for ORC."*
-- **1. RV-213: a mockup, before it is built.** Empty meal slots on Nutrition take a full card each, with two add controls. Lane B produces a before/after at 384 px, and the owner says yes or no.
-  - **Recommendation:** one compact row per empty meal, with its name and a single `+`.
-  - The same shape as RV-207 ⑥'s Log-tile mockup (the Lane O entry Lane B split out). **Show both in one sitting.**
-- **2. RV-218: which number is the day's calorie target.**
-  - The ring shows 1,534 (resting plus movement). The explainer names a goal of 1,660 and a budget of 1,356.
-  - **Recommendation:** the ring shows the budget the explainer already defends. The goal stays as the reference line, and the third number goes. The owner confirms which one he reads as "today's target".
-  - RV-218's copy bugs ("205 workouts", "-1,694 deficit", missing zero days) need no answer and can ship first.
-- **3. A merge-time yes on the security fixes.** These are needed **when each PR is green, not now**:
-  - **RV-191** (the feedback screenshot);
-  - **RV-190** (admin query session state; build it before OR-138);
-  - **RV-192** (registration). **It also carries one product option:** drop password sign-up entirely, since every current user signs in with Google. The recommendation is to keep it and verify email.
-  - **RV-193** (refresh token in the session);
-  - **RV-195** (three low auth gaps);
-  - **RV-196** (the ring-key plugin; needs an APK).
-- **Already asked elsewhere, listed so nothing is lost:**
-  - **RV-199 ②:** the GitHub "keep my email private" setting, which only the owner can flip.
-  - **RV-65:** whether the prescription keeps its model call, which is gated on the owner in Lane A.
-  - **OR-176** is answered: a standing yes for DV's three settings probes.
-- **Remove this entry** when 1 and 2 are answered and the six fixes have merged or been declined.
-
 ### [platform] RV-161 — five owner decisions the reads just made answerable
 - **✅ CLOSED 2026-09-28 — the last item is answered: PS-17 MOVES UP, and stays up.**
   He confirmed the 2026-09-25 promotion rather than reversing it: a phantom afternoon *"sleep"*
@@ -3219,26 +3335,6 @@ which is the right shape for something that can only be validated by living with
   `packages/shared/src/health/daytime-stress-thresholds.ts` (the derived buckets),
   `docs/superpowers/plans/2026-09-21-body-battery-rate-balance.md` §4 (the de-weighting argument).
 
-### [nutrition][sleep] LB-182 — the nutrition prompt is never told what he said about his sleep
-
-- **Lane: A** — `app/api/**`, which is Lane A by the path rule. Filed out of `LA-136`, whose Home
-  half shipped 2026-09-28; this is the half that entry deliberately did not decide separately.
-- **Added:** 2026-09-28 · Lane B, on shipping `LA-136`.
-- **The cheap half of LA-136, and the reason it is its own entry.** The route already runs a
-  `Promise.all` of repository reads, so `listDayCheckins` + `answeredMorningScales` is close to one
-  more line. What makes it not a rendering fix is that it changes **what the model is told about
-  him**, which is a different kind of change from putting a number on a screen.
-- **⛔ It must go through `answeredMorningScales`, never the raw column.** The sheet writes a neutral
-  `3` for a scale he never tapped, flagged `sleepQualityFeelTouched: false`. Four earlier readers in
-  this repo took the column directly and were calibrating, plotting and displaying **78 values
-  nobody gave**; telling an LLM he reported a night he never rated is the same bug with a worse
-  blast radius, because the model will then reason from it in prose.
-- **Recommendation, not a question for the owner: include it.** The prompt is already given other
-  self-reports, this is his own words about the thing the advice is partly for, and it is one line
-  to remove if the advice gets worse. A cheap reversible change does not need his sign-off — but if
-  the nutrition advice starts leaning on sleep in a way he dislikes, that IS his call and this is
-  the line to pull.
-
 ### [platform] RV-188 — production has not deployed 22 merges, including tonight's fixes: unblock the Railway build, then take it off the memory boundary
 
 - **Lane: A** — `package.json` `build` script, `next.config.ts`.
@@ -3336,48 +3432,6 @@ which is the right shape for something that can only be validated by living with
      them. The implementer checks them locally with a migration-free script. **Any delete of a
      production row is the owner's call.**
 
-### [platform] RV-192 — registration does not verify email, and Google sign-in links onto the unverified account
-- **Lane: A** — `app/api/auth/register/route.ts`, `auth.ts` signIn callback, `createEmailUser`.
-- **⚠ AUTH — the owner confirms before this merges.**
-- **Added:** 2026-09-24 · Review sweep 60.
-- **What:**
-  - Registering with an email that has been **invited but not yet registered** activates the account
-    immediately (`isActive = isInvited(email)`). Nothing proves the registrant owns that inbox.
-  - When the real person later signs in with Google, the signIn callback links Google onto that
-    existing password account. The password that created the account keeps working.
-- **Who and what:** anyone who knows an invited address can take the invite. When the invitee then
-  signs in with Google, they land in an account whose password someone else holds. The owner's own
-  account is not exposed, because registering an existing email returns 409. Reasoned from source;
-  not executed.
-- **Fix shape (recommended first):**
-  1. Do not treat an invite as proof of email ownership. A password account stays inactive until the
-     email is verified.
-  2. When Google links onto a password account, clear `password_hash` unless the email is verified,
-     or require the password before linking.
-- **Alternatives:** drop email and password registration and keep only Google, since every current
-  user signs in with Google. That is simpler, but it is a product choice, so it goes to the owner.
-- **✅ BOTH HALVES OF THE TAKEOVER PATH ARE CLOSED (Lane A, 2026-09-27) — but NOT by verifying
-  email, because there is nothing in this repository that can send one.** `createEmailUser` no
-  longer defaults `isActive` to `isInvited(email)`; a password account starts inactive and the owner
-  activates it. `linkOAuthAccount` clears `password_hash` as it links. Google sign-in still honours
-  the invite through `upsertUser`, and that stays right: **Google has verified the address, so there
-  the invite IS being matched against a proven owner.** The asymmetry is the whole fix.
-- **Why clearing the password is safe rather than destructive.** It runs only on the FIRST Google
-  sign-in for a row with no `oauthSub`, and the person triggering it is signing in with Google at
-  that moment, so they are not locked out. The owner's own account already carries an `oauthSub`, so
-  the branch cannot fire for him. `auth.ts:57` already returns null on a falsy hash, so a cleared
-  password is a refusal and not an empty one — pinned by a test, because the fix would be worse than
-  useless if null meant "no password required".
-- **How this survived a test file named for it.** `lib/__tests__/register-inactive.test.ts` is
-  titled *"accounts must start inactive/pending"* and asserts that the **route** passes no `isActive`
-  override — leaving activation to `isInvited`, which is the defect. A test named for a property,
-  asserting something weaker.
-- **Keep: fix 1 as the entry actually words it — real email verification — is NOT done, and it is
-  the owner's.** It needs a mail provider (none exists: no nodemailer/Resend/SES anywhere), a
-  secret, a token table and a verification screen. **Ask him the product question first**, because
-  the entry's own alternative may be the answer: every current user signs in with Google, so
-  dropping password registration outright would close this without building any of it.
-
 ### [app-shell][platform] LA-162 — after RV-192, the "Account created" toast tells an invited registrant the wrong thing
 - **Lane: B** — `app/sign-in/email-sign-in.tsx`, and possibly `app/register/register-form.tsx`.
 - **Needs: RV-192**
@@ -3393,35 +3447,6 @@ which is the right shape for something that can only be validated by living with
   calling the router by hand did. Fast Refresh rebuilds were logged around each submit, so it may
   be a dev-only artefact. It needs one run against a production build before anyone treats it as a
   bug, because if it is real the toast above is never seen at all.
-
-### [platform] RV-193 — the Google refresh token is copied into the session JSON that page scripts can read
-- **Lane: A** — `auth.config.ts:51`, `app/api/log-calendar-event/route.ts:22`.
-- **⚠ AUTH — the owner confirms before this merges.** The change is one line.
-- **Added:** 2026-09-24 · Review sweep 60.
-- **What:** the refresh token belongs in the encrypted, httpOnly JWT, and it is there. It is **also**
-  copied to `session.refreshToken`, which `GET /api/auth/session` returns to page JavaScript. No
-  client code uses it; its only consumer runs on the server.
-- **Impact:** needs script execution in the app's origin, which is exactly what RV-191 provides. The
-  token is long-lived, can write to Google Calendar, and outlives sign-out.
-- **Fix:** delete the line. Read the token server-side with `getToken()` in `log-calendar-event`.
-- **✅ SHIPPED (Lane A, 2026-09-27) — and it is not one line.** The line is gone from
-  `auth.config.ts`'s session callback and from the `Session` interface in `types/next-auth.d.ts`;
-  the JWT keeps it. The route reads it through a new `lib/auth/session-token.ts`.
-- **Why a shared module rather than a `getToken()` call in the route.** Auth.js derives the
-  decryption **salt from the cookie NAME**, so `secureCookie` is load-bearing: get it wrong and
-  every valid token reads as invalid, the route answers a plain 401, and every workout completion
-  stops reaching the calendar with nothing in the logs. That exact pairing was already solved in
-  `bearer-session.ts` and commented on in `request-error.ts`; a second hand-rolled copy is how it
-  drifts. `bearerSession` now calls the shared reader too.
-- **Both halves are tested against a REALLY encrypted token**, not a mocked decode: one that the
-  session the browser receives no longer carries the claim, driven through the real
-  `authConfig.callbacks.session`; one that the server still reads it back from a cookie minted with
-  `encode()`. The second is the test that would catch the silent death above.
-- **`bearerSession` builds its session by running that same callback**, so the mobile path loses the
-  claim identically — deliberate, and worth stating because it is not visible from the diff.
-- **The route's authorisation semantics are unchanged**: no refresh token is still 401, which is
-  what a signed-in user who never granted the calendar scope gets. A second test now pins the
-  signed-out case separately, because the two conditions became independent.
 
 ### [app-shell] LA-181 — a friend request you sent shows as "Unknown" with Accept/Decline buttons that cannot work
 
@@ -3440,51 +3465,6 @@ which is the right shape for something that can only be validated by living with
     for an outgoing row by design.
 - **How to check it:** `pnpm dev` with two local users: send a request, and confirm the sender sees
   "Request sent" with Cancel and the addressee sees the sender's name with Accept/Decline.
-
-### [platform] RV-195 — three low-severity auth and social gaps, one PR
-- **Lane: A.** **⚠ AUTH — the owner confirms before this merges.**
-- **① and ③ BUILT 2026-09-29 in #1930. ② is #1784**, from an earlier Lane A session. This entry
-  leaves the queue when #1784 merges.
-- **Added:** 2026-09-24 · Review sweep 60.
-1. **Mobile sign-in challenge is not bound to the browser that started it** (`app/auth-mobile-bridge/page.tsx`).
-   Exploiting it needs a malicious app on the phone plus a tapped link. Fix: `/mobile-signin` sets a
-   short-lived httpOnly cookie holding the challenge, and the bridge mints a token only if the query
-   value matches that cookie.
-2. **A deleted user stays signed in** (`lib/auth/is-active-refresh.ts`). A missing row is treated as
-   "no change". Fix: `auth()` returns null when the lookup succeeds and finds no row. The fail-open
-   for database outages stays.
-3. **A pending friend request reveals the target's name, avatar and friend code** (`slices/social.ts`
-   `sendFriendRequest`, pending rows in `listFriendships`). Fix: until the request is accepted, return
-   only what the requester typed.
-- **② SHIPPED (Lane A, 2026-09-27). ① and ③ are NOT, and each for a reason the entry could not have
-  known. The "one PR" line does not survive them — this is three items, shipping separately.**
-- **② was one line and the old comment argued against it.** `is-active-refresh.ts` read *"a missing
-  row is not evidence of deactivation"* and returned the token untouched, so a deleted account
-  stayed signed in until its token expired — up to seven days. What makes the inversion safe is
-  already in the code: a database outage **throws** and is caught, where the claim stands and nobody
-  is signed out by a blip; reaching the `!user` branch means the query ran and answered "no such
-  user" (`getUserById` returns null only for a non-matching id). The two cases the comment conflated
-  were separated by the language all along. Its test is inverted in place, keeping its intent.
-- **⛔ ① CANNOT BE BUILT WHERE THE ENTRY SAYS, and the alternative costs an APK.**
-  `app/mobile-signin/page.tsx` is a **client** component (`"use client"`, it calls `signIn()` in an
-  effect) — it cannot set an httpOnly cookie, and Next 15 forbids `cookies().set()` during a page
-  render, so making it a server component does not help either. The shapes that work:
-  **(a)** a route handler that sets the cookie and redirects — but then the URL the Android app
-  opens changes, which is a Kotlin change and a **new APK**, the one cost the entry does not
-  mention; **(b)** the client page `POST`s to a small route before calling `signIn`, keeping the
-  URL — no APK, and **it is worth checking whether it actually defends anything**, since a Chrome
-  Custom Tab shares Chrome's cookie jar, so an attacker able to open a URL in that browser sets the
-  cookie to their own challenge and the binding holds for them. **This wants the threat model
-  restated before code.** Recommend (b) only if that question resolves; otherwise the real defence
-  is elsewhere and this entry is describing the wrong control.
-- **⚠ ③ IS NOT SYMMETRIC, and "return only what the requester typed" cannot be done on the list
-  path.** Redaction must apply **only when the viewer is the requester** — the addressee has to see
-  who is asking or they cannot decide, and `rowToFriendship` does not know the viewer.
-  And the typed string is **not stored**: `sendFriendRequest` has `emailOrCode` and can echo it,
-  `listFriendships` has nothing, so an outgoing pending request would render blank where a name is
-  today. Storing it is a column, and **a migration ships alone and is never batched**. So ③ is
-  (i) a migration adding the typed identifier, (ii) a viewer-aware redaction, and (iii) a Lane B
-  change to what a pending outgoing row shows. Not one line, and not this PR.
 
 ### [devices][platform] RV-196 — any script in the app's origin can read, clear or redirect the Oura ring key through the native plugin
 - **Lane: A** · **Batch: native-security** — `android/**` (`OuraBlePlugin.kt`, `ScaleBlePlugin.kt`, `PolarBlePlugin.kt`). **Needs a new APK.**
@@ -3518,32 +3498,6 @@ which is the right shape for something that can only be validated by living with
      are explicit buttons in the debug console, so the cost is one deliberate extra tap.
 - **Keep:** the device check (Known Issues: "native security batch"), which includes confirming the ring still uploads after the update. Owner confirmation was given 2026-09-29. The dialog
   appears and is answerable, and ring/scale/strap ingest still reaches the server afterwards.
-
-### [platform] RV-197 — the production CSP allows WebSockets to any host, and nothing uses them
-- **Lane: A** — `lib/security/csp.ts` and its existing test.
-- **Added:** 2026-09-24 · Review sweep 60.
-- **What:** `connect-src` ends in `wss: ws:`. No `WebSocket` is used anywhere in
-  app/components/lib/packages; the only consumer is dev HMR. `connect-src` is the directive that would
-  otherwise stop injected script from sending data off-origin.
-- **Fix:** emit `ws: wss:` only when `isDev`, and pin that in the CSP test. Drop the unused
-  `generativelanguage.googleapis.com` at the same time.
-- **✅ SHIPPED (Lane A, 2026-09-27), both halves, exactly as written — the entry is right and its
-  evidence reproduces.** No `WebSocket` is constructed anywhere in `app/`, `components/`, `lib/` or
-  `packages/`, and there is no ws client in `package.json`.
-- **The stronger check, because a source grep cannot see a dependency:** built the app and grepped
-  the **emitted client bundles** (`.next/static`). Zero hits for `generativelanguage`, zero for
-  `WebSocket(`, and zero `ws://`/`wss://` literals of any kind. Nothing the browser ships wants
-  either of the things removed.
-- **`ws: wss:` is kept for dev rather than deleted** — the HMR socket is a real consumer. If a
-  production feature ever needs one, **name its host** (`wss://host`); do not restore the scheme.
-- **The enumerating test was loosened while being extended, deliberately.** `dev and production
-  differ only in …` compared exact strings, so it failed when the two ws schemes were merely
-  reordered — a change that changes nothing. It strips them by pattern now and still catches the
-  thing worth catching: a THIRD difference nobody decided on. Found by the mutation pass's
-  equivalent control, which is what that control is for.
-- **NOT verified against a running production server.** `pnpm start` cannot boot in the sandbox —
-  the instrumentation hook needs S3 credentials for the vendored model constants — so the header
-  was read from `buildCsp(false)` and from the bundles, never off the wire.
 
 ### [platform] RV-200 — four AI calls only reword numbers the app already computed: replace them with the computed text
 - **Lane: A** (routes and shared builders), then **B** (the cards). One PR covers both.
@@ -4028,27 +3982,25 @@ which is the right shape for something that can only be validated by living with
   only *after* a swallowed tap, so it is downstream of the same defect and may clear with it. If it
   survives, it is its own entry with its own mechanism, not a re-open of this one.
 
-### [app-shell][platform] LB-183 — one time-of-day form: a fourth is still live, and two more wait on a minutes-based helper
+### [app-shell][platform] LB-183 — one time-of-day form: switch the two minutes-of-day formatters to the shared helper
 
-- **Lane: A** — `packages/shared/src/date-utils.ts`. **Added:** 2026-09-28 · Lane B, split out of
-  `RV-208` ① on shipping that entry's ③.
-- **Why it is its own entry:** it was written inside `RV-208`, which is `Lane: B`. The lane field is
-  what routes work, so a Lane A item described in a Lane B entry reaches nobody — the same shape
-  CLAUDE.md calls out for an owner question buried in another entry. `RV-208` ① had already been
-  marked *"NOT Lane B"* in prose and still sat in Lane B's queue.
-- **The fourth form, measured 2026-09-27 by RUNNING both functions rather than reading them:**
-  `formatTime12h('06:40')` returns **`6:40am`**; `formatTimeOfDay` returns **`6:40 am`**. It feeds
-  `activity-detail-sheet.tsx` and `activity-history-card.tsx` — **the "Health's activity list reads
-  6:40am" surface `RV-208` opened with.** One character in a `packages/shared` file.
-- **Two more are blocked on a helper that does not exist yet.**
-  `components/health/sleep/sleep-verdict-copy.ts`'s `formatClock` (`11:10pm`) and
-  `components/health/sleep-timing-trend-utils.ts`'s `clockLabel` (`6:30 AM`, a chart axis) both
-  format **minutes-of-day**, not an instant, so `formatTimeOfDay` cannot take them as-is. They need
-  a minutes-based sibling in `packages/shared` — Lane A's engine half first; Lane B then converts
-  the two call sites, which are in its own tree.
-- **Do not "fix" the two call sites by reaching for `formatTimeOfDay`**: it takes an instant, and a
-  minutes-of-day value turned back into a `Date` is the timezone bug this repo keeps re-finding —
-  `formatClock`'s own header says so.
+- **Lane: B** — `components/health/sleep/sleep-verdict-copy.ts` (`formatClock`) and
+  `components/health/sleep-timing-trend-utils.ts` (`clockLabel`). Re-laned 2026-09-29: the engine
+  half shipped.
+- **Added:** 2026-09-28 · Lane B, split out of `RV-208` ①.
+- **✔ ENGINE SHIPPED 2026-09-29 (Lane A):**
+  - `formatMinutesOfDay(minutes)` in `packages/shared/src/date-utils.ts` prints exactly what
+    `formatTimeOfDay` prints ("6:40 am") for a minutes-since-midnight value. It rounds the whole
+    value first and wraps into one day.
+  - `formatTime12h` now delegates to it, so the activity list and sheet read "6:40 am" (the fourth
+    form is gone).
+- **What is left (Lane B):** replace `formatClock`'s and `clockLabel`'s bodies with
+  `formatMinutesOfDay`, and update their tests ("11:10pm" becomes "11:10 pm", "6:30 AM" becomes
+  "6:30 am").
+  - `clockLabel` also has a latent bug the helper fixes: it rounds the minute alone, so 419.6 renders
+    "6:60 AM".
+  - **Do not route either through `formatTimeOfDay`**: it takes an instant, and these values are
+    wall-clock minutes.
 
 ### [app-shell][platform] RV-208 — the same thing is written, formatted and coloured differently on different screens
 - **Inherited from `RV-212` ③ when that entry was cleared (2026-09-27):** the near-white primary is
