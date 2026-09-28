@@ -77,19 +77,27 @@ export default function MoreContent({ friendCode }: MoreContentProps) {
     }
   }, []);
 
+  // Cleared on a successful load so a retry that lands removes the line.
+  const [profileFailed, setProfileFailed] = useState(false);
+
   const refresh = useCallback(() => {
     cachedFetch<{ user: User }>(
       'more-user-profile', '/api/user/profile', TTL_MEDIUM,
       (d) => {
         if (d?.user) {
-          _user = d.user; setUser(d.user);
+          _user = d.user; setUser(d.user); setProfileFailed(false);
           if (_equippedTitle === undefined) setEquippedTitle(d.user.equippedTitle ?? null);
         }
       },
+      // RV-150: `cachedFetch` swallows `!res.ok`, and the `.catch` cannot fire — it resolves a
+      // boolean rather than rejecting (RV-84). Measured on a cold start with the routes down: the
+      // whole identity block, level, XP and trophy case were absent, reading as an empty account.
+      { onError: () => setProfileFailed(true) },
     ).catch(() => {});
     cachedFetch<{ seasons: Season[] }>(
       'more-seasons', '/api/seasons', TTL_MEDIUM,
       (d) => { if (d?.seasons) { _seasons = d.seasons; setSeasons(d.seasons); } },
+      { onError: () => setProfileFailed(true) },
     ).catch(() => {});
   }, []);
 
@@ -182,7 +190,7 @@ export default function MoreContent({ friendCode }: MoreContentProps) {
           {tab === "profile" ? (
             <>
               <SyncHealthCard userId={user?.id} />
-              <ProfileTab user={user} equippedTitle={equippedTitle} friendCode={friendCode} seasons={seasons} onUserSaved={(updated) => { _user = updated; setUser(updated); }} onTitleChange={handleTitleChange} />
+              <ProfileTab user={user} profileFailed={profileFailed} equippedTitle={equippedTitle} friendCode={friendCode} seasons={seasons} onUserSaved={(updated) => { _user = updated; setUser(updated); }} onTitleChange={handleTitleChange} />
             </>
           ) : (
             <FriendsTab />

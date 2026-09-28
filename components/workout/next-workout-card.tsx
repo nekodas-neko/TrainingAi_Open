@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { formatLoadKg } from "@trainingai/shared/format/units";
 import { MoonStarIcon } from "lucide-react";
 import type { NextSessionPrescriptionResponse } from "@/app/api/next-session/prescription/route";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
@@ -74,7 +75,7 @@ export function NextWorkoutCard() {
                         key={i}
                         className="rounded-md bg-background border border-border/60 px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground"
                       >
-                        {s.weightKg != null ? `${s.weightKg}kg × ${s.reps}` : `${s.reps} reps`}
+                        {s.weightKg != null ? `${formatLoadKg(s.weightKg)} × ${s.reps}` : `${s.reps} reps`}
                       </span>
                     ))}
                   </div>

@@ -18,6 +18,11 @@ git worktree add ../TrainingAi_Open-lane-a origin/main
 Start the agent in that directory. Never share one between lanes, and never run a lane from the
 owner's own working copy.
 
+**The same applies to ONE agent running two things at once.** A background suite reads the checkout
+as it goes, so a `git checkout` mid-run makes it test half of each branch. Measured 2026-09-27: a
+test file loaded from one branch ran against `date-utils.ts` from another and failed on a correct
+change. Run the suite in its own worktree, or do not switch branches until it exits.
+
 ## ② One database per agent
 
 `setup.sh` takes `LOCAL_DB_PORT`, `LOCAL_DB_NAME`, `LOCAL_PGDATA` and `LOCAL_PGLOG`, defaulting to the
@@ -45,6 +50,47 @@ that is not plain snake_case. It never touches `.env.local`. This replaces the g
 clone gave: `generate-claude-ro-views.js` writes whatever columns it finds into a committed file,
 so a database with hand-applied changes would publish them.
 
+## ④ Keep the lane's environment — do not rebuild it per PR
+
+The owner's goal (2026-09-28): Lane A runs locally and keeps churning, with a test environment that
+survives from one PR to the next. The shape that gives it:
+
+- **One permanent worktree per lane, and branches switch inside it.** Lane A's is
+  `D:/Projects/TrainingAi_Open-lane-a` (`git worktree add --detach ../TrainingAi_Open-lane-a origin/main`).
+  A new PR is a `git checkout -b <branch> origin/main` in that directory, **not** a new worktree.
+  A throwaway worktree is for one job only, such as resolving a conflict on another branch while a
+  suite runs, and it has no `node_modules`.
+- **`node_modules` is installed once.** `pnpm install --frozen-lockfile --prefer-offline` hard-links
+  from the shared store. The first install of the Lane A worktree took **12.5 s**, and after that only
+  a lockfile change needs a re-run.
+- **The worktree's own `.env.local` has no production database in it.** It is the owner's file with
+  every `DATABASE_URL`/`LOCAL_DATABASE_URL`/`CLAUDE_DB_READONLY_URL` line removed and the lane
+  database written in instead, with `DATABASE_SSL=false`. A command run there with no override
+  reaches `trainingai_lane_a`, never Railway, and the per-command overrides below stop being
+  load-bearing.
+- **Two databases per lane on the Docker server (5434), kept apart on purpose.**
+  `trainingai_lane_a` is the seeded one the test suite runs against, and `pnpm db:rebuild` resets it
+  to migrations plus the seed. `trainingai_lane_a_snapshot` holds the owner's production rows for
+  prod-shaped work (`pnpm dev` against real data, reproducing a drifted-row bug). They are separate
+  because a snapshot load TRUNCATEs every table, and the suite writes its own fixtures, so neither
+  can share a database with the other. Rebuild the snapshot database, then load it:
+
+  ```bash
+  LOCAL_DB_PORT=5434 DATABASE_URL=postgresql://postgres:postgres@localhost:5434/trainingai_lane_a_snapshot \
+  SNAPSHOT_URL='https://trainingai-production.up.railway.app/api/admin/db-snapshot?bulk=0' \
+  ADMIN_SNAPSHOT_SECRET=<from .env.local> node scripts/local-db/snapshot.js
+  ```
+
+  It holds the owner's rows only (the `claude_ro` scope) and omits the four bulk tables unless
+  `bulk=<days>` asks for them. It refuses a stream the server reports as failed, and it rolls back
+  on any count mismatch, so a bad load leaves the database as it was. **Rebuild before a migration
+  rehearsal, and snapshot when a bug needs real data.** The fresh seed is exactly what hides drifted
+  production rows. A load on 2026-09-28 brought 120 sessions, 1,317 sets, 127 nights and 91 Body
+  Battery days.
+- **vitest does not read `.env.local`.** A DB-gated test skips quietly unless `DATABASE_URL` is
+  exported, even in the lane worktree. Run the suite as
+  `DATABASE_URL=postgresql://postgres:postgres@localhost:5434/trainingai_lane_a DATABASE_SSL=false npx vitest run`.
+
 ## `.env.local` on a developer machine holds production URLs
 
 Both `DATABASE_URL` lines in the owner's `.env.local` point at Railway, and it sets
@@ -65,6 +111,11 @@ Unsetting `DATABASE_SSL` in the shell is not enough, because `.env.local`'s `tru
   `netstat -ano` and kill it.
 - **`pnpm start` will not boot without valid storage keys.** The instrumentation hook fails closed in
   production mode on `SignatureDoesNotMatch (403)`. That is deliberate, so do not work around it.
-- **Nine tests in six files fail on Windows and pass on Linux CI** — backslash paths, node running
-  in the machine's timezone rather than UTC, and one spawn timeout. See `LA-163`. Read a local red
-  against that list before debugging it, and treat CI as the authority.
+- **Do not run `pnpm lint` (or anything that reads the source tree) while the full suite runs.**
+  `check-comment-blindness.test.ts` writes fixtures into real files such as
+  `components/workout/set-card.tsx` and restores them afterwards. A lint in that window reports a
+  parsing error in a file nobody touched. Measured 2026-09-27; lint on its own was clean.
+- **The whole suite passes on Windows** since LA-163 (2026-09-28). Nine tests in six files used to
+  fail here and pass on CI: four compared OS paths against `/` literals, one read a `DATE` column as
+  an instant (node runs in the machine's zone), and one timed out on slow process spawns (LA-167).
+  A new failure that only appears locally is worth one look at those three shapes first.

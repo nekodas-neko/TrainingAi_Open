@@ -29,7 +29,11 @@ beforeEach(() => {
 describe('the store', () => {
   it('round-trips a reading with its age', () => {
     writeStrapBattery(72, 1_700_000_000_000)
-    expect(readStrapBattery()).toEqual({ percent: 72, at: 1_700_000_000_000 })
+    // One reading is its own low-water mark (BF-215) — not a missing field, so the chip is correct
+    // from the first render with no migration and no blank state.
+    expect(readStrapBattery()).toEqual({
+      percent: 72, at: 1_700_000_000_000, min: 72, minAt: 1_700_000_000_000,
+    })
   })
 
   it('is empty rather than wrong when nothing has been stored', () => {

@@ -16,7 +16,22 @@ import { readStrapBattery, writeStrapBattery, type StrapBatteryReading } from '@
  * build and every e2e. The hook then reports the stored value alone, which is the correct answer
  * rather than a degraded one: the last reading is still the last reading.
  */
-export function useStrapBattery(): { percent: number; ageMinutes: number } | null {
+export interface StrapBattery {
+  /**
+   * The number worth showing: the lowest reading of the last fortnight, not the latest (BF-215).
+   *
+   * The cell only reads low while it is under load, which is when the owner is training and not
+   * looking at Home; at rest — when he does look — it recovers to 100. So the latest reading is the
+   * one that never warns him, and the low-water mark is the one that does.
+   */
+  percent: number
+  /** Age of the LATEST reading, which is what "is this device still reporting" asks. */
+  ageMinutes: number
+  /** Present only while the drawn number is a low-water mark rather than the current reading. */
+  low?: { restingPercent: number; ageMinutes: number }
+}
+
+export function useStrapBattery(): StrapBattery | null {
   const [reading, setReading] = useState<StrapBatteryReading | null>(null)
 
   useEffect(() => {
@@ -60,5 +75,14 @@ export function useStrapBattery(): { percent: number; ageMinutes: number } | nul
   }, [])
 
   if (reading == null) return null
-  return { percent: reading.percent, ageMinutes: Math.max(0, (Date.now() - reading.at) / 60_000) }
+  const ageMinutes = Math.max(0, (Date.now() - reading.at) / 60_000)
+  if (reading.min >= reading.percent) return { percent: reading.percent, ageMinutes }
+  return {
+    percent: reading.min,
+    ageMinutes,
+    low: {
+      restingPercent: reading.percent,
+      ageMinutes: Math.max(0, (Date.now() - reading.minAt) / 60_000),
+    },
+  }
 }

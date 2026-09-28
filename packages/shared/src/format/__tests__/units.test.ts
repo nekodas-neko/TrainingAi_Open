@@ -6,7 +6,7 @@
  * Home, `82.5 kg` on day detail and `82.45kg` — raw and without the space — in the week-day sheet.
  */
 import { describe, it, expect } from 'vitest'
-import { formatKg, formatMinutes, formatHoursMinutes } from '@trainingai/shared/format/units'
+import { formatKg, formatLoadKg, formatMinutes, formatHoursMinutes } from '@trainingai/shared/format/units'
 import { formatPace, formatPaceValue } from '@trainingai/shared/health/vdot'
 
 describe('formatKg', () => {
@@ -120,5 +120,29 @@ describe('pace — one name, one meaning', () => {
     for (const sec of [0, 61, 312, 599.5, 3600]) {
       expect(formatPace(sec)).toBe(`${formatPaceValue(sec)}/km`)
     }
+  })
+})
+
+describe('formatLoadKg (RV-208 ②)', () => {
+  it('shows decimals only where the load has them', () => {
+    expect(formatLoadKg(68)).toBe('68 kg')
+    expect(formatLoadKg(67.5)).toBe('67.5 kg')
+    expect(formatLoadKg(71.25)).toBe('71.25 kg')
+  })
+
+  it('keeps a 1.25 kg plate step exact, where formatKg would round it', () => {
+    expect(formatKg(71.25)).toBe('71.3 kg')
+    expect(formatLoadKg(71.25)).toBe('71.25 kg')
+  })
+
+  it('keeps the space before the unit, and can drop the unit', () => {
+    expect(formatLoadKg(100)).toBe('100 kg')
+    expect(formatLoadKg(0)).toBe('0 kg')
+    expect(formatLoadKg(2.5, { unit: false })).toBe('2.5')
+  })
+
+  it('leaves formatKg padded unless asked', () => {
+    expect(formatKg(80)).toBe('80.0 kg')
+    expect(formatKg(80, { trim: true })).toBe('80 kg')
   })
 })

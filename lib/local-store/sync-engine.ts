@@ -653,6 +653,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     ouraDailySummary.length + ouraDailyDerived.length +
     dayCheckins.length + mealPlans.length + planMealAnswers.length;
 
+  let prunedPrograms = 0;
   try {
     await store!.applyDelta({ bodyMetrics, moodLogs, sleepSessions,
       workoutSessions, activityLogs, fitnessTests, prescribedRuns, programs, programSessions, sessionExercises,
@@ -660,6 +661,10 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
       foodItems, foodLogs, supplements, supplementLogs, injuries,
       exerciseLogs, setLogs, personalRecords, ouraDaily, ouraDailySummary, ouraDailyDerived, dayCheckins,
       mealPlans, mealPlanVariants, mealPlanMeals, planMealAnswers });
+    // RV-174: a deleted program or style leaves no row in any delta, so the mirror is pruned to the
+    // server's roster. Only when the server sent one — an absent roster must never read as "none".
+    const asIds = (v: unknown) => (Array.isArray(v) ? v.map(String) : undefined);
+    prunedPrograms = await store!.pruneProgramStructure(asIds(raw.programRoster), asIds(raw.progressionStyleRoster));
     await store!.setLastSyncAt(raw.syncedAt);
   } catch (err) {
     // A broken local schema throws here, not at the fetch — and this used to propagate straight
@@ -671,10 +676,10 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
   }
 
   return {
-    count,
+    count: count + prunedPrograms,
     domains: {
       biometrics:  bodyMetrics.length > 0 || moodLogs.length > 0 || sleepSessions.length > 0,
-      programs:    programs.length > 0 || progressionStyles.length > 0 ||
+      programs:    prunedPrograms > 0 || programs.length > 0 || progressionStyles.length > 0 ||
                    programSessions.length > 0 || sessionExercises.length > 0 ||
                    schedules.length > 0 || scheduleDays.length > 0 || styleSets.length > 0,
       workouts:    workoutSessions.length > 0 || exerciseLogs.length > 0 || personalRecords.length > 0,
@@ -839,7 +844,40 @@ async function enrichPayload(
   }
 }
 
-export async function pushMutations(userId: string): Promise<{ pushed: number } | null> {
+type PushResult = { pushed: number } | null;
+const pushRunning = new Map<string, Promise<PushResult>>();
+const pushTrailing = new Map<string, Promise<PushResult>>();
+
+/**
+ * LB-151: at most ONE drain of the outbox per user at a time. Eleven call sites reach this (the pull
+ * gesture, the sync-health card, per-domain writes, push-then-revalidate …), and two overlapping
+ * calls both read the same pending rows and both POSTed them. Measured harmless for the writes that
+ * matter (completion is stamped `WHERE completed_at IS NULL`, logs upsert by id) but the whole batch
+ * went up twice.
+ *
+ * A call that arrives mid-drain does NOT just get the running drain's result: that drain read the
+ * outbox before this caller's mutation existed, so answering from it would leave the mutation for
+ * some later push. It gets ONE trailing drain instead, shared by every caller that arrives while the
+ * first is running — so the queue is never drained twice at once and nothing queued is skipped.
+ */
+export function pushMutations(userId: string): Promise<PushResult> {
+  const running = pushRunning.get(userId);
+  if (!running) {
+    const run = pushMutationsOnce(userId).finally(() => pushRunning.delete(userId));
+    pushRunning.set(userId, run);
+    return run;
+  }
+  let trailing = pushTrailing.get(userId);
+  if (!trailing) {
+    trailing = running
+      .catch(() => null)
+      .then(() => { pushTrailing.delete(userId); return pushMutations(userId); });
+    pushTrailing.set(userId, trailing);
+  }
+  return trailing;
+}
+
+async function pushMutationsOnce(userId: string): Promise<PushResult> {
   const store = getLocalStore(userId);
   if (!store) return null;
 
@@ -989,7 +1027,10 @@ export async function pushMutations(userId: string): Promise<{ pushed: number } 
   // confirmation is not.
   const confirmedIds: string[] = [];
 
-  // Mark confirmed local records as synced
+  // Mark confirmed local records as synced. `batchIds` because this loop runs BEFORE
+  // `deleteMutations`: a confirm guard that asks "is another mutation still queued for this row?"
+  // must not count the ones it is confirming, or it never fires (LA-165).
+  const batchIds = confirmed.map(m => m.id);
   for (const m of confirmed) {
     try {
     if (m.domain === 'body_metrics') {
@@ -1084,7 +1125,14 @@ export async function pushMutations(userId: string): Promise<{ pushed: number } 
       if (wsId && exerciseLogId) await store.markWorkoutSynced(wsId, exerciseLogId);
     } else if (m.domain === 'session_rpe' || m.domain === 'complete_workout') {
       const wsId = m.payload.workoutSessionId as string | undefined;
-      if (wsId) await store.markSessionSynced(wsId);
+      if (wsId) await store.markSessionSynced(wsId, batchIds);
+    } else if (m.domain === 'exercise_log_edit' || m.domain === 'exercise_log_delete') {
+      // LA-165. The local write marked the log and its sets 'pending' so a pull could not revert it.
+      const exerciseLogId = m.payload.exerciseLogId as string | undefined;
+      if (exerciseLogId) await store.markExerciseLogSynced(exerciseLogId, batchIds);
+    } else if (m.domain === 'workout_session_delete') {
+      const wsId = m.payload.workoutSessionId as string | undefined;
+      if (wsId) await store.markWorkoutSessionTreeSynced(wsId, batchIds);
     } else if (m.domain === 'sleep_session') {
       // Local row id (its own PK, distinct from the server-side oura_id dedup key) —
       // same convention as workout_log/activity_logs above.
@@ -1117,4 +1165,6 @@ export function _resetSyncBackoff(): void {
   consecutive5xx = 0;
   pullBackoffUntil = 0;
   consecutivePullFailures = 0;
+  pushRunning.clear();
+  pushTrailing.clear();
 }

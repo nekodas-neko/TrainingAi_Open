@@ -236,6 +236,14 @@ describe('/api/measured-rmr', () => {
 
   // Bounds are plausibility, not validation theatre: a rate outside this is a typo or a unit
   // mix-up, and storing it would silently move the calorie target.
+  // LA-145. The shape regex accepts an impossible day, which then fails at the driver as a 500.
+  it('refuses a measured-on date that is not a real day', async () => {
+    for (const measuredOn of ['2026-02-31', '2026/02/30', '2026-13-01']) {
+      expect((await rmr(validRmr({ measuredOn }))).status, measuredOn).toBe(400)
+    }
+    expect(saveMeasuredRmr).not.toHaveBeenCalled()
+  })
+
   it('refuses a resting rate that is not a human one', async () => {
     for (const rmrKcal of [0, 499, 5001, 100_000, 1750.5]) {
       expect((await rmr(validRmr({ rmrKcal }))).status).toBe(400)

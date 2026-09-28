@@ -2340,7 +2340,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         ? await this.db.insert(s.activityLogs).values(values).onConflictDoUpdate({
             target: [s.activityLogs.userId, s.activityLogs.date, s.activityLogs.startTime],
             targetWhere: isNotNull(s.activityLogs.startTime),
-            set,
+            // DV-19. The natural-identity index covers tombstones, so a new activity saved at the
+            // minute of a deleted one lands on the deleted row, and without this it stays deleted
+            // and never reaches any device. Only a DIFFERENT id revives it: a stale edit to the
+            // deleted activity itself is the same id, and delete keeps winning over that.
+            set: {
+              ...set,
+              deletedAt: sql`CASE WHEN ${s.activityLogs.id} = excluded.id THEN ${s.activityLogs.deletedAt} ELSE NULL END`,
+            },
           }).returning()
         : await this.db.insert(s.activityLogs).values(values).onConflictDoUpdate({
             target: s.activityLogs.id,
@@ -4647,8 +4654,18 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         maxUpdatedAt: ouraDailyDerived.length ? new Date(ouraDailyDerived[ouraDailyDerived.length - 1].updatedAt as unknown as string | Date) : null },
     ], now)
 
+    // RV-174 — see `SyncDelta.programRoster`. Two small id-only reads, not windowed or paged:
+    // a roster that stopped at a page boundary would delete the rows it did not reach.
+    const programRosterRows = await this.db.select({ id: s.programs.id }).from(s.programs)
+      .where(eq(s.programs.userId, userId))
+    const styleRosterRows = await this.db.select({ id: s.progressionStyles.id }).from(s.progressionStyles)
+      .where(eq(s.progressionStyles.userId, userId))
+
     return { programs, programSessions, sessionExercises, schedules, scheduleDays,
-             progressionStyles, styleSets, bodyMetrics, sleepSessions,
+             progressionStyles, styleSets,
+             programRoster: programRosterRows.map(r => r.id),
+             progressionStyleRoster: styleRosterRows.map(r => r.id),
+             bodyMetrics, sleepSessions,
              moodLogs, activityLogs, fitnessTests, prescribedRuns, workoutSessions,
              exerciseLogs, setLogs,
              personalRecords: personalRecords.map(r => ({
@@ -5218,6 +5235,43 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             continue
           }
           await logExerciseFromPayload(userId, parsed.data, userTz)
+          processed++
+        } else if (mut.domain === 'exercise_log_edit') {
+          // RV-175. The same function PATCH /api/workout-entry calls. Lazy import for the reason
+          // post-completion-hr below gives: the module reaches back into `@/lib/data`.
+          const { ExerciseLogEditSchema, editExerciseLog } = await import('@/lib/workout/exercise-log-edits')
+          const parsed = ExerciseLogEditSchema.safeParse(mut.payload)
+          if (!parsed.success) {
+            errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid exercise_log_edit payload' })
+            continue
+          }
+          // A miss goes to `errors`, not `processed`: the commonest cause is the log itself still
+          // being in the outbox behind a failed push, which a later attempt resolves. The client's
+          // bounded retries then dead-letter a genuinely orphaned edit (see session_rpe below).
+          if (!await editExerciseLog(userId, parsed.data)) {
+            errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'No matching exercise log for exercise_log_edit' })
+            continue
+          }
+          processed++
+        } else if (mut.domain === 'exercise_log_delete') {
+          const { ExerciseLogDeleteSchema, deleteExerciseLog } = await import('@/lib/workout/exercise-log-edits')
+          const parsed = ExerciseLogDeleteSchema.safeParse(mut.payload)
+          if (!parsed.success) {
+            errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid exercise_log_delete payload' })
+            continue
+          }
+          // A miss is NOT an error, as with activity_logs (Q-328): a delete re-sent because its
+          // confirmation never landed finds nothing, and the row is gone either way.
+          await deleteExerciseLog(userId, parsed.data.exerciseLogId)
+          processed++
+        } else if (mut.domain === 'workout_session_delete') {
+          const { WorkoutSessionDeleteSchema, deleteWorkoutSessionAndReconcile } = await import('@/lib/workout/delete-session-reconcile')
+          const parsed = WorkoutSessionDeleteSchema.safeParse(mut.payload)
+          if (!parsed.success) {
+            errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid workout_session_delete payload' })
+            continue
+          }
+          await deleteWorkoutSessionAndReconcile(userId, parsed.data.workoutSessionId)
           processed++
         } else if (mut.domain === 'session_rpe') {
           const rpeCheck = SessionRpeSchema.safeParse(mut.payload)

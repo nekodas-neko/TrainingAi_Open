@@ -6,7 +6,37 @@
 > Nothing here was rewritten, reordered or archived: the section moved whole.
 >
 > **The domain-tag grep is unchanged and is why this is ONE file rather than one per pillar.**
-> `grep -n '^### .*\[sleep\]' docs/overview/known-issues.md` works exactly as it did against
+> `grep -n '^### [devices] ⚠️ The strap pairing screen's battery read changed shape and no phone has run it (BF-216, 2026-09-28)
+
+`chest-strap-pairing.tsx` read the battery level as `new Uint8Array(batt.buffer)[0]`, which discards
+the `DataView`'s offset; it now reads `batt.getUint8(0)`. **Today's value is identical** — the BLE
+plugin builds each view on a fresh buffer, so the offset is 0 — which is exactly why this is latent
+and why the sandbox cannot tell the two apart. The path only runs while pairing a real H10 over BLE,
+so nothing here has executed it. **Pass test on the S25:** pair the strap and confirm the screen
+shows a plausible battery percentage and a firmware revision string, and that the Home chip picks up
+the same number. A `RangeError` or an empty firmware line is the failure to watch for.
+
+### [devices][app-shell] ⚠️ The strap chip draws the cell's low-water mark now, and no workout has exercised it (BF-215, 2026-09-28)
+
+Home's strap chip read `100` until the cell was nearly dead: a CR2025 sags under a sustained BLE
+session and recovers at rest, so the reading that warns only exists while the owner is training and
+not looking. The chip now draws the lowest reading of the last 14 days, with the resting value named
+in the accessible name rather than on the glass (no room — the header column is 224 px at 412 dp).
+**The entry's recommendation — the minimum of the most recent connected SESSION — was measured and
+would have been a no-op:** `PolarGattClient.readBattery` fires once per connection, so the value
+cannot move inside a session. The mark is tracked across connections instead.
+
+**Pass test on the S25, across a workout:** before training the chip shows whatever the last
+fortnight's low was; after a session that sags the cell, it shows that session's low and keeps
+showing it once the cell recovers at rest. **The low-battery notification must still fire at the
+same point it does today** — that path is Kotlin (`DeviceBatteryNotifier.decide`, fed the raw
+percent by `onBattery`) and nothing in this change is native, but it is the thing to confirm.
+**What the sandbox cannot answer:** no real strap was connected, so every reading here was seeded.
+The 14-day window is a judgement, not a measurement — it is long enough to span several workouts and
+short enough that a replaced cell clears itself, and nothing can detect a cell change because a
+fresh CR2025 and a dying one both read 100 at rest.
+
+### .*\[sleep\]' docs/overview/known-issues.md` works exactly as it did against
 > `projectOverview.md`, and the standing rule depends on it. Per-pillar files would have forced an
 > issue tagged `[sleep][platform]` to live in one and go missing from the other.
 >
@@ -30,6 +60,59 @@
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [workouts][platform] ⚠️ A session given an RPE now returns to "synced" on the phone, and only the phone runs it (LA-165, 2026-09-28)
+
+`markSessionSynced`'s guard skips flipping a session to `synced` while another mutation for it is
+queued. The push-confirm loop runs BEFORE the batch is deleted, so the guard counted the very
+mutation it was confirming and never fired: proven against a real SQLite, a session whose only
+queued mutation was confirmed stayed `pending`. By the code, the stranded-workout sweep then found
+it five minutes later and re-queued a `workout_log` push for every exercise in the session, and only
+that re-push flipped it back. Every confirm now excludes the batch it is confirming. The same change
+adds the pending mode and confirms that offline log edits need (LA-166 will use them). **Not seen on
+a device.** **Pass test on the S25:** log a workout, set its RPE, wait five minutes with the app open,
+and the outbox shows no re-queued `workout_log` entries for that session. Before this change it would
+have shown one per exercise.
+
+### [activity][platform] ⚠️ The phone now retires an activity row the server merged away, and only the phone runs that code (DV-19, 2026-09-28)
+
+A push that lands on an activity already on the server at the same `(date, start_time)` merges into
+that row and keeps its id, so the phone's own row was confirmed and never came back, and the
+activity listed twice. `applyDelta` now deletes a `synced` row at the same second as an applied
+server row. The server half also changed: a new activity landing on a deleted one at the same
+minute is revived instead of staying deleted. Tested against real in-memory SQLite and the local
+Postgres, but `getLocalStore` is null on the web, so **the device path has not run anywhere.**
+**Pass test on the S25:** save an activity offline at the same minute as one the server already
+has, sync, and the list shows one row. The owner's `b8083d04` (24 Sept, 09:18, 40 min, no HR) is a
+bogus pre-BF-190 row. Deleting it also clears the phone's orphan `4b5c23e0`.
+
+### [heart-rate][devices] ⚠️ Ring workout HR thinned before the LA-168 fix stays thinned unless a full-window rollup re-runs (LA-168, 2026-09-28)
+
+An incremental rollup whose cutoff fell inside a workout re-saved the rest of that workout's ring
+HR at 5-minute bins and deleted the 15-second rows. It happened about three days after each workout.
+The fix is live once deployed, but it does not repair rows already rewritten. Measured on the
+owner's ring-only sessions: 08-21 103 → 12, 08-24 110 → 31, 09-05 32 → 5, 09-06 180 → 13,
+09-17 87 → 52, 09-20 164 → 99. The recap's `workout_hr_stats` snapshot kept its numbers, so recaps
+are unaffected. What re-derives from raw HR is affected: the Health HRR trend, zone minutes and the
+workout HR chart. **Recoverable only inside the rollup's 14-day HR window** (from 09-14 today), and
+only by a pass that starts before those sessions, meaning a full-window rollup (a cold start with no
+watermark, or the admin full-history run). The raw frames are still on the server. Sessions older
+than 14 days stay at 5 minutes, because nothing rewrites HR series past that horizon. **Owner
+decision:** whether to run one full-window pass after this deploys. It is cheap, but it pegs the
+process for minutes (Q-213).
+
+### [workouts][platform] ⚠️ A deleted program now leaves the phone's mirror, and only the phone runs that code (RV-174, 2026-09-28)
+
+Deleting a program or progression style used to leave it in the device's local mirror forever: both
+are hard deletes with no tombstone, and the sync delta carries only what changed. After deleting
+active program A and activating B, the mirror could hold two active programs, and the Workout screen
+offline could pick the wrong one. The pull now carries every program and style id the user has
+(`programRoster` / `progressionStyleRoster`) and `pruneProgramStructure` deletes the rest, children
+included, and clears a deleted style from the exercises that used it. Verified against a real
+in-memory SQLite and over HTTP on `pnpm dev`, but `getLocalStore` is null on the web, so **the
+device path has not run anywhere.** **Pass test on the S25:** delete a non-active program in Config,
+pull to sync, go offline, and the Workout screen and program list no longer show it; then delete the
+ACTIVE one after activating another, and offline the Workout screen opens the new one.
 
 ### [app-shell] ⚠️ The scrim now reaches pushed routes, and no phone has seen it there (DV-22, 2026-09-27)
 
@@ -7383,7 +7466,7 @@ in [`docs/handoffs/handoff-2026-08-02-platform-batch-queue-drain.md`](../handoff
    the bounded poll and the regeneration triggers; the unreliable server self-fetch is replaced by
    a client-fired one. Verified end to end at the S25 viewport on the dev server.
 4. ✅ **[readiness] The Body Battery anchor flips between readiness and sleep mid-day (Q-39).**
-   Fixed in **#996** (v1.250.2). The decision moved into `app/api/body-battery/anchor.ts` and a
+   Fixed in **#996** (v1.250.2). The decision moved into `lib/health/body-battery-anchor.ts` and a
    readiness-derived anchor is now frozen for the rest of the day; a sleep anchor is labelled
    provisional and upgrades exactly once. Reproduced on the dev DB (82 → 54 → held at 54) and the
    provisional copy checked at 360px in both themes.

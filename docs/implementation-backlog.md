@@ -490,6 +490,50 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [readiness][heart-rate][activity][workouts] LA-171 — five runs and checks Lane A shipped on 2026-09-28 that need the phone or an admin session
+- **Lane: DV** — handed over by the owner's instruction on 2026-09-28 (*"Assign whatever tasks you
+  can to DV agent — it can do most of these mechanical tasks"*). The phone's WebView holds the
+  owner's admin session, and a sandbox session does not. Work them in this order: ① to ③ change
+  production data and are authorised, and ④ and ⑤ are device checks.
+- **Added:** 2026-09-28 · Lane A.
+- **① Body Battery re-derive (TN-72) — after #1835 is on `main`.** The owner approved it on
+  2026-09-27, and the standing policy covers a backfill with a snapshot. Steps:
+  (a) Save the pre-image: `SELECT * FROM claude_ro.body_battery_daily ORDER BY date` through
+  `/api/admin/db-query`, written to a dated file in `scripts/device/` output. A derived table,
+  plus this copy, is the restore path.
+  (b) Dry-run in 31-day pages from inside the app's WebView:
+  `fetch('/api/admin/rederive-body-battery?from=<d>&to=<d+30>',{method:'POST'}).then(r=>r.json())`,
+  covering the whole stored range (about three pages).
+  (c) Record each page's `summary` (written, end-value delta, recomputed end distribution) on
+  **TN-72**. That is the "how many days move and by how much" the owner asked for.
+  (d) Re-run each page with `&dryRun=false`, and **stop if `written` differs from the dry run.**
+  (e) Re-read the table and confirm every re-derived row carries the v6 `model_version`.
+  **Pass:** stored days all v6, and the numbers are on TN-72.
+- **② One full-window rollup, to restore thinned workout HR (LA-168).** `POST
+  /api/oura-ble/samples/redecode` (admin; it queues a job, so poll `GET …/redecode?jobId=`). The HR
+  series only rewrites the last 14 days, so only sessions from about 09-14 recover, and older ones
+  stay at 5-minute bins. **Before and after:** for 09-17, 09-20, 09-22 and 09-24, compare the
+  `oura_heartrate` rows in each workout window with `workout_hr_stats.readings_count` (the query is
+  in LA-168's journal entry, `docs/overview/entries/2026-09-28-lane-a-la168-*`). **Pass:** the
+  ring-only sessions in the window return to 15-second spacing. It keeps the rollup worker busy
+  for minutes, so run it with nothing else in flight.
+- **③ Delete the bogus 24 Sept 09:18 treadmill walk (DV-19).** 40 min, 133 kcal, no steps or HR,
+  server id `b8083d04`. Delete it in the app's activity list, not by SQL. The owner listed it as
+  his to-do and handed it over with the instruction above. **Pass:** Health → Training lists that
+  walk once, and the phone's local store no longer holds `4b5c23e0` (the orphan retires when the
+  server row changes).
+- **④ Device check — LA-165.** Log a workout, set its RPE, keep the app open five minutes: the
+  outbox shows no re-queued `workout_log` for that session. Before the fix it showed one per
+  exercise. Known-Issues row: *"A session given an RPE now returns to 'synced'"*.
+- **⑤ Device check — DV-19.** Airplane mode, then save an activity at the same minute as one the
+  server already holds. Reconnect, pull, and the list shows **one** row. Known-Issues row: *"The
+  phone now retires an activity row the server merged away"*.
+- **Answers:** VERIFIED / FAILED / COULD NOT CHECK per item, with screen and navigation mode. A
+  FAILED goes back to Lane A with what reproduces it. When all five have answers, strike the
+  matching Known-Issues rows and TN-72's `Keep:`.
+- **NOT DV's, and still the owner's:** BF-214's approval (#1795), a progression style for Barbell
+  Skull Crusher (a preference), LA-169 (bodyweight plans), fresh S3 keys, and the held security PRs.
+
 ### [platform] LB-168 — `pnpm test` exits 1 with ZERO tests failed, about one full run in five
 - **✅ FIXED 2026-09-27 — root-caused to ONE emitter and closed in `vitest.setup.ts`. This entry
   stays queued only for the `Keep:` below.**
@@ -574,13 +618,57 @@ below threshold and left in place for next time.
   preference question, which is why it is being asked rather than decided.
 - **Blocks nothing.** RV-212 ①② shipped without it.
 
-### [platform] BF-213 — inbound PR #1608 takes migration numbers 288/289, which `main` already used, and its `claude_ro` twin is destroyed by the collision
+### [devices] BF-216 — three BLE reads still go through `.buffer`, which ignores the view's offset
+
+- **✅ THE PAIRING SCREEN SHIPPED 2026-09-28 (Lane B).** `chest-strap-pairing.tsx` reads
+  `batt.getUint8(0)` (guarded on `byteLength`, since it throws on an empty view where the old
+  `[0] ?? null` yielded null) and decodes the firmware view rather than its buffer.
+  `components/settings/__tests__/bf216-ble-view-offset.test.ts` holds it and **demonstrates the
+  defect rather than asserting a style**: on a `DataView(backing, 2, 1)` the old read returns the
+  filler byte and `getUint8(0)` returns the real one.
+- **Lane: A** — re-laned 2026-09-28. **The three that remain are device pipelines**, which §3 of the
+  agents contract puts in Lane A, so Lane B could not take them:
+  | site | read |
+  |---|---|
+  | `lib/colmi-ble/ble.ts:180` | `new Uint8Array(view.buffer)` — the V1 notification frame |
+  | `lib/colmi-ble/ble.ts:190` | `Array.from(new Uint8Array(view.buffer))` — the V2 big-data chunk |
+  | `lib/live-hr/chest-strap-source.ts:233` | `new Uint8Array(value.buffer)` — **the live HR measurement** |
+- **Not in scope:** `ble.ts:215`'s WRITE (`new DataView(bytes.buffer)`) builds its own array rather
+  than receiving one, so it owns the buffer it reads.
+- **Added:** 2026-09-27 · BugFix, found while tracing `BF-215`. **Not the cause of that report** —
+  every recorded reading came from the native path, which is correct.
+- **Latent rather than live, and worth fixing anyway.** `@capacitor-community/bluetooth-le` builds
+  its `DataView` from a fresh buffer today, so the offset is 0 and the read happens to be right.
+  That is a property of the plugin's current implementation, not of the API contract, and it is one
+  version bump away from silently changing.
+- **The guard already lists these two files by name** and fails if one stops matching — so fixing a
+  site means striking it from `LANE_A_DEBT` in the same commit, which is the reminder rather than a
+  chore.
+- **Reversal cost:** none. Three expressions.
+
+### [platform] BF-213 — inbound PR #1608 (HealthKit storage) owes a diff read from Review and a merge from the owner
 
 - **Lane:** O — an inbound PR is routed, not built: **Review** reads the diff and posts the review,
   the **schema half is Lane A's**, and the **merge is the owner's** (outside contributor, storage
   carve-out). Filed `O` because the lane field takes a letter and no Review letter exists.
 - **Added:** 2026-09-27 · BugFix, per OR-185's GitHub watch. Filed so Review has the finding rather
   than re-deriving it; the diff read is still Review's.
+- **✅ THE COLLISION IS RESOLVED — the contributor fixed it, verified 2026-09-27 22:56 on head
+  `0bb5a87e`.** This entry said the PR took **288/289**, which `main` already held, and that the
+  later-sorting twin would silently drop the new view. He renumbered to **290/291** and regenerated
+  the twin **after** applying, which is the ordering that matters: the regenerated file carries
+  `training_load_grid_len` and `training_load_valid_min`, so it was generated against a database
+  holding LA-161 rather than against a stale one.
+  **Checked with the tool that owns the question, not by reading the diff:**
+  `node scripts/next-schema-number.js` reports **292** next free, lists 290/291 as claimed by
+  `origin/health-sample-storage` alone, and reports **no collision** on them. CI is **all ten jobs
+  completed and success** on that head, Migration Check included.
+- **What is still owed is the diff read, and only that.** Storage carve-out, outside contributor:
+  **Review** reads it, **the owner merges**. Nothing here is blocking any more.
+- **⚠ Separately, `next-schema-number.js` reports a REAL collision that is OURS, not his** — `273`
+  and `274` are claimed by both `main` (merged, `273_exercise_media_review_status.sql`) and
+  `origin/lane-a/q44-phase3-pr1-table-rename`. That branch must renumber before it can land; the
+  check fails once both are in one tree. Not this entry's work — recorded so it is not lost.
 - **Needs:** — nothing.
 - **Superseded in part by BF-214 ① (built 2026-09-27, awaiting the owner).** `#1608` has since
   renumbered to 290/291. Once BF-214 merges, its `291_claude_ro_views_…` twin must be deleted and
@@ -769,31 +857,17 @@ below threshold and left in place for next time.
   a pruned raw row cannot be re-drained from the ring.
 
 
-### [platform] LA-163 — nine tests in six files fail on Windows and pass on Linux, so a local run lies
-
-- **Lane: A** · **Added:** 2026-09-27 · found by the first local Lane A session (OR-194).
-- **What:** the full suite on the owner's Windows machine gave 10,566 passed and **9 failed in 6
-  files**, none related to the diff under test. Each is a portability assumption:
-  - **Backslash paths:** `lib/oura-models/__tests__/constants-delivery.test.ts` (expects
-    `__fixtures__/constants` inside a `D:\…` path) and
-    `packages/shared/src/sync/__tests__/mutation-schema.test.ts` (an exclusion keyed on a `/` path
-    lets `lib\export\full-export.ts`'s `'_manifest'` through).
-  - **Probably the same:** `components/profile/__tests__/personal-details-one-editor.test.ts` (four
-    cases, `expected [ Array(1) ] to deeply equal [ Array(1) ]`) and
-    `components/ui/__tests__/rv208-one-duration-form.test.ts`. Both scan source files and compare
-    paths. **Unconfirmed**: read the arrays before assuming.
-  - **Timezone:** `lib/data/postgres/__tests__/user-profile-partial-patch.test.ts` reads a DOB back
-    as `1993-06-14T14:00Z` instead of `06-15T00:00Z`, exactly 10 h off. Node runs in the machine's
-    Brisbane zone here and in UTC on CI. Either pin `TZ=UTC` for the suite or compare dates, not
-    instants.
-  - **Timeout:** `scripts/__tests__/check-comment-blindness.test.ts` (`check-hex-literals` case) at
-    30 s. Process spawns are slow on Windows.
-- **Why it matters:** OR-195 moves a lane onto this machine. A local red that is not the diff costs
-  a debugging session each time, and the only defence today is a list in
-  `docs/local-agent-environment.md`.
-- **Fix shape:** normalise paths with `split(path.sep).join('/')` at each comparison; `TZ=UTC` in the
-  vitest config's `env`, which also matches CI; a longer timeout for the one spawn-heavy case.
-- **Done when:** the six files are green on Windows, and still green on CI.
+### [platform] LA-167 — every base-comparison ratchet starts one `git` process per file, which is 98% of its runtime
+- **Lane: O** — `scripts/lib/base-ref.js` (`countAtBase`), shared by the ratchet checks in Custom Rules.
+- **Added:** 2026-09-28 · Lane A, while fixing LA-163.
+- **Measured:** `check-hex-literals.js` takes 15 s on the owner's Windows machine, and a CPU profile
+  puts 15,048 of 15,360 ms in `spawnSync`. `countAtBase` runs `git show <base>:<file>` once per
+  scanned file. The script's own test cites ~6 s on Linux, so the same cost is there, just smaller.
+  Every ratchet built on `base-ref.js` pays it, and `pnpm check:rules` runs them in sequence.
+- **Fix shape:** one `git cat-file --batch` process per run, fed every `<base>:<path>` it needs, or
+  a single `git ls-tree`/`git grep` over the base tree. Either turns N spawns into one.
+- **Done when:** `check-hex-literals` runs in well under a second of spawn time, its output is
+  unchanged on `main`, and `check-comment-blindness.test.ts` can return to a 30 s limit.
 
 ### [platform] OR-195 — move Lane A to a persistent local session, where it can finally build the Kotlin it owns
 
@@ -3131,14 +3205,28 @@ which is the right shape for something that can only be validated by living with
   `docs/superpowers/plans/2026-09-21-body-battery-rate-balance.md` §4 (the de-weighting argument).
 
 ### [sleep][app-shell] LA-136 — Home lost its sleep line; the real sleep signal is collected and unused
+- **✅ APPROVED 2026-09-27 — build the mockup as drawn.**
+  The sleep line returns under the mood card from `sleepQualityFeel` (1–5), with the caption naming
+  it as his rating rather than a score. **The caption is part of the approval, not decoration** —
+  the line it replaces was fabricated and read as derived for 91 days.
+  **⚠ The cost is unchanged and is the whole risk here:** Home is in the persistent tab shell, so
+  this needs `useCachedValue`, a canonical TTL in `cache-ttl.ts`, and registration in every write
+  group touching `day_checkins`. A hand-rolled `useEffect(() => { cachedFetch(…) }, [])` never
+  re-runs there and the line will hold its first value until the app is killed — the Q-402 shape,
+  which this repo has shipped twelve times.
+- **📐 MOCKUP SHOWN 2026-09-27 — [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html) ([hosted copy](https://claude.ai/artifact/U4aypd5Un44whR6exTjWqX)).
+  Before/after at the real **384 px dark viewport**, using the app's own tokens from
+  `app/globals.css`. **Proposed:** the sleep line returns under the mood card, driven by `sleepQualityFeel` (1–5), captioned *"Your rating, not a score"* so it cannot be misread as derived the way the fabricated `Sleep: OK` was.
+- **Gate cleared 2026-09-27** — the mockup was approved; nothing is owed from the owner.
+  so the next act was to PRODUCE one and that is work, which must stay ungated. It exists, so what
+  is outstanding is his answer, and the gate parks the entry honestly. (This is the transition
+  `LB-163` describes; applying it before the picture existed is the trap.)
+- **The cost is on the mockup and is not optional:** Home is in the persistent tab shell, so it needs `useCachedValue`, a canonical TTL and registration in every `day_checkins` write group, or it paints once and never refreshes.
 - **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added; his answer is now the only outstanding thing.**
   Rendered from the *running app* at **384 px dark** rather than drawn, in one sitting with `LB-163`
   and `RV-213` as this entry asks: <https://claude.ai/artifact/SQxd9yfvjcbnZVseiPVwHh>. The after reads
   *"You rated last night's sleep **Good** this morning."* under the readiness card.
-- **Gate: owner** — the mockup has been shown; the code waits on his yes to that picture.
-- **Ask** — owner: does he want his morning sleep-feel back on Home, in the wording the mockup
-  shows? `Ask:` rather than position, because `Gate: owner` alone would sink this into PARKED
-  beside 35 device gates and nobody would see that an answer is the deliverable.
+- **Gate cleared 2026-09-27** — approved. Lane B builds to the mockup.
 - **The WORDING is part of what he is being asked to approve**, not an implementation detail. Naming
   whose judgement it is — *"you rated"* — is precisely what the dead `sleep_quality` line got wrong,
   so if he takes this, keep the phrasing. The `useCachedValue`/TTL/write-group cost is stated on the
@@ -3394,7 +3482,7 @@ which is the right shape for something that can only be validated by living with
      - **Replace:** a template that names the heaviest-weighted signal.
      - The card's `fetchInsight` has `try/finally` with no `catch`, so offline it throws an unhandled rejection.
   3. **✅ SHIPPED 2026-09-26 — running-plan explain is gone**
-     ([entry](overview/entries/2026-09-26-rv200-running-plan-explain.md)). Claim confirmed exactly:
+     ([entry](overview/history-2026-09-27-folded-3.md#2026-09-26-rv200-running-plan-explain)). Claim confirmed exactly:
      the card rendered the deterministic `rationale` immediately and only swapped in the model's
      sentence when it landed, so the call reworded text already on screen. Route, fetch, cache key
      and TTL deleted.
@@ -3705,11 +3793,25 @@ which is the right shape for something that can only be validated by living with
   bar, and no fill looks oval at a low percentage.
 
 ### [app-shell] LB-163 — Home's Log tiles: the pill sits on the icon and the row leaves a third empty
+- **✅ APPROVED 2026-09-27 — build the mockup as drawn.**
+  Fixed three-column grid, `Log` out from under the icon and below the value. **Acceptance:** at
+  384 px the row fills the width and `Log` does not overlap the icon at any tile count. **Keep the
+  44 px tap target** — the overlap came from `min-h-11` on an absolutely-positioned pill, not from
+  the size, so shrinking the target is the wrong fix. **Known trade, accepted:** a fourth widget
+  wraps to a second line instead of scrolling.
+- **📐 MOCKUP SHOWN 2026-09-27 — [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html) ([hosted copy](https://claude.ai/artifact/U4aypd5Un44whR6exTjWqX)).
+  Before/after at the real **384 px dark viewport**, using the app's own tokens from
+  `app/globals.css`. **Proposed:** a fixed three-column grid filling the row, and `Log` moved out from under the icon to its own control below the value. The `absolute top-0.5 right-0.5` pill with `min-h-11` is what puts it on the icon; the flex row is what leaves the right third empty.
+- **Gate cleared 2026-09-27** — the mockup was approved; nothing is owed from the owner.
+  so the next act was to PRODUCE one and that is work, which must stay ungated. It exists, so what
+  is outstanding is his answer, and the gate parks the entry honestly. (This is the transition
+  `LB-163` describes; applying it before the picture existed is the trap.)
+- **The trade, stated on the mockup:** each tile is narrower, so a fourth widget wraps to a second line rather than scrolling sideways.
 - **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added, and the lane moved `O` → `B`**: the remaining
   work after his answer is `app/session-select/components/metric-tiles-card.tsx`, which the path rule
   puts in Lane B. Rendered from the *running app* at **384 px dark** rather than drawn, in one sitting
   with `LA-136` and `RV-213`: <https://claude.ai/artifact/SQxd9yfvjcbnZVseiPVwHh>.
-- **Gate: owner** — the mockup has been shown; the layout answer is the only outstanding thing.
+- **Gate cleared 2026-09-27** — approved. Lane B builds to the mockup.
 - **Two corrections to the figures below, measured at 384 px while capturing the after.** The tiles
   occupy about **62%** of the row, not 58% — that reading was taken at 412 px. And the trade is not
   "each tile is narrower": on a three-column grid the tiles come out **wider**. The real cost is that
@@ -3721,12 +3823,6 @@ which is the right shape for something that can only be validated by living with
   one and put it to him — that is work, and work is ungated `Lane: O`. A gate here would park the
   entry and nobody would be tasked with asking. `Gate: owner` belongs on it once a mockup has been
   shown and the answer is what is outstanding.
-- **Ask: owner — three columns with `Log` below the value, accepting a roughly doubled row height?**
-  The mockup exists now (see the top of this entry); what is outstanding is his answer to it.
-  RV-207 ⑥ asks to move the "Log" label beside or
-  below the icon and put the tiles on a fixed three-column grid. That is a **visible rearrangement
-  of Home**, which CLAUDE.md gates on a mockup at the real 384 px dark viewport and a yes, and it
-  is the one item in RV-207 that is a layout decision rather than a defect with one right answer.
 - **The defects behind it are real, and REPRODUCED rather than read** (`metric-tiles-card.tsx`).
   Rendered in the Playwright harness at the 412 px dark viewport, 2026-09-26: the word **"Log" is
   drawn directly over each tile's icon** and is barely readable against it, and the three tiles
@@ -3929,16 +4025,40 @@ which is the right shape for something that can only be validated by living with
   is relative age, a different idiom from a duration. Control-run: reinstating the timeline's own
   helper fails it.
 - **STILL OPEN, and two of them are NOT Lane B:**
-  ① **Time-of-day casing is Lane A.** `formatTimeOfDay` emits `6:40am` (`h:mm aaa`); the uppercase
-  `6:40 AM` comes from **`app/api/day-timeline/route.ts:44`**, which formats `h:mm a` server-side.
-  That is `app/api/**`. **Lane: A** — one format string, and the route returning a display string
-  at all is worth a second look while it is open.
-  ② **Unit spacing (`7 × 68kg` against `98 kg`) needs a `formatKg` that emits decimals AS NEEDED.**
-  The default is one decimal, so routing the lift sites through it turns `68kg` into `68.0 kg`,
-  which is worse. `packages/shared/**` is **Lane A**: either an option on `formatKg` or a sibling.
-  Sites waiting on it: `pre-workout-screen:381`, `pip-view:121`, `exercise-stats-sheet:154`,
-  `weights-summary:93`, `ai-prescription-card:334`, `deload-info-sheet:28`. `components/admin/**`
-  is deliberately excluded, as it is for the timezone rules.
+  ① ~~**Time-of-day casing is Lane A.**~~ **✅ SHIPPED 2026-09-27 (Lane A).** The entry's premise was
+  half-wrong, measured: `formatTimeOfDay` emits `6:40 am` WITH a space, and there were THREE forms,
+  not two. `app/api/day-timeline/route.ts` formatted `h:mm a` itself (Home's `6:40 AM`), and a
+  second shared helper, `fmtAest` (`h:mmaaa`, `6:40am`), fed `/api/day-log` (Health → Day) and
+  the Body Battery card. The route now calls `formatTimeOfDay`, and `fmtAest` delegates to it, so
+  all four surfaces read `6:40 am`. **⚠ A FOURTH FORM IS STILL LIVE AND IT IS LANE A'S — measured 2026-09-27 by running both
+  functions**, not by reading them: `formatTime12h('06:40')` returns **`6:40am`** against
+  `formatTimeOfDay`'s **`6:40 am`**. It lives in `packages/shared/src/date-utils.ts` and feeds
+  `activity-detail-sheet.tsx` and `activity-history-card.tsx` — **the "Health's activity list reads
+  6:40am" surface this entry opened with, still unfixed.** The fix is one character in a Lane A
+  file, so it was not taken here.
+  **Still their own form, and blocked on the same lane:**
+  `components/health/sleep/sleep-verdict-copy.ts`'s `formatClock` (`11:10pm`) and
+  `components/health/sleep-timing-trend-utils.ts`'s `clockLabel` (`6:30 AM`, a chart axis). Both
+  format minutes-of-day rather than an instant, so they need a minutes-based sibling of
+  `formatTimeOfDay` — which is `packages/shared`, i.e. **Lane A's engine half first**, then Lane B
+  converts the two call sites. The entry called these Lane B's; the path rule says otherwise.
+  ② ~~**Unit spacing needs a `formatKg` that emits decimals AS NEEDED.**~~ **✅ The Lane A half
+  SHIPPED 2026-09-27:** `formatLoadKg` (`packages/shared/src/format/units.ts`) gives `68 kg` /
+  `67.5 kg` / `71.25 kg`. Two decimals, trimmed, because a 1.25 kg plate step rounds to `71.3` at
+  one decimal. `formatKg` also takes `trim`. **✅ THE RENDER SITES SHIPPED 2026-09-27 (Lane B) — and the entry's list of six was NINE.**
+  The three it did not name: `next-workout-card`, `week-day-sheet` and `formatVolume`. Eight are
+  lifted loads and now call `formatLoadKg`; `app/profile/[userId]/page.tsx`'s `formatVolume` is
+  **excluded with its reason** — a lifetime tonnage with `kT`/`T`/`kg` tiers, deliberately whole,
+  and spacing only its bottom tier would leave the three disagreeing.
+  `components/ui/__tests__/rv208-one-load-unit-spacing.test.ts` holds it, sibling of the duration
+  guard. **Its first version passed its own control run** — the regex matched only `${x}kg` and
+  half these sites are JSX `{x}kg`, so it was checking less than it claimed; it keys on `}kg` now
+  and is control-run against both forms.
+  **Owed, and NOT obtained:** no render. The seeded account has no weights on any of the eight
+  surfaces, so nothing was seen at 412 px. The residual risk is a wrap, not a wrong value — an
+  added space in two tight cells (`pip-view`'s overlay, `week-day-sheet`'s truncated row).
+  `app/api/**` is excluded from the guard: its five `${x}kg` are LLM prompt text and a Google
+  Calendar description, **Lane A's** and not renders.
   ③ **The movement-category palette needs two new hues, and the clash is real.** `SESSION_PALETTE`
   is indexed by POSITION (amber, green, indigo, blue, purple, red) — so "Push orange, Pull green,
   Legs purple" is the owner's session *order*, not a name map. Movement Balance uses
@@ -4114,12 +4234,34 @@ which is the right shape for something that can only be validated by living with
 - **Also for the device:** Body Battery's fill runs from about 45% to the right edge rather than from the left. That may be deliberate ("drains as you use it"). RV-205 should say which, and if it is deliberate, the bar needs a mark that makes the direction legible.
 
 ### [nutrition][app-shell] RV-213 — four empty meal slots take a full card each, with two "add" controls apiece — MOCKUP FIRST
+- **⛔ DECLINED 2026-09-27 — the owner said no to this one and yes to the other three in the same
+  sitting. Do NOT build it.**
+- **✅ HIS REASON, given when asked (2026-09-27): *"I like the original look; it shows the grouping
+  nicely with the space."*** So the empty height the finding measured is **doing work** — it is what
+  separates one meal from the next. Collapsing the slots would have saved ~150 px and cost the
+  grouping, which is the thing the screen is for.
+- **⚑ THIS IS A DESIGN PRINCIPLE FOR NUTRITION, NOT A ONE-OFF NO — record it and do not re-file it.**
+  A future sweep measuring blank space on the diary will reach the same finding and should stop
+  here: on this screen, **vertical space between meal cards is the grouping mechanism** and a
+  density change needs a new argument, not a repeat of this one.
+- **The finding itself was not disputed and is left on the record:** four empty meals render a
+  header `+` **and** a body `+ Add food` (`meal-card.tsx:73`, `:105`) — two controls for one action
+  — across roughly 320 px of mostly empty card. The mockup that was declined is in
+  [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html).
+- **Nothing is owed. Strike this entry** — a declined change is finished, not parked. Re-opening it
+  needs a new entry and a new reason, not a second attempt at this one.
+- **📐 MOCKUP SHOWN 2026-09-27 — [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html) ([hosted copy](https://claude.ai/artifact/U4aypd5Un44whR6exTjWqX)).
+  Before/after at the real **384 px dark viewport**, using the app's own tokens from
+  `app/globals.css`. **Proposed:** an empty meal collapses to one row — its name and a single `+`; meals with food keep the full card. Four empty meals go from roughly **320 px to 170 px**.
+- **Gate cleared 2026-09-27** — DECLINED, so nothing is owed by him. Do not build.
+  so the next act was to PRODUCE one and that is work, which must stay ungated. It exists, so what
+  is outstanding is his answer, and the gate parks the entry honestly. (This is the transition
+  `LB-163` describes; applying it before the picture existed is the trap.)
+- **The trade:** adding to an empty meal becomes a `+` rather than a labelled full-width row. Still a 44 px target, but a smaller one.
 - **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added; his answer is now the only outstanding thing.**
   Rendered from the *running app* at **384 px dark** rather than drawn, in one sitting with `LB-163`
   and `LA-136` as this entry asks: <https://claude.ai/artifact/SQxd9yfvjcbnZVseiPVwHh>.
-- **Gate: owner** — the mockup has been shown; the collapse is his pick, as the entry says.
-- **Ask** — owner: collapse an empty meal to one row with its name and a single `+`, accepting
-  that the `+` must grow to 48 px as part of it? `Ask:` for the same reason as `LA-136`.
+- _(historic gate note)_ — the mockup has been shown; the collapse is his pick, as the entry says.
 - **The heading says FOUR empty slots; the render showed SIX**, so the count below undercounts it.
   Collapsing them takes roughly **1,400 px → 800 px**, and two cards previously under the fold — the
   goal-versus-budget explainer and "Finished logging for today?" — reach the same screen.
@@ -4182,7 +4324,16 @@ which is the right shape for something that can only be validated by living with
   1. Settle which number the ring's denominator is, and make the explainer name that one. — **A.**
   2. Make "burned" on Day and Nutrition come from the same function. — **A.**
   3. ~~Fix the three copy bugs.~~ — **DONE** (two shipped, one already fixed).
-  4. Draw zero days. — **A**, in the route, for the reason above.
+  4. Draw zero days. — **A**, in the route, for the reason above. **⚠ But NOT the route alone —
+     re-verified 2026-09-27 (Lane A), and shipping it alone is a regression.**
+     `weekly-nutrition-chart.tsx` computes its "7-day avg" as `sum / data.length`, so padded zero
+     rows would count an unlogged day as 0 kcal and drag the average down. Its empty state keys
+     on `data.length === 0`, which padding makes unreachable. **And a live bug the padding would
+     mask:** the chart emphasises `i === data.length - 1` as today (full opacity, orange over
+     target). With gaps, on any morning before the first log, that is **yesterday's** bar.
+     **Shape:** the route pads with `logged: false` on empty days, and the chart (Lane B) averages
+     over logged days only, keeps an empty state for "nothing logged this week", and emphasises the
+     bar whose `date` is today. Ship both in one PR, or the chart first. Never the route first.
 - **Nothing here is Lane B's any more.** ①② are a reconciliation across routes, and ④ is the route
   under-delivering on its own window.
 - **Adjacent:** RV-164 and BF-154 touched the budget. Read them first. The calibration itself is not in scope.
@@ -4565,30 +4716,6 @@ which is the right shape for something that can only be validated by living with
 - **Keep:** the device check. Zone minutes appear on the Activity surfaces, and the new floor
   changes what those read for every past day; nothing here was seen on the phone.
 
-### [platform] LB-170 — the rate limiter's flush outlives the request, and under test it outlived the file
-- **Lane: A** — `lib/rate-limit.ts`. **Added:** 2026-09-27 · split out of `LB-168` once that was root-caused.
-- **Why it is split out rather than a `Keep:` on `LB-168`.** `LB-168` was a CI-health defect and it is
-  fixed; this is a latent behavioural one in Lane A's file with no live symptom. Left inside that
-  entry it would read as verification debt on something already shipped.
-- **What, measured.** `scheduleFlush` fires `(async () => { … })()` and nobody awaits it, so a DB
-  round trip (`ensureSchema` + an upsert on `rate_limits`) continues after the request that started it
-  has been answered. `inFlightFlushes` tracks the promises and **`_awaitRateLimitFlushes()` is already
-  exported for exactly this** — six test files call it. Nothing in the request path does.
-- **How it surfaced:** under vitest the flush landed after its test file had returned, which is how
-  `LB-168`'s teardown race happened. That half is fixed at the logging end, so this is now invisible
-  rather than absent — the write still happens late, it just no longer prints.
-- **Why it may be fine, and why that should be decided rather than assumed.** In production the
-  process is long-lived, so a flush completing after the response is the intended design (the comment
-  at the top of the file says so: the L1 map is the synchronous fast path and the DB is caught up
-  behind it). The question is the **shutdown** case — a Railway deploy replacing the container mid-flush
-  drops that increment silently, which is the same class as the accepted lag already documented there.
-- **What is actually owed:** a judgement, not necessarily a change. Either await the drain on shutdown
-  (there is no cron layer or lifecycle hook here — see `docs/module-map.md` §0, so this may cost more
-  than it saves), or write one line in `lib/rate-limit.ts` recording that a lost increment on deploy
-  is accepted, so the next reader does not re-open it. **Prefer the second unless the first is cheap.**
-- **Do NOT "fix" it by draining in the test setup** — measured on 2026-09-27, that takes the suite
-  from 348 s to 482 s and fails 70 files. `LB-168` has the numbers.
-
 ### [readiness][platform] LA-142 — four `oura_daily_derived` columns have no writer (and the two that looked worst DO have one)
 
 - **Lane: A** — `lib/oura-ble/rollup/run.ts`, `oura_daily_derived`.
@@ -4766,6 +4893,37 @@ unverified"* is now answered: it persists.
     those columns**, after a day of production: a short grid points at the ds window or at
     `dsToMs` dropping rows; a full grid means the floors are being evaluated on something other
     than what is stored.
+  - **Read attempted 2026-09-27 12:14 UTC (Lane A) — premature, not negative.** All 15 days
+    2026-09-13 → 09-27 carry a gate (`insufficient_met` ×13, `scorer_no_output` on 09-25/09-26) and
+    **`training_load_grid_len` / `training_load_valid_min` NULL on every one.** Every gated path in
+    `computeTrainingStress` returns both numbers, and the only other writer — the `oura_daily_derived`
+    `pushMutations` branch — COALESCEs, so it cannot null them. The shared `updated_at` (11:16 UTC,
+    after LA-161 deployed at 05:06) is a device push bumping the row, not the route running. **So the
+    route has not evaluated a day since LA-161 deployed.** The app asks it about TODAY only, when opened
+    (`sync-provider` warm, `training-stress-line`, `training-stress-badge`), so the first row with
+    numbers will be the next day the owner opens the app. Read that day; the older days will never
+    get them without a per-date call.
+  - **⚙ READ DONE 2026-09-28 (Lane A), and it resolves the "flat contradiction": the gate only ever
+    judges an UNFINISHED day.** The first row with LA-161's numbers is **09-28: grid 471, valid 343,
+    written 08:46 Brisbane.** At 08:46 about 526 minutes of the day exist, so a 720-minute floor
+    **cannot** pass. The route re-persists on every call but is only asked about **today**
+    (`sync-provider` warm, the line and the badge), and nothing ever evaluates a day after it ends.
+    So each stored `insufficient_met` is the verdict of whichever evaluation came last that day. A
+    morning one is guaranteed to fail, and the replay that "cleared both floors" read the day
+    **after** it finished. That is CLAUDE.md's *"treat today as a partial day"* rule, missed.
+    **Confirm with one evening read** (a grid ≥ 720 on the same day's row); strong, not yet observed.
+  - **So there are two layers, and the second is the 09-24 root cause again.** 09-25 and 09-26 read
+    `scorer_no_output`, which is **only** reachable once both floors pass, so those were late
+    evaluations of real days and the scorer still returned nothing. **The 09-24 NaN-validator
+    diagnosis is NOT refuted.** Hypothesis ① above ("a gap-filled series still returns null") was
+    measured in the sandbox, where `MANIFEST.json` is absent and the scorer returns null for
+    everything, so it proved nothing either way. Treat fix (b), filling the grid under a stated rule,
+    as the live proposal. It is a modelling assumption, so it goes through Tuning before Lane A
+    builds it.
+  - **The buildable half is filed as LA-170:** evaluate a day once it has ended, so the stored
+    verdict describes the whole day. Alone it only turns `insufficient_met` into
+    `scorer_no_output` on full days until the NaN fix lands. That is still worth having, because it
+    makes the stored reason honest.
 
 - **✅ ROOT CAUSE FOUND 2026-09-24, same session — and it is NOT insufficient MET data.** The label is
   overloaded: `computeTrainingStress` maps **every** null from `runTrainingStressScore` to
@@ -4874,6 +5032,25 @@ unverified"* is now answered: it persists.
   min(measured_at)`, which is the frames' extent and an upper bound on the grid's length. One user,
   one ring, the 9 days the hot window holds — days older than that live in `oura_raw_packed` and were
   not measured, so the 21-day gate run is only partly explained by this table.
+
+### [readiness][heart-rate] LA-170 — the training-load verdict is only ever computed for an unfinished day
+- **Lane: A** — `app/api/training-stress/route.ts`, `packages/shared/src/health/training-stress.ts`.
+- **Added:** 2026-09-28 · Lane A, from TN-79's LA-161 read.
+- **What:** `/api/training-stress` is asked only about today, and re-persists its gate on every call.
+  A day's stored verdict is therefore the last evaluation made *during* that day. A morning
+  evaluation cannot pass the 720-minute MET floor (09-28 at 08:46: grid 471). No path evaluates a
+  day after it ends, so every stored `insufficient_met` may be describing a partial day.
+- **Fix shape:** when today is evaluated, also evaluate the previous day if its stored verdict was
+  written before that day ended. That needs a record of *when* the verdict was computed, because
+  `updated_at` is bumped by device pushes (the sync-push branch COALESCEs into the same row). That
+  means a column (`training_load_evaluated_at`), so a migration **waits behind BF-214's numbering**.
+  Without it, re-evaluating on grid length alone would re-read a day of frames on every call for a
+  day the ring barely saw.
+- **What it will and will not change:** full days move from `insufficient_met` to a verdict computed
+  on the whole day, which today means `scorer_no_output` until TN-79's NaN fix lands. No score
+  appears from this alone; the stored reason becomes true.
+- **Done when:** yesterday's row carries a grid measured after its end, and a test pins that a
+  morning evaluation of today never becomes a completed day's final verdict.
 
 ### [activity] TN-76 — four of the Activity Score's six contributors do not behave as the model documents, measured off its own stored breakdown
 
@@ -5024,6 +5201,20 @@ volume7dKg,                             // likewise
   admin re-derive** for `body_battery_daily`, snapshot first, affected rows against prediction.
   This keeps his 2026-08-26 decision intact rather than reversing it. **State how many days move
   and by how much in the PR** — it is a stored number he reads.
+- **⚙ THE TOOL SHIPPED 2026-09-28 (Lane A); THE PRODUCTION RUN HAS NOT HAPPENED.**
+  `POST /api/admin/rederive-body-battery?from=&to=` (admin session, **dry-run unless `dryRun=false`**,
+  31 days a call) recomputes each finished day through `computeBodyBatteryDay`
+  (`lib/health/body-battery-day.ts`). That is the function the live route now calls, so there is one
+  walk, not two. It walks midnight to midnight, **keeps each day's frozen anchor**, skips today and
+  any day with no stored row, and its summary reports `written`, the end-value delta (mean,
+  mean-absolute, min, max) and the recomputed end distribution (mean, at 0, at 100). **So "how many
+  days move and by how much" is the dry-run's output.** It could not be stated in the PR: the
+  sandbox has no admin session against production, and the read-only endpoint cannot run the walk.
+- **Keep:** the run. Snapshot `body_battery_daily` first, dry-run each 31-day page and read the
+  summary, then re-run with `dryRun=false` and check `written` matches the dry run. Three pages
+  cover the 84 days. The stress term uses today's daytime-HRV model for every day, because a
+  per-day model is not stored. It carries 0.020 of drain, so its effect is small, but it is not
+  zero.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, verifying TN-55's own acceptance test after
   the fix shipped. **This corrects my own plan**, not Lane A's implementation — the constants landed
@@ -5259,14 +5450,23 @@ volume7dKg,                             // likewise
   certainly the same root as BF-200**, which is the owner reporting Skull Crusher alone ignoring a
   deload in the 09-25 Upper session — same exercise, same session, same missing per-exercise
   prescription data. Whoever takes BF-200 should check whether fixing it also restores this.
-- **What is left, and it is one question:** what happened in 09-06 → 09-12. The database does not
-  hold it — session metadata is uniform across the boundary — so it needs the deploy history for
-  those dates, not another query.
-- **And one product question, not a defect:** should a bodyweight exercise carry a plan at all?
-  `planned_pct` is a percentage of a 1RM that bodyweight movements do not have. 23 of September's
-  49 gaps are this, and every future adherence figure is computed over a denominator that silently
-  includes them. Deciding it is `Lane: O`; until it is decided, adherence coverage should be quoted
-  over LOADED sets only.
+- **~~What is left, and it is one question~~ — ANSWERED 2026-09-28 (Lane A): the window is the
+  BASELINE CALIBRATION ROUND, by design.** 09-07 to 09-12 is exactly **one workout for each of the
+  five sessions** (Pull, Push, Legs, Upper, Lower), the first after the 09-02 → 09-06 deload. Each
+  logged one set per exercise at up to **20 reps**, which is an AMRAP. Every session after it returns
+  to 10 planned sets. In the baseline phase `session-data.ts:215-216` sets `defaultSets = 1` and no
+  progression style, so there are no per-set percentages to write. Those 20 sets are a calibration
+  pass, not lost plans. **The deploy history was not needed.** BF-143 (09-12) touched the same
+  code, but it only stopped a *rebuilt* session skipping calibration.
+- **So TN-75's remaining work is small.** ① The loaded residue is Barbell Skull Crusher with no
+  `style_id`. That is BF-200's residue: the engine now deloads it (#1814), but it still records no
+  per-set plan until a style is assigned in Config, which is an owner action. ② The acceptance
+  criterion *"a set with no available plan is distinguishable from one never asked"* still holds.
+  Baseline sets cannot be told apart at read time, because `workout_sessions` stores no baseline
+  marker (`phase_type` is NULL across the boundary). It needs a column, so a migration, and it
+  waits behind BF-214's numbering. **Until then, quote adherence over loaded, non-baseline sets.**
+- **The bodyweight product question is split out as LA-169 (`Lane: O`)**, per the rule that an owner
+  decision must not sit inside a Lane A body.
 
 - **Where the mechanism is:** `claude_ro.set_logs.planned_pct` / `planned_reps` / `planned_rest_sec`,
   written on the set-log path; `exercise_logs.style_id` / `style_name` supply the per-set percentages.
@@ -5628,7 +5828,7 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
 
 ### [activity][platform] DV-19 — one treadmill walk is three rows on the device, and the list shows it twice
 
-- **Lane:** A — the activity write/sync path; B for the list if the rows are legitimate.
+- **Lane:** A — the activity write/sync path (② shipped); B for ③, the summary saving on every mount.
 - **Added:** 2026-09-26 · Device Verification, sweep 4a (seen while checking BF-107).
 - **Measured (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** The 2026-09-24 treadmill walk (~09:18–09:59) is **three** `activity_logs` rows in
   the local store, all `synced`, none deleted:
@@ -5637,8 +5837,22 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   - `4b5c23e0` `09:18`–`09:58` (no seconds), calories NULL (updated 23:19:12.887Z).
   Health → Training → *Activities this week* shows **two** "Treadmill interval walk · 24 Sept · 40 min ·
   133 kcal" rows.
-- **Not established:** what the server holds (my read of `/api/activity-logs?date=` returned an empty list,
-  and its parameters are unverified), and which write created the 09:18 pair 0.4 s apart.
+- **~~Not established~~ — traced 2026-09-28 (Lane A), production read-only.** The server holds **two**
+  rows. `b8083d04` was created **09:18:27, at the walk's start**, with the plan's 40 minutes. `d0231b08`
+  was created 09:59:28, at its end. Three causes, two of them already fixed:
+  ① **The 09:18 row is a walk ended within seconds and saved at the PLAN's duration.** That is
+  BF-190 and BF-191 (#1570), which shipped on 09-25, the day after this walk. It is not reproducible on current code.
+  ② **The third device row is an orphan, fixed 2026-09-28.** The device saved `4b5c23e0` at 09:18.
+  The push merged it into `b8083d04` on the server's `(user, date, start_time)` key and kept the
+  server's id, so `4b5c23e0` was confirmed `synced` and never came back. `applyDelta` now retires a
+  synced row at the same minute as an applied server row. **The same merge also landed a new activity
+  on a TOMBSTONE and left it deleted**, which is fixed with it: a different id now revives the row.
+  ③ **Two saves 45 s apart for one walk** (09:18:27 server, 09:19:12 device). The summary saves on
+  every mount (`savedRef` is per mount), so a remount writes a second row under a new id. **Lane B,
+  not traced further.** Check whether `WalkSummary` can still remount after LB-141 (#1812).
+- **What the owner's data still holds:** `b8083d04` is a genuine server row for a walk that did not
+  happen as recorded. Delete it from the list. `4b5c23e0` stays on this phone until `b8083d04`
+  changes, because the retire runs when the server row is applied. Deleting `b8083d04` does that.
 - **Pass test (device):** one walk produces one row, and the list shows it once.
 
 ### [nutrition][platform] DV-15 — a deleted food came back on the device as "synced" while the server had deleted it
@@ -6239,6 +6453,24 @@ drift.
   **state how many days it would have moved**. That is the standing bar for anything that changes
   numbers he reads daily, and it is the honest test of whether the corrector works at all.
 
+### [workouts] LA-169 — should a bodyweight exercise carry a prescribed plan at all?
+- **Lane: O** — a product preference: what the app should prescribe, not how.
+- **Ask** — owner: for Chin-Up, Pull-Up, Hanging Leg Raise and other bodyweight movements, should the
+  workout screen prescribe a target (reps per set) the way it does for loaded lifts, or only record
+  what you did?
+- **Added:** 2026-09-28 · Lane A, split out of `TN-75` so it reaches the Orchestrator.
+- **⭐ Recommendation: prescribe reps only, and record them as the plan.** A bodyweight movement has a
+  rep max (the app already stores and inverts one, #1120/#1133), so "8 reps, 3 sets" is prescribable.
+  `planned_pct` stays empty because it is a percentage of a lifted 1RM. Over time this makes adherence
+  measurable on those exercises too, with no new column.
+- **Alternatives.** *Record only, no plan:* the simplest, and honest if you never follow a target on
+  these, but they stay outside every adherence figure. *A load-style plan through added weight:*
+  better if you mostly train them weighted, but it misstates an unweighted set.
+- **Why it matters:** 23 of September's 49 sets with no plan are bodyweight. Until this is decided,
+  Tuning quotes adherence over loaded sets only.
+- **Reversal cost: low.** It changes what the workout screen shows and writes going forward. Nothing
+  already stored changes.
+
 ### [app-shell][heart-rate] LB-172 — Resting HR is drawn as a score, and neither proposed fix fits
 - **Lane: O** — the remaining fork is a visual-language decision on the card he reads every morning.
   Ungated on purpose: a mockup does not exist yet, so producing one is the next act and `Gate: owner`
@@ -6424,6 +6656,27 @@ drift.
 - **Lane:** A — `packages/shared/src/1rm.ts` (`resolveWorkingBasisWithSource`), `app/api/workout-data/route.ts` (`getLastRealOneRmBatch`).
 - **Added:** 2026-09-26 · BugFix intake. Owner, mid-deload on Upper: *"I went through with the deload routine. But it seems like skull crusher weight is the same as my active workout. Why's that?"*
 - **Needs:** — nothing.
+- **⚙ SHIPPED 2026-09-28 (Lane A): the deload now reaches an exercise with no style.** Root cause,
+  from production and then the code: Skull Crusher has had **no progression style** since
+  2026-09-10 (`session_exercises.style_id` NULL; its logs carry no `style_id` from that date),
+  and on 09-25 the AI prescription was not driving the load. The four styled exercises took their
+  base style and the Q-185 deload override (`packages/shared/src/workout/session-data.ts`) swapped in
+  the deload style: logged `deloaded`, 2 sets, `planned_pct = 52`. Skull Crusher had a null
+  `progressionStyle`, and that override **required a non-empty one**, so it was skipped: logged
+  `deloaded = false`, 3 × 30 kg, no `planned_pct`. The deload style comes from the goal alone, so
+  the requirement only ever exempted style-less exercises. Removed.
+  **Neither candidate (a) nor (b) above was the mechanism:** the basis was never consulted, and there
+  was no deload pct to misapply. The id-mismatch idea was checked too: the stored prescription's
+  `sessionExerciseId`s match all five current exercises.
+- **Keep:** three things the fix does not touch.
+  ① **How the style came off Skull Crusher around 2026-09-10.** A config save that dropped it, or a
+  remove-and-re-add, would each leave it style-less. The owner can simply re-assign one in Config;
+  whether a save path can drop a style is the Lane A question.
+  ② **A style-less exercise logs no `planned_pct` on ordinary days either**, which is part of
+  TN-75's coverage drop. The deload case is fixed; the normal case has no style to plan from, so it
+  needs a decision on a default, not a bug fix.
+  ③ **The 57.75 kg PR (2026-08-13) against a current 36.5** still looks inflated, as noted below. It
+  played no part in this bug.
 - **⚙ A SECOND SYMPTOM, same exercise, found 2026-09-27 (Lane A) while decomposing TN-75.**
   Barbell Skull Crusher is the ONLY loaded exercise in September with no `planned_pct` on any
   set — 6 sets across 09-19 and 09-25, including the very Upper session in the table below — and
@@ -6570,6 +6823,20 @@ drift.
 - **Lane:** A — `packages/shared/src/ai-periodization/generate-prescription.ts` (the session-level deload builder).
 - **Added:** 2026-09-26 · BugFix intake. Owner, on a Saturday Upper reading *"AI Prescription · Deload"* with `Full` selected: *"How am I supposed to select a full workout when the prescription is deload?"*
 - **Needs:** — nothing.
+- **⚙ SHIPPED 2026-09-28 (Lane A), as recommended below.** `buildWholeSessionDeloadPrescription`
+  (`packages/shared/src/ai-periodization/generate-prescription.ts`) now records `preDeload` on every
+  exercise that has a base style. The numbers are the program's own, fitted to today's budget: the
+  plan `buildRulesPrescription` builds, since a whole-session deload has no model numbers to keep.
+  `session-data` already turns `preDeload` into `preDeloadStyle`, and `applyDeloadReverts` already
+  clears `deloaded` on revert, so `Full` now restores the session and its sets count toward the 1RM.
+  No client, route or schema change. An exercise with no base style gets no `preDeload` and stays
+  deloaded under `Full`, which is how the per-exercise path behaves without a record.
+  **Applies to prescriptions generated after deploy.** The stored Upper and Pull prescriptions keep
+  their dead toggle until they are next regenerated.
+- **Keep:** two things this does not touch. ① `ai-prescription-card.tsx:260`'s *"you would need a
+  new prescription for that"* still names a remedy that does not exist. It now shows only for an
+  exercise with no base style, and is Lane B's copy. ② `deloadReason` is NULL on every stored
+  prescription, so neither the card nor anyone reading the data can say why a session was deloaded.
 
 - **He cannot, and the card is right to say so. The defect is upstream of the card.** `Full` works by
   REVERTING each exercise to the `preDeload` block the prescription recorded (`deloadRevertNames`,
@@ -7300,17 +7567,44 @@ drift.
 
 
 ### [cardio][activity] RV-166 — no prescribed run has ever been marked done, although the owner does most of them as walks
-- **✅ ANSWERED 2026-09-27 — and the answer is a DESIGN INSTRUCTION, not the yes/no that was asked.**
-  Verbatim: *"the walk/run section should be combined in the cardio hub; and would require one or
-  the other to be done."*
-  So: **merge walk and run into one section in the cardio hub, and completing EITHER satisfies the
-  prescription.** That resolves the finding — no prescribed run has ever been marked done while he
-  does most of them as walks — by removing the distinction rather than by ruling on it.
-  **⚠ This is an information-architecture change to a screen he uses, so it OWES A MOCKUP FIRST**
-  (CLAUDE.md: merging sections on a daily screen gets a mockup at 384 px dark and a yes before any
-  code). **Show it in the same sitting as `LA-136`, `LB-163` and `RV-213`** — that makes four.
-  The compliance/streak consequences need naming in the mockup: every past run day becomes
-  completable, so adherence figures move.
+- **✅ APPROVED 2026-09-27 — build it, WITH the walk flow below. Mockup:
+  [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html),
+  sections RV-166 and RV-166b.**
+- **The owner's added requirement, verbatim:** *"I will mostly do my treadmill walk; so when I click
+  walk; id like to be able set a guided walk - or just a treadmill walk + time. Or perhaps it could
+  even say x amount of minutes in x zone rate to count as complete."*
+  **Take both halves, they are complementary.**
+  **① State the criterion in ZONE terms on the card** — *"25 min in Zone 2 · 107–134 bpm"* with live
+  progress against it, rather than an opaque done/not-done.
+  **② Tapping `Walk it` offers two routes:** a **guided walk** (app paces, counts zone minutes
+  live) or a **treadmill walk + duration** from preset chips. Two taps for the common case.
+- **⚑ THIS ONLY WORKS BECAUSE OF `TN-78`, SHIPPED THE SAME DAY (#1774) — do not build one without
+  the other.** The moderate floor moved from 60% to **40% of heart-rate reserve**: at 60% it was
+  **134 bpm**, which he hit on **3 of 31 days**, so a treadmill walk earned ZERO zone minutes and a
+  zone-stated criterion would have been unreachable on foot. At 40% it is **107 bpm**, hit on
+  **24 of 31**. A zone-worded target on the pre-TN-78 floor would have been a target he could not
+  meet by walking.
+- **✅ FULLY SPECIFIED 2026-09-27 — the last open question is answered: a treadmill walk with NO
+  heart-rate data DOES count.** Count the logged minutes toward the target and mark the day
+  **estimated**. Refusing to complete a walk he actually did is the worse failure, and he took that
+  recommendation.
+  **⚑ REUSE THE EXISTING CONVENTION — do not invent a flag.** `packages/shared/src/health/observed-hr.ts:125`
+  already models this exact distinction as **`source: 'observed' | 'estimated'`** on
+  `MaxHrResolution`, and `body-battery-inputs.ts` and `hr-profile.ts` use the same shape. A
+  discriminator beats a boolean here for the reason that file demonstrates: it says *where the
+  number came from* rather than *whether to trust it*, so a third source can be added later without
+  rewriting every reader. Check `docs/module-map.md` before adding anything new.
+- **📐 MOCKUP SHOWN 2026-09-27 — [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html) ([hosted copy](https://claude.ai/artifact/U4aypd5Un44whR6exTjWqX)).
+  Before/after at the real **384 px dark viewport**, using the app's own tokens from
+  `app/globals.css`. **Proposed, to his instruction:** one *Today's cardio* card at the top of the hub holding the prescription and both ways to satisfy it, with either marking the day done.
+- **Gate cleared 2026-09-27** — approved and fully specified, walk flow included.
+  so the next act was to PRODUCE one and that is work, which must stay ungated. It exists, so what
+  is outstanding is his answer, and the gate parks the entry honestly. (This is the transition
+  `LB-163` describes; applying it before the picture existed is the trap.)
+- **⚠ THIS ONE MOVES STORED NUMBERS, unlike the other three.** Every past run day becomes completable, so adherence, streaks and compliance all shift once it ships — **quantify how far before merging.**
+- **⚠ Its BEFORE pane is rebuilt from the components, not screenshotted** — the hub needs live data the sandbox does not have. The other three befores come from source, and `LB-163`'s was independently reproduced in the Playwright harness.
+- **(Superseded 2026-09-27: this entry previously read *"owes a mockup first"*. The mockup was
+  drawn, shown and answered the same day — the approval above is the current state.)**
 
 - **Lane: B** — `components/guided-walk/walk-summary.tsx`, after the owner's answer in RV-170.
 - **Needs:** RV-170 — the rider question below is the block, and it was carried in prose only, so `next-item.js` offered this entry as READY twice (LB-142, 2026-09-24).
@@ -7439,10 +7733,19 @@ drift.
   the aggregate because it needs a freshness call, not a mechanism — `use-hr-profile.ts` argues at
   length against pinning this key and that argument has to be answered. **Re-measure first:** with
   the row fetch gone, `pg_stat_statements` now reports the small-window callers only.
-- **STILL OPEN — same shape, smaller.** `/api/health/trends` (`route.ts:73-84`) re-derives HR
-  recovery from raw HR, 2 queries per completed session over 14 days (~20), though
-  `workout_hr_stats.hrr1_best` is stored for **10 of 10**. Read the column — after a per-day
-  agreement check against production, which has not been done.
+- **~~STILL OPEN — same shape, smaller~~ — REFUTED 2026-09-28 by the agreement check it asked for.**
+  `/api/health/trends` re-derives HR recovery from raw HR, about 20 queries a call. This proposed
+  reading `workout_hr_stats.hrr1_best` instead. **The two are different statistics:** the trend plots
+  each session's **median** set HRR1 (`sessionHrr1Median`), and `hrr1_best` is the session's **max**
+  (`summariseWorkoutHr`). Measured against production for all 32 completed sessions in 45 days, they
+  disagree on **32 of 32 days**, with the column higher by 3 to 36 bpm/min. Reading it would redraw
+  the chart as a different metric, not make the same chart cheaper. A cheaper route would need a
+  stored per-session *median*, which is a migration. Nothing measured says the route's cost is worth
+  one: it is rate-limited to 10 a minute, and its query cost was never measured. **Not done, on
+  purpose.** The check also turned up LA-168 (fixed 2026-09-28): the raw HR under ring-only workouts has thinned since
+  the snapshots were taken, so this route's live re-derivation and the recap's stored number have
+  drifted apart.
+
 
 ### [devices][platform] RV-182 — per-ingest database work that does nothing or grows forever
 
@@ -7483,29 +7786,20 @@ drift.
 - **Checked and fine:** all three `oura_raw_samples` indexes are used, so its 45 MB is bloat (Q-540),
   not dead indexes. The cache hit rate is 99.9%, and nothing is idle in transaction.
 
-### [workouts][platform] RV-174 — a deleted program or progression style never leaves the device's mirror
 
-- **Lane: A** — `lib/data/postgres/slices/programs.ts:435,866`, `lib/local-store/sqlite-backend.ts` `applyDelta`.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
-- **The gap:** both are hard deletes on tables with no `deleted_at`, and both tables are in the
-  delta by `updated_at`. The local `applyDelta` only upserts them, so deleted parents stay on the
-  device forever.
-- **Failure:** `assembleLocalActiveProgram` takes `find(isActive) ?? programs[0]`
-  (`program-assembler.ts:37`). After deleting active program A and activating B, the mirror can hold
-  two rows with `is_active=1`. Offline with no cached workout-data, the Workout screen then shows
-  the stale/reselect state (`workout-screen.tsx:376-395`). Online recovers it.
-- **Fix:** add a tombstone, or delete by absence as saved meals already do (`sqlite-backend.ts:2696`).
-
-### [workouts][platform] RV-175 — editing or deleting a logged exercise or session offline is lost, after a success toast
-
-- **Lane: A** — a mutation domain for these edits. Lane B for `lib/hooks/use-day-entry-mutations.ts:50,90,132`.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
-- **The gap:** PATCH `/api/workout-entry`, DELETE `/api/workout-entry` and DELETE
-  `/api/workout-sessions` are API-first, and mirror to the local store only after a 2xx.
-  `pushMutations` has no domain for them.
-- **Failure:** offline, *"Updated"/"Deleted"* toasts first, then *"Failed to …"*. Nothing is queued,
-  so the edit is gone. That breaks the offline-first checklist's item 1. Only `handleDeleteActivity`
-  in the same hook was converted (Q-328).
+### [workouts] LA-166 — offline edits and deletes of logged work toast success and are lost: queue them instead
+- **Lane: B** — `lib/hooks/use-day-entry-mutations.ts` (`handleEdit`, `handleDelete`, `handleDeleteSession`).
+- **Needs: LA-165**
+- **Added:** 2026-09-28 · Lane A, the client half of RV-175.
+- **What:** the three handlers `fetch` first and mirror locally only after a 2xx, so offline they
+  toast "Updated"/"Deleted", then "Failed to …", and nothing is queued. Once LA-165 lands, write
+  locally in pending mode and `queueMutation` the matching domain: `exercise_log_edit`
+  (`{ exerciseLogId, weights, reps }`), `exercise_log_delete` (`{ exerciseLogId }`) or
+  `workout_session_delete` (`{ workoutSessionId }`). Payload schemas are in
+  `lib/workout/exercise-log-edits.ts` and `lib/workout/delete-session-reconcile.ts`. `handleDeleteActivity` in
+  the same hook is the reference (Q-328).
+- **Done when:** offline, each action toasts once, survives an app restart, and reaches the server on
+  reconnect. **Device check owed** — the local store is null on the web.
 
 ### [workouts] RV-184 — the AI prescription regenerates at workout open on days the completion already generated it
 
@@ -7519,6 +7813,26 @@ drift.
 - **Why it cannot be diagnosed today:** the fingerprint is only `{programSessionId, today}`. It
   leaves out `durationPreset`, `excludeSessionId` and which trigger fired.
 - **Fix:** add those three to the fingerprint, then find why the slot reads pending at open.
+- **⚠ RE-VERIFIED 2026-09-28 (Lane A): the premise is out of date, and the fix above would not find
+  anything.** Three facts against current `main`:
+  ① **Completion no longer generates a prescription.** `packages/shared/src/workout/complete-workout.ts`
+  only marks the slot `consumed`; the old `lib/workout/complete-workout.ts` that regenerated in-process
+  is gone. So the next open MUST regenerate, and "an open-time generation after the completion
+  produced one" describes a design that no longer exists. The only generators today are
+  `workout-data` at open (two call sites, `route.ts:552` and `:572`) and baseline completion.
+  ② **`excludeSessionId` is passed by nothing.** The `/prescribe` route accepts it and no client or
+  server caller sends it, so "which trigger fired" cannot be recovered from it either.
+  ③ **`ai_call_log.fingerprint` is stored as a 16-hex hash.** Adding fields splits the hashes; it
+  cannot make a trigger readable.
+- **What production actually shows (owner's rows, last 14 days, 19 calls):** one call per workout day,
+  plus a second for the same session 35-60 min later on 09-14, 09-15, 09-16 and 09-22, which fits
+  "open, train, reopen", now by design. **The one real anomaly is 09-16: two identical calls 7 s
+  apart**, which the 30 s cooldown exists to collapse. Candidates, unexamined: both `workout-data`
+  call sites firing in one request, or two replicas each missing the other's per-process cache.
+- **Revised next step:** find the 7-second pair's cause before instrumenting. If trigger names are
+  still wanted, they need a plain column (a schema change, so Lane A and after BF-214), not the
+  hashed fingerprint. Separately, `excludeSessionId` is a dead parameter: either wire it to a real
+  completion trigger or delete it with the comments that still describe one.
 
 ### [app-shell][platform] RV-183 — requests the client sends for data it already has
 
@@ -7584,8 +7898,28 @@ drift.
   (LB-150). `readTodayCacheSync()` keeps the unwrap in one place but is not TTL-aware, so a
   health-alert reconcile would act on a reading up to a Brisbane day old. **Do not hand-roll it at
   the call sites to keep the item in Lane B.**
-- **Still open:** the four `cachedFetchToday` reads above (blocked on the Lane A enabler), and the
-  other Lane A halves (`push-then-revalidate.ts`, `cache-groups.ts`, the 2N+1 post-write round).
+- **⚠ THE "ONE-LINE ENABLER" HAS AT MOST ONE LEGITIMATE CALLER — checked 2026-09-28 (Lane A)
+  against CLAUDE.md's RV-67 rule**, which disqualifies `freshWithinTtl` on any payload that is not a
+  pure function of stored rows the client can see being written:
+  - **`body-battery`: disqualified.** It drains with the clock, so its value changes with no writer
+    at all, and no invalidation group could ever catch that.
+  - **`readiness-score`: disqualified.** Its inputs are written server-side by the BLE rollup (sleep,
+    HRV, the derived scores). The client never observes those writes, so no proof can list them.
+  - **`next-session`: possible, not proven.** It is `getNextSession` (program, schedule, logs, rest
+    days, phase) **plus** the stored AI prescription (`getSessionPeriodization`) **plus** muscle
+    assignments. A proof has to show every one of those writers invalidates the key. The
+    prescription is written by the prescribe route and consumed at completion, which makes it the
+    one to check first.
+  - **The warm list's own read** inherits whichever of the above it warms.
+  **So do not expose the parameter on its own.** Ship it only in the PR that writes the
+  `next-session` proof. A flag with no qualifying caller is an invitation to add a disqualified one.
+- **Still open:** `next-session`'s proof (above), and the other Lane A halves
+  (`push-then-revalidate.ts`, `cache-groups.ts`, the 2N+1 post-write round). **On the 2N+1 round,
+  keep the immediate invalidate unless a change also handles a push that moves nothing.**
+  `pushThenRevalidate` revalidates only when `pushed > 0`. With LB-151's single-flight push, a
+  concurrent drain can carry this write and report 0 here, and dropping the immediate round would
+  then leave the screen stale for the key's TTL. One wasted request a log is the cheaper side of
+  that trade.
 - **✅ `LB-148` SHIPPED (2026-09-25):** the three reminder modules timed every notification in
   Brisbane or in the phone's zone. RV-176's sweep was `.tsx`-only and missed `lib/*.ts`; all 8 sites
   across the 3 modules now take the user's zone.
@@ -7635,36 +7969,6 @@ drift.
   **657 bytes**. The module list's sizes cannot be read as shipped bytes.
 - **Worth doing only if RV-186 shows script evaluation matters at cold start.** FCP is already
   1.02 s, and the service worker caches the chunks after the first load.
-
-### [platform] LA-145 — a date's SHAPE is checked in 25 files; its VALIDITY in 9
-
-- **Lane: A**
-- **Added:** 2026-09-25 · split out of RV-177, which closed the same day. RV-177 fixed four
-  date-validity gaps one at a time and the pattern under them was never filed, which is what this
-  entry is for. **The counts here are measured, not estimated** (`grep -rl` over `app/ lib/
-  packages/`, 2026-09-25): **25 files** carry the `^\d{4}[-/]\d{2}[-/]\d{2}$` shape regex, **9**
-  reach `isCalendarDate` or `normalizeDateParamIso`.
-- **Why the shape is not the check.** The regex accepts `2026-02-31` and `2026-99-99`. Both then
-  reach a `date` column and fail at the driver — `22008 date/time field value out of range` — which
-  surfaces as a bodiless 500, or, on a batch route, takes every record travelling with it. RV-177
-  measured exactly that on `sync-health`: a three-day payload with one bad day wrote none of it.
-- **The 11 files with a shape regex and no validity check**, as measured:
-  `app/api/admin/timing-baseline/route.ts` · `app/api/dexa-scans/route.ts` ·
-  `app/api/measured-rmr/route.ts` · `app/api/nutrition/plan-meal-answers/route.ts` ·
-  `app/api/water-log/route.ts` · `packages/shared/src/validation/injury.ts` ·
-  `packages/shared/src/validation/supplement.ts` · `packages/shared/src/validators/chat.ts` ·
-  `packages/shared/src/validation/health-connect-ingest.ts` · `app/api/sync-health/route.ts` ·
-  `lib/observability/sentry-scrub.ts`
-- **⚠ The last three are known false positives and must not be "fixed" blindly.**
-  `sentry-scrub.ts` matches dates to REDACT them, not to accept them — validity is meaningless
-  there. `sync-health` and `health-connect-ingest` both route their dates through
-  `ingestDayRejection`/`resolveIngestDate`, which call `isCalendarDate` internally; the grep cannot
-  see through the import. **So this is per-file triage, not a sweep** — the count is the reason to
-  look, never the size of the fix.
-- **The fix per file is one of two things**, both already in the tree: `.refine(isCalendarDate)` on
-  the validator where the date is a plain field, or `normalizeDateParamIso` in the handler where it
-  arrives as a param. Prefer ONE of them per route — RV-177 added both to `body-metadata` and the
-  mutation pass showed the second killed nothing, so it was reverted.
 
 ### [platform] RV-179 — five Custom Rules checks have blind spots the census walked through, and one CLAUDE.md count is stale
 
@@ -8138,26 +8442,28 @@ drift.
 - **Not in scope:** the bottom-clearance halves, which need gesture navigation (§2.1), and the
   owner-present rows (RV-157).
 
-### [platform][app-shell] RV-150 — DEVICE PROBE: fail one read endpoint at a time and see which cards vanish
+### [app-shell][activity] LB-175 — two surfaces still read as an empty account when their reads fail cold
 
-- **📱 ANSWERED for warm revisits (S25 · web v1.465.66 · APK 1.465.52 · gesture nav · sweep 4a, 2026-09-26).** Blocking each of 24 read endpoints in turn (Home 4,
-  Nutrition 6, More 4, Health 10) and revisiting the tab: **nothing visible changed in any case** — no
-  section lost, no error or "may be stale" signal, identical text. A failed refetch is invisible: every
-  card keeps its cached value as if current. Not tested: a failure with no cache (cold start).
-
-- **Lane: B** — re-laned 2026-09-26 (OR-175) off `DV` after sweep 4a.
-  **Answered: a failed refetch is invisible — no stale signal reaches the user.** This is the
-  `Q-499` shape (`cachedFetch`/`useCachedValue` swallow `!res.ok` unless the caller passes
-  `onError`), so the fix is at the call sites in `components/**`. Lane B.
-- **Added:** 2026-09-24 · Review. Method: **P18**.
-- **Why:** CLAUDE.md requires every self-fetching card to show a failure state (Q-499), because
-  `cachedFetch` swallows `!res.ok` unless the caller passes `onError`. RV-103 found one card showing
-  a stale number with no failure line, **by hand, on one screen**. `Fetch.enable` can fail any single
-  `GET /api/*` on the phone, so the whole app can be checked in one sitting.
-- **The falsifiable claim:** for each read endpoint, every card that reads it shows an error or
-  offline state when that endpoint returns 500 or never answers. **FAILED** per card that vanishes or
-  shows a stale value as current. Report it as a table (endpoint × card × outcome).
-  - **Never fail a write or `/api/sync/*`.** This probe is read-only by construction.
+- **Lane: B** — `app/session-select/session-select-content.tsx` (Home), then the Health tab.
+- **Added:** 2026-09-27 · Lane B, measured while shipping RV-150's fix.
+- **What:** RV-150's device sweep tested a WARM app and found nothing visible changed anywhere. The
+  case it names as untested — a failure with **no cache** — was measured at 412 px by clearing
+  storage and failing every `GET /api/*`, and it is a different answer. Three surfaces were fixed in
+  that PR; these two are what is left.
+  | surface | under a cold failure | honest? |
+  |---|---|---|
+  | Home | *"Your week in review didn't load"*, *"Couldn't load today's timeline"*, em dashes for the numbers | **yes** — the reference for this class |
+  | Home · body battery | the whole **BODY BATTERY** card and its explainer are absent | no |
+  | Home · greeting | *"Good morning, <name>."* and the avatar initials are absent | no |
+  | Health | 8 honest failure lines, but **GOALS**, **ESTIMATED 1RM** and **AVG DURATION** are absent | partly |
+- **Why it is not a one-line fix:** the leaf cards do not fetch. `body-battery-card.tsx` takes its
+  series as a prop and returns null under two points; `{bodyBattery && <BodyBatteryCard …>}` in the
+  parent is what removes it. The owner of each read is the screen, so the fix is one flag per read in
+  `session-select-content.tsx`, not an `onError` on a card.
+- **Done when:** a cold start with the reads failing names each absent section on Home and Health,
+  the way `/more/details` now does. `e2e/rv150-failed-read-says-so.spec.ts` is the shape to extend —
+  it must keep a healthy-cold-start case, or a component that always renders the line passes.
+- **Not in scope:** Nutrition's cold-start zeros, which are on `RV-103`.
 
 ### [platform] RV-151 — DEVICE PROBE: how long the phone keeps running old code after a deploy
 
@@ -8259,6 +8565,14 @@ drift.
   flakiness has a fix rather than an explanation. It is still strictly additive — absent the flag
   nothing renders, which is today's behaviour — and it is still **not observed on the device**, so
   it must not be written up as proven until ① is done.
+- **⚑ A SECOND, MEASURED DEFECT — cold start, 2026-09-27 (Lane B, while shipping RV-150).** With
+  storage cleared and every `GET /api/*` failing at 412 px, the card renders **`0 KCAL`**, *"Set a
+  calorie goal to see what's left"* and **`0 g`** for protein, carbs and fat, and the whole meal list
+  is absent. That is a failure stated as fact — the RV-87 shape — and it is worse than the vanishing
+  RV-150 fixed elsewhere, because the reader has no way to tell it from a day with nothing logged.
+  `energy-card.tsx` takes `breakdown` as a prop and defaults each figure with `?? 0`; the gate
+  belongs beside the `refreshing`/failure slot this entry already built, not in the card's defaults.
+
 - **⚑ REOPENED AS LANE B WORK 2026-09-27 (OR-182) — the `Keep:` filed a live defect as residue.**
   Sweep 4a passed the original fix and found a **new** one, 1 of 1: after using **Retry**, deleting
   that food left the card on 1,454 for 16 s+ while the server's balance said 1,534, and a tab swap
@@ -8525,6 +8839,14 @@ drift.
   the sandbox can only prove the primitive is wired in.
 
 ### [platform] LB-135 — an owner gate is recorded as satisfied without preserving what he approved
+- **✅ THE CLASS IS FIXED FOR THE 2026-09-27 BATCH, though this entry's own artefact is still lost.**
+  Four mockups (`LB-163`, `LA-136`, `RV-213`, `RV-166`) were produced and **committed to the repo**
+  as [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html)
+  rather than shown only in a chat, which is exactly the failure this entry records. **The
+  convention to follow: a mockup is not shown until it is in `docs/design/`** — an approval whose
+  artefact lives in a transcript is an approval no implementer can build to.
+  **What is STILL owed here is unchanged:** the 2026-09-22 Home IA mockup that `RV-119` was approved
+  against was never saved and cannot be recovered from this repo. That one has to be redrawn.
 
 - **Lane: O** · **Added:** 2026-09-23 · Lane B, found while taking `home-ia-merge`.
 - **RV-119, RV-117 and RV-118 all carry "Owner gate SATISFIED 2026-09-22 — mockup shown at 384 px
@@ -8644,24 +8966,6 @@ drift.
 - **⚑ `docs/implementation-backlog.md` already queues extracting these lines into
   `home-banner-stack.tsx`** as a *file-size* task. That is the natural place to land this, and
   whoever takes it should do both rather than extract twice.
-
-### [platform] LB-151 — `pushMutations` has no in-flight guard, and several surfaces can call it at once
-
-- **Lane: A** — `lib/local-store/sync-engine.ts` (Lane B found it while shipping RV-122).
-- **Added:** 2026-09-25 · from RV-122's *"do not double-fire against `handlePullSync`"* note, which
-  turned out to describe a gap in the engine rather than in the card.
-- **Measured:** `pushMutations` (`sync-engine.ts:839`) holds **no concurrency guard** — the only
-  gate is `push5xxUntil`, a server-error backoff — so two overlapping calls both drain the outbox.
-  Eleven call sites reach it (`more-content.tsx:118`, `sync-provider.tsx:165`/`:220`,
-  `push-then-revalidate.ts:33`, `sync-health-card.tsx`, per-domain writes); the More tab alone has
-  two on one screen, the pull gesture and the card.
-- **⚠ NOT established, and must be before this is sized:** whether a double drain actually
-  double-WRITES. The push endpoint shows no dedup on a mutation id, but the per-domain handlers may
-  be upserts, which makes it wasteful rather than wrong. **Read a couple of the domain writers
-  first** — that decides whether this is a correctness bug or a bandwidth one.
-- **RV-122 slightly improves it:** "Retry all" sends one push for N failures where N taps sent N.
-- **Fix if real:** a module-level in-flight promise later callers await, the shape `cachedFetch`'s
-  in-flight map already uses for reads.
 
 ### [app-shell][platform] LB-152 — the hex→token migration is a visible app-wide restyle: which green and red do you want?
 
@@ -9492,23 +9796,6 @@ drift.
 - **Watch, unchanged:** a faster sheet gives its content less time to paint, so a sheet that fetches
   on open gets slightly more visible about doing so. That is the instant-paint rule's job (seed from
   `readCacheSync`) and a sheet ignoring it is a separate finding, not a reason to keep 500 ms.
-
-### [platform] RV-78 — `/api/next-session` serialises two independent queries, and one card fetches with no seed
-
-- **Lane:** A — `app/api/next-session/route.ts:14,18,30`; plus
-  `components/nutrition/reta/weight-response-card.tsx:53`. **Added:** 2026-09-20 · Review sweep 51.
-- `getSessionPeriodization` (`:18`) and `getExerciseMuscleAssignments` (`:30`) both depend on `:14`'s
-  result but **not on each other**, and run in series on Home's most-refetched endpoint
-  (`NEXT_SESSION_TTL = TTL_SHORT`, refetched on every tab entry).
-- Separately, `weight-response-card.tsx:53` is the **only** component across `components/health`,
-  `components/nutrition`, `app/more` and the tab screens that calls `cachedFetch` with no
-  `readCacheSync` seed — the last instant-paint gap in that set. It lives inside `reta/vial-sheet.tsx`,
-  so it costs a skeleton flash when that sheet opens.
-- **Fix:** wrap the two reads in one `Promise.all` keyed off the resolved session; add a seed to the
-  card or convert it to `useCachedValue`.
-- **Not established:** neither query was timed, so on a dataset this size the saving may be
-  single-digit milliseconds. Filed for the shape, not a measured win.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** lines are now `next-session/route.ts:14,19,31`. **The two queries are not independent**: `:31` runs on the list already filtered at `:25`, so a naive `Promise.all` passes the wrong list. Fetch assignments for the unfiltered list, then filter. `weight-response-card.tsx:53` is only the no-local-store fallback, so there is no flash on the APK; drop the card half.
 
 ### [readiness][platform] TN-56 — one admin-gated replay endpoint is the only thing standing between Tuning and 25 unmeasurable thresholds
 
@@ -14763,62 +15050,25 @@ that is inefficient only against a "Zone-2" label walking cannot satisfy.
 **Pass test:** the walk summary shows a number that differs between the owner's 2026-08-14 session
 (30.0% reserve) and 2026-08-18 (50.5%), where the zone bar reads identically for both.
 
-### [devices][readiness] LA-82 — the cardio hub catches nine reads and dies on the two it cannot see
-
-- **Lane:** A — `packages/shared/src/health/hr-profile.ts:68`, plus the four routes that call it.
-- **Added:** 2026-09-08, Lane A — found while writing the hub's PS-39 tests, then measured by
-  failing each read in turn rather than read off the source.
-
-`GET /api/cardio-week` wraps nine of its eleven repository calls in `.catch(() => [])`, which is a
-clear statement that the hub should degrade rather than fail. **It does not, for two of them.**
-`resolveHrProfile` runs before the `Promise.all` and guards only one of its own three reads:
-
-```ts
-const [user, bodyMetrics, hrRows] = await Promise.all([
-  repo.getUserById(userId),                                            // unguarded
-  repo.listBodyMetrics(userId, from28dIso, todayIso),                  // unguarded
-  repo.getHrForWindow(userId, observedFrom, new Date()).catch(() => []),
-])
-```
-
-Measured by failing each read in turn: `getUserById` and `listBodyMetrics` take the whole route
-down; the other five are absorbed. **So the route's own four `.catch`es on `listBodyMetrics` are
-dead defence** — the profile has already thrown before any of them can run. `cardio-trends`,
-`hr-profile` and `zone-minutes` call the same resolver and inherit the same shape.
-
-**The asymmetry inside one `Promise.all` is the tell**: one of three lines has a catch. And the
-resolver is already built for missing data — `RESTING_HR_DEFAULT` covers no readings, and
-`ageFromDob` handles a null user — so it survives *empty* results and only dies on a *failed* read.
-
-**The two halves are not equally safe, and the first version of this entry missed that.** Measured
-2026-09-08 before implementing: they need different fixes, and one of them is the owner's.
-
-- **`listBodyMetrics` (resting HR) is safe to guard.** `restingHrSource` already distinguishes
-  `'measured'` from `'default'`, so adding `'unavailable'` makes a failed read legible rather than
-  silently confident. Two lines, cheap to reverse.
-- **`getUserById` (age) silently moves the training zones, and nothing marks it.** Age feeds
-  `hrMaxFromAge`, which returns `220 − age` or **190** when there is no age. For this owner that is
-  **184 → 190, a 6 bpm shift across the whole zone scale** — and `maxHrSource` still reads
-  `'estimated'`, identical to the ordinary estimated case. So guarding it without a marker converts
-  a loud failure into a quiet wrong answer, which is the shape this repo keeps paying for.
-
-- **✅ THE SECOND OF THE TWO QUESTIONS IS DECIDED, 2026-09-25 (Orchestrator) — it was never his.**
-  *Where the marker belongs:* **a new `maxHrSource` value, not a separate `degraded` flag.* That field
-  already exists to say **where the max came from**, and *"his age could not be read, so this is a
-  default"* is exactly a provenance answer. A parallel boolean creates two fields that have to agree
-  and will eventually not — it would permit `maxHrSource: 'estimated'` beside `degraded: true`
-  without saying which estimate is meant, and every future reader would have to check both. One field
-  stays one source of truth. Reversal: one enum value and one consumer, so this is cheap enough that
-  deliberating it further costs more than being wrong would. Per CLAUDE.md's standing narrowing,
-  structural calls are the agent's and get written down rather than asked.
-- **✅ GATE STRUCK 2026-09-25 — RENDER the zones, with the degradation marked.** He took the
-  recommendation. A quota measured against a guessed max is wrong in a way the screen cannot show,
-  but hiding the whole cardio hub on what may be a transient age-read failure is the worse failure —
-  so it renders, and it says so. **Both halves of this entry are now settled:** the marker goes on
-  `maxHrSource` as a new value (decided by the Orchestrator above, structural), and the render
-  question was his and is answered. Nothing is owed by him.
-
-Ship the resting half whenever; it needs no decision.
+### [devices][readiness] LA-82 — the zones can now come from a default age or resting HR, and no screen says so yet
+- **Lane: B** — `components/health/observed-hr-card.tsx` and the cardio hub's heart section.
+- **Added:** 2026-09-08 · Lane A. **Engine half SHIPPED 2026-09-28 (Lane A).** `resolveHrProfile`
+  guards all three of its reads, and `/api/cardio-week` guards its own copy of the user read, so a
+  transient fault no longer takes the hub down. Each failure is named in the source field, as the
+  2026-09-25 decisions set out (a provenance value, not a flag; render the zones and mark them):
+  - `maxHrSource: 'estimated-age-unread'`: the age could not be read, so the max is the no-age
+    190, not 220 − age. For the owner that moves every zone boundary by 6 bpm.
+  - `restingHrSource: 'unavailable'`: the read failed and 60 was assumed. `'default'` still
+    means "no readings", which is a different thing to tell someone.
+  Both are in `/api/cardio-week`'s `heart` block, and `maxHrSource` is `workingMaxSource` on
+  `/api/hr-profile`.
+- **What Lane B owes:** show those two values. Today `observed-hr-card.tsx:41` tests
+  `=== "observed"` and renders everything else as an ordinary estimate, so an age-unread max reads
+  exactly like a real one. That is the "quiet wrong answer" the owner's decision ruled out. Wording
+  is the lane's call. The requirement is that a zone quota measured against a stand-in max or resting
+  HR says so on screen.
+- **Done when:** with `getUserById` failing, the hub renders and its zone section says the max is a
+  stand-in. Likewise for resting HR.
 
 ### [nutrition][body] OR-102b — the reta tracker: vial setup, dose calculator, dose timeline, weight response
 
@@ -33060,50 +33310,6 @@ adopted.
 
 - **Keep:** do not close this on "it has not happened again" — an intermittent lock-ordering bug is
   precisely the thing that looks fixed for weeks.
-
-### [platform] LA-89 — `oura/hr-sync` has no callers, and its name says something that is not true
-- **✅ APPROVED 2026-09-27 — DELETE `oura/hr-sync`.**
-  A route whose name claims something untrue is worse than no route: it is what misdirects the next
-  investigation, exactly as the dead `program_session_id` column already did once (`BF-143`).
-  **Prove it dead first and show the evidence** — no callers in `app/**`, `lib/**`, `packages/**`,
-  and nothing reaching it in production — per the 2026-09-27 standing policy. Removing the tests
-  pinned to it goes in the same PR.
-
-- **Lane:** A — `app/api/oura/hr-sync/route.ts`.
-- **Added:** 2026-09-09, Lane A — found while writing the route's first tests (PS-39). Tested and
-  pinned as it stands; **not deleted**, because removing an HTTP surface is the owner's call.
-- **✅ GATE STRUCK 2026-09-25 — he answered: DELETE the route and its test.** The gate asked the one
-  thing the repo could not: whether anything *outside* it calls `/api/oura/hr-sync` — a curl in a
-  runbook, a Tasker profile, an old APK. It does not. Re-verified the same day at **zero live callers**
-  in `app/`, `lib/`, `components/`, `packages/`, `android/` and `scripts/`; the only hits are two
-  comments in `app/api/complete-workout/` recording that the caller was removed, plus tests.
-  **Two facts found while re-checking, which is why the recommendation was to delete rather than rename:**
-  the route is **not admin-gated** (both of its neighbours in the same test file are), and it
-  **answers `success: true` even when the pipeline throws**, deliberately. Renaming would keep a
-  second way into the pipeline that Q-122 was closing. Reversal: restore ~50 tested lines from git.
-
-Two separate things, and only the second is a decision:
-
-**The name is stale.** It is not an Oura *Cloud* sync. That call was removed 2026-08-13 — the ring
-has been on our own BLE key since the 2026-07-07 re-key, so it could only ever earn a 401 — and the
-route is now a thin wrapper over `syncAndAttributeSessionHr`, which attributes HR the BLE pipeline
-has already ingested. Live code, wrong name. Anyone grepping `oura/` while working the Cloud
-retirement will read it as a leftover and may delete the wrong thing.
-
-**It has no callers.** Searched across `app/`, `components/`, `lib/` and `android/`: every remaining
-reference is a comment or a test asserting it is *not* called. `complete-workout` used to POST to it
-server-to-self, which burned a second request worker and a second pool connection per completion and
-failed outright ("fetch failed") **9 times in production**; Q-122 replaced that with a direct call to
-the shared function. The route was left behind.
-
-**The decision, and why it is not mine to take:** an HTTP endpoint can have callers this repo cannot
-see — a curl in a runbook, a Tasker profile, an old APK build. The safe order is to confirm nothing
-external uses it (a week of `error_events`/access observation, or the owner simply saying so), then
-delete the route and its test together. Renaming instead is the worse option: it keeps a second way
-to reach the pipeline, which is what Q-122 was removing.
-
-Cheap either way — the route is 50 lines and tested, so it costs nothing to leave until someone
-answers.
 
 ### [platform] LA-85 — the calendar route's scope check may not match what Google actually throws
 

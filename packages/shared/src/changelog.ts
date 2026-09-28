@@ -6,6 +6,77 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.28",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: the chest-strap battery on Home read 100 almost all the time, because the coin cell only dips while you are training and recovers by the time you look. It now shows the lowest reading of the last fortnight \u2014 the number that actually tells you whether to change the cell before your next session.",
+    ],
+  },
+  {
+    version: "1.477.27",
+    date: "2026-09-28",
+    changes: [
+      "The cardio hub no longer fails to load when your age or resting heart rate cannot be read for a moment. It shows your zones and records that they are based on a stand-in.",
+    ],
+  },
+  {
+    version: "1.477.26",
+    date: "2026-09-28",
+    changes: [
+      "An activity saved at the same minute as one the server already had no longer shows twice on this phone.",
+      "An activity saved offline at the minute of a deleted one no longer arrives deleted.",
+    ],
+  },
+  {
+    version: "1.477.25",
+    date: "2026-09-28",
+    changes: [
+      "A workout's ring heart-rate trace keeps its 15-second detail. A background pass three days later could re-save part of it at 5-minute resolution and delete the finer points.",
+    ],
+  },
+  {
+    version: "1.477.24",
+    date: "2026-09-27",
+    changes: [
+      "Changed: a lifted weight now reads the same everywhere \u2014 \"68 kg\" rather than \"68kg\" on some screens and \"68 kg\" on others. Half kilos and 1.25 kg plate steps show exactly, and nothing gains a decimal it did not have.",
+    ],
+  },
+  {
+    version: "1.477.23",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: when the app could not reach the server and had nothing saved yet, More and Profile details quietly dropped your name, your readings and your tests \u2014 so it read like a brand-new account rather than a connection problem. Each now says it could not load.",
+    ],
+  },
+  {
+    version: "1.477.22",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: a program or progression style you deleted stayed on your phone, and offline the Workout screen could open a program you had already deleted. Deletions now reach the phone on the next sync.",
+    ],
+  },
+  {
+    version: "1.477.21",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: when a whole session was deloaded, choosing Full changed nothing, and sets done at full weight still counted as a deload and could not set a PR. Full now puts each exercise back to your program's own weights and sets, and those sets count.",
+    ],
+  },
+  {
+    version: "1.477.20",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: a deload week left an exercise at its full working weight when it had no progression style set — Skull Crusher came up at 3 × 30 kg beside four lifts at 52%. Every exercise in the session is lightened now.",
+    ],
+  },
+  {
+    version: "1.477.19",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: the same moment read \"6:40 AM\" on Home's timeline, \"6:40am\" on a day's workout card and \"6:40 am\" on the activity list. All three, and the Body Battery card's time axis, now read \"6:40 am\".",
+    ],
+  },
+  {
     version: "1.477.18",
     date: "2026-09-27",
     changes: [

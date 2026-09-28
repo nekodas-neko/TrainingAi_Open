@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveAnchor } from '../anchor'
+import { resolveAnchor } from '@/lib/health/body-battery-anchor'
 
 describe('resolveAnchor', () => {
   it('uses the derived readiness score when it exists', () => {

@@ -66,11 +66,21 @@ const prescriptionDedup = createDedupCache<GeneratePrescriptionResult>(30_000)
 // per-exercise deload's >50%-soreness escalation (see
 // docs/superpowers/specs/2026-07-02-per-exercise-deload-design.md) — "deloaded"
 // means the same numbers regardless of which trigger fired.
-function buildWholeSessionDeloadPrescription(
+export function buildWholeSessionDeloadPrescription(
   signals: PrescriptionSignals,
   reasoning: string,
 ): AiPrescription {
   const goal = signals.trainingGoal
+  // BF-198: what `Full` reverts to. The per-exercise deload records the numbers it replaced as
+  // `preDeload` (reevaluate.ts); this builder recorded nothing, so on a whole-session deload the
+  // `Full` toggle had nothing to restore and every set was still logged as a deload, earning no
+  // 1RM. There are no model numbers to keep here, so the full session is the program's own — the
+  // same plan the rules prescriber builds. An exercise with no base style gets none, and stays
+  // deloaded under `Full`, which is also what the per-exercise path does without a record.
+  const fullById = new Map(
+    (buildRulesPrescription(signals, reasoning)?.exercises ?? [])
+      .map(e => [e.sessionExerciseId, { sets: e.sets, reps: e.reps, pct: e.pct, restSec: e.restSec }]),
+  )
   const pct = DELOAD_LOWER_PCT[goal] ?? 50
   const reps = DELOAD_REPS[goal] ?? 8
 
@@ -102,6 +112,7 @@ function buildWholeSessionDeloadPrescription(
     // server's shouldCountTowardPr gate — treated these sets as genuine max-effort work.
     // Stamping it here gives every consumer one consistent signal instead of two (Q-115).
     deloaded: true,
+    preDeload: fullById.get(ex.sessionExerciseId),
   }))
 
   const sigById = new Map(signals.exercises.map(e => [e.sessionExerciseId, e]))
