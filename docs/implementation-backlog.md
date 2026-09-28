@@ -6673,12 +6673,24 @@ drift.
   - **Failed (1):** `food-log-swipe-delete:238`.
   - **Flaky (4):** `dv12-tab-switch-does-not-redraw-charts:27`, `tabs-instant-paint:42` (Home),
     `tn25-walk-prescription:49`, `tn53-sparkline-does-not-span-gaps:105`.
-- **⚑ THE FLAKY SET CHURNS; THE HARD FAILURE DOES NOT. That is the finding.** Only **2 of 6** flaky
-  specs recurred across the two runs (`tn25-walk-prescription`, `tn53-sparkline`); four from the first
-  census did not reappear and two are new. Meanwhile `food-log-swipe-delete:238` failed **hard in both
-  runs** — and in two of three local runs before that. **So `:238` is a defect and the rest is
-  order/timing noise**, which is exactly the separation this entry was opened to make. Start there and
-  treat the churning set as one population rather than as individual bugs.
+- **⚑ THE FLAKY SET CHURNS, AND A STABLE CORE OF ONE SPEC SITS INSIDE IT.** Across three CI runs the
+  flaky list is almost entirely different each time — but **`tn53-sparkline-does-not-span-gaps:105`
+  appears in ALL THREE**, and nothing else does. `tn25-walk-prescription`, `calorie-progress-bar` and
+  `tabs-instant-paint:42` each appear in two of three, the last two at *different lines/params*, which
+  is itself a signal: the instability is not tied to one assertion. **Start at `tn53:105`** — it is the
+  only spec with a reproduction rate near 100%.
+- **✅ THIRD CENSUS — run on `6a153f6b` (PR #1897), 2026-09-28. 265 passed · 0 FAILED · 6 flaky ·
+  1 skipped · 35.5 min.** Genuinely ran (36.9 min job), not an `e2e-ui-touched` skip.
+  Flaky: `calorie-progress-bar:142`, `deload-visible:109`, `meal-thumb-placeholder:132`,
+  `tabs-instant-paint:42` (Health), `tn53-sparkline:105`, `tn58-vs-yesterday-no-default:15`.
+- **⚠ THIS CORRECTS THE PARAGRAPH THIS ENTRY CARRIED AFTER THE SECOND CENSUS.** It read *"`:238` is a
+  defect and the rest is order/timing noise"* on the strength of two consecutive hard failures.
+  **`food-log-swipe-delete:238` PASSED in run three**, so it is 2 of 3 in CI plus 2 of 3 locally — the
+  highest-frequency flake, not a deterministic defect. Two data points looked like a pattern and were
+  not; the claim was made one run too early.
+- **✅ AND THE HEADLINE FOR `LB-56`: a fully green E2E run is achievable.** Run three failed nothing at
+  all. That is the first evidence that "required check" is not hopeless — the obstacle is the retry
+  budget masking ~6 flaky specs per run, not an unpassable suite.
 - **And the two stress specs are gone from the list, as predicted.** `tn35-stress-against-events` and
   `tn3b-stress-on-hr-chart` pass here; they were the deterministic `bucket_start` pair fixed in #1894,
   and removing them is most of the 5 → 1 improvement. Their disappearance is the evidence that the
