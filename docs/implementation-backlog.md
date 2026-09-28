@@ -618,27 +618,33 @@ below threshold and left in place for next time.
   preference question, which is why it is being asked rather than decided.
 - **Blocks nothing.** RV-212 ①② shipped without it.
 
-### [devices] BF-216 — the pairing screen reads a BLE characteristic through `.buffer`, which ignores the view's offset
+### [devices] BF-216 — three BLE reads still go through `.buffer`, which ignores the view's offset
 
-- **Lane:** B — `components/settings/chest-strap-pairing.tsx`.
+- **✅ THE PAIRING SCREEN SHIPPED 2026-09-28 (Lane B).** `chest-strap-pairing.tsx` reads
+  `batt.getUint8(0)` (guarded on `byteLength`, since it throws on an empty view where the old
+  `[0] ?? null` yielded null) and decodes the firmware view rather than its buffer.
+  `components/settings/__tests__/bf216-ble-view-offset.test.ts` holds it and **demonstrates the
+  defect rather than asserting a style**: on a `DataView(backing, 2, 1)` the old read returns the
+  filler byte and `getUint8(0)` returns the real one.
+- **Lane: A** — re-laned 2026-09-28. **The three that remain are device pipelines**, which §3 of the
+  agents contract puts in Lane A, so Lane B could not take them:
+  | site | read |
+  |---|---|
+  | `lib/colmi-ble/ble.ts:180` | `new Uint8Array(view.buffer)` — the V1 notification frame |
+  | `lib/colmi-ble/ble.ts:190` | `Array.from(new Uint8Array(view.buffer))` — the V2 big-data chunk |
+  | `lib/live-hr/chest-strap-source.ts:233` | `new Uint8Array(value.buffer)` — **the live HR measurement** |
+- **Not in scope:** `ble.ts:215`'s WRITE (`new DataView(bytes.buffer)`) builds its own array rather
+  than receiving one, so it owns the buffer it reads.
 - **Added:** 2026-09-27 · BugFix, found while tracing `BF-215`. **Not the cause of that report** —
   every recorded reading came from the native path, which is correct.
-- **Needs:** — nothing.
-- **`chest-strap-pairing.tsx:94`** reads the battery level as
-  `new Uint8Array(batt.buffer)[0]`. `batt` is a `DataView`, and **`.buffer` is the whole backing
-  `ArrayBuffer`** — it discards `byteOffset` and `byteLength`. If the BLE layer ever hands back a
-  view into a pooled or offset buffer, that reads a byte belonging to something else and stores it
-  as a battery percentage. `batt.getUint8(0)` is the correct read and cannot drift.
-- **The same shape is two lines below**, on the firmware string:
-  `new TextDecoder().decode(fw.buffer)` at `:102`. Same fix — decode the view, not its buffer.
 - **Latent rather than live, and worth fixing anyway.** `@capacitor-community/bluetooth-le` builds
-  its `DataView` from a fresh buffer today, so the offset is 0 and the read happens to be right. That
-  is a property of the plugin's current implementation, not of the API contract, and it is one
+  its `DataView` from a fresh buffer today, so the offset is 0 and the read happens to be right.
+  That is a property of the plugin's current implementation, not of the API contract, and it is one
   version bump away from silently changing.
-- **It writes to the same store the Home chip reads** (`writeStrapBattery`), so a wrong value here
-  would show up as `BF-215`'s symptom with a different cause — which is the argument for closing it
-  now rather than leaving two candidates for the next battery question.
-- **Reversal cost:** none. Two expressions.
+- **The guard already lists these two files by name** and fails if one stops matching — so fixing a
+  site means striking it from `LANE_A_DEBT` in the same commit, which is the reminder rather than a
+  chore.
+- **Reversal cost:** none. Three expressions.
 
 ### [platform] BF-213 — inbound PR #1608 (HealthKit storage) owes a diff read from Review and a merge from the owner
 

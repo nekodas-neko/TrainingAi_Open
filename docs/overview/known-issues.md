@@ -6,7 +6,17 @@
 > Nothing here was rewritten, reordered or archived: the section moved whole.
 >
 > **The domain-tag grep is unchanged and is why this is ONE file rather than one per pillar.**
-> `grep -n '^### [devices][app-shell] ⚠️ The strap chip draws the cell's low-water mark now, and no workout has exercised it (BF-215, 2026-09-28)
+> `grep -n '^### [devices] ⚠️ The strap pairing screen's battery read changed shape and no phone has run it (BF-216, 2026-09-28)
+
+`chest-strap-pairing.tsx` read the battery level as `new Uint8Array(batt.buffer)[0]`, which discards
+the `DataView`'s offset; it now reads `batt.getUint8(0)`. **Today's value is identical** — the BLE
+plugin builds each view on a fresh buffer, so the offset is 0 — which is exactly why this is latent
+and why the sandbox cannot tell the two apart. The path only runs while pairing a real H10 over BLE,
+so nothing here has executed it. **Pass test on the S25:** pair the strap and confirm the screen
+shows a plausible battery percentage and a firmware revision string, and that the Home chip picks up
+the same number. A `RangeError` or an empty firmware line is the failure to watch for.
+
+### [devices][app-shell] ⚠️ The strap chip draws the cell's low-water mark now, and no workout has exercised it (BF-215, 2026-09-28)
 
 Home's strap chip read `100` until the cell was nearly dead: a CR2025 sags under a sustained BLE
 session and recovers at rest, so the reading that warns only exists while the owner is training and
