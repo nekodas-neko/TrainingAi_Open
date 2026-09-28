@@ -281,8 +281,11 @@ describe.skipIf(!canRun)('claude_readonly role — the read-only guarantee', () 
       SELECT count(*)::int AS n FROM information_schema.tables
       WHERE table_schema = 'claude_ro'
         AND table_name NOT LIKE '\\_meta\\_%' AND table_name <> 'pg_stat_statements'`)
-    // Two tables are deliberately denied (invited_emails, rate_limits). Any OTHER mismatch means
-    // the generator needs re-running after a schema change.
-    expect(views.rows[0].n).toBe(tables.rows[0].n - 2)
+    // Denied tables get no view by design; the generator publishes that list, so read it rather than
+    // hardcoding a count (it was "2" until LA-61 denied a third). Any OTHER mismatch means the
+    // generator needs re-running after a schema change.
+    const denied = await exec(ADMIN_URL!, `SELECT count(*)::int AS n FROM claude_ro._meta_excluded_tables`)
+    expect(denied.rows[0].n).toBeGreaterThanOrEqual(2)
+    expect(views.rows[0].n).toBe(tables.rows[0].n - denied.rows[0].n)
   })
 })

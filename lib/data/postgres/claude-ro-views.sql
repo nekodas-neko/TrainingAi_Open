@@ -1652,7 +1652,8 @@ WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 CREATE VIEW claude_ro._meta_excluded_tables AS
 SELECT * FROM (VALUES
   ('invited_emails'),
-  ('rate_limits')
+  ('rate_limits'),
+  ('email_normalisation_preimage')
 ) AS t(table_name);
 
 -- Q-530: every column withheld from an emitted view, so a drift check can be column-level.

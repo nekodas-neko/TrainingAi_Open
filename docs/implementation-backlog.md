@@ -15915,47 +15915,6 @@ Not a decision for a queue pass: option 1 changes how every request in the app i
 >   `auth()` call, so it serves the client shell (200) and every data call behind it answers 401.
 >   Data stays protected; the sentence above saying `/` goes to a `/sign-in` redirect is out of date.
 
-### [platform] LA-61 — three email lookups on the OAuth path skip the normalisation the write applies
-- **✅ APPROVED 2026-09-28 — normalise on the way IN, and add the functional index. Both.**
-  The durable fix over patching the three known lookup sites: every future lookup is correct by
-  construction rather than by someone remembering. He took it over the smaller diff and over
-  leaving it as a single-user non-issue.
-  **It needs a one-off backfill of existing rows** — an UPDATE, not a delete, so it is authorised
-  under the 2026-09-27 production policy: verified snapshot first, affected rows against
-  prediction, stop on a mismatch. **Not a data-dropping change; no second confirmation needed.**
-  **⚠ Auth path — do not batch it with anything.** It touches Google sign-in, which is the owner's
-  carve-out area even when the change itself is mechanical.
-
-- **Lane:** A — `auth.ts` signIn callback, `lib/data/postgres/adapter.ts` (`getUserByEmail`).
-- **Added:** 2026-09-06, found while fixing PS-25's rate-limit key.
-- **Gate cleared 2026-09-28** — answered; normalise-in plus the functional index is approved.
-  than gaining them.
-
-Registration **writes** `email.toLowerCase().trim()`, and `getUserByEmail` compares with a plain
-`eq`, so the lookup is case- and whitespace-sensitive. Three sites on the Google path pass the raw
-provider value: `getUserByEmail(user.email!)`, `isInvited(user.email!)`, and
-`upsertUser({ email: user.email! })`. Two consequences, both silent:
-
-- **A duplicate account.** If the provider ever returns an address whose case differs from the
-  stored one, the link lookup misses and `upsertUser` creates a second row for the same person.
-- **A missed invite.** `isInvited` compares the same way, so an invite recorded in one case does not
-  match a sign-in in another, and the user lands in `/pending` with no explanation.
-
-Google normalises to lowercase in practice, which is why this has never fired. That is a property of
-someone else's service, not of this code.
-
-**Do NOT fix it by normalising the input.** Any row already stored non-normalised stops matching, and
-this endpoint cannot see how many such rows exist — `claude_ro` is row-scoped to the owner, so a
-count from the admin query proves nothing about anyone else's. Normalising the *comparison* instead
-(`lower(email) = lower($1)`) can only gain matches, never lose them.
-
-**That is the schema decision.** `users.email` is unique, and a `lower()` comparison does not use a
-plain b-tree index on `email` — it wants `CREATE INDEX ... ON users (lower(email))`, and arguably a
-unique one, which would then **fail to create** if two rows already differ only by case. That failure
-is information worth having, but it is a migration that can refuse to apply, so it is the owner's
-call rather than a queue pass. Alternative: leave lookups as they are and add the normalisation to
-`upsertUser`'s write only, which stops new divergence without touching matching.
-
 ### [sleep][platform] PS-17 — a phantom afternoon "sleep" replaced a real night in the daily summary, and it is scoring 🔴 LIVE
 
 - **⬆ MOVED UP THE QUEUE 2026-09-25 on the owner's call** (`RV-161` item 5). **12 of 27 recent dates

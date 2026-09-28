@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { rejectMealImage, mealImageRejectionMessage, FOOD_ITEM_IMAGE_MAX_BYTES } from '@trainingai/shared/nutrition/meal-image'
+import { normalizeEmail } from '@trainingai/shared/validation/email'
 import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { formatInTimeZone } from 'date-fns-tz'
 import { eq, and, or, inArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull } from 'drizzle-orm'
@@ -444,9 +445,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async upsertUser(user: Omit<User, 'id' | 'createdAt' | 'isActive' | 'isAdmin'>, forceActive?: boolean): Promise<User> {
-    const invited = forceActive ?? await this.isInvited(user.email)
+    // LA-61: normalised here, at the boundary, so no caller can store or match a raw provider value.
+    const email = normalizeEmail(user.email)
+    const invited = forceActive ?? await this.isInvited(email)
     const [r] = await this.db.insert(s.users)
-      .values({ oauthSub: user.oauthSub ?? null, email: user.email, name: user.name ?? null, isActive: invited })
+      .values({ oauthSub: user.oauthSub ?? null, email, name: user.name ?? null, isActive: invited })
       .onConflictDoUpdate({
         // Conflict on email — works for both OAuth and password users.
         // oauthSub UNIQUE doesn't fire when oauthSub is NULL (NULL != NULL in Postgres).
@@ -703,7 +706,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null> {
-    const [r] = await this.db.select().from(s.users).where(eq(s.users.email, email)).limit(1)
+    // lower(), not eq: it matches a row stored before LA-61's backfill (or one a collision kept it
+    // from normalising) as well as a normalised one. It can only gain matches, never lose one.
+    const [r] = await this.db.select().from(s.users).where(eq(sql`lower(${s.users.email})`, normalizeEmail(email))).limit(1)
     if (!r) return null
     return { ...this.rowToUser(r), passwordHash: r.passwordHash ?? undefined }
   }
@@ -771,9 +776,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async createEmailUser(email: string, passwordHash: string, name?: string, isActive?: boolean): Promise<User> {
-    const active = isActive ?? await this.isInvited(email)
+    const normal = normalizeEmail(email)
+    const active = isActive ?? await this.isInvited(normal)
     const [r] = await this.db.insert(s.users)
-      .values({ email, passwordHash, name: name ?? null, isActive: active })
+      .values({ email: normal, passwordHash, name: name ?? null, isActive: active })
       .returning()
     return this.rowToUser(r)
   }
@@ -785,15 +791,15 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async addInvite(email: string): Promise<void> {
-    await this.db.insert(invitedEmails).values({ email }).onConflictDoNothing()
+    await this.db.insert(invitedEmails).values({ email: normalizeEmail(email) }).onConflictDoNothing()
   }
 
   async removeInvite(email: string): Promise<void> {
-    await this.db.delete(invitedEmails).where(eq(invitedEmails.email, email))
+    await this.db.delete(invitedEmails).where(eq(sql`lower(${invitedEmails.email})`, normalizeEmail(email)))
   }
 
   async isInvited(email: string): Promise<boolean> {
-    const [r] = await this.db.select().from(invitedEmails).where(eq(invitedEmails.email, email)).limit(1)
+    const [r] = await this.db.select().from(invitedEmails).where(eq(sql`lower(${invitedEmails.email})`, normalizeEmail(email))).limit(1)
     return !!r
   }
 
