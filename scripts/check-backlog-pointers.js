@@ -43,6 +43,7 @@ const LANE_FIELD_LINE_RE = /^\s*[-*]\s*\*{0,2}Lane:/;
 /** An `Ask:` field line (BF-194). Only `owner` is a value — the field exists to surface HIS questions. */
 const ASK_FIELD_LINE_RE = /^\s*[-*]\s*\*{0,2}Ask\*{0,2}(?::\*{0,2}|\s*[—–-])\s*(.*)$/i;
 const { keepFromLines } = require('./lib/keep');
+const { interruptedField } = require('./lib/interrupted-field');
 const { keepKind, keepIsSettled } = require('./lib/keep-kind');
 const { decoratedField } = require('./lib/decorated-field');
 const { orphanedFieldsBelow } = require('./lib/mid-entry-heading');
@@ -468,6 +469,37 @@ for (const [id, m] of meta) {
 // happened to also announce completion in a heading, so the drift was latent rather than a live
 // failure; the next one would not have been.
 for (const [id, m] of meta) m.keep = keepFromLines(m.lines);
+
+// ---- A field whose name and colon have words between them ------------------
+//
+// `decoratedField` above catches a marker written in FRONT of a field. This is the same failure
+// from the other side — `- **Keep / Done when:**`, `- **Keep ①, the owner's:**` — where the bullet
+// opens with the field's name, reads to a human as a declaration, and says something before
+// reaching the colon. Every matcher anchors the colon directly after the name, so none of it parses.
+//
+// **RV-210 sat at rank 1 of Lane B's READY list this way**: all three of its fixes had shipped and
+// its only residue was a device pass, so an implementer working the queue top-down took a finished
+// entry and found nothing to build. `BF-191` and `BF-188` were filed the same way.
+//
+// Asking the real parser is what makes this safe to enforce. "Keep" is also an ordinary verb and
+// the backlog legitimately opens bullets with it, while the em-dash form `**Keep — …:**` parses
+// fine — so the shape alone would flag correct entries. A failure here means both that it looks
+// like a declaration AND that the tool cannot read it.
+{
+  const parsed = { Keep: (m) => m.keep, Gate: (m) => m.gates.length > 0, Needs: (m) => m.needs.length > 0,
+    Verify: (m) => verifyFromLines(m.lines) != null, Reference: (m) => referenceFromLines(m.lines) != null };
+  for (const [id, m] of meta) {
+    for (const line of m.lines) {
+      const hit = interruptedField(line);
+      if (!hit || parsed[hit.field](m)) continue;
+      failures.push(
+        `${id}: \`${hit.field}:\` is written with "${hit.between}" between the name and the colon, so ` +
+          `it is IGNORED and the entry stays in READY — write \`- **${hit.field}:** …\` and put the rest ` +
+          `after the colon:\n    ${line.trim().slice(0, 120)}`,
+      );
+    }
+  }
+}
 
 const COMPLETED_HEADING_BASELINE = new Set([]);
 {

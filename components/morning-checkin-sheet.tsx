@@ -8,18 +8,16 @@ import { toast } from 'sonner'
 import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { invalidateCheckinAffectsPrescription, invalidateHealthTrends } from '@/lib/cache-groups'
-import { MORNING_SCALES, type MorningScaleKey, type IllnessContext, type VsYesterday } from '@trainingai/shared/types/day-checkin'
-import { ScaleSelector } from '@/components/nutrition/end-of-day/scale-selector'
+import { type IllnessContext, type VsYesterday } from '@trainingai/shared/types/day-checkin'
+import { SleepAnnouncement } from '@/components/checkin/sleep-announcement'
+import { type StoredSleepVerdict } from '@/components/health/sleep/sleep-verdict-copy'
+import { saveSleepValue } from '@/components/checkin/save-sleep-value'
+import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
+import { cachedFetch } from '@/lib/sqlite/cache'
 import { IllnessContextPicker } from '@/components/checkin/illness-context-picker'
 import { VsYesterdayPicker } from '@/components/checkin/vs-yesterday-picker'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
-
-// Q-113: Recovery/Sleep-quality-feel default to a neutral, non-score-derived 3 — NOT
-// prefillMorningScales(readiness/sleepScore) as before, which silently seeded the sheet
-// with the Readiness/Sleep score's own guess. An unedited Save now genuinely means "didn't
-// have an opinion," rather than masquerading as agreement with a score the lifter never saw.
-const NEUTRAL_SCALES: Record<MorningScaleKey, number> = { perceivedRecovery: 3, sleepQualityFeel: 3 }
 
 interface Props {
   open: boolean
@@ -31,10 +29,11 @@ interface Props {
 
 export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved }: Props) {
   const tz = useUserTimezone()
-  const [scales, setScales] = useState<Record<MorningScaleKey, number>>(() => ({ ...NEUTRAL_SCALES }))
-  const [touched, setTouched] = useState<Record<MorningScaleKey, boolean>>({
-    perceivedRecovery: false, sleepQualityFeel: false,
-  })
+  // TN-82. `correction` is the stored 1–5 he set himself; null means the app's own answer stands.
+  // `acknowledged` is an EXPLICIT tap on a prominent announcement — never inferred from Save.
+  const [verdict, setVerdict] = useState<StoredSleepVerdict | null>(null)
+  const [correction, setCorrection] = useState<number | null>(null)
+  const [acknowledged, setAcknowledged] = useState(false)
   const [illnessContext, setIllnessContext] = useState<IllnessContext | null>(null)
   // TN-58. No NEUTRAL_SCALES equivalent and no `touched` flag, both deliberately: the column has
   // no default, so `null` already distinguishes "not answered" from every answer, and there is no
@@ -49,8 +48,8 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
   useEffect(() => {
     if (!open) {
       setLoaded(false); editedRef.current = false
-      setScales({ ...NEUTRAL_SCALES })
-      setTouched({ perceivedRecovery: false, sleepQualityFeel: false })
+      setCorrection(null)
+      setAcknowledged(false)
       setVsYesterday(null)
       setIllnessContext(null)
       return
@@ -67,18 +66,12 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
       if (cancelled) return
       if (!editedRef.current) {
         if (saved) {
-          setScales({
-            perceivedRecovery: saved.perceivedRecovery ?? NEUTRAL_SCALES.perceivedRecovery,
-            sleepQualityFeel:  saved.sleepQualityFeel ?? NEUTRAL_SCALES.sleepQualityFeel,
-          })
-          setTouched({
-            perceivedRecovery: saved.perceivedRecoveryTouched ?? false,
-            sleepQualityFeel:  saved.sleepQualityFeelTouched ?? false,
-          })
+          // Only a TOUCHED value is restored as a correction. An untouched one is the app's own
+          // auto-fill, and re-seeding the picker from it would show his own screen agreeing with
+          // itself — the shape TN-57 exists to prevent.
+          setCorrection(saved.sleepQualityFeelTouched ? saved.sleepQualityFeel ?? null : null)
           setIllnessContext(saved.illnessContext ?? null)
           setVsYesterday(saved.vsYesterday ?? null)
-        } else {
-          setScales({ ...NEUTRAL_SCALES })
         }
       }
       setLoaded(true)
@@ -87,16 +80,48 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
     return () => { cancelled = true }
   }, [open, loaded, userId, tz])
 
+  /**
+   * The verdict, in its OWN effect — and that is not tidiness.
+   *
+   * The effect above lists `loaded` in its deps and ends by SETTING it, so it tears itself down and
+   * re-runs once per open. Its cleanup flips the `cancelled` flag the first run's callbacks close
+   * over, which is harmless for state set synchronously and fatal for anything awaiting the network:
+   * the fetch resolved, found `cancelled` true, and dropped the answer on the floor. The sheet then
+   * showed no announcement at all, which looks exactly like a night with nothing to say.
+   *
+   * Keyed on `[open, tz]` only, so nothing cancels it but closing the sheet.
+   */
+  useEffect(() => {
+    if (!open) { setVerdict(null); return }
+    let cancelled = false
+    const date = todayInTz(tz)
+    // The SAME key and TTL the Home note uses (TN-85). A second key for one endpoint is how this app
+    // has produced stale and blank first paints before, and two TTL expressions for one key make
+    // freshness last-writer-wins.
+    void cachedFetch<{ verdict: StoredSleepVerdict | null }>(
+      `sleep-verdict:${date}`, `/api/sleep-verdict?date=${date}`, TTL_MEDIUM,
+      d => { if (!cancelled) setVerdict(d?.verdict ?? null) },
+      // Swallowed otherwise (Q-499). No error state is shown: the announcement is absent on a
+      // failure exactly as it is when there is nothing to announce, and the sheet still works.
+      { onError: () => { if (!cancelled) setVerdict(null) } },
+    )
+    return () => { cancelled = true }
+  }, [open, tz])
+
   async function handleSave() {
     if (saving) return
     setSaving(true)
     const date = todayInTz(tz)
+    const sleepWrite = saveSleepValue(correction, verdict)
     const payload = {
       phase: 'morning' as const,
-      perceivedRecovery: scales.perceivedRecovery,
-      sleepQualityFeel:  scales.sleepQualityFeel,
-      perceivedRecoveryTouched: touched.perceivedRecovery,
-      sleepQualityFeelTouched:  touched.sleepQualityFeel,
+      // TN-82. Recovery is no longer asked and has no verdict to announce in its place — there is
+      // no recovery model, and its input had 0 touched answers in 102 check-ins, so it costs a
+      // reading that has never once been taken. Null is the honest value for a question not put.
+      perceivedRecovery: null,
+      perceivedRecoveryTouched: false,
+      sleepQualityFeel:  sleepWrite.value,
+      sleepQualityFeelTouched:  sleepWrite.touched,
       illnessContext,
       vsYesterday,
       // Retired scales — always null so a re-save clears any historical value.
@@ -162,6 +187,22 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
         invalidateHealthTrends().catch(() => {})
         onSaved?.()
       })()
+
+      // TN-82's guard: three states, not two. Recorded only when he acted ON the announcement —
+      // a plain Save stays `none`, i.e. UNKNOWN, never promoted to agreement. He has saved 82 of 82
+      // sheets while touching a scale in 3, so a Save read as assent would manufacture exactly the
+      // data that looks like success and is actually absence.
+      void (async () => {
+        const state = correction != null ? 'corrected' : acknowledged ? 'acknowledged' : null
+        if (!state || !verdict) return
+        // Fire-and-forget: the VALUE is the check-in's to write and has already gone. Losing the
+        // response record costs an analysis column, and must never cost the check-in.
+        await fetch('/api/sleep-verdict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date, state }),
+        }).catch(() => {})
+      })()
     } catch {
       toast.error('Failed to save')
     } finally {
@@ -189,29 +230,33 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-4 pb-4 flex flex-col gap-4">
-          {/* First on the sheet, above the two scales. It is the question this check-in actually
-              wants answered — the absolute one below it has been skipped every time for 81 days —
-              and a question placed after two the owner skips inherits their fate. */}
+          {/* TN-82. Renders nothing when there is no verdict — the baseline is still filling, or
+              the ring has not drained the night. A line saying "not enough data" every morning is a
+              line that gets tuned out, and this is the one that must not be. */}
+          {verdict && (
+            <SleepAnnouncement
+              verdict={verdict}
+              correction={correction}
+              onCorrect={stored => {
+                editedRef.current = true
+                // Re-tapping the chosen one clears it, so a mis-tap is undoable without leaving a
+                // touched value behind claiming to be his answer.
+                setCorrection(c => (c === stored ? null : stored))
+                setAcknowledged(false)
+              }}
+              acknowledged={acknowledged}
+              onAcknowledge={() => { editedRef.current = true; setAcknowledged(true) }}
+            />
+          )}
+          {/* TN-58's note said this belonged first because *"a question placed after two the owner
+              skips inherits their fate"* — the two it had to escape are gone, and the announcement
+              is now the thing on this sheet he is meant to READ. Burying it under a question that
+              collected 2 of 82 is the failure mode the plan names (§3: him not reading it), so the
+              announcement leads and this follows. */}
           <VsYesterdayPicker
             value={vsYesterday}
             onChange={v => { editedRef.current = true; setVsYesterday(v) }}
           />
-          {MORNING_SCALES.map(scale => (
-            <ScaleSelector
-              key={scale.key}
-              label={scale.label}
-              low={scale.low}
-              high={scale.high}
-              color={scale.color}
-              labels={scale.labels}
-              value={scales[scale.key]}
-              onChange={v => {
-                editedRef.current = true
-                setScales(s => ({ ...s, [scale.key]: v }))
-                setTouched(t => ({ ...t, [scale.key]: true }))
-              }}
-            />
-          ))}
           <IllnessContextPicker
             value={illnessContext}
             onChange={v => { editedRef.current = true; setIllnessContext(v) }}

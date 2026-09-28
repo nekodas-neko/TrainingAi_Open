@@ -8,6 +8,7 @@ import { Moon, Footprints, MessageCircle, BatteryLow, Frown, Meh, Smile, Zap, ty
 import { cn, accentCardStyle } from '@trainingai/shared/utils'
 import { CARD_DEFAULT_COLORS } from '@/app/session-select/constants'
 import { Sparkline } from '@/components/ui/sparkline'
+import { SleepFeelLine } from '@/components/home/sleep-feel-line'
 import { ColorSwatchPicker } from '@/components/ui/color-swatch-picker'
 import { HomeNutritionCard } from '@/components/home/home-nutrition-card'
 import dynamic from 'next/dynamic'
@@ -46,6 +47,8 @@ interface HrReading { timestamp: string; bpm: number; source: string | null }
 interface WorkoutSession { sessionName: string; startedAt: string; completedAt: string | null }
 
 interface HomeCardWidgetProps {
+  /** LA-136 — the sleep line reads `day_checkins` local-first, which needs the store's owner. */
+  userId?: string
   sectionKey: CardSectionKey
   sectionEditMode: boolean
   activeCardWidgets: CardWidgetKey[]
@@ -85,7 +88,7 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
     metaToday, metaRecent, metaLoading, weekToDate,
     calorieGoal, calorieType, weightLookback, stepsGoal, stepsGoalType,
     sleepGoal, moodLog, sleepData, acwrData, muscleData, hrData, setMoodSheetOpen,
-    onCorrectSleepVerdict,
+    onCorrectSleepVerdict, userId,
   } = props
 
   const sparklinePoints = [...metaRecent].reverse().map(r => r.weightKg).filter((w): w is number => w != null)
@@ -229,6 +232,11 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
               </div>
               <MessageCircle className="h-6 w-6 ml-2 flex-none" style={{ color: "var(--accent-amber)" }} />
             </div>
+            {/* LA-136: under the mood card, as approved. A SIBLING of the row above, not inside its
+                left column — the approved drawing runs the divider the full width of the card and
+                puts the dots at its right edge, which nesting it beside the chat icon cannot do.
+                Renders nothing until he has rated. */}
+            <SleepFeelLine userId={userId} />
           </div>
         </div>
       )

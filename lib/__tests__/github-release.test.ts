@@ -59,6 +59,21 @@ describe('mapApkRelease', () => {
     })
   })
 
+  // BF-111. The release is created once and only its asset is replaced, so `published_at` is the
+  // date of the FIRST build forever. Shape captured from the live release on 2026-09-28.
+  it("dates the build by the APK asset's upload, not the release's first publish", () => {
+    const rolling = {
+      ...REAL,
+      published_at: '2026-08-23T12:33:06Z',
+      assets: [{ ...REAL.assets[0], updated_at: '2026-09-25T11:44:56Z' }],
+    }
+    expect(mapApkRelease(rolling).publishedAt).toBe('2026-09-25T11:44:56Z')
+  })
+
+  it('falls back to the release date only when there is no APK asset to date', () => {
+    expect(mapApkRelease({ ...REAL, assets: [] }).publishedAt).toBe('2026-08-04T09:20:07Z')
+  })
+
   it('nulls the APK url when the release carries no apk asset, rather than redirecting somewhere wrong', () => {
     expect(mapApkRelease({ ...REAL, assets: [{ name: 'notes.txt', browser_download_url: 'https://x/notes.txt' }] }).apkUrl).toBeNull()
     expect(mapApkRelease({ ...REAL, assets: undefined }).apkUrl).toBeNull()

@@ -11,6 +11,7 @@ import type { ProgramPhase, ProgramPhaseType, PhaseSetWithPhases, ExerciseRole }
 import { aestMidnight, toAestDateStr, todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { buildOwnedPhaseSetName } from '@trainingai/shared/phase-set-naming'
 import { isUuid } from '@trainingai/shared/validation/uuid'
+import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
 
 type Db = ReturnType<typeof getDb>
 
@@ -115,7 +116,7 @@ export async function listPrograms(db: Db, userId: string): Promise<Program[]> {
             styleId: e.styleId ?? undefined,
             muscleGroups: e.muscleGroups ?? [],
             position: e.position,
-            exerciseRole: (e.exerciseRole as ExerciseRole) ?? 'primary',
+            exerciseRole: (e.exerciseRole as ExerciseRole) ?? UNCLASSIFIED_EXERCISE_ROLE,
             supersetGroup: e.supersetGroup ?? null,
           })),
       }))
@@ -334,7 +335,7 @@ export async function saveProgram(db: Db, userId: string, program: Program): Pro
           styleId: ex.styleId ?? null,
           muscleGroups: ex.muscleGroups.map(mg => mg.toLowerCase()),
           position: ex.position,
-          exerciseRole: ex.exerciseRole ?? 'primary',
+          exerciseRole: ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE,
           supersetGroup: ex.supersetGroup ?? null,
         })))
       if (exerciseRows.length) await tx.insert(s.sessionExercises).values(exerciseRows)

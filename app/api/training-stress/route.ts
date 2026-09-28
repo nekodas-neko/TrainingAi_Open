@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { DEFAULT_TZ, todayInTz, normalizeDateParamIso, ageFromDob, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
+import type { WorkoutRepository } from '@/lib/data/repository'
+import { DEFAULT_TZ, todayInTz, normalizeDateParamIso, ageFromDob, dateStrMidnightInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 import { rateLimit } from '@/lib/rate-limit'
 import { computeTrainingStress, metGridFromDaytimeSamples, type TrainingStressResult } from '@trainingai/shared/health/training-stress'
 import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite'
@@ -33,6 +34,32 @@ export async function GET(req: Request) {
   }
 
   const repo = await getRepository()
+  const result = await evaluateTrainingStressDay(repo, userId, tz, date)
+
+  // LA-170. The route is only ever asked about TODAY, so a day's stored verdict used to be whichever
+  // evaluation ran last WHILE it was happening — and a morning one cannot clear the 720-minute MET
+  // floor. Once yesterday has ended, evaluate it once more over the whole day. The stamp is what
+  // makes this finite: a verdict computed after the day's end is final and is never redone.
+  // Fire-and-forget, so the read never waits on it.
+  if (!raw) {
+    const yesterday = shiftDateStr(date, -1)
+    const [row] = await repo.getOuraDailyDerived(userId, yesterday, yesterday).catch(() => [])
+    const evaluatedAt = row?.trainingLoadEvaluatedAt ?? null
+    if (evaluatedAt == null || evaluatedAt < dateStrMidnightInTz(date, tz)) {
+      evaluateTrainingStressDay(repo, userId, tz, yesterday)
+        .catch(err => console.error('[training-stress] re-evaluating yesterday failed:', err))
+    }
+  }
+
+  return NextResponse.json(result satisfies TrainingStressResponse, {
+    headers: { 'Cache-Control': 'private, no-store' },
+  })
+}
+
+/** Computes one day's verdict and persists it, stamped with when it was computed (LA-170). */
+async function evaluateTrainingStressDay(
+  repo: WorkoutRepository, userId: string, tz: string, date: string,
+): Promise<TrainingStressResult> {
   const dayStart = dateStrMidnightInTz(date, tz)
   const dayEnd = new Date(dayStart.getTime() + 86_400_000)
 
@@ -89,14 +116,13 @@ export async function GET(req: Request) {
       // LA-161: the grid dimensions go on every path, gated or not — a gate reason without the
       // numbers it was decided from is what made TN-79 an inference exercise.
       ? { trainingLoadOts: result.ots, trainingLoadHigh: result.high, trainingLoadGate: 'ok',
-          trainingLoadGridLen: result.metGridLen, trainingLoadValidMin: result.metValidMin }
+          trainingLoadGridLen: result.metGridLen, trainingLoadValidMin: result.metValidMin,
+          trainingLoadEvaluatedAt: new Date() }
       : { trainingLoadGate: result.reason,
-          trainingLoadGridLen: result.metGridLen, trainingLoadValidMin: result.metValidMin })
+          trainingLoadGridLen: result.metGridLen, trainingLoadValidMin: result.metValidMin,
+          trainingLoadEvaluatedAt: new Date() })
   } catch (err) {
     console.error('[training-stress] persist failed (read still served):', err)
   }
-
-  return NextResponse.json(result satisfies TrainingStressResponse, {
-    headers: { 'Cache-Control': 'private, no-store' },
-  })
+  return result
 }

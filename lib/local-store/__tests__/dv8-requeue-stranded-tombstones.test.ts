@@ -79,8 +79,9 @@ describe('DV-8 — the sweep re-queues stranded tombstones', () => {
 })
 
 describe('DV-8 — the sweep runs where the other heals run', () => {
+  // `pushMutationsOnce` is the drain itself; `pushMutations` became its single-flight wrapper (LB-151).
   it('is called from pushMutations, guarded, before the outbox drains', () => {
-    const push = engine.slice(engine.indexOf('export async function pushMutations'))
+    const push = engine.slice(engine.indexOf('async function pushMutationsOnce'))
     const call = push.indexOf('requeueStrandedFoodTombstones')
     const drain = push.indexOf('const pending = await store.getPendingMutations')
     expect(call).toBeGreaterThan(-1)
@@ -92,7 +93,7 @@ describe('DV-8 — the sweep runs where the other heals run', () => {
   it('shares one cutoff with the workout sweep rather than computing a second', () => {
     // Two independently-computed cutoffs drift apart under a slow sweep, and the later one can
     // then see a row the earlier one has just queued.
-    const push = engine.slice(engine.indexOf('export async function pushMutations'))
+    const push = engine.slice(engine.indexOf('async function pushMutationsOnce'))
     expect(push).toMatch(/const strandedCutoff = /)
     expect((push.match(/5 \* 60_000/g) ?? []).length).toBe(1)
   })

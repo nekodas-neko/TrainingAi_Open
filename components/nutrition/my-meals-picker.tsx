@@ -54,7 +54,10 @@ interface Props {
    *
    * A different question from the checkboxes below, and the copy has to make that survive a glance:
    * ticking a meal **forces** it into the plan, this lets the planner reach for one when it fits.
-   * Off by default, because on is a change to what every generation returns.
+   *
+   * **On by default once the library has anything in it (LB-159)**, off while it is empty, where it
+   * would change nothing. This comment said "off by default" until LA-176 and had been stale since
+   * the day LB-159 shipped — the owner of the default is `meal-plan-setup-sheet.tsx`, not this file.
    */
   useLibrary: boolean
   onChangeUseLibrary: (next: boolean) => void

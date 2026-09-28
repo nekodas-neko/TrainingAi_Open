@@ -180,7 +180,7 @@ const CREATE_SESSION_EXERCISES = `CREATE TABLE IF NOT EXISTS session_exercises (
   style_id      TEXT,
   muscle_groups TEXT,
   position      INTEGER NOT NULL,
-  exercise_role TEXT NOT NULL DEFAULT 'primary',
+  exercise_role TEXT NOT NULL DEFAULT 'accessory',
   updated_at    TEXT
 )`;
 

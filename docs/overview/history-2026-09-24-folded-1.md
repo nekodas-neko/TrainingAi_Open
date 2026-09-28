@@ -1190,7 +1190,7 @@ scratchpad when a repo is already poisoned (`pnpm install --frozen-lockfile` the
 > Custom Rules job, one step of which was `git fetch --depth=1 origin main`; that is what
 > re-shallowed the clone, on every run, immediately before every push. A bare fetch cannot *deepen*
 > a shallow clone, which is all it was ever doing. See
-> `docs/overview/entries/2026-09-23-lane-a-la130-unshallow-once.md`.
+> `docs/overview/history-2026-09-24-folded-1.md#2026-09-23-lane-a-la130-unshallow-once`.
 
 ## The entries: one orphaned finding, one for the Orchestrator
 

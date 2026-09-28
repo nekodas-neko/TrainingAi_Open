@@ -89,11 +89,25 @@ export const RESUME_RECHECK_MS = 500;
  * `stuck` / `resized` is the verdict spelled out rather than left for a reader to diff two numbers,
  * because the person reading `error_events` at that point will be looking for one word.
  */
-export function resumeRecheckMessage(first: ShellSample, second: ShellSample): string {
+export function resumeRecheckMessage(first: ShellSample, second: ShellSample, nativeHeights?: string | null): string {
   const h1 = Math.round(first.height);
   const h2 = Math.round(second.height);
   const verdict = h1 === h2 ? 'stuck' : 'resized';
-  return `bf110 resume recheck ${verdict} h1=${h1} h2=${h2} w2=${Math.round(second.width)} children2=${second.childCount}`;
+  // The native WebView's own height and its parent's (an APK with BF-110's relayout exposes them).
+  // After that relayout, a `stuck` with view < parent means the VIEW was never re-measured, while a
+  // `stuck` with view == parent means only Chromium's viewport lags the view. Different fixes.
+  const native = nativeHeights ? ` native ${nativeHeights}` : '';
+  return `bf110 resume recheck ${verdict} h1=${h1} h2=${h2} w2=${Math.round(second.width)} children2=${second.childCount}${native}`;
+}
+
+/** The native heights, where the APK exposes them. Never throws: a bridge call is best-effort. */
+export function readNativeHeights(): string | null {
+  try {
+    const r = (globalThis as { AndroidRenderer?: { viewHeights?: () => string } }).AndroidRenderer;
+    return typeof r?.viewHeights === 'function' ? r.viewHeights() : null;
+  } catch {
+    return null;
+  }
 }
 
 /** The subset of an element the nudge writes to. */
@@ -149,7 +163,7 @@ export function handleResume(
     // table prunes at 30 days and is the second-largest object in the database, and a row on every
     // resume would record nothing, since the DOM is intact either way.
     defer?.(() => {
-      reportClientError({ message: resumeRecheckMessage(sample, readShellSample(el)) });
+      reportClientError({ message: resumeRecheckMessage(sample, readShellSample(el), readNativeHeights()) });
     }, RESUME_RECHECK_MS);
   }
   nudgeRepaint(el, schedule);

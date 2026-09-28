@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { join } from 'node:path'
+import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
 import {
   EXERCISE_ROLES,
   EXERCISE_ROLE_LABEL,
@@ -30,13 +31,13 @@ describe('exercise role labels (BF-125)', () => {
     expect(EXERCISE_ROLES.map(r => EXERCISE_ROLE_LABEL[r])).toEqual(['Main', 'Secondary', 'Accessory'])
   })
 
-  it('reads a missing or unrecognised role as the primary one', () => {
-    // Has to agree with the editor's own `ex.exerciseRole ?? 'primary'`, or the badge would name
-    // one role while the selected pill highlighted another — the mismatch this file removes.
-    expect(exerciseRoleLabel(null)).toBe('Main')
-    expect(exerciseRoleLabel(undefined)).toBe('Main')
-    expect(exerciseRoleLabel('compound')).toBe('Main')
-    expect(exerciseRoleBadge(null)).toBe(exerciseRoleBadge('primary'))
+  it('reads a missing or unrecognised role as the unclassified one (BF-15)', () => {
+    // Has to agree with the editor's own `ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE`, or the badge
+    // would name one role while the selected pill highlighted another — the mismatch this file removes.
+    expect(exerciseRoleLabel(null)).toBe('Accessory')
+    expect(exerciseRoleLabel(undefined)).toBe('Accessory')
+    expect(exerciseRoleLabel('compound')).toBe('Accessory')
+    expect(exerciseRoleBadge(null)).toBe(exerciseRoleBadge(UNCLASSIFIED_EXERCISE_ROLE))
   })
 
   it('is the only place the words live', () => {

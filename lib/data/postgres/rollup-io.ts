@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNull, notInArray, sql } from 'drizzle-orm'
+import { and, eq, gte, inArray, isNull, notInArray, or, sql } from 'drizzle-orm'
 import * as s from './schema'
 import * as oura from './slices/oura'
 import { readRawFrames } from './slices/oura-raw-frames'
@@ -63,7 +63,11 @@ export function createPostgresRollupIO(deps: PostgresRollupIODeps): RollupIO {
       .from(s.workoutSessions)
       .where(and(
         eq(s.workoutSessions.userId, userId),
-        gte(s.workoutSessions.startedAt, since),
+        // Overlapping `since`, not starting after it (LA-168). A pass whose cutoff falls inside a
+        // workout must still see that workout, or it re-bins the rest of it at 5 minutes and deletes
+        // the 15-second rows. A day bounds the look-back: no real session is longer.
+        gte(s.workoutSessions.startedAt, new Date(since.getTime() - 24 * 3600 * 1000)),
+        or(isNull(s.workoutSessions.completedAt), gte(s.workoutSessions.completedAt, since)),
         isNull(s.workoutSessions.deletedAt),
       )),
     deleteBleHeartrateNotIn: async (since, keep) => {

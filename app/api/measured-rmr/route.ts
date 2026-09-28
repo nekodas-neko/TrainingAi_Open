@@ -3,6 +3,7 @@ import { z } from "zod";
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
 import { readJsonLimited } from "@trainingai/shared/http/request-guards";
+import { isCalendarDate } from '@trainingai/shared/date-utils'
 
 // BF-33: where a clinically measured RMR lands. The owner has a DEXA + RMR test booked and the app
 // had nowhere to put the result — every resting rate it uses today is predicted.
@@ -11,7 +12,7 @@ const MAX_BODY_BYTES = 4 * 1024;
 const PostSchema = z.object({
   // Both separators: the client's `localDateString()` emits YYYY/MM/DD, and a dash-only regex
   // rejects every real request before the handler runs (CLAUDE.md, the ai-chat localDate bug).
-  measuredOn: z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/),
+  measuredOn: z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/).refine(isCalendarDate, 'Not a real calendar date'),
   // Bounds are plausibility, not validation theatre: a human resting rate outside this is a typo
   // or a unit mix-up, and storing it would silently move the calorie target.
   rmrKcal: z.number().int().min(500).max(5000),

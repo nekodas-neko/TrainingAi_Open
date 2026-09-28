@@ -307,8 +307,23 @@ curve). **Before writing anything that treats one row as one night, call the hel
   these — call the module.
   ([`2026-08-03-night-vitals-extraction.md`](../../overview/history-2026-07-30.md))
 
-- **[`docs/overview/entries/2026-09-26-tn85-sleep-verdict-on-home.md`](../../overview/entries/2026-09-26-tn85-sleep-verdict-on-home.md)**
+- **[`2026-09-26-tn85-sleep-verdict-on-home`](../../overview/history-2026-09-27-folded-3.md#2026-09-26-tn85-sleep-verdict-on-home)**
   — TN-85. Last night's verdict is stated on the Home Sleep card, quietly for an ordinary night and
   with the numbers first for an outlier, with a correction one tap away. The morning modal is not a
   home for it: it opens once a day on one screen and retires on dismissal, and the owner has saved
   82 of those sheets while touching a scale in 3.
+
+- **[`2026-09-28-home-sleep-feel-line`](../../overview/entries/2026-09-28-home-sleep-feel-line.md)**
+  — LA-136. Home shows the sleep rating he actually gave, under the mood card, captioned as his
+  rating rather than a score. **The gate is the point:** the morning sheet stores a neutral `3` for
+  a scale he never tapped, so the read goes through `answeredMorningScales` — without it Home prints
+  *"OK · 3/5"* for a value nobody gave, which is the fabricated `Sleep: OK` this entry removed. The
+  scale is stored 1 = great … 5 = terrible while its labels run the other way; `storedOrderLabels`
+  is the only correct reverse.
+
+- **[`2026-09-28-checkin-announce-and-correct`](../../overview/entries/2026-09-28-checkin-announce-and-correct.md)**
+  — TN-82. The morning check-in stops asking for sleep quality and recovery; it announces the
+  night's verdict with its reason and takes a one-tap correction. **Only a correction writes
+  `touched: true`** — an auto-fill that flagged itself would re-create TN-57. Two traps recorded
+  there: removing the scales removes the numeric answer `dayCheckinHasAnswers` depends on, and
+  **Save is not an acknowledgement** (82 of 82 sheets saved, 3 scales touched).

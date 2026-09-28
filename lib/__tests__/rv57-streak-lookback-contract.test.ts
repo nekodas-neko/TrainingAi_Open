@@ -28,25 +28,43 @@ const ROOT = path.resolve(__dirname, '../..')
 // file at its size baseline, so the walk was extracted rather than the comments shaved). That move
 // turned this file red, which is the behaviour to keep: a path named here is how the test notices
 // the consumer has gone somewhere it is no longer watching.
+//
+// **2026-09-27 (LA-156): THE LOOP IS GONE, AND SO IS THE FAILURE IT COULD HAVE — so the two
+// assertions that named it are replaced rather than deleted.** The consumer now delegates to
+// `computeDayStreak`, which walks the DATES IT WAS GIVEN instead of counting back day by day. There
+// is no lookup past the window, so a supplier narrower than the consumer can no longer manufacture
+// rest days out of missing keys — BF-176's oscillation is structurally impossible rather than
+// merely guarded. Under-reporting against a short window remains, which is what the supplier
+// assertion below is for, and it is the half that still has teeth.
 const CONSUMER = 'app/session-select/compute-streak.ts'
+const SUPPLIER = 'app/api/streak-data/route.ts'
+const supplierSource = stripComments(readFileSync(path.join(ROOT, SUPPLIER), 'utf8'))
 
 /** Comments quote the retired literal while explaining the fix, so a raw match would pass on prose. */
 const source = stripComments(readFileSync(path.join(ROOT, CONSUMER), 'utf8'))
 
 describe('RV-57 — the streak consumer is bound by the constant it is contracted to', () => {
-  it('imports the shared constant', () => {
-    expect(source).toMatch(/import\s*\{[^}]*\bSTREAK_LOOKBACK_DAYS\b[^}]*\}\s*from\s*["']@trainingai\/shared\/workout\/streak-window["']/)
+  it('the SUPPLIER is still bound by the constant — the half that can still drift', () => {
+    // The route decides how many days Home is sent. Narrow it by hand and Home quietly disagrees
+    // with /api/achievements, which reads the history directly.
+    expect(supplierSource).toMatch(/import\s*\{[^}]*\bSTREAK_LOOKBACK_DAYS\b[^}]*\}\s*from\s*["']@trainingai\/shared\/workout\/streak-window["']/)
   })
 
-  it('walks the loop to that constant, not to a literal', () => {
-    expect(source).toMatch(/for\s*\(\s*let\s+ago\s*=\s*1;\s*ago\s*<\s*STREAK_LOOKBACK_DAYS;/)
-    // The literal is the thing that could not be held to the contract. Any bare 365 as a loop bound
-    // here is the defect returning, whatever the surrounding code looks like.
+  it('the consumer does not walk a window of its own, so it cannot disagree about one', () => {
+    // Delegation is the fix: a formula given the dates has nothing to assume about their span.
+    expect(source).toMatch(/\bcomputeDayStreak\b/)
+    expect(source).not.toMatch(/for\s*\(\s*let\s+ago\b/)
+  })
+
+  it('and no bare day-count literal has crept back in as a bound', () => {
+    // The literal is the thing that could not be held to the contract, in any shape.
     expect(source).not.toMatch(/ago\s*<\s*365/)
+    expect(source).not.toMatch(/\b365\b/)
   })
 
-  // NOTE: this case passes against the UNFIXED file too — it guards the other direction and is not
-  // evidence of this fix. The two above are: both were run against `origin/main` and both went red.
+  // NOTE: this case guards the other direction and passes whatever the consumer looks like. The
+  // supplier case above is the one with teeth — control-run 2026-09-27 by deleting the route's
+  // import, which turns it red.
   it('and the constant still covers the horizon the loop was written for', () => {
     // A guard against "fixing" the drift by shrinking the constant instead: BF-176's failure was a
     // supplier narrower than the consumer, and 365 is the horizon this loop has always assumed.

@@ -1184,7 +1184,7 @@ git push -u origin feat/cardio-hub-phase-1
 ## Task 14: Session bookkeeping (same PR — CLAUDE.md requires it)
 
 **Files:**
-- Create: `docs/overview/entries/2026-07-26-cardio-hub-phase-1.md`
+- Create: `docs/overview/history-2026-07-23.md#2026-07-26-cardio-hub-phase-1`
 - Modify: `projectOverview.md`, `docs/implementation-backlog.md`
 
 - [ ] **Step 1: Write the journal entry**

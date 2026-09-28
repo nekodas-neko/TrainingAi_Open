@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import SessionSelectContent from "@/app/session-select/session-select-content";
 import { BottomNav } from "@/components/shell/bottom-nav";
-import { StatusBarScrim } from "@/components/shell/status-bar-scrim";
 import { TabVisibilityProvider } from "./tab-visibility";
 import { hrefForTab, tabKeyForHref, type TabKey } from "./tabs";
 import { TAB_NAV_EVENT } from "@/lib/shell-nav";
@@ -210,7 +209,8 @@ export function TabShell({ initialTab, session }: { initialTab: TabKey; session:
               )}
               {...(!isActive ? { inert: true } : {})}
               aria-hidden={!isActive}
-              // Read by StatusBarScrim (DV-6) to scope scroll events to the panel on show.
+              // Read by StatusBarScrim (DV-6/DV-22), which ignores a scroller inside a panel
+              // that is not on show, and re-evaluates when this attribute flips.
               data-tab-active={isActive}
             >
               <TabVisibilityProvider visible={isActive} epoch={state.epochs[key]}>
@@ -220,7 +220,6 @@ export function TabShell({ initialTab, session }: { initialTab: TabKey; session:
           );
         })}
       </div>
-      <StatusBarScrim activeKey={state.active} />
       <BottomNav isAdmin={session.isAdmin} activeTab={state.active} onTabChange={show} />
     </>
   );

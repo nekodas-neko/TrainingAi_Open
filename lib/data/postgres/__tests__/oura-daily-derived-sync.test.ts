@@ -19,6 +19,7 @@ const FULL_PAYLOAD = {
   readinessScore: 78, readinessContributors: JSON.stringify({ hrv: 60 }), readinessSource: 'ble',
   activityScore: null, activityContributors: null, activeCaloriesEst: null,
   trainingLoadOts: 42.5, acwr: 1.37, trainingLoadHigh: true, trainingLoadGate: 'ok',
+  trainingLoadEvaluatedAt: '2026-09-28T01:00:00.000Z',
   trainingLoadGridLen: 1421, trainingLoadValidMin: 1073,
   recoveryIndexHours: 6.1, wornHoursBle: 21.3, nightHrvBaselineMs: 44.2,
   illnessFlag: 'none', illnessScore: 12, illnessBiomarkers: JSON.stringify({ temp: 0.1 }),

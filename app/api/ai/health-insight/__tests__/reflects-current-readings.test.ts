@@ -30,6 +30,7 @@ vi.mock('@/lib/data', () => ({
     listBodyMetrics: async () => [],
     getWorkoutSessionsFrom: async () => [],
     getUserById: async () => null,
+    getUserGoals: async () => ({ stepsGoal: null }),
   }),
 }))
 

@@ -188,6 +188,15 @@ export function resolveRequestedTables(cols: TableColumns, tablesParam: string |
       omitted.push({ table, reason: cols.excludedTables.has(table) ? 'denied (third-party data)' : 'unknown table' })
       continue
     }
+    // A claude_ro view with no public base table is not an app table — `pg_stat_statements` is
+    // the extension's statistics view, exposed there for query measurement. It has no primary key
+    // to paginate on, so `getPrimaryKeyColumns` threw and cut the stream off after
+    // `personal_records`: every table later in the alphabet, `users` included, was missing from
+    // every snapshot. A restore cannot load it either, so it is not exported.
+    if (!cols.publicTables.has(table)) {
+      omitted.push({ table, reason: 'not an app table (no public base table to restore into)' })
+      continue
+    }
     const isBulk = (BULK_TABLES as readonly string[]).includes(table)
     if (isBulk && !bulkAll && bulkDays == null) {
       omitted.push({ table, reason: 'bulk table — pass bulk=all or bulk=<days> to include' })

@@ -49,7 +49,11 @@ function MetricTilesCardComponent({
 
   return (
     <div className="px-4 pb-3">
-      <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+      {/* LB-163. A `flex` row of `min-w-[76px]` tiles left the right third of the row empty at
+          384 px — the tiles sized to content and the row did not. A fixed three-column grid fills it.
+          **Accepted trade, stated on the approved mockup:** a fourth widget wraps to a second line
+          rather than scrolling sideways, so `overflow-x-auto` goes with it. */}
+      <div className="grid grid-cols-3 gap-2">
         {visibleDefs.map(def => {
           const todayVal =
             def.key === "waterIntake"
@@ -84,9 +88,18 @@ function MetricTilesCardComponent({
               aria-label={`${def.label}: ${metaLoading ? "loading" : valText ?? "no data"} ${
                 def.unit || ""
               } — tap to view`}
-              className="flex-none flex flex-col items-center gap-1 rounded-2xl px-4 py-3 min-w-[76px] transition active:scale-95 relative cursor-pointer overflow-hidden"
+              className="flex flex-col items-center gap-1 rounded-2xl px-3 py-3 transition active:scale-95 relative cursor-pointer overflow-hidden"
               style={accentCardStyle(tileColor)}
             >
+              <def.icon className="h-4 w-4" style={{ color: tileColor }} />
+              <span className="text-sm font-bold tabular-nums">
+                {metaLoading ? "…" : valText ?? "—"}
+              </span>
+              <span className="text-[10px] text-muted-foreground">{def.unit || def.label}</span>
+              {/* LB-163. Was `absolute top-0.5 right-0.5`, which put a 44 px-tall pill on top of the
+                  icon. **The overlap came from the POSITIONING, not the size** — so this keeps
+                  `min-h-11` and moves the control into the flow below the value instead. Shrinking the
+                  tap target would have traded a layout bug for an accessibility one. */}
               <button
                 onClick={e => {
                   e.stopPropagation();
@@ -96,16 +109,11 @@ function MetricTilesCardComponent({
                     onLogTile(def);
                   }
                 }}
-                className="absolute top-0.5 right-0.5 min-h-11 flex items-center text-[10px] font-bold px-2.5 py-2 rounded-full bg-foreground/10 border border-border/50 leading-none"
+                className="mt-0.5 w-full min-h-11 flex items-center justify-center text-[10px] font-bold px-2 rounded-full bg-foreground/10 border border-border/50 leading-none"
                 aria-label={`Log ${def.label}`}
               >
                 Log
               </button>
-              <def.icon className="h-4 w-4" style={{ color: tileColor }} />
-              <span className="text-sm font-bold tabular-nums">
-                {metaLoading ? "…" : valText ?? "—"}
-              </span>
-              <span className="text-[10px] text-muted-foreground">{def.unit || def.label}</span>
               {waterWeeklyPct !== null && (
                 <div className="absolute bottom-0 left-0 right-0 h-1 bg-foreground/10">
                   <ProgressFill pct={waterWeeklyPct} color={tileColor} />

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { formatLoadKg } from "@trainingai/shared/format/units";
 import dynamic from "next/dynamic";
-import { BatteryLowIcon, CheckIcon, ChevronLeftIcon, DumbbellIcon, RefreshCwIcon, RotateCcwIcon, TriangleAlertIcon } from "lucide-react";
+import { BatteryLowIcon, CheckIcon, ChevronLeftIcon, RefreshCwIcon, RotateCcwIcon, TriangleAlertIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@trainingai/shared/utils";
 import type { WorkoutExercise } from "@/app/api/workout-data/route";
@@ -395,7 +396,7 @@ export function PreWorkoutScreen({
                             const reps = avgReps(ex.lastReps, 'floor');
                             const weight = modalWeight(ex.lastSetWeights ?? []);
                             const parts: string[] = [];
-                            if (reps != null && weight != null) parts.push(`${reps} × ${weight}kg`);
+                            if (reps != null && weight != null) parts.push(`${reps} × ${formatLoadKg(weight)}`);
                             else if (reps != null) parts.push(`${reps} reps`);
                             if (ex.estimated1rm != null) {
                               // RV-89: the `~` and `Math.round` were not a deliberate approximation
@@ -479,7 +480,6 @@ export function PreWorkoutScreen({
             disabled={loading || exercises.length === 0}
             onClick={onContinueWorkout}
           >
-            <DumbbellIcon className="mr-2 h-5 w-5" />
             Continue Workout
           </Button>
         ) : (
@@ -494,10 +494,7 @@ export function PreWorkoutScreen({
                 Preparing…
               </>
             ) : (
-              <>
-                <DumbbellIcon className="mr-2 h-5 w-5" />
-                Start Workout
-              </>
+              "Start Workout"
             )}
           </Button>
         )}
