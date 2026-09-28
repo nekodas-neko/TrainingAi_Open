@@ -87,4 +87,49 @@ function minuteStamp(now) {
   return `${now.getUTCFullYear()}${p(now.getUTCMonth() + 1)}${p(now.getUTCDate())}${p(now.getUTCHours())}${p(now.getUTCMinutes())}`;
 }
 
-module.exports = { GRANDFATHERED, RETIRED_FLOOR, claimsFromFiles, surveyClaims, minuteStamp };
+// BF-214 ① deleted every `claude_ro_views` migration; the views are one generated file now, and
+// `claude-ro-views-file.test.ts` fails any PR that adds such a migration. So a branch still holding
+// one is stale, not a claim, and it cannot be a live collision.
+const DEAD_PATTERN = /_claude_ro_views(_[^/]*)?\.sql$/;
+
+/**
+ * OR-202. `surveyClaims`' lists, made readable: one line per (number, file) however many branches
+ * hold it, and nothing for the dead `claude_ro_views` pattern. Before this, a single run printed
+ * 470 KB, and number 274 alone named the same file on 44 branches. A real collision sat between two
+ * paragraphs of that noise.
+ *
+ * @returns {{ reserved: {num: string, file: string, refs: string[]}[],
+ *             collisions: {num: string, files: {file: string, refs: string[]}[]}[],
+ *             deadRefs: number }}
+ */
+function summariseClaims({ reserved, collisions }) {
+  const dead = new Set();
+  const groups = new Map();
+  for (const r of reserved) {
+    if (DEAD_PATTERN.test(r.file)) { dead.add(r.ref); continue; }
+    const key = `${r.num}|${r.file}`;
+    if (!groups.has(key)) groups.set(key, { num: r.num, file: r.file, refs: [] });
+    groups.get(key).refs.push(r.ref);
+  }
+  const live = [];
+  for (const c of collisions) {
+    const byFile = new Map();
+    for (const claim of c.claims) {
+      const cut = claim.indexOf(': ');
+      const where = claim.slice(0, cut);
+      const file = claim.slice(cut + 2);
+      if (DEAD_PATTERN.test(file)) { if (where !== 'merged') dead.add(where); continue; }
+      if (!byFile.has(file)) byFile.set(file, []);
+      byFile.get(file).push(where);
+    }
+    if (byFile.size > 1) live.push({ num: c.num, files: [...byFile].map(([file, refs]) => ({ file, refs })) });
+  }
+  return { reserved: [...groups.values()], collisions: live, deadRefs: dead.size };
+}
+
+/** `origin/a, origin/b +3 more` — enough to act on without printing all of them. */
+function refList(refs, show = 2) {
+  return refs.length <= show ? refs.join(', ') : `${refs.slice(0, show).join(', ')} +${refs.length - show} more`;
+}
+
+module.exports = { GRANDFATHERED, RETIRED_FLOOR, DEAD_PATTERN, claimsFromFiles, surveyClaims, summariseClaims, refList, minuteStamp };
