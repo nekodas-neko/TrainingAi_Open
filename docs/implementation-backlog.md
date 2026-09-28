@@ -6521,6 +6521,35 @@ drift.
 - **Reversal cost: low.** (a) writes a nullable column that already exists. Clearing it restores
   today's state exactly.
 
+### [platform][workouts] LA-173 — four things Lane A needs from the owner (two merge yeses, a style, a key)
+- **Lane: O** — every item is the owner's to answer; nothing here is buildable until he does.
+- **Ask** — owner: four answers, each a yes/no or one action. ① Merge LA-159 (#1847)? ② Merge LA-142
+  (#1849), and close #1749? ③ Which progression style should Barbell Skull Crusher use? ④ Can fresh
+  storage keys go into Railway?
+- **Added:** 2026-09-28 · Lane A, moving the asks out of chat per the owner's instruction that
+  anything needing his input is assigned to the Orchestrator.
+- **① LA-159 (#1847): drop `program_phases.program_id`. ⭐ Recommend: yes.** 0 of the owner's 46
+  rows use it and no code reads or writes it. The migration re-checks **every** account and leaves
+  the column if any row holds a value, so it cannot drop data the owner-scoped read could not see.
+  Rehearsed on his real data (46 phases intact) and on CI's replay. Reversal: re-add a nullable
+  column, which restores the exact state because every value was NULL.
+- **② LA-142 (#1849): drop four dead `oura_daily_derived` columns on the server. ⭐ Recommend: yes,
+  and close #1749.** 133 rows, 0 values in each, with the same all-accounts guard. Unlike #1749 it
+  leaves the **device's** columns alone: a half-applied SQLite `DROP COLUMN` would throw on every
+  retry, which is how the device database has died before. Rehearsed on his real data (133 rows
+  intact). Whichever of ① and ② merges second must re-merge `main` and regenerate the views file,
+  and CI enforces that.
+- **③ Barbell Skull Crusher has no progression style** (BF-200 residue, TN-75). The engine now
+  deloads it, but it records no per-set plan until a style is assigned. **⭐ Recommend: the style
+  his other Upper accessories use.** He assigns it in Config, or names one here and an agent sets
+  it. A preference, so not assumed.
+- **④ Fresh S3 storage keys in Railway.** `pnpm start` refuses to boot on the current ones
+  (`SignatureDoesNotMatch`), so the production-mode check on the CSP and security PRs cannot run
+  locally. Only he can mint and set them; the code needs nothing.
+- **Already filed elsewhere, so NOT repeated here:** the six security merges (RV-221), BF-199's
+  rep→%1RM table (BF-201), bodyweight plans (LA-169), plan-meal matching (LA-172), and the calorie
+  number (OR-191).
+
 ### [app-shell][heart-rate] LB-172 — Resting HR is drawn as a score, and neither proposed fix fits
 - **Lane: O** — the remaining fork is a visual-language decision on the card he reads every morning.
   Ungated on purpose: a mockup does not exist yet, so producing one is the next act and `Gate: owner`
@@ -7693,24 +7722,6 @@ drift.
 - **Keep:** DV — does the H10's accelerometer stream start late, and how often? A walk under the
   floor now stores no steps at all, so if it is common the fix is the stream, not a lower floor.
   Pass/fail: walk with the strap already worn; record the first bin's tSec against the walk's start.
-
-### [workouts][platform] LA-143 — backfill `session_exercises.exercise_id` for the rows already saved
-
-- **Lane: A** — a one-statement migration, no new table or column so no `claude_ro` twin.
-- **✅ AUTHORISED 2026-09-27 (OR-182) — gate removed; this is the ADD half of the new policy.** It writes production rows and adds nothing destructive, so it no longer needs a separate yes. **The policy he set 2026-09-27 (OR-182):** an agent may run a production DB change that ADDS or backfills, and may drop an object proved dead with the evidence shown — each after a verified snapshot. **Anything that DELETES rows holding data still comes to him individually.**
-  **Two conditions before running it:** take the snapshot first and confirm it restores, and print the affected-row count and compare it against what the backfill predicted — a count that does not match the prediction stops the run rather than being written up afterwards.
-- **Added:** 2026-09-25, Lane A, while shipping RV-168.
-- **What is left.** RV-168 made `saveProgram` fill the FK, so it is correct from each program's next
-  save onward. Rows saved before that are still NULL — Bankai **0 of 25**, the others 1/25, 2/25,
-  1/17 — and fill in on their own when the owner next saves each. Nothing reads the column yet, so
-  nothing is broken meanwhile.
-- **Recommended.** The statement is migration 099's own backfill re-run, `WHERE exercise_id IS NULL`
-  so it cannot overwrite a Coach-set value; `SET exercise_id = NULL` undoes it exactly.
-  ```sql
-  UPDATE session_exercises se SET exercise_id = el.id
-    FROM exercise_library el
-   WHERE el.name = se.exercise_name AND se.exercise_id IS NULL;
-  ```
 
 ### [readiness] RV-169 — #1256's "history self-heals across the trailing 21 days" did not happen, and the span is 24 days, not 16
 
