@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.34",
+    date: "2026-09-28",
+    changes: [
+      "The Norwegian 4×4 run now describes its intervals the way the app actually sets them: Zone 4–5, meaning 80–100% of your heart-rate reserve. It used to say 85–95% of max heart rate, which is about 20 bpm below the target it gave you.",
+    ],
+  },
+  {
     version: "1.477.33",
     date: "2026-09-28",
     changes: [
