@@ -535,6 +535,28 @@ Live at the time of writing (2026-07-30):
 
 ## Decided, and deliberately not built
 
+- **⛔ ON THE DIARY, VERTICAL SPACE BETWEEN MEAL CARDS IS THE GROUPING MECHANISM — a density change
+  needs a NEW argument (owner, 2026-09-27 — RV-213, declined and struck).** A sweep measured four
+  (really six) empty meal slots at roughly 320 px of mostly-blank card and proposed collapsing each
+  to a single name-plus-`+` row, taking ~1,400 px to ~800 px and pulling two below-the-fold cards
+  onto the screen. A before/after was rendered at 384 px dark and shown. **He said no:**
+  *"I like the original look; it shows the grouping nicely with the space."*
+  - **So the empty height is doing work.** It is what separates one meal from the next, and the
+    saving was real but paid for in the thing the screen exists to show.
+  - **This is a principle, not a one-off no.** Any future sweep measuring blank space on the diary
+    will reach the same finding and should stop here. Re-opening it takes a **new entry with a new
+    reason** — not a second run at this one.
+  - **The finding's other half is on the record and is also not a to-do:** in
+    `components/nutrition/meal-card.tsx`, an empty meal renders a header `+` **and** a body
+    `+ Add food`. Two affordances, one action — but the header `+` is the control that is present in
+    **every** meal state and the body row is the empty-state one, so the pair is consistency rather
+    than duplication. Filing it separately would be re-opening a declined entry through a side door.
+    (Named without line numbers deliberately: `check-index-doc-paths` reads a `file:line` suffix as
+    part of the path, and a pinned line in an orientation doc goes stale on the next edit anyway.)
+  - The declined mockup is kept at
+    [`docs/design/2026-09-27-four-screen-mockups.html`](../../design/2026-09-27-four-screen-mockups.html),
+    so the next person can see what was rejected rather than re-drawing it.
+
 - **A plan meal's `suggestedTime` stays a LABEL — it schedules nothing (owner, 2026-08-24 — Q-201,
   removed from the queue).** *"For now it can stay as a label; we already have the notification
   system for when meals are missed, that's fine."* `meal_plan_meals.suggested_time` is written by the

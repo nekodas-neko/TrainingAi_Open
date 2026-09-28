@@ -4082,60 +4082,6 @@ which is the right shape for something that can only be validated by living with
    render or the device.
 - **Also for the device:** Body Battery's fill runs from about 45% to the right edge rather than from the left. That may be deliberate ("drains as you use it"). RV-205 should say which, and if it is deliberate, the bar needs a mark that makes the direction legible.
 
-### [nutrition][app-shell] RV-213 — four empty meal slots take a full card each, with two "add" controls apiece — MOCKUP FIRST
-- **⛔ DECLINED 2026-09-27 — the owner said no to this one and yes to the other three in the same
-  sitting. Do NOT build it.**
-- **✅ HIS REASON, given when asked (2026-09-27): *"I like the original look; it shows the grouping
-  nicely with the space."*** So the empty height the finding measured is **doing work** — it is what
-  separates one meal from the next. Collapsing the slots would have saved ~150 px and cost the
-  grouping, which is the thing the screen is for.
-- **⚑ THIS IS A DESIGN PRINCIPLE FOR NUTRITION, NOT A ONE-OFF NO — record it and do not re-file it.**
-  A future sweep measuring blank space on the diary will reach the same finding and should stop
-  here: on this screen, **vertical space between meal cards is the grouping mechanism** and a
-  density change needs a new argument, not a repeat of this one.
-- **The finding itself was not disputed and is left on the record:** four empty meals render a
-  header `+` **and** a body `+ Add food` (`meal-card.tsx:73`, `:105`) — two controls for one action
-  — across roughly 320 px of mostly empty card. The mockup that was declined is in
-  [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html).
-- **Nothing is owed. Strike this entry** — a declined change is finished, not parked. Re-opening it
-  needs a new entry and a new reason, not a second attempt at this one.
-- **📐 MOCKUP SHOWN 2026-09-27 — [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html) ([hosted copy](https://claude.ai/artifact/U4aypd5Un44whR6exTjWqX)).
-  Before/after at the real **384 px dark viewport**, using the app's own tokens from
-  `app/globals.css`. **Proposed:** an empty meal collapses to one row — its name and a single `+`; meals with food keep the full card. Four empty meals go from roughly **320 px to 170 px**.
-- **Gate cleared 2026-09-27** — DECLINED, so nothing is owed by him. Do not build.
-  so the next act was to PRODUCE one and that is work, which must stay ungated. It exists, so what
-  is outstanding is his answer, and the gate parks the entry honestly. (This is the transition
-  `LB-163` describes; applying it before the picture existed is the trap.)
-- **The trade:** adding to an empty meal becomes a `+` rather than a labelled full-width row. Still a 44 px target, but a smaller one.
-- **✅ MOCKUP SHOWN 2026-09-27 — `Gate: owner` added; his answer is now the only outstanding thing.**
-  Rendered from the *running app* at **384 px dark** rather than drawn, in one sitting with `LB-163`
-  and `LA-136` as this entry asks: <https://claude.ai/artifact/SQxd9yfvjcbnZVseiPVwHh>.
-- _(historic gate note)_ — the mockup has been shown; the collapse is his pick, as the entry says.
-- **The heading says FOUR empty slots; the render showed SIX**, so the count below undercounts it.
-  Collapsing them takes roughly **1,400 px → 800 px**, and two cards previously under the fold — the
-  goal-versus-budget explainer and "Finished logging for today?" — reach the same screen.
-- **⚠ RETRACTED 2026-09-27, SAME DAY — the tap-target caveat on this entry was WRONG, and it was
-  shown to the owner before it was checked.** It said the header `+` is `h-9 w-9`, a 36 px target
-  under the floor, so enlarging it had to ride along with the collapse. **Measured in the harness:
-  the button renders at 48 × 48.** `app/globals.css` carries a global floor —
-  `button, [role="button"] { min-height: 48px; min-width: 48px }`, with a `.tap-dense` opt-out — so
-  a Tailwind `h-9 w-9` on a `<button>` is raised to 48 and the class is not the rendered size.
-  **`LB-169` was filed on that misreading and has been removed.** The mockup page has been corrected.
-  **Nothing blocks this entry: collapsing an empty meal to its header row leaves a control that is
-  already at the floor.** The lesson is the one this repo keeps relearning from the other direction —
-  a source grep is a hypothesis, and a global stylesheet can make a class a poor guide to a size.
-
-- **Lane: B**
-- **UNGATED 2026-09-27 — the mockup does not exist yet, so the next act is to PRODUCE one, and that
-  is work. `Gate: owner` PARKED this entry, which meant nobody was tasked with drawing the picture
-  it was waiting on — the exact inversion `LB-163` documents. Add the gate back once the mockup has
-  been shown and his answer is the only thing outstanding.
-- **⚑ Show this in ONE sitting with `LB-163` and `LA-136`** — three mockups owed to one person
-  across Home and Nutrition. Split across three sittings, the same screens get judged three times.
-- **Added:** 2026-09-26 · Review sweep 63.
-- **What:** on a normal day the diary shows Morning snack, Afternoon snack, Dinner and Evening snack as four full-height "+ Add food" cards. Each also has a `+` in its header, so there are two add controls per empty meal and about a screen of height with nothing in it.
-- **Recommendation for the mockup:** collapse empty slots into one compact row per meal, with the name and a single `+`. Keep full cards for meals with food. The owner picks.
-
 ### [cardio][platform] LB-179 — a walk that satisfies a run prescription must not feed the run planner
 - **Lane: A** — `packages/shared/src/running/assemble-plan-context.ts`,
   `app/api/running-plan/run-type-stats/route.ts`, and (on the recommendation below) a migration plus
@@ -6598,6 +6544,37 @@ drift.
   `tn3b-stress-on-hr-chart` pass here; they were the deterministic `bucket_start` pair fixed in #1894,
   and removing them is most of the 5 → 1 improvement. Their disappearance is the evidence that the
   first census's mode-sorting was right.
+- **✅ `tn53:105` INVESTIGATED 2026-09-28 — and the entry's own suspect is REFUTED for this spec.**
+  It was picked as the start point for being the only spec flaky in all three censuses. The entry
+  says *"the suite runs `workers: 1` against one seeded database, so shared state is the obvious
+  suspect and is not yet shown."* It is still not shown, and for this spec it cannot be what the
+  entry means:
+  - **Reproduction attempted and FAILED, both ways.** Alone: **3 passed**. Run after the four other
+    specs that write `body_metrics` (`one-calorie-budget`, `measured-overview`,
+    `reta-weight-response`, `metric-bounds-at-keyboard`): **11 passed**. The entry's local note that
+    it *"fails when run after five other specs and passes alone"* did not reproduce here.
+  - **Nothing else writes the column it asserts on.** A census of `resting_heart_rate` across
+    `e2e/` returns exactly two files: this spec, and `rv72-progress-bars-composite`, whose match is
+    a **`page.route` stub** of a readiness payload — not a database write. So no other spec can add
+    or remove a point from the 14-day window this one counts.
+  - **And nothing mutates the other input to its window.** `LOCAL_TODAY` is derived from
+    `users.timezone`; no spec writes it (the only `UPDATE users` are `fixtures.ts`'s
+    `date_of_birth` and `profile-details-consolidation`'s `display_name`).
+- **⚑ SO THE NEXT STEP IS NOT "SHUFFLE THE ORDER" — IT IS TO READ THE FAILURE THAT ALREADY EXISTS.**
+  Every E2E run uploads a **`playwright-report`** artifact (run `36401730152` → artifact
+  `10962381954`, 42 MB), and Playwright retains the **first attempt** of a flaky test in it. That
+  report says in one look which of the three things failed — the 60 s wait for the card heading
+  (load), the `3 days missing` text (data), or the header-width measurement (layout) — and those
+  three point at completely different causes. Shuffling order is the expensive way to answer a
+  question the artifact has already answered on every run. **Download the report for a run where
+  `tn53:105` is listed flaky and read the first attempt's error before changing any spec.**
+  ⚠ The job LOG is not a substitute: it is ~9,000 lines and its tail is container teardown, so a
+  `tail_lines` fetch returns Postgres checkpoint noise rather than the Playwright summary.
+- **What this does NOT settle:** whether the other churning specs are order-dependent. The negative
+  result above is about `tn53` only — it was chosen precisely because it is the one spec that
+  reproduces across runs, and its data inputs turn out to be isolated. That makes **load/timing**
+  the live hypothesis for it, which is exactly what the retained first-attempt error would confirm
+  or kill.
 - **Not in scope:** the 45-minute cap. That is a symptom of ~250 specs on one worker, and it is
   `LB-166`'s.
 
