@@ -8927,6 +8927,30 @@ drift.
   a separate entry, conditional on this pass test** — file it then, with the measurement in hand.
 
 ### [platform] LB-166 — the full E2E suite no longer fits its 45-minute job limit, and it reports as `cancelled`
+- **✅ SHARDED 2026-09-28 (`ci.yml`) — and the `Needs: LB-149` park was INVERTED.** The entry sat
+  parked on `LB-149`, which is not a build: it *"closes when the next red E2E reports"*, waiting on a
+  `dmesg` witness. But a capped run reports `cancelled` and uploads nothing, so **`LB-166` was
+  blocking `LB-149`'s witness, not the other way round.** Sharding needs none of that diagnosis —
+  why the browser occasionally dies and how long the suite takes are unrelated questions.
+- **What shipped:** `e2e-gate` (computes the UI-paths diff ONCE — it needs `fetch-depth: 0`, and
+  four full clones to answer one question is the cheapest thing here to get wrong) → `e2e-shard`
+  ×4, each with its own Postgres, mirroring `test-shard` → an `e2e` rollup keeping the **`E2E`**
+  name so any future ruleset entry still finds it.
+  **Measured split: 72 tests per shard** (288 against the suite's 282 — the six are the `setup`
+  project, which every shard must run for its own database). Per-shard timeout **25 min**, down
+  from 45 for the whole.
+- **Two things fixed alongside, both of which would have outlived the split.**
+  ① The artifact upload was `if: failure()`, and a capped run is **`cancelled`**, not failed — which
+  is *why* run `36458784138` published nothing. It is `if: ${{ !success() }}` now, so the evidence
+  survives a timeout as well as a failure. ② The rollup refuses to report green when the **gate**
+  did not succeed: without that, a broken diff step leaves `changed` empty, the shards skip, and the
+  required check passes because the thing deciding whether to run it fell over.
+- **⚠ A DATABASE PER SHARD CHANGES WHICH SPECS SHARE ONE.** That reduces the seed-state class
+  `LB-178` found (fewer specs per database) and may **surface** an order-dependence that was hidden.
+  Expect a new failure or two on the first sharded runs and read them as the split doing its job,
+  not as the split being wrong.
+- **Not verified on CI yet** — a workflow change cannot be. Shard 1 was run locally end to end, and
+  all four were listed for balance.
 - **⚠ BACK OVER THE CAP, MEASURED 2026-09-28 — and the margin `LA-176` bought back has been spent,
   partly by me.** Two consecutive runs hit it: **#1926's head — 17:12:55 → 17:59:36, 46m41s**, and
   **#1927's — 17:32:01 → 18:17:18, 45m17s**. Both report `cancelled`. Against the three censuses
@@ -8983,12 +9007,19 @@ drift.
   this stands, and the ceiling is now reached by an ORDINARY PR rather than an unusually large one,
   so the margin is gone rather than thin. **This raises the entry's priority; it is no longer
   latent.**
-- **Needs:** LB-149 — that entry's browser-death signature (a 1.0s `newContext` failure before any
-  test body) may be the same saturation seen from the other end, or may be unrelated. Neither is
-  established and they should be looked at together.
+- **Needs:** — nothing. **⚠ This said `LB-149` until 2026-09-28, and the dependency was INVERTED.**
+  `LB-149` is not a build: it closes *"when the next red E2E reports"*, waiting on a `dmesg` witness
+  from a real browser death. A capped run reports `cancelled` and publishes nothing, so **this entry
+  was blocking that witness**, not waiting on it. The two questions — why the browser occasionally
+  dies, and how long the suite takes — turned out to share no mechanism, and looking at them
+  together cost `LB-166` the time it was parked. They can still be compared afterwards; the
+  sharded runs are what will produce the evidence to compare.
 - **Not proposing a number.** Raising `timeout-minutes` hides it, and sharding E2E the way `Tests`
   is already sharded is the durable answer — but LA-91 set every job's limit from MEASURED runs,
   so the fix starts with a measurement of where the 45 minutes goes, not with a bigger limit.
+  **✅ That is what was done:** the split is measured (72 tests per shard, listed for all four), and
+  the new per-shard limit is 25 min against a quarter of a ~45-minute suite — ample rather than
+  generous, so a suite that grows again goes red fast instead of cancelling silently.
 - **⚑ Whoever takes this should know the suite is still growing:** #1760 and the RV-211 PR each add
   one spec, both deliberately, because both caught defects no source guard could. The ceiling is
   the problem, not the specs.
