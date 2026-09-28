@@ -28,15 +28,15 @@ export async function GET() {
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const repo = await getRepository()
-  const [userWithHash, workoutCount] = await Promise.all([
-    repo.getUserByEmail(session.user.email!),
-    repo.countWorkoutSessions(session.user.id),
-  ])
+  // LB-180: a pure read of the users row. It used to add `workoutCount`, which nothing read. That
+  // count made every workout completion a writer of `more-user-profile`, and was the only thing
+  // keeping that key off `freshWithinTtl`.
+  const userWithHash = await repo.getUserByEmail(session.user.email!)
   if (!userWithHash) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const { passwordHash, ...user } = userWithHash
   return NextResponse.json(
-    { user, hasPassword: !!passwordHash, workoutCount },
+    { user, hasPassword: !!passwordHash },
     { headers: { "Cache-Control": "private, no-store" } },
   )
 }
