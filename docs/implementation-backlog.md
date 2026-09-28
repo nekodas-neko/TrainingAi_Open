@@ -797,61 +797,37 @@ below threshold and left in place for next time.
 - **Reversal cost:** a shipped second credential path is expensive to withdraw — anything already
   holding a token keeps working until it expires. That asymmetry is why the merge is the owner's.
 
-### [workouts] BF-217 — 9 of the 25 exercises in his live program have silently lost their progression style, and one whole session has lost all five
-- **Lane:** A — the program/session save path (`app/api/programs/**`), `session_exercises.style_id`.
-- **Added:** 2026-09-28 · BugFix intake, tracing the owner's *"I still cant change this to full?"* on Pull for Tue 29 Sept. Promoted out of BF-200 Keep ①, which recorded this as one exercise.
-- **Needs:** — nothing.
+### [workouts] LA-182 — nine exercises in his program have no progression style: he assigns them in Config
 
-- **The active program is the ONLY program this has happened to.** Measured in production
-  (`session_exercises` joined to `programs`, `deleted_at IS NULL`): `Bankai` — active — carries
-  **9 of 25 with `style_id` NULL**. Every other program carries **zero**, except the long-dead
-  `Main` (1 per session, 4 total). It is concentrated where he actually trains.
+- **Lane: O** · **Added:** 2026-09-29 · Lane A, closing BF-217.
+- **What he needs to do, about two minutes:** in Config → Bankai, give a style to each of these nine
+  exercises, whose style picker is blank:
+  - **Lower:** all five;
+  - Legs: Cable Lying Leg Curl;
+  - Pull: Face Pull;
+  - Push: Cable Chest Dips;
+  - Upper: Barbell Skull Crusher.
+- **Why it matters even though Bankai is AI-dynamic:** the AI picks a style each session, but the
+  rules fallback (used when he turns **Full** back on after a deload, and when the AI is
+  unavailable) skips any exercise without one. **Lower's Full toggle does nothing until these are
+  set.**
+- **Recommendation:** use the style each one was last logged with (Hypertrophy Plus, Hypertrophy
+  3-set or Powerbuilding), or his usual one. Any style fixes the fallback; the AI still chooses
+  per session. **Reversal cost: none.**
 
-  | session | style-less | of |
-  |---|---|---|
-  | **Lower** | **5** | 5 |
-  | Legs | 1 | 5 |
-  | Pull — Face Pull | 1 | 5 |
-  | Push | 1 | 5 |
-  | Upper — Skull Crusher | 1 | 5 |
+### [workouts][app-shell] LA-183 — an exercise can be saved with no progression style, and nothing says so until a deload
 
-- **It happened repeatedly over five days, which is what makes a save path the suspect.** Dating
-  each loss from the last `exercise_logs` row that still carried a `style_id`: Cable Lying Leg Curl
-  **09-09**, Barbell Skull Crusher **09-10**, the four Lower exercises **09-12**, Face Pull
-  **09-13**. A one-off corruption would not arrive in four instalments.
-
-- **⚠ `updated_at` cannot date any of this, and anyone bisecting from the table will be misled.**
-  All 25 rows read **`2026-09-28T05:17:31.544Z` to the millisecond** — a program save rewrites every
-  session-exercise row, so the column records the last save, never the loss. The logs are the only
-  dating evidence.
-
-- **What it costs him, in three places — the third is new and is why this is not cosmetic.**
-  ① The deload did not reach Skull Crusher (BF-200, since fixed at the deload-override site).
-  ② A style-less exercise records **no `planned_pct` on ordinary days**, which is part of TN-75's
-  coverage drop.
-  ③ **It now disables `Full` on a whole-session deload.** BF-198's fix takes its revert numbers from
-  `buildRulesPrescription`, which **skips** a style-less exercise and **returns null when every
-  exercise is one** (`generate-prescription.ts:169`, `:177`). So Pull revives 4 of 5 on
-  regeneration, and **`Lower` revives nothing at all** — its `Full` toggle is dead on the fixed code,
-  for the same reason it was dead on the broken one. The screen gives no hint that a style is
-  missing beyond a small `⚠ Style not found` on the pre-workout card.
-
-- **Two separable pieces of work, and they want different evidence.**
-  - **The repair** is the owner re-assigning styles to nine exercises in Config. One-off, his hands,
-    no code. Worth doing regardless of the cause, and it un-deads `Lower`.
-  - **The cause** is the Lane A question: can a program/session save write `style_id` NULL for an
-    exercise that had one? Read the save handler for the shape where the client omits the field and
-    the writer treats absent as null — the same class as the raw-body `.set()` rule in `CLAUDE.md`,
-    inverted. A remove-and-re-add in the UI would also produce it, and the two are distinguishable:
-    a re-add mints a new `session_exercises.id`, and the stored prescriptions' `sessionExerciseId`s
-    still matched all five Upper exercises on 09-25 (BF-200), so **at least Skull Crusher was not
-    re-added**. That is evidence for the save path and against the UI theory, for one of the nine.
-  - **Done when** a save that does not touch styles provably leaves `style_id` intact, with a test
-    covering the omitted-field shape, and the nine current nulls are accounted for as repaired.
-
-- **Not diagnosed here.** Whether the same save path can drop other per-exercise fields the client
-  may omit. Nobody has looked, and the blast radius question is the same one.
-
+- **Lane: B** — `components/config/program-editor-sheet.tsx`, `components/workout-builder/builder-review.tsx`.
+- **Added:** 2026-09-29 · Lane A, closing BF-217.
+- **What:** both program writers accept an exercise with `styleId` unset. The editor leaves a newly
+  added exercise style-less until someone picks one, and the builder passes the AI's
+  `progressionStyleId`, which can be empty. Nothing forces or defaults it. The editor gives no signal at all (its amber border fires only for a style that no longer exists,
+  not for none), and the pre-workout card shows a small `⚠ Style not found`. The cost
+  only lands when the rules fallback skips the exercise (BF-198's Full revert).
+- **Fix shape (Lane B's call on the UI):** default a new exercise's style to the one most used in
+  its session, or block the save with a message naming the style-less exercises. The server
+  already accepts either shape.
+- **Evidence it is not a save-path loss:** see the 2026-09-29 journal entry for BF-217.
 ### [platform] BF-214 — the `claude_ro` twin is 92% of the migration corpus, and it is why migration numbers collide twice as fast as they need to
 
 - **✅ BOTH HALVES SHIPPED.** ① (2026-09-27, owner's yes): the views are one generated file,
