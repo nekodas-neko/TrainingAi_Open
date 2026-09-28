@@ -2117,24 +2117,25 @@ below threshold and left in place for next time.
   that is a separate question.
   **This is the security carve-out being spent deliberately, not bypassed** — he was shown the four
   and what each changes, and chose a standing yes over four interruptions.
-- **⚑ SIX ARE BUILT AND WAITING (Lane A, 2026-09-28/29).** Each is a draft PR, tested and exercised on
-  `pnpm dev`. A yes flips it ready and it merges on green:
-  - **RV-191** → #1912: only a provable PNG/JPEG/WebP is accepted, and the admin panel opens a blob of
-    it, never the stored string;
-  - **RV-190** → #1914: every admin read-only query runs in a rolled-back, scrubbed transaction;
-  - **RV-193** → #1916: the Google refresh token stays in the encrypted JWT;
-  - **RV-197** → #1915: WebSockets are allowed by the CSP only in dev. It was not on the list of six,
-    but it is a security change, so it waits for the same yes.
-
-  - **RV-195** → #1930: the mobile sign-in challenge is bound to its tab, deleted users are signed
-    out, and a pending friend request shows its sender nothing. After merge, owe a DV sign-in through
-    Google on the S25;
-  - **RV-192** → #1931: an invite no longer activates a password registration, and linking Google
-    clears the password. **Behaviour change:** an invited person who registers with a password waits
-    in `/pending` until they use Google or an admin approves them. The "drop password sign-up"
-    option below is still his.
-
-  Only RV-196 (the ring-key plugin, which needs an APK) is not built yet.
+- **⚑ ALL SEVEN ARE BUILT. ONE PR EACH; review these (corrected 2026-09-29):**
+  - **RV-190** → **#1672**: every read-only query runs in a rolled-back transaction, reset on the way
+    in, and mutation-tested;
+  - **RV-191** → **#1671**: images are validated by their bytes (feedback and avatar), and the admin
+    thumbnail zooms in place;
+  - **RV-192** → **#1779**: an invite is not proof of the inbox, and linking Google clears the
+    password;
+  - **RV-193** → **#1781**: the refresh token is read server-side, never from the session;
+  - **RV-195** → **#1784** (② deleted users) **+ #1930** (① mobile sign-in bound to its tab, ③
+    pending friend requests masked);
+  - **RV-196 + OR-159** → **#1755**: native dialogs for the ring key (now including `setKey`),
+    uploads limited to the app's origin, and the cookie **and ring key** kept out of backup. Needs an
+    APK;
+  - **RV-197** → **#1789**: WebSockets are allowed by the CSP only in dev.
+- **⚠ DUPLICATES, DO NOT REVIEW: #1912, #1914, #1915, #1916 and #1931.** A Lane A session on
+  2026-09-28/29 rebuilt RV-190/191/193/197/192 without noticing the PRs above, and listed its own
+  here. Each is a strictly weaker copy of the original, compared diff by diff. They should be
+  closed; closing waits on the owner's OK, per the PR-closing rule. The session's two genuine
+  additions were folded into #1930 and #1755 instead.
 - **✅ PARTLY ANSWERED 2026-09-27 — item 2 is answered by rejecting its premise; item 1 is routed; item 3 is unchanged.**
   - **② the daily calorie target: he wants ONE number, and it is none of the three offered.**
     Verbatim: *"I just want one number the correct one - the one thats rmr + live activty +/-
