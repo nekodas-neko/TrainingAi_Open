@@ -6644,40 +6644,6 @@ drift.
 - **What is owed before any code:** a mockup of (a) in the default style at 384 px dark, per the
   large-UI rule. The measurements above are what it should be drawn against.
 
-### [workouts] LB-173 — the two "Start Workout" buttons differ, and "use the same variant" does not say which
-- **✅ DECIDED 2026-09-28 by the Orchestrator, NOT put to the owner — DROP the dumbbell from the
-  pre-workout screen's button. Both become text-only.**
-- **⚠ This entry's central claim was wrong, and checking it is what settled this.** It said *"there
-  is nothing in the repo that favours either direction"* and declined to recommend, calling a
-  choice *"dressing a coin toss as analysis"*. That was honest and it was untested — the repo does
-  favour a direction, and the measurement takes one pass.
-  **Measured 2026-09-28 across `components/**` and `app/**`: of 43 full-width primary `<Button>`s,
-  33 are TEXT-ONLY and 10 carry a decorative leading icon — 77%.** (A further 8 render a `Loader2`
-  spinner while saving; those are a state indicator, not a leading icon, and are excluded — counting
-  them would have put the split at 18 v 33 and muddied it.)
-  So the session card's icon-less button is the house convention and the pre-workout screen's is the
-  outlier. **Removing one icon is the change that makes them agree WITH the app**, rather than with
-  each other at a coin toss.
-- **Why this is not the owner's.** It is a restyle that fixes a consistency defect, not an
-  information-architecture change: nothing moves, nothing is added or removed from the screen, and
-  CLAUDE.md's mockup rule explicitly exempts *"an entry that merely restyles a component"*. The
-  2026-09-22 narrowing puts a derivable choice on the agent. **It is not the `LB-164` shape** — that
-  was ADDING a label he had not asked for; this is removing an inconsistency, in the direction the
-  other 33 buttons already point.
-- **Reversal cost: two lines**, and visible on his next workout, so a wrong call corrects itself
-  fast. **Lane B.**
-- **Lane: B.** A two-line change either way, on two daily paths, with no grounds in the repo for
-  picking a direction. Ungated: nothing is owed but the answer.
-- **Added:** 2026-09-27 · split out of `RV-214` ⑤ when that entry was cleared.
-- **Measured 2026-09-27:** the card's button is full-width green with **no** icon; the pre-workout
-  screen's carries a dumbbell. Review sweep 63 asked for "the same variant" and did not say which,
-  and both sit on paths he uses daily — so choosing arbitrarily is a visible change to his screen on
-  no grounds, which is the shape `LB-164` (the Coach label) was reverted for.
-- **No recommendation, deliberately.** There is nothing in the repo that favours either direction:
-  the icon is not load-bearing, and neither button is inconsistent with anything else. This is
-  preference, and inventing a reason to prefer one would be dressing a coin toss as analysis.
-- **Reversal cost: two lines.**
-
 ### [workouts] BF-201 — two decisions about the loads he actually trains at, split out of BF-197 and BF-199 so they reach him
 - **↻ RE-LANED TO `T` 2026-09-28 — decision 2 goes to Tuning BEFORE it goes to the owner, and that is
   a routing call rather than a deferral.**
