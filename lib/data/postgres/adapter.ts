@@ -771,15 +771,22 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     await this.db.update(s.users).set({ timingBaselineDate: date }).where(eq(s.users.id, userId))
   }
 
+  // Linking CLEARS the password (RV-192). The row being linked to was created by someone who typed
+  // that address and was never asked to prove they read it; the person arriving now proved it, via
+  // Google. Leaving the hash in place leaves a credential belonging to whoever registered first.
+  // They lose nothing they are using — they are signing in with Google as this runs.
   async linkOAuthAccount(userId: string, oauthSub: string): Promise<void> {
-    await this.db.update(s.users).set({ oauthSub }).where(eq(s.users.id, userId))
+    await this.db.update(s.users).set({ oauthSub, passwordHash: null }).where(eq(s.users.id, userId))
   }
 
+  // An invite is not proof that the registrant owns that inbox (RV-192). This defaulted to
+  // `isInvited(email)`, so anyone who knew an invited address got an ACTIVE account for it, and the
+  // real invitee's later Google sign-in linked onto the row. Google's own sign-in still honours the
+  // invite — see upsertUser — because there the address is verified by Google. Here nothing
+  // verifies it, so a password account starts inactive and the owner activates it.
   async createEmailUser(email: string, passwordHash: string, name?: string, isActive?: boolean): Promise<User> {
-    const normal = normalizeEmail(email)
-    const active = isActive ?? await this.isInvited(normal)
     const [r] = await this.db.insert(s.users)
-      .values({ email: normal, passwordHash, name: name ?? null, isActive: active })
+      .values({ email: normalizeEmail(email), passwordHash, name: name ?? null, isActive: isActive ?? false })
       .returning()
     return this.rowToUser(r)
   }

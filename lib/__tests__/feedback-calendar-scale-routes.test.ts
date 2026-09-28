@@ -32,8 +32,14 @@ const reportServerError = vi.fn((..._a: unknown[]) => undefined)
 const eventsInsert = vi.fn(async (..._a: unknown[]) => ({ data: { id: 'evt-1' } }))
 const setCredentials = vi.fn()
 
-let session: Row | null = { user: { id: 'u-1' }, refreshToken: 'rt-1' }
+let session: Row | null = { user: { id: 'u-1' } }
+// RV-193 — the refresh token is no longer ON the session. It is read from the encrypted cookie,
+// because the session object is what `GET /api/auth/session` hands to page JavaScript. These two
+// are now separate knobs on purpose: a signed-in caller with no calendar grant is
+// `session` set and `refreshToken` null, which is the 401 case below.
+let refreshToken: string | null = 'rt-1'
 vi.mock('@/auth', () => ({ auth: async () => session }))
+vi.mock('@/lib/auth/session-token', () => ({ googleRefreshTokenFrom: async () => refreshToken }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: (...a: unknown[]) => rateLimit(...a) }))
 vi.mock('@/lib/observability', () => ({ reportServerError: (...a: unknown[]) => reportServerError(...a) }))
 vi.mock('@/lib/data', () => {
@@ -68,7 +74,8 @@ beforeEach(() => {
   eventsInsert.mockResolvedValue({ data: { id: 'evt-1' } })
   listPendingScaleSamples.mockResolvedValue([])
   listRecentDismissedScaleSamples.mockResolvedValue([])
-  session = { user: { id: 'u-1' }, refreshToken: 'rt-1' }
+  session = { user: { id: 'u-1' } }
+  refreshToken = 'rt-1'
 })
 
 describe('POST /api/feedback', () => {
@@ -225,8 +232,18 @@ describe('POST /api/log-calendar-event', () => {
 
   it('refuses without a refresh token — the session alone is not enough here', async () => {
     // This route authorises on `refreshToken`, not on `user.id`: a signed-in user who never granted
-    // Google access has a session and cannot write a calendar event.
-    session = { user: { id: 'u-1' } }
+    // Google access has a session and cannot write a calendar event. Since RV-193 the token comes
+    // from the cookie rather than the session object, so this is the knob that moves; the session
+    // stays exactly as it is for a signed-in caller.
+    refreshToken = null
+    expect((await calendar(VALID_EVENT)).status).toBe(401)
+    expect(eventsInsert).not.toHaveBeenCalled()
+  })
+
+  it('refuses when there is no session at all, without reaching for a token', async () => {
+    // The two halves are independent now, so the signed-out case needs saying separately: a
+    // present refresh token must not admit a caller `auth()` refused.
+    session = null
     expect((await calendar(VALID_EVENT)).status).toBe(401)
     expect(eventsInsert).not.toHaveBeenCalled()
   })

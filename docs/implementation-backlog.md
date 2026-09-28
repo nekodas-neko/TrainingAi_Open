@@ -490,6 +490,53 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [workouts] LB-186 — the program editor adds an exercise with NO progression style, and nothing ever requires one
+
+- **Lane: B** · **Added:** 2026-09-28 · Orchestrator, root-causing `LA-173` ③ after the owner asked
+  why the styleless slots were not assigned automatically.
+- **The cause, verified link by link.** `components/config/program-editor-sheet.tsx:218` —
+  `addExercise` creates `{ key: nextEditKey(), name: "" }`, with no style and no default. The type
+  (`packages/shared/src/types/program.ts:53`) marks `styleId` optional; the route
+  (`app/api/workout-templates/route.ts:79-81`) checks only that a *provided* id is real; the save
+  (`lib/data/postgres/slices/programs.ts:335`) writes `styleId: ex.styleId ?? null`. **No layer
+  objects**, so a slot is styleless whenever the picker was never opened.
+- **Why it hid.** The engine falls back to the style on the exercise's **last log**, so a styleless
+  slot behaves normally while that exercise has styled history. It surfaces only when there is
+  none, or when a path needs a non-empty style.
+- **What it already cost.** `BF-200`: the Q-185 deload override required a non-empty style, skipped
+  Barbell Skull Crusher and prescribed **3 × 30 kg — his ordinary working weight — in a deload
+  week**, while the other four Upper exercises lightened correctly.
+- **The fix is a default, not a validation error.** Give a newly-added exercise the style its
+  **role** already uses in that program (accessories `Hypertrophy 3-set` or `General`, primaries
+  `Powerbuilding` on his data), with the picker still free to change it. **Blocking the save
+  instead would be worse** — it turns a silent gap into a wall in front of a half-built program.
+- **What proves it fixed:** add an exercise in Config, save without touching the style picker, and
+  confirm the stored `style_id` is non-null.
+
+### [workouts] LA-177 — backfill the nine styleless slots in the active program
+
+- **Lane: A** · **Added:** 2026-09-28 · Orchestrator, splitting the data half out of `LA-173` ③.
+- **Nine slots in `Bankai` (active) have `style_id IS NULL`** — 7 accessory (Hanging Leg Raise,
+  Cable Chest Dips, Face Pull, Cable Lying Leg Curl, Barbell Skull Crusher, Dumbbell Calf Raise,
+  Cable Seated Leg Curl), 1 primary (**Barbell Hip Thrust**) and 1 secondary (Dumbbell Bulgarian
+  Split).
+- **Assign by ROLE, not one style for all nine.** His accessories run `Hypertrophy 3-set` (17
+  slots) and `General` (15); his primaries run `Powerbuilding` (13). Barbell Skull Crusher itself
+  already carries `Hypertrophy 3-set` in one session and `General` in another, so **the exercise
+  has no single right answer and only the slot does**.
+- **Needs:** LB-186
+- **⛔ Do this AFTER `LB-186`, or it comes straight back** — backfilling while the editor still adds
+  styleless exercises fixes nine and permits the tenth. That ordering is the whole reason these are
+  two entries.
+- **Out of scope: the five unstyled primaries in `Main`** (Squat, Deadlift, Bench, Incline Bench,
+  Bent-Over Row). That program is **inactive**; counting them would inflate this from nine to
+  fourteen.
+- **This is an ADD/backfill on production data, which is authorised** — snapshot first and print the
+  affected-row count against the nine predicted, stopping on a mismatch.
+- **Method for re-deriving the nine:** `claude_ro.session_exercises` joined to
+  `program_sessions`/`programs`, `deleted_at IS NULL`, `is_active`, `style_id IS NULL`.
+
+
 ### [readiness][heart-rate][activity][workouts] LA-171 — five runs and checks Lane A shipped on 2026-09-28 that need the phone or an admin session
 - **Lane: DV** — handed over by the owner's instruction on 2026-09-28 (*"Assign whatever tasks you
   can to DV agent — it can do most of these mechanical tasks"*). The phone's WebView holds the
@@ -749,6 +796,61 @@ below threshold and left in place for next time.
   underneath it. Re-run before anyone reads that green.
 - **Reversal cost:** a shipped second credential path is expensive to withdraw — anything already
   holding a token keeps working until it expires. That asymmetry is why the merge is the owner's.
+
+### [workouts] BF-217 — 9 of the 25 exercises in his live program have silently lost their progression style, and one whole session has lost all five
+- **Lane:** A — the program/session save path (`app/api/programs/**`), `session_exercises.style_id`.
+- **Added:** 2026-09-28 · BugFix intake, tracing the owner's *"I still cant change this to full?"* on Pull for Tue 29 Sept. Promoted out of BF-200 Keep ①, which recorded this as one exercise.
+- **Needs:** — nothing.
+
+- **The active program is the ONLY program this has happened to.** Measured in production
+  (`session_exercises` joined to `programs`, `deleted_at IS NULL`): `Bankai` — active — carries
+  **9 of 25 with `style_id` NULL**. Every other program carries **zero**, except the long-dead
+  `Main` (1 per session, 4 total). It is concentrated where he actually trains.
+
+  | session | style-less | of |
+  |---|---|---|
+  | **Lower** | **5** | 5 |
+  | Legs | 1 | 5 |
+  | Pull — Face Pull | 1 | 5 |
+  | Push | 1 | 5 |
+  | Upper — Skull Crusher | 1 | 5 |
+
+- **It happened repeatedly over five days, which is what makes a save path the suspect.** Dating
+  each loss from the last `exercise_logs` row that still carried a `style_id`: Cable Lying Leg Curl
+  **09-09**, Barbell Skull Crusher **09-10**, the four Lower exercises **09-12**, Face Pull
+  **09-13**. A one-off corruption would not arrive in four instalments.
+
+- **⚠ `updated_at` cannot date any of this, and anyone bisecting from the table will be misled.**
+  All 25 rows read **`2026-09-28T05:17:31.544Z` to the millisecond** — a program save rewrites every
+  session-exercise row, so the column records the last save, never the loss. The logs are the only
+  dating evidence.
+
+- **What it costs him, in three places — the third is new and is why this is not cosmetic.**
+  ① The deload did not reach Skull Crusher (BF-200, since fixed at the deload-override site).
+  ② A style-less exercise records **no `planned_pct` on ordinary days**, which is part of TN-75's
+  coverage drop.
+  ③ **It now disables `Full` on a whole-session deload.** BF-198's fix takes its revert numbers from
+  `buildRulesPrescription`, which **skips** a style-less exercise and **returns null when every
+  exercise is one** (`generate-prescription.ts:169`, `:177`). So Pull revives 4 of 5 on
+  regeneration, and **`Lower` revives nothing at all** — its `Full` toggle is dead on the fixed code,
+  for the same reason it was dead on the broken one. The screen gives no hint that a style is
+  missing beyond a small `⚠ Style not found` on the pre-workout card.
+
+- **Two separable pieces of work, and they want different evidence.**
+  - **The repair** is the owner re-assigning styles to nine exercises in Config. One-off, his hands,
+    no code. Worth doing regardless of the cause, and it un-deads `Lower`.
+  - **The cause** is the Lane A question: can a program/session save write `style_id` NULL for an
+    exercise that had one? Read the save handler for the shape where the client omits the field and
+    the writer treats absent as null — the same class as the raw-body `.set()` rule in `CLAUDE.md`,
+    inverted. A remove-and-re-add in the UI would also produce it, and the two are distinguishable:
+    a re-add mints a new `session_exercises.id`, and the stored prescriptions' `sessionExerciseId`s
+    still matched all five Upper exercises on 09-25 (BF-200), so **at least Skull Crusher was not
+    re-added**. That is evidence for the save path and against the UI theory, for one of the nine.
+  - **Done when** a save that does not touch styles provably leaves `style_id` intact, with a test
+    covering the omitted-field shape, and the nine current nulls are accounted for as repaired.
+
+- **Not diagnosed here.** Whether the same save path can drop other per-exercise fields the client
+  may omit. Nobody has looked, and the blast radius question is the same one.
 
 ### [platform] BF-214 — the `claude_ro` twin is 92% of the migration corpus, and it is why migration numbers collide twice as fast as they need to
 
@@ -2058,17 +2160,37 @@ below threshold and left in place for next time.
   **② The calorie target is answered** by rejecting the three-number premise; it is `OR-191` now.
   **③ Unchanged and still the only live item:** a merge-time yes on the six security fixes
   (`RV-191`, `RV-190`, `RV-192`, `RV-193`, `RV-195`, `RV-196`) **as each PR goes green — not now.**
-- **Ask:** owner — one thing only: a merge-time yes on each of the six security fixes as its PR goes green. Nothing is needed before then.
-- **⚑ FOUR ARE BUILT AND WAITING (Lane A, 2026-09-28).** Each is a draft PR, tested and exercised on
-  `pnpm dev`. A yes flips it ready and it merges on green:
-  - **RV-191** → #1912: only a provable PNG/JPEG/WebP is accepted, and the admin panel opens a blob of
-    it, never the stored string;
-  - **RV-190** → #1914: every admin read-only query runs in a rolled-back, scrubbed transaction;
-  - **RV-193** → #1916: the Google refresh token stays in the encrypted JWT;
-  - **RV-197** → #1915: WebSockets are allowed by the CSP only in dev. It was not on the list of six,
-    but it is a security change, so it waits for the same yes.
-
-  RV-192, RV-195 and RV-196 are not built yet.
+- **✅ STANDING YES GIVEN 2026-09-28 — the four built security PRs merge on green WITHOUT coming
+  back to him.** `#1912` (RV-191, feedback-screenshot validation), `#1914` (RV-190, rolled-back
+  admin queries), `#1916` (RV-193, refresh token in the encrypted JWT) and `#1915` (RV-197,
+  dev-only WebSocket CSP).
+  **⛔ The yes is CONDITIONAL on two things, and neither is the merge button.** Each PR merges only
+  when its required checks are green **and** the pre-merge check it names in its own body is done —
+  `#1912` still owes an authenticated `pnpm dev` pass of the admin panel, which no CI job covers.
+  **It does not extend to `RV-192`, `RV-195` or `RV-196`, which are not built**; those come back
+  when they are, and `RV-192` additionally carries a product option (dropping password sign-up)
+  that is a separate question.
+  **This is the security carve-out being spent deliberately, not bypassed** — he was shown the four
+  and what each changes, and chose a standing yes over four interruptions.
+- **⚑ ALL SEVEN ARE BUILT. ONE PR EACH; review these (corrected 2026-09-29):**
+  - **RV-190** → **#1672**: every read-only query runs in a rolled-back transaction, reset on the way
+    in, and mutation-tested;
+  - **RV-191** → **#1671**: images are validated by their bytes (feedback and avatar), and the admin
+    thumbnail zooms in place;
+  - **RV-192** → **#1779**: an invite is not proof of the inbox, and linking Google clears the
+    password;
+  - **RV-193** → **#1781**: the refresh token is read server-side, never from the session;
+  - **RV-195** → **#1784** (② deleted users) **+ #1930** (① mobile sign-in bound to its tab, ③
+    pending friend requests masked);
+  - **RV-196 + OR-159** → **#1755**: native dialogs for the ring key (now including `setKey`),
+    uploads limited to the app's origin, and the cookie **and ring key** kept out of backup. Needs an
+    APK;
+  - **RV-197** → **#1789**: WebSockets are allowed by the CSP only in dev.
+- **⚠ DUPLICATES, DO NOT REVIEW: #1912, #1914, #1915, #1916 and #1931.** A Lane A session on
+  2026-09-28/29 rebuilt RV-190/191/193/197/192 without noticing the PRs above, and listed its own
+  here. Each is a strictly weaker copy of the original, compared diff by diff. They should be
+  closed; closing waits on the owner's OK, per the PR-closing rule. The session's two genuine
+  additions were folded into #1930 and #1755 instead.
 - **✅ PARTLY ANSWERED 2026-09-27 — item 2 is answered by rejecting its premise; item 1 is routed; item 3 is unchanged.**
   - **② the daily calorie target: he wants ONE number, and it is none of the three offered.**
     Verbatim: *"I just want one number the correct one - the one thats rmr + live activty +/-
@@ -2674,6 +2796,12 @@ deterministic, not data-dependent — and the update is **redundant**, not merel
   This becomes live the moment D4's pruning brings it under the quota, which is the trigger to
   prioritise it.
 - **Needs an APK** (`android/**`), so it batches with other native work rather than shipping alone.
+- **Batch:** `native-credential-surface` — assigned 2026-09-26 when this entry was next touched, per
+  the batching rule. The other member is **RV-196** (the ring key readable by any script in the
+  app's origin): both are `android/**`, both are about a stored credential's exposure, and each
+  would otherwise cost its own APK cycle. They stay separate decisions — this one excludes the
+  session cookie from backup, and the ring key's handling is still OR-160's, so building this must
+  not settle it by implication.
 
 ### [platform] OR-145 — the owner questions that are correctly gated and have never been asked
 - **✅ ALL SEVEN ANSWERED as of 2026-09-25.** Items 1, 2, 3 and 6 were put to him and answered (delete hr-sync; render zones with the degradation marked; retire the Exercise-detected card; an agent runs the BF-77 session). Items 5 and 7 resolved without asking, and item 2's structural half was decided by the Orchestrator. **What remains is NOT a question: the twelve-entry admin sitting is a scheduling ask, not a decision** — it stays below until those entries are picked up. Each answer is recorded on its own entry; this one leaves the queue when the gates it tracked are all struck.
@@ -3211,37 +3339,6 @@ which is the right shape for something that can only be validated by living with
      them. The implementer checks them locally with a migration-free script. **Any delete of a
      production row is the owner's call.**
 
-### [platform] RV-190 — `/api/admin/db-query` leaves session state behind on a pooled connection: owner scope, read-only and the timeout can all be changed by one query
-
-- **Lane: A** — `app/api/admin/db-query/route.ts`, `app/api/admin/db-snapshot/route.ts`,
-  `lib/data/postgres/readonly-client.ts`, `lib/data/postgres/claude-ro-owner.ts`.
-- **⚠ AUTH/SECURITY — the owner confirms before this merges.** The fix is small; the carve-out applies anyway.
-- **Added:** 2026-09-24 · Review sweep 60 ([`docs/reviews/2026-09-24-sweep-60-security-and-privacy.md`](reviews/2026-09-24-sweep-60-security-and-privacy.md)).
-- **What:** the route's comment says read-only is enforced by the `claude_readonly` role. The role
-  only sets **session defaults**: the owner scope (`app.claude_ro_owner`), `default_transaction_read_only`
-  and `statement_timeout`. A caller can override all three, and they persist, because each query runs
-  in autocommit on a 2-connection pool that is never reset. **Reproduced on the local database only.
-  Nothing was probed on production.**
-- **Who can reach it:** only a holder of `CLAUDE_DB_QUERY_SECRET` or an admin session. In practice
-  that is the owner and every agent session with the secret in its environment, including one steered
-  by prompt injection from fetched content. What it gets:
-  - other users' rows through the `claude_ro` views;
-  - writes the role was meant to refuse, including writes large enough to recreate the 2026-08-17
-    `disk_full` outage;
-  - queries with no time limit.
-  **Because the pool reuses connections, a later honest query can silently read another user's rows.**
-- **Fix shape:**
-  1. Wrap every db-query and db-snapshot query as `BEGIN TRANSACTION READ ONLY` → `SET LOCAL statement_timeout` →
-     `SET LOCAL app.claude_ro_owner` → query → `ROLLBACK`. The final `ROLLBACK` reverts any session-level
-     setting made inside the transaction; this was verified locally.
-  2. Second layer: `RESET ALL` (or `DISCARD ALL`) when a client is released.
-  3. Regression test: run a query that changes a setting, then assert that the next query on the same
-     pool sees the defaults.
-- **Interaction with OR-138:** OR-138 widens the owner scope on purpose, using `SET LOCAL`. Build this
-  first, or together with it. OR-138 without the transaction wrapper is the same hole with a legitimate
-  entry point.
-- **Reversal cost:** low. No migration is needed, and the views do not change.
-
 ### [platform] RV-192 — registration does not verify email, and Google sign-in links onto the unverified account
 - **Lane: A** — `app/api/auth/register/route.ts`, `auth.ts` signIn callback, `createEmailUser`.
 - **⚠ AUTH — the owner confirms before this merges.**
@@ -3262,6 +3359,27 @@ which is the right shape for something that can only be validated by living with
      or require the password before linking.
 - **Alternatives:** drop email and password registration and keep only Google, since every current
   user signs in with Google. That is simpler, but it is a product choice, so it goes to the owner.
+- **✅ BOTH HALVES OF THE TAKEOVER PATH ARE CLOSED (Lane A, 2026-09-27) — but NOT by verifying
+  email, because there is nothing in this repository that can send one.** `createEmailUser` no
+  longer defaults `isActive` to `isInvited(email)`; a password account starts inactive and the owner
+  activates it. `linkOAuthAccount` clears `password_hash` as it links. Google sign-in still honours
+  the invite through `upsertUser`, and that stays right: **Google has verified the address, so there
+  the invite IS being matched against a proven owner.** The asymmetry is the whole fix.
+- **Why clearing the password is safe rather than destructive.** It runs only on the FIRST Google
+  sign-in for a row with no `oauthSub`, and the person triggering it is signing in with Google at
+  that moment, so they are not locked out. The owner's own account already carries an `oauthSub`, so
+  the branch cannot fire for him. `auth.ts:57` already returns null on a falsy hash, so a cleared
+  password is a refusal and not an empty one — pinned by a test, because the fix would be worse than
+  useless if null meant "no password required".
+- **How this survived a test file named for it.** `lib/__tests__/register-inactive.test.ts` is
+  titled *"accounts must start inactive/pending"* and asserts that the **route** passes no `isActive`
+  override — leaving activation to `isInvited`, which is the defect. A test named for a property,
+  asserting something weaker.
+- **Keep: fix 1 as the entry actually words it — real email verification — is NOT done, and it is
+  the owner's.** It needs a mail provider (none exists: no nodemailer/Resend/SES anywhere), a
+  secret, a token table and a verification screen. **Ask him the product question first**, because
+  the entry's own alternative may be the answer: every current user signs in with Google, so
+  dropping password registration outright would close this without building any of it.
 
 ### [app-shell][platform] LA-162 — after RV-192, the "Account created" toast tells an invited registrant the wrong thing
 - **Lane: B** — `app/sign-in/email-sign-in.tsx`, and possibly `app/register/register-form.tsx`.
@@ -3289,6 +3407,24 @@ which is the right shape for something that can only be validated by living with
 - **Impact:** needs script execution in the app's origin, which is exactly what RV-191 provides. The
   token is long-lived, can write to Google Calendar, and outlives sign-out.
 - **Fix:** delete the line. Read the token server-side with `getToken()` in `log-calendar-event`.
+- **✅ SHIPPED (Lane A, 2026-09-27) — and it is not one line.** The line is gone from
+  `auth.config.ts`'s session callback and from the `Session` interface in `types/next-auth.d.ts`;
+  the JWT keeps it. The route reads it through a new `lib/auth/session-token.ts`.
+- **Why a shared module rather than a `getToken()` call in the route.** Auth.js derives the
+  decryption **salt from the cookie NAME**, so `secureCookie` is load-bearing: get it wrong and
+  every valid token reads as invalid, the route answers a plain 401, and every workout completion
+  stops reaching the calendar with nothing in the logs. That exact pairing was already solved in
+  `bearer-session.ts` and commented on in `request-error.ts`; a second hand-rolled copy is how it
+  drifts. `bearerSession` now calls the shared reader too.
+- **Both halves are tested against a REALLY encrypted token**, not a mocked decode: one that the
+  session the browser receives no longer carries the claim, driven through the real
+  `authConfig.callbacks.session`; one that the server still reads it back from a cookie minted with
+  `encode()`. The second is the test that would catch the silent death above.
+- **`bearerSession` builds its session by running that same callback**, so the mobile path loses the
+  claim identically — deliberate, and worth stating because it is not visible from the diff.
+- **The route's authorisation semantics are unchanged**: no refresh token is still 401, which is
+  what a signed-in user who never granted the calendar scope gets. A second test now pins the
+  signed-out case separately, because the two conditions became independent.
 
 ### [app-shell] LA-181 — a friend request you sent shows as "Unknown" with Accept/Decline buttons that cannot work
 
@@ -3323,6 +3459,35 @@ which is the right shape for something that can only be validated by living with
 3. **A pending friend request reveals the target's name, avatar and friend code** (`slices/social.ts`
    `sendFriendRequest`, pending rows in `listFriendships`). Fix: until the request is accepted, return
    only what the requester typed.
+- **② SHIPPED (Lane A, 2026-09-27). ① and ③ are NOT, and each for a reason the entry could not have
+  known. The "one PR" line does not survive them — this is three items, shipping separately.**
+- **② was one line and the old comment argued against it.** `is-active-refresh.ts` read *"a missing
+  row is not evidence of deactivation"* and returned the token untouched, so a deleted account
+  stayed signed in until its token expired — up to seven days. What makes the inversion safe is
+  already in the code: a database outage **throws** and is caught, where the claim stands and nobody
+  is signed out by a blip; reaching the `!user` branch means the query ran and answered "no such
+  user" (`getUserById` returns null only for a non-matching id). The two cases the comment conflated
+  were separated by the language all along. Its test is inverted in place, keeping its intent.
+- **⛔ ① CANNOT BE BUILT WHERE THE ENTRY SAYS, and the alternative costs an APK.**
+  `app/mobile-signin/page.tsx` is a **client** component (`"use client"`, it calls `signIn()` in an
+  effect) — it cannot set an httpOnly cookie, and Next 15 forbids `cookies().set()` during a page
+  render, so making it a server component does not help either. The shapes that work:
+  **(a)** a route handler that sets the cookie and redirects — but then the URL the Android app
+  opens changes, which is a Kotlin change and a **new APK**, the one cost the entry does not
+  mention; **(b)** the client page `POST`s to a small route before calling `signIn`, keeping the
+  URL — no APK, and **it is worth checking whether it actually defends anything**, since a Chrome
+  Custom Tab shares Chrome's cookie jar, so an attacker able to open a URL in that browser sets the
+  cookie to their own challenge and the binding holds for them. **This wants the threat model
+  restated before code.** Recommend (b) only if that question resolves; otherwise the real defence
+  is elsewhere and this entry is describing the wrong control.
+- **⚠ ③ IS NOT SYMMETRIC, and "return only what the requester typed" cannot be done on the list
+  path.** Redaction must apply **only when the viewer is the requester** — the addressee has to see
+  who is asking or they cannot decide, and `rowToFriendship` does not know the viewer.
+  And the typed string is **not stored**: `sendFriendRequest` has `emailOrCode` and can echo it,
+  `listFriendships` has nothing, so an outgoing pending request would render blank where a name is
+  today. Storing it is a column, and **a migration ships alone and is never batched**. So ③ is
+  (i) a migration adding the typed identifier, (ii) a viewer-aware redaction, and (iii) a Lane B
+  change to what a pending outgoing row shows. Not one line, and not this PR.
 
 ### [devices][platform] RV-196 — any script in the app's origin can read, clear or redirect the Oura ring key through the native plugin
 - **Lane: A** — `android/**` (`OuraBlePlugin.kt`, `ScaleBlePlugin.kt`, `PolarBlePlugin.kt`). **Needs a new APK.**
@@ -3353,6 +3518,23 @@ which is the right shape for something that can only be validated by living with
   otherwise stop injected script from sending data off-origin.
 - **Fix:** emit `ws: wss:` only when `isDev`, and pin that in the CSP test. Drop the unused
   `generativelanguage.googleapis.com` at the same time.
+- **✅ SHIPPED (Lane A, 2026-09-27), both halves, exactly as written — the entry is right and its
+  evidence reproduces.** No `WebSocket` is constructed anywhere in `app/`, `components/`, `lib/` or
+  `packages/`, and there is no ws client in `package.json`.
+- **The stronger check, because a source grep cannot see a dependency:** built the app and grepped
+  the **emitted client bundles** (`.next/static`). Zero hits for `generativelanguage`, zero for
+  `WebSocket(`, and zero `ws://`/`wss://` literals of any kind. Nothing the browser ships wants
+  either of the things removed.
+- **`ws: wss:` is kept for dev rather than deleted** — the HMR socket is a real consumer. If a
+  production feature ever needs one, **name its host** (`wss://host`); do not restore the scheme.
+- **The enumerating test was loosened while being extended, deliberately.** `dev and production
+  differ only in …` compared exact strings, so it failed when the two ws schemes were merely
+  reordered — a change that changes nothing. It strips them by pattern now and still catches the
+  thing worth catching: a THIRD difference nobody decided on. Found by the mutation pass's
+  equivalent control, which is what that control is for.
+- **NOT verified against a running production server.** `pnpm start` cannot boot in the sandbox —
+  the instrumentation hook needs S3 credentials for the vendored model constants — so the header
+  was read from `buildCsp(false)` and from the bundles, never off the wire.
 
 ### [platform] RV-200 — four AI calls only reword numbers the app already computed: replace them with the computed text
 - **Lane: A** (routes and shared builders), then **B** (the cards). One PR covers both.
@@ -5919,9 +6101,14 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   `/api/admin/db-query` from *one user, structurally* to *whichever user the caller names*. It is
   the owner's call, it has been made, and it is recorded here so the reasoning is not re-derived.
   **Do not widen it further than this entry describes without going back to him.**
-- **⚠ Build RV-190 first or with this (Review sweep 60).** The owner scope is a setting any caller
-  can change, and it persists on the pooled connection. A `SET LOCAL` without RV-190's transaction
-  wrapper leaves that hole open.
+- **✅ RV-190's prerequisite is met — it SHIPPED 2026-09-26**
+  ([entry](overview/entries/2026-09-26-rv190-db-query-session-state.md)). It said to build that
+  first because the owner scope is a setting any caller can change and it persisted on the pooled
+  connection, so a `SET LOCAL` without the transaction wrapper left the hole open. Every query on
+  the read-only pool now goes through `runScoped` (`lib/data/postgres/readonly-client.ts\'), which
+  is also the entry point this entry wants: it takes an optional `ownerId` and applies it with
+  `SET LOCAL` inside the read-only transaction, so widening the scope is a parameter rather than a
+  new mechanism.
 - **NO MIGRATION IS NEEDED, and that is the main finding.** Every `claude_ro` view already filters on
   `current_setting('app.claude_ro_owner', true)::uuid` (Q-456 moved them off the hard-coded id). The
   views do not change at all. What is fixed is **where that setting comes from**:
@@ -6386,9 +6573,13 @@ drift.
 
 ### [platform][workouts] LA-173 — five things Lane A needs from the owner (three merge yeses, a style, a key)
 - **Lane: O** — every item is the owner's to answer; nothing here is buildable until he does.
-- **Ask** — owner: five answers, each a yes/no or one action. ① Merge LA-159 (#1847)? ② Merge
-  LA-142 (#1849), and close #1749? ③ Assign styles to the **nine** unstyled slots in `Bankai` —
-  match by role, or name one? ④ Can fresh storage keys go into Railway? ⑤ Merge TN-56 (#1902)? ⑤ Merge TN-56 (#1902)?
+- **✅ ANSWERED 2026-09-28 — ①, ② and ⑤ are all YES; ③ was withdrawn as a question once it was
+  root-caused. ④ is the only thing still owed by him, and it is an action, not an answer.**
+  - **① merge `LA-159` (#1847)** — yes.
+  - **② merge `LA-142` (#1849) and close #1749** — yes.
+  - **⑤ merge `TN-56` (#1902)** — yes, auth-touching and approved on its shared-helper shape.
+  - **③ withdrawn** — not his to answer; see below.
+- **Ask** — owner: ④ only. Fresh S3 storage keys in Railway, which only he can mint and set. ⑤ Merge TN-56 (#1902)?
 - **Added:** 2026-09-28 · Lane A, moving the asks out of chat per the owner's instruction that
   anything needing his input is assigned to the Orchestrator.
 - **① LA-159 (#1847): drop `program_phases.program_id`. ⭐ Recommend: yes.** 0 of the owner's 46
@@ -6404,31 +6595,50 @@ drift.
   and CI enforces that.
   **#1849 shows a red E2E, and that is not this change:** the full E2E run fails the same way on every
   PR that runs it (LA-176), including three merged before it. The five required checks are green.
-- **③ NINE slots in the ACTIVE program have no progression style — not one.** (BF-200 residue,
-  TN-75.) The engine deloads them, but none records a per-set plan until a style is assigned.
-  **⚠ This item named Barbell Skull Crusher alone; measured against production 2026-09-28 it
-  understates the problem ninefold**, which matters because the fix is the same amount of work for
-  all nine and answering only for the one leaves eight behind.
-  **In `Bankai` (`is_active = true`), 9 unstyled slots:**
-  - **7 accessory** — Hanging Leg Raise, Cable Chest Dips, Face Pull, Cable Lying Leg Curl,
-    **Barbell Skull Crusher**, Dumbbell Calf Raise, Cable Seated Leg Curl.
-  - **1 primary** — Barbell Hip Thrust. **This is the one that should not wait**: a primary with no
-    per-set plan is the most visible of the nine.
-  - **1 secondary** — Dumbbell Bulgarian Split.
-  - The other **5 unstyled primaries** (Squat, Deadlift, Bench, Incline Bench, Bent-Over Row) are in
-    **`Main`, which is INACTIVE** — out of scope, and not to be counted with the nine.
-  **⭐ Recommend: match each slot to what the same role already uses in that program**, rather than
-  picking one style for all nine. His accessories already run **`Hypertrophy 3-set`** (17 slots) and
-  **`General`** (15); his primaries run **`Powerbuilding`** (13). Barbell Skull Crusher itself
-  already carries `Hypertrophy 3-set` in one session and `General` in another, so there is no single
-  right answer for the exercise — only for each slot.
-  **A preference, so not assumed.** He assigns them in Config, or says "match by role" here and an
-  agent sets all nine.
-  **Method:** `claude_ro.session_exercises` joined to `program_sessions`/`programs`, `deleted_at IS
-  NULL`, grouped by program and role. Row-scoped to the owner, which is the whole population here.
+- **③ ✅ ROOT-CAUSED 2026-09-28 — the owner asked *"why did these not get assigned automatically
+  during creation/editing?"* and the answer is that NOTHING EVER ASSIGNS ONE.** It is a gap in the
+  editor, not a data-entry mistake, so **the style question is withdrawn** — assigning the nine by
+  hand would leave the cause in place and the tenth would appear on the next edit. **Filed as
+  `LB-186` (the editor) and `LA-177` (the nine existing slots).**
+  **The chain, each link verified in the code:**
+  - `components/config/program-editor-sheet.tsx:218` — `addExercise` creates
+    `{ key: nextEditKey(), name: "" }`. **No style, no default.**
+  - `packages/shared/src/types/program.ts:53` — `styleId?: string`, optional.
+  - `app/api/workout-templates/route.ts:79-81` — validates that a *provided* `styleId` is real. It
+    does not require one.
+  - `lib/data/postgres/slices/programs.ts:335` — the save writes `styleId: ex.styleId ?? null`.
+
+  **So a slot is styleless whenever the picker was not opened, and no layer objects.**
+- **⚑ WHY IT STAYS INVISIBLE, which is why it reached a deload week before anyone saw it.** The
+  engine falls back to the style on the exercise's **last log**, so a styleless slot behaves
+  normally for as long as that exercise has styled history. It only bites when there is none, or
+  when a path requires a non-empty style — which is exactly `BF-200`: the Q-185 deload override
+  needed one, skipped Barbell Skull Crusher, and prescribed **3 × 30 kg, his ordinary working
+  weight, during a deload week**. The other four Upper exercises lightened correctly.
+- **⚠ Two things that look like evidence and are not, recorded so they are not re-run.**
+  `session_exercises.updated_at` **cannot date** when a slot lost its style: all 25 active slots
+  read 2026-09-28, because the save path rewrites every row. And `progression_styles` shows all 22
+  styles dating to 2026-06-16 with **no deletion trace**, so the `onDelete: 'set null'` theory —
+  that deleting a style silently nulled these — can be neither confirmed nor refuted from it. The
+  editor gap above is sufficient on its own and needs neither.
 - **④ Fresh S3 storage keys in Railway.** `pnpm start` refuses to boot on the current ones
   (`SignatureDoesNotMatch`), so the production-mode check on the CSP and security PRs cannot run
   locally. Only he can mint and set them; the code needs nothing.
+  **🔬 DIAGNOSED 2026-09-28 (Orchestrator), after the owner asked whether both key sets had been
+  tested. There are two NAMING SCHEMES and only one has values.**
+  - `lib/exercise-storage.ts:20-22` reads `AWS_* || STORAGE_*`. Only the **`AWS_*`** set is
+    populated; `.env.local` holds `DATABASE_URL` alone, and `STORAGE_*` is documented in
+    `.env.example` but unset.
+  - The populated set fails across **three regions** (`sin` as configured, `auto`, `us-east-1`) and
+    **three endpoints** (`t3.storageapi.dev` as configured, `t3.storage.dev`,
+    `fly.storage.tigris.dev`) — `SignatureDoesNotMatch` every time. **Region and endpoint are ruled
+    out**, which was worth testing because a wrong region produces this exact error from valid keys.
+  - The values are clean: 54-char `tid_…`, 75-char `tsec_…`, no whitespace or truncation. **So the
+    secret genuinely does not match the access key id** — rotated, or mismatched at paste time.
+  - **⛔ THE TRAP: `AWS_*` WINS.** Adding a correct `STORAGE_*` set while the broken `AWS_*` values
+    are still present **changes nothing** — the `||` takes `AWS_*` first. Either replace the
+    `AWS_*` pair, or unset it and use `STORAGE_*`. Setting both is how this gets "fixed" and stays
+    broken.
 - **Already filed elsewhere, so NOT repeated here:** the six security merges (RV-221), BF-199's
   rep→%1RM table (BF-201), bodyweight plans (LA-169), plan-meal matching (LA-172), and the calorie
   number (OR-191).
@@ -6803,6 +7013,32 @@ drift.
   ① **How the style came off Skull Crusher around 2026-09-10.** A config save that dropped it, or a
   remove-and-re-add, would each leave it style-less. The owner can simply re-assign one in Config;
   whether a save path can drop a style is the Lane A question.
+  **⚠ IT IS NOT ONE EXERCISE — measured in production 2026-09-28 (BugFix), while tracing the owner's
+  report that `Full` still would not take on Pull.** The active program `Bankai` has **9 of 25
+  session exercises with `style_id` NULL**, and every inactive program except the long-dead `Main`
+  has **zero**:
+
+  | session (active program) | style-less | of |
+  |---|---|---|
+  | **Lower** | **5** | 5 |
+  | Legs | 1 | 5 |
+  | Pull (Face Pull) | 1 | 5 |
+  | Push | 1 | 5 |
+  | Upper (Skull Crusher) | 1 | 5 |
+
+  **The losses are spread over days, not one corrupting event.** Dating each from the last
+  `exercise_logs` row that still carried a `style_id`: Cable Lying Leg Curl **09-09**, Skull Crusher
+  **09-10**, the Lower cluster **09-12**, Face Pull **09-13**. That is repeated, not a single bulk
+  rewrite — which strengthens "a save path drops the style" considerably over "something ran once".
+  **`updated_at` cannot date it:** all 25 rows read `2026-09-28T05:17:31.544Z` to the millisecond, so
+  a program save rewrites every session-exercise row and destroys the timestamp evidence. That is
+  itself worth knowing before anyone tries to bisect this from the table.
+  **The knock-on that makes this urgent rather than cosmetic:** BF-198's `Full` fix takes its revert
+  numbers from `buildRulesPrescription`, which SKIPS a style-less exercise and returns null when
+  every exercise is one (`generate-prescription.ts:169`, `:177`). **So a whole-session deload on
+  `Lower` has a completely dead `Full` toggle even on the fixed code**, and Pull revives 4 of 5.
+  Re-assigning the styles in Config is the owner's one-off repair; stopping the save path from
+  dropping them is the fix.
   ② **A style-less exercise logs no `planned_pct` on ordinary days either**, which is part of
   TN-75's coverage drop. The deload case is fixed; the normal case has no style to plan from, so it
   needs a decision on a default, not a bug fix.
@@ -6968,6 +7204,26 @@ drift.
   new prescription for that"* still names a remedy that does not exist. It now shows only for an
   exercise with no base style, and is Lane B's copy. ② `deloadReason` is NULL on every stored
   prescription, so neither the card nor anyone reading the data can say why a session was deloaded.
+  ③ **The FIX DOES NOT REACH A PRESCRIPTION ALREADY STORED, and the owner hit exactly that the
+  morning after it deployed** (BugFix, 2026-09-28, on his Pull screenshot for Tue 29 Sept still
+  reading *"Full is on, but these weights are unchanged"*). Measured in production: prod is on
+  `1.481.1` and the fix (`d4466c55`, merged 07:17 +10:00 that day) is in the deployed tree, but his
+  Pull prescription was **generated 2026-09-23T09:54:51Z and does not expire until
+  2026-09-30T09:54:51Z** — so it outlives tomorrow's session and keeps its dead toggle. It is the
+  only stored whole-session deload: 5 of 5 deloaded, 0 with `preDeload`.
+  **There IS a workaround, and it is one tap.** Changing the duration preset cannot be served from
+  the stored plan on a whole-session deload — `refitPrescriptionToBudget` needs a baseline and
+  whole-session deloads carry none, so it returns `no_baseline` and the route **falls through to
+  full generation** (`prescribe/route.ts:95`, `refit-prescription.ts:57`). On the fixed code that
+  regeneration writes `preDeload`. So tapping `Quick` or `Long` rebuilds the prescription and
+  revives `Full`, at the cost of one model call.
+  **But only 4 of his 5 Pull exercises would revive.** Face Pull has `style_id` NULL, and
+  `buildRulesPrescription` SKIPS a style-less exercise (`generate-prescription.ts:169`), so it gets
+  no `preDeload` and stays deloaded under `Full` — which is the documented behaviour, surfacing on
+  real data. **On Lower it would revive NOTHING: all 5 of 5 are style-less**, so the rules
+  prescriber returns null (`:177`), `fullById` is empty, and a whole-session deload there has a
+  fully dead `Full` even post-fix. See BF-200 Keep ① — the missing styles are 9 of 25 across the
+  active program, not one exercise.
 
 - **He cannot, and the card is right to say so. The defect is upstream of the card.** `Full` works by
   REVERTING each exercise to the `preDeload` block the prescription recorded (`deloadRevertNames`,
