@@ -62,6 +62,7 @@ const REPLAY = process.argv.includes('--replay')
 // migration path re-runs it.
 const REPLAY_EXEMPT = new Map([
   ['001_initial.sql', '002 renamed the column its cardio_sessions FK references'],
+  ['021_phase_sets.sql', '293 dropped program_phases.program_id, which its backfill reads (LA-159)'],
 ])
 
 async function main() {

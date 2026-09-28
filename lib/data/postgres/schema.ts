@@ -132,7 +132,6 @@ export const programSessions = pgTable('program_sessions', {
 
 export const programPhases = pgTable('program_phases', {
   id:               uuid('id').primaryKey().defaultRandom(),
-  programId:        uuid('program_id').references(() => programs.id, { onDelete: 'cascade' }),
   phaseSetId:       uuid('phase_set_id').references(() => phaseSets.id, { onDelete: 'cascade' }),
   position:         integer('position').notNull(),
   name:             text('name').notNull(),
