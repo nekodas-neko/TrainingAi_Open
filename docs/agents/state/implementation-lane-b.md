@@ -1,6 +1,6 @@
 # Implementation Agent (B) — baton
 
-**Updated:** 2026-09-28 · **Session title:** `🚧 Implementation Agent (B) 🟢` · **Next ID:** LB-177 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue. (LB-166 = the E2E 45-minute ceiling, #1770; LB-169 = RETRACTED, the button was never undersized; LB-170 = rate-limit's floating flush, handed to Lane A; LB-172 = the Resting HR unit fork, `Lane: O`; LB-174 = whether the walk screen should be immersive, `Lane: O`; LB-175 = shipped; LB-176 = Health says "No data" for a FAILED read, its replacement.)
+**Updated:** 2026-09-28 · **Session title:** `🚧 Implementation Agent (B) 🟢` · **Next ID:** LB-178 — allocate by grep, checking the JOURNAL too: a shipped entry leaves the queue. (LB-166 = the E2E 45-minute ceiling, #1770; LB-169 = RETRACTED, the button was never undersized; LB-170 = rate-limit's floating flush, handed to Lane A; LB-172 = the Resting HR unit fork, `Lane: O`; LB-174 = whether the walk screen should be immersive, `Lane: O`; LB-175 = shipped; LB-176 = Health says "No data" for a FAILED read; LB-177 = migration 295's test throws on the socket DB URL, `Lane: A`.)
 
 ## Now
 
