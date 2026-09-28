@@ -3305,7 +3305,7 @@ which is the right shape for something that can only be validated by living with
     either party.
   - `otherUser.displayName` holds what was typed only in the send response, so the list has no name
     for an outgoing row by design.
-- **Verify:** `pnpm dev` with two local users: send a request, and confirm the sender sees
+- **How to check it:** `pnpm dev` with two local users: send a request, and confirm the sender sees
   "Request sent" with Cancel and the addressee sees the sender's name with Accept/Decline.
 
 ### [devices][platform] RV-196 — any script in the app's origin can read, clear or redirect the Oura ring key through the native plugin
