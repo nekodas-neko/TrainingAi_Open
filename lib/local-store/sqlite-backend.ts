@@ -61,10 +61,9 @@ function foodItemRowToItem(r: Record<string, unknown>): FoodItem {
     satFatG: r.sat_fat_g != null ? Number(r.sat_fat_g) : undefined,
     source: (r.source ? String(r.source) : 'manual') as FoodItem['source'],
     barcode: r.barcode ? String(r.barcode) : undefined,
-    // `image_data_uri` is deliberately NOT read here — see LA-36. It is stored locally and the
-    // server's own searchFoodItems returns it, so the device's local-first read is the one surface
-    // that loses the picture. Fixing that is a visible change on two Lane B screens and wants its
-    // own entry rather than riding a de-duplication PR.
+    // LA-36: the picture BF-35 stores as bytes so it renders offline. The server's rowToFoodItem
+    // returns it from every read, and the local-first read now does too.
+    imageDataUri: r.image_data_uri ? String(r.image_data_uri) : null,
     region: '', createdAt: new Date(String(r.updated_at)),
   };
 }
@@ -2437,7 +2436,7 @@ export class SQLiteLocalStore implements LocalStore {
       `SELECT fl.id, fl.date, fl.meal_type_id, fl.food_item_id, fl.quantity_multiplier, fl.logged_at,
               fl.saved_meal_id, fl.meal_group_id, fl.meal_group_name,
               fi.name, fi.brand, fi.serving_size_g, fi.calories, fi.protein_g, fi.carbs_g, fi.fat_g,
-              fi.fiber_g, fi.sugar_g, fi.sodium_mg, fi.sat_fat_g, fi.source
+              fi.fiber_g, fi.sugar_g, fi.sodium_mg, fi.sat_fat_g, fi.source, fi.image_data_uri
          FROM food_logs fl
          JOIN food_items fi ON fi.id = fl.food_item_id
         WHERE fl.date = ? AND fl.deleted_at IS NULL
@@ -2467,6 +2466,7 @@ export class SQLiteLocalStore implements LocalStore {
           sugarG: r.sugar_g != null ? Number(r.sugar_g) : undefined,
           sodiumMg: r.sodium_mg != null ? Number(r.sodium_mg) : undefined,
           satFatG: r.sat_fat_g != null ? Number(r.sat_fat_g) : undefined,
+          imageDataUri: r.image_data_uri ? String(r.image_data_uri) : null,
           source: (r.source ? String(r.source) : 'manual') as 'ai' | 'barcode' | 'manual' | 'text',
           region: '', createdAt: new Date(String(r.logged_at)),
         },
@@ -2548,7 +2548,7 @@ export class SQLiteLocalStore implements LocalStore {
     const rows = await querySQL<Record<string, unknown>>(
       `SELECT fi.id, fi.name, fi.brand, fi.serving_size_g, fi.calories, fi.protein_g,
               fi.carbs_g, fi.fat_g, fi.fiber_g, fi.sugar_g, fi.sodium_mg, fi.sat_fat_g,
-              fi.source, fi.updated_at
+              fi.source, fi.image_data_uri, fi.updated_at
          FROM food_logs fl
          JOIN food_items fi ON fi.id = fl.food_item_id
         WHERE ${mealTypeId ? 'fl.meal_type_id = ? AND ' : ''}fl.deleted_at IS NULL
@@ -2570,6 +2570,7 @@ export class SQLiteLocalStore implements LocalStore {
         sugarG: r.sugar_g != null ? Number(r.sugar_g) : undefined,
         sodiumMg: r.sodium_mg != null ? Number(r.sodium_mg) : undefined,
         satFatG: r.sat_fat_g != null ? Number(r.sat_fat_g) : undefined,
+        imageDataUri: r.image_data_uri ? String(r.image_data_uri) : null,
         source: (r.source ? String(r.source) : 'manual') as FoodItem['source'],
         region: '', createdAt: new Date(String(r.updated_at)),
       } satisfies FoodItem);
