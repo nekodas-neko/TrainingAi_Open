@@ -67,7 +67,9 @@ export async function GET() {
 
   const [days, user, weekMetrics, lookbackMetrics, currentRestingMetrics, priorRestingMetrics, plan, dayExercises, todayActivityLogs] = await Promise.all([
     repo.getZoneMinutesRange(userId, from, to, tz, profile).catch(() => []),
-    repo.getUserById(userId),
+    // LA-82: the profile above already degrades on this read; this copy only feeds age and the step
+    // goal's inputs, which all take null.
+    repo.getUserById(userId).catch(() => null),
     repo.listBodyMetrics(userId, from, to).catch(() => []),
     // Wider window for weight resolution — weight isn't logged daily, so the week window
     // alone is too narrow to reliably find a recent reading (mirrors readiness-score's pattern).
@@ -131,6 +133,9 @@ export async function GET() {
         maxHr: observed.max ?? profile.maxHr,
         maxHrDeltaBpm,
         isReliable: observed.isReliable,
+        // LA-82: what the zone boundaries were computed from, so a default can be shown as one.
+        maxHrSource: profile.maxHrSource,
+        restingHrSource: profile.restingHrSource,
       },
       quota,
       dayQuota,
