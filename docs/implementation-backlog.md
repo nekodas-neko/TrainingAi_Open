@@ -28056,6 +28056,23 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [activity][nutrition] Q-524 — two different step goals, and the personalised one contradicts the evidence its own file cites
 
+- **Lane: T** — what remains is a scoring proposal (the derived goal from energy and measured stride),
+  so Tuning owes it before Lane A builds it.
+- **⚙ THE DECIDED HALF SHIPPED 2026-09-28 (Lane A).** `getDailyGoals` now uses `users.steps_goal`
+  when set, and every caller passes it: the Activity Score (readiness payload), the day audit, cardio
+  week and health-insight. Clearing the goal returns to the derived value, which is the "way back"
+  the owner required. **Moved, measured over the owner's last 91 days:** the Activity Score's steps
+  contributor rises on **79 days**, by **+2.2 points on average** (median +1.9, max +5.4), from
+  scores computed after deploy. Stored history is unchanged.
+- **⚠ Part (a), the provenance column, turned out NOT to be needed, and the entry's premise was
+  stale.** `/api/nutrition-goals/recommend` no longer writes `users.steps_goal`; it returns a
+  suggestion. Both writers, the recommendation sheet and Coach, write only when the owner accepts,
+  and under his rule that makes it manual. So every stored value is manual or accepted, NULL means
+  "use derived", and no automated path can overwrite it. **If an automatic writer is ever added,
+  this stops holding** and the column becomes necessary.
+- **Still open, for Tuning:** part (b), deriving the goal from BMR-scaled walking energy and measured
+  stride, and making `DEFAULT_STEP_GOAL` (8,000) agree with whichever derived value wins.
+
 - **Branch:** `fix/reconcile-step-goals`
 - **Plan:** none — **this needs an owner decision first** (which number wins), then a one-line change.
   Evidence: [`docs/reviews/2026-08-19-activity-contributor-audit.md`](reviews/2026-08-19-activity-contributor-audit.md) §3.
@@ -28275,7 +28292,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   1.53, 1.63) as steps fell — so the recommender tracked the decline **less than proportionally**
   rather than chasing it down one-for-one. The monotone 7,000 → 6,000 → 5,000 sequence and the absent
   evidence anchor are the findings; a fitted slope is not.
-- **Lane: A** — added 2026-09-24 (Tuning). This entry was fully decided on 2026-08-19 and signed off
+- **Previously Lane A** (re-laned to T on 2026-09-28, see the top) — added 2026-09-24 (Tuning). This entry was fully decided on 2026-08-19 and signed off
   again on 2026-08-31 with *"Lane A has everything it needs; nothing further is gated on the owner"*,
   and it carried **no `Lane:` field at all**, so `next-item.js` read it as UNCLASSIFIED and no
   implementer was ever offered it. The path rule resolves it with no ambiguity — `packages/shared/**`,

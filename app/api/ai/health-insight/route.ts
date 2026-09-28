@@ -80,7 +80,7 @@ export async function POST(req: Request) {
   // never clear its 21-day gate, and the gate must not be lowered to rescue a mis-wired caller.)
   const SESSION_FETCH_WINDOW_DAYS = 28
   const since7 = formatInTimeZone(subDays(new Date(), 7), tz, 'yyyy-MM-dd')
-  const [ouraRows, sleepRows, bodyMetrics, derivedRows, summaries, recentSessions, userProfile] = await Promise.all([
+  const [ouraRows, sleepRows, bodyMetrics, derivedRows, summaries, recentSessions, userProfile, userGoals] = await Promise.all([
     repo.getOuraDaily(userId, since7, date),
     repo.listSleepSessions(userId, since7, date),
     repo.listBodyMetrics(userId, since7, date),
@@ -88,6 +88,7 @@ export async function POST(req: Request) {
     repo.getOuraDailySummary(userId, since7, date),
     repo.getWorkoutSessionsFrom(userId, subDays(new Date(), SESSION_FETCH_WINDOW_DAYS)),
     repo.getUserById(userId),
+    repo.getUserGoals(userId).catch(() => null),
   ])
 
   const todayOura = ouraRows.find(r => r.date === date) ?? ouraRows[ouraRows.length - 1] ?? null
@@ -186,6 +187,7 @@ export async function POST(req: Request) {
       ageYears: ageFromDob(userProfile?.dateOfBirth, new Date(`${date}T00:00:00.000Z`)),
       sex: userProfile?.sex ?? null,
       activityLevel: userProfile?.activityLevel ?? null,
+      stepsGoal: userGoals?.stepsGoal ?? null,
     })
     // `recentSessions` spans 28 days (see the fetch), so these two — which feed the activity
     // score's 7-day lanes — filter back down rather than silently becoming 28-day figures.

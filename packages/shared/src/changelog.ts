@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.30",
+    date: "2026-09-28",
+    changes: [
+      "Your own step goal is now the one number everywhere, including the Activity Score and the cardio week. Clear it to go back to the suggested goal. The Activity Score's steps part reads a little higher on days short of 10,000 steps.",
+    ],
+  },
+  {
     version: "1.477.29",
     date: "2026-09-28",
     changes: [

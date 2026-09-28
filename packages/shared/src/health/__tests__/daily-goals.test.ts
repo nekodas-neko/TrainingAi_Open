@@ -46,3 +46,18 @@ describe('getDailyGoals', () => {
   })
 })
 
+describe("getDailyGoals — the user's own step goal is the one number (Q-524)", () => {
+  it('uses the step goal the user set, over the activity-level default', () => {
+    expect(getDailyGoals({ activityLevel: 'moderate', stepsGoal: 7000 }).stepGoal).toBe(7000)
+  })
+
+  it('falls back to the derived goal when none is set, which is the way back from a manual one', () => {
+    const derived = getDailyGoals({ activityLevel: 'moderate' }).stepGoal
+    expect(getDailyGoals({ activityLevel: 'moderate', stepsGoal: null }).stepGoal).toBe(derived)
+  })
+
+  it('treats a zero goal as unset rather than dividing progress by it', () => {
+    const derived = getDailyGoals({ activityLevel: 'moderate' }).stepGoal
+    expect(getDailyGoals({ activityLevel: 'moderate', stepsGoal: 0 }).stepGoal).toBe(derived)
+  })
+})
