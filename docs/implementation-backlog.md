@@ -858,11 +858,19 @@ below threshold and left in place for next time.
   (`autoregulation.ts:86–107`) — it adds a rep or a set, never load. So the 66 → 77.5 move came
   from the plan, not from his easy 09-21 session.
 
-- **What it will do is over-correct, next week.** Today is RPE 10 *and* 6 of 7 reps, so
-  `missedReps` is true and `rpeDelta ≥ 1.5`: the back-off fires for a **5–10% cut**
-  (`:65–77`). That lands him near 12.5 kg — which returned RPE 10 on 09-13. **The loop is
-  visible in the table**: 66% → RPE 6 (too light) → plan raises to 77.5% → RPE 10 (too heavy) →
-  back-off → too light. It has not settled in five weeks.
+- **It corrected itself in NINE MINUTES, not next week — this entry said next week and that was
+  wrong** (corrected 2026-09-29 08:20, same session). Today is RPE 10 *and* 6 of 7 reps, so
+  `missedReps` is true and `rpeDelta ≥ 1.5` and the back-off fires (`:65–77`) — but completing the
+  workout regenerates the next prescription in-process (`lib/workout/complete-workout.ts`), so it
+  ran at **`22:16:34Z`**, nine minutes after his screenshot. **Cable Preacher Curl now reads
+  `66% × 12`**, back at the accessory band's light edge. The correction loop is faster than
+  described and the description should not have been written from the autoregulation code alone
+  without checking when it runs.
+  **What stands is the oscillation, and the table is still the evidence**: 66% → RPE 6 (too light)
+  → plan raises to 77.5% → RPE 10 (too heavy) → back to 66%. That is a return to the load he
+  already found too easy, not a settling, and five weeks of this have produced no intermediate
+  value. **What the swing has never visited is the middle of the band** — see BF-221, which is why
+  the heavy end was reachable at all.
 
 - **The 1RM is the number to examine first.** Stored `estimated_1rm` was **17** after 09-21, and
   the card showed **17.25**. But 09-21 was `11.25 × 12 at RPE 6` — a set he stopped because 12
@@ -941,6 +949,71 @@ below threshold and left in place for next time.
   `computeRpeAdjustment` would apply next week, and declining it leaves the session untouched.
   **Device look owed** — this is a screen he reads mid-set with a rest timer running, so the
   suggestion must not shift the layout or compete with `Start Set 2`.
+
+### [workouts] BF-221 — the accessory rep band is advice to the model and a constraint on nothing: 7 reps at 77.5% is outside it on both axes
+- **Lane:** A — `packages/shared/src/ai-periodization/generate-prescription.ts:591` and the accessory branch at `:594–598`.
+- **Added:** 2026-09-29 · BugFix intake. Owner, reading his own Pull card: *"If its accessory shouldn't it have reps towards the 12+ rep range?"*
+- **Needs:** — nothing. Shares a symptom with BF-219; this is the code half and is buildable now.
+
+- **He is right, and the band is explicit.** His active program `Bankai` is `powerbuilding`, and
+  `goalRange('powerbuilding', 'accessory')` returns **66–75% · 8–12 reps** (run, not read —
+  `ACCESSORY_SPEC` is `{ repMin: 8, repMax: 12, targetRpe: 8.0 }`, `goal-ranges.ts:35`). He was
+  prescribed **77.5% × 7**: below the rep floor AND above the pct ceiling.
+
+- **The two violations are ONE violation, and that is the insight.** The accessory branch derives
+  load from the target effort at whatever reps it was handed:
+  `pct = pctForExpectedRpe(accessoryTargetRpe(goal), a.reps)` (`:597`). Holding RPE 8 constant,
+  fewer reps means heavier — so **dropping below the rep floor mechanically pushes the load above
+  the pct ceiling**. Fixing the reps fixes the load for free; fixing the load alone would leave
+  the rep count wrong and reintroduce the same pct next time.
+
+- **Nothing enforces the band on this path. Measured, by following every consumer of
+  `goalRange`** — there are three:
+  | consumer | what it does |
+  |---|---|
+  | `prompt.ts:96` | puts the range in the **prompt**. A request to the model, not a constraint. |
+  | `autoregulation.ts:150` | `clamp(ex.reps + adj.repDelta, band.repMin, …)` — **only when `adj.repDelta !== 0`**, i.e. only when an autoregulation adjustment actually fires. |
+  | `builder-review.tsx:566` | display only. |
+  Otherwise `ex.reps = a.reps` (`:591`) takes the model's number **unchecked**, and the accessory
+  pct clamp is `Math.min(85, Math.max(40, pct))` — **40–85, not the band's 66–75**.
+
+- **The primary and secondary branches DO clamp; the accessory branch is the only one that does
+  not.** Both others call `clampPrescribedPct(a.pct, exZone)` against
+  `intensityZoneForRole(...)` (`:605–620`) — whose own comment calls it "this clamp". The
+  accessory branch skips it by design, because accessories float to an RPE target rather than a
+  fixed band. **That design is sound and is not what this entry argues against.** The gap is that
+  floating the LOAD was implemented without ever constraining the REPS it floats against.
+
+- **It is live on a second exercise right now.** Read at 2026-09-29 08:20 from the prescription
+  regenerated at `22:16:34Z`: **Pull-Up, accessory, 77.5% × 7** — the same out-of-band pair, still
+  pending. Face Pull sits at `66% × 12`, the band's light edge, and is in band.
+
+- **⭐ Recommend clamping reps to the band at `:591`, before the pct is derived.** One line, the
+  same `clamp(a.reps, band.repMin, band.repMax)` that `autoregulation.ts:150` already applies on
+  its own path — so the constraint reads identically wherever it appears, and the accessory pct
+  then lands inside 66–75 on its own with no second clamp to keep in sync.
+- **Alternatives, with what each is better at:**
+  - **Tighten the accessory pct clamp to the band** instead. Better at bounding the load directly,
+    which is what the lifter feels. It loses because it treats the symptom: the reps stay wrong,
+    the derived pct gets overridden, and the prescription then claims an effort it is not
+    delivering — worse than the current state, which is at least self-consistent.
+  - **Strengthen the prompt.** Cheapest, and better if the model is usually right and rarely
+    strays. It loses because a prompt cannot be a guarantee, and this band is the kind of thing
+    that should hold whatever the model returns — the primary and secondary branches already made
+    that judgement.
+  - **Reject and re-ask the model on an out-of-band plan.** Better at preserving the model's
+    intent. It loses on cost (a second call, in a gym) to reach a number a clamp produces for free.
+- **Reversal cost: low.** One clamp, removable in a line; the band already exists and is already
+  the authority elsewhere.
+
+- **Done when** an accessory in a `powerbuilding` program cannot be prescribed outside 8–12 reps,
+  the derived pct consequently lands inside 66–75 with no additional clamp, and a regression test
+  feeds a deliberately out-of-band model response through and asserts both.
+
+- **Not diagnosed here.** Why the model chose 7 for two accessories while giving Face Pull 12. All
+  three are accessories in the same session and the prompt carries the same band for each; Face
+  Pull is also the one with **no progression style** (BF-217), so the difference may be a style
+  effect rather than a model whim. Worth one look before assuming the prompt is at fault.
 
 ### [platform] BF-214 — the `claude_ro` twin is 92% of the migration corpus, and it is why migration numbers collide twice as fast as they need to
 
