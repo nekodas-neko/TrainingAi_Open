@@ -118,3 +118,25 @@ codebase already says.
 
 **`RV-166` is now fully specified.** All three approved changes are released to Lane B with their
 acceptance criteria; nothing on this batch is waiting on the owner.
+
+## The PR sat conflicted overnight, and the decisions were nearly lost
+
+**#1794 did not merge.** Auto-merge was enabled and the branch went `dirty` — auto-merge waits for
+checks, it does not resolve conflicts — so it sat from 11:33 on 09-27 until 09-28 while `main` moved
+on by dozens of commits. **The owner's four answers existed only on that branch.**
+
+Worse than the delay: another session, reading `main`, re-applied `Gate: owner` to all four with
+fresh wording (*"the mockup has been shown; the code waits on his yes"*). That is correct behaviour
+against what `main` said, and it meant the queue showed four entries waiting on an owner who had
+already answered all four.
+
+**Resolved by keeping this branch's newer text** — the conflict was `RV-166` only, where `main` held
+the earlier *"owes a mockup first"* framing and this branch holds the approval, the walk flow and
+the estimated-source decision. One line of history records the supersession. The gates the other
+session added are cleared and the stale `Ask:` fields dropped, taking queue-wide `Ask: owner`
+21 → 18.
+
+**The lesson is about the mechanism, not the session.** Enabling auto-merge is not the same as the
+PR merging, and nothing notifies you when it goes conflicted. A decision-carrying PR needs its merge
+confirmed, not assumed — the same class as the standing rule that a check being green is not a check
+having run.

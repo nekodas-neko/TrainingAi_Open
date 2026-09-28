@@ -87,7 +87,7 @@ import {
 } from "@/lib/home/home-prefs";
 import { chooseRestDay, withRestDayOverride } from "@/lib/home/rest-day";
 import { fetchWithRetry } from "@trainingai/shared/fetch-with-retry";
-import { computeStreak } from "./compute-streak";
+import { computeStreak, type StreakSchedule } from "./compute-streak";
 import type { SleepRow } from "@/app/health/health-sections";
 import type { HrSleepWindow } from "@trainingai/shared/health/hr-sleep-band";
 
@@ -140,6 +140,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const localDay = useLocalDay();
   // Bound once so the identity is stable for the children that take it as a prop.
   const dayKey = useCallback((daysAgo = 0) => dayKeyInTz(tz, daysAgo), [tz]);
+  const [streakSchedule, setStreakSchedule] = useState<StreakSchedule>(null);
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [sleepData, setSleepData] = useState<HomeSleepRow[]>([]);
@@ -540,6 +541,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
             setPerSessionPhaseStatus(metaData?.perSessionPhaseStatus ?? []);
             const aiDynamic = metaData?.program?.phaseMode === 'ai_dynamic';
             setIsAiDynamic(aiDynamic);
+            setStreakSchedule((metaData?.program?.schedule ?? null) as StreakSchedule);
             if (!aiDynamic && metaData?.program?.schedule) {
               setWeeklyTarget(getScheduledSessionsPerWeek(metaData.program as unknown as Program));
             }
@@ -1039,7 +1041,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     });
   }, [trainedDays, tz]);
 
-  const streak = useMemo(() => computeStreak(trainedDays, dayKey), [trainedDays]);
+  const streak = useMemo(() => computeStreak(trainedDays, todayInTz(tz), streakSchedule), [trainedDays, tz, streakSchedule]);
 
   // This Week: Mon → today count (not rolling 7-day)
   const weekSessionCount = useMemo(

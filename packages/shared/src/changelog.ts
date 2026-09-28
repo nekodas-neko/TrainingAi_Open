@@ -6,6 +6,98 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.26",
+    date: "2026-09-28",
+    changes: [
+      "An activity saved at the same minute as one the server already had no longer shows twice on this phone.",
+      "An activity saved offline at the minute of a deleted one no longer arrives deleted.",
+    ],
+  },
+  {
+    version: "1.477.25",
+    date: "2026-09-28",
+    changes: [
+      "A workout's ring heart-rate trace keeps its 15-second detail. A background pass three days later could re-save part of it at 5-minute resolution and delete the finer points.",
+    ],
+  },
+  {
+    version: "1.477.24",
+    date: "2026-09-27",
+    changes: [
+      "Changed: a lifted weight now reads the same everywhere \u2014 \"68 kg\" rather than \"68kg\" on some screens and \"68 kg\" on others. Half kilos and 1.25 kg plate steps show exactly, and nothing gains a decimal it did not have.",
+    ],
+  },
+  {
+    version: "1.477.23",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: when the app could not reach the server and had nothing saved yet, More and Profile details quietly dropped your name, your readings and your tests \u2014 so it read like a brand-new account rather than a connection problem. Each now says it could not load.",
+    ],
+  },
+  {
+    version: "1.477.22",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: a program or progression style you deleted stayed on your phone, and offline the Workout screen could open a program you had already deleted. Deletions now reach the phone on the next sync.",
+    ],
+  },
+  {
+    version: "1.477.21",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: when a whole session was deloaded, choosing Full changed nothing, and sets done at full weight still counted as a deload and could not set a PR. Full now puts each exercise back to your program's own weights and sets, and those sets count.",
+    ],
+  },
+  {
+    version: "1.477.20",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: a deload week left an exercise at its full working weight when it had no progression style set — Skull Crusher came up at 3 × 30 kg beside four lifts at 52%. Every exercise in the session is lightened now.",
+    ],
+  },
+  {
+    version: "1.477.19",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: the same moment read \"6:40 AM\" on Home's timeline, \"6:40am\" on a day's workout card and \"6:40 am\" on the activity list. All three, and the Body Battery card's time axis, now read \"6:40 am\".",
+    ],
+  },
+  {
+    version: "1.477.18",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: on screens opened from a tab \u2014 a night's sleep detail, for instance \u2014 cards scrolled up under the clock with nothing behind them. They now get the same gradient the main tabs have had, fading in as you scroll.",
+    ],
+  },
+  {
+    version: "1.477.17",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: pressing back during an interval walk threw the walk away without asking, however long you had been walking. It now asks \u2014 save it to your history, discard it, or keep walking. A walk under a minute still just offers to discard, as before.",
+    ],
+  },
+  {
+    version: "1.477.16",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: a chin-up on a day's workout card read \"0kg\", as if you had lifted nothing. Bodyweight lifts now read \"BW\", and \"BW +10kg\" when you add weight.",
+    ],
+  },
+  {
+    version: "1.477.15",
+    date: "2026-09-27",
+    changes: [
+      "Fixed: Home's streak allowed a fixed two rest days, so if you train on a fixed weekly pattern with a longer gap \u2014 Monday and Tuesday, say \u2014 Home broke your streak while the achievements page kept it. Home now reads your schedule the same way, and the two agree.",
+    ],
+  },
+  {
+    version: "1.477.14",
+    date: "2026-09-27",
+    changes: [
+      "Changed: when you build a meal plan step by step, \"Use my saved meals\" now starts switched on if you have saved meals \u2014 so a plan is built around food you already cook, with your real macros. It stays off when your library is empty, where it would change nothing.",
+    ],
+  },
+  {
     version: "1.477.13",
     date: "2026-09-27",
     changes: [

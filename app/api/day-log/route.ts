@@ -11,6 +11,9 @@ import { correctBodyFatPct } from '@trainingai/shared/health/body-fat-calibratio
 export interface DayExercise {
   name: string;
   sessionName: string;
+  /** `exercise_library.exercise_type`, or null. Pass to `isBodyweightType` so a chin-up does not
+   *  read "0 kg" (RV-219). */
+  exerciseType: string | null;
   weightKg: number | null;
   setWeights: number[];
   sets: number | null;
@@ -158,6 +161,7 @@ export async function GET(req: NextRequest) {
     ws.exercises.map(el => ({
       name: el.exerciseName,
       sessionName: ws.sessionName,
+      exerciseType: el.exerciseType ?? null,
       weightKg: el.sets[0]?.weightKg ?? null,
       setWeights: el.sets.map(s => s.weightKg),
       sets: el.sets.length || null,

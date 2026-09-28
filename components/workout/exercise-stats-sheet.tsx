@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { formatLoadKg } from "@trainingai/shared/format/units";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { RotateCcwIcon, ChevronDownIcon, ChevronUpIcon, TrophyIcon, ZapIcon } from "lucide-react";
@@ -151,7 +152,7 @@ export function ExerciseStatsSheet({ exercise, isDoneToday, onClose, onRedo }: E
                 ? exercise.lastReps.map((r, i) => {
                     const ws = exercise.lastSetWeights ?? [];
                     const w = ws[i] ?? ws[ws.length - 1];
-                    return w != null ? ` · ${r}×${w}kg` : ` · ${r} reps`;
+                    return w != null ? ` · ${r}×${formatLoadKg(w)}` : ` · ${r} reps`;
                   }).join("")
                 : ""}
               {" · "}{formatSheetDate(exercise.lastDate)}

@@ -31,6 +31,87 @@
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts][platform] ⚠️ A session given an RPE now returns to "synced" on the phone, and only the phone runs it (LA-165, 2026-09-28)
+
+`markSessionSynced`'s guard skips flipping a session to `synced` while another mutation for it is
+queued. The push-confirm loop runs BEFORE the batch is deleted, so the guard counted the very
+mutation it was confirming and never fired: proven against a real SQLite, a session whose only
+queued mutation was confirmed stayed `pending`. By the code, the stranded-workout sweep then found
+it five minutes later and re-queued a `workout_log` push for every exercise in the session, and only
+that re-push flipped it back. Every confirm now excludes the batch it is confirming. The same change
+adds the pending mode and confirms that offline log edits need (LA-166 will use them). **Not seen on
+a device.** **Pass test on the S25:** log a workout, set its RPE, wait five minutes with the app open,
+and the outbox shows no re-queued `workout_log` entries for that session. Before this change it would
+have shown one per exercise.
+
+### [activity][platform] ⚠️ The phone now retires an activity row the server merged away, and only the phone runs that code (DV-19, 2026-09-28)
+
+A push that lands on an activity already on the server at the same `(date, start_time)` merges into
+that row and keeps its id, so the phone's own row was confirmed and never came back, and the
+activity listed twice. `applyDelta` now deletes a `synced` row at the same second as an applied
+server row. The server half also changed: a new activity landing on a deleted one at the same
+minute is revived instead of staying deleted. Tested against real in-memory SQLite and the local
+Postgres, but `getLocalStore` is null on the web, so **the device path has not run anywhere.**
+**Pass test on the S25:** save an activity offline at the same minute as one the server already
+has, sync, and the list shows one row. The owner's `b8083d04` (24 Sept, 09:18, 40 min, no HR) is a
+bogus pre-BF-190 row. Deleting it also clears the phone's orphan `4b5c23e0`.
+
+### [heart-rate][devices] ⚠️ Ring workout HR thinned before the LA-168 fix stays thinned unless a full-window rollup re-runs (LA-168, 2026-09-28)
+
+An incremental rollup whose cutoff fell inside a workout re-saved the rest of that workout's ring
+HR at 5-minute bins and deleted the 15-second rows. It happened about three days after each workout.
+The fix is live once deployed, but it does not repair rows already rewritten. Measured on the
+owner's ring-only sessions: 08-21 103 → 12, 08-24 110 → 31, 09-05 32 → 5, 09-06 180 → 13,
+09-17 87 → 52, 09-20 164 → 99. The recap's `workout_hr_stats` snapshot kept its numbers, so recaps
+are unaffected. What re-derives from raw HR is affected: the Health HRR trend, zone minutes and the
+workout HR chart. **Recoverable only inside the rollup's 14-day HR window** (from 09-14 today), and
+only by a pass that starts before those sessions, meaning a full-window rollup (a cold start with no
+watermark, or the admin full-history run). The raw frames are still on the server. Sessions older
+than 14 days stay at 5 minutes, because nothing rewrites HR series past that horizon. **Owner
+decision:** whether to run one full-window pass after this deploys. It is cheap, but it pegs the
+process for minutes (Q-213).
+
+### [workouts][platform] ⚠️ A deleted program now leaves the phone's mirror, and only the phone runs that code (RV-174, 2026-09-28)
+
+Deleting a program or progression style used to leave it in the device's local mirror forever: both
+are hard deletes with no tombstone, and the sync delta carries only what changed. After deleting
+active program A and activating B, the mirror could hold two active programs, and the Workout screen
+offline could pick the wrong one. The pull now carries every program and style id the user has
+(`programRoster` / `progressionStyleRoster`) and `pruneProgramStructure` deletes the rest, children
+included, and clears a deleted style from the exercises that used it. Verified against a real
+in-memory SQLite and over HTTP on `pnpm dev`, but `getLocalStore` is null on the web, so **the
+device path has not run anywhere.** **Pass test on the S25:** delete a non-active program in Config,
+pull to sync, go offline, and the Workout screen and program list no longer show it; then delete the
+ACTIVE one after activating another, and offline the Workout screen opens the new one.
+
+### [app-shell] ⚠️ The scrim now reaches pushed routes, and no phone has seen it there (DV-22, 2026-09-27)
+
+`/health/sleep` and every other screen opened from a tab scrolled under the status-bar clock with no
+backing: DV-6 mounted the scrim in `tab-shell.tsx`, which a pushed route is not inside. It is mounted
+in the root layout now, and the controller accepts a document scroll — a pushed route has no inner
+scroller, so its scroll event target is the `Document` rather than an Element, which the old handler
+discarded. Verified at 412 px in Chromium (absent at rest, opaque after scrolling, and a tab flip to
+a screen at the top clears it), and **control-run both ways**: without the hoist the scrim is not in
+the DOM at all, and with the hoist but the old controller it stays invisible. **Pass test on the
+S25:** scroll a pushed route and the gradient fades in behind the clock exactly as it does on the
+tabs, in both themes; at rest there is nothing. **What Chromium cannot answer** is whether the
+gradient composites on Samsung's WebView and how it reads against the real status bar — the two
+things the phone is for.
+
+### [activity][app-shell] ⚠️ Leaving a walk by the back gesture now asks, and the phone is the only place it can be seen (LB-141, 2026-09-27)
+
+The back gesture used to call `reset()` and throw a walk away silently, whatever its length; it now
+raises a save-or-discard prompt (the owner's decision, 2026-09-26). **The prompt itself is a
+Capacitor `backButton` listener with no web equivalent, so the sandbox cannot press it** — the
+harness verified the dialog's three options and their 336×48 hit areas by mounting it from the tab
+bar at 384 px, which is a different trigger reaching the same component, and the source guards pin
+the wiring. **Pass test:** on the S25, with a walk more than a minute old, press back — "Leave this
+walk?" appears with Save walk / Discard / Keep walking; **Save must land on the walk summary and
+produce a row in history**, not return to the previous screen; under a minute the same gesture shows
+the plain "Discard this walk?" confirm with no offer to save. **The save path is the half worth
+checking hardest**: it runs the walk screen's own finish, so a walk saved this way should read the
+same duration and calories as one ended with the End button.
+
 ### [workouts] ⚠️ The session card's icon, elapsed label and recovery strip are fixed but unseen on the phone (RV-214, 2026-09-27)
 
 Items ①③④ shipped and were rendered at 412 px dark: the icon slot renders a component (it printed the stored value as a 30 px **word**, because three surfaces bypassed `getSessionIcon` despite a comment claiming none did), "Last done 9 days ago" replaces the ambiguous "9 days ago", and the recovery chips fade out instead of being cut dead against the RECOVERY label. **The fade is a `mask-image`, and the harness is Chromium** — `-webkit-mask-image` is included because Samsung's WebView is the canonical runtime, but nothing here has confirmed it composites there. **Pass test:** on the S25, the session card shows a dumbbell glyph rather than a word, the recovery strip's chips fade at both ends rather than clipping, and the elapsed line reads "Last done …". **Still open on the entry:** ② (the "Recommended today" pill wrapping) **does not reproduce** at 412 px with the seeded program — a long session name may be what the sweep saw, so his own names would settle it; and ⑤ (the two Start Workout buttons differ — one has an icon) is confirmed but is a pick, not a defect.
@@ -6005,7 +6086,7 @@ Two things reduce (not remove) the risk: both statements are plain `ADD COLUMN` 
 `reconcileSchema()` carries both columns, so a partial v22 heals on the next open rather than
 wedging.
 
-Session journal: `docs/overview/entries/2026-08-08-supplements-sync-and-route-hygiene.md`.
+Session journal: `docs/overview/history-2026-08-07.md#2026-08-08-supplements-sync-and-route-hygiene`.
 
 ### [app-shell] Day-detail screen behind the training calendar (Q-110, 2026-08-08, v1.270.0) — swipe NOT verified on device · needs: android
 
@@ -6024,7 +6105,7 @@ thumb. Nothing else here is device-sensitive — no blur, filter or backdrop-fil
 is the shape Q-107 blames for pool exhaustion — if the gap is common, run the existing backfill rather
 than making this screen expensive). ~~The old `day-overlay-sheet.tsx` still exists~~ — **deleted, LB-3.**
 
-Session journal: `docs/overview/entries/2026-08-08-day-detail-screen.md`.
+Session journal: `docs/overview/history-2026-08-07.md#2026-08-08-day-detail-screen`.
 
 ### [app-shell][cardio][activity] Navless safe-area utility sweep (Q-118, 2026-08-07, v1.269.1) — NOT verified on device · needs: android
 
@@ -6061,7 +6142,7 @@ Low device risk by construction: no blur, filter or backdrop-filter, and the row
 bottom-anchored, so neither the Samsung compositor bug nor the safe-area floor applies. The one
 unexercised surface is Samsung WebView rendering of the `color-mix(in oklch, …)` gradient.
 
-Session journal: `docs/overview/entries/2026-08-07-cardio-hub-entry-card.md`.
+Session journal: `docs/overview/history-2026-08-04.md#2026-08-07-cardio-hub-entry-card`.
 Design docs: `docs/design/2026-08-07-other-activity-mockups.html`, `…-cardio-hub-fullscreen.html`.
 
 ### [app-shell] Fourteen new home score-card styles (2026-08-07, v1.268.0) — NOT verified on device · needs: browser
@@ -6078,7 +6159,7 @@ Chrome renders them fine, which is exactly why this needs the APK. The other twe
 filter, backdrop-filter or gradient at all and are low-risk by construction. Nothing here touches
 safe-area (the row is not anchored), gestures, native plugins or an offline-first domain.
 
-Session journal: `docs/overview/entries/2026-08-07-health-metrics-button-designs.md`.
+Session journal: `docs/overview/history-2026-08-04.md#2026-08-07-health-metrics-button-designs`.
 Design galleries: `docs/design/2026-08-07-score-row-mockups*.html`.
 
 Secondary, non-blocking: the picker is now a flat list of nineteen radio options, which wants
@@ -6090,7 +6171,7 @@ grouping or thumbnails rather than a longer list. Not scoped.
 than archived because the device check is still owed, which is what this section is for. Full
 investigation, including the measurement traps that make it expensive to re-derive:
 [`docs/handoffs/handoff-2026-08-07-activity-ring-clock-compression.md`](../handoffs/handoff-2026-08-07-activity-ring-clock-compression.md);
-session journal `docs/overview/entries/2026-08-08-ring-clock-compression.md`.
+session journal `docs/overview/history-2026-08-07.md#2026-08-08-ring-clock-compression`.
 
 **The slope was never the unknown** — the ring's counter ticks at exactly 100 ms/ds by construction,
 only the offset is unobserved. `resolveDsToMs` now applies that fixed slope with one offset per
@@ -7355,7 +7436,7 @@ in [`docs/handoffs/handoff-2026-08-02-platform-batch-queue-drain.md`](../handoff
    the bounded poll and the regeneration triggers; the unreliable server self-fetch is replaced by
    a client-fired one. Verified end to end at the S25 viewport on the dev server.
 4. ✅ **[readiness] The Body Battery anchor flips between readiness and sleep mid-day (Q-39).**
-   Fixed in **#996** (v1.250.2). The decision moved into `app/api/body-battery/anchor.ts` and a
+   Fixed in **#996** (v1.250.2). The decision moved into `lib/health/body-battery-anchor.ts` and a
    readiness-derived anchor is now frozen for the rest of the day; a sleep anchor is labelled
    provisional and upgrades exactly once. Reproduced on the dev DB (82 → 54 → held at 54) and the
    provisional copy checked at 360px in both themes.
@@ -8924,7 +9005,7 @@ tools → "Run backfill" (`POST /api/workout/backfill-set-hr-stats`, oldest-firs
 `docs/superpowers/plans/2026-07-21-per-set-hr-metrics.md`.
 
 ### [workouts][app-shell] Workout & health UX batch (v1.198.0, 2026-07-22) — capture paths NOT device-verified · needs: browser
-Owner-directed batch (see `docs/overview/entries/2026-07-22-workout-screen-fixes.md`): workout
+Owner-directed batch (see `docs/overview/history-2026-07-17.md#2026-07-22-workout-screen-fixes`): workout
 category/intensity pills, home deload "why" panel, per-factor health deep-dives across the 4 pillars,
 AI-prescription card refreshing in place (no app reopen), and an end-of-workout Time Summary
 (setup/work/rest actual-vs-planned). Logic + endpoints are `tsc`/lint/test green and dev-server

@@ -133,7 +133,7 @@ previous one.
 - `app/api/ai-periodization/program-overview/route.ts` — new `lastTrainedDaysAgo` computation.
 - `components/health/ai-periodization-status-card.tsx` — the card itself; `lastTrainedLabel()` is
   the new formatter.
-- `docs/overview/entries/2026-07-30-workout-dismissal-vfrq3b.md` — full investigation + fix
+- `docs/overview/history-2026-07-30.md#2026-07-30-workout-dismissal-vfrq3b` — full investigation + fix
   narrative, including the exact production SQL trail that found the bug.
 
 ## Open questions / blockers
