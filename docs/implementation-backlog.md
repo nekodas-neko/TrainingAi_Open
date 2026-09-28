@@ -7763,38 +7763,25 @@ drift.
   drifted apart.
 
 
-### [workouts] RV-184 — the AI prescription regenerates at workout open on days the completion already generated it
+### [workouts] LA-177 — the completion-time prescription is generated as if the lifter had trained 0 hours ago
 
-- **Lane: A** — `packages/shared/src/ai-periodization/generate-prescription.ts:303`.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
-- **From `ai_call_log` joined to workouts:** 35 prescription calls, 23 fingerprints.
-  - 10 of the 12 repeats are by design: generation at open, then at completion for the next run.
-  - **On 8 of 20 workout days an open-time generation ran although the previous completion had
-    already produced one.** That is ~2.1 s of *"Preparing your AI workout"* the owner waits through.
-  - Two near-duplicates came within the 30 s cooldown (09-06, 09-16).
-- **Why it cannot be diagnosed today:** the fingerprint is only `{programSessionId, today}`. It
-  leaves out `durationPreset`, `excludeSessionId` and which trigger fired.
-- **Fix:** add those three to the fingerprint, then find why the slot reads pending at open.
-- **⚠ RE-VERIFIED 2026-09-28 (Lane A): the premise is out of date, and the fix above would not find
-  anything.** Three facts against current `main`:
-  ① **Completion no longer generates a prescription.** `packages/shared/src/workout/complete-workout.ts`
-  only marks the slot `consumed`; the old `lib/workout/complete-workout.ts` that regenerated in-process
-  is gone. So the next open MUST regenerate, and "an open-time generation after the completion
-  produced one" describes a design that no longer exists. The only generators today are
-  `workout-data` at open (two call sites, `route.ts:552` and `:572`) and baseline completion.
-  ② **`excludeSessionId` is passed by nothing.** The `/prescribe` route accepts it and no client or
-  server caller sends it, so "which trigger fired" cannot be recovered from it either.
-  ③ **`ai_call_log.fingerprint` is stored as a 16-hex hash.** Adding fields splits the hashes; it
-  cannot make a trigger readable.
-- **What production actually shows (owner's rows, last 14 days, 19 calls):** one call per workout day,
-  plus a second for the same session 35-60 min later on 09-14, 09-15, 09-16 and 09-22, which fits
-  "open, train, reopen", now by design. **The one real anomaly is 09-16: two identical calls 7 s
-  apart**, which the 30 s cooldown exists to collapse. Candidates, unexamined: both `workout-data`
-  call sites firing in one request, or two replicas each missing the other's per-process cache.
-- **Revised next step:** find the 7-second pair's cause before instrumenting. If trigger names are
-  still wanted, they need a plain column (a schema change, so Lane A and after BF-214), not the
-  hashed fingerprint. Separately, `excludeSessionId` is a dead parameter: either wire it to a real
-  completion trigger or delete it with the comments that still describe one.
+- **Lane: B** — `components/workout-screen.tsx`, the post-completion `/prescribe` call (~line 1547).
+  A one-line body on a `components/` call; nothing on the engine side changes.
+- **Added:** 2026-09-28 · Lane A, found while working RV-184 (closed the same day; see its journal entry).
+- **What:** after a workout completes, the client POSTs `/prescribe` with **no body**, so
+  `excludeSessionId` is never sent. `signals.ts` measures `hoursSinceLastSession` from the newest
+  completed session, which is the one that just finished, so it reads about **0 hours**.
+  `shouldTriggerEmergencyDeload` fires on `hoursSinceLastSession < 36 && soreMusclesInSession ≥ 3`.
+  **A lifter who logged three sore muscles that morning is offered an emergency deload for their
+  NEXT session**, built without the model (so no `ai_call_log` row shows it). The parameter exists
+  for exactly this. `generate-prescription.ts` documents it, and the server's old completion path
+  passed it. It was lost when the trigger moved client-side.
+- **Fix:** `body: JSON.stringify({ excludeSessionId: wsId })` with the JSON content type. The route's
+  Zod schema already accepts it. It also puts the call on its own dedup key, which is correct: a
+  completion-path plan is not interchangeable with an open-path one.
+- **Not measured:** whether a spurious deload has actually been offered. That would need
+  `session_periodization` history, which is overwritten in place.
+- **Reversal cost:** none.
 
 ### [app-shell][platform] RV-183 — requests the client sends for data it already has
 
