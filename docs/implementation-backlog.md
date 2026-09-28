@@ -4253,6 +4253,52 @@ which is the right shape for something that can only be validated by living with
 - **What:** on a normal day the diary shows Morning snack, Afternoon snack, Dinner and Evening snack as four full-height "+ Add food" cards. Each also has a `+` in its header, so there are two add controls per empty meal and about a screen of height with nothing in it.
 - **Recommendation for the mockup:** collapse empty slots into one compact row per meal, with the name and a single `+`. Keep full cards for meals with food. The owner picks.
 
+### [cardio][platform] LB-179 — a walk that satisfies a run prescription must not feed the run planner
+- **Lane: A** — `packages/shared/src/running/assemble-plan-context.ts`,
+  `app/api/running-plan/run-type-stats/route.ts`, and (on the recommendation below) a migration plus
+  the local SQLite version. **Blocks `RV-166`**, which is approved and cannot ship without it.
+- **Added:** 2026-09-28 · Lane B, while re-verifying `RV-166` against `main` before building it.
+- **⚑ THE APPROVED SPEC RE-INTRODUCES A BUG THIS REPO ALREADY FIXED ONCE.** `RV-166` makes a walk
+  satisfy the run prescription — correct, and what the owner asked for. But `prescribed_runs.status`
+  is read by the **planner**, not only by display, and nothing records *how* the row was satisfied.
+  `assemble-plan-context.ts:97` already carries the comment *"Only COMPLETED runs count toward the
+  week's 80/20 sequence — a never-run pending row … must not advance the framework toward an
+  interval day (E2-7)"*. A walk marked `completed` walks straight through that guard. Same class,
+  different door.
+- **Three readers, measured 2026-09-28, not one:**
+  - `assemble-plan-context.ts:81` — `.filter(r => r.status === 'completed' && HARD_RUN_TYPES.has(r.runType))`
+    feeds `hoursSinceLastHardRun`, described in its own comment as *"real no-back-to-back-quality
+    protection"*. A treadmill walk completing a prescribed tempo tells the gate a quality session was
+    done and **suppresses the next one**. This is the worst of the three: it changes what the app
+    tells him to do.
+  - `assemble-plan-context.ts:97` — `runsThisWeek`, the 80/20 sequence and weekly frequency. A walk
+    advances the framework toward an interval day.
+  - `run-type-stats/route.ts:35` — pulls `distanceKm`/`avgPaceSecPerKm`/`avgHr` off the linked log and
+    files them under the **prescribed** `runType`. A ~12 min/km treadmill pace lands in "easy run"
+    pace statistics.
+- **✅ RECOMMENDATION — record how it was satisfied on the row (`completedAs: 'run' | 'walk'`), do not
+  re-derive it per reader.** The completing client knows the activity type at the moment it links the
+  row (`done-activity-screen.tsx`); every reader otherwise has to join back to the activity log to
+  recover a fact that was known when it was written. **`assembleInputs` does not fetch activity logs
+  at all** — its `Promise.all` takes prescribed runs, loads, workouts, sleep and Oura — so the
+  derive-at-read-time option means adding a query to a hot path *and* repeating it in each of the
+  three readers, and in every reader added later. It also matches the convention `RV-166` itself
+  cites: a discriminator like `observed-hr.ts`'s `source: 'observed' | 'estimated'`, which says where
+  a value came from rather than whether to trust it.
+- **Alternative, and what it is better at:** derive it at read time from `log.activityType`
+  (`run-type-stats` already loads the logs, so that one reader is a one-line filter). **Better at
+  shipping today** — no migration, no local SQLite version bump, nothing to backfill, and it is the
+  whole fix for the stats reader. It loses on the two planner readers, which is where the real defect
+  is.
+- **Reversal cost: low.** A nullable column readers ignore until they use it; existing rows read
+  `null`, which means *"satisfied before this was tracked"* and must be treated as a run (that is what
+  they are — the link only ever fired for `activityType === 'run'`).
+- **⚠ Do NOT backfill.** Every existing `completed` row was necessarily a run, so a backfill would
+  write a fact that is already implied, and `RV-166`'s own warning about moving stored numbers is
+  about *future* completions, not past ones.
+- **Not measured:** how many days change once `RV-166` ships. `RV-166` owes that figure before merging
+  and this entry does not answer it.
+
 ### [nutrition] RV-218 — one Nutrition screen shows three calorie targets, the Day screen a fourth "burned", and "205 workouts" means 205 kcal
 - **✅ TWO OF THE THREE COPY BUGS SHIPPED 2026-09-27 (#1782). THE THIRD WAS ALREADY FIXED. ITEMS ①②④ ARE LANE A's — established below, not assumed.**
 - **Lane: A** for what remains. Was `Lane: B`, with *"if the numbers come from different routes,
@@ -6589,6 +6635,22 @@ drift.
   the 45-minute cap, where it had been hitting it. Six specs that each burned a timeout before
   failing were most of the difference, so clearing `LA-176` bought back roughly the margin the cap
   was eating.
+- **✅ SECOND CENSUS — run `36401730152` (`bfe59627`, PR #1894's head), 2026-09-28. This one settles
+  which half of the entry is real.** **263 passed · 1 failed · 4 flaky · 1 skipped · 3 did not run ·
+  36.6 min**, against the first census's 257 / 5 / 6.
+  - **Failed (1):** `food-log-swipe-delete:238`.
+  - **Flaky (4):** `dv12-tab-switch-does-not-redraw-charts:27`, `tabs-instant-paint:42` (Home),
+    `tn25-walk-prescription:49`, `tn53-sparkline-does-not-span-gaps:105`.
+- **⚑ THE FLAKY SET CHURNS; THE HARD FAILURE DOES NOT. That is the finding.** Only **2 of 6** flaky
+  specs recurred across the two runs (`tn25-walk-prescription`, `tn53-sparkline`); four from the first
+  census did not reappear and two are new. Meanwhile `food-log-swipe-delete:238` failed **hard in both
+  runs** — and in two of three local runs before that. **So `:238` is a defect and the rest is
+  order/timing noise**, which is exactly the separation this entry was opened to make. Start there and
+  treat the churning set as one population rather than as individual bugs.
+- **And the two stress specs are gone from the list, as predicted.** `tn35-stress-against-events` and
+  `tn3b-stress-on-hr-chart` pass here; they were the deterministic `bucket_start` pair fixed in #1894,
+  and removing them is most of the 5 → 1 improvement. Their disappearance is the evidence that the
+  first census's mode-sorting was right.
 - **Not in scope:** the 45-minute cap. That is a symptom of ~250 specs on one worker, and it is
   `LB-166`'s.
 
@@ -7629,6 +7691,15 @@ drift.
 
 
 ### [cardio][activity] RV-166 — no prescribed run has ever been marked done, although the owner does most of them as walks
+- **Needs:** LB-179 — the planner must be able to tell a walk-satisfied prescription from a run-satisfied
+  one before a walk is allowed to satisfy one. Shipping the two-guard change alone corrupts the
+  prescription engine, not just a stat.
+- **✅ ROOT CAUSE FOUND 2026-09-28, and it is two lines** — `components/activity/done-activity-screen.tsx:285`
+  and `:322`, both `if (activityType === 'run' && prescribedRunId)`. He logs walks, so
+  `linkPrescribedRun` never fires. **Everything else the completion needs already exists**: the
+  `prescribed_runs.status`/`activityLogId` columns, the `prescribed_run` outbox domain, the local-store
+  write, and `PATCH /api/running-plan/runs/[id]`. So the entry's *"has never been marked done"* is not
+  a missing feature — it is a type guard, and the build is the card plus `LB-179`, not the plumbing.
 - **✅ APPROVED 2026-09-27 — build it, WITH the walk flow below. Mockup:
   [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html),
   sections RV-166 and RV-166b.**
