@@ -17,6 +17,7 @@ import { intensityZoneForPct } from "@trainingai/shared/workout/intensity-zone";
 import { isBodyweightType } from "@trainingai/shared/1rm";
 import { RoleChip } from "./role-chip";
 import { invalidatePrescriptionChanged } from "@/lib/cache-groups";
+import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role';
 
 export interface ExerciseSignal {
   role: string;
@@ -390,7 +391,7 @@ export function AiPrescriptionCard({
                   const sig = exerciseSignalsById?.[ex.sessionExerciseId];
                   const bullets = explainExerciseChoice({
                     phase: prescription.phase,
-                    role: sig?.role ?? 'primary',
+                    role: sig?.role ?? UNCLASSIFIED_EXERCISE_ROLE,
                     rm1Trend: sig?.rm1Trend ?? 'flat',
                     rm1ChangeKg: sig?.rm1ChangeKg ?? 0,
                     lastSetMode: lastSetModeById?.[ex.sessionExerciseId],
