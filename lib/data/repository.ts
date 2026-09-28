@@ -753,6 +753,9 @@ export interface WorkoutRepository {
   listRecentPersonalRecords(userId: string, from: Date, to: Date): Promise<{ exerciseName: string; estimated1rm: number; achievedAt: Date; exerciseType: string | null }[]>
   // All-time best estimated1rm per exercise, keyed by exercise name.
   listPersonalRecords(userId: string): Promise<Map<string, number>>
+  // LB-95: every all-time record WITH the date it was achieved, newest first — for a surface that
+  // must say when each value was read. `listPersonalRecords` drops the date and keeps its callers.
+  listPersonalRecordsDated(userId: string): Promise<{ exerciseName: string; estimated1rm: number; achievedAt: Date }[]>
   // All-time max reps logged per exercise, keyed by exercise name.
   listMaxReps(userId: string): Promise<Map<string, number>>
   // Second-most-recent estimated 1RM per exercise, keyed by exercise name (for trend detection).
