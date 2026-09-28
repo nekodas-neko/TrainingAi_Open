@@ -14030,29 +14030,18 @@ the rest of that day; and `perceived_recovery` carries at least three distinct v
 
 ### [workouts] LB-95 — personal records are the one half of the measured overview with no route to read them
 
-- **Lane:** A — it needs `app/api/**`, which is Lane A's. Filed by Lane B, which hit the wall while
-  building the rest of the section.
-- **Needs:** BF-133.
-- **What is missing is a read, not a screen.** `personal_records` holds 33 rows — exercise name,
-  `estimated_1rm`, `achieved_at` — and nothing exposes them to the user's own client.
-  `repo.listPersonalRecords` returns a `Map<string, number>` with **the date thrown away**, and the
-  only route that reads them for the current user is `/api/weights-summary`, which reports a
-  `personalRecord1rm` per exercise **of the active program** and carries no date either.
-  `/api/friends/feed` selects `achievedAt` — for other people's records.
-- **⚠ Neither existing source is usable here, and the reason is the card's own rule.** BF-133 is
-  built on *every value carries the date it was read*; a record rendered without one sits beside a
-  dated scan and reads as current. And an active-program filter would silently drop the records for
-  everything not currently programmed — a lifetime best on an exercise you have stopped doing is
-  exactly what a lifetime-best list is for, so a partial list is worse than none.
-- **What to build:** a `GET /api/personal-records` returning `{ exerciseName, estimated1rm,
-  achievedAt }` for the caller, all exercises, newest first, `private, no-store` like its siblings —
-  plus a repository read that keeps the date. Widening `listPersonalRecords` in place would touch
-  its five existing callers, which all want the map; a second read beside it is the smaller change.
-- **Then the surface is small:** a `Training` group in `components/more/details/`, built with the
-  `readingGroups`-shaped rows the section already renders. Lane B's, and roughly an hour once the
-  route exists.
+- **Lane: B** — `components/more/details/`. Re-laned 2026-09-28: the route half is built (below),
+  and what is left is the surface.
+- **✔ ROUTE BUILT 2026-09-28 (Lane A):** `GET /api/personal-records` returns
+  `{ records: [{ exerciseName, estimated1rm, achievedAt }] }` for the caller: every exercise, not
+  filtered to the active program, newest first, `achievedAt` as an ISO instant, `private, no-store`.
+  It reads through a new `listPersonalRecordsDated` beside `listPersonalRecords`, whose 10 call
+  sites want the undated map and are untouched.
+- **What is left:** a `Training` group in `components/more/details/`, built with the
+  `readingGroups`-shaped rows the section already renders. **Every value carries its date** (BF-133's
+  rule), and a record on an exercise no longer programmed stays in the list. Read through
+  `cachedFetch` with a `readCacheSync` seed per the cache rules, and give the key one TTL.
 - **Added:** 2026-09-09 · Lane B, while shipping BF-133's clinical half.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** `Needs: BF-133` has cleared. *"Five callers"* is now **10 call sites across 7 files**, which strengthens the case for a second read.
 
 ### [body][platform] LB-96 — no route returns a weight series longer than seven days, so a browser cannot see a dosing period
 

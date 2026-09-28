@@ -3711,6 +3711,18 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return new Map(rows.map(r => [r.exerciseName, r.estimated1rm]))
   }
 
+  async listPersonalRecordsDated(userId: string): Promise<{ exerciseName: string; estimated1rm: number; achievedAt: Date }[]> {
+    return this.db
+      .select({
+        exerciseName: s.personalRecords.exerciseName,
+        estimated1rm: s.personalRecords.estimated1rm,
+        achievedAt: s.personalRecords.achievedAt,
+      })
+      .from(s.personalRecords)
+      .where(eq(s.personalRecords.userId, userId))
+      .orderBy(desc(s.personalRecords.achievedAt), s.personalRecords.exerciseName)
+  }
+
   async listMaxReps(userId: string): Promise<Map<string, number>> {
     const rows = await this.db
       .select({
