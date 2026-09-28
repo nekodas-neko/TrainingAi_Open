@@ -546,11 +546,13 @@ Live at the time of writing (2026-07-30):
   - **This is a principle, not a one-off no.** Any future sweep measuring blank space on the diary
     will reach the same finding and should stop here. Re-opening it takes a **new entry with a new
     reason** — not a second run at this one.
-  - **The finding's other half is on the record and is also not a to-do:** an empty meal renders a
-    header `+` (`components/nutrition/meal-card.tsx:73`) *and* a body `+ Add food` (`:105`). Two
-    affordances, one action — but the header `+` is the control that is present in **every** meal
-    state and the body row is the empty-state one, so the pair is consistency rather than
-    duplication. Filing it separately would be re-opening a declined entry through a side door.
+  - **The finding's other half is on the record and is also not a to-do:** in
+    `components/nutrition/meal-card.tsx`, an empty meal renders a header `+` **and** a body
+    `+ Add food`. Two affordances, one action — but the header `+` is the control that is present in
+    **every** meal state and the body row is the empty-state one, so the pair is consistency rather
+    than duplication. Filing it separately would be re-opening a declined entry through a side door.
+    (Named without line numbers deliberately: `check-index-doc-paths` reads a `file:line` suffix as
+    part of the path, and a pinned line in an orientation doc goes stale on the next edit anyway.)
   - The declined mockup is kept at
     [`docs/design/2026-09-27-four-screen-mockups.html`](../../design/2026-09-27-four-screen-mockups.html),
     so the next person can see what was rejected rather than re-drawing it.
