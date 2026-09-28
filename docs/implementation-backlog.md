@@ -7825,26 +7825,6 @@ drift.
   rewrite and no per-ingest cost. It needs the sleep windows at read time (a join) and it puts the
   rule in two places, so it is a real trade rather than an obvious win.
 
-### [workouts] LA-177 — the completion-time prescription is generated as if the lifter had trained 0 hours ago
-
-- **Lane: B** — `components/workout-screen.tsx`, the post-completion `/prescribe` call (~line 1547).
-  A one-line body on a `components/` call; nothing on the engine side changes.
-- **Added:** 2026-09-28 · Lane A, found while working RV-184 (closed the same day; see its journal entry).
-- **What:** after a workout completes, the client POSTs `/prescribe` with **no body**, so
-  `excludeSessionId` is never sent. `signals.ts` measures `hoursSinceLastSession` from the newest
-  completed session, which is the one that just finished, so it reads about **0 hours**.
-  `shouldTriggerEmergencyDeload` fires on `hoursSinceLastSession < 36 && soreMusclesInSession ≥ 3`.
-  **A lifter who logged three sore muscles that morning is offered an emergency deload for their
-  NEXT session**, built without the model (so no `ai_call_log` row shows it). The parameter exists
-  for exactly this. `generate-prescription.ts` documents it, and the server's old completion path
-  passed it. It was lost when the trigger moved client-side.
-- **Fix:** `body: JSON.stringify({ excludeSessionId: wsId })` with the JSON content type. The route's
-  Zod schema already accepts it. It also puts the call on its own dedup key, which is correct: a
-  completion-path plan is not interchangeable with an open-path one.
-- **Not measured:** whether a spurious deload has actually been offered. That would need
-  `session_periodization` history, which is overwritten in place.
-- **Reversal cost:** none.
-
 ### [app-shell][platform] RV-183 — requests the client sends for data it already has
 
 - **Lane: B** — `app/more/more-content.tsx`. Re-laned 2026-09-28: every Lane A half is now shipped

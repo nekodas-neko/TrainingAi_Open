@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.478.3",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: finishing a workout could make the app offer you an emergency deload for your next session, because it measured the gap since your last session from the one you had just finished \u2014 reading it as zero hours ago. If you had logged three or more sore muscles, that was enough to trigger it.",
+    ],
+  },
+  {
     version: "1.478.2",
     date: "2026-09-28",
     changes: [
