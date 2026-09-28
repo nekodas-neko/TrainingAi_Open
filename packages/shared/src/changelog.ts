@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.477.31",
+    version: "1.477.32",
     date: "2026-09-28",
     changes: [
       "Fixed: with no connection, editing or deleting a logged exercise \u2014 or deleting a whole session \u2014 said it had saved and then said it had failed, and the change was lost. All three are now saved on the phone straight away and sent when you are back online, the way deleting an activity already worked.",
+    ],
+  },
+  {
+    version: "1.477.31",
+    date: "2026-09-28",
+    changes: [
+      "Set cards, AI chat charts and the heart-rate recovery traces now share one colour set that never uses green, amber or red, so a set's colour no longer reads like a verdict on it.",
     ],
   },
   {

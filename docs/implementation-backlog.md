@@ -9335,39 +9335,6 @@ drift.
   if either regex stops matching; `components/__tests__/rv101-volume-ramp-and-key.test.ts` states the
   rule independently — 3 of its 4 assertions fail against `origin/main`.
 
-### [platform][workouts] LB-153 — three chart palettes disagree; merging them changes colours you see daily
-- **✅ ANSWERED 2026-09-27 — merge everything, the workout set colours included.**
-  He took the biggest of the three, knowing set 1 amber / set 2 green changes on a screen he sees
-  every session. One categorical palette, and **no colour in it that also means good/warning/bad
-  elsewhere** — that constraint is the point of the change, not a detail of it.
-  **Now Lane A** by the path rule: the palette lands in `packages/shared/src/chart-colors.ts` beside
-  `resolveColor()`. RV-102 prescribed Lane B; that was wrong and is why only its invisible halves
-  shipped. The three surfaces to convert in the same PR: the AI chat charts, the HR-recovery trace,
-  and `set-card.tsx`'s `SET_COLORS`. Sibling-surface sweep applies — grep for every other chart
-  before calling it done.
-
-- **Lane: A**
-- **Added:** 2026-09-25 · split out of RV-102 by Lane B, which shipped that entry's two invisible halves.
-- **Recommendation: merge them, and include the workout set colours.** One categorical palette, no
-  colour in it that also means good/warning/bad elsewhere.
-- **Why, a year out.** Right now `#22c55e` means "primary mover", "at target", "good score" *and*
-  "set 2" depending on where you look, so every new chart re-picks colours and the meaning of green
-  keeps thinning. One palette that is deliberately NOT the good/amber/bad triad ends that, and it is
-  what makes a future chart cheap to add correctly.
-- **What you would actually see change.** Three surfaces: the AI chat's charts, the HR-recovery
-  trace, and the workout set cards. The workout one is the one you look at every session — set 1 is
-  `#f59e0b` (amber) and set 2 `#22c55e` (green) today, which reads as a judgement on the set rather
-  than an index.
-- **Alternatives.** *Leave it* — zero risk, and genuinely fine if you read the set colours as
-  labels rather than verdicts; it is only confusing if you don't. *Merge the two charts but keep the
-  workout set colours* — no change to your daily screen, and it keeps the one case that actually
-  misreads. *Merge everything* — most consistent, biggest visual change.
-- **Reversal cost: one constant.** It is a colour table, not a structure; if you dislike it, it
-  reverts in a line.
-- **Then:** the palette itself lands in `packages/shared/src/chart-colors.ts` beside `resolveColor()`
-  — which already exists, and is **Lane A's** by the path rule, so re-lane this once answered.
-  RV-102 prescribed it to Lane B; that was wrong and is why only its invisible halves shipped.
-
 ### [platform] LA-122 — Reference: the six owner decisions Lane A is currently blocked on
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (Lane A, filed for the Orchestrator at the owner's request).
@@ -17234,6 +17201,14 @@ paint, only on Samsung's WebView, invisible in Chrome and in `pnpm dev`.
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** the telemetry is in, and `667 stuck` still fires. But **this entry names no native fix**: `MainActivity.java:569` `onResume` has no viewport or relayout handling. Add a concrete hypothesis (a relayout or insets request on resume) before a Lane A session starts, or it opens as investigation on an APK-only path. Relabelling `stuck` is still owed.
 
 ### [app-shell] BF-111 — "Up to date — v1.414.1 is the newest build" sits under a v1.436.2 badge, and both are right
+
+- **⚙ RE-FIXED 2026-09-28 (Lane A): the date now comes from the APK asset.** Measured live that day:
+  the rolling release was created 2026-08-23 and never moves, while its `app-debug.apk` asset was
+  uploaded 2026-09-25 (v1.465.52). `mapApkRelease` now takes the asset's `updated_at`, falling back
+  to `published_at` only when there is no asset. The module comment that said the release is
+  "deleted and recreated on every publish" was wrong and is corrected.
+- **Keep:** DV — More → About on the S25 should read "built 25 Sept" (or the date of whatever APK is
+  newest), not 23 Aug. The card renders only on native, so the phone is the only place to check it.
 
 - **❌ FAILED ON THE S25, 2026-09-13** (owner, no note). The card returns early off-native, so this is
   the first time any of its three states has been on a screen — and it did not survive that.
