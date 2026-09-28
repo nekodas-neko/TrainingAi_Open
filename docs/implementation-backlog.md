@@ -6510,6 +6510,20 @@ drift.
   number (OR-191).
 
 ### [app-shell][heart-rate] LB-172 — Resting HR is drawn as a score, and neither proposed fix fits
+- **📐 MOCKUP DRAWN 2026-09-28 — [`docs/design/2026-09-28-resting-hr-cell.html`](design/2026-09-28-resting-hr-cell.html)
+  ([hosted](https://claude.ai/artifact/7ngUaPpJieYqDkfBpJAiEC)). Committed, per the convention
+  `LB-135` left behind.** Three panes at 384 px dark: today, (a) the `bpm` caption, (b) the HR cell
+  drawn without a ring. The measurements that rule out both of `RV-211`'s proposals are on the page
+  as a table rather than as prose.
+- **Gate:** owner — the picture exists now, so his pick is the only outstanding thing.
+- **⚑ ONE QUESTION SETTLES IT, and it is not about taste:** does he use the `nolabel` or `overlap`
+  ring style? **In those two, (a) does nothing at all** — `nolabel` removes the label on purpose and
+  `overlap` has no caption slot — so 58 keeps reading as a score with nothing naming the metric.
+  If he uses either, (b) is the only option that works and the recommendation flips. Asked that way
+  on the page.
+- **⚠ Not device-verified.** Drawn from the harness geometry, not screenshotted on the S25 — the row
+  needs live scores. **(b) owes a device look before it ships**, because it changes a shape rather
+  than adding a word.
 - **Lane: O** — the remaining fork is a visual-language decision on the card he reads every morning.
   Ungated on purpose: a mockup does not exist yet, so producing one is the next act and `Gate: owner`
   would park it. Add the gate once he has seen one.
