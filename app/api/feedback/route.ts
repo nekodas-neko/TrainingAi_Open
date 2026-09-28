@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { readJsonLimited, parseImageDataUrl } from '@trainingai/shared/http/request-guards'
 import { rateLimit } from '@/lib/rate-limit'
 
 const MAX_SCREENSHOT_BYTES = 500_000
@@ -29,6 +29,10 @@ export async function POST(req: NextRequest) {
   }
   if (screenshotData != null && (typeof screenshotData !== 'string' || screenshotData.length > MAX_SCREENSHOT_BYTES)) {
     return NextResponse.json({ error: 'Screenshot too large' }, { status: 400 })
+  }
+  // RV-191: the admin panel renders and opens this value, so it must be an image and nothing else.
+  if (screenshotData != null && screenshotData !== '' && parseImageDataUrl(screenshotData) == null) {
+    return NextResponse.json({ error: 'Screenshot must be a PNG, JPEG or WebP image' }, { status: 400 })
   }
 
   const repo = await getRepository()

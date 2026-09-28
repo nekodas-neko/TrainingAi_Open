@@ -55,6 +55,12 @@ const jsonPost = (handler: (r: NextRequest) => Promise<Response>, body: unknown,
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
   }))
 const feedback = (b: unknown) => jsonPost(postFeedback, b, '/api/feedback')
+/** A data URL whose bytes start with JPEG's start-of-image marker, `bytes` long. */
+const jpegDataUrl = (bytes: number) => {
+  const buf = Buffer.alloc(bytes, 0x11)
+  buf[0] = 0xff; buf[1] = 0xd8; buf[2] = 0xff
+  return 'data:image/jpeg;base64,' + buf.toString('base64')
+}
 const calendar = (b: unknown) => jsonPost(postCalendar, b, '/api/log-calendar-event')
 
 const VALID_EVENT = {
@@ -102,9 +108,24 @@ describe('POST /api/feedback', () => {
     expect(await res.json()).toEqual({ error: 'Screenshot too large' })
     expect(createFeedback).not.toHaveBeenCalled()
 
-    // Just under, and it is stored.
-    await feedback({ type: 'bug', title: 'x', screenshotData: 'd'.repeat(400_000) })
-    expect((createFeedback.mock.calls[0][1] as Row).screenshotData).toBe('d'.repeat(400_000))
+    // Just under, and it is stored — as long as it is really an image (RV-191).
+    const jpeg = jpegDataUrl(300_000)
+    expect(jpeg.length).toBeLessThan(500_000)
+    await feedback({ type: 'bug', title: 'x', screenshotData: jpeg })
+    expect((createFeedback.mock.calls[0][1] as Row).screenshotData).toBe(jpeg)
+  })
+
+  it('RV-191: refuses a screenshot that is not provably a PNG, JPEG or WebP', async () => {
+    const html = 'data:text/html;base64,' + Buffer.from('<script>alert(1)</script>').toString('base64')
+    const lying = 'data:image/png;base64,' + Buffer.from('<script>alert(1)</script>').toString('base64')
+    const mismatched = jpegDataUrl(30).replace('image/jpeg', 'image/png')
+    for (const screenshotData of [html, lying, mismatched, 'javascript:alert(1)', 'd'.repeat(400_000),
+      jpegDataUrl(30) + '"onerror="x', jpegDataUrl(30).replace(';base64', ';charset=x;base64')]) {
+      createFeedback.mockClear()
+      const res = await feedback({ type: 'bug', title: 'x', screenshotData })
+      expect(res.status, screenshotData.slice(0, 40)).toBe(400)
+      expect(createFeedback).not.toHaveBeenCalled()
+    }
   })
 
   it('refuses a report it could not file, one rule at a time', async () => {

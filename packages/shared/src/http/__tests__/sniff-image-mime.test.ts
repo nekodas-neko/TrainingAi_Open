@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sniffImageMime, ALLOWED_IMAGE_MIME, isAllowedImageMime } from '../request-guards'
+import { sniffImageMime, ALLOWED_IMAGE_MIME, isAllowedImageMime, parseImageDataUrl } from '../request-guards'
 
 // Headers built from the format specs rather than captured from a file, so a wrong byte is a
 // wrong byte rather than a blessed regression.
@@ -62,5 +62,29 @@ describe('sniffImageMime', () => {
       expect(isAllowedImageMime(got)).toBe(true)
       expect(ALLOWED_IMAGE_MIME).toContain(got)
     }
+  })
+})
+
+describe('parseImageDataUrl (RV-191)', () => {
+  const b64 = (bytes: number[]) => Buffer.from(bytes).toString('base64')
+  const PNG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0]
+
+  it('accepts a data URL whose declared type and bytes agree', () => {
+    const parsed = parseImageDataUrl(`data:image/png;base64,${b64(PNG)}`)
+    expect(parsed?.mime).toBe('image/png')
+    expect(Array.from(parsed!.bytes)).toEqual(PNG)
+  })
+
+  it('refuses everything that could be opened as something other than that image', () => {
+    for (const v of [
+      `data:image/jpeg;base64,${b64(PNG)}`,                     // declared JPEG, bytes PNG
+      `data:image/svg+xml;base64,${b64(PNG)}`,                  // SVG can script
+      `data:text/html;base64,${b64(PNG)}`,
+      `data:image/png,${b64(PNG)}`,                             // not base64
+      `data:image/png;base64,${b64(PNG)} `,                     // trailing content
+      `data:image/png;base64,${b64(PNG).slice(0, -1)}`,         // truncated
+      `DATA:image/png;base64,${b64(PNG)}`,
+      42, null, '',
+    ]) expect(parseImageDataUrl(v), String(v).slice(0, 30)).toBeNull()
   })
 })

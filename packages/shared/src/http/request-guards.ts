@@ -89,3 +89,27 @@ export function sniffImageMime(bytes: Uint8Array): AllowedImageMime | null {
   if (bytes.length >= 12 && at(0, 0x52, 0x49, 0x46, 0x46) && at(8, 0x57, 0x45, 0x42, 0x50)) return 'image/webp'
   return null
 }
+
+/**
+ * A `data:` URL that is provably an image we accept, decoded — or null.
+ *
+ * RV-191. A stored data URL is later handed to `<img src>` and to a click that opens it, so "a
+ * string under 500 KB" let `data:text/html,…` through to an admin's browser. Three things must
+ * agree: the declared type is one of `ALLOWED_IMAGE_MIME`, the payload is strict base64 (no
+ * parameters, no whitespace, nothing after it), and the decoded bytes sniff as the SAME type. A
+ * declared PNG carrying HTML fails the third.
+ */
+export function parseImageDataUrl(value: unknown): { mime: AllowedImageMime; bytes: Uint8Array } | null {
+  if (typeof value !== 'string') return null
+  const m = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+={0,2})$/.exec(value)
+  if (!m || m[2].length % 4 !== 0) return null
+  let bytes: Uint8Array
+  try {
+    const bin = atob(m[2])
+    bytes = Uint8Array.from(bin, c => c.charCodeAt(0))
+  } catch {
+    return null
+  }
+  const sniffed = sniffImageMime(bytes)
+  return sniffed != null && sniffed === m[1] ? { mime: sniffed, bytes } : null
+}

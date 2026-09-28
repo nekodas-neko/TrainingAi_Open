@@ -11,6 +11,7 @@ import type { User } from '@trainingai/shared/types'
 import { invalidateAdminPendingCount } from '@/lib/cache-groups'
 import ExerciseManager from '@/components/admin/exercise-manager'
 import ActivityTypeManager from '@/components/admin/activity-type-manager'
+import { FeedbackScreenshot } from '@/components/admin/feedback-screenshot'
 import { MoreRow, MoreRowGroup } from '@/components/more/more-row'
 import { useTransitionRouter } from "@/lib/view-transition";
 import { initialsOf } from '@/lib/initials';
@@ -289,15 +290,7 @@ export default function AdminContent() {
                       {sub.description && (
                         <p className="text-sm text-muted-foreground whitespace-pre-wrap">{sub.description}</p>
                       )}
-                      {sub.screenshotData && (
-                        // eslint-disable-next-line @next/next/no-img-element -- base64 screenshot, variable size
-                        <img
-                          src={sub.screenshotData}
-                          alt="Screenshot"
-                          className="rounded-xl max-w-full border border-border cursor-zoom-in"
-                          onClick={() => window.open(sub.screenshotData!, '_blank')}
-                        />
-                      )}
+                      {sub.screenshotData && <FeedbackScreenshot data={sub.screenshotData} />}
                       <div className="flex justify-end">
                         {isConfirming ? (
                           <div className="flex gap-2">

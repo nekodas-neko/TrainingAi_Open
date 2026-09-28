@@ -3270,28 +3270,6 @@ which is the right shape for something that can only be validated by living with
 - **Not the changelog:** cutting it to 9.8 KB changed nothing. Bounding it is still reasonable
   hygiene, but it is not this fix.
 
-### [platform][app-shell] RV-191 — the feedback screenshot is stored unchecked and the admin panel opens it as a URL
-- **Lane: A** first (validation), then **B** (render). One PR covers both halves.
-- **⚠ SECURITY, HIGH — the owner confirms before this merges.**
-- **Added:** 2026-09-24 · Review sweep 60. **Ahead of RV-190 because any signed-in user can reach it, and it is the script-execution precondition for RV-193 and RV-196.**
-- **What:**
-  - `POST /api/feedback` checks only that `screenshotData` is a string of 500 KB or less. The avatar
-    route validates image data with `isAllowedImageMime`; this route has no equivalent.
-  - `app/admin/admin-content.tsx` renders the value as an `<img src>` and opens it with
-    `window.open` on click.
-  - The CSP still allows `'unsafe-inline'` (SEC-H7).
-- **Who can reach it:** any user who can sign in can submit feedback. An admin who clicks the
-  thumbnail then runs code with the admin's session in the app's origin. This was reasoned from
-  source and not executed.
-- **Fix shape:**
-  1. **A:** accept only `data:image/(png|jpeg|webp);base64,` and reuse the avatar route's MIME check.
-     Reject anything else with 400.
-  2. **B:** render the thumbnail without navigating to the stored value. Open a blob made from the
-     decoded bytes, or show it in the existing lightbox.
-  3. **Existing rows:** the `claude_ro` view omits `screenshot_data`, so this sweep could not check
-     them. The implementer checks them locally with a migration-free script. **Any delete of a
-     production row is the owner's call.**
-
 ### [platform] RV-190 — `/api/admin/db-query` leaves session state behind on a pooled connection: owner scope, read-only and the timeout can all be changed by one query
 
 - **Lane: A** — `app/api/admin/db-query/route.ts`, `app/api/admin/db-snapshot/route.ts`,
