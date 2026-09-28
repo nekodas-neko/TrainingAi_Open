@@ -53,3 +53,30 @@ save and never the loss. Anyone bisecting this from the table will conclude it h
 
 No device run and no code change. The workaround is derived from the route and refit source, not
 observed on the phone — the owner tapping a duration preset on Pull is what would confirm it.
+
+---
+
+## Follow-up the same morning: `Quick` returned one exercise
+
+The workaround worked — he re-tapped the duration, `Full` took, and Pull came back as
+`Accumulation · Accepted`. He then reported that **`Quick · 30 min` gives a single exercise**
+(Barbell Chest Supported Row, `~21 min of work`).
+
+**Filed as BF-218.** Dropping whole exercises on a short preset is deliberate and well-argued
+(`budget-stage.ts:126`) — five exercises floored at two sets genuinely do overrun 30 minutes. The
+defect is that `dropToBudget` has **no floor but one** (`while (kept.length > 1 …)`) and re-fits
+survivors from their **original** set counts, so the loop can prefer one exercise at full sets over
+three at two, because it only asks whether the result fits.
+
+**The reconstruction is exact, which is what makes the rest trustworthy.** Feeding his stored plan
+(5 exercises × 2 sets, rest 180/127/90/90/90) through `estimateSessionDurationSec` at his measured
+**319 s** transition reproduces the card's **53 min** to the tenth (53.1). Against the 24-minute
+`Quick` working budget: **2 exercises fit as shipped, 3 corrected for BF-197.**
+
+He got one, not two — so the survivor carried more than two sets. **That link is inferred, not
+read:** the `Quick` prescription was overwritten by his `Normal` regeneration at 21:26:19Z. One
+re-tap and one query settles it.
+
+This is also the sharpest evidence yet for **LA-178**, the open owner question on whether to fix the
+duration double-count — added there. His LA-65 answer ("five at two sets fill the hour") was about
+the 60-minute case, where the over-protection is invisible. At 30 minutes it costs him the session.
