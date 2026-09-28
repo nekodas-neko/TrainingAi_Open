@@ -7694,24 +7694,6 @@ drift.
   floor now stores no steps at all, so if it is common the fix is the stream, not a lower floor.
   Pass/fail: walk with the strap already worn; record the first bin's tSec against the walk's start.
 
-### [workouts][platform] LA-143 — backfill `session_exercises.exercise_id` for the rows already saved
-
-- **Lane: A** — a one-statement migration, no new table or column so no `claude_ro` twin.
-- **✅ AUTHORISED 2026-09-27 (OR-182) — gate removed; this is the ADD half of the new policy.** It writes production rows and adds nothing destructive, so it no longer needs a separate yes. **The policy he set 2026-09-27 (OR-182):** an agent may run a production DB change that ADDS or backfills, and may drop an object proved dead with the evidence shown — each after a verified snapshot. **Anything that DELETES rows holding data still comes to him individually.**
-  **Two conditions before running it:** take the snapshot first and confirm it restores, and print the affected-row count and compare it against what the backfill predicted — a count that does not match the prediction stops the run rather than being written up afterwards.
-- **Added:** 2026-09-25, Lane A, while shipping RV-168.
-- **What is left.** RV-168 made `saveProgram` fill the FK, so it is correct from each program's next
-  save onward. Rows saved before that are still NULL — Bankai **0 of 25**, the others 1/25, 2/25,
-  1/17 — and fill in on their own when the owner next saves each. Nothing reads the column yet, so
-  nothing is broken meanwhile.
-- **Recommended.** The statement is migration 099's own backfill re-run, `WHERE exercise_id IS NULL`
-  so it cannot overwrite a Coach-set value; `SET exercise_id = NULL` undoes it exactly.
-  ```sql
-  UPDATE session_exercises se SET exercise_id = el.id
-    FROM exercise_library el
-   WHERE el.name = se.exercise_name AND se.exercise_id IS NULL;
-  ```
-
 ### [readiness] RV-169 — #1256's "history self-heals across the trailing 21 days" did not happen, and the span is 24 days, not 16
 
 - **⛔ A re-lane away from the device agent was proposed 2026-09-25 and is DECLINED (Orchestrator)**,
