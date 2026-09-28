@@ -490,6 +490,53 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [workouts] LB-186 — the program editor adds an exercise with NO progression style, and nothing ever requires one
+
+- **Lane: B** · **Added:** 2026-09-28 · Orchestrator, root-causing `LA-173` ③ after the owner asked
+  why the styleless slots were not assigned automatically.
+- **The cause, verified link by link.** `components/config/program-editor-sheet.tsx:218` —
+  `addExercise` creates `{ key: nextEditKey(), name: "" }`, with no style and no default. The type
+  (`packages/shared/src/types/program.ts:53`) marks `styleId` optional; the route
+  (`app/api/workout-templates/route.ts:79-81`) checks only that a *provided* id is real; the save
+  (`lib/data/postgres/slices/programs.ts:335`) writes `styleId: ex.styleId ?? null`. **No layer
+  objects**, so a slot is styleless whenever the picker was never opened.
+- **Why it hid.** The engine falls back to the style on the exercise's **last log**, so a styleless
+  slot behaves normally while that exercise has styled history. It surfaces only when there is
+  none, or when a path needs a non-empty style.
+- **What it already cost.** `BF-200`: the Q-185 deload override required a non-empty style, skipped
+  Barbell Skull Crusher and prescribed **3 × 30 kg — his ordinary working weight — in a deload
+  week**, while the other four Upper exercises lightened correctly.
+- **The fix is a default, not a validation error.** Give a newly-added exercise the style its
+  **role** already uses in that program (accessories `Hypertrophy 3-set` or `General`, primaries
+  `Powerbuilding` on his data), with the picker still free to change it. **Blocking the save
+  instead would be worse** — it turns a silent gap into a wall in front of a half-built program.
+- **What proves it fixed:** add an exercise in Config, save without touching the style picker, and
+  confirm the stored `style_id` is non-null.
+
+### [workouts] LA-177 — backfill the nine styleless slots in the active program
+
+- **Lane: A** · **Added:** 2026-09-28 · Orchestrator, splitting the data half out of `LA-173` ③.
+- **Nine slots in `Bankai` (active) have `style_id IS NULL`** — 7 accessory (Hanging Leg Raise,
+  Cable Chest Dips, Face Pull, Cable Lying Leg Curl, Barbell Skull Crusher, Dumbbell Calf Raise,
+  Cable Seated Leg Curl), 1 primary (**Barbell Hip Thrust**) and 1 secondary (Dumbbell Bulgarian
+  Split).
+- **Assign by ROLE, not one style for all nine.** His accessories run `Hypertrophy 3-set` (17
+  slots) and `General` (15); his primaries run `Powerbuilding` (13). Barbell Skull Crusher itself
+  already carries `Hypertrophy 3-set` in one session and `General` in another, so **the exercise
+  has no single right answer and only the slot does**.
+- **Needs:** LB-186
+- **⛔ Do this AFTER `LB-186`, or it comes straight back** — backfilling while the editor still adds
+  styleless exercises fixes nine and permits the tenth. That ordering is the whole reason these are
+  two entries.
+- **Out of scope: the five unstyled primaries in `Main`** (Squat, Deadlift, Bench, Incline Bench,
+  Bent-Over Row). That program is **inactive**; counting them would inflate this from nine to
+  fourteen.
+- **This is an ADD/backfill on production data, which is authorised** — snapshot first and print the
+  affected-row count against the nine predicted, stopping on a mismatch.
+- **Method for re-deriving the nine:** `claude_ro.session_exercises` joined to
+  `program_sessions`/`programs`, `deleted_at IS NULL`, `is_active`, `style_id IS NULL`.
+
+
 ### [readiness][heart-rate][activity][workouts] LA-171 — five runs and checks Lane A shipped on 2026-09-28 that need the phone or an admin session
 - **Lane: DV** — handed over by the owner's instruction on 2026-09-28 (*"Assign whatever tasks you
   can to DV agent — it can do most of these mechanical tasks"*). The phone's WebView holds the
@@ -2058,7 +2105,18 @@ below threshold and left in place for next time.
   **② The calorie target is answered** by rejecting the three-number premise; it is `OR-191` now.
   **③ Unchanged and still the only live item:** a merge-time yes on the six security fixes
   (`RV-191`, `RV-190`, `RV-192`, `RV-193`, `RV-195`, `RV-196`) **as each PR goes green — not now.**
-- **Ask:** owner — one thing only: a merge-time yes on each of the six security fixes as its PR goes green. Nothing is needed before then.
+- **✅ STANDING YES GIVEN 2026-09-28 — the four built security PRs merge on green WITHOUT coming
+  back to him.** `#1912` (RV-191, feedback-screenshot validation), `#1914` (RV-190, rolled-back
+  admin queries), `#1916` (RV-193, refresh token in the encrypted JWT) and `#1915` (RV-197,
+  dev-only WebSocket CSP).
+  **⛔ The yes is CONDITIONAL on two things, and neither is the merge button.** Each PR merges only
+  when its required checks are green **and** the pre-merge check it names in its own body is done —
+  `#1912` still owes an authenticated `pnpm dev` pass of the admin panel, which no CI job covers.
+  **It does not extend to `RV-192`, `RV-195` or `RV-196`, which are not built**; those come back
+  when they are, and `RV-192` additionally carries a product option (dropping password sign-up)
+  that is a separate question.
+  **This is the security carve-out being spent deliberately, not bypassed** — he was shown the four
+  and what each changes, and chose a standing yes over four interruptions.
 - **⚑ FOUR ARE BUILT AND WAITING (Lane A, 2026-09-28).** Each is a draft PR, tested and exercised on
   `pnpm dev`. A yes flips it ready and it merges on green:
   - **RV-191** → #1912: only a provable PNG/JPEG/WebP is accepted, and the admin panel opens a blob of
@@ -6366,9 +6424,13 @@ drift.
 
 ### [platform][workouts] LA-173 — five things Lane A needs from the owner (three merge yeses, a style, a key)
 - **Lane: O** — every item is the owner's to answer; nothing here is buildable until he does.
-- **Ask** — owner: five answers, each a yes/no or one action. ① Merge LA-159 (#1847)? ② Merge
-  LA-142 (#1849), and close #1749? ③ Assign styles to the **nine** unstyled slots in `Bankai` —
-  match by role, or name one? ④ Can fresh storage keys go into Railway? ⑤ Merge TN-56 (#1902)? ⑤ Merge TN-56 (#1902)?
+- **✅ ANSWERED 2026-09-28 — ①, ② and ⑤ are all YES; ③ was withdrawn as a question once it was
+  root-caused. ④ is the only thing still owed by him, and it is an action, not an answer.**
+  - **① merge `LA-159` (#1847)** — yes.
+  - **② merge `LA-142` (#1849) and close #1749** — yes.
+  - **⑤ merge `TN-56` (#1902)** — yes, auth-touching and approved on its shared-helper shape.
+  - **③ withdrawn** — not his to answer; see below.
+- **Ask** — owner: ④ only. Fresh S3 storage keys in Railway, which only he can mint and set. ⑤ Merge TN-56 (#1902)?
 - **Added:** 2026-09-28 · Lane A, moving the asks out of chat per the owner's instruction that
   anything needing his input is assigned to the Orchestrator.
 - **① LA-159 (#1847): drop `program_phases.program_id`. ⭐ Recommend: yes.** 0 of the owner's 46
@@ -6384,28 +6446,32 @@ drift.
   and CI enforces that.
   **#1849 shows a red E2E, and that is not this change:** the full E2E run fails the same way on every
   PR that runs it (LA-176), including three merged before it. The five required checks are green.
-- **③ NINE slots in the ACTIVE program have no progression style — not one.** (BF-200 residue,
-  TN-75.) The engine deloads them, but none records a per-set plan until a style is assigned.
-  **⚠ This item named Barbell Skull Crusher alone; measured against production 2026-09-28 it
-  understates the problem ninefold**, which matters because the fix is the same amount of work for
-  all nine and answering only for the one leaves eight behind.
-  **In `Bankai` (`is_active = true`), 9 unstyled slots:**
-  - **7 accessory** — Hanging Leg Raise, Cable Chest Dips, Face Pull, Cable Lying Leg Curl,
-    **Barbell Skull Crusher**, Dumbbell Calf Raise, Cable Seated Leg Curl.
-  - **1 primary** — Barbell Hip Thrust. **This is the one that should not wait**: a primary with no
-    per-set plan is the most visible of the nine.
-  - **1 secondary** — Dumbbell Bulgarian Split.
-  - The other **5 unstyled primaries** (Squat, Deadlift, Bench, Incline Bench, Bent-Over Row) are in
-    **`Main`, which is INACTIVE** — out of scope, and not to be counted with the nine.
-  **⭐ Recommend: match each slot to what the same role already uses in that program**, rather than
-  picking one style for all nine. His accessories already run **`Hypertrophy 3-set`** (17 slots) and
-  **`General`** (15); his primaries run **`Powerbuilding`** (13). Barbell Skull Crusher itself
-  already carries `Hypertrophy 3-set` in one session and `General` in another, so there is no single
-  right answer for the exercise — only for each slot.
-  **A preference, so not assumed.** He assigns them in Config, or says "match by role" here and an
-  agent sets all nine.
-  **Method:** `claude_ro.session_exercises` joined to `program_sessions`/`programs`, `deleted_at IS
-  NULL`, grouped by program and role. Row-scoped to the owner, which is the whole population here.
+- **③ ✅ ROOT-CAUSED 2026-09-28 — the owner asked *"why did these not get assigned automatically
+  during creation/editing?"* and the answer is that NOTHING EVER ASSIGNS ONE.** It is a gap in the
+  editor, not a data-entry mistake, so **the style question is withdrawn** — assigning the nine by
+  hand would leave the cause in place and the tenth would appear on the next edit. **Filed as
+  `LB-186` (the editor) and `LA-177` (the nine existing slots).**
+  **The chain, each link verified in the code:**
+  - `components/config/program-editor-sheet.tsx:218` — `addExercise` creates
+    `{ key: nextEditKey(), name: "" }`. **No style, no default.**
+  - `packages/shared/src/types/program.ts:53` — `styleId?: string`, optional.
+  - `app/api/workout-templates/route.ts:79-81` — validates that a *provided* `styleId` is real. It
+    does not require one.
+  - `lib/data/postgres/slices/programs.ts:335` — the save writes `styleId: ex.styleId ?? null`.
+
+  **So a slot is styleless whenever the picker was not opened, and no layer objects.**
+- **⚑ WHY IT STAYS INVISIBLE, which is why it reached a deload week before anyone saw it.** The
+  engine falls back to the style on the exercise's **last log**, so a styleless slot behaves
+  normally for as long as that exercise has styled history. It only bites when there is none, or
+  when a path requires a non-empty style — which is exactly `BF-200`: the Q-185 deload override
+  needed one, skipped Barbell Skull Crusher, and prescribed **3 × 30 kg, his ordinary working
+  weight, during a deload week**. The other four Upper exercises lightened correctly.
+- **⚠ Two things that look like evidence and are not, recorded so they are not re-run.**
+  `session_exercises.updated_at` **cannot date** when a slot lost its style: all 25 active slots
+  read 2026-09-28, because the save path rewrites every row. And `progression_styles` shows all 22
+  styles dating to 2026-06-16 with **no deletion trace**, so the `onDelete: 'set null'` theory —
+  that deleting a style silently nulled these — can be neither confirmed nor refuted from it. The
+  editor gap above is sufficient on its own and needs neither.
 - **④ Fresh S3 storage keys in Railway.** `pnpm start` refuses to boot on the current ones
   (`SignatureDoesNotMatch`), so the production-mode check on the CSP and security PRs cannot run
   locally. Only he can mint and set them; the code needs nothing.
