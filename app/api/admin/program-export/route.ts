@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { estimateExerciseDurationSec, transitionSecForEquipment } from '@trainingai/shared/workout/duration-model'
+import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
 import {
   formatProgramExport,
   type ProgramExport,
@@ -60,7 +61,7 @@ export async function GET(req: NextRequest) {
 
         return {
           name: ex.exerciseName,
-          role: ex.exerciseRole ?? 'primary',
+          role: ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE,
           sets,
           muscles: ex.muscleGroups ?? [],
           supersetGroup: ex.supersetGroup ?? null,

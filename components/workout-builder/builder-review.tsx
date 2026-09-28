@@ -20,6 +20,7 @@ import type { MuscleSetsEntry } from '@/app/api/weekly-muscle-sets/route'
 import { EXERCISE_ROLES, EXERCISE_ROLE_LABEL, exerciseRoleLabel, exerciseRoleBadge } from '@/components/workout/exercise-role-labels'
 import type { ExerciseRole } from '@trainingai/shared/types/program'
 import { mustBypassImageOptimizer } from '@trainingai/shared/media/private-media'
+import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
 
 interface Props {
   program: GeneratedProgram
@@ -615,10 +616,10 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
                             key={role}
                             type="button"
                             onClick={() => setExerciseRole(si, ei, role)}
-                            aria-pressed={(ex.exerciseRole ?? 'primary') === role}
+                            aria-pressed={(ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE) === role}
                             className={cn(
                               'tap-dense tap-target-44 px-2.5 py-1.5 rounded text-xs border transition',
-                              (ex.exerciseRole ?? 'primary') === role
+                              (ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE) === role
                                 ? 'bg-brand text-brand-foreground border-brand font-semibold'
                                 : 'bg-muted text-muted-foreground border-border hover:bg-background',
                             )}

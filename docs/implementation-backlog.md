@@ -590,6 +590,32 @@ below threshold and left in place for next time.
   variable; **reachability from an unawaited promise** was. (c) a vitest bump is unnecessary.
 - **Not the same as `LB-166`** (the E2E 45-minute ceiling) — different job, different mechanism.
 
+### [workouts] LA-178 — two of your answers point opposite ways on the session-length estimate: fix the double-count, or leave it?
+
+- **Lane: O** · **Added:** 2026-09-28 · Lane A, found before starting BF-197.
+- **The question, in one line:** should the workout-length estimate stop charging the rest after
+  the last set of each exercise and the gap after the last exercise (BF-197), now that you've said
+  five exercises at two sets already fill your hour (LA-65)?
+- **Why it came back to you:** the two answers clash.
+  - 2026-09-27 (BF-201, decision 1): fix both double-counts, and size a finish-early margin to your
+    75th percentile.
+  - 2026-09-28 (LA-65): five at two sets fill the hour, so leave the transition constant alone.
+    That entry warns the "safe-looking" fix brings back the overrun you reported.
+- **Recommendation: fix the double-counts AND add the p75 margin together, never the fix alone.**
+  - The double-count is a bug that happens to protect you. It grows with exercise and set count,
+    not with how variable your sessions are, so it over-protects a 5×2 and under-protects a 3×4.
+  - Measured on 32 sessions, it adds 14.2 phantom minutes. Your real working time is a median
+    39.9 min against the card's 51.
+  - A p75 margin keeps the protection you're relying on, but sizes it to your actual spread. It is
+    what you chose on 09-27.
+  - Expect a 5-exercise session to gain some third sets, while a long-tail day stays under the hour
+    about three times in four.
+- **Alternative: leave both as they are.** Nothing changes on day one, and your 5×2 sessions keep
+  fitting. Its cost: every exercise stays pinned at two sets while you finish around 11 minutes
+  early on a typical day, and the mixed 2/3-set sessions you asked for rarely appear.
+- **Reversal cost:** one constant and one function. Either way can be undone in a single change.
+- **What your answer unblocks:** BF-197 (Lane A builds it the day this is answered).
+
 ### [nutrition] LB-167 — does the meal tile read as a failed image to you? (RV-212 ④)
 - **Lane: O.** Ungated on purpose: getting the answer IS the work, and `Gate: owner` would park it
   out of the Orchestrator's READY list.
@@ -6944,7 +6970,8 @@ drift.
 ### [workouts] BF-197 — the duration estimate charges a rest he never takes and a transition that does not exist, and those 14.2 phantom minutes are what holds every exercise at 2 sets
 - **Lane:** A — `packages/shared/src/workout/duration-model.ts` (`estimateExerciseDurationSec`).
 - **Added:** 2026-09-24 · BugFix, from the owner's *"bar load and rest time should be able to be analyzed from past and can determine how much time is needed so not sure if that can be adjusted."*
-- **Needs:** — nothing. Supersedes the "change nothing" recommendation in `LA-65`, amended below.
+- **Needs:** LA-178
+- **Supersedes** the "change nothing" recommendation in the LA-65 reference, amended below. (Kept out of the `Needs:` line: the parser read the ID there as a dependency.)
 
 - **His hypothesis was right, and the mechanism he asked for already exists.** The model does learn
   both quantities from his own history: `resolveTransitionSec` (`time-audit.ts:338`) prefers his
@@ -7728,43 +7755,6 @@ drift.
   **read** time instead, so the stored rows can stay wrong without mattering, with no production
   rewrite and no per-ingest cost. It needs the sleep windows at read time (a join) and it puts the
   rule in two places, so it is a real trade rather than an obvious win.
-
-### [heart-rate][platform] RV-181 — the HR profile pulled 90 days of raw heart rate to compute six numbers
-
-- **Lane: A** — `packages/shared/src/health/hr-profile.ts`, `lib/data/postgres/slices/oura.ts`.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Two agents measured this independently.
-- **The headline SURVIVED re-measurement on 2026-09-25**, against a moving window three weeks on:
-  **565 s of 1,117 s of all database time (50.6%)**, 12,591 calls, 44.84 ms mean, 16,843 rows a
-  call. The 90-day window is 134,425 raw rows, **133,041** after the chest-strap merge.
-- **SHIPPED 2026-09-25** ([entry](overview/history-2026-09-26-folded-3.md#2026-09-25-rv181-observed-hr-sql-aggregate)):
-  `repo.getObservedHrProfile` computes the profile in SQL, one row instead of the window. The seven
-  `resolveHrProfile` callers fetch no rows; `/api/cardio-week` reads its two 30-day windows as
-  aggregates too, so `resolveHrProfileWithWindow` (RV-73) is gone with its boundary caveat.
-- **⚠ The EVIDENCE line was wrong — sweep 51's "same statistic as a SQL aggregate at 54 ms" had no
-  chest-strap merge**, which is 78% of the rows and the whole cost. Measured: plain form 67 ms, the
-  merge-preserving form shipped 225–260 ms, the row fetch ~354 ms. **So the saving is about a third,
-  not seven eighths.** The rest of the win is 133,041 rows no longer crossing the wire or being
-  materialised in Node per resolve. Formulations tried and their timings are in the journal entry.
-- **STILL OPEN — the memo, which holds the other two thirds.** The 90-day shape ran **~1,460 times
-  in 25.2 days (~58/day)** and the aggregate does not touch that count: `useHrProfile` is mounted on
-  the active-workout and exercise-summary screens and `hr-profile` is in `invalidateOuraSync`, so
-  every ring drain during a workout refetches it (drains run 20–32/hour at 07–09). Not shipped with
-  the aggregate because it needs a freshness call, not a mechanism — `use-hr-profile.ts` argues at
-  length against pinning this key and that argument has to be answered. **Re-measure first:** with
-  the row fetch gone, `pg_stat_statements` now reports the small-window callers only.
-- **~~STILL OPEN — same shape, smaller~~ — REFUTED 2026-09-28 by the agreement check it asked for.**
-  `/api/health/trends` re-derives HR recovery from raw HR, about 20 queries a call. This proposed
-  reading `workout_hr_stats.hrr1_best` instead. **The two are different statistics:** the trend plots
-  each session's **median** set HRR1 (`sessionHrr1Median`), and `hrr1_best` is the session's **max**
-  (`summariseWorkoutHr`). Measured against production for all 32 completed sessions in 45 days, they
-  disagree on **32 of 32 days**, with the column higher by 3 to 36 bpm/min. Reading it would redraw
-  the chart as a different metric, not make the same chart cheaper. A cheaper route would need a
-  stored per-session *median*, which is a migration. Nothing measured says the route's cost is worth
-  one: it is rate-limited to 10 a minute, and its query cost was never measured. **Not done, on
-  purpose.** The check also turned up LA-168 (fixed 2026-09-28): the raw HR under ring-only workouts has thinned since
-  the snapshots were taken, so this route's live re-derivation and the recap's stored number have
-  drifted apart.
-
 
 ### [workouts] LA-177 — the completion-time prescription is generated as if the lifter had trained 0 hours ago
 
@@ -10192,6 +10182,17 @@ why the count of affected entries always understated the harm.
 
 ### [devices][readiness][platform] BF-187 — opening the app never asks the ring for anything; the only drain triggers are two gestures and an hourly timer
 
+- **✔ BUILT 2026-09-28 (Lane A), native + JS, v1.478.0.** `OuraRingService.drainIfStale(maxAgeMs)`
+  decides staleness inside the service, and `status()` now reports `lastDrainAgeMs`. The plugin
+  method `drainIfStale` and `syncOuraRingIfStale()` (`lib/oura-ble/sync.ts`, 10-minute cooldown)
+  are called from `sync-provider.tsx` on mount and on Capacitor `resume`. An APK without the method
+  makes it a no-op. Kotlin compiled locally, and a typo in the new code fails the build.
+  `bf187-drain-on-open.test.ts` covers the JS side.
+- **Verify:** device — install the APK this merge publishes. With the service connected, note
+  `cursorDs`, background the app past 10 minutes, then resume: a drain starts with no gesture, and the
+  Oura cards refresh on their own within ~10–40 s. Tab away and back three times inside 10 minutes:
+  one drain, not three (`lastDrainAgeMs` in the status shows it).
+
 - **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake). Owner: *"Can we somehow get the
   sleep data to sync as soon as the app is opened? I know the oura app did it so we should be able
   to request/pull it."*
@@ -11338,32 +11339,6 @@ line must name **what moved** (resting HR and HRV off baseline), never imply inf
   column is non-null either way. The unit test carries the proof instead — 4 of its 6 assertions fail
   against `main`, including a real `MoodFieldsSchema.parse` round-trip, which is the silent strip the
   fix is about.
-
-### [workouts][platform] LB-118 — the explain page's `signals` omits sore-tick provenance, so LB-117 cannot be built in its lane
-
-- **Lane:** A — `lib/data/postgres/adapter.ts:1912` and `packages/shared/src/types/program.ts:127`.
-  Filed by Lane B on 2026-09-17 after checking LB-117's premise.
-- **Two one-line changes, and the value is already in scope.** The explain `signals` block is built
-  at `adapter.ts:1912` with `soreMuscles: moodLog?.soreMuscles ?? []` and no provenance;
-  `moodLog.suggestedSoreMuscles` is read twenty lines above it (line 1892, where the SCORER is fed).
-  Add it to the `signals` object and to the `signals` type.
-- **⛔ LB-117 says the adapter is *"deliberately unchanged"* and that *"the data is there"*. Both are
-  true of the repository and false of the payload the page renders.** `getMoodLog` and `listMoodLogs`
-  do return the field — it just never reaches `signals`, which is what the explain surface is given.
-  Same shape as OR-118: a derivation that exists and an exposure that does not.
-- **⚠ A Lane-B-only workaround EXISTS and is the wrong answer — this is the part worth reading.**
-  `GET /api/mood?date=…` returns the whole `MoodLog`, provenance included, so the page could fetch
-  it client-side with no Lane A change at all. **Do not.** Q-105's rule for this screen is that it
-  shows the numbers the recommendation was *actually computed from*, and `next-session` is cached
-  (`NEXT_SESSION_TTL` = `TTL_SHORT`) while the check-in can be edited after it was computed. A
-  separately-fetched mood log can therefore be a *different* check-in from the one behind the score,
-  and the page would explain a recommendation with inputs it never used — a subtler version of
-  exactly the defect LB-117 is about.
-- **Verification:** an explain payload for a day whose check-in carried a suggested tick shows the
-  field; one from before provenance existed shows `null`, not `[]` — the scorer reads null as
-  "unknown" and scores the old way, and the page must be able to say "not recorded" rather than
-  "none were suggestions".
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** citations moved: the explain `signals` block is at `adapter.ts:1952`, the in-scope value at `:1923`, the type at `types/program.ts:147`. Otherwise accurate.
 
 ### [workouts][app-shell] LB-117 — the explain screen lists sore muscles that no longer penalise anything
 
@@ -14283,34 +14258,21 @@ anchor that then moves.
 phase the owner reaches; and TN-25's three options no longer need answering, because no single session
 is claiming to be both.
 
-### [cardio][heart-rate] TN-32 — three user-facing surfaces describe zones in a model the engine does not use
-- **Lane:** A — both (2 engine, 1 surface) → A, engine half first.
+### [cardio][heart-rate] TN-32 — the Heart Rate page grades heart rate with no profile, and colours a resting-range value red
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-09 · found in the zone audit TN-30 came out of.
-- **Superseded lane note (demoted from a field, TN-63):** this read the surface letter and listed `packages/shared/src/running/frameworks/zone2-base.ts:6`, `frameworks/norwegian-4x4.ts:6`, `app/health/heart-rate/page.tsx:69-72`. Those shared paths are the engine lane's, and the field above already applies the both-halves rule.
-- **Sibling of TN-30**, independent of it. Copy and labels only — no threshold moves.
-
-Three separate places tell the user something the zone engine does not do:
-
-1. **The framework prose quotes %HRmax while the engine uses %reserve.** `zone2-base.ts:6` says
-   *"Zone-2 emphasis (**60–70% HRmax**)"* and `norwegian-4x4.ts:6` says Z4–5 is *"**85–95% max HR**"*.
-   `targetsForRunType` reads the Karvonen bands, where Zone 2 is 60–70% of **reserve** — **133–145 bpm
-   for this owner, or 71–78% of HRmax.** The prose promises 112–131 and the engine prescribes
-   133–145: a ~20 bpm gap between what the framework says and what it does.
-2. **The Heart Rate page classifies HR with no profile at all.** `heart-rate/page.tsx:69` uses fixed
-   cuts — `<60` "Resting", `<100` "Normal", else "Elevated" — the only place in the app where a heart
-   rate is graded without the user's own resting and max. **And it colours 60–100 bpm `#f87171`, a
-   RED**, while the zone palette colours that same range blue-green. A resting-adjacent heart rate is
-   rendered as an alarm.
-3. **Zone names are typed twice.** `HR_ZONE_META` (`hr-zones.ts:48`) and `ZONE_LABELS`
-   (`session-picker.ts:85`) are identical today and unlinked. One-line fix; the cheapest of the three.
-
-**⚠ Do not resolve (1) by changing the zone fractions.** The bands are conventional and shared; the
-prose is what is wrong. Same principle as TN-25's — the target is right and the copy is wrong.
-
-**Pass test:** every user-visible sentence describing a zone states the same basis the engine uses,
-and no heart rate is coloured as an alarm at a value inside the user's own Zone 1.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** ① only `norwegian-4x4.ts:33` is user-facing; `zone2-base.ts:6` is a code comment, so drop it. ② moved to `heart-rate/page.tsx:77-79`, still graded 60–100 with `#f87171`. ③ still unlinked (`hr-zones.ts:48`, `session-picker.ts:85`).
+- **Lane: B** — `app/health/heart-rate/page.tsx` (~lines 77-79). Re-laned 2026-09-28: the two engine
+  parts shipped (below), and this is the one surface part left.
+- **Added:** 2026-09-09 · found in the zone audit TN-30 came out of. Copy and labels only; no
+  threshold moves.
+- **What is left:** the page classifies HR with fixed cuts (`<60` "Resting", `<100` "Normal", else
+  "Elevated"). It is the only place a heart rate is graded without the user's own resting and max, and
+  it colours 60–100 bpm a RED (`#f87171`) that the zone palette uses for nothing in that range. Grade it
+  through `hr-zones.ts` with the user's profile, and take colours from `HR_ZONE_META`.
+- **Pass test:** no heart rate inside the user's own Zone 1 is coloured as an alarm.
+- **✔ SHIPPED 2026-09-28 (Lane A):** the Norwegian 4×4 rationale now states the engine's basis (Zone
+  4–5 = 80–100% of heart-rate reserve), and `session-picker.ts` reads zone names from `HR_ZONE_META`
+  instead of typing them twice. `tn32-zone-copy-basis.test.ts` fails on a framework rationale that
+  quotes a %-of-max figure.
 
 ### [nutrition] BF-138 — the app runs two energy models at once and never states either, so the owner cannot tell which number to eat to
 
@@ -15222,6 +15184,8 @@ absent one, because the next scan trusts it. Add one only from a commit that act
 
 - **Lane:** A — `packages/shared/src/workout/duration-model.ts` (`TRANSITION_SEC_*`), `app/api/generate-program/route.ts`.
 - **Added:** 2026-09-07 · Lane A, from the BF-128 measurement pass.
+- **Reference:** why `resolveTransitionSec` stays as it is. Its two errors cancel at five exercises, and the owner confirmed five fit the hour; the safe-looking fix reintroduces the overrun.
+- **✔ CHECKED 2026-09-28 (Lane A): mixed set counts need no change.** The budget stage sizes sets per exercise, one set at a time by role priority (`time-budget.ts` `expandToBudget`/`fitToBudget`). There is no uniform count anywhere, so a 3×3 + 2×2 session comes out of it naturally. `la65-mixed-set-counts.test.ts` pins that. BF-201's p75 margin still has to be judged against mixed sessions.
 - **Gate cleared 2026-09-28** — the lived feedback arrived: five fits, leave the constant.
 - **Needs:** — nothing.
 - **The measurement is DONE and the contradiction this entry was filed for is resolved** (2026-09-07,
@@ -22768,79 +22732,25 @@ breath_avg_rpm:   9.1     9.7    10.0     9.8      9.8     <- the value it is co
 
 ### [workouts] BF-15 — the exercise-role fallback is `primary`, so unclassified work is prescribed like a main lift
 
-> **⚑ OWNER DECISION 2026-08-30 — a live session with NO Primary is legitimate, and this rule must
-> not treat it as a defect.** BF-16b found `Shikai / Lower` carrying three Secondary and two
-> Accessory and no Primary, and this rule would have nominated Barbell Good Morning. Put to the
-> owner, who declined: *"Reject; I wanted it made that way on purpose."* BF-16b is closed and
-> removed.
->
-> **What that changes here:** the nomination rule is a *suggestion*, never a correction to apply, and
-> nothing downstream — a validator, a Coach prompt, a data-quality sweep — may flag "no Primary" as
-> wrong. If this rule is implemented, it offers and the user decides.
-
-- **Branch:** _unassigned_
-- **Added:** 2026-08-24 · owner report — *"some 'isolation' type work will increase to a main level when it should be accessory sort of — like bicep curls... but what about cable dips?"*
-- **Lane: A** — `lib/data/postgres/schema.ts`, one Postgres migration, `lib/sqlite/migrations.ts` (local schema version), `packages/shared/src/workout/exercise-role.ts`, and the read fallbacks below.
-- **Ships alone.** BF-16b depends on it but is owner-gated; BF-17 is a label change that must stay separately revertable. BF-16a lands *before* it — see `Needs:` below.
-- **⚑ The design is settled and written up — read [`docs/superpowers/plans/2026-08-24-exercise-roles.md`](superpowers/plans/2026-08-24-exercise-roles.md) before touching any of it.** It carries the budget-scaled session shape with its calibration, the anchor rule, the measured 90% fixture, and **four shapes that were proposed and rejected with reasons** (position-based roles, isolation→accessory, never-auto-Primary, remembered per-exercise preference). Re-proposing one costs a session.
-
-**The role decides the prescription, not a badge.** `resolveStyleForExercise`
-(`packages/shared/src/phase-engine.ts:147`) selects the progression style from `exercise_role`, so an
-exercise that lands on `primary` by omission is prescribed at **90% × 3** in a Peak phase where
-`accessory` would have given a flat 60% × 12. `session-data.ts:299` also reads it for
-`lastSetMode`, so the same exercise takes an **AMRAP last set** — a set to failure at a percentage
-chosen for a compound.
-
-**Two schema defaults say `primary` and must flip together** — a local default disagreeing with the
-server writes divergent rows on the offline path:
-
-| Site | Current |
-|---|---|
-| `lib/data/postgres/schema.ts:138` | `.default('primary')` |
-| `lib/sqlite/migrations.ts:178` | `DEFAULT 'primary'` |
-
-**Ten read sites hard-code the same fallback** and must flip with them, or a null read
-re-manufactures the defect downstream: `lib/coach/domains/session-exercise.ts:311`,
-`lib/local-store/sync-engine.ts:422`, `lib/local-store/sqlite-backend.ts:1010`,
-`lib/data/postgres/slices/programs.ts:118,289`, `app/api/admin/program-export/route.ts:63`,
-`components/config/program-editor-sheet.tsx:854`, `components/config-screen.tsx:398,450`,
-`packages/shared/src/workout/session-data.ts:190,299,317,365`,
-`packages/shared/src/ai-periodization/generate-prescription.ts:389,464`,
-`components/workout/ai-prescription-card.tsx:278`.
-
-**Second half — the classifier is wired to exactly one path.** `recommendExerciseRole` is called only
-from `lib/coach/domains/session-exercise.ts:183,273` (the Coach swap). The program editor, the AI
-generator and the local assembler all take the column default instead. Replace it with the plan's
-budget-aware rule and wire it into those creation paths.
-
-- **What would count as fixed:** a session built at 30 minutes produces 1 Primary / 1 Secondary /
-  1 Accessory and at 60 minutes 1 / 2 / 2; a single exercise added to a session that already has an
-  anchor never silently becomes Primary; a test asserts the two schema defaults agree; and the plan's
-  §4 fixture passes at ≥ 90%.
-- **⛔ Two defects must be fixed in the same PR, both found in review 2026-08-24 — plan §2.**
-  **(a)** `resolveStyleForExercise` returns `'own'` when the Accessory phase has no style, and
-  `session-data.ts:193` then keeps a `styleId` that can itself be null — an exercise with **no
-  prescribed percentages at all**. Reachable in one action: `phase-editor.tsx:112` offers a blank
-  `— select style —`. Latent today (all 8 phase-sets have a style set), but this change moves the
-  unclassified population into `accessory` and enlarges the exposed group. Make the accessory style
-  non-nullable, or make `'own'` fall back to the phase's primary style.
-  **(b)** The anchor rule must require a catalogued exercise with **≥ 3 muscles**. Without the guard
-  it picks index 0 on a session of entirely Coach-invented exercises — a silent Primary at 90% × 3
-  on a movement nobody classified, which is exactly what `UNCLASSIFIED_EXERCISE_ROLE` exists to
-  prevent. If nothing qualifies, nominate no Primary.
-- **Needs:** BF-16a — the rule reads muscle counts and that entry corrects them, so writing the
-  fixture first would pin it to data known to be wrong.
-- **Ordering and role must stay independent.** The generator orders a new session Primary →
-  Secondary → Accessory by default, but **reordering an exercise must never change its role** — the
-  owner's Legs day deliberately opens with a hip thrust as Secondary before the squat. Verified
-  2026-08-24: nothing derives `exercise_role` from `position` today, so this holds by construction.
-  An implementation that re-derives on reorder would silently overwrite that preference.
-- **Do NOT sweep existing role rows in this PR** — that is BF-16b, and it is owner-gated.
-- **Related, not blocking: BF-7** covers the *runtime* duration picker. This entry reads the
-  session's *configured* budget, which BF-7's owner decision confirms is the anchor.
-- **Surface: server/shared + local SQLite.** The local-schema half is **not** web-reproducible
-  (`getLocalStore` returns null in the sandbox), so it needs the device check or a Known-Issues row.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** the site list has moved: defaults at `schema.ts:153` and `sqlite/migrations.ts:181`; `resolveStyleForExercise` at `phase-engine.ts:164`; Coach callers at `session-exercise.ts:210,300`; fallbacks at `session-exercise.ts:356`, `sync-engine.ts:429`, `sqlite-backend.ts:1047`, `programs.ts:118,320`, `session-data.ts:194,317,335,388`, `generate-prescription.ts:398,473`, `ai-prescription-card.tsx:384`. **There is a new site at `builder-review.tsx:614,617`.**
+- **Lane: B** — the editor's add-exercise path (`components/config/program-editor-sheet.tsx`) and the
+  builder review. Re-laned 2026-09-28: the engine half shipped (below).
+- **Added:** 2026-08-24 · owner report — *"some 'isolation' type work will increase to a main level
+  when it should be accessory sort of — like bicep curls... but what about cable dips?"*
+- **✔ SHIPPED 2026-09-28 (Lane A, v1.477.33):** both schema defaults and all 20 read-site fallbacks
+  now default a missing role to `UNCLASSIFIED_EXERCISE_ROLE` (`accessory`), and a test fails on
+  any `?? 'primary'` that returns. Defect (a) is fixed: an Accessory exercise whose Accessory phase
+  has no style keeps its own style, or else takes the phase's lighter style, and never nothing.
+  `recommendAddedExerciseRole` (never Primary; Secondary while the session shape has a slot free)
+  and `sessionShape` are in `packages/shared/src/workout/exercise-role.ts`.
+- **What is left (Lane B):** call `recommendAddedExerciseRole` when an exercise is added in the
+  editor, instead of leaving it on the fallback. It needs the catalogue's muscle count and the
+  session's `timeBudgetMinutes`; the result is a pre-selected pill the user can change.
+- **⚠ The plan's WHOLE-SESSION rule is deliberately not built** — see the 2026-09-28 journal entry.
+  Every whole-session creation path now takes roles from the model with Primaries capped in code
+  (BF-126), and against the BF-16a-corrected catalogue the rule scored 87% on the owner's sessions,
+  below its own 90% bar, by anchoring Legs on the hip thrust (5 muscles) over the squat (4).
+  Nothing in the catalogue separates those two.
+- **Design:** [`docs/superpowers/plans/2026-08-24-exercise-roles.md`](superpowers/plans/2026-08-24-exercise-roles.md).
 
 ### [workouts][platform] BF-17 — `main` and `primary` are two axes wearing the same word, and the UI labels them backwards
 
@@ -24674,6 +24584,36 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   `components/` references it. The 2026-08-18 run — 764 buckets, 941,233 frames — was five hand-typed
   `fetch()` calls. It needs the same GET-preview + press-until-`remaining: 0` treatment the other
   levers have, beside them in the footprint card.
+
+### [devices][platform] LA-179 — a 2-second raw-frame read runs ~1.5 times a minute, and its caller is not yet identified
+
+- **Lane: A** — `lib/data/postgres/slices/oura-raw-frames.ts` (`readRawFrames`) and whichever caller
+  this turns out to be.
+- **Added:** 2026-09-28 · Lane A, while closing RV-181.
+- **Measured in production, `pg_stat_statements` deltas over two windows (16.8 and 19.1 min):**
+  the hot-tier raw read (`user_id`, a tag list, `ring_timestamp_ds >= cutoff`, no upper bound,
+  ordered) ran **27 and 28 times, at 2.1 and 2.0 s a call**. That is about **3 minutes of database
+  time an hour** if it persists. Its lifetime mean is 93 ms.
+- **What such a call reads:** for the rollup's 15 tags, all **136,976** hot rows, **3.5 MB of hex**,
+  none with `decoded`. A server-side `count` and byte sum over the same rows takes **99 ms**, so the
+  2 s is returning and sorting the rows, not finding them.
+- **⚠ THE CALLER IS NOT ESTABLISHED, and the first reading of this was wrong.** It was filed as "the
+  rollup re-reads its hot window on every ingest". Checked the same session:
+  - the ingest route rolls up only when `stored > 0`;
+  - only **5 minutes** in the preceding two hours stored anything;
+  - `oura_daily_derived` was rewritten once (110 days at 07:45) and not during the window.
+  So ingest-driven rollups do not account for 28 calls in 19 minutes. The readers with that
+  shape are the rollup (`run.ts`, ingest or admin redecode) and `getOuraRawSamplesForTags`,
+  which feeds the admin `/api/oura-ble/device-metrics` panel and the daytime-HRV refit. An
+  automated harness driving the admin diagnostics, as Device Verification does, fits 1.5 a minute
+  better than anything the app does on its own.
+- **Next step: attribute before optimising.** Re-sample on a day with no agent driving the device;
+  if the rate drops to a handful an hour, this is harness load and the entry closes. If it persists,
+  add a route tag to the query (a SQL comment on each caller) so `pg_stat_statements` names it.
+- **If it IS the rollup, the directions:** read only the span a drain touched, plus each
+  derivation's look-back; or one rollup per drain rather than per batch; or a decoded per-user
+  cache in the worker. Measure rollups per drain first.
+- **Not urgent:** nothing reported slowness, and the cache hit rate is 99.9%.
 
 ### [devices][platform] OR-123 — nothing on the device ever marks a raw row `rolled_up`, so the local prune is wired to a flag with no writer
 
@@ -33680,45 +33620,6 @@ intake traced it, it did not design it.
 **Done looks like:** a week-in-review page reachable from the notification and from a permanent
 Health entry point, drawing its charts from values the route returned rather than from parsed prose,
 with the recap week visibly compared against the one before it.
-
-### [platform] LA-137 — generalise the delta/applyDelta column guard, with the false positives that defeated the first attempt
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-24 · found by Lane A while shipping RV-172.
-- **Lane: A** — `lib/local-store/`, `lib/data/postgres/adapter.ts`, a new `scripts/check-*.js`.
-- **The invariant is real and general.** `applyDelta` writes `col = excluded.col` unconditionally,
-  so any column it writes that the delta select omits is not left alone — it is nulled, on every
-  pull, for ever. RV-172 found three instances of that (`supplement_logs.taken_at` plus the vial
-  triple, `exercise_logs.exercise_deloaded`, and `food_items` reading a field the server has never
-  had). Three in one sweep is a class, not a coincidence, and the remaining tables were checked by
-  hand rather than by anything that will still be true next month.
-- **RV-172 shipped the SPECIFIC guard only**
-  (`lib/local-store/__tests__/rv172-delta-carries-what-applydelta-writes.test.ts`) — it pins the
-  three regressions that actually happened and nothing else. The general version was written first
-  and **withdrawn for false positives**, which is why this entry exists rather than the check.
-- **The four traps, so the next attempt does not rediscover them:**
-  - **`INSERT INTO` tracking bleeds between statements.** Scanning the file linearly and attributing
-    every `col=excluded.col` to the most recent `INSERT INTO` made `supplements` inherit
-    `supplement_logs`' `taken_at`. Statements must be bounded, not accumulated.
-  - **The SQL literal's end is not the next backtick.** The supplement upsert interpolates
-    `${isMeal ? ` … ` : ` … `}`, whose branches are themselves template literals — so the first
-    backtick after the `INSERT` is a NESTED one, and slicing there truncates the statement before
-    `taken_at`, the exact column the guard exists to protect. Terminate on the backtick that opens
-    the params array (`` `,\n[ ``).
-  - **Every table has TWO upserts with an `excluded` clause** — the pull one in `applyDeltaBody` and
-    a local-write one. Picking the first by position reads whichever the file happens to list first;
-    scope to the enclosing function instead.
-  - **Snake→camel splitting produces junk columns.** `1rm` yields `rm`; `_bpm` and `max_est`
-    survived as phantom column names.
-- **And the trap that is not about parsing: a comment explaining a defect contains the defect.** A
-  note reading *"this used to read `toIso(r.updatedAt)`"* matches a search for exactly that and
-  fails a file the code passes. This bit three separate guards in one day (TN-66's prompt guard,
-  RV-143's entry parser, RV-172's own test). Strip `//` lines before matching; do not reword around
-  it, because the next comment will not know to.
-- **Done looks like:** a Custom Rules step that reads every `applyDeltaBody` upsert, resolves its
-  `excluded` columns, and fails when one is absent from the matching delta select or pull mapper —
-  with a **baseline of zero** and no skipped-site count, or, if sites must be skipped, the count
-  printed so a clean run is never mistaken for full coverage (the fetch-once scanner's lesson).
-  A guard that cries wolf is worse than no guard; this repo has paid for that twice.
 
 ### [nutrition] LA-119 — a mixed-unit supplement day renders as "no amount", which reads as "no number was logged"
 

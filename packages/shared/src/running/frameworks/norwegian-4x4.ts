@@ -3,7 +3,7 @@ import type { FrameworkContext, Prescription, RunFramework, RunType } from '../t
 
 const KEY = 'norwegian-4x4'
 // The interval workout is a fixed protocol structure — 10 min warm-up + 4 × 4 min work
-// (Zone 4-5, 85-95% max HR) + 3 × 3 min active recovery between reps + 5 min cool-down
+// (Zone 4-5, 80-100% of heart-rate reserve in the engine's Karvonen bands) + 3 × 3 min active recovery between reps + 5 min cool-down
 // = 40 min total. It does not grow with training age the way easy-run volume does;
 // growing it would depart from the published protocol (Helgerud et al. 2007, J Strength
 // Cond Res; Wisløff et al. 2007, Circulation).
@@ -30,7 +30,7 @@ function nextRun(ctx: FrameworkContext): Prescription {
   if (hardSoFar < MAX_HARD_PER_WEEK && canGoHard) {
     type = 'interval'
     durationMin = INTERVAL_DURATION_MIN
-    rationale = 'Norwegian 4×4 — 4 × 4 minutes at 85–95% max HR (Zone 4–5), each followed by 3 minutes of easy active recovery, bracketed by a 10-minute warm-up and 5-minute cool-down. One of the most time-efficient, evidence-backed protocols for raising VO₂max.'
+    rationale = 'Norwegian 4×4 — 4 × 4 minutes in Zone 4–5 (80–100% of your heart-rate reserve), each followed by 3 minutes of easy active recovery, bracketed by a 10-minute warm-up and 5-minute cool-down. One of the most time-efficient, evidence-backed protocols for raising VO₂max.'
   } else if (!hasLong && easySoFar >= 1) {
     type = 'long'
     durationMin = Math.max(30, Math.round(weeklyFillMinutes * 0.35))
