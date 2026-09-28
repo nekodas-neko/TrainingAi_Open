@@ -4766,8 +4766,22 @@ which is the right shape for something that can only be validated by living with
 ### [readiness][devices][heart-rate] TN-79 — Q-270's route is NOT silent: it persists `insufficient_met` on 21 days while the MET data it needs is present
 
 - **Branch:** `tuning/training-load-gate-diagnosis`
-- **Lane:** A — `app/api/training-stress/route.ts`, `lib/data/postgres/adapter.ts`
-  (`getOuraDaytimeSignals`), `packages/shared/src/health/training-stress.ts`. Engine by the path rule.
+- **Lane: T** — re-laned 2026-09-29 (was A). Lane A's diagnosis is finished (below); what is left is
+  fix (b), which the entry itself says is a modelling assumption that goes through Tuning before Lane
+  A builds it. **Tuning:** propose the gap rule for the MET grid, including how many days it re-scores,
+  then re-lane this entry to A.
+- **✅ THE READ LA-170 OWED IS DONE, 2026-09-29 (Lane A), and it confirms the prediction. The MET floors
+  are settled; the NaN contract is what is left.** Production, `oura_daily_derived`:
+
+  | day | gate | grid | valid | evaluated (UTC) |
+  |---|---|---:|---:|---|
+  | 2026-09-28 | `scorer_no_output` | **1418** | **1195** | 09-28 21:13, **after the day ended** (07:13 Brisbane on the 29th) |
+  | 2026-09-29 | `insufficient_met` | 474 | 328 | 09-28 22:16, today, partial, as expected |
+
+  09-28 cleared both floors (720 and 360) with room and still produced no score. That is only
+  reachable past the floors, so **the scorer is rejecting a full, real day**, which is the 2026-09-24
+  root cause: `validate()` refuses any NaN when `noOts === 0`, and the grid carries a NaN in every
+  minute with no sample (~220 of 1418 here). **Fix (b) is the only live proposal.**
 - **Added:** 2026-09-24 · Tuning agent, while checking whether `Q-204` was startable.
 - **Why this matters beyond itself:** `Q-204` (Q-137 direction B) carries `Needs: Q-270`, and Q-204 is
   what would retire **TN-76**'s lane-balance finding and **TN-78**'s threshold question by replacing
