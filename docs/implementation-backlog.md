@@ -6415,7 +6415,17 @@ drift.
 ### [nutrition] BF-203a — phase A: the `estimated` answer state, and counting it once
 - **Lane:** A — migration, `plan_meal_answers`, `packages/shared/src/nutrition/meal-estimate.ts`, `lib/health/energy-balance-service.ts`.
 - **Added:** 2026-09-26 · BugFix intake. First of BF-203's three phases.
-- **Needs:** — nothing.
+- **Needs: LA-172**
+- **⛔ STOPPED 2026-09-28 (Lane A) on the plan's own stop-check, and in a worse form than it
+  anticipated.** The plan matches a logged meal to a plan slot **by meal type** and says to stop if
+  two plan meals share one. Production: **all 8 of the owner's plan meals have `meal_type_id`
+  NULL.** The creation path never sets it; it is optional and no screen or generator fills it.
+  So as written, the estimator could never see a slot as logged, would estimate every slot every
+  day, and would add those calories on top of what was really logged. That is the double-count the
+  design exists to prevent. How a logged meal is matched to a slot is a decision about the numbers
+  the owner reads, so it is filed as **LA-172** (`Lane: O`) with a recommendation. Also stale in
+  the plan: its migration numbers (284/285) and its `claude_ro` twin step predate BF-214. Use
+  `next-schema-number.js` and regenerate `claude-ro-views.sql` in place.
 - **The plan:** [`plans/2026-09-26-meal-plan-tracking-a-estimated-answers.md`](superpowers/plans/2026-09-26-meal-plan-tracking-a-estimated-answers.md) — nine tasks, TDD, with the migration shipping as its own PR.
 - **Adds exactly ONE state.** `plan_meal_answers` is declines-only (Q-187 phase 2) and gains
   `estimated` plus the macros that estimate carries. **`'yes'` is never stored** — *"I ate it stays
@@ -6488,6 +6498,28 @@ drift.
   Tuning quotes adherence over loaded sets only.
 - **Reversal cost: low.** It changes what the workout screen shows and writes going forward. Nothing
   already stored changes.
+
+### [nutrition] LA-172 — how should the app tell that a planned meal was eaten, when no plan meal has a meal type?
+- **Lane: O** — a decision about which food counts toward a plan, which moves the calorie totals the
+  owner reads.
+- **Ask** — owner: when the app checks whether you ate a planned meal, should it (a) give each plan
+  meal the meal type its suggested time falls in (so "Turkey and Rice Bowl" at 11:40 becomes Lunch)
+  and count any food logged under that type, or (b) match by when you logged, within a window
+  around the suggested time?
+- **Added:** 2026-09-28 · Lane A, blocking BF-203a.
+- **What was found:** all 8 of the owner's plan meals have `meal_type_id` NULL. They carry a name,
+  targets and a `suggested_time` (07:00, 11:40, 16:20 …), but no meal type. Anything that matches
+  logs to slots by meal type matches nothing.
+- **⭐ Recommendation: (a) assign the meal type from the suggested time,** at plan creation and once
+  for existing plans (a backfill, which the standing policy covers). It makes the link explicit and
+  visible: the plan screen can show "Lunch · Turkey and Rice Bowl", you can correct a wrong one, and
+  it keeps working if you log late. BF-203's Phase B (logging straight from a slot) can later make
+  it exact.
+- **Alternative (b), time-window matching at read time:** needs no stored change and no backfill,
+  and is better if meal types are something you don't want to maintain. It loses on the ordinary
+  case: a lunch logged at 15:00 misses its window, gets an estimate, and is counted twice.
+- **Reversal cost: low.** (a) writes a nullable column that already exists. Clearing it restores
+  today's state exactly.
 
 ### [app-shell][heart-rate] LB-172 — Resting HR is drawn as a score, and neither proposed fix fits
 - **Lane: O** — the remaining fork is a visual-language decision on the card he reads every morning.
