@@ -6498,6 +6498,8 @@ drift.
   retry, which is how the device database has died before. Rehearsed on his real data (133 rows
   intact). Whichever of ① and ② merges second must re-merge `main` and regenerate the views file,
   and CI enforces that.
+  **#1849 shows a red E2E, and that is not this change:** the full E2E run fails the same way on every
+  PR that runs it (LA-176), including three merged before it. The five required checks are green.
 - **③ Barbell Skull Crusher has no progression style** (BF-200 residue, TN-75). The engine now
   deloads it, but it records no per-set plan until a style is assigned. **⭐ Recommend: the style
   his other Upper accessories use.** He assigns it in Config, or names one here and an agent sets
@@ -6541,6 +6543,28 @@ drift.
 - **Reversal cost: low.** One function, three test files, no stored data.
 - **Q-279 waits on this answer** (`Needs: LA-175`). The review's harness should be saved as a script
   next time, so the same argument can be re-run instead of reconstructed.
+
+### [platform][app-shell] LA-176 — six E2E specs fail on every PR that runs the full suite, and nothing notices because E2E is advisory
+- **Lane: B** — the six specs are screen flows, so triage belongs to the surface lane. Any engine
+  cause found hands back to Lane A.
+- **Added:** 2026-09-28 · Lane A, while checking why LA-142's PR (#1849) timed out.
+- **What was found.** Most PRs *skip* the real E2E run and report "pass" in about 45 seconds. PRs
+  that touch paths the workflow filters on run all ~250 specs, and those have all hit the
+  **45-minute cap** today: #1818 (RV-175), #1826 (LA-165) and #1849 (LA-142). **Six specs fail in all
+  three:**
+  `food-log-swipe-delete`, `home-card-invalidation-refetch`, `la109-back-from-subroute`,
+  `meal-plan-library-surface`, `one-calorie-budget` and `rv38-body-battery-no-data-badge`.
+  Others fail in one or two (`tn50-checkin-starts-unanswered`, `tn53-sparkline-does-not-span-gaps`,
+  `tn85-sleep-verdict-on-home`, `tabs-instant-paint`, `baseline-not-a-failure`,
+  `card-429-error-state` …).
+- **Not established:** whether these are real regressions or broken tests. `rv38` asserts the Body
+  Battery "Limited data" badge (*"the card must qualify a number it cannot support"*). It was already
+  failing on #1818, before TN-72 moved that computation, so TN-72 did not cause it.
+- **Why it matters beyond E2E hygiene.** Six consistent failures are either six regressions shipping
+  unseen or six tests nobody trusts. Both defeat the suite, and LB-56's decision about whether to
+  make E2E required cannot be made against a suite that is red on every full run.
+- **First step:** run the six locally against `main` (`pnpm e2e -g <spec>`) and sort them into
+  regression or stale test, one line each, before fixing anything.
 
 ### [app-shell][heart-rate] LB-172 — Resting HR is drawn as a score, and neither proposed fix fits
 - **📐 MOCKUP DRAWN 2026-09-28 — [`docs/design/2026-09-28-resting-hr-cell.html`](design/2026-09-28-resting-hr-cell.html)
@@ -15603,6 +15627,8 @@ short all day.
   change on a shared service, needs TN-29 read first, and is not this entry's recommendation.
 
 ### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
+
+- **⚠ 2026-09-28 (Lane A): the full run now hits its 45-minute cap with real assertion failures, not only dead-browser flakes.** Six specs fail on every full run. Filed as **LA-176** for triage. Until that is sorted, the suite is red whenever it actually runs, which bears directly on whether it can become a required check.
 
 - **Lane:** O — the Orchestrator's, not an implementer's. `.github/workflows/ci.yml`, `playwright.config.ts` and the required-checks
   setting are the Orchestrator's and the owner's.
