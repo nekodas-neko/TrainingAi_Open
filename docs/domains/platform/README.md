@@ -531,3 +531,12 @@ Live at the time of writing (2026-07-30):
 - [`2026-08-24-metric-bounds-at-keyboard`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-metric-bounds-at-keyboard) — **Q-321, bounds asked at the keyboard, 2026-08-24** (`validation/body-metrics.ts` held every threshold and nothing under `components/`/`app/` imported it, so a 5,000 kg weight was queued and dropped server-side. Three sheets now share `components/health/metric-bounds.ts`; `log-value-sheet.tsx` had no check at all across seven fields.) **Device path not exercised.**
 - [`2026-08-24-activity-log-delete-outbox`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-activity-log-delete-outbox) — **Q-328, the activity delete goes through the outbox, 2026-08-24** (the one activity-log write with no outbox domain; `softDeleteActivityLogPending` not `deleteActivityLog`, because a queued delete must stay `pending` until its push is confirmed). **Offline path not exercised** — `Gate: device`.
   — the A4b journal entry.
+
+- **[`2026-09-28-error-boundary-retries-chunk-load`](../../overview/entries/2026-09-28-error-boundary-retries-chunk-load.md)**
+  — **LB-184: the root boundary retries a failed chunk load once.** Found as `LB-178`'s third E2E
+  cause — a `next/dynamic` chunk failing under `next dev` crashed Home to the boundary and the
+  running spec reported *"element(s) not found"*, reading as a broken feature. The fix is
+  user-facing too: online, a transient chunk fetch used to dead-end until the owner tapped.
+  **The retry guard is module-level and must stay so** — `reset()` remounts the boundary, so a
+  state or ref guard reloads forever. Classifier in `lib/chunk-load-error.ts`, matched narrowly
+  because a false positive silently reloads a genuinely broken screen.

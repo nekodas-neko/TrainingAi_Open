@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.481.1",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: if part of the app failed to download \u2014 a patchy moment on mobile data, say \u2014 you got a \u201cSomething went wrong\u201d screen and had to tap Try again yourself. It now retries once on its own and you usually never see it. If it genuinely cannot load, the screen still appears, so nothing is hidden from you.",
+    ],
+  },
+  {
     version: "1.481.0",
     date: "2026-09-28",
     changes: [
