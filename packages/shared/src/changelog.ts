@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.481.2",
+    version: "1.481.3",
     date: "2026-09-29",
     changes: [
       "Fixed: a profile picture that is not really an image — a file that says PNG but is not one — is now refused when you upload it, instead of being saved and then showing as a broken picture.",
+    ],
+  },
+  {
+    version: "1.481.2",
+    date: "2026-09-29",
+    changes: [
+      "Security: being invited no longer lets someone else claim your account. Registering with an invited email address used to activate the account straight away, with nothing checking that the person registering could actually read that inbox — so whoever got there first held the password. A new email-and-password account now waits for approval, and signing in with Google clears any password set on it beforehand. Signing in with Google is unaffected: Google has already proved the address, so an invite is honoured there as before.",
     ],
   },
   {

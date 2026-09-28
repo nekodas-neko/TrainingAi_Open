@@ -7,6 +7,7 @@ import { auth as googleAuth, calendar as calendarApi } from "@googleapis/calenda
 import { reportServerError } from '@/lib/observability'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { rateLimit } from '@/lib/rate-limit'
+import { googleRefreshTokenFrom } from '@/lib/auth/session-token'
 import { z } from 'zod'
 
 // One calendar event.
@@ -55,7 +56,11 @@ function makeOAuth2(refreshToken: string) {
 
 export async function POST(req: NextRequest) {
   const session = await auth();
-  const refreshToken = session?.refreshToken;
+  // Read from the encrypted cookie, not from the session object (RV-193): that object is returned
+  // to page scripts. `auth()` still decides identity — it enforces `isActive` — and the refresh
+  // token still decides authorisation here, because a signed-in user who never granted the
+  // calendar scope has none and has always been a 401.
+  const refreshToken = session ? await googleRefreshTokenFrom(req.headers) : null;
   if (!refreshToken) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const userId = session?.user?.id ?? 'anon';

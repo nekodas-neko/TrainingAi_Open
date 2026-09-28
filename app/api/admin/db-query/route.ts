@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getPool } from '@/lib/data/postgres/client'
-import { getReadonlyPool, isReadonlyDbConfigured, describeReadonlyConnection } from '@/lib/data/postgres/readonly-client'
+import { getReadonlyPool, isReadonlyDbConfigured, describeReadonlyConnection, runScoped } from '@/lib/data/postgres/readonly-client'
 import { requireAdmin, adminFailureOutcome } from '@/lib/admin'
 import { rateLimit } from '@/lib/rate-limit'
 import { safeCompare } from '@/lib/security/constant-time'
@@ -121,7 +121,10 @@ export async function POST(req: NextRequest) {
     // Wrapping in a subquery bounds ANY submitted query without parsing it. MAX_ROWS + 1 detects
     // truncation rather than silently returning a capped set as if it were complete.
     const wrapped = `SELECT * FROM (${sql.replace(/;\s*$/, '')}) _q LIMIT ${MAX_ROWS + 1}`
-    const result = await getReadonlyPool().query(wrapped)
+    // RV-190: through `runScoped`, never `pool.query`. The role's read-only flag, statement
+    // timeout and owner scope are session DEFAULTS that a submitted query can simply `SET` — and
+    // on a pool that is never reset, the override rode the connection into the next request.
+    const result = await runScoped(getReadonlyPool(), wrapped)
 
     const truncated = result.rows.length > MAX_ROWS
     const rows = truncated ? result.rows.slice(0, MAX_ROWS) : result.rows
@@ -162,7 +165,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { rows } = await getReadonlyPool().query(`
+    const { rows } = await runScoped(getReadonlyPool(), `
       SELECT table_name, column_name, data_type
       FROM information_schema.columns
       WHERE table_schema = 'claude_ro'
