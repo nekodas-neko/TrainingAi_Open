@@ -590,6 +590,34 @@ below threshold and left in place for next time.
   variable; **reachability from an unawaited promise** was. (c) a vitest bump is unnecessary.
 - **Not the same as `LB-166`** (the E2E 45-minute ceiling) — different job, different mechanism.
 
+### [nutrition][body] LA-180 — your one calorie number: taken literally, it lands at 1,034 kcal today and 797 on a rest day
+
+- **Lane: O** · **Added:** 2026-09-28 · Lane A, on picking up `OR-191`, before writing any code.
+- **Recommendation: budget = your target + today's movement above your usual.** The target is 1,618
+  once applied. On a day you move as much as usual you get exactly 1,618. Walk more and it grows;
+  sit still and it shrinks. The deficit is already inside 1,618, so it is never subtracted twice.
+- **Why it wins a year out:**
+  - It is the number you already chose, made live.
+  - It cannot fall below a safe floor on a quiet day.
+  - It stays right as your weight changes, because the target is re-derived (`OR-201`) rather than
+    typed.
+- **Why not literally "RMR + live activity − deficit"?** The deficit the app uses for weight loss is
+  500 kcal. Today, with a 1,297 RMR and 237 of movement, that is **1,034 kcal**; on a rest day it is
+  **797**. Both are under your resting burn and under the app's own 1,200 floor. The formula has the
+  right shape, but RMR is the wrong base for a 500 deficit: that deficit is meant to come off
+  *maintenance*, which includes the ordinary day's movement.
+  - **What the literal formula is better at:** you can see every term. If you want that, the answer
+    is a smaller deficit (about 250), not this formula as written.
+- **Alternative: keep today's three-term screen and relabel it.** It lost because you asked for one
+  number.
+- **⚠ Also decide which number lands:** `OR-191` says apply **1,618**, while `LA-126` has DV
+  accepting the post-RV-66 recommendation, expected around **1,359**. They write the same field. The
+  recommendation is 1,618, as you said on 2026-09-28, and `LA-126`'s accept is dropped. If you want
+  the 1,359 cut instead, say so, and it becomes the target the live number is built on.
+- **Reversal cost:** low. It is one function and one display, and the stored target is untouched
+  either way.
+- **What happens when you answer:** Lane A builds `OR-191` on the chosen shape.
+
 ### [workouts] LA-178 — two of your answers point opposite ways on the session-length estimate: fix the double-count, or leave it?
 
 - **Lane: O** · **Added:** 2026-09-28 · Lane A, found before starting BF-197.
@@ -755,6 +783,7 @@ below threshold and left in place for next time.
   need a tap at all. **Do not apply 1,618 by hand AND have DV accept a recommendation** — that is
   two writes racing on the same field. Whoever goes first states which number landed.
 
+- **Needs:** LA-180 — measured 2026-09-28: the literal formula with the app's 500 kcal deficit gives 1,034 today and 797 on a rest day, so the shape is his call. **Do not build until it is answered.**
 - **Lane: A** — the formula lives in shared/server code, so the engine half goes first by the path
   rule; the display half is Lane B and follows in the same batch.
 - **Added:** 2026-09-27 · Orchestrator, from the owner's answer to `RV-221` ② / `RV-164`. He was
