@@ -69,18 +69,19 @@ describe.skipIf(!canRun)('the DB footprint counts rows rather than estimating th
   // merely imprecise, it is stale by however long it has been since an ANALYZE that never runs.
   it('disagrees with n_live_tup, which is the bug', async () => {
     await pool.query(`ANALYZE oura_raw_samples`)
-    const before = Number((await pool.query(
-      `SELECT n_live_tup FROM pg_stat_user_tables WHERE relname = 'oura_raw_samples'`)).rows[0]?.n_live_tup ?? 0)
 
     await insert(9)   // no ANALYZE after this — the state this database is always in
 
     const estimate = Number((await pool.query(
       `SELECT n_live_tup FROM pg_stat_user_tables WHERE relname = 'oura_raw_samples'`)).rows[0]?.n_live_tup ?? 0)
     const real = Number((await pool.query(`SELECT count(*)::int AS n FROM oura_raw_samples`)).rows[0].n)
-    // `>=`, not `toBe`: vitest runs other files against this database at the same time, and one of
-    // them inserting a raw sample between these reads made both assertions miss by one (2026-09-28).
-    // An estimate-based count is stale and BELOW the real one, so `>=` still fails the bug.
-    expect(real).toBeGreaterThanOrEqual(before + 9)
+    // That this test's 9 rows landed is read from ITS OWN rows, not the table. Other files insert into
+    // and delete from this table at the same time: an insert made a table-wide `toBe` miss by one,
+    // and after that was loosened to `>=`, a neighbour's cleanup made it miss the other way
+    // (`expected 210 to be >= 215`, 2026-09-28). Neither direction can move this count.
+    const mine = Number((await pool.query(
+      `SELECT count(*)::int AS n FROM oura_raw_samples WHERE user_id = $1`, [USER])).rows[0].n)
+    expect(mine).toBe(9)
     // If this ever stops holding, autovacuum ran mid-test and the case proved nothing — which is
     // itself worth knowing, so it asserts rather than skipping.
     expect(estimate, 'the estimate went stale, which is the premise').toBeLessThan(real)

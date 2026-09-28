@@ -24,3 +24,5 @@ if no row in any account holds a value. Otherwise it leaves the column and raise
 
 **Held for the owner's yes before merge**, as the entry required for a data-dropping migration,
 even though the guard means nothing with a value can be dropped.
+
+**Found by this PR's suite:** the first guard test ran its DDL on the shared test database and failed under load with "tuple concurrently updated". It now runs in a throwaway database holding only the two objects the migration touches, and a new mutation (skipping the view drop) is killed by it. `storage-footprint-real-counts` raced again, the other way this time: a neighbour's cleanup made a table-wide `>=` miss. It now checks its own rows (exactly 9).

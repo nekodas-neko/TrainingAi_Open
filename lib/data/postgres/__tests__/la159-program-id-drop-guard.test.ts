@@ -1,75 +1,75 @@
 // LA-159 — migration 293 drops program_phases.program_id only when no row anywhere holds a value.
 // The production measurement behind it could only see the owner's rows (claude_ro is owner-scoped),
-// so the guard is what makes the drop safe for every other account. Each case runs inside a
-// transaction that re-creates the pre-293 shape and is rolled back, so the shared test database is
-// never left altered.
+// so the guard is what makes the drop safe for every other account.
+//
+// It runs in a THROWAWAY DATABASE holding only the two objects the migration touches. The first
+// version ran the DDL inside a rolled-back transaction on the shared test database, and under the
+// full suite it failed with "tuple concurrently updated": ALTER TABLE and DROP VIEW on objects other
+// files were reading at the same time. A test that locks its neighbours' tables is a hazard to them
+// as well as to itself.
 //
 // Runs only against a real local dev Postgres — skips cleanly without DATABASE_URL.
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { Pool } from 'pg'
 
 const canRun = !!process.env.DATABASE_URL
 const MIGRATION = readFileSync(join(process.cwd(), 'lib/data/postgres/migrations/293_drop_program_phases_program_id.sql'), 'utf8')
-const USER = '00000000-0000-4000-8000-000000000159'
+const PROBE_DB = 'la159_guard_probe'
 
 describe.skipIf(!canRun)('migration 293 — the program_id drop guard (LA-159)', () => {
-  let pool: import('pg').Pool
+  let admin: Pool
+  let probe: Pool
 
   beforeAll(async () => {
-    const { getPool } = await import('@/lib/data/postgres/client')
-    pool = getPool()
+    const url = new URL(process.env.DATABASE_URL!)
+    url.pathname = '/postgres'
+    admin = new Pool({ connectionString: url.toString(), max: 1 })
+    await admin.query(`DROP DATABASE IF EXISTS ${PROBE_DB} WITH (FORCE)`)
+    await admin.query(`CREATE DATABASE ${PROBE_DB}`)
+    url.pathname = `/${PROBE_DB}`
+    probe = new Pool({ connectionString: url.toString(), max: 1 })
   })
 
-  /** Runs `fn` against the pre-293 shape, then rolls everything back. */
-  async function inPre293Shape(programIdValue: 'set' | 'null', fn: (q: (sql: string) => Promise<unknown[]>) => Promise<void>) {
-    const client = await pool.connect()
-    try {
-      await client.query('BEGIN')
-      await client.query('ALTER TABLE program_phases ADD COLUMN IF NOT EXISTS program_id uuid')
-      await client.query(`INSERT INTO users (id, email, password_hash) VALUES ($1, 'la159@example.com', 'x') ON CONFLICT (id) DO NOTHING`, [USER])
-      const { rows: [program] } = await client.query(
-        `INSERT INTO programs (user_id, name) VALUES ($1, 'LA-159') RETURNING id`, [USER])
-      const { rows: [set] } = await client.query(
-        `INSERT INTO phase_sets (user_id, name) VALUES ($1, 'LA-159') RETURNING id`, [USER])
-      await client.query(
-        `INSERT INTO program_phases (phase_set_id, position, name, duration_cycles, phase_type, program_id)
-         VALUES ($1, 0, 'P', 1, 'normal', $2)`,
-        [set.id, programIdValue === 'set' ? program.id : null])
-      await client.query(`UPDATE program_phases SET program_id = NULL WHERE phase_set_id <> $1`, [set.id])
-      await fn(async sql => (await client.query(sql)).rows)
-    } finally {
-      await client.query('ROLLBACK')
-      client.release()
-    }
-  }
+  afterAll(async () => {
+    if (!canRun) return
+    await probe?.end()
+    await admin.query(`DROP DATABASE IF EXISTS ${PROBE_DB} WITH (FORCE)`)
+    await admin.end()
+  })
 
-  const hasColumn = `SELECT 1 FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'program_phases' AND column_name = 'program_id'`
+  /** The pre-293 shape: the column, and a claude_ro view that depends on it. */
+  beforeEach(async () => {
+    await probe.query(`
+      DROP SCHEMA IF EXISTS claude_ro CASCADE;
+      DROP TABLE IF EXISTS program_phases;
+      CREATE TABLE program_phases (id serial PRIMARY KEY, phase_set_id uuid, program_id uuid);
+      CREATE SCHEMA claude_ro;
+      CREATE VIEW claude_ro.program_phases AS SELECT id, phase_set_id, program_id FROM program_phases;
+    `)
+  })
+
+  const hasColumn = async () => (await probe.query(
+    `SELECT 1 FROM information_schema.columns
+     WHERE table_schema = 'public' AND table_name = 'program_phases' AND column_name = 'program_id'`,
+  )).rows.length === 1
 
   it('keeps the column when any row holds a value', async () => {
-    await inPre293Shape('set', async q => {
-      await q(MIGRATION)
-      expect(await q(hasColumn)).toHaveLength(1)
-    })
+    await probe.query(`INSERT INTO program_phases (phase_set_id, program_id) VALUES (gen_random_uuid(), NULL), (gen_random_uuid(), gen_random_uuid())`)
+    await probe.query(MIGRATION)
+    expect(await hasColumn()).toBe(true)
   })
 
-  it('drops the column when every row is empty', async () => {
-    await inPre293Shape('null', async q => {
-      await q(MIGRATION)
-      expect(await q(hasColumn)).toHaveLength(0)
-    })
+  it('drops the column, and the view that blocked it, when every row is empty', async () => {
+    await probe.query(`INSERT INTO program_phases (phase_set_id, program_id) VALUES (gen_random_uuid(), NULL)`)
+    await probe.query(MIGRATION)
+    expect(await hasColumn()).toBe(false)
   })
 
   it('is a no-op once the column is gone', async () => {
-    const client = await pool.connect()
-    try {
-      await client.query('BEGIN')
-      await client.query(MIGRATION)
-      expect((await client.query(hasColumn)).rows).toHaveLength(0)
-    } finally {
-      await client.query('ROLLBACK')
-      client.release()
-    }
+    await probe.query(MIGRATION)
+    await expect(probe.query(MIGRATION)).resolves.toBeDefined()
+    expect(await hasColumn()).toBe(false)
   })
 })
