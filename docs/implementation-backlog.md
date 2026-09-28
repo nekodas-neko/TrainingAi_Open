@@ -10152,6 +10152,17 @@ why the count of affected entries always understated the harm.
 
 ### [devices][readiness][platform] BF-187 — opening the app never asks the ring for anything; the only drain triggers are two gestures and an hourly timer
 
+- **✔ BUILT 2026-09-28 (Lane A), native + JS, v1.478.0.** `OuraRingService.drainIfStale(maxAgeMs)`
+  decides staleness inside the service, and `status()` now reports `lastDrainAgeMs`. The plugin
+  method `drainIfStale` and `syncOuraRingIfStale()` (`lib/oura-ble/sync.ts`, 10-minute cooldown)
+  are called from `sync-provider.tsx` on mount and on Capacitor `resume`. An APK without the method
+  makes it a no-op. Kotlin compiled locally, and a typo in the new code fails the build.
+  `bf187-drain-on-open.test.ts` covers the JS side.
+- **Verify:** device — install the APK this merge publishes. With the service connected, note
+  `cursorDs`, background the app past 10 minutes, then resume: a drain starts with no gesture, and the
+  Oura cards refresh on their own within ~10–40 s. Tab away and back three times inside 10 minutes:
+  one drain, not three (`lastDrainAgeMs` in the status shows it).
+
 - **Branch:** _unassigned_ · **Added:** 2026-09-23 (BugFix intake). Owner: *"Can we somehow get the
   sleep data to sync as soon as the app is opened? I know the oura app did it so we should be able
   to request/pull it."*

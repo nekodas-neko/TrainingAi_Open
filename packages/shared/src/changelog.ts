@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.478.0",
+    date: "2026-09-28",
+    changes: [
+      "New: opening the app, or coming back to it, now asks your ring for its latest data instead of waiting for the hourly sync. Your sleep, heart rate and steps fill in 10–40 seconds after opening, not on the first screen. It only happens if the ring hasn't synced in the last 10 minutes, so switching apps back and forth costs one sync. Needs the new app version.",
+    ],
+  },
+  {
     version: "1.477.33",
     date: "2026-09-28",
     changes: [

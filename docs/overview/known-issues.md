@@ -31,6 +31,14 @@
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [devices][readiness] ⚠️ The app now drains the ring on open and resume, and no phone has run it (BF-187, 2026-09-28)
+
+`drainIfStale` is Kotlin, so it reaches the phone only in the APK this merge publishes. Until that
+is installed, the JS call is a no-op and the hourly drain is unchanged. The whole path is
+native-only, so nothing here ran outside a compile and a unit test. **Pass test on the S25:** the
+backlog entry's `Verify:` line (one drain after a >10-min background, one drain for three quick tab
+switches, cards refreshing within ~10–40 s).
+
 ### [workouts] ⚠️ A missing exercise role now reads as Accessory, and no phone has run the device half (BF-15, 2026-09-28)
 
 The local store's fallbacks (`program-assembler.ts`, `sqlite-backend.ts`, `sync-engine.ts`) and the
