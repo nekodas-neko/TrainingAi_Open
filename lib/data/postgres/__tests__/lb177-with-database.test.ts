@@ -31,4 +31,18 @@ describe('probe-database tests do not rewrite the URL with new URL() (LB-177)', 
       .filter(f => /\.pathname\s*=/.test(readFileSync(join(dir, f), 'utf8')))
     expect(offenders).toEqual([])
   })
+
+  // A probe database is dropped WITH (FORCE), which terminates any of its clients still closing
+  // (57P01). An unlistened pool error is unhandled and fails the whole CI shard: it did, once, on a
+  // docs-only PR. So every file that force-drops a probe database listens on the probe pool.
+  it('a test that force-drops its probe database listens for the terminated client', () => {
+    const dir = join(process.cwd(), 'lib/data/postgres/__tests__')
+    const offenders = readdirSync(dir)
+      .filter(f => f.endsWith('.test.ts'))
+      .filter(f => {
+        const src = readFileSync(join(dir, f), 'utf8')
+        return /DROP DATABASE[^`]*WITH \(FORCE\)/.test(src) && !/probe\.on\('error'/.test(src)
+      })
+    expect(offenders).toEqual([])
+  })
 })
