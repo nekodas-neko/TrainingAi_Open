@@ -11,7 +11,7 @@
 //
 // Runs only against a real Postgres. CI's "Tests" job DOES set DATABASE_URL, so these run there.
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
-import { migrationTestLock } from './migration-test-lock'
+import { migrationTestLock, runMigrationSql } from './migration-test-lock'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -82,7 +82,7 @@ describe.skipIf(!canRun)('migration 153 — planned_pct on bodyweight sets (Q-14
     const id = await seedSet('Q14 Chin', 75)
     expect(await plannedPctOf(id)).toBe(75)
 
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
 
     expect(await plannedPctOf(id)).toBeNull()
   })
@@ -90,7 +90,7 @@ describe.skipIf(!canRun)('migration 153 — planned_pct on bodyweight sets (Q-14
   it('leaves a weighted set’s prescribed percentage alone', async () => {
     const id = await seedSet('Q14 Bench', 80)
 
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
 
     // Real autoregulation deviations live here and must survive.
     expect(Number(await plannedPctOf(id))).toBe(80)
@@ -100,15 +100,15 @@ describe.skipIf(!canRun)('migration 153 — planned_pct on bodyweight sets (Q-14
     const bodyweight = await seedSet('Q14 Chin', 68)
     const weighted = await seedSet('Q14 Bench', 72.5)
 
-    await pool.query(migrationSql())
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
+    await runMigrationSql(pool, migrationSql())
 
     expect(await plannedPctOf(bodyweight)).toBeNull()
     expect(Number(await plannedPctOf(weighted))).toBe(72.5)
   })
 
   it('adds planned_reps to both set_logs and set_hr_stats', async () => {
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
     const { rows } = await pool.query(
       `SELECT table_name FROM information_schema.columns
         WHERE table_schema = 'public' AND column_name = 'planned_reps'
