@@ -6542,17 +6542,6 @@ drift.
 - **Q-279 waits on this answer** (`Needs: LA-175`). The review's harness should be saved as a script
   next time, so the same argument can be re-run instead of reconstructed.
 
-### [platform] LA-174 — a migration test deadlocks under the full suite because it UPDATEs shared tables
-- **Lane: A** · **Added:** 2026-09-28 · Lane A, seen in Q-524's full local run.
-- **What:** `planned-pct-bodyweight-migration.test.ts` runs migration 153, a table-wide
-  `UPDATE set_logs`, against the shared test database while other files write the same table, and
-  failed with `deadlock detected`. It passes 4/4 alone. This is the same hazard LA-159's guard test
-  hit (`tuple concurrently updated`), and the fix is the same shape: run it in a throwaway database
-  holding only what the migration touches (LA-159 and LA-142's guard tests are the pattern).
-- **Also sweep:** any other test that executes a migration's SQL against the shared database.
-  `grep -rln "migrations/.*.sql" lib/data/postgres/__tests__` finds the candidates.
-- **Done when:** no migration-SQL test mutates the shared test database.
-
 ### [app-shell][heart-rate] LB-172 — Resting HR is drawn as a score, and neither proposed fix fits
 - **📐 MOCKUP DRAWN 2026-09-28 — [`docs/design/2026-09-28-resting-hr-cell.html`](design/2026-09-28-resting-hr-cell.html)
   ([hosted](https://claude.ai/artifact/7ngUaPpJieYqDkfBpJAiEC)). Committed, per the convention

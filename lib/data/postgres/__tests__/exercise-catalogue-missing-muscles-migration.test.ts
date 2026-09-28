@@ -11,7 +11,7 @@
 //
 // Runs only against a real Postgres. CI's "Tests" job DOES set DATABASE_URL, so these run there.
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
-import { migrationTestLock } from './migration-test-lock'
+import { migrationTestLock, runMigrationSql } from './migration-test-lock'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -80,7 +80,7 @@ describe.skipIf(!canRun)('migration 216 — catalogue rows missing muscles (BF-1
   })
 
   it('adds each missing muscle as a secondary, keeping what was already there', async () => {
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
     for (const name of NAMES) {
       const got = await musclesOn(name)
       // Everything the row already recorded survives, with its original role.
@@ -98,15 +98,15 @@ describe.skipIf(!canRun)('migration 216 — catalogue rows missing muscles (BF-1
   // muscles, so these rows were structurally barred from ever being an anchor.
   it('takes every one of the five to at least three muscles', async () => {
     for (const name of NAMES) expect((await musclesOn(name)).length, name).toBeLessThan(3)
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
     for (const name of NAMES) expect((await musclesOn(name)).length, name).toBeGreaterThanOrEqual(3)
   })
 
   it('is idempotent — a second and third run add nothing', async () => {
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
     const once = await Promise.all(NAMES.map(musclesOn))
-    await pool.query(migrationSql())
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
+    await runMigrationSql(pool, migrationSql())
     expect(await Promise.all(NAMES.map(musclesOn))).toEqual(once)
   })
 
@@ -119,7 +119,7 @@ describe.skipIf(!canRun)('migration 216 — catalogue rows missing muscles (BF-1
       { muscle: 'traps', role: 'main' },
       { muscle: 'Forearms', role: 'secondary' },
     ]))
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
     const got = await musclesOn('Barbell Shrug')
     expect(got.filter(m => m.muscle.toLowerCase() === 'forearms')).toHaveLength(1)
     expect(got).toContainEqual({ muscle: 'Forearms', role: 'secondary' })
@@ -128,7 +128,7 @@ describe.skipIf(!canRun)('migration 216 — catalogue rows missing muscles (BF-1
 
   it('leaves a catalogue row it does not name alone', async () => {
     const before = await musclesOn('Barbell Overhead Press')
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
     expect(await musclesOn('Barbell Overhead Press')).toEqual(before)
   })
 })
