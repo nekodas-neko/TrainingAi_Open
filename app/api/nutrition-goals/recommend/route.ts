@@ -12,6 +12,8 @@ import { ACTIVITY_LEVELS } from '@trainingai/shared/types/user'
 import { calculateBaseline, clampRecommendation, type BaselineResult } from '@trainingai/shared/nutrition/goal-recommendation'
 import { getCurrentPhase } from '@trainingai/shared/phase-engine'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { answeredMorningScales } from '@trainingai/shared/health/self-report'
+import type { DayCheckin } from '@trainingai/shared/types/day-checkin'
 import type { BodyMetrics, SleepSession, MoodLog } from '@trainingai/shared/types'
 import type { NutritionTargets } from '@trainingai/shared/types/nutrition'
 import type { UserGoals } from '@/lib/data/repository'
@@ -65,6 +67,8 @@ interface ContextInput {
   bodyMetrics: BodyMetrics[]
   sleepSessions: SleepSession[]
   moodLogs: MoodLog[]
+  /** Morning check-ins in the window. Only the scales he actually answered reach the prompt (LB-182). */
+  morningCheckins: DayCheckin[]
   workoutSessionCount: number
   personalRecords: { exerciseName: string; estimated1rm: number; achievedAt: Date }[]
   /** name -> exercise_type, so a bodyweight record isn't quoted as kilograms (Q-19b). */
@@ -118,6 +122,16 @@ function buildContext(c: ContextInput, tz: string): string {
     // learns that this person's sleep never varies.
     .map(m => `${m.logDate}: ${sleepByDate.get(m.logDate)!.durationHours!.toFixed(1)}h sleep, energy=${m.energyLevel}`)
 
+  // LB-182: what he SAID about each night, beside the measured duration above. Through
+  // `answeredMorningScales` and never the raw column: the sheet stores a neutral seed for a scale he
+  // did not touch, and telling the model he rated a night he never rated is the TN-66 defect again,
+  // in prose. The scale runs BACKWARDS (1 = slept great, 5 = terrible), so the line says so.
+  const sleepFeelLines = c.morningCheckins
+    .map(ci => ({ date: ci.logDate, feel: answeredMorningScales(ci).sleepQualityFeel }))
+    .filter((r): r is { date: string; feel: number } => r.feel != null)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map(r => `${r.date}: ${r.feel}`)
+
   const bfReadings = c.bodyMetrics.filter(m => m.bodyFatPct != null).sort((a, b) => a.date.localeCompare(b.date))
   const latestBf = bfReadings.length > 0 ? bfReadings[bfReadings.length - 1].bodyFatPct! : null
   const bfDelta = bfReadings.length >= 2 ? latestBf! - bfReadings[0].bodyFatPct! : null
@@ -159,6 +173,9 @@ function buildContext(c: ContextInput, tz: string): string {
     avgHrv != null ? `Average HRV: ${avgHrv} ms.` : null,
     `Workout sessions in the last 14 days: ${c.workoutSessionCount}.`,
     sleepMoodPairs.length > 0 ? `Sleep/mood data points:\n${sleepMoodPairs.join('\n')}` : 'No paired sleep+mood data in this window.',
+    sleepFeelLines.length > 0
+      ? `How he said he slept, on the mornings he rated it (1 = slept great, 5 = slept terribly):\n${sleepFeelLines.join('\n')}`
+      : 'He did not rate or correct how he slept on any morning in this window.',
     prLines.length > 0 ? `Personal records achieved in this window:\n${prLines.join('\n')}` : 'No new personal records in this window.',
   ]
 
@@ -201,10 +218,13 @@ export async function POST(req: Request) {
   const windowStart = new Date(todayMidnightUtc(tz).getTime() - 14 * 86_400_000)
   const fromIso = toAestDay(windowStart, tz)
 
-  const [bodyMetrics, sleepSessions, moodLogs, workoutSessions, personalRecords, userGoals, nutritionTargets, program] = await Promise.all([
+  const [bodyMetrics, sleepSessions, moodLogs, morningCheckins, workoutSessions, personalRecords, userGoals, nutritionTargets, program] = await Promise.all([
     repo.listBodyMetrics(userId, fromIso, todayIso),
     repo.listSleepSessions(userId, fromIso, todayIso),
     repo.listMoodLogs(userId, fromIso, todayIso),
+    // A self-report is context, not a requirement: a failed read leaves the line out rather than
+    // failing the recommendation.
+    (async () => repo.listDayCheckins(userId, fromIso, todayIso, 'morning'))().catch(() => [] as DayCheckin[]),
     repo.getWorkoutSessionsFrom(userId, windowStart),
     repo.listRecentPersonalRecords(userId, windowStart, new Date()),
     repo.getUserGoals(userId),
@@ -285,6 +305,7 @@ export async function POST(req: Request) {
     bodyMetrics,
     sleepSessions,
     moodLogs,
+    morningCheckins,
     workoutSessionCount: workoutSessions.length,
     personalRecords,
     exerciseTypes,
