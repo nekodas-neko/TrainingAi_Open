@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.478.7",
+    date: "2026-09-28",
+    changes: [
+      "Changed: Home's Log tiles now fill the row as three even columns, and the Log button sits below the value instead of on top of the icon. A fourth widget wraps to a second line rather than scrolling sideways.",
+    ],
+  },
+  {
     version: "1.478.6",
     date: "2026-09-28",
     changes: [
