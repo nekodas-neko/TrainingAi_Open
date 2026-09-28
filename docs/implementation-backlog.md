@@ -7837,20 +7837,6 @@ drift.
   not dead indexes. The cache hit rate is 99.9%, and nothing is idle in transaction.
 
 
-### [workouts] LA-166 — offline edits and deletes of logged work toast success and are lost: queue them instead
-- **Lane: B** — `lib/hooks/use-day-entry-mutations.ts` (`handleEdit`, `handleDelete`, `handleDeleteSession`).
-- **Needs: LA-165**
-- **Added:** 2026-09-28 · Lane A, the client half of RV-175.
-- **What:** the three handlers `fetch` first and mirror locally only after a 2xx, so offline they
-  toast "Updated"/"Deleted", then "Failed to …", and nothing is queued. Once LA-165 lands, write
-  locally in pending mode and `queueMutation` the matching domain: `exercise_log_edit`
-  (`{ exerciseLogId, weights, reps }`), `exercise_log_delete` (`{ exerciseLogId }`) or
-  `workout_session_delete` (`{ workoutSessionId }`). Payload schemas are in
-  `lib/workout/exercise-log-edits.ts` and `lib/workout/delete-session-reconcile.ts`. `handleDeleteActivity` in
-  the same hook is the reference (Q-328).
-- **Done when:** offline, each action toasts once, survives an app restart, and reaches the server on
-  reconnect. **Device check owed** — the local store is null on the web.
-
 ### [workouts] RV-184 — the AI prescription regenerates at workout open on days the completion already generated it
 
 - **Lane: A** — `packages/shared/src/ai-periodization/generate-prescription.ts:303`.
