@@ -31,6 +31,36 @@
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] Home's banner registry has no guard against an unstable `report`
+
+- **The crash it prevents shipped and was fixed the same day** (RV-119 in v1.481.0, fixed in
+  v1.481.2): `report` was rebuilt on every presence change, the reporting effect depends on it, so a
+  banner whose presence changed after mount re-ran every other banner's effect — **"Maximum update
+  depth exceeded"**, Home on the root error boundary.
+- **What is missing:** nothing fails if `report` becomes unstable again. The protection is
+  `card-429-error-state.spec.ts`, which only catches it when a banner's presence genuinely changes
+  during a run. A stability test would need a React renderer for components, which this repo does
+  not use.
+- **Not device-verified, and the crash was never seen on the device.** The reproduction is a 429 stub
+  on `/api/weekly-digest`. Nothing about the loop requires a *failure* — only a presence change — so
+  real timing could reach it; whether it does is unknown.
+- **If a Home crash is ever reported,** this is the first thing to check: open Home with a banner
+  that resolves late and watch for the error boundary.
+### [devices][platform] The native security batch (RV-196, OR-159) is NOT device-verified, and ring uploads are the half that matters
+
+- **Shipped in #1755, Kotlin, so it needs the CI APK installed as an UPDATE.** Never uninstall first:
+  the ring key exists only on the phone.
+- **Owed on the S25 (Lane DV):**
+  1. **After the update and one app open, the ring, the scale and the strap still upload.**
+     `setIngestUrl` now refuses any origin but the app's own. A wrong refusal is swallowed by the
+     caller, and the previously stored URL keeps working, so the failure would be silent rather
+     than an outage. Check `oura_raw_samples` for rows newer than the install.
+  2. **Show key** and **Clear key** in the Oura BLE console each open a system dialog. For Clear,
+     **tap Cancel and never confirm**; the pass is that the dialog appears and the key survives.
+  3. The backup exclusion cannot be observed while backup sits over its 25 MB quota (see OR-159's
+     Keep).
+- **Strike this row** when 1 and 2 are VERIFIED.
+
 ### [app-shell] Home's banner strip is NOT device-verified, and the multi-banner case was never rendered
 
 - **Shipped 2026-09-28 (RV-119, v1.481.0), web-verified with ONE banner present.** The four

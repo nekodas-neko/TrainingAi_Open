@@ -15,6 +15,7 @@
 //   node scripts/next-item.js --lane A        one lane — A · B · O · DV
 //   node scripts/next-item.js --all           do not truncate READY
 //   node scripts/next-item.js --sittings      owed device checks, grouped by domain
+//   node scripts/next-item.js --no-prs        skip the open-PR lookup (also NEXT_ITEM_NO_PRS=1)
 //
 // `--sittings` answers a different question from the rest of the file: not *what can I start* but
 // *what could the owner clear in one pick-up of the phone*. A device check costs the owner's
@@ -34,6 +35,7 @@ const path = require('path');
 
 const { bucketFor } = require('./lib/queue-buckets');
 const { parseEntries, NoQueueError } = require('./lib/backlog-entries');
+const { fetchOpenPrs, matchOpenPrs } = require('./lib/open-prs');
 
 const ROOT = path.resolve(__dirname, '..');
 const BACKLOG = path.join(ROOT, 'docs/implementation-backlog.md');
@@ -48,6 +50,8 @@ const laneArg = (() => {
 const showAll = argv.includes('--all');
 const sittingsOnly = argv.includes('--sittings');
 const TOP_N = showAll ? Infinity : 10;
+// Never under a test runner or CI: a network call there is slow at best and meaningless at worst.
+const skipPrs = argv.includes('--no-prs') || process.env.NEXT_ITEM_NO_PRS === '1' || !!process.env.VITEST || !!process.env.CI;
 
 let entries;
 try {
@@ -208,6 +212,28 @@ if (sittingsOnly) {
 }
 
 console.log(`\nQueue: ${entries.length} entries${laneArg ? ` · lane ${laneArg}` : ''}\n`);
+
+// An entry with an OPEN PR is not "nobody has started it" — see lib/open-prs.js for the six
+// rebuilt PRs this exists to prevent. Moved out of READY, not just annotated, because READY's top
+// line is what an implementer starts on.
+const openPrs = skipPrs ? null : fetchOpenPrs();
+const inFlight = [];
+if (openPrs) {
+  const byId = matchOpenPrs(ready.map((e) => e.id), openPrs);
+  for (let i = ready.length - 1; i >= 0; i--) {
+    const prs = byId.get(ready[i].id);
+    if (prs) inFlight.unshift({ e: ready[i], prs });
+    if (prs) ready.splice(i, 1);
+  }
+} else if (!skipPrs) {
+  console.log('⚠ open PRs could not be read (`gh` missing or signed out). An entry below may already have one:');
+  console.log('  check `gh pr list --search <ID>` before starting it.\n');
+}
+if (inFlight.length) {
+  console.log(`IN FLIGHT (${inFlight.length}) — an open PR already exists. Finish, review or merge THAT; do not rebuild it.`);
+  inFlight.forEach(({ e, prs }) => console.log(`      ${fmt(e)}\n        open PR: ${prs.map((n) => '#' + n).join(', ')}`));
+  console.log('');
+}
 
 // BF-194. Printed ABOVE `READY` and outside the `TOP_N` cut, because an owner question is not
 // "next" — it is blocking, and the measurement that produced this section is that two of them fell

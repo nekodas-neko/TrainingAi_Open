@@ -44,7 +44,18 @@ export function buildCsp(isDev: boolean): string {
   // guard sweeps `app/`, `components/`, `lib/` and `packages/shared/src`, and the CSP was living in
   // `next.config.ts` at the repo root, where nothing looked. So the header kept permitting outbound
   // connections to an integration that no longer exists. Extracting this file is what surfaced it.
-  "connect-src 'self' https://generativelanguage.googleapis.com https://accounts.google.com https://oauth2.googleapis.com https://api.open-meteo.com https://geocoding-api.open-meteo.com https://raw.githubusercontent.com https://*.tile.openstreetmap.org https://*.tile.thunderforest.com wss: ws:",
+  // `ws: wss:` is DEV-ONLY (RV-197). Those two schemes allowed a WebSocket to ANY host, and
+  // `connect-src` is the directive that would otherwise stop injected script sending data
+  // off-origin — so the one blanket in the list undid most of the rest. Nothing in `app/`,
+  // `components/`, `lib/` or `packages/` constructs a `WebSocket`, and there is no ws client in
+  // `package.json`; the only consumer is the dev server's HMR socket, which is why this is keyed
+  // on `isDev` rather than deleted. **If a production feature ever needs one, name its host** —
+  // `wss://host` — rather than restoring the scheme.
+  //
+  // `https://generativelanguage.googleapis.com` went with it. Gemini is called through
+  // `@ai-sdk/google` on the SERVER; the browser never connects to it, and the host appeared
+  // nowhere in the codebase except this line.
+  `connect-src 'self' https://accounts.google.com https://oauth2.googleapis.com https://api.open-meteo.com https://geocoding-api.open-meteo.com https://raw.githubusercontent.com https://*.tile.openstreetmap.org https://*.tile.thunderforest.com${isDev ? ' ws: wss:' : ''}`,
   "frame-src 'none'",
   "object-src 'none'",
   "base-uri 'self'",

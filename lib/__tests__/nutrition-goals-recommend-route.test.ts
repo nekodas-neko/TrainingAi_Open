@@ -21,6 +21,7 @@ const listBodyMetrics = vi.fn(async (_u: string, _f: string, _t: string) => [
 ] as Row[])
 const listSleepSessions = vi.fn(async () => [] as Row[])
 const listMoodLogs = vi.fn(async () => [] as Row[])
+const listDayCheckins = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getWorkoutSessionsFrom = vi.fn(async () => [] as Row[])
 const listRecentPersonalRecords = vi.fn(async () => [] as Row[])
 const getUserGoals = vi.fn(async () => ({
@@ -46,7 +47,7 @@ vi.mock('@/lib/data', () => {
   // Built inside the factory's returned function, not its body: `vi.mock` is hoisted above the
   // `const` declarations above and reading them at factory-evaluation time is a TDZ error.
   const repo = async () => ({
-    getUserById, listBodyMetrics, listSleepSessions, listMoodLogs, getWorkoutSessionsFrom,
+    getUserById, listBodyMetrics, listSleepSessions, listMoodLogs, listDayCheckins, getWorkoutSessionsFrom,
     listRecentPersonalRecords, getUserGoals, getNutritionTargets, getActiveProgram,
     getExerciseTypes, getBodyFatCalibration, getLatestMeasuredRmr, listProgramPhases,
     countSessionsSinceStart, createGoalRecommendation,
@@ -341,5 +342,37 @@ describe('POST /api/nutrition-goals/recommend — failure and context', () => {
     expect(body.current.stepsGoal).toBe(9000)
     expect(body.current.activityLevel).toBe('moderate')
     expect(body.id).toBe('rec-1')
+  })
+})
+
+// LB-182: the prompt is told how he said he slept — but only on mornings he actually rated it.
+describe('POST /api/nutrition-goals/recommend — the sleep self-report reaches the prompt honestly', () => {
+  const promptSent = () => (generateObject.mock.calls[0][0] as { prompt: string }).prompt
+  const checkin = (logDate: string, sleepQualityFeel: number, touched: boolean) => ({
+    logDate, perceivedRecovery: 3, perceivedRecoveryTouched: false, sleepQualityFeel, sleepQualityFeelTouched: touched,
+  })
+
+  it('includes the mornings he rated, with the scale direction named, and asks for the morning phase', async () => {
+    listDayCheckins.mockResolvedValueOnce([checkin('2026-09-07', 4, true), checkin('2026-09-05', 1, true)])
+    await post()
+    expect(listDayCheckins.mock.calls.at(-1)?.[3]).toBe('morning')
+    const prompt = promptSent()
+    expect(prompt).toContain('1 = slept great, 5 = slept terribly')
+    expect(prompt).toMatch(/2026-09-05: 1\n2026-09-07: 4/)
+  })
+
+  it('never reports the untouched neutral seed as something he said', async () => {
+    listDayCheckins.mockResolvedValueOnce([checkin('2026-09-07', 3, false), checkin('2026-09-06', 3, false)])
+    await post()
+    const prompt = promptSent()
+    expect(prompt).not.toContain('2026-09-07: 3')
+    expect(prompt).toContain('He did not rate or correct how he slept on any morning in this window.')
+  })
+
+  it('still recommends when the check-in read fails', async () => {
+    listDayCheckins.mockRejectedValueOnce(new Error('db blip'))
+    const res = await post()
+    expect(res.status).toBe(200)
+    expect(promptSent()).toContain('He did not rate or correct how he slept')
   })
 })

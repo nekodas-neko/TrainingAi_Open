@@ -61,9 +61,23 @@ export async function refreshIsActiveClaim<T extends IsActiveClaim>(
 
   try {
     const user = await lookup(token.userId)
-    // A missing row is not evidence of deactivation, so the claim is left alone AND the
-    // timestamp is not advanced — the next request retries rather than waiting a day.
-    if (!user) return token
+    // A row that is GONE is deactivation — the strongest form of it (RV-195 ②). This used to
+    // return the token untouched, reasoning that "a missing row is not evidence of deactivation",
+    // and the consequence was that a deleted account stayed signed in until its token expired:
+    // every `auth()` call found `isActive: true` on a user who no longer exists.
+    //
+    // The distinction that makes this safe is the try/catch around it. A database outage THROWS
+    // and is caught below, where the claim stands and nobody is signed out by a blip. Reaching
+    // here means the query ran and answered "no such user" — `getUserById` returns null only for
+    // a non-matching id — so the two cases the old comment conflated are already separated by
+    // the language, not by this line.
+    //
+    // `isActiveCheckedAt` is deliberately NOT advanced: there is nothing to re-check, and leaving
+    // it means a row restored by hand takes effect on the next request rather than in a day.
+    if (!user) {
+      token.isActive = false
+      return token
+    }
     token.isActive = user.isActive
     // Only when the lookup actually supplies it — a lookup that omits `isAdmin` must not be read
     // as "not an admin" and silently strip the claim.
