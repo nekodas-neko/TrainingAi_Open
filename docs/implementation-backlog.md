@@ -8467,10 +8467,40 @@ drift.
   rewritten on every tap. **Fails the 10 kB-per-key bar** on workout-data:meta, workout-card and
   sleep-sessions. → Lane B/A to decide whether warm-tab rewrites of unchanged payloads can be skipped.
 
-- **Lane: B** — re-laned 2026-09-26 (OR-175) off `DV` after sweep 4a.
-  **Answered on device: ~120k characters of `localStorage` rewritten per Home tap, and the
-  friends-feed entry is 459k.** A synchronous main-thread write of that size on every tap is a
-  plausible contributor to `DV-12`. Stores and hooks are Lane B.
+- **Lane: A** — re-laned 2026-09-28 by Lane B after tracing every key the probe named. `lib/sqlite/**`
+  is Lane A's by the path list, and this entry's own rule already said so: *"the fix goes to Lane A if
+  it is the cache layer (`lib/sqlite/**`) or to Lane B if it is a store."* The 2026-09-26 re-lane to B
+  reasoned *"stores and hooks are Lane B"*, which is true but is not where the bytes come from.
+- **✅ EVERY KEY THE PROBE NAMED IS WRITTEN BY ONE LINE: `lib/sqlite/cache.ts:82`,
+  `localStorage.setItem(LS_PREFIX + key, JSON.stringify(entry))`.** `workout-data:meta`,
+  `workout-card:<id>`, `sleep-sessions`, `friends-feed`, `oura-hr-day:<today>`, `exercise-library`,
+  `saved-meals`, `body-battery` are all `cachedFetch` keys. Not one is a Zustand store, so no
+  `partialize` change touches any of them.
+- **⚠ AND IT IS THREE SERIALISATIONS PER WRITE, NOT ONE.** `setCached` calls `ssWrite`
+  (`JSON.stringify(data)` → sessionStorage), then `lsSet` (`JSON.stringify(entry)` → localStorage),
+  then on device `runSQL` with another `JSON.stringify(data)` → SQLite. So a Home tap's ~120k of
+  payload is stringified about **three times, ~360k on the main thread**, and written to three stores.
+  The probe measured only the localStorage leg.
+- **⛔ THE OBVIOUS FIX IS UNSAFE ON WEB AND SAFE ON DEVICE — do not apply it to both.** "Skip the
+  rewrite when the payload is unchanged" freezes `cachedAt`, and `isFreshWithinTtl` reads exactly that
+  (`cache.ts:319`). On **web**, localStorage IS the primary store, so a frozen stamp ages entries out
+  early and produces MORE network fetches — it defeats `freshWithinTtl`, which `nutrition-targets`,
+  `more-seasons` and the exercise catalogue now depend on. On the **APK**, `isFreshWithinTtl` reads
+  `api_cache.cached_at` from SQLite, so the localStorage stamp does not participate in any freshness
+  decision.
+- **✅ AND THE SEED SURVIVES A SKIP, which is what makes it cheap.** The localStorage leg is deliberate
+  — its comment says it *"survives APK kills so `readCacheSync` can serve instant data on relaunch"* —
+  but it is written with `floorSeedTtl(ttlSeconds)`, and `OFFLINE_SEED_TTL_FLOOR` is **7 days**
+  (`packages/shared/src/cache-ttl.ts:129`). On an unchanged payload the stored bytes are already
+  correct and the stamp has days of headroom, so not refreshing it costs nothing a user can reach.
+  **So the shape that works: on device only, skip the localStorage `setItem` when the serialised data
+  is byte-identical to what is stored.** Cheap to test, and it leaves web untouched.
+- **Not measured:** whether that skip actually moves `DV-12`'s numbers, or whether the `getItem` +
+  compare it needs costs more than the `setItem` it avoids. The tracing above is from source; the
+  measurement is Lane A's to take, and `DV-12`'s `perf.js longtasks` pass test is the bar.
+- **`ta_nav_timing_v1` is NOT worth splitting out.** It is `lib/perf/nav-timing-recorder.ts`, and it is
+  already capped — `loadSamples` slices to `NAV_SAMPLE_LIMIT` — so its 5.4k is 4.5% of a Home tap and
+  bounded by design. Left alone deliberately rather than filed.
 - **Added:** 2026-09-24 · Review. Method: **P21**. Feeds **DV-12**, whose profile found
   `localStorage.setItem` at 1–15 ms on every tab tap and left the caller unnamed.
 - **The suspect, from source:** `lib/sqlite/cache.ts:82` writes `JSON.stringify(entry)` of the
