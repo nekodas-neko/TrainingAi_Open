@@ -6635,6 +6635,22 @@ drift.
   the 45-minute cap, where it had been hitting it. Six specs that each burned a timeout before
   failing were most of the difference, so clearing `LA-176` bought back roughly the margin the cap
   was eating.
+- **✅ SECOND CENSUS — run `36401730152` (`bfe59627`, PR #1894's head), 2026-09-28. This one settles
+  which half of the entry is real.** **263 passed · 1 failed · 4 flaky · 1 skipped · 3 did not run ·
+  36.6 min**, against the first census's 257 / 5 / 6.
+  - **Failed (1):** `food-log-swipe-delete:238`.
+  - **Flaky (4):** `dv12-tab-switch-does-not-redraw-charts:27`, `tabs-instant-paint:42` (Home),
+    `tn25-walk-prescription:49`, `tn53-sparkline-does-not-span-gaps:105`.
+- **⚑ THE FLAKY SET CHURNS; THE HARD FAILURE DOES NOT. That is the finding.** Only **2 of 6** flaky
+  specs recurred across the two runs (`tn25-walk-prescription`, `tn53-sparkline`); four from the first
+  census did not reappear and two are new. Meanwhile `food-log-swipe-delete:238` failed **hard in both
+  runs** — and in two of three local runs before that. **So `:238` is a defect and the rest is
+  order/timing noise**, which is exactly the separation this entry was opened to make. Start there and
+  treat the churning set as one population rather than as individual bugs.
+- **And the two stress specs are gone from the list, as predicted.** `tn35-stress-against-events` and
+  `tn3b-stress-on-hr-chart` pass here; they were the deterministic `bucket_start` pair fixed in #1894,
+  and removing them is most of the 5 → 1 improvement. Their disappearance is the evidence that the
+  first census's mode-sorting was right.
 - **Not in scope:** the 45-minute cap. That is a symptom of ~250 specs on one worker, and it is
   `LB-166`'s.
 
