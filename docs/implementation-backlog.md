@@ -9281,39 +9281,6 @@ drift.
   if either regex stops matching; `components/__tests__/rv101-volume-ramp-and-key.test.ts` states the
   rule independently — 3 of its 4 assertions fail against `origin/main`.
 
-### [platform][workouts] LB-153 — three chart palettes disagree; merging them changes colours you see daily
-- **✅ ANSWERED 2026-09-27 — merge everything, the workout set colours included.**
-  He took the biggest of the three, knowing set 1 amber / set 2 green changes on a screen he sees
-  every session. One categorical palette, and **no colour in it that also means good/warning/bad
-  elsewhere** — that constraint is the point of the change, not a detail of it.
-  **Now Lane A** by the path rule: the palette lands in `packages/shared/src/chart-colors.ts` beside
-  `resolveColor()`. RV-102 prescribed Lane B; that was wrong and is why only its invisible halves
-  shipped. The three surfaces to convert in the same PR: the AI chat charts, the HR-recovery trace,
-  and `set-card.tsx`'s `SET_COLORS`. Sibling-surface sweep applies — grep for every other chart
-  before calling it done.
-
-- **Lane: A**
-- **Added:** 2026-09-25 · split out of RV-102 by Lane B, which shipped that entry's two invisible halves.
-- **Recommendation: merge them, and include the workout set colours.** One categorical palette, no
-  colour in it that also means good/warning/bad elsewhere.
-- **Why, a year out.** Right now `#22c55e` means "primary mover", "at target", "good score" *and*
-  "set 2" depending on where you look, so every new chart re-picks colours and the meaning of green
-  keeps thinning. One palette that is deliberately NOT the good/amber/bad triad ends that, and it is
-  what makes a future chart cheap to add correctly.
-- **What you would actually see change.** Three surfaces: the AI chat's charts, the HR-recovery
-  trace, and the workout set cards. The workout one is the one you look at every session — set 1 is
-  `#f59e0b` (amber) and set 2 `#22c55e` (green) today, which reads as a judgement on the set rather
-  than an index.
-- **Alternatives.** *Leave it* — zero risk, and genuinely fine if you read the set colours as
-  labels rather than verdicts; it is only confusing if you don't. *Merge the two charts but keep the
-  workout set colours* — no change to your daily screen, and it keeps the one case that actually
-  misreads. *Merge everything* — most consistent, biggest visual change.
-- **Reversal cost: one constant.** It is a colour table, not a structure; if you dislike it, it
-  reverts in a line.
-- **Then:** the palette itself lands in `packages/shared/src/chart-colors.ts` beside `resolveColor()`
-  — which already exists, and is **Lane A's** by the path rule, so re-lane this once answered.
-  RV-102 prescribed it to Lane B; that was wrong and is why only its invisible halves shipped.
-
 ### [platform] LA-122 — Reference: the six owner decisions Lane A is currently blocked on
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (Lane A, filed for the Orchestrator at the owner's request).

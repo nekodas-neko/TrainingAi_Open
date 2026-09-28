@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.31",
+    date: "2026-09-28",
+    changes: [
+      "Set cards, AI chat charts and the heart-rate recovery traces now share one colour set that never uses green, amber or red, so a set's colour no longer reads like a verdict on it.",
+    ],
+  },
+  {
     version: "1.477.30",
     date: "2026-09-28",
     changes: [
