@@ -6,7 +6,22 @@
 > Nothing here was rewritten, reordered or archived: the section moved whole.
 >
 > **The domain-tag grep is unchanged and is why this is ONE file rather than one per pillar.**
-> `grep -n '^### [workouts] ⚠️ Offline edits and deletes of logged work now queue, and only a phone can prove it (LA-166, 2026-09-28)
+> `grep -n '^### [platform][workouts][readiness] ⚠️ Two sync-pull fields now reach the phone, and no phone has pulled them (LA-137, 2026-09-28)
+
+LA-137's pull guard found two fields the client's pull mapper lost:
+- `workout_sessions.session_id`. The server sends it as `programSessionId` and the mapper read
+  `sessionId`, so every pull NULLed the device's link from a workout to its program session. Q-131's
+  "fix" had read the wrong key.
+- `day_checkins.food_logging_completed_at`. It was never mapped, so a completion made on another
+  device never arrived.
+
+Both mappers run only in the app, so the sandbox exercised them on `node:sqlite` against a real
+pull. No device reads the session link today (the push omits it when null, so the server's copy
+was never harmed). **Pass test on the S25:** after a pull, a synced workout's local row carries its
+`session_id`, readable through the admin local-DB view, or via any screen that lists workouts
+without error.
+
+### [workouts] ⚠️ Offline edits and deletes of logged work now queue, and only a phone can prove it (LA-166, 2026-09-28)
 
 The three handlers in `use-day-entry-mutations.ts` used to `fetch` first and mirror locally only
 after a 2xx, so offline they toasted "Updated"/"Deleted", then "Failed to …", and queued nothing —
