@@ -6,7 +6,27 @@
 > Nothing here was rewritten, reordered or archived: the section moved whole.
 >
 > **The domain-tag grep is unchanged and is why this is ONE file rather than one per pillar.**
-> `grep -n '^### .*\[sleep\]' docs/overview/known-issues.md` works exactly as it did against
+> `grep -n '^### [devices][app-shell] ⚠️ The strap chip draws the cell's low-water mark now, and no workout has exercised it (BF-215, 2026-09-28)
+
+Home's strap chip read `100` until the cell was nearly dead: a CR2025 sags under a sustained BLE
+session and recovers at rest, so the reading that warns only exists while the owner is training and
+not looking. The chip now draws the lowest reading of the last 14 days, with the resting value named
+in the accessible name rather than on the glass (no room — the header column is 224 px at 412 dp).
+**The entry's recommendation — the minimum of the most recent connected SESSION — was measured and
+would have been a no-op:** `PolarGattClient.readBattery` fires once per connection, so the value
+cannot move inside a session. The mark is tracked across connections instead.
+
+**Pass test on the S25, across a workout:** before training the chip shows whatever the last
+fortnight's low was; after a session that sags the cell, it shows that session's low and keeps
+showing it once the cell recovers at rest. **The low-battery notification must still fire at the
+same point it does today** — that path is Kotlin (`DeviceBatteryNotifier.decide`, fed the raw
+percent by `onBattery`) and nothing in this change is native, but it is the thing to confirm.
+**What the sandbox cannot answer:** no real strap was connected, so every reading here was seeded.
+The 14-day window is a judgement, not a measurement — it is long enough to span several workouts and
+short enough that a replaced cell clears itself, and nothing can detect a cell change because a
+fresh CR2025 and a dying one both read 100 at rest.
+
+### .*\[sleep\]' docs/overview/known-issues.md` works exactly as it did against
 > `projectOverview.md`, and the standing rule depends on it. Per-pillar files would have forced an
 > issue tagged `[sleep][platform]` to live in one and go missing from the other.
 >

@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.28",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: the chest-strap battery on Home read 100 almost all the time, because the coin cell only dips while you are training and recovers by the time you look. It now shows the lowest reading of the last fortnight \u2014 the number that actually tells you whether to change the cell before your next session.",
+    ],
+  },
+  {
     version: "1.477.27",
     date: "2026-09-28",
     changes: [

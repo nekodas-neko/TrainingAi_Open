@@ -618,43 +618,6 @@ below threshold and left in place for next time.
   preference question, which is why it is being asked rather than decided.
 - **Blocks nothing.** RV-212 ①② shipped without it.
 
-### [devices][app-shell] BF-215 — the strap battery reads 100 at rest and 30 under load, so the chip is a gauge that only tells the truth mid-workout
-
-- **Lane:** B — `components/device-battery-chip.tsx`, `components/home/header-chips.tsx`,
-  `lib/hooks/use-strap-battery.ts`. No native change: the Kotlin read is correct.
-- **Added:** 2026-09-27 · owner: *"Strap battery is at 100... it was 30 last time I used it? Is this
-  working?"*
-- **Needs:** — nothing.
-- **The pipeline is working, and the measurement says so.** Production `strap_status`, every
-  non-null reading ever recorded: **exactly two distinct values.** `100` — 43 readings,
-  2026-09-23 23:19 → 2026-09-27 20:58. `30` — 17 readings, **all inside one 92-minute window**,
-  2026-09-25 20:54 → 22:26. The app stored and rendered what the strap reported, each time.
-- **A CR2025 cannot recharge, so 100 → 30 → 100 is not a state of charge.** It is coin-cell voltage
-  sag: under a sustained BLE session the cell droops and the H10 reports a lower level, and at rest
-  it recovers. That the 30s are one contiguous session rather than scattered is what rules out a
-  decode fault or buffer garbage — a misread would vary, and this does not.
-- **Two values across five days also says the H10's gauge is COARSE**, not a 0–100 scale. Treat
-  `100` as "not obviously dying" rather than "full".
-- **The consequence is the actual defect, and it is a UI one.** The cell only reads low while it is
-  under load, which is exactly when the owner is training and not looking at Home. At rest — when he
-  does look — it reads 100. **So the chip will read 100 until the cell is almost completely dead**,
-  and the one number that predicts failure is the one it never shows.
-- **The low-battery notification DID work and is the existing backstop.**
-  `DeviceBatteryNotifier.LOW_THRESHOLD = 35`, the reading was 30, so it fired during that session.
-  Any change here must not break it.
-- **Recommendation: show the LOWEST reading from the most recent connected session, not the latest.**
-  A coin cell's resting voltage stays high until the end; the sag under load is the early warning, so
-  the minimum is the informative number and the last value is the least informative one. Label it for
-  what it is ("30 under load") rather than presenting it as a live level.
-  **Alternative — leave the chip alone and lean on the notification.** It already fires at the right
-  moment and costs nothing. It loses the at-a-glance answer to *"should I change the cell before this
-  workout?"*, which is the question the chip exists to answer.
-  **Alternative — drop the strap chip entirely.** Honest, and it removes a number nobody can act on;
-  it also removes the only place the strap's state is visible without opening settings.
-- **Reversal cost:** none — presentation only, no stored state and no native change.
-- **Verify on the device** across a workout: the chip should show the session minimum afterwards, and
-  the low-battery notification must still fire at the same point it does today.
-
 ### [devices] BF-216 — the pairing screen reads a BLE characteristic through `.buffer`, which ignores the view's offset
 
 - **Lane:** B — `components/settings/chest-strap-pairing.tsx`.
