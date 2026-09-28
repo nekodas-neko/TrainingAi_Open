@@ -31,6 +31,13 @@
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell] ⚠️ A native relayout on resume targets the blank screen, and only telemetry from the phone can say if it worked (BF-110, 2026-09-28)
+
+`MainActivity.onResume` now re-measures the WebView on resume. It is Java, so it reaches the phone only
+in the APK this merge publishes. The pass test reads `bf110 resume recheck` rows in `error_events`
+after that APK is installed: `resized` means fixed, and `stuck` plus the new native heights says
+which layer to fix next (the entry's `Verify:` spells out each case).
+
 ### [devices][readiness] ⚠️ The app now drains the ring on open and resume, and no phone has run it (BF-187, 2026-09-28)
 
 `drainIfStale` is Kotlin, so it reaches the phone only in the APK this merge publishes. Until that

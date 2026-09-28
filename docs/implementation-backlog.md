@@ -16839,6 +16839,19 @@ stronger reason the measured one wins.
 
 ### [app-shell][platform] BF-110 — the blank resume survives a scroll, which means the renderer never died
 
+- **✔ NATIVE FIX BUILT 2026-09-28 (Lane A), v1.478.4, APK.** `MainActivity.onResume` asks the WebView to
+  re-measure against its parent now and again at 250 ms, before the JS recheck at 500 ms reads the
+  viewport. `AndroidRenderer.viewHeights()` exposes the WebView's and its parent's heights, and the
+  recheck breadcrumb appends them (`native view=… parent=…`). Java compiled locally, and a typo in
+  the new code fails the build.
+- **Verify:** device, read from the telemetry the owner already produces. After the APK is installed,
+  `error_events WHERE message LIKE 'bf110 resume recheck%'`: before this it read `stuck` 25 of 25.
+  - Mostly `resized`: the relayout works, and this entry can close.
+  - Still `stuck` with `native view` < `parent`: the view is not re-measured, so try a
+    harder nudge (detach and re-attach the layout params).
+  - Still `stuck` with `view` = `parent`: only Chromium's viewport lags. That is a WebView-level
+    fix (resize the view by a pixel and back), and this relayout cannot reach it.
+
 - **✅ THE READING IS IN, and it says NATIVE — measured 2026-09-18 (Review sweep 50). This entry is
   no longer waiting on data.** `error_events WHERE message LIKE 'bf110 resume recheck%'`:
 
