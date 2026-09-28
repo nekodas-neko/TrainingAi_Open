@@ -39,6 +39,22 @@
   pull completes without error. Check the WebView console for a SQLite error naming `completed_as`.
 - **Strike this row** when that is VERIFIED.
 
+### [app-shell] Home's banner registry has no guard against an unstable `report`
+
+- **The crash it prevents shipped and was fixed the same day** (RV-119 in v1.481.0, fixed in
+  v1.481.2): `report` was rebuilt on every presence change, the reporting effect depends on it, so a
+  banner whose presence changed after mount re-ran every other banner's effect — **"Maximum update
+  depth exceeded"**, Home on the root error boundary.
+- **What is missing:** nothing fails if `report` becomes unstable again. The protection is
+  `card-429-error-state.spec.ts`, which only catches it when a banner's presence genuinely changes
+  during a run. A stability test would need a React renderer for components, which this repo does
+  not use.
+- **Not device-verified, and the crash was never seen on the device.** The reproduction is a 429 stub
+  on `/api/weekly-digest`. Nothing about the loop requires a *failure* — only a presence change — so
+  real timing could reach it; whether it does is unknown.
+- **If a Home crash is ever reported,** this is the first thing to check: open Home with a banner
+  that resolves late and watch for the error boundary.
+
 ### [devices][platform] The native security batch (RV-196, OR-159) is NOT device-verified, and ring uploads are the half that matters
 
 - **Shipped in #1755, Kotlin, so it needs the CI APK installed as an UPDATE.** Never uninstall first:

@@ -66,6 +66,31 @@ test('the weekly recap says it failed instead of vanishing, and offers a retry',
   // Home, not `/session-select` — that path redirects to the Workout tab. `SessionSelectContent` is
   // rendered by the tab shell at `/`, which is where this banner actually lives.
   await page.goto('/', { waitUntil: 'networkidle' })
-  await expect(page.getByText('Your week in review didn’t load')).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByText('Tap to try again')).toBeVisible()
+
+  // RV-119 put this banner behind Home's "N ready" strip, which the owner approved. What this spec
+  // guards is Q-499's guarantee — the card SAYS it failed rather than silently vanishing — and that
+  // is now made of two halves, both asserted here:
+  //
+  //   1. the strip ADVERTISES it, so the failure is visible on Home at all; and
+  //   2. the message and its retry are really there behind it, not dropped.
+  //
+  // **Half 1 is the one that catches the real regression.** A failed recap that stopped reporting
+  // its presence would be uncounted AND hidden — invisible twice over, which is exactly the silent
+  // vanish this spec exists for. It has already earned its keep: it caught an infinite render loop
+  // in the presence registry that crashed Home to the error boundary outright.
+  //
+  // Expanding is deliberately NOT re-driven here. `rv119-home-banner-strip.spec.ts` already taps the
+  // strip and asserts the banners become visible; repeating that interaction in this spec's context
+  // tests the harness rather than the guarantee.
+  const strip = page.getByTestId('home-banner-strip')
+  await expect(strip, 'the failed recap did not even reach the strip — it vanished silently')
+    .toBeVisible({ timeout: 30_000 })
+  await expect(strip, 'the strip does not say anything is waiting').toContainText(/[1-4] ready/)
+  await expect(strip, 'the strip does not name the week in review as what is waiting')
+    .toContainText(/Week in review/)
+
+  // Present, behind the collapse — `toBeAttached`, not `toBeVisible`, because the container is
+  // hidden until tapped and that is the approved information architecture, not a defect.
+  await expect(page.getByText('Your week in review didn’t load')).toBeAttached({ timeout: 30_000 })
+  await expect(page.getByText('Tap to try again')).toBeAttached()
 })
