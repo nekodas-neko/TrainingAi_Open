@@ -50,6 +50,40 @@ that is not plain snake_case. It never touches `.env.local`. This replaces the g
 clone gave: `generate-claude-ro-views.js` writes whatever columns it finds into a committed file,
 so a database with hand-applied changes would publish them.
 
+## ④ Keep the lane's environment — do not rebuild it per PR
+
+The owner's goal (2026-09-28): Lane A runs locally and keeps churning, with a test environment that
+survives from one PR to the next. The shape that gives it:
+
+- **One permanent worktree per lane, and branches switch inside it.** Lane A's is
+  `D:/Projects/TrainingAi_Open-lane-a` (`git worktree add --detach ../TrainingAi_Open-lane-a origin/main`).
+  A new PR is a `git checkout -b <branch> origin/main` in that directory, **not** a new worktree.
+  A throwaway worktree is for one job only, such as resolving a conflict on another branch while a
+  suite runs, and it has no `node_modules`.
+- **`node_modules` is installed once.** `pnpm install --frozen-lockfile --prefer-offline` hard-links
+  from the shared store. The first install of the Lane A worktree took **12.5 s**, and after that only
+  a lockfile change needs a re-run.
+- **The worktree's own `.env.local` has no production database in it.** It is the owner's file with
+  every `DATABASE_URL`/`LOCAL_DATABASE_URL`/`CLAUDE_DB_READONLY_URL` line removed and the lane
+  database written in instead, with `DATABASE_SSL=false`. A command run there with no override
+  reaches `trainingai_lane_a`, never Railway, and the per-command overrides below stop being
+  load-bearing.
+- **One database per lane on the Docker server**, `trainingai_lane_a` on 5434. `pnpm db:rebuild`
+  resets it to migrations plus the seed. `pnpm db:snapshot` loads the owner's production rows into
+  it for prod-shaped testing:
+
+  ```bash
+  LOCAL_DB_PORT=5434 DATABASE_URL=postgresql://postgres:postgres@localhost:5434/trainingai_lane_a \
+  SNAPSHOT_URL='https://trainingai-production.up.railway.app/api/admin/db-snapshot?bulk=0' \
+  ADMIN_SNAPSHOT_SECRET=<from .env.local> node scripts/local-db/snapshot.js
+  ```
+
+  It holds the owner's rows only (the `claude_ro` scope) and omits the four bulk tables unless
+  `bulk=<days>` asks for them. It refuses a stream the server reports as failed, and it rolls back
+  on any count mismatch, so a bad load leaves the database as it was. **Rebuild before a migration
+  rehearsal, and snapshot when a bug needs real data.** The fresh seed is exactly what hides drifted
+  production rows.
+
 ## `.env.local` on a developer machine holds production URLs
 
 Both `DATABASE_URL` lines in the owner's `.env.local` point at Railway, and it sets
