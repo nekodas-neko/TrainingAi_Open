@@ -837,8 +837,25 @@ below threshold and left in place for next time.
 
 ### [platform] OR-196 — docs-only PRs run the full suite, and the obvious fix would block every merge
 
-- **Lane: A** · **Added:** 2026-09-27 · Orchestrator. Lane assignment is by the residual rule rather
-  than a path list — CI config is neither lane's named territory; Lane A claims it as platform.
+- **⚑ OWNER DECISION (Lane A, 2026-09-28): may a docs-only PR skip the expensive half of the
+  required checks?** Recommendation: **yes, with the design below.** Measured on #1865, a docs-only
+  PR from today: **21 billed minutes** (4 test shards 2–3 min each, Build 3.6 min, and the rest at
+  about 1 min each). The design would cost about 7.
+  - **Design (drafted, then deliberately not committed).** A `Changes` job lists the PR's files
+    through the API. Old paths of renames are included, so moving code into `docs/` doesn't count
+    as docs. It outputs `code=false` only when every path is under `docs/` or ends `.md`. Lint,
+    Build and Migration Check still RUN and REPORT, but skip their steps. The four shards are not
+    required checks and are skipped outright. `Tests` then runs `scripts/__tests__`, where the
+    tests that read the real backlog live. Custom Rules and E2E are unchanged. **It fails safe:**
+    a failed `Changes` job, an unreadable file list, or ≥3,000 files runs everything.
+  - **Why it came back to you.** Lane A's tooling refused the edit as a CI bypass: it makes
+    *required* checks pass without running their work on a class of PR. That is a real change to
+    what "green" means. The owner decides that, not an agent.
+  - **Alternative:** leave it. This is what the workflow's own comment chose (*"correctness over a
+    few saved minutes"*), and it still costs nothing but minutes.
+  - **Reversal cost:** one workflow file and one small script.
+- **Lane: O** (was A). On a yes, Lane A builds it from the design above.
+- **Added:** 2026-09-27 · Orchestrator.
 - **The waste is real.** `.github/workflows/ci.yml` has no `paths-ignore`, so a markdown-only PR runs
   Lint, Tests, Build, Migration Check and Custom Rules. Most Orchestrator, Review, BugFix and Tuning
   PRs are markdown-only, which is most PRs.
