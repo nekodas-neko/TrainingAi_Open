@@ -3909,27 +3909,25 @@ which is the right shape for something that can only be validated by living with
   only *after* a swallowed tap, so it is downstream of the same defect and may clear with it. If it
   survives, it is its own entry with its own mechanism, not a re-open of this one.
 
-### [app-shell][platform] LB-183 — one time-of-day form: a fourth is still live, and two more wait on a minutes-based helper
+### [app-shell][platform] LB-183 — one time-of-day form: switch the two minutes-of-day formatters to the shared helper
 
-- **Lane: A** — `packages/shared/src/date-utils.ts`. **Added:** 2026-09-28 · Lane B, split out of
-  `RV-208` ① on shipping that entry's ③.
-- **Why it is its own entry:** it was written inside `RV-208`, which is `Lane: B`. The lane field is
-  what routes work, so a Lane A item described in a Lane B entry reaches nobody — the same shape
-  CLAUDE.md calls out for an owner question buried in another entry. `RV-208` ① had already been
-  marked *"NOT Lane B"* in prose and still sat in Lane B's queue.
-- **The fourth form, measured 2026-09-27 by RUNNING both functions rather than reading them:**
-  `formatTime12h('06:40')` returns **`6:40am`**; `formatTimeOfDay` returns **`6:40 am`**. It feeds
-  `activity-detail-sheet.tsx` and `activity-history-card.tsx` — **the "Health's activity list reads
-  6:40am" surface `RV-208` opened with.** One character in a `packages/shared` file.
-- **Two more are blocked on a helper that does not exist yet.**
-  `components/health/sleep/sleep-verdict-copy.ts`'s `formatClock` (`11:10pm`) and
-  `components/health/sleep-timing-trend-utils.ts`'s `clockLabel` (`6:30 AM`, a chart axis) both
-  format **minutes-of-day**, not an instant, so `formatTimeOfDay` cannot take them as-is. They need
-  a minutes-based sibling in `packages/shared` — Lane A's engine half first; Lane B then converts
-  the two call sites, which are in its own tree.
-- **Do not "fix" the two call sites by reaching for `formatTimeOfDay`**: it takes an instant, and a
-  minutes-of-day value turned back into a `Date` is the timezone bug this repo keeps re-finding —
-  `formatClock`'s own header says so.
+- **Lane: B** — `components/health/sleep/sleep-verdict-copy.ts` (`formatClock`) and
+  `components/health/sleep-timing-trend-utils.ts` (`clockLabel`). Re-laned 2026-09-29: the engine
+  half shipped.
+- **Added:** 2026-09-28 · Lane B, split out of `RV-208` ①.
+- **✔ ENGINE SHIPPED 2026-09-29 (Lane A):**
+  - `formatMinutesOfDay(minutes)` in `packages/shared/src/date-utils.ts` prints exactly what
+    `formatTimeOfDay` prints ("6:40 am") for a minutes-since-midnight value. It rounds the whole
+    value first and wraps into one day.
+  - `formatTime12h` now delegates to it, so the activity list and sheet read "6:40 am" (the fourth
+    form is gone).
+- **What is left (Lane B):** replace `formatClock`'s and `clockLabel`'s bodies with
+  `formatMinutesOfDay`, and update their tests ("11:10pm" becomes "11:10 pm", "6:30 AM" becomes
+  "6:30 am").
+  - `clockLabel` also has a latent bug the helper fixes: it rounds the minute alone, so 419.6 renders
+    "6:60 AM".
+  - **Do not route either through `formatTimeOfDay`**: it takes an instant, and these values are
+    wall-clock minutes.
 
 ### [app-shell][platform] RV-208 — the same thing is written, formatted and coloured differently on different screens
 - **Inherited from `RV-212` ③ when that entry was cleared (2026-09-27):** the near-white primary is
