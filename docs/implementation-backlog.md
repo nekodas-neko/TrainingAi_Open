@@ -3389,17 +3389,6 @@ which is the right shape for something that can only be validated by living with
   be a dev-only artefact. It needs one run against a production build before anyone treats it as a
   bug, because if it is real the toast above is never seen at all.
 
-### [platform] RV-193 — the Google refresh token is copied into the session JSON that page scripts can read
-- **Lane: A** — `auth.config.ts:51`, `app/api/log-calendar-event/route.ts:22`.
-- **⚠ AUTH — the owner confirms before this merges.** The change is one line.
-- **Added:** 2026-09-24 · Review sweep 60.
-- **What:** the refresh token belongs in the encrypted, httpOnly JWT, and it is there. It is **also**
-  copied to `session.refreshToken`, which `GET /api/auth/session` returns to page JavaScript. No
-  client code uses it; its only consumer runs on the server.
-- **Impact:** needs script execution in the app's origin, which is exactly what RV-191 provides. The
-  token is long-lived, can write to Google Calendar, and outlives sign-out.
-- **Fix:** delete the line. Read the token server-side with `getToken()` in `log-calendar-event`.
-
 ### [platform] RV-195 — three low-severity auth and social gaps, one PR
 - **Lane: A.** One PR. **⚠ AUTH — the owner confirms before this merges.**
 - **Added:** 2026-09-24 · Review sweep 60.

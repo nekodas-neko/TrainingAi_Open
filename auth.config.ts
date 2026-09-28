@@ -48,7 +48,8 @@ export const authConfig: NextAuthConfig = {
     },
     session({ session, token }) {
       if (token.userId) session.user.id = token.userId
-      if (token.refreshToken) session.refreshToken = token.refreshToken
+      // RV-193: the Google refresh token stays in the encrypted JWT. The session object is readable
+      // by page script via /api/auth/session; read the token server-side with googleRefreshTokenFor.
       if (typeof token.isActive === "boolean") session.isActive = token.isActive
       if (typeof token.isAdmin === "boolean") session.user.isAdmin = token.isAdmin
       if (token.timezone) session.user.timezone = token.timezone

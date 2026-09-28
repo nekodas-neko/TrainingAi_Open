@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { googleRefreshTokenFor } from "@/lib/auth/google-refresh-token";
 // OR-166 — the SCOPED client, not the `googleapis` umbrella. Same generated Calendar v3 code;
 // `googleapis` bundles every Google API alongside it, which is 203 MB against this one's 884 kB,
 // and Next traces the whole import graph for the server bundle on every build.
@@ -55,10 +56,11 @@ function makeOAuth2(refreshToken: string) {
 
 export async function POST(req: NextRequest) {
   const session = await auth();
-  const refreshToken = session?.refreshToken;
+  const userId = session?.user?.id;
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const refreshToken = await googleRefreshTokenFor(req.headers, userId);
   if (!refreshToken) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const userId = session?.user?.id ?? 'anon';
   if (!rateLimit(`${userId}:log-calendar-event`, RATE_LIMIT_PER_HOUR, 3_600_000)) {
     return NextResponse.json({ error: 'Too many requests — try again shortly.' }, { status: 429 });
   }

@@ -34,6 +34,15 @@ const setCredentials = vi.fn()
 
 let session: Row | null = { user: { id: 'u-1' }, refreshToken: 'rt-1' }
 vi.mock('@/auth', () => ({ auth: async () => session }))
+// RV-193: the refresh token is read from the encrypted JWT, never the session object. The fixture
+// keeps `refreshToken` on `session` for readability and serves it from here. `jwtUserId` lets a
+// case hand the route a JWT that belongs to someone else.
+let jwtUserId: string | null | undefined
+vi.mock('next-auth/jwt', () => ({
+  getToken: async () => session
+    ? { userId: jwtUserId === undefined ? (session.user as Row).id : jwtUserId, refreshToken: session.refreshToken }
+    : null,
+}))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: (...a: unknown[]) => rateLimit(...a) }))
 vi.mock('@/lib/observability', () => ({ reportServerError: (...a: unknown[]) => reportServerError(...a) }))
 vi.mock('@/lib/data', () => {
@@ -69,6 +78,7 @@ beforeEach(() => {
   listPendingScaleSamples.mockResolvedValue([])
   listRecentDismissedScaleSamples.mockResolvedValue([])
   session = { user: { id: 'u-1' }, refreshToken: 'rt-1' }
+  jwtUserId = undefined
 })
 
 describe('POST /api/feedback', () => {
@@ -227,6 +237,12 @@ describe('POST /api/log-calendar-event', () => {
     // This route authorises on `refreshToken`, not on `user.id`: a signed-in user who never granted
     // Google access has a session and cannot write a calendar event.
     session = { user: { id: 'u-1' } }
+    expect((await calendar(VALID_EVENT)).status).toBe(401)
+    expect(eventsInsert).not.toHaveBeenCalled()
+  })
+
+  it('RV-193: refuses a refresh token from a JWT that belongs to another user', async () => {
+    jwtUserId = 'u-2'
     expect((await calendar(VALID_EVENT)).status).toBe(401)
     expect(eventsInsert).not.toHaveBeenCalled()
   })

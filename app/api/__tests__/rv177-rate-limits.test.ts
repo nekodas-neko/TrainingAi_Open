@@ -18,6 +18,10 @@ vi.mock('@/lib/nutrition/meal-top-up', () => ({
   scaleWithTopUp: vi.fn(async (ingredients: unknown) => ingredients),
 }))
 
+// RV-193: the route reads the refresh token from the JWT, not the session.
+vi.mock('next-auth/jwt', () => ({
+  getToken: async () => ({ userId: USER, refreshToken: 'fake-refresh-token' }),
+}))
 vi.mock('@/auth', () => ({
   auth: vi.fn(async () => ({
     user: { id: USER, timezone: 'Australia/Brisbane' },

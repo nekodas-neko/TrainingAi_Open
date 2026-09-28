@@ -4,7 +4,6 @@ import type { ActivityLevel } from "@trainingai/shared/types/user"
 
 declare module "next-auth" {
   interface Session {
-    refreshToken?: string
     isActive?: boolean
     user: {
       id: string
