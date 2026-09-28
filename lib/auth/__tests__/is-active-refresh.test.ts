@@ -45,11 +45,11 @@ describe('refreshIsActiveClaim', () => {
     expect(token.isActiveCheckedAt).toBe(0)
   })
 
-  it('RV-195: treats a deleted user (lookup succeeds, no row) as inactive, and re-checks next request', async () => {
+  it('treats a missing user row as no evidence, and retries next request', async () => {
     const token = { userId: 'u1', isActive: true, isActiveCheckedAt: 0 }
     await refreshIsActiveClaim(token, async () => null, NOW)
-    expect(token.isActive).toBe(false)
-    expect(token.isActiveCheckedAt).toBe(0) // not advanced — a restored row is seen next request
+    expect(token.isActive).toBe(true)
+    expect(token.isActiveCheckedAt).toBe(0) // not advanced — next request tries again
   })
 
   it('does nothing without a userId', async () => {

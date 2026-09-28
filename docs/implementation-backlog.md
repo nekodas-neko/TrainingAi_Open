@@ -3308,6 +3308,22 @@ which is the right shape for something that can only be validated by living with
 - **How to check it:** `pnpm dev` with two local users: send a request, and confirm the sender sees
   "Request sent" with Cancel and the addressee sees the sender's name with Accept/Decline.
 
+### [platform] RV-195 — three low-severity auth and social gaps, one PR
+- **Lane: A.** **⚠ AUTH — the owner confirms before this merges.**
+- **① and ③ BUILT 2026-09-29 in #1930. ② is #1784**, from an earlier Lane A session. This entry
+  leaves the queue when #1784 merges.
+- **Added:** 2026-09-24 · Review sweep 60.
+1. **Mobile sign-in challenge is not bound to the browser that started it** (`app/auth-mobile-bridge/page.tsx`).
+   Exploiting it needs a malicious app on the phone plus a tapped link. Fix: `/mobile-signin` sets a
+   short-lived httpOnly cookie holding the challenge, and the bridge mints a token only if the query
+   value matches that cookie.
+2. **A deleted user stays signed in** (`lib/auth/is-active-refresh.ts`). A missing row is treated as
+   "no change". Fix: `auth()` returns null when the lookup succeeds and finds no row. The fail-open
+   for database outages stays.
+3. **A pending friend request reveals the target's name, avatar and friend code** (`slices/social.ts`
+   `sendFriendRequest`, pending rows in `listFriendships`). Fix: until the request is accepted, return
+   only what the requester typed.
+
 ### [devices][platform] RV-196 — any script in the app's origin can read, clear or redirect the Oura ring key through the native plugin
 - **Lane: A** — `android/**` (`OuraBlePlugin.kt`, `ScaleBlePlugin.kt`, `PolarBlePlugin.kt`). **Needs a new APK.**
   **⚠ SECURITY — the owner confirms before this merges.**
