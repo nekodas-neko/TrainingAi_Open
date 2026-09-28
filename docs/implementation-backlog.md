@@ -3404,7 +3404,7 @@ which is the right shape for something that can only be validated by living with
   2. **`revealKey` and `clearKey`** now require a native `AlertDialog` tap. A system dialog is
      outside the WebView, so a script in the origin can open it and cannot answer it. Both callers
      are explicit buttons in the debug console, so the cost is one deliberate extra tap.
-- **Keep:** owner confirmation before merge (this entry's own ⚠), and the device check — the dialog
+- **Keep:** the device check (Known Issues: "native security batch"), which includes confirming the ring still uploads after the update. Owner confirmation was given 2026-09-29. The dialog
   appears and is answerable, and ring/scale/strap ingest still reaches the server afterwards.
 
 ### [platform] RV-197 — the production CSP allows WebSockets to any host, and nothing uses them
