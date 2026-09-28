@@ -353,7 +353,7 @@ export const sessionExerciseHandler: DomainHandler = {
         styleId: (r.styleId as string | null) ?? null,
         position: r.position as number,
         muscleGroups: (r.muscleGroups as string[]) ?? [],
-        exerciseRole: (r.exerciseRole as ExerciseRole | undefined) ?? 'primary',
+        exerciseRole: (r.exerciseRole as ExerciseRole | undefined) ?? UNCLASSIFIED_EXERCISE_ROLE,
       })
       await bumpProgramOfSession(db, r.sessionId as string)
       return { ok: true }

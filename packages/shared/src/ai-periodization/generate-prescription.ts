@@ -40,6 +40,7 @@ import type { AiPrescription, AiPrescriptionExercise, PeriodizationPhase } from 
 import type { PrescriptionSignals } from '@trainingai/shared/ai-periodization/signals'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { createDedupCache } from '@trainingai/shared/ai-periodization/generation-dedup'
+import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
 
 export type GeneratePrescriptionResult =
   | {
@@ -586,7 +587,7 @@ async function runPrescriptionGeneration(
   for (const ex of parsed.exercises) {
     const a = autoregById.get(ex.session_exercise_id)
     if (!a) continue
-    const role = roleById.get(ex.session_exercise_id) ?? 'primary'
+    const role = roleById.get(ex.session_exercise_id) ?? UNCLASSIFIED_EXERCISE_ROLE
     ex.reps = a.reps
     ex.sets = a.sets
     if (role === 'accessory') {

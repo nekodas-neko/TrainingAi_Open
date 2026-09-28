@@ -13,6 +13,13 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    version: "1.477.33",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: an exercise added without choosing a role used to become a Main lift, loaded at the heaviest percentage with a to-failure last set. It is now Accessory until you change it, so a movement nobody classified is under-loaded rather than over-loaded. Roles you have already set are not touched.",
+    ],
+  },
+  {
     version: "1.477.32",
     date: "2026-09-28",
     changes: [

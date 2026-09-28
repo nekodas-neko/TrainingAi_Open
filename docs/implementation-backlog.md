@@ -7726,43 +7726,6 @@ drift.
   rewrite and no per-ingest cost. It needs the sleep windows at read time (a join) and it puts the
   rule in two places, so it is a real trade rather than an obvious win.
 
-### [heart-rate][platform] RV-181 — the HR profile pulled 90 days of raw heart rate to compute six numbers
-
-- **Lane: A** — `packages/shared/src/health/hr-profile.ts`, `lib/data/postgres/slices/oura.ts`.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)). Two agents measured this independently.
-- **The headline SURVIVED re-measurement on 2026-09-25**, against a moving window three weeks on:
-  **565 s of 1,117 s of all database time (50.6%)**, 12,591 calls, 44.84 ms mean, 16,843 rows a
-  call. The 90-day window is 134,425 raw rows, **133,041** after the chest-strap merge.
-- **SHIPPED 2026-09-25** ([entry](overview/history-2026-09-26-folded-3.md#2026-09-25-rv181-observed-hr-sql-aggregate)):
-  `repo.getObservedHrProfile` computes the profile in SQL, one row instead of the window. The seven
-  `resolveHrProfile` callers fetch no rows; `/api/cardio-week` reads its two 30-day windows as
-  aggregates too, so `resolveHrProfileWithWindow` (RV-73) is gone with its boundary caveat.
-- **⚠ The EVIDENCE line was wrong — sweep 51's "same statistic as a SQL aggregate at 54 ms" had no
-  chest-strap merge**, which is 78% of the rows and the whole cost. Measured: plain form 67 ms, the
-  merge-preserving form shipped 225–260 ms, the row fetch ~354 ms. **So the saving is about a third,
-  not seven eighths.** The rest of the win is 133,041 rows no longer crossing the wire or being
-  materialised in Node per resolve. Formulations tried and their timings are in the journal entry.
-- **STILL OPEN — the memo, which holds the other two thirds.** The 90-day shape ran **~1,460 times
-  in 25.2 days (~58/day)** and the aggregate does not touch that count: `useHrProfile` is mounted on
-  the active-workout and exercise-summary screens and `hr-profile` is in `invalidateOuraSync`, so
-  every ring drain during a workout refetches it (drains run 20–32/hour at 07–09). Not shipped with
-  the aggregate because it needs a freshness call, not a mechanism — `use-hr-profile.ts` argues at
-  length against pinning this key and that argument has to be answered. **Re-measure first:** with
-  the row fetch gone, `pg_stat_statements` now reports the small-window callers only.
-- **~~STILL OPEN — same shape, smaller~~ — REFUTED 2026-09-28 by the agreement check it asked for.**
-  `/api/health/trends` re-derives HR recovery from raw HR, about 20 queries a call. This proposed
-  reading `workout_hr_stats.hrr1_best` instead. **The two are different statistics:** the trend plots
-  each session's **median** set HRR1 (`sessionHrr1Median`), and `hrr1_best` is the session's **max**
-  (`summariseWorkoutHr`). Measured against production for all 32 completed sessions in 45 days, they
-  disagree on **32 of 32 days**, with the column higher by 3 to 36 bpm/min. Reading it would redraw
-  the chart as a different metric, not make the same chart cheaper. A cheaper route would need a
-  stored per-session *median*, which is a migration. Nothing measured says the route's cost is worth
-  one: it is rate-limited to 10 a minute, and its query cost was never measured. **Not done, on
-  purpose.** The check also turned up LA-168 (fixed 2026-09-28): the raw HR under ring-only workouts has thinned since
-  the snapshots were taken, so this route's live re-derivation and the recap's stored number have
-  drifted apart.
-
-
 ### [workouts] LA-177 — the completion-time prescription is generated as if the lifter had trained 0 hours ago
 
 - **Lane: B** — `components/workout-screen.tsx`, the post-completion `/prescribe` call (~line 1547).
@@ -11335,32 +11298,6 @@ line must name **what moved** (resting HR and HRV off baseline), never imply inf
   column is non-null either way. The unit test carries the proof instead — 4 of its 6 assertions fail
   against `main`, including a real `MoodFieldsSchema.parse` round-trip, which is the silent strip the
   fix is about.
-
-### [workouts][platform] LB-118 — the explain page's `signals` omits sore-tick provenance, so LB-117 cannot be built in its lane
-
-- **Lane:** A — `lib/data/postgres/adapter.ts:1912` and `packages/shared/src/types/program.ts:127`.
-  Filed by Lane B on 2026-09-17 after checking LB-117's premise.
-- **Two one-line changes, and the value is already in scope.** The explain `signals` block is built
-  at `adapter.ts:1912` with `soreMuscles: moodLog?.soreMuscles ?? []` and no provenance;
-  `moodLog.suggestedSoreMuscles` is read twenty lines above it (line 1892, where the SCORER is fed).
-  Add it to the `signals` object and to the `signals` type.
-- **⛔ LB-117 says the adapter is *"deliberately unchanged"* and that *"the data is there"*. Both are
-  true of the repository and false of the payload the page renders.** `getMoodLog` and `listMoodLogs`
-  do return the field — it just never reaches `signals`, which is what the explain surface is given.
-  Same shape as OR-118: a derivation that exists and an exposure that does not.
-- **⚠ A Lane-B-only workaround EXISTS and is the wrong answer — this is the part worth reading.**
-  `GET /api/mood?date=…` returns the whole `MoodLog`, provenance included, so the page could fetch
-  it client-side with no Lane A change at all. **Do not.** Q-105's rule for this screen is that it
-  shows the numbers the recommendation was *actually computed from*, and `next-session` is cached
-  (`NEXT_SESSION_TTL` = `TTL_SHORT`) while the check-in can be edited after it was computed. A
-  separately-fetched mood log can therefore be a *different* check-in from the one behind the score,
-  and the page would explain a recommendation with inputs it never used — a subtler version of
-  exactly the defect LB-117 is about.
-- **Verification:** an explain payload for a day whose check-in carried a suggested tick shows the
-  field; one from before provenance existed shows `null`, not `[]` — the scorer reads null as
-  "unknown" and scores the old way, and the page must be able to say "not recorded" rather than
-  "none were suggestions".
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** citations moved: the explain `signals` block is at `adapter.ts:1952`, the in-scope value at `:1923`, the type at `types/program.ts:147`. Otherwise accurate.
 
 ### [workouts][app-shell] LB-117 — the explain screen lists sore muscles that no longer penalise anything
 
@@ -22752,79 +22689,25 @@ breath_avg_rpm:   9.1     9.7    10.0     9.8      9.8     <- the value it is co
 
 ### [workouts] BF-15 — the exercise-role fallback is `primary`, so unclassified work is prescribed like a main lift
 
-> **⚑ OWNER DECISION 2026-08-30 — a live session with NO Primary is legitimate, and this rule must
-> not treat it as a defect.** BF-16b found `Shikai / Lower` carrying three Secondary and two
-> Accessory and no Primary, and this rule would have nominated Barbell Good Morning. Put to the
-> owner, who declined: *"Reject; I wanted it made that way on purpose."* BF-16b is closed and
-> removed.
->
-> **What that changes here:** the nomination rule is a *suggestion*, never a correction to apply, and
-> nothing downstream — a validator, a Coach prompt, a data-quality sweep — may flag "no Primary" as
-> wrong. If this rule is implemented, it offers and the user decides.
-
-- **Branch:** _unassigned_
-- **Added:** 2026-08-24 · owner report — *"some 'isolation' type work will increase to a main level when it should be accessory sort of — like bicep curls... but what about cable dips?"*
-- **Lane: A** — `lib/data/postgres/schema.ts`, one Postgres migration, `lib/sqlite/migrations.ts` (local schema version), `packages/shared/src/workout/exercise-role.ts`, and the read fallbacks below.
-- **Ships alone.** BF-16b depends on it but is owner-gated; BF-17 is a label change that must stay separately revertable. BF-16a lands *before* it — see `Needs:` below.
-- **⚑ The design is settled and written up — read [`docs/superpowers/plans/2026-08-24-exercise-roles.md`](superpowers/plans/2026-08-24-exercise-roles.md) before touching any of it.** It carries the budget-scaled session shape with its calibration, the anchor rule, the measured 90% fixture, and **four shapes that were proposed and rejected with reasons** (position-based roles, isolation→accessory, never-auto-Primary, remembered per-exercise preference). Re-proposing one costs a session.
-
-**The role decides the prescription, not a badge.** `resolveStyleForExercise`
-(`packages/shared/src/phase-engine.ts:147`) selects the progression style from `exercise_role`, so an
-exercise that lands on `primary` by omission is prescribed at **90% × 3** in a Peak phase where
-`accessory` would have given a flat 60% × 12. `session-data.ts:299` also reads it for
-`lastSetMode`, so the same exercise takes an **AMRAP last set** — a set to failure at a percentage
-chosen for a compound.
-
-**Two schema defaults say `primary` and must flip together** — a local default disagreeing with the
-server writes divergent rows on the offline path:
-
-| Site | Current |
-|---|---|
-| `lib/data/postgres/schema.ts:138` | `.default('primary')` |
-| `lib/sqlite/migrations.ts:178` | `DEFAULT 'primary'` |
-
-**Ten read sites hard-code the same fallback** and must flip with them, or a null read
-re-manufactures the defect downstream: `lib/coach/domains/session-exercise.ts:311`,
-`lib/local-store/sync-engine.ts:422`, `lib/local-store/sqlite-backend.ts:1010`,
-`lib/data/postgres/slices/programs.ts:118,289`, `app/api/admin/program-export/route.ts:63`,
-`components/config/program-editor-sheet.tsx:854`, `components/config-screen.tsx:398,450`,
-`packages/shared/src/workout/session-data.ts:190,299,317,365`,
-`packages/shared/src/ai-periodization/generate-prescription.ts:389,464`,
-`components/workout/ai-prescription-card.tsx:278`.
-
-**Second half — the classifier is wired to exactly one path.** `recommendExerciseRole` is called only
-from `lib/coach/domains/session-exercise.ts:183,273` (the Coach swap). The program editor, the AI
-generator and the local assembler all take the column default instead. Replace it with the plan's
-budget-aware rule and wire it into those creation paths.
-
-- **What would count as fixed:** a session built at 30 minutes produces 1 Primary / 1 Secondary /
-  1 Accessory and at 60 minutes 1 / 2 / 2; a single exercise added to a session that already has an
-  anchor never silently becomes Primary; a test asserts the two schema defaults agree; and the plan's
-  §4 fixture passes at ≥ 90%.
-- **⛔ Two defects must be fixed in the same PR, both found in review 2026-08-24 — plan §2.**
-  **(a)** `resolveStyleForExercise` returns `'own'` when the Accessory phase has no style, and
-  `session-data.ts:193` then keeps a `styleId` that can itself be null — an exercise with **no
-  prescribed percentages at all**. Reachable in one action: `phase-editor.tsx:112` offers a blank
-  `— select style —`. Latent today (all 8 phase-sets have a style set), but this change moves the
-  unclassified population into `accessory` and enlarges the exposed group. Make the accessory style
-  non-nullable, or make `'own'` fall back to the phase's primary style.
-  **(b)** The anchor rule must require a catalogued exercise with **≥ 3 muscles**. Without the guard
-  it picks index 0 on a session of entirely Coach-invented exercises — a silent Primary at 90% × 3
-  on a movement nobody classified, which is exactly what `UNCLASSIFIED_EXERCISE_ROLE` exists to
-  prevent. If nothing qualifies, nominate no Primary.
-- **Needs:** BF-16a — the rule reads muscle counts and that entry corrects them, so writing the
-  fixture first would pin it to data known to be wrong.
-- **Ordering and role must stay independent.** The generator orders a new session Primary →
-  Secondary → Accessory by default, but **reordering an exercise must never change its role** — the
-  owner's Legs day deliberately opens with a hip thrust as Secondary before the squat. Verified
-  2026-08-24: nothing derives `exercise_role` from `position` today, so this holds by construction.
-  An implementation that re-derives on reorder would silently overwrite that preference.
-- **Do NOT sweep existing role rows in this PR** — that is BF-16b, and it is owner-gated.
-- **Related, not blocking: BF-7** covers the *runtime* duration picker. This entry reads the
-  session's *configured* budget, which BF-7's owner decision confirms is the anchor.
-- **Surface: server/shared + local SQLite.** The local-schema half is **not** web-reproducible
-  (`getLocalStore` returns null in the sandbox), so it needs the device check or a Known-Issues row.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** the site list has moved: defaults at `schema.ts:153` and `sqlite/migrations.ts:181`; `resolveStyleForExercise` at `phase-engine.ts:164`; Coach callers at `session-exercise.ts:210,300`; fallbacks at `session-exercise.ts:356`, `sync-engine.ts:429`, `sqlite-backend.ts:1047`, `programs.ts:118,320`, `session-data.ts:194,317,335,388`, `generate-prescription.ts:398,473`, `ai-prescription-card.tsx:384`. **There is a new site at `builder-review.tsx:614,617`.**
+- **Lane: B** — the editor's add-exercise path (`components/config/program-editor-sheet.tsx`) and the
+  builder review. Re-laned 2026-09-28: the engine half shipped (below).
+- **Added:** 2026-08-24 · owner report — *"some 'isolation' type work will increase to a main level
+  when it should be accessory sort of — like bicep curls... but what about cable dips?"*
+- **✔ SHIPPED 2026-09-28 (Lane A, v1.477.33):** both schema defaults and all 20 read-site fallbacks
+  now default a missing role to `UNCLASSIFIED_EXERCISE_ROLE` (`accessory`), and a test fails on
+  any `?? 'primary'` that returns. Defect (a) is fixed: an Accessory exercise whose Accessory phase
+  has no style keeps its own style, or else takes the phase's lighter style, and never nothing.
+  `recommendAddedExerciseRole` (never Primary; Secondary while the session shape has a slot free)
+  and `sessionShape` are in `packages/shared/src/workout/exercise-role.ts`.
+- **What is left (Lane B):** call `recommendAddedExerciseRole` when an exercise is added in the
+  editor, instead of leaving it on the fallback. It needs the catalogue's muscle count and the
+  session's `timeBudgetMinutes`; the result is a pre-selected pill the user can change.
+- **⚠ The plan's WHOLE-SESSION rule is deliberately not built** — see the 2026-09-28 journal entry.
+  Every whole-session creation path now takes roles from the model with Primaries capped in code
+  (BF-126), and against the BF-16a-corrected catalogue the rule scored 87% on the owner's sessions,
+  below its own 90% bar, by anchoring Legs on the hip thrust (5 muscles) over the squat (4).
+  Nothing in the catalogue separates those two.
+- **Design:** [`docs/superpowers/plans/2026-08-24-exercise-roles.md`](superpowers/plans/2026-08-24-exercise-roles.md).
 
 ### [workouts][platform] BF-17 — `main` and `primary` are two axes wearing the same word, and the UI labels them backwards
 

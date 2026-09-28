@@ -31,6 +31,16 @@
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts] ⚠️ A missing exercise role now reads as Accessory, and no phone has run the device half (BF-15, 2026-09-28)
+
+The local store's fallbacks (`program-assembler.ts`, `sqlite-backend.ts`, `sync-engine.ts`) and the
+local `session_exercises` default flipped from `primary` to `accessory`. Stored roles are NOT NULL,
+so this only changes a row that genuinely has none. An existing install keeps its old SQLite column
+default, but every local insert names the role. **Pass test on the S25:** open a program in the editor
+and the workout screen; every exercise keeps the role it showed before. Add one without picking a role:
+it shows Accessory.
+
+
 ### [platform][workouts][readiness] ⚠️ Two sync-pull fields now reach the phone, and no phone has pulled them (LA-137, 2026-09-28)
 
 LA-137's pull guard found two fields the client's pull mapper lost:

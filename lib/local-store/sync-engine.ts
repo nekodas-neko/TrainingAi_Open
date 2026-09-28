@@ -2,6 +2,7 @@ import { getLocalStore } from './index';
 import { reconcileDeadLetters } from './dead-letter-signal';
 import { resolveFailedOutboxIds, serverBackoffMs, buildWorkoutLogPayload } from './sync-helpers';
 import type { SyncDelta } from '@/lib/data/repository';
+import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role';
 import type {
   LocalBodyMetric, LocalMoodLog, LocalSleepSession,
   LocalWorkoutSession, LocalActivityLog, LocalFitnessTest, LocalPrescribedRun, LocalProgram, LocalProgressionStyle,
@@ -430,7 +431,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     styleId:      r.styleId ? String(r.styleId) : null,
     muscleGroups: (r.muscleGroups as string[]) ?? [],
     position:     Number(r.position),
-    exerciseRole: String(r.exerciseRole ?? 'primary'),
+    exerciseRole: String(r.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE),
     supersetGroup: r.supersetGroup != null ? Number(r.supersetGroup) : null,
   } satisfies LocalSessionExercise));
 
