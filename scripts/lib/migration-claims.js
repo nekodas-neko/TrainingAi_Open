@@ -13,6 +13,11 @@
 // collision: renumber the unmerged migration instead.
 const GRANDFATHERED = new Set(['081', '087', '146', '161']);
 
+// BF-214 deleted the 59 `claude_ro` view migrations, the newest of them 289. Production has every one
+// of those filenames recorded, so a number up to here names two different files in two places. The
+// next number never drops below this floor, whatever the directory's highest file happens to be.
+const RETIRED_FLOOR = 289;
+
 /** Filenames → the numbers they claim, as { num: [file, …] }. Non-numeric prefixes are ignored. */
 function claimsFromFiles(files) {
   const byNumber = new Map();
@@ -29,10 +34,11 @@ function claimsFromFiles(files) {
 /**
  * @param {string[]} merged        migration filenames on the base branch
  * @param {{ref: string, files: string[]}[]} branches  filenames on each other ref
+ * @param {number} [floor]  `next` never goes below `floor + 1` — see RETIRED_FLOOR
  * @returns {{ next: string, reserved: {num: string, ref: string, file: string}[],
  *            collisions: {num: string, claims: string[]}[] }}
  */
-function surveyClaims(merged, branches) {
+function surveyClaims(merged, branches, floor = RETIRED_FLOOR) {
   const mergedClaims = claimsFromFiles(merged);
   const owners = new Map(); // num -> [ "main: 284_x.sql", … ]
   const note = (num, where, file) => {
@@ -60,11 +66,9 @@ function surveyClaims(merged, branches) {
 
   const used = [...owners.keys()].map(Number);
   const width = Math.max(3, ...[...owners.keys()].map((n) => n.length));
-  const next = used.length
-    ? String(Math.max(...used) + 1).padStart(width, '0')
-    : String(1).padStart(width, '0');
+  const next = String(Math.max(floor, ...used) + 1).padStart(width, '0');
 
   return { next, reserved: reserved.sort((a, b) => Number(a.num) - Number(b.num)), collisions };
 }
 
-module.exports = { GRANDFATHERED, claimsFromFiles, surveyClaims };
+module.exports = { GRANDFATHERED, RETIRED_FLOOR, claimsFromFiles, surveyClaims };

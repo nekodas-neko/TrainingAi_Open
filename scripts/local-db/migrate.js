@@ -33,6 +33,7 @@
 // on a duplicate-table error could freeze a half-applied migration as done, forever. Retrying every
 // boot is noisy; recording a partial application is unrecoverable.
 const { Pool } = require('pg')
+const { createHash } = require('crypto')
 const { readFileSync, readdirSync } = require('fs')
 const { join } = require('path')
 
@@ -119,6 +120,27 @@ async function main() {
   if (REPLAY) {
     console.info(`[migrate] REPLAY — every migration re-run against a schema that already has everything.`)
     for (const e of exempted) console.info(`[migrate] replay-exempt: ${e}`)
+  }
+  // BF-214 — the claude_ro views, applied after the migrations exactly as `ensureSchema` does (see
+  // `applyClaudeRoViews` in lib/data/postgres/client.ts for why they are a file and not a migration).
+  // Unlike there, a failure here FAILS the run: this is what CI's Migration Check executes.
+  const viewsSql = readFileSync(join(__dirname, '../../lib/data/postgres/claude-ro-views.sql'), 'utf-8')
+  const viewsMarker = `claude-ro-views.sql@${createHash('sha256').update(viewsSql).digest('hex').slice(0, 16)}`
+  if (!applied.has(viewsMarker)) {
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      await client.query(viewsSql)
+      await client.query('INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING', [viewsMarker])
+      await client.query('COMMIT')
+      console.info(`[migrate] claude_ro views rebuilt (${viewsMarker})`)
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {})
+      failed.push(`claude-ro-views.sql [${err.code ?? 'no code'}]`)
+      console.error(`[migrate] FAILED claude-ro-views.sql [${err.code ?? 'no code'}]:`, err.message?.slice(0, 200))
+    } finally {
+      client.release()
+    }
   }
   console.info(
     `[migrate] applied ${ran}, skipped ${applied.size} already recorded, ` +

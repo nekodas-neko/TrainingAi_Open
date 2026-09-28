@@ -670,6 +670,9 @@ below threshold and left in place for next time.
   `origin/lane-a/q44-phase3-pr1-table-rename`. That branch must renumber before it can land; the
   check fails once both are in one tree. Not this entry's work — recorded so it is not lost.
 - **Needs:** — nothing.
+- **Superseded in part by BF-214 ① (built 2026-09-27, awaiting the owner).** `#1608` has since
+  renumbered to 290/291. Once BF-214 merges, its `291_claude_ro_views_…` twin must be deleted and
+  `lib/data/postgres/claude-ro-views.sql` regenerated instead; the new test fails the PR until then.
 - **The collision is live, not hypothetical.** `#1608` (`health-sample-storage`, `jsboiss`) adds
   `288_apple_health_samples.sql` and `289_claude_ro_views_apple_health_samples.sql`. `main` already
   holds `288_training_load_grid_dimensions.sql` and `289_claude_ro_views_grid_dimensions.sql`
@@ -737,6 +740,23 @@ below threshold and left in place for next time.
   collision by name**, so ② can be judged against a working detector rather than against prose. ②
   makes that command obsolete when it lands, which is a deletion, not a conflict.
 - **Needs:** — nothing.
+- **⚙ ① BUILT 2026-09-27 (Lane A, `lane-a/bf214-claude-ro-views-file`) — held for the owner's yes,
+  given 2026-09-27 for the deletion; the merge changes what runs at every deploy.** The views are
+  `lib/data/postgres/claude-ro-views.sql`, applied by `ensureSchema`/`migrate.js` after the
+  migrations in a transaction, gated on a content hash in `schema_migrations`. 59 twins deleted
+  (287 → 228 files). `next-schema-number.js` floors at 289. `claude-ro-views-file.test.ts`
+  regenerates and diffs, so a missed COLUMN now fails CI.
+  - **Corrections to this entry, measured:** the "no CI check" line is half-right —
+    `claude-ro-readonly-role.test.ts` DOES run in CI (the Tests job's URL is TCP) and fails on a
+    table with no view; what was missing was column level. And ① also lifts the baton's
+    "a column rename is not available in this repo", which the historical twins caused.
+  - **The explicit transaction is not what makes the file atomic** — Postgres already runs a
+    multi-statement query as one implicit transaction (a mutant removing `BEGIN` survived for that
+    reason). It ties the marker row to the rebuild.
+  - **Open PRs holding twins must drop them and regenerate the file instead:** `#1608`
+    (`291_claude_ro_views_apple_health_samples.sql`) and `#1749` (`287_claude_ro_views_drop_dead_derived.sql`).
+    Merging either as it stands fails the new test, which is the intent.
+  - **② is what remains**, and it stays this entry.
 - **Measured on `main` 2026-09-27:** **59 of 287 migrations are `claude_ro` view twins**, and they
   are **85,881 of 93,632 lines — 92% of the entire migration corpus**. Each is a ~1,688-line FULL
   SNAPSHOT opening `DROP SCHEMA claude_ro CASCADE` and rebuilding all 98 views. **Only the newest
@@ -956,6 +976,31 @@ below threshold and left in place for next time.
   any future correlation must be reported with that caveat attached.
 - **Reversal cost: one weight constant and a renormalisation** — but the re-scored history is a
   write, so it follows the snapshot-and-predicted-rows rule.
+
+
+### [nutrition][body] OR-201 — a target the app can compute should not wait on a tap
+
+- **Lane: O** · **Added:** 2026-09-28 · Orchestrator, from the owner's answer on `LA-126`:
+  *"Although this should be calculated by us rather than manually set."*
+- **What he is describing.** `LA-126` has been open since 2026-09-21 because his live nutrition
+  targets are numbers a model invented, and the fix is a recommendation he has to **accept by hand**
+  in the app. He has delegated that one tap to the device agent — and said the tap should not exist.
+- **The principle, stated so it can be applied beyond this entry:** where the app can derive a
+  target from stored inputs, it derives it. A manual accept is for a value the app cannot know, not
+  for one it computed and is asking permission to use.
+- **This is the same thing `OR-191` asks for from the other end.** That entry wants **one** calorie
+  number, `RMR + live activity ± the deficit for the weight goal`. A number defined by a formula
+  cannot also be a number he sets by hand — so `OR-191`'s formula and this entry's principle are one
+  change, and building either alone leaves the contradiction in place. **Work them together.**
+- **⚠ What this does NOT license.** Deriving a target is not the same as silently rewriting one he
+  has already set: a recompute that moves his daily calorie figure without telling him is the
+  failure mode, and the history-row policy's spirit applies — recompute freely, but say so. The
+  proposal must state what he sees when the derived number changes.
+- **Open question the proposal must answer, not this entry:** whether any target stays manual
+  (a deliberate cut or bulk he wants to hold), and how a manual override is expressed once the
+  default is computed.
+- **Reversal cost: low while it is a default, high once the manual field is removed.** Keep the
+  override until the derived number has been right for a month.
 
 
 ### [app-shell] PS-48 — two owner questions that finish the collection v2 rules
@@ -2128,6 +2173,14 @@ below threshold and left in place for next time.
 - **Remove this entry** when 1 and 2 are answered and the six fixes have merged or been declined.
 
 ### [platform] RV-161 — five owner decisions the reads just made answerable
+- **✅ CLOSED 2026-09-28 — the last item is answered: PS-17 MOVES UP, and stays up.**
+  He confirmed the 2026-09-25 promotion rather than reversing it: a phantom afternoon *"sleep"*
+  replacing a real night on **12 of 27 recent dates** is a data-correctness defect he sees daily on
+  every sleep surface, and it feeds readiness. He did **not** take the stronger option of jumping
+  the whole Lane A queue, so it sits high without displacing the approved schema group.
+  **All five of this entry's items are now resolved** — ① rederive authorised, ② outlier-only
+  ratings, ③ Q-30 re-asked as `OR-192`, ④ Q-527 already approved 2026-09-25, ⑤ PS-17 up.
+  **Strike this entry.**
 - **✅ PARTLY ANSWERED 2026-09-27 — items 1 and 2 are settled; 3 is deferred with a steer; 4 and 5 are still owed.**
   - **① `rederive-baselines`: YES — dry-run first, then run.** Authorised. It is a recompute from
     stored inputs, which is the half of the history-row policy he already said yes to. **This
@@ -2146,7 +2199,6 @@ below threshold and left in place for next time.
     hand-edits-no policy. Nothing is owed from him; the production write is Lane A's.
     Re-ask on its own.
   - **⑤ PS-17's queue position: NOT ASKED** — dropped for room in the 2026-09-27 round. Still owed.
-- **Ask:** owner — one left from the five: whether PS-17 moves up the queue. (Q-30 is re-asked on its own entry.)
 
 - **Lane: O** — each is the owner's; the recommendation comes first. **Moved to the head of `O` on 2026-09-24 at the owner's instruction (*"send the decisions to orchestrator"*), per #1508's rule: rank 17 was in the queue and out of view.**
 - **Added:** 2026-09-24 · Review sweep 56 ([`docs/reviews/2026-09-24-sweep-56-reads-nobody-ran.md`](reviews/2026-09-24-sweep-56-reads-nobody-ran.md)).
@@ -4699,6 +4751,8 @@ which is the right shape for something that can only be validated by living with
 ### [readiness][platform] LA-142 — four `oura_daily_derived` columns have no writer (and the two that looked worst DO have one)
 
 - **Lane: A** — `lib/oura-ble/rollup/run.ts`, `oura_daily_derived`.
+- **Rebase note (2026-09-27):** `#1749` carries `287_claude_ro_views_drop_dead_derived.sql`. If
+  BF-214 merges first, delete that twin and regenerate `lib/data/postgres/claude-ro-views.sql`.
 - **Added:** 2026-09-25, Lane A — found while fixing LA-140, by asking how many columns share its
   shape. **Corrected the same day; the first version of this entry was wrong, see below.**
 - **Measured on production 2026-09-25: 11 of `oura_daily_derived`'s columns are NULL on every row.**
@@ -4898,7 +4952,12 @@ unverified"* is now answered: it persists.
     everything, so it proved nothing either way. Treat fix (b), filling the grid under a stated rule,
     as the live proposal. It is a modelling assumption, so it goes through Tuning before Lane A
     builds it.
-  - **The buildable half is filed as LA-170:** evaluate a day once it has ended, so the stored
+  - **⚙ LA-170 SHIPPED 2026-09-28:** every verdict is stamped (`training_load_evaluated_at`, migration
+    292), and a read of today re-evaluates yesterday once it has ended. **The next read:** the day
+    after deploy, yesterday's row should carry a grid ≥ 720 and a stamp after its own midnight. If
+    the gate then reads `scorer_no_output` on full days, the floors are cleared and fix (b) (the NaN
+    contract) is what is left.
+  - **The buildable half was filed as LA-170:** evaluate a day once it has ended, so the stored
     verdict describes the whole day. Alone it only turns `insufficient_met` into
     `scorer_no_output` on full days until the NaN fix lands. That is still worth having, because it
     makes the stored reason honest.
@@ -5010,25 +5069,6 @@ unverified"* is now answered: it persists.
   min(measured_at)`, which is the frames' extent and an upper bound on the grid's length. One user,
   one ring, the 9 days the hot window holds — days older than that live in `oura_raw_packed` and were
   not measured, so the 21-day gate run is only partly explained by this table.
-
-### [readiness][heart-rate] LA-170 — the training-load verdict is only ever computed for an unfinished day
-- **Lane: A** — `app/api/training-stress/route.ts`, `packages/shared/src/health/training-stress.ts`.
-- **Added:** 2026-09-28 · Lane A, from TN-79's LA-161 read.
-- **What:** `/api/training-stress` is asked only about today, and re-persists its gate on every call.
-  A day's stored verdict is therefore the last evaluation made *during* that day. A morning
-  evaluation cannot pass the 720-minute MET floor (09-28 at 08:46: grid 471). No path evaluates a
-  day after it ends, so every stored `insufficient_met` may be describing a partial day.
-- **Fix shape:** when today is evaluated, also evaluate the previous day if its stored verdict was
-  written before that day ended. That needs a record of *when* the verdict was computed, because
-  `updated_at` is bumped by device pushes (the sync-push branch COALESCEs into the same row). That
-  means a column (`training_load_evaluated_at`), so a migration **waits behind BF-214's numbering**.
-  Without it, re-evaluating on grid length alone would re-read a day of frames on every call for a
-  day the ring barely saw.
-- **What it will and will not change:** full days move from `insufficient_met` to a verdict computed
-  on the whole day, which today means `scorer_no_output` until TN-79's NaN fix lands. No score
-  appears from this alone; the stored reason becomes true.
-- **Done when:** yesterday's row carries a grid measured after its end, and a test pins that a
-  morning evaluation of today never becomes a completed day's final verdict.
 
 ### [activity] TN-76 — four of the Activity Score's six contributors do not behave as the model documents, measured off its own stored breakdown
 
@@ -8823,6 +8863,15 @@ drift.
   the sandbox can only prove the primitive is wired in.
 
 ### [platform] LB-135 — an owner gate is recorded as satisfied without preserving what he approved
+- **✅ CLOSED 2026-09-28 — SUPERSEDED, not completed.** This entry's job was exporting the
+  2026-09-22 Home mockup from the Orchestrator's chat to the repo. **That artefact is
+  unrecoverable** — the session is gone and nothing in `docs/design/` holds it — so it was
+  **redrawn** instead: [`docs/design/2026-09-28-home-banner-stack.html`](design/2026-09-28-home-banner-stack.html),
+  linked from `RV-119`, which is where the remaining decision lives.
+- **The rule it leaves behind, which is the durable part:** a mockup is not shown until it is in
+  `docs/design/`. An approval whose artefact lives only in a transcript records that a decision
+  happened and loses what was decided — `RV-119` sat unbuildable for six days on exactly that.
+  **Strike this entry.**
 - **✅ THE CLASS IS FIXED FOR THE 2026-09-27 BATCH, though this entry's own artefact is still lost.**
   Four mockups (`LB-163`, `LA-136`, `RV-213`, `RV-166`) were produced and **committed to the repo**
   as [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html)
@@ -8909,8 +8958,38 @@ drift.
 - Leave Home's `weightSparkline` alone — it is the glance version and links into `/health?tab=body`.
 
 ### [app-shell] RV-119 — seven independent banners stack above Home's first real content
+- **📐 REDRAWN 2026-09-28 — [`docs/design/2026-09-28-home-banner-stack.html`](design/2026-09-28-home-banner-stack.html)
+  ([hosted](https://claude.ai/artifact/V3PRnnjchdhAA9nXYwgXLt)). Committed, so it cannot be lost a
+  second time. **`LB-135`'s export is superseded** — the 2026-09-22 artefact is unrecoverable, so
+  it was redrawn rather than found.
+- **The agreed split is UNCHANGED and is not re-asked:** illness advisory and early deload stay
+  full-width; exercise-detected, goals check-in, day-in-review and weekly recap collapse. The APK
+  banner is already shipped as removed, so it is six, not seven.
+  **Verified against `main` 2026-09-28, not taken from the entry:**
+  `app/session-select/session-select-content.tsx:1128–1192` renders `IllnessAdvisoryBanner`, the
+  auto-detected walk/run prompt, the `earlyDeloadRecommended` banner, `showGoalsCheckin`, the
+  day-review `DismissibleBanner` and `WeeklyRecapBanner`, in that order.
+- **Ask:** owner — one pick: **A (one strip)** or **B (thin rows)** for the four that collapse. Recommendation A, on the page with what each costs.
+- **Gate:** owner — the picture now exists, so his answer is the only outstanding thing.
+- **⚠ Heights on the page are drawn to scale relative to one another, NOT measured on the device.**
+  A live screenshot needs all six conditions true at once, which no sandbox can arrange. Whichever
+  treatment he picks owes a device look at the real stack before it is called done.
+- **✅ ANSWERED 2026-09-28 — REDRAW the mockup and re-approve. Do not build to the 2026-09-22
+  approval.**
+  He chose redrawing over building to the described split. The reasoning stands on its own: the
+  approval survives and the artefact does not, so *"build to it"* is not actionable, and a lane can
+  implement the description exactly and still produce a Home he dislikes — the failure the mockup
+  rule exists to prevent.
+  **Orchestrator draws it**, same shape as the 2026-09-27 batch that worked: before/after at 384 px
+  dark, committed to `docs/design/` so it cannot be lost a second time.
+  **What the drawing must show:** two banners staying full-width (illness advisory, early deload)
+  and four collapsing (exercise-detected, goals check-in, day-review, weekly recap) — **five in the
+  original, minus the APK banner, which has already shipped as removed.** The open question the
+  picture has to answer is what a *collapsed strip* actually looks like, which is the part no
+  description settles.
+  **`LB-135` stays open** — its job was exporting the lost artefact, and the artefact is
+  unrecoverable, so the redraw supersedes the export.
 
-- **Ask:** owner — seven independent banners can stack above Home's first card. Which collapse and which stay full-width is a look he sees daily, so it needs him before code, and it owes a mockup at 384 px dark.
 
 - **Lane: O — the mockup EXISTS, in the ORCHESTRATOR's chat, and needs exporting (LB-135).** The
   owner confirmed 2026-09-23 that the 2026-09-22 mockup was shown in that session; it was never
@@ -9551,8 +9630,20 @@ drift.
   the code path, **not** from stored output. That is exactly what the measurement above would settle.
 
 ### [body][nutrition] LA-126 — the owner's live nutrition targets are numbers a model invented 🔴 LIVE
+- **✅ ANSWERED 2026-09-28 — TWO things, and the second is the bigger one.**
+  Verbatim: *"Send it to DV agent to do sort out. Although this should be calculated by us rather
+  than manually set."*
+  **① The tap goes to Device Verification** — the field below is set to `DV`. **⚠ This is the owner EXPLICITLY
+  overriding a line in this entry** — it said *"nobody may run it for him"*, and he has now
+  authorised the device agent to do it on his phone. Record it as his authorisation, not as an
+  agent deciding it was fine. DV accepts the post-`RV-66` recommendation and reports the before and
+  after numbers.
+  **② The manual accept should not exist.** *"This should be calculated by us rather than manually
+  set"* is a product direction, not a comment on this tap: a target the app can compute should not
+  wait on him to approve it. **Filed as `OR-201`**, and it makes this entry the last time anyone
+  asks him to tap this.
 
-- **Lane:** A — production data, `nutrition_targets`. **Added:** 2026-09-21 (Lane A, while shipping
+- **Lane:** DV — re-laned 2026-09-28 (was `A`). Production data, `nutrition_targets`. **Added:** 2026-09-21 (Lane A, while shipping
   RV-66).
 - **✅ DECIDED BY THE OWNER, 2026-09-23 — gate released: *"we want the corrected/calculated numbers
   only."*** He was offered the option of seeing both first and did not take it. So the computed
@@ -9580,8 +9671,8 @@ drift.
 - **The numbers he is moving to**, so nobody has to re-derive them: **1,359 kcal / 111 g protein /
   143 g carbs / 38 g fat** at the DEXA-corrected body fat — down **259 kcal** and **39 g protein**
   from the 1,660 / 150 he has been eating for three weeks. That is a real cut, not a correction.
-- **Ask: owner** — ONE TAP, not a decision — accept the post-RV-66 calorie recommendation in the app. The outcome was decided 2026-09-23; nobody may run it for him. Surfaced 2026-09-26 (OR-181): it was gated and therefore invisible, so it has been waiting on an action nobody asked him to take.
-- **Gate:** owner — the OUTCOME is decided (2026-09-23, computed numbers only); what is still owed is the WRITE, which is his one tap on a post-RV-66 recommendation. A decision recorded in a backlog entry is not a hand on his production data — do not run it for him.
+- **Gate cleared 2026-09-28** — the owner authorised the device agent to make the write. What was
+  owed was his tap; he has delegated it, so nothing is outstanding from him.
 - **Measured 2026-09-21, and CORRECTED 2026-09-22 — the gap is wider than first filed, and it is not
   only the nutrition targets.** `claude_ro.nutrition_targets` holds **1,660 kcal / 150 g protein /
   141 g carbs / 55 g fat**, *exactly* the `goal_recommendations` row from **2026-08-31** — a row the
@@ -14554,12 +14645,28 @@ the right shape and the wrong scope: it explains the macro-vs-calorie gap only.
   so rather than presenting four estimates as equally solid.
 - **Reversal cost:** none — one read-only surface over values that already exist.
 ### [nutrition][body] BF-137 — the maintenance estimator is fitting a GLP-1 weight drop and calling it metabolic rate 🔴 LIVE
+- **✅ ANSWERED 2026-09-28 — he REFUSED the date, and the replacement is better.**
+  Verbatim: *"Try incorporate supplements usage with other factors. We want it to be supplement
+  agnostic essentially."*
+  So: **do not hardcode a GLP-1 vial date.** The maintenance estimator should treat
+  supplement/medication usage as an ordinary input alongside the others, so it handles this drug,
+  the next one, and a change of dose, without anyone telling it a date.
+  **⚑ THE DATA ALREADY EXISTS AND NOTHING IN `health/` READS IT — this is the finding.**
+  `supplement_logs` (`schema.ts:1149`) stores a **dated log per intake with a `doseText` snapshot**,
+  kept deliberately so that titrating 2 mg → 4 mg does not rewrite history. That is precisely the
+  series an estimator needs: what was taken, at what dose, from when. Meanwhile `grep supplement`
+  across `packages/shared/src/health/**` and `lib/health/**` returns **nothing** — the estimator
+  cannot see any of it.
+  So the date this entry was blocked on is **derivable**, and asking him for it was the wrong shape
+  of question.
+  **Re-laned `T`** — it changes a computed number he reads daily, so a Tuning proposal comes first
+  and must state how many days move. Implementation is then Lane A.
 
-- **Lane:** A — `packages/shared/src/nutrition/adaptive-tdee.ts`, alongside **TN-29** and best built with it.
+- **Lane:** T — `packages/shared/src/nutrition/adaptive-tdee.ts`, alongside **TN-29** and best built with it.
 - **Added:** 2026-09-10 · owner, after his budget rose 651 kcal: *"I thought discussed 1650 was like the maint? with 200 minus for recomp? how did we go up?"* — he was right, and checking him is what found this.
 - **Needs:** — nothing. **Cross-reference TN-29**, which catches this *instance* through a different mechanism; the cause below is not the one TN-29 names, and will recur on every new vial.
-- **Ask: owner** — ONE DATE — when the current GLP-1 vial started. The general guard shipped (TN-29, v1.457.4) and catches this instance; the specific correction cannot run without that date. Surfaced 2026-09-26 (OR-181).
-- **Gate: owner** — added 2026-09-16, and it is a DATA correction rather than a decision. See below.
+- **Gate cleared 2026-09-28** — he answered by refusing the date and specifying a supplement-agnostic
+  estimator instead. Nothing further is owed from him until a Tuning proposal exists.
 - ⚙️ **STATUS 2026-09-16 — the general guard shipped; this entry's specific fix is blocked on one
   date the owner has to set.**
   - **TN-29's ceiling is in** (v1.457.4), and it catches *this instance*: the 2,245 that prompted
@@ -15381,11 +15488,28 @@ absent one, because the next scan trusts it. Add one only from a commit that act
   a structural call for the builder; the push is simpler and works offline.
 
 ### [workouts] LA-65 — the transition constant is charged once too often at a value that is too low, and the two errors cancel at five exercises
+- **✅ ANSWERED 2026-09-28 — five exercises ARE fitting the hour, so the constant stays as it is.**
+  Verbatim: *"Yes 5 have been hitting the hour at 2 sets per one. Might need to mix and match to
+  get 3 sets where needed."*
+  **The two errors that cancel at five are doing no harm, and this entry now exists to stop someone
+  "fixing" them into a regression** — the safe-looking correction reintroduces the overrun he
+  reported. Leave `resolveTransitionSec` alone. **Keep this entry as a `Reference:`**, not as work.
+- **⚑ HIS SECOND SENTENCE IS A NEW REQUIREMENT, and it changes what the five in "five exercises"
+  means.** He wants to mix 2-set and 3-set exercises inside one session, so the sessions the
+  estimate is tuned against stop being uniform.
+  **Checked before filing: the duration model already handles this.**
+  `packages/shared/src/workout/duration-model.ts` costs time per SET (`SET_SETUP_SEC`,
+  `SECONDS_PER_REP`) rather than per exercise, so a 5×2 and a 3×3 + 2×2 session price correctly
+  with no change.
+  **What is NOT established, and is the thing to verify:** whether the prescription generator and
+  its trim ordering will actually produce mixed set counts, or whether BF-128's "five exercises"
+  carries an implicit uniform-2. That is Lane A's to check against `generate-prescription.ts`.
+  **It also raises the stakes on `BF-201`'s p75 margin** — a 5×3 session is materially longer than
+  a 5×2, so a margin fitted to uniform sessions under-protects the mixed ones.
 
 - **Lane:** A — `packages/shared/src/workout/duration-model.ts` (`TRANSITION_SEC_*`), `app/api/generate-program/route.ts`.
 - **Added:** 2026-09-07 · Lane A, from the BF-128 measurement pass.
-- **Ask: owner** — LIVED FEEDBACK after several sessions under BF-128’s five exercises: does five fit the hour in practice? **The recommendation is to change nothing until then** — the safe-looking fix reintroduces the bug he reported. Surfaced 2026-09-26 (OR-181).
-- **Gate:** owner — LIVED FEEDBACK, not a decision. The recommendation below is to change nothing until he has trained several sessions under BF-128's five exercises; the safe-looking fix reintroduces the bug he reported. What is owed is whether five fits the hour in practice.
+- **Gate cleared 2026-09-28** — the lived feedback arrived: five fits, leave the constant.
 - **Needs:** — nothing.
 - **The measurement is DONE and the contradiction this entry was filed for is resolved** (2026-09-07,
   same day). What remains is one decision, which is why it is gated rather than closed.
@@ -15840,21 +15964,19 @@ Not a decision for a queue pass: option 1 changes how every request in the app i
 >   Data stays protected; the sentence above saying `/` goes to a `/sign-in` redirect is out of date.
 
 ### [platform] LA-61 — three email lookups on the OAuth path skip the normalisation the write applies
+- **✅ APPROVED 2026-09-28 — normalise on the way IN, and add the functional index. Both.**
+  The durable fix over patching the three known lookup sites: every future lookup is correct by
+  construction rather than by someone remembering. He took it over the smaller diff and over
+  leaving it as a single-user non-issue.
+  **It needs a one-off backfill of existing rows** — an UPDATE, not a delete, so it is authorised
+  under the 2026-09-27 production policy: verified snapshot first, affected rows against
+  prediction, stop on a mismatch. **Not a data-dropping change; no second confirmation needed.**
+  **⚠ Auth path — do not batch it with anything.** It touches Google sign-in, which is the owner's
+  carve-out area even when the change itself is mechanical.
 
 - **Lane:** A — `auth.ts` signIn callback, `lib/data/postgres/adapter.ts` (`getUserByEmail`).
 - **Added:** 2026-09-06, found while fixing PS-25's rate-limit key.
-- **Ask: owner** — **recommendation: normalise on the way IN and add the functional index, both in one
-  migration.** This is auth, which is why it stays yours rather than being decided here. Today
-  registration stores `email.toLowerCase().trim()` while three Google-path lookups pass the raw
-  provider value, so a provider that returns `Dasa.Delan@…` finds no user and **creates a second
-  account** — silently, and the first one keeps its data. The durable fix is a `lower(email)` unique
-  functional index plus normalising at the three call sites; the index is what stops the next call
-  site reintroducing it. **What could go wrong:** if two rows already differ only by case, the unique
-  index fails to build — so the migration checks for that first and reports rather than guessing which
-  row wins. **Reversal cost: drop the index.** The alternative, normalising at the call sites only, is
-  cheaper now and leaves the same bug one new call site away. Surfaced 2026-09-26 (OR-181): it was
-  `Gate: owner` with no question written, so it had never been put to you.
-- **Gate:** owner — the schema decision above; getting it wrong loses matches on existing rows rather
+- **Gate cleared 2026-09-28** — answered; normalise-in plus the functional index is approved.
   than gaining them.
 
 Registration **writes** `email.toLowerCase().trim()`, and `getUserByEmail` compares with a plain
@@ -29676,6 +29798,18 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   the card and its route retire. Do not restore `upsertOuraWorkouts` — nothing can call it.
 
 ### [activity][devices] Q-222 — auto activity-detection false positives trace to a classifier the codebase already flags as unvalidated
+- **✅ ANSWERED 2026-09-28 — add confirm/reject to a detected activity.**
+  When the app auto-detects an activity it asks once whether it was real, and every answer is a
+  labelled sample. He took this over labelling a batch retrospectively and over switching detection
+  off. **The cost lands where the problem is:** a tap on each false positive, which is the thing
+  already annoying him.
+  **Two halves, and they are different lanes.** The prompt and its control are Lane B
+  (`components/**`); **storing the label is Lane A and needs a migration** — a detected activity
+  needs a nullable verdict column or its own table, plus the local-store mirror, since this is an
+  offline-first domain. **Lane A first**, per the engine-half-first rule.
+  **⚠ Do not tune the bands until labels exist.** The classifier's own header forbids hand-tuning
+  without real data, and this entry exists because that was the prohibited move. Collect first,
+  fit second, and state how many detections the refit moves.
 
 - **Lane:** A
 - **Branch:** `feat/gait-classifier-calibration-capture`
@@ -29698,8 +29832,8 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   as test fixtures. None of this has been done; the bands today are still the plan's initial
   priors. Grepped the backlog for a tracking entry — none exists; this gap has sat as a code
   comment only.
-- **Ask: owner** — LABELLED DATA, not a decision — auto-detected activities confirmed or rejected as they happen, so the classifier has something real to fit. The classifier’s own header forbids hand-tuning without it. Surfaced 2026-09-26 (OR-181).
-- **Gate:** owner — the DATA, not a decision: every path in this entry ends at labelled activity only he can produce, and the classifier's own header forbids the one thing that looks implementable (*"do not hand-tune further without real data"*). Tightening the bands from a desk is the prohibited move, not the fallback.
+- **Gate cleared 2026-09-28** — he approved confirm/reject on a detected activity. The labels are the
+  deliverable now, and collecting them is buildable work.
 - **Why it is gated rather than READY (added 2026-09-04):** every path in this entry ends at data only
   the owner can produce, and it was heading Lane A's READY list with nothing an implementer could
   start. The classifier's own header forbids the one thing that looks implementable — *"do not
@@ -32576,10 +32710,15 @@ private build machine. Implement in the new public repo once it exists, per owne
 repo's production path is unaffected until then.
 
 ### [sleep] 🟠 Q-4 — `respiratory_rate` is persisted from an estimator its own docs call uncalibrated
+- **✅ ANSWERED 2026-09-28 — he wears the Polar H10 tonight (2026-09-28).**
+  So the blocker is a single night of data, arriving imminently. **Next session to pick this up:
+  check whether the night landed before doing anything else** — one night of chest-strap RR against
+  the same night's estimated `respiratory_rate` is the whole comparison. If it did not land, ask
+  once; do not re-open the decision, which he has now made three times (2026-08-04, 2026-09-01,
+  2026-09-28).
 
 - **Lane:** A
-- **Ask: owner** — ONE NIGHT wearing the Polar H10, not a decision — he said yes on 2026-08-04 and chose this off a list of four on 2026-09-01. Nothing here can start until that night exists. Surfaced 2026-09-26 (OR-181).
-- **Gate:** owner — SCHEDULING, not consent. He said yes on 2026-08-04 and chose it off a list of four on 2026-09-01; what is owed is one night wearing the Polar H10, and nothing else can start until that data exists.
+- **Gate cleared 2026-09-28** — he wears the strap tonight. What remains is data arriving, not a decision.
 
 > **⚑ Owner answered 2026-08-04: willing to wear the Polar H10 overnight for ground truth — *"yes but
 > not tonight."*** Still owner-gated, but the gate is now scheduling rather than consent.
