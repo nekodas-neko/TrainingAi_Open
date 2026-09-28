@@ -5,7 +5,9 @@
 // sets contain no phases" when the table was fine.
 //
 // That is the worst kind of bug in an audit tool: it does not fail, it lies. These tests pin the
-// scoping to the column the data actually uses.
+// scoping to the column the data actually uses. LA-159 then dropped `program_id` itself (migration
+// 293), so the two cases that pinned it as always-NULL went with it: the column no longer exists to
+// be misread.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { randomUUID } from 'crypto'
 
@@ -43,33 +45,13 @@ describe.skipIf(!canRun)('claude_ro program_phases scoping', () => {
     await pool.query(`DELETE FROM users WHERE id = $1`, [TEST_USER_ID])
   })
 
-  it('the modern write path leaves program_id NULL', async () => {
-    // This is the fact the old predicate contradicted. If a future change starts populating
-    // program_id, this test failing is the signal to revisit the view — not a reason to delete it.
-    const { rows } = await pool.query<{ n: string }>(
-      `SELECT count(*)::text AS n FROM program_phases WHERE phase_set_id = $1 AND program_id IS NOT NULL`,
-      [setId],
-    )
-    expect(rows[0].n).toBe('0')
-  })
-
-  it('the OLD program_id-only predicate finds nothing — this was the bug', async () => {
-    const { rows } = await pool.query<{ n: string }>(
-      `SELECT count(*)::text AS n FROM program_phases t
-       WHERE EXISTS (SELECT 1 FROM programs p WHERE p.id = t.program_id AND p.user_id = $1)`,
-      [TEST_USER_ID],
-    )
-    expect(rows[0].n).toBe('0')
-  })
-
   it('the phase_set-scoped predicate finds them, and stays scoped to the owner', async () => {
-    const predicate = `EXISTS (SELECT 1 FROM phase_sets ps WHERE ps.id = t.phase_set_id AND ps.user_id = $1)
-                       OR EXISTS (SELECT 1 FROM programs p WHERE p.id = t.program_id AND p.user_id = $1)`
+    const predicate = `EXISTS (SELECT 1 FROM phase_sets ps WHERE ps.id = t.phase_set_id AND ps.user_id = $1)`
     const mine = await pool.query<{ n: string }>(
       `SELECT count(*)::text AS n FROM program_phases t WHERE ${predicate}`, [TEST_USER_ID])
     expect(mine.rows[0].n).toBe('3')
 
-    // The OR arm must not become a leak: a different user still sees none of these rows.
+    // And a different user still sees none of these rows.
     const other = await pool.query<{ n: string }>(
       `SELECT count(*)::text AS n FROM program_phases t
        WHERE (${predicate}) AND t.phase_set_id = $2`,

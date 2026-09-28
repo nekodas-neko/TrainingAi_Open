@@ -115,9 +115,8 @@ const VIA = {
   // deliberately) and the modern write path — createPhaseSet / updatePhaseSet, and the 042 seed —
   // inserts phases with only `phase_set_id`. A program_id-only predicate therefore hid EVERY phase
   // row, which is how a 2026-08-05 audit came to report "eight phase sets contain no phases" when
-  // the table was fine. The program_id arm stays for any legacy row that still has one.
-  program_phases:         t => `EXISTS (SELECT 1 FROM public.phase_sets ps WHERE ps.id = ${t}.phase_set_id AND ps.user_id = $OWNER)`
-                              + ` OR EXISTS (SELECT 1 FROM public.programs p WHERE p.id = ${t}.program_id AND p.user_id = $OWNER)`,
+  // the table was fine. The program_id arm went with the column (LA-159): 0 rows ever held one.
+  program_phases:         t => `EXISTS (SELECT 1 FROM public.phase_sets ps WHERE ps.id = ${t}.phase_set_id AND ps.user_id = $OWNER)`,
   program_volume_targets: t => `EXISTS (SELECT 1 FROM public.programs p WHERE p.id = ${t}.program_id AND p.user_id = $OWNER)`,
   schedules:              t => `EXISTS (SELECT 1 FROM public.programs p WHERE p.id = ${t}.program_id AND p.user_id = $OWNER)`,
   schedule_days:          t => `EXISTS (SELECT 1 FROM public.schedules s JOIN public.programs p ON p.id = s.program_id WHERE s.id = ${t}.schedule_id AND p.user_id = $OWNER)`,
