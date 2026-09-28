@@ -6941,7 +6941,8 @@ drift.
 ### [workouts] BF-197 — the duration estimate charges a rest he never takes and a transition that does not exist, and those 14.2 phantom minutes are what holds every exercise at 2 sets
 - **Lane:** A — `packages/shared/src/workout/duration-model.ts` (`estimateExerciseDurationSec`).
 - **Added:** 2026-09-24 · BugFix, from the owner's *"bar load and rest time should be able to be analyzed from past and can determine how much time is needed so not sure if that can be adjusted."*
-- **Needs:** — nothing. Supersedes the "change nothing" recommendation in `LA-65`, amended below.
+- **Needs:** — nothing.
+- **Supersedes** the "change nothing" recommendation in the LA-65 reference, amended below. (Kept out of the `Needs:` line: the parser read the ID there as a dependency, and LA-65 is now a permanent Reference, so it parked this entry.)
 
 - **His hypothesis was right, and the mechanism he asked for already exists.** The model does learn
   both quantities from his own history: `resolveTransitionSec` (`time-audit.ts:338`) prefers his
@@ -14228,34 +14229,21 @@ anchor that then moves.
 phase the owner reaches; and TN-25's three options no longer need answering, because no single session
 is claiming to be both.
 
-### [cardio][heart-rate] TN-32 — three user-facing surfaces describe zones in a model the engine does not use
-- **Lane:** A — both (2 engine, 1 surface) → A, engine half first.
+### [cardio][heart-rate] TN-32 — the Heart Rate page grades heart rate with no profile, and colours a resting-range value red
 
-- **Branch:** _unassigned_ · **Added:** 2026-09-09 · found in the zone audit TN-30 came out of.
-- **Superseded lane note (demoted from a field, TN-63):** this read the surface letter and listed `packages/shared/src/running/frameworks/zone2-base.ts:6`, `frameworks/norwegian-4x4.ts:6`, `app/health/heart-rate/page.tsx:69-72`. Those shared paths are the engine lane's, and the field above already applies the both-halves rule.
-- **Sibling of TN-30**, independent of it. Copy and labels only — no threshold moves.
-
-Three separate places tell the user something the zone engine does not do:
-
-1. **The framework prose quotes %HRmax while the engine uses %reserve.** `zone2-base.ts:6` says
-   *"Zone-2 emphasis (**60–70% HRmax**)"* and `norwegian-4x4.ts:6` says Z4–5 is *"**85–95% max HR**"*.
-   `targetsForRunType` reads the Karvonen bands, where Zone 2 is 60–70% of **reserve** — **133–145 bpm
-   for this owner, or 71–78% of HRmax.** The prose promises 112–131 and the engine prescribes
-   133–145: a ~20 bpm gap between what the framework says and what it does.
-2. **The Heart Rate page classifies HR with no profile at all.** `heart-rate/page.tsx:69` uses fixed
-   cuts — `<60` "Resting", `<100` "Normal", else "Elevated" — the only place in the app where a heart
-   rate is graded without the user's own resting and max. **And it colours 60–100 bpm `#f87171`, a
-   RED**, while the zone palette colours that same range blue-green. A resting-adjacent heart rate is
-   rendered as an alarm.
-3. **Zone names are typed twice.** `HR_ZONE_META` (`hr-zones.ts:48`) and `ZONE_LABELS`
-   (`session-picker.ts:85`) are identical today and unlinked. One-line fix; the cheapest of the three.
-
-**⚠ Do not resolve (1) by changing the zone fractions.** The bands are conventional and shared; the
-prose is what is wrong. Same principle as TN-25's — the target is right and the copy is wrong.
-
-**Pass test:** every user-visible sentence describing a zone states the same basis the engine uses,
-and no heart rate is coloured as an alarm at a value inside the user's own Zone 1.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** ① only `norwegian-4x4.ts:33` is user-facing; `zone2-base.ts:6` is a code comment, so drop it. ② moved to `heart-rate/page.tsx:77-79`, still graded 60–100 with `#f87171`. ③ still unlinked (`hr-zones.ts:48`, `session-picker.ts:85`).
+- **Lane: B** — `app/health/heart-rate/page.tsx` (~lines 77-79). Re-laned 2026-09-28: the two engine
+  parts shipped (below), and this is the one surface part left.
+- **Added:** 2026-09-09 · found in the zone audit TN-30 came out of. Copy and labels only; no
+  threshold moves.
+- **What is left:** the page classifies HR with fixed cuts (`<60` "Resting", `<100` "Normal", else
+  "Elevated"). It is the only place a heart rate is graded without the user's own resting and max, and
+  it colours 60–100 bpm a RED (`#f87171`) that the zone palette uses for nothing in that range. Grade it
+  through `hr-zones.ts` with the user's profile, and take colours from `HR_ZONE_META`.
+- **Pass test:** no heart rate inside the user's own Zone 1 is coloured as an alarm.
+- **✔ SHIPPED 2026-09-28 (Lane A):** the Norwegian 4×4 rationale now states the engine's basis (Zone
+  4–5 = 80–100% of heart-rate reserve), and `session-picker.ts` reads zone names from `HR_ZONE_META`
+  instead of typing them twice. `tn32-zone-copy-basis.test.ts` fails on a framework rationale that
+  quotes a %-of-max figure.
 
 ### [nutrition] BF-138 — the app runs two energy models at once and never states either, so the owner cannot tell which number to eat to
 
@@ -15167,6 +15155,8 @@ absent one, because the next scan trusts it. Add one only from a commit that act
 
 - **Lane:** A — `packages/shared/src/workout/duration-model.ts` (`TRANSITION_SEC_*`), `app/api/generate-program/route.ts`.
 - **Added:** 2026-09-07 · Lane A, from the BF-128 measurement pass.
+- **Reference:** why `resolveTransitionSec` stays as it is. Its two errors cancel at five exercises, and the owner confirmed five fit the hour; the safe-looking fix reintroduces the overrun.
+- **✔ CHECKED 2026-09-28 (Lane A): mixed set counts need no change.** The budget stage sizes sets per exercise, one set at a time by role priority (`time-budget.ts` `expandToBudget`/`fitToBudget`). There is no uniform count anywhere, so a 3×3 + 2×2 session comes out of it naturally. `la65-mixed-set-counts.test.ts` pins that. BF-201's p75 margin still has to be judged against mixed sessions.
 - **Gate cleared 2026-09-28** — the lived feedback arrived: five fits, leave the constant.
 - **Needs:** — nothing.
 - **The measurement is DONE and the contradiction this entry was filed for is resolved** (2026-09-07,
