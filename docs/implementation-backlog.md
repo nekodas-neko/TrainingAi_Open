@@ -590,6 +590,32 @@ below threshold and left in place for next time.
   variable; **reachability from an unawaited promise** was. (c) a vitest bump is unnecessary.
 - **Not the same as `LB-166`** (the E2E 45-minute ceiling) — different job, different mechanism.
 
+### [workouts] LA-178 — two of your answers point opposite ways on the session-length estimate: fix the double-count, or leave it?
+
+- **Lane: O** · **Added:** 2026-09-28 · Lane A, found before starting BF-197.
+- **The question, in one line:** should the workout-length estimate stop charging the rest after
+  the last set of each exercise and the gap after the last exercise (BF-197), now that you've said
+  five exercises at two sets already fill your hour (LA-65)?
+- **Why it came back to you:** the two answers clash.
+  - 2026-09-27 (BF-201, decision 1): fix both double-counts, and size a finish-early margin to your
+    75th percentile.
+  - 2026-09-28 (LA-65): five at two sets fill the hour, so leave the transition constant alone.
+    That entry warns the "safe-looking" fix brings back the overrun you reported.
+- **Recommendation: fix the double-counts AND add the p75 margin together, never the fix alone.**
+  - The double-count is a bug that happens to protect you. It grows with exercise and set count,
+    not with how variable your sessions are, so it over-protects a 5×2 and under-protects a 3×4.
+  - Measured on 32 sessions, it adds 14.2 phantom minutes. Your real working time is a median
+    39.9 min against the card's 51.
+  - A p75 margin keeps the protection you're relying on, but sizes it to your actual spread. It is
+    what you chose on 09-27.
+  - Expect a 5-exercise session to gain some third sets, while a long-tail day stays under the hour
+    about three times in four.
+- **Alternative: leave both as they are.** Nothing changes on day one, and your 5×2 sessions keep
+  fitting. Its cost: every exercise stays pinned at two sets while you finish around 11 minutes
+  early on a typical day, and the mixed 2/3-set sessions you asked for rarely appear.
+- **Reversal cost:** one constant and one function. Either way can be undone in a single change.
+- **What your answer unblocks:** BF-197 (Lane A builds it the day this is answered).
+
 ### [nutrition] LB-167 — does the meal tile read as a failed image to you? (RV-212 ④)
 - **Lane: O.** Ungated on purpose: getting the answer IS the work, and `Gate: owner` would park it
   out of the Orchestrator's READY list.
@@ -6941,8 +6967,8 @@ drift.
 ### [workouts] BF-197 — the duration estimate charges a rest he never takes and a transition that does not exist, and those 14.2 phantom minutes are what holds every exercise at 2 sets
 - **Lane:** A — `packages/shared/src/workout/duration-model.ts` (`estimateExerciseDurationSec`).
 - **Added:** 2026-09-24 · BugFix, from the owner's *"bar load and rest time should be able to be analyzed from past and can determine how much time is needed so not sure if that can be adjusted."*
-- **Needs:** — nothing.
-- **Supersedes** the "change nothing" recommendation in the LA-65 reference, amended below. (Kept out of the `Needs:` line: the parser read the ID there as a dependency, and LA-65 is now a permanent Reference, so it parked this entry.)
+- **Needs:** LA-178
+- **Supersedes** the "change nothing" recommendation in the LA-65 reference, amended below. (Kept out of the `Needs:` line: the parser read the ID there as a dependency.)
 
 - **His hypothesis was right, and the mechanism he asked for already exists.** The model does learn
   both quantities from his own history: `resolveTransitionSec` (`time-audit.ts:338`) prefers his
