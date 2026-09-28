@@ -3435,15 +3435,6 @@ which is the right shape for something that can only be validated by living with
 - **Reversal cost:** low. The Kotlin change is small, but it costs an APK cycle. Batch it with the next
   native change rather than cutting an APK for it alone, **unless RV-191 cannot land first**.
 
-### [platform] RV-197 — the production CSP allows WebSockets to any host, and nothing uses them
-- **Lane: A** — `lib/security/csp.ts` and its existing test.
-- **Added:** 2026-09-24 · Review sweep 60.
-- **What:** `connect-src` ends in `wss: ws:`. No `WebSocket` is used anywhere in
-  app/components/lib/packages; the only consumer is dev HMR. `connect-src` is the directive that would
-  otherwise stop injected script from sending data off-origin.
-- **Fix:** emit `ws: wss:` only when `isDev`, and pin that in the CSP test. Drop the unused
-  `generativelanguage.googleapis.com` at the same time.
-
 ### [platform] RV-200 — four AI calls only reword numbers the app already computed: replace them with the computed text
 - **Lane: A** (routes and shared builders), then **B** (the cards). One PR covers both.
 - **Added:** 2026-09-25 · Review sweep 61 ([`docs/reviews/2026-09-25-sweep-61-ai-to-logic.md`](reviews/2026-09-25-sweep-61-ai-to-logic.md)). **Owner request, 2026-09-25:** *"we use AI more than we need to … use logic instead to save on tokens and offline compatibility."* That request is the product decision, so **no further owner gate is needed**. The only cost is the AI's phrasing.

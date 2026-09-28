@@ -25,6 +25,15 @@ describe('content security policy', () => {
     expect(directive(dev, 'script-src')).toContain("'unsafe-eval'")
   })
 
+  // RV-197: a scheme-only `ws:`/`wss:` source lets injected script open a socket to any host, which
+  // is the exfiltration connect-src exists to stop. Only dev HMR uses one.
+  it('allows WebSockets in dev only, and no scheme-wide source in production', () => {
+    const connect = directive(prod, 'connect-src').split(' ').slice(1)
+    for (const src of connect) expect(src, 'a bare scheme allows every host').not.toMatch(/^[a-z]+:$/)
+    expect(connect).not.toContain('https://generativelanguage.googleapis.com')
+    expect(directive(dev, 'connect-src')).toContain(' ws: wss:')
+  })
+
   it('keeps the directives that are not about scripts closed', () => {
     expect(directive(prod, 'object-src')).toBe("object-src 'none'")
     expect(directive(prod, 'frame-src')).toBe("frame-src 'none'")
@@ -45,7 +54,7 @@ describe('content security policy', () => {
     }
   })
 
-  it('dev and production differ only in the eval allowance', () => {
-    expect(dev.replace(" 'unsafe-eval'", '')).toBe(prod)
+  it('dev and production differ only in the eval allowance and the HMR socket (RV-197)', () => {
+    expect(dev.replace(" 'unsafe-eval'", '').replace(' ws: wss:', '')).toBe(prod)
   })
 })
