@@ -7796,46 +7796,6 @@ drift.
   drifted apart.
 
 
-### [devices][platform] RV-182 — per-ingest database work that does nothing or grows forever
-
-- **Lane: A** — `lib/data/postgres/adapter.ts`, `lib/oura-ble/clock.ts`, `lib/oura-ble/rollup/run.ts`.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
-- **SHIPPED 2026-09-25, part ① of three** ([entry](overview/history-2026-09-26-folded-3.md#2026-09-25-rv182-noop-backfill)):
-  the backfill `UPDATE` is deleted. Re-measured that day before removing it — **4,932 calls, 90 s,
-  8.0% of all database time, 0 rows updated**, and `measured_at` has **0 nulls**. Safe because a NULL
-  can no longer be written: one insert path, a non-null anchor by construction, and
-  `oura-raw-sample-measured-at.test.ts` now pins that across the first-ever batch, an epoch open and
-  a history re-drain. **The column is NOT dropped** — that is a data-dropping migration and the
-  owner's.
-- **SHIPPED ② 2026-09-25** ([entry](overview/history-2026-09-26-folded-3.md#2026-09-25-rv182-clock-offset-sql)):
-  `getOuraClockOffsets` returns each epoch's robust offset as one row. Five adapter read paths that
-  only convert timestamps now take it; the rollup and three others keep the series, which they
-  genuinely need. **19–27 ms warm against the series read's ~48 ms.**
-- **⚠ The entry's ATTRIBUTION of ② was wrong, and so was the first fix I measured.** It read the cost
-  as one number across three functions. Measured separately: **all 9.4% is `getOuraClockAnchors`**
-  (2,190 calls, 48.45 ms, 106 s); `getOuraClockEpochHead` is 1.80 ms and `getNewestOuraClockAnchorByUtc`
-  1.71 ms, 0.8% apiece — so the proposed index and `LIMIT 1` bought at most 1.6% and left the 9.4%.
-  The expensive one could not become `LIMIT 1` either: LA-139 moved four call sites onto the full
-  series because a single newest anchor was the wrong offset. **And the obvious aggregate is a
-  REGRESSION** — `row_number() OVER (PARTITION BY epoch …)` measured **53–67 ms**, worse than the
-  read it replaces, because it sorts all 12,591 rows. Only the count-then-top-N shape wins.
-- **SHIPPED ③ 2026-09-25** ([entry](overview/history-2026-09-26-folded-3.md#2026-09-25-rv182-hr-rollup-churn)): the
-  rollup upserts the HR window first, then deletes only the timestamps that left it. Re-measured
-  before the change — **628,197 inserts and 574,974 deletes against 140,181 live rows, 95 updates**
-  (the entry's 535k/137k, grown).
-- **⚠ The entry's fix for ③ — "upsert with `IS DISTINCT FROM`" — was ALREADY DONE**, and had been
-  since review B1/R1: `upsertOuraHeartrate` carries `ON CONFLICT … DO UPDATE … WHERE bpm IS DISTINCT
-  FROM excluded.bpm`, written so an idempotent re-roll does not bump `updated_at` and re-send the
-  point over the Track-B sync. The defect was the blanket `DELETE … WHERE source = 'ble' AND
-  timestamp >= cutoff` running immediately **in front of it**, which removed exactly the rows about
-  to be written — so the conflict target never matched, every row was a fresh insert, and the guard
-  never applied. Reordering restores behaviour the upsert already had.
-- **`oura_heartrate_pkey` is still 7 MB with 0 scans** against the unique key's 792,453. Dropping a
-  primary key is a migration and ships alone; not done here.
-- **Checked and fine:** all three `oura_raw_samples` indexes are used, so its 45 MB is bloat (Q-540),
-  not dead indexes. The cache hit rate is 99.9%, and nothing is idle in transaction.
-
-
 ### [workouts] RV-184 — the AI prescription regenerates at workout open on days the completion already generated it
 
 - **Lane: A** — `packages/shared/src/ai-periodization/generate-prescription.ts:303`.
