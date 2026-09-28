@@ -17195,6 +17195,14 @@ paint, only on Samsung's WebView, invisible in Chrome and in `pnpm dev`.
 
 ### [app-shell] BF-111 — "Up to date — v1.414.1 is the newest build" sits under a v1.436.2 badge, and both are right
 
+- **⚙ RE-FIXED 2026-09-28 (Lane A): the date now comes from the APK asset.** Measured live that day:
+  the rolling release was created 2026-08-23 and never moves, while its `app-debug.apk` asset was
+  uploaded 2026-09-25 (v1.465.52). `mapApkRelease` now takes the asset's `updated_at`, falling back
+  to `published_at` only when there is no asset. The module comment that said the release is
+  "deleted and recreated on every publish" was wrong and is corrected.
+- **Keep:** DV — More → About on the S25 should read "built 25 Sept" (or the date of whatever APK is
+  newest), not 23 Aug. The card renders only on native, so the phone is the only place to check it.
+
 - **❌ FAILED ON THE S25, 2026-09-13** (owner, no note). The card returns early off-native, so this is
   the first time any of its three states has been on a screen — and it did not survive that.
   The screenshot this asked for was taken on 2026-09-23 — see the ❌ bullet below: it is the **date**.
