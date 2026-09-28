@@ -113,8 +113,14 @@ class ScaleBlePlugin : Plugin() {
     /** Store the server origin the service POSTs samples to (window.location.origin),
      *  called on every app open; persisted so a restarted service has it too. */
     @PluginMethod fun setIngestUrl(call: PluginCall) {
-        val url = call.getString("url")?.trim()?.trimEnd('/') ?: return call.reject("url required")
-        if (!url.startsWith("http")) return call.reject("url must be absolute")
+        val url = com.trainingai.app.IngestUrlPolicy.normalize(call.getString("url"))
+            ?: return call.reject("url required")
+        // RV-196: an absolute URL was the only requirement, so a script in the origin could
+        // point this at any host and the choice survived restarts. The allowlist lives in
+        // IngestUrlPolicy so it is one decision across all three plugins, and unit-testable.
+        if (!com.trainingai.app.IngestUrlPolicy.isAllowed(url)) {
+            return call.reject("url origin not allowed")
+        }
         prefs().edit().putString("ingest_url", url).apply()
         ScaleBleService.instance?.setIngestUrl(url)
         call.resolve()
