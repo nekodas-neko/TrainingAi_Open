@@ -83,3 +83,41 @@ describe('resolveHrProfile — one resolver, corroborated', () => {
     expect(p.observedMax).toBeNull()
   })
 })
+
+describe('resolveHrProfile — a failed read degrades, and says so (LA-82)', () => {
+  const failing = (which: 'getUserById' | 'listBodyMetrics') => {
+    const repo = repoWith({ bpms: flat(150, 10), rhr: [55, 57] }) as unknown as Record<string, unknown>
+    repo[which] = async () => { throw new Error('db down') }
+    return repo as unknown as WorkoutRepository
+  }
+
+  it('an unread age falls back to the no-age estimate and names it', async () => {
+    const p = await resolveHrProfile(failing('getUserById'), 'u', 'Australia/Brisbane')
+    expect(p.maxHr).toBe(190)
+    expect(p.maxHrSource).toBe('estimated-age-unread')
+  })
+
+  it('a user with no date of birth is an ordinary estimate, not an unread one', async () => {
+    const p = await resolveHrProfile(repoWith({ bpms: flat(150, 10), dob: null }), 'u', 'Australia/Brisbane')
+    expect(p.maxHr).toBe(190)
+    expect(p.maxHrSource).toBe('estimated')
+  })
+
+  it('an unread age does not matter once a corroborated observed max wins', async () => {
+    const repo = repoWith({ bpms: [...flat(150, 200), ...flat(195, 5)] }) as unknown as Record<string, unknown>
+    repo.getUserById = async () => { throw new Error('db down') }
+    const p = await resolveHrProfile(repo as unknown as WorkoutRepository, 'u', 'Australia/Brisbane')
+    expect(p.maxHrSource).toBe('observed')
+  })
+
+  it('an unread resting HR assumes 60 and is marked unavailable, not default', async () => {
+    const p = await resolveHrProfile(failing('listBodyMetrics'), 'u', 'Australia/Brisbane')
+    expect(p.restingHr).toBe(60)
+    expect(p.restingHrSource).toBe('unavailable')
+  })
+
+  it('an empty resting-HR window is still an ordinary default', async () => {
+    const p = await resolveHrProfile(repoWith({ bpms: flat(150, 10), rhr: [] }), 'u', 'Australia/Brisbane')
+    expect(p.restingHrSource).toBe('default')
+  })
+})

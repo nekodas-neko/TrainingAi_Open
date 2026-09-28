@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.477.27",
+    date: "2026-09-28",
+    changes: [
+      "The cardio hub no longer fails to load when your age or resting heart rate cannot be read for a moment. It shows your zones and records that they are based on a stand-in.",
+    ],
+  },
+  {
     version: "1.477.26",
     date: "2026-09-28",
     changes: [

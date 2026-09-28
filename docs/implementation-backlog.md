@@ -15076,62 +15076,25 @@ that is inefficient only against a "Zone-2" label walking cannot satisfy.
 **Pass test:** the walk summary shows a number that differs between the owner's 2026-08-14 session
 (30.0% reserve) and 2026-08-18 (50.5%), where the zone bar reads identically for both.
 
-### [devices][readiness] LA-82 — the cardio hub catches nine reads and dies on the two it cannot see
-
-- **Lane:** A — `packages/shared/src/health/hr-profile.ts:68`, plus the four routes that call it.
-- **Added:** 2026-09-08, Lane A — found while writing the hub's PS-39 tests, then measured by
-  failing each read in turn rather than read off the source.
-
-`GET /api/cardio-week` wraps nine of its eleven repository calls in `.catch(() => [])`, which is a
-clear statement that the hub should degrade rather than fail. **It does not, for two of them.**
-`resolveHrProfile` runs before the `Promise.all` and guards only one of its own three reads:
-
-```ts
-const [user, bodyMetrics, hrRows] = await Promise.all([
-  repo.getUserById(userId),                                            // unguarded
-  repo.listBodyMetrics(userId, from28dIso, todayIso),                  // unguarded
-  repo.getHrForWindow(userId, observedFrom, new Date()).catch(() => []),
-])
-```
-
-Measured by failing each read in turn: `getUserById` and `listBodyMetrics` take the whole route
-down; the other five are absorbed. **So the route's own four `.catch`es on `listBodyMetrics` are
-dead defence** — the profile has already thrown before any of them can run. `cardio-trends`,
-`hr-profile` and `zone-minutes` call the same resolver and inherit the same shape.
-
-**The asymmetry inside one `Promise.all` is the tell**: one of three lines has a catch. And the
-resolver is already built for missing data — `RESTING_HR_DEFAULT` covers no readings, and
-`ageFromDob` handles a null user — so it survives *empty* results and only dies on a *failed* read.
-
-**The two halves are not equally safe, and the first version of this entry missed that.** Measured
-2026-09-08 before implementing: they need different fixes, and one of them is the owner's.
-
-- **`listBodyMetrics` (resting HR) is safe to guard.** `restingHrSource` already distinguishes
-  `'measured'` from `'default'`, so adding `'unavailable'` makes a failed read legible rather than
-  silently confident. Two lines, cheap to reverse.
-- **`getUserById` (age) silently moves the training zones, and nothing marks it.** Age feeds
-  `hrMaxFromAge`, which returns `220 − age` or **190** when there is no age. For this owner that is
-  **184 → 190, a 6 bpm shift across the whole zone scale** — and `maxHrSource` still reads
-  `'estimated'`, identical to the ordinary estimated case. So guarding it without a marker converts
-  a loud failure into a quiet wrong answer, which is the shape this repo keeps paying for.
-
-- **✅ THE SECOND OF THE TWO QUESTIONS IS DECIDED, 2026-09-25 (Orchestrator) — it was never his.**
-  *Where the marker belongs:* **a new `maxHrSource` value, not a separate `degraded` flag.* That field
-  already exists to say **where the max came from**, and *"his age could not be read, so this is a
-  default"* is exactly a provenance answer. A parallel boolean creates two fields that have to agree
-  and will eventually not — it would permit `maxHrSource: 'estimated'` beside `degraded: true`
-  without saying which estimate is meant, and every future reader would have to check both. One field
-  stays one source of truth. Reversal: one enum value and one consumer, so this is cheap enough that
-  deliberating it further costs more than being wrong would. Per CLAUDE.md's standing narrowing,
-  structural calls are the agent's and get written down rather than asked.
-- **✅ GATE STRUCK 2026-09-25 — RENDER the zones, with the degradation marked.** He took the
-  recommendation. A quota measured against a guessed max is wrong in a way the screen cannot show,
-  but hiding the whole cardio hub on what may be a transient age-read failure is the worse failure —
-  so it renders, and it says so. **Both halves of this entry are now settled:** the marker goes on
-  `maxHrSource` as a new value (decided by the Orchestrator above, structural), and the render
-  question was his and is answered. Nothing is owed by him.
-
-Ship the resting half whenever; it needs no decision.
+### [devices][readiness] LA-82 — the zones can now come from a default age or resting HR, and no screen says so yet
+- **Lane: B** — `components/health/observed-hr-card.tsx` and the cardio hub's heart section.
+- **Added:** 2026-09-08 · Lane A. **Engine half SHIPPED 2026-09-28 (Lane A).** `resolveHrProfile`
+  guards all three of its reads, and `/api/cardio-week` guards its own copy of the user read, so a
+  transient fault no longer takes the hub down. Each failure is named in the source field, as the
+  2026-09-25 decisions set out (a provenance value, not a flag; render the zones and mark them):
+  - `maxHrSource: 'estimated-age-unread'`: the age could not be read, so the max is the no-age
+    190, not 220 − age. For the owner that moves every zone boundary by 6 bpm.
+  - `restingHrSource: 'unavailable'`: the read failed and 60 was assumed. `'default'` still
+    means "no readings", which is a different thing to tell someone.
+  Both are in `/api/cardio-week`'s `heart` block, and `maxHrSource` is `workingMaxSource` on
+  `/api/hr-profile`.
+- **What Lane B owes:** show those two values. Today `observed-hr-card.tsx:41` tests
+  `=== "observed"` and renders everything else as an ordinary estimate, so an age-unread max reads
+  exactly like a real one. That is the "quiet wrong answer" the owner's decision ruled out. Wording
+  is the lane's call. The requirement is that a zone quota measured against a stand-in max or resting
+  HR says so on screen.
+- **Done when:** with `getUserById` failing, the hub renders and its zone section says the max is a
+  stand-in. Likewise for resting HR.
 
 ### [nutrition][body] OR-102b — the reta tracker: vial setup, dose calculator, dose timeline, weight response
 
