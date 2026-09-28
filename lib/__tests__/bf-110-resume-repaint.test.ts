@@ -9,6 +9,7 @@ import {
 
 vi.mock('@/lib/client-error', () => ({ reportClientError: vi.fn() }))
 import { reportClientError } from '@/lib/client-error'
+import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 /**
  * BF-110 — the blank resume survives a scroll, which means the renderer never died.
@@ -19,8 +20,7 @@ import { reportClientError } from '@/lib/client-error'
  */
 
 const ROOT = path.resolve(__dirname, '..', '..')
-const src = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+const src = (rel: string) => stripComments(readFileSync(path.join(ROOT, rel), 'utf8'))
 
 const el = (width: number, height: number, childCount: number) => ({
   getBoundingClientRect: () => ({ width, height }),
@@ -180,5 +180,26 @@ describe('where it is wired', () => {
   it('removes its listener, so a remount does not stack handlers', () => {
     expect(src('lib/hooks/use-resume-repaint.ts'))
       .toMatch(/removeEventListener\('visibilitychange', onVisible\)/)
+  })
+})
+
+describe('the native heights on the recheck (BF-110 native relayout)', () => {
+  it('appends the native view and parent heights when the APK exposes them', async () => {
+    const { resumeRecheckMessage } = await import('../resume-repaint')
+    const s = (h: number, w = 384, c = 1) => ({ width: w, height: h, childCount: c })
+    expect(resumeRecheckMessage(s(667), s(667), 'view=667 parent=826'))
+      .toBe('bf110 resume recheck stuck h1=667 h2=667 w2=384 children2=1 native view=667 parent=826')
+    expect(resumeRecheckMessage(s(667), s(667), null)).toBe('bf110 resume recheck stuck h1=667 h2=667 w2=384 children2=1')
+  })
+
+  it('reads the bridge when present, and never throws when it is absent or broken', async () => {
+    const { readNativeHeights } = await import('../resume-repaint')
+    const g = globalThis as { AndroidRenderer?: unknown }
+    expect(readNativeHeights()).toBeNull()
+    g.AndroidRenderer = { viewHeights: () => 'view=826 parent=826' }
+    expect(readNativeHeights()).toBe('view=826 parent=826')
+    g.AndroidRenderer = { viewHeights: () => { throw new Error('bridge gone') } }
+    expect(readNativeHeights()).toBeNull()
+    delete g.AndroidRenderer
   })
 })

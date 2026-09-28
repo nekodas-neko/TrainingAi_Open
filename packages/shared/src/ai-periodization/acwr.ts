@@ -1,3 +1,5 @@
+import { median } from '@trainingai/shared/stats'
+
 export interface AcwrSession { startedAt: Date; volumeKg: number }
 export interface AcwrOptions { minSpanDays?: number; minSessions?: number; minChronicWeeklyLoadKg?: number }
 export interface AcwrResult {
@@ -33,8 +35,13 @@ export function computeVolumeAcwr(sessions: AcwrSession[], todayMid: Date, opts:
   const spanDays = Math.round(spanMs / 86_400_000)
   const dataSpanWeeks = Math.max(1, spanDays / 7)
   const chronicWeeklyAvgKg = chronicLoad / dataSpanWeeks
-  const sorted = [...vols].sort((a, b) => a - b)
-  const typicalSessionVolumeKg = sorted.length ? sorted[Math.floor(sorted.length / 2)] : 0
+  // The shared median (LA-151). This read `sorted[floor(n/2)]` — the UPPER of the two middles —
+  // which over the owner's real 119 sessions differs on 39% of rolling 28-day windows, always
+  // upward, by a median 1.85% and up to 21%. It is REPORTED, not scored: Q-190 took the volume
+  // lane off this number, so the bias reached the score audit's display and nothing that computes.
+  // 0 for an empty window keeps the `number` contract every consumer is typed against, and the
+  // window is gated by `minSessions` before anything acts on it.
+  const typicalSessionVolumeKg = median(vols) ?? 0
   const gatesPass =
     spanDays >= minSpanDays &&
     sessions.length >= minSessions &&

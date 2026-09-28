@@ -46,6 +46,20 @@ export interface PrescriptionSignals {
     // repCompletionRate = actual ÷ prescribed reps last session.
     rpeDelta: number | null
     repCompletionRate: number | null
+    /**
+     * The exercise's own progression style, set by set — the numbers the program prescribes
+     * before any model sees them (RV-202).
+     *
+     * Added because a failed model call had nothing to fall back on: this layer carried
+     * identity, 1RM history, timing and autoregulation inputs but not one base number, so the
+     * only deterministic plan available was `buildWholeSessionDeloadPrescription` — which would
+     * have prescribed a DELOAD to everyone whose model call failed. That is a training decision,
+     * not a degraded answer.
+     *
+     * Empty when the exercise has no style, or the style has no sets. A rules prescription skips
+     * those exercises rather than inventing a number for them.
+     */
+    baseSets: Array<{ pct: number; reps: number; restSec: number }>
   }>
   phase: string
   sessionsInPhase: number
@@ -173,12 +187,15 @@ export async function aggregateSignals(
   const today = todayInTz(tz)
   const todayMid = todayMidnightUtc(tz)
 
-  const [rawState, program, allPrs, prevPrs, injuries] = await Promise.all([
+  const [rawState, program, allPrs, prevPrs, injuries, styles] = await Promise.all([
     repo.getSessionPeriodization(userId, programSessionId),
     repo.getActiveProgram(userId),
     repo.listPersonalRecords(userId),
     repo.listPrevious1rm(userId),
     repo.listInjuries(userId),
+    // RV-202: the program's own per-set numbers, so a failed model call has something
+    // deterministic to fall back on. `SessionExercise` carries only `styleId`.
+    repo.listProgressionStyles(userId),
   ])
 
   if (!rawState || !program) return null
@@ -253,6 +270,16 @@ export async function aggregateSignals(
   const cardSignalsById = new Map(
     buildCardExerciseSignals(programSession.exercises, allPrs, prevPrs).map(c => [c.sessionExerciseId, c]),
   )
+  const setsByStyleId = new Map(
+    styles.map(st => [
+      st.id,
+      // Set order is the prescription's order; `style_sets` carries `setNumber` for exactly that.
+      [...st.sets]
+        .sort((a, b) => a.setNumber - b.setNumber)
+        .map(x => ({ pct: x.pct, reps: x.reps, restSec: x.restSec })),
+    ]),
+  )
+
   const exercises = programSession.exercises.map(ex => {
     // Identity/role/trend come from the shared derivation the card also uses — one rule, so the
     // card and the engine can never disagree about a lift's strength trend.
@@ -283,6 +310,7 @@ export async function aggregateSignals(
       equipment: equipmentMap[ex.exerciseName] ?? [],
       transitionSec: resolveTransitionSec(ex.exerciseName, equipmentMap[ex.exerciseName], measuredTimeBudget),
       plateau,
+      baseSets: (ex.styleId ? setsByStyleId.get(ex.styleId) : undefined) ?? [],
     }
   })
 

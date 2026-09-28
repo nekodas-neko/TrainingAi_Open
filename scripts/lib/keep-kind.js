@@ -92,11 +92,39 @@ function keepKind(text) {
  */
 const S25_OUTCOME = /(VERIFIED|FAILED|REPORTED BROKEN) ON THE S25/;
 
+/**
+ * A shipped-here marker: the entry records that its own fix landed.
+ *
+ * Narrow on purpose. It must not match the *prose* of a fix ("this ships as one fix with BF-165"),
+ * only the decorated line an implementer writes when the code is in a merged diff.
+ */
+const SHIPPED_HERE = /(✅|⚠)\s*\**\s*(FIXED|SHIPPED|LANDED)\b/;
+
+const lastMatch = (lines, re) => {
+  for (let i = lines.length - 1; i >= 0; i -= 1) if (re.test(lines[i])) return i;
+  return -1;
+};
+
 function keepIsSettled(keep, lines) {
   if (!keep) return false;
   const kind = keep.gate ? 'check' : keepKind(keep.text);
   if (kind !== 'check') return false;
-  if (!lines.some((l) => S25_OUTCOME.test(l))) return false;
+
+  const outcome = lastMatch(lines, S25_OUTCOME);
+  if (outcome === -1) return false;
+
+  // **An entry FOUND by a device failure and then fixed will always carry an outcome line, and it
+  // is the original report rather than a verification** (LB-161, 2026-09-26). DV-2 opens with
+  // `❌ FAILED ON THE S25, 2026-09-23`, ships its fix on 09-25, and correctly keeps a `Keep:` for
+  // the pass test on that fix — and this rule told the reader to strike it. That is the advisory
+  // arguing against the entry being right, which is how an advisory gets scrolled past.
+  //
+  // Position is the evidence available: a shipped marker BELOW the last outcome means the outcome
+  // predates the fix, so nothing has looked at what is on the device now. This is deliberately not
+  // a date comparison — plenty of these lines carry no date, and one that does can be the date of
+  // the report rather than of the look.
+  if (lastMatch(lines, SHIPPED_HERE) > outcome) return false;
+
   return !/\bDONE\b/.test(keep.text);
 }
 

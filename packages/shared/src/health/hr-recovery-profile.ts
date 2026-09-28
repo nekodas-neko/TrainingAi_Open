@@ -16,7 +16,7 @@
 // safe once posture/source is held constant or explicitly labelled. **This DOES bite now**: cool-down
 // episodes are mixed in, and they are the only ones reaching the top bands, so a top-band figure is
 // a cardio figure. `bySource` on every band is what makes that visible; render it.
-import { median } from './daily-medians'
+import { median } from '@trainingai/shared/stats'
 
 export interface PeakBand {
   label: string

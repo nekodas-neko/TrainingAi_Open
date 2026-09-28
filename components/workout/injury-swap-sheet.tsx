@@ -37,7 +37,7 @@ export function InjurySwapSheet({ open, onOpenChange, original, injuredMuscles, 
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="max-h-[80vh] overflow-y-auto">
+      <SheetContent side="bottom" className="max-h-[80dvh] overflow-y-auto">
         <SheetHeader>
           <SheetTitle>Swap Exercise</SheetTitle>
         </SheetHeader>

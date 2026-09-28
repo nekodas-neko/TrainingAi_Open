@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { shouldCuePhaseChange, phaseCueHaptic } from '@/lib/walk/walk-phase-cue'
 import { buildIntervalPlan, segmentAt, DEFAULT_WALK_CONFIG } from '@/lib/walk/interval-plan'
+import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 /**
  * BF-105 — the interval-walk phase change had no in-app cue at all.
@@ -14,8 +15,7 @@ import { buildIntervalPlan, segmentAt, DEFAULT_WALK_CONFIG } from '@/lib/walk/in
 
 const ROOT = path.resolve(__dirname, '..', '..')
 const source = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
-const stripped = (rel: string) => source(rel)
-  .replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+const stripped = (rel: string) => stripComments(source(rel))
 
 describe('when a cue fires', () => {
   it('stays silent on the first resolve, so opening the screen is not a phase change', () => {

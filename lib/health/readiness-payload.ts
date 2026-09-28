@@ -14,7 +14,8 @@
  */
 import { getRepository } from '@/lib/data'
 import type { OuraDailyDerivedPatch } from '@/lib/data/repository'
-import { todayInTz, todayMidnightUtc, toAestDay, ageFromDob } from '@trainingai/shared/date-utils'
+import { todayInTz, todayMidnightUtc, toAestDay, ageFromDob, shiftDateStr } from '@trainingai/shared/date-utils'
+import { recentDoses, withDoseContext, DOSE_EFFECT_LOOKBACK_DAYS, type RecentDose } from '@trainingai/shared/health/dose-context'
 import { getCurrentPhase } from '@trainingai/shared/phase-engine'
 import { computeVolumeAcwr, ACWR_THRESHOLDS } from '@trainingai/shared/ai-periodization/acwr'
 import { scoreBand } from '@trainingai/shared/health/score-band'
@@ -22,13 +23,13 @@ import { computeSleepScore, sleepComponentsToContributors, sleepScoreBaselines }
 import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { getDailyGoals, type DailyGoals } from '@trainingai/shared/health/daily-goals'
-import { hrMaxFromAge, computeHrZones } from '@trainingai/shared/health/hr-zones'
-import { accumulateZoneSeconds, activeMinutesFromZoneSeconds } from '@trainingai/shared/health/zone-minutes'
+import { hrMaxFromAge, computeHrZones, moderateIntensityBpm } from '@trainingai/shared/health/hr-zones'
+import { accumulateZoneSeconds, activeMinutesFromReadings } from '@trainingai/shared/health/zone-minutes'
 import { computeMovedHours, moveHoursGoal } from '@trainingai/shared/health/hourly-movement'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { baselineZ } from '@trainingai/shared/health/personal-baseline'
 import { computeReadinessComposite, checkinScoreFromEnergy, READINESS_MODEL_VERSION, type ReadinessCompositeResult } from '@trainingai/shared/health/readiness-composite'
-import { resilienceLevelToBand } from '@/lib/health/stress-resilience'
+import { resilienceLevelToBand, observeResilienceCoverage } from '@/lib/health/stress-resilience'
 import { computeIllnessRadar, illnessAdvisory, illnessZScores, type IllnessFlag, type IllnessBiomarker, type IllnessBiomarkerKey } from '@trainingai/shared/health/illness-radar'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { scoreAvailability, metricAvailability, trailingBaselineZ, type ReadinessInputKey, type ScoreAvailability, type MetricAvailability } from '@/lib/health/score-availability'
@@ -186,7 +187,7 @@ export interface ReadinessScoreResponse {
     // Zone-minutes / move-every-hour — null (not zero) when there's no intraday HR series to derive
     // them from today (e.g. no baseline resting HR yet); zero is a real "no elevated HR today" result.
     zoneMinutes: number | null; moveHours: number | null
-    sessions7d: number; volume7dKg: number; typicalSessionVolumeKg: number
+    sessions7d: number; volume7dKg: number
   } | null
   // True when the over-exertion taper (ACWR above the optimal band) pulled the displayed score
   // below the pre-taper goal-completion score.
@@ -238,11 +239,34 @@ export interface ReadinessScoreResponse {
   illnessBiomarkers: Partial<Record<IllnessBiomarkerKey, IllnessBiomarker>> | null
   illnessSuppression: number         // readiness points subtracted by the radar (0 unless elevated/fever)
   illnessAdvisory: string | null     // inline copy for the readiness surface, null when nothing to say
+  /** TN-46: vial-dosed administrations in the last few days, newest first. Optional because a cached
+   *  payload from before it existed does not carry it. Context only: no score
+   *  reads it. The advisory above names the latest when a flag is up. */
+  recentDoses?: RecentDose[]
   // Our own derived stress-resilience (stress_resilience_2_2_1) — supersedes the frozen Oura Cloud
   // resilience string. null until enough history accrues (never fabricated).
   ownResilienceLevel: number | null                                          // 1.0-5.0
   ownResilienceBand: 'low' | 'limited' | 'adequate' | 'solid' | 'strong' | null
   ownResilienceConfidence: number | null
+  // LA-158: the day the level above was produced. The level is the most recent one in a 7-day
+  // window, NOT necessarily today's, and the tile had no way to tell the two apart — on
+  // 2026-09-27 it was rendering 09-22's level as current. A surface that shows a number owes
+  // the reader its date whenever the number can be days old.
+  ownResilienceAsOf: string | null                                           // 'YYYY-MM-DD'
+  // LA-158: what was observed when no level could be shown, so the surface can say why instead
+  // of rendering nothing. Deliberately NOT a diagnosis: the payload looks at 7 days while the
+  // model gates on `windowDays`, so a shortfall here is consistent with the coverage gate having
+  // closed without establishing it. The numbers let the surface state what is true —
+  // "N of the last M days had enough daytime coverage; the model needs K of W" — and no more.
+  // `null` for the threshold fields means the resilience constants were not injected on this
+  // request, which is a different thing from a threshold of zero.
+  ownResilienceUnavailable: {
+    daysSeen: number
+    daysMeetingCoverageGate: number | null
+    coverageGateMinutes: number | null
+    minValidDays: number | null
+    modelWindowDays: number | null
+  } | null
 }
 
 /** Exported for TN-6a's pass test: the ladder's contribution has to be measured, not read. */
@@ -322,7 +346,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   const from28dIso  = toAestDay(from28dDate, tz)
   const from7dIso   = toAestDay(new Date(todayMid.getTime() - 7 * 86_400_000), tz)
 
-  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, todayMood, userProfile] = await Promise.all([
+  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, todayMood, userProfile, userGoals, doseEvents] = await Promise.all([
     repo.listBodyMetrics(userId, from28dIso, todayIso),
     repo.listSleepSessions(userId, from28dIso, todayIso),
     repo.getWorkoutSessionsFrom(userId, from28dDate),
@@ -334,11 +358,21 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     repo.getLatestOuraCloudVitals(userId),
     repo.getMoodLog(userId, todayIso),
     repo.getUserById(userId),
+    // Q-524: the step goal the user set, which wins over the activity-level default.
+    repo.getUserGoals(userId).catch(() => null),
+    // TN-46: context for a flagged day, never an input to the score. A failure costs the context only.
+    (async () => repo.listDoseEvents(userId, shiftDateStr(todayIso, -DOSE_EFFECT_LOOKBACK_DAYS), todayIso))().catch(() => []),
   ])
 
   const derivedToday = derivedTodayRows.find(r => r.day === todayIso) ?? null
   // Latest day with a produced resilience level (today may be too incomplete to resolve one yet).
   const latestResilience = [...derivedTodayRows].reverse().find(r => r.resilienceLevel != null) ?? null
+  // LA-158: when there is no level, record what was actually observed rather than leaving the
+  // surface to render nothing and say nothing. Measured 2026-09-27: resilience had published
+  // nothing since 09-22 and the only reason anyone knew was a query against the table.
+  const resilienceUnavailable = latestResilience?.resilienceLevel != null
+    ? null
+    : observeResilienceCoverage(derivedTodayRows.map(r => r.daytimeStressCoverageMin))
   const ouraToday = ouraRows.find(r => r.date === todayIso) ?? null
   const ouraByDate = toOuraByDate(ouraRows)
 
@@ -405,7 +439,6 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     todayMid,
   )
   const todayWorkoutVolumeKg = load.todayVolumeKg
-  const typicalSessionVolumeKg = load.typicalSessionVolumeKg
 
   // Skip ACWR for the first 28 days of a new program — chronic load baseline not yet valid.
   // Resolved here (ahead of the activity score) so the over-exertion taper can read it.
@@ -427,12 +460,14 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     ageYears,
     sex: userProfile?.sex ?? null,
     activityLevel: userProfile?.activityLevel ?? null,
+    stepsGoal: userGoals?.stepsGoal ?? null,
   })
   // Rolling 7-day strength window (inclusive of today).
   const sessions7dRows = recentSessions.filter(ws => new Date(ws.startedAt).getTime() >= todayMid.getTime() - 7 * 86_400_000)
   const sessions7d = sessions7dRows.length
   const strengthSessionToday = recentSessions.some(ws => new Date(ws.startedAt).getTime() >= todayMid.getTime())
   const volume7dKg = sessions7dRows.reduce((s, ws) => s + ws.exercises.reduce((s2, ex) => s2 + (ex.volume ?? 0), 0), 0)
+  const recentDoseList = recentDoses(doseEvents, todayIso)
   const todayMetrics = bodyMetrics.find(m => m.date === todayIso) ?? null
 
   // Zone-minutes + move-every-hour, from the SAME intraday HR series already fetched above for
@@ -443,8 +478,10 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   if (baselineRhr != null && todayHrRows.length > 0) {
     const maxHr = hrMaxFromAge(ageYears)
     const zones = computeHrZones({ maxHr, restingHr: baselineRhr })
-    zoneMinutesToday = activeMinutesFromZoneSeconds(
-      accumulateZoneSeconds(todayHrRows.map(r => ({ timestamp: r.timestamp.getTime(), bpm: r.bpm })), zones),
+    zoneMinutesToday = activeMinutesFromReadings(
+      todayHrRows.map(r => ({ timestamp: r.timestamp.getTime(), bpm: r.bpm })),
+      zones,
+      moderateIntensityBpm({ maxHr, restingHr: baselineRhr }),
     )
     movedHoursToday = computeMovedHours({ hrRows: todayHrRows, maxHr, restingHr: baselineRhr, tz, dateIso: todayIso })
   }
@@ -458,7 +495,6 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     strengthSessionToday,
     sessions7d,
     volume7dKg,
-    typicalSessionVolumeKg,
     goals,
     acwr,
   })
@@ -476,7 +512,6 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     activeCalories: yesterdayMetrics?.activeCalories ?? null,
     sessions7d: prevWindow.sessions7d,
     volume7dKg: prevWindow.volume7dKg,
-    typicalSessionVolumeKg,
     goals,
   })?.preTaperScore ?? null) : null
 
@@ -679,6 +714,27 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // The thresholds are NOT touched here (EARLY_DELOAD_SCORE_MAX / EARLY_DELOAD_ACWR_MIN). Moving
   // them in the same change would make it impossible to tell whether a prompt appeared because the
   // gate opened or because the bar dropped — and a threshold is Tuning's proposal, not this one's.
+  // LA-138, answered 2026-09-27 and closed: `ai_dynamic` gets NO in-deload suppression, on
+  // purpose. `inDeloadPhase` below can only ever be false for it — `listProgramPhases` resolves
+  // through `programs.phase_set_id` and that mode has none (it periodizes dynamically, which is
+  // the point of the mode; do NOT populate `program_phases` for it). The active program also has
+  // `started_at` NULL, so the ternary below short-circuits before the phases are even fetched —
+  // two independent reasons, where the entry named one.
+  //
+  // **Do not "fix" this by consulting `ai-dynamic.ts`'s deload signal.** That is
+  // `deloadOrRestRecommended` — a RECOMMENDATION to deload, not a state of being in one.
+  // Suppressing this warning on it would silence the prompt exactly when two independent systems
+  // agree a deload is due, which is backwards. The honest "already deloading" signal for this
+  // mode is a stored prescription with `phaseAction === 'deload'` under `prescriptionDrivesLoad`,
+  // and that is SESSION-scoped while this gate is program-scoped — it would have to guess which
+  // session it meant.
+  //
+  // What settles it is the asymmetry plus the count. A false suppression hides a health warning;
+  // a false prompt costs one confirmation tap, since every early deload needs the owner's yes.
+  // And there is nothing to suppress. Measured in production 2026-09-27: of the 119 logged
+  // workout sessions, `is_early_deload` is false on every one — the 3 that carry a deload
+  // `phase_type` are scheduled phase deloads off the two `automatic` programs, which is the
+  // path that already has suppression. Revisit if an early deload ever actually fires.
   let earlyDeloadRecommended = false
   let earlyDeload: EarlyDeloadReason | null = null
   if (program?.phaseMode === 'automatic' || program?.phaseMode === 'ai_dynamic') {
@@ -895,7 +951,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
       ? {
           steps: todayMetrics?.steps ?? null, activeCalories: todayMetrics?.activeCalories ?? null,
           zoneMinutes: zoneMinutesToday, moveHours: movedHoursToday,
-          sessions7d, volume7dKg, typicalSessionVolumeKg,
+          sessions7d, volume7dKg,
         }
       : null,
     activityTaperApplied:    activityResult?.taperApplied ?? false,
@@ -925,9 +981,12 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     illnessScore:             illness?.score                         ?? null,
     illnessBiomarkers:        illness?.biomarkers                    ?? null,
     illnessSuppression:       illness?.readinessSuppression          ?? 0,
-    illnessAdvisory:          illness ? illnessAdvisory(illness.flag) : null,
+    illnessAdvisory:          illness ? withDoseContext(illnessAdvisory(illness.flag), recentDoseList) : null,
+    recentDoses:              recentDoseList,
     ownResilienceLevel:       latestResilience?.resilienceLevel ?? null,
     ownResilienceBand:        latestResilience?.resilienceLevel != null ? resilienceLevelToBand(latestResilience.resilienceLevel) : null,
     ownResilienceConfidence:  latestResilience?.resilienceConfidence ?? null,
+    ownResilienceAsOf:        latestResilience?.day ?? null,
+    ownResilienceUnavailable: resilienceUnavailable,
   } satisfies ReadinessScoreResponse
 }

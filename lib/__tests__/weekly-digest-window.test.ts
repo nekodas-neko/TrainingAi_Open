@@ -1,5 +1,5 @@
 /**
- * PS-39 — `POST /api/weekly-digest`, one of the twelve #956 exposed as believed-tested-and-not.
+ * PS-39 — `GET /api/weekly-digest`, one of the twelve #956 exposed as believed-tested-and-not.
  *
  * Its subject is a **date window**, which is this repo's most-broken class, and the route's own
  * comment says why the obvious window is wrong: recapping "this week so far" is near-empty on a
@@ -53,16 +53,14 @@ vi.mock('@/lib/ai/insight-cache', () => ({
   readFreshInsight: (...a: unknown[]) => readFreshInsight(...a),
 }))
 
-import { POST } from '@/app/api/weekly-digest/route'
+import { GET } from '@/app/api/weekly-digest/route'
+import type { WeeklyDigestMetrics } from '@trainingai/shared/health/weekly-digest-metrics'
 
 let seq = 0
 const freshUser = () => { sessionUser = { id: `u-${++seq}`, timezone: TZ } }
 
-const post = (body?: unknown) =>
-  POST(new Request('http://localhost/api/weekly-digest', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  }) as never)
+// A GET since RV-201 — it always was a read, and only a POST because it ran a model.
+const post = () => GET()
 
 const session = (startedAt: Date, volume: number) => ({
   startedAt, exercises: [{ exerciseName: 'Bench', volume, sets: [{}, {}] }],
@@ -86,10 +84,15 @@ afterEach(() => { vi.useRealTimers() })
 
 /** Freeze the clock to a known instant so the week boundaries are computable, not guessed. */
 const freezeAt = (iso: string) => { vi.useFakeTimers(); vi.setSystemTime(new Date(iso)) }
-const promptOf = () => (generateText.mock.calls[0][0] as { prompt: string }).prompt
-const bodyOf = async (r: Response) => r.json() as Promise<{ weekStart: string; cached: boolean; digest: string }>
+/**
+ * The rendered digest. This read the model's PROMPT until RV-201 removed the model — asserting
+ * the response is strictly better anyway: it is what the reader gets, not what a model was told.
+ */
+const digestOf = async () => (await bodyOf(await post())).digest
+const bodyOf = async (r: Response) =>
+  r.json() as Promise<{ weekStart: string; digest: string; metrics: WeeklyDigestMetrics }>
 
-describe('POST /api/weekly-digest recaps the last COMPLETED week', () => {
+describe('GET /api/weekly-digest recaps the last COMPLETED week', () => {
   it('on a Monday, recaps the week that just ended — not the empty one just begun', async () => {
     // The failure the route exists to avoid: "this week so far" on a Monday morning is near-empty
     // and reads as a ~100% drop against the prior full week.
@@ -115,9 +118,10 @@ describe('POST /api/weekly-digest recaps the last COMPLETED week', () => {
     getWorkoutSessionsFrom.mockResolvedValue([
       session(new Date('2026-09-02T15:00:00Z'), 5000),   // in the recap week, none before it
     ])
-    await post()
-    expect(promptOf()).toContain('first week of data')
-    expect(promptOf()).not.toContain('Infinity')
+    const digest = await digestOf()
+    expect(digest).toContain('first week of data')
+    expect(digest).not.toContain('Infinity')
+    expect(digest).not.toContain('NaN')
   })
 
   it('compares the two full weeks when both have volume', async () => {
@@ -126,71 +130,59 @@ describe('POST /api/weekly-digest recaps the last COMPLETED week', () => {
       session(new Date('2026-09-02T15:00:00Z'), 6000),   // recap week (Aug 31 – Sep 6)
       session(new Date('2026-08-26T15:00:00Z'), 4000),   // prior week (Aug 24 – Aug 30)
     ])
-    await post()
-    expect(promptOf()).toContain('+50% vs the week before')
+    const { digest, metrics } = await bodyOf(await post())
+    // 6000 against 4000 is +50%, and the digest states it rather than restating the tonnages.
+    expect(metrics.training.volumeKg).toBe(6000)
+    expect(metrics.training.priorVolumeKg).toBe(4000)
+    expect(digest).toContain('+50%')
   })
 })
 
-describe('caching and failure', () => {
-  it('serves a fresh cached digest without calling the model', async () => {
+describe('the digest is recomputed, never cached or degraded (RV-201)', () => {
+  // Three tests lived here for the prose cache keyed on (week, context hash), and one for the
+  // degrade path. RV-201 removed the model, so there is no paid call to cache and no failure to
+  // degrade from. What Q-293 actually cared about — the digest describing the week's CURRENT
+  // numbers rather than whatever was written first — is now structural, and that is what these
+  // assert.
+  it('follows the data when it changes under the same week key (Q-293)', async () => {
     freezeAt('2026-09-10T14:00:00Z')
-    readFreshInsight.mockResolvedValue('last week you did well')
-    const json = await bodyOf(await post())
-    expect(json).toMatchObject({ digest: 'last week you did well', cached: true })
+    getWorkoutSessionsFrom.mockResolvedValue([session(new Date('2026-09-02T15:00:00Z'), 6000)])
+    expect(await digestOf()).toContain('6,000 kg')
+
+    getWorkoutSessionsFrom.mockResolvedValue([session(new Date('2026-09-02T15:00:00Z'), 9000)])
+    const after = await digestOf()
+    expect(after).toContain('9,000 kg')
+    expect(after).not.toContain('6,000 kg')
+  })
+
+  it('never calls a model and never stores a row', async () => {
+    freezeAt('2026-09-10T14:00:00Z')
+    await post()
     expect(generateText).not.toHaveBeenCalled()
+    expect(upsertAiHealthInsight).not.toHaveBeenCalled()
+    expect(readFreshInsight).not.toHaveBeenCalled()
   })
 
-  it('force bypasses the cache', async () => {
+  it('answers 200 with the metrics on every path — there is no longer one that does not', async () => {
     freezeAt('2026-09-10T14:00:00Z')
-    readFreshInsight.mockResolvedValue('stale but fresh-enough by date')
-    const json = await bodyOf(await post({ force: true }))
-    expect(json.cached).toBe(false)
-    expect(json.digest).toBe('the recap')
-    expect(generateText).toHaveBeenCalled()
-  })
-
-  it('re-generates when the inputs changed, even though the week is closed (Q-293)', async () => {
-    // The recap week is closed, so its inputs mostly are too — but a late ring back-fill or a
-    // corrected weigh-in still changes them, and keying the cache on the week alone served the
-    // first digest written for it for the rest of the week with no way to notice.
-    freezeAt('2026-09-10T14:00:00Z')
-    await post()
-    const firstHash = readFreshInsight.mock.calls[0][4]
-
-    readFreshInsight.mockClear()
-    getWorkoutSessionsFrom.mockResolvedValue([session(new Date('2026-09-02T15:00:00Z'), 9999)])
-    await post()
-    expect(readFreshInsight.mock.calls[0][4]).not.toBe(firstHash)
-  })
-
-  /**
-   * Was `expect(502)`. RV-69 changed the status deliberately: the route has already computed every
-   * number in the recap before it calls the model, so it now answers 200 with those lines and
-   * `degraded: true` rather than discarding them. The property this test was written for is
-   * untouched and is what is still asserted — **the error text must not reach the body**, which is
-   * the live incident behind it (`errorLog`'s `[ERROR]: ${error}` once published a whole failing
-   * statement to the client). A degraded answer is a wider body than a bare error, so the leak
-   * check matters more here than it did before, not less.
-   */
-  it('degrades without leaking the error, and stores nothing', async () => {
-    freezeAt('2026-09-10T14:00:00Z')
-    generateText.mockRejectedValue(new Error('select * from workout_sessions blew up'))
     const res = await post()
     expect(res.status).toBe(200)
-    const text = await res.text()
-    expect(JSON.parse(text).degraded).toBe(true)
-    expect(text).not.toContain('workout_sessions')
-    expect(text).not.toContain('blew up')
-    expect(upsertAiHealthInsight).not.toHaveBeenCalled()
+    const json = await bodyOf(res)
+    expect(json.metrics).toBeTruthy()
+    expect((json as unknown as { degraded?: boolean }).degraded).toBeUndefined()
   })
 
-  it('refuses without a session, and 413s an oversized body', async () => {
+  it('refuses without a session, and answers the owner without reaching a model', async () => {
+    // The oversized-body half of this test went with the POST (RV-201): a GET carries no body, so
+    // the 413 guard it asserted no longer has an input to refuse. What it was really protecting —
+    // that an unauthenticated caller cannot spend a model call — now holds because there is no
+    // model call to spend, which is the stronger version of the same guarantee.
     freezeAt('2026-09-10T14:00:00Z')
     sessionUser = null
     expect((await post()).status).toBe(401)
 
     freshUser()
-    expect((await post({ force: true, pad: 'x'.repeat(5 * 1024) })).status).toBe(413)
+    expect((await post()).status).toBe(200)
     expect(generateText).not.toHaveBeenCalled()
   })
 })

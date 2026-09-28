@@ -2,12 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { intensityZoneForPct } from '@trainingai/shared/workout/intensity-zone'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../../..')
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
 /** The card explains this bug in prose, so a raw-source match would pass on the comment. */
 const code = (rel: string) =>
-  read(rel).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\/[^\n]*/g, '')
+  stripComments(read(rel))
 
 /**
  * BF-163 — the owner, on the same card: *"Is hypertrogpy the correct tag?"*

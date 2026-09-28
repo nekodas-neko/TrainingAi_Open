@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { backActionForPath, TABS } from '../tabs'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /**
  * LB-107 — the owner asked for this by name: *"when you press back on a tab and there is no
@@ -20,7 +21,7 @@ import { backActionForPath, TABS } from '../tabs'
 const ROOT = join(__dirname, '..', '..', '..')
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
 /** Comments stripped: both files describe this fix in prose. */
-const code = (rel: string) => read(rel).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*/g, '')
+const code = (rel: string) => stripComments(read(rel)).replace(/\/\/.*/g, '')
 
 describe('LB-107 — back from a tab lands on Home', () => {
   it('sends every non-home tab to Home', () => {

@@ -11,10 +11,12 @@ import type { HealthTrendDay } from "@/app/api/health/trends/route";
 import { useHeroColorScheme } from "./detail-hero";
 import { resolveColor } from "@trainingai/shared/chart-colors";
 import { gapDataset } from "./trend-sparkline-gaps";
+import { trendSparklinePropsEqual } from "./trend-sparkline-equal";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
-type Field = "readinessScore" | "sleepScore" | "activityScore" | "hrvMs" | "rhrBpm" | "hrr1Bpm" | "wornHours" | "sessionDurationMin" | "workoutDensity" | "proteinPerKg" | "steps" | "waterMl" | "temperatureDeviation";
+// One definition, beside the comparator that has to agree with it.
+import type { TrendField as Field } from "./trend-sparkline-equal";
 
 interface TrendSparklineProps {
   trends: HealthTrendDay[];
@@ -135,4 +137,24 @@ function TrendSparklineBase({ trends, field, label, color, unit }: TrendSparklin
   );
 }
 
-export const TrendSparkline = memo(TrendSparklineBase);
+/**
+ * **`memo` with a VALUE comparator, because the default shallow one is defeated here (DV-12).**
+ *
+ * Every tab re-show bumps `TabVisibilityProvider`'s `epoch`, the screens refetch because of it — that
+ * is deliberate, since all five tabs stay mounted and a bare mount effect would show one snapshot
+ * forever — and the refetch hands down a **new `trends` array with the same contents**. A shallow
+ * compare sees a different reference, so this re-renders, rebuilds `data`/`options` inline, and
+ * `react-chartjs-2` runs `chart.update()`, which re-measures every axis label.
+ *
+ * **Measured: 578 canvas `font`-setter calls on every single switch to the Health tab** (five of these
+ * on screen), against 0 on a tab with no charts — and the canvas `font` setter is the top self-time
+ * item in the device CPU profile of a tab tap, at 7–48 ms. It is not a resize: instrumenting
+ * `ResizeObserver` shows 5 chart callbacks during load and **zero** on a tab switch, which is also why
+ * `resizeDelay` did nothing when it was tried.
+ *
+ * So compare the values this component actually READS — `date` and `t[field]` — rather than the array
+ * identity. An unchanged refetch then re-renders nothing. The other props are primitives and compare
+ * shallowly as before. This is the repo's standing `React.memo` rule (*"only works with stable props"*)
+ * one level up: the prop is not an inline literal, it is a new array with equal contents.
+ */
+export const TrendSparkline = memo(TrendSparklineBase, trendSparklinePropsEqual);

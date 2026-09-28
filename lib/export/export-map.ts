@@ -106,6 +106,7 @@ export const EXPORTED: Record<string, ExportScope> = {
   session_periodization: { kind: 'user_id' },
   set_hr_stats: { kind: 'user_id' },
   sleep_sessions: { kind: 'user_id' },
+  sleep_verdicts: { kind: 'user_id' },
   step_live_windows: { kind: 'user_id' },
   supplement_logs: { kind: 'user_id' },
   supplement_vials: { kind: 'user_id' },
@@ -201,4 +202,5 @@ export const EXCLUDED: Record<string, Exclusion> = {
   // ── Jointly about another account. ───────────────────────────────────────────
   friendships: { category: 'third-party', reason: 'each row is also the other account\'s relationship record, and the counterparty is an opaque uuid here' },
   invited_emails: { category: 'third-party', reason: 'other people\'s email addresses' },
+  email_normalisation_preimage: { category: 'third-party', reason: 'LA-61\'s undo record: every account\'s pre-backfill email address' },
 }

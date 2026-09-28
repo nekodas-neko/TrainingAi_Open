@@ -11,6 +11,7 @@
  * (`runDhrvImputation`). Deterministic given its inputs. See the P3 plan doc.
  */
 import type { DaytimeStressConstants } from '@/lib/oura-models/constants'
+import { median } from '@trainingai/shared/stats'
 import { daytimeHrvEstimatesPerBucket, inSleepWindow, type DaytimeHrvModel, type SleepWindow } from '@trainingai/shared/health/daytime-hrv-model'
 
 export interface DhrvBaselines {
@@ -183,18 +184,12 @@ export interface StressPoint {
   stressLevel: number
 }
 
-function median(a: number[]): number {
-  const s = [...a].sort((x, y) => x - y)
-  const m = Math.floor(s.length / 2)
-  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2
-}
-
 // Shared tail for both dhrv sources (ONNX and D5's own model): self-calibrating day-median
 // baseline + Oura's real stress-level rule. The two per-bucket loops differ in HOW dhrv is
 // derived; this scoring step is identical either way.
 export function scoreStressPoints(raw: { t: number; dhrv: number }[], b: DhrvBaselines): StressPoint[] {
   if (raw.length === 0) return []
-  const med = median(raw.map(r => r.dhrv))
+  const med = median(raw.map(r => r.dhrv))!  // non-null: the empty case returned above
   return raw.map(r => ({ t: r.t, dhrv: r.dhrv, stressLevel: daytimeStressLevel(r.dhrv, med, b.dhrvBaseline) }))
 }
 

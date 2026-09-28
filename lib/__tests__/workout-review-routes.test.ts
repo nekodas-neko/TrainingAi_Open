@@ -1,16 +1,21 @@
 /**
  * PS-39 — the Workout Review pair, neither of which had a test that imports its handler.
  *
- * They divide the way this app divides everywhere: the **review** route asks a model what to change
- * and the **apply** route writes it. So the model is load-bearing in neither, and each has its own
- * way of not trusting it — review discards any `session_exercise_id` the model invented, apply
- * validates every client-supplied id against the user's own active program and stamps its own
- * `confidence: 1.0` over whatever the client sent. Both are invisible from the outside: a route that
- * stopped checking ids returns the same shape.
+ * They divide the way this app divides everywhere: the **review** route decides what to change and
+ * the **apply** route writes it. Apply validates every client-supplied id against the user's own
+ * active program and stamps its own `confidence: 1.0` over whatever the client sent — invisible
+ * from the outside, because a route that stopped checking ids returns the same shape.
  *
- * `reconcileReview` is deliberately NOT mocked — it is the thing worth holding. `aggregateSignals`
- * and the two prompt builders are, because they are a wide read and a string formatter respectively,
- * and neither is what these cases are about.
+ * **RV-204 removed the review's model call.** The proposal is now `buildRulesReview` →
+ * `reconcileReview`, the same deterministic trim the prescription path runs. So the cases that
+ * used to assert on the string handed to `generateObject` assert on the PROPOSAL instead, which
+ * is what the user actually sees; and the `ai` mock stays, unused, so that a reintroduced model
+ * call fails the first case below rather than passing silently.
+ *
+ * `reconcileReview` and `buildRulesReview` are deliberately NOT mocked — they are the thing worth
+ * holding. `aggregateSignals` is, because it is a ~30-read aggregate and none of these cases are
+ * about it. `reconcileReview`'s own guards (the last primary, under-target coverage, invented
+ * ids) are unit-tested next to it in `review/__tests__/reconcile.test.ts`.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
@@ -39,13 +44,6 @@ vi.mock('@/lib/data', () => {
 })
 vi.mock('@trainingai/shared/ai-periodization/signals', () => ({
   aggregateSignals: (...a: unknown[]) => aggregateSignals(...a),
-}))
-vi.mock('@trainingai/shared/workout/review/prompt', () => ({
-  buildReviewSystemPrompt: (goal: string, phase: string) => `sys:${goal}:${phase}`,
-  // The "before" numbers are the half of the prompt this route builds itself, so the stub keeps
-  // them readable rather than discarding them — that is what the prescription cases assert on.
-  buildReviewUserPrompt: (_s: unknown, current: Map<string, unknown>, today: string) =>
-    `today:${today} ${[...current].map(([id, p]) => `${id}=${JSON.stringify(p)}`).join(' ')}`,
 }))
 vi.mock('ai', () => ({ generateObject: (o: unknown) => generateObject(o) }))
 vi.mock('@/lib/ai/instrument', () => ({
@@ -143,7 +141,11 @@ beforeEach(() => {
 
 afterEach(() => { vi.restoreAllMocks() })
 
-const promptOf = () => (generateObject.mock.calls[0][0] as { prompt: string }).prompt
+/** The "before" shape the review diffs against, straight off the proposal the user is shown. */
+const beforeOf = async (id: string) => {
+  const body = await (await reviewPost()).json()
+  return (body.proposal.exercises as Row[]).find(e => e.sessionExerciseId === id)!.before as Row
+}
 const storedPrescription = () => storePrescription.mock.calls[0][2] as Row
 
 describe('POST /api/workout-review/session/[sessionId]', () => {
@@ -192,36 +194,51 @@ describe('POST /api/workout-review/session/[sessionId]', () => {
     expect((await reviewPost()).status).toBe(404)
   })
 
-  it('answers 502 when the model fails, not a raw 500', async () => {
-    generateObject.mockRejectedValue(new Error('gemini down'))
+  /**
+   * RV-204. The route used to answer 502 when Gemini failed; there is no model to fail now. The
+   * `ai` mock is still installed above and this is what makes its absence load-bearing — a
+   * reintroduced model call fails here rather than passing quietly and costing tokens again.
+   */
+  it('reaches no model at all', async () => {
     const res = await reviewPost()
-    expect(res.status).toBe(502)
-    expect((await res.json()).error).toContain('try again')
+    expect(res.status).toBe(200)
+    expect(generateObject).not.toHaveBeenCalled()
+    // Deterministic arithmetic reports itself as certain, and always exactly this.
+    expect((await res.json()).confidence).toBe(1)
   })
 
-  // The model is given a list of ids and can still return one that is not in it. `reconcileReview`
-  // keys off the session's own exercises, so an invented id cannot become a proposal row.
-  it('discards a session_exercise_id the model invented', async () => {
-    generateObject.mockResolvedValue({ object: aiReview({
-      exercises: [aiExercise(SQUAT, 'Squat'), aiExercise(FOREIGN, 'Somebody else\'s lift', { action: 'drop' })],
-    }) })
+  // An invented id was a MODEL failure mode — `buildRulesReview` emits ids it was handed, so the
+  // route can no longer produce one. `reconcileReview`'s guard against it stays and is tested
+  // next to that function; this holds the weaker, true property at the route.
+  it('proposes only the session\'s own exercises, with nothing invented', async () => {
     const body = await (await reviewPost()).json()
-    expect(body.proposal.invalidIds).toEqual([FOREIGN])
-    expect(console.warn).toHaveBeenCalledWith(expect.stringContaining('invented session_exercise_id'), [FOREIGN])
+    expect(body.proposal.invalidIds).toEqual([])
     expect(body.proposal.exercises.map((e: Row) => e.sessionExerciseId).sort())
       .toEqual([SQUAT, ROW, CURL].sort())
+    expect(body.proposal.exercises.map((e: Row) => e.sessionExerciseId)).not.toContain(FOREIGN)
   })
 
-  // Guard 1 in reconcileReview: a session always keeps a main compound lift.
-  it('refuses the model the last primary lift', async () => {
-    generateObject.mockResolvedValue({ object: aiReview({
-      exercises: [aiExercise(SQUAT, 'Squat', { action: 'drop', drop_reason: 'over budget' })],
-    }) })
+  /**
+   * The main compound lift survives a budget nothing can fit. Two things hold it and they are
+   * different: `dropToBudget` stops at one exercise and trim priority sends accessories first,
+   * and `reconcileReview`'s guard refuses a drop that would take the last primary. This asserts
+   * the OUTCOME, which is the thing the user cares about either way.
+   */
+  it('keeps the main compound lift even when the budget cannot hold the session', async () => {
+    aggregateSignals.mockResolvedValue(signals({ effectiveTimeBudgetMin: 1 }))
     const body = await (await reviewPost()).json()
+    // Non-vacuous by construction: assert the budget really did force drops, or a change that
+    // stopped dropping anything would pass this while the guard went untested.
+    expect(body.proposal.droppedIds.length).toBeGreaterThan(0)
     const squat = body.proposal.exercises.find((e: Row) => e.sessionExerciseId === SQUAT)
-    expect(squat.action).toBe('keep')
-    expect(squat.guardAdjusted).toBe(true)
-    expect(squat.reason).toContain('at least one main compound lift')
+    expect(squat.action).not.toBe('drop')
+  })
+
+  // Nothing to change is a real answer, and the summary line has to say so rather than going blank.
+  it('says so when the session already fits, changing nothing', async () => {
+    const body = await (await reviewPost()).json()
+    expect(body.proposal.exercises.every((e: Row) => e.action === 'keep')).toBe(true)
+    expect(body.reasoning).toContain('already fits')
   })
 
   it('reports the session name and budget from the program, not the model', async () => {
@@ -241,9 +258,9 @@ describe('POST /api/workout-review/session/[sessionId]', () => {
       prescriptionStatus: 'pending',
       prescription: { phaseAction: 'deload', exercises: [{ sessionExerciseId: SQUAT, sets: 9, reps: 9, pct: 40, restSec: 999 }] },
     }))
-    await reviewPost()
-    expect(promptOf()).not.toContain('"pct":40')
-    expect(promptOf()).toContain('"pct":80') // the primary role default
+    const before = await beforeOf(SQUAT)
+    expect(before.pct).not.toBe(40)
+    expect(before.pct).toBe(80) // the primary role default
   })
 
   it('diffs against a pending `stay`, whose numbers are already today\'s load', async () => {
@@ -251,8 +268,7 @@ describe('POST /api/workout-review/session/[sessionId]', () => {
       prescriptionStatus: 'pending',
       prescription: { phaseAction: 'stay', exercises: [{ sessionExerciseId: SQUAT, sets: 9, reps: 9, pct: 99, restSec: 999 }] },
     }))
-    await reviewPost()
-    expect(promptOf()).toContain('"pct":99')
+    expect((await beforeOf(SQUAT)).pct).toBe(99)
   })
 
   it('diffs against an accepted prescription, which is driving the bar', async () => {
@@ -260,15 +276,13 @@ describe('POST /api/workout-review/session/[sessionId]', () => {
       prescriptionStatus: 'accepted',
       prescription: { phaseAction: 'stay', exercises: [{ sessionExerciseId: SQUAT, sets: 9, reps: 9, pct: 99, restSec: 999 }] },
     }))
-    await reviewPost()
-    expect(promptOf()).toContain('"pct":99')
+    expect((await beforeOf(SQUAT)).pct).toBe(99)
   })
 
   it('falls back to a role default when an exercise has no progression style', async () => {
-    await reviewPost()
     // primary 3×5@80, secondary 3×8@72, accessory 3×12@65
-    expect(promptOf()).toContain(`${SQUAT}={"sets":3,"reps":5,"pct":80,"restSec":180}`)
-    expect(promptOf()).toContain(`${CURL}={"sets":3,"reps":12,"pct":65,"restSec":90}`)
+    expect(await beforeOf(SQUAT)).toEqual({ sets: 3, reps: 5, pct: 80, restSec: 180 })
+    expect(await beforeOf(CURL)).toEqual({ sets: 3, reps: 12, pct: 65, restSec: 90 })
   })
 })
 

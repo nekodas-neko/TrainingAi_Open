@@ -3,12 +3,13 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { isBodyweightType } from '@trainingai/shared/1rm'
 import { mroundStepUp, weightStepFor } from '../utils'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../../..')
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
 /** The card explains this bug in prose, so a raw-source match would pass on the comment. */
 const code = (rel: string) =>
-  read(rel).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\/[^\n]*/g, '')
+  stripComments(read(rel))
 
 /**
  * BF-162 — the owner, reading his Legs prescription: *"Is this right?"*

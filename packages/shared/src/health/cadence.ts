@@ -15,6 +15,8 @@
  * now delegates to `bandAutocorrPeak` here so there is a single autocorrelation implementation.
  */
 
+import { median } from '@trainingai/shared/stats'
+
 /** Which sensor a cadence reading came from. */
 export type CadenceSource = 'ring' | 'strap'
 
@@ -349,7 +351,7 @@ export function summarizeCadence(readings: CadenceReading[], startMs: number): C
   // true cadence — one 140.8 among readings clustered at ~64 dragged a mean to 73.6 (+9.6 vs
   // truth) while the median landed at 63.8 (−0.2). A single bad window should not move the
   // number a user sees, and a mean has no defence against one.
-  const avgSpm = medianOf(valid.map(r => r.spm))
+  const avgSpm = medianRounded(valid.map(r => r.spm))
 
   const bins = new Map<number, number[]>()
   for (const r of valid) {
@@ -361,7 +363,7 @@ export function summarizeCadence(readings: CadenceReading[], startMs: number): C
   }
   const series = [...bins.entries()]
     .sort((a, b) => a[0] - b[0])
-    .map(([tSec, values]) => ({ tSec, spm: median(values) }))
+    .map(([tSec, values]) => ({ tSec, spm: medianRounded(values) }))
 
   const counts = new Map<CadenceSource, number>()
   for (const r of valid) counts.set(r.source, (counts.get(r.source) ?? 0) + 1)
@@ -393,7 +395,7 @@ function estimateSteps(valid: CadenceReading[], startMs: number): number | null 
     if (existing) existing.push(r.spm)
     else bins.set(bin, [r.spm])
   }
-  return stepsFromCadenceSeries([...bins.entries()].map(([tSec, values]) => ({ tSec, spm: median(values) })))
+  return stepsFromCadenceSeries([...bins.entries()].map(([tSec, values]) => ({ tSec, spm: medianRounded(values) })))
 }
 
 /**
@@ -426,16 +428,15 @@ export function stepsFromCadenceSeries(
   return Math.round(steps)
 }
 
-/** Median of a non-empty list, rounded to 1 dp. */
-function medianOf(values: number[]): number {
-  return median(values)
-}
-
-function median(values: number[]): number {
-  const sorted = [...values].sort((a, b) => a - b)
-  const mid = sorted.length >> 1
-  const m = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
-  return Math.round(m * 10) / 10
+/**
+ * Median of a non-empty list, rounded to 1 dp. The rounding is cadence's display convention, not
+ * part of the statistic — the median itself is the shared one (LA-148). Every caller here builds
+ * its list from at least one reading, so the empty branch is unreachable; it returns 0 rather
+ * than throwing because a cadence of 0 is what "no readings" already means downstream.
+ */
+function medianRounded(values: number[]): number {
+  const m = median(values)
+  return m === null ? 0 : Math.round(m * 10) / 10
 }
 
 // ---------------------------------------------------------------------------

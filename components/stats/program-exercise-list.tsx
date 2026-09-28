@@ -1,5 +1,6 @@
 "use client";
 
+import { SessionGlyph } from "@/components/session-glyph";
 import { useState } from "react";
 import type { ProgramSession } from "@trainingai/shared/types/program";
 import type { MuscleAssignment } from "@trainingai/shared/types/program";
@@ -27,7 +28,7 @@ export function ProgramExerciseList({ sessions, muscleMap }: ProgramExerciseList
               className="w-full flex items-center gap-3 px-4 py-3 text-left"
               onClick={() => setExpandedSession(isExpanded ? null : sess.id)}
             >
-              <span className="text-xl">{sess.icon ?? p.emoji}</span>
+              <SessionGlyph icon={sess.icon} palettePosition={sess.position} className="h-5 w-5" />
               <div className="flex-1 min-w-0">
                 <p className={cn("font-bold text-sm", p.textClass)}>{sess.name}</p>
                 <p className="text-xs text-muted-foreground">{sess.exercises.length} exercises</p>

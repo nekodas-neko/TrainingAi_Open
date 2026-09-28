@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { groupSignals } from '@trainingai/shared/session-explain/group-signals'
 import type { SessionExplainData } from '@trainingai/shared/session-explain/build-explain-data'
-import { buildWeeklyDigestContext } from '@trainingai/shared/health/weekly-digest-metrics'
+import { buildWeeklyDigestText } from '@trainingai/shared/health/weekly-digest-metrics'
 import type { WeekOverWeek, WeeklyDigestMetrics } from '@trainingai/shared/health/weekly-digest-metrics'
 
 // BF-178. The number these three surfaces render is the app's OWN ble-derived composite
@@ -57,9 +57,12 @@ describe('BF-178 — the readiness signal is ours, and must not be credited to O
       sleepScore: wow, sleepHours: wow, stressHighMinutes: wow,
       illness: null, resilience: null, ots: null, weightChangeKg: null, friendCount: null,
     }
-    const ctx = buildWeeklyDigestContext(metrics)
-    expect(ctx).toContain('Readiness: 62/100')
-    expect(ctx).not.toContain('Oura readiness')
+    // Was the model's context block until RV-201 removed that model. The guarantee moves with the
+    // text: what the owner READS must not attribute our own readiness to Oura.
+    const text = buildWeeklyDigestText(metrics)
+    expect(text).toContain('readiness')
+    expect(text).toContain('62')
+    expect(text).not.toContain('Oura')
   })
 
   it('never calls it Oura in the session-explain prompt, and never says "not connected"', () => {

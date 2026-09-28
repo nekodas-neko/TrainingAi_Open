@@ -37,6 +37,10 @@ export async function invalidateWorkoutSummaries(): Promise<void> {
     // was in zero groups while its sibling was in three. Nothing distinguishes their write
     // sensitivity; one was registered and one was not.
     invalidateCache('weekly-review-month-window:'),
+    // RV-201 — the weekly recap is a GET now, so it has a client cache to go stale. It draws from
+    // the same writes as the two keys above: sessions, volume and PRs from a workout, HRV /
+    // readiness / sleep / stress from a sync, weight from a body-metric write.
+    invalidateCache('weekly-digest:'),
     // a lifting session's HR feeds the same whole-day zone series as any cardio activity
     invalidateCache('cardio-week'),
     invalidateCache('calendar-data:'),
@@ -163,10 +167,15 @@ export async function invalidateProgramStructure(): Promise<void> {
 /** Caches that derive from biometric sync — invalidate after pullDelta brings new body/sleep/mood rows. */
 export async function invalidateBiometrics(): Promise<void> {
   await Promise.all([
+    // LB-156 — derived from sleep rows, which a manual sleep log writes.
+    invalidateCache('bedtime-estimate'),
     // a weight/step write moves both the burn estimate and the calibration window
     invalidateCache('energy-balance:'),
     invalidateCache('body-metadata'),
     invalidateCache('sleep-sessions'),
+    // RV-201 — the weekly recap reads sleep hours, sleep score and overnight HRV, and a pull-delta
+    // is how those rows arrive on a device that did not sync them itself.
+    invalidateCache('weekly-digest:'),
     invalidateCache('readiness-score'),
     invalidateCache('weekly-stats'),
     invalidateCache('progress-summary'),
@@ -202,6 +211,8 @@ export async function invalidateGoalRecommendations(): Promise<void> {
 /** Caches that derive from Oura data — invalidate after a manual/automatic Oura sync. */
 export async function invalidateOuraSync(): Promise<void> {
   await Promise.all([
+    // LB-156 — derived from sleep rows, which a sync writes.
+    invalidateCache('bedtime-estimate'),
     invalidateCache('body-metadata'),
     invalidateCache('sleep-sessions'),
     invalidateCache('readiness-score'),
@@ -216,6 +227,10 @@ export async function invalidateOuraSync(): Promise<void> {
     // was in zero groups while its sibling was in three. Nothing distinguishes their write
     // sensitivity; one was registered and one was not.
     invalidateCache('weekly-review-month-window:'),
+    // RV-201 — the weekly recap is a GET now, so it has a client cache to go stale. It draws from
+    // the same writes as the two keys above: sessions, volume and PRs from a workout, HRV /
+    // readiness / sleep / stress from a sync, weight from a body-metric write.
+    invalidateCache('weekly-digest:'),
     // A BLE sync drains new keepalive battery polls, so the latest-battery read is stale after
     // one. Read by both Ring Status cards (More/Profile and Health) on this single shared key.
     invalidateCache('oura-ble-battery-latest'),
@@ -359,6 +374,10 @@ export async function invalidateBodyMetricWrite(): Promise<void> {
     // was in zero groups while its sibling was in three. Nothing distinguishes their write
     // sensitivity; one was registered and one was not.
     invalidateCache('weekly-review-month-window:'),
+    // RV-201 — the weekly recap is a GET now, so it has a client cache to go stale. It draws from
+    // the same writes as the two keys above: sessions, volume and PRs from a workout, HRV /
+    // readiness / sleep / stress from a sync, weight from a body-metric write.
+    invalidateCache('weekly-digest:'),
   ])
 }
 
@@ -485,6 +504,10 @@ export async function invalidatePrescriptionChanged(programSessionId?: string): 
 export async function invalidateCheckinAffectsPrescription(): Promise<void> {
   await Promise.all([
     invalidateReadinessInputs(),
+    // LB-156 — the check-in POSTs are what change this key, and they call THIS group. Until now only
+    // invalidateNutritionWrite cleared it, so a converted reader would have been evicted by a food
+    // log and left stale by the check-in save that actually changed it.
+    invalidateCache('day-checkin:'),
     invalidateCache('workout-data'),
     invalidateCache('workout-card:'),
     invalidateCache('ai-periodization-session:'),
@@ -550,6 +573,10 @@ export async function invalidateNutritionWrite(): Promise<void> {
     // `day_checkins.food_logging_completed_at` — the check-in sheets COALESCE that column rather
     // than setting it, so no other path can make this key stale.
     invalidateCache('day-checkin:'),
+    // LB-156 — a plan-meal answer (a decline, and BF-203's estimate once it exists) changes what the
+    // day counts. ⚠ Its writer, `app/nutrition/use-plan-meal-logging.ts`, calls no group yet; the
+    // LB-155 conversion must make it call this one, or registering the key here protects nothing.
+    invalidateCache('plan-meal-answers:'),
     // prefix-invalidate every `nutrition-food-logs-<date>` entry
     invalidateCache('nutrition-food-logs-'),
     invalidateCache('nutrition-weekly-summary'),

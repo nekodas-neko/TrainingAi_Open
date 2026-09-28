@@ -18,6 +18,57 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-09-26 — CLAUDE.md +8 (the branch audit needed one more step, and it is cheaper than the mistake)
+
+`OR-174` was filed and corrected the same day. It claimed four surviving branches held a head start
+on live queued work; diffed afterwards, **not one did** — `OR-127`'s harness is on `main` with `main`
+208 lines ahead, `RV-99`'s files are byte-identical, and `Q-44` adds migrations `main` already uses
+for something else.
+
+The lines buy the direction-of-evidence point, which is the transferable part: **the queue records
+what is WANTED, only the diff records what EXISTS.** An entry stays open for reasons unrelated to
+its branch — OR-127's harness shipped, and the entry is open for the on-device run it still owes.
+Matching a live entry is necessary, not sufficient; the check is three questions against `main` — is
+the file there, is it identical, is `main` ahead.
+
+Caught because the device agent was about to start a sitting with `OR-127` at rank 1, which is the
+one case where the wrong answer costs real time.
+
+## 2026-09-26 — CLAUDE.md → 1046 (branch-meaning rule, and auto-merge confirmed working)
+
+The owner asked that every branch have a reason. The rule that answers it is one line — **a branch
+has meaning only if it has an open PR, and a draft PR is how you mark work worth keeping** — and the
+lines are spent on the two things that make it safe to apply.
+
+**Why not the backlog's `Branch:` field**, which is the obvious candidate and was rejected on
+measurement: 199 entries carry one and it records a PLAN. `Q-44`'s names `refactor/de-oura-identifiers`
+while its live branch is `lane-a/q44-phase3-pr1-table-rename`; `OR-127` and `RV-99` have live branches
+and no field at all. A draft PR is a fact GitHub maintains and cannot drift.
+
+**And why the sweep is not simply "no open PR → delete":** of 38 survivors, four held unmerged work
+for entries still in the queue, one of them rank 1 in `DV`. That is the sentence that stops the next
+session writing a one-line cleanup script and losing live work.
+
+**+4 more in the same PR: `enable_pr_auto_merge` was tested and it works**, so the passage that has
+now been wrong in both directions three times finally says something measured. It was enabled on this
+very PR while its checks were pending. The gotcha is recorded with it — the call refuses on an
+already-green PR, which is the tool declining rather than anything being broken, so enable it right
+after opening.
+
+## 2026-09-26 — CLAUDE.md → 1028 (two repository settings that were wrong, and the squash-merge trap)
+
+Growth in the file that most needs restraint, and it buys the removal of two false premises rather
+than new prose. CLAUDE.md asserted **auto-delete-head-branch was on** (it was off for the repo's whole
+history — 1,562 branches had accumulated) and asserted **`enable_pr_auto_merge` does not work** (that
+was the `ProtectMain`-was-`Disabled` signature, the same root cause as OR-164). The first is corrected
+outright; the second is marked STALE rather than flipped, because enabling the checkbox is not
+evidence it works and this passage has now been wrong in both directions three times in two days.
+
+Most of the 17 lines are the trap, which is the part a future session would otherwise rediscover
+expensively: **`git branch --merged` reported 3 merged out of 1,562**, because squash-merge means a
+merged branch's tip is never an ancestor of `main`. A cleanup keyed on ancestry deletes nothing; one
+"fixed" by ignoring ancestry deletes the 28 closed-but-unmerged branches that hold unlanded work.
+
 ## 2026-09-25 — backlog → BF-92's consent recorded as a runnable device check
 
 The owner approved throwing one deliberate client-side error in production to prove Sentry receives
@@ -17482,7 +17533,7 @@ rather than the journal: the entry's two contrast figures were measured against 
 1.65:1 and 2.11:1 rather than 2.04 and 2.60), its prescribed fix cannot be built (there is 1.52:1 of
 total range to hold the two lifted stops and their separation), and two things it asked for are
 declined with reasons rather than silently skipped. Narrative went to
-`docs/overview/entries/2026-09-25-rv101-heatmap-ramp-and-key.md`.
+`docs/overview/history-2026-09-26-folded-1.md#2026-09-25-rv101-heatmap-ramp-and-key`.
 
 A refutation left out of the entry gets rediscovered by whoever picks it up next, which is what the
 extra lines buy.
@@ -17551,7 +17602,7 @@ this branch was in the gate, so the baseline moved under it; the +9 is unchanged
 
 The entry stays open deliberately: `ci.yml` now dumps `dmesg` on an E2E failure, and the cause is
 established by the next red run rather than by this PR. Narrative in
-`docs/overview/entries/2026-09-25-lb149-e2e-browser-death.md`.
+`docs/overview/history-2026-09-26-folded-1.md#2026-09-25-lb149-e2e-browser-death`.
 
 ## 2026-09-25 — `docs/implementation-backlog.md` 31321 → 31326 (+5)
 
@@ -17636,7 +17687,7 @@ PR, and only the removal was missed. It carried no `Keep:` and no `STILL OPEN`, 
 `node scripts/next-item.js --lane A` kept offering finished work as READY at position 23. Its
 content is not lost: the Q-139 history, the 16,144 ds round-trip error, the nine adapter call sites
 and the fixture-that-could-not-fail lesson are all in
-`docs/overview/entries/2026-09-25-la141-clock-inverse.md`, checked line by line before deleting.
+`docs/overview/history-2026-09-26-folded-1.md#2026-09-25-la141-clock-inverse`, checked line by line before deleting.
 
 Its two queue neighbours, RV-181 and RV-182, were checked at the same time and **stay** — each
 carries inline unfinished work (RV-181's memo and `/api/health/trends`; RV-182's
@@ -17986,3 +18037,83 @@ and a reversal cost to be answerable without reading the parent. BF-202 records 
 the queue share that shape, with the caveat that the number is a keyword upper bound rather than a
 finding — that caveat is the part worth the lines, since acting on 70 as if it were 70 real decisions
 would waste the sweep.
+
+
+## 2026-09-26 — `projectOverview.md` +17 → RV-203's Known-Issues row
+
+One open-issue row, which is what this section of the index is for. It costs 17 lines because
+three separate things have to survive being read cold: what changed (Describe now offers your own
+foods before the AI), **which half is unverified and why** (the local-store branch — `getLocalStore`
+returns null in the sandbox and there is no DOM project, so what ran was the cached-list branch),
+and the pass test that would close it. The last of those is the line that makes the row worth
+keeping rather than deleting on the next sweep — an entry that says "not device-verified" without
+saying what would verify it never leaves.
+
+It also carries the correction the finding needed: the barcode half cannot work offline for a
+different reason than the one Review gave, so the row points at `LB-158` instead of implying the
+work is merely unstarted.
+
+## 2026-09-26 — projectOverview.md 12902 → 12906 (`feat/duration-refit-without-the-model`)
+
+Four lines onto the BF-7 known-issue row, correcting the premise it argued from. It said the
+future duration control "must commit on release rather than per detent" *because* a prescription
+averages 2,445 ms — and RV-202 ② removed the model call from that path entirely (~0.4 s, 0
+`ai_call_log` rows over three switches).
+
+The conclusion survives, which is why this is four lines rather than a deletion: per-detent is
+still wrong, because each re-fit runs a full `aggregateSignals` and spends the route's 20/hour
+`prescribe:` budget. Leaving the old number would have been worse than leaving nothing — a Lane B
+session reading it would either build the control against a cost that no longer exists, or notice
+the number was stale and discard the conclusion with it.
+
+It was first written at 7 lines and cut to 4 against this ratchet; the pointer to LA-147 is what
+lets the short version stay honest about what replaced the old reason.
+
+## 2026-09-26 — projectOverview.md 12906 → 12916 (`fix/vitest-teardown-flake-retry`)
+
+Ten lines for one Known-Issues row: a vitest bug that fails a green test run, now absorbed by a CI
+retry. It earns a row rather than living only in a journal entry because of the last line — the
+wrapper has to be **deleted** when upstream closes vitest#11153, and a removal condition that only
+exists in an archived journal file is a removal that never happens.
+
+The rest of what was learned went where it belongs instead of here: the upstream measurements and
+the corrected `disableConsoleIntercept` costing are in `docs/local-dev-database.md` beside the
+nine-sighting investigation, and the mechanism plus the "do not generalise this into a blanket CI
+retry" warning are a `docs/module-map.md` row. This row is deliberately the short version and
+points at the script.
+
+## 2026-09-26 — projectOverview.md +7 (BF-126 cat art, not device-verified)
+
+One Known-Issues row for the drawn collection art, which shipped without an S25 look. It is trimmed
+to seven lines, with the detail in BF-126 and the journal entry; the row itself is what CLAUDE.md
+requires for an unverified surface change.
+
+## 2026-09-26 — `projectOverview.md` +18 → RV-207's Known-Issues row
+
+One open-issue row for a change that touches eight daily controls and is entirely unverified
+visually. It costs 18 lines because three separate things have to survive a cold read: what
+changed (press states across the tab bar and the daily screens, plus four smaller defects in the
+same pass), **that none of it has been seen** — there is no DOM project in the suite, so the press
+states and the unit change are held by source assertions — and the pass test, which is RV-207's
+own and needs the device.
+
+The last third is what stops the row being deleted on the next sweep: an entry that says "not
+verified" without saying what would verify it never leaves. It also names the two splits
+(`LB-162`, `LB-163`) so the reader does not go looking for the other half in this diff.
+
+## 2026-09-26 — `projectOverview.md` +4 → DV-21's Known-Issues row
+
+One open-issue row for two notification channels the app posted to and never created. It is four
+lines — heading plus a single paragraph — because the detail lives on `DV-21` and in the journal
+entry; what has to survive a cold read here is only that the fix is unverified on the phone and
+what would verify it. It earns a row rather than nothing because a notification change is one of
+the surfaces the device-verification gate names explicitly, and because the symptom is silence:
+without the row, "no alerts have appeared" reads the same before and after.
+
+## 2026-09-26 — `projectOverview.md` +4 → TN-85's Known-Issues row
+
+One open-issue row for the sleep verdict's new home on the Home card. Four lines — heading plus a
+single paragraph — with the detail on `TN-85` and in the journal entry. It earns a row because it
+is new furniture on the screen the owner opens first and nothing about it has been seen on the
+S25, and because the row is where the split from `TN-82` is recorded: this shipped a surface and
+removed nothing, while the modal half still owes a mockup.

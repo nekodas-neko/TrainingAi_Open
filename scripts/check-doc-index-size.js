@@ -175,8 +175,8 @@ for (const [rel, limit] of Object.entries(BASELINE)) {
     slack.push(
       `${rel} is ${lines} lines against a ${limit}-line baseline — ${gap} line${gap === 1 ? '' : 's'} of slack, over its ${slackBand(limit)}-line band.\n` +
         `      Run \`node scripts/check-doc-index-size.js --tighten\` to write ${lines}, or set it by\n` +
-        `      hand in ${baselinePathFor(rel)}, in this PR, with a note in\n` +
-        `      docs/doc-size-baseline-history.md. Left as it is, the document can regrow into that\n` +
+        `      hand in ${baselinePathFor(rel)}, in this PR, with a note in its own file under\n` +
+        `      docs/doc-size/history/. Left as it is, the document can regrow into that\n` +
         `      slack without the ratchet saying anything.`,
     );
     continue;
@@ -196,7 +196,7 @@ for (const [rel, limit] of Object.entries(BASELINE)) {
       (grew === null ? '.' : ` — ${grew} of which this branch added.`) + `\n` +
       `      Move the new material to where it belongs — a journal entry, an archive, a reference\n` +
       `      doc — or, if the growth is genuinely part of the index, raise the baseline in the same\n` +
-      `      PR with a note in docs/doc-size-baseline-history.md. To raise it, run\n` +
+      `      PR with a note in its own file under docs/doc-size/history/. To raise it, run\n` +
       `      \`node scripts/check-doc-index-size.js --fix\` rather than editing\n` +
       `      ${baselinePathFor(rel)} by hand — the file's own line count and this check's count\n` +
       `      differ by one, so a hand-set number usually needs a second round to land.`,
@@ -252,7 +252,7 @@ if (FIX) {
   if (fixed.length) {
     console.log('check-doc-index-size --fix: rewrote');
     fixed.forEach((f) => console.log('  • ' + f));
-    console.log('  Add a note to docs/doc-size-baseline-history.md saying WHY the document moved —');
+    console.log('  Add a note in docs/doc-size/history/<YYYY-MM-DD-branch-slug>.md saying WHY it moved —');
     console.log('  the number is arithmetic, the reason is not, and the reason is the point.');
   } else if (!withheld.length) {
     console.log('check-doc-index-size --fix: every baseline already matches its document.');

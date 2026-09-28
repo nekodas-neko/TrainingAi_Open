@@ -23,7 +23,6 @@
   "lib/__tests__/log-food-invalidation.test.ts": 1,
   "lib/__tests__/meal-reminders.test.ts": 1,
   "lib/__tests__/program-assembler.test.ts": 3,
-  "lib/__tests__/prompt-bodyweight-units.test.ts": 1,
   "lib/__tests__/prompt-deload-awareness.test.ts": 1,
   "lib/__tests__/prompt-recovery-signals.test.ts": 1,
   "lib/__tests__/reevaluate.test.ts": 1,

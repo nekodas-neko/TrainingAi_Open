@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../../..')
 const src = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
 /** Comments state the intent; these assertions are about what runs. */
 const code = (rel: string) =>
-  src(rel).replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+  stripComments(src(rel))
 
 /**
  * BF-177 — "kcal left" held a pre-log number on the S25 until the user left the tab and came back.

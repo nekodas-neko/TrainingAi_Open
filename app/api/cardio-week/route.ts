@@ -65,9 +65,11 @@ export async function GET() {
     repo.getObservedHrProfile(userId, priorFrom, priorTo).catch(() => EMPTY_OBSERVED_HR),
   ])
 
-  const [days, user, weekMetrics, lookbackMetrics, currentRestingMetrics, priorRestingMetrics, plan, dayExercises, todayActivityLogs] = await Promise.all([
+  const [days, user, weekMetrics, lookbackMetrics, currentRestingMetrics, priorRestingMetrics, plan, dayExercises, todayActivityLogs, userGoals] = await Promise.all([
     repo.getZoneMinutesRange(userId, from, to, tz, profile).catch(() => []),
-    repo.getUserById(userId),
+    // LA-82: the profile above already degrades on this read; this copy only feeds age and the step
+    // goal's inputs, which all take null.
+    repo.getUserById(userId).catch(() => null),
     repo.listBodyMetrics(userId, from, to).catch(() => []),
     // Wider window for weight resolution — weight isn't logged daily, so the week window
     // alone is too narrow to reliably find a recent reading (mirrors readiness-score's pattern).
@@ -80,6 +82,8 @@ export async function GET() {
     // activity for today — either one means today isn't a lazy day.
     repo.getDayExerciseNames(userId, today.replace(/-/g, '/'), tz).catch(() => []),
     repo.listActivityLogs(userId, today, today).catch(() => []),
+    // Q-524: the weekly steps target is the user's own goal × 7 when they set one.
+    repo.getUserGoals(userId).catch(() => null),
   ])
   const trainedToday = dayExercises.length > 0 || todayActivityLogs.length > 0
 
@@ -114,6 +118,7 @@ export async function GET() {
     ageYears,
     sex: user?.sex ?? null,
     activityLevel: user?.activityLevel ?? null,
+    stepsGoal: userGoals?.stepsGoal ?? null,
   })
 
   const stepsToday = weekMetrics.find((m) => m.date === today)?.steps ?? 0
@@ -131,6 +136,9 @@ export async function GET() {
         maxHr: observed.max ?? profile.maxHr,
         maxHrDeltaBpm,
         isReliable: observed.isReliable,
+        // LA-82: what the zone boundaries were computed from, so a default can be shown as one.
+        maxHrSource: profile.maxHrSource,
+        restingHrSource: profile.restingHrSource,
       },
       quota,
       dayQuota,

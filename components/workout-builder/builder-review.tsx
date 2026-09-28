@@ -1,5 +1,6 @@
 'use client'
 
+import { SessionGlyph } from "@/components/session-glyph"
 import { useState, useEffect, useMemo } from 'react'
 import Image from 'next/image'
 import { toast } from 'sonner'
@@ -19,6 +20,7 @@ import type { MuscleSetsEntry } from '@/app/api/weekly-muscle-sets/route'
 import { EXERCISE_ROLES, EXERCISE_ROLE_LABEL, exerciseRoleLabel, exerciseRoleBadge } from '@/components/workout/exercise-role-labels'
 import type { ExerciseRole } from '@trainingai/shared/types/program'
 import { mustBypassImageOptimizer } from '@trainingai/shared/media/private-media'
+import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
 
 interface Props {
   program: GeneratedProgram
@@ -501,7 +503,10 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
         <div className="px-4 py-3 space-y-4">
           {program.sessions.map((session, si) => (
             <div key={si} className="rounded-xl bg-muted p-3 space-y-2">
-              <p className="font-bold text-sm">{session.icon} {session.name}</p>
+              <p className="flex items-center gap-1.5 font-bold text-sm">
+                <SessionGlyph icon={session.icon} palettePosition={si} className="h-4 w-4" />
+                {session.name}
+              </p>
               {session.exercises.map((ex, ei) => {
                 const swapKey = `${si}-${ei}`
                 const alts = getAlternatives(ex)
@@ -611,10 +616,10 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
                             key={role}
                             type="button"
                             onClick={() => setExerciseRole(si, ei, role)}
-                            aria-pressed={(ex.exerciseRole ?? 'primary') === role}
+                            aria-pressed={(ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE) === role}
                             className={cn(
                               'tap-dense tap-target-44 px-2.5 py-1.5 rounded text-xs border transition',
-                              (ex.exerciseRole ?? 'primary') === role
+                              (ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE) === role
                                 ? 'bg-brand text-brand-foreground border-brand font-semibold'
                                 : 'bg-muted text-muted-foreground border-border hover:bg-background',
                             )}
@@ -720,7 +725,7 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
                   <p className="flex-1 text-sm truncate">{name}</p>
                   <div className="flex items-center gap-1 flex-none">
                     <input
-                      type="number"
+                      type="number" enterKeyHint="done"
                       inputMode="decimal"
                       value={oneRmInputs[name] ?? ''}
                       onChange={e => setOneRmInputs(prev => ({ ...prev, [name]: e.target.value }))}

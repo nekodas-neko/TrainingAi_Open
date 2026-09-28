@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { cachedFetch, cachedFetchToday, readTodayCacheSync, invalidateCache, isBodyMetadataFresh, isWorkoutDataToday, subscribeToInvalidation } from '../sqlite/cache'
+import { cachedFetch, cachedFetchToday, readTodayCacheSync, invalidateCache, isBodyMetadataFresh, isWorkoutDataToday, subscribeToInvalidation, setCacheTimezone } from '../sqlite/cache'
 import { todayInTz } from '@trainingai/shared/date-utils'
 
 // Proxy-backed so Object.keys(localStorage) enumerates stored keys the same way
@@ -365,5 +365,42 @@ describe('cachedFetch — shouldCache', () => {
     respond({ recap: 'whatever', degraded: true })
     await cachedFetch('should-cache-absent', '/api/recap', 3600, () => {})
     expect(storage.getItem('ta_cache:should-cache-absent')).toContain('whatever')
+  })
+})
+
+// LB-150 — the envelope's "today" is the USER's today. At 20:00 UTC on 2026-07-03 it is already the
+// 4th in Brisbane but still the 3rd in New York, so a New York user's cache must be judged by the 3rd.
+describe("the today envelope keys on the user's timezone (LB-150)", () => {
+  let storage: Storage
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-03T20:00:00Z'))
+    storage = makeMemoryStorage()
+    vi.stubGlobal('window', {})
+    vi.stubGlobal('localStorage', storage)
+    vi.stubGlobal('sessionStorage', makeMemoryStorage())
+    setCacheTimezone('America/New_York')
+  })
+  afterEach(() => { setCacheTimezone(undefined); vi.useRealTimers(); vi.unstubAllGlobals() })
+
+  const put = (key: string, date: string) =>
+    storage.setItem(`ta_cache:${key}`, JSON.stringify({ data: { date, data: { v: date } }, expiresAt: Date.now() + 60_000 }))
+
+  it("reads an entry stamped with the user's today", () => {
+    put('ny-today', '2026-07-03')
+    expect(readTodayCacheSync('ny-today')).toEqual({ v: '2026-07-03' })
+  })
+
+  it("refuses an entry stamped with Brisbane's today, which is the user's tomorrow", () => {
+    put('bne-today', '2026-07-04')
+    expect(readTodayCacheSync('bne-today')).toBeNull()
+  })
+
+  it("stamps a fetched payload with the user's date, so it reads back the same day", async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => ({ x: 1 }) })))
+    await cachedFetchToday('ny-fetched', '/api/x', 60, () => {})
+    const stored = JSON.parse(storage.getItem('ta_cache:ny-fetched')!)
+    expect(stored.data.date).toBe('2026-07-03')
+    expect(readTodayCacheSync('ny-fetched')).toEqual({ x: 1 })
   })
 })

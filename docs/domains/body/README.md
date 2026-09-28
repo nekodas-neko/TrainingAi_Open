@@ -52,7 +52,7 @@ others (energy balance, bodyweight 1RM, readiness) and shouldn't be buried insid
   — §5: reviewed and **came back clean**. The 17-vs-68 composition-column gap is benign (those
   columns first appear 2026-07-29); the six tape-measure columns at 0 of 108 are *correctly empty*.
   No entries filed.
-- [`docs/handoff-2026-07-29-ingest-and-records.md`](../../handoff-2026-07-29-ingest-and-records.md)
+- [`docs/handoffs/handoff-2026-07-29-ingest-and-records.md`](../../handoffs/handoff-2026-07-29-ingest-and-records.md)
   — §Q-25 covers the weigh-in-filed-on-the-wrong-day fault and the clock-resolution fix.
 - [`docs/reviews/2026-08-03-cross-domain-bug-review.md`](../../reviews/2026-08-03-cross-domain-bug-review.md)
   — Q-56 (open, investigation-first, shared with `devices`/`sleep`): real `body_metrics` rows landed
@@ -142,8 +142,8 @@ BF-58's device answers are the open items. Re-run the greps rather than trusting
   `pending` or `dismissed`, never `confirmed`), so there is no second write path. **It had printed
   under KEEP as "not new work" while its residue was the work** — read Keeps whole. Device check owed.
 
-- Handoffs: `ls docs/handoff-*-body-*.md` — plus
-  [`docs/handoff-2026-08-03-cross-owner-bug-batch-triage.md`](../../handoff-2026-08-03-cross-owner-bug-batch-triage.md)
+- Handoffs: `ls docs/handoffs/handoff-*-body-*.md` — plus
+  [`docs/handoffs/handoff-2026-08-03-cross-owner-bug-batch-triage.md`](../../handoffs/handoff-2026-08-03-cross-owner-bug-batch-triage.md)
   (Q-69 — scale weight trend should use the day's lowest confirmed reading, not the first), filed
   under `cross` because it spans five pillars.
 - Journal: `grep -rl 'weigh\|body.composition\|scale' docs/overview/entries/`

@@ -1,3 +1,5 @@
+import { median } from '@trainingai/shared/stats'
+
 // Nightly skin temperature + deviation. Ported faithfully from open_oura's
 // `nightly_temperature_calculate @ 0x203520`
 // (`crates/oura-analysis/src/ported/temperature.rs`, pinned 2026-07-11): a 7-sample
@@ -75,13 +77,11 @@ export type TemperatureFrame = { ds: number; tempsC: number[] }
 export function temperatureFrameSeries(frames: TemperatureFrame[]): { ds: number; centi: number }[] {
   const out: { ds: number; centi: number }[] = []
   for (const f of frames) {
-    const centi = f.tempsC.map(c => Math.round(c * 100)).sort((a, b) => a - b)
-    if (centi.length === 0) continue
-    const mid = centi.length >> 1
-    out.push({
-      ds: f.ds,
-      centi: centi.length % 2 === 1 ? centi[mid] : Math.round((centi[mid - 1] + centi[mid]) / 2),
-    })
+    // Every value is already an integer centi-degC, so the round only ever acts on the average of
+    // two middles — the same thing the inline copy this replaced did (LA-151).
+    const centi = median(f.tempsC.map(c => Math.round(c * 100)))
+    if (centi === null) continue
+    out.push({ ds: f.ds, centi: Math.round(centi) })
   }
   return out.sort((a, b) => a.ds - b.ds)
 }

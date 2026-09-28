@@ -31,7 +31,7 @@ import { BODY_BATTERY_TTL, TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_REC
 import { getStepOrchestrator } from '@/lib/oura-ble/step-orchestrator';
 import { getContinuousCapture, isContinuousCaptureEnabled } from '@/lib/oura-ble/continuous-capture';
 import { getOuraBle } from '@/lib/oura-ble/plugin';
-import { readRollupState, announceOuraSynced } from '@/lib/oura-ble/sync';
+import { readRollupState, announceOuraSynced, syncOuraRingIfStale } from '@/lib/oura-ble/sync';
 import { waitForRollup, type RollupState } from '@/lib/oura-ble/rollup-wait';
 
 interface CacheTask {
@@ -233,6 +233,27 @@ export function SyncProvider({ userId }: SyncProviderProps) {
   // (`isBleDataFresh`), which meant the only times it actually reached out were the times the user
   // most needed the app responsive. Fresh biometrics come from the BLE ingest pipeline
   // (`/api/oura-ble/samples` → the rollup), not from here.
+  //
+  // BF-187: removing that sync also removed the ONLY open/resume trigger, so opening the app never
+  // asked the ring for anything and freshness was bounded by the hourly drain (median ~25 min lag
+  // after waking). This puts the trigger back on the BLE pipeline. The cooldown lives in the native
+  // service (`drainIfStale`), which can see the autonomous drains and an in-flight one.
+  useEffect(() => {
+    if (!userId) return;
+
+    let handle: { remove: () => void } | undefined;
+    const drain = () => { void syncOuraRingIfStale(); };
+
+    (async () => {
+      const { Capacitor } = await import('@capacitor/core');
+      if (!Capacitor.isNativePlatform()) return;
+      drain();
+      const { App } = await import('@capacitor/app');
+      handle = await App.addListener('resume', drain);
+    })();
+
+    return () => { handle?.remove(); };
+  }, [userId]);
 
   // Reconcile meal reminder notifications on app open and on resume from background
   useEffect(() => {

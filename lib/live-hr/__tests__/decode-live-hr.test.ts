@@ -46,8 +46,9 @@ describe('smoothedBpmFromFrames', () => {
     const older = frameHex(0x86, 1500, aohrBody([80]))
     const newer = frameHex(0x86, 3000, aohrBody([82]))
     const res = smoothedBpmFromFrames([newer, older], 1000)
-    // Beats [80,82] (ts order) → median sorted[1] = 82; ringTs = max = 3000.
-    expect(res).toEqual({ bpm: 82, ringTs: 3000 })
+    // Beats [80,82] → 81, the midpoint. This read 82 until LA-148: the old private median
+    // returned the UPPER of the two middles, which biases every even-count window upward.
+    expect(res).toEqual({ bpm: 81, ringTs: 3000 })
   })
 
   it('bounds the median to the most recent window of beats', () => {
@@ -74,7 +75,7 @@ describe('smoothedBpmFromFrames', () => {
     const hr = frameHex(0x86, 1000, aohrBody([66, 68]))
     const junk = frameHex(0x84, 1001, [0x10, 0x00]) // ambient_event — no HR
     const res = smoothedBpmFromFrames([hr, junk], 0)
-    expect(res).toEqual({ bpm: 68, ringTs: 1000 }) // median of [66,68] sorted[1] = 68
+    expect(res).toEqual({ bpm: 67, ringTs: 1000 }) // [66,68] → 67; was 68 under the old upper-middle
   })
 })
 

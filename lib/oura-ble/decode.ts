@@ -10,6 +10,8 @@
  * operates on the body (timestamp already stripped).
  */
 
+import { median } from '@trainingai/shared/stats'
+
 export interface RawFrame {
   tag: number
   payload: Uint8Array
@@ -629,9 +631,7 @@ export function cadenceSecFromDs(dsList: number[]): number | null {
     if (d > 0) deltas.push(d) // drop duplicate-timestamp batches (same event, many samples)
   }
   if (deltas.length === 0) return null
-  deltas.sort((a, b) => a - b)
-  const mid = Math.floor(deltas.length / 2)
-  const medianDs = deltas.length % 2 ? deltas[mid] : (deltas[mid - 1] + deltas[mid]) / 2
+  const medianDs = median(deltas)!  // non-null: the empty case returned above
   return Math.round(medianDs / 10) // deciseconds → seconds
 }
 

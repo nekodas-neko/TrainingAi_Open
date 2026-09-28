@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { weatherCacheKey } from '../use-weather'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../../..')
 
@@ -47,7 +48,7 @@ describe('weatherCacheKey', () => {
 
 describe('the hook reads the cache only once it knows where it is', () => {
   const raw = readFileSync(path.join(ROOT, 'lib/weather/use-weather.ts'), 'utf8')
-  const code = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const code = stripComments(raw)
 
   it('resolves coordinates before reading the keyed cache', () => {
     const coordsAt = code.indexOf('const device = await getDeviceLocation()')
@@ -92,7 +93,7 @@ describe('the manifest start_url is a real route', () => {
 describe('the boot warm does not issue its own requests', () => {
   const raw = readFileSync(path.join(ROOT, 'components/sync-provider.tsx'), 'utf8')
   const warm = raw.slice(raw.indexOf('async function warmCache'), raw.indexOf('interface SyncProviderProps'))
-  const code = warm.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const code = stripComments(warm)
 
   it('has no bare fetch left in it', () => {
     expect(code).not.toMatch(/\bawait fetch\(/)

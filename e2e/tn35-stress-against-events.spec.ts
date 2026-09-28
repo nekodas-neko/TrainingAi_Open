@@ -62,10 +62,18 @@ test.describe('TN-35 — the day screen reads stress against the day\'s events',
       day = rows[0].d
 
       for (const [i, h] of MEASURED_HOURS.entries()) {
+        // `bucket_mid`, not `bucket_start` — LA-114 renamed the column on 2026-09-28 (migration
+        // 202609280647) and did not sweep these two fixtures, so both files failed on every CI run
+        // with `column "bucket_start" does not exist` before the first assertion ran. The value
+        // written is unchanged: the column has always held the MIDPOINT, and the rename only made
+        // the name say so. These grid times (:00/:30) are not where a real midpoint lands (:15/:45,
+        // since t = bucketStart + 15 min), which is deliberate and does not move any assertion here
+        // — the round-trip is fixture-writes/route-reads on one value, and the events below sit well
+        // inside a bucket either way.
         await db.query(
-          `INSERT INTO oura_daytime_stress_buckets (user_id, day, bucket_start, level)
+          `INSERT INTO oura_daytime_stress_buckets (user_id, day, bucket_mid, level)
            VALUES ($1, $2, (($2 || ' ' || $3)::timestamp AT TIME ZONE $4), $5)
-           ON CONFLICT (user_id, bucket_start) DO UPDATE SET level = EXCLUDED.level, day = EXCLUDED.day`,
+           ON CONFLICT (user_id, bucket_mid) DO UPDATE SET level = EXCLUDED.level, day = EXCLUDED.day`,
           [userId, day,
            `${String(Math.floor(h)).padStart(2, '0')}:${h % 1 ? '30' : '00'}:00`,
            tz, [-0.8, -0.6, -0.4][i]],

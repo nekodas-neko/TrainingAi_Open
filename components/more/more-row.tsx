@@ -35,7 +35,7 @@ export function MoreRow({
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center justify-between px-4 py-3 hover:bg-muted/60 transition"
+      className="flex w-full items-center justify-between px-4 py-3 active:bg-muted/60 transition-[background-color] duration-100 motion-reduce:transition-none"
     >
       <div className="flex items-center gap-3 flex-1">
         <Icon className="h-4 w-4 text-muted-foreground shrink-0" />

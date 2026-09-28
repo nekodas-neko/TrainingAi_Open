@@ -29,7 +29,7 @@ describe('constants delivery', () => {
     it.skipIf(hasRealConstants())('serves the synthetic fixtures and says so, rather than nothing', async () => {
       const result = await ensureConstantsAvailable()
       expect(result.source).toBe('fixtures')
-      expect(result.dir).toContain('__fixtures__/constants')
+      expect(result.dir?.replace(/\\/g, '/')).toContain('__fixtures__/constants')
       // The detail is the boot line a developer reads. It has to name the values as fake there,
       // because that line is the only place the substitution is visible at all.
       expect(result.detail).toContain('SYNTHETIC')

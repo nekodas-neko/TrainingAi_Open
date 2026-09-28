@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /**
  * BF-79's central claim, as a check rather than a sentence: **each personal-detail column is
@@ -46,8 +47,7 @@ function walk(dir: string, out: string[] = []): string[] {
 
 /** Source with comments and import lines removed, so a guard cannot pass on its own prose. */
 function code(file: string): string {
-  return readFileSync(file, 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '')
+  return stripComments(readFileSync(file, 'utf8'))
     .replace(/\/\/.*/g, '')
     .split('\n')
     .filter(l => !l.trimStart().startsWith('import '))
@@ -93,7 +93,7 @@ function writersOf(field: string): string[] {
       const src = code(file)
       if (!src.includes('/api/user/profile')) continue
       if (!/method:\s*'PATCH'/.test(src)) continue
-      if (new RegExp(`\\b${field}\\s*:`).test(requestBodies(src))) found.push(file.slice(ROOT.length + 1))
+      if (new RegExp(`\\b${field}\\s*:`).test(requestBodies(src))) found.push(file.slice(ROOT.length + 1).replace(/\\/g, '/'))
     }
   }
   return found.sort()

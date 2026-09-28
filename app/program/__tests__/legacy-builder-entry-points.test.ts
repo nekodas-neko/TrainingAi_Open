@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /**
  * Two bugs, one shape: a link to the Program Builder that goes somewhere plausible and does not
@@ -33,7 +34,7 @@ import { join } from 'node:path'
  *  `window.location.search` read. Stripping comments keeps the assertions strict about code without
  *  making them unwritable-about. */
 function code(src: string): string {
-  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+  return stripComments(src)
 }
 
 const root = process.cwd()

@@ -72,6 +72,10 @@ export function toLocalFoodItems(server: readonly FoodLogWithItem[], nowIso: str
     sodiumMg: l.foodItem.sodiumMg ?? null,
     satFatG: l.foodItem.satFatG ?? null,
     imageDataUri: l.foodItem.imageDataUri ?? null,
+    // LB-158. `listFoodLogs` selects the whole `food_items` row, so the code is here — and this
+    // is a second hydration surface onto the same table, which is exactly the shape BF-72's
+    // missing `savedMealId` took.
+    barcode: l.foodItem.barcode ?? null,
     source: l.foodItem.source,
     updatedAt: nowIso,
   }))

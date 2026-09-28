@@ -12,6 +12,7 @@ import { bodyBatteryColor, type BodyBatteryLabel } from '@trainingai/shared/heal
 import { StressStrip } from '@/components/body-battery/stress-strip'
 import { StressDayChart } from '@/components/body-battery/stress-day-chart'
 import type { BodyBatteryResponse } from '@/app/api/body-battery/route'
+import { ProgressFill } from '@/components/ui/progress-fill'
 
 const BATTERY_ICON: Record<BodyBatteryLabel, LucideIcon> = {
   Charged: BatteryFull,
@@ -101,6 +102,12 @@ export function BodyBatteryCard({ battery }: { battery: BodyBatteryResponse }) {
   // thing not passing it on. `sufficient` is false in both cases, which is what makes it the right
   // condition on its own.
   const lowData = conf != null && !conf.sufficient
+  // **No HR drove the arc at all, so there is no level to band.** RV-38 made the qualification
+  // STRONGER as the data got worse, and this continues that rather than undoing it: a sparse day
+  // keeps its number and gains the "Limited data" chip, and a day with nothing behind it stops
+  // presenting a band and a figure as measured. A zero-data account read `Good / Steady / 50`,
+  // which is three claims about a body the app has never sensed (RV-211 ②).
+  const noData = !battery.hasData
 
   return (
     <div className="mx-4 mb-3">
@@ -114,25 +121,37 @@ export function BodyBatteryCard({ battery }: { battery: BodyBatteryResponse }) {
       {/* ── Collapsed ── */}
       <div className="px-3 py-2.5">
         <div className="flex items-center gap-2 mb-2">
-          <BatteryIcon label={battery.label} />
+          {/* A level icon is a claim too — `BatteryMedium` draws a half-full cell for a label that
+              came from the route's default rather than from any reading. */}
+          {noData
+            ? <SignalLow className="h-4 w-4 text-muted-foreground" />
+            : <BatteryIcon label={battery.label} />}
           <span className="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground leading-none">
             Body Battery
           </span>
-          <span className="text-sm font-semibold leading-none" style={{ color }}>
-            {battery.label}
+          <span
+            className="text-sm font-semibold leading-none"
+            style={noData ? undefined : { color }}
+          >
+            {noData ? 'No data yet' : battery.label}
           </span>
           <div className="flex-1" />
           {/* Not a control — this card is itself a <button>, and nesting one inside it is
               undefined behaviour in Samsung's WebView. */}
-          {lowData && (
+          {/* Redundant beside "No data yet", which is the stronger statement of the same thing. */}
+          {lowData && !noData && (
             <span className="flex items-center gap-1 rounded-full bg-muted/70 px-1.5 py-0.5 text-[9px] font-medium text-muted-foreground leading-none">
               <SignalLow className="h-3 w-3 flex-none" />
               Limited data
             </span>
           )}
-          <TrendBadge trend={battery.trend} />
-          <span className="text-xl font-bold tabular-nums leading-none" style={{ color }}>
-            {battery.current}
+          {/* A trend over nothing is "Steady", which reads as a measurement. */}
+          {!noData && <TrendBadge trend={battery.trend} />}
+          <span
+            className="text-xl font-bold tabular-nums leading-none"
+            style={noData ? undefined : { color }}
+          >
+            {noData ? '—' : battery.current}
           </span>
           <ChevronDownIcon
             className="h-4 w-4 text-muted-foreground flex-none transition-transform duration-200"
@@ -147,12 +166,11 @@ export function BodyBatteryCard({ battery }: { battery: BodyBatteryResponse }) {
           Energy left right now — opens at your readiness and drains as you use it.
         </p>
 
-        {/* progress bar — fill anchored right so the tank empties from the left */}
+        {/* progress bar — fill anchored right so the tank empties from the left.
+            An empty track when nothing drove the arc: a 50% fill is the same claim the header
+            just stopped making, and it is the more legible of the two (RV-211 ②). */}
         <div className="h-2 rounded-full overflow-hidden bg-muted/60 flex justify-end">
-          <div
-            className="h-full rounded-full transition-all duration-500"
-            style={{ width: `${battery.current}%`, background: color }}
-          />
+          {!noData && <ProgressFill pct={battery.current} color={color} origin="right" />}
         </div>
       </div>
 

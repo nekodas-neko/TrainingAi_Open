@@ -174,7 +174,7 @@ printable food labels).
 ### 2026-08-19/20 — the workout-energy cluster
 
 Six entries from one owner question plus two screenshots. Full narrative in
-[`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](../../handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md).
+[`docs/handoffs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](../../handoffs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md).
 Three of six shipped within hours. One decision (Q-420's set-scale mapping) was superseded the same
 day by a re-measurement that checked a consumer nobody had enumerated — the lesson: *a decision about
 a number is only as good as the enumeration of who reads it.*
@@ -182,7 +182,7 @@ a number is only as good as the enumeration of who reads it.*
 ### 2026-08-23/24 — nine entries, a trainer-role design, and one rescued PR
 
 Full narrative in
-[`docs/handoff-2026-08-24-cross-bugfix-nine-entries-trainer-role-and-admin-fix.md`](../../handoff-2026-08-24-cross-bugfix-nine-entries-trainer-role-and-admin-fix.md).
+[`docs/handoffs/handoff-2026-08-24-cross-bugfix-nine-entries-trainer-role-and-admin-fix.md`](../../handoffs/handoff-2026-08-24-cross-bugfix-nine-entries-trainer-role-and-admin-fix.md).
 
 Filed **BF-1** → **BF-9** (blood panels, DEXA filter, dosed substances, scan slowdown,
 week-in-review, finished-logging #355, session-length slider, auto-deload #353, trainer role). Also

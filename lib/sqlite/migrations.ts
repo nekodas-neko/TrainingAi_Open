@@ -121,6 +121,8 @@ const CREATE_OURA_DAILY_DERIVED_LOCAL = `CREATE TABLE IF NOT EXISTS oura_daily_d
   training_load_ots            REAL,
   training_load_gate           TEXT,
   training_load_high           INTEGER,
+  training_load_grid_len       INTEGER,
+  training_load_valid_min      INTEGER,
   recovery_index_hours         REAL,
   worn_hours_ble               REAL,
   night_hrv_baseline_ms        REAL,
@@ -178,7 +180,7 @@ const CREATE_SESSION_EXERCISES = `CREATE TABLE IF NOT EXISTS session_exercises (
   style_id      TEXT,
   muscle_groups TEXT,
   position      INTEGER NOT NULL,
-  exercise_role TEXT NOT NULL DEFAULT 'primary',
+  exercise_role TEXT NOT NULL DEFAULT 'accessory',
   updated_at    TEXT
 )`;
 
@@ -226,6 +228,7 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'saved_meals',     column: 'servings',       ddl: `ALTER TABLE saved_meals ADD COLUMN servings REAL NOT NULL DEFAULT 1` },
   { table: 'saved_meals',     column: 'image_data_uri',  ddl: `ALTER TABLE saved_meals ADD COLUMN image_data_uri TEXT` },
   { table: 'food_items',      column: 'image_data_uri',  ddl: `ALTER TABLE food_items ADD COLUMN image_data_uri TEXT` },
+  { table: 'food_items',      column: 'barcode',         ddl: `ALTER TABLE food_items ADD COLUMN barcode TEXT` },
   { table: 'food_logs',       column: 'saved_meal_id',  ddl: `ALTER TABLE food_logs ADD COLUMN saved_meal_id TEXT` },
   { table: 'food_logs',       column: 'meal_group_id',  ddl: `ALTER TABLE food_logs ADD COLUMN meal_group_id TEXT` },
   { table: 'food_logs',       column: 'meal_group_name', ddl: `ALTER TABLE food_logs ADD COLUMN meal_group_name TEXT` },
@@ -417,6 +420,8 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'oura_daily_derived', column: 'daytime_stress_coverage_min', ddl: `ALTER TABLE oura_daily_derived ADD COLUMN daytime_stress_coverage_min REAL` },
   { table: 'oura_daily_derived', column: 'chronic_stress_granular_nights', ddl: `ALTER TABLE oura_daily_derived ADD COLUMN chronic_stress_granular_nights INTEGER` },
   { table: 'oura_daily_derived', column: 'training_load_gate', ddl: `ALTER TABLE oura_daily_derived ADD COLUMN training_load_gate TEXT` },
+  { table: 'oura_daily_derived', column: 'training_load_grid_len', ddl: `ALTER TABLE oura_daily_derived ADD COLUMN training_load_grid_len INTEGER` },
+  { table: 'oura_daily_derived', column: 'training_load_valid_min', ddl: `ALTER TABLE oura_daily_derived ADD COLUMN training_load_valid_min INTEGER` },
   { table: 'oura_daily_derived', column: 'vascular_age',                  ddl: `ALTER TABLE oura_daily_derived ADD COLUMN vascular_age REAL` },
   { table: 'oura_daily_derived', column: 'pwv',                          ddl: `ALTER TABLE oura_daily_derived ADD COLUMN pwv REAL` },
   { table: 'oura_daily_derived', column: 'body_comp',                     ddl: `ALTER TABLE oura_daily_derived ADD COLUMN body_comp TEXT` },
@@ -489,6 +494,10 @@ const CREATE_FOOD_ITEMS = `CREATE TABLE IF NOT EXISTS food_items (
   -- URL: food_items is read local-first and a URL renders nothing in airplane mode. Reaches fresh
   -- installs only -- the v30 ALTER is what reaches an upgraded device.
   image_data_uri TEXT,
+  -- LB-158. The scanned product code. Local because it is the one exact identifier a food row
+  -- has: with it the device recognises a tin it has already stored, and a re-scan needs no
+  -- network. Reaches fresh installs only -- the v41 ALTER is what reaches an upgraded device.
+  barcode        TEXT,
   updated_at     TEXT NOT NULL
 )`;
 
@@ -1581,6 +1590,27 @@ export const MIGRATIONS: UpgradeStatement[] = [
       // CREATE_DAY_CHECKINS above so fresh installs already have it, this ALTER reaches every
       // upgraded device, and the RECONCILE_COLUMNS row is the authority if it half-applies.
       `ALTER TABLE day_checkins ADD COLUMN vs_yesterday TEXT`,
+    ],
+  },
+  {
+    toVersion: 41,
+    statements: [
+      // LB-158. Same shape as v35-v40, and NOT mirroring a Postgres migration: `food_items.barcode`
+      // has existed server-side since the column was added. The column is in CREATE_FOOD_ITEMS
+      // above so fresh installs already have it, this ALTER reaches every upgraded device, and the
+      // RECONCILE_COLUMNS row is the authority if it half-applies.
+      `ALTER TABLE food_items ADD COLUMN barcode TEXT`,
+    ],
+  },
+  {
+    // LA-161, mirroring Postgres migration 288. **v43, not v42** — v42 is taken by the unmerged
+    // LA-142 branch, and two branches claiming one local version is a silent divergence rather
+    // than a conflict. A gap is harmless: the runner applies every entry above the device's
+    // current version, so a device goes 41 → 43 if v42 never lands.
+    toVersion: 43,
+    statements: [
+      `ALTER TABLE oura_daily_derived ADD COLUMN training_load_grid_len INTEGER`,
+      `ALTER TABLE oura_daily_derived ADD COLUMN training_load_valid_min INTEGER`,
     ],
   },
 ];

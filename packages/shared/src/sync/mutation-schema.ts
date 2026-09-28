@@ -22,6 +22,11 @@ export const SYNCED_MUTATION_DOMAINS = [
   // BF-84. A rest day the user CHOSE, distinct from one inferred from a gap in workout history.
   // Payload is `{ resting: boolean }` against `date`; un-choosing tombstones rather than deleting.
   'rest_days',
+  // RV-175. Editing or deleting a LOGGED exercise, and deleting a whole session. These were
+  // API-first with no domain, so offline they toasted success, then failed, and were lost. Each push
+  // branch calls the same function its web route does (`lib/workout/exercise-log-edits.ts`,
+  // `lib/workout/delete-session.ts`).
+  'exercise_log_edit', 'exercise_log_delete', 'workout_session_delete',
 ] as const
 
 export type SyncedMutationDomain = (typeof SYNCED_MUTATION_DOMAINS)[number]

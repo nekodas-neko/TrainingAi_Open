@@ -78,6 +78,9 @@ export interface OuraBlePlugin {
   startAccel(): Promise<void>
   stopAccel(): Promise<void>
   drainHistory(opts?: { fromZero?: boolean }): Promise<{ sent: boolean; cursor: number }>
+  /** BF-187: drain unless the service drained within `maxAgeMs`. The service decides.
+   *  Not implemented on APKs older than this build — callers catch. */
+  drainIfStale(opts: { maxAgeMs: number }): Promise<{ result: 'started' | 'fresh' | 'draining' | 'not-ready' | 'no-ingest' | 'not-running' }>
   confirmStored(opts: { ds: number }): Promise<{ ok: boolean }>
   /** Not implemented on APKs older than the native-ingest build — callers catch. */
   setIngestUrl(opts: { url: string }): Promise<void>

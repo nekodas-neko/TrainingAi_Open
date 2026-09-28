@@ -37,6 +37,9 @@ export interface LocalStore {
   // Local-first food-library search: matches previously-logged/created items in the
   // local food_items table by name/brand. Empty query returns the most recent items.
   searchFoodItems(query: string): Promise<FoodItem[]>;
+  /** LB-158. The user's own saved food for this scanned code, or null. The one exact identifier a
+   *  food row has, so a re-scan of a product already in the library resolves with no network. */
+  getFoodItemByBarcode(barcode: string): Promise<FoodItem | null>;
   /** BF-38. Every local row at this exact calorie count — the candidate set the create-time
    *  duplicate check runs over, mirroring the server's prefilter so the two agree. */
   findFoodItemsByCalories(calories: number): Promise<FoodItem[]>;
@@ -109,7 +112,9 @@ export interface LocalStore {
   logWorkoutLocally(payload: LogExercisePayload, syncStatus: 'pending' | 'synced'): Promise<void>;
   markWorkoutSynced(workoutSessionId: string, exerciseLogId: string): Promise<void>;
   setSessionRpe(workoutSessionId: string, rpe: number): Promise<void>;
-  markSessionSynced(workoutSessionId: string): Promise<void>;
+  /** `confirmingIds`: the batch being confirmed, still queued while the confirm runs — see
+   *  `otherQueuedMutations` in the SQLite backend for why leaving it out made this never fire. */
+  markSessionSynced(workoutSessionId: string, confirmingIds?: string[]): Promise<void>;
   // F4: flip sync_status for the three Oura push domains once a queued mutation is
   // server-confirmed. Narrow UPDATE-by-key (mirrors markSessionSynced), not a full
   // upsert — these domains have no local single-row write path yet (that's D2's
@@ -134,9 +139,17 @@ export interface LocalStore {
   completeWorkoutLocally(workoutSessionId: string, completedAt: string): Promise<void>;
   // Mirrors a server-confirmed history edit/delete into the local render source so
   // Stats/Health reflect it immediately instead of waiting for the next pull.
-  deleteExerciseLogLocally(exerciseLogId: string): Promise<void>;
-  updateExerciseLogLocally(exerciseLogId: string, sets: Array<{ setNumber: number; weightKg: number; reps: number; intensityPct?: number | null }>): Promise<void>;
-  deleteWorkoutSessionLocally(workoutSessionId: string): Promise<void>;
+  // LA-165: `pending: true` for an OFFLINE edit, which is queued and must survive a pull that
+  // arrives before its push (`applyDelta` overwrites only `synced` rows). The default stays
+  // `synced`, which is right for a caller mirroring a write the server already confirmed.
+  deleteExerciseLogLocally(exerciseLogId: string, opts?: { pending?: boolean }): Promise<void>;
+  updateExerciseLogLocally(exerciseLogId: string, sets: Array<{ setNumber: number; weightKg: number; reps: number; intensityPct?: number | null }>, opts?: { pending?: boolean }): Promise<void>;
+  deleteWorkoutSessionLocally(workoutSessionId: string, opts?: { pending?: boolean }): Promise<void>;
+  /** Push-confirm for `exercise_log_edit` / `exercise_log_delete`: the log and its sets back to
+   *  `synced`, unless another queued mutation still names the log. */
+  markExerciseLogSynced(exerciseLogId: string, confirmingIds?: string[]): Promise<void>;
+  /** Push-confirm for `workout_session_delete`: the session, its logs and their sets. */
+  markWorkoutSessionTreeSynced(workoutSessionId: string, confirmingIds?: string[]): Promise<void>;
 
   // Bulk write from delta sync
   applyDelta(delta: {
@@ -174,6 +187,15 @@ export interface LocalStore {
     planMealAnswers?:   LocalPlanMealAnswer[];
   }): Promise<void>;
 
+  /**
+   * RV-174. Deletes every mirrored program and progression style the server no longer has, with
+   * their children, and clears a session exercise's style if that style is gone (the server's FK
+   * does the same, `ON DELETE SET NULL`, without touching the program, so no delta ever says so).
+   * An absent roster prunes nothing; an EMPTY one means the user has none left. Returns how many
+   * programs and styles it removed, so the caller can tell whether anything changed.
+   */
+  pruneProgramStructure(programIds?: string[], styleIds?: string[]): Promise<number>;
+
   // Outbox
   queueMutation(m: Omit<PendingMutation, 'id' | 'createdAt' | 'attempts' | 'lastError' | 'status' | 'nextRetryAt'>): Promise<void>;
   getPendingMutations(userId: string): Promise<PendingMutation[]>;
@@ -190,6 +212,15 @@ export interface LocalStore {
   // food_item (from the local row) ordered before the log, then reset the log to
   // pending. Idempotent and bounded. Returns the number of logs healed.
   requeueStrandedFoodItems(userId: string): Promise<number>;
+  /**
+   * DV-8 heal: re-queue food-log DELETE tombstones left `pending` with no outbox entry.
+   *
+   * Re-queues rather than marking synced. A stranded tombstone is indistinguishable from one
+   * whose mutation never got queued at all, so flipping it to `synced` would silently drop a
+   * delete that never reached the server. Re-pushing is idempotent — the server arm soft-deletes
+   * by id — so the safe move is to re-queue and let the normal confirm path settle it.
+   */
+  requeueStrandedFoodTombstones(userId: string, cutoffIso: string): Promise<number>;
   deleteMutations(ids: string[]): Promise<void>;
 
   // Sync meta

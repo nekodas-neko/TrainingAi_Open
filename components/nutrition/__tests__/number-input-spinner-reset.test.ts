@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'node:fs'
 import path from 'node:path'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const root = path.resolve(__dirname, '../../..')
 const read = (rel: string) => fs.readFileSync(path.join(root, rel), 'utf8')
@@ -14,8 +15,7 @@ const read = (rel: string) => fs.readFileSync(path.join(root, rel), 'utf8')
  * shipped that shape four times — a guard satisfied by the prose documenting its own fix.
  */
 const code = (rel: string) =>
-  read(rel)
-    .replace(/\/\*[\s\S]*?\*\//g, '')
+  stripComments(read(rel))
     .replace(/\/\/.*/g, '')
     .split('\n')
     .filter(l => !l.trimStart().startsWith('import '))

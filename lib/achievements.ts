@@ -1,10 +1,10 @@
 import { getDb } from '@/lib/data/postgres/client'
 import { sql } from 'drizzle-orm'
 import { formatInTimeZone } from 'date-fns-tz'
-import { shiftDateStr } from '@trainingai/shared/date-utils'
+import { shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 import type { AchievementResult } from '@/components/profile/achievements-grid'
 import { calorieDayHitsGoal } from '@trainingai/shared/achievements-calc'
-import { maxCompliantRestGapFor } from '@trainingai/shared/schedule-utils'
+import { computeDayStreak, streakRestGapFor } from '@trainingai/shared/workout/day-streak'
 import { reconcileUserStats } from '@/lib/data/postgres/slices/user-stats'
 
 const LEVEL_THRESHOLDS = [0, 100, 250, 500, 900, 1400, 2100, 3000, 4200, 5800, 8000]
@@ -29,7 +29,16 @@ function computeLevel(xp: number): { level: number; levelLabel: string; currentL
   return { level, levelLabel: getLevelLabel(level), currentLevelXp, nextLevelXp }
 }
 
-export function computeStreak(dates: string[], tz: string, maxRestGap = 0): { best: number; current: number } {
+/**
+ * A streak of dated ENTRIES — one per day that has one, with `maxRestGap` days allowed between.
+ *
+ * RV-216 renamed this from `computeStreak`. It shared that name with Home's function while
+ * counting a different quantity: this counts entries, Home counts the calendar days they span,
+ * and on the owner's real history the two read 83 and 111 for the same input. Food, sleep and
+ * calorie-goal streaks want THIS one — "log food 7 days in a row" means seven entries. The
+ * training streak wants `computeDayStreak`, which is what the card and the achievements say.
+ */
+export function computeEntryStreak(dates: string[], tz: string, maxRestGap = 0): { best: number; current: number } {
   if (dates.length === 0) return { best: 0, current: 0 }
 
   const sorted = [...dates].sort()
@@ -234,15 +243,19 @@ export async function computeAchievements(userId: string, tz: string): Promise<A
   // schedule, so an unscheduled user is unaffected.
   const scheduleRow = scheduleRes.rows[0] as
     { type: string; rest_after_n: number | null; days: number[] | null } | undefined
-  const workoutRestGap = maxCompliantRestGapFor(scheduleRow ? {
+  const workoutRestGap = streakRestGapFor(scheduleRow ? {
     type: scheduleRow.type === 'weekly' ? 'weekly' : 'rotation',
     restAfterN: scheduleRow.rest_after_n ?? undefined,
     // The query already filtered to days carrying a session, so every one here is a training day.
     days: (scheduleRow.days ?? []).map(d => ({ dayOfWeek: d, sessionId: 'scheduled' })),
   } : undefined)
-  const workoutStreaks = computeStreak(workoutDates, tz, workoutRestGap)
-  const foodStreaks = computeStreak(foodDates, tz)
-  const sleepStreaks = computeStreak(sleepDates, tz)
+  // RV-216. Calendar DAYS, not a count of sessions — which is what Home's card has always shown,
+  // what the four streak achievements below mean by "7-day", and what the banner promises. The
+  // two readings gave 111 and 83 for the same history; the reported "best 49" was the session
+  // count at BF-122a's rotation gap of 1. `streakRestGapFor` keeps BF-122a and floors it at 2.
+  const workoutStreaks = computeDayStreak(workoutDates, todayInTz(tz), workoutRestGap)
+  const foodStreaks = computeEntryStreak(foodDates, tz)
+  const sleepStreaks = computeEntryStreak(sleepDates, tz)
 
   const goalRow = goalDirRes.rows[0] as { target_weight: number | null; current_weight: number | null } | undefined
   const calorieGoalDates = calorieTarget > 0
@@ -250,7 +263,7 @@ export async function computeAchievements(userId: string, tz: string): Promise<A
         .filter(d => calorieDayHitsGoal(Number(d.total_cals), calorieTarget, goalRow?.target_weight ?? null, goalRow?.current_weight ?? null))
         .map(d => String(d.day))
     : []
-  const calorieGoalStreaks = computeStreak(calorieGoalDates, tz)
+  const calorieGoalStreaks = computeEntryStreak(calorieGoalDates, tz)
 
   const monthsActive = new Set(workoutDates.map(d => d.slice(0, 7))).size
 

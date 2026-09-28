@@ -70,6 +70,15 @@ export function useCachedValue<T>(
      * already treats a previous day's entry as a miss.
      */
     freshWithinTtl?: boolean
+    /**
+     * Bump to re-run the fetch — the retry affordance for a card that failed (RV-201).
+     *
+     * A refetch, deliberately, and not an `invalidateCache` of the key: purging would throw away
+     * a cached copy that is still the best thing available to show, and a component calling
+     * `invalidateCache` directly is the #1279 shape the Custom Rules gate refuses outright.
+     * Invalidation belongs to a write; this is a read that did not land.
+     */
+    reloadToken?: number
   },
 ): T | null {
   const [data, setData] = useState<T | null>(null)
@@ -81,6 +90,7 @@ export function useCachedValue<T>(
 
   const today = opts?.today ?? false
   const freshWithinTtl = opts?.freshWithinTtl ?? false
+  const reloadToken = opts?.reloadToken ?? 0
 
   // Seed in an effect, never a useState initializer — a cache read in an initializer causes a
   // hydration mismatch (session 165).
@@ -114,7 +124,7 @@ export function useCachedValue<T>(
     })
 
     return () => { alive = false; unsubscribe() }
-  }, [key, url, ttlSeconds, today, freshWithinTtl])
+  }, [key, url, ttlSeconds, today, freshWithinTtl, reloadToken])
 
   return data
 }

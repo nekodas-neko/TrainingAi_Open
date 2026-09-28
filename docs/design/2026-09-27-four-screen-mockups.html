@@ -1,0 +1,440 @@
+<title>Four Screens, Before and After</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root{
+    color-scheme: dark;
+    --page-bg:#0c1110; --page-panel:#131a18; --page-line:#22302c;
+    --page-fg:#e8efec; --page-dim:#93a49e; --page-accent:#00e07a; --page-warn:#ff8f6b;
+    /* the app's own dark tokens, copied from app/globals.css */
+    --background: oklch(0.145 0.020 149);
+    --card:       oklch(0.185 0.028 149);
+    --muted:      oklch(0.225 0.034 149);
+    --foreground: oklch(0.985 0 0);
+    --muted-foreground: oklch(0.75 0 0);
+    --border:     oklch(1 0 0 / 7%);
+    --brand:      oklch(0.723 0.219 149.579);
+    --accent-cyan:  oklch(0.62 0.18 210);
+    --accent-amber: oklch(0.70 0.18 75);
+    --accent-purple:oklch(0.65 0.20 295);
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;background:var(--page-bg);color:var(--page-fg);
+    font-family:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+    line-height:1.55;padding-block:32px;padding-left:16px;padding-right:16px;
+  }
+  .wrap{max-width:900px;margin:0 auto}
+  h1{font-size:26px;line-height:1.2;margin:0 0 6px;text-wrap:balance;font-weight:700;letter-spacing:-.01em}
+  .sub{color:var(--page-dim);margin:0 0 6px;max-width:62ch}
+  .meta{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;color:var(--page-dim);
+        text-transform:uppercase;letter-spacing:.09em;margin:0 0 28px}
+  section{border-top:1px solid var(--page-line);padding-block:28px 8px}
+  h2{font-size:18px;margin:0 0 2px;font-weight:600}
+  .id{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--page-accent);
+      letter-spacing:.08em;text-transform:uppercase;margin:0 0 8px}
+  .ask{margin:0 0 18px;max-width:64ch;color:var(--page-fg)}
+  .ask b{color:var(--page-accent);font-weight:600}
+  .pair{display:flex;gap:18px;overflow-x:auto;padding-bottom:12px;scrollbar-width:thin}
+  .pane{flex:0 0 auto}
+  .cap{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+  .chip{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.1em;
+        text-transform:uppercase;padding:3px 8px;border-radius:999px;font-weight:600}
+  .chip.now{background:rgba(255,143,107,.14);color:var(--page-warn);border:1px solid rgba(255,143,107,.3)}
+  .chip.new{background:rgba(0,224,122,.13);color:var(--page-accent);border:1px solid rgba(0,224,122,.32)}
+  .cap span.w{font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--page-dim)}
+  /* the phone: a real 384px-wide dark viewport */
+  .phone{width:384px;background:var(--background);border:1px solid var(--page-line);
+         border-radius:22px;overflow:hidden;
+         font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+         color:var(--foreground);font-size:14px;line-height:1.4}
+  .screen{padding:14px 0}
+  .note{margin:14px 0 0;padding:12px 14px;background:var(--page-panel);
+        border:1px solid var(--page-line);border-left:3px solid var(--page-accent);
+        border-radius:0 8px 8px 0;font-size:13.5px;max-width:64ch}
+  .note.cost{border-left-color:var(--page-warn)}
+  .note b{font-weight:600}
+  .note + .note{margin-top:8px}
+  /* ---- app primitives, matching the repo ---- */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px}
+  .mx{margin-left:16px;margin-right:16px}
+  .lbl{font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--muted-foreground)}
+  .dim{color:var(--muted-foreground)}
+  .tiny{font-size:10px}
+  .num{font-variant-numeric:tabular-nums}
+  .row{display:flex;align-items:center;gap:8px}
+  .sp{justify-content:space-between}
+  .ic{width:16px;height:16px;flex:0 0 16px;display:block}
+  /* log tiles */
+  .tiles{display:flex;gap:8px;overflow:hidden}
+  .tile{flex:none;min-width:76px;border-radius:16px;padding:12px 16px;position:relative;
+        display:flex;flex-direction:column;align-items:center;gap:4px}
+  .tile .logbtn{position:absolute;top:2px;right:2px;font-size:10px;font-weight:700;
+        padding:8px 10px;border-radius:999px;background:rgba(255,255,255,.10);
+        border:1px solid var(--border);line-height:1}
+  .tilegrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .tile2{border-radius:16px;padding:10px 8px 8px;display:flex;flex-direction:column;
+         align-items:center;gap:3px}
+  .tile2 .logbtn2{margin-top:4px;font-size:10px;font-weight:700;padding:5px 12px;
+         border-radius:999px;background:rgba(255,255,255,.10);border:1px solid var(--border);line-height:1.2}
+  .empty-flag{border:1px dashed rgba(255,143,107,.45);border-radius:10px;
+         color:var(--page-warn);font-size:10px;font-family:"IBM Plex Mono",monospace;
+         display:flex;align-items:center;justify-content:center;letter-spacing:.06em}
+  /* meal cards */
+  .mealhdr{display:flex;align-items:center;gap:8px;padding:4px 4px;color:var(--muted-foreground)}
+  .mealbody{border:1px solid var(--border);background:rgba(255,255,255,.03);border-radius:16px;
+            padding:13px 16px;display:flex;align-items:center;gap:8px;color:var(--muted-foreground)}
+  .mealrow{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--border)}
+  .mealrow:last-child{border-bottom:none}
+  .plus{width:28px;height:28px;border-radius:999px;display:flex;align-items:center;
+        justify-content:center;flex:0 0 28px}
+  .seg{display:flex;gap:6px;margin-top:10px}
+  .segbtn{flex:1;text-align:center;padding:9px 6px;border-radius:12px;font-size:13px;font-weight:600;
+          border:1px solid var(--border);background:rgba(255,255,255,.04)}
+  .segbtn.on{background:rgba(0,255,135,.10);border-color:rgba(0,255,135,.30);color:var(--brand)}
+  .bar{height:6px;border-radius:999px;background:rgba(255,255,255,.09);overflow:hidden}
+  .bar i{display:block;height:100%;border-radius:999px;background:var(--brand)}
+  .pill{font-size:10px;padding:3px 9px;border-radius:999px;border:1px solid var(--border);
+        background:rgba(255,255,255,.05);color:var(--muted-foreground)}
+  .pill.done{background:rgba(0,255,135,.12);border-color:rgba(0,255,135,.3);color:var(--brand)}
+  .strike{text-decoration:line-through;opacity:.5}
+  footer{border-top:1px solid var(--page-line);margin-top:34px;padding-top:18px;
+         color:var(--page-dim);font-size:13px}
+  footer b{color:var(--page-fg)}
+  @media (max-width:520px){ h1{font-size:22px} }
+</style>
+
+<div class="wrap">
+  <h1>Four screens, before and after</h1>
+  <p class="sub">Every change below rearranges a screen you use daily, so each one needs a yes before it is built. Both panes are the real 384&nbsp;px dark viewport, using the app's own theme tokens.</p>
+  <p class="meta">2026-09-27 · LA-136 · LB-163 · RV-213 · RV-166 · scroll each pair sideways on a phone</p>
+
+  <!-- ============ 1. LB-163 ============ -->
+  <section>
+    <p class="id">LB-163 — Home, Log tiles</p>
+    <h2>The word “Log” sits on top of the icon, and the row leaves a third of the screen empty</h2>
+    <p class="ask">Reproduced in the Playwright harness at the dark viewport. The <b>Log</b> pill is absolutely positioned at the tile's top-right with a 44&nbsp;px tap target, so it lands on the icon; and the tiles are a flex row rather than a grid, so three of them fill about 58% of the width.</p>
+    <div class="pair">
+      <div class="pane">
+        <div class="cap"><span class="chip now">Now</span><span class="w">384 px</span></div>
+        <div class="phone"><div class="screen">
+          <div class="mx" style="display:flex;gap:8px">
+            <div class="tile" style="background:rgba(0,255,135,.07);border:1px solid rgba(0,255,135,.18)">
+              <div class="logbtn">Log</div>
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="oklch(0.723 0.219 149.579)" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+              <span style="font-size:14px;font-weight:700" class="num">11,900</span>
+              <span class="tiny dim">steps</span>
+            </div>
+            <div class="tile" style="background:rgba(0,180,255,.07);border:1px solid rgba(0,180,255,.18)">
+              <div class="logbtn">Log</div>
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="oklch(0.62 0.18 210)" stroke-width="2"><path d="M12 2v6M7 8h10l2 12H5z"/></svg>
+              <span style="font-size:14px;font-weight:700" class="num">1,534</span>
+              <span class="tiny dim">kcal</span>
+            </div>
+            <div class="tile" style="background:rgba(255,190,60,.07);border:1px solid rgba(255,190,60,.18)">
+              <div class="logbtn">Log</div>
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="oklch(0.70 0.18 75)" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              <span style="font-size:14px;font-weight:700" class="num">78.4</span>
+              <span class="tiny dim">kg</span>
+            </div>
+            <div class="empty-flag" style="flex:1">EMPTY · 42%</div>
+          </div>
+        </div></div>
+      </div>
+      <div class="pane">
+        <div class="cap"><span class="chip new">Proposed</span><span class="w">384 px</span></div>
+        <div class="phone"><div class="screen">
+          <div class="mx tilegrid">
+            <div class="tile2" style="background:rgba(0,255,135,.07);border:1px solid rgba(0,255,135,.18)">
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="oklch(0.723 0.219 149.579)" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+              <span style="font-size:16px;font-weight:700" class="num">11,900</span>
+              <span class="tiny dim">steps</span>
+              <div class="logbtn2">Log</div>
+            </div>
+            <div class="tile2" style="background:rgba(0,180,255,.07);border:1px solid rgba(0,180,255,.18)">
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="oklch(0.62 0.18 210)" stroke-width="2"><path d="M12 2v6M7 8h10l2 12H5z"/></svg>
+              <span style="font-size:16px;font-weight:700" class="num">1,534</span>
+              <span class="tiny dim">kcal</span>
+              <div class="logbtn2">Log</div>
+            </div>
+            <div class="tile2" style="background:rgba(255,190,60,.07);border:1px solid rgba(255,190,60,.18)">
+              <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="oklch(0.70 0.18 75)" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              <span style="font-size:16px;font-weight:700" class="num">78.4</span>
+              <span class="tiny dim">kg</span>
+              <div class="logbtn2">Log</div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+    <p class="note">Three equal columns fill the width, and <b>Log</b> moves below the value as its own control. The number gets bigger because the grid gives each tile more room, not less.</p>
+    <p class="note cost"><b>The trade:</b> each tile is narrower than it is today, so a four-tile row would get tight. If you add a fourth widget it wraps to a second line rather than scrolling sideways.</p>
+  </section>
+
+  <!-- ============ 2. LA-136 ============ -->
+  <section>
+    <p class="id">LA-136 — Home, sleep line</p>
+    <h2>Home lost its sleep line, and the real signal is collected but unused</h2>
+    <p class="ask">The old “Sleep: OK” was fabricated — a <b>NOT NULL</b> default on a field the check-in stopped collecting on 25 June, so it was the stored value on 93 of 108 rows. It was removed and nothing replaced it. Meanwhile the morning check-in does collect <b>sleepQualityFeel</b>, 1–5, with a touched flag, and nothing reads it.</p>
+    <div class="pair">
+      <div class="pane">
+        <div class="cap"><span class="chip now">Now</span><span class="w">384 px</span></div>
+        <div class="phone"><div class="screen">
+          <div class="mx card">
+            <div class="row sp"><span class="lbl">This morning</span><span class="tiny dim">7:12 am</span></div>
+            <div class="row" style="margin-top:10px;gap:10px">
+              <div style="font-size:26px">🙂</div>
+              <div>
+                <div style="font-weight:600">Energy — OK</div>
+                <div class="tiny dim">Mood logged</div>
+              </div>
+            </div>
+            <div style="margin-top:12px;height:1px;background:var(--border)"></div>
+            <div class="empty-flag" style="height:34px;margin-top:10px">NO SLEEP LINE</div>
+          </div>
+        </div></div>
+      </div>
+      <div class="pane">
+        <div class="cap"><span class="chip new">Proposed</span><span class="w">384 px</span></div>
+        <div class="phone"><div class="screen">
+          <div class="mx card">
+            <div class="row sp"><span class="lbl">This morning</span><span class="tiny dim">7:12 am</span></div>
+            <div class="row" style="margin-top:10px;gap:10px">
+              <div style="font-size:26px">🙂</div>
+              <div>
+                <div style="font-weight:600">Energy — OK</div>
+                <div class="tiny dim">Mood logged</div>
+              </div>
+            </div>
+            <div style="margin-top:12px;height:1px;background:var(--border)"></div>
+            <div class="row sp" style="margin-top:11px">
+              <div class="row" style="gap:8px">
+                <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="oklch(0.65 0.20 295)" stroke-width="2"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>
+                <span style="font-weight:600">Slept well</span>
+              </div>
+              <div class="row" style="gap:3px">
+                <span style="color:var(--brand)">●●●●</span><span class="dim">○</span>
+                <span class="tiny dim num" style="margin-left:4px">4/5</span>
+              </div>
+            </div>
+            <div class="tiny dim" style="margin-top:4px">Your rating, not a score</div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+    <p class="note">The line comes back under the mood card, driven by what you actually answer each morning. The caption states whose number it is, so it can never be mistaken for a derived score again.</p>
+    <p class="note cost"><b>Not a one-line swap.</b> Home sits in the persistent tab shell, so this read needs <b>useCachedValue</b>, a canonical TTL, and registration in every write group touching <code>day_checkins</code> — or it paints once and never refreshes, which is the bug class this repo has fixed twelve times.</p>
+  </section>
+
+  <!-- ============ 3. RV-213 ============ -->
+  <section>
+    <p class="id">RV-213 — Nutrition, empty meal slots</p>
+    <h2>Four empty meals take a full card each, with two add buttons apiece</h2>
+    <p class="ask">On a normal day the diary shows Morning snack, Afternoon snack, Dinner and Evening snack as four full-height cards. Each has a <b>+</b> in its header and an <b>“+ Add food”</b> row in its body — two controls that do the same thing — and about a screen of height with nothing in it.</p>
+    <div class="pair">
+      <div class="pane">
+        <div class="cap"><span class="chip now">Now</span><span class="w">384 px</span></div>
+        <div class="phone"><div class="screen">
+          <div class="mx" style="display:flex;flex-direction:column;gap:14px">
+            <div>
+              <div class="mealhdr"><span class="lbl" style="flex:1">Breakfast</span><span class="tiny num">412</span><div class="plus">+</div><span class="dim">⌄</span></div>
+              <div style="border:1px solid var(--border);background:rgba(255,255,255,.03);border-radius:16px">
+                <div class="mealrow"><span style="flex:1">Greek yoghurt, berries</span><span class="tiny dim num">412</span></div>
+              </div>
+            </div>
+            <div>
+              <div class="mealhdr"><span class="lbl" style="flex:1">Morning snack</span><div class="plus">+</div></div>
+              <div class="mealbody"><span>+</span><span style="font-size:14px">Add food</span></div>
+            </div>
+            <div>
+              <div class="mealhdr"><span class="lbl" style="flex:1">Afternoon snack</span><div class="plus">+</div></div>
+              <div class="mealbody"><span>+</span><span style="font-size:14px">Add food</span></div>
+            </div>
+            <div>
+              <div class="mealhdr"><span class="lbl" style="flex:1">Dinner</span><div class="plus">+</div></div>
+              <div class="mealbody"><span>+</span><span style="font-size:14px">Add food</span></div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+      <div class="pane">
+        <div class="cap"><span class="chip new">Proposed</span><span class="w">384 px</span></div>
+        <div class="phone"><div class="screen">
+          <div class="mx" style="display:flex;flex-direction:column;gap:14px">
+            <div>
+              <div class="mealhdr"><span class="lbl" style="flex:1">Breakfast</span><span class="tiny num">412</span><div class="plus">+</div><span class="dim">⌄</span></div>
+              <div style="border:1px solid var(--border);background:rgba(255,255,255,.03);border-radius:16px">
+                <div class="mealrow"><span style="flex:1">Greek yoghurt, berries</span><span class="tiny dim num">412</span></div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <div class="row sp" style="padding:10px 4px;border-bottom:1px solid var(--border)">
+                <span class="lbl">Morning snack</span><div class="plus" style="color:var(--brand)">+</div>
+              </div>
+              <div class="row sp" style="padding:10px 4px;border-bottom:1px solid var(--border)">
+                <span class="lbl">Afternoon snack</span><div class="plus" style="color:var(--brand)">+</div>
+              </div>
+              <div class="row sp" style="padding:10px 4px;border-bottom:1px solid var(--border)">
+                <span class="lbl">Dinner</span><div class="plus" style="color:var(--brand)">+</div>
+              </div>
+              <div class="row sp" style="padding:10px 4px">
+                <span class="lbl">Evening snack</span><div class="plus" style="color:var(--brand)">+</div>
+              </div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+    <p class="note">An empty meal collapses to one row — its name and a single <b>+</b>. Meals with food keep the full card, so the day still reads as “what I ate” rather than a list of slots. Four empty meals go from about 320&nbsp;px to about 170&nbsp;px.</p>
+    <p class="note cost"><b>The trade:</b> adding to an empty meal is a smaller tap target than a full-width row. It is still the standard 44&nbsp;px, but it is a <b>+</b> rather than a labelled button.</p>
+  </section>
+
+  <!-- ============ 4. RV-166 ============ -->
+  <section>
+    <p class="id">RV-166 — Cardio hub, walk and run · <span style="color:var(--page-warn)">revised</span></p>
+    <h2>The prescription and the activity log are two different things</h2>
+    <p class="ask">The first draft of this pane was wrong: it showed the prescription card <i>replacing</i> the modality picker, which lost <b>Other</b> and left no way to log a second activity. They are separate. The <b>prescription</b> is today's plan and there is one of it; the <b>log</b> is what you actually did and there can be any number, of any kind. Merging walk and run applies to the first only.</p>
+    <div class="pair">
+      <div class="pane">
+        <div class="cap"><span class="chip now">Before you train</span><span class="w">384 px</span></div>
+        <div class="phone"><div class="screen">
+          <div class="mx" style="display:flex;flex-direction:column;gap:12px">
+            <div class="card">
+              <div class="row sp"><span class="lbl">Today&rsquo;s cardio</span><span class="pill">To do</span></div>
+              <div style="margin-top:8px;font-weight:600;font-size:15px">Easy 25 min</div>
+              <div class="tiny dim" style="margin-top:2px">Zone 2 &middot; a run or a walk both count</div>
+              <div class="seg">
+                <div class="segbtn">Run it</div>
+                <div class="segbtn">Walk it</div>
+              </div>
+            </div>
+            <div class="tiny dim" style="letter-spacing:.14em;text-transform:uppercase;font-family:'IBM Plex Mono',monospace">What do you want to do?</div>
+            <div class="row" style="gap:8px">
+              <div class="segbtn">Run</div><div class="segbtn">Walk</div><div class="segbtn">Other</div>
+            </div>
+            <div class="tiny dim" style="margin-top:-4px">Log anything &mdash; cycling, rowing, a class. Unchanged.</div>
+            <div class="card">
+              <div class="row sp"><span class="lbl">Zone minutes</span><span class="pill">Today</span></div>
+              <div class="row" style="margin-top:8px;gap:10px"><span style="font-size:22px;font-weight:700" class="num">8</span><span class="tiny dim">of 22 min</span></div>
+              <div class="bar" style="margin-top:8px"><i style="width:36%"></i></div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+      <div class="pane">
+        <div class="cap"><span class="chip new">After a walk, then a bike ride</span><span class="w">384 px</span></div>
+        <div class="phone"><div class="screen">
+          <div class="mx" style="display:flex;flex-direction:column;gap:12px">
+            <div class="card" style="background:rgba(0,255,135,.07);border-color:rgba(0,255,135,.18)">
+              <div class="row sp"><span class="lbl">Today&rsquo;s cardio</span><span class="pill done">Done</span></div>
+              <div style="margin-top:8px;font-weight:600;font-size:15px">Easy 25 min</div>
+              <div class="tiny dim" style="margin-top:2px">Completed as a <b style="color:var(--brand)">walk</b> &middot; 28 min &middot; 7:40 am</div>
+            </div>
+            <div class="tiny dim" style="letter-spacing:.14em;text-transform:uppercase;font-family:'IBM Plex Mono',monospace">What do you want to do?</div>
+            <div class="row" style="gap:8px">
+              <div class="segbtn">Run</div><div class="segbtn">Walk</div><div class="segbtn">Other</div>
+            </div>
+            <div class="tiny dim" style="margin-top:-4px">Still here. Doing one does not close the day.</div>
+            <div class="card">
+              <div class="row sp" style="margin-bottom:8px"><span class="lbl">Logged today</span><span class="tiny dim num">2</span></div>
+              <div class="row sp" style="padding:7px 0;border-bottom:1px solid var(--border)">
+                <div class="row" style="gap:8px"><span style="color:var(--brand)">&#10003;</span><span>Walk &middot; 28 min</span></div>
+                <span class="pill done">Plan</span>
+              </div>
+              <div class="row sp" style="padding:7px 0">
+                <div class="row" style="gap:8px"><span class="dim">&bull;</span><span>Cycling &middot; 42 min</span></div>
+                <span class="pill">Extra</span>
+              </div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+    <p class="note"><b>Where &ldquo;Other&rdquo; lives:</b> exactly where it does now. The modality picker is untouched and always available &mdash; the prescription card sits <i>above</i> it, it does not replace it. My first draft dropped the picker from the after pane, which is what made this look like a problem.</p>
+    <p class="note"><b>How you do another:</b> the same way as the first. The prescription is one item and is satisfied once; every activity after it is logged normally and appears under <b>Logged today</b>. The <b>Plan</b> chip marks the one that satisfied the prescription, so you can see which did at a glance.</p>
+    <p class="note cost"><b>One edge your rule leaves open, followed literally here.</b> You said &ldquo;one or the other&rdquo;, so <b>Run</b> and <b>Walk</b> satisfy the prescription and <b>Other</b> does not &mdash; a 42-minute bike ride logs as Extra and leaves the run To&nbsp;do. That may be wrong for you: if a hard ride should count as having done your cardio, say so and Other gets a &ldquo;count this as today&rsquo;s cardio&rdquo; action rather than a blanket rule.</p>
+    <p class="note cost"><b>Still true:</b> this changes stored numbers, not just layout. Every past run day becomes completable, so adherence, streaks and compliance all move once it ships. Both panes here are rebuilt from <code>cardio-content.tsx</code> rather than screenshotted &mdash; the hub needs live data the sandbox lacks.</p>
+  </section>
+
+  <!-- ============ 5. RV-166b : the walk flow ============ -->
+  <section>
+    <p class="id">RV-166b — how a walk actually completes the day</p>
+    <h2>Most of them are treadmill walks, so say what counts and make it two taps</h2>
+    <p class="ask">Your note: <b>&ldquo;I will mostly do my treadmill walk; so when I click walk, I&rsquo;d like to set a guided walk &mdash; or just a treadmill walk + time. Or perhaps it could even say x amount of minutes in x zone rate to count as complete.&rdquo;</b> Both, and they fit together: the card states the criterion in zone terms, and tapping <b>Walk it</b> offers the two ways of meeting it.</p>
+    <div class="pair">
+      <div class="pane">
+        <div class="cap"><span class="chip new">The card states what counts</span><span class="w">384 px</span></div>
+        <div class="phone"><div class="screen">
+          <div class="mx" style="display:flex;flex-direction:column;gap:12px">
+            <div class="card">
+              <div class="row sp"><span class="lbl">Today&rsquo;s cardio</span><span class="pill">In progress</span></div>
+              <div style="margin-top:8px;font-weight:600;font-size:15px">25 min in Zone&nbsp;2</div>
+              <div class="tiny dim" style="margin-top:2px">107&ndash;134 bpm &middot; a run or a walk both count</div>
+              <div class="row sp" style="margin-top:10px">
+                <span class="tiny dim">Counted so far</span>
+                <span class="tiny num" style="color:var(--brand);font-weight:600">18 / 25 min</span>
+              </div>
+              <div class="bar" style="margin-top:6px"><i style="width:72%"></i></div>
+              <div class="seg">
+                <div class="segbtn">Run it</div>
+                <div class="segbtn on">Walk it</div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="row sp"><span class="lbl">Live</span><span class="pill done">Zone 2</span></div>
+              <div class="row" style="margin-top:6px;gap:10px;align-items:baseline">
+                <span style="font-size:26px;font-weight:700" class="num">118</span>
+                <span class="tiny dim">bpm &middot; treadmill walk &middot; 21:04</span>
+              </div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+      <div class="pane">
+        <div class="cap"><span class="chip new">Tapping &ldquo;Walk it&rdquo;</span><span class="w">384 px</span></div>
+        <div class="phone"><div class="screen">
+          <div class="mx" style="display:flex;flex-direction:column;gap:12px">
+            <div style="opacity:.28" class="card">
+              <div class="row sp"><span class="lbl">Today&rsquo;s cardio</span><span class="pill">To do</span></div>
+              <div style="margin-top:8px;font-weight:600;font-size:15px">25 min in Zone&nbsp;2</div>
+            </div>
+            <div class="card" style="border-color:rgba(0,255,135,.22)">
+              <div style="width:36px;height:4px;border-radius:999px;background:rgba(255,255,255,.18);margin:0 auto 12px"></div>
+              <div style="font-weight:600;font-size:15px">How are you walking?</div>
+              <div class="tiny dim" style="margin-top:2px;margin-bottom:12px">Either counts toward the 25 minutes.</div>
+
+              <div class="row sp" style="padding:12px;border:1px solid rgba(0,255,135,.28);background:rgba(0,255,135,.07);border-radius:14px">
+                <div>
+                  <div style="font-weight:600">Guided walk</div>
+                  <div class="tiny dim" style="margin-top:2px">App paces you and counts zone minutes live</div>
+                </div>
+                <span style="color:var(--brand)">&rsaquo;</span>
+              </div>
+
+              <div style="padding:12px;border:1px solid var(--border);border-radius:14px;margin-top:8px">
+                <div class="row sp">
+                  <div style="font-weight:600">Treadmill walk</div>
+                  <span class="tiny dim">just log it</span>
+                </div>
+                <div class="row" style="gap:6px;margin-top:10px">
+                  <div class="segbtn">20 min</div>
+                  <div class="segbtn on">30 min</div>
+                  <div class="segbtn">45 min</div>
+                  <div class="segbtn" style="flex:0 0 44px">&hellip;</div>
+                </div>
+                <div class="tiny dim" style="margin-top:8px">Zone minutes still come from your heart rate while you walk.</div>
+              </div>
+            </div>
+          </div>
+        </div></div>
+      </div>
+    </div>
+    <p class="note"><b>Why the criterion can be stated in zones now, and could not last week.</b> You moved the moderate floor from 60% to <b>40% of heart-rate reserve</b> this morning (TN-78, shipped in #1774). At 60% the floor was <b>134 bpm</b>, which you hit on 3 days out of 31 &mdash; a treadmill walk earned zero zone minutes, so &ldquo;25 min in Zone 2&rdquo; would have been unreachable on foot. At 40% it is <b>107 bpm</b>, hit on 24 of 31. The two changes only work together.</p>
+    <p class="note"><b>Two taps for the common case.</b> Walk it &rarr; a duration chip. The presets are yours to set; 30 min is drawn as the default because it is the one that clears a 25-minute target outright.</p>
+    <p class="note"><b>Answered:</b> a treadmill walk with no heart-rate data <b>does</b> count &mdash; the logged minutes go toward the target and the day is marked <b>estimated</b>. Refusing to complete a walk you actually did is the worse failure. The app already models this exactly, as <code>source: 'observed' | 'estimated'</code> in <code>observed-hr.ts</code>, so it reuses that rather than adding a flag.</p>
+  </section>
+
+  <footer>
+    <p><b>What I need from you:</b> a yes, a no, or a change, for each of the four. They are independent — approving one does not commit you to the others.</p>
+    <p>Reversal cost is low on the first three: one component each, no stored data. <b>RV-166 is the exception</b> — it changes what counts as a completed session, so the numbers it moves are the part to think about.</p>
+  </footer>
+</div>

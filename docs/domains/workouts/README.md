@@ -47,6 +47,7 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
   feasibility spike is queued.
 - [`docs/reviews/2026-09-14-what-triggers-a-deload.md`](../../reviews/2026-09-14-what-triggers-a-deload.md) — **every deload trigger measured, 2026-09-14** (TN-36, sibling of TN-34). **Nine conditions can recommend a deload and exactly one can decline it** — past three training days every branch returns `recommended: true` and readiness only picks the strength, so a readiness of 100 still recommends one. **28 of 45 cleared days were cleared by the streak counter; none on merit.** And the step change has a date: deload went **19% in August to 79% in September** because `7c428a7f` fixed TN-22's storage defect and the stress override, which had never reached its 120 threshold, began firing — **0 times then 9 times**, on the number TN-33 measured as carrying no signal.
 - [`docs/reviews/2026-09-25-sweep-61-ai-to-logic.md`](../../reviews/2026-09-25-sweep-61-ai-to-logic.md) — **sweep 61, 2026-09-25: where AI can be replaced with logic.** 121 calls in 30 days, which is cents, so the case is offline use and correctness. Entries RV-200 to RV-204.
+- [`docs/reviews/2026-09-26-sweep-63-design-review.md`](../../reviews/2026-09-26-sweep-63-design-review.md) — **sweep 63, 2026-09-26: a design review from 69 web screenshots and a static audit.** Entries RV-207 to RV-215: initials, pressed states, colour and format consistency, the type scale, the keyboard, empty-account truths and loading states.
 - [`docs/reviews/2026-09-03-progression-exact-adherence-ratchet.md`](../../reviews/2026-09-03-progression-exact-adherence-ratchet.md) — **exact adherence is not 1RM-neutral, 2026-09-03** (sweep 46, RV-43/RV-44). `1rm.ts` claims — and the 2026-07-10 workout review repeated — that `prescriptionFactor` makes *"exact adherence 1RM-neutral"*. It is, for the exact prescribed weight; the plate **ceiling** round between formula and barbell breaks it, and `prescriptionFactor` amplifies that round-up by **1/pct** (1.43× at 70%). Measured over 1,201 starting 1RMs: **p50 +2.60%, p90 +7.12%, max +13.55%** on a barbell, settling in 3 sessions, and permanent because `upsertPersonalRecordIfBetter` is monotone. **It converges rather than running away**, which caps the severity; the fix is a scoring decision and is `Gate: owner`. Also clean: Home's `scoreBand` is a single source with no re-derived thresholds, and **AI-10 from the 2026-07-10 review is fixed** — `mround125Up` now has zero call sites, superseded by the equipment-aware `mroundStepUp`.
 - [`docs/reviews/2026-09-21-sweep-52-what-the-owner-sees.md`](../../reviews/2026-09-21-sweep-52-what-the-owner-sees.md) — **the visual sweep, 2026-09-21** (RV-84…RV-102), ranked by where the owner actually is (resume telemetry: Home 22 · Nutrition 14 · Health 11 · More 7 · Workout 2). **Systemic:** `cachedFetch` cannot reject — its network section is wrapped in `try/catch/finally` — so every `.catch()` chained onto it is dead code at **16 sites**, and the error states built on them are unreachable (RV-84). **Home carries three failure-vanish bugs:** the score row disappears with no skeleton or message (RV-85, whose helper `fetchWithRetry` retries 3× then gives up *silently*, landing on the blank widget its own header says it exists to prevent), a failed streak fetch paints a confident **0-day streak** (RV-86), and Profile invents *Level 1 · Novice · 0 XP* (RV-87). **One stored 1RM renders four numbers** — 92.5 / 92.25 / ~92 / 92.3 — with four sites calling the shared `displayOneRm` for the bodyweight branch and hand-rolling the weighted one (RV-89); `mround125` doing display duty already shipped BF-127. **A real CSS bug:** `truncate` on a flex container clips the name with no ellipsis *and* clips the green done-tick out of existence (RV-92). **A number painted the wrong band's colour:** the ACWR value is hard-coded to the `high` amber while its label says "Optimal" (RV-97). Layout findings are measured against production content (130 of 337 food items exceed the 22-char budget; the owner's lower-back injury is live).
 - [`docs/reviews/2026-09-20-sweep-51-efficiency.md`](../../reviews/2026-09-20-sweep-51-efficiency.md) — **the efficiency sweep, 2026-09-20** (RV-64…RV-79). **The headline is not an AI finding:** `/api/hr-profile` pulls **128,734** production rows into JS and sorts them to produce two order statistics and a mean — an aggregate answers in **54 ms, one row** — and `LiveHrChart` remounts it *once per rest period*, so a 5×4 workout triggers ~20 full scans on the same pool as `log-exercise` (RV-64, with `cardio-week` pulling the window twice more, RV-73). **On "logic not AI":** the app makes only **49 LLM calls in 14 days**, so cost is not the argument — the two real cases are the prescription, whose prompt tells the model a deterministic layer will overwrite its numbers and then does (RV-65, which asks for the raw-vs-final *measurement* first, BF-110-style, because only the reconciled output is stored), and `nutrition-goals/recommend`, where a model picks inside a **545 kcal band** around a computed baseline and the result is shown as fact and written into targets (RV-66). Also records a comment at `health-content.tsx:338` claiming `cachedFetch` honours its TTL — it does not, the gate is opt-in, **191 read sites and 8 flags** (RV-67). **Corrects two mid-sweep errors of mine:** reduced motion IS handled globally via `MotionConfig reducedMotion="user"`, and every bare `pb-safe` is permitted page-level scroll padding — no safe-area violation exists.
@@ -289,7 +290,7 @@ Live at the time of writing (2026-07-30):
   Android's recogniser in any test, so the parser is proven on strings, not on speech; the press is
   W4 in [`device-verification-queue.md`](../../device-verification-queue.md), sharing a sitting with
   LA-37.
-- **[`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](../../handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)**
+- **[`docs/handoffs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](../../handoffs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)**
   — 🆕 the workout-energy intake cluster (Q-391 · Q-419 · ~~Q-423~~ · Q-420 · Q-421 · Q-422), from one
   owner question about making the burn estimate more accurate. Records that `computeActiveEnergy`
   **already** calls the estimator per strength session and discards the split; that the done screen
@@ -309,42 +310,54 @@ Live at the time of writing (2026-07-30):
   same `x && f(x)` shape but is inside a `displaySession ?` branch — redundant, not a bug.
 
 - Cross-domain, but the deload work lives here:
-  [`docs/handoff-2026-08-11-platform-queue-drain-deload-coverage-coach-charts.md`](../../handoff-2026-08-11-platform-queue-drain-deload-coverage-coach-charts.md)
+  [`docs/handoffs/handoff-2026-08-11-platform-queue-drain-deload-coverage-coach-charts.md`](../../handoffs/handoff-2026-08-11-platform-queue-drain-deload-coverage-coach-charts.md)
   (Q-175 — a confirmed deload **week** never reached the AI-dynamic prescription, the second of the
   app's two deload entry points; and **Q-185**, still open, which the fix exposed: the reduction
   lives inside `if (aiDrivesLoad)`, so an exercise the prescription does not name is not reduced by
   either entry point).
-- Handoffs: `ls docs/handoff-*-workouts-*.md` — most recently
-  [`docs/handoff-2026-08-17-workouts-owner-bug-batch-deload-fallback.md`](../../handoff-2026-08-17-workouts-owner-bug-batch-deload-fallback.md)
+- Handoffs: `ls docs/handoffs/handoff-*-workouts-*.md` — most recently
+  [`docs/handoffs/handoff-2026-08-17-workouts-owner-bug-batch-deload-fallback.md`](../../handoffs/handoff-2026-08-17-workouts-owner-bug-batch-deload-fallback.md)
   (Q-310 root-caused and queued — the ai_dynamic generic fallback's hardcoded `isDeloadActive:
   false`; also shipped the warm-up timer label fix, PR #1350. Q-245/246/247/248, filed earlier in
   the same owner-bug-batch thread, were picked up and shipped by other sessions before this handoff
   was written — see #1375/v1.317.0 and v1.317.1). Before that,
-  [`docs/handoff-2026-08-05-workouts-measured-warmup-preset-scaling.md`](../../handoff-2026-08-05-workouts-measured-warmup-preset-scaling.md)
+  [`docs/handoffs/handoff-2026-08-05-workouts-measured-warmup-preset-scaling.md`](../../handoffs/handoff-2026-08-05-workouts-measured-warmup-preset-scaling.md)
   (Q-83 **built** — the measured warmup median is now capped at 20% of the budget, but only when
   today's budget is below the session's own configured length; carries the sandbox traps for probing
   the AI time-budget path, and why an ungated cap is wrong. Produced **Q-85**: rest, not warmup,
   dominates a short budget). That superseded
-  [`docs/handoff-2026-08-05-workouts-time-budget-and-cadence-backlog-planning.md`](../../handoff-2026-08-05-workouts-time-budget-and-cadence-backlog-planning.md)
+  [`docs/handoffs/handoff-2026-08-05-workouts-time-budget-and-cadence-backlog-planning.md`](../../handoffs/handoff-2026-08-05-workouts-time-budget-and-cadence-backlog-planning.md)
   (the same work, triaged and queued but not yet built). Before that,
-  [`docs/handoff-2026-08-03-workouts-auto-apply-phase-transitions.md`](../../handoff-2026-08-03-workouts-auto-apply-phase-transitions.md)
+  [`docs/handoffs/handoff-2026-08-03-workouts-auto-apply-phase-transitions.md`](../../handoffs/handoff-2026-08-03-workouts-auto-apply-phase-transitions.md)
   (auto-apply set a status but never called `advancePhase`, so four of five session types sat in
   accumulation since June against prescriptions already written at intensification loads — fixed in
   #1025 / v1.252.0; carries the prod-audit evidence, the local test-env traps, and why deloads and
   ceiling-forced transitions still ask). Plus
-  [`docs/handoff-2026-07-29-ai-prescription-engine.md`](../../handoff-2026-07-29-ai-prescription-engine.md)
-  and [`docs/handoff-2026-07-29-ingest-and-records.md`](../../handoff-2026-07-29-ingest-and-records.md),
+  [`docs/handoffs/handoff-2026-07-29-ai-prescription-engine.md`](../../handoffs/handoff-2026-07-29-ai-prescription-engine.md)
+  and [`docs/handoffs/handoff-2026-07-29-ingest-and-records.md`](../../handoffs/handoff-2026-07-29-ingest-and-records.md),
   both written before the domain went into handoff filenames.
-  Also [`docs/handoff-2026-08-24-workouts-review-sweep-40-write-surface.md`](../../handoff-2026-08-24-workouts-review-sweep-40-write-surface.md)
+  Also [`docs/handoffs/handoff-2026-08-24-workouts-review-sweep-40-write-surface.md`](../../handoffs/handoff-2026-08-24-workouts-review-sweep-40-write-surface.md)
   (Review sweep 40 — three program-config write paths accepted a progression-style id owned by another
   user while the `PUT` twin of one refused the identical value; all three fixed, RV-32…RV-34, and the
   write-up's FK inventory names the 23 edges still unprobed).
-  Also [`docs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md`](../../handoff-2026-08-02-cross-owner-bug-batch-investigation.md)
+  Also [`docs/handoffs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md`](../../handoffs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md)
   (Q-38 — a phase transition emptying the prescription card permanently), filed under `cross` because it spans five pillars.
-  Also [`docs/handoff-2026-08-03-cross-owner-bug-batch-triage.md`](../../handoff-2026-08-03-cross-owner-bug-batch-triage.md)
+  Also [`docs/handoffs/handoff-2026-08-03-cross-owner-bug-batch-triage.md`](../../handoffs/handoff-2026-08-03-cross-owner-bug-batch-triage.md)
   (Q-63 — skip button needs a confirm; Q-64 — voice logging dead on the APK; Q-65 — PiP missing the
   rest countdown on the exercise-summary screen), same reason.
 - Journal: `grep -rl 'workout\|prescription\|1RM' docs/overview/entries/` — including
+  [`2026-09-27-rv219-day-workout-card.md`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv219-day-workout-card)
+  (RV-219 ② — the Day card's exercise name wraps instead of cutting the distinguishing words; why
+  shrinking the icons was ruled out by the 48 px tap-target floor; and why the "0 kg" half needs a
+  field on `day-log`, since `DayExercise` carries no `exerciseType` and nothing resolves one
+  client-side),
+  [`2026-09-27-rv214-session-card`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv214-session-card)
+  (RV-214 ①③④ — three surfaces printed `session.icon` as text because they bypassed the map A-7's
+  comment said everyone used; plus why the check is keyed narrowly, and what ②⑤ still need),
+  [`2026-09-27-rv202-label-the-numbers-source`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv202-label-the-numbers-source)
+  (RV-202 ③ — the pre-workout list names which day its numbers came from; and `LB-165`, the
+  five-link trace showing RV-202 ①'s rules fallback reaches no screen at all, so the ~30 s
+  "Preparing your AI workout…" wait it was written to remove is still there),
   [`docs/overview/history-2026-07-28.md`](../../overview/history-2026-07-28.md)
   and [`docs/overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)
   (Q-115-followup — the sore-muscle check-in now predicts and warns about a whole-session deload

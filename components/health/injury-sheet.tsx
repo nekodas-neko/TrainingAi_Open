@@ -198,7 +198,7 @@ export function InjurySheet({ open, onOpenChange, injury, onSaved, onDeleted, us
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="rounded-t-2xl max-h-[90vh] flex flex-col">
+      <SheetContent side="bottom" className="rounded-t-2xl max-h-[90dvh] flex flex-col">
         <SheetHeader className="border-b border-border/30 pb-3 shrink-0">
           <SheetTitle>{injury ? 'Edit Injury' : 'Log Injury'}</SheetTitle>
         </SheetHeader>

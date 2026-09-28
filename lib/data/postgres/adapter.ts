@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto'
 import { rejectMealImage, mealImageRejectionMessage, FOOD_ITEM_IMAGE_MAX_BYTES } from '@trainingai/shared/nutrition/meal-image'
+import { normalizeEmail } from '@trainingai/shared/validation/email'
 import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { formatInTimeZone } from 'date-fns-tz'
 import { eq, and, or, inArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull } from 'drizzle-orm'
@@ -70,7 +71,7 @@ import type {
   User, Program, ProgramSession, SessionExercise, Schedule, ScheduleDay,
   ProgressionStyle, StyleSet,
   WorkoutSession, ExerciseLog, SetLog, ExerciseHistoryLogRow,
-  BodyMetrics, ActivityLog, ActivityType, SleepSession, NextSessionRecommendation,
+  BodyMetrics, ActivityLog, ActivityType, SleepSession, SleepVerdictRecord, NextSessionRecommendation,
   ActivityLevel, FitnessGoal, MoodLog, GoalRecommendation,
 } from '@trainingai/shared/types'
 import type { ExerciseLibraryEntry, MuscleAssignment, ProgramPhase, ProgramPhaseType, PhaseSetWithPhases, ExerciseType } from '@trainingai/shared/types/program'
@@ -444,9 +445,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async upsertUser(user: Omit<User, 'id' | 'createdAt' | 'isActive' | 'isAdmin'>, forceActive?: boolean): Promise<User> {
-    const invited = forceActive ?? await this.isInvited(user.email)
+    // LA-61: normalised here, at the boundary, so no caller can store or match a raw provider value.
+    const email = normalizeEmail(user.email)
+    const invited = forceActive ?? await this.isInvited(email)
     const [r] = await this.db.insert(s.users)
-      .values({ oauthSub: user.oauthSub ?? null, email: user.email, name: user.name ?? null, isActive: invited })
+      .values({ oauthSub: user.oauthSub ?? null, email, name: user.name ?? null, isActive: invited })
       .onConflictDoUpdate({
         // Conflict on email — works for both OAuth and password users.
         // oauthSub UNIQUE doesn't fire when oauthSub is NULL (NULL != NULL in Postgres).
@@ -703,7 +706,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null> {
-    const [r] = await this.db.select().from(s.users).where(eq(s.users.email, email)).limit(1)
+    // lower(), not eq: it matches a row stored before LA-61's backfill (or one a collision kept it
+    // from normalising) as well as a normalised one. It can only gain matches, never lose one.
+    const [r] = await this.db.select().from(s.users).where(eq(sql`lower(${s.users.email})`, normalizeEmail(email))).limit(1)
     if (!r) return null
     return { ...this.rowToUser(r), passwordHash: r.passwordHash ?? undefined }
   }
@@ -771,9 +776,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async createEmailUser(email: string, passwordHash: string, name?: string, isActive?: boolean): Promise<User> {
-    const active = isActive ?? await this.isInvited(email)
+    const normal = normalizeEmail(email)
+    const active = isActive ?? await this.isInvited(normal)
     const [r] = await this.db.insert(s.users)
-      .values({ email, passwordHash, name: name ?? null, isActive: active })
+      .values({ email: normal, passwordHash, name: name ?? null, isActive: active })
       .returning()
     return this.rowToUser(r)
   }
@@ -785,15 +791,15 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async addInvite(email: string): Promise<void> {
-    await this.db.insert(invitedEmails).values({ email }).onConflictDoNothing()
+    await this.db.insert(invitedEmails).values({ email: normalizeEmail(email) }).onConflictDoNothing()
   }
 
   async removeInvite(email: string): Promise<void> {
-    await this.db.delete(invitedEmails).where(eq(invitedEmails.email, email))
+    await this.db.delete(invitedEmails).where(eq(sql`lower(${invitedEmails.email})`, normalizeEmail(email)))
   }
 
   async isInvited(email: string): Promise<boolean> {
-    const [r] = await this.db.select().from(invitedEmails).where(eq(invitedEmails.email, email)).limit(1)
+    const [r] = await this.db.select().from(invitedEmails).where(eq(sql`lower(${invitedEmails.email})`, normalizeEmail(email))).limit(1)
     return !!r
   }
 
@@ -1226,6 +1232,15 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           .orderBy(asc(s.setLogs.exerciseLogId), asc(s.setLogs.setNumber))
       : []
 
+    // RV-219: the type decides whether a lift is shown in kg or as bodyweight. A separate lookup
+    // rather than a join on the query above, so the log rows keep the shape every caller reads.
+    const libIds = [...new Set(elRows.map(e => e.exerciseId).filter((id): id is string => !!id))]
+    const typeById = new Map(libIds.length
+      ? (await this.db.select({ id: s.exerciseLibrary.id, exerciseType: s.exerciseLibrary.exerciseType })
+          .from(s.exerciseLibrary).where(inArray(s.exerciseLibrary.id, libIds)))
+          .map(r => [r.id, r.exerciseType] as const)
+      : [])
+
     return wsRows.map(ws => ({
       id: ws.id, userId: ws.userId, sessionId: ws.programSessionId ?? undefined,
       sessionName: ws.sessionName, startedAt: ws.startedAt,
@@ -1247,6 +1262,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           muscleGroups: e.muscleGroups ?? [], loggedAt: e.loggedAt,
           interExerciseRestSec: e.interExerciseRestSec ?? undefined,
           prepTimeSec: e.prepTimeSec ?? undefined,
+          exerciseType: (e.exerciseId && typeById.get(e.exerciseId)) ?? null,
           sets: setRows
             .filter(ss => ss.exerciseLogId === e.id)
             .map<SetLog>(ss => ({
@@ -1899,6 +1915,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           hrvTrend,
           energyLevel: moodLog?.energyLevel ?? null,
           soreMuscles: moodLog?.soreMuscles ?? [],
+          // LB-118: the same check-in's provenance the scorer was fed above, so the explain page
+          // can tell a suggested tick from a chosen one. Null (not []) = not recorded.
+          suggestedSoreMuscles: moodLog?.suggestedSoreMuscles ?? null,
           temperatureDeviation,
           temperatureBaselineDays,
           temperatureAlertThresholdC: TEMP_ALERT_THRESHOLD_C,
@@ -2051,6 +2070,45 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         gt(s.sleepSessions.durationHours, 0),
       ))
       .orderBy(desc(s.sleepSessions.date))
+    return rows.map(r => r.date)
+  }
+
+  /** PS-49 — per-day step totals for the Ranger's bank. */
+  async listStepTotals(userId: string, from: string, to: string): Promise<{ date: string; steps: number }[]> {
+    const rows = await this.db.select({ date: s.bodyMetrics.date, steps: s.bodyMetrics.steps }).from(s.bodyMetrics)
+      .where(and(
+        eq(s.bodyMetrics.userId, userId),
+        gte(s.bodyMetrics.date, from),
+        lte(s.bodyMetrics.date, to),
+        gt(s.bodyMetrics.steps, 0),
+        isNull(s.bodyMetrics.deletedAt),
+      ))
+      .orderBy(asc(s.bodyMetrics.date))
+    return rows.map(r => ({ date: r.date, steps: Number(r.steps) }))
+  }
+
+  /** PS-49 — days with at least one live food log (a Health cat point). */
+  async listFoodLogDayKeys(userId: string, from: string, to: string): Promise<string[]> {
+    const rows = await this.db.selectDistinct({ date: s.foodLogs.date }).from(s.foodLogs)
+      .where(and(
+        eq(s.foodLogs.userId, userId),
+        gte(s.foodLogs.date, from),
+        lte(s.foodLogs.date, to),
+        isNull(s.foodLogs.deletedAt),
+      ))
+    return rows.map(r => String(r.date))
+  }
+
+  /** PS-49 — days with a recorded weight (a Health cat point). */
+  async listWeightDayKeys(userId: string, from: string, to: string): Promise<string[]> {
+    const rows = await this.db.select({ date: s.bodyMetrics.date }).from(s.bodyMetrics)
+      .where(and(
+        eq(s.bodyMetrics.userId, userId),
+        gte(s.bodyMetrics.date, from),
+        lte(s.bodyMetrics.date, to),
+        isNotNull(s.bodyMetrics.weightKg),
+        isNull(s.bodyMetrics.deletedAt),
+      ))
     return rows.map(r => r.date)
   }
 
@@ -2330,7 +2388,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         ? await this.db.insert(s.activityLogs).values(values).onConflictDoUpdate({
             target: [s.activityLogs.userId, s.activityLogs.date, s.activityLogs.startTime],
             targetWhere: isNotNull(s.activityLogs.startTime),
-            set,
+            // DV-19. The natural-identity index covers tombstones, so a new activity saved at the
+            // minute of a deleted one lands on the deleted row, and without this it stays deleted
+            // and never reaches any device. Only a DIFFERENT id revives it: a stale edit to the
+            // deleted activity itself is the same id, and delete keeps winning over that.
+            set: {
+              ...set,
+              deletedAt: sql`CASE WHEN ${s.activityLogs.id} = excluded.id THEN ${s.activityLogs.deletedAt} ELSE NULL END`,
+            },
           }).returning()
         : await this.db.insert(s.activityLogs).values(values).onConflictDoUpdate({
             target: s.activityLogs.id,
@@ -2756,6 +2821,95 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       awakHours:        session.awakHours        ?? null,
       sleepPhase5Min:   session.sleepPhase5Min   ?? null,
     }], source)
+  }
+
+  // ── TN-81: the announced sleep verdict ────────────────────────────────────────────────
+  // The component values and the bands are columns rather than a jsonb blob so Tuning can
+  // correlate corrections against them in SQL — reading the label without the evidence is the
+  // failure this table exists to prevent.
+
+  async getSleepVerdict(userId: string, date: string): Promise<SleepVerdictRecord | null> {
+    const [r] = await this.db.select().from(s.sleepVerdicts)
+      .where(and(eq(s.sleepVerdicts.userId, userId), eq(s.sleepVerdicts.date, date)))
+      .limit(1)
+    if (!r) return null
+    return {
+      date: r.date,
+      verdict: r.verdict as SleepVerdictRecord['verdict'],
+      triggered: r.triggered ?? [],
+      components: {
+        durationHours: r.durationHours,
+        onsetMinutes: r.onsetMinutes,
+        efficiency: r.efficiency,
+      },
+      bands: {
+        durationLow: r.durationLow, durationHigh: r.durationHigh,
+        onsetLow: r.onsetLow, onsetHigh: r.onsetHigh,
+        efficiencyLow: r.efficiencyLow, efficiencyHigh: r.efficiencyHigh,
+      },
+      baselineNights: r.baselineNights,
+      modelVersion: r.modelVersion,
+      responseState: r.responseState as SleepVerdictRecord['responseState'],
+    }
+  }
+
+  async upsertSleepVerdict(
+    userId: string,
+    record: Omit<SleepVerdictRecord, 'responseState'>,
+  ): Promise<void> {
+    await this.db.insert(s.sleepVerdicts)
+      .values({
+        userId,
+        date: record.date,
+        verdict: record.verdict,
+        triggered: record.triggered,
+        durationHours: record.components.durationHours,
+        onsetMinutes: record.components.onsetMinutes,
+        efficiency: record.components.efficiency,
+        durationLow: record.bands.durationLow,
+        durationHigh: record.bands.durationHigh,
+        onsetLow: record.bands.onsetLow,
+        onsetHigh: record.bands.onsetHigh,
+        efficiencyLow: record.bands.efficiencyLow,
+        efficiencyHigh: record.bands.efficiencyHigh,
+        baselineNights: record.baselineNights,
+        modelVersion: record.modelVersion,
+      })
+      .onConflictDoUpdate({
+        target: [s.sleepVerdicts.userId, s.sleepVerdicts.date],
+        set: {
+          verdict: sql`EXCLUDED.verdict`,
+          triggered: sql`EXCLUDED.triggered`,
+          durationHours: sql`EXCLUDED.duration_hours`,
+          onsetMinutes: sql`EXCLUDED.onset_minutes`,
+          efficiency: sql`EXCLUDED.efficiency`,
+          durationLow: sql`EXCLUDED.duration_low`,
+          durationHigh: sql`EXCLUDED.duration_high`,
+          onsetLow: sql`EXCLUDED.onset_low`,
+          onsetHigh: sql`EXCLUDED.onset_high`,
+          efficiencyLow: sql`EXCLUDED.efficiency_low`,
+          efficiencyHigh: sql`EXCLUDED.efficiency_high`,
+          baselineNights: sql`EXCLUDED.baseline_nights`,
+          modelVersion: sql`EXCLUDED.model_version`,
+          updatedAt: sql`now()`,
+          // `response_state` is deliberately ABSENT. Re-announcing a night must never erase the
+          // fact that he already answered it — that would silently turn an answer back into
+          // silence, which is the one direction this dataset cannot recover from.
+        },
+      })
+  }
+
+  /** Returns false when there is no announced verdict for that day to respond to. */
+  async setSleepVerdictResponse(
+    userId: string,
+    date: string,
+    state: 'acknowledged' | 'corrected',
+  ): Promise<boolean> {
+    const updated = await this.db.update(s.sleepVerdicts)
+      .set({ responseState: state, updatedAt: new Date() })
+      .where(and(eq(s.sleepVerdicts.userId, userId), eq(s.sleepVerdicts.date, date)))
+      .returning({ id: s.sleepVerdicts.id })
+    return updated.length > 0
   }
 
   async listSleepSessions(userId: string, from: string, to: string): Promise<SleepSession[]> {
@@ -3599,6 +3753,18 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return new Map(rows.map(r => [r.exerciseName, r.estimated1rm]))
   }
 
+  async listPersonalRecordsDated(userId: string): Promise<{ exerciseName: string; estimated1rm: number; achievedAt: Date }[]> {
+    return this.db
+      .select({
+        exerciseName: s.personalRecords.exerciseName,
+        estimated1rm: s.personalRecords.estimated1rm,
+        achievedAt: s.personalRecords.achievedAt,
+      })
+      .from(s.personalRecords)
+      .where(eq(s.personalRecords.userId, userId))
+      .orderBy(desc(s.personalRecords.achievedAt), s.personalRecords.exerciseName)
+  }
+
   async listMaxReps(userId: string): Promise<Map<string, number>> {
     const rows = await this.db
       .select({
@@ -4176,6 +4342,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       proteinG: s.foodItems.proteinG, carbsG: s.foodItems.carbsG, fatG: s.foodItems.fatG,
       fiberG: s.foodItems.fiberG, sugarG: s.foodItems.sugarG, sodiumMg: s.foodItems.sodiumMg,
       satFatG: s.foodItems.satFatG, source: s.foodItems.source,
+      // LB-158. Absent here meant the device could never recognise a product it had already
+      // stored, so every re-scan of the same tin was an Open Food Facts round trip.
+      barcode: s.foodItems.barcode,
       // BF-35. Absent here means the picture never reaches the device, which is the whole point of
       // storing bytes rather than a URL.
       imageDataUri: s.foodItems.imageDataUri,
@@ -4545,8 +4714,18 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         maxUpdatedAt: ouraDailyDerived.length ? new Date(ouraDailyDerived[ouraDailyDerived.length - 1].updatedAt as unknown as string | Date) : null },
     ], now)
 
+    // RV-174 — see `SyncDelta.programRoster`. Two small id-only reads, not windowed or paged:
+    // a roster that stopped at a page boundary would delete the rows it did not reach.
+    const programRosterRows = await this.db.select({ id: s.programs.id }).from(s.programs)
+      .where(eq(s.programs.userId, userId))
+    const styleRosterRows = await this.db.select({ id: s.progressionStyles.id }).from(s.progressionStyles)
+      .where(eq(s.progressionStyles.userId, userId))
+
     return { programs, programSessions, sessionExercises, schedules, scheduleDays,
-             progressionStyles, styleSets, bodyMetrics, sleepSessions,
+             progressionStyles, styleSets,
+             programRoster: programRosterRows.map(r => r.id),
+             progressionStyleRoster: styleRosterRows.map(r => r.id),
+             bodyMetrics, sleepSessions,
              moodLogs, activityLogs, fitnessTests, prescribedRuns, workoutSessions,
              exerciseLogs, setLogs,
              personalRecords: personalRecords.map(r => ({
@@ -5117,6 +5296,43 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           }
           await logExerciseFromPayload(userId, parsed.data, userTz)
           processed++
+        } else if (mut.domain === 'exercise_log_edit') {
+          // RV-175. The same function PATCH /api/workout-entry calls. Lazy import for the reason
+          // post-completion-hr below gives: the module reaches back into `@/lib/data`.
+          const { ExerciseLogEditSchema, editExerciseLog } = await import('@/lib/workout/exercise-log-edits')
+          const parsed = ExerciseLogEditSchema.safeParse(mut.payload)
+          if (!parsed.success) {
+            errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid exercise_log_edit payload' })
+            continue
+          }
+          // A miss goes to `errors`, not `processed`: the commonest cause is the log itself still
+          // being in the outbox behind a failed push, which a later attempt resolves. The client's
+          // bounded retries then dead-letter a genuinely orphaned edit (see session_rpe below).
+          if (!await editExerciseLog(userId, parsed.data)) {
+            errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'No matching exercise log for exercise_log_edit' })
+            continue
+          }
+          processed++
+        } else if (mut.domain === 'exercise_log_delete') {
+          const { ExerciseLogDeleteSchema, deleteExerciseLog } = await import('@/lib/workout/exercise-log-edits')
+          const parsed = ExerciseLogDeleteSchema.safeParse(mut.payload)
+          if (!parsed.success) {
+            errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid exercise_log_delete payload' })
+            continue
+          }
+          // A miss is NOT an error, as with activity_logs (Q-328): a delete re-sent because its
+          // confirmation never landed finds nothing, and the row is gone either way.
+          await deleteExerciseLog(userId, parsed.data.exerciseLogId)
+          processed++
+        } else if (mut.domain === 'workout_session_delete') {
+          const { WorkoutSessionDeleteSchema, deleteWorkoutSessionAndReconcile } = await import('@/lib/workout/delete-session-reconcile')
+          const parsed = WorkoutSessionDeleteSchema.safeParse(mut.payload)
+          if (!parsed.success) {
+            errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid workout_session_delete payload' })
+            continue
+          }
+          await deleteWorkoutSessionAndReconcile(userId, parsed.data.workoutSessionId)
+          processed++
         } else if (mut.domain === 'session_rpe') {
           const rpeCheck = SessionRpeSchema.safeParse(mut.payload)
           if (!rpeCheck.success) {
@@ -5226,6 +5442,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           const int = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v) : null)
           const bool = (v: unknown): boolean | null => (typeof v === 'boolean' ? v : null)
           const str = (v: unknown): string | null => (typeof v === 'string' ? v : null)
+          const ts = (v: unknown): Date | null => {
+            if (typeof v !== 'string') return null
+            const d = new Date(v)
+            return Number.isNaN(d.getTime()) ? null : d
+          }
           const json = (v: unknown): unknown | null => {
             if (v == null) return null
             if (typeof v === 'string') { try { return JSON.parse(v) } catch { return null } }
@@ -5246,6 +5467,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             acwr:                  num(p.acwr),
             trainingLoadHigh:      bool(p.trainingLoadHigh),
             trainingLoadGate:      str(p.trainingLoadGate),
+            trainingLoadGridLen:   int(p.trainingLoadGridLen),
+            trainingLoadValidMin:  int(p.trainingLoadValidMin),
+            trainingLoadEvaluatedAt: ts(p.trainingLoadEvaluatedAt),
             recoveryIndexHours:    num(p.recoveryIndexHours),
             wornHoursBle:          num(p.wornHoursBle),
             nightHrvBaselineMs:    num(p.nightHrvBaselineMs),
@@ -7063,6 +7287,23 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * first when reviewing this: a meal's contribution must still be there afterwards.
    */
   // RV-45. See deleteSupplement — reports the match, does not change it.
+  async listDoseEvents(userId: string, from: string, to: string) {
+    const rows = await this.db
+      .select({ name: s.supplements.name, date: s.supplementLogs.logDate, amount: s.supplementLogs.amount, unit: s.supplementLogs.unit })
+      .from(s.supplementLogs)
+      .innerJoin(s.supplements, eq(s.supplements.id, s.supplementLogs.supplementId))
+      .where(and(
+        eq(s.supplementLogs.userId, userId),
+        gte(s.supplementLogs.logDate, from),
+        lte(s.supplementLogs.logDate, to),
+        isNull(s.supplementLogs.deletedAt),
+        isNotNull(s.supplementLogs.amount),
+        isNotNull(s.supplementLogs.vialStrengthMg),
+      ))
+      .orderBy(asc(s.supplementLogs.logDate))
+    return rows.map(r => ({ supplementName: r.name, date: r.date, amount: Number(r.amount), unit: r.unit }))
+  }
+
   async unlogSupplement(supplementId: string, userId: string, date: string): Promise<boolean> {
     const rows = await this.db.update(s.supplementLogs)
       .set({ deletedAt: new Date(), updatedAt: new Date() })

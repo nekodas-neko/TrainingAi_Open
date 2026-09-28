@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { movementParts, movementSummary } from '../movement-breakdown'
 import { computeActiveEnergy } from '@trainingai/shared/health/daily-energy'
 import { STEP_BASE_CREDIT } from '@trainingai/shared/health/energy-baseline'
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /**
  * BF-87 — the breakdown under the calorie bar, and the threshold that explains a zero.
@@ -17,8 +18,7 @@ import { STEP_BASE_CREDIT } from '@trainingai/shared/health/energy-baseline'
 const ROOT = join(__dirname, '..', '..', '..')
 
 /** Source with comments and imports stripped, so a guard cannot pass on the prose describing it. */
-const code = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '')
+const code = (rel: string) => stripComments(readFileSync(join(ROOT, rel), 'utf8'))
   .replace(/\/\/.*/g, '')
   .split('\n')
   .filter(l => !l.trimStart().startsWith('import '))
@@ -32,8 +32,7 @@ const code = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
  * could not fail, because the import it was looking for was the first thing removed. Found by
  * mutation, which is the only thing that finds this.
  */
-const codeWithImports = (rel: string) => readFileSync(join(ROOT, rel), 'utf8')
-  .replace(/\/\*[\s\S]*?\*\//g, '')
+const codeWithImports = (rel: string) => stripComments(readFileSync(join(ROOT, rel), 'utf8'))
   .replace(/\/\/.*/g, '')
 
 /**
@@ -118,7 +117,18 @@ describe('the parts the service hands us already add up', () => {
 
   it('drops the addends that contributed nothing, and keeps the rest in a fixed order', () => {
     expect(movementSummary({ workoutKcal: 320, activityKcal: 0, stepsKcal: 227 }))
-      .toBe('320 workouts · 227 steps')
+      .toBe('320 kcal workouts · 227 kcal steps')
+  })
+
+  // RV-218: without the unit this read "205 workouts · 32 steps" under a calorie bar, where the
+  // numbers are kcal — so it parsed as a COUNT of workouts and a number of steps, which is a
+  // different claim about the same day and a plausible one. Asserted per addend rather than on
+  // the whole string, so a reworded separator or order cannot quietly drop it.
+  it('gives every addend its unit, because every number here is kcal', () => {
+    const summary = movementSummary({ workoutKcal: 205, activityKcal: 11, stepsKcal: 32 })
+    for (const part of summary.split(' · ')) {
+      expect(part, `"${part}" has no unit — it reads as a count`).toMatch(/^[\d,]+ kcal \w+$/)
+    }
   })
 })
 

@@ -6,9 +6,8 @@ import * as s from '@/lib/data/postgres/schema'
 import { inArray, eq, and, gte, sum, count, isNull } from 'drizzle-orm'
 import { sql } from 'drizzle-orm'
 import type { LeaderboardEntry } from '@trainingai/shared/types/friends'
-import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
-import { computeStreak } from '@/lib/achievements'
-import { maxCompliantRestGapFor } from '@trainingai/shared/schedule-utils'
+import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
+import { computeDayStreak, streakRestGapFor } from '@trainingai/shared/workout/day-streak'
 import { longestWeeklyStreak } from '@trainingai/shared/workout/year-review'
 import { startOfWeek, format } from 'date-fns'
 import { toZonedTime } from 'date-fns-tz'
@@ -139,7 +138,9 @@ export async function GET(req: Request) {
       // BF-122a — the allowance comes from each user's own schedule. A literal 1 here was right
       // only for a rotation: someone training Mon+Tue is compliant across a five-day hole, and
       // their leaderboard streak broke every week.
-      allTimeStreak: computeStreak(days, tz, maxCompliantRestGapFor(scheduleByUser.get(u.id))).best,
+      // RV-216: calendar days, the same formula Home and the achievements use — a leaderboard
+      // comparing users cannot be the one surface counting a different quantity.
+      allTimeStreak: computeDayStreak(days, todayInTz(tz), streakRestGapFor(scheduleByUser.get(u.id))).best,
     }
   })
 

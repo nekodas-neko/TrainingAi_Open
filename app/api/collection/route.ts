@@ -7,6 +7,8 @@ import { maxCompliantRestGap } from '@trainingai/shared/schedule-utils'
 import { earlyDeloadWeekDays } from '@trainingai/shared/phase-engine'
 import {
   replayCollection, LADDERS, STEPS_MAX_REST_GAP, SLEEP_MAX_REST_GAP, COLLECTION_RULES_VERSION,
+  replayBankCollection, V2_LADDERS, COLLECTION_RULES_VERSION_V2,
+  STEPS_UNITS_PER_T1, STEPS_DRAIN_PER_DAY, HEALTH_POINTS_PER_T1, HEALTH_DRAIN_PER_DAY,
   type CollectionState,
 } from '@trainingai/shared/collection/ladder'
 
@@ -54,7 +56,7 @@ export async function GET() {
   const today = todayInTz(tz)
   const repo = await getRepository()
 
-  const [trainedDays, restDays, program, stepDays, sleepDays] = await Promise.all([
+  const [trainedDays, restDays, program, stepDays, sleepDays, stepTotals, foodDays, weightDays] = await Promise.all([
     repo.listTrainedDayKeys(userId, tz),
     repo.listRestDays(userId, HISTORY_START, today),
     repo.getActiveProgram(userId),
@@ -63,6 +65,10 @@ export async function GET() {
     // them, so the filter below is gone rather than relocated.
     repo.listStepDayKeys(userId, HISTORY_START, today),
     repo.listSleepDayKeys(userId, HISTORY_START, today),
+    // PS-49 — v2's faucets.
+    repo.listStepTotals(userId, HISTORY_START, today),
+    repo.listFoodLogDayKeys(userId, HISTORY_START, today),
+    repo.listWeightDayKeys(userId, HISTORY_START, today),
   ])
 
   // `pausedDays` is compliance the app itself asked for, so that following its instructions never
@@ -104,11 +110,35 @@ export async function GET() {
     }),
   }
 
+  // PS-49 — collection rules v2, BESIDE v1 rather than instead of it: the current surface reads
+  // `collections`, so nothing the owner sees changes until the surface switches to `v2`. That
+  // switch re-scores his history, which PS-48 ④ asks him about first.
+  const healthPoints = new Map<string, number>()
+  for (const day of [...sleepDays, ...foodDays, ...weightDays]) healthPoints.set(day, (healthPoints.get(day) ?? 0) + 1)
+  const v2 = {
+    rulesVersion: COLLECTION_RULES_VERSION_V2,
+    collections: {
+      // The Tank keeps the rest-allowance decay: a constant drain would punish a lighter schedule
+      // on the days its plan says to rest.
+      workout: replayCollection({ days: trainedDays, ladder: V2_LADDERS.workout, maxRestGap: maxCompliantRestGap(program), pausedDays, today }),
+      steps: replayBankCollection({
+        gains: new Map(stepTotals.map(r => [r.date, r.steps])), ladder: V2_LADDERS.steps,
+        unitsPerT1: STEPS_UNITS_PER_T1, drainPerDay: STEPS_DRAIN_PER_DAY, today,
+      }),
+      health: replayBankCollection({
+        gains: healthPoints, ladder: V2_LADDERS.health,
+        unitsPerT1: HEALTH_POINTS_PER_T1, drainPerDay: HEALTH_DRAIN_PER_DAY, today,
+      }),
+      // The Rogue's unit and drain are the owner's open question (PS-48 ②).
+      cardio: null,
+    },
+  }
+
   return NextResponse.json(
     // `rulesVersion` rides along so a cached collection and a live one cannot straddle a threshold
     // change unnoticed — the cache half of `ladder.ts`'s versioning note. `no-store` is the other
     // half: this route is replayed from history on every read and must never be served stale.
-    { collections, rulesVersion: COLLECTION_RULES_VERSION, today },
+    { collections, rulesVersion: COLLECTION_RULES_VERSION, today, v2 },
     { headers: { 'Cache-Control': 'private, no-store' } },
   )
 }

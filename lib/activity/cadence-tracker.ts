@@ -21,6 +21,7 @@ import {
   TOTAL_AMPLITUDE_MG_COLUMN,
 } from '@/lib/oura-models/steps-motion-decoder'
 import { classifyGait, hasGaitMotion } from '@trainingai/shared/health/gait-classifier'
+import { median } from '@trainingai/shared/stats'
 import { getPolarBle, type PolarAccelBatch } from '@/lib/polar-ble/plugin'
 import type { PluginListenerHandle } from '@capacitor/core'
 import {
@@ -260,11 +261,11 @@ export class CadenceTracker {
     // absent dequantisation table would be plausible and wrong, which is worse than showing nothing.
     if (!hasStepsDecoderConstants()) return
     const decoded = runStepsMotionDecoder({ timestamps: [nowMs], data: [columns] })
-    const strideHz = median(decoded.data.map(r => r[STRIDE_FREQUENCY_COLUMN]))
+    const strideHz = medianOr0(decoded.data.map(r => r[STRIDE_FREQUENCY_COLUMN]))
     const features = {
       strideHz,
-      strideAmpFrac: median(decoded.data.map(r => r[STRIDE_AMPLITUDE_FRAC_COLUMN])),
-      totalAmplitudeMg: median(decoded.data.map(r => r[TOTAL_AMPLITUDE_MG_COLUMN])),
+      strideAmpFrac: medianOr0(decoded.data.map(r => r[STRIDE_AMPLITUDE_FRAC_COLUMN])),
+      totalAmplitudeMg: medianOr0(decoded.data.map(r => r[TOTAL_AMPLITUDE_MG_COLUMN])),
     }
     const classification = classifyGait(features)
     this.ringStrideHz = strideHz
@@ -436,9 +437,16 @@ export class CadenceTracker {
   }
 }
 
-function median(values: number[]): number {
-  if (values.length === 0) return 0
-  const sorted = [...values].sort((a, b) => a - b)
-  const mid = sorted.length >> 1
-  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2
+/**
+ * The decoded column's middle value, as a plain number for `classifyGait`.
+ *
+ * A thin adapter over the shared `median` rather than another implementation of it (LA-151).
+ * The `0` is the empty contract this file has always had and is unreachable today: every caller
+ * passes one decoded row, so the array has exactly one element and neither the empty branch nor
+ * the even-count tie-break can fire. It stays because `classifyGait` takes numbers, and because
+ * a 0 here would read as "standing still" rather than as "no reading" — which is the reason to
+ * keep it in one place instead of at three call sites.
+ */
+function medianOr0(values: number[]): number {
+  return median(values) ?? 0
 }

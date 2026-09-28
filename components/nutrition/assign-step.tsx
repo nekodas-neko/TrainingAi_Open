@@ -125,7 +125,7 @@ export function AssignStep({ nutrition, preselectedMealTypeId, onBack, onConfirm
             </button>
           ))}
           <input
-            type="number"
+            type="number" enterKeyHint="done"
             step={0.1}
             min={0.1}
             value={quantity}

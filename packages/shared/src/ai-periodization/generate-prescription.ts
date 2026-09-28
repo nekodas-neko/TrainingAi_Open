@@ -1,4 +1,15 @@
 import { todayInTz } from '@trainingai/shared/date-utils'
+
+/**
+ * How long a rules fallback plan is held (LB-165).
+ *
+ * Long enough to cover the session the lifter is about to do, short enough that one provider
+ * blip is not a day of uninformed plans — the seven-day hold a normal `storePrescription` takes
+ * is the thing RV-202 was right to refuse. Expressed as a duration rather than a local-day
+ * boundary deliberately: a day boundary needs calendar arithmetic and a timezone, and neither
+ * buys anything here over "a few hours from now".
+ */
+const RULES_PRESCRIPTION_TTL_MS = 6 * 60 * 60 * 1000
 import { aggregateSignals } from '@trainingai/shared/ai-periodization/signals'
 import { buildSystemPrompt, buildUserPrompt, intensityZoneForRole } from '@trainingai/shared/ai-periodization/prompt'
 import { accessoryTargetRpe } from '@trainingai/shared/ai-periodization/goal-ranges'
@@ -10,12 +21,11 @@ import {
   applyDeloadFloor,
   canAutoApplyTransition,
 } from '@trainingai/shared/ai-periodization/phase-guards'
-import { fitToBudget, expandToBudget, dropToBudget, applyRoleSetPlausibility, estimateSessionDurationMin, type MuscleContribution, type MuscleVolumeState } from '@trainingai/shared/ai-periodization/time-budget'
+import { fitToBudget, estimateSessionDurationMin } from '@trainingai/shared/ai-periodization/time-budget'
+import { applyBudgetStage } from '@trainingai/shared/ai-periodization/budget-stage'
 import { capLoadToAnchor } from '@trainingai/shared/ai-periodization/role-plausibility'
 import { resolveMeasuredRestSec } from '@trainingai/shared/workout/time-profile'
-import { normalizeMuscle } from '@trainingai/shared/muscles'
-import { volumeLandmarks } from '@trainingai/shared/ai-periodization/volume-targets'
-import { budgetForPreset, durationDirection, requestedBudgetMin, type DurationPreset } from '@trainingai/shared/workout/duration-model'
+import { budgetForPreset, requestedBudgetMin, type DurationPreset } from '@trainingai/shared/workout/duration-model'
 import { applyAutoregulation, clampPrescribedPct } from '@trainingai/shared/ai-periodization/autoregulation'
 import { shouldTriggerEmergencyDeload } from '@trainingai/shared/ai-periodization/emergency-deload'
 import { computePerExerciseDeload } from '@trainingai/shared/ai-periodization/per-exercise-deload'
@@ -30,6 +40,7 @@ import type { AiPrescription, AiPrescriptionExercise, PeriodizationPhase } from 
 import type { PrescriptionSignals } from '@trainingai/shared/ai-periodization/signals'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { createDedupCache } from '@trainingai/shared/ai-periodization/generation-dedup'
+import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
 
 export type GeneratePrescriptionResult =
   | {
@@ -47,20 +58,31 @@ export type GeneratePrescriptionResult =
 // is generated 2-3× per open (confirmed via the ai_call_log double-trip panel:
 // prescription was the #1 token spender AND the worst double-trip). The dedup collapses
 // concurrent calls (in-flight) and near-simultaneous repeats (a 30s read-through
-// cooldown). Per-process (per Railway replica); a user's rapid requests hit one replica,
-// so the open-burst is caught, and signals don't change within the window so the reused
-// result is identical to a re-run.
-const prescriptionDedup = createDedupCache<GeneratePrescriptionResult>(30_000)
+// cooldown). Per-process (per Railway replica), so the two open-time triggers landing on
+// different replicas miss it; `runPrescriptionGeneration` carries a stored-row twin for that
+// (RV-184). Signals don't change within the window, so the reused result is identical to a re-run.
+const JUST_GENERATED_MS = 30_000
+const prescriptionDedup = createDedupCache<GeneratePrescriptionResult>(JUST_GENERATED_MS)
 
 // Whole-session deload construction shared by the emergency-deload path and the
 // per-exercise deload's >50%-soreness escalation (see
 // docs/superpowers/specs/2026-07-02-per-exercise-deload-design.md) — "deloaded"
 // means the same numbers regardless of which trigger fired.
-function buildWholeSessionDeloadPrescription(
+export function buildWholeSessionDeloadPrescription(
   signals: PrescriptionSignals,
   reasoning: string,
 ): AiPrescription {
   const goal = signals.trainingGoal
+  // BF-198: what `Full` reverts to. The per-exercise deload records the numbers it replaced as
+  // `preDeload` (reevaluate.ts); this builder recorded nothing, so on a whole-session deload the
+  // `Full` toggle had nothing to restore and every set was still logged as a deload, earning no
+  // 1RM. There are no model numbers to keep here, so the full session is the program's own — the
+  // same plan the rules prescriber builds. An exercise with no base style gets none, and stays
+  // deloaded under `Full`, which is also what the per-exercise path does without a record.
+  const fullById = new Map(
+    (buildRulesPrescription(signals, reasoning)?.exercises ?? [])
+      .map(e => [e.sessionExerciseId, { sets: e.sets, reps: e.reps, pct: e.pct, restSec: e.restSec }]),
+  )
   const pct = DELOAD_LOWER_PCT[goal] ?? 50
   const reps = DELOAD_REPS[goal] ?? 8
 
@@ -92,6 +114,7 @@ function buildWholeSessionDeloadPrescription(
     // server's shouldCountTowardPr gate — treated these sets as genuine max-effort work.
     // Stamping it here gives every consumer one consistent signal instead of two (Q-115).
     deloaded: true,
+    preDeload: fullById.get(ex.sessionExerciseId),
   }))
 
   const sigById = new Map(signals.exercises.map(e => [e.sessionExerciseId, e]))
@@ -127,6 +150,109 @@ function buildWholeSessionDeloadPrescription(
     deload: true,
     reasoning,
     confidence: 1.0,
+  }
+}
+
+/**
+ * The program's own numbers, fitted to today's time budget — what to prescribe when the model
+ * call fails (RV-202).
+ *
+ * **Deliberately NOT `buildWholeSessionDeloadPrescription`.** That builder was the only
+ * deterministic plan this layer had, and reaching for it on a model failure would prescribe a
+ * DELOAD to everyone whose Gemini call timed out: a training decision, made by an outage. This
+ * one prescribes what the lifter's own program already says, which is the honest degraded
+ * answer — the same numbers they would get with the AI turned off.
+ *
+ * What the model would have added and this cannot: phase transitions, RPE autoregulation, and
+ * per-exercise deloads. So `phaseAction` stays `'stay'`, `deload` is false, and `confidence` is
+ * deliberately low rather than 1.0 — the plan is sound but uninformed, and the card's
+ * low-confidence path should treat it that way.
+ *
+ * An exercise with no `baseSets` (no style, or an empty one) is SKIPPED rather than given an
+ * invented number. A prescription that quietly fabricates a load is worse than a shorter one.
+ */
+export function buildRulesPrescription(
+  signals: PrescriptionSignals,
+  reasoning: string,
+): AiPrescription | null {
+  const withBase = signals.exercises.filter(ex => ex.baseSets.length > 0)
+  // Nothing to build from: every exercise is style-less. The caller keeps its error path.
+  if (withBase.length === 0) return null
+
+  // One row per exercise, from its own style. `pct`/`reps`/`restSec` come from the FIRST set —
+  // the prescription shape is one triple per exercise, not per set, so a style whose sets differ
+  // is represented by its opening set, which is the one the lifter warms into.
+  const planned = withBase.map(ex => ({
+    ex,
+    sets: ex.baseSets.length,
+    reps: ex.baseSets[0].reps,
+    pct: ex.baseSets[0].pct,
+    restSec: ex.baseSets[0].restSec,
+  }))
+
+  const fitted = new Map(
+    fitToBudget(
+      planned.map(p => ({
+        sessionExerciseId: p.ex.sessionExerciseId,
+        role: p.ex.role,
+        sets: p.sets,
+        reps: p.reps,
+        restSec: p.restSec,
+        transitionSec: p.ex.transitionSec,
+        measuredSecPerRep: p.ex.timeProfile?.secPerRep ?? null,
+        measuredRestSec: p.ex.timeProfile ? resolveMeasuredRestSec(p.ex.timeProfile, p.pct) : null,
+      })),
+      signals.effectiveTimeBudgetMin,
+    ).map(f => [f.sessionExerciseId, f.sets]),
+  )
+
+  const exercises: AiPrescriptionExercise[] = planned.map(p => ({
+    sessionExerciseId: p.ex.sessionExerciseId,
+    name: p.ex.name,
+    sets: fitted.get(p.ex.sessionExerciseId) ?? p.sets,
+    reps: p.reps,
+    pct: p.pct,
+    restSec: p.restSec,
+  }))
+
+  const plannedById = new Map(planned.map(p => [p.ex.sessionExerciseId, p]))
+  const estimatedSessionDurationMin = estimateSessionDurationMin(
+    exercises.map(ex => {
+      const p = plannedById.get(ex.sessionExerciseId)
+      return {
+        sets: ex.sets, reps: ex.reps, restSec: ex.restSec,
+        transitionSec: p?.ex.transitionSec ?? 240,
+        measuredSecPerRep: p?.ex.timeProfile?.secPerRep ?? null,
+        measuredRestSec: p?.ex.timeProfile ? resolveMeasuredRestSec(p.ex.timeProfile, ex.pct) : null,
+      }
+    }),
+  )
+
+  const weeklyVolumeContribution: Record<string, number> = {}
+  for (const ex of exercises) {
+    const p = plannedById.get(ex.sessionExerciseId)
+    if (!p) continue
+    for (const ma of p.ex.muscleAssignments) {
+      const weight = ma.role === 'main' ? 1.0 : 0.5
+      const muscle = ma.muscle.toLowerCase()
+      weeklyVolumeContribution[muscle] = (weeklyVolumeContribution[muscle] ?? 0) + ex.sets * weight
+    }
+  }
+
+  return {
+    // The stored phase, unchanged: a rules plan never moves the lifter through periodization.
+    // `signals.phase` is the persisted string, narrowed the same way the model's echo is at the
+    // two sites below — periodization state is written by this engine, so the value is ours.
+    phase: signals.phase as PeriodizationPhase,
+    phaseAction: 'stay',
+    exercises,
+    estimatedSessionDurationMin,
+    weeklyVolumeContribution,
+    deload: false,
+    reasoning,
+    confidence: 0.3,
+    confidenceReasons: ['Built from your program\u2019s own sets — the AI coach could not be reached.'],
+    source: 'rules',
   }
 }
 
@@ -200,6 +326,30 @@ async function runPrescriptionGeneration(
 
   if (state.phase === 'baseline' && !state.baselineComplete) {
     return { ok: false, error: 'Baseline not complete', status: 400 }
+  }
+
+  // RV-184. Opening a workout fires two plain generations: `workout-data`'s server-side one and
+  // the client's POST. On different replicas they miss the per-process cooldown above.
+  // Production 2026-09-15 has the pair: identical input, the second starting 5.4 s after the
+  // first had finished, which a shared cache would have answered. The stored row is visible to
+  // every replica, so a plain call (no preset, no completion exclusion: exactly the calls the
+  // cooldown would have collapsed) returns a plan generated under 30 s ago instead of asking the
+  // model again. Anything it cannot vouch for falls through to generation as before: a preset or
+  // custom-length plan, or a slot already consumed or dismissed.
+  const fresh = state.prescription
+  if (
+    fresh && excludeSessionId == null && durationPreset == null &&
+    (fresh.durationPreset == null || fresh.durationPreset === 'standard') &&
+    (state.prescriptionStatus === 'pending' || state.prescriptionStatus === 'auto_applied') &&
+    state.prescriptionGeneratedAt != null &&
+    Date.now() - state.prescriptionGeneratedAt.getTime() < JUST_GENERATED_MS
+  ) {
+    return {
+      ok: true,
+      prescription: fresh,
+      prescriptionStatus: state.prescriptionStatus,
+      estimatedSessionDurationMin: fresh.estimatedSessionDurationMin,
+    }
   }
 
   // BF-7 PR 2b — "is this the default?" is now a comparison, not a label test. `!== 'standard'` was
@@ -313,6 +463,48 @@ async function runPrescriptionGeneration(
     parsed = result.object
   } catch (err) {
     console.error('Gemini prescription generation failed:', err)
+    // RV-202 — answer with the program's own numbers rather than 502.
+    //
+    // The 502 was not a quiet failure: the client ignores the non-ok response and polls
+    // `PRESCRIPTION_POLL_MAX = 10` times at 3 s, so the lifter watched "Preparing your AI
+    // workout…" for about thirty seconds and then got the base program anyway. This arrives at
+    // the same numbers immediately.
+    //
+    // **Persisted, with a SHORT expiry — and the comment here used to say the opposite.**
+    //
+    // RV-202 left this unstored, reasoning that `storePrescription` holds a plan for seven days
+    // so the model would get no further attempt until it expired. That reasoning is still right
+    // about seven days, and the conclusion it reached was wrong, because it assumed the returned
+    // plan reached someone: *"this plan is only what today's caller is handed"*. LB-165 measured
+    // the caller. `workout-data` fires this generation as a background single-flight and never
+    // reads its result; both `/prescribe` clients check `res.ok` and refetch. Nothing painted it.
+    // And `isAiPrescriptionPending` keys on `prescriptionStatus === 'consumed'`, which only
+    // `storePrescription` clears — so not storing also left the screen saying "Preparing your AI
+    // workout…" forever. The lifter's experience was unchanged by RV-202: the same ten 3 s polls
+    // and the same amber banner.
+    //
+    // Storing it is what makes it visible, and the seven-day objection is answered by the expiry
+    // rather than by refusing to store: `RULES_PRESCRIPTION_TTL_MS` covers the session in front of
+    // the lifter and lets the model be tried again the same day. `reevaluate` re-generates once
+    // `prescriptionExpiresAt` passes, and `workout-data` serves a stored plan without checking
+    // expiry, so the short TTL costs nothing on the read side.
+    const rules = buildRulesPrescription(
+      signals,
+      'Your AI coach could not be reached, so this is your program as written.',
+    )
+    if (rules) {
+      await repo.storePrescription(
+        userId, programSessionId, rules, new Date(Date.now() + RULES_PRESCRIPTION_TTL_MS),
+      )
+      return {
+        ok: true,
+        prescription: rules,
+        prescriptionStatus: 'pending',
+        estimatedSessionDurationMin: rules.estimatedSessionDurationMin,
+      }
+    }
+    // No exercise in the session carries a progression style, so there are no numbers to fall
+    // back to. The old error is still the honest answer here.
     return { ok: false, error: 'AI generation failed', status: 502 }
   }
 
@@ -395,7 +587,7 @@ async function runPrescriptionGeneration(
   for (const ex of parsed.exercises) {
     const a = autoregById.get(ex.session_exercise_id)
     if (!a) continue
-    const role = roleById.get(ex.session_exercise_id) ?? 'primary'
+    const role = roleById.get(ex.session_exercise_id) ?? UNCLASSIFIED_EXERCISE_ROLE
     ex.reps = a.reps
     ex.sets = a.sets
     if (role === 'accessory') {
@@ -447,130 +639,41 @@ async function runPrescriptionGeneration(
     ex.pct = cappedPct.get(ex.session_exercise_id) ?? ex.pct
   }
 
-  // Time-budget enforcement — the AI is asked to fit the budget, but trim deterministically
-  // so the session is guaranteed to fit the allocated time. Sets are cut by muscle-overage
-  // priority, biased toward accessories first (see fitToBudget/trimPriority) — normally
-  // accessories still go first, but a severe cross-tier imbalance (e.g. a primary's muscle
-  // well past its weekly MAV while an accessory's is badly undertrained) can pull the cut out
-  // of a higher-priority role instead. Role floors are absolute either way — a primary is
-  // never touched below 2 sets. A set earned by autoregulation is trimmed last, so it funds
-  // itself from lower-value work. Duration is estimated from the prescribed reps and rest, so
-  // it reflects the actual longest-case session.
-  const muscleVolume = new Map<string, MuscleVolumeState>(
-    Object.entries(signals.weeklyTargets).map(([muscle, mav]) => [
-      muscle,
-      { loggedBeforeSession: signals.weeklyLogged[muscle] ?? 0, mav },
-    ]),
-  )
-  const timedExercises = parsed.exercises.map(ex => {
-    const sig = signals.exercises.find(e => e.sessionExerciseId === ex.session_exercise_id)
-    const muscleGroups: MuscleContribution[] = (sig?.muscleAssignments ?? []).map(ma => ({
-      muscle: normalizeMuscle(ma.muscle),
-      weight: ma.role === 'main' ? 1.0 : 0.5,
-    }))
-    return {
+  // The deterministic tail — role plausibility, the budget passes and everything derived from
+  // them — is shared with the no-model duration re-fit (budget-stage.ts).
+  //
+  // The set counts going IN are what a re-fit has to start from, so they are captured here and
+  // stored on the prescription. The budget passes are lossy in one direction: fitToBudget only
+  // REMOVES sets, and a return to the session's own length runs neither drop nor expand, so
+  // re-fitting a trimmed plan could never give the sets back (short → standard would keep the
+  // 2-set short plan and label it standard).
+  const refitBaseline = {
+    sets: Object.fromEntries(parsed.exercises.map(ex => [ex.session_exercise_id, ex.sets])),
+    reasoning: parsed.reasoning,
+    ...(autoreg.earnedSetIds.size > 0 && { earnedSetIds: [...autoreg.earnedSetIds] }),
+  }
+
+  const budget = applyBudgetStage(
+    parsed.exercises.map(ex => ({
       sessionExerciseId: ex.session_exercise_id,
-      role: sig?.role ?? 'primary',
+      name: ex.name,
       sets: ex.sets,
       reps: ex.reps,
+      pct: ex.pct,
       restSec: ex.rest_sec,
-      transitionSec: sig?.transitionSec ?? 240,
-      muscleGroups,
-      measuredSecPerRep: sig?.timeProfile?.secPerRep ?? null,
-      measuredRestSec: sig?.timeProfile ? resolveMeasuredRestSec(sig.timeProfile, ex.pct) : null,
-    }
-  })
-
-  // A short session is the one case where trimming alone can't reach the budget — five
-  // exercises floored at two sets still overrun a 30-minute ask, and two token sets each is
-  // worse training than doing fewer exercises properly. dropToBudget drops whole exercises
-  // in trim-priority order; they ride out on the prescription's existing droppedExerciseIds,
-  // which every render path already honours.
-  // Role plausibility on volume runs BEFORE the budget passes, so every preset gets it and the
-  // plan is already the right shape when trimming/expansion start — rather than relying on them
-  // to repair a shape the model chose blind.
-  const plausible = applyRoleSetPlausibility(timedExercises, muscleVolume)
-
-  // BF-7 PR 2a: branch on the DIRECTION today runs in, not on the label. `short`/`long` were only
-  // ever a proxy for "shorter than the session" / "longer than the session", and reading the label
-  // is what stops the ladder growing past three rungs. `durationDirection` derives it from minutes,
-  // so when the preset becomes a number this call site is already correct.
-  const direction = durationDirection(validSession.timeBudgetMinutes, durationPreset)
-
-  const dropped = direction < 0
-    ? dropToBudget(plausible, signals.effectiveTimeBudgetMin, autoreg.earnedSetIds, muscleVolume)
-    : null
-  const trimmed = dropped?.exercises ?? fitToBudget(
-    plausible,
-    signals.effectiveTimeBudgetMin,
+    })),
+    signals,
+    validSession.timeBudgetMinutes,
+    durationPreset,
     autoreg.earnedSetIds,
-    muscleVolume,
   )
-  const droppedIdSet = new Set(dropped?.droppedIds ?? [])
-
-  // Filling the budget is the 'long' preset's whole point: fitToBudget only removes sets, so
-  // without this a 90-minute session returned the 60-minute plan and handed the surplus back.
-  //
-  // Gated on an EXPLICIT long request, never run on a standard session. The duration model
-  // is deliberately conservative (duration-model.ts) and that under-fill IS the finish-early
-  // margin — the owner's sessions land on time because of it. Expanding by default would
-  // spend exactly that margin.
-  let sized = trimmed
-  if (direction > 0) {
-    const mrvByMuscle = new Map<string, number>(
-      [...new Set(timedExercises.flatMap(e => (e.muscleGroups ?? []).map(m => m.muscle)))]
-        .map(muscle => [muscle, volumeLandmarks(signals.trainingGoal, muscle).mrv]),
-    )
-    sized = expandToBudget(trimmed, signals.effectiveTimeBudgetMin, muscleVolume, mrvByMuscle)
-  }
-
-  const fittedSets = new Map(sized.map(f => [f.sessionExerciseId, f.sets]))
-  // A DROPPED exercise is absent from `sized`, so falling back to `ex.sets` would hand back the
-  // model's raw, un-capped count — production stored an accessory at 5 sets (its ceiling is 4)
-  // that way. Dropped entries are still kept in the prescription (droppedExerciseIds filters at
-  // render), so they must carry a plausible shape too. Fall back to the role-capped counts.
-  const plausibleSets = new Map(plausible.map(p => [p.sessionExerciseId, p.sets]))
   for (const ex of parsed.exercises) {
-    ex.sets = fittedSets.get(ex.session_exercise_id)
-      ?? plausibleSets.get(ex.session_exercise_id)
-      ?? ex.sets
+    ex.sets = budget.sets.get(ex.session_exercise_id) ?? ex.sets
   }
-
-  const sigById = new Map(signals.exercises.map(e => [e.sessionExerciseId, e]))
-  // Dropped exercises keep their prescription entry (the Workout Review "drop this cycle"
-  // convention — droppedExerciseIds filters at render), so every derived total below must
-  // exclude them explicitly or the session would be costed for work it won't do.
-  const activeExercises = parsed.exercises.filter(ex => !droppedIdSet.has(ex.session_exercise_id))
-  const estimatedSessionDurationMin = estimateSessionDurationMin(
-    activeExercises.map(ex => {
-      const sig = sigById.get(ex.session_exercise_id)
-      return {
-        sets: ex.sets, reps: ex.reps, restSec: ex.rest_sec,
-        transitionSec: sig?.transitionSec ?? 240,
-        measuredSecPerRep: sig?.timeProfile?.secPerRep ?? null,
-        measuredRestSec: sig?.timeProfile ? resolveMeasuredRestSec(sig.timeProfile, ex.pct) : null,
-      }
-    }),
-  )
-
-  if (droppedIdSet.size > 0) {
-    const names = parsed.exercises
-      .filter(ex => droppedIdSet.has(ex.session_exercise_id)).map(ex => ex.name).join(', ')
-    parsed.reasoning = `${parsed.reasoning} To fit the ${signals.effectiveTimeBudgetMin}-min working budget, ${names} ${droppedIdSet.size === 1 ? 'was' : 'were'} dropped for today — the muscles furthest ahead of their weekly target — so the remaining work keeps full sets rather than every exercise being cut to a token two.`
-  } else if (estimatedSessionDurationMin > signals.effectiveTimeBudgetMin) {
-    parsed.reasoning = `${parsed.reasoning} Note: even at minimum sets this session is estimated at ${estimatedSessionDurationMin} min against the ${signals.effectiveTimeBudgetMin}-min working budget — it has more exercises than the time budget fits. Consider removing an accessory from this session or raising its time budget.`
-  }
-
-  const weeklyVolumeContribution: Record<string, number> = {}
-  for (const ex of activeExercises) {
-    const signal = signals.exercises.find(e => e.sessionExerciseId === ex.session_exercise_id)
-    if (!signal) continue
-    for (const ma of signal.muscleAssignments) {
-      const weight = ma.role === 'main' ? 1.0 : 0.5
-      const muscle = ma.muscle.toLowerCase()
-      weeklyVolumeContribution[muscle] = (weeklyVolumeContribution[muscle] ?? 0) + ex.sets * weight
-    }
-  }
+  const droppedIdSet = budget.droppedIds
+  const estimatedSessionDurationMin = budget.estimatedSessionDurationMin
+  const weeklyVolumeContribution = budget.weeklyVolumeContribution
+  parsed.reasoning = `${refitBaseline.reasoning}${budget.budgetNote}`
 
   const aiPrescription: AiPrescription = {
     phase: parsed.phase as PeriodizationPhase,
@@ -599,6 +702,7 @@ async function runPrescriptionGeneration(
     confidence: signals.confidence,
     confidenceReasons: signals.confidenceReasons,
     durationPreset: durationPreset ?? 'standard',
+    refitBaseline,
     ...(droppedIdSet.size > 0 && { droppedExerciseIds: [...droppedIdSet] }),
   }
 

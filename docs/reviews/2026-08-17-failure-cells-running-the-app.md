@@ -8,7 +8,7 @@ real user reaches. Four areas came back **clean** and are recorded as such at th
 
 ## Why this lens
 
-The six review rounds that closed on 2026-08-17 (`docs/handoff-2026-08-17-cross-comprehensive-review-six-rounds.md`)
+The six review rounds that closed on 2026-08-17 (`docs/handoffs/handoff-2026-08-17-cross-comprehensive-review-six-rounds.md`)
 state their own limit plainly: *"Nothing in six rounds was rendered — no device, emulator, browser,
 or `pnpm dev` run. Every finding is from source reading, production queries, or the local load-test
 harness."* Thirty-eight backlog entries came out of that, and none of them could have come from

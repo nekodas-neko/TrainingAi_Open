@@ -43,10 +43,10 @@ export function HeaderChips() {
   // of a 224 px column and the daytime weather chip needs 113 of it, which is the clipping the owner
   // reported. The chip itself renders nothing when the list is empty, so the conditionals that used
   // to wrap each pill live in the filter.
-  const devices: DeviceBattery[] = [
+  const devices: DeviceBattery[] = ([
     ring != null && { label: 'Ring', percent: ring.percent, charging: ring.charging ?? false, ageMinutes: ring.ageMinutes },
-    strap != null && { label: 'Strap', percent: strap.percent, ageMinutes: strap.ageMinutes },
-  ].filter((d): d is DeviceBattery => d !== false)
+    strap != null && { label: 'Strap', percent: strap.percent, ageMinutes: strap.ageMinutes, low: strap.low },
+  ] as (DeviceBattery | false)[]).filter((d): d is DeviceBattery => d !== false)
 
   return (
     <>

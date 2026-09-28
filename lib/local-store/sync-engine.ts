@@ -2,6 +2,7 @@ import { getLocalStore } from './index';
 import { reconcileDeadLetters } from './dead-letter-signal';
 import { resolveFailedOutboxIds, serverBackoffMs, buildWorkoutLogPayload } from './sync-helpers';
 import type { SyncDelta } from '@/lib/data/repository';
+import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role';
 import type {
   LocalBodyMetric, LocalMoodLog, LocalSleepSession,
   LocalWorkoutSession, LocalActivityLog, LocalFitnessTest, LocalPrescribedRun, LocalProgram, LocalProgressionStyle,
@@ -176,7 +177,9 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     syncStatus:  'synced' as const,
     // Q-131: present on both ends' schemas but dropped here, so a restored device replayed its
     // outbox with no program-session link and fell back to matching by name.
-    sessionId:      r.sessionId ? String(r.sessionId) : null,
+    // LA-137: the server's `session_id` column is the Drizzle property `programSessionId`, so that is
+    // the key the pull JSON carries. Reading `r.sessionId` alone bound NULL over the link on every pull.
+    sessionId:      (r.programSessionId ?? r.sessionId) ? String(r.programSessionId ?? r.sessionId) : null,
     intensityMode:  r.intensityMode ? String(r.intensityMode) : null,
     wasOverride:    Boolean(r.wasOverride),
   } satisfies LocalWorkoutSession));
@@ -300,6 +303,8 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     activeCaloriesEst:              (r.activeCaloriesEst as number) ?? null,
     trainingLoadOts:                (r.trainingLoadOts as number) ?? null,
     trainingLoadGate:               (r.trainingLoadGate as string) ?? null,
+    trainingLoadGridLen:            (r.trainingLoadGridLen as number) ?? null,
+    trainingLoadValidMin:           (r.trainingLoadValidMin as number) ?? null,
     trainingLoadHigh:               (r.trainingLoadHigh as boolean) ?? null,
     recoveryIndexHours:             (r.recoveryIndexHours as number) ?? null,
     wornHoursBle:                   (r.wornHoursBle as number) ?? null,
@@ -426,7 +431,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     styleId:      r.styleId ? String(r.styleId) : null,
     muscleGroups: (r.muscleGroups as string[]) ?? [],
     position:     Number(r.position),
-    exerciseRole: String(r.exerciseRole ?? 'primary'),
+    exerciseRole: String(r.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE),
     supersetGroup: r.supersetGroup != null ? Number(r.supersetGroup) : null,
   } satisfies LocalSessionExercise));
 
@@ -475,6 +480,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     sodiumMg:     (r.sodiumMg as number) ?? null,
     satFatG:      (r.satFatG as number) ?? null,
     source:       r.source ? String(r.source) : null,
+    barcode:      r.barcode ? String(r.barcode) : null,
     imageDataUri: r.imageDataUri ? String(r.imageDataUri) : null,
     // RV-172 — read from `createdAt`, because `food_items` HAS no `updated_at` server-side. This
     // read `toIso(r.updatedAt)`, and `toIso` is `String(v)` for a non-Date, so it stored the
@@ -581,6 +587,9 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     vsYesterday:       (r.vsYesterday as import('@trainingai/shared/types/day-checkin').VsYesterday) ?? null,
     soreMuscles:       (r.soreMuscles as string[]) ?? [],
     journal:           r.journal ? String(r.journal) : null,
+    // LA-137: selected by the server and never mapped, so a completion made on another device never
+    // arrived (applyDelta COALESCEs this column, so the local value survived; the remote one did not).
+    foodLoggingCompletedAt: r.foodLoggingCompletedAt ? toIso(r.foodLoggingCompletedAt) : null,
     updatedAt:         toIso(r.updatedAt),
     deletedAt:         r.deletedAt ? toIso(r.deletedAt) : null,
     syncStatus:        'synced' as const,
@@ -650,6 +659,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     ouraDailySummary.length + ouraDailyDerived.length +
     dayCheckins.length + mealPlans.length + planMealAnswers.length;
 
+  let prunedPrograms = 0;
   try {
     await store!.applyDelta({ bodyMetrics, moodLogs, sleepSessions,
       workoutSessions, activityLogs, fitnessTests, prescribedRuns, programs, programSessions, sessionExercises,
@@ -657,6 +667,10 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
       foodItems, foodLogs, supplements, supplementLogs, injuries,
       exerciseLogs, setLogs, personalRecords, ouraDaily, ouraDailySummary, ouraDailyDerived, dayCheckins,
       mealPlans, mealPlanVariants, mealPlanMeals, planMealAnswers });
+    // RV-174: a deleted program or style leaves no row in any delta, so the mirror is pruned to the
+    // server's roster. Only when the server sent one — an absent roster must never read as "none".
+    const asIds = (v: unknown) => (Array.isArray(v) ? v.map(String) : undefined);
+    prunedPrograms = await store!.pruneProgramStructure(asIds(raw.programRoster), asIds(raw.progressionStyleRoster));
     await store!.setLastSyncAt(raw.syncedAt);
   } catch (err) {
     // A broken local schema throws here, not at the fetch — and this used to propagate straight
@@ -668,10 +682,10 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
   }
 
   return {
-    count,
+    count: count + prunedPrograms,
     domains: {
       biometrics:  bodyMetrics.length > 0 || moodLogs.length > 0 || sleepSessions.length > 0,
-      programs:    programs.length > 0 || progressionStyles.length > 0 ||
+      programs:    prunedPrograms > 0 || programs.length > 0 || progressionStyles.length > 0 ||
                    programSessions.length > 0 || sessionExercises.length > 0 ||
                    schedules.length > 0 || scheduleDays.length > 0 || styleSets.length > 0,
       workouts:    workoutSessions.length > 0 || exerciseLogs.length > 0 || personalRecords.length > 0,
@@ -836,7 +850,40 @@ async function enrichPayload(
   }
 }
 
-export async function pushMutations(userId: string): Promise<{ pushed: number } | null> {
+type PushResult = { pushed: number } | null;
+const pushRunning = new Map<string, Promise<PushResult>>();
+const pushTrailing = new Map<string, Promise<PushResult>>();
+
+/**
+ * LB-151: at most ONE drain of the outbox per user at a time. Eleven call sites reach this (the pull
+ * gesture, the sync-health card, per-domain writes, push-then-revalidate …), and two overlapping
+ * calls both read the same pending rows and both POSTed them. Measured harmless for the writes that
+ * matter (completion is stamped `WHERE completed_at IS NULL`, logs upsert by id) but the whole batch
+ * went up twice.
+ *
+ * A call that arrives mid-drain does NOT just get the running drain's result: that drain read the
+ * outbox before this caller's mutation existed, so answering from it would leave the mutation for
+ * some later push. It gets ONE trailing drain instead, shared by every caller that arrives while the
+ * first is running — so the queue is never drained twice at once and nothing queued is skipped.
+ */
+export function pushMutations(userId: string): Promise<PushResult> {
+  const running = pushRunning.get(userId);
+  if (!running) {
+    const run = pushMutationsOnce(userId).finally(() => pushRunning.delete(userId));
+    pushRunning.set(userId, run);
+    return run;
+  }
+  let trailing = pushTrailing.get(userId);
+  if (!trailing) {
+    trailing = running
+      .catch(() => null)
+      .then(() => { pushTrailing.delete(userId); return pushMutations(userId); });
+    pushTrailing.set(userId, trailing);
+  }
+  return trailing;
+}
+
+async function pushMutationsOnce(userId: string): Promise<PushResult> {
   const store = getLocalStore(userId);
   if (!store) return null;
 
@@ -850,8 +897,9 @@ export async function pushMutations(userId: string): Promise<{ pushed: number } 
   // Re-queue workouts stranded by a double failure (POST threw AND queueMutation
   // threw): pending locally, absent from the outbox. Grace period avoids racing
   // a direct POST that is still in flight.
+  const strandedCutoff = new Date(Date.now() - 5 * 60_000).toISOString();
   try {
-    const cutoff = new Date(Date.now() - 5 * 60_000).toISOString();
+    const cutoff = strandedCutoff;
     const stranded = await store.getStrandedPendingWorkouts(cutoff);
     for (const h of stranded) {
       for (const el of h.exerciseLogs) {
@@ -866,6 +914,18 @@ export async function pushMutations(userId: string): Promise<{ pushed: number } 
   // One-shot per row — a healed log leaves the 'failed' set, so this can't loop.
   try {
     await store.requeueStrandedFoodItems(userId);
+  } catch { /* best-effort; the normal queue still drains */ }
+
+  // DV-8 heal: food-log DELETE tombstones left `pending` with their outbox entry already gone,
+  // by the confirm-ordering bug fixed below. The fix stops new ones; it cannot reach the 36 that
+  // were already stranded, because nothing retries a mutation that is no longer queued and
+  // `applyDelta` only overwrites `synced` rows. Re-queued, never marked synced — see the backend
+  // method for why that distinction is the whole point.
+  //
+  // Self-limiting rather than one-shot: a re-queued tombstone has an outbox entry, so the next
+  // sweep does not see it. If its push fails the entry stays and it still is not re-swept.
+  try {
+    await store.requeueStrandedFoodTombstones(userId, strandedCutoff);
   } catch { /* best-effort; the normal queue still drains */ }
 
   const pending = await store.getPendingMutations(userId);
@@ -961,10 +1021,24 @@ export async function pushMutations(userId: string): Promise<{ pushed: number } 
 
   if (confirmed.length === 0) return anyRequestOk ? { pushed: 0 } : null;
 
-  await store.deleteMutations(confirmed.map(m => m.id));
+  // DV-8: the outbox is cleared AFTER each row is confirmed locally, never before. The loop
+  // below is a hundred lines of per-domain arms, any of which can throw on a local read or
+  // write; with the delete up front, one throw left every remaining row `pending` with its
+  // outbox entry already gone. Nothing retries a mutation that is no longer queued and
+  // `applyDelta` only overwrites `synced` rows, so those rows were stranded permanently — 36
+  // food tombstones over 14 days plus a set_logs row, measured on the phone.
+  //
+  // This is the same rule the Oura history cursor already follows: only advance past what is
+  // durably recorded. A re-push is free (every domain's handler is idempotent); a lost
+  // confirmation is not.
+  const confirmedIds: string[] = [];
 
-  // Mark confirmed local records as synced
+  // Mark confirmed local records as synced. `batchIds` because this loop runs BEFORE
+  // `deleteMutations`: a confirm guard that asks "is another mutation still queued for this row?"
+  // must not count the ones it is confirming, or it never fires (LA-165).
+  const batchIds = confirmed.map(m => m.id);
   for (const m of confirmed) {
+    try {
     if (m.domain === 'body_metrics') {
       const recs = await store.getBodyMetrics(m.date);
       const rec = recs.find(r => r.date === m.date);
@@ -1057,7 +1131,14 @@ export async function pushMutations(userId: string): Promise<{ pushed: number } 
       if (wsId && exerciseLogId) await store.markWorkoutSynced(wsId, exerciseLogId);
     } else if (m.domain === 'session_rpe' || m.domain === 'complete_workout') {
       const wsId = m.payload.workoutSessionId as string | undefined;
-      if (wsId) await store.markSessionSynced(wsId);
+      if (wsId) await store.markSessionSynced(wsId, batchIds);
+    } else if (m.domain === 'exercise_log_edit' || m.domain === 'exercise_log_delete') {
+      // LA-165. The local write marked the log and its sets 'pending' so a pull could not revert it.
+      const exerciseLogId = m.payload.exerciseLogId as string | undefined;
+      if (exerciseLogId) await store.markExerciseLogSynced(exerciseLogId, batchIds);
+    } else if (m.domain === 'workout_session_delete') {
+      const wsId = m.payload.workoutSessionId as string | undefined;
+      if (wsId) await store.markWorkoutSessionTreeSynced(wsId, batchIds);
     } else if (m.domain === 'sleep_session') {
       // Local row id (its own PK, distinct from the server-side oura_id dedup key) —
       // same convention as workout_log/activity_logs above.
@@ -1068,7 +1149,18 @@ export async function pushMutations(userId: string): Promise<{ pushed: number } 
     } else if (m.domain === 'oura_daily_derived') {
       await store.markOuraDailyDerivedSynced(m.date);
     }
+      confirmedIds.push(m.id);
+    } catch (err) {
+      // Deliberately NOT recorded as a mutation failure: the server applied this one, so
+      // counting it toward the dead-letter budget would present a successful write as failed.
+      // The entry stays queued and the next push retries it, which self-heals as soon as the
+      // local write works. The cost is that a permanently-throwing arm retries forever — loud
+      // in the log, and strictly better than the silent permanent strand it replaces.
+      console.error('[sync] confirm failed, leaving mutation queued:', m.domain, err);
+    }
   }
+
+  await store.deleteMutations(confirmedIds);
 
   return { pushed: confirmed.length };
 }
@@ -1079,4 +1171,6 @@ export function _resetSyncBackoff(): void {
   consecutive5xx = 0;
   pullBackoffUntil = 0;
   consecutivePullFailures = 0;
+  pushRunning.clear();
+  pushTrailing.clear();
 }

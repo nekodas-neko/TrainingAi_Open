@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 /** Batch `layout-384` — RV-92, RV-93, RV-94, RV-95, RV-96. Five places where a 384px-class screen
  *  cut the wrong thing off. They share one verification, which is why they ship together.
@@ -12,7 +13,7 @@ import path from 'node:path'
 const ROOT = path.resolve(__dirname, '../..')
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
 const code = (src: string) =>
-  src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/^\s*\/\/.*$/gm, '')
+  stripComments(src)
 
 describe('layout-384', () => {
   it('RV-92 — the exercise name truncates, and the done tick is not inside the truncating box', () => {
