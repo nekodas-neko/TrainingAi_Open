@@ -707,6 +707,25 @@ below threshold and left in place for next time.
   either way.
 - **What happens when you answer:** Lane A builds `OR-191` on the chosen shape.
 
+### [nutrition] LA-185 — how should the calorie ring show a meal the app ASSUMED you ate?
+- **Lane: O** · **Added:** 2026-09-30 · Lane A, splitting the owner's half out of BF-203a.
+- **⚑ FOR THE OWNER.** When a planned meal's time passes with nothing logged and nothing declined,
+  BF-203a counts the plan's calories for it as an ESTIMATE, never as a food log. The ring then has to
+  show that some of "eaten" is assumed. That is a visible change to a screen used daily, so it gets a
+  mockup at 384 px before any code.
+- **Recommendation: one ring, with the assumed part drawn as a lighter, striped extension of the
+  eaten arc, and one line under the number: "incl. 480 estimated · tap to confirm".** The total stays
+  honest (the budget really is being used), the assumed share is visible at a glance, and the tap is
+  where Phase B's confirm/decline sheet lands.
+  - **Alternative: leave estimates out of the ring and show them as a separate note.** Better at never
+    overstating what was eaten. It loses because "kcal left" then over-promises on exactly the days a
+    meal went unlogged, which is the problem BF-203 exists to fix.
+  - **Alternative: a second, inner ring.** Better at separating the two numbers, but it adds a second
+    gauge to read for a number that is usually zero.
+- **Reversal cost: low.** Display only. The stored estimate and the totals do not change with the choice.
+- **Owed:** the mockup (before/after, dark, 384 px), then his pick. BF-203a's device materialiser does not
+  wait on it, but nothing should display an estimate until he has chosen.
+
 ### [workouts] LA-178 — two of your answers point opposite ways on the session-length estimate: fix the double-count, or leave it?
 
 - **Lane: O** · **Added:** 2026-09-28 · Lane A, found before starting BF-197.
@@ -6184,25 +6203,6 @@ drift.
   so the variant choice should come from one shared helper rather than two copies.
 - **Done when** a split plan shows its training variant on a scheduled training day and its rest
   variant otherwise, with a test on the chooser.
-
-### [nutrition] LA-185 — how should the calorie ring show a meal the app ASSUMED you ate?
-- **Lane: O** · **Added:** 2026-09-30 · Lane A, splitting the owner's half out of BF-203a.
-- **⚑ FOR THE OWNER.** When a planned meal's time passes with nothing logged and nothing declined,
-  BF-203a counts the plan's calories for it as an ESTIMATE, never as a food log. The ring then has to
-  show that some of "eaten" is assumed. That is a visible change to a screen used daily, so it gets a
-  mockup at 384 px before any code.
-- **Recommendation: one ring, with the assumed part drawn as a lighter, striped extension of the
-  eaten arc, and one line under the number: "incl. 480 estimated · tap to confirm".** The total stays
-  honest (the budget really is being used), the assumed share is visible at a glance, and the tap is
-  where Phase B's confirm/decline sheet lands.
-  - **Alternative: leave estimates out of the ring and show them as a separate note.** Better at never
-    overstating what was eaten. It loses because "kcal left" then over-promises on exactly the days a
-    meal went unlogged, which is the problem BF-203 exists to fix.
-  - **Alternative: a second, inner ring.** Better at separating the two numbers, but it adds a second
-    gauge to read for a number that is usually zero.
-- **Reversal cost: low.** Display only. The stored estimate and the totals do not change with the choice.
-- **Owed:** the mockup (before/after, dark, 384 px), then his pick. BF-203a's device materialiser does not
-  wait on it, but nothing should display an estimate until he has chosen.
 
 ### [nutrition] BF-203a — phase A: the `estimated` answer state, and counting it once
 - **Lane:** A — migration, `plan_meal_answers`, `packages/shared/src/nutrition/meal-estimate.ts`, `lib/health/energy-balance-service.ts`.
