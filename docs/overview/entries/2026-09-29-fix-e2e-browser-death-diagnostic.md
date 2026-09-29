@@ -78,6 +78,20 @@ seeded database was its leading suspect. The snapshot also names a candidate: th
 this day? · 0 of 10 days marked"* banner is in the CI tree, and whether it renders is database state,
 which moves the row the tap coordinate was computed against.
 
+## And the next run reclassified the other failure
+
+PR #1951's run (`36511264561`) failed shard 2 and only shard 2, with **one** spec in the artifact:
+`food-log-swipe-delete:238`, byte-identical error, the row swiped open in the snapshot again. No browser
+death in that run at all.
+
+So `:238` is **4 of 4 attempts across two consecutive CI runs, and 0 of 8 locally the same day**. It is
+not the highest-frequency flake any more, and it is not order-dependence: it passes on this sandbox's
+browser and fails on CI's. The candidate that fits — recorded on `LB-178` as a candidate, not a finding
+— is that CI installs `chromium_headless_shell` while a sandbox session runs `/opt/pw-browsers/chromium`
+(`playwright install` is proxy-blocked here), and the spec turns on a CDP `touchscreen.tap()` landing
+inside a 64 px tray. Two Chromium builds is a live explanation for a pass/fail that tracks the machine
+rather than the run. **This container cannot install headless-shell, so it cannot be settled here.**
+
 ## Not fixed
 
 - **`LB-149` does not close.** The crash is witnessed and the instrument repaired; what is owed is one

@@ -6698,6 +6698,22 @@ drift.
   the snapshot names one candidate outright — the *"Finished logging this day? · 0 of 10 days marked"*
   banner is present in the CI tree, and whether it renders is database state, which moves the row the
   tap coordinate was computed against.
+- **⚠ FIFTH DATA POINT, AND IT RECLASSIFIES `:238` — run `36511264561` (PR #1951), 2026-09-29.**
+  Shard 2 again, and **only** shard 2. The retained artifact holds **exactly one** failing spec this
+  time, `food-log-swipe-delete:238`, with the byte-identical error — `getByRole('heading', {name:
+  'Delete food log?'})`, *element(s) not found* after 5 s, over a DOM snapshot showing the row swiped
+  open. No browser death in this run at all. **So `:238` is 4 of 4 attempts across two consecutive CI
+  runs, and 0 of 8 locally the same day.** That is not "the highest-frequency flake" any more and it is
+  not order-dependence either: **it passes on this sandbox's browser and fails on CI's, consistently.**
+- **⚑ The candidate that fits, and cannot be settled from a sandbox session.** CI installs
+  `chromium_headless_shell`; a sandbox session runs `/opt/pw-browsers/chromium` (`playwright.config.ts`
+  picks it when present, because `playwright install` is proxy-blocked here). This spec turns on
+  `page.touchscreen.tap()` landing inside a 64 px tray — a CDP hit test — so two different Chromium
+  builds are a live explanation for a pass/fail that tracks the machine rather than the run.
+  **Unproven: the only honest test is running headless-shell, and this container cannot install it.**
+  Next step is either an `E2E shard` job re-run with `--headed`/full chromium to compare, or moving the
+  assertion off the coordinate (the sibling test at `:274` already asserts the property — *the tray is
+  the topmost element over its own rect* — timing- and coordinate-free, and it passes on CI).
 - **⛔ Reading that artifact needs the repository-scoped path, not the one the log prints** — see
   `LB-149` for the 403 that looks like an auth failure and is the sandbox proxy.
 - **✅ AND THE HEADLINE FOR `LB-56`: a fully green E2E run is achievable.** Run three failed nothing at
