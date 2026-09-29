@@ -21,6 +21,7 @@ import type { ProgressionStyle } from "@trainingai/shared/types";
 import type { ExerciseRole, PhaseSetWithPhases } from "@trainingai/shared/types/program";
 import type { EditablePhase } from "@/components/config/phase-editor";
 import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role';
+import { roleForSelectedExercise, musclesForSelectedExercise } from "./recommended-exercise-role";
 import { defaultStyleIdForSlot } from '@/components/config/default-exercise-style';
 
 export interface EditableSet { pct: number; reps: number; restSec?: number; useFor1rm?: boolean }
@@ -232,20 +233,20 @@ export function ProgramEditorSheet({
 
   const selectExerciseName = (si: number, ei: number, name: string) => {
     const match = exerciseLibrary.find(l => l.name.toLowerCase() === name.toLowerCase());
-    const mainMuscles = match ? match.muscles.filter(m => m.role === "main").map(m => m.muscle) : undefined;
-    const secondaryMuscles = match ? match.muscles.filter(m => m.role === "secondary").map(m => m.muscle) : undefined;
+    const muscles = musclesForSelectedExercise(match);
     onProgramSessionsChange(programSessions.map((s, i) =>
       i === si ? {
         ...s,
         exercises: s.exercises.map((e, j) => j !== ei ? e : {
           ...e,
           name,
+          // BF-15 — here, not in `addExercise`: that adds an EMPTY slot and the role needs a
+          // catalogue muscle count, which exists only once a name resolves.
+          exerciseRole: roleForSelectedExercise(match, programSessions[si], ei),
           libraryId: match?.id,
-          mainMuscles: mainMuscles ?? e.mainMuscles,
-          secondaryMuscles: secondaryMuscles ?? e.secondaryMuscles,
-          muscleGroups: match
-            ? match.muscles.map(m => m.muscle)
-            : e.muscleGroups,
+          mainMuscles: muscles.mainMuscles ?? e.mainMuscles,
+          secondaryMuscles: muscles.secondaryMuscles ?? e.secondaryMuscles,
+          muscleGroups: muscles.muscleGroups ?? e.muscleGroups,
         }),
       } : s
     ));
