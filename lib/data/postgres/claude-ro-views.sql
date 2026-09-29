@@ -94,6 +94,26 @@ SELECT
 FROM public.app_load_metrics t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
+CREATE VIEW claude_ro.apple_health_samples AS
+SELECT
+  t.user_id,
+  t.sample_id,
+  t.sample_type,
+  t.start_at,
+  t.end_at,
+  t.quantity_value,
+  t.quantity_unit,
+  t.category_value,
+  t.source_bundle_id,
+  t.source_name,
+  t.device_name,
+  t.device_model,
+  t.deleted_at,
+  t.received_at,
+  t.updated_at
+FROM public.apple_health_samples t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.applied_mutations AS
 SELECT
   t.user_id,
