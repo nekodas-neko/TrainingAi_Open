@@ -9,10 +9,11 @@ import { toast } from 'sonner'
 import { Textarea } from '@/components/ui/textarea'
 import { useActivityStore } from '@/lib/stores/activity-store'
 import { useShallow } from 'zustand/react/shallow'
-import { invalidateActivityWrites, invalidateRunningPlan } from '@/lib/cache-groups'
+import { invalidateActivityWrites } from '@/lib/cache-groups'
 import { decodeRoute } from '@/lib/activity/route-encoding'
 import { todayInTz, msToHHMMInTz } from '@trainingai/shared/date-utils'
 import { getLocalStore } from '@/lib/local-store'
+import { linkPrescribedRun, completedAsFor } from '@/lib/activity/link-prescribed-run'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { omitNullFields } from '@/lib/local-store/sync-helpers'
 import { calculateSteps } from '@/lib/activity/treadmill-utils'
@@ -38,29 +39,6 @@ const ActivityRouteMap = dynamic(
   () => import('./activity-route-map').then(m => m.ActivityRouteMap),
   { ssr: false },
 )
-
-// Fire-and-forget: a failed link must never block the "Activity saved" toast the user is
-// already seeing — the run just stays 'pending' and can still be marked via Skip/Complete.
-async function linkPrescribedRun(userId: string | undefined, prescribedRunId: string, activityLogId: string, tz: string) {
-  const store = userId ? getLocalStore(userId) : null
-  if (store) {
-    const today = todayInTz(tz)
-    const runs = await store.getPrescribedRuns(today)
-    const existing = runs.find((r) => r.id === prescribedRunId)
-    if (existing) {
-      await store.upsertPrescribedRun({ ...existing, status: 'completed', activityLogId, updatedAt: new Date().toISOString(), syncStatus: 'pending' })
-    }
-    await store.queueMutation({ userId: userId!, domain: 'prescribed_run', date: today, payload: { id: prescribedRunId, status: 'completed', activityLogId } })
-    await invalidateRunningPlan()
-    return
-  }
-  await fetch(`/api/running-plan/runs/${prescribedRunId}`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status: 'completed', activityLogId }),
-  }).catch(() => {})
-  await invalidateRunningPlan()
-}
 
 export function DoneActivityScreen({ userId }: { userId?: string }) {
   const tz = useUserTimezone();
@@ -282,8 +260,10 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
         navigateToTab(router, '/workout')
         pushThenRevalidate(userId!, invalidateActivityWrites)
         savedLocally = true
-        if (activityType === 'run' && prescribedRunId) {
-          linkPrescribedRun(userId, prescribedRunId, logId, tz).catch(() => {})
+        // RV-166: any activity started FROM the prescription satisfies it, run or walk — the id is
+        // only ever armed by the cardio card's own two actions, so nothing else can reach this.
+        if (prescribedRunId) {
+          linkPrescribedRun(userId, prescribedRunId, logId, tz, completedAsFor(activityType)).catch(() => {})
         }
       } catch (sqliteErr) {
         console.error('Activity log SQLite write failed, falling back to API:', sqliteErr)
@@ -319,8 +299,8 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
       })
       if (!res.ok) throw new Error()
       const { activityLog } = await res.json()
-      if (activityType === 'run' && prescribedRunId) {
-        linkPrescribedRun(userId, prescribedRunId, activityLog.id, tz).catch(() => {})
+      if (prescribedRunId) {
+        linkPrescribedRun(userId, prescribedRunId, activityLog.id, tz, completedAsFor(activityType)).catch(() => {})
       }
       await invalidateActivityWrites()
       toast.success('Activity saved')

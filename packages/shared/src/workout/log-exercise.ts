@@ -133,6 +133,14 @@ export async function logExerciseFromPayload(
     const periodizationState = await repo.getSessionPeriodization(userId, sessionId).catch(() => null);
     if (periodizationState?.phase === 'deload') {
       currentPhaseType = 'deload';
+    } else if (periodizationState?.phase === 'baseline' && !periodizationState.baselineComplete) {
+      // TN-75: the same test `workout-data` uses for `isAiDynamicBaseline`, so the server agrees
+      // with the screen that this is a calibration session. It is stored as the session's
+      // `phase_type`, which is the marker adherence reads need to exclude calibration sets (they
+      // carry no per-set plan by design). It also sends the estimate through the AMRAP formula the
+      // client already used; measured on the 09-07→09-12 round, that moves 5 of 20 loaded logs by
+      // one 0.25 kg rounding step and leaves the rest identical.
+      currentPhaseType = 'baseline';
     }
   }
 

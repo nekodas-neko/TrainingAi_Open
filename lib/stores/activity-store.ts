@@ -44,7 +44,10 @@ export interface ActivityState {
 
 interface ActivityActions {
   startActivity: (typeId: string, label: string, icon: string, isDistanceBased: boolean) => void
-  linkPrescribedRun: (id: string) => void
+  /** RV-166 — a session that already happened, straight to the summary for confirmation. */
+  logCompletedActivity: (typeId: string, label: string, icon: string, durationMin: number) => void
+  /** null clears it — a prescription must not be satisfied twice by two activities (RV-166). */
+  linkPrescribedRun: (id: string | null) => void
   setTitle: (title: string) => void
   begin: () => void
   pause: () => void
@@ -167,6 +170,27 @@ export const useActivityStore = create<ActivityStore>()(
       }),
 
       linkPrescribedRun: (id) => set({ prescribedRunId: id }),
+
+      // RV-166. A treadmill walk the owner already did: arm the session as FINISHED so it lands on
+      // the done screen with the minutes filled in, and the one activity-log writer in
+      // `done-activity-screen` still does the saving. A second writer for "just log it" would be a
+      // third copy of the offline-first write contract, which is the rule this avoids.
+      logCompletedActivity: (typeId, label, icon, durationMin) => {
+        const endMs = Date.now()
+        set({
+          ...INITIAL_STATE,
+          activitySessionId: crypto.randomUUID(),
+          activityType: typeId,
+          activityLabel: label,
+          activityIcon: icon,
+          isDistanceBased: false,
+          title: label,
+          mode: 'done',
+          startMs: endMs - durationMin * 60000,
+          endMs,
+          draftSummary: { durationMin },
+        })
+      },
 
       setTitle: (title) => set({ title }),
 

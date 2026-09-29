@@ -15,6 +15,8 @@
 
 import { eq, and, asc, desc, inArray, isNull, sql } from 'drizzle-orm'
 import { UserFacingError } from '@trainingai/shared/errors'
+import { planMealTypeId } from '@trainingai/shared/nutrition/meal-type-for-time'
+import { listMealTypes } from './nutrition'
 import type { getDb } from '../client'
 import * as s from '../schema'
 import type {
@@ -230,6 +232,7 @@ export async function getActiveMealPlan(db: Db, userId: string): Promise<MealPla
 // ── Writes ─────────────────────────────────────────────────────────────────────
 
 export async function createMealPlan(db: Db, userId: string, input: CreateMealPlanInput): Promise<MealPlan> {
+  const mealTypes = await listMealTypes(db, userId)
   const planId = await db.transaction(async tx => {
     // RV-42. Inside the transaction and before the first insert, so a refusal writes nothing.
     await assertOwnedMealRefs(tx, userId, input.variants.flatMap(v => v.meals))
@@ -270,7 +273,8 @@ export async function createMealPlan(db: Db, userId: string, input: CreateMealPl
       if (v.meals.length > 0) {
         await tx.insert(s.mealPlanMeals).values(v.meals.map(m => ({
           variantId: variant.id,
-          mealTypeId: m.mealTypeId ?? null,
+          // LA-172: tag → derived from suggested time → none.
+          mealTypeId: planMealTypeId(m, mealTypes),
           savedMealId: m.savedMealId ?? null,
           position: m.position,
           name: m.name,
@@ -401,6 +405,16 @@ export async function updateMealPlanMeal(
   if (input.savedMealId !== undefined) set.savedMealId = input.savedMealId
   if (input.ingredients !== undefined) set.ingredients = input.ingredients
   if (input.suggestedTime !== undefined) set.suggestedTime = input.suggestedTime
+  // LA-172: a new time gives an UNTYPED meal a derived type. A meal that already has one keeps it,
+  // because the stored value may be the owner's own tag and a tag wins over the time.
+  if (input.suggestedTime && input.mealTypeId === undefined) {
+    const [cur] = await db.select({ mealTypeId: s.mealPlanMeals.mealTypeId })
+      .from(s.mealPlanMeals).where(eq(s.mealPlanMeals.id, mealId)).limit(1)
+    if (cur && cur.mealTypeId == null) {
+      const derived = planMealTypeId({ suggestedTime: input.suggestedTime }, await listMealTypes(db, userId))
+      if (derived) set.mealTypeId = derived
+    }
+  }
   if (Object.keys(set).length === 0) {
     const [row] = await db.select().from(s.mealPlanMeals).where(eq(s.mealPlanMeals.id, mealId)).limit(1)
     return row ? rowToMeal(row) : null
@@ -438,6 +452,7 @@ export async function replaceMealPlanStructure(
 ): Promise<MealPlan | null> {
   const owned = await ownedPlan(db, id, userId)
   if (!owned) return null
+  const mealTypes = await listMealTypes(db, userId)
 
   await db.transaction(async tx => {
     // RV-42. Before the delete below, so a refused request does not destroy the existing structure.
@@ -469,7 +484,8 @@ export async function replaceMealPlanStructure(
       if (v.meals.length > 0) {
         await tx.insert(s.mealPlanMeals).values(v.meals.map(m => ({
           variantId: variant.id,
-          mealTypeId: m.mealTypeId ?? null,
+          // LA-172: tag → derived from suggested time → none.
+          mealTypeId: planMealTypeId(m, mealTypes),
           savedMealId: m.savedMealId ?? null,
           position: m.position,
           name: m.name,

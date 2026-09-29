@@ -40,18 +40,10 @@ export function ingredientToEntry(ing: NutritionIngredient): NewFoodEntry {
   }
 }
 
-/**
- * Which meal bucket a time of day falls in.
- *
- * Shared because the saved-meals sheet decides this the same way, and two copies would drift the
- * moment someone edits their meal-type hours. Falls back to the first bucket rather than refusing —
- * a gap in the user's configured hours should not lose a log.
- */
-export function mealTypeForHour(mealTypes: MealType[], hour: number): string | null {
-  return mealTypes.find(m => hour >= m.timeStartHour && hour < m.timeEndHour)?.id
-    ?? mealTypes[0]?.id
-    ?? null
-}
+// The window rule lives in a dependency-free module so the server can store a derived type without
+// importing this file's client-side logging path (LA-172).
+export { mealTypeForHour } from './meal-type-for-time'
+import { mealTypeForHour } from './meal-type-for-time'
 
 export interface PlanMealToLog {
   name: string
