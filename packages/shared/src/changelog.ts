@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.481.8",
+    date: "2026-09-29",
+    changes: [
+      "In an AI-built program, an exercise the generator could not match to one of your progression styles now takes the style the rest of that program uses, instead of being saved with none. Its sets and reps also show on the review screen now — a style the screen had no description for used to leave that line blank, which looked the same as having no style at all.",
+    ],
+  },
+  {
     version: "1.481.7",
     date: "2026-09-29",
     changes: [
