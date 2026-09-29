@@ -11,6 +11,8 @@ import { StatTile } from '@/components/ui/stat-tile'
 import { formatMinutes } from '@trainingai/shared/format/units'
 import { pullDelta } from '@/lib/local-store/sync-engine'
 import { getLocalStore } from '@/lib/local-store'
+import { useActivityStore } from '@/lib/stores/activity-store'
+import { linkPrescribedRun } from '@/lib/activity/link-prescribed-run'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { omitNullFields } from '@/lib/local-store/sync-helpers'
 import { invalidateActivityWrites } from '@/lib/cache-groups'
@@ -142,6 +144,16 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // RV-166. Armed by the cardio card's "Walk it -> Guided walk" and read here because this screen
+  // owns the walk's own save — the field lives on the activity store, which is its one home.
+  function satisfyPrescription(activityLogId: string) {
+    const store = useActivityStore.getState()
+    const prescribedRunId = store.prescribedRunId
+    if (!prescribedRunId) return
+    store.linkPrescribedRun(null)
+    linkPrescribedRun(userId, prescribedRunId, activityLogId, tz, 'walk').catch(() => {})
+  }
+
   async function saveWalk() {
     const date = todayInTz(tz)
     const startTime = msToHHMMInTz(startedAtMs)
@@ -219,6 +231,7 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
           }),
         })
         invalidateActivityWrites().catch(() => {})
+        satisfyPrescription(logId)
         setSaved(true)
         // BF-107. The push only flips the row to `synced`; the derived calories arrive on a PULL, so
         // one is forced here and the row read back. It stays inside `pushThenRevalidate`'s callback
@@ -260,8 +273,9 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
       if (!res.ok) throw new Error()
       // BF-107. `POST /api/activity-logs` answers `{ activityLog }` with the derived calories on it,
       // and this response was being thrown away.
-      const body = await res.json().catch(() => null) as { activityLog?: { caloriesBurned?: number | null } } | null
+      const body = await res.json().catch(() => null) as { activityLog?: { id?: string; caloriesBurned?: number | null } } | null
       if (body?.activityLog?.caloriesBurned != null) setKcal(body.activityLog.caloriesBurned)
+      if (body?.activityLog?.id) satisfyPrescription(body.activityLog.id)
       await invalidateActivityWrites()
       setSaved(true)
     } catch {
