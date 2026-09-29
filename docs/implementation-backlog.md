@@ -3389,24 +3389,6 @@ which is the right shape for something that can only be validated by living with
      them. The implementer checks them locally with a migration-free script. **Any delete of a
      production row is the owner's call.**
 
-### [app-shell] LA-181 — a friend request you sent shows as "Unknown" with Accept/Decline buttons that cannot work
-
-- **Lane: B** — `components/more/manage-friends-sheet.tsx`.
-- **Added:** 2026-09-29 · Lane A, while shipping RV-195 ③.
-- **What:** `pending` in the sheet holds incoming AND outgoing requests and gives every row
-  Accept/Decline. Accept on a request you SENT always fails, because the server accepts only as the
-  addressee. Since RV-195 the list also masks the target of an outgoing request, so its name reads
-  "Unknown".
-- **Fix:**
-  - Split pending by `f.requesterId === <me>`.
-  - Incoming rows keep Accept/Decline.
-  - Outgoing rows read *"Request sent"* with a Cancel. `DELETE /api/friends/[id]` already allows
-    either party.
-  - `otherUser.displayName` holds what was typed only in the send response, so the list has no name
-    for an outgoing row by design.
-- **How to check it:** `pnpm dev` with two local users: send a request, and confirm the sender sees
-  "Request sent" with Cancel and the addressee sees the sender's name with Accept/Decline.
-
 ### [devices][platform] RV-196 — any script in the app's origin can read, clear or redirect the Oura ring key through the native plugin
 - **Lane: A** · **Batch: native-security** — `android/**` (`OuraBlePlugin.kt`, `ScaleBlePlugin.kt`, `PolarBlePlugin.kt`). **Needs a new APK.**
   **⚠ SECURITY — the owner confirms before this merges.**

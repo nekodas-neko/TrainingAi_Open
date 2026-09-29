@@ -12,6 +12,7 @@ import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl';
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { TabPanels } from "@/components/ui/tab-panels";
 import { useRefreshOnTabShow } from "@/components/shell/tab-visibility";
+import { splitPendingRequests } from "./pending-friend-requests";
 
 type View = "feed" | "leaderboard";
 
@@ -37,7 +38,9 @@ export default function FriendsTab() {
 
   useRefreshOnTabShow(fetchFriendships);
 
-  const pendingCount = friendships.filter(f => f.status === 'pending').length;
+  // Only requests waiting on YOU — a badge counting the ones you sent asks you to act on
+  // something you cannot act on (LA-181).
+  const pendingCount = splitPendingRequests(friendships).incoming.length;
 
   return (
     <div className="px-4 pt-4 space-y-3">

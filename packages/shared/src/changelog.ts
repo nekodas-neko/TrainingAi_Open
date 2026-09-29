@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.481.10",
+    date: "2026-09-29",
+    changes: [
+      "A friend request you sent now shows under \u201cSent\u201d as \u201cRequest sent\u201d with a Cancel, instead of appearing as \u201cUnknown\u201d with Accept and Decline buttons that could never work \u2014 only the person who receives a request can accept it. The number on the Manage button also counts only the requests waiting on you.",
+    ],
+  },
+  {
     version: "1.481.9",
     date: "2026-09-29",
     changes: [
