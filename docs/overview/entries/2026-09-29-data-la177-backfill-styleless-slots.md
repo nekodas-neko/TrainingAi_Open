@@ -22,4 +22,4 @@
 - **Tests:** `la177-backfill-styleless-slots.test.ts`, covering majority by role, tie by name, the
   unlearnable role left null, inactive untouched, an already-styled slot untouched, and a second run
   as a no-op.
-- **Owed:** one production read after deploy, expecting 0 styleless slots in the active program.
+- **✅ Verified in production 2026-09-29:** migration applied at 11:43:24 UTC; the active program holds **0** styleless slots, and Lower reads primary → Powerbuilding, secondary → Hypertrophy Plus, accessories → Hypertrophy 3-set, as predicted.
