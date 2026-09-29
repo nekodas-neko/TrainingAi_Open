@@ -6619,9 +6619,22 @@ drift.
   `page.touchscreen.tap()` landing inside a 64 px tray — a CDP hit test — so two different Chromium
   builds are a live explanation for a pass/fail that tracks the machine rather than the run.
   **Unproven: the only honest test is running headless-shell, and this container cannot install it.**
-  Next step is either an `E2E shard` job re-run with `--headed`/full chromium to compare, or moving the
-  assertion off the coordinate (the sibling test at `:274` already asserts the property — *the tray is
-  the topmost element over its own rect* — timing- and coordinate-free, and it passes on CI).
+- **⚠ CORRECTION to the bullet above, same day: the browser build is ONE of two candidates, not "the"
+  one.** `:238` taps a coordinate computed from a `stableBox` captured **before** the swipe, and taps it
+  immediately after the release — so a systematic difference in either the resting geometry *or* how far
+  the row has settled by tap time produces exactly this pass-here/fail-there split. Nothing measured so
+  far distinguishes a coordinate that misses the tray from a tray that swallows the press.
+- **✅ SHIPPED 2026-09-29: the spec now names what is under the tap point**, via
+  `document.elementFromPoint` read at the tap coordinate and interpolated into the assertion's own
+  failure message. The retained artifact could only ever show the confirmation was absent; the next red
+  run says whether the point landed on the tray, the row, or something else entirely — which
+  discriminates the two candidates without needing headless-shell. Verified inert on the happy path:
+  the file passes **8 of 8** locally with it in.
+- **Next step is to read that message off the next shard-2 failure.** If the topmost element is the
+  Delete control, the coordinate is fine and the press is being swallowed — a real defect on the web
+  path, and the sibling at `:274` (which asserts the property coordinate-free and passes on CI) is then
+  the shape `:238` should adopt. If it is the row or anything else, the coordinate is wrong on CI's
+  geometry and the fix is to derive the tap point after the release rather than before it.
 - **⛔ Reading that artifact needs the repository-scoped path, not the one the log prints** — see
   `LB-149` for the 403 that looks like an auth failure and is the sandbox proxy.
 - **✅ AND THE HEADLINE FOR `LB-56`: a fully green E2E run is achievable.** Run three failed nothing at
