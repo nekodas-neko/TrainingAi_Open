@@ -15,7 +15,7 @@ import type {
   MealPlan, MealPlanMeal, DietaryRestriction, UserDietaryRestriction, DietarySeverity,
 } from '@trainingai/shared/types/nutrition'
 import type {
-  CreateMealPlanInput, UpdateMealPlanInput, UpdateMealInput, ReplaceStructureInput, PlanMealAnswer,
+  CreateMealPlanInput, UpdateMealPlanInput, UpdateMealInput, ReplaceStructureInput, PlanMealAnswer, EstimateToStore,
 } from './postgres/slices/meal-plans'
 import type { Friendship, Season } from '@trainingai/shared/types/friends'
 import type {
@@ -970,6 +970,8 @@ export interface WorkoutRepository {
   /** Undo a decline. Soft, so the reversal reaches a device that has not synced. */
   deletePlanMealAnswer(userId: string, planMealId: string, logDate: string): Promise<boolean>
   listPlanMealAnswers(userId: string, logDate: string): Promise<PlanMealAnswer[]>
+  /** BF-203a. Store estimates for one local day, never over an existing live answer. Returns how many were new. */
+  upsertEstimatedAnswers(userId: string, logDate: string, estimates: readonly EstimateToStore[], basis: string): Promise<number>
   listDietaryRestrictions(): Promise<DietaryRestriction[]>
   listUserDietaryRestrictions(userId: string): Promise<UserDietaryRestriction[]>
   replaceUserDietaryRestrictions(userId: string, entries: { restrictionId: string; severity: DietarySeverity }[]): Promise<UserDietaryRestriction[]>
