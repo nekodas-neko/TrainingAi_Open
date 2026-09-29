@@ -24540,7 +24540,15 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [app-shell][platform] OR-115 — the admin surface has accumulated buttons nobody uses
 
-- **Lane:** B — `app/admin/**`, most of it presentational.
+- **Lane:** O — the inventory it was waiting on now EXISTS, so what is left is the owner's call. Re-laned from B
+  2026-09-29. Ungated on purpose: `Gate:` would PARK it, and getting the answer is the Orchestrator's work.
+  The implementation half comes back to **B** (`app/more/settings/developer/**`, `app/admin/**`) once he answers.
+- **Ask:** owner: one pass over the six bare cards on Settings → Developer, keep / hide / delete each, list and
+  recommendations in [`docs/admin-control-inventory.md`](admin-control-inventory.md) §A. Three carry a strong
+  enough recommendation that a silent yes is reasonable (**model assets** keep and never hide deeply — silent
+  fallback makes it the only signal that production is not quietly served from the repo tree; **set-HR backfill**
+  keep reachable; **exercise unit fix** hide). The genuinely open two are **program export** and **workout-HR
+  backfill**, both defensible either way and neither costly to reverse.
 - **Added:** 2026-09-14 · owner, while declining to stage a ring re-sync for Q-533: *"I'd like to
   re-organize all the buttons and options we have in the admin section to only use what we actually
   need as well."*
@@ -24562,6 +24570,25 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   real question and gets an `Ask:` with the list attached. Original text: the keep/hide/delete call per
   control is theirs once the inventory exists. The
   inventory itself is not gated and is the next action.
+- **✅ THE INVENTORY EXISTS (2026-09-29, Lane B): [`docs/admin-control-inventory.md`](admin-control-inventory.md).**
+  Three findings change how this entry should be read:
+  **① "The admin section" is TWO screens.** `/admin` (admin-gated, six tabs) and
+  **`/more/settings/developer`** (Settings → Developer). The six maintenance cards this entry is really about
+  — backfills, a unit correction, an export — are on the **Developer** screen, not `/admin`, so a search for
+  "the admin buttons" finds half of them. The split is deliberate (`Q-531`/`Q-234`: a drain is destructive and
+  access control outranks the taxonomy) and nothing here undoes it.
+  **② Nothing is unreachable, so *delete* is never justified on dead-code grounds.** All 19 components in
+  `components/admin/` resolve from a live import, checked by EXPORT NAME. ⚠ A path-shaped grep (`admin/<file>`)
+  first reported `hr-backfill-card.tsx` dead — it is the shared base both backfill cards import as
+  `./hr-backfill-card`, which has no `admin/` in it (OR-187 again). This is a *too many live controls* problem,
+  which supports this entry's do-not-delete rule rather than overriding it.
+  **③ Two cards say "One-off admin utility" in their own header and are not.** `set-hr-backfill-card`'s body:
+  re-running it *"is the remedy whenever a workout ends without its recap being viewed"*, because attribution
+  only runs from the recap fetch. **Read the body, not the label** — and the label is worth fixing.
+  The accretion itself is structural and is Lane B's to fix once the calls are made: those six cards sit BELOW a
+  labelled `Diagnostics` group with **no group heading of their own**, and `/admin/oura-ble`'s six numbered
+  `ConsoleSection`s (each with a `when=` line) are the template — the owner already said that pattern *"works but
+  could be labeled better"*.
 
 ### [app-shell][devices] Q-531 — Q-234 moved the device consoles out of /admin, and in use that made them worse
 
