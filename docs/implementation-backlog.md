@@ -975,6 +975,13 @@ below threshold and left in place for next time.
 - **Lane:** A — `lib/data/postgres/slices/oura.ts:566` and `:1070`.
 - **Added:** 2026-09-29 · BugFix intake, from the session-start database read. Not reported by anyone; found because the growth rate had moved.
 - **Needs:** — nothing.
+- **✔ BUILT 2026-09-29 (Lane A).** Both prune `.catch`es now call `recordPruneFailure`
+  (`lib/data/postgres/slices/oura.ts`), which still logs to stdout and ALSO writes an `error_events`
+  row (`url = 'prune:<table>'`). It uses the slice's own handle, because `reportServerError` would make
+  the slice import its composition root. A source guard test pins both call sites.
+- **Keep:** confirm the first-ever `rr_intervals` prune ran. After **2026-10-15**, `min(at)` on
+  `rr_intervals` should sit at about 90 days rather than keep receding, and `error_events` should
+  hold no `prune:rr_intervals` row. Repeat for `oura_heartrate` after ~2026-12-19 at 180 days.
 
 - **The growth rate has risen and it is NOT a leak — this is the "shape" the session-start rule asks
   about, answered.** Measured 2026-09-29: **261 MB total, 93 MB index**. Against the two figures in
