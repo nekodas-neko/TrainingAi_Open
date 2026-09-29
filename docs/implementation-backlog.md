@@ -490,6 +490,40 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [sleep][readiness] OR-204 — ship the Sleep Score partial-data flag, which never needed the owner
+
+- **Lane: A** · **Added:** 2026-09-29 · Orchestrator, splitting the buildable half out of `Q-72`.
+- **`Q-72` is gated on the owner and says, in its own words, that this half is not:** *"The
+  partial-data flag does not depend on this and can ship."* The gate is real for the other half —
+  whether he will rate sleep again, or wants a different yardstick — but it **parks the whole
+  entry**, so a shippable change has been sitting behind a question it does not depend on.
+- **What stays with `Q-72` and is genuinely his:** Review sweep 56 measured, on production, that of
+  36 mornings since 08-18 **35 hold the neutral 3 untouched and 1 is null — 0 real sleep ratings
+  under the new model.** So the three-week rank re-validation has nothing to rank, and **the clock
+  cannot unblock it**; only he can, by rating sleep again or naming a different yardstick.
+- **Why split rather than ungate `Q-72`:** ungating would put the owner question back into the
+  READY list as though it were buildable, which is the inversion `CLAUDE.md` warns about. Two
+  entries keep both true — this one startable, that one correctly parked.
+- **Read `Q-72` before building**, for the model context; this entry is the flag only.
+
+### [platform] OR-205 — the AI confidence value gates an automatic action, which a standing rule already forbids
+
+- **Lane: A** · **Added:** 2026-09-29 · Orchestrator, splitting `PS-31` (e).
+- **`PS-31` (e) carries two questions and files both as the owner's. Only one is.** The model's
+  `confidence` is (i) **used to decide `source`** (`lib/.../log-food.ts:31`) and (ii) rendered to
+  the owner as an "AI confidence" bar.
+- **(i) is not a decision — the rule already made it.** `CLAUDE.md`'s AI defaults: *"no LLM
+  self-reported number (confidence, totals) may gate an automatic action."* A value deciding
+  `source` is gating an automatic action, so **this half is a defect to fix, not a preference to
+  ask about.** Replace it with a deterministic rule, or make the behaviour independent of the
+  model's self-report.
+- **(ii) stays with `PS-31` and is genuinely his** — the rule forbids showing such a number *as
+  fact*, and the bar is honestly labelled as the model's own confidence, so whether it earns its
+  place on the screen is a display preference the repo cannot answer.
+- **Do not "fix" (ii) while here.** Removing a surface he may want is the failure this split exists
+  to avoid.
+
+
 ### [platform] OR-203 — the database grew 3× its trend for six days, and no per-table baseline exists to say which table did it
 
 - **Lane: A** · **Added:** 2026-09-29 · Orchestrator, from the session-start size read.
@@ -15573,7 +15607,12 @@ nulling the column is data-dropping, and a Redecode restores real numbers.
 
 - **Lane:** A — `app/api/ai/health-insight/route.ts`, `app/api/weekly-digest/route.ts`,
   `app/api/running-plan/explain/route.ts`, `app/api/nutrition/scan/route.ts:184`.
-  **Gate:** owner for the confidence-bar question.
+  **Gate:** owner for the confidence-bar DISPLAY only — narrowed 2026-09-29.
+  **⚑ (e) was TWO questions and only one is his.** The half where `confidence` **decides `source`**
+  is forbidden outright by `CLAUDE.md` (*"no LLM self-reported number … may gate an automatic
+  action"*), so it is a defect, not a preference — **split out as `OR-205`, buildable now.** What
+  remains here is whether the honestly-labelled bar earns its place on screen, which the repo
+  cannot answer.
 - **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §P6.
 
 (a) `health-insight`'s deterministic "nothing to interpret" gate (:180-183) is defeated in 3 of 4
@@ -30076,7 +30115,7 @@ each other. The score has ~18 points of dynamic range and spends all of it above
   - **⚠️ Do not quote `energy_level` ↔ HRV = −0.424 as a finding.** It is the largest coefficient in
     that review and points the wrong way; Pearson on a 4-level ordinal with 92% of mass in two adjacent
     levels manufactures exactly this. Needs a rank measure and a training-day confound check first.
-- **📊 Read 2026-09-24 (Review sweep 56, production, SELECT only):** **the clock cannot unblock this.** Of 36 mornings since 08-18, **35 hold the neutral 3 untouched and 1 is null. There are 0 real sleep ratings under the new model**, so the 3-week rank re-validation (due 09-08) has nothing to rank. The question for the owner is whether he will rate sleep again or wants a different yardstick. The partial-data flag does not depend on this and can ship.
+- **📊 Read 2026-09-24 (Review sweep 56, production, SELECT only):** **the clock cannot unblock this.** Of 36 mornings since 08-18, **35 hold the neutral 3 untouched and 1 is null. There are 0 real sleep ratings under the new model**, so the 3-week rank re-validation (due 09-08) has nothing to rank. The question for the owner is whether he will rate sleep again or wants a different yardstick. The partial-data flag does not depend on this and can ship — **split out as `OR-204` on 2026-09-29 so it is not parked behind this gate.** What stays here is the yardstick question alone.
 
 ### [platform][workouts][nutrition] Q-168 — AI Coach follow-ups (Q-157 is complete)
 
