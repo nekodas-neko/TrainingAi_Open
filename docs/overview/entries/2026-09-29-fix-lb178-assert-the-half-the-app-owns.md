@@ -55,10 +55,15 @@ advance did not survive its own input.
 - Before it: **8 of 8** with the rejected replacement, which is how its emptiness was found.
 - `npx tsc --noEmit`, `npx eslint` on the spec, `pnpm check:rules` **Ran 83 of 83**, `pnpm test`,
   `pnpm build`.
+- **✅ AND THE PREDICTION HELD, checked after the merge:** run `36555135104` on head `89df41b8`
+  read `completed` / `success`, and `get_job_logs failed_only: true` returned **0 failed jobs of
+  15** — so shard 2 is green and the seven-run red streak on this suite is closed. Read that from
+  `list_workflow_runs` matched on `head_sha`, not from `get_status`, which reports commit statuses
+  this repo does not post and read `total_count: 0` on a run that was in fact fully green.
 
 ## Not exercised
 
-- **Shard 2 going green.** That is the prediction this PR makes and its own CI run is the first test of
-  it — the third consecutive PR here whose verification is owed to its own run, which is the standing
-  cost of a fault that only exists on a machine this container cannot be.
+- **Shard 2 going green** was owed to this PR's own CI run — the third consecutive PR here in that
+  position, which is the standing cost of a fault that only exists on a machine this container cannot
+  be. **That run has since passed**; see the last bullet under *Verified*.
 - **The device.** Test-harness only; no product code and nothing the APK runs.
