@@ -490,6 +490,47 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] OR-203 — the database grew 3× its trend for six days, and no per-table baseline exists to say which table did it
+
+- **Lane: A** · **Added:** 2026-09-29 · Orchestrator, from the session-start size read.
+- **Measured 2026-09-29: 261 MB**, against **232 MB on 2026-09-23** (sweep 54) and **227.4 MB on
+  2026-09-20**. That is **+29 MB in 6 days ≈ 4.8 MB/day, against the 1.53 MB/day** sweep 54
+  recorded and the ~1.71 MB/day standing expectation. **Roughly 3× trend.**
+- **⚠ It is the wrong DIRECTION as well as the wrong size.** Sweep 54's falsifiable prediction was a
+  step **down** when `rr_intervals` hits its 90-day cap in late October, settling near 0.96 MB/day.
+  A step up three weeks before that is not the predicted shape.
+- **⛔ IT IS NOT STALLED RECLAIM, so do not reach for `VACUUM` first.** Autovacuum ran on
+  2026-09-28 on every large table. `oura_raw_samples` holds 26k dead tuples one day after a
+  vacuum, which is the packer deleting sealed buckets — ordinary churn, not a leak.
+- **⛔ AND IT IS NOT `error_events`**, the obvious suspect: still **52 MB**, unchanged since
+  2026-09-18 across 115 → 172 → 277 live rows. That is the known bloat, already filed and
+  owner-gated. Not this.
+- **THE REAL GAP: nobody can say which table grew, because sweep 54 recorded only the TOTAL.**
+  A per-table snapshot is therefore recorded here as the baseline the next read diffs against —
+  taken 2026-09-29, `pg_total_relation_size`, which is exact (unlike `n_live_tup`, a planner
+  estimate that has read 0 against 764 real rows):
+
+  | table | total | indexes |
+  |---|---|---|
+  | `oura_raw_samples` | 76 MB | 45 MB |
+  | `error_events` | 52 MB | 776 kB |
+  | `oura_heartrate` | 38 MB | 23 MB |
+  | `rr_intervals` | 31 MB | 15 MB |
+  | `oura_raw_packed` | 28 MB | 144 kB |
+  | `oura_ble_clock_anchors` | 3960 kB | 2504 kB |
+  | `db_query_log` | 2368 kB | 440 kB |
+  | `oura_ble_battery_poll` | 2264 kB | 1312 kB |
+  | whole database | **261 MB** | 93 MB |
+
+- **What to do:** re-read the same query in a few days and diff against the table above. One
+  reading cannot separate a step change from a burst — **six days is a short window, and a single
+  heavy sync day would move it** — so the first job is to establish whether the rate persists,
+  not to act on 4.8 MB/day as if it were the new steady state.
+- **Then the standing question stays the same:** act on a departure from the SHAPE — a retention
+  window that stopped reclaiming — not on the daily figure. `rr_intervals` reaching its cap in late
+  October is the next scheduled step down, and **a step that does not arrive is the signal**.
+
+
 ### [workouts] LA-177 — backfill the nine styleless slots in the active program
 
 - **Lane: A** · **Added:** 2026-09-28 · Orchestrator, splitting the data half out of `LA-173` ③.
@@ -16646,6 +16687,19 @@ stronger reason the measured one wins.
 
 ### [app-shell][platform] BF-110 — the blank resume survives a scroll, which means the renderer never died
 
+- **📡 PRODUCTION READ 2026-09-29 (Orchestrator, session-start): STILL REPRODUCING, and the newest
+  rows do NOT yet carry the native breadcrumb.** Latest `bf110 resume recheck stuck` is
+  **2026-09-28 22:18:50**, reading `h1=826 h2=826 w2=384 children2=7` — **the DOM is intact and the
+  recheck still finds it stuck**, which is this entry's whole thesis holding. None of the rows read
+  carried the `native view=… parent=…` suffix the 2026-09-28 fix appends, so **this telemetry is
+  from BEFORE v1.478.4 was installed, and says nothing about whether the fix works.** Do not read
+  it as the fix failing. The `Verify:` below is still owed and is still the thing that answers it.
+- **⚠ SIDE EFFECT WORTH FIXING WITH IT: this instrumentation is now 96% of the fault table.**
+  `error_events` holds **143 rows, of which 137 are `bf110`** — the other six span a month and one
+  of those is a deliberate probe. It does not *evict* real faults (the 30-day prune is by age), but
+  the session-start read is how faults get found, and a 96% noise floor defeats that read. **Give
+  the breadcrumb a removal step in the same PR that closes this entry**, rather than leaving it to
+  be noticed later.
 - **✔ NATIVE FIX BUILT 2026-09-28 (Lane A), v1.478.4, APK.** `MainActivity.onResume` asks the WebView to
   re-measure against its parent now and again at 250 ms, before the JS recheck at 500 ms reads the
   viewport. `AndroidRenderer.viewHeights()` exposes the WebView's and its parent's heights, and the
