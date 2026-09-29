@@ -54,6 +54,22 @@ so the only change is the word: *"Request cancelled"* rather than *"Friend remov
   two-user handshake is worth it.
 - Full gate: `npx tsc --noEmit`, `pnpm check:rules`, `pnpm lint`, `pnpm test`, `pnpm build`.
 
+## It also carries the journal compaction sweep, because the gate made it mine
+
+Merging `origin/main` brought in four other lanes' PRs and took `docs/overview/entries/` to **62
+foldable entries, over the 60 runaway limit** — a hard `check-doc-index-size` failure that would have
+blocked every lane's next PR, not just this one. Its message says so outright: *"This branch adds 1 of
+them, so the sweep is yours: you are already here."*
+
+`node scripts/fold-journal-entries.js` folded **40 entries into `history-2026-09-29-folded-1.md`** and
+rewrote the citations pointing at them in four files (`docs/implementation-backlog.md` and the
+app-shell, platform and sleep domain indexes). **Six were held back**, which is the script's own rule
+rather than an error: it refuses to fold an entry an agent baton cites, because rewriting that link
+means one lane writing into another's live state file.
+
+`check-doc-links` reads **OK across 885 files** afterwards, which is the check the script tells you to
+run instead of reasoning about which links moved.
+
 ## Not exercised
 
 - **The device.** A list split and a label change in a sheet; no native plugin, safe-area, gesture or

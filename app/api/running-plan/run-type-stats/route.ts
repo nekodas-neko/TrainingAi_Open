@@ -1,3 +1,4 @@
+import { completedAsRun } from '@trainingai/shared/running/run-completion'
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
@@ -32,7 +33,8 @@ export async function GET() {
 
   const logById = new Map(logs.map((l) => [l.id, l]))
   const completed: CompletedRunForStats[] = prescribedRuns
-    .filter((r) => r.status === 'completed' && r.activityLogId != null)
+    // LB-179: a walk's pace filed under the prescribed run type would corrupt that type's stats.
+    .filter((r) => completedAsRun(r) && r.activityLogId != null)
     .map((r) => {
       const log = logById.get(r.activityLogId!)
       return {

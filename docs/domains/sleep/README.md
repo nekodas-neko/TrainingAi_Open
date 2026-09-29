@@ -313,7 +313,7 @@ curve). **Before writing anything that treats one row as one night, call the hel
   home for it: it opens once a day on one screen and retires on dismissal, and the owner has saved
   82 of those sheets while touching a scale in 3.
 
-- **[`2026-09-28-home-sleep-feel-line`](../../overview/entries/2026-09-28-home-sleep-feel-line.md)**
+- **[`2026-09-28-home-sleep-feel-line`](../../overview/history-2026-09-29-folded-1.md#2026-09-28-home-sleep-feel-line)**
   — LA-136. Home shows the sleep rating he actually gave, under the mood card, captioned as his
   rating rather than a score. **The gate is the point:** the morning sheet stores a neutral `3` for
   a scale he never tapped, so the read goes through `answeredMorningScales` — without it Home prints
@@ -321,7 +321,7 @@ curve). **Before writing anything that treats one row as one night, call the hel
   scale is stored 1 = great … 5 = terrible while its labels run the other way; `storedOrderLabels`
   is the only correct reverse.
 
-- **[`2026-09-28-checkin-announce-and-correct`](../../overview/entries/2026-09-28-checkin-announce-and-correct.md)**
+- **[`2026-09-28-checkin-announce-and-correct`](../../overview/history-2026-09-29-folded-1.md#2026-09-28-checkin-announce-and-correct)**
   — TN-82. The morning check-in stops asking for sleep quality and recovery; it announces the
   night's verdict with its reason and takes a one-tap correction. **Only a correction writes
   `touched: true`** — an auto-fill that flagged itself would re-create TN-57. Two traps recorded

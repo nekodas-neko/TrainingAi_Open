@@ -972,6 +972,99 @@ below threshold and left in place for next time.
   Pull is also the one with **no progression style** (BF-217), so the difference may be a style
   effect rather than a model whim. Worth one look before assuming the prompt is at fault.
 
+### [platform] BF-222 — neither sensor retention prune has EVER fired, both horizons land inside ten weeks, and a failure logs where nothing reads it
+- **Lane:** A — `lib/data/postgres/slices/oura.ts:566` and `:1070`.
+- **Added:** 2026-09-29 · BugFix intake, from the session-start database read. Not reported by anyone; found because the growth rate had moved.
+- **Needs:** — nothing.
+
+- **The growth rate has risen and it is NOT a leak — this is the "shape" the session-start rule asks
+  about, answered.** Measured 2026-09-29: **261 MB total, 93 MB index**. Against the two figures in
+  the docs — 171 MB on 08-18, 215 MB on 09-11 — the rate went **1.83 MB/day → 2.56 MB/day**, a 40%
+  rise on a `CLAUDE.md` line that says to expect ~1.7.
+  **The cause is that the two largest growing tables have never reached their retention horizon:**
+
+  | table | retention | oldest row | age | has it ever pruned? |
+  |---|---|---|---|---|
+  | `oura_heartrate` | **180 d** (`HR_RETENTION_DAYS`) | 2026-06-22 | **99 d** | **no** |
+  | `rr_intervals` | **90 d** (inline literal) | 2026-07-17 | **74 d** | **no** |
+
+  Both are still filling. `oura_raw_samples` — the one window that *does* cycle — is holding at
+  173,960 rows across its 7-day span, so it is reclaiming correctly.
+
+- **So the acceleration is temporary, and the plateau can be projected.** At the measured fill rates
+  (1,503 and 2,572 rows/day, from real `count(*)` — `n_live_tup` reads 135,306 against 148,811 real
+  rows on `oura_heartrate`, the estimator trap again):
+
+  | table | now | at horizon | date it flattens |
+  |---|---|---|---|
+  | `oura_heartrate` | 38 MB | **~69 MB** | ~2026-12-19 |
+  | `rr_intervals` | 31 MB | **~38 MB** | ~2026-10-15 |
+
+  **Whole database lands near 300 MB and stops** (plus the packed archive's ~0.1 MB/day). At
+  $0.15/GB/month that is **about 4.5 cents a month**. Worth carrying into `Q-30`, which is still
+  open on storage cost.
+
+- **⚠ THE RISK, and it is the reason this is an entry rather than a journal line: an untested prune
+  is about to run for the first time, and its failure is invisible.** Both are
+  **throttled, fire-and-forget, on-write** (`shouldPrune`, at most once per 24 h) and both end in
+  `.catch(err => console.error('[prune] … failed:', err))` — **stdout, not `error_events`**. Nothing
+  reads stdout. So if either `DELETE` fails or the throttle never lets it run, the table simply
+  keeps growing and the only signal is the number a session happens to read months later. The two
+  first-ever executions land **~2026-10-15** and **~2026-12-19**.
+- **⭐ Recommend routing both prune failures to `error_events`** — it is the channel built for
+  "faults that never reach a human", which is exactly this, and the session-start read already
+  looks there. One `insertErrorEvent` call in each catch.
+  **Then confirm the first run actually happened** rather than assuming: after 2026-10-15,
+  `min(at)` on `rr_intervals` should sit at 90 days, not keep receding.
+- **Alternatives:** (a) **a scheduled job** — better at not depending on a write to trigger, but
+  there is no cron layer (`docs/module-map.md` §0) and adding one for this is disproportionate;
+  (b) **leave it** — defensible at 4.5 cents a month, and it loses because the cost is not the
+  point: a prune that silently never runs makes every future size reading uninterpretable.
+- **Reversal cost: low.** Two lines, in two catch blocks.
+
+- **A second thing the read exposed: nothing stores the shape, so every session re-derives it.** The
+  rule says to compare against the shape rather than the daily figure, but no prior `idx` or
+  per-table figure is recorded anywhere in `docs/` — this comparison took four queries plus digging
+  two datapoints out of prose. **The fix is the journal, not a table:** a session that runs the read
+  writes the four numbers (total, idx, top table, oldest row of the growing tables) into its entry,
+  and the next session diffs against it. Recorded here rather than as its own entry because the
+  projection above is what a future session actually needs.
+
+### [platform] BF-223 — `oura_heartrate_pkey` is 7.2 MB of index that has never been scanned in the database's lifetime
+- **Lane:** A — `lib/data/postgres/schema.ts` (`ouraHeartrate`), plus a migration to drop the constraint.
+- **Added:** 2026-09-29 · BugFix intake, from the session-start database read.
+- **Needs:** — nothing.
+
+- **Measured against production, with the evidence the owner's DB policy requires for a drop:**
+  - `pg_stat_user_indexes.idx_scan` = **0** for `oura_heartrate_pkey`, and
+    `pg_stat_database.stats_reset` is **NULL** — statistics have never been reset, so that zero
+    covers the table's whole life, not a window.
+  - **0 foreign keys** reference `oura_heartrate` (`pg_constraint`, `contype='f'`).
+  - The sibling `oura_heartrate_user_id_timestamp_key` takes **10,025,158** scans. Every read path
+    goes through `(user_id, timestamp)`; nothing looks a row up by `id`.
+  - Size: **7,256 kB**, on a 38 MB table that is projected to reach ~69 MB (BF-222) — so the index
+    grows with it.
+
+- **What it is NOT, checked before recommending anything.** The `id` column itself is read — the
+  full-export path emits it (`lib/export/__tests__/full-export.test.ts:94`) — but that comes off a
+  sequential read, not an index lookup, and **dropping the primary-key constraint does not drop the
+  column**. Uniqueness is guaranteed by the sequence default, not by the index.
+
+- **⭐ Recommend dropping the constraint and keeping the column**, in a migration of its own, after
+  confirming the export path does not order or paginate by `id` — that is the one read this entry
+  did not fully trace, and it is the only thing that could make a PK worth 7 MB.
+- **Alternatives:** (a) **leave it** — a primary key is conventional, and 7 MB of 261 is 2.8%, so
+  this is genuinely small; it loses mainly because the index grows with a table heading for 69 MB
+  and the write cost is paid on every sensor insert; (b) **replace it with the natural key** —
+  making `(user_id, timestamp)` the primary key removes both the surrogate index and the separate
+  unique index, which is the tidier end state, but it rewrites the table and is a bigger change than
+  the finding justifies on its own.
+- **Reversal cost: low.** Re-adding a primary key on a populated table is one statement and a
+  rebuild; nothing depends on it.
+- **Do NOT run this as a production change without the owner**, despite `OR-182` authorising proved-dead
+  drops: this is `DROP CONSTRAINT` on the sensor table the Oura pipeline writes to continuously, and
+  the standing policy's confirm-first half covers anything irreversible in that area.
+
 ### [platform] BF-214 — the `claude_ro` twin is 92% of the migration corpus, and it is why migration numbers collide twice as fast as they need to
 
 - **✅ BOTH HALVES SHIPPED.** ① (2026-09-27, owner's yes): the views are one generated file,
@@ -3356,7 +3449,7 @@ which is the right shape for something that can only be validated by living with
   the Samsung WebView**, which is the canonical runtime; it follows the same Blink policy, but that
   is inference rather than a measurement.
 - **Still worth the fix, as boundary validation rather than an exploit**, and the validation half
-  SHIPPED 2026-09-25 ([entry](overview/entries/2026-09-25-rv191-image-data-uri-validation.md)).
+  SHIPPED 2026-09-25 ([entry](overview/history-2026-09-29-folded-1.md#2026-09-25-rv191-image-data-uri-validation)).
 - **⚠ The fix shape in this entry was WEAKER than the codebase already knew.** It says to reuse the
   avatar route's check — but that route validated the **declared** MIME, which whoever sends the
   data URI writes, so `data:image/png;base64,<SVG>` passed it. `sniffImageMime` already existed for
@@ -4168,51 +4261,6 @@ which is the right shape for something that can only be validated by living with
    render or the device.
 - **Also for the device:** Body Battery's fill runs from about 45% to the right edge rather than from the left. That may be deliberate ("drains as you use it"). RV-205 should say which, and if it is deliberate, the bar needs a mark that makes the direction legible.
 
-### [cardio][platform] LB-179 — a walk that satisfies a run prescription must not feed the run planner
-- **Lane: A** — `packages/shared/src/running/assemble-plan-context.ts`,
-  `app/api/running-plan/run-type-stats/route.ts`, and (on the recommendation below) a migration plus
-  the local SQLite version. **Blocks `RV-166`**, which is approved and cannot ship without it.
-- **Added:** 2026-09-28 · Lane B, while re-verifying `RV-166` against `main` before building it.
-- **⚑ THE APPROVED SPEC RE-INTRODUCES A BUG THIS REPO ALREADY FIXED ONCE.** `RV-166` makes a walk
-  satisfy the run prescription — correct, and what the owner asked for. But `prescribed_runs.status`
-  is read by the **planner**, not only by display, and nothing records *how* the row was satisfied.
-  `assemble-plan-context.ts:97` already carries the comment *"Only COMPLETED runs count toward the
-  week's 80/20 sequence — a never-run pending row … must not advance the framework toward an
-  interval day (E2-7)"*. A walk marked `completed` walks straight through that guard. Same class,
-  different door.
-- **Three readers, measured 2026-09-28, not one:**
-  - `assemble-plan-context.ts:81` — `.filter(r => r.status === 'completed' && HARD_RUN_TYPES.has(r.runType))`
-    feeds `hoursSinceLastHardRun`, described in its own comment as *"real no-back-to-back-quality
-    protection"*. A treadmill walk completing a prescribed tempo tells the gate a quality session was
-    done and **suppresses the next one**. This is the worst of the three: it changes what the app
-    tells him to do.
-  - `assemble-plan-context.ts:97` — `runsThisWeek`, the 80/20 sequence and weekly frequency. A walk
-    advances the framework toward an interval day.
-  - `run-type-stats/route.ts:35` — pulls `distanceKm`/`avgPaceSecPerKm`/`avgHr` off the linked log and
-    files them under the **prescribed** `runType`. A ~12 min/km treadmill pace lands in "easy run"
-    pace statistics.
-- **✅ RECOMMENDATION — record how it was satisfied on the row (`completedAs: 'run' | 'walk'`), do not
-  re-derive it per reader.** The completing client knows the activity type at the moment it links the
-  row (`done-activity-screen.tsx`); every reader otherwise has to join back to the activity log to
-  recover a fact that was known when it was written. **`assembleInputs` does not fetch activity logs
-  at all** — its `Promise.all` takes prescribed runs, loads, workouts, sleep and Oura — so the
-  derive-at-read-time option means adding a query to a hot path *and* repeating it in each of the
-  three readers, and in every reader added later. It also matches the convention `RV-166` itself
-  cites: a discriminator like `observed-hr.ts`'s `source: 'observed' | 'estimated'`, which says where
-  a value came from rather than whether to trust it.
-- **Alternative, and what it is better at:** derive it at read time from `log.activityType`
-  (`run-type-stats` already loads the logs, so that one reader is a one-line filter). **Better at
-  shipping today** — no migration, no local SQLite version bump, nothing to backfill, and it is the
-  whole fix for the stats reader. It loses on the two planner readers, which is where the real defect
-  is.
-- **Reversal cost: low.** A nullable column readers ignore until they use it; existing rows read
-  `null`, which means *"satisfied before this was tracked"* and must be treated as a run (that is what
-  they are — the link only ever fired for `activityType === 'run'`).
-- **⚠ Do NOT backfill.** Every existing `completed` row was necessarily a run, so a backfill would
-  write a fact that is already implied, and `RV-166`'s own warning about moving stored numbers is
-  about *future* completions, not past ones.
-- **Not measured:** how many days change once `RV-166` ships. `RV-166` owes that figure before merging
-  and this entry does not answer it.
 
 ### [nutrition] RV-218 — one Nutrition screen shows three calorie targets, the Day screen a fourth "burned", and "205 workouts" means 205 kcal
 - **✅ TWO OF THE THREE COPY BUGS SHIPPED 2026-09-27 (#1782). THE THIRD WAS ALREADY FIXED. ITEMS ①②④ ARE LANE A's — established below, not assumed.**
@@ -4251,16 +4299,11 @@ which is the right shape for something that can only be validated by living with
   1. Settle which number the ring's denominator is, and make the explainer name that one. — **A.**
   2. Make "burned" on Day and Nutrition come from the same function. — **A.**
   3. ~~Fix the three copy bugs.~~ — **DONE** (two shipped, one already fixed).
-  4. Draw zero days. — **A**, in the route, for the reason above. **⚠ But NOT the route alone —
-     re-verified 2026-09-27 (Lane A), and shipping it alone is a regression.**
-     `weekly-nutrition-chart.tsx` computes its "7-day avg" as `sum / data.length`, so padded zero
-     rows would count an unlogged day as 0 kcal and drag the average down. Its empty state keys
-     on `data.length === 0`, which padding makes unreachable. **And a live bug the padding would
-     mask:** the chart emphasises `i === data.length - 1` as today (full opacity, orange over
-     target). With gaps, on any morning before the first log, that is **yesterday's** bar.
-     **Shape:** the route pads with `logged: false` on empty days, and the chart (Lane B) averages
-     over logged days only, keeps an empty state for "nothing logged this week", and emphasises the
-     bar whose `date` is today. Ship both in one PR, or the chart first. Never the route first.
+  4. ~~Draw zero days.~~ **✅ SHIPPED 2026-09-29 (Lane A), route and chart in one PR.** The route
+     returns seven rows, with `logged: false` on an empty day and `isToday` marked where the timezone
+     is known. The chart (`weekly-nutrition-days.ts`) averages logged days only, keeps its empty state
+     when nothing was logged, and emphasises today's bar rather than the last one. Seen at 384 px on
+     the owner's snapshot: seven bars with Fri/Mon/Tue at zero, "avg of 4 logged days: 745 kcal".
 - **Nothing here is Lane B's any more.** ①② are a reconciliation across routes, and ④ is the route
   under-delivering on its own window.
 - **Adjacent:** RV-164 and BF-154 touched the budget. Read them first. The calibration itself is not in scope.
@@ -5214,87 +5257,6 @@ volume7dKg,                             // likewise
   `app/api/admin/backfill-derived-scores` (the pattern to copy).
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** production now has v6 on 1 day and v5 on 51. The only `upsertBodyBatteryDaily` call is `route.ts:385` (`date: todayIso`), and `backfill-derived-scores` has no battery code. It overlaps Q-273 scope item 2 (general score backfill); this is its battery instance.
 
-### [workouts] TN-74 — the zero `estimated_1rm` is mostly BY DESIGN, and the rest is Q-298's already-fixed bug
-- **✅ ANSWERED by `RV-170` 2026-09-24 — and the answer is DO NOT REWRITE.** The zero one-rep-max
-  rows are a **hand-edit**, limb (b): **NO**, per the `BF-81` precedent. **Mark them visibly
-  known-bad instead.** `RV-170` also corrects the count — **15, not 10**; the 08-09 and 08-16 Pull
-  clusters sat on deload sessions. The "the OWNER'S call" sentence below is stale.
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning. **⚠ Re-measured by Lane A the same day
-  against production and the code; the original framing does not survive, and the corrected version
-  is below. The measurements were sound; the conclusion drawn from them was not.**
-- **Lane: A** — what is left is small; see **Still open**.
-- **⛔ THE HEADLINE IS WRONG: 42 zeros is not the defect count. 32 of them are correct.**
-  Grouped in production by `exercise_deloaded` over 494 non-deleted logs:
-
-  | `exercise_deloaded` | logs | `estimated_1rm = 0` | positive |
-  |---|---:|---:|---:|
-  | true | 32 | **32 (all)** | 0 |
-  | false | 462 | **10** | 452 |
-
-  `estimateOneRm` returns `{ estimated1rm: 0, target80: 0 }` when `deloaded`
-  (`packages/shared/src/1rm.ts:166`), and `lib/data/postgres/adapter.ts:1482` states the contract
-  outright: ***"`estimated_1rm > 0` IS the deload test, not a proxy for one."*** So zero is the
-  intended encoding for a deload, and **76% of the reported defect is the design working**.
-- **⛔ AND THE ACCEPTANCE CRITERION CONTRADICTS THAT CONTRACT.** The entry asked for NULL instead of
-  0 so downstream can tell "no estimate" from "an estimate of zero". Queries across the adapter use
-  `estimated_1rm > 0` **as** the deload test, so switching to NULL is not a storage tidy-up — it
-  changes what those queries mean. Anyone picking this up decides that deliberately or leaves it.
-- **The 10 genuine zeros are TWO SESSIONS, not a rate.** Both "Pull": **2026-08-09** and
-  **2026-08-16**, five logs each, four of five carrying loaded sets. Every exercise in both sessions
-  stored zero — including the bodyweight Pull-Up, which takes a different code path — so the zeroing
-  is **session-wide**, which is what `deloaded`'s early return does and what a per-set formula fault
-  cannot do.
-- **The mechanism is Q-298, and it is ALREADY FIXED — no code change is owed for it.**
-  `packages/shared/src/workout/log-exercise.ts:308-317` carries its own account: the estimate uses
-  `deloadedForEstimate = exerciseDeloaded === true || (isAnyDeload && !isBaseline)`, which includes a
-  **phase-level** deload, while the row *used to* store `exerciseDeloaded ?? false`. So a phase
-  deload zeroed the 1RM and stamped the row `false`. Line 317 now stores `deloadedForEstimate`. The
-  10 rows are **historical residue written before that fix**, and they were written that way at log
-  time — `updated_at - logged_at` is **2–7 minutes, same day**, so nothing modified them later.
-  Supporting but not proof: `session_periodization` for the Pull session records a phase transition
-  dated **2026-08-16**, consistent with a deload window covering both. That table keeps only current
-  state, so the phase on 08-09 cannot be read back.
-- **⛔ THERE IS NO MYSTERY SUPPLIER — the entry's central open question dissolves.** It asked what
-  supplies a positive 1RM to *"138 non-zero logs with NO loaded flagged set"*. Nothing does:
-  `amrapAverage1Rm` and `calculate1RM` filter sets with `!flagged || style![i]?.useFor1rm`, so when
-  **no** set is flagged, `!flagged` is true and **every** set is used. "No `use_for_1rm` set" means
-  "use them all", not "compute from nothing".
-- **⚠ A hypothesis worth recording as REFUTED, so it is not re-run.** That the style's flagged set
-  positions outran the sets actually performed. Measured: **08-16 Barbell Shrug** and **08-23
-  Barbell Shrug** both have a 4-set style with all four flagged and both logged **2** sets — 08-16
-  stored **0**, 08-23 stored **108.75**. Identical style shape, identical set count, opposite
-  results. The style is not the variable.
-- **Still open, and it is small:**
-  1. **The four zero-1RM/positive-`target_80` rows.** All four are the **same 2026-08-06 deload
-     session**, correctly flagged `deloaded = true`, so `estimateOneRm` gave them `target80: 0` —
-     and their `updated_at` is **6–7 hours later, on 08-07**. Some later write path set `target_80`
-     without touching `estimated_1rm`. **Which path is NOT established** and is the one thing here
-     still worth chasing.
-  2. **⛔ RESOLVED 2026-09-27 (Lane A) — and item 2 as written was a TRAP. Do not drop the field.**
-     *"An accepted input that silently does nothing"* is true of the SERVER and false of the
-     device. `sqlite-backend.ts:459-460` writes `payload.estimated1rm` and `payload.target80`
-     straight into the local `exercise_logs` row, under its own comment *"use client-provided
-     offline estimate if present"* — so the field is load-bearing on the offline path, which is
-     the canonical runtime. **Taking either of the entry's two remedies would have removed the
-     1RM from every offline-logged exercise on the device until it synced.**
-     - **The real defect was underneath it, and is fixed.** The predicate deciding whether an
-       estimate is suppressed existed in **two copies** — `log-exercise.ts:218` and
-       `workout-screen.tsx:1224` — computing `exerciseDeloaded === true || (isAnyDeload &&
-       !isBaseline)` independently. They agreed, so nothing had broken. They are now one exported
-       `isDeloadedForEstimate` in `packages/shared/src/workout/log-exercise.ts`, called by both.
-     - **Why it mattered despite agreeing:** the client copy decides what the DEVICE stores
-       offline, and `estimated_1rm > 0` **is** the deload test (`adapter.ts:1482`). A drift would
-       not have shown as a wrong number on a screen — it would have shown as an offline-logged
-       exercise disagreeing with the server about whether a deload happened at all.
-- **Repairing the historical rows is the OWNER'S call, not this entry's.** Rewriting 10 (or 42)
-  stored estimates is a data rewrite; the code that produced them is fixed, and nothing here
-  establishes that a wrong prescribed weight ever reached a screen.
-- **Untouched and still correct:** the entry's own correction about the high-rep guard — `repFactor`
-  freezes Brzycki at its 20-rep value and `amrapScaleFactor` de-rates high reps — and its warning
-  that the stored-1RM-to-set-weight ratio is a join artefact. Both stand; do not re-measure them.
-
-
 ### [workouts] TN-75 — the load prescription IS followed; what regressed is the field that lets anyone check, from 93% coverage in August to 72% in September
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, completing TN-64's question from the other
@@ -5982,7 +5944,7 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   the owner's call, it has been made, and it is recorded here so the reasoning is not re-derived.
   **Do not widen it further than this entry describes without going back to him.**
 - **✅ RV-190's prerequisite is met — it SHIPPED 2026-09-26**
-  ([entry](overview/entries/2026-09-26-rv190-db-query-session-state.md)). It said to build that
+  ([entry](overview/history-2026-09-29-folded-1.md#2026-09-26-rv190-db-query-session-state)). It said to build that
   first because the owner scope is a setting any caller can change and it persisted on the pooled
   connection, so a `SET LOCAL` without the transaction wrapper left the hole open. Every query on
   the read-only pool now goes through `runScoped` (`lib/data/postgres/readonly-client.ts\'), which
@@ -7873,6 +7835,16 @@ drift.
 - **Needs:** LB-179 — the planner must be able to tell a walk-satisfied prescription from a run-satisfied
   one before a walk is allowed to satisfy one. Shipping the two-guard change alone corrupts the
   prescription engine, not just a stat.
+- **✔ LB-179 SHIPPED 2026-09-29, so this is what the walk half must send.** Link the prescription with
+  `completedAs: 'walk'` whenever the satisfying activity is not a run, on BOTH paths in
+  `done-activity-screen.tsx`'s `linkPrescribedRun`:
+  - the local `store.upsertPrescribedRun({ ...existing, status: 'completed', completedAs: 'walk', … })`;
+  - the queued `prescribed_run` mutation's payload.
+
+  **Omitting it records a run**: the server writes null on any status change that does not say
+  otherwise. So the run path needs no change, and a walk that forgets the field is counted as a run.
+  The planner, the hard-run gate and the run-type stats all read `completedAsRun`
+  (`packages/shared/src/running/run-completion.ts`).
 - **✅ ROOT CAUSE FOUND 2026-09-28, and it is two lines** — `components/activity/done-activity-screen.tsx:285`
   and `:322`, both `if (activityType === 'run' && prescribedRunId)`. He logs walks, so
   `linkPrescribedRun` never fires. **Everything else the completion needs already exists**: the
