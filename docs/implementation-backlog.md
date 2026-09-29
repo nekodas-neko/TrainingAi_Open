@@ -9171,8 +9171,22 @@ drift.
   `LB-178` found (fewer specs per database) and may **surface** an order-dependence that was hidden.
   Expect a new failure or two on the first sharded runs and read them as the split doing its job,
   not as the split being wrong.
-- **Not verified on CI yet** — a workflow change cannot be. Shard 1 was run locally end to end, and
-  all four were listed for balance.
+- **✅ VERIFIED ON CI 2026-09-29, run `36508371834`** (the first UI-touching PR after the split, #1950).
+  All four `E2E shard N` jobs spawned, each seeded its own Postgres, and the rollup reported. Playwright
+  step wall-clock: **shard 1 10m53s · shard 2 10.7m · shard 3 8m41s · shard 4 8m46s**, and the whole
+  `e2e-gate` → shards → rollup sequence ran **01:32:40 → 01:44:52, ~12.2 min** against ~33–36 min
+  unsharded and the 45-minute cap it had been hitting.
+- **✅ And the entry's own stated risk is measured and small.** It read *"shard balance is by file count
+  and not by duration, so wall-clock per shard may be uneven"*: the spread is **8m41s to 10m53s, ~25%**,
+  with the slowest at 11 of its 25-minute timeout. Balancing by duration would buy nothing worth the
+  machinery. **`if: ${{ !success() }}` also gates correctly** — the diagnostic and upload steps read
+  `skipped` on the three green shards and ran on the red one, which is where the 33-file, 15.7 MB
+  artifact came from.
+- **⚠ And the split's predicted side effect DID show up, on its first run.** Shard 2 went red where
+  three shards were green: `food-log-swipe-delete:238` failing its own assertion (`LB-178`, fourth data
+  point — **a database per shard did NOT fix it**) and a browser death in `meal-label:542` (`LB-149`,
+  whose first witness this is). Both are recorded on their own entries; neither is the split's doing,
+  and localising them to one shard of four is the split working.
 - **⚠ BACK OVER THE CAP, MEASURED 2026-09-28 — and the margin `LA-176` bought back has been spent,
   partly by me.** Two consecutive runs hit it: **#1926's head — 17:12:55 → 17:59:36, 46m41s**, and
   **#1927's — 17:32:01 → 18:17:18, 45m17s**. Both report `cancelled`. Against the three censuses

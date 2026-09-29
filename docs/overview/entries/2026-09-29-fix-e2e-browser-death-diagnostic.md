@@ -31,6 +31,18 @@ The `free -m` / `ps` block is now labelled **AT TEARDOWN**. It ran minutes after
 11 GB free of 16 with swap untouched; reading that as "memory was fine" is the mistake the label exists
 to prevent. Catching the peak needs a sampler running alongside the suite, which is not built.
 
+## LB-166's own verification, which this run also settles
+
+The split was merged with *"a workflow change cannot be verified before it merges — the first PR after
+this is the test."* This was that PR. All four shards spawned, each on its own Postgres, and the
+rollup reported. Playwright step wall-clock: **shard 1 10m53s · shard 2 10.7m · shard 3 8m41s · shard 4
+8m46s**; the whole `e2e-gate` → shards → rollup sequence took **~12.2 min** (01:32:40 → 01:44:52)
+against ~33–36 min unsharded and the 45-minute cap it had been hitting.
+
+That also answers the risk `LB-166` named against itself — shard balance is by **file count**, not
+duration, so wall-clock could have come out lopsided. The spread is **~25%** (8m41s to 10m53s), slowest
+shard at 11 of its 25-minute timeout. Balancing by duration would buy nothing worth the machinery.
+
 ## Two things that DID work, both from LB-166
 
 The `if: ${{ !success() }}` artifact upload retained the first attempt — `playwright-report-2`, 33
