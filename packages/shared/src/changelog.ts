@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.486.1",
-    date: "2026-09-30",
+    version: "1.486.2",
+    date: "2026-09-29",
     changes: [
       "Accessory exercises now stay inside their goal's rep range, so an accessory can no longer be prescribed heavy and low-rep, like 77.5% for 7",
+    ],
+  },
+  {
+    version: "1.486.1",
+    date: "2026-09-29",
+    changes: [
+      "The Sleep card now says so when a night's score is based on incomplete data: a quiet \"Partial data\" note, or a clearer one naming what is missing when heart rate or HRV was absent.",
     ],
   },
   {

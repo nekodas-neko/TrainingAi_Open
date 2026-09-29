@@ -520,22 +520,6 @@ below threshold and left in place for next time.
   until he answers, since the two are independent.
 
 
-### [sleep][readiness] OR-204 — ship the Sleep Score partial-data flag, which never needed the owner
-
-- **Lane: A** · **Added:** 2026-09-29 · Orchestrator, splitting the buildable half out of `Q-72`.
-- **`Q-72` is gated on the owner and says, in its own words, that this half is not:** *"The
-  partial-data flag does not depend on this and can ship."* The gate is real for the other half —
-  whether he will rate sleep again, or wants a different yardstick — but it **parks the whole
-  entry**, so a shippable change has been sitting behind a question it does not depend on.
-- **What stays with `Q-72` and is genuinely his:** Review sweep 56 measured, on production, that of
-  36 mornings since 08-18 **35 hold the neutral 3 untouched and 1 is null — 0 real sleep ratings
-  under the new model.** So the three-week rank re-validation has nothing to rank, and **the clock
-  cannot unblock it**; only he can, by rating sleep again or naming a different yardstick.
-- **Why split rather than ungate `Q-72`:** ungating would put the owner question back into the
-  READY list as though it were buildable, which is the inversion `CLAUDE.md` warns about. Two
-  entries keep both true — this one startable, that one correctly parked.
-- **Read `Q-72` before building**, for the model context; this entry is the flag only.
-
 ### [platform] OR-205 — the AI confidence value gates an automatic action, which a standing rule already forbids
 
 - **Lane: A** · **Added:** 2026-09-29 · Orchestrator, splitting `PS-31` (e).
