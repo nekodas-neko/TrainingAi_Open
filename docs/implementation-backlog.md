@@ -3449,7 +3449,7 @@ which is the right shape for something that can only be validated by living with
   the Samsung WebView**, which is the canonical runtime; it follows the same Blink policy, but that
   is inference rather than a measurement.
 - **Still worth the fix, as boundary validation rather than an exploit**, and the validation half
-  SHIPPED 2026-09-25 ([entry](overview/entries/2026-09-25-rv191-image-data-uri-validation.md)).
+  SHIPPED 2026-09-25 ([entry](overview/history-2026-09-29-folded-1.md#2026-09-25-rv191-image-data-uri-validation)).
 - **⚠ The fix shape in this entry was WEAKER than the codebase already knew.** It says to reuse the
   avatar route's check — but that route validated the **declared** MIME, which whoever sends the
   data URI writes, so `data:image/png;base64,<SVG>` passed it. `sniffImageMime` already existed for
@@ -3481,24 +3481,6 @@ which is the right shape for something that can only be validated by living with
   3. **Existing rows:** the `claude_ro` view omits `screenshot_data`, so this sweep could not check
      them. The implementer checks them locally with a migration-free script. **Any delete of a
      production row is the owner's call.**
-
-### [app-shell] LA-181 — a friend request you sent shows as "Unknown" with Accept/Decline buttons that cannot work
-
-- **Lane: B** — `components/more/manage-friends-sheet.tsx`.
-- **Added:** 2026-09-29 · Lane A, while shipping RV-195 ③.
-- **What:** `pending` in the sheet holds incoming AND outgoing requests and gives every row
-  Accept/Decline. Accept on a request you SENT always fails, because the server accepts only as the
-  addressee. Since RV-195 the list also masks the target of an outgoing request, so its name reads
-  "Unknown".
-- **Fix:**
-  - Split pending by `f.requesterId === <me>`.
-  - Incoming rows keep Accept/Decline.
-  - Outgoing rows read *"Request sent"* with a Cancel. `DELETE /api/friends/[id]` already allows
-    either party.
-  - `otherUser.displayName` holds what was typed only in the send response, so the list has no name
-    for an outgoing row by design.
-- **How to check it:** `pnpm dev` with two local users: send a request, and confirm the sender sees
-  "Request sent" with Cancel and the addressee sees the sender's name with Accept/Decline.
 
 ### [devices][platform] RV-196 — any script in the app's origin can read, clear or redirect the Oura ring key through the native plugin
 - **Lane: A** · **Batch: native-security** — `android/**` (`OuraBlePlugin.kt`, `ScaleBlePlugin.kt`, `PolarBlePlugin.kt`). **Needs a new APK.**
@@ -4016,26 +3998,6 @@ which is the right shape for something that can only be validated by living with
   only *after* a swallowed tap, so it is downstream of the same defect and may clear with it. If it
   survives, it is its own entry with its own mechanism, not a re-open of this one.
 
-### [app-shell][platform] LB-183 — one time-of-day form: switch the two minutes-of-day formatters to the shared helper
-
-- **Lane: B** — `components/health/sleep/sleep-verdict-copy.ts` (`formatClock`) and
-  `components/health/sleep-timing-trend-utils.ts` (`clockLabel`). Re-laned 2026-09-29: the engine
-  half shipped.
-- **Added:** 2026-09-28 · Lane B, split out of `RV-208` ①.
-- **✔ ENGINE SHIPPED 2026-09-29 (Lane A):**
-  - `formatMinutesOfDay(minutes)` in `packages/shared/src/date-utils.ts` prints exactly what
-    `formatTimeOfDay` prints ("6:40 am") for a minutes-since-midnight value. It rounds the whole
-    value first and wraps into one day.
-  - `formatTime12h` now delegates to it, so the activity list and sheet read "6:40 am" (the fourth
-    form is gone).
-- **What is left (Lane B):** replace `formatClock`'s and `clockLabel`'s bodies with
-  `formatMinutesOfDay`, and update their tests ("11:10pm" becomes "11:10 pm", "6:30 AM" becomes
-  "6:30 am").
-  - `clockLabel` also has a latent bug the helper fixes: it rounds the minute alone, so 419.6 renders
-    "6:60 AM".
-  - **Do not route either through `formatTimeOfDay`**: it takes an instant, and these values are
-    wall-clock minutes.
-
 ### [app-shell][platform] RV-208 — the same thing is written, formatted and coloured differently on different screens
 - **Inherited from `RV-212` ③ when that entry was cleared (2026-09-27):** the near-white primary is
   **not** a one-off. Review sweep 63 flagged Nutrition's "I've finished logging" as the only
@@ -4315,7 +4277,18 @@ which is the right shape for something that can only be validated by living with
   consumer re-derive those seven dates, which is how a second copy of a window starts.
 - **Fix:**
   1. Settle which number the ring's denominator is, and make the explainer name that one. — **A.**
-  2. Make "burned" on Day and Nutrition come from the same function. — **A.**
+  2. ~~Make "burned" on Day and Nutrition come from the same function.~~ **✅ RESOLVED 2026-09-29 (Lane A):
+     the totals ALREADY come from one function**, and the real cause was a word.
+     - Day's "Burned 1,694" is the energy timeline's total, which spreads `restingBaseKcal + activeKcal`
+       from the same `/api/nutrition/energy-balance` response Home's card prints as `expenditureKcal`.
+     - Nutrition's energy card printed **"+237 burned" for the movement EARNED today alone**: one word
+       for two numbers.
+     - **Shipped:** that header now reads **"+N earned"**, matching the "N earned from movement" line
+       under it. Seen on the owner's snapshot on 09-28 as "+369 earned"; the e2e assertion was
+       updated.
+     - **What remains is ①, not ②.** The ring's budget is anchored on the measured RMR (`bmr`, 1,297)
+       while expenditure uses `restingBaseKcal` (maintenance minus habitual movement). That is
+       deliberate (BF-152), and whether the one number keeps it is the owner's LA-180 answer.
   3. ~~Fix the three copy bugs.~~ — **DONE** (two shipped, one already fixed).
   4. ~~Draw zero days.~~ **✅ SHIPPED 2026-09-29 (Lane A), route and chart in one PR.** The route
      returns seven rows, with `logged: false` on an empty day and `isToday` marked where the timezone
@@ -5043,7 +5016,7 @@ unverified"* is now answered: it persists.
 ### [activity] TN-76 — four of the Activity Score's six contributors do not behave as the model documents, measured off its own stored breakdown
 
 - **Branch:** `tuning/activity-contributor-behaviour`
-- **Lane:** A — `packages/shared/src/health/activity-score.ts` and `daily-goals.ts`; engine by the path rule.
+- **Lane: T** — re-laned 2026-09-29 (was A), per OR-178: a scoring change that owes a Tuning PROPOSAL first. The proposal below is incomplete by its own rule (no concrete weights for option (b), no count of stored days moved), so nothing is buildable yet. **Tuning:** name the weights, compute the days moved over the stored contributors, then re-lane to A with the owner's sign-off. The implementation files are `packages/shared/src/health/activity-score.ts` and `daily-goals.ts` (Lane A).
 - **Added:** 2026-09-24 · Tuning agent. **Proposal only** — Tuning never ships a scoring change.
 - **Where the mechanism is:** `packages/shared/src/health/activity-score.ts` (lane weights, the taper,
   `STRENGTH_FREQ_CURVE`), `packages/shared/src/health/daily-goals.ts` (every goal it scores against).
@@ -5962,7 +5935,7 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   the owner's call, it has been made, and it is recorded here so the reasoning is not re-derived.
   **Do not widen it further than this entry describes without going back to him.**
 - **✅ RV-190's prerequisite is met — it SHIPPED 2026-09-26**
-  ([entry](overview/entries/2026-09-26-rv190-db-query-session-state.md)). It said to build that
+  ([entry](overview/history-2026-09-29-folded-1.md#2026-09-26-rv190-db-query-session-state)). It said to build that
   first because the owner scope is a setting any caller can change and it persisted on the pooled
   connection, so a `SET LOCAL` without the transaction wrapper left the hole open. Every query on
   the read-only pool now goes through `runScoped` (`lib/data/postgres/readonly-client.ts\'), which
@@ -6520,220 +6493,6 @@ drift.
 - **Reversal cost: low.** One function, three test files, no stored data.
 - **Q-279 waits on this answer** (`Needs: LA-175`). The review's harness should be saved as a script
   next time, so the same argument can be re-run instead of reconstructed.
-
-### [platform][app-shell] LB-178 — the E2E suite is flaky once specs share a run, and nobody knows how flaky
-
-- **Lane: B** — `e2e/food-log-swipe-delete.spec.ts`, `e2e/tn53-sparkline-does-not-span-gaps.spec.ts`,
-  then whatever a repeat-run census names.
-- **Added:** 2026-09-28 · Lane B, measured while clearing `LA-176`'s six always-red specs.
-- **What LA-176 left behind.** All six deterministic failures are fixed, and five of the six
-  "sometimes fails" specs it listed now pass. What is left is not a failing assertion — it is
-  **order- and timing-sensitivity that only appears when specs share a run**:
-  - `food-log-swipe-delete` had six tests that had never executed, because the file died in
-    `beforeAll`. They pass — but across three runs, **two runs each failed a DIFFERENT one**
-    (`:238 a tap the instant the swipe ends`, then `:274 the tray is hit-testable the moment the row
-    moves`), and the third passed 8/8. Both are swipe-gesture timing tests.
-  - `tn53-sparkline-does-not-span-gaps` **fails when run after five other specs and passes alone.**
-    The suite runs `workers: 1` against one seeded database, so shared state is the obvious suspect
-    and is not yet shown.
-- **Why it matters.** `LB-56` asks whether E2E should be a required check. It cannot be, against a
-  suite where a green run is a coin toss — and "flake" is not a root cause here, it is the finding.
-  A required check that fails one run in three trains everyone to re-run it, which is worse than
-  advisory.
-- **First step, and it is a measurement not a fix:** run the full suite three times and record which
-  specs differ between runs. A spec that fails in one run and passes in the next is order-dependent;
-  the shared database and `workers: 1` make that testable by shuffling order, not by reading code.
-- **✅ FIRST FULL-CI CENSUS TAKEN — run `36396363930` (PR #1893's merge head `3d8ba081`), 2026-09-28.**
-  This is the entry's own first step, run against CI rather than locally, which matters: the
-  order-sensitivity only appears with all ~250 specs sharing one worker and one database, and that is
-  a shape a local subset cannot reproduce.
-  **257 passed · 5 failed · 6 flaky · 1 skipped · 3 did not run · 36.3 min.**
-  - **Failed:** `food-log-swipe-delete:238`, `diary-nested-meal:231`, `or162-canvas-census:30`,
-    `tn35-stress-against-events:98`, `tn3b-stress-on-hr-chart:103`.
-  - **Flaky (passed on retry):** `calorie-progress-bar:102`, `diary-nested-meal:197`,
-    `la164-bodyweight-weight-cell:88`, `single-foods-database-search:62`,
-    `tn25-walk-prescription:74`, `tn53-sparkline-does-not-span-gaps:105`.
-- **⚠ TWO OF THOSE FIVE WERE NOT FLAKE, AND REMOVING THEM IS THE POINT OF RECORDING THIS.** The two
-  stress specs failed **deterministically**, on a schema rename rather than on timing: `LA-114`
-  renamed `oura_daytime_stress_buckets.bucket_start` to `bucket_mid` that same day (migration
-  `202609280647`) and did not sweep the two fixtures that `INSERT` it, so both files died in
-  `beforeAll` with `column "bucket_start" does not exist` before reaching an assertion. **Fixed in
-  this PR** — the sibling-surface half of `LA-114`'s own rename. A census that had counted them as
-  flake would have inflated the flake rate by 40% and pointed the investigation at ordering.
-- **So the flake question is now three specs wide, and `food-log-swipe-delete` is confirmed.** `:238`
-  failed in CI exactly as it did in two of three local runs — the same swipe-gesture timing test, so
-  it is the most reproducible of the set and the right place to start. `tn53:105` appeared as
-  **flaky** here (passed on retry) rather than failing, which is consistent with order-dependence and
-  not with a broken assertion. **New to the list:** `diary-nested-meal` on **two** lines at once
-  (`:231` hard, `:197` flaky) — and `:231` has prior history in this file under two earlier runs
-  (#1280 run 1 and #1377), so it is a long-standing intermittent rather than a new one.
-- **`or162-canvas-census:30` is a measurement instrument, not a feature test** — see `OR-162`, which
-  already records that the census reads 0 canvases in the harness and that the harness cannot answer
-  its question. Its failure belongs to that entry, not to this one; noted here only so the census is
-  complete.
-- **One thing this run settles in `LB-166`'s favour:** at **36.3 min** the suite finished **under**
-  the 45-minute cap, where it had been hitting it. Six specs that each burned a timeout before
-  failing were most of the difference, so clearing `LA-176` bought back roughly the margin the cap
-  was eating.
-- **✅ SECOND CENSUS — run `36401730152` (`bfe59627`, PR #1894's head), 2026-09-28. This one settles
-  which half of the entry is real.** **263 passed · 1 failed · 4 flaky · 1 skipped · 3 did not run ·
-  36.6 min**, against the first census's 257 / 5 / 6.
-  - **Failed (1):** `food-log-swipe-delete:238`.
-  - **Flaky (4):** `dv12-tab-switch-does-not-redraw-charts:27`, `tabs-instant-paint:42` (Home),
-    `tn25-walk-prescription:49`, `tn53-sparkline-does-not-span-gaps:105`.
-- **⚑ THE FLAKY SET CHURNS, AND A STABLE CORE OF ONE SPEC SITS INSIDE IT.** Across three CI runs the
-  flaky list is almost entirely different each time — but **`tn53-sparkline-does-not-span-gaps:105`
-  appears in ALL THREE**, and nothing else does. `tn25-walk-prescription`, `calorie-progress-bar` and
-  `tabs-instant-paint:42` each appear in two of three, the last two at *different lines/params*, which
-  is itself a signal: the instability is not tied to one assertion. **Start at `tn53:105`** — it is the
-  only spec with a reproduction rate near 100%.
-- **✅ THIRD CENSUS — run on `6a153f6b` (PR #1897), 2026-09-28. 265 passed · 0 FAILED · 6 flaky ·
-  1 skipped · 35.5 min.** Genuinely ran (36.9 min job), not an `e2e-ui-touched` skip.
-  Flaky: `calorie-progress-bar:142`, `deload-visible:109`, `meal-thumb-placeholder:132`,
-  `tabs-instant-paint:42` (Health), `tn53-sparkline:105`, `tn58-vs-yesterday-no-default:15`.
-- **⚠ THIS CORRECTS THE PARAGRAPH THIS ENTRY CARRIED AFTER THE SECOND CENSUS.** It read *"`:238` is a
-  defect and the rest is order/timing noise"* on the strength of two consecutive hard failures.
-  **`food-log-swipe-delete:238` PASSED in run three**, so it is 2 of 3 in CI plus 2 of 3 locally — the
-  highest-frequency flake, not a deterministic defect. Two data points looked like a pattern and were
-  not; the claim was made one run too early.
-- **✅ FOURTH DATA POINT, AND THE FIRST UNDER SHARDING — run `36508371834` (`93d30a41`, PR #1950's
-  head), 2026-09-29.** Four shards, each on its own Postgres. **Shards 1, 3 and 4 green; shard 2
-  failed.** `food-log-swipe-delete:238` failed **twice** (first attempt plus retry1), then
-  `meal-label:542` hit a browser death later in the same shard (`LB-149`), and 3 tests did not run.
-  So `:238` is now **4 of 5 in CI** and remains the highest-frequency flake, and a database per shard
-  did NOT make it go away — which is a real result, because "one seeded database shared by 124 specs"
-  was this entry's leading suspect for it.
-- **⚑ AND IT IS NOT THE BROWSER DEATH'S COLLATERAL, WHICH THE RETAINED FIRST ATTEMPT SETTLES.** The
-  artifact holds a full DOM snapshot for `:238`, so the browser was alive and rendering: the row is
-  swiped open (`button "Delete Spec Swipe Yoghurt": Delete` is in the tree) and the confirmation
-  heading simply never appeared — `expect(getByRole('heading', {name: 'Delete food log?'}))`,
-  *element(s) not found* after 5 s. A genuine assertion failure, ahead of the crash in the same shard,
-  not a symptom of it. **Run in isolation locally the same day it passes: 8 of 8, `:238` in 14.3 s.**
-  So the next step for this spec is the gap between its CI environment and an isolated local run, and
-  the snapshot names one candidate outright — the *"Finished logging this day? · 0 of 10 days marked"*
-  banner is present in the CI tree, and whether it renders is database state, which moves the row the
-  tap coordinate was computed against.
-- **⚠ FIFTH DATA POINT, AND IT RECLASSIFIES `:238` — run `36511264561` (PR #1951), 2026-09-29.**
-  Shard 2 again, and **only** shard 2. The retained artifact holds **exactly one** failing spec this
-  time, `food-log-swipe-delete:238`, with the byte-identical error — `getByRole('heading', {name:
-  'Delete food log?'})`, *element(s) not found* after 5 s, over a DOM snapshot showing the row swiped
-  open. No browser death in this run at all. **So `:238` is 4 of 4 attempts across two consecutive CI
-  runs, and 0 of 8 locally the same day.** That is not "the highest-frequency flake" any more and it is
-  not order-dependence either: **it passes on this sandbox's browser and fails on CI's, consistently.**
-- **⚑ The candidate that fits, and cannot be settled from a sandbox session.** CI installs
-  `chromium_headless_shell`; a sandbox session runs `/opt/pw-browsers/chromium` (`playwright.config.ts`
-  picks it when present, because `playwright install` is proxy-blocked here). This spec turns on
-  `page.touchscreen.tap()` landing inside a 64 px tray — a CDP hit test — so two different Chromium
-  builds are a live explanation for a pass/fail that tracks the machine rather than the run.
-  **Unproven: the only honest test is running headless-shell, and this container cannot install it.**
-  Next step is either an `E2E shard` job re-run with `--headed`/full chromium to compare, or moving the
-  assertion off the coordinate (the sibling test at `:274` already asserts the property — *the tray is
-  the topmost element over its own rect* — timing- and coordinate-free, and it passes on CI).
-- **⛔ Reading that artifact needs the repository-scoped path, not the one the log prints** — see
-  `LB-149` for the 403 that looks like an auth failure and is the sandbox proxy.
-- **✅ AND THE HEADLINE FOR `LB-56`: a fully green E2E run is achievable.** Run three failed nothing at
-  all. That is the first evidence that "required check" is not hopeless — the obstacle is the retry
-  budget masking ~6 flaky specs per run, not an unpassable suite.
-- **And the two stress specs are gone from the list, as predicted.** `tn35-stress-against-events` and
-  `tn3b-stress-on-hr-chart` pass here; they were the deterministic `bucket_start` pair fixed in #1894,
-  and removing them is most of the 5 → 1 improvement. Their disappearance is the evidence that the
-  first census's mode-sorting was right.
-- **✅ `tn53:105` INVESTIGATED 2026-09-28 — and the entry's own suspect is REFUTED for this spec.**
-  It was picked as the start point for being the only spec flaky in all three censuses. The entry
-  says *"the suite runs `workers: 1` against one seeded database, so shared state is the obvious
-  suspect and is not yet shown."* It is still not shown, and for this spec it cannot be what the
-  entry means:
-  - **Reproduction attempted and FAILED, both ways.** Alone: **3 passed**. Run after the four other
-    specs that write `body_metrics` (`one-calorie-budget`, `measured-overview`,
-    `reta-weight-response`, `metric-bounds-at-keyboard`): **11 passed**. The entry's local note that
-    it *"fails when run after five other specs and passes alone"* did not reproduce here.
-  - **Nothing else writes the column it asserts on.** A census of `resting_heart_rate` across
-    `e2e/` returns exactly two files: this spec, and `rv72-progress-bars-composite`, whose match is
-    a **`page.route` stub** of a readiness payload — not a database write. So no other spec can add
-    or remove a point from the 14-day window this one counts.
-  - **And nothing mutates the other input to its window.** `LOCAL_TODAY` is derived from
-    `users.timezone`; no spec writes it (the only `UPDATE users` are `fixtures.ts`'s
-    `date_of_birth` and `profile-details-consolidation`'s `display_name`).
-- **⚑ SO THE NEXT STEP IS NOT "SHUFFLE THE ORDER" — IT IS TO READ THE FAILURE THAT ALREADY EXISTS.**
-  Every E2E run uploads a **`playwright-report`** artifact (run `36401730152` → artifact
-  `10962381954`, 42 MB), and Playwright retains the **first attempt** of a flaky test in it. That
-  report says in one look which of the three things failed — the 60 s wait for the card heading
-  (load), the `3 days missing` text (data), or the header-width measurement (layout) — and those
-  three point at completely different causes. Shuffling order is the expensive way to answer a
-  question the artifact has already answered on every run. **Download the report for a run where
-  `tn53:105` is listed flaky and read the first attempt's error before changing any spec.**
-  ⚠ The job LOG is not a substitute: it is ~9,000 lines and its tail is container teardown, so a
-  `tail_lines` fetch returns Postgres checkpoint noise rather than the Playwright summary.
-- **What this does NOT settle:** whether the other churning specs are order-dependent. The negative
-  result above is about `tn53` only — it was chosen precisely because it is the one spec that
-  reproduces across runs, and its data inputs turn out to be isolated. That makes **load/timing**
-  the live hypothesis for it, which is exactly what the retained first-attempt error would confirm
-  or kill.
-- **✅ `tn53:105` ROOT-CAUSED AND FIXED 2026-09-28 — and it was never order-dependence.**
-  Reading the retained first attempt (as the step above says to) answered it immediately. The error
-  is not a timeout and not a wrong count — **the note is absent entirely**:
-  `Expected substring: "3 days missing"` · `Received string: "Resting Heart Rate — 14 days"`. So the
-  chart saw **zero** gaps.
-  - **Cause: `scripts/local-db/seed.sql` gives EVERY one of the last 14 days a
-    `resting_heart_rate` (58).** The spec seeded its four readings with `ON CONFLICT DO UPDATE` and
-    never cleared the rest, so on a freshly seeded database the window is full and there is no gap
-    to disclose. A spec cannot assert a gap it does not create.
-  - **That is the whole flaky signature, and it is deterministic.** CI seeds a **new** database every
-    run → attempt 1 meets a full window and fails; the spec's own `afterAll` then NULLs those seeded
-    values; the retry re-runs `beforeAll` against an empty window and **passes**. Hence "flaky" in
-    all three censuses rather than failing outright.
-  - **And it is why it could never reproduce locally.** A local database is persistent, so one
-    earlier run had already emptied it. Measured 2026-09-28: **0 of 15** rows in the window carried
-    a reading locally, against **15 of 15** on a fresh seed. Restoring `resting_heart_rate = 58`
-    across the window reproduced the CI failure exactly, byte for byte.
-  - **Fix:** `beforeAll` NULLs `resting_heart_rate` across the whole window before seeding its four,
-    so the spec is independent of the seed and idempotent. Control-run both ways against the
-    restored fresh-seed state: unfixed **fails** with the CI error, fixed **passes**.
-  - **Sibling sweep, clean:** of the specs that both seed `body_metrics` and mention an absence,
-    only this one asserts on a *rendered* absence — `metric-bounds-at-keyboard` and
-    `reta-weight-response` match on prose and an error message.
-- **⚑ SO THE REMAINING CHURN HAS A BETTER HYPOTHESIS THAN ORDER: SEED-STATE DEPENDENCE.** The real
-  asymmetry is not which spec ran first — it is that **CI runs against a database seeded minutes
-  earlier, while a local database has been mutated by every previous run**. Any spec whose assertion
-  depends on an absence, or on the seed's exact values, is a different test in the two environments,
-  and `tn53` proves the shape. **The cheap probe is `pnpm db:local` (rebuild) followed by the full
-  suite** — that reproduces CI's starting conditions locally, which shuffling order does not.
-- **✅ A THIRD CAUSE, MEASURED 2026-09-28 — AND IT IS NOT IN THE SPECS AT ALL.** The E2E run on
-  `937bae10` (the `tn53` fix, run `36450249635`) failed `tn82-checkin-announce-and-correct`. Reading
-  its retained screenshot: Home had crashed to the error boundary with
-  **`Failed to load chunk /_next/static/chunks/components_activity_exercise-detected-card_tsx_….js`
-  … (next/dynamic entry, async loader)**. The assertions never ran; the spec reported
-  *"the sheet never auto-opened"*, which reads as a broken feature.
-  - **This is a dev-server chunk-load failure**, not a test defect and not a product defect: `pnpm
-    e2e` runs against `next dev`, which compiles on demand, so a request for a `next/dynamic` chunk
-    can fail while it is being built — under a 36-minute single-worker run, on whichever spec happens
-    to be on Home at that moment.
-  - **It explains the CHURN directly.** The flaky list is almost entirely different each run, which
-    no per-spec defect accounts for. A failure that lands on *whatever is running* does.
-  - **The tell to look for:** an assertion failing with "element(s) not found" on a screen that
-    should plainly be there, plus a screenshot of the error boundary. Three of the six specs in that
-    run's `test-results/` touch Home.
-  - **✅ MITIGATED 2026-09-28 (`LB-184`): the root boundary now retries a chunk load once.** Of the
-    three candidates — dropping `next/dynamic` for that card (its `ssr: false` is deliberate),
-    building the app for E2E instead of `next dev`, or teaching the boundary to retry — the third
-    was taken because it is the only one that is **also a user-facing fix**: on the device a
-    transient chunk fetch failure put the owner on an error screen until he tapped, and the
-    boundary's own comment already called an *offline* chunk failure expected while the online case
-    dead-ended. `lib/chunk-load-error.ts` classifies it; `app/error.tsx` retries after 400 ms, once
-    per page life, from a **module-level** guard (`reset()` remounts the boundary, so a state or ref
-    guard would reload forever). The first, transient failure is deliberately not reported; a
-    persistent one comes back with the retry spent and is.
-  - **⚠ ITS EFFECT IS UNMEASURED AND CANNOT BE MEASURED YET (2026-09-28).** Both runs since it
-    landed hit the 45-minute cap (`LB-166`, updated with the figures), and **a capped run uploads no
-    `playwright-report` artifact** — so the retained first attempts this entry's whole method depends
-    on do not exist. The next census waits on `LB-166`.
-  - **This does NOT close the entry.** It removes the cause's *effect* on a spec run, and the other
-    two candidates remain open — building for E2E is still the structural answer to `next dev`
-    compiling on demand, and it is `.github/` rather than this lane's. Whether the churn drops is
-    measurable on the next census.
-  - **`tn53` is NOT in that run's failures** — the seed-state fix above holds on CI.
-- **Not in scope:** the 45-minute cap. That is a symptom of ~250 specs on one worker, and it is
-  `LB-166`'s.
 
 ### [app-shell][heart-rate] LB-172 — Resting HR is drawn as a score, and neither proposed fix fits
 - **📐 MOCKUP DRAWN 2026-09-28 — [`docs/design/2026-09-28-resting-hr-cell.html`](design/2026-09-28-resting-hr-cell.html)

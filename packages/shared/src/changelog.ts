@@ -6,6 +6,27 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.481.13",
+    date: "2026-09-29",
+    changes: [
+      "Nutrition's energy card now says \"+N earned\" for the calories today's movement added, instead of \"burned\", which the Day screen uses for the whole day's total.",
+    ],
+  },
+  {
+    version: "1.481.12",
+    date: "2026-09-29",
+    changes: [
+      "Clock times on the sleep screens now read \u201c11:30 pm\u201d, matching the rest of the app, instead of \u201c11:30 PM\u201d on the sleep timing chart and \u201c11:30pm\u201d in the sleep verdict. A rounding fault that could print a time like \u201c6:60 AM\u201d is gone with it.",
+    ],
+  },
+  {
+    version: "1.481.11",
+    date: "2026-09-29",
+    changes: [
+      "A friend request you sent now shows under \u201cSent\u201d as \u201cRequest sent\u201d with a Cancel, instead of appearing as \u201cUnknown\u201d with Accept and Decline buttons that could never work \u2014 only the person who receives a request can accept it. The number on the Manage button also counts only the requests waiting on you.",
+    ],
+  },
+  {
     version: "1.481.10",
     date: "2026-09-29",
     changes: [
