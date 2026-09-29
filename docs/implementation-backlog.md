@@ -7303,7 +7303,30 @@ drift.
 
 ### [readiness][body] LA-144 — the Body Battery's wake anchor discards the whole day when the main sleep is a daytime block
 
-- **Lane: A** — `app/api/body-battery/route.ts` (the wake-anchor block, ~line 172-188).
+- **Lane: T** — re-laned 2026-09-29 (was A). The fix is a change to how a battery DAY is bounded, which
+  moves a number the owner reads daily, so it needs a Tuning proposal with a replay before Lane A
+  builds it. The code now lives in `lib/health/body-battery-day.ts` (the route is a thin caller) and
+  `packages/shared/src/health/body-battery-walk.ts`.
+- **⚙ Lane A analysis, 2026-09-29. The entry's own fix is inconsistent, and the defect is rare.**
+  - **Rare: 3 of 95 main sleeps (≥ 3 h) began in the daytime** (06:00-19:59 Brisbane): 08-27
+    11:35→16:52, 09-18 14:49→19:00, and 09-23 10:42→17:25. Every other day's main sleep is
+    overnight, and those days' waking window would be unchanged by any option below.
+  - **Why "waking = the day minus the sleep intervals" is wrong as stated:** the walk starts from the
+    ANCHOR, which is the level AFTER the main sleep has charged (readiness for that sleep). Walking
+    09-23's 00:00→10:42 from that anchor drains a post-sleep value before the sleep happens. Under
+    today's model those hours belong to 09-22's day, which stops at midnight, so they fall between
+    two days and are counted by neither. That, not the anchor guard, is the loss.
+  - **Recommendation for the proposal: bound a battery day wake-to-next-main-sleep, not
+    midnight-to-midnight.** A day's walk runs from its main sleep's end until the next main sleep
+    starts (or now), and the date key stays the wake date. 09-23's 00:00→10:42 then extends 09-22's
+    day, and 09-23's day starts at 17:25 as today. On the 92 overnight days nothing moves except the
+    evening tail after local midnight, which today is cut at 00:00. **Measure that tail**: it is the
+    real size of the change. **Alternative, smaller:** leave day bounds alone and only extend a day's
+    walk past midnight when the next main sleep starts after 06:00. That moves exactly the 3 days, at
+    the cost of a rule that only exists for the exception.
+  - **Owed with the proposal:** the replay count of stored days that move under the chosen bound (the
+    Tuning rule), and whether the stored 09-23 row is recomputed. That is a production write, so
+    owner's call, as the entry already says.
 - **Added:** 2026-09-25, Lane A. This is the *"09-23 no HR seen"* investigation Review sweep 59 asked
   to be split out of LA-134 as startable now; LA-134 keeps only the constants re-sweep, which is
   still date-blocked to 2026-10-04.
