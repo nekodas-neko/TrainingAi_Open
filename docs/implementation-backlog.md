@@ -4224,16 +4224,11 @@ which is the right shape for something that can only be validated by living with
   1. Settle which number the ring's denominator is, and make the explainer name that one. — **A.**
   2. Make "burned" on Day and Nutrition come from the same function. — **A.**
   3. ~~Fix the three copy bugs.~~ — **DONE** (two shipped, one already fixed).
-  4. Draw zero days. — **A**, in the route, for the reason above. **⚠ But NOT the route alone —
-     re-verified 2026-09-27 (Lane A), and shipping it alone is a regression.**
-     `weekly-nutrition-chart.tsx` computes its "7-day avg" as `sum / data.length`, so padded zero
-     rows would count an unlogged day as 0 kcal and drag the average down. Its empty state keys
-     on `data.length === 0`, which padding makes unreachable. **And a live bug the padding would
-     mask:** the chart emphasises `i === data.length - 1` as today (full opacity, orange over
-     target). With gaps, on any morning before the first log, that is **yesterday's** bar.
-     **Shape:** the route pads with `logged: false` on empty days, and the chart (Lane B) averages
-     over logged days only, keeps an empty state for "nothing logged this week", and emphasises the
-     bar whose `date` is today. Ship both in one PR, or the chart first. Never the route first.
+  4. ~~Draw zero days.~~ **✅ SHIPPED 2026-09-29 (Lane A), route and chart in one PR.** The route
+     returns seven rows, with `logged: false` on an empty day and `isToday` marked where the timezone
+     is known. The chart (`weekly-nutrition-days.ts`) averages logged days only, keeps its empty state
+     when nothing was logged, and emphasises today's bar rather than the last one. Seen at 384 px on
+     the owner's snapshot: seven bars with Fri/Mon/Tue at zero, "avg of 4 logged days: 745 kcal".
 - **Nothing here is Lane B's any more.** ①② are a reconciliation across routes, and ④ is the route
   under-delivering on its own window.
 - **Adjacent:** RV-164 and BF-154 touched the budget. Read them first. The calibration itself is not in scope.

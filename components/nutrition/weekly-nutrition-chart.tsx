@@ -16,19 +16,12 @@ import { resolveColor } from '@trainingai/shared/chart-colors'
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
 import { useTheme } from 'next-themes'
 import type { NutritionAdherenceResponse } from '@/app/api/nutrition/adherence/route'
+import { weeklyChartModel, type WeeklyDay } from './weekly-nutrition-days'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip)
 
-interface DaySummary {
-  date: string
-  calories: number
-  proteinG: number
-  carbsG: number
-  fatG: number
-}
-
 interface Props {
-  data: DaySummary[]
+  data: WeeklyDay[]
   calorieTarget?: number | null
   adherence?: NutritionAdherenceResponse | null
   /** Drawn as one row of a grouped section rather than as its own card (Q-395b). */
@@ -57,6 +50,7 @@ export function WeeklyNutritionChart({ data, calorieTarget, adherence , grouped}
 
   const labels = data.map(d => fmtDayLabel(d.date))
   const values = data.map(d => d[metric])
+  const model = weeklyChartModel(data)
 
   const chartData = useMemo(() => {
     const resolved = resolveColor(cfg.color)
@@ -67,7 +61,8 @@ export function WeeklyNutritionChart({ data, calorieTarget, adherence , grouped}
           label: `${cfg.label} (${cfg.unit})`,
           data: values,
           backgroundColor: values.map((v, i) => {
-            if (metric === 'calories' && calorieTarget && i === data.length - 1) {
+            // RV-218: emphasise TODAY's bar, not the last one. With gaps the last bar was yesterday.
+            if (metric === 'calories' && calorieTarget && i === model.todayIndex) {
               return v > calorieTarget ? 'rgba(249,115,22,0.7)' : resolved
             }
             return `${resolved}99`
@@ -79,7 +74,7 @@ export function WeeklyNutritionChart({ data, calorieTarget, adherence , grouped}
       ],
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [labels.join(','), values.join(','), metric, calorieTarget, data.length, resolvedTheme])
+  }, [labels.join(','), values.join(','), metric, calorieTarget, model.todayIndex, resolvedTheme])
 
   const options = useMemo(() => ({
     responsive: true,
@@ -125,15 +120,16 @@ export function WeeklyNutritionChart({ data, calorieTarget, adherence , grouped}
         </div>
       </div>
       <div className="h-40">
-        {data.length === 0 ? (
+        {!model.hasAnyLogged ? (
           <EmptyState title="No data yet" className="h-full justify-center py-0" />
         ) : (
           <Bar data={chartData} options={options} />
         )}
       </div>
-      {metric === 'calories' && calorieTarget && data.length > 0 && (
+      {metric === 'calories' && calorieTarget && model.avgCalories != null && (
         <p className="text-[10px] text-muted-foreground mt-2 text-center">
-          Target: {calorieTarget} kcal/day · 7-day avg: {Math.round(data.reduce((s, d) => s + d.calories, 0) / data.length)} kcal
+          {/* RV-218: averaged over the days he logged, so an unlogged day is not counted as 0 kcal. */}
+          Target: {calorieTarget} kcal/day · avg of {model.loggedDays} logged day{model.loggedDays === 1 ? '' : 's'}: {model.avgCalories} kcal
         </p>
       )}
       {adherence && adherence.requiredMealTypeCount > 0 && (
