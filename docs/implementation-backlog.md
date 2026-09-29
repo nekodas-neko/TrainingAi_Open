@@ -1055,7 +1055,25 @@ below threshold and left in place for next time.
   projection above is what a future session actually needs.
 
 ### [platform] BF-223 — `oura_heartrate_pkey` is 7.2 MB of index that has never been scanned in the database's lifetime
-- **Lane:** A — `lib/data/postgres/schema.ts` (`ouraHeartrate`), plus a migration to drop the constraint.
+- **Lane: O** — re-laned 2026-09-29 (was A). The entry itself reserves this for the owner: it changes a
+  constraint on the table the Oura pipeline writes to continuously. Lane A builds it once he says yes.
+- **⚑ FOR THE OWNER, the question in one line:** *may we make `(user_id, timestamp)` the heart-rate
+  table's primary key, which removes 7 MB of index that is never used?*
+  - **Recommendation: yes, alternative (b): the natural key as the primary key.**
+  - **Lane A traced the one open read (2026-09-29), and it rules out the entry's first
+    recommendation.** The DB snapshot export (`lib/export/db-snapshot.ts`) pages every table by its
+    PRIMARY KEY (`getPrimaryKeyColumns` → keyset `ORDER BY <pk>`). Its own comment says a table with
+    none "would need one before it could be paginated safely at all". **Dropping
+    `oura_heartrate_pkey` outright leaves an empty key list, so the export's SQL reads `ORDER BY `
+    and fails for this table.**
+  - Making `(user_id, timestamp)` the key keeps that pagination working, turns the existing unique
+    index (10 M scans) into the key, and drops the never-scanned 7.2 MB surrogate index. The `id`
+    column stays; the full export still emits it.
+  - **Cost:** the swap rewrites the index on a 38 MB table (seconds, under a lock on sensor inserts,
+    which the device retries), and it needs a snapshot first under the standing policy.
+  - **Leaving it** is also fine: 7 MB of 261 MB, about a cent a month. It loses only because the
+    index grows with a table heading for ~69 MB and every sensor insert maintains it.
+  - **Reversal cost: low:** re-adding a surrogate key is one statement and a rebuild.
 - **Added:** 2026-09-29 · BugFix intake, from the session-start database read.
 - **Needs:** — nothing.
 
