@@ -60,6 +60,9 @@ interface ActiveWorkoutScreenProps {
   onRpeChange?: (setIdx: number, value: number) => void;
   onRequestInjurySwap?: (exerciseIndex: number, injuredMuscles: string[]) => void;
   userId?: string;
+  /** BF-220: a deload's loads are deliberately light, so the in-session cut is not offered there.
+   *  Only the orchestrator knows this (`useDeloadChoice`), so it has to come down as a prop. */
+  isDeload?: boolean;
 }
 
 export function ActiveWorkoutScreen({
@@ -91,6 +94,7 @@ export function ActiveWorkoutScreen({
   onRpeChange,
   onRequestInjurySwap,
   userId,
+  isDeload,
 }: ActiveWorkoutScreenProps) {
   // RV-64 — read once for the screen's whole lifetime. `LiveHrChart` fetched this itself and is
   // mounted on the rest phase, so it ran once per rest period against a 20-per-60s route limit.
@@ -535,6 +539,9 @@ export function ActiveWorkoutScreen({
                   currentSet={currentSet}
                   workoutPhase={workoutPhase}
                   intensityPct={exercise?.progressionStyle?.[currentSet]?.pct}
+                  prevSetPrescribedReps={currentSet > 0 ? exercise?.progressionStyle?.[currentSet - 1]?.reps : undefined}
+                  prevSetPct={currentSet > 0 ? exercise?.progressionStyle?.[currentSet - 1]?.pct : undefined}
+                  isDeload={isDeload}
                   onRepChange={onRepChange}
                   onWeightChange={onWeightChange}
                   isBaseline={isBaseline}
