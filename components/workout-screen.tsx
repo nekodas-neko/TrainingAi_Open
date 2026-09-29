@@ -1777,6 +1777,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
   return (
     <>
     <ActiveWorkoutScreen
+      isDeload={deload}
       exercise={effectiveExercises[store.currentIdx]}
       exerciseIndex={store.currentIdx}
       totalExercises={effectiveExercises.length}

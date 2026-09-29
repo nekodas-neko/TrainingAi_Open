@@ -490,6 +490,36 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [readiness][app-shell] OR-206 — the morning check-in compares to "normal", not to yesterday
+
+- **Lane: B** · **Added:** 2026-09-29 · Orchestrator, from the owner on the S25:
+  *"I dont like the comparison to the yesterday. Maybe comparison to \"normal\". So about the same;
+  better or worse. With it default selected to about the same."*
+- **① The wording change is his call and is not in dispute.** `components/checkin/vs-yesterday-picker.tsx`
+  asks *"Compared to yesterday"*; he wants *compared to normal*. Same three options, same order.
+  **Rename the component and the field with it** — `vsYesterday` / `day_checkins.vs_yesterday` stop
+  describing what is being asked the moment the prompt changes, and a field whose name contradicts
+  its question is how the next reader gets it wrong.
+- **⚠ IT CHANGES WHAT THE STORED HISTORY MEANS, and nothing currently marks the boundary.** Rows
+  written before the change answer *"vs yesterday"*; rows after answer *"vs normal"*. These are
+  different questions and **must not be pooled in one trend**. Whatever ships needs a marker — a
+  new column, or a recorded cutover date Tuning can split on. **This is the engineering half and it
+  is not optional**, because the field feeds a scoring input.
+- **⛔ ② THE DEFAULT SELECTION CONTRADICTS `TN-58`'s CENTRAL DESIGN — put to the owner 2026-09-29,
+  not yet answered.** That entry has **no default and no pre-selection**, deliberately, and the
+  picker's own comment says the reason: the absolute 1–5 control it replaced produced **two
+  distinct values across 96 check-ins, sd 0.29**, and *"a neutral stored as though it were an
+  answer is the defect TN-57 just fixed"*. `day_checkins.vs_yesterday` has **no column default** for
+  the same reason, so a skipped answer stays NULL and reads as *not answered*.
+  **The cost of defaulting, stated plainly:** the sheet writes only on Save, but Save is one tap, so
+  a pre-selected neutral makes a reflexive Save indistinguishable from a considered *"about the
+  same"* — which is the degeneration `TN-58` exists to escape, under a new name.
+  **`e2e/tn58-vs-yesterday-no-default.spec.ts` asserts nothing is selected on open**, so ② cannot
+  ship without deciding what happens to that test. **Do not delete it to make the change pass.**
+- **The owner's preference wins if he reaffirms it** — it is his product call. Build ① now; hold ②
+  until he answers, since the two are independent.
+
+
 ### [platform] OR-205 — the AI confidence value gates an automatic action, which a standing rule already forbids
 
 - **Lane: A** · **Added:** 2026-09-29 · Orchestrator, splitting `PS-31` (e).
@@ -908,59 +938,6 @@ below threshold and left in place for next time.
   The stored plan is the AI one (`Accumulation`, confidence 80%), but which component chose the pct
   was not traced, and it decides whether this is a prompt problem or a formula problem.
 
-### [workouts] BF-220 — he told the app the set was too heavy and the next set did not move: RPE reaches nothing until the following week's prescription
-- **Lane:** B — `components/workout-screen.tsx`, `components/workout/active-workout-screen.tsx`. The shared decision function already exists; nothing new is needed in the engine for the minimal version.
-- **Added:** 2026-09-29 · BugFix intake. Owner, mid-rest on Pull: *"This was too heavy for me … would be nice to be able to tell coach then and there if thats on the list of possibilities."*
-- **Needs:** — nothing. Shares a cause with BF-219 but is separately buildable and separately useful.
-
-- **He already told it, which is the part that makes this worth building.** He logged set 1 as
-  `13.75 kg × 6` at **RPE 10 · Maximum** against a prescribed 7. The next card on the same screen
-  still read **`2 · 13.75 kg × 7 reps · ↑ up next`** — unchanged. The signal he is asking to send
-  is one the app already captured and then did nothing with for a week.
-
-- **Confirmed: there is no within-session reaction to RPE at all.** `computeRpeAdjustment`
-  (`autoregulation.ts:56`) has exactly **two** call sites in the repo — its own definition and
-  `autoregulation.ts:141` — and that runs at prescription-generation time. No workout-screen path
-  consults RPE for anything. So the answer to *"is that on the list of possibilities?"* is that it
-  is not currently possible, not that it is hard.
-
-- **The rule that would fire is already written and already agrees with him.** Today's set meets
-  the back-off condition exactly — `rpeDelta ≥ RPE_DEAD_BAND` **and** `missedReps` (6 of 7) — and
-  would return *"−N% load — RPE ran high and you fell short of the prescribed reps"*
-  (`:65–77`), sized 5–10% by how far the reps fell short. **The app knows the set was too heavy the
-  moment he logs it.** It just waits until next week to say so.
-
-- **⭐ Recommend the smallest version: offer, do not apply.** After a logged set whose RPE and rep
-  completion trip the existing back-off condition, show a one-tap suggestion on the next set card —
-  *"That was RPE 10 and 6 of 7. Drop set 2 to 12.5 kg?"* — pre-filling the weight dial rather than
-  changing the plan. Why this shape:
-  - It reuses `computeRpeAdjustment` unchanged, so the in-session answer and the next-week answer
-    can never disagree — which they would the moment a second rule was written for the same job.
-  - It never silently rewrites a session he is in the middle of. A suggestion he ignores costs him
-    one glance; an automatic change he did not want costs him the set.
-  - It is a client-side read of data already on screen. No route, no schema, no model call, works
-    offline — which matters, because this fires in a gym.
-- **Alternatives, with what each is better at:**
-  - **Apply it automatically.** Better at getting the load right for someone who will not tap.
-    It loses because the first time it drops a load he wanted to keep, he stops trusting the
-    number on the card — and this is the screen he cannot afford to distrust.
-  - **A free-text "tell the coach" box mid-workout.** Better at capturing *why* (an injury, bad
-    sleep, a machine at a different setting) which RPE alone cannot express. It loses as the
-    FIRST thing to build: it needs a model call in a gym with bad signal, and it asks him to type
-    between sets to say something the RPE picker already said in one tap. Worth its own entry
-    later, not this one.
-  - **Feed it into the NEXT exercise too, not just the next set.** A reasonable extension, and
-    deliberately out of scope until the single-exercise case has been used for a few sessions —
-    one exercise feeling heavy is weak evidence about the next one.
-- **Reversal cost: low.** A suggestion chip behind a condition that already exists; deleting it
-  removes the feature and nothing else.
-
-- **Done when** a set logged at high RPE that misses its prescribed reps produces a visible,
-  dismissible load suggestion on the next set card of the same exercise, the number matches what
-  `computeRpeAdjustment` would apply next week, and declining it leaves the session untouched.
-  **Device look owed** — this is a screen he reads mid-set with a rest timer running, so the
-  suggestion must not shift the layout or compete with `Start Set 2`.
-
 ### [workouts] BF-221 — the accessory rep band is advice to the model and a constraint on nothing: 7 reps at 77.5% is outside it on both axes
 - **Lane:** A — `packages/shared/src/ai-periodization/generate-prescription.ts:591` and the accessory branch at `:594–598`.
 - **Added:** 2026-09-29 · BugFix intake. Owner, reading his own Pull card: *"If its accessory shouldn't it have reps towards the 12+ rep range?"*
@@ -1092,7 +1069,25 @@ below threshold and left in place for next time.
   projection above is what a future session actually needs.
 
 ### [platform] BF-223 — `oura_heartrate_pkey` is 7.2 MB of index that has never been scanned in the database's lifetime
-- **Lane:** A — `lib/data/postgres/schema.ts` (`ouraHeartrate`), plus a migration to drop the constraint.
+- **Lane: O** — re-laned 2026-09-29 (was A). The entry itself reserves this for the owner: it changes a
+  constraint on the table the Oura pipeline writes to continuously. Lane A builds it once he says yes.
+- **⚑ FOR THE OWNER, the question in one line:** *may we make `(user_id, timestamp)` the heart-rate
+  table's primary key, which removes 7 MB of index that is never used?*
+  - **Recommendation: yes, alternative (b): the natural key as the primary key.**
+  - **Lane A traced the one open read (2026-09-29), and it rules out the entry's first
+    recommendation.** The DB snapshot export (`lib/export/db-snapshot.ts`) pages every table by its
+    PRIMARY KEY (`getPrimaryKeyColumns` → keyset `ORDER BY <pk>`). Its own comment says a table with
+    none "would need one before it could be paginated safely at all". **Dropping
+    `oura_heartrate_pkey` outright leaves an empty key list, so the export's SQL reads `ORDER BY `
+    and fails for this table.**
+  - Making `(user_id, timestamp)` the key keeps that pagination working, turns the existing unique
+    index (10 M scans) into the key, and drops the never-scanned 7.2 MB surrogate index. The `id`
+    column stays; the full export still emits it.
+  - **Cost:** the swap rewrites the index on a 38 MB table (seconds, under a lock on sensor inserts,
+    which the device retries), and it needs a snapshot first under the standing policy.
+  - **Leaving it** is also fine: 7 MB of 261 MB, about a cent a month. It loses only because the
+    index grows with a table heading for ~69 MB and every sensor insert maintains it.
+  - **Reversal cost: low:** re-adding a surrogate key is one statement and a rebuild.
 - **Added:** 2026-09-29 · BugFix intake, from the session-start database read.
 - **Needs:** — nothing.
 
