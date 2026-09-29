@@ -14452,26 +14452,6 @@ that is inefficient only against a "Zone-2" label walking cannot satisfy.
 **Pass test:** the walk summary shows a number that differs between the owner's 2026-08-14 session
 (30.0% reserve) and 2026-08-18 (50.5%), where the zone bar reads identically for both.
 
-### [devices][readiness] LA-82 — the zones can now come from a default age or resting HR, and no screen says so yet
-- **Lane: B** — `components/health/observed-hr-card.tsx` and the cardio hub's heart section.
-- **Added:** 2026-09-08 · Lane A. **Engine half SHIPPED 2026-09-28 (Lane A).** `resolveHrProfile`
-  guards all three of its reads, and `/api/cardio-week` guards its own copy of the user read, so a
-  transient fault no longer takes the hub down. Each failure is named in the source field, as the
-  2026-09-25 decisions set out (a provenance value, not a flag; render the zones and mark them):
-  - `maxHrSource: 'estimated-age-unread'`: the age could not be read, so the max is the no-age
-    190, not 220 − age. For the owner that moves every zone boundary by 6 bpm.
-  - `restingHrSource: 'unavailable'`: the read failed and 60 was assumed. `'default'` still
-    means "no readings", which is a different thing to tell someone.
-  Both are in `/api/cardio-week`'s `heart` block, and `maxHrSource` is `workingMaxSource` on
-  `/api/hr-profile`.
-- **What Lane B owes:** show those two values. Today `observed-hr-card.tsx:41` tests
-  `=== "observed"` and renders everything else as an ordinary estimate, so an age-unread max reads
-  exactly like a real one. That is the "quiet wrong answer" the owner's decision ruled out. Wording
-  is the lane's call. The requirement is that a zone quota measured against a stand-in max or resting
-  HR says so on screen.
-- **Done when:** with `getUserById` failing, the hub renders and its zone section says the max is a
-  stand-in. Likewise for resting HR.
-
 ### [nutrition][body] OR-102b — the reta tracker: vial setup, dose calculator, dose timeline, weight response
 
 - **Lane:** B — a new section under Nutrition, plus the supplement sheet.

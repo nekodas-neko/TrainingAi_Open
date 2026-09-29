@@ -5,6 +5,7 @@ import { HeartPulse, TriangleAlert } from "lucide-react";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { HR_PROFILE_TTL } from "@trainingai/shared/cache-ttl";
 import type { HrProfileResponse } from "@/app/api/hr-profile/route";
+import { maxHrSourceNote } from "./hr-source-copy";
 
 const KEY = "hr-profile";
 const URL = "/api/hr-profile";
@@ -38,7 +39,10 @@ export function ObservedHrCard() {
 
   const obs = data.observed;
   const maxLabel = obs.max != null ? `${obs.max}` : "—";
-  const usingObserved = data.workingMaxSource === "observed";
+  // LA-82. Was `=== "observed"` with everything else printed as "age-estimated", so an
+  // `estimated-age-unread` max — the generic 190, not 220 − age — read exactly like a real
+  // estimate from a known age.
+  const maxNote = maxHrSourceNote(data.workingMaxSource);
 
   return (
     <div className="rounded-xl border border-border bg-muted/20 p-4">
@@ -59,11 +63,14 @@ export function ObservedHrCard() {
       <div className="mt-3 space-y-1 border-t border-border pt-3 text-[11px] leading-snug text-muted-foreground">
         <p>
           Working max: <span className="font-semibold text-foreground tabular-nums">{data.workingMax} bpm</span>{" "}
-          ({usingObserved ? "your recorded max" : "age-estimated"}). Age estimate{" "}
+          ({maxNote.label}). Age estimate{" "}
           <span className="tabular-nums">{data.estimatedMax}</span> · resting{" "}
           <span className="tabular-nums">{data.restingHr}</span>.
         </p>
-        {!obs.isReliable && (
+        {maxNote.detail && (
+          <p className="text-amber-600 dark:text-amber-400">{maxNote.detail}</p>
+        )}
+        {!obs.isReliable && !maxNote.standIn && (
           <p className="text-amber-600 dark:text-amber-400">
             Not enough monitored heart-rate data yet for a confident max — wear the ring/strap on a few
             harder sessions. Using the age estimate for now.

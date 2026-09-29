@@ -22,6 +22,7 @@ import { getLocalStore } from '@/lib/local-store'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { LatestBaselineCard } from '@/components/fitness-tests/latest-baseline-card'
 import type { ZoneQuota } from '@trainingai/shared/health/zone-quota'
+import type { HrProfile } from '@trainingai/shared/health/hr-profile'
 
 interface CardioWeek {
   week: { from: string; to: string }
@@ -33,6 +34,9 @@ interface CardioWeek {
     maxHr: number | null
     maxHrDeltaBpm: number | null
     isReliable: boolean
+    /** LA-82 — the route sends both; absent on a payload cached before it did. */
+    maxHrSource?: HrProfile['maxHrSource']
+    restingHrSource?: HrProfile['restingHrSource']
   }
   quota: ZoneQuota
   dayQuota: ZoneQuota
@@ -204,6 +208,8 @@ export function CardioContent({ userId }: { userId?: string }) {
             maxHr={data.heart.maxHr}
             maxHrDeltaBpm={data.heart.maxHrDeltaBpm}
             isReliable={data.heart.isReliable}
+            maxHrSource={data.heart.maxHrSource}
+            restingHrSource={data.heart.restingHrSource}
           />
           {/* BF-159. Moved off the Health tab's Training list, which is otherwise all lifting, and
               placed against the heart profile: that card is what the heart is doing lately, this is
