@@ -252,6 +252,11 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   *daytime* stress minutes — same word, different model. Readiness itself comes out **clean**: it is
   the reference for a good trail, storing sub-scores **plus `provisional` flags`**.)
 
+**Doses are plotted against resting HR and HRV** (TN-46, v1.483.0) — the card lives in the
+Readiness screen's `extraCards` slot and is absent unless a vial dose falls in the 60-day window.
+**The lag is the rule**: the effect was measured to peak 2–4 days after a dose, so a night counts
+as post-dose only from the day AFTER one. It annotates and never corrects; no score reads it.
+
 ## Open issues
 
 ```bash

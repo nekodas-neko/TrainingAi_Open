@@ -213,6 +213,8 @@ export async function invalidateOuraSync(): Promise<void> {
   await Promise.all([
     // LB-156 — derived from sleep rows, which a sync writes.
     invalidateCache('bedtime-estimate'),
+    // TN-46 — the overlay's other input: each night's resting HR, HRV and stored baseline.
+    invalidateCache('dose-vitals:'),
     invalidateCache('body-metadata'),
     invalidateCache('sleep-sessions'),
     invalidateCache('readiness-score'),
@@ -388,7 +390,12 @@ export async function invalidateFriends(): Promise<void> {
 
 /** Supplement definitions or today's logs changed. */
 export async function invalidateSupplements(): Promise<void> {
-  await invalidateCache('supplements')
+  await Promise.all([
+    invalidateCache('supplements'),
+    // TN-46 — a vial-dosed log is one of the two inputs to the dose/vitals overlay, so logging a
+    // dose has to reach the chart that annotates it.
+    invalidateCache('dose-vitals:'),
+  ])
 }
 
 /** Caches behind the Health > Progress Trends card — invalidate after any write that

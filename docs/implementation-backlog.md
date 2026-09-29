@@ -10905,30 +10905,6 @@ existing 65 days moves by less than 5 points on every one of them.
   (`packages/shared/src/ai-periodization/generation-dedup.ts`).
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **THE PREMISE DOES NOT HOLD.** This entry's own 2026-09-23 re-verification says the two top-up calls aim at different targets, so they are not duplicates. The path has **zero** top-up calls in `ai_call_log` ever (sweep 56). A dedup key would be a near no-op that reads as done. RV-189 proposes removing it, or rewording it as *"top up once, re-scale for the rest variant"* and parking it until meal-plan generation is in use.
 
-### [readiness][devices][platform] TN-46 — plot dose against vitals: the engine join shipped, the overlay chart has not
-
-- **Lane: B** — the overlay. Re-laned 2026-09-28: the engine half shipped (below).
-- **Added:** 2026-09-17 · owner: *"The idea was to be able to correlate change in vitals with reta"*,
-  and *"go with whatever option you think is best"*. The decision (annotate, never correct; the
-  pre-dose reference is the baseline already stored per night) is recorded in the journal entries
-  and the 2026-09-28 entry below.
-- **✔ ENGINE SHIPPED 2026-09-28 (Lane A):**
-  - `packages/shared/src/health/dose-context.ts` finds recent doses in a 5-day window (the measured
-    peak was 2–4 days) and phrases them.
-  - `repo.listDoseEvents` reads the log's own `amount`/`unit`, never the vial's `dose` (a 20×
-    trap), and only vial-dosed logs.
-  - The readiness payload carries `recentDoses`, and its illness advisory, which the notification
-    reuses, names the latest dose. No score reads either.
-- **What is left (Lane B):** the overlay. `GET /api/health/dose-vitals?days=60` returns the doses,
-  each night's resting HR (the night's low, which is what the baseline tracks) and HRV, and the
-  baseline stored for that night, plus `effectLookbackDays`. Plot the vitals as lines with the
-  baseline beside them and the doses as markers. **Do not correlate same-day:** the effect lags
-  2–4 days.
-- **Known limit, chosen:** vial-dosed only, so a daily oral medication does not annotate every day.
-  If an oral medication ever needs this, give supplements an explicit "track against vitals" flag
-  rather than widening the filter.
-- **Do NOT re-tune any threshold against the dosing period** (the original entry's warning stands).
-
 ### [readiness][devices] TN-45 — the only illness band that has ever fired is the one with no penalty and no UI 🔴 LIVE
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-17 · found on a routine production read after TN-34/BF-13/TN-39 shipped.

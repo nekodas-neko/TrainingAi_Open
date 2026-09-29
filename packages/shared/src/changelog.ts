@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.483.0",
+    date: "2026-09-29",
+    changes: [
+      "The Readiness screen now plots your resting heart rate and HRV against the nights you took a vial dose, with the baseline stored for each night beside them. It states that the effect was measured to peak two to four days after a dose, so the days after a marker are the ones to read \u2014 not the marker itself.",
+      "The card only appears when there is a dose in the last 60 days to annotate, and nothing it shows feeds any score.",
+    ],
+  },
+  {
     version: "1.482.2",
     date: "2026-09-29",
     changes: [
