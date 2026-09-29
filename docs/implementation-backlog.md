@@ -6763,83 +6763,45 @@ drift.
   bar) rather than 30; and the other four exercises are unchanged at 30 / 8.75 / 6.25 and their
   bodyweight equivalent. **Device look owed** — the load is only visible on the exercise screen.
 
-### [workouts] BF-199 — the prescription barely uses the model it is named after: sets are always clamped, reps/pct follow a table, and rest is the only free output and it is noise
-- **Lane:** A — `packages/shared/src/ai-periodization/generate-prescription.ts`, `app/api/ai-periodization/session/[sessionId]/prescribe/route.ts`.
-- **Added:** 2026-09-26 · BugFix intake. Owner: *"Prescription uses ai right? Do we NEED ai for this? Can we do this through logic so its easy to prescribe and represcribe"*
-- **Needs:** — nothing. **Wants a plan doc before implementation** (`docs/superpowers/plans/`), per the backlog-driven protocol; this entry is the measurement, not the design.
+### [workouts] BF-199 — prescription from rules, Phase 1: shadow the rules path beside the model and measure
 
-- **Short answer: no, and most of it is already logic.** There is exactly **one** model call in the
-  whole pipeline (`generateObject`, `generate-prescription.ts:304`). Everything around it —
-  `reconcilePrescription`, `applyRoleSetPlausibility`, `fitToBudget`/`dropToBudget`/`expandToBudget`,
-  the role floors — is deterministic TypeScript, and **the deload path makes a complete, valid
-  prescription with no model call at all.** The app already contains a working non-AI prescriber; it
-  runs whenever a deload is recommended.
+- **Lane: A** — `packages/shared/src/ai-periodization/generate-prescription.ts` (+ a read-only admin replay).
+- **Added:** 2026-09-26 · BugFix intake. Owner: *"Do we NEED ai for this? Can we do this through logic so its easy to prescribe and represcribe"*.
+- **Plan:** [`docs/superpowers/plans/2026-09-29-rules-prescription-engine.md`](superpowers/plans/2026-09-29-rules-prescription-engine.md) (written 2026-09-29, Lane A). Phases 2 and 3 are `BF-199b` and `BF-199c`.
+- **Scope, no user-visible change:** on every normal prescription also compute
+  `buildRulesPrescription`, and record the per-exercise difference against the reconciled model
+  output (sets, reps, pct, rest), plus **whether the model's phase and `phaseAction` survived
+  reconciliation**, which nobody has measured and which Phase 2's phase decision turns on. Add a
+  read-only admin replay summarising it.
+- **Done when:** two weeks of his sessions are recorded and the summary reads out: the share of
+  rules = model on reps/pct within 2.5 %, the rest distribution for each, and phase survival.
+- **The original measurement** (sets always the fitter's, reps/pct a curve, rest the only free and
+  noisy output, 35/35 calls ok) is in the plan §1 and the 2026-09-29 journal entry.
 
-- **Measured: what the model actually contributes.** All 33 distinct `(sets, reps, pct, rest)` tuples
-  across every stored prescription (`session_periodization`):
+### [workouts] BF-199b — prescription from rules, Phase 2: rules own sets/reps/pct/rest; the model writes only the prose
 
-  | output | what production shows | whose number is it |
-  |---|---|---|
-  | **sets** | **2 in all 33 tuples, without exception** | **not the model's.** `fitToBudget` clamps to its floor of 2 because the budget is binding (BF-197). The model's set count never survives. |
-  | **reps + pct** | a tight curve: 12→66, 11→68, 10→70.5, 9→72.5, 8→75, 7→76–77.5, 6→80, 4→88, 3→88 — about **+2.25 % per rep fewer** | **a lookup table.** `progression_styles`/`style_sets` already stores `pct`, `reps` and `rest_sec` per set, which is the same four fields the prescription emits. |
-  | **rest** | **23 distinct values from 68 s to 300 s** — 76, 97, 101, 109, 128, 139, 143, 161, 187, 189 | **the model's, and the only genuinely free one.** The styles say 60 / 90 / 120 / 130 / 180. A coach does not prescribe 143 seconds. |
+- **Lane: A** — `packages/shared/src/ai-periodization/generate-prescription.ts`.
+- **Needs:** BF-199, BF-201
+- **Added:** 2026-09-29 · Lane A, from the BF-199 plan.
+- **Plan:** [`docs/superpowers/plans/2026-09-29-rules-prescription-engine.md`](superpowers/plans/2026-09-29-rules-prescription-engine.md) §3 Phase 2.
+- **Scope:**
+  - A phase → rep target table per role, seeded from the observed distribution and stated with its
+    source.
+  - pct from BF-201's signed-off rep→%1RM table, and rest snapped to the style's `rest_sec`.
+  - The prose call fires after the plan is stored and is patched in when it returns.
+  - The phase logic follows BF-199's measurement.
+- **Done when:** a replay reproduces stored sets/reps/pct within the stated tolerance, rest lands
+  only on style values, and Full is a re-evaluation.
 
-  So the one quantity the model controls end-to-end is the one that looks wrong, and the two that
-  look right are reproducible from a table the database already holds.
+### [workouts] BF-199c — prescription from rules, Phase 3: represcribe on the device with no round trip
 
-- **⚠ The honest counter-argument, which this entry does NOT overstate.** Reliability is **not**
-  currently a problem: `ai_call_log` shows **35 prescription calls, 35 `ok`, zero failures**, averaging
-  **2.1 s** and **3,645 tokens**. The structural risk is real — the route has **no fallback**, so a
-  failure returns `502 'AI generation failed'` and the lifter gets no plan at all (`:311`) — but it has
-  not bitten yet, and *"the AI keeps failing"* is not an argument available here. The case rests on
-  what the model adds, not on it breaking.
-
-- **⭐ Recommend: move the numbers to deterministic rules, keep the model for the prose.** The
-  `reasoning` string is genuinely generative and is the part worth an LLM; the four numbers are not.
-  Concretely: a rep→%1RM table (the curve above, already implicit in the output), the existing
-  style/role values, and the budget fitter that is already authoritative for set count.
-- **What that buys, in the owner's own terms — *"easy to prescribe and represcribe"*:**
-  - **Represcribing becomes instant, offline and free** — no 2.1 s round trip, no token spend, no rate
-    limit, no 502 path, and it works in the low-reception case BF-195 is about.
-  - **`Full` stops being a dead toggle outright.** BF-198 exists because the override needs numbers the
-    session-level deload never recorded; under a rules engine the full prescription is a **pure
-    function of the same inputs**, so "give me today at full intensity" is a re-evaluation rather than
-    a stored-state problem. **BF-198's fix and this change are the same idea at two sizes.**
-  - **It becomes testable and diffable.** A scoring or sizing change could be replayed over months of
-    history to state how many sessions it moves — which is exactly the evidence **BF-189** needs and
-    cannot get today, because the current generator is non-deterministic by construction.
-- **Alternatives, with what each is better at:**
-  - **Keep the model and constrain it harder** (enumerate rest to 60/90/120/180 in the schema). Better
-    at preserving whatever adaptive judgement it brings, and it is a one-schema change. It loses on the
-    owner's actual ask — it is still a network round trip, so representcribing stays slow, online-only
-    and fallible.
-  - **Rules engine with the model as an advisory second opinion** (numbers from logic; the model may
-    flag *"this looks too hard given readiness"*). Better if his trust in adaptation is the point. It
-    loses on complexity: two sources for one number is the shape **One Formula, One Place** exists to
-    prevent, and it keeps the network dependency.
-  - **Leave it.** Cheapest today. It loses because BF-198, BF-189 and the represcribe cost are all
-    downstream of the same non-determinism.
-- **Reversal cost: moderate, and one-way in practice.** The rules path can sit behind the existing
-  route and be compared against stored prescriptions before anything switches — but once the lifter is
-  used to instant represcribing, going back to a 2 s round trip will read as a regression.
-
-- **⚑ ONE PART IS NOT AN ENGINEERING CALL AND MUST NOT BE DECIDED BY A LANE: the rep→%1RM table
-  values** — split out as **`BF-201`** so it reaches him rather than sitting inside a `Lane: A` entry.
-  Those are the loads he trains at, so they are calibration — **Tuning proposes, the owner
-  signs**, per the standing rule that Tuning never ships a scoring change. The *architecture* is the
-  lane's; the *numbers in the table* are not. A proposal is incomplete until it states how many of his
-  past sessions the table would have changed.
-- **Not diagnosed here.** What the model contributes to **phase** decisions
-  (`accumulation`/`intensification`/`deload`, `phaseAction`) as opposed to the four per-exercise
-  numbers — `reconcilePrescription` already resolves a "stay" response and the phase is largely
-  schedule- and volume-driven, but nobody has measured how often the model's phase survives
-  reconciliation. That measurement belongs in the plan doc, because a phase engine is the one part
-  that might genuinely want judgement.
-- **Verification:** a rules-generated prescription reproduces the stored `sets`/`reps`/`pct` of past
-  prescriptions within a stated tolerance across his history; rest lands on the style's own values
-  rather than arbitrary seconds; representcribing makes no network call and works offline; and the
-  `reasoning` prose still renders.
-
+- **Lane: A** — the client prescription path (Lane B for any screen change it needs).
+- **Needs:** BF-199b
+- **Added:** 2026-09-29 · Lane A, from the BF-199 plan.
+- **Plan:** [`docs/superpowers/plans/2026-09-29-rules-prescription-engine.md`](superpowers/plans/2026-09-29-rules-prescription-engine.md) §3 Phase 3.
+- **Scope:** a duration preset or Full/deload re-runs the rules from the signals on the client, with
+  no model call, no 502 path, and working offline (BF-195).
+- **Done when:** it represcribes offline on the S25 (a Lane DV check once built).
 ### [workouts] BF-198 — `Full` cannot override a WHOLE-SESSION deload, and the card's stated remedy does not exist
 - **Lane:** A — `packages/shared/src/ai-periodization/generate-prescription.ts` (the session-level deload builder).
 - **Added:** 2026-09-26 · BugFix intake. Owner, on a Saturday Upper reading *"AI Prescription · Deload"* with `Full` selected: *"How am I supposed to select a full workout when the prescription is deload?"*
