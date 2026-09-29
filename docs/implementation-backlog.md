@@ -6196,7 +6196,7 @@ drift.
   one. A new plan can put two meals in one window (the nearest-window rule gives 12:00 and 13:00 the
   same type), so Task 3 must decide what one logged meal of a shared type satisfies, rather than
   assume it cannot happen.
-- **Next: Task 2 (local SQLite mirror, next free version from `next-schema-number.js`).**
+- **Task 2 built 2026-09-30:** local v45 adds the six `est_*` columns (CREATE, ALTER, RECONCILE_COLUMNS). Tasks 3-4 (`meal-estimate.ts`) and 5 (`upsertEstimatedAnswers`, decline clears an estimate) are in their own PRs. **Next: 5b/6/8**, and the pull must carry `est_*` to the device.
   **⚠ Before Task 5,** every reader of `plan_meal_answers` treats a row as a DECLINE, because
   until now every row was one. That covers the server reads and the device's local store after a pull. Each must
   filter `answer = 'no'` before any `estimated` row can be written, or an estimate would hide the
