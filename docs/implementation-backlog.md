@@ -20030,20 +20030,6 @@ whether or not anyone draws them first.
   in both themes, so a green `pnpm dev` is not sufficient evidence and a Known-Issues row is the
   fallback if no device is available.
 
-### [nutrition][devices] LA-36 — `food_items.image_data_uri` is written to the device and read back by nothing
-
-- **Lane: B** — the render. Re-laned 2026-09-28: the engine half is done (below).
-- **✔ ENGINE SHIPPED 2026-09-28 (Lane A):** every local food read now returns `imageDataUri`:
-  `searchFoodItems` (through `foodItemRowToItem`), the recent-foods read, and the item embedded in
-  `getFoodLogsWithItems`. The server's `rowToFoodItem` always did.
-  `la36-food-item-image-local-read.test.ts` runs on an in-memory SQLite and fails on all three with
-  the fix reverted.
-- **What is left (Lane B):** nothing renders a food item's picture in a list yet.
-  `diary-meal-group.tsx`'s `MealThumb` is the saved-meal shape to copy. Mind the memory: at the
-  16 KB `FOOD_ITEM_IMAGE_MAX_BYTES` cap, 20 search rows are ~320 KB. The device measured 1 of 339
-  local foods carrying a picture on 2026-09-23, so today's cost is negligible.
-- **Added:** 2026-08-30, found while extracting the local food-item row mapper for BF-38.
-
 ### [nutrition] LB-18 — `Recent` on Log Food is scoped to a meal bucket; it may want to be global
 
 > **✅ ANSWERED BY THE OWNER ON THE DEVICE, 2026-08-30 — make it global.** *"Recent doesnt need to be
