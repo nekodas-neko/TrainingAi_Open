@@ -1,4 +1,5 @@
 import type { SleepComponent, SleepVerdict } from '@trainingai/shared/health/sleep-verdict'
+import { formatMinutesOfDay } from '@trainingai/shared/date-utils'
 
 /** The verdict as `/api/sleep-verdict` returns it — the stored snapshot, never recomputed. */
 export interface StoredSleepVerdict {
@@ -30,19 +31,14 @@ export function formatDuration(hours: number): string {
 }
 
 /**
- * Signed minutes from local midnight → a clock time. `-50` → `11:10pm`, `80` → `1:20am`.
+ * Signed minutes from local midnight → a clock time. `-50` → `11:10 pm`, `80` → `1:20 am`.
  *
  * The sign is what makes this arithmetic instead of modular wrapping — see `VerdictNight.onsetMinutes`.
  * Device-local formatting is not used anywhere here: these minutes are already in the user's zone,
  * so turning them back into a `Date` would be the timezone bug this app keeps re-finding.
  */
 export function formatClock(minutesFromMidnight: number): string {
-  const wrapped = ((Math.round(minutesFromMidnight) % 1440) + 1440) % 1440
-  const hour24 = Math.floor(wrapped / 60)
-  const minute = wrapped % 60
-  const suffix = hour24 < 12 ? 'am' : 'pm'
-  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12
-  return `${hour12}:${String(minute).padStart(2, '0')}${suffix}`
+  return formatMinutesOfDay(minutesFromMidnight)
 }
 
 /**
@@ -68,7 +64,7 @@ export function componentClause(v: StoredSleepVerdict, component: SleepComponent
   return value && delta ? `${value}, ${delta}` : null
 }
 
-/** The night's own number: `slept 5h10`, `asleep at 1:20am`, `82% of the night asleep`. */
+/** The night's own number: `slept 5h10`, `asleep at 1:20 am`, `82% of the night asleep`. */
 export function componentValue(v: StoredSleepVerdict, component: SleepComponent): string | null {
   const { components: c, bands: b } = v
   if (component === 'duration') {
