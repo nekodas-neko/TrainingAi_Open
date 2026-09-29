@@ -102,12 +102,14 @@ test('a generated exercise with no style still shows a sets/reps line on the rev
   // of the style and so cannot show this defect.
   await expect(page.getByRole('heading', { name: 'Progression style' })).toBeVisible()
   await page.getByRole('button', { name: /Linear Progression/ }).click()
+  // Linear skips step 8 (`handleNext`: next === 8 && linear → 9), so this lands on 9, not 8.
   await next(page).click()
 
-  // Linear skips step 8, so this is 9 (length) then 10 (schedule) on their defaults.
-  await next(page).click()
+  // 9 — program length, default 12 weeks. This is the LAST Next: step 10 is `lastQuestionStep`
+  // outside AI mode, so the footer button there already reads Generate Program.
   await next(page).click()
 
+  // 10 — the rotation schedule, on its defaults.
   await page.getByRole('button', { name: /Generate Program/ }).click()
 
   // The review screen, reached with the stubbed program.
