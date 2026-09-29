@@ -14,6 +14,7 @@
   identical and 5 move by one 0.25 kg rounding step (mean 0.06 kg), computed with the repo's own
   `estimateOneRm` on production set data. `exercise-log-edits.ts` already keyed its recompute on
   `phase_type === 'baseline'`, so edits now agree too.
+- **TN-75 leaves the queue:** ① is covered by LA-177's backfill and ② is this change. The bodyweight question stays as LA-169 (Lane O).
 - **Not done:** historical sessions stay unmarked, so reads covering 09-07→09-12 still exclude that
   window by date.
 - **Verified:** a log-exercise test (an unfinished baseline is stored as `'baseline'`, a finished
