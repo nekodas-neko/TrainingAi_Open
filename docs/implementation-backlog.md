@@ -3998,26 +3998,6 @@ which is the right shape for something that can only be validated by living with
   only *after* a swallowed tap, so it is downstream of the same defect and may clear with it. If it
   survives, it is its own entry with its own mechanism, not a re-open of this one.
 
-### [app-shell][platform] LB-183 — one time-of-day form: switch the two minutes-of-day formatters to the shared helper
-
-- **Lane: B** — `components/health/sleep/sleep-verdict-copy.ts` (`formatClock`) and
-  `components/health/sleep-timing-trend-utils.ts` (`clockLabel`). Re-laned 2026-09-29: the engine
-  half shipped.
-- **Added:** 2026-09-28 · Lane B, split out of `RV-208` ①.
-- **✔ ENGINE SHIPPED 2026-09-29 (Lane A):**
-  - `formatMinutesOfDay(minutes)` in `packages/shared/src/date-utils.ts` prints exactly what
-    `formatTimeOfDay` prints ("6:40 am") for a minutes-since-midnight value. It rounds the whole
-    value first and wraps into one day.
-  - `formatTime12h` now delegates to it, so the activity list and sheet read "6:40 am" (the fourth
-    form is gone).
-- **What is left (Lane B):** replace `formatClock`'s and `clockLabel`'s bodies with
-  `formatMinutesOfDay`, and update their tests ("11:10pm" becomes "11:10 pm", "6:30 AM" becomes
-  "6:30 am").
-  - `clockLabel` also has a latent bug the helper fixes: it rounds the minute alone, so 419.6 renders
-    "6:60 AM".
-  - **Do not route either through `formatTimeOfDay`**: it takes an instant, and these values are
-    wall-clock minutes.
-
 ### [app-shell][platform] RV-208 — the same thing is written, formatted and coloured differently on different screens
 - **Inherited from `RV-212` ③ when that entry was cleared (2026-09-27):** the near-white primary is
   **not** a one-off. Review sweep 63 flagged Nutrition's "I've finished logging" as the only

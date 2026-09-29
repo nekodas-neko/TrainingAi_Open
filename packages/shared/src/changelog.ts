@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.481.12",
+    date: "2026-09-29",
+    changes: [
+      "Clock times on the sleep screens now read \u201c11:30 pm\u201d, matching the rest of the app, instead of \u201c11:30 PM\u201d on the sleep timing chart and \u201c11:30pm\u201d in the sleep verdict. A rounding fault that could print a time like \u201c6:60 AM\u201d is gone with it.",
+    ],
+  },
+  {
     version: "1.481.11",
     date: "2026-09-29",
     changes: [
