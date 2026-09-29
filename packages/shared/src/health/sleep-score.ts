@@ -270,8 +270,40 @@ function midpointHour(start: Date, end: Date, tz: string): number {
   return midpointHourOf(new Date((start.getTime() + end.getTime()) / 2), tz)
 }
 
+/**
+ * OR-204 / Q-72 (owner, 2026-08-23): *"If its missing data it shouldnt [score] differently [without
+ * saying so]. Depending on how much is missing."* How complete a night's score is, by model weight.
+ *
+ * `ratio` is present weight / total weight (110). `level` has three bands and no more, per the owner:
+ * `full` when nothing is missing; `partial` for a light note; `low` once the missing weight reaches
+ * the `hr` + `hrv` share (28 of 110, a quarter of the model). It changes how the score is PRESENTED,
+ * never how it is computed.
+ */
+export interface SleepScoreCoverage {
+  ratio: number
+  missing: string[]
+  level: 'full' | 'partial' | 'low'
+}
+
+const SLEEP_WEIGHT_TOTAL = Object.values(SLEEP_WEIGHTS).reduce((a, b) => a + b, 0)
+/** The missing weight at which a night is flagged clearly rather than lightly: `hr` + `hrv`. */
+export const SLEEP_COVERAGE_LOW_MISSING_WEIGHT = SLEEP_WEIGHTS.hr + SLEEP_WEIGHTS.hrv
+
+export function sleepScoreCoverage(components: Record<string, number>): SleepScoreCoverage {
+  const keys = Object.keys(SLEEP_WEIGHTS) as (keyof typeof SLEEP_WEIGHTS)[]
+  const missing = keys.filter(k => components[k] == null)
+  const missingWeight = missing.reduce((sum, k) => sum + SLEEP_WEIGHTS[k], 0)
+  return {
+    ratio: Math.round(((SLEEP_WEIGHT_TOTAL - missingWeight) / SLEEP_WEIGHT_TOTAL) * 100) / 100,
+    missing,
+    level: missing.length === 0 ? 'full' : missingWeight >= SLEEP_COVERAGE_LOW_MISSING_WEIGHT ? 'low' : 'partial',
+  }
+}
+
 export interface SleepScoreResult {
   score: number
+  /** OR-204: how complete the model's inputs were for this night. */
+  coverage: SleepScoreCoverage
   /** Each available contributor's 0–100 sub-score (missing contributors are absent). */
   components: Record<string, number>
   /**
@@ -480,7 +512,7 @@ export function computeSleepScore(
     }
   }
 
-  return { score: clamp100(score), preCapScore, components, fragmentationCap }
+  return { score: clamp100(score), preCapScore, components, fragmentationCap, coverage: sleepScoreCoverage(components) }
 }
 
 /** Signed hours from `ref` to `h` on a 24-hour clock, in [−12, 12). Positive = later than `ref`.

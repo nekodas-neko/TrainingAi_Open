@@ -170,6 +170,8 @@ export interface ReadinessScoreResponse {
   // there isn't enough data to compute one). The chip/detail read this, not the Oura-only ouraScore.
   readinessDisplayScore: number | null
   sleepScore: number | null
+  /** OR-204: how complete today's OWN sleep score is. Null when the score is not ours (Oura fallback) or absent. */
+  sleepScoreCoverage: import('@trainingai/shared/health/sleep-score').SleepScoreCoverage | null
   activityScore: number | null      // Oura activity score blended with logged training load
   activityBlend: ActivityBlendResult
   readinessContributors: Record<string, number | null> | null
@@ -937,6 +939,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     // night), whereas sleepScore100 comes from computeSleepScore(lastSleep) off the same fresh
     // BLE sleep session. Matches the derived-first order the /api/health/trends route already uses.
     sleepScore:              sleepScore100 ?? ouraToday?.sleepScore ?? null,
+    sleepScoreCoverage:      sleepScoreResult?.coverage ?? null,
     activityScore:           activityBlend.final,
     activityBlend,
     readinessContributors:   ouraToday?.readinessContributors       ?? null,

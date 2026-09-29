@@ -172,7 +172,7 @@ export function HealthScoreDetail({
           temperatureDeviation: row.day === today ? row.temperatureDeviation : null,
           temperatureDeviationSource: row.day === today && row.temperatureDeviation != null ? 'cloud' : null,
           daySummary: null,
-          sleepScore: row.sleepScore, activityScore: row.activityScore,
+          sleepScore: row.sleepScore, sleepScoreCoverage: null, activityScore: row.activityScore,
           activityBlend: { base: row.activityScore, adjustment: 0, final: row.activityScore, trained: false },
           readinessContributors: row.contributors as Record<string, number | null> | null,
           readinessCompositeContributors: null,
