@@ -13910,22 +13910,6 @@ anchor that then moves.
 phase the owner reaches; and TN-25's three options no longer need answering, because no single session
 is claiming to be both.
 
-### [cardio][heart-rate] TN-32 — the Heart Rate page grades heart rate with no profile, and colours a resting-range value red
-
-- **Lane: B** — `app/health/heart-rate/page.tsx` (~lines 77-79). Re-laned 2026-09-28: the two engine
-  parts shipped (below), and this is the one surface part left.
-- **Added:** 2026-09-09 · found in the zone audit TN-30 came out of. Copy and labels only; no
-  threshold moves.
-- **What is left:** the page classifies HR with fixed cuts (`<60` "Resting", `<100` "Normal", else
-  "Elevated"). It is the only place a heart rate is graded without the user's own resting and max, and
-  it colours 60–100 bpm a RED (`#f87171`) that the zone palette uses for nothing in that range. Grade it
-  through `hr-zones.ts` with the user's profile, and take colours from `HR_ZONE_META`.
-- **Pass test:** no heart rate inside the user's own Zone 1 is coloured as an alarm.
-- **✔ SHIPPED 2026-09-28 (Lane A):** the Norwegian 4×4 rationale now states the engine's basis (Zone
-  4–5 = 80–100% of heart-rate reserve), and `session-picker.ts` reads zone names from `HR_ZONE_META`
-  instead of typing them twice. `tn32-zone-copy-basis.test.ts` fails on a framework rationale that
-  quotes a %-of-max figure.
-
 ### [nutrition] BF-138 — the app runs two energy models at once and never states either, so the owner cannot tell which number to eat to
 
 - **Lane:** B — a single explainer surface; the numbers it states already exist. **Do not change any calculation under this entry.**

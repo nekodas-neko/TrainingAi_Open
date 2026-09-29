@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.484.1",
+    date: "2026-09-29",
+    changes: [
+      "The Heart Rate screen now grades your current rate against your own zones instead of fixed cuts. A reading between 60 and 100 was coloured red and called \u201cNormal\u201d; for your resting and max that is inside Zone 1, so most of a sitting day looked like an alarm.",
+      "Until your profile loads the number shows without a grade, rather than being graded by numbers that are not yours.",
+    ],
+  },
+  {
     version: "1.484.0",
     date: "2026-09-29",
     changes: [
