@@ -798,76 +798,57 @@ below threshold and left in place for next time.
   preference question, which is why it is being asked rather than decided.
 - **Blocks nothing.** RV-212 ①② shipped without it.
 
-### [platform] BF-213 — inbound PR #1608 (HealthKit storage) owes a diff read from Review and a merge from the owner
-
-- **Lane:** O — an inbound PR is routed, not built: **Review** reads the diff and posts the review,
-  the **schema half is Lane A's**, and the **merge is the owner's** (outside contributor, storage
-  carve-out). Filed `O` because the lane field takes a letter and no Review letter exists.
-- **Added:** 2026-09-27 · BugFix, per OR-185's GitHub watch. Filed so Review has the finding rather
-  than re-deriving it; the diff read is still Review's.
+### [platform] BF-224 — the two inbound PRs merged unreviewed, and one of them is live auth: a bearer token with the session cookie's own 7-day life
+- **Lane:** O — the diff read is **Review's**, and the one judgement in it (bearer lifetime) is the **owner's**, being auth. Filed `O` because the lane field takes a letter and there is no Review letter. Nothing here is Lane A's until a decision lands.
+- **Added:** 2026-09-29 · BugFix, third firing of OR-185's inbound watch. Replaces `BF-212` and `BF-213`, both removed: they routed PRs that have now merged, so they were finished entries sitting in the queue.
 - **Needs:** — nothing.
 
-- **CURRENT STATE, read 2026-09-28 22:56 on head `5d680b16`. Nothing is blocking; the diff read is
-  all that is owed.** The PR adds `apple_health_samples` — a user-scoped table with soft deletes,
-  four CHECK constraints and a partial history index — plus its Drizzle definition and both
-  `export-map.ts` rows (`SOFT_DELETED` and `EXPORTED`). **All ten CI jobs completed and success**,
-  Migration Check included.
-  **The green is NOT stale, checked rather than assumed:** no commit on `main` has touched
-  `lib/data/postgres/claude-ro-views.sql` or added a migration since his run at 08:43Z, so the one
-  shared file this PR edits has not moved underneath it.
+- **What happened.** `jsboiss` merged **both** his PRs himself at **10:25 on 2026-09-29** — `#1607`
+  (bearer tokens for native login) and `#1608` (HealthKit sample storage). That is entirely his to
+  do and this entry does not dispute it. **The point is that the review `BF-212` said was owed never
+  happened, and `#1607` is the auth carve-out**, with the owner listed as a requested reviewer who
+  did not review. It is deployed.
 
-- **⚠ THIS ENTRY HAS BEEN WRONG TWICE, BOTH TIMES BECAUSE THE CONTRIBUTOR FIXED IT FIRST.** The
-  history, compressed, because three contradicting layers were harder to read than the outcome:
-  ① Filed 09-27 saying the PR took migrations **288/289**, which `main` already held, and that the
-  later-sorting `claude_ro` twin would silently drop the new view. True when written.
-  ② Corrected 09-27 22:56 — he had renumbered to **290/291** and regenerated the twin *after*
-  applying, which is the ordering that matters.
-  ③ Corrected again 09-28 22:56 — **the numbered scheme is gone from this PR entirely.** He has
-  adopted BF-214's conventions: the migration is `202609280817_apple_health_samples.sql` (the
-  `YYYYMMDDHHMM_<what>` form) and the views are an **in-place edit of the single
-  `claude-ro-views.sql`**, not a numbered twin. So there is no number left to collide on, and this
-  entry's prediction that "its `291_claude_ro_views_…` twin must be deleted once BF-214 merges" was
-  satisfied by the author without being asked.
-  **The lesson worth keeping is procedural, not technical:** an entry describing an inbound PR
-  describes a moving object, and re-reading the PR costs one call. Read before citing it.
+- **⚠ It merged on a STALE green, and the sweep is meant to say so plainly.** `#1607`'s only CI run
+  is **2026-09-25, six jobs with a single `Tests`** — from before the suite was sharded into four.
+  `main` took four days and a CI topology change between that run and the merge. All six passed;
+  none of them ran against the tree it landed on. (`#1608`'s green was current — checked 09-28, ten
+  jobs, and `main` had not touched its one shared file since.)
 
-- **⚠ Separately, a REAL collision that is OURS, not his** — `273` and `274` are claimed by both
-  `main` (merged, `273_exercise_media_review_status.sql`) and
-  `origin/lane-a/q44-phase3-pr1-table-rename`, a branch with no open PR. A dead branch reads as a
-  reservation to any tool that scans refs. Delete the branch or leave it; do not renumber for it.
-  Recorded so it is not lost. Not this entry's work.
+- **The diff is 23 lines and most of it is careful.** `app/api/auth/exchange-mobile-token/route.ts`:
+  `responseType` is allowlisted to `cookie`/`token` with a 400 otherwise; the session is verified
+  through `getToken` — decrypt plus an explicit `exp` check — before anything is returned; the
+  response carries `Cache-Control: private, no-store`; the cookie path is untouched. The author's
+  claim that the cookie login is preserved holds.
 
-- **Scope: storage ONLY. 4 files, +89/−1, `mergeable_state: clean`, and the owner is already a
-  requested reviewer.** The author's own summary — *"it doesn't change syncing or calculations"* —
-  matches the diff: there is **no ingest route in this PR**, so nothing writes the table yet.
-- **What Review should look at, since the schema is the whole substance.** The
-  `apple_health_samples_payload` CHECK requires a live row to carry either a quantity or a category
-  and never both, and exempts a tombstone — the question is whether that matches what the future
-  sync endpoint will actually write, because a CHECK is expensive to loosen once rows exist. The
-  table is keyed `(user_id, sample_id)` with `sample_id` supplied by the client; the composite key
-  scopes it to the user, so the cross-user hazard in `CLAUDE.md`'s write-path discipline does not
-  apply here — but it becomes the thing to check on the follow-up PR that adds the route, and that
-  route needs its Zod schema at creation per the ingest rule.
-- **Reversal cost:** none here — nothing has merged, and the table has no writer.
+- **⭐ THE ONE THING THAT NEEDS A DECISION: the bearer token IS the session cookie's value, with the
+  cookie's lifetime.** `accessToken: sessionCookieValue` and `expiresAt: session.exp`, against
+  `session: { strategy: "jwt", maxAge: 7 * 24 * 60 * 60 }` (`auth.config.ts:9`). So one credential
+  now exists in two containers with very different properties: a cookie is `httpOnly`, `SameSite`
+  and confined to the browser; a bearer token is *deliberately handed to a native app to store and
+  replay*, for up to seven days, and being a stateless JWT **nothing can revoke it before `exp`** —
+  the once-a-day `refreshIsActiveClaim` is the only lever, and it only covers account deactivation.
+- **⚠ AND THE ALARMING VERSION OF THIS IS WRONG — checked, because it nearly went in this entry.**
+  The session JWT *does* carry the Google refresh token (`auth.config.ts:45`,
+  `token.refreshToken = account.refresh_token`), which is what `RV-193` exists to keep out of the
+  session JSON. **But the JWT is ENCRYPTED, not merely signed** — verified against the pinned
+  source, `@auth/core@0.41.3` `jwt.ts:52-53`, `alg: "dir"`, `enc: "A256CBC-HS512"`, JWE. A client
+  holding this token **cannot read what is inside it**. So this is not `RV-193` reaching a new
+  surface; it is an opaque session credential in a weaker container. That distinction is the whole
+  severity of the finding and it should not be restated without the citation.
+- **Recommendation for the owner, one line:** give the token branch its own shorter expiry rather
+  than inheriting the cookie's seven days — the client can re-exchange, and the exposure window is
+  the only thing that meaningfully changes. Alternatives: **leave it** (better at not breaking a
+  client already built against it, and defensible — the token is opaque, verified and rate-limited),
+  or **a revocable token type** (better at the revocation gap, and loses because it puts session
+  state in the database for one client).
+- **Reversal cost: low.** One expiry value in one branch of one route.
 
-### [platform] BF-212 — inbound PR #1607 adds a second credential path, and `Q-1a` covers the same area
-
-- **Lane:** O — **Review** reads the diff and posts the review; the **merge is the owner's** (auth,
-  outside contributor — both halves of that carve-out at once). Filed `O` for the same reason as
-  `BF-213`: the lane field takes a letter and there is no Review letter.
-- **Added:** 2026-09-27 · BugFix, per OR-185's GitHub watch.
-- **Needs:** — nothing.
-- **What it is:** `#1607` (`native-token-exchange`, `jsboiss`) returns an opt-in bearer token with an
-  expiry beside the existing cookie login, for an Expo/React-Native iPhone client. The author states
-  the cookie path is preserved.
-- **Check it against `Q-1a` before reviewing** — same area, client half. TN-80 already flags a
-  conflicting design as the likely finding, and two credential paths that disagree about session
-  lifetime is the shape to look for.
-- **Its CI green is STALE and must not be read as current.** The run is from **2026-09-25** and
-  executed a single `Tests` job; every PR since runs four shards, so the workflow has changed shape
-  underneath it. Re-run before anyone reads that green.
-- **Reversal cost:** a shipped second credential path is expensive to withdraw — anything already
-  holding a token keeps working until it expires. That asymmetry is why the merge is the owner's.
+- **What Review should read, now that it is post-merge.** The route above, whether any client is
+  already exchanging with `responseType: 'token'`, and whether `#1608`'s
+  `apple_health_samples_payload` CHECK matches what the future sync endpoint will write — that
+  table is on `main` with **no writer**, so the constraint is still free to change and will not be
+  once rows exist.
 
 ### [workouts] BF-219 — Cable Preacher Curl has been prescribed 13.75 kg four times and returned RPE 10 three of them, with the reps falling 9 → 8 → 7 → 6
 - **Lane:** T — a load-selection calibration, so a Tuning proposal is owed before anyone builds it. Implementation lane afterwards is A (`packages/shared/src/1rm.ts`, `packages/shared/src/ai-periodization/`).
@@ -2178,10 +2159,15 @@ below threshold and left in place for next time.
   | **#1755** | `OR-159`+`RV-196` native security | all green (+ Android green) | **his call** |
   | **#1672** | `RV-190` read-only session leak | all green | **his call** |
   | **#1671** | `RV-191` image byte validation | all green | **his call** |
-  | **#1608** | HealthKit storage (external) | all green | **his call** — see `BF-213` |
-  | **#1607** | bearer tokens (external, auth) | green but **from 09-25** | re-run first |
+  | ~~**#1608**~~ | HealthKit storage (external) | all green | **MERGED 09-29 10:25 by `jsboiss`** |
+  | ~~**#1607**~~ | bearer tokens (external, auth) | green but **from 09-25** | **MERGED 09-29 10:25 by `jsboiss`**, on that stale green |
   **#1755 appeared in this file ZERO times** when that was measured; #1749, #1672 and #1671 appeared
   once each, inside their own closing entries rather than as items awaiting him.
+  **⚠ The two external rows are struck because the author merged them himself on 2026-09-29 — which
+  is his to do, and which means the review this register was tracking never happened.** `#1607` is
+  the auth carve-out and landed on the 09-25 green this table had already flagged as needing a
+  re-run. `BF-212` and `BF-213` are removed (finished entries do not sit in the queue); what is
+  genuinely still owed moved to **`BF-224`**, a post-merge read.
 - **Both blocked PRs report their gates passing, and both have a red REQUIRED check.** #1749's
   Migration Check reads `applied 228, skipped 0, **58 failed**`, every one `column
   t.active_calories_est does not exist` — the general form is `BF-214`. #1499's Build fails at the
