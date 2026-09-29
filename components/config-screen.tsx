@@ -139,15 +139,21 @@ export default function ConfigScreen({ userId, openNewProgram }: { userId?: stri
 
   useEffect(() => { load(); }, [load]);
 
-  // Re-fetch phase sets whenever the section is opened so order is always live
-  useEffect(() => {
+  // LB-155 — both read through the cache rather than around it. The bare GETs they replace set this
+  // screen's state and left `workout-templates` / `phase-sets` holding pre-write data for everyone
+  // else; their writers invalidate first, so these miss and hit the network anyway.
+  const refreshPrograms = useCallback(() => {
+    cachedFetch<{ programs: Program[] }>('workout-templates', '/api/workout-templates', TTL_LONG,
+      (data) => { if (data?.programs) setPrograms(data.programs); }).catch(() => {});
+  }, []);
+  useEffect(() => {   // phase sets, re-read whenever the section opens so the order is live
     if (!phaseSetsOpen) return;
-    fetch('/api/phase-sets').then(r => r.ok ? r.json() : null).then(data => {
-      if (!data) return;
-      const sets: PhaseSetWithPhases[] = data.phaseSets ?? [];
-      setPhaseSets(sets);
-      setSelectedPhaseSetId(prev => prev || (sets.find(ps => ps.isDefault)?.id ?? sets[0]?.id ?? ''));
-    });
+    cachedFetch<{ phaseSets: PhaseSetWithPhases[] }>('phase-sets', '/api/phase-sets', TTL_LONG,
+      (data) => {
+        const sets = data.phaseSets ?? [];
+        setPhaseSets(sets);
+        setSelectedPhaseSetId(prev => prev || (sets.find(ps => ps.isDefault)?.id ?? sets[0]?.id ?? ''));
+      }).catch(() => {});
   }, [phaseSetsOpen]);
 
   const openNewStyle = () => {
@@ -970,11 +976,7 @@ export default function ConfigScreen({ userId, openNewProgram }: { userId?: stri
         sessionId={reviewSessionId}
         open={reviewSessionId !== null}
         onOpenChange={(open) => { if (!open) setReviewSessionId(null); }}
-        onApplied={() => {
-          fetch('/api/workout-templates')
-            .then(r => r.ok ? r.json() : null)
-            .then(data => { if (data?.programs) setPrograms(data.programs); });
-        }}
+        onApplied={refreshPrograms}
       />
 
       {/* Builder Wizard Sheet — closing routes through the wizard's guard so a built
@@ -986,9 +988,7 @@ export default function ConfigScreen({ userId, openNewProgram }: { userId?: stri
             registerCloseGuard={(fn) => { builderCloseGuardRef.current = fn; }}
             onSaved={() => {
               setBuilderOpen(false);
-              fetch('/api/workout-templates')
-                .then(r => r.ok ? r.json() : null)
-                .then(data => { if (data?.programs) setPrograms(data.programs); });
+              refreshPrograms();
             }}
           />
         </SheetContent>

@@ -9075,17 +9075,41 @@ drift.
   from scratch. They were not hard questions — they were questions nobody had been asked, because
   each lived in a session transcript that ended. **Writing them in one place was the whole of the
   work.** That is the argument for this ledger continuing to exist after these six clear.
-### [platform] LB-155 — the bare-`fetch` rule is ENFORCED; 3 sites converted, 10 blocked on a Lane A group entry
+### [platform] LB-155 — the bare-`fetch` rule is ENFORCED; what is left is 8 per-query reads, not a conversion backlog
 
-- **⚙ LB-156 SHIPPED 2026-09-28 (Lane A): the five keys are registered.** `phase-sets` and
-  `workout-templates` were already in `invalidateProgramStructure`. `day-checkin:` joined
-  `invalidateCheckinAffectsPrescription`, `bedtime-estimate` joined both sleep-writing groups, and
-  `plan-meal-answers:` joined `invalidateNutritionWrite`. **⚠ One thing the conversion must add:**
-  `app/nutrition/use-plan-meal-logging.ts`'s answer POST calls **no** group, so converting its read
-  without making that write call `invalidateNutritionWrite()` caches a stale answer.
+- **⚙ LB-156 SHIPPED 2026-09-28 (Lane A): the five keys are registered** (verified in
+  `cache-groups.ts`, not taken from this entry). `phase-sets` and `workout-templates` were already in
+  `invalidateProgramStructure`; `day-checkin:` joined `invalidateCheckinAffectsPrescription`,
+  `bedtime-estimate` both sleep-writing groups, `plan-meal-answers:` `invalidateNutritionWrite`.
+- **⛔ BUT "10 conversions once LB-156 lands" DOES NOT SURVIVE READING THE TEN SITES (2026-09-29).**
+  The missing group entries were necessary and nowhere near sufficient. Read one by one:
+  - **✅ 3 CONVERTED, and they were a live cache bug rather than lint debt** — `config-screen.tsx`'s
+    phase-set re-open refresh and its TWO `workout-templates` post-write refetches (collapsed into one
+    `refreshPrograms`, they were the same three lines twice). All three set this screen's state while
+    leaving the shared entry holding pre-write data for every other reader — and this file **already**
+    fetches both keys through `cachedFetch` at `TTL_LONG` in `load()`, so they were bypassing a cache
+    they own. `config-screen.tsx` leaves the baseline entirely (4 → 0).
+  - **⛔ 1 is AUTHORITATIVE** — `openPhaseSetEditor` needs the sets IN SEQUENCE to build the editor
+    state, and its own comment says why: the editor saves over whatever it opened with, so a stale set
+    wipes migration-added phases. `cachedFetch` is callback-shaped, so cached-then-fresh would open the
+    editor on the stale set and reopen it. Moved to `AUTHORITATIVE_READS` with that reason.
+  - **⛔ 4 are LOCAL-STORE FALLBACKS, not reads the canonical runtime ever takes** — `day-checkin` ×3
+    (`session-select-content.tsx`, `morning-checkin-sheet.tsx`, `end-of-day-review.tsx`) and
+    `plan-meal-answers` ×1 each sit behind `store.getDayCheckin(...)` / `store.getPlanMealAnswers(...)`
+    and run only where `getLocalStore` returns null, i.e. web/dev. They are also one-shot decision
+    reads (open a sheet or not), which the cached-then-fresh callback pair does not fit.
+  - **⛔ 2 are NOTIFICATION SCHEDULERS** — `day-review-reminders.ts` and `meal-reminders.ts` read
+    `bedtime-estimate` to compute a schedule. `cachedFetch` fires `onData` twice on a stale entry, so
+    the conversion schedules twice; and `freshWithinTtl` is disqualified because the payload is
+    derived from sleep rows written server-side by the BLE rollup (the RV-67 test `readiness-score`
+    also fails).
+  **So 6 of the 10 are not debt and will never convert as written, and the entry's `Needs:` was never
+  the whole blocker.** Whoever takes this next needs a different question for those six, not a retry.
+- **⚠ Still true and still owed:** `use-plan-meal-logging.ts`'s answer POST calls **no** group, so if
+  that read is ever converted the write must call `invalidateNutritionWrite()` in the same change.
+- **Keep:** the **8 deliberately deferred per-query reads** (`?q=`, `?code=`, `?threadId=`, `?sessionId=`, plus `exercise-history?name=`), which need a key that carries the query without churning the cache on every keystroke. That is the ONLY conversion work left — everything else in the ratchet is classified above as authoritative, a local-store fallback, or a scheduler. **Do not re-read the ten sites; they are triaged.**
 - **Lane: B**. **Added:** 2026-09-25 · measured while shipping RV-79.
   **Enforcement shipped 2026-09-25** — `scripts/check-bare-api-fetch.js`, wired into Custom Rules.
-- **Needs: LB-156**
 - **⛔ The count in the first version of this entry was wrong twice over. It is 67 today.** Filed as
   **69**; that included a false positive, because the scan dropped `method:` but not the SHORTHAND
   `{ method, headers }`, which has no colon — so a POST in `supplements-section.tsx` counted as a
@@ -9132,8 +9156,9 @@ drift.
     not clear it at all.
   - **8 remain deliberately deferred**: the six per-query reads this entry already listed, plus
     `exercise-history?name=` in `workout-screen.tsx`. Unchanged reasoning.
-  **So the remaining Lane B work is 0 until `LB-156` lands**, which is why this entry now carries
-  `Needs: LB-156` rather than a count.
+  **⚠ That paragraph's arithmetic was right and its conclusion was wrong** — see the 2026-09-29
+  triage above. `LB-156` landing unblocked 4 of the 10, of which 3 converted and 1 proved
+  authoritative; the other 6 were never blocked on a cache group at all.
 - **Remaining work — the ~20 conversions, triaged in the BASELINE itself so nobody re-derives it.**
   Weakest first: six are **per-query** (`?q=`, `?code=`, `?threadId=`, `?sessionId=`) where a key
   must carry the query, and a search-as-you-type key churns the cache for nothing. Strongest are the

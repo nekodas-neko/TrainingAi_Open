@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.482.2",
+    date: "2026-09-29",
+    changes: [
+      "Reordering your training phases, applying a workout review, or saving a program from the builder now updates every screen that shows them, instead of only the Config screen you were looking at.",
+    ],
+  },
+  {
     version: "1.482.1",
     date: "2026-09-29",
     changes: [

@@ -55,6 +55,8 @@ const AUTHORITATIVE_READS = [
    'offline-first hydration: the file already caches this key on the no-store path. THIS call is the authoritative server copy that feeds applyDelta and hydrates the local store, and its own comment turns a failure into "keep the local render". A cached value would be applied as authoritative and re-insert rows the outbox has already deleted (BF-47).'],
   ['components/workout-screen.tsx', '/api/achievements',
    'the XP delta baseline: recordXpEarned subtracts the pre-workout XP from this response. A cached pre-workout value makes the gain read 0. It already writes the answer back with setCached, which is the caching half done correctly.'],
+  ['components/config-screen.tsx', '/api/phase-sets',
+   'openPhaseSetEditor needs the sets IN SEQUENCE to build the editor state, and its own comment says why: the editor saves over whatever it was opened with, so a stale set wipes migration-added phases. cachedFetch is callback-shaped, so the cached-then-fresh pair would open the editor on the stale set and then reopen it. The other phase-sets read in this file IS converted (the re-open refresh), which is the pair this population exists to separate.'],
 ];
 
 const DEBUG_DIRS = [
@@ -85,7 +87,6 @@ const BASELINE = {
   'app/session-select/session-select-content.tsx': 1,             // day-checkin  (1 of 3)
   'components/morning-checkin-sheet.tsx': 1,                      // day-checkin  (2 of 3)
   'components/nutrition/end-of-day/end-of-day-review.tsx': 1,     // day-checkin  (3 of 3, evening)
-  'components/config-screen.tsx': 4,                              // phase-sets x2 + workout-templates x2
   'lib/day-review-reminders.ts': 1,                               // bedtime-estimate (1 of 2)
   'lib/meal-reminders.ts': 1,                                     // bedtime-estimate (2 of 2)
 
