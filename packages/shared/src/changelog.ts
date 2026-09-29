@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.483.1",
+    date: "2026-09-29",
+    changes: [
+      "The \u201cWhy this?\u201d screen now separates sore muscles you ticked yourself, which lowered the session score, from ones the app suggested and had already accounted for. Previously both sat on one line, so a muscle could appear as sore beside a recovery figure that had ignored it.",
+    ],
+  },
+  {
     version: "1.483.0",
     date: "2026-09-29",
     changes: [

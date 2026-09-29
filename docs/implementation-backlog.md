@@ -11024,35 +11024,6 @@ line must name **what moved** (resting HR and HRV off baseline), never imply inf
   against `main`, including a real `MoodFieldsSchema.parse` round-trip, which is the silent strip the
   fix is about.
 
-### [workouts][app-shell] LB-117 — the explain screen lists sore muscles that no longer penalise anything
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-17 (Lane A, found while shipping BF-173).
-- **Lane: B** — the "Why this?" explain surface. The `signals.soreMuscles` block in
-  `lib/data/postgres/adapter.ts` is what feeds it and is deliberately unchanged: it still reports
-  the ticks truthfully.
-- **This is a consequence of BF-173, filed rather than left to be discovered.** The explain page's
-  rule (Q-105) is that it shows the numbers the recommendation was actually computed from. After
-  BF-173 an accepted suggestion is listed as sore and does **not** lower the score, so the page can
-  show a muscle under "sore" beside a recovery figure that ignored it — the same
-  reads-as-broken shape Q-105 was written about, and adjacent to BF-172's mislabelling.
-- **What to do:** distinguish the two in the signals block the page renders — a suggested tick is
-  "the model already counted this", a lifter-added one is "this lowered the score". The data is
-  there: `moodLog.suggestedSoreMuscles` is read back by `getMoodLog` and `listMoodLogs`.
-- **Not urgent and deliberately not batched with BF-172:** that entry is about a label on a
-  different number (session fit called readiness). Same screen, different defect.
-- **Needs:** LB-118
-- **⛔ CHECKED 2026-09-17 AND THIS IS NOT BUILDABLE IN THIS LANE YET.** *"The data is there"* is true
-  of the repository and false of what the page is given: the explain `signals` block
-  (`adapter.ts:1912`) carries `soreMuscles` and no provenance, and `signals` is the payload this
-  surface renders. Exposing it is two one-line edits in Lane A files — filed as **LB-118**, with the
-  value already in scope at `adapter.ts:1892`.
-- **⚠ And the obvious Lane B workaround is wrong, which is why this is parked rather than improvised.**
-  `GET /api/mood` returns the provenance, so the page could fetch it itself — but `next-session` is
-  cached and the check-in can change after the recommendation was computed, so that fetch can
-  describe a *different* check-in from the one behind the score. Q-105 exists to stop this page
-  explaining a recommendation with inputs it did not use.
-- **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** still correctly parked on `Needs: LB-118`. Its `adapter.ts:1912` citation is now `:1952`.
-
 ### [readiness] TN-34 — the stress-deload override fires on 83% of days, off the one number measured to carry no signal
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-10 · found answering the owner's *"is stress a real usable value?"*
