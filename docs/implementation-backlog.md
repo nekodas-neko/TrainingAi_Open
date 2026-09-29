@@ -6639,6 +6639,20 @@ drift.
   output (sets, reps, pct, rest), plus **whether the model's phase and `phaseAction` survived
   reconciliation**, which nobody has measured and which Phase 2's phase decision turns on. Add a
   read-only admin replay summarising it.
+- **✔ BUILT 2026-09-29 (Lane A).** Every model-generated prescription writes a `prescription_shadow`
+  row (migration `202609291131`, `claude_ro.prescription_shadow`) with the given
+  sets/reps/pct/rest, the rules prescriber's for the same exercise (`null` where it has no style),
+  and the model's phase and action before and after reconciliation. It is best-effort and runs
+  after the store. No admin endpoint was built: the view is enough for a `db-query` summary.
+- **First real sample** (`pnpm dev` on the owner's snapshot, Push):
+  - Rest given 209 / 141 / 97 / 113 s against the style's 120 / 75 / 60.
+  - The rules path had nothing for the styleless Cable Chest Dips, which LA-177 has since backfilled.
+  - **The model's prose said it "excluded Dumbbell Fly" while the numbers it returned included it.**
+    That is evidence for Phase 2's prose-from-final-numbers.
+- **Keep:** the read, after two weeks of production prescriptions: the share where rules = given on
+  reps/pct within 2.5 %, the rest distribution for each, and how often `model_phase` ≠ `final_phase`
+  or `model_phase_action` ≠ `final_phase_action`. Earliest useful date **2026-10-13**. It unblocks
+  BF-199b.
 - **Done when:** two weeks of his sessions are recorded and the summary reads out: the share of
   rules = model on reps/pct within 2.5 %, the rest distribution for each, and phase survival.
 - **The original measurement** (sets always the fitter's, reps/pct a curve, rest the only free and
