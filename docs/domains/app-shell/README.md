@@ -582,7 +582,7 @@ Live at the time of writing (2026-07-30):
   `components/ui/sheet.tsx` does this for the close button's 64px corner and says why. Related:
   `SheetContent side="bottom"` bakes the bottom inset and `p-0` does not strip it.
 
-- **[`2026-09-28-movement-balance-palette-clash`](../../overview/entries/2026-09-28-movement-balance-palette-clash.md)**
+- **[`2026-09-28-movement-balance-palette-clash`](../../overview/history-2026-09-29-folded-2.md#2026-09-28-movement-balance-palette-clash)**
   — **RV-208 ③: category colours stopped borrowing session colours, and the hue space is
   over-subscribed.** Movement Balance coloured `legs` `--accent-green` (**0°** from session green)
   and `pull` `--accent-purple` (**10°** from session purple, **20°** from indigo), while the calendar
