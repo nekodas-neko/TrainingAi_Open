@@ -31,6 +31,22 @@
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts][app-shell] BF-220's in-session load suggestion is NOT device-verified, and it lands on the screen he reads mid-set
+
+- v1.486.0 offers a lighter next set after one logged at high RPE that fell short of its reps. The
+  decision is unit-tested to the number (13.75 → **12.5 kg**, the figure the entry predicted from the
+  same function) and the pill's appearance, acceptance and dismissal are covered in the browser
+  (`e2e/bf220-rpe-load-suggestion.spec.ts`). **What no sandbox can answer is whether it belongs
+  there.**
+- **Owed (Lane DV):** on the S25 at 412 dp, log a set at RPE 10 two reps short and look at the next
+  set card. Pass/fail is the entry's own: **the suggestion must not shift the layout or compete with
+  `Start Set 2`**, which is the control he is reaching for with a rest timer running. Check also that
+  the row does not push `Start Set 2` under the gesture bar.
+- **A second reading is owed at the same time:** the pill sits above the card, so on a short viewport
+  it may arrive off-screen and be missed entirely — the opposite failure from crowding, and equally
+  invisible from here.
+- **Strike this row** when both are VERIFIED.
+
 ### [cardio][activity] RV-166's walk completion is NOT device-verified, and the local store is the whole path
 
 - v1.482.0 lets a walk finish the day's prescribed run from the new *Today's cardio* card. The link
