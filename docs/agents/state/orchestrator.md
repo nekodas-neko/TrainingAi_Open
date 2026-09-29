@@ -23,6 +23,13 @@ never been used. That is the reason the owner chose a watermark over a status co
 and a Lane B surface is a lot of machinery for a feature with one lifetime submission, and this
 costs nothing to abandon.
 
+## Session-start reads — last taken 2026-09-29
+
+All three run. **Feedback: 0 rows** (none of the owner's — the watermark above does not move).
+**Faults: quiet** — 143 rows in `error_events`, of which **137 are `bf110` instrumentation**; the
+six real ones span a month and are all already filed. **Size: 261 MB, off trend** — +29 MB in six
+days against 1.53 MB/day, filed as `OR-203` with the per-table baseline sweep 54 did not record.
+
 ## Now
 
 **Five rounds of owner device-checks are done** (OR-111→118); 81 answers, 30 entries left the queue.
