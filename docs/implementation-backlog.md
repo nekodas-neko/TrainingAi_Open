@@ -5413,8 +5413,7 @@ volume7dKg,                             // likewise
     rounding step, mean 0.06 kg.** Negligible, and it makes server and screen agree.
   - **Historical sessions are NOT marked.** The 09-07→09-12 round stays NULL (no backfill, no
     rewrite), so an adherence read covering it still excludes those dates by rule.
-- **Keep:** ① Barbell Skull Crusher has no style, so it records no per-set plan until one is
-  assigned. That is the owner's action, already asked in LA-182.
+- ① Barbell Skull Crusher's missing style is covered by **LA-177**, which backfills it (Hypertrophy 3-set).
 - **So TN-75's remaining work is small.** ① The loaded residue is Barbell Skull Crusher with no
   `style_id`. That is BF-200's residue: the engine now deloads it (#1814), but it still records no
   per-set plan until a style is assigned in Config, which is an owner action. ② The acceptance
