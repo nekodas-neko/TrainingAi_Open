@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.484.0",
+    date: "2026-09-29",
+    changes: [
+      "More \u2192 Details now lists your personal records \u2014 the best estimated one-rep max for every exercise you have logged, each with the day it was set. They were the one thing the app measured and gave you no way to read.",
+      "Exercises you no longer train stay in the list, since a best lift does not stop being one when the program changes.",
+    ],
+  },
+  {
     version: "1.483.1",
     date: "2026-09-29",
     changes: [
