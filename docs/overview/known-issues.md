@@ -31,6 +31,19 @@
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [cardio][activity] RV-166's walk completion is NOT device-verified, and the local store is the whole path
+
+- v1.482.0 lets a walk finish the day's prescribed run from the new *Today's cardio* card. The link
+  writes through `store.upsertPrescribedRun` + the outbox, and **`getLocalStore` returns null in the
+  browser** — so the write, the `completedAs: 'walk'` payload and the pull-back have never run
+  anywhere but a unit test. The card's rendering IS covered (`e2e/rv166-todays-cardio-card.spec.ts`).
+- **Owed (Lane DV):** from the Cardio Hub, `Walk it` → a duration chip → Save. The card must then
+  read **Done · Completed as a walk**, `prescribed_runs.completed_as` must be `'walk'`, and the next
+  prescription must be unaffected by it (a walk must not satisfy the planner as a run, LB-179).
+- Also unexercised: the **estimated** path — a treadmill walk with no heart rate counting from its
+  logged minutes. No sandbox row has that shape.
+- **Strike this row** when that is VERIFIED.
+
 ### [cardio][platform] LB-179's local SQLite v44 (prescribed_runs.completed_as) is NOT device-verified
 
 - Shipped with the web deploy, with no APK. On first open after deploy the S25 should migrate to **v44**,
