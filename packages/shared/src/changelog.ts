@@ -16,6 +16,13 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    version: "1.481.13",
+    date: "2026-09-29",
+    changes: [
+      "Nutrition's energy card now says \"+N earned\" for the calories today's movement added, instead of \"burned\", which the Day screen uses for the whole day's total.",
+    ],
+  },
+  {
     version: "1.481.12",
     date: "2026-09-29",
     changes: [

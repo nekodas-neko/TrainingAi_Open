@@ -4277,7 +4277,18 @@ which is the right shape for something that can only be validated by living with
   consumer re-derive those seven dates, which is how a second copy of a window starts.
 - **Fix:**
   1. Settle which number the ring's denominator is, and make the explainer name that one. — **A.**
-  2. Make "burned" on Day and Nutrition come from the same function. — **A.**
+  2. ~~Make "burned" on Day and Nutrition come from the same function.~~ **✅ RESOLVED 2026-09-29 (Lane A):
+     the totals ALREADY come from one function**, and the real cause was a word.
+     - Day's "Burned 1,694" is the energy timeline's total, which spreads `restingBaseKcal + activeKcal`
+       from the same `/api/nutrition/energy-balance` response Home's card prints as `expenditureKcal`.
+     - Nutrition's energy card printed **"+237 burned" for the movement EARNED today alone**: one word
+       for two numbers.
+     - **Shipped:** that header now reads **"+N earned"**, matching the "N earned from movement" line
+       under it. Seen on the owner's snapshot on 09-28 as "+369 earned"; the e2e assertion was
+       updated.
+     - **What remains is ①, not ②.** The ring's budget is anchored on the measured RMR (`bmr`, 1,297)
+       while expenditure uses `restingBaseKcal` (maintenance minus habitual movement). That is
+       deliberate (BF-152), and whether the one number keeps it is the owner's LA-180 answer.
   3. ~~Fix the three copy bugs.~~ — **DONE** (two shipped, one already fixed).
   4. ~~Draw zero days.~~ **✅ SHIPPED 2026-09-29 (Lane A), route and chart in one PR.** The route
      returns seven rows, with `logged: false` on an empty day and `isToday` marked where the timezone
