@@ -5043,7 +5043,7 @@ unverified"* is now answered: it persists.
 ### [activity] TN-76 — four of the Activity Score's six contributors do not behave as the model documents, measured off its own stored breakdown
 
 - **Branch:** `tuning/activity-contributor-behaviour`
-- **Lane:** A — `packages/shared/src/health/activity-score.ts` and `daily-goals.ts`; engine by the path rule.
+- **Lane: T** — re-laned 2026-09-29 (was A), per OR-178: a scoring change that owes a Tuning PROPOSAL first. The proposal below is incomplete by its own rule (no concrete weights for option (b), no count of stored days moved), so nothing is buildable yet. **Tuning:** name the weights, compute the days moved over the stored contributors, then re-lane to A with the owner's sign-off. The implementation files are `packages/shared/src/health/activity-score.ts` and `daily-goals.ts` (Lane A).
 - **Added:** 2026-09-24 · Tuning agent. **Proposal only** — Tuning never ships a scoring change.
 - **Where the mechanism is:** `packages/shared/src/health/activity-score.ts` (lane weights, the taper,
   `STRENGTH_FREQ_CURVE`), `packages/shared/src/health/daily-goals.ts` (every goal it scores against).
