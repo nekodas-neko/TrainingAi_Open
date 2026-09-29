@@ -6348,31 +6348,6 @@ drift.
   **state how many days it would have moved**. That is the standing bar for anything that changes
   numbers he reads daily, and it is the honest test of whether the corrector works at all.
 
-### [workouts] LA-169 — should a bodyweight exercise carry a prescribed plan at all?
-- **✅ ANSWERED 2026-09-28 — PRESCRIBE REPS ONLY on bodyweight movements, and record them as the plan.**
-  Chin-Up, Pull-Up, Hanging Leg Raise and the rest get a rep target the way loaded lifts get a
-  weight, using the rep max the app already stores and inverts. **`planned_pct` stays empty** — it
-  is a percentage of a lifted 1RM and there is no load to take a percentage of. No new column.
-  He declined record-only (which leaves them outside every adherence figure) and declined planning
-  them as added weight (which misstates an unweighted set as 0 kg).
-  **What this unblocks:** 23 of September's 49 unplanned sets are bodyweight, so Tuning stops
-  quoting adherence over loaded sets only. **Say so when the first figure moves** — adherence will
-  change the day this ships, and it will look like a regression if nobody names the cause.
-  **Back to Lane A** (`TN-75`'s parent work).
-- **Lane: A** — a product preference: what the app should prescribe, not how.
-- **Added:** 2026-09-28 · Lane A, split out of `TN-75` so it reaches the Orchestrator.
-- **⭐ Recommendation: prescribe reps only, and record them as the plan.** A bodyweight movement has a
-  rep max (the app already stores and inverts one, #1120/#1133), so "8 reps, 3 sets" is prescribable.
-  `planned_pct` stays empty because it is a percentage of a lifted 1RM. Over time this makes adherence
-  measurable on those exercises too, with no new column.
-- **Alternatives.** *Record only, no plan:* the simplest, and honest if you never follow a target on
-  these, but they stay outside every adherence figure. *A load-style plan through added weight:*
-  better if you mostly train them weighted, but it misstates an unweighted set.
-- **Why it matters:** 23 of September's 49 sets with no plan are bodyweight. Until this is decided,
-  Tuning quotes adherence over loaded sets only.
-- **Reversal cost: low.** It changes what the workout screen shows and writes going forward. Nothing
-  already stored changes.
-
 ### [nutrition] LA-172 — how should the app tell that a planned meal was eaten, when no plan meal has a meal type?
 - **✅ ANSWERED 2026-09-28 — BOTH, and the answer is wider than option (a).**
   Verbatim: *"Give it a type by its time; as well as what its tagged with."*
