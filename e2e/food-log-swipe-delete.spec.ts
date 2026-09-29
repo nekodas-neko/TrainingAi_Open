@@ -249,10 +249,14 @@ test('a tap the instant the swipe ends opens the confirmation', async ({ page })
   await swipeRowLeft(page, row, { distance: 200, releaseWithPoint: true })
   const tapX = box.x + box.width - 32
   const tapY = box.y + box.height / 2
-  // LB-178: this fails 6 of 6 on CI and passes 8 of 8 here, so the difference is systematic rather
-  // than a race — and the retained artifact could only ever show that the confirmation was absent,
-  // never why. Name whatever is under the tap point at the moment of the tap, so the next red run
-  // says whether the coordinate missed the tray or the tray swallowed the press.
+  // LB-178: this fails on CI and passes here, systematically. The first diagnostic answered half of
+  // it — on CI the topmost element under the tap point IS the Delete button, twice, so the
+  // coordinate is right and the press is swallowed. What is still open is WHERE it is swallowed,
+  // and only one fact separates the two answers: whether a `click` reaches the button at all.
+  //   click fires, no confirmation  → the app ignores a press this soon after a drag: a real defect.
+  //   no click at all               → the browser never synthesised one from this CDP tap, which is
+  //                                   the harness's limit and not the product's.
+  // Both listeners are capture-phase on `document`, so nothing the button does can hide them.
   const hit = await page.evaluate(
     ([x, y]) => {
       const el = document.elementFromPoint(x, y)
@@ -260,12 +264,31 @@ test('a tap the instant the swipe ends opens the confirmation', async ({ page })
     },
     [tapX, tapY],
   )
+  await page.evaluate(() => {
+    const seen: string[] = []
+    ;(window as unknown as { __lb178: string[] }).__lb178 = seen
+    for (const type of ['pointerdown', 'touchstart', 'touchend', 'click'] as const) {
+      document.addEventListener(
+        type,
+        e => seen.push(`${type}:${(e.target as Element | null)?.textContent?.trim().slice(0, 12) ?? '?'}`),
+        true,
+      )
+    }
+  })
   await page.touchscreen.tap(tapX, tapY)
 
-  await expect(
-    page.getByRole('heading', { name: 'Delete food log?' }),
-    `the press right after the release was swallowed on the web path too — the cause is now ours. At (${Math.round(tapX)}, ${Math.round(tapY)}) the topmost element was ${hit}`,
-  ).toBeVisible({ timeout: 5_000 })
+  const confirmation = page.getByRole('heading', { name: 'Delete food log?' })
+  const opened = await confirmation
+    .waitFor({ state: 'visible', timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false)
+  const events = await page.evaluate(() => (window as unknown as { __lb178?: string[] }).__lb178 ?? [])
+  expect(
+    opened,
+    `the press right after the release was swallowed on the web path too — the cause is now ours. `
+      + `At (${Math.round(tapX)}, ${Math.round(tapY)}) the topmost element was ${hit}; `
+      + `events seen: ${events.join(' | ') || 'NONE'}`,
+  ).toBe(true)
   expect(await logCount(), 'the tap deleted the entry with no confirmation').toBe(1)
 })
 

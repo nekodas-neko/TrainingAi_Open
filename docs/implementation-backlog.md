@@ -6630,11 +6630,28 @@ drift.
   run says whether the point landed on the tray, the row, or something else entirely — which
   discriminates the two candidates without needing headless-shell. Verified inert on the happy path:
   the file passes **8 of 8** locally with it in.
-- **Next step is to read that message off the next shard-2 failure.** If the topmost element is the
-  Delete control, the coordinate is fine and the press is being swallowed — a real defect on the web
-  path, and the sibling at `:274` (which asserts the property coordinate-free and passes on CI) is then
-  the shape `:238` should adopt. If it is the row or anything else, the coordinate is wrong on CI's
-  geometry and the fix is to derive the tap point after the release rather than before it.
+- **✅ READ OFF RUN `36547587451` (PR #1964), 2026-09-29 — and it refutes the browser-build candidate.**
+  On CI the topmost element under the tap point is `button… "Delete"`, on the first attempt **and** the
+  retry. **The coordinate is right; the press is swallowed.** So neither the geometry nor the Chromium
+  build explains it, and both earlier candidates are dead.
+- **⛔ AND THE "ADOPT `:274`'s SHAPE" PLAN IS WRONG — reading the result showed why.** `:274` asserts
+  *the tray is the topmost element over its own rect*, which is **exactly what the diagnostic has just
+  proved true on CI**. Converting `:238` to that shape would swap a failing assertion for one already
+  known to pass, which is quarantining the failure under another name. The plan was written before the
+  answer existed; the answer retires it.
+- **What is still open is WHERE the press is swallowed, and one fact separates the two answers:**
+  whether a `click` reaches the button at all. The button's own handler has no guard —
+  `swipe-actions.tsx` does `openRows.delete(close); close(); a.onPress()` unconditionally — so either
+  the app never receives the click, or it receives it and the confirmation still does not open.
+  - **click fires, no confirmation** → the app ignores a press this soon after a drag. A real defect,
+    and the same shape `BF-61` was filed for after the device failed it twice.
+  - **no click at all** → the browser never synthesised one from a CDP tap issued this soon after a
+    CDP swipe. That is the harness's limit, not the product's — and the spec's own docstring already
+    says the device-level cause is unreachable from here.
+- **✅ SHIPPED: capture-phase listeners for `pointerdown`/`touchstart`/`touchend`/`click` on
+  `document`**, with what they saw appended to the same failure message (`events seen: …`). Inert on the
+  happy path — the file passes **8 of 8** locally with both diagnostics in. The assertion still requires
+  the confirmation to open; nothing is skipped or weakened.
 - **⛔ Reading that artifact needs the repository-scoped path, not the one the log prints** — see
   `LB-149` for the 403 that looks like an auth failure and is the sandbox proxy.
 - **✅ AND THE HEADLINE FOR `LB-56`: a fully green E2E run is achievable.** Run three failed nothing at
