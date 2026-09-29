@@ -247,11 +247,24 @@ test('a tap the instant the swipe ends opens the confirmation', async ({ page })
   // measurement is a round-trip, and spending one is the opposite of what this test is timing.
   // One action, `ACTION_WIDTH` = 64, pinned right — see `swipe-actions-math.ts`.
   await swipeRowLeft(page, row, { distance: 200, releaseWithPoint: true })
-  await page.touchscreen.tap(box.x + box.width - 32, box.y + box.height / 2)
+  const tapX = box.x + box.width - 32
+  const tapY = box.y + box.height / 2
+  // LB-178: this fails 6 of 6 on CI and passes 8 of 8 here, so the difference is systematic rather
+  // than a race — and the retained artifact could only ever show that the confirmation was absent,
+  // never why. Name whatever is under the tap point at the moment of the tap, so the next red run
+  // says whether the coordinate missed the tray or the tray swallowed the press.
+  const hit = await page.evaluate(
+    ([x, y]) => {
+      const el = document.elementFromPoint(x, y)
+      return el ? `${el.tagName.toLowerCase()}${el.className ? '.' + String(el.className).slice(0, 60) : ''} "${(el.textContent ?? '').trim().slice(0, 30)}"` : 'nothing'
+    },
+    [tapX, tapY],
+  )
+  await page.touchscreen.tap(tapX, tapY)
 
   await expect(
     page.getByRole('heading', { name: 'Delete food log?' }),
-    'the press right after the release was swallowed on the web path too — the cause is now ours',
+    `the press right after the release was swallowed on the web path too — the cause is now ours. At (${Math.round(tapX)}, ${Math.round(tapY)}) the topmost element was ${hit}`,
   ).toBeVisible({ timeout: 5_000 })
   expect(await logCount(), 'the tap deleted the entry with no confirmation').toBe(1)
 })
