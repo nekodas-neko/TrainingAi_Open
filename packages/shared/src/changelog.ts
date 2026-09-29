@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.486.1",
+    date: "2026-09-30",
+    changes: [
+      "Accessory exercises now stay inside their goal's rep range, so an accessory can no longer be prescribed heavy and low-rep, like 77.5% for 7",
+    ],
+  },
+  {
     version: "1.486.0",
     date: "2026-09-29",
     changes: [

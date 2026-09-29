@@ -12,7 +12,7 @@ import { todayInTz } from '@trainingai/shared/date-utils'
 const RULES_PRESCRIPTION_TTL_MS = 6 * 60 * 60 * 1000
 import { aggregateSignals } from '@trainingai/shared/ai-periodization/signals'
 import { buildSystemPrompt, buildUserPrompt, intensityZoneForRole } from '@trainingai/shared/ai-periodization/prompt'
-import { accessoryTargetRpe } from '@trainingai/shared/ai-periodization/goal-ranges'
+import { accessoryTargetRpe, settleAccessory } from '@trainingai/shared/ai-periodization/goal-ranges'
 import { expectedRpe, pctForExpectedRpe } from '@trainingai/shared/ai-periodization/expected-rpe'
 import {
   applyAccumulationCeiling,
@@ -599,8 +599,10 @@ async function runPrescriptionGeneration(
       // Accessories are prescribed to a target EFFORT (goal RPE); the load floats to hit that RPE
       // at the settled reps, so effort stays constant across rep ranges and progression comes from
       // the 1RM rising rather than a fixed % band. Compounds keep the phase-relative clamp below.
-      const pct = pctForExpectedRpe(accessoryTargetRpe(signals.trainingGoal), a.reps)
-      ex.pct = Math.min(85, Math.max(40, pct))
+      // BF-221: the reps it floats against are held to the goal's accessory band first.
+      const settled = settleAccessory(signals.trainingGoal, a.reps)
+      ex.reps = settled.reps
+      ex.pct = settled.pct
     } else if (role === 'secondary') {
       // Secondary compounds are worked at least as hard as an accessory (owner steer 2026-07-20)
       // — they previously had NO effort floor, so the moderate band could pass a light AI pick
