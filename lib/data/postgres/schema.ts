@@ -864,6 +864,14 @@ export const planMealAnswers = pgTable('plan_meal_answers', {
   logDate:    date('log_date').notNull(),
   answer:     text('answer').notNull().default('no'),
   answeredAt: timestamp('answered_at', { withTimezone: true }).notNull().defaultNow(),
+  // BF-203a. Set only when `answer = 'estimated'`; a DB constraint enforces the pairing. The bias and
+  // basis record how the estimate was made, so it can be explained later without re-deriving it.
+  estCalories: integer('est_calories'),
+  estProteinG: doublePrecision('est_protein_g'),
+  estCarbsG:   doublePrecision('est_carbs_g'),
+  estFatG:     doublePrecision('est_fat_g'),
+  estBiasKcal: integer('est_bias_kcal'),
+  estBasis:    text('est_basis'),
   // Undo is a soft delete: "no" is one mis-tap from losing the meal for the day, and a hard DELETE
   // would never reach a device that has not synced.
   deletedAt:  timestamp('deleted_at', { withTimezone: true }),
