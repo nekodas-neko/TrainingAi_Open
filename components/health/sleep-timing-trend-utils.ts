@@ -4,6 +4,7 @@
 // import-analysis here).
 import { minutesFromNoon } from "@trainingai/shared/health/sleep-consistency";
 import { DEFAULT_TZ } from "@trainingai/shared/date-utils";
+import { formatMinutesOfDay } from "@trainingai/shared/date-utils";
 
 export interface TimingNight {
   date: string;
@@ -16,19 +17,15 @@ export interface TimingPoint {
   value: number | null;
 }
 
-// Clock time, HH:MM AM/PM, from an already-zoned minutes-since-midnight value. The caller
-// resolves the zone (see `timingPoints`); this does no timezone work of its own.
+// Clock time in the app's one time-of-day form ("6:40 am"), from an already-zoned
+// minutes-since-midnight value. The caller resolves the zone (see `timingPoints`); this does
+// no timezone work of its own.
 //
 // DV-7 removed the "device-local is already correct for client display" convention this comment
 // used to cite — it never was, it was merely invisible on a phone sitting in the zone the data
 // was recorded in.
 export function clockLabel(minutesSinceMidnight: number): string {
-  const m = ((minutesSinceMidnight % 1440) + 1440) % 1440;
-  const h24 = Math.floor(m / 60);
-  const min = Math.round(m % 60);
-  const period = h24 < 12 ? "AM" : "PM";
-  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
-  return `${h12}:${String(min).padStart(2, "0")} ${period}`;
+  return formatMinutesOfDay(minutesSinceMidnight);
 }
 
 // Bedtimes cluster around midnight — plot on the noon-shifted axis (minutesFromNoon) so
