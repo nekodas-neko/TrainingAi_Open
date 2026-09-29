@@ -409,6 +409,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
           recentSleep={recentSleep}
           lastSleep={lastSleep}
           computedSleepScore={readiness?.sleepScore ?? null}
+          sleepScoreCoverage={readiness?.sleepScoreCoverage ?? null}
           metaLoading={metaLoading}
           onOpenSheet={() => setMetricSheet("sleep")}
         />
