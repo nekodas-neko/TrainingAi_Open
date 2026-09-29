@@ -2,6 +2,7 @@
 
 import { HealthScoreDetail } from "@/components/health/health-score-detail";
 import { ReadinessBreakdown } from "@/components/health/readiness-breakdown";
+import { DoseVitalsCard } from "@/components/health/dose-vitals-card-lazy";
 
 export function ReadinessContent({ userId }: { userId?: string }) {
   return (
@@ -30,6 +31,10 @@ export function ReadinessContent({ userId }: { userId?: string }) {
               <p className="text-sm text-muted-foreground">{data.daySummary}</p>
             </div>
           )}
+          {/* TN-46. Here rather than on its own screen: resting HR and HRV are readiness inputs, so
+              the overlay sits beside the score they feed. It renders itself away when no vial-dosed
+              log falls in the window, which is most of the time. */}
+          <DoseVitalsCard />
         </>
       )}
     />
