@@ -12794,6 +12794,17 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 
 ### [app-shell] LB-157 — Home's header row cannot hold a date AND three chips at 412 dp: which reading moves?
 
+- **📐 MOCKUP DRAWN 2026-09-29 — [`docs/design/2026-09-29-home-header-date-line.html`](design/2026-09-29-home-header-date-line.html)
+  ([hosted](https://claude.ai/artifact/5rLHxLdX9RJM16GuveofDb)). This is what was owed before building,
+  and it is now what the entry is waiting on.**
+- **⚑ THE ANSWER LEAVES TWO PLACEMENTS, and they look different enough to be worth a glance.** *"The
+  chips keep the header row; the date moves below it"* puts the date UNDER the chips (**A**), while
+  this entry's own recommendation says *"on its own line ABOVE the chips"* (**B**). Both cost the same
+  ~18 px and both stop the row depending on the weather chip's width, so it is a preference, not an
+  engineering call — drawn side by side at 412 dp rather than guessed. **A is the default** if he does
+  not care, since it is what he wrote.
+- **Gate: owner** — the mockup above, and A or B. Build follows immediately; it is a handful of lines
+  in `header-meta-row.tsx`.
 - **✅ ANSWERED BY THE OWNER, 2026-09-26: THE DATE GOES ON ITS OWN LINE.** The weather and battery chips
   keep the header row; the date moves below it. **He kept the battery chips on Home deliberately**
   (they were added as Q-111), so do not revisit moving them — that alternative was offered and
@@ -12847,9 +12858,10 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
 - **Reversal cost: low for all three.** Each is a handful of lines in `header-meta-row.tsx` (plus one
   card for option 2), no data and no migration. So this is worth deciding quickly rather than
   carefully — the expensive part has been the two rounds of shipping a fix that could not work.
-- **A mockup of the chosen option is owed before it is built** (the large-UI rule): a two-line header
-  visibly rearranges the screen he reads daily. This entry is the question, not the build — `Gate:`
-  is deliberately absent so it prints as READY and someone puts it to him.
+- **✔ The mockup owed by the large-UI rule is DRAWN (2026-09-29, top of this entry).** `Gate: owner`
+  is now present, which is correct for this state and was correctly absent before: the earlier
+  question needed to print as READY so someone would put it to him, and this one is *blocked pending
+  an answer already sought*, which is what a gate is for.
 - **What the sandbox cannot settle, and nobody should try again:** the seeded DB has no weather
   snapshot, so `WeatherChip` renders a **56 px skeleton** and the real three-chip row cannot be
   reproduced here. The chip figures above are the 2026-09-12 device measurements; the row width, the
