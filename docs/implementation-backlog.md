@@ -3389,22 +3389,6 @@ which is the right shape for something that can only be validated by living with
      them. The implementer checks them locally with a migration-free script. **Any delete of a
      production row is the owner's call.**
 
-### [app-shell][platform] LA-162 — after RV-192, the "Account created" toast tells an invited registrant the wrong thing
-- **Lane: B** — `app/sign-in/email-sign-in.tsx`, and possibly `app/register/register-form.tsx`.
-- **Needs: RV-192**
-- **Added:** 2026-09-27 · found by Lane A running #1779 on `pnpm dev`.
-- **What:** on `?registered=1` the sign-in screen toasts *"Sign in below — or wait for approval if
-  not yet invited."* That was true while an invite activated a password account. RV-192 (#1779)
-  makes **every** password registration start inactive, invited or not, so the second half becomes
-  the whole story and the first half becomes wrong: an invited registrant who follows it and signs
-  in lands on `/pending`. The copy should say the account waits for approval. Parked on `RV-192`
-  because before that merges the current text is accurate.
-- **Check first, unconfirmed:** in three dev-mode runs the register form's
-  `router.push('/sign-in?registered=1')` did not navigate after a successful `POST`, although
-  calling the router by hand did. Fast Refresh rebuilds were logged around each submit, so it may
-  be a dev-only artefact. It needs one run against a production build before anyone treats it as a
-  bug, because if it is real the toast above is never seen at all.
-
 ### [app-shell] LA-181 — a friend request you sent shows as "Unknown" with Accept/Decline buttons that cannot work
 
 - **Lane: B** — `components/more/manage-friends-sheet.tsx`.
