@@ -40,7 +40,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { cachedFetch, readCacheSync, setCached, cachedFetchToday, readTodayCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { useInvalidationRefetch } from "@/lib/hooks/use-invalidation-refetch";
-import { invalidateWorkoutSummaries, invalidateReadinessInputs, invalidateOuraSync, invalidateWorkoutMetaRefresh, invalidatePrescriptionChanged } from "@/lib/cache-groups";
+import { invalidateWorkoutSummaries, invalidateReadinessInputs, invalidateOuraSync, invalidateWorkoutMetaRefresh, invalidatePrescriptionChanged, invalidateUserProfile } from "@/lib/cache-groups";
 import { mergeCalendarOverlay, readLocalCalendarOverlay } from "@/lib/calendar/local-overlay";
 import { syncOuraRing } from "@/lib/oura-ble/sync";
 import { getLocalStore } from "@/lib/local-store";
@@ -917,6 +917,10 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     setGoalsCheckinDismissed(true);
     setGoalsProfile(prev => prev ? { ...prev, lastGoalReviewAt: new Date().toISOString() } : prev);
     await fetch('/api/nutrition-goals/touch-review', { method: 'POST' }).catch(() => {});
+    // RV-183. This writes `users.lastGoalReviewAt`, which is part of `/api/user/profile`'s payload
+    // and is read RIGHT HERE to decide whether to re-prompt. The optimistic line above only covers
+    // this mount; without the eviction the next one re-reads the pre-write date.
+    await invalidateUserProfile().catch(() => {});
   }, []);
 
   function handleGoalsUserSaved(updated: User) {

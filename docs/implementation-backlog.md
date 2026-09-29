@@ -7743,46 +7743,6 @@ drift.
   rewrite and no per-ingest cost. It needs the sleep windows at read time (a join) and it puts the
   rule in two places, so it is a real trade rather than an obvious win.
 
-### [app-shell][platform] RV-183 — requests the client sends for data it already has
-
-- **Lane: B** — `app/more/more-content.tsx`. Re-laned 2026-09-28: every Lane A half is now shipped
-  or closed with a reason (below), and what is left is two callers on the More screen.
-- **Added:** 2026-09-24 · Review sweep 58 ([`docs/reviews/2026-09-24-sweep-58-rules-and-performance.md`](reviews/2026-09-24-sweep-58-rules-and-performance.md)).
-- **Needs:** LB-180 — the only thing left here is `more-user-profile`, and it cannot take the flag
-  while its payload carries a `countWorkoutSessions()` derivation. LB-180 removes that dead field.
-- **The `more-seasons` half is done (2026-09-28), with the proof at its call site.** RV-67 purity:
-  `listSeasonsWithResults` is two plain selects mapped to the payload — no clock, no derivation.
-  Writers: **none exist** anywhere in the repo, and `/api/seasons` is GET-only, so the
-  every-writer-is-covered half is vacuous rather than unproven. A re-show inside 30 minutes now costs
-  ONE GET instead of two. Guarded by `app/__tests__/rv183-more-seasons-ttl.test.ts`, which fails on the
-  *appearance of a writer* rather than waiting for the stale symptom.
-- **⚑ One genuine missed writer found and fixed while proving it:** equipping a title PATCHes
-  `/api/user/equipped-title`, which writes `users.equipped_title` — part of `/api/user/profile`'s
-  payload — and updated local state only, never calling `invalidateUserProfile()`. Harmless while that
-  key always revalidates; **30 minutes of a wrong title** on More and on `/more/details` (which reads
-  the same key through `useCachedValue`) the moment it does not. That is the class CLAUDE.md's
-  cache-group rule exists for, and it was a live omission independent of any optimisation.
-- **What is left:** `more-user-profile` only. Its proof is otherwise complete now — the writer gap is
-  closed — so it reduces to LB-180 landing.
-- **Closed 2026-09-28 (Lane A): the today-envelope keys cannot take `freshWithinTtl`, so the
-  "one-line enabler" in `cachedFetchToday` is NOT to be built.** All three fail RV-67:
-  - `body-battery` drains with the clock.
-  - `readiness-score` is fed by the BLE rollup's server-side writes.
-  - `next-session` fails for the same reason in `ai_dynamic` mode. There, `getNextSession` scores
-    from Oura rows, sleep, body metrics and derived scores over a `Date.now()` window
-    (`adapter.ts`, the `phaseMode === 'ai_dynamic'` branch). The prescription half WAS provable:
-    every client writer (prescribe, respond, transition, check-in) calls
-    `invalidatePrescriptionChanged`, and workout-review apply calls `invalidateProgramStructure` +
-    `invalidateWorkoutSummaries`. But a proof has to hold for every user, and one mode breaks it.
-  A flag with no qualifying caller invites a disqualified one, so the parameter stays unexposed.
-- **Closed: the 2N+1 post-write round stays.** `pushThenRevalidate` revalidates only when
-  `pushed > 0`. Under LB-151's single-flight push, a concurrent drain can carry this write and report
-  0, and dropping the immediate invalidate would then leave the screen stale for the key's TTL. One
-  wasted request per log is the cheaper side.
-- **Shipped earlier:** the supplement and meal reminder reconciles read local-first (LB-147; both
-  were correctness bugs offline), `LB-148`'s reminder time zones, and the exercise-catalogue claim
-  was retracted (it is already `freshWithinTtl` with a proof).
-
 ### [app-shell] RV-185 — every tab downloads 457 kB of JavaScript before first paint; two libraries load eagerly that the first paint may not need
 
 - **Lane: B** — measure first, then trim.
