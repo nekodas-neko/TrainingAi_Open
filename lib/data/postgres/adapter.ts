@@ -2724,13 +2724,15 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return rows.map(r => this.rowToPrescribedRun(r))
   }
 
-  async upsertPrescribedRun(userId: string, run: Omit<PrescribedRun, 'userId' | 'updatedAt'>): Promise<PrescribedRun> {
+  async upsertPrescribedRun(userId: string, run: Omit<PrescribedRun, 'userId' | 'updatedAt' | 'completedAs'>): Promise<PrescribedRun> {
     const values = {
       id: run.id, userId, planId: run.planId, date: run.date, runType: run.runType,
       durationMin: run.durationMin ?? null, distanceKm: run.distanceKm ?? null,
       targetHrLow: run.targetHrLow ?? null, targetHrHigh: run.targetHrHigh ?? null,
       targetZoneIds: run.targetZoneIds, rationale: run.rationale, gateAction: run.gateAction,
       status: run.status, activityLogId: run.activityLogId ?? null,
+      // LB-179: a fresh or regenerated prescription has not been completed by anything yet.
+      completedAs: null,
     }
     const [r] = await this.db.insert(s.prescribedRuns).values(values)
       .onConflictDoUpdate({
@@ -2746,6 +2748,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const set: Record<string, unknown> = { updatedAt: new Date() }
     if (patch.status !== undefined) set.status = patch.status
     if (patch.activityLogId !== undefined) set.activityLogId = patch.activityLogId
+    // LB-179: every status write says how it was satisfied. A client that does not send it predates
+    // walks completing a prescription, so its completion was a run (null). Leaving the old value
+    // would let a 'walk' from before a regeneration outlive it.
+    if (patch.status !== undefined) set.completedAs = patch.status === 'completed' ? (patch.completedAs ?? null) : null
+    else if (patch.completedAs !== undefined) set.completedAs = patch.completedAs
     const [r] = await this.db.update(s.prescribedRuns)
       .set(set)
       .where(and(eq(s.prescribedRuns.id, id), eq(s.prescribedRuns.userId, userId)))
@@ -2772,6 +2779,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       rationale: r.rationale, gateAction: r.gateAction,
       status: r.status as PrescribedRun['status'], activityLogId: r.activityLogId ?? null,
       updatedAt: r.updatedAt,
+      completedAs: (r.completedAs as PrescribedRun['completedAs']) ?? null,
     }
   }
 
@@ -5259,6 +5267,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           await this.updatePrescribedRun(userId, parsed.data.id, {
             status: parsed.data.status,
             activityLogId: parsed.data.activityLogId ?? null,
+            completedAs: parsed.data.completedAs,
           })
           processed++
         } else if (mut.domain === 'injuries') {

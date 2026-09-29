@@ -20,7 +20,7 @@
  *     offset, which straddles two local days.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { toAestDay, todayInTz } from '@trainingai/shared/date-utils'
+import { toAestDay, todayInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 
 type Row = Record<string, unknown>
 type LoggedDay = { date: string; requiredMealTypesLogged: number }
@@ -254,9 +254,18 @@ describe('/api/nutrition/weekly-summary', () => {
     expect(todayInTz('Etc/GMT-14')).not.toBe(todayInTz('Etc/GMT+12'))
   })
 
-  it('passes the rows through as the repository gave them', async () => {
-    listFoodLogsSummary.mockResolvedValue([{ date: '2026-09-01', calories: 2100 }])
-    expect(await (await getWeekly()).json()).toEqual([{ date: '2026-09-01', calories: 2100 }])
+  // RV-218 ④: always seven rows, oldest first. A day with no logs is `logged: false` with zeros,
+  // and today is marked by the route, which is where the timezone is known.
+  it('returns all seven days, marks the unlogged ones, and marks today', async () => {
+    const today = todayInTz(sessionUser!.timezone as string)
+    const yesterday = shiftDateStr(today, -1)
+    listFoodLogsSummary.mockResolvedValue([{ date: yesterday, calories: 2100, proteinG: 150, carbsG: 200, fatG: 60 }])
+    const days = await (await getWeekly()).json() as Row[]
+    expect(days).toHaveLength(7)
+    expect(days[0].date).toBe(shiftDateStr(today, -6))
+    expect(days[6]).toMatchObject({ date: today, logged: false, isToday: true, calories: 0 })
+    expect(days[5]).toMatchObject({ date: yesterday, logged: true, isToday: false, calories: 2100 })
+    expect(days.filter(d => d.isToday)).toHaveLength(1)
   })
 })
 

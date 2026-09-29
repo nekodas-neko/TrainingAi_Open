@@ -229,6 +229,7 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'saved_meals',     column: 'image_data_uri',  ddl: `ALTER TABLE saved_meals ADD COLUMN image_data_uri TEXT` },
   { table: 'food_items',      column: 'image_data_uri',  ddl: `ALTER TABLE food_items ADD COLUMN image_data_uri TEXT` },
   { table: 'food_items',      column: 'barcode',         ddl: `ALTER TABLE food_items ADD COLUMN barcode TEXT` },
+  { table: 'prescribed_runs', column: 'completed_as',    ddl: `ALTER TABLE prescribed_runs ADD COLUMN completed_as TEXT` },
   { table: 'food_logs',       column: 'saved_meal_id',  ddl: `ALTER TABLE food_logs ADD COLUMN saved_meal_id TEXT` },
   { table: 'food_logs',       column: 'meal_group_id',  ddl: `ALTER TABLE food_logs ADD COLUMN meal_group_id TEXT` },
   { table: 'food_logs',       column: 'meal_group_name', ddl: `ALTER TABLE food_logs ADD COLUMN meal_group_name TEXT` },
@@ -877,6 +878,7 @@ const CREATE_PRESCRIBED_RUNS = `CREATE TABLE IF NOT EXISTS prescribed_runs (
   gate_action     TEXT,
   status          TEXT,
   activity_log_id TEXT,
+  completed_as    TEXT,
   updated_at      TEXT NOT NULL,
   deleted_at      TEXT,
   sync_status     TEXT NOT NULL DEFAULT 'pending'
@@ -1611,6 +1613,15 @@ export const MIGRATIONS: UpgradeStatement[] = [
     statements: [
       `ALTER TABLE oura_daily_derived ADD COLUMN training_load_grid_len INTEGER`,
       `ALTER TABLE oura_daily_derived ADD COLUMN training_load_valid_min INTEGER`,
+    ],
+  },
+  {
+    // LB-179, mirroring Postgres migration 202609282225. How a prescribed run was satisfied, so the
+    // on-device planner can tell a walk from a run. In CREATE_PRESCRIBED_RUNS for fresh installs,
+    // this ALTER for upgraded devices, and RECONCILE_COLUMNS if it half-applies.
+    toVersion: 44,
+    statements: [
+      `ALTER TABLE prescribed_runs ADD COLUMN completed_as TEXT`,
     ],
   },
 ];

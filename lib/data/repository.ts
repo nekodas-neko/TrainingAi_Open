@@ -355,10 +355,13 @@ export interface PrescribedRun {
   targetHrLow: number | null; targetHrHigh: number | null; targetZoneIds: number[]
   rationale: string; gateAction: string; status: 'pending' | 'completed' | 'skipped'
   activityLogId: string | null; updatedAt: Date
+  /** LB-179: how it was satisfied; null = before this was tracked, i.e. a run. */
+  completedAs: 'run' | 'walk' | null
 }
 export interface PrescribedRunUpdate {   // Zod-whitelisted PATCH body — never a raw request body into .set()
   status?: 'completed' | 'skipped'
   activityLogId?: string | null
+  completedAs?: 'run' | 'walk' | null
 }
 
 export interface IncomingMutation {
@@ -698,7 +701,7 @@ export interface WorkoutRepository {
   getActiveRunningPlan(userId: string): Promise<RunningPlan | null>
   saveRunningPlan(userId: string, plan: Omit<RunningPlan, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { id?: string }): Promise<RunningPlan>
   getPrescribedRuns(userId: string, from: string, to: string): Promise<PrescribedRun[]>
-  upsertPrescribedRun(userId: string, run: Omit<PrescribedRun, 'userId' | 'updatedAt'>): Promise<PrescribedRun>
+  upsertPrescribedRun(userId: string, run: Omit<PrescribedRun, 'userId' | 'updatedAt' | 'completedAs'>): Promise<PrescribedRun>
   updatePrescribedRun(userId: string, id: string, patch: PrescribedRunUpdate): Promise<PrescribedRun | null>
   listActivityTypes(): Promise<ActivityType[]>
   createActivityType(data: { label: string; icon: string; isDistanceBased: boolean; sortOrder: number }): Promise<ActivityType>
