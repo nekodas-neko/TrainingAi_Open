@@ -14965,6 +14965,19 @@ short all day.
 
 ### [platform] LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
 
+- **⚠ 2026-09-29 (Lane B): "gates nothing" has now cost four merges, and the evidence is that
+  advisory is worse than either alternative.** Runs `36594986970`, `36598412525`, `36602819608` and
+  `36604843800` all concluded **failure** at the run level and three of them merged anyway, because
+  the failing job is `E2E` and `E2E` is not required. One spec's `page.route` overlay was leaking a
+  pending `route.fetch()` past the end of its test, which Playwright reports **outside any test** —
+  so every one of those shards printed `74 expected · 0 unexpected · ok: true` and exited 1. Fixed in
+  `fix/e2e-route-overlay-outlives-test` (`tolerateTestEnd` + `check-e2e-route-tolerance.js`).
+  **What bears on THIS entry is not the bug, it is that nobody saw it for four PRs.** A red advisory
+  check is read as weather: the standing suspicion was `LB-149`'s browser death, and it was not that
+  at all — the browser was healthy and 74 tests passed. An advisory check that is chronically red
+  stops carrying information, which is an argument for required OR for deleted, and against the
+  current state.
+
 - **⚠ 2026-09-28 (Lane A): the full run now hits its 45-minute cap with real assertion failures, not only dead-browser flakes.** Six specs fail on every full run. Filed as **LA-176** for triage. Until that is sorted, the suite is red whenever it actually runs, which bears directly on whether it can become a required check.
 
 - **Lane:** O — the Orchestrator's, not an implementer's. `.github/workflows/ci.yml`, `playwright.config.ts` and the required-checks

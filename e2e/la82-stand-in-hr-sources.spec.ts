@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { settleRouteBoundary } from './fixtures'
+import { settleRouteBoundary, tolerateTestEnd } from './fixtures'
 
 /**
  * LA-82 — a zone boundary resting on a stand-in says so.
@@ -15,11 +15,11 @@ import { settleRouteBoundary } from './fixtures'
 test.setTimeout(180_000)
 
 async function overlay(page: import('@playwright/test').Page, path: string, patch: (body: Record<string, unknown>) => Record<string, unknown>) {
-  await page.route(u => new URL(u).pathname === path, async r => {
+  await page.route(u => new URL(u).pathname === path, tolerateTestEnd(async r => {
     const real = await r.fetch()
     const body = await real.json().catch(() => ({}))
     await r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(patch(body)) })
-  })
+  }))
 }
 
 test('the hub says the max is a stand-in when the age could not be read', async ({ page }) => {

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { settleRouteBoundary } from './fixtures'
+import { settleRouteBoundary, tolerateTestEnd } from './fixtures'
 
 /**
  * TN-32 — the Heart Rate page grades against the user's own zones.
@@ -21,11 +21,11 @@ const PROFILE = { maxHr: 185, restingHr: 52 }
 // page: its cards dereference fields the readiness payload normally carries, and the hero rendered
 // nothing at all while `/api/client-error` fired.
 async function stubReadiness(page: import('@playwright/test').Page, bpm: number | null) {
-  await page.route(u => new URL(u).pathname === '/api/readiness-score', async r => {
+  await page.route(u => new URL(u).pathname === '/api/readiness-score', tolerateTestEnd(async r => {
     const real = await r.fetch()
     const body = await real.json().catch(() => ({}))
     await r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...body, hrCurrent: bpm }) })
-  })
+  }))
 }
 
 // Overlaid for the same reason as the readiness stub, and it bit harder here: `/api/hr-profile`
@@ -33,11 +33,11 @@ async function stubReadiness(page: import('@playwright/test').Page, bpm: number 
 // thin `{ maxHr, restingHr }` body took the whole screen to "Something went wrong". Only the two
 // anchors the grading reads are pinned.
 async function stub(page: import('@playwright/test').Page, bpm: number | null) {
-  await page.route(u => new URL(u).pathname === '/api/hr-profile', async r => {
+  await page.route(u => new URL(u).pathname === '/api/hr-profile', tolerateTestEnd(async r => {
     const real = await r.fetch()
     const body = await real.json().catch(() => ({}))
     await r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ ...body, ...PROFILE }) })
-  })
+  }))
   await stubReadiness(page, bpm)
 }
 
@@ -69,9 +69,9 @@ test('a genuinely high rate is still graded from the user’s own bands', async 
 })
 
 test('with no profile there is no grade, rather than an invented one', async ({ page }) => {
-  await page.route(u => new URL(u).pathname === '/api/hr-profile', async r => {
+  await page.route(u => new URL(u).pathname === '/api/hr-profile', tolerateTestEnd(async r => {
     await r.fulfill({ status: 500, contentType: 'application/json', body: '{}' })
-  })
+  }))
   await stubReadiness(page, 78)
   await page.goto('/health/heart-rate')
   await settleRouteBoundary(page)

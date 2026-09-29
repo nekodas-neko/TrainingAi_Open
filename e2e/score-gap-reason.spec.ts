@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { STORAGE_STATE } from './fixtures'
+import { STORAGE_STATE, tolerateTestEnd } from './fixtures'
 
 /**
  * Q-278 — a score that could not be computed no longer reads the same as a score that could.
@@ -15,7 +15,7 @@ import { STORAGE_STATE } from './fixtures'
 test.use({ storageState: STORAGE_STATE, serviceWorkers: 'block' })
 
 async function readinessWith(page: import('@playwright/test').Page, availability: unknown) {
-  await page.route(u => new URL(u).pathname === '/api/readiness-score', async r => {
+  await page.route(u => new URL(u).pathname === '/api/readiness-score', tolerateTestEnd(async r => {
     // Built from the real response so every other field on the screen stays honest — only the
     // score and its availability are replaced.
     const real = await r.fetch()
@@ -25,7 +25,7 @@ async function readinessWith(page: import('@playwright/test').Page, availability
       contentType: 'application/json',
       body: JSON.stringify({ ...body, score: null, readinessDisplayScore: null, ouraScore: null, availability }),
     })
-  })
+  }))
 }
 
 test('an absent score says nothing was recorded', async ({ page }) => {
