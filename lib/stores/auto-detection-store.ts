@@ -11,12 +11,17 @@ export interface PendingSession {
   id: string
   startMs: number
   endMs: number
-  routePolyline: string   // encoded; empty string if source === 'oura'
+  routePolyline: string   // encoded
   distanceKm: number
   durationMin: number
   activityType: 'walk' | 'run'
-  source: 'phone' | 'oura'
-  ouraWorkoutId?: string
+  /**
+   * Q-231 retired the `'oura'` source with the Cloud sync that wrote it. The union is kept at one
+   * member rather than removed outright because **this store is persisted**: a device can still hold
+   * a pending session stamped `'oura'` from before the change, and `onRehydrateStorage` drops those
+   * rather than letting them render as phone sessions with no route.
+   */
+  source: 'phone'
 }
 
 export interface DetectionDiag {
@@ -51,7 +56,6 @@ interface AutoDetectionActions {
   discardSession(): void
   dismissSession(id: string): void
   removeSession(id: string): void
-  addOuraSession(session: Omit<PendingSession, 'id'>): void
   setDetectionError(message: string | null): void
   setDetectionDiag(diag: DetectionDiag | null): void
 }
@@ -175,12 +179,6 @@ export const useAutoDetectionStore = create<AutoDetectionState & AutoDetectionAc
         pendingSessions: s.pendingSessions.filter(p => p.id !== id),
       })),
 
-      addOuraSession: (session) => set(s => ({
-        pendingSessions: [
-          ...s.pendingSessions,
-          { ...session, id: crypto.randomUUID() },
-        ],
-      })),
     }),
     {
       name: 'auto-detection-store',
@@ -207,6 +205,12 @@ export const useAutoDetectionStore = create<AutoDetectionState & AutoDetectionAc
       onRehydrateStorage: () => (state) => {
         if (!state) return
         state.isDetecting = false
+        // Q-231: a session persisted before the Oura Cloud ingest was removed carries `source:
+        // 'oura'` and an empty `routePolyline`. Nothing can mark it reviewed server-side any more, so
+        // it would sit in the card forever offering a route-less review. Drop it on the way in.
+        state.pendingSessions = state.pendingSessions.filter(
+          p => (p as { source?: string }).source !== 'oura',
+        )
         // A persisted in-flight session whose last point is stale means the
         // app died mid/after-walk. Finalize it — endSession's own quality
         // gates decide whether it becomes a pending session — instead of

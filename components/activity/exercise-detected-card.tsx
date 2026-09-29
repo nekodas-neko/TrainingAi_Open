@@ -1,11 +1,7 @@
 'use client'
 
-import { useEffect } from 'react'
 import { useAutoDetectionStore } from '@/lib/stores/auto-detection-store'
-import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { useReportBannerPresence } from '@/components/home/home-banner-presence'
-import { invalidateOuraWorkoutReview } from '@/lib/cache-groups'
-import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { formatTimeOfDay } from '@trainingai/shared/date-utils'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 
@@ -13,40 +9,26 @@ interface Props {
   onReview: (sessionId: string) => void
 }
 
+/**
+ * The confirm card for a detected walk or run.
+ *
+ * **Q-231 removed the Oura half, not this card.** It used to ingest `/api/oura/workouts?unreviewed=true`
+ * into `pendingSessions` as well, and the entry's scope said to retire the card outright on the grounds
+ * that *"retiring this card removes nothing he currently sees working"*. That was measured and is not so:
+ * `pendingSessions` has a second writer, the **live phone-GPS detector** — `AutoDetectionProvider` is
+ * mounted in `app/layout.tsx` and calls `startAutoDetection()` unconditionally on native, `endSession()`
+ * turns a qualifying walk into a pending session, and **this card is the only surface that renders one**
+ * (the review sheet resolves a session by an id only this card supplies). Removing it would have orphaned
+ * that pipeline silently.
+ *
+ * So what went is the Cloud plumbing the owner actually asked about — the unreviewed fetch, the ingest,
+ * and the server-side mark-reviewed PATCH. Dismissal is now purely local, which is all a phone session
+ * ever needed.
+ */
 export function ExerciseDetectedCard({ onReview }: Props) {
   const tz = useUserTimezone()
   const pendingSessions = useAutoDetectionStore(s => s.pendingSessions)
   const dismissSession = useAutoDetectionStore(s => s.dismissSession)
-  const addOuraSession = useAutoDetectionStore(s => s.addOuraSession)
-
-  const detected = useCachedValue<Array<{
-    id: string; activity: string; startDatetime: string; endDatetime: string;
-    distanceM: number | null;
-  }>>('oura-unreviewed-workouts', '/api/oura/workouts?unreviewed=true', TTL_MEDIUM)
-
-  useEffect(() => {
-    if (!detected) return
-    const currentSessions = useAutoDetectionStore.getState().pendingSessions
-    for (const w of detected) {
-      const startMs = new Date(w.startDatetime).getTime()
-      const endMs = new Date(w.endDatetime).getTime()
-      const alreadyCovered = currentSessions.some(
-        p => (p.source === 'oura' && p.ouraWorkoutId === w.id)
-          || (p.source === 'phone' && p.startMs < endMs && p.endMs > startMs)
-      )
-      if (alreadyCovered) continue
-      addOuraSession({
-        startMs,
-        endMs,
-        routePolyline: '',
-        distanceKm: w.distanceM ? w.distanceM / 1000 : 0,
-        durationMin: (endMs - startMs) / 60000,
-        activityType: w.activity.toLowerCase().includes('run') ? 'run' : 'walk',
-        source: 'oura',
-        ouraWorkoutId: w.id,
-      })
-    }
-  }, [detected, addOuraSession])
 
   // RV-119 — above the early return, because a hook cannot be skipped. Outside Home's provider this
   // is a no-op, so the card still works wherever else it is rendered.
@@ -57,33 +39,8 @@ export function ExerciseDetectedCard({ onReview }: Props) {
   const session = [...pendingSessions].sort((a, b) => b.startMs - a.startMs)[0]
   const extras = pendingSessions.length - 1
 
-  function markReviewedOnServer(s: (typeof pendingSessions)[number]): boolean {
-    if (s.source !== 'oura' || !s.ouraWorkoutId) return false
-    fetch('/api/oura/workouts', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: s.ouraWorkoutId }),
-    }).catch(() => {})
-    return true
-  }
-
-  // Dismissing an Oura-detected workout must mark it reviewed server-side AND bust the
-  // cached unreviewed list — otherwise the next mount re-ingests it from the stale entry
-  // (the workout is no longer in pendingSessions, so ingestWorkouts' alreadyCovered check
-  // passes and the card reappears). Matches the review sheet's save/dismiss paths.
-  function dismissOne(s: (typeof pendingSessions)[number]) {
-    const marked = markReviewedOnServer(s)
-    dismissSession(s.id)
-    if (marked) void invalidateOuraWorkoutReview()
-  }
-
   function dismissAll() {
-    let markedReviewed = false
-    for (const s of pendingSessions) {
-      if (markReviewedOnServer(s)) markedReviewed = true
-      dismissSession(s.id)
-    }
-    if (markedReviewed) void invalidateOuraWorkoutReview()
+    for (const s of pendingSessions) dismissSession(s.id)
   }
 
   return (
@@ -108,7 +65,7 @@ export function ExerciseDetectedCard({ onReview }: Props) {
             </button>
           ) : (
             <button
-              onClick={() => dismissOne(session)}
+              onClick={() => dismissSession(session.id)}
               className="rounded-lg px-3 py-1.5 text-xs font-semibold text-muted-foreground"
             >
               Dismiss
