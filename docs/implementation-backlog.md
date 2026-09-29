@@ -5403,13 +5403,25 @@ volume7dKg,                             // likewise
   progression style, so there are no per-set percentages to write. Those 20 sets are a calibration
   pass, not lost plans. **The deploy history was not needed.** BF-143 (09-12) touched the same
   code, but it only stopped a *rebuilt* session skipping calibration.
+- **✅ ② SHIPPED 2026-09-29 (Lane A), and it needed no migration.** `workout_sessions.phase_type`
+  already exists and `'baseline'` is already a phase type. It was NULL for AI-dynamic calibration
+  sessions only because the log path never recognised them (`log-exercise.ts` checked the
+  periodization state for `deload` alone). It now applies `workout-data`'s own test (`phase ===
+  'baseline' && !baselineComplete`), so **every new calibration session is stored as `'baseline'`**.
+  - The same flag also sends the server's estimate through the AMRAP formula the client already used.
+    **Measured on the 09-07→09-12 round: 15 of 20 loaded logs identical, 5 differ by one 0.25 kg
+    rounding step, mean 0.06 kg.** Negligible, and it makes server and screen agree.
+  - **Historical sessions are NOT marked.** The 09-07→09-12 round stays NULL (no backfill, no
+    rewrite), so an adherence read covering it still excludes those dates by rule.
+- **Keep:** ① Barbell Skull Crusher has no style, so it records no per-set plan until one is
+  assigned. That is the owner's action, already asked in LA-182.
 - **So TN-75's remaining work is small.** ① The loaded residue is Barbell Skull Crusher with no
   `style_id`. That is BF-200's residue: the engine now deloads it (#1814), but it still records no
   per-set plan until a style is assigned in Config, which is an owner action. ② The acceptance
   criterion *"a set with no available plan is distinguishable from one never asked"* still holds.
   Baseline sets cannot be told apart at read time, because `workout_sessions` stores no baseline
-  marker (`phase_type` is NULL across the boundary). It needs a column, so a migration, and it
-  waits behind BF-214's numbering. **Until then, quote adherence over loaded, non-baseline sets.**
+  marker (`phase_type` is NULL across the boundary). (Superseded by the shipped
+  item above: the existing column suffices.)
 - **The bodyweight product question is split out as LA-169 (`Lane: O`)**, per the rule that an owner
   decision must not sit inside a Lane A body.
 
