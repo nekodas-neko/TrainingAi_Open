@@ -490,29 +490,6 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [workouts] LB-186 — the program editor adds an exercise with NO progression style, and nothing ever requires one
-
-- **Lane: B** · **Added:** 2026-09-28 · Orchestrator, root-causing `LA-173` ③ after the owner asked
-  why the styleless slots were not assigned automatically.
-- **The cause, verified link by link.** `components/config/program-editor-sheet.tsx:218` —
-  `addExercise` creates `{ key: nextEditKey(), name: "" }`, with no style and no default. The type
-  (`packages/shared/src/types/program.ts:53`) marks `styleId` optional; the route
-  (`app/api/workout-templates/route.ts:79-81`) checks only that a *provided* id is real; the save
-  (`lib/data/postgres/slices/programs.ts:335`) writes `styleId: ex.styleId ?? null`. **No layer
-  objects**, so a slot is styleless whenever the picker was never opened.
-- **Why it hid.** The engine falls back to the style on the exercise's **last log**, so a styleless
-  slot behaves normally while that exercise has styled history. It surfaces only when there is
-  none, or when a path needs a non-empty style.
-- **What it already cost.** `BF-200`: the Q-185 deload override required a non-empty style, skipped
-  Barbell Skull Crusher and prescribed **3 × 30 kg — his ordinary working weight — in a deload
-  week**, while the other four Upper exercises lightened correctly.
-- **The fix is a default, not a validation error.** Give a newly-added exercise the style its
-  **role** already uses in that program (accessories `Hypertrophy 3-set` or `General`, primaries
-  `Powerbuilding` on his data), with the picker still free to change it. **Blocking the save
-  instead would be worse** — it turns a silent gap into a wall in front of a half-built program.
-- **What proves it fixed:** add an exercise in Config, save without touching the style picker, and
-  confirm the stored `style_id` is non-null.
-
 ### [workouts] LA-177 — backfill the nine styleless slots in the active program
 
 - **Lane: A** · **Added:** 2026-09-28 · Orchestrator, splitting the data half out of `LA-173` ③.
@@ -726,57 +703,50 @@ below threshold and left in place for next time.
   carve-out). Filed `O` because the lane field takes a letter and no Review letter exists.
 - **Added:** 2026-09-27 · BugFix, per OR-185's GitHub watch. Filed so Review has the finding rather
   than re-deriving it; the diff read is still Review's.
-- **✅ THE COLLISION IS RESOLVED — the contributor fixed it, verified 2026-09-27 22:56 on head
-  `0bb5a87e`.** This entry said the PR took **288/289**, which `main` already held, and that the
-  later-sorting twin would silently drop the new view. He renumbered to **290/291** and regenerated
-  the twin **after** applying, which is the ordering that matters: the regenerated file carries
-  `training_load_grid_len` and `training_load_valid_min`, so it was generated against a database
-  holding LA-161 rather than against a stale one.
-  **Checked with the tool that owns the question, not by reading the diff:**
-  `node scripts/next-schema-number.js` reports **292** next free, lists 290/291 as claimed by
-  `origin/health-sample-storage` alone, and reports **no collision** on them. CI is **all ten jobs
-  completed and success** on that head, Migration Check included.
-- **What is still owed is the diff read, and only that.** Storage carve-out, outside contributor:
-  **Review** reads it, **the owner merges**. Nothing here is blocking any more.
-- **⚠ Separately, `next-schema-number.js` reports a REAL collision that is OURS, not his** — `273`
-  and `274` are claimed by both `main` (merged, `273_exercise_media_review_status.sql`) and
-  `origin/lane-a/q44-phase3-pr1-table-rename`. That branch must renumber before it can land; the
-  check fails once both are in one tree. Not this entry's work — recorded so it is not lost.
 - **Needs:** — nothing.
-- **Superseded in part by BF-214 ① (built 2026-09-27, awaiting the owner).** `#1608` has since
-  renumbered to 290/291. Once BF-214 merges, its `291_claude_ro_views_…` twin must be deleted and
-  `lib/data/postgres/claude-ro-views.sql` regenerated instead; the new test fails the PR until then.
-- **The collision is live, not hypothetical.** `#1608` (`health-sample-storage`, `jsboiss`) adds
-  `288_apple_health_samples.sql` and `289_claude_ro_views_apple_health_samples.sql`. `main` already
-  holds `288_training_load_grid_dimensions.sql` and `289_claude_ro_views_grid_dimensions.sql`
-  (LA-161). Same numbers, different content, both applied — `ensureSchema` tracks by **filename**,
-  so nothing stops either.
-- **The consequence is worse than a duplicate number, and it is silent.** Every `claude_ro` twin
-  opens with `DROP SCHEMA claude_ro CASCADE; CREATE SCHEMA claude_ro;` and recreates every view from
-  a snapshot of the database it was generated against. The two 289s sort by filename, so
-  `…_apple_health_samples` runs **first** and `…_grid_dimensions` runs **second** — and the second
-  was generated before `apple_health_samples` existed. **`claude_ro.apple_health_samples` is created
-  and then dropped in the same deploy**, leaving the table unreadable through `/api/admin/db-query`
-  with no error anywhere.
-- **What the contributor should do, and it is small:** renumber to the next free pair (**290/291**
-  as of 2026-09-27) and **regenerate the twin after applying**, not before — the generator reads
-  `information_schema` from a live database, so generating first produces a file byte-identical to
-  its predecessor. That gotcha is already in CLAUDE.md's twin section and is exactly what bites here.
-- **The PR also edits `docs/implementation-backlog.md`'s pointer** from 286 to 290. Correct for
-  `main` today and still worth flagging: a contributor editing the shared pointer row is a guaranteed
-  conflict with any agent PR that adds a migration.
-- **This is `BF-211`'s evidence, and the two should be read together** — the issue proposes deriving
-  the migration number from filenames, and this is what deriving it produces when an unmerged branch
-  holds numbers the filenames cannot show.
-- **Reproduced independently by the tool BF-211 shipped**, 2026-09-27: `node
-  scripts/next-schema-number.js` names `288: merged: 288_training_load_grid_dimensions.sql vs
-  origin/health-sample-storage: 288_apple_health_samples.sql`, and the same for 289. It also reports
-  **290** as the next free pair, which is what this entry recommends. So the renumber can be
-  verified rather than argued.
-- **It flags a second collision that is NOT work: 273/274 on `origin/lane-a/q44-phase3-pr1-table-rename`**,
-  a branch with no open PR. A dead branch reads exactly like a reservation to any tool that scans
-  refs. Delete the branch or leave it; do not renumber anything for it.
-- **Reversal cost:** none here — nothing has merged.
+
+- **CURRENT STATE, read 2026-09-28 22:56 on head `5d680b16`. Nothing is blocking; the diff read is
+  all that is owed.** The PR adds `apple_health_samples` — a user-scoped table with soft deletes,
+  four CHECK constraints and a partial history index — plus its Drizzle definition and both
+  `export-map.ts` rows (`SOFT_DELETED` and `EXPORTED`). **All ten CI jobs completed and success**,
+  Migration Check included.
+  **The green is NOT stale, checked rather than assumed:** no commit on `main` has touched
+  `lib/data/postgres/claude-ro-views.sql` or added a migration since his run at 08:43Z, so the one
+  shared file this PR edits has not moved underneath it.
+
+- **⚠ THIS ENTRY HAS BEEN WRONG TWICE, BOTH TIMES BECAUSE THE CONTRIBUTOR FIXED IT FIRST.** The
+  history, compressed, because three contradicting layers were harder to read than the outcome:
+  ① Filed 09-27 saying the PR took migrations **288/289**, which `main` already held, and that the
+  later-sorting `claude_ro` twin would silently drop the new view. True when written.
+  ② Corrected 09-27 22:56 — he had renumbered to **290/291** and regenerated the twin *after*
+  applying, which is the ordering that matters.
+  ③ Corrected again 09-28 22:56 — **the numbered scheme is gone from this PR entirely.** He has
+  adopted BF-214's conventions: the migration is `202609280817_apple_health_samples.sql` (the
+  `YYYYMMDDHHMM_<what>` form) and the views are an **in-place edit of the single
+  `claude-ro-views.sql`**, not a numbered twin. So there is no number left to collide on, and this
+  entry's prediction that "its `291_claude_ro_views_…` twin must be deleted once BF-214 merges" was
+  satisfied by the author without being asked.
+  **The lesson worth keeping is procedural, not technical:** an entry describing an inbound PR
+  describes a moving object, and re-reading the PR costs one call. Read before citing it.
+
+- **⚠ Separately, a REAL collision that is OURS, not his** — `273` and `274` are claimed by both
+  `main` (merged, `273_exercise_media_review_status.sql`) and
+  `origin/lane-a/q44-phase3-pr1-table-rename`, a branch with no open PR. A dead branch reads as a
+  reservation to any tool that scans refs. Delete the branch or leave it; do not renumber for it.
+  Recorded so it is not lost. Not this entry's work.
+
+- **Scope: storage ONLY. 4 files, +89/−1, `mergeable_state: clean`, and the owner is already a
+  requested reviewer.** The author's own summary — *"it doesn't change syncing or calculations"* —
+  matches the diff: there is **no ingest route in this PR**, so nothing writes the table yet.
+- **What Review should look at, since the schema is the whole substance.** The
+  `apple_health_samples_payload` CHECK requires a live row to carry either a quantity or a category
+  and never both, and exempts a tombstone — the question is whether that matches what the future
+  sync endpoint will actually write, because a CHECK is expensive to loosen once rows exist. The
+  table is keyed `(user_id, sample_id)` with `sample_id` supplied by the client; the composite key
+  scopes it to the user, so the cross-user hazard in `CLAUDE.md`'s write-path discipline does not
+  apply here — but it becomes the thing to check on the follow-up PR that adds the route, and that
+  route needs its Zod schema at creation per the ingest rule.
+- **Reversal cost:** none here — nothing has merged, and the table has no writer.
 
 ### [platform] BF-212 — inbound PR #1607 adds a second credential path, and `Q-1a` covers the same area
 
@@ -815,19 +785,6 @@ below threshold and left in place for next time.
   3-set or Powerbuilding), or his usual one. Any style fixes the fallback; the AI still chooses
   per session. **Reversal cost: none.**
 
-### [workouts][app-shell] LA-183 — an exercise can be saved with no progression style, and nothing says so until a deload
-
-- **Lane: B** — `components/config/program-editor-sheet.tsx`, `components/workout-builder/builder-review.tsx`.
-- **Added:** 2026-09-29 · Lane A, closing BF-217.
-- **What:** both program writers accept an exercise with `styleId` unset. The editor leaves a newly
-  added exercise style-less until someone picks one, and the builder passes the AI's
-  `progressionStyleId`, which can be empty. Nothing forces or defaults it. The editor gives no signal at all (its amber border fires only for a style that no longer exists,
-  not for none), and the pre-workout card shows a small `⚠ Style not found`. The cost
-  only lands when the rules fallback skips the exercise (BF-198's Full revert).
-- **Fix shape (Lane B's call on the UI):** default a new exercise's style to the one most used in
-  its session, or block the save with a message naming the style-less exercises. The server
-  already accepts either shape.
-- **Evidence it is not a save-path loss:** see the 2026-09-29 journal entry for BF-217.
 ### [workouts] BF-219 — Cable Preacher Curl has been prescribed 13.75 kg four times and returned RPE 10 three of them, with the reps falling 9 → 8 → 7 → 6
 - **Lane:** T — a load-selection calibration, so a Tuning proposal is owed before anyone builds it. Implementation lane afterwards is A (`packages/shared/src/1rm.ts`, `packages/shared/src/ai-periodization/`).
 - **Added:** 2026-09-29 · BugFix intake. Owner, mid-set on Pull: *"This was too heavy for me. What is the role of this exercise? Should be accessory."*
@@ -3432,22 +3389,6 @@ which is the right shape for something that can only be validated by living with
      them. The implementer checks them locally with a migration-free script. **Any delete of a
      production row is the owner's call.**
 
-### [app-shell][platform] LA-162 — after RV-192, the "Account created" toast tells an invited registrant the wrong thing
-- **Lane: B** — `app/sign-in/email-sign-in.tsx`, and possibly `app/register/register-form.tsx`.
-- **Needs: RV-192**
-- **Added:** 2026-09-27 · found by Lane A running #1779 on `pnpm dev`.
-- **What:** on `?registered=1` the sign-in screen toasts *"Sign in below — or wait for approval if
-  not yet invited."* That was true while an invite activated a password account. RV-192 (#1779)
-  makes **every** password registration start inactive, invited or not, so the second half becomes
-  the whole story and the first half becomes wrong: an invited registrant who follows it and signs
-  in lands on `/pending`. The copy should say the account waits for approval. Parked on `RV-192`
-  because before that merges the current text is accurate.
-- **Check first, unconfirmed:** in three dev-mode runs the register form's
-  `router.push('/sign-in?registered=1')` did not navigate after a successful `POST`, although
-  calling the router by hand did. Fast Refresh rebuilds were logged around each submit, so it may
-  be a dev-only artefact. It needs one run against a production build before anyone treats it as a
-  bug, because if it is real the toast above is never seen at all.
-
 ### [app-shell] LA-181 — a friend request you sent shows as "Unknown" with Accept/Decline buttons that cannot work
 
 - **Lane: B** — `components/more/manage-friends-sheet.tsx`.
@@ -4245,23 +4186,6 @@ which is the right shape for something that can only be validated by living with
    render or the device.
 - **Also for the device:** Body Battery's fill runs from about 45% to the right edge rather than from the left. That may be deliberate ("drains as you use it"). RV-205 should say which, and if it is deliberate, the bar needs a mark that makes the direction legible.
 
-### [platform][app-shell] LB-180 — `/api/user/profile` returns a `workoutCount` nobody reads, and it is what disqualifies the key from a TTL gate
-- **Lane: A** — `app/api/user/profile/route.ts`. One field and one `Promise.all` leg.
-- **Added:** 2026-09-28 · Lane B, while proving `RV-183`'s two More-screen keys against RV-67.
-- **What:** the GET returns `{ user, hasPassword, workoutCount }`, where `workoutCount` is
-  `repo.countWorkoutSessions(userId)`. **Nothing reads it** — a repo-wide grep for `workoutCount`
-  outside the route that produces it finds zero hits in `app/`, `components/`, `lib/` or `packages/`.
-- **Why it matters beyond a dead field.** It is a DERIVATION, so under RV-67 every workout completion
-  is a writer of `more-user-profile`, and no group a completion calls clears that key
-  (`invalidateWorkoutSummaries()` does not contain it; only `invalidateUserProfile()` and
-  `invalidateGoalRecommendations()` do). That is the sole remaining reason the key cannot take
-  `freshWithinTtl`, which would drop the More re-show from one GET to zero. Removing the field makes
-  the payload a pure read of the `users` row and the key eligible.
-- **Also remove the `Promise.all` leg** — it is a `count(*)` over `workout_sessions` on every profile
-  read, for a value that is discarded.
-- **Then `RV-183` can finish:** its `Needs:` clears and Lane B adds the flag with the proof, which is
-  otherwise complete — the equip-title writer was the one genuine gap and it is fixed (#RV-183's PR).
-- **Reversal cost: none.** Re-adding a field no caller reads is a one-line revert.
 
 ### [nutrition] RV-218 — one Nutrition screen shows three calorie targets, the Day screen a fourth "burned", and "205 workouts" means 205 kcal
 - **✅ TWO OF THE THREE COPY BUGS SHIPPED 2026-09-27 (#1782). THE THIRD WAS ALREADY FIXED. ITEMS ①②④ ARE LANE A's — established below, not assumed.**
@@ -4738,8 +4662,22 @@ which is the right shape for something that can only be validated by living with
 ### [readiness][devices][heart-rate] TN-79 — Q-270's route is NOT silent: it persists `insufficient_met` on 21 days while the MET data it needs is present
 
 - **Branch:** `tuning/training-load-gate-diagnosis`
-- **Lane:** A — `app/api/training-stress/route.ts`, `lib/data/postgres/adapter.ts`
-  (`getOuraDaytimeSignals`), `packages/shared/src/health/training-stress.ts`. Engine by the path rule.
+- **Lane: T** — re-laned 2026-09-29 (was A). Lane A's diagnosis is finished (below); what is left is
+  fix (b), which the entry itself says is a modelling assumption that goes through Tuning before Lane
+  A builds it. **Tuning:** propose the gap rule for the MET grid, including how many days it re-scores,
+  then re-lane this entry to A.
+- **✅ THE READ LA-170 OWED IS DONE, 2026-09-29 (Lane A), and it confirms the prediction. The MET floors
+  are settled; the NaN contract is what is left.** Production, `oura_daily_derived`:
+
+  | day | gate | grid | valid | evaluated (UTC) |
+  |---|---|---:|---:|---|
+  | 2026-09-28 | `scorer_no_output` | **1418** | **1195** | 09-28 21:13, **after the day ended** (07:13 Brisbane on the 29th) |
+  | 2026-09-29 | `insufficient_met` | 474 | 328 | 09-28 22:16, today, partial, as expected |
+
+  09-28 cleared both floors (720 and 360) with room and still produced no score. That is only
+  reachable past the floors, so **the scorer is rejecting a full, real day**, which is the 2026-09-24
+  root cause: `validate()` refuses any NaN when `noOts === 0`, and the grid carries a NaN in every
+  minute with no sample (~220 of 1418 here). **Fix (b) is the only live proposal.**
 - **Added:** 2026-09-24 · Tuning agent, while checking whether `Q-204` was startable.
 - **Why this matters beyond itself:** `Q-204` (Q-137 direction B) carries `Needs: Q-270`, and Q-204 is
   what would retire **TN-76**'s lane-balance finding and **TN-78**'s threshold question by replacing
@@ -6682,6 +6620,41 @@ drift.
   **`food-log-swipe-delete:238` PASSED in run three**, so it is 2 of 3 in CI plus 2 of 3 locally — the
   highest-frequency flake, not a deterministic defect. Two data points looked like a pattern and were
   not; the claim was made one run too early.
+- **✅ FOURTH DATA POINT, AND THE FIRST UNDER SHARDING — run `36508371834` (`93d30a41`, PR #1950's
+  head), 2026-09-29.** Four shards, each on its own Postgres. **Shards 1, 3 and 4 green; shard 2
+  failed.** `food-log-swipe-delete:238` failed **twice** (first attempt plus retry1), then
+  `meal-label:542` hit a browser death later in the same shard (`LB-149`), and 3 tests did not run.
+  So `:238` is now **4 of 5 in CI** and remains the highest-frequency flake, and a database per shard
+  did NOT make it go away — which is a real result, because "one seeded database shared by 124 specs"
+  was this entry's leading suspect for it.
+- **⚑ AND IT IS NOT THE BROWSER DEATH'S COLLATERAL, WHICH THE RETAINED FIRST ATTEMPT SETTLES.** The
+  artifact holds a full DOM snapshot for `:238`, so the browser was alive and rendering: the row is
+  swiped open (`button "Delete Spec Swipe Yoghurt": Delete` is in the tree) and the confirmation
+  heading simply never appeared — `expect(getByRole('heading', {name: 'Delete food log?'}))`,
+  *element(s) not found* after 5 s. A genuine assertion failure, ahead of the crash in the same shard,
+  not a symptom of it. **Run in isolation locally the same day it passes: 8 of 8, `:238` in 14.3 s.**
+  So the next step for this spec is the gap between its CI environment and an isolated local run, and
+  the snapshot names one candidate outright — the *"Finished logging this day? · 0 of 10 days marked"*
+  banner is present in the CI tree, and whether it renders is database state, which moves the row the
+  tap coordinate was computed against.
+- **⚠ FIFTH DATA POINT, AND IT RECLASSIFIES `:238` — run `36511264561` (PR #1951), 2026-09-29.**
+  Shard 2 again, and **only** shard 2. The retained artifact holds **exactly one** failing spec this
+  time, `food-log-swipe-delete:238`, with the byte-identical error — `getByRole('heading', {name:
+  'Delete food log?'})`, *element(s) not found* after 5 s, over a DOM snapshot showing the row swiped
+  open. No browser death in this run at all. **So `:238` is 4 of 4 attempts across two consecutive CI
+  runs, and 0 of 8 locally the same day.** That is not "the highest-frequency flake" any more and it is
+  not order-dependence either: **it passes on this sandbox's browser and fails on CI's, consistently.**
+- **⚑ The candidate that fits, and cannot be settled from a sandbox session.** CI installs
+  `chromium_headless_shell`; a sandbox session runs `/opt/pw-browsers/chromium` (`playwright.config.ts`
+  picks it when present, because `playwright install` is proxy-blocked here). This spec turns on
+  `page.touchscreen.tap()` landing inside a 64 px tray — a CDP hit test — so two different Chromium
+  builds are a live explanation for a pass/fail that tracks the machine rather than the run.
+  **Unproven: the only honest test is running headless-shell, and this container cannot install it.**
+  Next step is either an `E2E shard` job re-run with `--headed`/full chromium to compare, or moving the
+  assertion off the coordinate (the sibling test at `:274` already asserts the property — *the tray is
+  the topmost element over its own rect* — timing- and coordinate-free, and it passes on CI).
+- **⛔ Reading that artifact needs the repository-scoped path, not the one the log prints** — see
+  `LB-149` for the 403 that looks like an auth failure and is the sandbox proxy.
 - **✅ AND THE HEADLINE FOR `LB-56`: a fully green E2E run is achievable.** Run three failed nothing at
   all. That is the first evidence that "required check" is not hopeless — the obstacle is the retry
   budget masking ~6 flaky specs per run, not an unpassable suite.
@@ -9128,6 +9101,44 @@ drift.
   a separate entry, conditional on this pass test** — file it then, with the measurement in hand.
 
 ### [platform] LB-166 — the full E2E suite no longer fits its 45-minute job limit, and it reports as `cancelled`
+- **✅ SHARDED 2026-09-28 (`ci.yml`) — and the `Needs: LB-149` park was INVERTED.** The entry sat
+  parked on `LB-149`, which is not a build: it *"closes when the next red E2E reports"*, waiting on a
+  `dmesg` witness. But a capped run reports `cancelled` and uploads nothing, so **`LB-166` was
+  blocking `LB-149`'s witness, not the other way round.** Sharding needs none of that diagnosis —
+  why the browser occasionally dies and how long the suite takes are unrelated questions.
+- **What shipped:** `e2e-gate` (computes the UI-paths diff ONCE — it needs `fetch-depth: 0`, and
+  four full clones to answer one question is the cheapest thing here to get wrong) → `e2e-shard`
+  ×4, each with its own Postgres, mirroring `test-shard` → an `e2e` rollup keeping the **`E2E`**
+  name so any future ruleset entry still finds it.
+  **Measured split: 72 tests per shard** (288 against the suite's 282 — the six are the `setup`
+  project, which every shard must run for its own database). Per-shard timeout **25 min**, down
+  from 45 for the whole.
+- **Two things fixed alongside, both of which would have outlived the split.**
+  ① The artifact upload was `if: failure()`, and a capped run is **`cancelled`**, not failed — which
+  is *why* run `36458784138` published nothing. It is `if: ${{ !success() }}` now, so the evidence
+  survives a timeout as well as a failure. ② The rollup refuses to report green when the **gate**
+  did not succeed: without that, a broken diff step leaves `changed` empty, the shards skip, and the
+  required check passes because the thing deciding whether to run it fell over.
+- **⚠ A DATABASE PER SHARD CHANGES WHICH SPECS SHARE ONE.** That reduces the seed-state class
+  `LB-178` found (fewer specs per database) and may **surface** an order-dependence that was hidden.
+  Expect a new failure or two on the first sharded runs and read them as the split doing its job,
+  not as the split being wrong.
+- **✅ VERIFIED ON CI 2026-09-29, run `36508371834`** (the first UI-touching PR after the split, #1950).
+  All four `E2E shard N` jobs spawned, each seeded its own Postgres, and the rollup reported. Playwright
+  step wall-clock: **shard 1 10m53s · shard 2 10.7m · shard 3 8m41s · shard 4 8m46s**, and the whole
+  `e2e-gate` → shards → rollup sequence ran **01:32:40 → 01:44:52, ~12.2 min** against ~33–36 min
+  unsharded and the 45-minute cap it had been hitting.
+- **✅ And the entry's own stated risk is measured and small.** It read *"shard balance is by file count
+  and not by duration, so wall-clock per shard may be uneven"*: the spread is **8m41s to 10m53s, ~25%**,
+  with the slowest at 11 of its 25-minute timeout. Balancing by duration would buy nothing worth the
+  machinery. **`if: ${{ !success() }}` also gates correctly** — the diagnostic and upload steps read
+  `skipped` on the three green shards and ran on the red one, which is where the 33-file, 15.7 MB
+  artifact came from.
+- **⚠ And the split's predicted side effect DID show up, on its first run.** Shard 2 went red where
+  three shards were green: `food-log-swipe-delete:238` failing its own assertion (`LB-178`, fourth data
+  point — **a database per shard did NOT fix it**) and a browser death in `meal-label:542` (`LB-149`,
+  whose first witness this is). Both are recorded on their own entries; neither is the split's doing,
+  and localising them to one shard of four is the split working.
 - **⚠ BACK OVER THE CAP, MEASURED 2026-09-28 — and the margin `LA-176` bought back has been spent,
   partly by me.** Two consecutive runs hit it: **#1926's head — 17:12:55 → 17:59:36, 46m41s**, and
   **#1927's — 17:32:01 → 18:17:18, 45m17s**. Both report `cancelled`. Against the three censuses
@@ -9184,12 +9195,19 @@ drift.
   this stands, and the ceiling is now reached by an ORDINARY PR rather than an unusually large one,
   so the margin is gone rather than thin. **This raises the entry's priority; it is no longer
   latent.**
-- **Needs:** LB-149 — that entry's browser-death signature (a 1.0s `newContext` failure before any
-  test body) may be the same saturation seen from the other end, or may be unrelated. Neither is
-  established and they should be looked at together.
+- **Needs:** — nothing. **⚠ This said `LB-149` until 2026-09-28, and the dependency was INVERTED.**
+  `LB-149` is not a build: it closes *"when the next red E2E reports"*, waiting on a `dmesg` witness
+  from a real browser death. A capped run reports `cancelled` and publishes nothing, so **this entry
+  was blocking that witness**, not waiting on it. The two questions — why the browser occasionally
+  dies, and how long the suite takes — turned out to share no mechanism, and looking at them
+  together cost `LB-166` the time it was parked. They can still be compared afterwards; the
+  sharded runs are what will produce the evidence to compare.
 - **Not proposing a number.** Raising `timeout-minutes` hides it, and sharding E2E the way `Tests`
   is already sharded is the durable answer — but LA-91 set every job's limit from MEASURED runs,
   so the fix starts with a measurement of where the 45 minutes goes, not with a bigger limit.
+  **✅ That is what was done:** the split is measured (72 tests per shard, listed for all four), and
+  the new per-shard limit is 25 min against a quarter of a ~45-minute suite — ample rather than
+  generous, so a suite that grows again goes red fast instead of cancelling silently.
 - **⚑ Whoever takes this should know the suite is still growing:** #1760 and the RV-211 PR each add
   one spec, both deliberately, because both caught defects no source guard could. The ceiling is
   the problem, not the specs.
@@ -9214,7 +9232,30 @@ drift.
 - **✅ Shipped instead of a guess: the run now says why (`ci.yml`, `if: failure()`).** One `dmesg`
   read names an OOM kill and its RSS; an **empty** dmesg eliminates OOM outright, which nobody has
   been able to say in three sessions. Costs nothing on a green run.
-- **Keep — the cause is NOT established, and this entry closes when the next red E2E reports.**
+- **✅ THE NEXT RED E2E HAS NOW REPORTED (run 36508371834, 2026-09-29), AND IT CARRIED NO WITNESS —
+  BECAUSE THE INSTRUMENT ABOVE WAS BROKEN.** Shard 2 of the new four-way split: `meal-label.spec.ts:542`
+  hit `browser.newContext: Target page, context or browser has been closed` with a full
+  **`chrome-headless-shell` crash stack** (32 frames, `[end of stack trace]`) at ~01:39:5x. Shards 1, 3
+  and 4 were green; the shard finished 66 passed · 1 failed · 1 flaky · **3 did not run**, 10.7 min.
+  **The `kernel OOM kills` group printed NOTHING AT ALL** — not even its own fallback line — because
+  `dmesg | grep … | tail -20 || echo …` can never reach that `echo`: **`tail` exits 0 on empty input.**
+  So the one read this entry was waiting three sessions for produced silence, and silence cannot tell
+  "no OOM lines" from "dmesg would not talk to us". Fixed 2026-09-29 — the step reads dmesg once and
+  branches, and names the unreadable case separately.
+- **What this run DID establish.** `free -m` and `ps` in that step are **teardown** figures (11 GB free
+  of 16, swap untouched, minutes after the crash) and say nothing about the moment of death — now
+  labelled as such in the step. The `if: ${{ !success() }}` artifact upload from `LB-166` **works**:
+  `playwright-report-2`, 33 files, 15.7 MB, first attempt retained.
+- **⛔ And the way to read that artifact is not the URL the log prints.** The run log's
+  `github.com/<owner>/<repo>/actions/runs/<run>/artifacts/<id>` is refused by the sandbox's agent proxy
+  with a **403** whose body says *"sessions are bound to their configured repositories"* — which reads
+  exactly like a GitHub auth failure and is not one. The repository-scoped REST path works from a
+  sandbox session: `curl -sSL -o a.zip https://api.github.com/repos/<owner>/<repo>/actions/artifacts/<id>/zip`
+  returned **200, 15,686,307 bytes**. Get the id from `get_job_logs` (the upload step prints
+  `Artifact ID …`).
+- **Keep — the cause is STILL NOT established.** The crash is now witnessed and the instrument is
+  fixed; what is owed is one more red E2E read through the repaired dmesg branch. If it reports no OOM,
+  memory is out and the next step is sampling during the run rather than after it.
 - **⛔ The entry's own discriminator is too weak, measured 2026-09-25.** It said 3 consecutive runs
   on an unchanged head would settle spec-pair vs runner. All **3 of 3 PASSED** (28m53s, ~34 min,
   ~33 min on run 3069 attempts 1–3), so the fault did not reproduce at all — it is rarer than
@@ -25014,6 +25055,24 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   fires again, keep the whole log and compare the named call-site count against the 9 a clean run
   reports.
 
+### [workouts][platform] LB-187 — the AI builder's review screen has no browser coverage at all, and it is where a generated program is committed
+
+- **Lane: B** — `e2e/`, a new spec against `components/workout-builder/builder-review.tsx`.
+- **Added:** 2026-09-29 · Lane B, while closing `LA-183`'s builder half.
+- **Nothing in `e2e/` reaches this screen** — `grep -l 'generate-program' e2e/` is empty — yet it is
+  the single point at which an AI-generated program is written to the database, and it carries real
+  editing: swap an exercise, change a role, reorder, add, drop, and the style/volume projection.
+  `LA-183`'s builder fix landed with unit tests and a source guard because of this, not instead of it.
+- **Why it has none, and what it would take:** reaching the review means driving a **nine-step**
+  wizard and then a live Gemini generation. The spec has to `page.route` a stubbed
+  `/api/generate-program` response — which is cheap and also makes the fixture exact, so a style-less
+  exercise can be asserted on deliberately rather than waited for. Per the Custom Rules check, an
+  `/api` stub needs `serviceWorkers: 'block'`.
+- **What it should assert, at minimum:** a generated exercise the stub leaves style-less shows a
+  sets/reps line rather than a blank one, and the program saved carries a non-null `style_id`.
+- **Cost to weigh before building it:** one more spec on a suite that hit its 45-minute ceiling four
+  days ago (`LB-166`). Nine wizard steps is not a 20-second spec, and it should be sized against the
+  shards' current wall-clock rather than added blind.
 ### [app-shell][platform] OR-115 — the admin surface has accumulated buttons nobody uses
 
 - **Lane:** B — `app/admin/**`, most of it presentational.

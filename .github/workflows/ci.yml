@@ -689,15 +689,79 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
         run: node scripts/check-catalogue-equipment.js
 
-  e2e:
-    # Its own job, deliberately not folded into Tests: a browser job's runtime and failure modes
-    # (flake, timeout, a dev server that never came up) are different enough that mixing them makes
-    # a red CI ambiguous. It is also the only job here that runs the actual application.
-    name: E2E
-    # LB-31: the nightly verifies `main`'s test suite only — see the `schedule` trigger.
+  # LB-166. Split out of the E2E job so the UI-paths diff is computed ONCE rather than four times:
+  # it needs `fetch-depth: 0`, and four full clones to answer the same question is the cheapest part
+  # of this change to get wrong. Its output gates the shards below.
+  e2e-gate:
+    name: E2E gate
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 5
+    outputs:
+      changed: ${{ steps.ui.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The UI-paths check below diffs against the base branch, which a depth-1 clone cannot see.
+          fetch-depth: 0
+      - name: Does this change touch the UI?
+        id: ui
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "Not a pull request — running the full suite."
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          BASE="origin/${{ github.base_ref }}"
+          git fetch --quiet origin "${{ github.base_ref }}"
+          # `...` compares against the merge base, so unrelated commits landing on the base branch
+          # while this PR is open do not make an engine-only PR look like a UI one.
+          FILES=$(git diff --name-only "$BASE...HEAD")
+          echo "$FILES" | sed 's/^/  /'
+          # `app/api/**` is dropped BEFORE the match (LA-63): it is reached by no browser, so a
+          # migration and four API routes used to buy the full ~25-minute suite. An `app/` path that
+          # is not under `app/api/` still counts, which is what keeps a page change gated.
+          # `__tests__/` is dropped alongside `app/api/`, and for the same reason: a vitest file
+          # under app/ or components/ is not loaded by any browser, so it cannot change what
+          # Playwright sees. Measured 2026-09-23 — PR #1405 touched exactly ONE such file
+          # (app/session-explain/__tests__/bf172-fit-not-readiness.test.ts) and bought four full
+          # ~34-minute runs, drifting out of date during three of them. `e2e/` specs are NOT under
+          # a `__tests__/` directory (checked: zero), so the browser suite still gates on itself.
+          # LB-108: the prefix list missed `lib/`, and E2E reported GREEN IN 40 SECONDS on a
+          # ~28-minute suite for a PR that changed `lib/resume-repaint.ts` and
+          # `lib/hooks/use-resume-repaint.ts` — the log is Postgres starting and stopping, with no
+          # Playwright invocation. A longer prefix list does not fix it: `lib/` holds 282 source
+          # files, 81 reachable from a client module and 201 not, and the reachable set includes
+          # `lib/sqlite/cache.ts`, which every screen reads through. So reachability is COMPUTED
+          # from the `'use client'` roots. `app/api/**` and `__tests__/` stay excluded (LA-63), so
+          # an engine change still skips the browser and LA-63's saving is intact.
+          CHANGED=$(printf '%s\n' "$FILES" | node scripts/e2e-ui-touched.js)
+          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
+
+  # LB-166. Four shards, mirroring `test-shard`, because the suite crossed its 45-minute ceiling
+  # again on 2026-09-28 (46m41s and 45m17s against 35.5–36.6 min earlier the same day) and a run
+  # killed at the cap reports `cancelled` and **uploads no artifact** — so the playwright-report
+  # holding every flaky test's first attempt, which LB-178's whole method depends on, did not exist.
+  # Raising the cap buys a few months of the same; sharding makes a capped run impossible instead.
+  #
+  # A database per shard is deliberate, exactly as `test-shard` argues: shards run in parallel so
+  # four container starts cost nothing in wall clock, and FEWER specs sharing one database is the
+  # seed-state class (LB-178) reduced, not multiplied. ⚠ It also changes WHICH specs share a
+  # database, so an order-dependence that was hidden may surface — that is the point, not a risk to
+  # design around.
+  e2e-shard:
+    name: E2E shard ${{ matrix.shard }}
+    needs: e2e-gate
+    if: needs.e2e-gate.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    # Was 45 for the whole suite. A quarter of it needs nowhere near that, and a tight-but-ample
+    # ceiling is what turns "the suite grew again" into a fast red rather than a silent cancel.
+    timeout-minutes: 25
+    strategy:
+      # One shard failing must not cancel the rest: diagnosing a red suite needs all four reports.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     services:
       postgres:
         image: postgres:16
@@ -733,68 +797,17 @@ jobs:
       AUTH_SECRET: e2e-ci-secret-not-used-outside-this-job
     steps:
       - uses: actions/checkout@v5
-        with:
-          # The UI-paths check below diffs against the base branch, which a depth-1 clone cannot see.
-          fetch-depth: 0
-      # LA-22. E2E is meant to gate UI changes and only UI changes, and the owner chose exactly that
-      # on 2026-08-26. The obvious implementation — a `paths:` filter on the job — is the wrong one:
-      # a REQUIRED check that does not run leaves the PR pending forever, which is why the Android
-      # workflow is deliberately not required. So the job always runs and always reports, and skips
-      # its expensive half when nothing it can test has changed. That makes it safe to require.
-      #
-      # A non-UI PR still pays for checkout and the Postgres service (~20 s) rather than the full
-      # run — which is ~29 min, not the ~10 this line claimed until 2026-09-25 (LB-149, measured
-      # on run 3069: `pnpm e2e` 10:15:36 → 10:44:29 across 124 specs). On a push to main there is
-      # no base to diff against, so everything runs.
-      - name: Does this change touch the UI?
-        id: ui
-        run: |
-          if [ "${{ github.event_name }}" != "pull_request" ]; then
-            echo "Not a pull request — running the full suite."
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          BASE="origin/${{ github.base_ref }}"
-          git fetch --quiet origin "${{ github.base_ref }}"
-          # `...` compares against the merge base, so unrelated commits landing on the base branch
-          # while this PR is open do not make an engine-only PR look like a UI one.
-          FILES=$(git diff --name-only "$BASE...HEAD")
-          echo "$FILES" | sed 's/^/  /'
-          # `app/api/**` is dropped BEFORE the match (LA-63): it is reached by no browser, so a
-          # migration and four API routes used to buy the full ~25-minute suite. An `app/` path that
-          # is not under `app/api/` still counts, which is what keeps a page change gated.
-          # `__tests__/` is dropped alongside `app/api/`, and for the same reason: a vitest file
-          # under app/ or components/ is not loaded by any browser, so it cannot change what
-          # Playwright sees. Measured 2026-09-23 — PR #1405 touched exactly ONE such file
-          # (app/session-explain/__tests__/bf172-fit-not-readiness.test.ts) and bought four full
-          # ~34-minute runs, drifting out of date during three of them. `e2e/` specs are NOT under
-          # a `__tests__/` directory (checked: zero), so the browser suite still gates on itself.
-          # LB-108: the prefix list missed `lib/`, and E2E reported GREEN IN 40 SECONDS on a
-          # ~28-minute suite for a PR that changed `lib/resume-repaint.ts` and
-          # `lib/hooks/use-resume-repaint.ts` — the log is Postgres starting and stopping, with no
-          # Playwright invocation. A longer prefix list does not fix it: `lib/` holds 282 source
-          # files, 81 reachable from a client module and 201 not, and the reachable set includes
-          # `lib/sqlite/cache.ts`, which every screen reads through. So reachability is COMPUTED
-          # from the `'use client'` roots. `app/api/**` and `__tests__/` stay excluded (LA-63), so
-          # an engine change still skips the browser and LA-63's saving is intact.
-          CHANGED=$(printf '%s\n' "$FILES" | node scripts/e2e-ui-touched.js)
-          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
-        if: steps.ui.outputs.changed == 'true'
         with:
           version: 10.33.0
       - uses: actions/setup-node@v5
-        if: steps.ui.outputs.changed == 'true'
         with:
           node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-        if: steps.ui.outputs.changed == 'true'
       - name: Apply all migrations
-        if: steps.ui.outputs.changed == 'true'
         run: node scripts/local-db/migrate.js
       - name: Seed the test user and program
-        if: steps.ui.outputs.changed == 'true'
         run: psql "$DATABASE_URL" -f scripts/local-db/seed.sql
       # No PLAYWRIGHT_BROWSERS_PATH here: the runner has no pre-installed Chromium, so Playwright
       # manages its own. playwright.config.ts only pins an executablePath when the sandbox's
@@ -812,14 +825,12 @@ jobs:
       # means the CDN, not the specs.
       - name: Resolve the installed Playwright version
         id: playwright
-        if: steps.ui.outputs.changed == 'true'
         # The RESOLVED version, not the `^1.62.1` range in package.json — the range does not change
         # when the lockfile moves to a new build, and a cache keyed on it would serve the previous
         # browser forever. Hashing the whole lockfile would work too, and would throw the browsers
         # away on every unrelated dependency bump.
         run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
       - name: Cache the Playwright browsers
-        if: steps.ui.outputs.changed == 'true'
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
@@ -831,10 +842,14 @@ jobs:
       # which are apt packages outside ~/.cache and cannot be cached here. On a hit it finds the
       # browser already present and skips the download, which is the whole saving.
       - name: Install Chromium
-        if: steps.ui.outputs.changed == 'true'
         run: npx playwright install --with-deps chromium
-      - run: pnpm e2e
-        if: steps.ui.outputs.changed == 'true'
+      # `npx playwright test`, not `pnpm e2e -- --shard=…`. The package script is exactly
+      # `playwright test`, so the two should be identical — but the `--` form hung locally with no
+      # output rather than forwarding the flag, and a CI step that hangs costs the whole job's
+      # timeout to discover. Calling the runner directly is unambiguous and was verified by listing
+      # each shard (72 tests apiece, 288 against the suite's 282 — the six are the `setup` project,
+      # which every shard must run for its own database).
+      - run: npx playwright test --shard=${{ matrix.shard }}/4
       # LB-149. Twice now the browser has simply vanished mid-run — two specs failing in 1.0s each
       # with `browser.newContext: Target page, context or browser has been closed`, which means the
       # process was already gone when the spec started. The run recorded NOTHING about why, so three
@@ -847,13 +862,33 @@ jobs:
       # useful and is what nobody has been able to say. Runs only on failure, so a green run pays
       # nothing.
       - name: If the browser died, say why
-        if: failure() && steps.ui.outputs.changed == 'true'
+        if: ${{ !success() }}
         run: |
           echo "::group::kernel OOM kills"
-          sudo dmesg 2>/dev/null | grep -iE "killed process|out of memory|oom-kill" | tail -20 \
-            || echo "no OOM kill in dmesg — the browser was not killed for memory, look elsewhere"
+          # `dmesg | grep … | tail -20 || echo …` NEVER reaches that echo, because `tail` exits 0 on
+          # empty input. So this group printed NOTHING on run 36508371834 — the very first browser
+          # death it existed to explain (LB-149, shard 2: a chrome-headless-shell crash stack and
+          # `browser.newContext: Target page, context or browser has been closed`). Read dmesg once,
+          # then branch on what it says, and keep "no OOM lines" distinct from "dmesg would not talk
+          # to us": silence cannot tell those apart, and one of them rules memory out while the other
+          # leaves it wide open.
+          if dmesg_out=$(sudo dmesg 2>&1); then
+            oom=$(printf '%s\n' "$dmesg_out" | grep -iE "killed process|out of memory|oom-kill" | tail -20)
+            if [ -n "$oom" ]; then
+              echo "$oom"
+            else
+              echo "no OOM kill in dmesg — the browser was not killed for memory, look elsewhere"
+            fi
+          else
+            echo "dmesg is unreadable on this runner, so memory pressure is UNKNOWN, not ruled out:"
+            printf '%s\n' "$dmesg_out" | tail -5
+          fi
           echo "::endgroup::"
-          echo "::group::memory and the largest processes still alive"
+          # ⚠ Read these two as TEARDOWN figures, not as the state at the moment of death: the step
+          # runs after Playwright has exited, so the browser's own memory is already returned. Run
+          # 36508371834 reported 11 GB free of 16 and untouched swap here, minutes after a crash.
+          # Catching the peak would need a sampler running alongside the suite.
+          echo "::group::memory and the largest processes still alive (AT TEARDOWN)"
           free -m
           ps -eo pid,rss,comm --sort=-rss | head -12
           echo "::endgroup::"
@@ -864,11 +899,43 @@ jobs:
       # three sessions — the step is gated on the browser run having happened, so the only way it
       # fires is a genuinely empty report.
       - uses: actions/upload-artifact@v6
-        if: failure() && steps.ui.outputs.changed == 'true'
+        if: ${{ !success() }}
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: |
             playwright-report/
             test-results/
           if-no-files-found: error
           retention-days: 7
+
+  # The name every reader (and any future ruleset entry) expects. Publishes one pass/fail for the
+  # four shards; it installs nothing and runs in seconds.
+  e2e:
+    name: E2E
+    if: always() && github.event_name != 'schedule'
+    needs: [e2e-gate, e2e-shard]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      # `always()` above, so this still reports when a shard fails — without it the job is SKIPPED,
+      # the check never arrives, and a PR waiting on it hangs. The no-UI case reports success on
+      # purpose: LA-22's whole design is that this job always runs and always reports, which is what
+      # makes it safe to require, and skipping the browser when nothing it can test changed is the
+      # saving rather than an absence of an answer.
+      - name: Every shard passed
+        run: |
+          echo "ui-changed: ${{ needs.e2e-gate.outputs.changed }}"
+          echo "shards:     ${{ needs.e2e-shard.result }}"
+          # A gate that did not SUCCEED is not an answer. Without this, a broken diff step leaves
+          # `changed` empty, the shards are skipped, and the branch below reads that as "no UI
+          # change" and reports green — a required check passing because the thing that decides
+          # whether to run it fell over.
+          if [ "${{ needs.e2e-gate.result }}" != "success" ]; then
+            echo "The E2E gate did not succeed (${{ needs.e2e-gate.result }}) — refusing to report green."
+            exit 1
+          fi
+          if [ "${{ needs.e2e-gate.outputs.changed }}" != "true" ]; then
+            echo "No UI-reachable change — the browser suite did not run."
+            exit 0
+          fi
+          test "${{ needs.e2e-shard.result }}" = "success"
