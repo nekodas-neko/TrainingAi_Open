@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.481.11",
+    date: "2026-09-28",
+    changes: [
+      "Nutrition's energy card now says \"+N earned\" for the calories today's movement added, instead of \"burned\", which the Day screen uses for the whole day's total.",
+    ],
+  },
+  {
     version: "1.481.10",
     date: "2026-09-29",
     changes: [
