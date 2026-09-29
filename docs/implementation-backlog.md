@@ -490,6 +490,36 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [readiness][app-shell] OR-206 — the morning check-in compares to "normal", not to yesterday
+
+- **Lane: B** · **Added:** 2026-09-29 · Orchestrator, from the owner on the S25:
+  *"I dont like the comparison to the yesterday. Maybe comparison to \"normal\". So about the same;
+  better or worse. With it default selected to about the same."*
+- **① The wording change is his call and is not in dispute.** `components/checkin/vs-yesterday-picker.tsx`
+  asks *"Compared to yesterday"*; he wants *compared to normal*. Same three options, same order.
+  **Rename the component and the field with it** — `vsYesterday` / `day_checkins.vs_yesterday` stop
+  describing what is being asked the moment the prompt changes, and a field whose name contradicts
+  its question is how the next reader gets it wrong.
+- **⚠ IT CHANGES WHAT THE STORED HISTORY MEANS, and nothing currently marks the boundary.** Rows
+  written before the change answer *"vs yesterday"*; rows after answer *"vs normal"*. These are
+  different questions and **must not be pooled in one trend**. Whatever ships needs a marker — a
+  new column, or a recorded cutover date Tuning can split on. **This is the engineering half and it
+  is not optional**, because the field feeds a scoring input.
+- **⛔ ② THE DEFAULT SELECTION CONTRADICTS `TN-58`'s CENTRAL DESIGN — put to the owner 2026-09-29,
+  not yet answered.** That entry has **no default and no pre-selection**, deliberately, and the
+  picker's own comment says the reason: the absolute 1–5 control it replaced produced **two
+  distinct values across 96 check-ins, sd 0.29**, and *"a neutral stored as though it were an
+  answer is the defect TN-57 just fixed"*. `day_checkins.vs_yesterday` has **no column default** for
+  the same reason, so a skipped answer stays NULL and reads as *not answered*.
+  **The cost of defaulting, stated plainly:** the sheet writes only on Save, but Save is one tap, so
+  a pre-selected neutral makes a reflexive Save indistinguishable from a considered *"about the
+  same"* — which is the degeneration `TN-58` exists to escape, under a new name.
+  **`e2e/tn58-vs-yesterday-no-default.spec.ts` asserts nothing is selected on open**, so ② cannot
+  ship without deciding what happens to that test. **Do not delete it to make the change pass.**
+- **The owner's preference wins if he reaffirms it** — it is his product call. Build ① now; hold ②
+  until he answers, since the two are independent.
+
+
 ### [sleep][readiness] OR-204 — ship the Sleep Score partial-data flag, which never needed the owner
 
 - **Lane: A** · **Added:** 2026-09-29 · Orchestrator, splitting the buildable half out of `Q-72`.
