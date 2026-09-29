@@ -7598,82 +7598,31 @@ drift.
 
 
 ### [cardio][activity] RV-166 — no prescribed run has ever been marked done, although the owner does most of them as walks
-- **Needs:** LB-179 — the planner must be able to tell a walk-satisfied prescription from a run-satisfied
-  one before a walk is allowed to satisfy one. Shipping the two-guard change alone corrupts the
-  prescription engine, not just a stat.
-- **✔ LB-179 SHIPPED 2026-09-29, so this is what the walk half must send.** Link the prescription with
-  `completedAs: 'walk'` whenever the satisfying activity is not a run, on BOTH paths in
-  `done-activity-screen.tsx`'s `linkPrescribedRun`:
-  - the local `store.upsertPrescribedRun({ ...existing, status: 'completed', completedAs: 'walk', … })`;
-  - the queued `prescribed_run` mutation's payload.
-
-  **Omitting it records a run**: the server writes null on any status change that does not say
-  otherwise. So the run path needs no change, and a walk that forgets the field is counted as a run.
-  The planner, the hard-run gate and the run-type stats all read `completedAsRun`
-  (`packages/shared/src/running/run-completion.ts`).
-- **✅ ROOT CAUSE FOUND 2026-09-28, and it is two lines** — `components/activity/done-activity-screen.tsx:285`
-  and `:322`, both `if (activityType === 'run' && prescribedRunId)`. He logs walks, so
-  `linkPrescribedRun` never fires. **Everything else the completion needs already exists**: the
-  `prescribed_runs.status`/`activityLogId` columns, the `prescribed_run` outbox domain, the local-store
-  write, and `PATCH /api/running-plan/runs/[id]`. So the entry's *"has never been marked done"* is not
-  a missing feature — it is a type guard, and the build is the card plus `LB-179`, not the plumbing.
-- **✅ APPROVED 2026-09-27 — build it, WITH the walk flow below. Mockup:
-  [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html),
-  sections RV-166 and RV-166b.**
-- **The owner's added requirement, verbatim:** *"I will mostly do my treadmill walk; so when I click
-  walk; id like to be able set a guided walk - or just a treadmill walk + time. Or perhaps it could
-  even say x amount of minutes in x zone rate to count as complete."*
-  **Take both halves, they are complementary.**
-  **① State the criterion in ZONE terms on the card** — *"25 min in Zone 2 · 107–134 bpm"* with live
-  progress against it, rather than an opaque done/not-done.
-  **② Tapping `Walk it` offers two routes:** a **guided walk** (app paces, counts zone minutes
-  live) or a **treadmill walk + duration** from preset chips. Two taps for the common case.
-- **⚑ THIS ONLY WORKS BECAUSE OF `TN-78`, SHIPPED THE SAME DAY (#1774) — do not build one without
-  the other.** The moderate floor moved from 60% to **40% of heart-rate reserve**: at 60% it was
-  **134 bpm**, which he hit on **3 of 31 days**, so a treadmill walk earned ZERO zone minutes and a
-  zone-stated criterion would have been unreachable on foot. At 40% it is **107 bpm**, hit on
-  **24 of 31**. A zone-worded target on the pre-TN-78 floor would have been a target he could not
-  meet by walking.
-- **✅ FULLY SPECIFIED 2026-09-27 — the last open question is answered: a treadmill walk with NO
-  heart-rate data DOES count.** Count the logged minutes toward the target and mark the day
-  **estimated**. Refusing to complete a walk he actually did is the worse failure, and he took that
-  recommendation.
-  **⚑ REUSE THE EXISTING CONVENTION — do not invent a flag.** `packages/shared/src/health/observed-hr.ts:125`
-  already models this exact distinction as **`source: 'observed' | 'estimated'`** on
-  `MaxHrResolution`, and `body-battery-inputs.ts` and `hr-profile.ts` use the same shape. A
-  discriminator beats a boolean here for the reason that file demonstrates: it says *where the
-  number came from* rather than *whether to trust it*, so a third source can be added later without
-  rewriting every reader. Check `docs/module-map.md` before adding anything new.
-- **📐 MOCKUP SHOWN 2026-09-27 — [`docs/design/2026-09-27-four-screen-mockups.html`](design/2026-09-27-four-screen-mockups.html) ([hosted copy](https://claude.ai/artifact/U4aypd5Un44whR6exTjWqX)).
-  Before/after at the real **384 px dark viewport**, using the app's own tokens from
-  `app/globals.css`. **Proposed, to his instruction:** one *Today's cardio* card at the top of the hub holding the prescription and both ways to satisfy it, with either marking the day done.
-- **Gate cleared 2026-09-27** — approved and fully specified, walk flow included.
-  so the next act was to PRODUCE one and that is work, which must stay ungated. It exists, so what
-  is outstanding is his answer, and the gate parks the entry honestly. (This is the transition
-  `LB-163` describes; applying it before the picture existed is the trap.)
-- **⚠ THIS ONE MOVES STORED NUMBERS, unlike the other three.** Every past run day becomes completable, so adherence, streaks and compliance all shift once it ships — **quantify how far before merging.**
-- **⚠ Its BEFORE pane is rebuilt from the components, not screenshotted** — the hub needs live data the sandbox does not have. The other three befores come from source, and `LB-163`'s was independently reproduced in the Playwright harness.
-- **(Superseded 2026-09-27: this entry previously read *"owes a mockup first"*. The mockup was
-  drawn, shown and answered the same day — the approval above is the current state.)**
-
-- **Lane: B** — `components/guided-walk/walk-summary.tsx`, after the owner's answer in RV-170.
-- **Needs:** RV-170 — the rider question below is the block, and it was carried in prose only, so `next-item.js` offered this entry as READY twice (LB-142, 2026-09-24).
+- **✅ SHIPPED 2026-09-29, v1.482.0** — `feat/cardio-walk-satisfies-prescription`. The *Today's cardio*
+  card is on the hub above the modality picker, stating the criterion in zone terms with live progress;
+  `Walk it` offers a guided walk or a treadmill walk from a duration chip; both link the prescription
+  with `completedAs: 'walk'` through the one extracted `lib/activity/link-prescribed-run.ts`.
+- **⚠ THE ENTRY'S ROOT CAUSE WAS HALF THE STORY, and the other half is the reason this needed a card.**
+  The two `activityType === 'run' && prescribedRunId` guards were real, but removing the type half alone
+  is INERT: the only writer of `prescribedRunId` (`running-plan-content.tsx`'s `onStart`) calls
+  `startActivity('run', …)` first, so the id is never set on a walk and the guard's second half was
+  already false. There was no way to START a walk from the prescription, which is what was built.
+- **Decision recorded: no third activity-log writer.** The mockup's *"treadmill walk, just log it"* has
+  no existing home — `LogActivitySheet` is a type picker onto the live timer, and the guided walk builds
+  an INTERVAL plan, so plain minutes through it fabricate an interval walk. So `logCompletedActivity`
+  arms the session as finished and the existing done screen still does the writing. Three taps, one writer.
+- **No backfill, so stored numbers do NOT move.** The entry warned adherence/streaks/compliance shift;
+  that applies to backfilling the 20 past days with a walk logged, which is a separate decision under
+  the history policy and was deliberately not taken. Those days stay `pending`.
+- **Keep:** the device pass. The whole completion path is the local store and the outbox, and
+  `getLocalStore` returns null in the browser — so the link, the `completedAs` write and the pull-back
+  have never run anywhere but a unit test. Pass/fail on the S25: start a treadmill walk from `Walk it`,
+  save it, and the card reads **Done · Completed as a walk**; then confirm `prescribed_runs.completed_as`
+  is `'walk'` and the next prescription is unchanged by it. Also: the estimated path (a walk with no
+  heart rate counts from its logged minutes) has no sandbox data.
+- **Lane: B**
+- **Verify: device** — the work is shipped; what is owed is the look, not the build.
 - **Added:** 2026-09-24 · Review sweep 57, a census of the owner's production data ([`docs/reviews/2026-09-24-sweep-57-data-census.md`](reviews/2026-09-24-sweep-57-data-census.md)).
-- **In production:** `prescribed_runs` has **26 rows: 0 completed and 0 with `activity_log_id`**.
-  22 are pending (21 of them in the past) and 4 are skipped. **17 of the pending days and 3 of the
-  skipped days have a walk, treadmill session or run logged that day.**
-- **Why:** the only writer of `completed` is `linkPrescribedRun`
-  (`components/activity/done-activity-screen.tsx:34-50`). It runs only when
-  `activityType === 'run' && prescribedRunId` (`:270`, `:307`). The guided-walk save never touches
-  `prescribed_runs`.
-- **What the owner sees:**
-  - *"Today's run is done — nice work"* (`running-plan-content.tsx:273`) never appears.
-  - `RunTypeStatsCard` is **permanently empty**: its route filters `completed && activityLogId`
-    (`run-type-stats/route.ts:35`).
-  - Every past prescription reads as pending.
-- **Needs the owner's answer (RV-170):** does a guided or treadmill walk on a prescribed day count?
-  If yes, link it at the walk save, and backfill the 20 past days only under the history policy.
-
 ### [activity][devices] RV-167 — a walk whose strap cadence stream started late stores a fifth of its steps, and nothing flags it
 
 - **Lane: DV** — the code half shipped; what is left is a measurement on the strap.

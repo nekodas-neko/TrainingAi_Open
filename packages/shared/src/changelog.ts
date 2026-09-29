@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.482.0",
+    date: "2026-09-29",
+    changes: [
+      "Today\u2019s cardio now has its own card at the top of the Cardio Hub, and it says what actually counts \u2014 \u201c25 min in Zone 2 \u00b7 107\u2013134 bpm\u201d \u2014 with the minutes you have already banked against it, instead of an opaque done-or-not.",
+      "A walk can finish the day\u2019s prescribed run. Tapping \u201cWalk it\u201d offers a guided walk or a treadmill walk you just log from a duration chip, and either one marks the day done \u2014 previously only a run could, so no prescribed run had ever been marked done at all.",
+      "A walk that completes the day is recorded as a walk, so it no longer counts as a run when the app plans your next quality session or works out your running pace.",
+      "A treadmill walk with no heart-rate reading still counts: its logged minutes go toward the target and the day is marked estimated.",
+    ],
+  },
+  {
     version: "1.481.12",
     date: "2026-09-29",
     changes: [
