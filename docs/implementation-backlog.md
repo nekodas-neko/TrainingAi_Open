@@ -972,6 +972,99 @@ below threshold and left in place for next time.
   Pull is also the one with **no progression style** (BF-217), so the difference may be a style
   effect rather than a model whim. Worth one look before assuming the prompt is at fault.
 
+### [platform] BF-222 — neither sensor retention prune has EVER fired, both horizons land inside ten weeks, and a failure logs where nothing reads it
+- **Lane:** A — `lib/data/postgres/slices/oura.ts:566` and `:1070`.
+- **Added:** 2026-09-29 · BugFix intake, from the session-start database read. Not reported by anyone; found because the growth rate had moved.
+- **Needs:** — nothing.
+
+- **The growth rate has risen and it is NOT a leak — this is the "shape" the session-start rule asks
+  about, answered.** Measured 2026-09-29: **261 MB total, 93 MB index**. Against the two figures in
+  the docs — 171 MB on 08-18, 215 MB on 09-11 — the rate went **1.83 MB/day → 2.56 MB/day**, a 40%
+  rise on a `CLAUDE.md` line that says to expect ~1.7.
+  **The cause is that the two largest growing tables have never reached their retention horizon:**
+
+  | table | retention | oldest row | age | has it ever pruned? |
+  |---|---|---|---|---|
+  | `oura_heartrate` | **180 d** (`HR_RETENTION_DAYS`) | 2026-06-22 | **99 d** | **no** |
+  | `rr_intervals` | **90 d** (inline literal) | 2026-07-17 | **74 d** | **no** |
+
+  Both are still filling. `oura_raw_samples` — the one window that *does* cycle — is holding at
+  173,960 rows across its 7-day span, so it is reclaiming correctly.
+
+- **So the acceleration is temporary, and the plateau can be projected.** At the measured fill rates
+  (1,503 and 2,572 rows/day, from real `count(*)` — `n_live_tup` reads 135,306 against 148,811 real
+  rows on `oura_heartrate`, the estimator trap again):
+
+  | table | now | at horizon | date it flattens |
+  |---|---|---|---|
+  | `oura_heartrate` | 38 MB | **~69 MB** | ~2026-12-19 |
+  | `rr_intervals` | 31 MB | **~38 MB** | ~2026-10-15 |
+
+  **Whole database lands near 300 MB and stops** (plus the packed archive's ~0.1 MB/day). At
+  $0.15/GB/month that is **about 4.5 cents a month**. Worth carrying into `Q-30`, which is still
+  open on storage cost.
+
+- **⚠ THE RISK, and it is the reason this is an entry rather than a journal line: an untested prune
+  is about to run for the first time, and its failure is invisible.** Both are
+  **throttled, fire-and-forget, on-write** (`shouldPrune`, at most once per 24 h) and both end in
+  `.catch(err => console.error('[prune] … failed:', err))` — **stdout, not `error_events`**. Nothing
+  reads stdout. So if either `DELETE` fails or the throttle never lets it run, the table simply
+  keeps growing and the only signal is the number a session happens to read months later. The two
+  first-ever executions land **~2026-10-15** and **~2026-12-19**.
+- **⭐ Recommend routing both prune failures to `error_events`** — it is the channel built for
+  "faults that never reach a human", which is exactly this, and the session-start read already
+  looks there. One `insertErrorEvent` call in each catch.
+  **Then confirm the first run actually happened** rather than assuming: after 2026-10-15,
+  `min(at)` on `rr_intervals` should sit at 90 days, not keep receding.
+- **Alternatives:** (a) **a scheduled job** — better at not depending on a write to trigger, but
+  there is no cron layer (`docs/module-map.md` §0) and adding one for this is disproportionate;
+  (b) **leave it** — defensible at 4.5 cents a month, and it loses because the cost is not the
+  point: a prune that silently never runs makes every future size reading uninterpretable.
+- **Reversal cost: low.** Two lines, in two catch blocks.
+
+- **A second thing the read exposed: nothing stores the shape, so every session re-derives it.** The
+  rule says to compare against the shape rather than the daily figure, but no prior `idx` or
+  per-table figure is recorded anywhere in `docs/` — this comparison took four queries plus digging
+  two datapoints out of prose. **The fix is the journal, not a table:** a session that runs the read
+  writes the four numbers (total, idx, top table, oldest row of the growing tables) into its entry,
+  and the next session diffs against it. Recorded here rather than as its own entry because the
+  projection above is what a future session actually needs.
+
+### [platform] BF-223 — `oura_heartrate_pkey` is 7.2 MB of index that has never been scanned in the database's lifetime
+- **Lane:** A — `lib/data/postgres/schema.ts` (`ouraHeartrate`), plus a migration to drop the constraint.
+- **Added:** 2026-09-29 · BugFix intake, from the session-start database read.
+- **Needs:** — nothing.
+
+- **Measured against production, with the evidence the owner's DB policy requires for a drop:**
+  - `pg_stat_user_indexes.idx_scan` = **0** for `oura_heartrate_pkey`, and
+    `pg_stat_database.stats_reset` is **NULL** — statistics have never been reset, so that zero
+    covers the table's whole life, not a window.
+  - **0 foreign keys** reference `oura_heartrate` (`pg_constraint`, `contype='f'`).
+  - The sibling `oura_heartrate_user_id_timestamp_key` takes **10,025,158** scans. Every read path
+    goes through `(user_id, timestamp)`; nothing looks a row up by `id`.
+  - Size: **7,256 kB**, on a 38 MB table that is projected to reach ~69 MB (BF-222) — so the index
+    grows with it.
+
+- **What it is NOT, checked before recommending anything.** The `id` column itself is read — the
+  full-export path emits it (`lib/export/__tests__/full-export.test.ts:94`) — but that comes off a
+  sequential read, not an index lookup, and **dropping the primary-key constraint does not drop the
+  column**. Uniqueness is guaranteed by the sequence default, not by the index.
+
+- **⭐ Recommend dropping the constraint and keeping the column**, in a migration of its own, after
+  confirming the export path does not order or paginate by `id` — that is the one read this entry
+  did not fully trace, and it is the only thing that could make a PK worth 7 MB.
+- **Alternatives:** (a) **leave it** — a primary key is conventional, and 7 MB of 261 is 2.8%, so
+  this is genuinely small; it loses mainly because the index grows with a table heading for 69 MB
+  and the write cost is paid on every sensor insert; (b) **replace it with the natural key** —
+  making `(user_id, timestamp)` the primary key removes both the surrogate index and the separate
+  unique index, which is the tidier end state, but it rewrites the table and is a bigger change than
+  the finding justifies on its own.
+- **Reversal cost: low.** Re-adding a primary key on a populated table is one statement and a
+  rebuild; nothing depends on it.
+- **Do NOT run this as a production change without the owner**, despite `OR-182` authorising proved-dead
+  drops: this is `DROP CONSTRAINT` on the sensor table the Oura pipeline writes to continuously, and
+  the standing policy's confirm-first half covers anything irreversible in that area.
+
 ### [platform] BF-214 — the `claude_ro` twin is 92% of the migration corpus, and it is why migration numbers collide twice as fast as they need to
 
 - **✅ BOTH HALVES SHIPPED.** ① (2026-09-27, owner's yes): the views are one generated file,
