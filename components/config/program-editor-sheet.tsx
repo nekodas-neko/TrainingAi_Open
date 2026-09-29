@@ -21,6 +21,7 @@ import type { ProgressionStyle } from "@trainingai/shared/types";
 import type { ExerciseRole, PhaseSetWithPhases } from "@trainingai/shared/types/program";
 import type { EditablePhase } from "@/components/config/phase-editor";
 import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role';
+import { defaultStyleIdForSlot } from '@/components/config/default-exercise-style';
 
 export interface EditableSet { pct: number; reps: number; restSec?: number; useFor1rm?: boolean }
 export interface EditableExercise {
@@ -216,8 +217,10 @@ export function ProgramEditorSheet({
   };
 
   const addExercise = (si: number) => {
+    // A new slot starts on the style this program already uses, never styleless — see LB-186.
+    const styleId = defaultStyleIdForSlot(programSessions, styles);
     onProgramSessionsChange(programSessions.map((s, i) =>
-      i === si ? { ...s, exercises: [...s.exercises, { key: nextEditKey(), name: "" }] } : s
+      i === si ? { ...s, exercises: [...s.exercises, { key: nextEditKey(), name: "", styleId }] } : s
     ));
   };
 
@@ -263,10 +266,13 @@ export function ProgramEditorSheet({
   };
 
   const updateExerciseRole = (si: number, ei: number, role: ExerciseRole) => {
+    // A slot with no style takes the one this role already uses here; a style the user picked stands.
+    const styled = (e: EditableExercise): EditableExercise =>
+      e.styleId ? e : { ...e, styleId: defaultStyleIdForSlot(programSessions, styles, role) };
     onProgramSessionsChange(programSessions.map((s, i) =>
       i === si ? {
         ...s,
-        exercises: s.exercises.map((e, j) => j === ei ? { ...e, exerciseRole: role } : e),
+        exercises: s.exercises.map((e, j) => j === ei ? { ...styled(e), exerciseRole: role } : e),
       } : s
     ));
   };

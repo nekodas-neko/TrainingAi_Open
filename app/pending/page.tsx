@@ -1,6 +1,7 @@
 import { Meteors } from '@/components/ui/meteors'
 import { Clock } from 'lucide-react'
 import Link from 'next/link'
+import { AWAITING_APPROVAL_SENTENCE } from '@/lib/approval-copy'
 
 export default function PendingPage() {
   return (
@@ -21,7 +22,7 @@ export default function PendingPage() {
           <div className="space-y-2">
             <h2 className="text-xl font-semibold">Awaiting approval</h2>
             <p className="text-muted-foreground text-sm leading-relaxed">
-              Your account has been registered. Access will be granted once an admin approves it — usually within a day.
+              Your account has been registered. {AWAITING_APPROVAL_SENTENCE}
             </p>
           </div>
           <Link href="/sign-in" className="block text-sm underline underline-offset-4 text-muted-foreground">

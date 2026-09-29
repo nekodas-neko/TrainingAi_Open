@@ -6,10 +6,38 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.481.10",
+    date: "2026-09-29",
+    changes: [
+      "The 7-day nutrition chart now always shows seven days, with days you didn't log drawn as empty. Its average counts only the days you logged, and today's bar is the one highlighted.",
+    ],
+  },
+  {
+    version: "1.481.9",
+    date: "2026-09-29",
+    changes: [
+      "After creating an account, the sign-in screen no longer says \u201cSign in below\u201d. Every new account now waits for approval before it can be used, so it says that instead \u2014 the same sentence the waiting screen shows, rather than advice that sent you to a screen contradicting it.",
+    ],
+  },
+  {
+    version: "1.481.8",
+    date: "2026-09-29",
+    changes: [
+      "In an AI-built program, an exercise the generator could not match to one of your progression styles now takes the style the rest of that program uses, instead of being saved with none. Its sets and reps also show on the review screen now — a style the screen had no description for used to leave that line blank, which looked the same as having no style at all.",
+    ],
+  },
+  {
+    version: "1.481.7",
+    date: "2026-09-29",
+    changes: [
+      "An exercise you add to a program now starts on a progression style — the one that program already uses — instead of starting on none. A style-less exercise looked normal but was skipped by anything that needed a style: in a deload week one was prescribed its ordinary working weight while the rest of the session lightened correctly. You can still change the style, or clear it, in the picker.",
+    ],
+  },
+  {
     version: "1.481.6",
     date: "2026-09-28",
     changes: [
-      "The 7-day nutrition chart now always shows seven days, with days you didn't log drawn as empty. Its average counts only the days you logged, and today's bar is the one highlighted.",
+      "Fixed: Home could crash to a \u201cSomething went wrong\u201d screen shortly after opening, if one of the notifications behind the new \u201cN ready\u201d row changed while the screen was loading \u2014 a failed week-in-review was the reliable way to hit it. Introduced earlier today in v1.481.0; nothing was lost when it happened, but the screen had to be reloaded.",
     ],
   },
   {
