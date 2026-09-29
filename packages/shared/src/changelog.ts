@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.485.2",
+    date: "2026-09-29",
+    changes: [
+      "The \"Exercise detected\" card no longer offers walks and runs picked up by the retired Oura Cloud sync \u2014 that sync is gone and could not add a new one, so the only thing it could still surface was a handful of frozen rows from July.",
+      "Detection by your phone's GPS is untouched and still shows the same card: a qualifying walk or run is finalised at the end and waits there for you to review or dismiss it.",
+    ],
+  },
+  {
     version: "1.485.1",
     date: "2026-09-29",
     changes: [

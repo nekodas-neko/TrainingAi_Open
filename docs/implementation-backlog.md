@@ -29005,6 +29005,40 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [activity][devices] Q-231 — the "Exercise detected" card can never show anything again; its only writer was the Oura Cloud sync
 
+- **⛔ THE SCOPE WAS WRONG AND THE OWNER'S CONDITION DID NOT HOLD — CORRECTED 2026-09-29 (Lane B).**
+  This entry said to remove the card, on the stated grounds that *"retiring this card removes nothing he
+  currently sees working"*, and his yes was **conditional on exactly that**. **Measured: false.**
+  `pendingSessions` has a **second writer with nothing to do with the Oura Cloud sync** — the phone-GPS
+  detector. `AutoDetectionProvider` is mounted in **`app/layout.tsx:188`** (the root layout, every route)
+  and calls `startAutoDetection()` **unconditionally on native**, with no setting gating it;
+  `endSession()` turns a session passing the distance/pace/motorised gates into a `pendingSessions`
+  entry, and `inflight-teardown.test.ts` calls that entry *"the popup"* outright.
+  **`ExerciseDetectedCard` is the ONLY surface that renders one** — `exercise-review-sheet.tsx` resolves a
+  session by an id only this card supplies (`onReview(session.id)`). Removing the card would have orphaned
+  the live phone detector **silently**: no compile error, no failing test.
+  **The entry did spot two pipelines and missed the third.** It correctly separated the Cloud card from the
+  BLE classifier writing `activity_logs`; the phone-GPS path writing `pendingSessions` is a third, and it
+  is the one that shares this card.
+- **✅ WHAT SHIPPED INSTEAD (v1.485.2) — the Cloud plumbing, which is what he actually asked about.**
+  Gone from the card: the `oura-unreviewed-workouts` fetch of `/api/oura/workouts?unreviewed=true`, the
+  ingest effect, `markReviewedOnServer`, and its `invalidateOuraWorkoutReview` calls (128 → 85 lines).
+  Gone from the review sheet: both `source === 'oura'` PATCH branches, the phone-saves-overlapping-Oura
+  sweep, the *"Route not available"* branch, and its two `invalidateOuraWorkoutReview` pairings
+  (352 → 317 lines). Gone from the store: `addOuraSession`, and `source` narrowed to `'phone'`.
+  **A session persisted as `'oura'` before the change is dropped in `onRehydrateStorage`** rather than left
+  to render as a route-less phone session nothing can mark reviewed.
+  **This is his instruction executed faithfully once the premise is fixed, not a new product decision** —
+  the Oura half is genuinely unusable and is removed; the card he can still see working is not.
+- **Guarded so it cannot be retired again on the same premise:**
+  `components/activity/__tests__/q231-detected-card-is-the-phone-surface.test.ts` (6 tests) asserts the
+  provider is mounted in the root layout, the store still finalises a phone session, the card renders
+  `pendingSessions`, the banner stack mounts it, and the Cloud plumbing is absent. **Control-run: removing
+  the mount fails the test named *"removing it orphans the phone detector"*.** ⚠ Its Cloud-absence
+  assertions match **code, not mentions** — the first version failed on the card's own docstring
+  explaining what was removed, which is the false positive `scripts/lib/strip-comments.js` exists for.
+- **⚠ The mount location in the re-sequencing note below is STALE.** It says
+  `session-select-content.tsx`; the only mount is **`components/home/home-banner-stack.tsx:108`**, moved by
+  RV-119's banner-stack split. `rv119-banner-stack-split.test.ts` asserts it is there.
 - **⚙ RE-SEQUENCED 2026-09-28 (Lane A): the SURFACE half goes first, the reverse of the usual order.**
   Removing `/api/oura/workouts` first would leave the card's GET and the review sheet's three PATCHes
   (`exercise-review-sheet.tsx:194,209,232`) hitting a 404. So Lane B removes the card, its mount in
@@ -29012,7 +29046,11 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   route, the `day-timeline` walk filter and `lib/oura/types.ts`'s `OuraWorkout`. **Keep
   `repo.getOuraWorkouts`:** `compute-hr-recovery-profile.ts` reads the frozen rows as HR-recovery
   episode anchors, so removing it would change a computed profile, which is a separate scoring question.
-- **Lane:** B — the surface half first (see the re-sequencing note); Lane A's route/type removal follows.
+- **Lane:** A — **the surface half SHIPPED 2026-09-29 (v1.485.2)**, so what is left is Lane A's:
+  remove `app/api/oura/workouts/route.ts`, the `day-timeline` walk filter (`route.ts:90` and the `:255`
+  filter), `lib/oura/types.ts`'s `OuraWorkout`, and `invalidateOuraWorkoutReview` from `lib/cache-groups.ts`
+  (now callerless — Lane B removed its three call sites). **Keep `repo.getOuraWorkouts`**, unchanged:
+  `compute-hr-recovery-profile.ts` still reads the frozen rows as HR-recovery episode anchors.
 - **Branch:** `fix/detected-activity-has-no-source`
 - **✅ ANSWERED 2026-09-25 — RETIRE THE CARD.** The owner: *"If its not being used because we don't
   use the oura sync then get rid of it."* A conditional yes, and **the condition was checked before

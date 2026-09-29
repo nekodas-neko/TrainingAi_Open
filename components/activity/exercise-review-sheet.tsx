@@ -14,7 +14,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { toast } from 'sonner'
 import { useAutoDetectionStore } from '@/lib/stores/auto-detection-store'
 import { decodeRoute } from '@/lib/activity/route-encoding'
-import { invalidateActivityWrites, invalidateOuraWorkoutReview } from '@/lib/cache-groups'
+import { invalidateActivityWrites } from '@/lib/cache-groups'
 import { buildRouteZoneSegments } from '@/lib/activity/route-hr-zones'
 import { computeHrZones } from '@trainingai/shared/health/hr-zones'
 
@@ -163,7 +163,7 @@ export function ExerciseReviewSheet({ sessionId, userId, onClose }: Props) {
               routePolyline,
             }),
           })
-          pushThenRevalidate(userId!, () => Promise.all([invalidateActivityWrites(), invalidateOuraWorkoutReview()]))
+          pushThenRevalidate(userId!, () => invalidateActivityWrites())
           savedLocally = true
         } catch (sqliteErr) {
           console.error('Activity log SQLite write failed, falling back to API:', sqliteErr)
@@ -190,33 +190,11 @@ export function ExerciseReviewSheet({ sessionId, userId, onClose }: Props) {
         if (!res.ok) throw new Error()
       }
 
-      if (session.source === 'oura' && session.ouraWorkoutId) {
-        fetch('/api/oura/workouts', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: session.ouraWorkoutId }),
-        }).catch(() => {})
-      }
-
-      // If saving a phone session, also mark any overlapping Oura sessions as
-      // reviewed so the same walk doesn't reappear after the next Oura sync.
-      if (session.source === 'phone') {
-        const allSessions = useAutoDetectionStore.getState().pendingSessions
-        for (const other of allSessions) {
-          if (other.source !== 'oura' || !other.ouraWorkoutId) continue
-          const overlaps = other.startMs < session.endMs && other.endMs > session.startMs
-          if (!overlaps) continue
-          fetch('/api/oura/workouts', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: other.ouraWorkoutId }),
-          }).catch(() => {})
-          removeSession(other.id)
-        }
-      }
-
+      // Q-231: the Oura mark-reviewed PATCH and the overlapping-Oura-session sweep went with the
+      // Cloud sync that wrote those rows. A detected session is phone-only now, so saving one needs
+      // nothing beyond the activity write.
       removeSession(session.id)
-      await Promise.all([invalidateActivityWrites(), invalidateOuraWorkoutReview()])
+      await invalidateActivityWrites()
       toast.success('Activity saved')
       onClose()
     } catch {
@@ -228,14 +206,6 @@ export function ExerciseReviewSheet({ sessionId, userId, onClose }: Props) {
 
   function handleDismiss() {
     if (!session) return
-    if (session.source === 'oura' && session.ouraWorkoutId) {
-      fetch('/api/oura/workouts', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: session.ouraWorkoutId }),
-      }).catch(() => {})
-      invalidateOuraWorkoutReview().catch(() => {})
-    }
     removeSession(session.id)
     onClose()
   }
@@ -320,11 +290,6 @@ export function ExerciseReviewSheet({ sessionId, userId, onClose }: Props) {
 
             {routePoints.length > 1 && (
               <ActivityRouteMap points={routePoints} zoneSegments={zoneSegments} className="mb-4 h-56 w-full" />
-            )}
-            {session.source === 'oura' && (
-              <p className="mb-4 text-center text-xs text-muted-foreground">
-                Route not available &mdash; phone wasn&apos;t tracking
-              </p>
             )}
 
             <div className="flex gap-3">
