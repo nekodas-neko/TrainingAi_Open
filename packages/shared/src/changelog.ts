@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.481.7",
+    date: "2026-09-29",
+    changes: [
+      "An exercise you add to a program now starts on a progression style — the one that program already uses — instead of starting on none. A style-less exercise looked normal but was skipped by anything that needed a style: in a deload week one was prescribed its ordinary working weight while the rest of the session lightened correctly. You can still change the style, or clear it, in the picker.",
+    ],
+  },
+  {
     version: "1.481.6",
     date: "2026-09-28",
     changes: [
