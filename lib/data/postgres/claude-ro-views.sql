@@ -1113,7 +1113,13 @@ SELECT
   t.answered_at,
   t.deleted_at,
   t.created_at,
-  t.updated_at
+  t.updated_at,
+  t.est_calories,
+  t.est_protein_g,
+  t.est_carbs_g,
+  t.est_fat_g,
+  t.est_bias_kcal,
+  t.est_basis
 FROM public.plan_meal_answers t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 

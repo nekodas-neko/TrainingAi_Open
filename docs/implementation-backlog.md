@@ -6182,6 +6182,24 @@ drift.
   the owner reads, so it is filed as **LA-172** (`Lane: O`) with a recommendation. Also stale in
   the plan: its migration numbers (284/285) and its `claude_ro` twin step predate BF-214. Use
   `next-schema-number.js` and regenerate `claude-ro-views.sql` in place.
+- **▶ RESUMED 2026-09-30 (Lane A). Task 1, the migration, is built and ships alone:**
+  `202609292220_plan_meal_answer_estimated.sql` plus the `est_*` columns in `schema.ts` and
+  `claude-ro-views.sql`. **The plan's migration was incomplete.** Migration 187 pinned
+  `CHECK (answer IN ('no'))`, and the plan added the shape constraint without widening that one, so
+  every `estimated` insert would have been refused. This migration widens it to `('no', 'estimated')`.
+  A real-Postgres test pins all four cases (estimate with calories stored; estimate without and
+  decline with calories refused; `'yes'` still refused).
+- **The stop-check, re-run after LA-172:** the owner's only plan (4 meals × 2 variants) now maps to
+  four DISTINCT meal types, so no two slots share one. **But that plan was soft-deleted on
+  2026-08-11 and he has no active plan**, so this feature estimates nothing for him until he makes
+  one. A new plan can put two meals in one window (the nearest-window rule gives 12:00 and 13:00 the
+  same type), so Task 3 must decide what one logged meal of a shared type satisfies, rather than
+  assume it cannot happen.
+- **Next: Task 2 (local SQLite mirror, next free version from `next-schema-number.js`).**
+  **⚠ Before Task 5,** every reader of `plan_meal_answers` treats a row as a DECLINE, because
+  until now every row was one. That covers the server reads and the device's local store after a pull. Each must
+  filter `answer = 'no'` before any `estimated` row can be written, or an estimate would hide the
+  prompt it replaces.
 - **The plan:** [`plans/2026-09-26-meal-plan-tracking-a-estimated-answers.md`](superpowers/plans/2026-09-26-meal-plan-tracking-a-estimated-answers.md) — nine tasks, TDD, with the migration shipping as its own PR.
 - **Adds exactly ONE state.** `plan_meal_answers` is declines-only (Q-187 phase 2) and gains
   `estimated` plus the macros that estimate carries. **`'yes'` is never stored** — *"I ate it stays
