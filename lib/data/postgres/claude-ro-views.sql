@@ -1140,6 +1140,20 @@ SELECT
 FROM public.prescribed_runs t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
+CREATE VIEW claude_ro.prescription_shadow AS
+SELECT
+  t.id,
+  t.user_id,
+  t.program_session_id,
+  t.model_phase,
+  t.model_phase_action,
+  t.final_phase,
+  t.final_phase_action,
+  t.rows,
+  t.created_at
+FROM public.prescription_shadow t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.program_phases AS
 SELECT
   t.id,
