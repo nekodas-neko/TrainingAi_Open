@@ -6648,10 +6648,28 @@ drift.
   - **no click at all** → the browser never synthesised one from a CDP tap issued this soon after a
     CDP swipe. That is the harness's limit, not the product's — and the spec's own docstring already
     says the device-level cause is unreachable from here.
-- **✅ SHIPPED: capture-phase listeners for `pointerdown`/`touchstart`/`touchend`/`click` on
-  `document`**, with what they saw appended to the same failure message (`events seen: …`). Inert on the
-  happy path — the file passes **8 of 8** locally with both diagnostics in. The assertion still requires
-  the confirmation to open; nothing is skipped or weakened.
+- **✅ ANSWERED, run `36551121615` (PR #1965), 2026-09-29: `pointerdown:Delete | touchstart:Delete |
+  touchend:Delete` — and NO `click`, on both attempts.** The touch reaches the right element and
+  Chromium never synthesises a click from it. That is its **tap-suppression window after a gesture**,
+  entered because the tap is a CDP dispatch issued immediately after a CDP swipe. The sibling at
+  `:192` taps identically just *outside* the window, gets its click, and has been green throughout —
+  which is the control that makes this the explanation rather than a story.
+- **⇒ The failing test's unique content was Chromium's behaviour, not the app's, so it is REMOVED —
+  with every claim it made checked against a named sibling first, in the spec file where it stood.**
+  Tray raised while the row is displaced → *the tray is hit-testable the moment the row moves* (holds
+  the row mid-drag at 36 px, where the old `isOpen` gating measurably fails). Press opens a
+  confirmation rather than deleting → *a swipe reveals Delete, and Delete asks before it deletes*.
+  Same mid-animation → *the first tap on Delete opens the confirmation, even mid-animation*.
+- **⚠ A narrowed replacement was written and REJECTED rather than shipped**, and that is the part worth
+  keeping: asserting the hit test **at rest** passes under the very `isOpen` regression it would claim
+  to guard, because at rest `isOpen` and `displaced` are both true. It ran 8 of 8 green and was still
+  wrong. **A test whose assertion is weaker than its name is worse than none** — and it took writing it
+  out to see that, not reasoning about it.
+- **What is genuinely lost:** nothing the web path can hold. The device half — the press the S25
+  swallows — was never reachable here, which the spec's own docstring said from the start and sweep
+  4a's probing at 0/100/300/500 ms confirmed.
+- **So the suite should be green on shard 2 from the next run**, and `LB-178`'s census question is
+  answered: of everything it listed, the residue was one spec measuring the harness.
 - **⛔ Reading that artifact needs the repository-scoped path, not the one the log prints** — see
   `LB-149` for the 403 that looks like an auth failure and is the sandbox proxy.
 - **✅ AND THE HEADLINE FOR `LB-56`: a fully green E2E run is achievable.** Run three failed nothing at
