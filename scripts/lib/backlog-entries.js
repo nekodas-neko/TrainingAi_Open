@@ -46,6 +46,25 @@ class NoQueueError extends Error {
 }
 
 /**
+ * True when a `Needs:` value declares NO dependency, whatever it says afterwards.
+ *
+ * **The id extraction reads the whole line, so the sentence explaining a dependency's removal used to
+ * recreate it.** `LB-166`'s field is `- **Needs:** — nothing. **⚠ This said \`LB-149\` until
+ * 2026-09-28, and the dependency was INVERTED.**` — declared clear, parsed as parked on `LB-149`,
+ * and `next-item.js` therefore hid a SHIPPED entry in PARKED where it reads as neither work nor
+ * done. Measured 2026-09-29: **six entries across four lanes**, every one of which says
+ * *"separately buildable"*, *"buildable now"* or *"the dependency was INVERTED"* in the very line
+ * that parked it.
+ *
+ * Same class as `decorated-field.js` and the comment-blindness guard: a matcher reading a MENTION as
+ * a declaration. Here the cure is to stop reading past the declaration itself — a field that says
+ * "nothing" means nothing, and the prose after it is a note to a human.
+ */
+function declaresNothing(value) {
+  return /^[\s—–-]*\*{0,2}(nothing|none)\b/i.test(value);
+}
+
+/**
  * @param {string[]} lines  the whole backlog file, split on newlines
  * @returns {BacklogEntry[]} entries in priority order
  * @throws {NoQueueError}
@@ -75,7 +94,9 @@ function parseEntries(lines) {
   if (!current) continue;
 
   const needs = line.match(/^\s*[-*]\s*\*{0,2}Needs:\*{0,2}\s*(.+)$/i);
-  if (needs) for (const m of needs[1].matchAll(idPattern('g'))) current.needs.push(m[1]);
+  if (needs && !declaresNothing(needs[1])) {
+    for (const m of needs[1].matchAll(idPattern('g'))) current.needs.push(m[1]);
+  }
 
   const gate = line.match(/^\s*[-*]\s*\*{0,2}Gate:\*{0,2}\s*([a-z]+)/i);
   if (gate) {
@@ -191,4 +212,5 @@ function proseParkedOnly(entries) {
 }
 
 module.exports = {
+  declaresNothing,
   bareOwnerGates, parseEntries, parkReasons, proseParkedOnly, NoQueueError };
