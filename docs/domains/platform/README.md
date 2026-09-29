@@ -539,7 +539,7 @@ Live at the time of writing (2026-07-30):
 - [`2026-08-24-activity-log-delete-outbox`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-activity-log-delete-outbox) — **Q-328, the activity delete goes through the outbox, 2026-08-24** (the one activity-log write with no outbox domain; `softDeleteActivityLogPending` not `deleteActivityLog`, because a queued delete must stay `pending` until its push is confirmed). **Offline path not exercised** — `Gate: device`.
   — the A4b journal entry.
 
-- **[`2026-09-28-error-boundary-retries-chunk-load`](../../overview/entries/2026-09-28-error-boundary-retries-chunk-load.md)**
+- **[`2026-09-28-error-boundary-retries-chunk-load`](../../overview/history-2026-09-29-folded-1.md#2026-09-28-error-boundary-retries-chunk-load)**
   — **LB-184: the root boundary retries a failed chunk load once.** Found as `LB-178`'s third E2E
   cause — a `next/dynamic` chunk failing under `next dev` crashed Home to the boundary and the
   running spec reported *"element(s) not found"*, reading as a broken feature. The fix is

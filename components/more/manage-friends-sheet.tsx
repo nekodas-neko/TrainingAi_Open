@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import type { Friendship } from "@trainingai/shared/types/friends";
 import { UserCircle, Check, X, UserMinus } from "lucide-react";
 import { invalidateFriends } from "@/lib/cache-groups";
+import { splitPendingRequests } from "@/components/more/pending-friend-requests";
 
 interface ManageFriendsSheetProps {
   open: boolean
@@ -21,7 +22,7 @@ export function ManageFriendsSheet({ open, onOpenChange, friendships, onRefresh 
   const [addValue, setAddValue] = useState("");
   const [sending, setSending] = useState(false);
 
-  const pending = friendships.filter(f => f.status === 'pending' && f.addresseeId !== f.requesterId);
+  const { incoming, outgoing } = splitPendingRequests(friendships);
   const accepted = friendships.filter(f => f.status === 'accepted');
 
   const handleAdd = async () => {
@@ -68,9 +69,11 @@ export function ManageFriendsSheet({ open, onOpenChange, friendships, onRefresh 
     onRefresh();
   };
 
-  const handleRemove = async (id: string) => {
+  // One endpoint for both: `DELETE /api/friends/[id]` allows either party, so cancelling a request
+  // you sent is the same call as removing a friend. Only the word for it differs.
+  const handleRemove = async (id: string, message = 'Friend removed') => {
     await fetch(`/api/friends/${id}`, { method: 'DELETE' });
-    toast.success('Friend removed');
+    toast.success(message);
     await invalidateFriends();
     onRefresh();
   };
@@ -99,12 +102,12 @@ export function ManageFriendsSheet({ open, onOpenChange, friendships, onRefresh 
             </div>
           </div>
 
-          {/* Pending requests */}
-          {pending.length > 0 && (
+          {/* Requests waiting on you */}
+          {incoming.length > 0 && (
             <div>
               <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Pending Requests</p>
               <div className="space-y-2">
-                {pending.map(f => (
+                {incoming.map(f => (
                   <div key={f.id} className="flex items-center gap-3 rounded-xl bg-muted/30 p-3">
                     <UserCircle className="w-8 h-8 text-muted-foreground flex-shrink-0" />
                     <div className="flex-1 min-w-0">
@@ -119,6 +122,30 @@ export function ManageFriendsSheet({ open, onOpenChange, friendships, onRefresh 
                         <X className="w-3 h-3" />
                       </Button>
                     </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Requests you sent. RV-195 masks the target until it is accepted, so there is no name to
+              show here by design — the row says what it is and offers the way back out. */}
+          {outgoing.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Sent</p>
+              <div className="space-y-2">
+                {outgoing.map(f => (
+                  <div key={f.id} className="flex items-center gap-3 rounded-xl bg-muted/30 p-3">
+                    <UserCircle className="w-8 h-8 text-muted-foreground flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold truncate">Request sent</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {f.otherUser.displayName ?? 'Waiting for them to accept'}
+                      </p>
+                    </div>
+                    <Button size="sm" variant="ghost" aria-label="Cancel request" onClick={() => handleRemove(f.id, 'Request cancelled')}>
+                      <X className="w-3 h-3" />
+                    </Button>
                   </div>
                 ))}
               </div>

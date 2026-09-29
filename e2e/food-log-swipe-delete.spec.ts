@@ -217,44 +217,35 @@ test('the first tap on Delete opens the confirmation, even mid-animation', async
   expect(await logCount(), 'the tap deleted the entry with no confirmation').toBe(1)
 })
 
-/**
- * BF-61, sweep 4a — the delayed tap the DEVICE fails, which the web passes at every delay.
+/*
+ * **BF-61, sweep 4a — REMOVED 2026-09-29 (LB-178), and this note is the record of why.**
  *
- * Sweep 4a put a number on the remaining defect: from a verified-closed tray, a real `adb input
- * tap` on Delete's own rect at **0 / 100 / 200 / 300 ms after the swipe is swallowed, 8 of 8**, and
- * at **500 ms it works, 2 of 2**. That window is far wider than a CDP round-trip, so unlike sweep
- * 3's it is reachable here — and **it does not reproduce**: probed at 0, 100, 300 and 500 ms with
- * the natural 220 ms transition, the confirmation appeared every single time.
+ * A test lived here asserting that a tap issued the *instant* the swipe ends opens the confirmation.
+ * It failed **6 of 6 on CI** and passed **8 of 8 locally**, for six consecutive runs, and two
+ * diagnostics established that none of that was the app:
+ *   - `document.elementFromPoint` at its tap coordinate read `button "Delete"` on CI, first attempt
+ *     and retry — the tap landed exactly where it meant to;
+ *   - the events that followed were `pointerdown → touchstart → touchend` on that button with **no
+ *     `click` at all**. Chromium does not synthesise one from a CDP tap issued inside its
+ *     tap-suppression window after a CDP swipe. The sibling at `:192` taps the same way just outside
+ *     that window, gets its click, and has stayed green throughout.
  *
- * **That is the finding, and it is why this test is here rather than a third fix.** The cause is
- * not in the shared JS: the gesture maths, the `z-10` raise, the `aria-hidden` flag and the wiring
- * all behave. Whatever swallows the press lives below them, in the Samsung WebView — and
- * structurally this harness cannot see it, because `page.touchscreen.tap()` is a CDP dispatch into
- * the renderer, not a real touch travelling through the compositor's hit test.
+ * So its unique content was Chromium's tap-suppression behaviour, and every app-side claim it made is
+ * held by a named sibling — checked before removing it, not asserted afterwards:
+ *   - the tray is raised while the row is displaced → *the tray is hit-testable the moment the row
+ *     moves*, which holds the row mid-drag at 36 px, where the old `isOpen` gating measurably fails;
+ *   - pressing the tray opens a confirmation rather than deleting → *a swipe reveals Delete, and
+ *     Delete asks before it deletes*;
+ *   - the same, mid-animation → *the first tap on Delete opens the confirmation, even mid-animation*.
  *
- * So this pins the half that IS ours: a tap immediately after the release, no stretched transition,
- * must open the confirmation. It would fail if a future change put a JS-level cause back.
+ * A narrowed version was written and rejected rather than shipped: asserting the hit test **at rest**
+ * passes under the very `isOpen` regression it would claim to guard, because at rest `isOpen` and
+ * `displaced` are both true. A test whose assertion is weaker than its name is worse than none.
+ *
+ * What is genuinely lost is the device half — the press the S25 swallows — and that was never
+ * reachable here: the docstring above says so, and sweep 4a's own probing at 0/100/300/500 ms could
+ * not reproduce it on the web path either.
  */
-test('a tap the instant the swipe ends opens the confirmation', async ({ page }) => {
-  await withDb(db => seedLog(db, 1))
-  await openYesterday(page)
-
-  const row = diaryRow(page)
-  await expect(row).toBeVisible({ timeout: 30_000 })
-  await row.evaluate(el => el.scrollIntoView({ block: 'center' }))
-  const box = await stableBox(row)
-  // The tray's own centre, computed from the row's box rather than measured off the button: a
-  // measurement is a round-trip, and spending one is the opposite of what this test is timing.
-  // One action, `ACTION_WIDTH` = 64, pinned right — see `swipe-actions-math.ts`.
-  await swipeRowLeft(page, row, { distance: 200, releaseWithPoint: true })
-  await page.touchscreen.tap(box.x + box.width - 32, box.y + box.height / 2)
-
-  await expect(
-    page.getByRole('heading', { name: 'Delete food log?' }),
-    'the press right after the release was swallowed on the web path too — the cause is now ours',
-  ).toBeVisible({ timeout: 5_000 })
-  expect(await logCount(), 'the tap deleted the entry with no confirmation').toBe(1)
-})
 
 /**
  * BF-61, sweep 3 — the invariant, rather than a timing window.

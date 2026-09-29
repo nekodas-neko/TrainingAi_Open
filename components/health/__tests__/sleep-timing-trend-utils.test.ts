@@ -9,18 +9,24 @@ const BNE = "Australia/Brisbane";
 
 describe("clockLabel", () => {
   it("formats midday and midnight correctly", () => {
-    expect(clockLabel(0)).toBe("12:00 AM");
-    expect(clockLabel(720)).toBe("12:00 PM");
+    expect(clockLabel(0)).toBe("12:00 am");
+    expect(clockLabel(720)).toBe("12:00 pm");
   });
 
   it("formats a plain morning/evening time", () => {
-    expect(clockLabel(6 * 60 + 30)).toBe("6:30 AM");
-    expect(clockLabel(22 * 60 + 15)).toBe("10:15 PM");
+    expect(clockLabel(6 * 60 + 30)).toBe("6:30 am");
+    expect(clockLabel(22 * 60 + 15)).toBe("10:15 pm");
   });
 
   it("wraps a negative or over-1440 value back onto the clock", () => {
-    expect(clockLabel(-30)).toBe("11:30 PM");
-    expect(clockLabel(1440 + 45)).toBe("12:45 AM");
+    expect(clockLabel(-30)).toBe("11:30 pm");
+    expect(clockLabel(1440 + 45)).toBe("12:45 am");
+  });
+
+  it("rounds the whole value, so a fractional minute cannot render :60", () => {
+    // LB-183: this rounded the MINUTE alone after the hour had been floored, so 419.6 read
+    // "6:60 AM". The shared helper rounds first, which carries into the hour.
+    expect(clockLabel(419.6)).toBe("7:00 am");
   });
 });
 
@@ -55,13 +61,13 @@ describe("timingValueToClock", () => {
   it("round-trips a bedtime value back to its clock time", () => {
     const nights = [{ date: "2026-08-01", sleepStart: "2026-08-01T23:30:00+10:00", sleepEnd: null }];
     const value = timingPoints(nights, "bedtime", BNE)[0].value as number;
-    expect(timingValueToClock(value, "bedtime")).toBe("11:30 PM");
+    expect(timingValueToClock(value, "bedtime")).toBe("11:30 pm");
   });
 
   it("round-trips a wake value back to its clock time", () => {
     const nights = [{ date: "2026-08-01", sleepStart: null, sleepEnd: "2026-08-01T07:15:00+10:00" }];
     const value = timingPoints(nights, "wake", BNE)[0].value as number;
-    expect(timingValueToClock(value, "wake")).toBe("7:15 AM");
+    expect(timingValueToClock(value, "wake")).toBe("7:15 am");
   });
 });
 
