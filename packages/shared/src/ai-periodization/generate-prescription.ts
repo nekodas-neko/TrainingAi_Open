@@ -36,6 +36,7 @@ import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
 import { z } from 'zod'
 import { PrescriptionSchema } from '@trainingai/shared/ai-periodization/prescription-schema'
 import { reconcilePrescription } from '@trainingai/shared/ai-periodization/reconcile-prescription'
+import { buildPrescriptionShadow } from '@trainingai/shared/ai-periodization/prescription-shadow'
 import type { AiPrescription, AiPrescriptionExercise, PeriodizationPhase } from '@trainingai/shared/types/ai-periodization'
 import type { PrescriptionSignals } from '@trainingai/shared/ai-periodization/signals'
 import type { WorkoutRepository } from '@/lib/data/repository'
@@ -508,6 +509,10 @@ async function runPrescriptionGeneration(
     return { ok: false, error: 'AI generation failed', status: 502 }
   }
 
+  // BF-199 Phase 1: the model's own phase answer, before reconciliation rewrites `parsed`.
+  const modelPhase = String(parsed.phase)
+  const modelPhaseAction = String(parsed.phase_action)
+
   // Single post-parse reconciliation pass — resolves the phase for a "stay" response,
   // normalizes ambiguous pct fractions, drops hallucinated ids, de-dupes, backfills any
   // model-omitted exercise, and applies the deterministic per-exercise deload override by
@@ -776,6 +781,12 @@ async function runPrescriptionGeneration(
   // generations for this session could interleave between them and leave the status describing the
   // other run's prescription (Q-54).
   await repo.storePrescription(userId, programSessionId, prescription, expiresAt, prescriptionStatus)
+
+  // BF-199 Phase 1: record what the rules prescriber would have said beside what was given.
+  // Best-effort and after the store: evidence must never cost the lifter a plan.
+  await (async () => repo.recordPrescriptionShadow(userId, programSessionId, buildPrescriptionShadow({
+    modelPhase, modelPhaseAction, final: prescription, rules: buildRulesPrescription(signals, ''),
+  })))().catch(err => console.error('[prescribe] shadow record failed (ignored):', err))
 
   return { ok: true, prescription, prescriptionStatus, estimatedSessionDurationMin }
 }

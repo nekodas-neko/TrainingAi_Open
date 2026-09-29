@@ -1077,6 +1077,19 @@ export const appLoadMetrics = pgTable('app_load_metrics', {
 
 // AI call observability — one row per @ai-sdk/google model call (metadata only,
 // written best-effort by lib/ai/instrument.ts). See migration 136.
+/** BF-199 Phase 1 — the given prescription beside the rules prescriber's, per model call. Evidence only. */
+export const prescriptionShadow = pgTable('prescription_shadow', {
+  id:               uuid('id').primaryKey().defaultRandom(),
+  userId:           uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  programSessionId: uuid('program_session_id').references(() => programSessions.id, { onDelete: 'set null' }),
+  modelPhase:       text('model_phase').notNull(),
+  modelPhaseAction: text('model_phase_action').notNull(),
+  finalPhase:       text('final_phase').notNull(),
+  finalPhaseAction: text('final_phase_action').notNull(),
+  rows:             jsonb('rows').notNull(),
+  createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export const aiCallLog = pgTable('ai_call_log', {
   id:           uuid('id').primaryKey().defaultRandom(),
   userId:       uuid('user_id').references(() => users.id, { onDelete: 'set null' }),

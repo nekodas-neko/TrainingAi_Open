@@ -51,6 +51,26 @@ import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
 
 type Db = ReturnType<typeof getDb>
 
+/**
+ * BF-222. A retention prune that fails must leave a row where the session-start read looks.
+ *
+ * These prunes are fire-and-forget on the write path and used to end in `console.error`, i.e.
+ * stdout, which nothing reads. Neither had ever run when this was written (both tables were still
+ * inside their horizon), so their first execution, ~2026-10-15 for `rr_intervals` and ~2026-12-19
+ * for `oura_heartrate`, would have failed invisibly and the table would simply have kept growing.
+ * Written directly with the same handle rather than through `reportServerError`, which reaches the
+ * database via `@/lib/data` and would make this slice import its own composition root.
+ */
+export function recordPruneFailure(db: Db, table: string, err: unknown): void {
+  console.error(`[prune] ${table} failed:`, err)
+  const message = `[prune] ${table} retention DELETE failed: ${err instanceof Error ? err.message : String(err)}`
+  db.insert(s.errorEvents).values({
+    userId: null, source: 'server', message: message.slice(0, 2000),
+    stack: err instanceof Error ? (err.stack ?? null)?.slice(0, 8000) ?? null : null,
+    url: `prune:${table}`, userAgent: null,
+  }).catch(e => console.error('[prune] could not record the failure either:', e))
+}
+
 // ── Daily Scores ───────────────────────────────────────────────────────────────
 
 export async function upsertOuraDaily(db: Db, userId: string, rows: OuraDailyRow[], source: HealthSource): Promise<void> {
@@ -563,7 +583,7 @@ export async function upsertOuraHeartrate(db: Db, userId: string, rows: { timest
   const now = Date.now()
   if (shouldPrune(lastHeartrateStorePrune, now, HR_PRUNE_THROTTLE_MS)) {
     lastHeartrateStorePrune = now
-    db.execute(sql`DELETE FROM oura_heartrate WHERE timestamp < now() - (${HR_RETENTION_DAYS} || ' days')::interval`).catch(err => console.error('[prune] oura_heartrate failed:', err))
+    db.execute(sql`DELETE FROM oura_heartrate WHERE timestamp < now() - (${HR_RETENTION_DAYS} || ' days')::interval`).catch(err => recordPruneFailure(db, 'oura_heartrate', err))
   }
 }
 
@@ -1067,7 +1087,7 @@ export async function insertRrIntervals(db: Db, userId: string, rows: { at: Date
   const now = Date.now()
   if (shouldPrune(lastRrIntervalsPrune, now, RR_PRUNE_THROTTLE_MS)) {
     lastRrIntervalsPrune = now
-    db.execute(sql`DELETE FROM rr_intervals WHERE at < now() - interval '90 days'`).catch(err => console.error('[prune] rr_intervals failed:', err))
+    db.execute(sql`DELETE FROM rr_intervals WHERE at < now() - interval '90 days'`).catch(err => recordPruneFailure(db, 'rr_intervals', err))
   }
 }
 

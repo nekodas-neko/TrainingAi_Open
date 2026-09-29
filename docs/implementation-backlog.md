@@ -490,6 +490,40 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [sleep][readiness] OR-204 — ship the Sleep Score partial-data flag, which never needed the owner
+
+- **Lane: A** · **Added:** 2026-09-29 · Orchestrator, splitting the buildable half out of `Q-72`.
+- **`Q-72` is gated on the owner and says, in its own words, that this half is not:** *"The
+  partial-data flag does not depend on this and can ship."* The gate is real for the other half —
+  whether he will rate sleep again, or wants a different yardstick — but it **parks the whole
+  entry**, so a shippable change has been sitting behind a question it does not depend on.
+- **What stays with `Q-72` and is genuinely his:** Review sweep 56 measured, on production, that of
+  36 mornings since 08-18 **35 hold the neutral 3 untouched and 1 is null — 0 real sleep ratings
+  under the new model.** So the three-week rank re-validation has nothing to rank, and **the clock
+  cannot unblock it**; only he can, by rating sleep again or naming a different yardstick.
+- **Why split rather than ungate `Q-72`:** ungating would put the owner question back into the
+  READY list as though it were buildable, which is the inversion `CLAUDE.md` warns about. Two
+  entries keep both true — this one startable, that one correctly parked.
+- **Read `Q-72` before building**, for the model context; this entry is the flag only.
+
+### [platform] OR-205 — the AI confidence value gates an automatic action, which a standing rule already forbids
+
+- **Lane: A** · **Added:** 2026-09-29 · Orchestrator, splitting `PS-31` (e).
+- **`PS-31` (e) carries two questions and files both as the owner's. Only one is.** The model's
+  `confidence` is (i) **used to decide `source`** (`lib/.../log-food.ts:31`) and (ii) rendered to
+  the owner as an "AI confidence" bar.
+- **(i) is not a decision — the rule already made it.** `CLAUDE.md`'s AI defaults: *"no LLM
+  self-reported number (confidence, totals) may gate an automatic action."* A value deciding
+  `source` is gating an automatic action, so **this half is a defect to fix, not a preference to
+  ask about.** Replace it with a deterministic rule, or make the behaviour independent of the
+  model's self-report.
+- **(ii) stays with `PS-31` and is genuinely his** — the rule forbids showing such a number *as
+  fact*, and the bar is honestly labelled as the model's own confidence, so whether it earns its
+  place on the screen is a display preference the repo cannot answer.
+- **Do not "fix" (ii) while here.** Removing a surface he may want is the failure this split exists
+  to avoid.
+
+
 ### [platform] OR-203 — the database grew 3× its trend for six days, and no per-table baseline exists to say which table did it
 
 - **Lane: A** · **Added:** 2026-09-29 · Orchestrator, from the session-start size read.
@@ -529,30 +563,6 @@ below threshold and left in place for next time.
 - **Then the standing question stays the same:** act on a departure from the SHAPE — a retention
   window that stopped reclaiming — not on the daily figure. `rr_intervals` reaching its cap in late
   October is the next scheduled step down, and **a step that does not arrive is the signal**.
-
-
-### [workouts] LA-177 — backfill the nine styleless slots in the active program
-
-- **Lane: A** · **Added:** 2026-09-28 · Orchestrator, splitting the data half out of `LA-173` ③.
-- **Nine slots in `Bankai` (active) have `style_id IS NULL`** — 7 accessory (Hanging Leg Raise,
-  Cable Chest Dips, Face Pull, Cable Lying Leg Curl, Barbell Skull Crusher, Dumbbell Calf Raise,
-  Cable Seated Leg Curl), 1 primary (**Barbell Hip Thrust**) and 1 secondary (Dumbbell Bulgarian
-  Split).
-- **Assign by ROLE, not one style for all nine.** His accessories run `Hypertrophy 3-set` (17
-  slots) and `General` (15); his primaries run `Powerbuilding` (13). Barbell Skull Crusher itself
-  already carries `Hypertrophy 3-set` in one session and `General` in another, so **the exercise
-  has no single right answer and only the slot does**.
-- **Needs:** LB-186
-- **⛔ Do this AFTER `LB-186`, or it comes straight back** — backfilling while the editor still adds
-  styleless exercises fixes nine and permits the tenth. That ordering is the whole reason these are
-  two entries.
-- **Out of scope: the five unstyled primaries in `Main`** (Squat, Deadlift, Bench, Incline Bench,
-  Bent-Over Row). That program is **inactive**; counting them would inflate this from nine to
-  fourteen.
-- **This is an ADD/backfill on production data, which is authorised** — snapshot first and print the
-  affected-row count against the nine predicted, stopping on a mismatch.
-- **Method for re-deriving the nine:** `claude_ro.session_exercises` joined to
-  `program_sessions`/`programs`, `deleted_at IS NULL`, `is_active`, `style_id IS NULL`.
 
 
 ### [readiness][heart-rate][activity][workouts] LA-171 — five runs and checks Lane A shipped on 2026-09-28 that need the phone or an admin session
@@ -808,24 +818,6 @@ below threshold and left in place for next time.
 - **Reversal cost:** a shipped second credential path is expensive to withdraw — anything already
   holding a token keeps working until it expires. That asymmetry is why the merge is the owner's.
 
-### [workouts] LA-182 — nine exercises in his program have no progression style: he assigns them in Config
-
-- **Lane: O** · **Added:** 2026-09-29 · Lane A, closing BF-217.
-- **What he needs to do, about two minutes:** in Config → Bankai, give a style to each of these nine
-  exercises, whose style picker is blank:
-  - **Lower:** all five;
-  - Legs: Cable Lying Leg Curl;
-  - Pull: Face Pull;
-  - Push: Cable Chest Dips;
-  - Upper: Barbell Skull Crusher.
-- **Why it matters even though Bankai is AI-dynamic:** the AI picks a style each session, but the
-  rules fallback (used when he turns **Full** back on after a deload, and when the AI is
-  unavailable) skips any exercise without one. **Lower's Full toggle does nothing until these are
-  set.**
-- **Recommendation:** use the style each one was last logged with (Hypertrophy Plus, Hypertrophy
-  3-set or Powerbuilding), or his usual one. Any style fixes the fallback; the AI still chooses
-  per session. **Reversal cost: none.**
-
 ### [workouts] BF-219 — Cable Preacher Curl has been prescribed 13.75 kg four times and returned RPE 10 three of them, with the reps falling 9 → 8 → 7 → 6
 - **Lane:** T — a load-selection calibration, so a Tuning proposal is owed before anyone builds it. Implementation lane afterwards is A (`packages/shared/src/1rm.ts`, `packages/shared/src/ai-periodization/`).
 - **Added:** 2026-09-29 · BugFix intake. Owner, mid-set on Pull: *"This was too heavy for me. What is the role of this exercise? Should be accessory."*
@@ -1017,6 +1009,13 @@ below threshold and left in place for next time.
 - **Lane:** A — `lib/data/postgres/slices/oura.ts:566` and `:1070`.
 - **Added:** 2026-09-29 · BugFix intake, from the session-start database read. Not reported by anyone; found because the growth rate had moved.
 - **Needs:** — nothing.
+- **✔ BUILT 2026-09-29 (Lane A).** Both prune `.catch`es now call `recordPruneFailure`
+  (`lib/data/postgres/slices/oura.ts`), which still logs to stdout and ALSO writes an `error_events`
+  row (`url = 'prune:<table>'`). It uses the slice's own handle, because `reportServerError` would make
+  the slice import its composition root. A source guard test pins both call sites.
+- **Keep:** confirm the first-ever `rr_intervals` prune ran. After **2026-10-15**, `min(at)` on
+  `rr_intervals` should sit at about 90 days rather than keep receding, and `error_events` should
+  hold no `prune:rr_intervals` row. Repeat for `oura_heartrate` after ~2026-12-19 at 180 days.
 
 - **The growth rate has risen and it is NOT a leak — this is the "shape" the session-start rule asks
   about, answered.** Measured 2026-09-29: **261 MB total, 93 MB index**. Against the two figures in
@@ -5289,108 +5288,6 @@ volume7dKg,                             // likewise
   `app/api/admin/backfill-derived-scores` (the pattern to copy).
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** production now has v6 on 1 day and v5 on 51. The only `upsertBodyBatteryDaily` call is `route.ts:385` (`date: todayIso`), and `backfill-derived-scores` has no battery code. It overlaps Q-273 scope item 2 (general score backfill); this is its battery instance.
 
-### [workouts] TN-75 — the load prescription IS followed; what regressed is the field that lets anyone check, from 93% coverage in August to 72% in September
-
-- **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, completing TN-64's question from the other
-  side: readiness gates no prescription, so does the prescription itself reach the bar?
-- **Lane: A** — `planned_*` is written on the set-log path, engine territory.
-- **The good news first, and it is a real non-finding worth recording.** Where both planned and actual
-  are present (432 sets): mean load deviation **−0.81 percentage points** (sd 3.45), with **214 of 432
-  (50%) inside half a point of plan**. Reps: **228 of 432 exact**, mean deviation **+0.45**, and only
-  **17 sets under** the prescribed reps. So the owner follows the prescribed load closely and overshoots
-  reps slightly rather than falling short. **The prescription path works.** What TN-64 found disconnected
-  is the readiness *input* to it, not the mechanism — worth separating, because "the app's advice is
-  ignored" would be the wrong conclusion to draw from TN-64 alone.
-- **The regression.** `planned_pct` coverage by month, over sets joined to their sessions:
-
-  | month | sets | with a plan | coverage |
-  |---|---:|---:|---:|
-  | 2026-05 | 332 | 0 | **0%** |
-  | 2026-06 | 165 | 0 | **0%** |
-  | 2026-07 | 372 | 147 | 40% |
-  | 2026-08 | 266 | 247 | **93%** |
-  | 2026-09 | 151 | 109 | **72%** |
-
-  The field arrives in July, reaches 93% in August, then **falls 21 points in September**. Coverage going
-  backwards is the finding; the 0% before July is just the field's age.
-- **Two distinct shapes inside the September gap.**
-  - **A five-session hole, 2026-09-07 → 09-12: 24 sets, ZERO with a plan.** Those five sessions also ran
-    **4–5 sets each against 10 in every session either side**, and all carry `intensity_mode` NULL where
-    the 2–6 September sessions carry `'deload'`. A different regime, not scattered loss.
-  - **A steady residue elsewhere**: sessions from 09-14 on sit at 8 of 10 with striking consistency.
-    Measured against set position, the loss is **even — 7 of 40 missing on set 1 and 7 of 40 on set 2** —
-    so it is **whole exercises lacking a plan, not late sets losing one.**
-- **⚠ THE OBVIOUS UNIFICATION WITH TN-74 IS FALSE, and I nearly filed it.** `planned_pct` derives from a
-  1RM, so a log with `estimated_1rm = 0` should have no prescribable percentage — which would have made
-  TN-74 and this one defect. Measured over sets since 2026-07-01: **16% of sets WITH a plan sit on a
-  zero-1RM log (81 of 503), against only 4% of sets WITHOUT one (11 of 286).** The association runs the
-  *opposite* way to the prediction. Missing `style_id` does not explain it either (13 of 286).
-  **They are two independent defects** and must be worked as such.
-- **Why this matters for tuning specifically.** `planned_pct` is the only column that makes
-  prescription-adherence measurable at all. The adherence figures at the top of this entry could only be
-  computed on **39% of sets** (503 of 1,286), and on the five-session hole they cannot be computed at
-  all. Every future claim about whether the app's advice was taken is limited by this coverage, so the
-  regression costs the analysis, not just the record.
-- **Acceptance criteria:** September-onward coverage returns to August's level or better; the five-session
-  window's cause is identified (whatever produced 4–5-set sessions with no plan and a null intensity
-  mode); and a set written with no available plan is distinguishable from one never asked, rather than
-  both reading NULL.
-- **What this does NOT establish.** Why those five sessions differ. Which exercises carry the steady
-  residue — the even split by set position says it is per-exercise, but the exercises were not named.
-  And whether the −0.81-point mean deviation is the owner rounding to available plates or genuinely
-  under-loading; a plate-rounding check would settle it and was not run.
-- **⚙ DECOMPOSED EXACTLY 2026-09-27 (Lane A). September's shortfall is THREE causes, two of them
-  benign, and the coverage percentage should stop being read as one number.** Re-measured on more
-  data than the filing had (172 sets, 71.5%, so it is not recovering). **49 sets lack a plan and
-  all 49 are accounted for:**
-
-  | cause | sets | what it is |
-  |---|---:|---|
-  | Bodyweight exercises | **23** | Chin-Up, Pull-Up, Hanging Leg Raise — `equipment = {bodyweight}` |
-  | The 09-06 → 09-12 window | **20** | five sessions, one set per exercise, no plan on any |
-  | Barbell Skull Crusher | **6** | no `style_id`, so no per-set percentages exist to record |
-
-- **Split loaded from bodyweight and the picture inverts.** August: loaded **233/233 = 100%**,
-  bodyweight 14/33. September: loaded **121/147 = 82.3%**, bodyweight **2/25 = 8%**. So the
-  headline drop is mostly a change in what was TRAINED, not in what was recorded — and there is
-  still a real loaded regression underneath it, which is the next two rows.
-- **⚠ The entry's proposed signature for the window does NOT separate it.** It says the hole's
-  sessions "all carry `intensity_mode` NULL where the 2–6 September sessions carry `'deload'`".
-  True, and useless as a discriminator: **every session from 09-13 to 09-24 also carries NULL**
-  and every one of them has full coverage. `was_override` does not separate them either (09-10
-  false and no plans, 09-13 false and fully planned). **The discriminator that does work is set
-  count: the window logged exactly ONE set per exercise** (3/3, 5/5, 4/4, 4/4, 4/4) against two
-  per exercise on every healthy day. Start there, not at `intensity_mode`.
-- **⚠ And two readings of the residue are wrong — both were mine, and the data killed them.**
-  ① *"It is the bodyweight mix"* — no: loaded coverage itself fell from 100% to 82.3%.
-  ② *"The residue is sets performed beyond the prescribed count"* — no: on 09-19 the same **one**
-  exercise is unplanned at set 1, set 2 AND set 3 (4/3, 4/3, 4/3), which is the per-exercise shape
-  the entry originally measured. The entry was right and the tidy explanation was wrong.
-- **The whole loaded residue is one exercise: Barbell Skull Crusher**, 6 sets across 09-19 and
-  09-25, carrying `style_id` NULL where every planned exercise carries one. **That is almost
-  certainly the same root as BF-200**, which is the owner reporting Skull Crusher alone ignoring a
-  deload in the 09-25 Upper session — same exercise, same session, same missing per-exercise
-  prescription data. Whoever takes BF-200 should check whether fixing it also restores this.
-- **~~What is left, and it is one question~~ — ANSWERED 2026-09-28 (Lane A): the window is the
-  BASELINE CALIBRATION ROUND, by design.** 09-07 to 09-12 is exactly **one workout for each of the
-  five sessions** (Pull, Push, Legs, Upper, Lower), the first after the 09-02 → 09-06 deload. Each
-  logged one set per exercise at up to **20 reps**, which is an AMRAP. Every session after it returns
-  to 10 planned sets. In the baseline phase `session-data.ts:215-216` sets `defaultSets = 1` and no
-  progression style, so there are no per-set percentages to write. Those 20 sets are a calibration
-  pass, not lost plans. **The deploy history was not needed.** BF-143 (09-12) touched the same
-  code, but it only stopped a *rebuilt* session skipping calibration.
-- **So TN-75's remaining work is small.** ① The loaded residue is Barbell Skull Crusher with no
-  `style_id`. That is BF-200's residue: the engine now deloads it (#1814), but it still records no
-  per-set plan until a style is assigned in Config, which is an owner action. ② The acceptance
-  criterion *"a set with no available plan is distinguishable from one never asked"* still holds.
-  Baseline sets cannot be told apart at read time, because `workout_sessions` stores no baseline
-  marker (`phase_type` is NULL across the boundary). It needs a column, so a migration, and it
-  waits behind BF-214's numbering. **Until then, quote adherence over loaded, non-baseline sets.**
-- **The bodyweight product question is split out as LA-169 (`Lane: O`)**, per the rule that an owner
-  decision must not sit inside a Lane A body.
-
-- **Where the mechanism is:** `claude_ro.set_logs.planned_pct` / `planned_reps` / `planned_rest_sec`,
-  written on the set-log path; `exercise_logs.style_id` / `style_name` supply the per-set percentages.
 
 ### [readiness][sleep][workouts] TN-73 — the RPE residual PASSES a positive control, which turns the scores' null into a measured ceiling: they move perceived effort ~5× less than doing one more set
 
@@ -6389,61 +6286,6 @@ drift.
   **state how many days it would have moved**. That is the standing bar for anything that changes
   numbers he reads daily, and it is the honest test of whether the corrector works at all.
 
-### [workouts] LA-169 — should a bodyweight exercise carry a prescribed plan at all?
-- **✅ ANSWERED 2026-09-28 — PRESCRIBE REPS ONLY on bodyweight movements, and record them as the plan.**
-  Chin-Up, Pull-Up, Hanging Leg Raise and the rest get a rep target the way loaded lifts get a
-  weight, using the rep max the app already stores and inverts. **`planned_pct` stays empty** — it
-  is a percentage of a lifted 1RM and there is no load to take a percentage of. No new column.
-  He declined record-only (which leaves them outside every adherence figure) and declined planning
-  them as added weight (which misstates an unweighted set as 0 kg).
-  **What this unblocks:** 23 of September's 49 unplanned sets are bodyweight, so Tuning stops
-  quoting adherence over loaded sets only. **Say so when the first figure moves** — adherence will
-  change the day this ships, and it will look like a regression if nobody names the cause.
-  **Back to Lane A** (`TN-75`'s parent work).
-- **Lane: A** — a product preference: what the app should prescribe, not how.
-- **Added:** 2026-09-28 · Lane A, split out of `TN-75` so it reaches the Orchestrator.
-- **⭐ Recommendation: prescribe reps only, and record them as the plan.** A bodyweight movement has a
-  rep max (the app already stores and inverts one, #1120/#1133), so "8 reps, 3 sets" is prescribable.
-  `planned_pct` stays empty because it is a percentage of a lifted 1RM. Over time this makes adherence
-  measurable on those exercises too, with no new column.
-- **Alternatives.** *Record only, no plan:* the simplest, and honest if you never follow a target on
-  these, but they stay outside every adherence figure. *A load-style plan through added weight:*
-  better if you mostly train them weighted, but it misstates an unweighted set.
-- **Why it matters:** 23 of September's 49 sets with no plan are bodyweight. Until this is decided,
-  Tuning quotes adherence over loaded sets only.
-- **Reversal cost: low.** It changes what the workout screen shows and writes going forward. Nothing
-  already stored changes.
-
-### [nutrition] LA-172 — how should the app tell that a planned meal was eaten, when no plan meal has a meal type?
-- **✅ ANSWERED 2026-09-28 — BOTH, and the answer is wider than option (a).**
-  Verbatim: *"Give it a type by its time; as well as what its tagged with."*
-  **① Derive the meal type from `suggested_time`** — 11:40 becomes Lunch — at plan creation, and
-  **once as a backfill for the 8 existing plan meals**, all of which have `meal_type_id` NULL.
-  **② AND honour an explicit tag where one exists.** A tag the owner sets WINS over the derived
-  type; the time is the default, not the authority.
-  So a plan meal's type resolves as **tag → derived-from-time → none**, and the plan screen can show
-  *"Lunch · Turkey and Rice Bowl"* with the derived value visible and correctable, which is what
-  makes a wrong derivation fixable instead of invisible.
-  **He did NOT take window-matching by log time** — that silently stops counting a real meal on any
-  day he eats late, with nothing on screen explaining why.
-  **The backfill is an UPDATE**, covered by the standing production policy: snapshot, affected rows
-  against prediction, stop on mismatch. **Unblocks `BF-203a`.**
-- **Lane: A** — a decision about which food counts toward a plan, which moves the calorie totals the
-  owner reads.
-- **Added:** 2026-09-28 · Lane A, blocking BF-203a.
-- **What was found:** all 8 of the owner's plan meals have `meal_type_id` NULL. They carry a name,
-  targets and a `suggested_time` (07:00, 11:40, 16:20 …), but no meal type. Anything that matches
-  logs to slots by meal type matches nothing.
-- **⭐ Recommendation: (a) assign the meal type from the suggested time,** at plan creation and once
-  for existing plans (a backfill, which the standing policy covers). It makes the link explicit and
-  visible: the plan screen can show "Lunch · Turkey and Rice Bowl", you can correct a wrong one, and
-  it keeps working if you log late. BF-203's Phase B (logging straight from a slot) can later make
-  it exact.
-- **Alternative (b), time-window matching at read time:** needs no stored change and no backfill,
-  and is better if meal types are something you don't want to maintain. It loses on the ordinary
-  case: a lunch logged at 15:00 misses its window, gets an estimate, and is counted twice.
-- **Reversal cost: low.** (a) writes a nullable column that already exists. Clearing it restores
-  today's state exactly.
 
 ### [platform][workouts] LA-173 — five things Lane A needs from the owner (three merge yeses, a style, a key)
 - **Lane: O** — every item is the owner's to answer; nothing here is buildable until he does.
@@ -6804,83 +6646,59 @@ drift.
   bar) rather than 30; and the other four exercises are unchanged at 30 / 8.75 / 6.25 and their
   bodyweight equivalent. **Device look owed** — the load is only visible on the exercise screen.
 
-### [workouts] BF-199 — the prescription barely uses the model it is named after: sets are always clamped, reps/pct follow a table, and rest is the only free output and it is noise
-- **Lane:** A — `packages/shared/src/ai-periodization/generate-prescription.ts`, `app/api/ai-periodization/session/[sessionId]/prescribe/route.ts`.
-- **Added:** 2026-09-26 · BugFix intake. Owner: *"Prescription uses ai right? Do we NEED ai for this? Can we do this through logic so its easy to prescribe and represcribe"*
-- **Needs:** — nothing. **Wants a plan doc before implementation** (`docs/superpowers/plans/`), per the backlog-driven protocol; this entry is the measurement, not the design.
+### [workouts] BF-199 — prescription from rules, Phase 1: shadow the rules path beside the model and measure
 
-- **Short answer: no, and most of it is already logic.** There is exactly **one** model call in the
-  whole pipeline (`generateObject`, `generate-prescription.ts:304`). Everything around it —
-  `reconcilePrescription`, `applyRoleSetPlausibility`, `fitToBudget`/`dropToBudget`/`expandToBudget`,
-  the role floors — is deterministic TypeScript, and **the deload path makes a complete, valid
-  prescription with no model call at all.** The app already contains a working non-AI prescriber; it
-  runs whenever a deload is recommended.
+- **Lane: A** — `packages/shared/src/ai-periodization/generate-prescription.ts` (+ a read-only admin replay).
+- **Added:** 2026-09-26 · BugFix intake. Owner: *"Do we NEED ai for this? Can we do this through logic so its easy to prescribe and represcribe"*.
+- **Plan:** [`docs/superpowers/plans/2026-09-29-rules-prescription-engine.md`](superpowers/plans/2026-09-29-rules-prescription-engine.md) (written 2026-09-29, Lane A). Phases 2 and 3 are `BF-199b` and `BF-199c`.
+- **Scope, no user-visible change:** on every normal prescription also compute
+  `buildRulesPrescription`, and record the per-exercise difference against the reconciled model
+  output (sets, reps, pct, rest), plus **whether the model's phase and `phaseAction` survived
+  reconciliation**, which nobody has measured and which Phase 2's phase decision turns on. Add a
+  read-only admin replay summarising it.
+- **✔ BUILT 2026-09-29 (Lane A).** Every model-generated prescription writes a `prescription_shadow`
+  row (migration `202609291131`, `claude_ro.prescription_shadow`) with the given
+  sets/reps/pct/rest, the rules prescriber's for the same exercise (`null` where it has no style),
+  and the model's phase and action before and after reconciliation. It is best-effort and runs
+  after the store. No admin endpoint was built: the view is enough for a `db-query` summary.
+- **First real sample** (`pnpm dev` on the owner's snapshot, Push):
+  - Rest given 209 / 141 / 97 / 113 s against the style's 120 / 75 / 60.
+  - The rules path had nothing for the styleless Cable Chest Dips, which LA-177 has since backfilled.
+  - **The model's prose said it "excluded Dumbbell Fly" while the numbers it returned included it.**
+    That is evidence for Phase 2's prose-from-final-numbers.
+- **Keep:** the read, after two weeks of production prescriptions: the share where rules = given on
+  reps/pct within 2.5 %, the rest distribution for each, and how often `model_phase` ≠ `final_phase`
+  or `model_phase_action` ≠ `final_phase_action`. Earliest useful date **2026-10-13**. It unblocks
+  BF-199b.
+- **Done when:** two weeks of his sessions are recorded and the summary reads out: the share of
+  rules = model on reps/pct within 2.5 %, the rest distribution for each, and phase survival.
+- **The original measurement** (sets always the fitter's, reps/pct a curve, rest the only free and
+  noisy output, 35/35 calls ok) is in the plan §1 and the 2026-09-29 journal entry.
 
-- **Measured: what the model actually contributes.** All 33 distinct `(sets, reps, pct, rest)` tuples
-  across every stored prescription (`session_periodization`):
+### [workouts] BF-199b — prescription from rules, Phase 2: rules own sets/reps/pct/rest; the model writes only the prose
 
-  | output | what production shows | whose number is it |
-  |---|---|---|
-  | **sets** | **2 in all 33 tuples, without exception** | **not the model's.** `fitToBudget` clamps to its floor of 2 because the budget is binding (BF-197). The model's set count never survives. |
-  | **reps + pct** | a tight curve: 12→66, 11→68, 10→70.5, 9→72.5, 8→75, 7→76–77.5, 6→80, 4→88, 3→88 — about **+2.25 % per rep fewer** | **a lookup table.** `progression_styles`/`style_sets` already stores `pct`, `reps` and `rest_sec` per set, which is the same four fields the prescription emits. |
-  | **rest** | **23 distinct values from 68 s to 300 s** — 76, 97, 101, 109, 128, 139, 143, 161, 187, 189 | **the model's, and the only genuinely free one.** The styles say 60 / 90 / 120 / 130 / 180. A coach does not prescribe 143 seconds. |
+- **Lane: A** — `packages/shared/src/ai-periodization/generate-prescription.ts`.
+- **Needs:** BF-199, BF-201
+- **Added:** 2026-09-29 · Lane A, from the BF-199 plan.
+- **Plan:** [`docs/superpowers/plans/2026-09-29-rules-prescription-engine.md`](superpowers/plans/2026-09-29-rules-prescription-engine.md) §3 Phase 2.
+- **Scope:**
+  - A phase → rep target table per role, seeded from the observed distribution and stated with its
+    source.
+  - pct from BF-201's signed-off rep→%1RM table, and rest snapped to the style's `rest_sec`.
+  - The prose call fires after the plan is stored and is patched in when it returns.
+  - The phase logic follows BF-199's measurement.
+- **Done when:** a replay reproduces stored sets/reps/pct within the stated tolerance, rest lands
+  only on style values, and Full is a re-evaluation.
 
-  So the one quantity the model controls end-to-end is the one that looks wrong, and the two that
-  look right are reproducible from a table the database already holds.
+### [workouts] BF-199c — prescription from rules, Phase 3: represcribe on the device with no round trip
 
-- **⚠ The honest counter-argument, which this entry does NOT overstate.** Reliability is **not**
-  currently a problem: `ai_call_log` shows **35 prescription calls, 35 `ok`, zero failures**, averaging
-  **2.1 s** and **3,645 tokens**. The structural risk is real — the route has **no fallback**, so a
-  failure returns `502 'AI generation failed'` and the lifter gets no plan at all (`:311`) — but it has
-  not bitten yet, and *"the AI keeps failing"* is not an argument available here. The case rests on
-  what the model adds, not on it breaking.
-
-- **⭐ Recommend: move the numbers to deterministic rules, keep the model for the prose.** The
-  `reasoning` string is genuinely generative and is the part worth an LLM; the four numbers are not.
-  Concretely: a rep→%1RM table (the curve above, already implicit in the output), the existing
-  style/role values, and the budget fitter that is already authoritative for set count.
-- **What that buys, in the owner's own terms — *"easy to prescribe and represcribe"*:**
-  - **Represcribing becomes instant, offline and free** — no 2.1 s round trip, no token spend, no rate
-    limit, no 502 path, and it works in the low-reception case BF-195 is about.
-  - **`Full` stops being a dead toggle outright.** BF-198 exists because the override needs numbers the
-    session-level deload never recorded; under a rules engine the full prescription is a **pure
-    function of the same inputs**, so "give me today at full intensity" is a re-evaluation rather than
-    a stored-state problem. **BF-198's fix and this change are the same idea at two sizes.**
-  - **It becomes testable and diffable.** A scoring or sizing change could be replayed over months of
-    history to state how many sessions it moves — which is exactly the evidence **BF-189** needs and
-    cannot get today, because the current generator is non-deterministic by construction.
-- **Alternatives, with what each is better at:**
-  - **Keep the model and constrain it harder** (enumerate rest to 60/90/120/180 in the schema). Better
-    at preserving whatever adaptive judgement it brings, and it is a one-schema change. It loses on the
-    owner's actual ask — it is still a network round trip, so representcribing stays slow, online-only
-    and fallible.
-  - **Rules engine with the model as an advisory second opinion** (numbers from logic; the model may
-    flag *"this looks too hard given readiness"*). Better if his trust in adaptation is the point. It
-    loses on complexity: two sources for one number is the shape **One Formula, One Place** exists to
-    prevent, and it keeps the network dependency.
-  - **Leave it.** Cheapest today. It loses because BF-198, BF-189 and the represcribe cost are all
-    downstream of the same non-determinism.
-- **Reversal cost: moderate, and one-way in practice.** The rules path can sit behind the existing
-  route and be compared against stored prescriptions before anything switches — but once the lifter is
-  used to instant represcribing, going back to a 2 s round trip will read as a regression.
-
-- **⚑ ONE PART IS NOT AN ENGINEERING CALL AND MUST NOT BE DECIDED BY A LANE: the rep→%1RM table
-  values** — split out as **`BF-201`** so it reaches him rather than sitting inside a `Lane: A` entry.
-  Those are the loads he trains at, so they are calibration — **Tuning proposes, the owner
-  signs**, per the standing rule that Tuning never ships a scoring change. The *architecture* is the
-  lane's; the *numbers in the table* are not. A proposal is incomplete until it states how many of his
-  past sessions the table would have changed.
-- **Not diagnosed here.** What the model contributes to **phase** decisions
-  (`accumulation`/`intensification`/`deload`, `phaseAction`) as opposed to the four per-exercise
-  numbers — `reconcilePrescription` already resolves a "stay" response and the phase is largely
-  schedule- and volume-driven, but nobody has measured how often the model's phase survives
-  reconciliation. That measurement belongs in the plan doc, because a phase engine is the one part
-  that might genuinely want judgement.
-- **Verification:** a rules-generated prescription reproduces the stored `sets`/`reps`/`pct` of past
-  prescriptions within a stated tolerance across his history; rest lands on the style's own values
-  rather than arbitrary seconds; representcribing makes no network call and works offline; and the
-  `reasoning` prose still renders.
-
+- **Lane: A** — the client prescription path (Lane B for any screen change it needs).
+- **Needs:** BF-199b
+- **Added:** 2026-09-29 · Lane A, from the BF-199 plan.
+- **Plan:** [`docs/superpowers/plans/2026-09-29-rules-prescription-engine.md`](superpowers/plans/2026-09-29-rules-prescription-engine.md) §3 Phase 3.
+- **Scope:** a duration preset or Full/deload re-runs the rules from the signals on the client, with
+  no model call, no 502 path, and working offline (BF-195).
+- **Done when:** it represcribes offline on the S25 (a Lane DV check once built).
 ### [workouts] BF-198 — `Full` cannot override a WHOLE-SESSION deload, and the card's stated remedy does not exist
 - **Lane:** A — `packages/shared/src/ai-periodization/generate-prescription.ts` (the session-level deload builder).
 - **Added:** 2026-09-26 · BugFix intake. Owner, on a Saturday Upper reading *"AI Prescription · Deload"* with `Full` selected: *"How am I supposed to select a full workout when the prescription is deload?"*
@@ -7303,7 +7121,30 @@ drift.
 
 ### [readiness][body] LA-144 — the Body Battery's wake anchor discards the whole day when the main sleep is a daytime block
 
-- **Lane: A** — `app/api/body-battery/route.ts` (the wake-anchor block, ~line 172-188).
+- **Lane: T** — re-laned 2026-09-29 (was A). The fix is a change to how a battery DAY is bounded, which
+  moves a number the owner reads daily, so it needs a Tuning proposal with a replay before Lane A
+  builds it. The code now lives in `lib/health/body-battery-day.ts` (the route is a thin caller) and
+  `packages/shared/src/health/body-battery-walk.ts`.
+- **⚙ Lane A analysis, 2026-09-29. The entry's own fix is inconsistent, and the defect is rare.**
+  - **Rare: 3 of 95 main sleeps (≥ 3 h) began in the daytime** (06:00-19:59 Brisbane): 08-27
+    11:35→16:52, 09-18 14:49→19:00, and 09-23 10:42→17:25. Every other day's main sleep is
+    overnight, and those days' waking window would be unchanged by any option below.
+  - **Why "waking = the day minus the sleep intervals" is wrong as stated:** the walk starts from the
+    ANCHOR, which is the level AFTER the main sleep has charged (readiness for that sleep). Walking
+    09-23's 00:00→10:42 from that anchor drains a post-sleep value before the sleep happens. Under
+    today's model those hours belong to 09-22's day, which stops at midnight, so they fall between
+    two days and are counted by neither. That, not the anchor guard, is the loss.
+  - **Recommendation for the proposal: bound a battery day wake-to-next-main-sleep, not
+    midnight-to-midnight.** A day's walk runs from its main sleep's end until the next main sleep
+    starts (or now), and the date key stays the wake date. 09-23's 00:00→10:42 then extends 09-22's
+    day, and 09-23's day starts at 17:25 as today. On the 92 overnight days nothing moves except the
+    evening tail after local midnight, which today is cut at 00:00. **Measure that tail**: it is the
+    real size of the change. **Alternative, smaller:** leave day bounds alone and only extend a day's
+    walk past midnight when the next main sleep starts after 06:00. That moves exactly the 3 days, at
+    the cost of a rule that only exists for the exception.
+  - **Owed with the proposal:** the replay count of stored days that move under the chosen bound (the
+    Tuning rule), and whether the stored 09-23 row is recomputed. That is a production write, so
+    owner's call, as the entry already says.
 - **Added:** 2026-09-25, Lane A. This is the *"09-23 no HR seen"* investigation Review sweep 59 asked
   to be split out of LA-134 as startable now; LA-134 keeps only the constants re-sweep, which is
   still date-blocked to 2026-10-04.
@@ -15723,7 +15564,12 @@ nulling the column is data-dropping, and a Redecode restores real numbers.
 
 - **Lane:** A — `app/api/ai/health-insight/route.ts`, `app/api/weekly-digest/route.ts`,
   `app/api/running-plan/explain/route.ts`, `app/api/nutrition/scan/route.ts:184`.
-  **Gate:** owner for the confidence-bar question.
+  **Gate:** owner for the confidence-bar DISPLAY only — narrowed 2026-09-29.
+  **⚑ (e) was TWO questions and only one is his.** The half where `confidence` **decides `source`**
+  is forbidden outright by `CLAUDE.md` (*"no LLM self-reported number … may gate an automatic
+  action"*), so it is a defect, not a preference — **split out as `OR-205`, buildable now.** What
+  remains here is whether the honestly-labelled bar earns its place on screen, which the repo
+  cannot answer.
 - **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §P6.
 
 (a) `health-insight`'s deterministic "nothing to interpret" gate (:180-183) is defeated in 3 of 4
@@ -30226,7 +30072,7 @@ each other. The score has ~18 points of dynamic range and spends all of it above
   - **⚠️ Do not quote `energy_level` ↔ HRV = −0.424 as a finding.** It is the largest coefficient in
     that review and points the wrong way; Pearson on a 4-level ordinal with 92% of mass in two adjacent
     levels manufactures exactly this. Needs a rank measure and a training-day confound check first.
-- **📊 Read 2026-09-24 (Review sweep 56, production, SELECT only):** **the clock cannot unblock this.** Of 36 mornings since 08-18, **35 hold the neutral 3 untouched and 1 is null. There are 0 real sleep ratings under the new model**, so the 3-week rank re-validation (due 09-08) has nothing to rank. The question for the owner is whether he will rate sleep again or wants a different yardstick. The partial-data flag does not depend on this and can ship.
+- **📊 Read 2026-09-24 (Review sweep 56, production, SELECT only):** **the clock cannot unblock this.** Of 36 mornings since 08-18, **35 hold the neutral 3 untouched and 1 is null. There are 0 real sleep ratings under the new model**, so the 3-week rank re-validation (due 09-08) has nothing to rank. The question for the owner is whether he will rate sleep again or wants a different yardstick. The partial-data flag does not depend on this and can ship — **split out as `OR-204` on 2026-09-29 so it is not parked behind this gate.** What stays here is the yardstick question alone.
 
 ### [platform][workouts][nutrition] Q-168 — AI Coach follow-ups (Q-157 is complete)
 

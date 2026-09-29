@@ -173,6 +173,7 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
 
 - [`docs/reviews/2026-08-18-production-verification.md`](../../reviews/2026-08-18-production-verification.md) — **this run's own findings checked against production, 2026-08-18** (Q-460 cannot be adjudicated from production — 74% of completed sessions lack an RPE, which is consistent with both a dropped write and a skipped prompt). Filed Q-472; **amended Q-460, Q-465, Q-467, Q-468** — one refuted, two re-scoped to zero exposure, one shown unprovable either way.
 - [`docs/reviews/2026-08-20-non-workout-write-surface-ownership.md`](../../reviews/2026-08-20-non-workout-write-surface-ownership.md) — **the non-workout write surface, probed live with two accounts, 2026-08-20** (RV-32 — `POST /api/phase-sets`, `POST /api/workout-templates` and `POST /api/log-exercise` all persist a **progression-style id owned by another user**, while the `PUT` twin of the first rejects the identical value 400; the unscoped join at `programs.ts:427` then returns the other user's style *name*. RV-34 — a client-supplied `program_sessions.id` that is not yours is a raw `pg 23505` 500). **Rule (b) came back clean** — 325 `.set()` sites, zero raw request bodies. Six more clean results recorded, including Q-129's guard verified live.
+- [Rules prescription engine plan (BF-199)](../../superpowers/plans/2026-09-29-rules-prescription-engine.md) — sets/reps/pct/rest from rules, the model kept for the prose; shadow, then switch, then represcribe offline.
 
 ## Open issues
 
