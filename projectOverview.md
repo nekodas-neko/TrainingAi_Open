@@ -26,7 +26,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.481.9 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.481.11 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-09-29.
 
 **Recent changes are NOT listed here.** They live in the session journal —

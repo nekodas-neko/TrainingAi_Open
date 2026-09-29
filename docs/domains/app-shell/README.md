@@ -593,7 +593,7 @@ Live at the time of writing (2026-07-30):
   redundant encoding. `rv208-movement-category-hues.test.ts` asserts the arithmetic against
   `globals.css`, not the literals. **Before adding any category palette, scan both systems first.**
 
-- **[`2026-09-28-home-banner-strip`](../../overview/entries/2026-09-28-home-banner-strip.md)**
+- **[`2026-09-28-home-banner-strip`](../../overview/history-2026-09-29-folded-1.md#2026-09-28-home-banner-strip)**
   — **RV-119: Home's banners split by severity, four behind one strip.** Illness advisory and early
   deload stay full-width; activity-to-review, goals check-in, day review and weekly recap collapse.
   **Read this before adding any Home banner:** two of the four decide their own visibility and

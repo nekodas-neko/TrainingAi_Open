@@ -3449,7 +3449,7 @@ which is the right shape for something that can only be validated by living with
   the Samsung WebView**, which is the canonical runtime; it follows the same Blink policy, but that
   is inference rather than a measurement.
 - **Still worth the fix, as boundary validation rather than an exploit**, and the validation half
-  SHIPPED 2026-09-25 ([entry](overview/entries/2026-09-25-rv191-image-data-uri-validation.md)).
+  SHIPPED 2026-09-25 ([entry](overview/history-2026-09-29-folded-1.md#2026-09-25-rv191-image-data-uri-validation)).
 - **⚠ The fix shape in this entry was WEAKER than the codebase already knew.** It says to reuse the
   avatar route's check — but that route validated the **declared** MIME, which whoever sends the
   data URI writes, so `data:image/png;base64,<SVG>` passed it. `sniffImageMime` already existed for
@@ -3481,24 +3481,6 @@ which is the right shape for something that can only be validated by living with
   3. **Existing rows:** the `claude_ro` view omits `screenshot_data`, so this sweep could not check
      them. The implementer checks them locally with a migration-free script. **Any delete of a
      production row is the owner's call.**
-
-### [app-shell] LA-181 — a friend request you sent shows as "Unknown" with Accept/Decline buttons that cannot work
-
-- **Lane: B** — `components/more/manage-friends-sheet.tsx`.
-- **Added:** 2026-09-29 · Lane A, while shipping RV-195 ③.
-- **What:** `pending` in the sheet holds incoming AND outgoing requests and gives every row
-  Accept/Decline. Accept on a request you SENT always fails, because the server accepts only as the
-  addressee. Since RV-195 the list also masks the target of an outgoing request, so its name reads
-  "Unknown".
-- **Fix:**
-  - Split pending by `f.requesterId === <me>`.
-  - Incoming rows keep Accept/Decline.
-  - Outgoing rows read *"Request sent"* with a Cancel. `DELETE /api/friends/[id]` already allows
-    either party.
-  - `otherUser.displayName` holds what was typed only in the send response, so the list has no name
-    for an outgoing row by design.
-- **How to check it:** `pnpm dev` with two local users: send a request, and confirm the sender sees
-  "Request sent" with Cancel and the addressee sees the sender's name with Accept/Decline.
 
 ### [devices][platform] RV-196 — any script in the app's origin can read, clear or redirect the Oura ring key through the native plugin
 - **Lane: A** · **Batch: native-security** — `android/**` (`OuraBlePlugin.kt`, `ScaleBlePlugin.kt`, `PolarBlePlugin.kt`). **Needs a new APK.**
@@ -5962,7 +5944,7 @@ RV-185 each ship against a recorded baseline, then re-run each row after its fix
   the owner's call, it has been made, and it is recorded here so the reasoning is not re-derived.
   **Do not widen it further than this entry describes without going back to him.**
 - **✅ RV-190's prerequisite is met — it SHIPPED 2026-09-26**
-  ([entry](overview/entries/2026-09-26-rv190-db-query-session-state.md)). It said to build that
+  ([entry](overview/history-2026-09-29-folded-1.md#2026-09-26-rv190-db-query-session-state)). It said to build that
   first because the owner scope is a setting any caller can change and it persisted on the pooled
   connection, so a `SET LOCAL` without the transaction wrapper left the hole open. Every query on
   the read-only pool now goes through `runScoped` (`lib/data/postgres/readonly-client.ts\'), which
