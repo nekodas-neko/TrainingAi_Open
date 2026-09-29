@@ -69,7 +69,7 @@ describe('RV-183 — the more-seasons TTL gate stays safe', () => {
       .not.toMatch(/export async function (POST|PUT|PATCH|DELETE)/)
   })
 
-  it('the flag is on more-seasons and NOT on more-user-profile', () => {
+  it('the flag is on both More-screen keys', () => {
     // Comments STRIPPED first. The proof for this flag is written at its call site and names
     // `freshWithinTtl` several times, so a raw-source slice between the two calls matched the prose
     // rather than the code — the control run that flagged the profile key exposed it as a baseline
@@ -86,13 +86,24 @@ describe('RV-183 — the more-seasons TTL gate stays safe', () => {
     // key and its `opts`, so the window stopped short of the thing it was meant to check. The profile
     // call precedes the seasons call inside `refresh`, so this slice is exactly its region.
     expect(profileAt, 'the two calls swapped order — re-bound this slice').toBeLessThan(seasonsAt)
-    // `more-user-profile` carries `countWorkoutSessions()` in its payload and no completion-path
-    // group clears it. LB-180 removes that dead field; until then the flag here is unsafe.
-    expect(more.slice(profileAt, seasonsAt), 'more-user-profile is not eligible yet — see LB-180')
-      .not.toMatch(/freshWithinTtl/)
+    // Was asserted ABSENT until LB-180 landed: the payload carried `countWorkoutSessions()`, a
+    // derivation no completion-path group clears. That field is gone, the three remaining
+    // un-invalidating writers are closed below, and the flag is on.
+    expect(more.slice(profileAt, seasonsAt), 'more-user-profile lost its freshWithinTtl — if that was '
+      + 'deliberate, the writer guards below are now dead weight')
+      .toMatch(/freshWithinTtl:\s*true/)
   })
 
-  it('equipping a title clears the profile key, which is what LB-180 will rely on', () => {
+  it('the profile payload is still a pure read of one stored row', () => {
+    // The RV-67 half. A derivation, a clock or a `today` in this handler re-disqualifies the key,
+    // and the failure mode is 30 minutes of a wrong identity block rather than a flash.
+    const route = readFileSync(path.join(ROOT, 'app/api/user/profile/route.ts'), 'utf8')
+    const get = route.slice(route.indexOf('export async function GET'), route.indexOf('export async function PATCH'))
+    expect(get, 'the dead workoutCount derivation came back — see LB-180').not.toMatch(/countWorkoutSessions/)
+    expect(get, 'a clock in the payload disqualifies freshWithinTtl').not.toMatch(/Date\.now\(\)|new Date\(|todayInTz/)
+  })
+
+  it('equipping a title clears the profile key', () => {
     // Found while proving this: the equip PATCH writes `users.equipped_title`, part of
     // `/api/user/profile`'s payload, and updated local state only. Harmless while that key always
     // revalidates; 30 minutes of a wrong title the moment it does not.
@@ -100,5 +111,21 @@ describe('RV-183 — the more-seasons TTL gate stays safe', () => {
     expect(sheet).toMatch(/\/api\/user\/equipped-title/)
     expect(sheet, 'a writer of users.equipped_title must clear more-user-profile')
       .toMatch(/invalidateUserProfile\(\)/)
+  })
+
+  // The three writers found while proving the profile key. Each wrote a users column that is part of
+  // `/api/user/profile`'s payload and updated local state only — invisible while the key always
+  // revalidated, and 30 minutes of hard staleness the moment it stopped.
+  it.each([
+    ['app/session-select/session-select-content.tsx', /nutrition-goals\/touch-review/,
+      'users.last_goal_review_at — and this screen reads it back to decide whether to re-prompt'],
+    ['components/profile/edit-profile-sheet.tsx', /'\/api\/user\/password'/,
+      'users.password_hash — reported as hasPassword, which this same sheet reads'],
+    ['lib/user/preferences-sync.ts', /'\/api\/user\/preferences'/,
+      'users.preferences — nothing reads it back through this key today, which is why it would be missed'],
+  ])('%s invalidates the profile key after its users write', (file, writes, why) => {
+    const src = readFileSync(path.join(ROOT, file), 'utf8')
+    expect(src, `${file} no longer makes this write — re-check the proof`).toMatch(writes)
+    expect(src, `a writer of ${why} must clear more-user-profile`).toMatch(/invalidateUserProfile\(\)/)
   })
 })

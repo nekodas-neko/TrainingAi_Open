@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.482.1",
+    date: "2026-09-29",
+    changes: [
+      "Three settings changes now take effect everywhere immediately instead of leaving a stale copy behind: setting a password, choosing \u201cremind me later\u201d on the goals check-in, and any preference toggle.",
+      "The More tab no longer re-requests your profile and seasons every time you switch back to it \u2014 a re-show inside half an hour is now free.",
+    ],
+  },
+  {
     version: "1.482.0",
     date: "2026-09-29",
     changes: [

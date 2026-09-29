@@ -90,15 +90,18 @@ describe('RV-183 — the More tab no longer claims a free re-show', () => {
     expect(src).toMatch(/'more-seasons'/)
   })
 
-  it('more-user-profile still pays for its re-show, because it has no proof yet', () => {
-    // Its payload carries `countWorkoutSessions()` — a derivation no completion-path group clears —
-    // so the flag here would be up to 30 minutes of a stale identity block. `LB-180` removes that
-    // dead field; until it lands this must keep revalidating.
+  it('more-user-profile gets its re-show free, now that the proof holds', () => {
+    // Was asserted ABSENT here: the payload carried `countWorkoutSessions()`, a derivation no
+    // completion-path group clears. LB-180 removed it, and the three un-invalidating writers of the
+    // users row (the goal-review touch, the password set, the preference bag) were closed with the
+    // flag. The proof itself is written at the call site; the writer guards live in
+    // `app/__tests__/rv183-more-seasons-ttl.test.ts`, which is where a new writer will be caught.
     const src = code('app/more/more-content.tsx')
     const at = src.indexOf("'more-user-profile', '/api/user/profile'")
     const next = src.indexOf("'more-seasons', '/api/seasons'")
     expect(at).toBeGreaterThan(-1)
     expect(at, 'the two calls swapped order — re-bound this slice').toBeLessThan(next)
-    expect(src.slice(at, next), 'see LB-180 before flagging this one').not.toMatch(/freshWithinTtl/)
+    expect(src.slice(at, next), 'the flag went away — if deliberate, say so at the call site')
+      .toMatch(/freshWithinTtl:\s*true/)
   })
 })

@@ -92,7 +92,7 @@ export default function MoreContent({ friendCode }: MoreContentProps) {
       // RV-150: `cachedFetch` swallows `!res.ok`, and the `.catch` cannot fire — it resolves a
       // boolean rather than rejecting (RV-84). Measured on a cold start with the routes down: the
       // whole identity block, level, XP and trophy case were absent, reading as an empty account.
-      { onError: () => setProfileFailed(true) },
+      { onError: () => setProfileFailed(true), freshWithinTtl: true },
     ).catch(() => {});
     // `freshWithinTtl` — RV-183, with the written proof CLAUDE.md requires:
     //  - RV-67 purity: `listSeasonsWithResults` is two plain selects (`seasons`, then this user's
@@ -102,8 +102,8 @@ export default function MoreContent({ friendCode }: MoreContentProps) {
     //  - Writers: there are NONE. `grep` over `lib/`, `app/` and `scripts/` finds no insert, update
     //    or delete against either table, and `/api/seasons` is GET-only. Nothing this device can do
     //    changes the payload, so the "every writer's group holds the key" half of the proof is
-    //    vacuous rather than unproven — which is why this qualifies where `more-user-profile` does
-    //    not.
+    //    vacuous rather than unproven. `more-user-profile` had to earn that half the hard way; see
+    //    the block below `useRefreshOnTabShow`.
     //  - A cleared entry still fetches: `cachedFetchCore` only short-circuits when a cached value
     //    exists AND is fresh, so a future group that starts clearing this key needs no change here.
     // The residual risk is bounded and stated: a season result written server-side appears up to
@@ -130,16 +130,26 @@ export default function MoreContent({ friendCode }: MoreContentProps) {
   // the TTL governs whether the cached paint is used, never whether the request is sent. Only
   // `freshWithinTtl: true` skips the round trip.
   //
-  // RV-183, resolved by measuring both keys rather than flagging both: `more-seasons` now carries
-  // `freshWithinTtl` (its proof is at the call site above), so a re-show inside 30 minutes costs ONE
-  // GET rather than two.
+  // RV-183: both keys now carry `freshWithinTtl`, so a re-show inside 30 minutes costs NO GET
+  // rather than two. `more-seasons`'s proof is at its call site above.
   //
-  // `more-user-profile` does NOT, and the reason is worth keeping. Its payload is
-  // `{ user, hasPassword, workoutCount }`, and `workoutCount` is `countWorkoutSessions()` — a
-  // derivation, so every workout completion is a writer of this key, and no group a completion calls
-  // clears it. That field has zero consumers anywhere in the repo, so removing it from the route
-  // makes the payload pure and the key eligible; that is `LB-180`, Lane A's, because the route is
-  // theirs. Until then the flag would trade one saved GET for a stale identity block.
+  // `more-user-profile` now carries it too, and the proof is this, because a missed writer here is
+  // 30 minutes of a wrong identity block rather than a flash:
+  //
+  //   PURE — `GET /api/user/profile` is `getUserByEmail` plus `hasPassword`, one stored row. No
+  //   clock, no `today`, no derivation. `workoutCount` was the disqualifier and `LB-180` removed it
+  //   (`user-account-routes.test.ts` asserts the body no longer has it).
+  //
+  //   EVERY WRITER — the payload spreads the whole users row, so all eleven `update(s.users)` sites
+  //   count. Nine reach a group holding this key: the profile PATCH and the goals sheet's
+  //   `activityLevel` write (`invalidateGoalRecommendations`), the avatar, the equipped title and
+  //   the details save (`invalidateUserProfile`), and — closed by THIS change — the goal-review
+  //   touch, the password set and the preference-bag PATCH. The remaining two cannot be reached from
+  //   a client write and cannot go stale here: `friendCode` is generated inside `upsertUser` at
+  //   sign-in and returned by that same call, and `isActive` is an admin action on another account.
+  //
+  // The other three readers of this key deliberately keep revalidating — `edit-profile-sheet` is
+  // where `hasPassword` is acted on, and the two one-shot reads save nothing worth the risk.
   useRefreshOnTabShow(refresh);
 
   const handlePullSync = useCallback(async () => {
