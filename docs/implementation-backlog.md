@@ -719,6 +719,43 @@ below threshold and left in place for next time.
 - **Reversal cost:** one constant and one function. Either way can be undone in a single change.
 - **What your answer unblocks:** BF-197 (Lane A builds it the day this is answered).
 
+### [app-shell][platform] LB-152 — the accent-token retune repaints ~212 readings, not zero: re-opening the answer
+
+- **Lane: O** — re-laned 2026-09-29 by Lane B. **The answer given on 2026-09-26 rests on a premise
+  that is measurably false, so this is the owner's again before any code is written.**
+- **📐 DECISION PAGE — [`docs/design/2026-09-29-accent-token-retune.html`](design/2026-09-29-accent-token-retune.html)
+  ([hosted](https://claude.ai/artifact/YHV4gt6F5Lxut3q8cp4zKp)).** Both candidates on the app's own
+  dark surfaces at 384 px, with the counts.
+- **What he answered (2026-09-26):** option (b) — retune the token to today's `#22c55e` / `#ef4444`,
+  then migrate — *"The app's appearance must not change at any point, which is the test for this
+  work."*
+- **⛔ WHY THAT CANNOT HOLD.** The entry counted the LITERAL sites and never counted the sites already
+  on the token. The app is dark-only (`forcedTheme="dark"`), so the live values are
+  `--accent-green: oklch(0.84 0.22 145)` = `rgb(86,238,102)` and
+  `--destructive: oklch(0.704 0.191 22.216)` = `rgb(255,100,103)`. Retuning them repaints:
+  - **62** uses of `var(--accent-green)` across **30** files — Home, Health, Nutrition, Workout,
+    Cardio, Coach, More;
+  - **10** uses of `var(--destructive)` plus **140** `bg-/text-/border-destructive` classes across
+    **58** files — every destructive button, error line and delete affordance in the app.
+  So **(b) changes ~212 readings and (a) changes 14** — (b) is the larger visual change by an order
+  of magnitude, and the entry sold it to him as the no-op.
+- **Recommendation: (a), migrate to the token.** Same one-source benefit for a fifteenth of the
+  visual change; it keeps the design system's own values instead of overwriting them with copies
+  that drifted; and every component written in recent months already renders the bright token, so it
+  is the direction the app is moving anyway.
+- **(b) is still right if he actively prefers the mid green and red** — that is a genuine preference
+  and only he can hold it. What he should know before choosing it is that it is an app-wide restyle,
+  not an invisible one. **(c) leave it** keeps 116 literals drifting and reverts `warmup-screen.tsx`.
+- **Reversal cost:** low in effort either way — one token value then a mechanical diff — but it can
+  only be judged by looking at a screen, which is what the decision page is for.
+- **Amber is unaffected** either way: `rgb(234,179,8)` vs `rgb(239,175,0)` is below what the eye
+  picks up on a phone.
+- **Unchanged and still true:** of **116** literal sites, only **33** have a condition choosing the
+  colour and reading all 33 leaves **14** true bands (working on `RV-99`). The other 83 are
+  unconditional card tints, chart colours and icon gradients, which keep their hex whatever he
+  decides. This **still blocks `RV-99`'s Lane B half**.
+- **Added:** 2026-09-25 · Lane B, after measuring rather than migrating.
+
 ### [nutrition] LB-167 — does the meal tile read as a failed image to you? (RV-212 ④)
 - **Lane: O.** Ungated on purpose: getting the answer IS the work, and `Gate: owner` would park it
   out of the Orchestrator's READY list.
@@ -8560,55 +8597,6 @@ drift.
 - **What is lost:** the goal bars are Progress's subject, so **Progress becomes a 4-card tab.** Say
   that out loud before doing it.
 - Leave Home's `weightSparkline` alone — it is the glance version and links into `/health?tab=body`.
-
-### [app-shell][platform] LB-152 — the hex→token migration is a visible app-wide restyle: which green and red do you want?
-
-- **✅ ANSWERED BY THE OWNER, 2026-09-26: RETUNE THE TOKEN FIRST, THEN MIGRATE — option (b).** Set the token
-  to today's `#22c55e` / `#ef4444`, land that, then move the literal sites onto it. **The app's
-  appearance must not change at any point**, which is the test for this work: a screenshot before and
-  after the whole sequence should be identical. The brighter values were the library's default, never
-  a choice made here.
-- **Lane: B** — re-laned 2026-09-26 (OR-178). `app/globals.css` for the token, then `app/**` + `components/**`
-  for the sites. **This unblocks `RV-99`'s Lane B half**, which was waiting on the same answer.
-- **Added:** 2026-09-25 · Lane B, after measuring rather than migrating.
-- **The question, in one line:** RV-99 wants ~113 hard-coded greens and reds replaced by the design
-  tokens. Doing it **changes what you see** on screens you read daily. Which do you want to keep?
-- **What changes** (the app is dark-only, so these are the live values):
-
-  | | today | after | difference |
-  |---|---|---|---|
-  | green | `rgb(34,197,94)` — mid green | `rgb(86,238,102)` — brighter, lighter | large (67) |
-  | red | `rgb(239,68,68)` | `rgb(255,100,103)` — lighter, slightly pink | visible (50) |
-  | amber | `rgb(234,179,8)` | `rgb(239,175,0)` | none you could see (10) |
-
-- **Recommendation: migrate.** The tokens are the app's own design system; the hexes are copies that
-  drifted, and every new component already uses the tokens, so the split widens on its own. A year
-  out, one source means a theme change is one edit rather than 113.
-- **What that costs:** every band green and red gets brighter. If the current mid-green is what you
-  actually want, the honest fix is the reverse — change the TOKEN to `#22c55e` and migrate to it,
-  which gets the same one-source benefit while keeping today's appearance. That is equally easy
-  and the entry is neutral between them; only you can say which looks right.
-- **Reversal cost:** low but not free — a revert is a large mechanical diff, so it is worth looking
-  at a screen before rather than after.
-- **What is NOT in this question:** the one real defect was shipped separately (see RV-99), amber is
-  imperceptible and can go either way, and identity colours (rarity, HR zones, macro colours, the
-  per-metric Home tints) keep their hex regardless.
-- **The question that was asked (ANSWERED 2026-09-26, see above):** — migrating ~113 hard-coded greens and reds to the design tokens makes them all visibly brighter (green `rgb(34,197,94)`→`rgb(86,238,102)`). Keep today's look, or take the token's? Retuning the token to today's hex first gets the same one-source benefit with no visual change.
-- **The three answers, any of which unblocks it:** (a) migrate to the token and accept the brighter
-  green and red; (b) retune the token to today's `#22c55e`/`#ef4444` first, then migrate — same
-  one-source benefit, appearance unchanged; (c) leave it, and close RV-99's Lane B half.
-- **⛔ CORRECTED 2026-09-25 — "~113" was wrong, and the real number changes how big a decision this
-  is.** Counted and classified rather than estimated (the working is on `RV-99`): of **116** literal
-  sites in `app/**` + `components/**`, only **33** have a condition choosing the colour, and reading
-  all 33 leaves **14 true bands**. The rest are things this question explicitly does not cover —
-  deliberate red→amber→green ramps, a state red that already agrees across three files, per-metric
-  identity accents, and a fallback default. The other **83** sites are unconditional card tints,
-  chart colours and icon gradients, which keep their hex whatever you decide.
-- **So the honest version: about FOURTEEN readings get brighter, not a hundred and thirteen.** Mostly
-  on Health — a body-fat delta, a goal's on-track label, the monotony meter, the weekly muscle-sets
-  bars — plus the streak card's broken state and the deload banner's severity. **That makes (a) "just
-  migrate" much cheaper than this entry implied:** a screen or two to glance at. (b) is unchanged and
-  still right if today's mid-green is what you want; (c) now reverts `warmup-screen.tsx` too.
 
 ### [platform] OR-136 — the 4-hourly Lane A Routine still tells every firing to maintain a PR that merged three days ago
 
