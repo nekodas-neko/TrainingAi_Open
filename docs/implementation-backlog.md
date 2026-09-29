@@ -506,24 +506,6 @@ below threshold and left in place for next time.
   entries keep both true — this one startable, that one correctly parked.
 - **Read `Q-72` before building**, for the model context; this entry is the flag only.
 
-### [platform] OR-205 — the AI confidence value gates an automatic action, which a standing rule already forbids
-
-- **Lane: A** · **Added:** 2026-09-29 · Orchestrator, splitting `PS-31` (e).
-- **`PS-31` (e) carries two questions and files both as the owner's. Only one is.** The model's
-  `confidence` is (i) **used to decide `source`** (`lib/.../log-food.ts:31`) and (ii) rendered to
-  the owner as an "AI confidence" bar.
-- **(i) is not a decision — the rule already made it.** `CLAUDE.md`'s AI defaults: *"no LLM
-  self-reported number (confidence, totals) may gate an automatic action."* A value deciding
-  `source` is gating an automatic action, so **this half is a defect to fix, not a preference to
-  ask about.** Replace it with a deterministic rule, or make the behaviour independent of the
-  model's self-report.
-- **(ii) stays with `PS-31` and is genuinely his** — the rule forbids showing such a number *as
-  fact*, and the bar is honestly labelled as the model's own confidence, so whether it earns its
-  place on the screen is a display preference the repo cannot answer.
-- **Do not "fix" (ii) while here.** Removing a surface he may want is the failure this split exists
-  to avoid.
-
-
 ### [platform] OR-203 — the database grew 3× its trend for six days, and no per-table baseline exists to say which table did it
 
 - **Lane: A** · **Added:** 2026-09-29 · Orchestrator, from the session-start size read.
@@ -15389,7 +15371,7 @@ nulling the column is data-dropping, and a Redecode restores real numbers.
   **Gate:** owner for the confidence-bar DISPLAY only — narrowed 2026-09-29.
   **⚑ (e) was TWO questions and only one is his.** The half where `confidence` **decides `source`**
   is forbidden outright by `CLAUDE.md` (*"no LLM self-reported number … may gate an automatic
-  action"*), so it is a defect, not a preference — **split out as `OR-205`, buildable now.** What
+  action"*), so it is a defect, not a preference — **split out as `OR-205`, shipped 2026-09-30** (no origin now means manual; confidence is no longer an input). What
   remains here is whether the honestly-labelled bar earns its place on screen, which the repo
   cannot answer.
 - **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §P6.

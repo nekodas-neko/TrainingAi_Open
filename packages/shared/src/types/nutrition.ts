@@ -139,6 +139,9 @@ export interface NutritionIngredient {
   clientId?: string
 }
 
+/** How a scan result was produced. `photo`/`text`/`url` are the model; the other two are Open Food Facts. */
+export type ScanOrigin = 'barcode' | 'search' | 'photo' | 'text' | 'url'
+
 export interface NutritionScanResult {
   name: string
   brand?: string
@@ -165,8 +168,12 @@ export interface NutritionScanResult {
    * "came from a scan" and nothing more — which is why every barcode-scanned food was stored as
    * `'ai'`. And `notes` is model-authored prose on the photo path, so keying behaviour off it
    * would be gating on LLM output.
+   *
+   * OR-205: `/api/nutrition/scan` sets `'photo'`, `'text'` or `'url'` by which input it read. It set
+   * nothing before, so every model scan reached `scanOriginToSource`'s confidence fallback, and the
+   * model's self-reported confidence decided the stored `source`.
    */
-  origin?: 'barcode' | 'search' | 'photo'
+  origin?: ScanOrigin
   /**
    * LB-158. The code that identified this product, echoed by `/api/nutrition/barcode`. Same
    * reason as `origin` above: the caller builds a `food_items` row several steps later, and the
