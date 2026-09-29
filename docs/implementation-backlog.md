@@ -15443,7 +15443,17 @@ absent one, because the next scan trusts it. Add one only from a commit that act
 - **Lane:** A. The labelling half shipped (see **Keep** below); what is left is the anchor decision itself, which reaches `lib/health/energy-balance-service.ts`.
 - **Added:** 2026-09-09 · owner, on the Nutrition tab: *"is this the right number? looks like its took 200 off the base then 200 off again?"*
 - **Needs:** — nothing.
-- **Gate:** owner — the anchor is a scoring-shaped decision and TN-29 protects the stored 1,660.
+- **Needs:** LA-180
+- **⚑ THE OWNER QUESTION HERE LIVES ON `LA-180`, NOT HERE — linked 2026-09-28 (Orchestrator).**
+  Both entries decide the same thing: **what number the day opens at.** `LA-180` was filed
+  2026-09-28 off `OR-191` with a worked recommendation (budget = target + today's movement above
+  usual, landing at 1,618) and **neither entry referenced the other**, so the same decision was
+  queued twice and could have been answered twice, differently.
+  **The gate is replaced by the dependency above**: this entry is not separately gated on the
+  owner, it is waiting on `LA-180`'s answer. When that lands, the anchor here follows from it.
+- **Still true and still binding:** cross-check **TN-29** before changing any number — it protects
+  the stored 1,660, and matching one figure to the other without reading it moves a value that
+  entry deliberately holds.
 - **Keep:** the anchor decision, and only that. **The labelling shipped 2026-09-09** —
   `macro-budget-gap.ts` + `energy-card.tsx` name what the grams add up to, how far that sits from the
   budget, and that the ⓘ's resting burn already has habitual movement removed (the invisible

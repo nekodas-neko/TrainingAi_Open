@@ -91,6 +91,28 @@ CLAUDE.md says an owner question belongs near the top of `O`. Physically moving 
 highest-conflict edit possible on the backlog, so it is its own pass rather than a rider on the
 ungate — doing both together risked losing both.
 
-**Also owed:** the other 69 gated entries are triaged only as a shape (~29 calibration that should
-arrive as a Tuning proposal, ~25 engineering calls wearing an owner gate, the rest product
-preference). Each still needs reading before it moves.
+**⚠ THAT SHAPE ESTIMATE DID NOT SURVIVE READING — corrected 2026-09-28 (Orchestrator).** The line
+here used to say the remaining gated entries were *"~29 calibration … ~25 engineering calls wearing
+an owner gate, the rest product preference"*, and invited the next session to go and unpark them.
+**A sample of six was read in full — `PS-41`, `PS-44`, `TN-2`, `TN-33`, `LA-95`, `BF-134` — and
+FIVE were correctly gated.** Do not plan a bulk unpark on the old estimate.
+
+**The trap that produced the wrong guess, and it is worth knowing before reading any gated entry:**
+**a ✅ recorded owner decision inside an entry does NOT mean its gate is stale.** The gate usually
+names a *different* question from the one that was answered, and it says so in the field — which is
+the part to read. This session read the ✅ line on `PS-41`, concluded the gate was eleven days
+stale, wrote the unpark, and only then read the field: *"NOT the tester question, which he settled
+on 2026-09-17 … there is no precedence ladder to slot into. That is what needs his answer."* The
+edit was reverted before it shipped. `TN-2` is the same shape — its ✅ sign-off covers the
+*direction*, while the gate is waiting on the owner to supply the `.constants.json` set.
+**Read the `Gate:` field itself. The ✅ lines above it are not evidence about it.**
+
+**Count is now 34, down from 76.** The one genuine defect the sample found was `BF-134`: it and
+`LA-180` both decide what number the day's calorie budget opens at, **neither referenced the
+other**, so the same decision sat queued twice and could have been answered twice, differently.
+`BF-134` now carries `Needs: LA-180` instead of its own gate.
+
+**Two owner ACTIONS are buried in gated entries and are easy to miss when listing what he owes** —
+neither is a question, so neither shows up as one: `TN-2` needs him to supply the `.constants.json`
+set (absent from the repo since Q-49 and from every container), and `PS-44` needs a week of
+chest-strap-to-bed data he already agreed on 2026-09-17 to record.
