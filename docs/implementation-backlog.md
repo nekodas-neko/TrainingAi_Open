@@ -22339,28 +22339,6 @@ breath_avg_rpm:   9.1     9.7    10.0     9.8      9.8     <- the value it is co
 - **Surface: server/shared, web-reproducible.** Same as BF-13.
 
 
-### [workouts] BF-15 — the exercise-role fallback is `primary`, so unclassified work is prescribed like a main lift
-
-- **Lane: B** — the editor's add-exercise path (`components/config/program-editor-sheet.tsx`) and the
-  builder review. Re-laned 2026-09-28: the engine half shipped (below).
-- **Added:** 2026-08-24 · owner report — *"some 'isolation' type work will increase to a main level
-  when it should be accessory sort of — like bicep curls... but what about cable dips?"*
-- **✔ SHIPPED 2026-09-28 (Lane A, v1.477.33):** both schema defaults and all 20 read-site fallbacks
-  now default a missing role to `UNCLASSIFIED_EXERCISE_ROLE` (`accessory`), and a test fails on
-  any `?? 'primary'` that returns. Defect (a) is fixed: an Accessory exercise whose Accessory phase
-  has no style keeps its own style, or else takes the phase's lighter style, and never nothing.
-  `recommendAddedExerciseRole` (never Primary; Secondary while the session shape has a slot free)
-  and `sessionShape` are in `packages/shared/src/workout/exercise-role.ts`.
-- **What is left (Lane B):** call `recommendAddedExerciseRole` when an exercise is added in the
-  editor, instead of leaving it on the fallback. It needs the catalogue's muscle count and the
-  session's `timeBudgetMinutes`; the result is a pre-selected pill the user can change.
-- **⚠ The plan's WHOLE-SESSION rule is deliberately not built** — see the 2026-09-28 journal entry.
-  Every whole-session creation path now takes roles from the model with Primaries capped in code
-  (BF-126), and against the BF-16a-corrected catalogue the rule scored 87% on the owner's sessions,
-  below its own 90% bar, by anchoring Legs on the hip thrust (5 muscles) over the squat (4).
-  Nothing in the catalogue separates those two.
-- **Design:** [`docs/superpowers/plans/2026-08-24-exercise-roles.md`](superpowers/plans/2026-08-24-exercise-roles.md).
-
 ### [workouts][platform] BF-17 — `main` and `primary` are two axes wearing the same word, and the UI labels them backwards
 
 - **Branch:** _unassigned_

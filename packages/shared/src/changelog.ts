@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.485.1",
+    date: "2026-09-29",
+    changes: [
+      "Naming an exercise in the program editor now pre-selects a sensible role for it \u2014 Secondary for a compound while the session still has room, Accessory otherwise, and never Primary. Bicep curls no longer arrive prescribed like a main lift. The pill is still yours to change, and a role you have already set is never overwritten.",
+    ],
+  },
+  {
     version: "1.485.0",
     date: "2026-09-29",
     changes: [
