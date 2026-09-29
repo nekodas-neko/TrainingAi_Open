@@ -1,4 +1,4 @@
-import type { FoodLogWithItem, NutritionIngredient, NutritionScanResult } from '@trainingai/shared/types/nutrition'
+import type { FoodLogWithItem, NutritionIngredient, NutritionScanResult, ScanOrigin } from '@trainingai/shared/types/nutrition'
 import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { cancelMealReminder } from '@/lib/meal-reminders'
@@ -20,15 +20,13 @@ import { DEFAULT_TZ } from '../date-utils'
  * chosen one — BF-70's follow-up. `'barcode'` is the value BF-70 exists to start writing: it was
  * essentially never stored, which is why BF-38 measured 3 of 221 rows carrying it.
  */
-export function scanOriginToSource(
-  origin: 'barcode' | 'search' | 'photo' | undefined,
-  confidence: string | undefined,
-): NewFoodEntry['source'] {
+export function scanOriginToSource(origin: ScanOrigin | undefined): NewFoodEntry['source'] {
   if (origin === 'barcode') return 'barcode'
-  if (origin === 'photo' || origin === 'search') return 'ai'
-  // No origin: a hand-typed entry, or a result from a producer that predates the field. Fall back
-  // to the old rule so an unknown producer behaves exactly as it did before.
-  return confidence ? 'ai' : 'manual'
+  if (origin === 'photo' || origin === 'text' || origin === 'url' || origin === 'search') return 'ai'
+  // OR-205. No origin means no scan: a hand-typed entry. This used to fall back to
+  // `confidence ? 'ai' : 'manual'`, which let the model's self-reported confidence decide a stored
+  // value, and the photo scan route set no origin, so that fallback was the path for every AI scan.
+  return 'manual'
 }
 
 export interface NewFoodEntry {
