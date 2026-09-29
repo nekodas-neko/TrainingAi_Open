@@ -34,6 +34,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const updated = await repo.updatePrescribedRun(userId, id, {
     status: parsed.data.status,
     activityLogId: parsed.data.activityLogId ?? null,
+    completedAs: parsed.data.completedAs,
   })
   if (!updated) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json({ run: updated })

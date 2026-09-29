@@ -4186,51 +4186,6 @@ which is the right shape for something that can only be validated by living with
    render or the device.
 - **Also for the device:** Body Battery's fill runs from about 45% to the right edge rather than from the left. That may be deliberate ("drains as you use it"). RV-205 should say which, and if it is deliberate, the bar needs a mark that makes the direction legible.
 
-### [cardio][platform] LB-179 — a walk that satisfies a run prescription must not feed the run planner
-- **Lane: A** — `packages/shared/src/running/assemble-plan-context.ts`,
-  `app/api/running-plan/run-type-stats/route.ts`, and (on the recommendation below) a migration plus
-  the local SQLite version. **Blocks `RV-166`**, which is approved and cannot ship without it.
-- **Added:** 2026-09-28 · Lane B, while re-verifying `RV-166` against `main` before building it.
-- **⚑ THE APPROVED SPEC RE-INTRODUCES A BUG THIS REPO ALREADY FIXED ONCE.** `RV-166` makes a walk
-  satisfy the run prescription — correct, and what the owner asked for. But `prescribed_runs.status`
-  is read by the **planner**, not only by display, and nothing records *how* the row was satisfied.
-  `assemble-plan-context.ts:97` already carries the comment *"Only COMPLETED runs count toward the
-  week's 80/20 sequence — a never-run pending row … must not advance the framework toward an
-  interval day (E2-7)"*. A walk marked `completed` walks straight through that guard. Same class,
-  different door.
-- **Three readers, measured 2026-09-28, not one:**
-  - `assemble-plan-context.ts:81` — `.filter(r => r.status === 'completed' && HARD_RUN_TYPES.has(r.runType))`
-    feeds `hoursSinceLastHardRun`, described in its own comment as *"real no-back-to-back-quality
-    protection"*. A treadmill walk completing a prescribed tempo tells the gate a quality session was
-    done and **suppresses the next one**. This is the worst of the three: it changes what the app
-    tells him to do.
-  - `assemble-plan-context.ts:97` — `runsThisWeek`, the 80/20 sequence and weekly frequency. A walk
-    advances the framework toward an interval day.
-  - `run-type-stats/route.ts:35` — pulls `distanceKm`/`avgPaceSecPerKm`/`avgHr` off the linked log and
-    files them under the **prescribed** `runType`. A ~12 min/km treadmill pace lands in "easy run"
-    pace statistics.
-- **✅ RECOMMENDATION — record how it was satisfied on the row (`completedAs: 'run' | 'walk'`), do not
-  re-derive it per reader.** The completing client knows the activity type at the moment it links the
-  row (`done-activity-screen.tsx`); every reader otherwise has to join back to the activity log to
-  recover a fact that was known when it was written. **`assembleInputs` does not fetch activity logs
-  at all** — its `Promise.all` takes prescribed runs, loads, workouts, sleep and Oura — so the
-  derive-at-read-time option means adding a query to a hot path *and* repeating it in each of the
-  three readers, and in every reader added later. It also matches the convention `RV-166` itself
-  cites: a discriminator like `observed-hr.ts`'s `source: 'observed' | 'estimated'`, which says where
-  a value came from rather than whether to trust it.
-- **Alternative, and what it is better at:** derive it at read time from `log.activityType`
-  (`run-type-stats` already loads the logs, so that one reader is a one-line filter). **Better at
-  shipping today** — no migration, no local SQLite version bump, nothing to backfill, and it is the
-  whole fix for the stats reader. It loses on the two planner readers, which is where the real defect
-  is.
-- **Reversal cost: low.** A nullable column readers ignore until they use it; existing rows read
-  `null`, which means *"satisfied before this was tracked"* and must be treated as a run (that is what
-  they are — the link only ever fired for `activityType === 'run'`).
-- **⚠ Do NOT backfill.** Every existing `completed` row was necessarily a run, so a backfill would
-  write a fact that is already implied, and `RV-166`'s own warning about moving stored numbers is
-  about *future* completions, not past ones.
-- **Not measured:** how many days change once `RV-166` ships. `RV-166` owes that figure before merging
-  and this entry does not answer it.
 
 ### [nutrition] RV-218 — one Nutrition screen shows three calorie targets, the Day screen a fourth "burned", and "205 workouts" means 205 kcal
 - **✅ TWO OF THE THREE COPY BUGS SHIPPED 2026-09-27 (#1782). THE THIRD WAS ALREADY FIXED. ITEMS ①②④ ARE LANE A's — established below, not assumed.**
@@ -7891,6 +7846,16 @@ drift.
 - **Needs:** LB-179 — the planner must be able to tell a walk-satisfied prescription from a run-satisfied
   one before a walk is allowed to satisfy one. Shipping the two-guard change alone corrupts the
   prescription engine, not just a stat.
+- **✔ LB-179 SHIPPED 2026-09-29, so this is what the walk half must send.** Link the prescription with
+  `completedAs: 'walk'` whenever the satisfying activity is not a run, on BOTH paths in
+  `done-activity-screen.tsx`'s `linkPrescribedRun`:
+  - the local `store.upsertPrescribedRun({ ...existing, status: 'completed', completedAs: 'walk', … })`;
+  - the queued `prescribed_run` mutation's payload.
+
+  **Omitting it records a run**: the server writes null on any status change that does not say
+  otherwise. So the run path needs no change, and a walk that forgets the field is counted as a run.
+  The planner, the hard-run gate and the run-type stats all read `completedAsRun`
+  (`packages/shared/src/running/run-completion.ts`).
 - **✅ ROOT CAUSE FOUND 2026-09-28, and it is two lines** — `components/activity/done-activity-screen.tsx:285`
   and `:322`, both `if (activityType === 'run' && prescribedRunId)`. He logs walks, so
   `linkPrescribedRun` never fires. **Everything else the completion needs already exists**: the

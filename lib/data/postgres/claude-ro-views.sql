@@ -1115,7 +1115,8 @@ SELECT
   t.activity_log_id,
   t.created_at,
   t.updated_at,
-  t.deleted_at
+  t.deleted_at,
+  t.completed_as
 FROM public.prescribed_runs t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 

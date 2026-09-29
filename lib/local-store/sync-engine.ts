@@ -396,6 +396,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     gateAction:    r.gateAction != null ? String(r.gateAction) : 'proceed',
     status:        (r.status as LocalPrescribedRun['status']) ?? 'pending',
     activityLogId: r.activityLogId != null ? String(r.activityLogId) : null,
+    completedAs:   r.completedAs === 'run' || r.completedAs === 'walk' ? r.completedAs : null,
     updatedAt:     toIso(r.updatedAt),
     deletedAt:     r.deletedAt ? toIso(r.deletedAt) : null,
     syncStatus:    'synced' as const,

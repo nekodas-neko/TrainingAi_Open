@@ -459,6 +459,8 @@ export const prescribedRuns = pgTable('prescribed_runs', {
   gateAction:    text('gate_action').notNull().default('proceed'),
   status:        text('status').notNull().default('pending'),
   activityLogId: uuid('activity_log_id').references(() => activityLogs.id, { onDelete: 'set null' }),
+  /** LB-179: 'run' | 'walk' | null (null = completed before this was tracked, i.e. a run). */
+  completedAs:   text('completed_as'),
   createdAt:     timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:     timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt:     timestamp('deleted_at', { withTimezone: true }),

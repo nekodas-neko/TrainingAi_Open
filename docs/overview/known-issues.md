@@ -31,6 +31,14 @@
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [cardio][platform] LB-179's local SQLite v44 (prescribed_runs.completed_as) is NOT device-verified
+
+- Shipped with the web deploy, with no APK. On first open after deploy the S25 should migrate to **v44**,
+  adding the `prescribed_runs.completed_as` column.
+- **Owed (Lane DV):** after one app open, the running plan tab still shows today's prescription, and a
+  pull completes without error. Check the WebView console for a SQLite error naming `completed_as`.
+- **Strike this row** when that is VERIFIED.
+
 ### [app-shell] Home's banner registry has no guard against an unstable `report`
 
 - **The crash it prevents shipped and was fixed the same day** (RV-119 in v1.481.0, fixed in
@@ -46,6 +54,7 @@
   real timing could reach it; whether it does is unknown.
 - **If a Home crash is ever reported,** this is the first thing to check: open Home with a banner
   that resolves late and watch for the error boundary.
+
 ### [devices][platform] The native security batch (RV-196, OR-159) is NOT device-verified, and ring uploads are the half that matters
 
 - **Shipped in #1755, Kotlin, so it needs the CI APK installed as an UPDATE.** Never uninstall first:

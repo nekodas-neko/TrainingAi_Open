@@ -981,6 +981,7 @@ export class SQLiteLocalStore implements LocalStore {
       gateAction:    r.gate_action != null ? String(r.gate_action) : 'proceed',
       status:        (r.status as LocalPrescribedRun['status']) ?? 'pending',
       activityLogId: r.activity_log_id != null ? String(r.activity_log_id) : null,
+      completedAs:   r.completed_as === 'run' || r.completed_as === 'walk' ? r.completed_as : null,
       updatedAt:     String(r.updated_at),
       deletedAt:     r.deleted_at != null ? String(r.deleted_at) : null,
       syncStatus:    (r.sync_status as 'pending' | 'synced') ?? 'synced',
@@ -992,21 +993,23 @@ export class SQLiteLocalStore implements LocalStore {
       `INSERT INTO prescribed_runs
          (id, plan_id, date, run_type, duration_min, distance_km, target_hr_low,
           target_hr_high, target_zone_ids, rationale, gate_action, status,
-          activity_log_id, updated_at, deleted_at, sync_status)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+          activity_log_id, completed_as, updated_at, deleted_at, sync_status)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(id) DO UPDATE SET
          plan_id=excluded.plan_id, date=excluded.date, run_type=excluded.run_type,
          duration_min=excluded.duration_min, distance_km=excluded.distance_km,
          target_hr_low=excluded.target_hr_low, target_hr_high=excluded.target_hr_high,
          target_zone_ids=excluded.target_zone_ids, rationale=excluded.rationale,
          gate_action=excluded.gate_action, status=excluded.status,
-         activity_log_id=excluded.activity_log_id, updated_at=excluded.updated_at,
+         activity_log_id=excluded.activity_log_id, completed_as=excluded.completed_as,
+         updated_at=excluded.updated_at,
          deleted_at=excluded.deleted_at, sync_status=excluded.sync_status`,
       [
         record.id, record.planId, record.date, record.runType, record.durationMin,
         record.distanceKm, record.targetHrLow, record.targetHrHigh,
         JSON.stringify(record.targetZoneIds ?? []), record.rationale, record.gateAction,
-        record.status, record.activityLogId, record.updatedAt, record.deletedAt, record.syncStatus,
+        record.status, record.activityLogId, record.completedAs ?? null,
+        record.updatedAt, record.deletedAt, record.syncStatus,
       ],
     );
   }
@@ -1841,20 +1844,21 @@ export class SQLiteLocalStore implements LocalStore {
         `INSERT INTO prescribed_runs
            (id, plan_id, date, run_type, duration_min, distance_km, target_hr_low,
             target_hr_high, target_zone_ids, rationale, gate_action, status,
-            activity_log_id, updated_at, deleted_at, sync_status)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
+            activity_log_id, completed_as, updated_at, deleted_at, sync_status)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
          ON CONFLICT(id) DO UPDATE SET
            plan_id=excluded.plan_id, date=excluded.date, run_type=excluded.run_type,
            duration_min=excluded.duration_min, distance_km=excluded.distance_km,
            target_hr_low=excluded.target_hr_low, target_hr_high=excluded.target_hr_high,
            target_zone_ids=excluded.target_zone_ids, rationale=excluded.rationale,
            gate_action=excluded.gate_action, status=excluded.status,
-           activity_log_id=excluded.activity_log_id, updated_at=excluded.updated_at,
+           activity_log_id=excluded.activity_log_id, completed_as=excluded.completed_as,
+           updated_at=excluded.updated_at,
            deleted_at=excluded.deleted_at, sync_status='synced'
          WHERE prescribed_runs.sync_status='synced' AND prescribed_runs.deleted_at IS NULL`,
         [r.id, r.planId, r.date, r.runType, r.durationMin, r.distanceKm, r.targetHrLow,
          r.targetHrHigh, JSON.stringify(r.targetZoneIds ?? []), r.rationale, r.gateAction,
-         r.status, r.activityLogId, r.updatedAt, r.deletedAt],
+         r.status, r.activityLogId, r.completedAs ?? null, r.updatedAt, r.deletedAt],
       );
     }
 
