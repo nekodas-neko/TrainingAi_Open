@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.481.9",
+    date: "2026-09-29",
+    changes: [
+      "After creating an account, the sign-in screen no longer says \u201cSign in below\u201d. Every new account now waits for approval before it can be used, so it says that instead \u2014 the same sentence the waiting screen shows, rather than advice that sent you to a screen contradicting it.",
+    ],
+  },
+  {
     version: "1.481.8",
     date: "2026-09-29",
     changes: [
