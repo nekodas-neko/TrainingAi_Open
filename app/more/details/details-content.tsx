@@ -7,6 +7,7 @@ import { PersonalDetailsSection, type PersonalDetailsValues } from '@/components
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { MeasuredOverviewSection } from '@/components/more/details/measured-overview-section'
 import { PerformanceOverviewSection } from '@/components/more/details/performance-overview-section'
+import { TrainingOverviewSection } from '@/components/more/details/training-overview-section'
 import type { MetricRow } from '@/components/more/details/measured-overview'
 import { invalidateGoalRecommendations, invalidateUserProfile } from '@/lib/cache-groups'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
@@ -142,6 +143,10 @@ export function DetailsContent() {
           because they do not update on their own and because each half has to be able to render
           when the other has nothing. */}
       <PerformanceOverviewSection userId={user?.id} />
+
+      {/* LB-95. The lifting half, last because it is the only one that grows on its own — a new
+          record appears here the moment a set beats the old one, where a scan or a test does not. */}
+      <TrainingOverviewSection />
     </MoreSubScreen>
   )
 }

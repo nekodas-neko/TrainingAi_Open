@@ -19,6 +19,9 @@ export async function invalidateWorkoutSummaries(): Promise<void> {
     invalidateCache('weekly-stats'),
     invalidateCache('weekly-muscle-sets'),
     invalidateCache('weights-summary'),
+    // LB-95 — a logged set can set a new estimated 1RM, and the More > Details screen now reads
+    // them. Without this the new record waits out the key's TTL on the one screen that lists it.
+    invalidateCache('personal-records'),
     invalidateCache('next-session'),
     invalidateCache('muscle-recovery'),
     invalidateCache('readiness-score'),

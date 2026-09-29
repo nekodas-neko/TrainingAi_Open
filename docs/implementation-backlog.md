@@ -13531,21 +13531,6 @@ the rest of that day; and `perceived_recovery` carries at least three distinct v
 - **Added:** 2026-09-09 · Lane B, on being blocked by the ceiling twice in one hour.
 
 
-### [workouts] LB-95 — personal records are the one half of the measured overview with no route to read them
-
-- **Lane: B** — `components/more/details/`. Re-laned 2026-09-28: the route half is built (below),
-  and what is left is the surface.
-- **✔ ROUTE BUILT 2026-09-28 (Lane A):** `GET /api/personal-records` returns
-  `{ records: [{ exerciseName, estimated1rm, achievedAt }] }` for the caller: every exercise, not
-  filtered to the active program, newest first, `achievedAt` as an ISO instant, `private, no-store`.
-  It reads through a new `listPersonalRecordsDated` beside `listPersonalRecords`, whose 10 call
-  sites want the undated map and are untouched.
-- **What is left:** a `Training` group in `components/more/details/`, built with the
-  `readingGroups`-shaped rows the section already renders. **Every value carries its date** (BF-133's
-  rule), and a record on an exercise no longer programmed stays in the list. Read through
-  `cachedFetch` with a `readCacheSync` seed per the cache rules, and give the key one TTL.
-- **Added:** 2026-09-09 · Lane B, while shipping BF-133's clinical half.
-
 ### [body][platform] LB-96 — no route returns a weight series longer than seven days, so a browser cannot see a dosing period
 
 - **Lane:** A — `app/api/body-metadata/route.ts` (or a new route), which Lane B may not touch.
