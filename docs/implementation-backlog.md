@@ -574,6 +574,23 @@ below threshold and left in place for next time.
   reading cannot separate a step change from a burst — **six days is a short window, and a single
   heavy sync day would move it** — so the first job is to establish whether the rate persists,
   not to act on 4.8 MB/day as if it were the new steady state.
+- **Second read, Lane A, 2026-09-29 22:06 UTC (08:06 Brisbane on 09-30), about a day after the
+  baseline: 261.5 MB. Flat.** Every table in the list is within 0.5 MB of the baseline. One day
+  proves nothing about the rate, which is why this entry stays open.
+- **What the six-day window did NOT contain: a faster writer.** Daily inflow by row timestamp,
+  read the same session:
+  - `oura_raw_packed`: 0.23–0.37 MB/day, every day from 09-14 to 09-29.
+  - `oura_raw_samples`: 20–27k rows/day, holding a normal hot window of **180,345 rows** from 09-22.
+  - `oura_heartrate` and `rr_intervals`: in their usual worn/unworn pattern, with no burst day.
+
+  So the +29 MB is not new data arriving faster. **The likeliest non-row candidate is index growth
+  on the churning hot window.** `oura_raw_samples_user_tag_ts` is **20 MB for 180k three-column
+  keys, about 3× a tightly packed btree**. The packer deletes sealed buckets all day, and a btree
+  does not return emptied pages. Its heap is 33 MB and its indexes 47 MB. This is a lead, not a
+  finding, because nothing recorded that index's size on 09-23 to compare with.
+- **Next read, on or after 2026-10-03:** the same per-table query plus
+  `pg_stat_user_indexes` for `oura_raw_samples`. Growth in that index alone would confirm it, and a
+  `REINDEX CONCURRENTLY` of it would be the remedy, which is a structural call and not the owner's.
 - **Then the standing question stays the same:** act on a departure from the SHAPE — a retention
   window that stopped reclaiming — not on the daily figure. `rr_intervals` reaching its cap in late
   October is the next scheduled step down, and **a step that does not arrive is the signal**.
