@@ -865,10 +865,30 @@ jobs:
         if: ${{ !success() }}
         run: |
           echo "::group::kernel OOM kills"
-          sudo dmesg 2>/dev/null | grep -iE "killed process|out of memory|oom-kill" | tail -20 \
-            || echo "no OOM kill in dmesg — the browser was not killed for memory, look elsewhere"
+          # `dmesg | grep … | tail -20 || echo …` NEVER reaches that echo, because `tail` exits 0 on
+          # empty input. So this group printed NOTHING on run 36508371834 — the very first browser
+          # death it existed to explain (LB-149, shard 2: a chrome-headless-shell crash stack and
+          # `browser.newContext: Target page, context or browser has been closed`). Read dmesg once,
+          # then branch on what it says, and keep "no OOM lines" distinct from "dmesg would not talk
+          # to us": silence cannot tell those apart, and one of them rules memory out while the other
+          # leaves it wide open.
+          if dmesg_out=$(sudo dmesg 2>&1); then
+            oom=$(printf '%s\n' "$dmesg_out" | grep -iE "killed process|out of memory|oom-kill" | tail -20)
+            if [ -n "$oom" ]; then
+              echo "$oom"
+            else
+              echo "no OOM kill in dmesg — the browser was not killed for memory, look elsewhere"
+            fi
+          else
+            echo "dmesg is unreadable on this runner, so memory pressure is UNKNOWN, not ruled out:"
+            printf '%s\n' "$dmesg_out" | tail -5
+          fi
           echo "::endgroup::"
-          echo "::group::memory and the largest processes still alive"
+          # ⚠ Read these two as TEARDOWN figures, not as the state at the moment of death: the step
+          # runs after Playwright has exited, so the browser's own memory is already returned. Run
+          # 36508371834 reported 11 GB free of 16 and untouched swap here, minutes after a crash.
+          # Catching the peak would need a sampler running alongside the suite.
+          echo "::group::memory and the largest processes still alive (AT TEARDOWN)"
           free -m
           ps -eo pid,rss,comm --sort=-rss | head -12
           echo "::endgroup::"

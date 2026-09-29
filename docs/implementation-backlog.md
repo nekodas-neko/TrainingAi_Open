@@ -6694,6 +6694,25 @@ drift.
   **`food-log-swipe-delete:238` PASSED in run three**, so it is 2 of 3 in CI plus 2 of 3 locally — the
   highest-frequency flake, not a deterministic defect. Two data points looked like a pattern and were
   not; the claim was made one run too early.
+- **✅ FOURTH DATA POINT, AND THE FIRST UNDER SHARDING — run `36508371834` (`93d30a41`, PR #1950's
+  head), 2026-09-29.** Four shards, each on its own Postgres. **Shards 1, 3 and 4 green; shard 2
+  failed.** `food-log-swipe-delete:238` failed **twice** (first attempt plus retry1), then
+  `meal-label:542` hit a browser death later in the same shard (`LB-149`), and 3 tests did not run.
+  So `:238` is now **4 of 5 in CI** and remains the highest-frequency flake, and a database per shard
+  did NOT make it go away — which is a real result, because "one seeded database shared by 124 specs"
+  was this entry's leading suspect for it.
+- **⚑ AND IT IS NOT THE BROWSER DEATH'S COLLATERAL, WHICH THE RETAINED FIRST ATTEMPT SETTLES.** The
+  artifact holds a full DOM snapshot for `:238`, so the browser was alive and rendering: the row is
+  swiped open (`button "Delete Spec Swipe Yoghurt": Delete` is in the tree) and the confirmation
+  heading simply never appeared — `expect(getByRole('heading', {name: 'Delete food log?'}))`,
+  *element(s) not found* after 5 s. A genuine assertion failure, ahead of the crash in the same shard,
+  not a symptom of it. **Run in isolation locally the same day it passes: 8 of 8, `:238` in 14.3 s.**
+  So the next step for this spec is the gap between its CI environment and an isolated local run, and
+  the snapshot names one candidate outright — the *"Finished logging this day? · 0 of 10 days marked"*
+  banner is present in the CI tree, and whether it renders is database state, which moves the row the
+  tap coordinate was computed against.
+- **⛔ Reading that artifact needs the repository-scoped path, not the one the log prints** — see
+  `LB-149` for the 403 that looks like an auth failure and is the sandbox proxy.
 - **✅ AND THE HEADLINE FOR `LB-56`: a fully green E2E run is achievable.** Run three failed nothing at
   all. That is the first evidence that "required check" is not hopeless — the obstacle is the retry
   budget masking ~6 flaky specs per run, not an unpassable suite.
@@ -9247,7 +9266,30 @@ drift.
 - **✅ Shipped instead of a guess: the run now says why (`ci.yml`, `if: failure()`).** One `dmesg`
   read names an OOM kill and its RSS; an **empty** dmesg eliminates OOM outright, which nobody has
   been able to say in three sessions. Costs nothing on a green run.
-- **Keep — the cause is NOT established, and this entry closes when the next red E2E reports.**
+- **✅ THE NEXT RED E2E HAS NOW REPORTED (run 36508371834, 2026-09-29), AND IT CARRIED NO WITNESS —
+  BECAUSE THE INSTRUMENT ABOVE WAS BROKEN.** Shard 2 of the new four-way split: `meal-label.spec.ts:542`
+  hit `browser.newContext: Target page, context or browser has been closed` with a full
+  **`chrome-headless-shell` crash stack** (32 frames, `[end of stack trace]`) at ~01:39:5x. Shards 1, 3
+  and 4 were green; the shard finished 66 passed · 1 failed · 1 flaky · **3 did not run**, 10.7 min.
+  **The `kernel OOM kills` group printed NOTHING AT ALL** — not even its own fallback line — because
+  `dmesg | grep … | tail -20 || echo …` can never reach that `echo`: **`tail` exits 0 on empty input.**
+  So the one read this entry was waiting three sessions for produced silence, and silence cannot tell
+  "no OOM lines" from "dmesg would not talk to us". Fixed 2026-09-29 — the step reads dmesg once and
+  branches, and names the unreadable case separately.
+- **What this run DID establish.** `free -m` and `ps` in that step are **teardown** figures (11 GB free
+  of 16, swap untouched, minutes after the crash) and say nothing about the moment of death — now
+  labelled as such in the step. The `if: ${{ !success() }}` artifact upload from `LB-166` **works**:
+  `playwright-report-2`, 33 files, 15.7 MB, first attempt retained.
+- **⛔ And the way to read that artifact is not the URL the log prints.** The run log's
+  `github.com/<owner>/<repo>/actions/runs/<run>/artifacts/<id>` is refused by the sandbox's agent proxy
+  with a **403** whose body says *"sessions are bound to their configured repositories"* — which reads
+  exactly like a GitHub auth failure and is not one. The repository-scoped REST path works from a
+  sandbox session: `curl -sSL -o a.zip https://api.github.com/repos/<owner>/<repo>/actions/artifacts/<id>/zip`
+  returned **200, 15,686,307 bytes**. Get the id from `get_job_logs` (the upload step prints
+  `Artifact ID …`).
+- **Keep — the cause is STILL NOT established.** The crash is now witnessed and the instrument is
+  fixed; what is owed is one more red E2E read through the repaired dmesg branch. If it reports no OOM,
+  memory is out and the next step is sampling during the run rather than after it.
 - **⛔ The entry's own discriminator is too weak, measured 2026-09-25.** It said 3 consecutive runs
   on an unchanged head would settle spec-pair vs runner. All **3 of 3 PASSED** (28m53s, ~34 min,
   ~33 min on run 3069 attempts 1–3), so the fault did not reproduce at all — it is rarer than
