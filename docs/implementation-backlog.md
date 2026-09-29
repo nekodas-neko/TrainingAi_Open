@@ -4303,6 +4303,7 @@ which is the right shape for something that can only be validated by living with
 - **Lane: A** for what remains. Was `Lane: B`, with *"if the numbers come from different routes,
   the reconciliation half goes to A"* — they do, and it does.
 - **Added:** 2026-09-26 · Review sweep 64 (`p23-nutrition-warm-01/02`, `t2-day-01`, `home-nutri` crop).
+- **Needs:** LA-180 — the one open item, ①, is which number the ring's budget stands on, and that is the owner's answer on LA-180. Parked 2026-09-30 so it stops heading Lane A's READY list with nothing buildable.
 - **What the owner sees on one day:**
   - the Nutrition ring: **"0 OF 1,534"** (1,297 resting + 237 movement);
   - the "Why two numbers" card: **goal 1,660, budget 1,356, a 304 gap**;
