@@ -71,7 +71,9 @@ export function computeLogMacros(
 export async function listMealTypes(db: Db, userId: string): Promise<MealType[]> {
   const rows = await db.select().from(s.mealTypes)
     .where(and(eq(s.mealTypes.userId, userId), isNull(s.mealTypes.deletedAt)))
-    .orderBy(asc(s.mealTypes.sortOrder))
+    // created_at breaks a sort_order tie, so plan-meal type derivation (LA-172) picks the same type
+    // here as the backfill migration does.
+    .orderBy(asc(s.mealTypes.sortOrder), asc(s.mealTypes.createdAt))
   return rows.map(rowToMealType)
 }
 

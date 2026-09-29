@@ -6312,37 +6312,6 @@ drift.
 - **Reversal cost: low.** It changes what the workout screen shows and writes going forward. Nothing
   already stored changes.
 
-### [nutrition] LA-172 — how should the app tell that a planned meal was eaten, when no plan meal has a meal type?
-- **✅ ANSWERED 2026-09-28 — BOTH, and the answer is wider than option (a).**
-  Verbatim: *"Give it a type by its time; as well as what its tagged with."*
-  **① Derive the meal type from `suggested_time`** — 11:40 becomes Lunch — at plan creation, and
-  **once as a backfill for the 8 existing plan meals**, all of which have `meal_type_id` NULL.
-  **② AND honour an explicit tag where one exists.** A tag the owner sets WINS over the derived
-  type; the time is the default, not the authority.
-  So a plan meal's type resolves as **tag → derived-from-time → none**, and the plan screen can show
-  *"Lunch · Turkey and Rice Bowl"* with the derived value visible and correctable, which is what
-  makes a wrong derivation fixable instead of invisible.
-  **He did NOT take window-matching by log time** — that silently stops counting a real meal on any
-  day he eats late, with nothing on screen explaining why.
-  **The backfill is an UPDATE**, covered by the standing production policy: snapshot, affected rows
-  against prediction, stop on mismatch. **Unblocks `BF-203a`.**
-- **Lane: A** — a decision about which food counts toward a plan, which moves the calorie totals the
-  owner reads.
-- **Added:** 2026-09-28 · Lane A, blocking BF-203a.
-- **What was found:** all 8 of the owner's plan meals have `meal_type_id` NULL. They carry a name,
-  targets and a `suggested_time` (07:00, 11:40, 16:20 …), but no meal type. Anything that matches
-  logs to slots by meal type matches nothing.
-- **⭐ Recommendation: (a) assign the meal type from the suggested time,** at plan creation and once
-  for existing plans (a backfill, which the standing policy covers). It makes the link explicit and
-  visible: the plan screen can show "Lunch · Turkey and Rice Bowl", you can correct a wrong one, and
-  it keeps working if you log late. BF-203's Phase B (logging straight from a slot) can later make
-  it exact.
-- **Alternative (b), time-window matching at read time:** needs no stored change and no backfill,
-  and is better if meal types are something you don't want to maintain. It loses on the ordinary
-  case: a lunch logged at 15:00 misses its window, gets an estimate, and is counted twice.
-- **Reversal cost: low.** (a) writes a nullable column that already exists. Clearing it restores
-  today's state exactly.
-
 ### [platform][workouts] LA-173 — five things Lane A needs from the owner (three merge yeses, a style, a key)
 - **Lane: O** — every item is the owner's to answer; nothing here is buildable until he does.
 - **✅ ANSWERED 2026-09-28 — ①, ② and ⑤ are all YES; ③ was withdrawn as a question once it was
