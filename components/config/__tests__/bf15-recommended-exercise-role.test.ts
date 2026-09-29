@@ -6,8 +6,8 @@ import type { ExerciseLibraryEntry, ExerciseRole } from '@trainingai/shared/type
 const entry = (n: number, name = 'X'): ExerciseLibraryEntry => ({
   id: name, name,
   muscles: Array.from({ length: n }, (_, i) => ({ muscle: `m${i}`, role: i === 0 ? 'main' : 'secondary' })),
-  equipment: ['barbell'], exerciseType: 'strength',
-} as ExerciseLibraryEntry)
+  equipment: ['barbell'], exerciseType: 'weighted',
+})
 
 const session = (roles: (ExerciseRole | undefined)[], budget?: number) =>
   ({ exercises: roles.map(r => ({ exerciseRole: r })), timeBudgetMinutes: budget })
