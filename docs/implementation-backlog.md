@@ -6169,6 +6169,22 @@ drift.
   future estimates; and the replay figure is recorded here. **Device pass owed** on the resolve sheet.
 
 
+### [nutrition] LA-184 — a split meal plan always shows its rest-day variant, because nothing passes `isTrainingDay`
+- **Lane: B** — `components/nutrition/meal-plan-section.tsx` and whichever `app/nutrition/**` screen renders it.
+- **Added:** 2026-09-30 · Lane A, found while building BF-203a.
+- **Measured by grep, and `tsc` agrees:** `MealPlanSection` takes `isTrainingDay?: boolean` and hands
+  it to `pickVariant`, which chooses `'all'`, else `training` when true, else `rest`. **No caller
+  passes the prop**, so on a plan split into training and rest variants it is always `undefined` and
+  the card shows the REST variant every day, training days included.
+- **Not live for the owner today:** his only plan was soft-deleted on 2026-08-11. It bites the next
+  split plan anyone makes, and the AI generator makes split plans (`meal-plans/generate` builds
+  `training`/`rest` variants).
+- **Do:** pass today's training-day flag from the user's schedule, the same source the rest of the
+  app uses for "is today a training day". BF-203a's estimator needs the same answer server-side,
+  so the variant choice should come from one shared helper rather than two copies.
+- **Done when** a split plan shows its training variant on a scheduled training day and its rest
+  variant otherwise, with a test on the chooser.
+
 ### [nutrition] BF-203a — phase A: the `estimated` answer state, and counting it once
 - **Lane:** A — migration, `plan_meal_answers`, `packages/shared/src/nutrition/meal-estimate.ts`, `lib/health/energy-balance-service.ts`.
 - **Added:** 2026-09-26 · BugFix intake. First of BF-203's three phases.

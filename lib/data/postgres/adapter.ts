@@ -3974,6 +3974,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async savePlanMealAnswer(userId: string, input: { id?: string; planMealId: string; logDate: string }) { return mp.savePlanMealAnswer(this.db, userId, input) }
   async deletePlanMealAnswer(userId: string, planMealId: string, logDate: string) { return mp.deletePlanMealAnswer(this.db, userId, planMealId, logDate) }
   async listPlanMealAnswers(userId: string, logDate: string) { return mp.listPlanMealAnswers(this.db, userId, logDate) }
+  async upsertEstimatedAnswers(userId: string, logDate: string, estimates: readonly mp.EstimateToStore[], basis: string) { return mp.upsertEstimatedAnswers(this.db, userId, logDate, estimates, basis) }
   async listDietaryRestrictions() { return mp.listDietaryRestrictions(this.db) }
   async listUserDietaryRestrictions(userId: string) { return mp.listUserDietaryRestrictions(this.db, userId) }
   async replaceUserDietaryRestrictions(userId: string, entries: { restrictionId: string; severity: DietarySeverity }[]) { return mp.replaceUserDietaryRestrictions(this.db, userId, entries) }
