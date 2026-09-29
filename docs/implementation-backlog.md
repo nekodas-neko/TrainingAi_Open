@@ -24538,24 +24538,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   fires again, keep the whole log and compare the named call-site count against the 9 a clean run
   reports.
 
-### [workouts][platform] LB-187 — the AI builder's review screen has no browser coverage at all, and it is where a generated program is committed
-
-- **Lane: B** — `e2e/`, a new spec against `components/workout-builder/builder-review.tsx`.
-- **Added:** 2026-09-29 · Lane B, while closing `LA-183`'s builder half.
-- **Nothing in `e2e/` reaches this screen** — `grep -l 'generate-program' e2e/` is empty — yet it is
-  the single point at which an AI-generated program is written to the database, and it carries real
-  editing: swap an exercise, change a role, reorder, add, drop, and the style/volume projection.
-  `LA-183`'s builder fix landed with unit tests and a source guard because of this, not instead of it.
-- **Why it has none, and what it would take:** reaching the review means driving a **nine-step**
-  wizard and then a live Gemini generation. The spec has to `page.route` a stubbed
-  `/api/generate-program` response — which is cheap and also makes the fixture exact, so a style-less
-  exercise can be asserted on deliberately rather than waited for. Per the Custom Rules check, an
-  `/api` stub needs `serviceWorkers: 'block'`.
-- **What it should assert, at minimum:** a generated exercise the stub leaves style-less shows a
-  sets/reps line rather than a blank one, and the program saved carries a non-null `style_id`.
-- **Cost to weigh before building it:** one more spec on a suite that hit its 45-minute ceiling four
-  days ago (`LB-166`). Nine wizard steps is not a 20-second spec, and it should be sized against the
-  shards' current wall-clock rather than added blind.
 ### [app-shell][platform] OR-115 — the admin surface has accumulated buttons nobody uses
 
 - **Lane:** B — `app/admin/**`, most of it presentational.
