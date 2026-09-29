@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.484.2",
+    date: "2026-09-29",
+    changes: [
+      "When a heart-rate zone is built on a stand-in rather than on you, the Cardio Hub and the heart-rate profile now say so. A max that fell back to a generic 190 because your age couldn\u2019t be read used to look exactly like a real age estimate.",
+      "A resting rate that has never been measured and one that failed to load now say different things \u2014 the first tells you to wear your ring overnight, the second that it should return on its own.",
+    ],
+  },
+  {
     version: "1.484.1",
     date: "2026-09-29",
     changes: [
