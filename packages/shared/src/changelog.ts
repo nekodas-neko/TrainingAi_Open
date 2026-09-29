@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.485.0",
+    date: "2026-09-29",
+    changes: [
+      "A food you have saved with a picture now shows it in the diary, instead of the placeholder tile. The pictures were already being stored on the device and nothing ever read them back.",
+      "Foods without a picture keep the tile, so the list does not go ragged.",
+    ],
+  },
+  {
     version: "1.484.2",
     date: "2026-09-29",
     changes: [
