@@ -490,29 +490,6 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [workouts] LB-186 — the program editor adds an exercise with NO progression style, and nothing ever requires one
-
-- **Lane: B** · **Added:** 2026-09-28 · Orchestrator, root-causing `LA-173` ③ after the owner asked
-  why the styleless slots were not assigned automatically.
-- **The cause, verified link by link.** `components/config/program-editor-sheet.tsx:218` —
-  `addExercise` creates `{ key: nextEditKey(), name: "" }`, with no style and no default. The type
-  (`packages/shared/src/types/program.ts:53`) marks `styleId` optional; the route
-  (`app/api/workout-templates/route.ts:79-81`) checks only that a *provided* id is real; the save
-  (`lib/data/postgres/slices/programs.ts:335`) writes `styleId: ex.styleId ?? null`. **No layer
-  objects**, so a slot is styleless whenever the picker was never opened.
-- **Why it hid.** The engine falls back to the style on the exercise's **last log**, so a styleless
-  slot behaves normally while that exercise has styled history. It surfaces only when there is
-  none, or when a path needs a non-empty style.
-- **What it already cost.** `BF-200`: the Q-185 deload override required a non-empty style, skipped
-  Barbell Skull Crusher and prescribed **3 × 30 kg — his ordinary working weight — in a deload
-  week**, while the other four Upper exercises lightened correctly.
-- **The fix is a default, not a validation error.** Give a newly-added exercise the style its
-  **role** already uses in that program (accessories `Hypertrophy 3-set` or `General`, primaries
-  `Powerbuilding` on his data), with the picker still free to change it. **Blocking the save
-  instead would be worse** — it turns a silent gap into a wall in front of a half-built program.
-- **What proves it fixed:** add an exercise in Config, save without touching the style picker, and
-  confirm the stored `style_id` is non-null.
-
 ### [workouts] LA-177 — backfill the nine styleless slots in the active program
 
 - **Lane: A** · **Added:** 2026-09-28 · Orchestrator, splitting the data half out of `LA-173` ③.
