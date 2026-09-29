@@ -490,30 +490,6 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [workouts] LA-177 — backfill the nine styleless slots in the active program
-
-- **Lane: A** · **Added:** 2026-09-28 · Orchestrator, splitting the data half out of `LA-173` ③.
-- **Nine slots in `Bankai` (active) have `style_id IS NULL`** — 7 accessory (Hanging Leg Raise,
-  Cable Chest Dips, Face Pull, Cable Lying Leg Curl, Barbell Skull Crusher, Dumbbell Calf Raise,
-  Cable Seated Leg Curl), 1 primary (**Barbell Hip Thrust**) and 1 secondary (Dumbbell Bulgarian
-  Split).
-- **Assign by ROLE, not one style for all nine.** His accessories run `Hypertrophy 3-set` (17
-  slots) and `General` (15); his primaries run `Powerbuilding` (13). Barbell Skull Crusher itself
-  already carries `Hypertrophy 3-set` in one session and `General` in another, so **the exercise
-  has no single right answer and only the slot does**.
-- **Needs:** LB-186
-- **⛔ Do this AFTER `LB-186`, or it comes straight back** — backfilling while the editor still adds
-  styleless exercises fixes nine and permits the tenth. That ordering is the whole reason these are
-  two entries.
-- **Out of scope: the five unstyled primaries in `Main`** (Squat, Deadlift, Bench, Incline Bench,
-  Bent-Over Row). That program is **inactive**; counting them would inflate this from nine to
-  fourteen.
-- **This is an ADD/backfill on production data, which is authorised** — snapshot first and print the
-  affected-row count against the nine predicted, stopping on a mismatch.
-- **Method for re-deriving the nine:** `claude_ro.session_exercises` joined to
-  `program_sessions`/`programs`, `deleted_at IS NULL`, `is_active`, `style_id IS NULL`.
-
-
 ### [readiness][heart-rate][activity][workouts] LA-171 — five runs and checks Lane A shipped on 2026-09-28 that need the phone or an admin session
 - **Lane: DV** — handed over by the owner's instruction on 2026-09-28 (*"Assign whatever tasks you
   can to DV agent — it can do most of these mechanical tasks"*). The phone's WebView holds the
@@ -766,24 +742,6 @@ below threshold and left in place for next time.
   underneath it. Re-run before anyone reads that green.
 - **Reversal cost:** a shipped second credential path is expensive to withdraw — anything already
   holding a token keeps working until it expires. That asymmetry is why the merge is the owner's.
-
-### [workouts] LA-182 — nine exercises in his program have no progression style: he assigns them in Config
-
-- **Lane: O** · **Added:** 2026-09-29 · Lane A, closing BF-217.
-- **What he needs to do, about two minutes:** in Config → Bankai, give a style to each of these nine
-  exercises, whose style picker is blank:
-  - **Lower:** all five;
-  - Legs: Cable Lying Leg Curl;
-  - Pull: Face Pull;
-  - Push: Cable Chest Dips;
-  - Upper: Barbell Skull Crusher.
-- **Why it matters even though Bankai is AI-dynamic:** the AI picks a style each session, but the
-  rules fallback (used when he turns **Full** back on after a deload, and when the AI is
-  unavailable) skips any exercise without one. **Lower's Full toggle does nothing until these are
-  set.**
-- **Recommendation:** use the style each one was last logged with (Hypertrophy Plus, Hypertrophy
-  3-set or Powerbuilding), or his usual one. Any style fixes the fallback; the AI still chooses
-  per session. **Reversal cost: none.**
 
 ### [workouts] BF-219 — Cable Preacher Curl has been prescribed 13.75 kg four times and returned RPE 10 three of them, with the reps falling 9 → 8 → 7 → 6
 - **Lane:** T — a load-selection calibration, so a Tuning proposal is owed before anyone builds it. Implementation lane afterwards is A (`packages/shared/src/1rm.ts`, `packages/shared/src/ai-periodization/`).
