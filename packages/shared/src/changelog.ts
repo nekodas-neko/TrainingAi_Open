@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.486.0",
+    date: "2026-09-29",
+    changes: [
+      "Rate a set RPE 9 or 10 and fall short of its reps, and the next set now offers a lighter weight \u2014 one tap fills the dial in. The app already worked this out when it built next week's plan; it just never said so during the session.",
+      "It offers and never applies: ignore it and the set is exactly as prescribed. The reason it gives is the same sentence next week's adjustment would have used, so the two can't disagree.",
+      "A set you didn't rate suggests nothing, and deload and baseline weeks are left alone.",
+    ],
+  },
+  {
     version: "1.485.2",
     date: "2026-09-29",
     changes: [
