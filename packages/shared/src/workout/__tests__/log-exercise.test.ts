@@ -151,6 +151,23 @@ describe('logExerciseFromPayload — ai_dynamic deload PR gate (AI-8)', () => {
     expect(result.isPR).toBe(true)
   })
 
+  // TN-75: an AI-dynamic calibration session is stored as 'baseline', matching workout-data's test.
+  it('stores an unfinished ai_dynamic baseline as the session phase, and a finished one as nothing', async () => {
+    getActiveProgramWithPhases.mockResolvedValue(null)
+    getActiveProgram.mockResolvedValue({ id: 'p1', phaseMode: 'ai_dynamic' })
+    getSessionPeriodization.mockResolvedValue({ phase: 'baseline', baselineComplete: false } as never)
+    await logExerciseFromPayload('u1', basePayload, TZ)
+    expect(createWorkoutSession).toHaveBeenLastCalledWith(
+      'u1', 'ps-1', 'Push', expect.any(Date), undefined, 'baseline', false,
+    )
+
+    getSessionPeriodization.mockResolvedValue({ phase: 'baseline', baselineComplete: true } as never)
+    await logExerciseFromPayload('u1', basePayload, TZ)
+    expect(createWorkoutSession).toHaveBeenLastCalledWith(
+      'u1', 'ps-1', 'Push', expect.any(Date), undefined, undefined, false,
+    )
+  })
+
   it('skips the session_periodization lookup for non-ai_dynamic programs', async () => {
     getActiveProgramWithPhases.mockResolvedValue(null)
     getActiveProgram.mockResolvedValue({ id: 'p1', phaseMode: 'manual' })
