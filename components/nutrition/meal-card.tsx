@@ -12,6 +12,7 @@ import { FoodRow } from './food-row'
 import { DiaryMealGroup } from './diary-meal-group'
 import { groupDiaryEntries, sumLogs, type DiaryEntry } from './diary-groups'
 import type { SavedMealSummary } from '@/lib/hooks/use-saved-meal-summaries'
+import { foodSecondaryLine } from './food-name-line'
 
 interface Props {
   mealType: MealType
@@ -162,7 +163,7 @@ function logAmountLabel(log: FoodLogWithItem): string {
   const servingG = log.foodItem.servingSizeG ?? 0
   const q = Math.round(log.quantityMultiplier * 100) / 100
   const amount = `${q} ${q === 1 ? 'serving' : 'servings'}${servingG > 0 ? ` · ${Math.round(servingG * log.quantityMultiplier)} g` : ''}`
-  return log.foodItem.brand ? `${log.foodItem.brand} · ${amount}` : amount
+  return foodSecondaryLine(log.foodItem.brand, amount) ?? amount
 }
 
 /**

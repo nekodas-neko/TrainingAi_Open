@@ -10,6 +10,7 @@ import { SavedMealResults } from './saved-meal-results'
 import { matchSavedMeals } from './saved-meal-flatten'
 import { SegmentedTabs } from '@/components/ui/segmented-tabs'
 import type { ExternalFood } from '@/lib/hooks/use-food-database-search'
+import { foodSecondaryLine } from './food-name-line'
 
 interface Props {
   query: string
@@ -250,10 +251,13 @@ const SearchResultRow = memo(function SearchResultRow(
 ) {
   const press = useCallback(() => onAdd(item), [item, onAdd])
   const serving = (item.servingSizeG ?? 0) > 0 ? `${Math.round(item.servingSizeG!)} g serving` : 'serving'
+  // RV-208 ⑤. This row dropped the brand ENTIRELY, which is the same divergence as putting it
+  // first: the food-database results and Recent both name it, so one library list identified a
+  // food and its sibling did not. The brand leads the secondary line here, as everywhere else.
   return (
     <FoodRow
       name={item.name}
-      secondary={`${Math.round(item.proteinG ?? 0)}g P per ${serving}`}
+      secondary={foodSecondaryLine(item.brand, `${Math.round(item.proteinG ?? 0)}g P per ${serving}`)}
       calories={item.calories}
       onPress={press}
     />
