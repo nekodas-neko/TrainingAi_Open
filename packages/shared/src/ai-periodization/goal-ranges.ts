@@ -57,6 +57,22 @@ function accessoryRange(trainingGoal: string): GoalRange {
   }
 }
 
+/**
+ * BF-221. An accessory's reps and load, settled against its goal band.
+ *
+ * The model's reps are clamped to the band FIRST and the load is derived from the target effort at
+ * those reps. The band's pct edges come from the same `pctForExpectedRpe` at the rep edges, so the
+ * derived load lands inside the band with no second clamp. Before this the reps were taken from the
+ * model unchecked, and 7 reps on a powerbuilding accessory derived 77.5 %, outside the band on both
+ * axes. The 40–85 bound is the pre-existing sanity clamp and does not bind inside any band.
+ */
+export function settleAccessory(trainingGoal: string, reps: number): { reps: number; pct: number } {
+  const { repMin, repMax, targetRpe } = accessorySpec(trainingGoal)
+  const settled = Math.min(repMax, Math.max(repMin, reps))
+  const pct = pctForExpectedRpe(targetRpe, settled)
+  return { reps: settled, pct: Math.min(85, Math.max(40, pct)) }
+}
+
 // Goals whose SECONDARY compounds train a moderate step below the primary anchor (kept in sync
 // with prompt.ts MODERATE_SECONDARY_GOALS / secondaryIntensityZone). Only listed goals differ;
 // everything else falls through to COMPOUND (secondary == primary, e.g. strength).

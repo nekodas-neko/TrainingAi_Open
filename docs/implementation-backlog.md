@@ -490,38 +490,35 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [sleep][readiness] OR-204 — ship the Sleep Score partial-data flag, which never needed the owner
+### [readiness][app-shell] OR-206 — the morning check-in compares to "normal", not to yesterday
 
-- **Lane: A** · **Added:** 2026-09-29 · Orchestrator, splitting the buildable half out of `Q-72`.
-- **`Q-72` is gated on the owner and says, in its own words, that this half is not:** *"The
-  partial-data flag does not depend on this and can ship."* The gate is real for the other half —
-  whether he will rate sleep again, or wants a different yardstick — but it **parks the whole
-  entry**, so a shippable change has been sitting behind a question it does not depend on.
-- **What stays with `Q-72` and is genuinely his:** Review sweep 56 measured, on production, that of
-  36 mornings since 08-18 **35 hold the neutral 3 untouched and 1 is null — 0 real sleep ratings
-  under the new model.** So the three-week rank re-validation has nothing to rank, and **the clock
-  cannot unblock it**; only he can, by rating sleep again or naming a different yardstick.
-- **Why split rather than ungate `Q-72`:** ungating would put the owner question back into the
-  READY list as though it were buildable, which is the inversion `CLAUDE.md` warns about. Two
-  entries keep both true — this one startable, that one correctly parked.
-- **Read `Q-72` before building**, for the model context; this entry is the flag only.
+- **Lane: B** · **Added:** 2026-09-29 · Orchestrator, from the owner on the S25:
+  *"I dont like the comparison to the yesterday. Maybe comparison to \"normal\". So about the same;
+  better or worse. With it default selected to about the same."*
+- **① The wording change is his call and is not in dispute.** `components/checkin/vs-yesterday-picker.tsx`
+  asks *"Compared to yesterday"*; he wants *compared to normal*. Same three options, same order.
+  **Rename the component and the field with it** — `vsYesterday` / `day_checkins.vs_yesterday` stop
+  describing what is being asked the moment the prompt changes, and a field whose name contradicts
+  its question is how the next reader gets it wrong.
+- **⚠ IT CHANGES WHAT THE STORED HISTORY MEANS, and nothing currently marks the boundary.** Rows
+  written before the change answer *"vs yesterday"*; rows after answer *"vs normal"*. These are
+  different questions and **must not be pooled in one trend**. Whatever ships needs a marker — a
+  new column, or a recorded cutover date Tuning can split on. **This is the engineering half and it
+  is not optional**, because the field feeds a scoring input.
+- **⛔ ② THE DEFAULT SELECTION CONTRADICTS `TN-58`'s CENTRAL DESIGN — put to the owner 2026-09-29,
+  not yet answered.** That entry has **no default and no pre-selection**, deliberately, and the
+  picker's own comment says the reason: the absolute 1–5 control it replaced produced **two
+  distinct values across 96 check-ins, sd 0.29**, and *"a neutral stored as though it were an
+  answer is the defect TN-57 just fixed"*. `day_checkins.vs_yesterday` has **no column default** for
+  the same reason, so a skipped answer stays NULL and reads as *not answered*.
+  **The cost of defaulting, stated plainly:** the sheet writes only on Save, but Save is one tap, so
+  a pre-selected neutral makes a reflexive Save indistinguishable from a considered *"about the
+  same"* — which is the degeneration `TN-58` exists to escape, under a new name.
+  **`e2e/tn58-vs-yesterday-no-default.spec.ts` asserts nothing is selected on open**, so ② cannot
+  ship without deciding what happens to that test. **Do not delete it to make the change pass.**
+- **The owner's preference wins if he reaffirms it** — it is his product call. Build ① now; hold ②
+  until he answers, since the two are independent.
 
-### [platform] OR-205 — the AI confidence value gates an automatic action, which a standing rule already forbids
-
-- **Lane: A** · **Added:** 2026-09-29 · Orchestrator, splitting `PS-31` (e).
-- **`PS-31` (e) carries two questions and files both as the owner's. Only one is.** The model's
-  `confidence` is (i) **used to decide `source`** (`lib/.../log-food.ts:31`) and (ii) rendered to
-  the owner as an "AI confidence" bar.
-- **(i) is not a decision — the rule already made it.** `CLAUDE.md`'s AI defaults: *"no LLM
-  self-reported number (confidence, totals) may gate an automatic action."* A value deciding
-  `source` is gating an automatic action, so **this half is a defect to fix, not a preference to
-  ask about.** Replace it with a deterministic rule, or make the behaviour independent of the
-  model's self-report.
-- **(ii) stays with `PS-31` and is genuinely his** — the rule forbids showing such a number *as
-  fact*, and the bar is honestly labelled as the model's own confidence, so whether it earns its
-  place on the screen is a display preference the repo cannot answer.
-- **Do not "fix" (ii) while here.** Removing a surface he may want is the failure this split exists
-  to avoid.
 
 
 ### [platform] OR-203 — the database grew 3× its trend for six days, and no per-table baseline exists to say which table did it
@@ -560,6 +557,23 @@ below threshold and left in place for next time.
   reading cannot separate a step change from a burst — **six days is a short window, and a single
   heavy sync day would move it** — so the first job is to establish whether the rate persists,
   not to act on 4.8 MB/day as if it were the new steady state.
+- **Second read, Lane A, 2026-09-29 22:06 UTC (08:06 Brisbane on 09-30), about a day after the
+  baseline: 261.5 MB. Flat.** Every table in the list is within 0.5 MB of the baseline. One day
+  proves nothing about the rate, which is why this entry stays open.
+- **What the six-day window did NOT contain: a faster writer.** Daily inflow by row timestamp,
+  read the same session:
+  - `oura_raw_packed`: 0.23–0.37 MB/day, every day from 09-14 to 09-29.
+  - `oura_raw_samples`: 20–27k rows/day, holding a normal hot window of **180,345 rows** from 09-22.
+  - `oura_heartrate` and `rr_intervals`: in their usual worn/unworn pattern, with no burst day.
+
+  So the +29 MB is not new data arriving faster. **The likeliest non-row candidate is index growth
+  on the churning hot window.** `oura_raw_samples_user_tag_ts` is **20 MB for 180k three-column
+  keys, about 3× a tightly packed btree**. The packer deletes sealed buckets all day, and a btree
+  does not return emptied pages. Its heap is 33 MB and its indexes 47 MB. This is a lead, not a
+  finding, because nothing recorded that index's size on 09-23 to compare with.
+- **Next read, on or after 2026-10-03:** the same per-table query plus
+  `pg_stat_user_indexes` for `oura_raw_samples`. Growth in that index alone would confirm it, and a
+  `REINDEX CONCURRENTLY` of it would be the remedy, which is a structural call and not the owner's.
 - **Then the standing question stays the same:** act on a departure from the SHAPE — a retention
   window that stopped reclaiming — not on the daily figure. `rr_intervals` reaching its cap in late
   October is the next scheduled step down, and **a step that does not arrive is the signal**.
@@ -784,76 +798,57 @@ below threshold and left in place for next time.
   preference question, which is why it is being asked rather than decided.
 - **Blocks nothing.** RV-212 ①② shipped without it.
 
-### [platform] BF-213 — inbound PR #1608 (HealthKit storage) owes a diff read from Review and a merge from the owner
-
-- **Lane:** O — an inbound PR is routed, not built: **Review** reads the diff and posts the review,
-  the **schema half is Lane A's**, and the **merge is the owner's** (outside contributor, storage
-  carve-out). Filed `O` because the lane field takes a letter and no Review letter exists.
-- **Added:** 2026-09-27 · BugFix, per OR-185's GitHub watch. Filed so Review has the finding rather
-  than re-deriving it; the diff read is still Review's.
+### [platform] BF-224 — the two inbound PRs merged unreviewed, and one of them is live auth: a bearer token with the session cookie's own 7-day life
+- **Lane:** O — the diff read is **Review's**, and the one judgement in it (bearer lifetime) is the **owner's**, being auth. Filed `O` because the lane field takes a letter and there is no Review letter. Nothing here is Lane A's until a decision lands.
+- **Added:** 2026-09-29 · BugFix, third firing of OR-185's inbound watch. Replaces `BF-212` and `BF-213`, both removed: they routed PRs that have now merged, so they were finished entries sitting in the queue.
 - **Needs:** — nothing.
 
-- **CURRENT STATE, read 2026-09-28 22:56 on head `5d680b16`. Nothing is blocking; the diff read is
-  all that is owed.** The PR adds `apple_health_samples` — a user-scoped table with soft deletes,
-  four CHECK constraints and a partial history index — plus its Drizzle definition and both
-  `export-map.ts` rows (`SOFT_DELETED` and `EXPORTED`). **All ten CI jobs completed and success**,
-  Migration Check included.
-  **The green is NOT stale, checked rather than assumed:** no commit on `main` has touched
-  `lib/data/postgres/claude-ro-views.sql` or added a migration since his run at 08:43Z, so the one
-  shared file this PR edits has not moved underneath it.
+- **What happened.** `jsboiss` merged **both** his PRs himself at **10:25 on 2026-09-29** — `#1607`
+  (bearer tokens for native login) and `#1608` (HealthKit sample storage). That is entirely his to
+  do and this entry does not dispute it. **The point is that the review `BF-212` said was owed never
+  happened, and `#1607` is the auth carve-out**, with the owner listed as a requested reviewer who
+  did not review. It is deployed.
 
-- **⚠ THIS ENTRY HAS BEEN WRONG TWICE, BOTH TIMES BECAUSE THE CONTRIBUTOR FIXED IT FIRST.** The
-  history, compressed, because three contradicting layers were harder to read than the outcome:
-  ① Filed 09-27 saying the PR took migrations **288/289**, which `main` already held, and that the
-  later-sorting `claude_ro` twin would silently drop the new view. True when written.
-  ② Corrected 09-27 22:56 — he had renumbered to **290/291** and regenerated the twin *after*
-  applying, which is the ordering that matters.
-  ③ Corrected again 09-28 22:56 — **the numbered scheme is gone from this PR entirely.** He has
-  adopted BF-214's conventions: the migration is `202609280817_apple_health_samples.sql` (the
-  `YYYYMMDDHHMM_<what>` form) and the views are an **in-place edit of the single
-  `claude-ro-views.sql`**, not a numbered twin. So there is no number left to collide on, and this
-  entry's prediction that "its `291_claude_ro_views_…` twin must be deleted once BF-214 merges" was
-  satisfied by the author without being asked.
-  **The lesson worth keeping is procedural, not technical:** an entry describing an inbound PR
-  describes a moving object, and re-reading the PR costs one call. Read before citing it.
+- **⚠ It merged on a STALE green, and the sweep is meant to say so plainly.** `#1607`'s only CI run
+  is **2026-09-25, six jobs with a single `Tests`** — from before the suite was sharded into four.
+  `main` took four days and a CI topology change between that run and the merge. All six passed;
+  none of them ran against the tree it landed on. (`#1608`'s green was current — checked 09-28, ten
+  jobs, and `main` had not touched its one shared file since.)
 
-- **⚠ Separately, a REAL collision that is OURS, not his** — `273` and `274` are claimed by both
-  `main` (merged, `273_exercise_media_review_status.sql`) and
-  `origin/lane-a/q44-phase3-pr1-table-rename`, a branch with no open PR. A dead branch reads as a
-  reservation to any tool that scans refs. Delete the branch or leave it; do not renumber for it.
-  Recorded so it is not lost. Not this entry's work.
+- **The diff is 23 lines and most of it is careful.** `app/api/auth/exchange-mobile-token/route.ts`:
+  `responseType` is allowlisted to `cookie`/`token` with a 400 otherwise; the session is verified
+  through `getToken` — decrypt plus an explicit `exp` check — before anything is returned; the
+  response carries `Cache-Control: private, no-store`; the cookie path is untouched. The author's
+  claim that the cookie login is preserved holds.
 
-- **Scope: storage ONLY. 4 files, +89/−1, `mergeable_state: clean`, and the owner is already a
-  requested reviewer.** The author's own summary — *"it doesn't change syncing or calculations"* —
-  matches the diff: there is **no ingest route in this PR**, so nothing writes the table yet.
-- **What Review should look at, since the schema is the whole substance.** The
-  `apple_health_samples_payload` CHECK requires a live row to carry either a quantity or a category
-  and never both, and exempts a tombstone — the question is whether that matches what the future
-  sync endpoint will actually write, because a CHECK is expensive to loosen once rows exist. The
-  table is keyed `(user_id, sample_id)` with `sample_id` supplied by the client; the composite key
-  scopes it to the user, so the cross-user hazard in `CLAUDE.md`'s write-path discipline does not
-  apply here — but it becomes the thing to check on the follow-up PR that adds the route, and that
-  route needs its Zod schema at creation per the ingest rule.
-- **Reversal cost:** none here — nothing has merged, and the table has no writer.
+- **⭐ THE ONE THING THAT NEEDS A DECISION: the bearer token IS the session cookie's value, with the
+  cookie's lifetime.** `accessToken: sessionCookieValue` and `expiresAt: session.exp`, against
+  `session: { strategy: "jwt", maxAge: 7 * 24 * 60 * 60 }` (`auth.config.ts:9`). So one credential
+  now exists in two containers with very different properties: a cookie is `httpOnly`, `SameSite`
+  and confined to the browser; a bearer token is *deliberately handed to a native app to store and
+  replay*, for up to seven days, and being a stateless JWT **nothing can revoke it before `exp`** —
+  the once-a-day `refreshIsActiveClaim` is the only lever, and it only covers account deactivation.
+- **⚠ AND THE ALARMING VERSION OF THIS IS WRONG — checked, because it nearly went in this entry.**
+  The session JWT *does* carry the Google refresh token (`auth.config.ts:45`,
+  `token.refreshToken = account.refresh_token`), which is what `RV-193` exists to keep out of the
+  session JSON. **But the JWT is ENCRYPTED, not merely signed** — verified against the pinned
+  source, `@auth/core@0.41.3` `jwt.ts:52-53`, `alg: "dir"`, `enc: "A256CBC-HS512"`, JWE. A client
+  holding this token **cannot read what is inside it**. So this is not `RV-193` reaching a new
+  surface; it is an opaque session credential in a weaker container. That distinction is the whole
+  severity of the finding and it should not be restated without the citation.
+- **Recommendation for the owner, one line:** give the token branch its own shorter expiry rather
+  than inheriting the cookie's seven days — the client can re-exchange, and the exposure window is
+  the only thing that meaningfully changes. Alternatives: **leave it** (better at not breaking a
+  client already built against it, and defensible — the token is opaque, verified and rate-limited),
+  or **a revocable token type** (better at the revocation gap, and loses because it puts session
+  state in the database for one client).
+- **Reversal cost: low.** One expiry value in one branch of one route.
 
-### [platform] BF-212 — inbound PR #1607 adds a second credential path, and `Q-1a` covers the same area
-
-- **Lane:** O — **Review** reads the diff and posts the review; the **merge is the owner's** (auth,
-  outside contributor — both halves of that carve-out at once). Filed `O` for the same reason as
-  `BF-213`: the lane field takes a letter and there is no Review letter.
-- **Added:** 2026-09-27 · BugFix, per OR-185's GitHub watch.
-- **Needs:** — nothing.
-- **What it is:** `#1607` (`native-token-exchange`, `jsboiss`) returns an opt-in bearer token with an
-  expiry beside the existing cookie login, for an Expo/React-Native iPhone client. The author states
-  the cookie path is preserved.
-- **Check it against `Q-1a` before reviewing** — same area, client half. TN-80 already flags a
-  conflicting design as the likely finding, and two credential paths that disagree about session
-  lifetime is the shape to look for.
-- **Its CI green is STALE and must not be read as current.** The run is from **2026-09-25** and
-  executed a single `Tests` job; every PR since runs four shards, so the workflow has changed shape
-  underneath it. Re-run before anyone reads that green.
-- **Reversal cost:** a shipped second credential path is expensive to withdraw — anything already
-  holding a token keeps working until it expires. That asymmetry is why the merge is the owner's.
+- **What Review should read, now that it is post-merge.** The route above, whether any client is
+  already exchanging with `responseType: 'token'`, and whether `#1608`'s
+  `apple_health_samples_payload` CHECK matches what the future sync endpoint will write — that
+  table is on `main` with **no writer**, so the constraint is still free to change and will not be
+  once rows exist.
 
 ### [workouts] BF-219 — Cable Preacher Curl has been prescribed 13.75 kg four times and returned RPE 10 three of them, with the reps falling 9 → 8 → 7 → 6
 - **Lane:** T — a load-selection calibration, so a Tuning proposal is owed before anyone builds it. Implementation lane afterwards is A (`packages/shared/src/1rm.ts`, `packages/shared/src/ai-periodization/`).
@@ -896,7 +891,7 @@ below threshold and left in place for next time.
   **What stands is the oscillation, and the table is still the evidence**: 66% → RPE 6 (too light)
   → plan raises to 77.5% → RPE 10 (too heavy) → back to 66%. That is a return to the load he
   already found too easy, not a settling, and five weeks of this have produced no intermediate
-  value. **What the swing has never visited is the middle of the band** — see BF-221, which is why
+  value. **What the swing has never visited is the middle of the band** — see BF-221 (shipped 2026-09-30: accessory reps now clamp to the band, so 77.5% × 7 is no longer reachable), which is why
   the heavy end was reachable at all.
 
 - **The 1RM is the number to examine first.** Stored `estimated_1rm` was **17** after 09-21, and
@@ -923,124 +918,6 @@ below threshold and left in place for next time.
 - **Not diagnosed here.** Whether the 66 → 77.5 change came from the model or the rules prescriber.
   The stored plan is the AI one (`Accumulation`, confidence 80%), but which component chose the pct
   was not traced, and it decides whether this is a prompt problem or a formula problem.
-
-### [workouts] BF-220 — he told the app the set was too heavy and the next set did not move: RPE reaches nothing until the following week's prescription
-- **Lane:** B — `components/workout-screen.tsx`, `components/workout/active-workout-screen.tsx`. The shared decision function already exists; nothing new is needed in the engine for the minimal version.
-- **Added:** 2026-09-29 · BugFix intake. Owner, mid-rest on Pull: *"This was too heavy for me … would be nice to be able to tell coach then and there if thats on the list of possibilities."*
-- **Needs:** — nothing. Shares a cause with BF-219 but is separately buildable and separately useful.
-
-- **He already told it, which is the part that makes this worth building.** He logged set 1 as
-  `13.75 kg × 6` at **RPE 10 · Maximum** against a prescribed 7. The next card on the same screen
-  still read **`2 · 13.75 kg × 7 reps · ↑ up next`** — unchanged. The signal he is asking to send
-  is one the app already captured and then did nothing with for a week.
-
-- **Confirmed: there is no within-session reaction to RPE at all.** `computeRpeAdjustment`
-  (`autoregulation.ts:56`) has exactly **two** call sites in the repo — its own definition and
-  `autoregulation.ts:141` — and that runs at prescription-generation time. No workout-screen path
-  consults RPE for anything. So the answer to *"is that on the list of possibilities?"* is that it
-  is not currently possible, not that it is hard.
-
-- **The rule that would fire is already written and already agrees with him.** Today's set meets
-  the back-off condition exactly — `rpeDelta ≥ RPE_DEAD_BAND` **and** `missedReps` (6 of 7) — and
-  would return *"−N% load — RPE ran high and you fell short of the prescribed reps"*
-  (`:65–77`), sized 5–10% by how far the reps fell short. **The app knows the set was too heavy the
-  moment he logs it.** It just waits until next week to say so.
-
-- **⭐ Recommend the smallest version: offer, do not apply.** After a logged set whose RPE and rep
-  completion trip the existing back-off condition, show a one-tap suggestion on the next set card —
-  *"That was RPE 10 and 6 of 7. Drop set 2 to 12.5 kg?"* — pre-filling the weight dial rather than
-  changing the plan. Why this shape:
-  - It reuses `computeRpeAdjustment` unchanged, so the in-session answer and the next-week answer
-    can never disagree — which they would the moment a second rule was written for the same job.
-  - It never silently rewrites a session he is in the middle of. A suggestion he ignores costs him
-    one glance; an automatic change he did not want costs him the set.
-  - It is a client-side read of data already on screen. No route, no schema, no model call, works
-    offline — which matters, because this fires in a gym.
-- **Alternatives, with what each is better at:**
-  - **Apply it automatically.** Better at getting the load right for someone who will not tap.
-    It loses because the first time it drops a load he wanted to keep, he stops trusting the
-    number on the card — and this is the screen he cannot afford to distrust.
-  - **A free-text "tell the coach" box mid-workout.** Better at capturing *why* (an injury, bad
-    sleep, a machine at a different setting) which RPE alone cannot express. It loses as the
-    FIRST thing to build: it needs a model call in a gym with bad signal, and it asks him to type
-    between sets to say something the RPE picker already said in one tap. Worth its own entry
-    later, not this one.
-  - **Feed it into the NEXT exercise too, not just the next set.** A reasonable extension, and
-    deliberately out of scope until the single-exercise case has been used for a few sessions —
-    one exercise feeling heavy is weak evidence about the next one.
-- **Reversal cost: low.** A suggestion chip behind a condition that already exists; deleting it
-  removes the feature and nothing else.
-
-- **Done when** a set logged at high RPE that misses its prescribed reps produces a visible,
-  dismissible load suggestion on the next set card of the same exercise, the number matches what
-  `computeRpeAdjustment` would apply next week, and declining it leaves the session untouched.
-  **Device look owed** — this is a screen he reads mid-set with a rest timer running, so the
-  suggestion must not shift the layout or compete with `Start Set 2`.
-
-### [workouts] BF-221 — the accessory rep band is advice to the model and a constraint on nothing: 7 reps at 77.5% is outside it on both axes
-- **Lane:** A — `packages/shared/src/ai-periodization/generate-prescription.ts:591` and the accessory branch at `:594–598`.
-- **Added:** 2026-09-29 · BugFix intake. Owner, reading his own Pull card: *"If its accessory shouldn't it have reps towards the 12+ rep range?"*
-- **Needs:** — nothing. Shares a symptom with BF-219; this is the code half and is buildable now.
-
-- **He is right, and the band is explicit.** His active program `Bankai` is `powerbuilding`, and
-  `goalRange('powerbuilding', 'accessory')` returns **66–75% · 8–12 reps** (run, not read —
-  `ACCESSORY_SPEC` is `{ repMin: 8, repMax: 12, targetRpe: 8.0 }`, `goal-ranges.ts:35`). He was
-  prescribed **77.5% × 7**: below the rep floor AND above the pct ceiling.
-
-- **The two violations are ONE violation, and that is the insight.** The accessory branch derives
-  load from the target effort at whatever reps it was handed:
-  `pct = pctForExpectedRpe(accessoryTargetRpe(goal), a.reps)` (`:597`). Holding RPE 8 constant,
-  fewer reps means heavier — so **dropping below the rep floor mechanically pushes the load above
-  the pct ceiling**. Fixing the reps fixes the load for free; fixing the load alone would leave
-  the rep count wrong and reintroduce the same pct next time.
-
-- **Nothing enforces the band on this path. Measured, by following every consumer of
-  `goalRange`** — there are three:
-  | consumer | what it does |
-  |---|---|
-  | `prompt.ts:96` | puts the range in the **prompt**. A request to the model, not a constraint. |
-  | `autoregulation.ts:150` | `clamp(ex.reps + adj.repDelta, band.repMin, …)` — **only when `adj.repDelta !== 0`**, i.e. only when an autoregulation adjustment actually fires. |
-  | `builder-review.tsx:566` | display only. |
-  Otherwise `ex.reps = a.reps` (`:591`) takes the model's number **unchecked**, and the accessory
-  pct clamp is `Math.min(85, Math.max(40, pct))` — **40–85, not the band's 66–75**.
-
-- **The primary and secondary branches DO clamp; the accessory branch is the only one that does
-  not.** Both others call `clampPrescribedPct(a.pct, exZone)` against
-  `intensityZoneForRole(...)` (`:605–620`) — whose own comment calls it "this clamp". The
-  accessory branch skips it by design, because accessories float to an RPE target rather than a
-  fixed band. **That design is sound and is not what this entry argues against.** The gap is that
-  floating the LOAD was implemented without ever constraining the REPS it floats against.
-
-- **It is live on a second exercise right now.** Read at 2026-09-29 08:20 from the prescription
-  regenerated at `22:16:34Z`: **Pull-Up, accessory, 77.5% × 7** — the same out-of-band pair, still
-  pending. Face Pull sits at `66% × 12`, the band's light edge, and is in band.
-
-- **⭐ Recommend clamping reps to the band at `:591`, before the pct is derived.** One line, the
-  same `clamp(a.reps, band.repMin, band.repMax)` that `autoregulation.ts:150` already applies on
-  its own path — so the constraint reads identically wherever it appears, and the accessory pct
-  then lands inside 66–75 on its own with no second clamp to keep in sync.
-- **Alternatives, with what each is better at:**
-  - **Tighten the accessory pct clamp to the band** instead. Better at bounding the load directly,
-    which is what the lifter feels. It loses because it treats the symptom: the reps stay wrong,
-    the derived pct gets overridden, and the prescription then claims an effort it is not
-    delivering — worse than the current state, which is at least self-consistent.
-  - **Strengthen the prompt.** Cheapest, and better if the model is usually right and rarely
-    strays. It loses because a prompt cannot be a guarantee, and this band is the kind of thing
-    that should hold whatever the model returns — the primary and secondary branches already made
-    that judgement.
-  - **Reject and re-ask the model on an out-of-band plan.** Better at preserving the model's
-    intent. It loses on cost (a second call, in a gym) to reach a number a clamp produces for free.
-- **Reversal cost: low.** One clamp, removable in a line; the band already exists and is already
-  the authority elsewhere.
-
-- **Done when** an accessory in a `powerbuilding` program cannot be prescribed outside 8–12 reps,
-  the derived pct consequently lands inside 66–75 with no additional clamp, and a regression test
-  feeds a deliberately out-of-band model response through and asserts both.
-
-- **Not diagnosed here.** Why the model chose 7 for two accessories while giving Face Pull 12. All
-  three are accessories in the same session and the prompt carries the same band for each; Face
-  Pull is also the one with **no progression style** (BF-217), so the difference may be a style
-  effect rather than a model whim. Worth one look before assuming the prompt is at fault.
 
 ### [platform] BF-222 — neither sensor retention prune has EVER fired, both horizons land inside ten weeks, and a failure logs where nothing reads it
 - **Lane:** A — `lib/data/postgres/slices/oura.ts:566` and `:1070`.
@@ -2282,10 +2159,15 @@ below threshold and left in place for next time.
   | **#1755** | `OR-159`+`RV-196` native security | all green (+ Android green) | **his call** |
   | **#1672** | `RV-190` read-only session leak | all green | **his call** |
   | **#1671** | `RV-191` image byte validation | all green | **his call** |
-  | **#1608** | HealthKit storage (external) | all green | **his call** — see `BF-213` |
-  | **#1607** | bearer tokens (external, auth) | green but **from 09-25** | re-run first |
+  | ~~**#1608**~~ | HealthKit storage (external) | all green | **MERGED 09-29 10:25 by `jsboiss`** |
+  | ~~**#1607**~~ | bearer tokens (external, auth) | green but **from 09-25** | **MERGED 09-29 10:25 by `jsboiss`**, on that stale green |
   **#1755 appeared in this file ZERO times** when that was measured; #1749, #1672 and #1671 appeared
   once each, inside their own closing entries rather than as items awaiting him.
+  **⚠ The two external rows are struck because the author merged them himself on 2026-09-29 — which
+  is his to do, and which means the review this register was tracking never happened.** `#1607` is
+  the auth carve-out and landed on the 09-25 green this table had already flagged as needing a
+  re-run. `BF-212` and `BF-213` are removed (finished entries do not sit in the queue); what is
+  genuinely still owed moved to **`BF-224`**, a post-merge read.
 - **Both blocked PRs report their gates passing, and both have a red REQUIRED check.** #1749's
   Migration Check reads `applied 228, skipped 0, **58 failed**`, every one `column
   t.active_calories_est does not exist` — the general form is `BF-214`. #1499's Build fails at the
@@ -4342,6 +4224,7 @@ which is the right shape for something that can only be validated by living with
 - **Lane: A** for what remains. Was `Lane: B`, with *"if the numbers come from different routes,
   the reconciliation half goes to A"* — they do, and it does.
 - **Added:** 2026-09-26 · Review sweep 64 (`p23-nutrition-warm-01/02`, `t2-day-01`, `home-nutri` crop).
+- **Needs:** LA-180 — the one open item, ①, is which number the ring's budget stands on, and that is the owner's answer on LA-180. Parked 2026-09-30 so it stops heading Lane A's READY list with nothing buildable.
 - **What the owner sees on one day:**
   - the Nutrition ring: **"0 OF 1,534"** (1,297 resting + 237 movement);
   - the "Why two numbers" card: **goal 1,660, budget 1,356, a 304 gap**;
@@ -6272,6 +6155,22 @@ drift.
   future estimates; and the replay figure is recorded here. **Device pass owed** on the resolve sheet.
 
 
+### [nutrition] LA-184 — a split meal plan always shows its rest-day variant, because nothing passes `isTrainingDay`
+- **Lane: B** — `components/nutrition/meal-plan-section.tsx` and whichever `app/nutrition/**` screen renders it.
+- **Added:** 2026-09-30 · Lane A, found while building BF-203a.
+- **Measured by grep, and `tsc` agrees:** `MealPlanSection` takes `isTrainingDay?: boolean` and hands
+  it to `pickVariant`, which chooses `'all'`, else `training` when true, else `rest`. **No caller
+  passes the prop**, so on a plan split into training and rest variants it is always `undefined` and
+  the card shows the REST variant every day, training days included.
+- **Not live for the owner today:** his only plan was soft-deleted on 2026-08-11. It bites the next
+  split plan anyone makes, and the AI generator makes split plans (`meal-plans/generate` builds
+  `training`/`rest` variants).
+- **Do:** pass today's training-day flag from the user's schedule, the same source the rest of the
+  app uses for "is today a training day". BF-203a's estimator needs the same answer server-side,
+  so the variant choice should come from one shared helper rather than two copies.
+- **Done when** a split plan shows its training variant on a scheduled training day and its rest
+  variant otherwise, with a test on the chooser.
+
 ### [nutrition] BF-203a — phase A: the `estimated` answer state, and counting it once
 - **Lane:** A — migration, `plan_meal_answers`, `packages/shared/src/nutrition/meal-estimate.ts`, `lib/health/energy-balance-service.ts`.
 - **Added:** 2026-09-26 · BugFix intake. First of BF-203's three phases.
@@ -6286,6 +6185,24 @@ drift.
   the owner reads, so it is filed as **LA-172** (`Lane: O`) with a recommendation. Also stale in
   the plan: its migration numbers (284/285) and its `claude_ro` twin step predate BF-214. Use
   `next-schema-number.js` and regenerate `claude-ro-views.sql` in place.
+- **▶ RESUMED 2026-09-30 (Lane A). Task 1, the migration, is built and ships alone:**
+  `202609292220_plan_meal_answer_estimated.sql` plus the `est_*` columns in `schema.ts` and
+  `claude-ro-views.sql`. **The plan's migration was incomplete.** Migration 187 pinned
+  `CHECK (answer IN ('no'))`, and the plan added the shape constraint without widening that one, so
+  every `estimated` insert would have been refused. This migration widens it to `('no', 'estimated')`.
+  A real-Postgres test pins all four cases (estimate with calories stored; estimate without and
+  decline with calories refused; `'yes'` still refused).
+- **The stop-check, re-run after LA-172:** the owner's only plan (4 meals × 2 variants) now maps to
+  four DISTINCT meal types, so no two slots share one. **But that plan was soft-deleted on
+  2026-08-11 and he has no active plan**, so this feature estimates nothing for him until he makes
+  one. A new plan can put two meals in one window (the nearest-window rule gives 12:00 and 13:00 the
+  same type), so Task 3 must decide what one logged meal of a shared type satisfies, rather than
+  assume it cannot happen.
+- **Task 2 built 2026-09-30:** local v45 adds the six `est_*` columns (CREATE, ALTER, RECONCILE_COLUMNS). Tasks 3-4 (`meal-estimate.ts`) and 5 (`upsertEstimatedAnswers`, decline clears an estimate) are in their own PRs. **Next: 5b/6/8**, and the pull must carry `est_*` to the device.
+  **⚠ Before Task 5,** every reader of `plan_meal_answers` treats a row as a DECLINE, because
+  until now every row was one. That covers the server reads and the device's local store after a pull. Each must
+  filter `answer = 'no'` before any `estimated` row can be written, or an estimate would hide the
+  prompt it replaces.
 - **The plan:** [`plans/2026-09-26-meal-plan-tracking-a-estimated-answers.md`](superpowers/plans/2026-09-26-meal-plan-tracking-a-estimated-answers.md) — nine tasks, TDD, with the migration shipping as its own PR.
 - **Adds exactly ONE state.** `plan_meal_answers` is declines-only (Q-187 phase 2) and gains
   `estimated` plus the macros that estimate carries. **`'yes'` is never stored** — *"I ate it stays
@@ -15407,7 +15324,7 @@ nulling the column is data-dropping, and a Redecode restores real numbers.
   **Gate:** owner for the confidence-bar DISPLAY only — narrowed 2026-09-29.
   **⚑ (e) was TWO questions and only one is his.** The half where `confidence` **decides `source`**
   is forbidden outright by `CLAUDE.md` (*"no LLM self-reported number … may gate an automatic
-  action"*), so it is a defect, not a preference — **split out as `OR-205`, buildable now.** What
+  action"*), so it is a defect, not a preference — **split out as `OR-205`, shipped 2026-09-30** (no origin now means manual; confidence is no longer an input). What
   remains here is whether the honestly-labelled bar earns its place on screen, which the repo
   cannot answer.
 - **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §P6.

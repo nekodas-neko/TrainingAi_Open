@@ -22,6 +22,8 @@ import { getLocalStore } from "@/lib/local-store";
 import { todayInTz, shiftDateStr } from "@trainingai/shared/date-utils";
 import { SessionRing, SessionPill, ExerciseClock, WarmupRampProgress, GetReadyProgress, RestTimer } from "./workout-clocks";
 import { useWorkoutStore } from "@/lib/stores/workout-store";
+import { rpeLoadSuggestion } from "./rpe-load-suggestion";
+import { RpeSuggestionPill } from "./rpe-suggestion-pill";
 import { ExerciseMediaPanel } from "./exercise-media-panel";
 import { InjuryBanner, InjuryChip } from "./injury-notice";
 import { injuredMusclesFor } from "./injury-muscles";
@@ -60,6 +62,9 @@ interface ActiveWorkoutScreenProps {
   onRpeChange?: (setIdx: number, value: number) => void;
   onRequestInjurySwap?: (exerciseIndex: number, injuredMuscles: string[]) => void;
   userId?: string;
+  /** BF-220: a deload's loads are deliberately light, so the in-session cut is not offered there.
+   *  Only the orchestrator knows this (`useDeloadChoice`), so it has to come down as a prop. */
+  isDeload?: boolean;
 }
 
 export function ActiveWorkoutScreen({
@@ -91,6 +96,7 @@ export function ActiveWorkoutScreen({
   onRpeChange,
   onRequestInjurySwap,
   userId,
+  isDeload,
 }: ActiveWorkoutScreenProps) {
   // RV-64 — read once for the screen's whole lifetime. `LiveHrChart` fetched this itself and is
   // mounted on the rest phase, so it ran once per rest period against a 20-per-60s route limit.
@@ -161,6 +167,31 @@ export function ActiveWorkoutScreen({
     (value: number) => onRpeChange?.(currentSet, value),
     [onRpeChange, currentSet],
   );
+
+  // BF-220 — the set he JUST logged, read here rather than in the card because the card unmounts
+  // during rest (see the pill's placement note below).
+  const prevRpe = useWorkoutStore((s) => (currentSet > 0 ? s.rpeValues?.[currentSet - 1] : undefined));
+  const prevReps = useWorkoutStore((s) => (currentSet > 0 ? s.reps[currentSet - 1] : undefined));
+  const currentWeight = useWorkoutStore((s) => s.perSetWeights[currentSet]);
+  const [dismissedSuggestionSet, setDismissedSuggestionSet] = useState<number | null>(null);
+  const loadSuggestion = currentSet > 0 && dismissedSuggestionSet !== currentSet
+    ? rpeLoadSuggestion(
+        {
+          loggedRpe: prevRpe,
+          repsDone: prevReps,
+          prescribedReps: exercise?.progressionStyle?.[currentSet - 1]?.reps,
+          pct: exercise?.progressionStyle?.[currentSet - 1]?.pct,
+        },
+        currentWeight ?? 0,
+        { isBaseline, isDeload, exerciseType: exercise?.exerciseType, equipment: exercise?.equipment },
+      )
+    : null;
+  const suggestedWeight = loadSuggestion?.weightKg;
+  // Hoisted: the pill is memoised and an inline arrow defeats a shallow compare (Q-490).
+  const acceptLoadSuggestion = useCallback(() => {
+    if (suggestedWeight !== undefined) onWeightChange(currentSet, suggestedWeight);
+  }, [onWeightChange, currentSet, suggestedWeight]);
+  const dismissLoadSuggestion = useCallback(() => setDismissedSuggestionSet(currentSet), [currentSet]);
 
   // Guards an action that would discard work in progress. The rule itself lives in `leave-guard.ts`
   // so it can be tested — this repo has no component-test setup, so inline it was unreachable.
@@ -524,6 +555,22 @@ export function ActiveWorkoutScreen({
                 rest's recovery dip; the full-exercise trace lives on the summary card. */}
             {workoutPhase === "rest" && !allSetsLogged && (
               <LiveHrChart profile={hrProfile} sinceMs={restStartMs} compact className="mt-2" />
+            )}
+
+            {/* ── BF-220: the offer from the set he just logged ──
+                **Above the phase switch on purpose, and that placement is the whole finding.** The
+                first attempt put this inside `ActiveSetCard`, which renders only while
+                `workoutPhase === "set"` — so it never mounted in the one window it exists for: the
+                REST between logging a hard set and starting the next, which is exactly when he is
+                looking at this screen. A browser render is what showed that; the unit tests could
+                not, and neither could reading the props. */}
+            {loadSuggestion && !allSetsLogged && (
+              <RpeSuggestionPill
+                weightKg={loadSuggestion.weightKg}
+                note={loadSuggestion.note}
+                onAccept={acceptLoadSuggestion}
+                onDismiss={dismissLoadSuggestion}
+              />
             )}
 
             {/* ── Centre: active card or rest timer — always in the same flex zone ── */}

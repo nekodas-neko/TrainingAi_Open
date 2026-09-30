@@ -6,6 +6,29 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.486.2",
+    date: "2026-09-30",
+    changes: [
+      "Accessory exercises now stay inside their goal's rep range, so an accessory can no longer be prescribed heavy and low-rep, like 77.5% for 7",
+    ],
+  },
+  {
+    version: "1.486.1",
+    date: "2026-09-29",
+    changes: [
+      "The Sleep card now says so when a night's score is based on incomplete data: a quiet \"Partial data\" note, or a clearer one naming what is missing when heart rate or HRV was absent.",
+    ],
+  },
+  {
+    version: "1.486.0",
+    date: "2026-09-29",
+    changes: [
+      "Rate a set RPE 9 or 10 and fall short of its reps, and the next set now offers a lighter weight \u2014 one tap fills the dial in. The app already worked this out when it built next week's plan; it just never said so during the session.",
+      "It offers and never applies: ignore it and the set is exactly as prescribed. The reason it gives is the same sentence next week's adjustment would have used, so the two can't disagree.",
+      "A set you didn't rate suggests nothing, and deload and baseline weeks are left alone.",
+    ],
+  },
+  {
     version: "1.485.2",
     date: "2026-09-29",
     changes: [

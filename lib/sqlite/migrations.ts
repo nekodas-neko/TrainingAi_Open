@@ -230,6 +230,12 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'food_items',      column: 'image_data_uri',  ddl: `ALTER TABLE food_items ADD COLUMN image_data_uri TEXT` },
   { table: 'food_items',      column: 'barcode',         ddl: `ALTER TABLE food_items ADD COLUMN barcode TEXT` },
   { table: 'prescribed_runs', column: 'completed_as',    ddl: `ALTER TABLE prescribed_runs ADD COLUMN completed_as TEXT` },
+  { table: 'plan_meal_answers', column: 'est_calories', ddl: `ALTER TABLE plan_meal_answers ADD COLUMN est_calories INTEGER` },
+  { table: 'plan_meal_answers', column: 'est_protein_g', ddl: `ALTER TABLE plan_meal_answers ADD COLUMN est_protein_g REAL` },
+  { table: 'plan_meal_answers', column: 'est_carbs_g', ddl: `ALTER TABLE plan_meal_answers ADD COLUMN est_carbs_g REAL` },
+  { table: 'plan_meal_answers', column: 'est_fat_g', ddl: `ALTER TABLE plan_meal_answers ADD COLUMN est_fat_g REAL` },
+  { table: 'plan_meal_answers', column: 'est_bias_kcal', ddl: `ALTER TABLE plan_meal_answers ADD COLUMN est_bias_kcal INTEGER` },
+  { table: 'plan_meal_answers', column: 'est_basis', ddl: `ALTER TABLE plan_meal_answers ADD COLUMN est_basis TEXT` },
   { table: 'food_logs',       column: 'saved_meal_id',  ddl: `ALTER TABLE food_logs ADD COLUMN saved_meal_id TEXT` },
   { table: 'food_logs',       column: 'meal_group_id',  ddl: `ALTER TABLE food_logs ADD COLUMN meal_group_id TEXT` },
   { table: 'food_logs',       column: 'meal_group_name', ddl: `ALTER TABLE food_logs ADD COLUMN meal_group_name TEXT` },
@@ -770,7 +776,8 @@ const CREATE_MEAL_PLAN_MEALS = `CREATE TABLE IF NOT EXISTS meal_plan_meals (
   ingredients       TEXT NOT NULL DEFAULT '[]',
   suggested_time    TEXT
 )`;
-// Q-187 phase 2. Declines only — "I ate it" is the food log itself. `sync_status` is what stops a
+// Q-187 phase 2. Declines, and since BF-203a estimates (`answer = 'estimated'` with its `est_*`
+// macros). Never a 'yes' — "I ate it" is the food log itself. `sync_status` is what stops a
 // pull clobbering an answer the user just gave offline: applyDelta only overwrites a row that is
 // already 'synced'.
 const CREATE_PLAN_MEAL_ANSWERS = `CREATE TABLE IF NOT EXISTS plan_meal_answers (
@@ -779,6 +786,12 @@ const CREATE_PLAN_MEAL_ANSWERS = `CREATE TABLE IF NOT EXISTS plan_meal_answers (
   log_date      TEXT NOT NULL,
   answer        TEXT NOT NULL DEFAULT 'no',
   answered_at   TEXT,
+  est_calories  INTEGER,
+  est_protein_g REAL,
+  est_carbs_g   REAL,
+  est_fat_g     REAL,
+  est_bias_kcal INTEGER,
+  est_basis     TEXT,
   deleted_at    TEXT,
   updated_at    TEXT,
   sync_status   TEXT NOT NULL DEFAULT 'pending'
@@ -1622,6 +1635,20 @@ export const MIGRATIONS: UpgradeStatement[] = [
     toVersion: 44,
     statements: [
       `ALTER TABLE prescribed_runs ADD COLUMN completed_as TEXT`,
+    ],
+  },
+  {
+    // BF-203a, mirroring Postgres migration 202609292220. The macros an `estimated` plan-meal answer
+    // assumed. In CREATE_PLAN_MEAL_ANSWERS for fresh installs, these ALTERs for upgraded devices, and
+    // RECONCILE_COLUMNS if the version half-applies.
+    toVersion: 45,
+    statements: [
+      `ALTER TABLE plan_meal_answers ADD COLUMN est_calories INTEGER`,
+      `ALTER TABLE plan_meal_answers ADD COLUMN est_protein_g REAL`,
+      `ALTER TABLE plan_meal_answers ADD COLUMN est_carbs_g REAL`,
+      `ALTER TABLE plan_meal_answers ADD COLUMN est_fat_g REAL`,
+      `ALTER TABLE plan_meal_answers ADD COLUMN est_bias_kcal INTEGER`,
+      `ALTER TABLE plan_meal_answers ADD COLUMN est_basis TEXT`,
     ],
   },
 ];
