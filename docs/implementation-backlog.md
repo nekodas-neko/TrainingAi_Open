@@ -4254,6 +4254,18 @@ which is the right shape for something that can only be validated by living with
   truncated element still reports its full text and `toHaveText` passes on an unreadable ellipsis.
   `quick-edit-log-sheet.tsx` is excluded with its reason: it is a sheet header that already leads
   with the name and gives the brand its own line, so there is nothing to separate.
+  **⛔ AND IT BROKE TWO E2E SPECS THAT NOBODY NOTICED FOR FOUR PRs — fixed 2026-09-30.**
+  `food-row-shared.spec.ts` and `single-foods-database-search.spec.ts` asserted the accessible name
+  `<brand> — <name>`, which is exactly the string this change retired; both were red from v1.486.4
+  to v1.486.9. **Three things had to line up for that to stay invisible:** `pnpm test` is vitest
+  only and never runs Playwright, the source guards scan `components/` and not `e2e/`, and **E2E is
+  advisory here**, so three red shards blocked no merge. They now assert the name line and the brand
+  as **two** things, so a row that dropped the brand entirely — what `ingredient-search.tsx` was
+  doing before this change — cannot pass a name-only check either.
+  The guard gained the case, scoped to those two files with the reason stated rather than dressed up
+  as a general rule: one legitimate em dash in an accessible name exists in the suite
+  (`plan-meal-log-decline.spec.ts`'s *"Didn't eat this — undo"*). **What generalises is the habit:
+  when you change a rendered string, grep `e2e/` for it.**
 - **A question this raised and did not answer:** every separator site uses a bare
   `toLocaleString()`, which follows the DEVICE locale — a phone set to German renders `1.534`. The
   fix above matches the existing convention rather than inventing a rival one. Whether counts
@@ -8863,9 +8875,34 @@ drift.
   sandbox session: `curl -sSL -o a.zip https://api.github.com/repos/<owner>/<repo>/actions/artifacts/<id>/zip`
   returned **200, 15,686,307 bytes**. Get the id from `get_job_logs` (the upload step prints
   `Artifact ID …`).
-- **Keep — the cause is STILL NOT established.** The crash is now witnessed and the instrument is
-  fixed; what is owed is one more red E2E read through the repaired dmesg branch. If it reports no OOM,
-  memory is out and the next step is sampling during the run rather than after it.
+- **⚑ THE WITNESS ARRIVED 2026-09-30, AND IT IS NOT OOM — READ FROM RUN 36699855503 (#2016).** Two
+  of that run's five E2E failures are this crash, and both carry the same line in
+  `error-context.md`'s browser log:
+
+  ```
+  Received signal 11 SEGV_MAPERR 0000000001b0
+  ```
+
+  **SIGSEGV with `SEGV_MAPERR` at `0x1b0` is a near-null dereference, not a kill** — an OOM would be
+  SIGKILL with an `Out of memory` line, so **memory is out as the explanation** and the dmesg branch
+  no longer has a question to answer. Four things the backtrace establishes, and one it does not:
+  - **The same fault ADDRESS in two independent shards** (`lb186-new-exercise-has-a-style` on shard
+    2, `meal-portion-scale` on shard 2), which points at one reproducible code path rather than
+    random corruption.
+  - **It is the BROWSER process, not a renderer.** The stack runs through
+    `libglib-2.0`'s main loop (frames 16–18) into Chromium's own message pump — which is exactly
+    why `browser.newContext` then fails for every later test in the shard, the cascade this entry
+    describes.
+  - **The binary is pinned and named:** `chrome-headless-shell-1234`, from
+    `~/.cache/ms-playwright/chromium_headless_shell-1234`.
+  - **The frames are unsymbolised** (offsets into the stripped shell), so **which** code path it is
+    remains unestablished — and nothing here shows the crash is our page's doing at all.
+- **Keep — the cause is narrowed, not established, and the next step has changed.** Not another
+  dmesg read: that instrument was built for an OOM hypothesis this witness rules out. A SIGSEGV in a
+  pinned Chromium is a **harness** question rather than a product one — the remedy is a
+  Playwright/Chromium bump or a flag that avoids the path, which is a decision about the harness and
+  not a fix Lane B should make unilaterally. Symbolising those offsets against the shipped
+  `chrome-headless-shell` build would name the frame if it is worth the trouble.
 - **⛔ The entry's own discriminator is too weak, measured 2026-09-25.** It said 3 consecutive runs
   on an unchanged head would settle spec-pair vs runner. All **3 of 3 PASSED** (28m53s, ~34 min,
   ~33 min on run 3069 attempts 1–3), so the fault did not reproduce at all — it is rarer than
