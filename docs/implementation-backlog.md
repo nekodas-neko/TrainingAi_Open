@@ -490,57 +490,6 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [readiness][app-shell] LB-191 — does the "compared to normal" picker get a default? It contradicts TN-58's central design
-- **✅ ANSWERED 2026-09-30 — YES, PRE-SELECT "About the same". AGAINST the recommendation, and
-  reaffirmed after the cost was put to him.** He was shown `TN-58`'s measurement — **2 distinct
-  values across 96 check-ins, sd 0.29** — and the specific cost, that a one-tap Save makes a
-  reflexive answer indistinguishable from a considered one on a field feeding readiness. He chose
-  the default anyway. **This is settled: do not re-propose no-default, and do not re-raise the
-  measurement.**
-- **⛔ `e2e/tn58-vs-yesterday-no-default.spec.ts` IS UPDATED, NEVER DELETED.** Its no-default
-  assertion is now wrong; everything else it protects is not. It still has to prove the control
-  renders three options, that a mis-tap can be cleared, and that a **dismissed sheet writes no
-  row**. Rewrite those against the new default, keep the file and its `TN-58` reference, and
-  rename it to match what it now asserts.
-- **⚠ THE NULL PATH IS NOW THE ONLY THING SEPARATING THE TWO CASES — keep it alive.** The sheet
-  writes solely on Save and `day_checkins.vs_yesterday` has **no column default**, so dismissing
-  with the X must still store nothing. With a neutral pre-selected, that dismissal is the sole
-  remaining signal of *not answered*. A later change that writes a row on close would erase the
-  distinction without touching this entry.
-- **Tuning's boundary moved TWICE, and one marker must cover both:** the question changed (`OR-206`,
-  vs yesterday → vs normal) and a neutral can now arrive unconsidered (this entry). Record the
-  marker as covering both, or a later reader will split on one and pool the other.
-
-- **Lane: B** — returned 2026-09-30, the answer is in. It was `O` while the question was open
-  (split out of `OR-206` ② because the lane field is what routes work and that entry is Lane B —
-  the same reason `RV-208` moved its Lane A half out to `LB-183`), ungated on purpose so it stayed
-  in the READY list rather than being parked behind the gate. **Added:** 2026-09-30 · Lane B.
-- **The question, his words on the S25 (2026-09-29):** *"Maybe comparison to \"normal\". So about the
-  same; better or worse. **With it default selected to about the same.**"* The wording half is not in
-  dispute and ships without him (`OR-206`); only the default is.
-- **Recommendation: ship the rename with NO default, and give him `TN-82`'s announce-and-correct
-  shape instead** — the one he approved twice for the sleep rating on this same sheet.
-- **Why, a year out.** A pre-selected neutral makes a reflexive Save indistinguishable from a
-  considered *"about the same"* — and this app has measured that failure four times over: `wake_mood`
-  collected 17 answers then zero, the 1–5 sleep scale 3 of 82, `perceived_recovery` **0 touched in
-  102 check-ins**, and `vs_yesterday` itself 2 of 82. `TN-58` built this picker with no default and
-  the column has none, both for that reason; `TN-57` was the fix for a neutral stored as though it
-  were an answer. The field feeds a scoring input, so the cost is a contaminated tuning signal, not
-  an untidy screen.
-- **What he is actually asking for, and the cheaper way to give it to him.** He wants to not tap
-  three things on a normal morning. The sleep announcement already does that here: the app states
-  what it filled and why, he corrects it in one tap, and a plain Save records **unknown** rather
-  than assent. One-tap morning, and a skipped answer still distinguishable from a given one.
-- **The alternative, and what it is genuinely better at.** Defaulting to *"about the same"* produces
-  a row every day, and a dense series is easier to chart than a NULL-heavy column. If he reaffirms
-  it, it is his call and it ships — but then the column needs a `touched` flag beside it, as
-  `sleep_quality_feel` has, or tuning cannot tell his answer from the app's.
-- **Reversal cost: low, and asymmetric.** Adding a default later is one line. Removing one later
-  does not un-write the rows already stored under it, and nothing records which of those were
-  considered — so the cheap direction is to start without it.
-- **`e2e/tn58-vs-yesterday-no-default.spec.ts` asserts nothing is selected on open.** Whichever way
-  this goes, that test is amended with the reason. It is never deleted to make a change pass.
-
 ### [platform] LB-194 — a test mutates a tracked source file, so `git add -A` is unsafe for the nine minutes a suite runs
 
 - **Lane: A** · **Added:** 2026-09-30 · Lane B, found after committing the artefact once and then
@@ -592,6 +541,18 @@ below threshold and left in place for next time.
   yesterday"*; rows after answer *"vs normal"*. Different questions, and they **must not be pooled
   in one trend**. A deploy date cannot mark it exactly — Railway ships on merge, so a given local
   day can hold rows from both sides of the cutover.
+- **⚠ THE BOUNDARY MOVED TWICE, AND ONE MARKER MUST COVER BOTH** (from `LB-191`, shipped
+  2026-09-30). The second shift is not the wording: it is that **a neutral can now arrive
+  unconsidered**, because the control seeds *"About the same"* and a one-tap Save stores it. So rows
+  divide into three eras, not two — no default and "vs yesterday"; seeded neutral and "vs yesterday";
+  seeded neutral and "vs normal" — and the middle one already exists and is accumulating. A version
+  column handles all three for free; **a recorded cutover DATE handles only one of the two shifts**,
+  which is a second reason to prefer the column. Record it as covering both, or a later reader will
+  split on one and pool the other.
+- **What still separates "not answered" from a reflexive "same" is the DISMISSAL**, and nothing
+  else does now: the column has no default and the sheet writes solely on Save. Any later change
+  that writes a row on close erases that distinction, and it would do so without touching this
+  entry or the picker.
 - **Recommendation: a stored question-version column**, the shape `SLEEP_VERDICT_MODEL_VERSION`
   already set on this sheet — each row says which question it answered, and a later wording change
   costs one integer instead of another archaeology pass. A recorded cutover date is the cheaper
@@ -619,10 +580,15 @@ below threshold and left in place for next time.
 - **It cannot ship before `LB-190`.** Changing the prompt is precisely what makes the stored answers
   mean two different things, so the marker has to be in place first. This is not sequencing for
   tidiness: the field feeds a scoring input.
-- **Also here:** `components/morning-checkin-sheet.tsx`'s state and handler names, the two
-  `components/checkin/__tests__/tn58-vs-yesterday-control.test.ts` cases, and
-  `e2e/tn58-vs-yesterday-no-default.spec.ts` — which keeps asserting that nothing is selected on
-  open until `LB-191` says otherwise. **Do not delete it to make the change pass.**
+- **Also here:** `components/morning-checkin-sheet.tsx`'s state and handler names, the
+  `components/checkin/__tests__/tn58-vs-yesterday-control.test.ts` cases, the
+  `VS_YESTERDAY_DEFAULT` constant the picker now exports, and
+  **`e2e/tn58-vs-yesterday-neutral-default.spec.ts`** — renamed from `…-no-default` when `LB-191`
+  shipped the seeded neutral (2026-09-30). It no longer asserts that nothing is selected; it asserts
+  the NEUTRAL is, that a retap still reaches NULL, and that a dismissal writes no row. Its
+  `'Compared to yesterday'` accessible-name locator is what this rename breaks, and the `GROUP`
+  constant at the top of the file is the one place to change it. **Do not delete it to make the
+  change pass.**
 
 
 ### [platform] OR-203 — the database grew 3× its trend for six days, and no per-table baseline exists to say which table did it
@@ -15364,6 +15330,15 @@ re-proved on 2026-09-04** — three specs pass in isolation and fail in the full
   - **Start from the `error-context.md` Playwright writes beside each failure**, not from the spec:
     it carries the accessibility snapshot of the screen at the moment it gave up, and that is what
     identified both drifts here in minutes after hours of theorising.
+  - **`meal-type-reassign:65` is a THIRD confirmed sharding casualty, and it now has the second data
+    point it was owed** (2026-09-30, Lane B, from #2016's and #2023's shard 3). The *"Move N
+    entries"* dialog resolves **0 radios where 6 are expected**, and it **failed its automatic retry
+    in the same run** — so it is not shard state that a re-run shakes off. It **passes locally in a
+    full run**, which is the exact signature this entry describes: it needs the six meal types an
+    earlier spec creates, and sharding took that spec away. Recorded here rather than as its own
+    entry because the fix is this entry's — make the spec create its own state — not a separate bug.
+    ⚠ It was written up in #2023's journal as *"not reproduced"* on one data point; that read is now
+    superseded, and *"flake" was correctly refused as a root cause there.*
 
 - **⚠️ Do not trust a local full-suite run without checking the dev server survived it.** A re-run
   after the meal-plan fix reported **106 failed / 41 passed** — almost every failure at ~250ms,
@@ -33510,6 +33485,25 @@ intake traced it, it did not design it.
 **Done looks like:** a week-in-review page reachable from the notification and from a permanent
 Health entry point, drawing its charts from values the route returned rather than from parsed prose,
 with the recap week visibly compared against the one before it.
+
+### [readiness][app-shell] LB-197 — "About the same" wraps to two lines, and it is now the pill selected every morning
+
+- **Lane: O** · **Added:** 2026-09-30 · Lane B, seen while rendering `LB-191`. **Filed low on
+  purpose: it blocks nothing and is cosmetic.** It is `O` rather than a build lane because it is a
+  **looks judgement**, which CLAUDE.md puts with the owner even though the phone is where he will
+  see it — not a measurement, so not `DV`.
+- **What was seen.** Rendered at **384 px dark, portrait**, in the Playwright harness (not on the
+  S25): the three pills are `flex-1`, so *Better* and *Worse* sit on one line while *About the same*
+  wraps to two and sets the row's height. It has looked like this since `TN-58`; what changed is
+  that `LB-191` made it the **pre-selected** pill, so the taller, filled one is now the visual
+  anchor of the sheet every morning rather than an occasional selection.
+- **The question is whether it bothers him at all**, and there is no engineering answer to it. If it
+  does, the cheapest fix is shorter copy (*"Same"*), and **the copy for this control is his** —
+  `OR-206` is already changing the prompt on his words, so a label change rides there rather than
+  arriving separately. Equalising the height instead (a fixed `min-h` on the row) keeps the full
+  wording and costs a little vertical space on a sheet that already scrolls.
+- **Do not build either without him.** A pill that reads fine to me is exactly the judgement this
+  lane is told not to make on his daily screens.
 
 ### [nutrition] LA-119 — a mixed-unit supplement day renders as "no amount", which reads as "no number was logged"
 

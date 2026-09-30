@@ -15,7 +15,7 @@ import { saveSleepValue } from '@/components/checkin/save-sleep-value'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { cachedFetch } from '@/lib/sqlite/cache'
 import { IllnessContextPicker } from '@/components/checkin/illness-context-picker'
-import { VsYesterdayPicker } from '@/components/checkin/vs-yesterday-picker'
+import { VS_YESTERDAY_DEFAULT, VsYesterdayPicker } from '@/components/checkin/vs-yesterday-picker'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 
@@ -35,10 +35,12 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
   const [correction, setCorrection] = useState<number | null>(null)
   const [acknowledged, setAcknowledged] = useState(false)
   const [illnessContext, setIllnessContext] = useState<IllnessContext | null>(null)
-  // TN-58. No NEUTRAL_SCALES equivalent and no `touched` flag, both deliberately: the column has
-  // no default, so `null` already distinguishes "not answered" from every answer, and there is no
-  // seeded position for an untouched save to accept.
-  const [vsYesterday, setVsYesterday] = useState<VsYesterday | null>(null)
+  // LB-191. Seeded with the neutral, by the owner's explicit call against the recommendation. Still
+  // no `touched` flag: the column has no default and the sheet writes solely on Save, so DISMISSING
+  // is what stores nothing — and with a value seeded, that dismissal is the only remaining signal
+  // of "not answered". A restored row is the exception below: it is read back exactly as stored,
+  // NULL included, so a cleared-and-saved answer is not re-seeded into agreeing with itself.
+  const [vsYesterday, setVsYesterday] = useState<VsYesterday | null>(VS_YESTERDAY_DEFAULT)
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
   // Set as soon as the user taps anything — the async saved-checkin fetch below must
@@ -50,7 +52,7 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
       setLoaded(false); editedRef.current = false
       setCorrection(null)
       setAcknowledged(false)
-      setVsYesterday(null)
+      setVsYesterday(VS_YESTERDAY_DEFAULT)
       setIllnessContext(null)
       return
     }
@@ -71,6 +73,9 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
           // itself — the shape TN-57 exists to prevent.
           setCorrection(saved.sleepQualityFeelTouched ? saved.sleepQualityFeel ?? null : null)
           setIllnessContext(saved.illnessContext ?? null)
+          // `?? null`, not `?? VS_YESTERDAY_DEFAULT` (LB-191): a stored NULL is either a cleared
+          // answer or a row from before the seed, and re-seeding the neutral over it would show
+          // his own screen agreeing with itself — the shape TN-57 exists to prevent.
           setVsYesterday(saved.vsYesterday ?? null)
         }
       }

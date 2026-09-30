@@ -8,28 +8,46 @@ import { stripComments } from '../../../scripts/lib/strip-comments.js'
  *  them touched. This is the comparative control that asks the question we actually want answered,
  *  writing the `vs_yesterday` column LB-124 shipped.
  *
- *  **The defect this guards is a default, not a bug in the happy path.** A neutral stored as though
- *  it were an answer is exactly what TN-57 fixed, and shipping one here would recreate it under a
- *  new name — so the assertions are about what happens when the owner says NOTHING.
+ *  **LB-191 inverted the first case: the neutral IS seeded now**, by the owner's explicit call after
+ *  the cost was put to him. So the question these guard has changed from *"is nothing selected"* to
+ *  *"is the seeded value the neutral, and is NULL still reachable"* — because with a value seeded,
+ *  the only remaining signal of "not answered" is a dismissal storing nothing, and a `??` anywhere
+ *  on the write path would turn the seed into an answer the owner never gave.
  *
- *  **2 of these 5 discriminate, and it is stated rather than implied.** Reverting the sheet turns
- *  the first two red. The third characterises a component that did not exist before, and the last
- *  two are Lane A's schema and `dayCheckinHasAnswers` — they pass either way and are here because
- *  the whole design depends on them: a 201-that-stores-nothing, or a three-tap check-in rejected
- *  as empty, would each make this question unable to produce the variance it exists to produce. */
+ *  **2 of these 5 discriminate, and it is stated rather than implied.** Seeding `null` again, or
+ *  seeding a value the control does not offer, turns the first red; a `??` on the payload turns the
+ *  second red. The third characterises the picker, and the last two are Lane A's schema and
+ *  `dayCheckinHasAnswers` — they pass either way and are here because the whole design depends on
+ *  them: a 201-that-stores-nothing, or a three-tap check-in rejected as empty, would each make this
+ *  question unable to produce the variance it exists to produce. */
 
 const ROOT = path.resolve(__dirname, '../../..')
 const read = (rel: string) => readFileSync(path.join(ROOT, rel), 'utf8')
 const code = (src: string) =>
   stripComments(src)
 
-describe('TN-58 — a skipped comparative answer stores nothing', () => {
-  it('the control has no default and no pre-selection', () => {
+describe('TN-58/LB-191 — the comparative control seeds the neutral, and NULL stays reachable', () => {
+  it('the control seeds the neutral, and seeds it from the picker\'s own constant', () => {
     const sheet = code(read('components/morning-checkin-sheet.tsx'))
-    expect(sheet, 'the state is seeded with a value — the TN-57 defect under a new name')
-      .toMatch(/useState<VsYesterday \| null>\(null\)/)
+    expect(sheet, 'the seed is back to null, or is a literal that can drift from the option list')
+      .toMatch(/useState<VsYesterday \| null>\(VS_YESTERDAY_DEFAULT\)/)
+    // Closing the sheet resets the state, so a seed applied only at mount would leave the SECOND
+    // open of the day with nothing selected.
+    expect(sheet, 'the close-reset still clears to null, so the seed lasts one open only')
+      .toMatch(/setVsYesterday\(VS_YESTERDAY_DEFAULT\)/)
+    const picker = code(read('components/checkin/vs-yesterday-picker.tsx'))
+    expect(picker, 'the seeded value is not the neutral — it must be the one labelled "About the same"')
+      .toMatch(/VS_YESTERDAY_DEFAULT: VsYesterday = 'same'/)
     expect(sheet, 'vsYesterday was added to the absolute scales\' neutral seed')
       .not.toMatch(/NEUTRAL_SCALES[^\n]*vsYesterday/)
+  })
+
+  it('a restored row is read back exactly as stored, so a cleared answer stays cleared', () => {
+    // The one place the seed must NOT apply. A stored NULL is either an answer he cleared or a row
+    // from before LB-191; re-seeding the neutral over it is the TN-57 shape under a new name.
+    const sheet = code(read('components/morning-checkin-sheet.tsx'))
+    expect(sheet, 'the restore re-seeds the neutral over a stored NULL')
+      .toMatch(/setVsYesterday\(saved\.vsYesterday \?\? null\)/)
   })
 
   it('and the sheet posts it straight through, with no ?? fallback on the way', () => {
