@@ -646,6 +646,9 @@ plan records why and what would force that to change."
 
 ### Task 6: Count estimates in the day's totals — in exactly one place
 
+> **⛔ SUPERSEDED 2026-09-30** by "Revised Tasks 6–8, device-first" at the end of this file. The server assembly is only half of what the ring reads.
+
+
 **Files:**
 - Modify: `lib/health/energy-balance-service.ts`
 - Test: `lib/health/__tests__/bf203-estimates-in-balance.test.ts`
@@ -717,6 +720,9 @@ part rather than showing one number that hides it."
 
 ### Task 7: Prove estimates cannot reach the models that set the goal
 
+> **⛔ SUPERSEDED 2026-09-30** by "Revised Tasks 6–8, device-first" at the end of this file. Both `LEARNERS` paths do not exist.
+
+
 **Files:**
 - Test: `lib/health/__tests__/bf203-estimates-excluded-from-learners.test.ts`
 
@@ -770,6 +776,9 @@ plan -> estimate, and nothing outside it would catch the drift."
 ---
 
 ### Task 8: Materialise on app open
+
+> **⛔ SUPERSEDED 2026-09-30** by "Revised Tasks 6–8, device-first" at the end of this file. The device never calls this GET.
+
 
 **Files:**
 - Modify: `app/api/nutrition/plan-meal-answers/route.ts`
@@ -865,3 +874,66 @@ git push -u origin lane-a/bf203a-estimated-answers
 - The resolve sheet — Phase B
 - The corrector; `biasKcal` is hardcoded to 0 until Phase C
 - Any change to how the calorie target is derived
+
+
+---
+
+## Revised Tasks 6–8, device-first (2026-09-30, Lane A)
+
+Tasks 1–5 shipped as #2001, #2004, #2002 and #2003, with corrections recorded in their journal
+entries. The original 6–8 were traced against the APK's read paths before building, and each targeted
+a path the phone does not use (BF-203a entry, "PAUSED"). The facts these tasks rest on, all measured:
+
+- `use-plan-meal-logging.ts` `loadAnswers` reads `store.getPlanMealAnswers` and fetches the API only
+  with no local store. It passes EVERY row to `applyAnswers` as a decline.
+- The Nutrition ring's centre is `totals.calories`, a client `reduce` over local food logs. Its zone
+  bar, "Eaten" and "kcal left" read the server's `intakeKcal` from `computeEnergyBalance`.
+- The outbox `plan_meal_answers` push branch (`adapter.ts` ~5616) calls only `savePlanMealAnswer`
+  (which writes `'no'`) or `deletePlanMealAnswer`. It does not send the local row's `id`.
+- The local table has no unique key on `(plan_meal_id, log_date)`; a server row pulled back lands
+  under the server's id beside the local one. Harmless for a decline SET, wrong for a calorie SUM.
+- `computeEnergyBalance` builds today's `intakeKcal` and the maintenance window from one
+  `intakeByDate` map; `adaptive-tdee.ts` (`packages/shared/src/nutrition/`) consumes the window.
+- The web build is a logic-free dev surface (Canonical Runtime), so **estimates materialise on the
+  device only**. With no local store there are no estimates, and that is correct.
+
+### Task 6′: Readers stop treating every answer as a decline (ships FIRST, before anything writes one)
+
+- `loadAnswers` passes only `answer === 'no'` rows to `applyAnswers`, on both the store and the API
+  branch, and keeps the estimated rows separately (by `planMealId`) for Task 8′'s totals.
+- `LocalPlanMealAnswer` gains the six `est_*` fields. `getPlanMealAnswers`, the pull mapper
+  (`sync-engine.ts` ~644), `applyDelta` (`sqlite-backend.ts` ~1392) and the server delta map
+  (`adapter.ts` ~4707) carry them. LA-137's test then holds the pull end to end.
+- The local decline write replaces a live estimate for the same meal and day: an UPDATE of the
+  existing `(plan_meal_id, log_date)` live row to `'no'` with `est_*` cleared, insert only when none.
+  This is the device mirror of #2003's server fix.
+- Test: a store with one `'no'` and one `'estimated'` row yields a declined set of one.
+
+### Task 7′: The learner guard, on real paths
+
+Assert that `packages/shared/src/nutrition/adaptive-tdee.ts` does not read `plan_meal_answers` or `est_*`,
+**and** that `computeEnergyBalance` adds estimates to today's `intakeKcal` only and never to
+`intakeByDate`. The second is behavioural: build a balance with an estimate, assert the maintenance
+window's intake for every day is unchanged. Also run the guard with a path check, so a moved file
+fails the test rather than passing it vacuously.
+
+### Task 8′: Materialise on the device, sync it, count it in both places
+
+1. **Materialiser** (`lib/local-store/` or a small module beside the hook, one function): for TODAY
+   only, read the local active plan and pick today's variant with the shared chooser LA-184 asks for.
+   Read `getMealTypes`, today's local food logs (their meal types), and live answers. Resolve
+   `slotCloseHour` and the user-local hour (`formatInTimeZone`, never `getHours()`), then
+   `dueForEstimate`. Write each due estimate with a generated id via
+   `store.upsertPlanMealAnswer` and queue a `plan_meal_answers` mutation carrying
+   `{ id, planMealId, logDate, answer: 'estimated', est_* }`. Call it from `loadAnswers` before the read.
+2. **Push:** the server branch routes `answer === 'estimated'` to `upsertEstimatedAnswers` with the
+   CLIENT's id (add an optional `id` to it), keeping the ownership join `savePlanMealAnswer` does,
+   because this id now comes from a client. A decline or delete behaves as today.
+3. **Totals, one number:** the client `totals.calories` adds the day's live estimates, counting each
+   `planMealId` once. `computeEnergyBalance` adds them to `intakeKcal` only, reported as
+   `estimatedKcal` beside `confirmedKcal`. **Nothing renders an estimate until LA-185 (owner) picks
+   the marking.** Until then, gate the addition behind that decision rather than ship an unmarked number.
+4. **Verify on the APK** (Known-Issues row until then): an estimate appears after its slot closes, once;
+   a decline replaces it; the centre and the zone bar agree; `food_logs` gains no row.
+
+**Order:** 6′ → 7′ → 8′ (1–2) → LA-185 answered → 8′ (3–4).
