@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.486.5",
+    date: "2026-09-30",
+    changes: [
+      "A meal plan split into training and rest days now shows the right one for today. It was showing the rest-day variant every day, training days included — including the \"Rest day\" label on the card and the lower calorie and carb targets underneath it.",
+      "Other days still show the rest-day variant: the app can only work out today's day type from your rotation, and answering it for last Tuesday needs a change on the server side.",
+    ],
+  },
+  {
     version: "1.486.4",
     date: "2026-09-30",
     changes: [

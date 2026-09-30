@@ -3,6 +3,10 @@
 import { useEffect, useState } from 'react'
 import { nowDatetimeInTz } from '@trainingai/shared/date-utils'
 import type { FoodLogWithItem, MealPlan, MealType } from '@trainingai/shared/types/nutrition'
+import type { NextSessionRecommendation } from '@trainingai/shared/types/program'
+import { NEXT_SESSION_TTL } from '@trainingai/shared/cache-ttl'
+import { useCachedValue } from '@/lib/hooks/use-cached-value'
+import { isSplitPlan, trainingDayForPlanDate } from './plan-variant-day'
 import { usePlanMealLogging } from '@/app/nutrition/use-plan-meal-logging'
 import { usePlanMealSaving } from '@/app/nutrition/use-plan-meal-saving'
 import { MealPlanSection } from './meal-plan-section'
@@ -52,11 +56,32 @@ export function ActivePlanCard({
   const [nowHour, setNowHour] = useState<number | null>(null)
   useEffect(() => { setNowHour(hourFromTzDatetime(nowDatetimeInTz(tz))) }, [tz, logDate])
 
+  /**
+   * LA-184. `MealPlanSection` has taken `isTrainingDay?: boolean` since it was written and nothing
+   * ever passed it, so a split plan showed its REST variant every day.
+   *
+   * `useCachedValue` rather than a seed-only read or a `useEffect(…, [])`: this card lives in the
+   * **persistent tab shell**, which never unmounts, so a fetch-once effect would hold its first
+   * answer until the app was killed — the Q-402 shape. `today: true` because `next-session` is a
+   * `cachedFetchToday` key at every other site and the variant is a property of the KEY, and
+   * `NEXT_SESSION_TTL` because that key has one canonical TTL.
+   *
+   * `onError` is a deliberate no-op: an unknown day type falls back to the behaviour above it, and
+   * a meal plan is not the surface to report a workout recommendation's failure on.
+   */
+  const rec = useCachedValue<NextSessionRecommendation>(
+    'next-session', '/api/next-session', NEXT_SESSION_TTL, { today: true, onError: () => {} },
+  )
+  const isTrainingDay = isSplitPlan(plan)
+    ? trainingDayForPlanDate(logDate, today, rec)
+    : undefined
+
   return (
     <MealPlanSection
       plan={plan}
       loading={loading}
       eaten={eaten}
+      isTrainingDay={isTrainingDay}
       onLogMeal={mealTypes.length > 0 ? logMeal : undefined}
       loggingPosition={loggingPosition}
       loggedPositions={loggedPositions}
