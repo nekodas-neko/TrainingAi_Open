@@ -16,6 +16,11 @@ import type { EnergyBalanceResponse } from '@/app/api/nutrition/energy-balance/r
 export function EnergyExplainer({ data }: { data: EnergyBalanceResponse }) {
   const b = data.balance!
   const m = data.maintenance
+  const storedGoal = data.target.currentKcal
+  // BF-138. The two figures the owner was reconciling by hand: the goal stored once, and the budget
+  // today's movement has grown. Named together only when they actually differ — a reconciliation
+  // shown on a day they agree is noise on a panel that already has five paragraphs.
+  const showsTwoModels = storedGoal != null && Math.abs(storedGoal - b.expenditureKcal) >= 100
   return (
     <div className="space-y-2 rounded-xl bg-muted/50 p-3">
       <p className="text-[10px] leading-relaxed text-muted-foreground">
@@ -23,6 +28,22 @@ export function EnergyExplainer({ data }: { data: EnergyBalanceResponse }) {
         ({b.restingBaseKcal.toLocaleString()} kcal) plus measured movement ({b.activeKcal.toLocaleString()} kcal
         from workouts, activities, and every step you take).
       </p>
+
+      {/* BF-138 ①. The chain from the number he knows to the number on screen. He knows his own
+          measured RMR and saw a different base, and reasonably suspected an error — the steps
+          between were sound and stated nowhere. Endpoints only: the multiplier and the step credit
+          are intermediates this payload does not carry, and inventing them here would be a second
+          implementation of a calculation this entry forbids touching. */}
+      {b.restingRateKcal != null && b.restingRateKcal !== b.restingBaseKcal && (
+        <p className="text-[10px] leading-relaxed text-muted-foreground">
+          That resting burn starts from your measured resting rate of{' '}
+          <span className="font-semibold text-foreground">{b.restingRateKcal.toLocaleString()} kcal</span>,
+          scaled up for simply being awake and about, then reduced again by the everyday walking that
+          scaling already assumed — which is what leaves{' '}
+          <span className="font-semibold text-foreground">{b.restingBaseKcal.toLocaleString()} kcal</span>{' '}
+          for your movement to be added to.
+        </p>
+      )}
 
       {/* BF-134's reported symptom. The owner read `1,453 base − 200 for your goal` as two
           deductions, because one of them is: the resting burn already has habitual movement
@@ -59,6 +80,35 @@ export function EnergyExplainer({ data }: { data: EnergyBalanceResponse }) {
         {' '}{b.targetNetKcal >= 0 ? '+' : ''}{b.targetNetKcal.toLocaleString()} kcal/day your goal calls for.
         Sustaining today&apos;s net works out to {b.projectedWeeklyKg >= 0 ? '+' : ''}{b.projectedWeeklyKg} kg/week.
       </p>
+
+      {/* BF-138 ②. The question he actually asked — *"I thought it was eat to 1,350 + exercise
+          right? im getting confused"*. Both numbers are defensible and neither was ever named
+          beside the other, so four screens showing four figures read as four bugs. This states the
+          relationship rather than picking a winner: that is a calibration question (BF-137, TN-29)
+          and this entry is explicitly not allowed to answer it. */}
+      {showsTwoModels && (
+        <p className="text-[10px] leading-relaxed text-muted-foreground">
+          <span className="font-semibold text-foreground">Why two numbers.</span> Your saved daily
+          goal ({storedGoal.toLocaleString()} kcal) assumes a typical day&apos;s movement is already
+          included; today&apos;s budget ({b.expenditureKcal.toLocaleString()} kcal) starts from rest
+          and climbs as you move. On an average day they should land close together — when they do
+          not, the saved goal is the one that has not caught up.
+        </p>
+      )}
+
+      {/* BF-138 ③. The most useful sentence available is not any estimate. A flat weight across a
+          long logged window is measured; every figure above it is derived, and presenting them as
+          equally solid is what made the derived ones look authoritative. */}
+      {m != null && m.daysLogged >= 14 && m.weightRateKgPerWeek != null && (
+        <p className="text-[10px] leading-relaxed text-muted-foreground">
+          <span className="font-semibold text-foreground">What is actually measured:</span> across{' '}
+          {m.daysLogged} logged days your weight moved{' '}
+          {Math.abs(m.weightRateKgPerWeek) < 0.1
+            ? <>barely at all</>
+            : <>{m.weightRateKgPerWeek > 0 ? 'up' : 'down'} about {Math.abs(m.weightRateKgPerWeek)} kg a week</>}
+          . That is an observation; everything above it is an estimate.
+        </p>
+      )}
 
       {m?.source === 'calibrated' && (
         <p className="text-[10px] leading-relaxed text-muted-foreground">

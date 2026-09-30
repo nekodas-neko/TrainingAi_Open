@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.486.3",
+    date: "2026-09-30",
+    changes: [
+      "The \u24d8 panel behind your calorie numbers now traces where they come from: your measured resting rate, what gets added for being up and about, and what gets taken back off for the walking that already assumed \u2014 which is the figure your movement is then added to.",
+      "It also names your saved daily goal beside today's budget when they disagree, and says which of the numbers on screen is actually measured rather than estimated.",
+      "Nothing about how any of it is calculated has changed.",
+    ],
+  },
+  {
     version: "1.486.2",
     date: "2026-09-30",
     changes: [

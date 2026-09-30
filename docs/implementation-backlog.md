@@ -13733,51 +13733,28 @@ anchor that then moves.
 phase the owner reaches; and TN-25's three options no longer need answering, because no single session
 is claiming to be both.
 
-### [nutrition] BF-138 — the app runs two energy models at once and never states either, so the owner cannot tell which number to eat to
+### [nutrition][app-shell] LB-189 — two controls share one accessible name, and the tab shell keeps both mounted
 
-- **Lane:** B — a single explainer surface; the numbers it states already exist. **Do not change any calculation under this entry.**
-- **Added:** 2026-09-10 · owner, after four screens showed four different figures: *"I thought it was eat to 1350 + excercise amount right? im getting confused- can we have a central idea of everything"*.
-- **Needs:** — nothing. **Read BF-134, BF-137 and TN-29 first**: they are three separate defects that all present as *"the number is wrong"*, and this entry is why one owner hit all three inside a week.
+- **Lane: B** — `components/nutrition/energy-card.tsx`, `components/nutrition/calorie-balance-bar.tsx`.
+- **Added:** 2026-09-30 · Lane B, found while proving `BF-138`'s copy renders.
+- **Both carry `aria-label="How energy balance is calculated"`** — `energy-card.tsx:218` (Nutrition)
+  and `calorie-balance-bar.tsx:75` (Health). The tab shell keeps every tab's tree mounted, so both
+  are in the accessibility tree whichever screen is open.
+- **What it cost to find:** a document-wide `getByRole('button', { name: … }).first()` clicked the
+  **off-screen** one for a full 60 seconds while `aria-expanded` stayed `false`. That reads as a dead
+  button and is a mis-aimed one — the class `tapInView` exists for, met here first-hand.
+  `e2e/bf138-energy-model-explainer.spec.ts` works around it and records why; the duplicate itself is
+  not fixed.
+- **Why it is more than a test nuisance.** Two controls with the same name on one accessibility tree
+  is a real duplicate for a screen reader, which cannot use the viewport to tell them apart the way a
+  sighted user does.
+- **Fix:** name each for its own surface (*"How today's budget is calculated"* on Nutrition,
+  *"How the energy bar is calculated"* on Health, or similar). Check for other specs matching the
+  shared string before renaming — `grep -rn 'How energy balance is calculated' e2e/`.
+- **Position is priority and this is placed deliberately:** adjacent to the surfaces it concerns and
+  cheap, not urgent. Nothing is broken for a sighted user today.
+- **Reversal cost:** none — two label strings.
 
-**He was right, and that is the point.** *"Eat to 1,350 + exercise"* describes the app's own dynamic
-model accurately — 1,325 measured RMR, plus movement as it happens. He could not confirm it from any
-screen.
-
-**The two models, both live, both defensible, never named:**
-
-| | anchor | where it shows | assumes |
-|---|---|---|---|
-| **Static** | `nutrition_targets.calories` = **1,660**, written once 2026-08-31 | the macro row | a typical day's movement, already included |
-| **Dynamic** | `restingBase + goalDelta + earned` | the calorie ring and the zone bar | nothing; it climbs as you move |
-
-**They are the same model seen two ways and should agree on an average day — for this owner they do
-not.** Measured over 30 days: median **2,438 steps/day**, **22 workouts (5.3/week)**, so typical
-earned movement is roughly **215 kcal**. That puts a normal day at `1,453 − 200 + 215 ≈ **1,470**`
-against a stored goal of **1,660** — a standing **~190 kcal** disagreement that is nobody's bug and
-everybody's confusion. **Reconciling those two is the real question this entry raises**; BF-134 only
-made the gap *visible* by explaining it on the card.
-
-**The chain that produces "base", and why it reads as arbitrary:** measured RMR **1,325** → ×1.2 for
-sedentary living → minus the walking already inside "sedentary" (BF-88 made steps earn from the first
-one, so the credit is removed from the base to stop double-counting) → **≈1,453**. Every step is
-sound and *none of it is stated anywhere*, which is why a user who knows his own RMR sees 1,453 and
-reasonably suspects an error — as he did on 2026-09-08.
-
-**Recommendation: one explainer, reachable from every number it explains, stating the chain above
-with the user's own figures substituted.** Not a tooltip per surface — that is how three surfaces
-came to describe the same model in three vocabularies. The `WHY TWO NUMBERS` block BF-134 added is
-the right shape and the wrong scope: it explains the macro-vs-calorie gap only.
-
-- **⚠ This entry must not become a calculation change.** Three entries already propose changes to
-  these numbers (BF-134 labelling, BF-137 the drug window, TN-29 the activity cross-check). An
-  explainer written while those are in flight should state *today's* model and be updated with them,
-  not pre-empt them. Writing it is also a good forcing function: a model that cannot be stated in six
-  lines is not yet a model.
-- **⚠ State the units of confidence, not just the numbers.** The most useful sentence available to
-  this owner is not any estimate — it is *"your weight was flat across 29 days at 1,340–1,530 logged
-  intake"*. Measured stability beats every derived figure on the screen, and the explainer should say
-  so rather than presenting four estimates as equally solid.
-- **Reversal cost:** none — one read-only surface over values that already exist.
 ### [nutrition][body] BF-137 — the maintenance estimator is fitting a GLP-1 weight drop and calling it metabolic rate 🔴 LIVE
 - **✅ ANSWERED 2026-09-28 — he REFUSED the date, and the replacement is better.**
   Verbatim: *"Try incorporate supplements usage with other factors. We want it to be supplement
