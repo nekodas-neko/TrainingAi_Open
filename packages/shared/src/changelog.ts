@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.486.8",
+    date: "2026-09-30",
+    changes: [
+      "Home now tells you when your biomarkers are drifting. The illness radar's quietest band \u2014 the one with no readiness penalty \u2014 has fired twice and had nowhere to appear, so both times it reached you as silence. It is a small line under the score chips naming what moved, not a banner: it carries no instruction and should not read like one.",
+    ],
+  },
+  {
     version: "1.486.7",
     date: "2026-09-30",
     changes: [
