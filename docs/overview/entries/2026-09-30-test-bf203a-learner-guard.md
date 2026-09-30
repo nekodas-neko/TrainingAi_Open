@@ -12,4 +12,4 @@ answers or estimate macros, and that the assembly never puts anything into `inta
 food-log summary. The behavioural half lands with Task 8′, the first code that adds an estimate: a
 balance built with an estimate must leave every window day's intake unchanged.
 
-**Verified:** the new test passes (3 cases).
+**Verified:** the new test passes (2 cases: the learner, and the assembly map).
