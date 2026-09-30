@@ -5627,8 +5627,30 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid plan_meal_answers payload: missing planMealId' })
             continue
           }
+          const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
           if (p.deleted) {
             await mp.deletePlanMealAnswer(this.db, userId, planMealId, logDate.replace(/\//g, '-'))
+          } else if (p.answer === 'estimated') {
+            // BF-203a. A device estimate. Routing it to `savePlanMealAnswer` would store it as a
+            // DECLINE. Calories are required, as the table's shape constraint also insists.
+            const calories = num(p.estCalories)
+            if (calories == null || calories < 0) {
+              errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'plan_meal_answers: estimate without calories' })
+              continue
+            }
+            const saved = await mp.saveClientEstimate(this.db, userId, logDate.replace(/\//g, '-'), {
+              id: typeof p.id === 'string' ? p.id : undefined,
+              planMealId,
+              calories: Math.round(calories),
+              proteinG: num(p.estProteinG) ?? 0,
+              carbsG: num(p.estCarbsG) ?? 0,
+              fatG: num(p.estFatG) ?? 0,
+              biasKcal: Math.round(num(p.estBiasKcal) ?? 0),
+            })
+            if (!saved) {
+              errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'plan_meal_answers: unknown or non-owned plan meal' })
+              continue
+            }
           } else {
             const saved = await mp.savePlanMealAnswer(this.db, userId, {
               id: typeof p.id === 'string' ? p.id : undefined,
