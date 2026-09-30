@@ -13,11 +13,25 @@ reminders, and the nutrition screen's editing surfaces.
 | Tables | `food_logs`, `food_items`, saved meals, supplements + supplement logs, `meal_plans` + `meal_plan_variants` + `meal_plan_meals`, `dietary_restrictions` + `user_dietary_restrictions` |
 | Food row display | `components/nutrition/food-row.tsx` (the one row shape, Q-406), `components/nutrition/food-name-line.ts` (`foodSecondaryLine` — the food's name leads, the brand rides the grey line, RV-208 ⑤) |
 | Meal Plan | `lib/data/postgres/slices/meal-plans.ts`, `packages/shared/src/nutrition/meal-split.ts`, `components/nutrition/meal-plan-*.tsx`, `app/api/nutrition/meal-plans/` |
+| Which plan variant applies | `components/nutrition/plan-variant-day.ts` (`trainingDayForPlanDate` — three values, `undefined` meaning UNKNOWN) → `MealPlanSection`'s `pickVariant`. **Only TODAY is answerable**: `getNextSession` takes no date, and the owner's programs are all `rotation` with zero `schedule_days` (LA-184; per-date is `LB-195`) |
 | Meal plan in Coach | `lib/coach/widgets.ts` (`PlanCardSchema`, `PLAN_CARD_ACTIONS`), `lib/coach/tools.ts` (`showMealPlan`), `components/coach/plan-card.tsx`, `packages/shared/src/nutrition/save-plan-meal.ts` |
 
 **`app/nutrition/nutrition-content.tsx` is the canonical local-first read pattern** for the whole
 app — its supplements reads (`getLocalStore(userId)` → `store.getSupplements()`, API only as
 fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offline-First".
+
+**A meal plan's day type is only knowable for TODAY** (LA-184, 2026-09-30) — and the reason is the
+owner's own data, measured in production: **all five of his programs are `type: 'rotation'` with
+`rest_after_n: 3` and ZERO `schedule_days` rows**, so the weekly day-of-week branch of
+`getNextSession` has never been taken for him, and a rotation's day type for a date comes from
+workout history the client does not hold. `getNextSession(userId, timezone?)` also takes no date,
+which is why `next-session` is a `cachedFetchToday` key. `trainingDayForPlanDate` therefore answers
+`undefined` for any other day, and `pickVariant` treats that as the rest variant it already showed.
+**⛔ `!isRestDay` is not "training day"** — with no active program the recommendation is
+`{ isRestDay: false, reason: 'No active program configured' }` with no session, a claim about
+nothing. Per-date is `LB-195`, which first has to settle that a PAST day type is a fact and a future
+one is a projection.
+See [`the journal entry`](../../overview/entries/2026-09-30-fix-la184-split-plan-training-variant.md).
 
 **Food rows: the name leads, the brand follows** (RV-208 ⑤, 2026-09-30). `foodSecondaryLine`
 (`components/nutrition/food-name-line.ts`) is the one place that joins them, across all six

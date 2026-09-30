@@ -6347,6 +6347,44 @@ drift.
   future estimates; and the replay figure is recorded here. **Device pass owed** on the resolve sheet.
 
 
+### [nutrition][workouts] LB-195 — a meal plan's day type is only knowable for TODAY, and the owner's schedule is the reason
+
+- **Lane: A** · **Added:** 2026-09-30 · Lane B, the half of `LA-184` that Lane B could not reach.
+- **What shipped, so this entry is not re-solving it.** `LA-184`'s split-variant bug is fixed **for
+  today**: `ActivePlanCard` now reads `next-session` and passes `isTrainingDay`, and a split plan
+  shows its training variant on a training day. **Every other date still shows the rest variant**,
+  which is what it did before, so nothing regressed — but the card has day chevrons and the plan is
+  rendered for `logDate`, so the answer is wrong-by-omission on any day he navigates to.
+- **⛔ IT IS NOT A MISSING PARAMETER — THE DATA TO ANSWER IT DOES NOT EXIST CLIENT-SIDE.** Measured
+  2026-09-30 against production `claude_ro`, not inferred: **all five of the owner's programs are
+  `type: 'rotation'` with `rest_after_n: 3`, and every one has ZERO `schedule_days` rows.** So there
+  is no day-of-week map to read, and the weekly branch of `getNextSession`
+  (`adapter.ts`, `schedule?.type === 'weekly' && schedule.days?.length`) has never once been taken
+  for him. A rotation's day type for a given date is a function of **workout history** — where the
+  rotate-3-then-rest cycle has got to — which only the server holds.
+- **And `getNextSession(userId, timezone?)` takes no date.** The whole recommendation is about today;
+  the `next-session` cache key is `cachedFetchToday` for the same reason. There is no per-date
+  answer to ask for.
+- **⚠ Two DIFFERENT questions are hiding in "is date D a training day", and they need separate
+  answers before anything is built.** For a **past** date it means *did he train* — already
+  answerable from `workout_sessions`, and it is what the week strip shows. For a **future** date it
+  means *would the rotation put a session there*, which is a projection, and a projection can be
+  falsified by a single unplanned rest day. Answering both with one boolean is how a card ends up
+  confidently wrong about last Tuesday.
+- **Recommendation: answer the PAST from history and leave the future unknown.** A past day type is
+  a fact, it is the half he can actually check against what he ate, and `getRecentTrainedDays`
+  already reads it. A projected future day type is a guess the plan would present as a target —
+  and `LA-184`'s `undefined` third state already renders correctly for it.
+- **The alternative, and what it is better at:** project the rotation forward too. It is better at
+  the one case that matters for planning — deciding tonight what to eat tomorrow — and if that turns
+  out to be what he wants, it is his call rather than an engineering one, so it goes to `O` first.
+- **BF-203a needs the same answer server-side** for its estimator, which is the argument for putting
+  it in one place rather than two: a per-date day type belongs beside the schedule logic, not in a
+  nutrition component.
+- **Done when** a split plan shows the right variant for a past date the owner navigates to, from a
+  server answer, with a test that pins a rotation schedule with zero `schedule_days` — the shape his
+  own data has, and the one a weekly fixture would never exercise.
+
 ### [nutrition] LA-184 — a split meal plan always shows its rest-day variant, because nothing passes `isTrainingDay`
 - **Lane: B** — `components/nutrition/meal-plan-section.tsx` and whichever `app/nutrition/**` screen renders it.
 - **Added:** 2026-09-30 · Lane A, found while building BF-203a.
@@ -6357,11 +6395,30 @@ drift.
 - **Not live for the owner today:** his only plan was soft-deleted on 2026-08-11. It bites the next
   split plan anyone makes, and the AI generator makes split plans (`meal-plans/generate` builds
   `training`/`rest` variants).
-- **Do:** pass today's training-day flag from the user's schedule, the same source the rest of the
-  app uses for "is today a training day". BF-203a's estimator needs the same answer server-side,
-  so the variant choice should come from one shared helper rather than two copies.
-- **Done when** a split plan shows its training variant on a scheduled training day and its rest
-  variant otherwise, with a test on the chooser.
+- **✅ SHIPPED 2026-09-30 (Lane B) FOR TODAY — and the entry's stated source does not exist.**
+  `ActivePlanCard` now reads `next-session` through `useCachedValue` (`today: true`,
+  `NEXT_SESSION_TTL`) and passes `isTrainingDay`; `components/nutrition/plan-variant-day.ts` holds
+  the derivation. **The bug was visible on screen the whole time** — the card renders
+  `variant.dayType` as a badge, so a split plan read *"Rest day"* on a training day.
+  **⛔ "Pass today's flag from the user's schedule" had nothing to read.** Measured against
+  production `claude_ro` rather than assumed: **all five of the owner's programs are
+  `type: 'rotation'` with `rest_after_n: 3` and ZERO `schedule_days` rows**, so the weekly
+  day-of-week branch of `getNextSession` has never been taken for him, and a rotation's day type
+  comes from workout history the client does not hold. `getNextSession(userId, timezone?)` also
+  **takes no date** — the recommendation is about today, which is why `next-session` is a
+  `cachedFetchToday` key. So today is the only date answerable from Lane B, and the per-date half
+  is **`LB-195`** (`Lane: A`), which also carries the two different questions hiding inside it (a
+  PAST day type is a fact; a future one is a projection).
+  **⛔ And `!isRestDay` is not "training day"** — with no active program `getNextSession` returns
+  `{ isRestDay: false, reason: 'No active program configured' }` and no session, a claim about
+  nothing. The helper answers a third value, `undefined`, and `undefined` falls through to exactly
+  the rest-variant behaviour that was there before, which is what makes a today-only fix safe.
+  **8 unit tests + 3 browser tests**, all control-run: removing the prop reddens only the
+  training-day case, which is the defect's own signature.
+- **Keep:** the per-date half, and it is `LB-195`'s rather than this entry's. Nothing is owed on a
+  device — the seeded database and production both hold **zero `meal_plans`** (`count(*)`), so the
+  render used stubbed payloads, and there is no split plan anywhere for a phone to look at. When the
+  owner next makes one, the badge is the thing to glance at.
 
 ### [nutrition] BF-203a — phase A: the `estimated` answer state, and counting it once
 - **Lane:** A — migration, `plan_meal_answers`, `packages/shared/src/nutrition/meal-estimate.ts`, `lib/health/energy-balance-service.ts`.
