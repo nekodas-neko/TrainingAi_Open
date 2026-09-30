@@ -2086,30 +2086,6 @@ below threshold and left in place for next time.
   for it in Google Calendar. **Not reachable from the container**, which has no Google refresh token;
   everything short of a real credential was exercised, the live token exchange included.
 
-### [app-shell] OR-167 — two icon libraries ship; the smaller one is six files
-- ✅ **ANSWERED 2026-09-30 — KEEP BOTH icon libraries. This is AGAINST the recommendation.** The
-  entry argued for dropping the 6-file library against lucide's 270; the owner chose not to change
-  icons on screens he reads mid-run for a dependency saving. **The measurement is not a reason to
-  re-ask** — it was put to him with those numbers.
-  **Consequence to write down rather than rediscover:** two icon sets stay in the bundle, so a
-  future contributor has no rule saying which to reach for. If that becomes a real problem it is a
-  new entry about consistency, not a re-run of this one.
-
-- **Lane: B** · **Added:** 2026-09-25 · OR-165's dependency audit.
-- **Measured 2026-09-25:** `lucide-react` (**43 MB**) is imported by **270** files;
-  `@phosphor-icons/react` (**41 MB**) by **six**, for five icons — `HeartIcon`, `PauseIcon`,
-  `PlayIcon`, `StopIcon`, `FootprintsIcon` — all in the activity and run screens
-  (`components/activity/**`).
-- **Proposal:** move those five onto lucide (`Heart`, `Pause`, `Play`, `Square`, `Footprints`) and
-  drop the dependency. Two icon sets in one app is also a consistency problem independent of size.
-- **⚠ THE OWNER SEES THESE ICONS DURING A RUN, so this is a look change, not a cleanup.** Phosphor
-  and lucide draw the same concepts differently — weight, corner radius, the foot shape. **Show a
-  before/after at 384 px dark before building it**, per CLAUDE.md's mockup rule.
-- **Do not fold this into an unrelated PR.** A silent icon swap on a daily screen is exactly the
-  change that gets noticed and resented afterwards.
-- **Not established:** whether lucide has an acceptable `FootprintsIcon` equivalent — it has
-  `Footprints`, unchecked against the current glyph.
-
 ### [platform] OR-184 — the collaborator's issue and two PRs, and the channel that had no reader
 
 - **Lane: O** — the routing only. **The three are now covered by a standing rule rather than by this
