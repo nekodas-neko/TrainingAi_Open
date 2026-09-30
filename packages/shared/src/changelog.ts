@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.486.6",
+    date: "2026-09-30",
+    changes: [
+      "The two ⓘ buttons behind your calorie figures had the same name for a screen reader — Nutrition's now says it explains today's calorie budget, and Health's says it explains your energy balance. Nothing on screen looks different.",
+    ],
+  },
+  {
     version: "1.486.5",
     date: "2026-09-30",
     changes: [

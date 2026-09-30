@@ -13982,28 +13982,6 @@ anchor that then moves.
 phase the owner reaches; and TN-25's three options no longer need answering, because no single session
 is claiming to be both.
 
-### [nutrition][app-shell] LB-189 — two controls share one accessible name, and the tab shell keeps both mounted
-
-- **Lane: B** — `components/nutrition/energy-card.tsx`, `components/nutrition/calorie-balance-bar.tsx`.
-- **Added:** 2026-09-30 · Lane B, found while proving `BF-138`'s copy renders.
-- **Both carry `aria-label="How energy balance is calculated"`** — `energy-card.tsx:218` (Nutrition)
-  and `calorie-balance-bar.tsx:75` (Health). The tab shell keeps every tab's tree mounted, so both
-  are in the accessibility tree whichever screen is open.
-- **What it cost to find:** a document-wide `getByRole('button', { name: … }).first()` clicked the
-  **off-screen** one for a full 60 seconds while `aria-expanded` stayed `false`. That reads as a dead
-  button and is a mis-aimed one — the class `tapInView` exists for, met here first-hand.
-  `e2e/bf138-energy-model-explainer.spec.ts` works around it and records why; the duplicate itself is
-  not fixed.
-- **Why it is more than a test nuisance.** Two controls with the same name on one accessibility tree
-  is a real duplicate for a screen reader, which cannot use the viewport to tell them apart the way a
-  sighted user does.
-- **Fix:** name each for its own surface (*"How today's budget is calculated"* on Nutrition,
-  *"How the energy bar is calculated"* on Health, or similar). Check for other specs matching the
-  shared string before renaming — `grep -rn 'How energy balance is calculated' e2e/`.
-- **Position is priority and this is placed deliberately:** adjacent to the surfaces it concerns and
-  cheap, not urgent. Nothing is broken for a sighted user today.
-- **Reversal cost:** none — two label strings.
-
 ### [nutrition][body] BF-137 — the maintenance estimator is fitting a GLP-1 weight drop and calling it metabolic rate 🔴 LIVE
 - **✅ ANSWERED 2026-09-28 — he REFUSED the date, and the replacement is better.**
   Verbatim: *"Try incorporate supplements usage with other factors. We want it to be supplement

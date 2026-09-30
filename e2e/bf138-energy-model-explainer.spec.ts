@@ -83,27 +83,26 @@ async function overlay(page: import('@playwright/test').Page, v: typeof SPEAKS |
 /**
  * Open the ⓘ panel and keep it open.
  *
- * **TWO controls carry this exact accessible name** — `energy-card.tsx` on Nutrition and
- * `calorie-balance-bar.tsx` on Health — and the tab shell keeps every tab's tree mounted, so both
- * are in the DOM whichever screen you are on. A `.first()` here clicked the off-screen one for 60
- * seconds while `aria-expanded` stayed `false`, which reads as a dead button and is a mis-aimed one:
- * the documented failure `tapInView` exists for. Resolution stays with the locator; `tapInView` only
- * adds the viewport filter a document-wide match cannot do for itself.
+ * **This used to need `evaluateAll` across two matches, and `LB-189` removed the reason.** Two
+ * controls carried the one accessible name *"How energy balance is calculated"* —
+ * `energy-card.tsx` on Nutrition and `calorie-balance-bar.tsx` on Health — and the tab shell keeps
+ * every tab's tree mounted, so both were in the DOM whichever screen you were on. A `.first()`
+ * clicked the OFF-SCREEN one for 60 seconds while `aria-expanded` stayed `false`, which reads as a
+ * dead button and is a mis-aimed one. They are named apart now, so the locator resolves to exactly
+ * one element and `toHaveCount(1)` is the standing guard against the duplicate coming back.
  *
- * The `toPass` loop is separately load-bearing: `showInfo` is local state on a card that revalidates
- * in the background, so a remount puts the panel back to closed and one click is a race.
+ * **The other two mechanisms stay, because they were never about the duplicate.** `tapInView`
+ * because the control can sit below the fold, and the `toPass` loop because `showInfo` is local
+ * state on a card that revalidates in the background — a remount puts the panel back to closed, so
+ * one click followed by an assertion is a race.
  */
 async function openInfoPanel(page: import('@playwright/test').Page): Promise<void> {
-  const toggle = page.getByRole('button', { name: 'How energy balance is calculated' })
-  await expect(toggle.first()).toBeVisible({ timeout: 60_000 })
+  const toggle = page.getByRole('button', { name: "How today's calorie budget is calculated" })
+  await expect(toggle).toHaveCount(1, { timeout: 60_000 })
+  await expect(toggle).toBeVisible()
   await expect(async () => {
-    const open = await toggle.evaluateAll(els =>
-      els.some(el => el.getAttribute('aria-expanded') === 'true'))
-    if (!open) await tapInView(page, toggle)
-    await expect
-      .poll(() => toggle.evaluateAll(els => els.some(el => el.getAttribute('aria-expanded') === 'true')),
-        { timeout: 3_000 })
-      .toBe(true)
+    if (await toggle.getAttribute('aria-expanded') !== 'true') await tapInView(page, toggle)
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true', { timeout: 3_000 })
   }).toPass({ timeout: 60_000 })
 }
 

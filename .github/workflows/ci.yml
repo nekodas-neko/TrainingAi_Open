@@ -428,6 +428,9 @@ jobs:
       - name: An e2e route handler that fetches tolerates the test ending
         run: node scripts/check-e2e-route-tolerance.js
 
+      - name: No two controls share one accessible name
+        run: node scripts/check-duplicate-aria-labels.js
+
       - name: A session's stored icon is never rendered as text
         run: node scripts/check-session-icon-render.js
 

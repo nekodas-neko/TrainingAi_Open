@@ -519,6 +519,14 @@ Live at the time of writing (2026-07-30):
   12 px, no token below `text-xs` — which is why every one was a literal). The workout screens' nine
   named sites are on it; the remaining 103 across 24 files are a per-file shrink-only ratchet rather
   than a sweep.
+- **[`2026-09-30-fix-lb189-duplicate-accessible-names`](../../overview/entries/2026-09-30-fix-lb189-duplicate-accessible-names.md)**
+  — **the tab shell keeps every tab's tree mounted, so a name unique per SCREEN is not unique per
+  DOCUMENT.** Two energy-balance ⓘ toggles shared `aria-label="How energy balance is calculated"`, and
+  a document-wide `.first()` clicked the off-screen one for 60 s while `aria-expanded` stayed `false`.
+  A census of every static `aria-label` found 17 repeats, **15 legitimately repeated** (one-per-surface
+  dismiss/nav controls, the admin console, and one pair where a PUSHED route is not co-mounted with its
+  tab) plus one more of the same class. `scripts/check-duplicate-aria-labels.js` holds it, printing the
+  interpolated labels it cannot compare.
 - **[`2026-09-30-fix-rv208-date-and-brand-forms`](../../overview/entries/2026-09-30-fix-rv208-date-and-brand-forms.md)**
   — RV-208 ④⑤, the last two parts. **`'long'` (`Saturday 26 September`) is the form a day-scoped
   HEADER takes**: there were three, and `weekday-date-long` pairs a long weekday with `en-AU`'s
