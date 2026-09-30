@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.486.7",
+    date: "2026-09-30",
+    changes: [
+      "The Resilience tile on Readiness now tells you WHEN its number is from. It reads the most recent day in the last week that had one, which is not always today \u2014 on 27 September it was showing 22 September's level with nothing saying so.",
+      "And when there is no level at all it now says what was seen instead of disappearing: how many of the last seven days had enough daytime wear, beside how many days the model needs. Those two counts sit side by side and nothing claims one caused the other.",
+    ],
+  },
+  {
     version: "1.486.6",
     date: "2026-09-30",
     changes: [
