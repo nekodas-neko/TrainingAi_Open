@@ -185,15 +185,16 @@ export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef,
     if (store) {
       try {
         const rows = await store.getPlanMealAnswers(date)
-        applyAnswers(date, rows.map(r => r.planMealId))
+        // BF-203a: an 'estimated' answer is the app's assumption, not the user saying no.
+        applyAnswers(date, rows.filter(r => r.answer === 'no').map(r => r.planMealId))
         return
       } catch { /* fall through to the online read */ }
     }
     try {
       const res = await fetch(`/api/nutrition/plan-meal-answers?date=${date}`)
       if (!res.ok) return
-      const data = await res.json() as { answers?: { planMealId: string }[] }
-      applyAnswers(date, (data.answers ?? []).map(a => a.planMealId))
+      const data = await res.json() as { answers?: { planMealId: string; answer?: string }[] }
+      applyAnswers(date, (data.answers ?? []).filter(a => (a.answer ?? 'no') === 'no').map(a => a.planMealId))
     } catch { /* offline and no store — leave the set as it is */ }
   }, [userId, applyAnswers])
 
