@@ -265,8 +265,18 @@ export function HealthScoreDetail({
             </div>
           </div>
         )}
-        {title === "Readiness" && data?.ownResilienceLevel != null && data.ownResilienceBand != null && (
-          <ResilienceTile level={data.ownResilienceLevel} band={data.ownResilienceBand} confidence={data.ownResilienceConfidence} />
+        {/* LA-158. The gate is the DATA, not the level: the tile renders a stale level with its
+            date and no level with what was observed, and returns null itself when there is
+            neither. Gating on `ownResilienceLevel != null` here is what made a closed coverage
+            gate indistinguishable from a healthy quiet day. */}
+        {title === "Readiness" && data && (
+          <ResilienceTile
+            level={data.ownResilienceLevel}
+            band={data.ownResilienceBand}
+            confidence={data.ownResilienceConfidence}
+            asOf={data.ownResilienceAsOf}
+            unavailable={data.ownResilienceUnavailable}
+          />
         )}
         {breakdown && data && breakdown(data)}
 

@@ -4691,7 +4691,11 @@ which is the right shape for something that can only be validated by living with
       minimum. Reading it as a healthy regime to contrast against the level-5 one overstates it.
     - **This does not explain the level-5 regime** and is not offered as doing so. It is a separate,
       later fault on the same metric.
-    - **The actionable half is filed as LA-158** — nothing anywhere says the metric has stopped.
+    - ~~**The actionable half is filed as LA-158** — nothing anywhere says the metric has stopped.~~
+      **✅ LA-158 SHIPPED IN FULL 2026-09-30** (engine 09-27 Lane A, surface 09-30 Lane B, v1.486.7)
+      and has left the queue: the tile names the day a stale level came from, and when there is no
+      level it states what was observed instead of rendering nothing. The wear-vs-ingest question
+      it raised is **LA-160**.
 
   - **⚙ THE PRESCRIBED PASS WOULD DESTROY THIS ENTRY'S OWN EVIDENCE — measured 2026-09-27 (Lane A).
     Do not run it before reading [`docs/reviews/2026-09-27-tn70-resilience-snapshot.md`](reviews/2026-09-27-tn70-resilience-snapshot.md).**
@@ -4710,33 +4714,6 @@ which is the right shape for something that can only be validated by living with
       values in both regimes (`{5,6,7,8}/14`), so it separates nothing — the 0.464-vs-0.434 means
       overstate it. And the `resilience_daily_sleep_recovery` finding rests on **5 days against 6**,
       not 16 against 14: the three daily indices are NULL on the other 19 rows.
-
-### [readiness][devices] LA-158 — resilience stopped publishing and the surface says nothing
-- **Lane: B** — the payload half shipped (below); what is left is rendering it.
-- **Branch:** _unassigned_ · **Added:** 2026-09-27 · found verifying TN-70 against production.
-- **⚙ THE ENGINE HALF SHIPPED 2026-09-27 (Lane A), and it corrected this entry's premise.**
-  The entry said the tile had gone blank. It had not: `buildReadinessPayload` reads a **7-day**
-  window (`getOuraDailyDerived(userId, from7dIso, todayIso)`) and takes the most recent row with a
-  level, so on 2026-09-27 the tile was **rendering 09-22's level 1 as if it were today's, with no
-  date** — and would have gone silently blank once 09-22 left the window. Two defects, and the
-  live one was staleness rather than absence.
-  - `ReadinessScoreResponse` now carries **`ownResilienceAsOf`** (the day the level came from) and
-    **`ownResilienceUnavailable`** (`daysSeen`, `daysMeetingCoverageGate`, `coverageGateMinutes`,
-    `minValidDays`, `modelWindowDays`) via the new pure `observeResilienceCoverage` in
-    `lib/health/stress-resilience.ts`.
-  - **It is an OBSERVATION, not a diagnosis, deliberately.** The payload sees 7 days while the
-    model gates on `windowDays` (14), so a shortfall it can see does not establish that the
-    coverage gate is why nothing published. The fields make a true sentence — *"2 of the last 7
-    days had enough daytime coverage; the model needs 5 of 14"* — and stop there. A test pins the
-    absence of a `reason` field so a later "tidy-up" cannot turn it into a verdict.
-- **What is left, and it is Lane B's:** render them. `components/health/resilience-tile.tsx` takes
-  level/band/confidence and no date, and `health-score-detail.tsx:265` renders the tile only when
-  `ownResilienceLevel != null`. So: show `ownResilienceAsOf` (or a staleness marker) whenever the
-  level is not today's, and when there is no level render the shortfall from
-  `ownResilienceUnavailable` instead of rendering nothing.
-- **Do NOT "fix" this by lowering the gate.** 4 hours of daytime coverage is the vendor model's own
-  constant, and a level computed from 50 minutes would be worse than no level.
-- **Keep:** the Lane B render above. The wear-vs-ingest question is now **LA-160**.
 
 ### [readiness][devices] LA-160 — is the ring actually worn in the daytime, or has daytime-stress ingest degraded?
 - **Lane: DV** — only the phone can separate these two.
