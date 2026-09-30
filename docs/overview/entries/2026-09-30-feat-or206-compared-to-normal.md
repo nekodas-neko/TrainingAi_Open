@@ -72,3 +72,16 @@ Rendered at **384 px dark, portrait**.
   here re-tests it.
 - **Whether "Compared to normal" is the wording he wants.** It is the entry's reading of his words
   and was not put back to him. Changing it later is one line plus this guard.
+
+## A correction to something this session wrote an hour earlier
+
+`#2026` came back with **all four E2E shards green** — including `meal-type-reassign`, which
+`#2026`'s own PR had just recorded on `LB-56` as a confirmed sharding casualty that *"failed its
+automatic retry in the same run"*.
+
+Recorded rather than left, because a claim that has already moved is worse than none. **It does not
+restore the flake reading.** `#2026` renamed an e2e spec, the shards are filled in file order, so
+which specs ran beside `meal-type-reassign` changed between the two runs. That is this entry's own
+thesis — *which specs run together decides it* — so the sharper statement is that the spec is
+sensitive to its shard's contents, and **passing is as uninformative as failing** until it creates
+its own state.

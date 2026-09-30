@@ -15299,6 +15299,13 @@ re-proved on 2026-09-04** — three specs pass in isolation and fail in the full
     entry because the fix is this entry's — make the spec create its own state — not a separate bug.
     ⚠ It was written up in #2023's journal as *"not reproduced"* on one data point; that read is now
     superseded, and *"flake" was correctly refused as a root cause there.*
+    **⚠ AND IT PASSED ON THE VERY NEXT RUN** (#2026, 2026-09-30, all four shards green) — recorded
+    here the same day the line above was written, because a claim that has already moved is worse
+    than none. This does NOT restore the flake reading: #2026 **renamed an e2e spec**, and the
+    shards are filled in file order, so which specs run beside `meal-type-reassign` changed between
+    the two runs. That is precisely this entry's thesis — *which specs run together decides it* —
+    so the sharper statement is that the spec is **sensitive to its shard's contents**, and passing
+    is as uninformative as failing until it creates its own state.
 
 - **⚠️ Do not trust a local full-suite run without checking the dev server survived it.** A re-run
   after the meal-plan fix reported **106 failed / 41 passed** — almost every failure at ~250ms,
