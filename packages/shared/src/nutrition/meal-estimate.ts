@@ -3,6 +3,9 @@
 // slots are owed an estimate and at what macros. No I/O, no clock, no timezone maths — the caller
 // resolves the user-local hour and passes it in, which is what makes the boundary testable.
 
+import type { MealType } from '@trainingai/shared/types/nutrition'
+import { planMealTypeId } from './meal-type-for-time'
+
 export interface EstimateSlot {
   planMealId: string
   /** The plan meal's stored meal type (LA-172 gives every timed meal one). */
@@ -36,6 +39,32 @@ export function slotCloseHour(typeEndHour: number | null | undefined, suggestedT
   const end = typeof typeEndHour === 'number' ? typeEndHour : null
   if (end == null && suggested == null) return null
   return Math.max(end ?? 0, suggested ?? 0)
+}
+
+/**
+ * The estimate slots of one plan variant. A meal's type is its stored tag, else the window its
+ * suggested time falls in or is nearest to (LA-172's rule, the same one the server stores). A meal
+ * with no resolvable type or close hour is left out: it can never be estimated, rather than being
+ * estimated at a guessed time.
+ */
+export function estimateSlotsFor(
+  meals: readonly { id: string; mealTypeId: string | null; suggestedTime: string | null; targetCalories: number; targetProteinG: number; targetCarbsG: number; targetFatG: number }[],
+  mealTypes: readonly MealType[],
+): EstimateSlot[] {
+  const slots: EstimateSlot[] = []
+  for (const m of meals) {
+    const mealTypeId = planMealTypeId(m, mealTypes as MealType[])
+    if (!mealTypeId) continue
+    const type = mealTypes.find(t => t.id === mealTypeId)
+    const closeHour = slotCloseHour(type?.timeEndHour, m.suggestedTime)
+    if (closeHour == null) continue
+    slots.push({
+      planMealId: m.id, mealTypeId, closeHour,
+      targetCalories: m.targetCalories, targetProteinG: m.targetProteinG,
+      targetCarbsG: m.targetCarbsG, targetFatG: m.targetFatG,
+    })
+  }
+  return slots
 }
 
 export function dueForEstimate(input: {

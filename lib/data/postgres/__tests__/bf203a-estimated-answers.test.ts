@@ -84,4 +84,43 @@ describe.skipIf(!canRun)('estimated plan-meal answers (BF-203a)', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0].answer).toBe('estimated')
   })
+
+  // Task 8′. The device pushes an estimate through the outbox. Before this branch existed, every
+  // plan_meal_answers mutation went to savePlanMealAnswer and would have landed as a DECLINE.
+  describe('pushed from a device', () => {
+    const push = (payload: Record<string, unknown>, id = randomUUID()) =>
+      repo.pushMutations(TEST_USER_ID, [{ id, domain: 'plan_meal_answers', date: DAY, payload }])
+    const estimatePayload = (rowId: string) => ({
+      id: rowId, planMealId: mealId, logDate: DAY, answer: 'estimated',
+      estCalories: 480, estProteinG: 30, estCarbsG: 40, estFatG: 10, estBiasKcal: 0, estBasis: 'planA',
+    })
+
+    it('stores it as an estimate, under the device row id', async () => {
+      const rowId = randomUUID()
+      const res = await push(estimatePayload(rowId))
+      expect(res.errors ?? []).toEqual([])
+      const [row] = await repo.listPlanMealAnswers(TEST_USER_ID, DAY)
+      expect(row).toMatchObject({ id: rowId, answer: 'estimated', estCalories: 480 })
+    })
+
+    it('is a no-op when replayed, and never overwrites a decline', async () => {
+      const rowId = randomUUID()
+      await push(estimatePayload(rowId))
+      await push(estimatePayload(rowId))
+      expect(await repo.listPlanMealAnswers(TEST_USER_ID, DAY)).toHaveLength(1)
+      await pool.query('DELETE FROM plan_meal_answers WHERE user_id = $1', [TEST_USER_ID])
+      await repo.savePlanMealAnswer(TEST_USER_ID, { planMealId: mealId, logDate: DAY })
+      await push(estimatePayload(randomUUID()))
+      const [row] = await repo.listPlanMealAnswers(TEST_USER_ID, DAY)
+      expect(row).toMatchObject({ answer: 'no', estCalories: null })
+    })
+
+    it('rejects an estimate with no calories, and one for a meal that is not the caller\'s', async () => {
+      const noKcal = await push({ ...estimatePayload(randomUUID()), estCalories: undefined })
+      expect(noKcal.errors?.[0]?.error).toMatch(/without calories/)
+      const foreign = await push({ ...estimatePayload(randomUUID()), planMealId: randomUUID() })
+      expect(foreign.errors?.[0]?.error).toMatch(/non-owned/)
+      expect(await repo.listPlanMealAnswers(TEST_USER_ID, DAY)).toEqual([])
+    })
+  })
 })
