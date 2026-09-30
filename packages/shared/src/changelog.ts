@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.486.9",
+    date: "2026-09-30",
+    changes: [
+      "AI Build can now base a new program on one you already have. Pick it on the first step beside the name, and the generator sees that program's sessions and exercises and builds something similar \u2014 the server had been able to do this for a month with nothing on screen to ask for it.",
+      "Optional: leave it on \"From scratch\" and nothing changes.",
+    ],
+  },
+  {
     version: "1.486.8",
     date: "2026-09-30",
     changes: [

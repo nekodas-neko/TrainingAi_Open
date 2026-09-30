@@ -18822,10 +18822,30 @@ deadlifts in the builder gets deadlifts again the next time the engine writes a 
 > **An id, never a program object** — accepting the structure from the client would be an ownership
 > hole and a prompt-injection surface for nothing the id does not already give.
 >
-> - **Keep — step 3, the picker (Lane B).** `listPrograms` already exists; one control in the
->   builder wizard, and no reference selected leaves today's behaviour unchanged. **Nothing reaches
->   the owner until this ships** — the parameter has no caller.
+> - ~~**Keep — step 3, the picker (Lane B).**~~ **✅ SHIPPED 2026-09-30 (Lane B, v1.486.9) — the
+>   parameter has a caller at last.** `ReferenceProgramPicker` sits on **step 1**, beside the name
+>   field, rather than as an eleventh step: it is optional, so no selection sends nothing and the
+>   generator behaves exactly as before, which is what makes an existing step safe and avoids
+>   renumbering a ten-step wizard. It self-hides when there is nothing to reference.
+>   **No Lane A file was touched, and that was a choice worth recording.** The program list comes
+>   from `GET /api/workout-templates` (`{ programs }` off `listPrograms`), read through the SAME key,
+>   URL, TTL and fetch variant `config-screen.tsx` already uses — `useCachedValue` rather than a
+>   `useEffect(…, [])`, so a program created in the config screen behind this sheet joins the list
+>   (Q-402). The id is held in the wizard's own state rather than added to `BuilderInputs`, because
+>   `packages/shared/src/types/builder.ts` is Lane A's file and the route already declares
+>   `referenceProgramId` at the top level; it earns a place in the shared type when a second consumer
+>   wants it, the review screen naming what it was based on being the obvious one.
+>   **`null` is omitted rather than sent** — the schema is `.strict()` and
+>   `z.string().uuid().optional()` rejects an explicit null, so "no reference" has to mean "no key",
+>   and a rejected body would be a 400 for the whole generation.
+>   **The route's an-id-never-an-object rule is asserted ON THE WIRE**, not in the source: the e2e
+>   reads the request body and checks no `sessions`/`exercises` structure rode along with the id.
 > - **Keep — step 4, the history summary.** Deliberately separate; step 2 sends structure only.
+>   **⚠ And one harness hazard found while driving the wizard, recorded because it will bite again:**
+>   step 3 is a `WeightDial`, and **`tapInView` scrolls** — bringing the Next button into view over a
+>   scroll-wheel moves it, so the spec's request carries `sessionsPerWeek: 1` rather than the default
+>   3. Harmless there (the dial floors at 1), and fatal to any spec that asserts a dial's value after
+>   a later scroll.
 > - **⚠ The name-drift caveat is real and measured.** Reference names go through LA-43's resolver
 >   before entering the prompt, but the seeded program's `Bench Press` / `Overhead Press` /
 >   `Romanian Deadlift` do **not** resolve — the library holds `Barbell Bench Press` and the resolver
