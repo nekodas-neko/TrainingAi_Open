@@ -8852,7 +8852,7 @@ drift.
   sandbox session: `curl -sSL -o a.zip https://api.github.com/repos/<owner>/<repo>/actions/artifacts/<id>/zip`
   returned **200, 15,686,307 bytes**. Get the id from `get_job_logs` (the upload step prints
   `Artifact ID …`).
-- **⚑ THE WITNESS ARRIVED 2026-09-30, AND IT IS NOT OOM — READ FROM RUN 36699855503 (#2016).** Two
+- **⚠ CORRECTED 2026-09-30, SAME DAY, BY THE SESSION THAT WROTE IT. This line said "THE WITNESS ARRIVED" and it is the NINTH sighting, not the first — `LB-56` has carried this exact fault address since 2026-09-09, six times over.** I read the artifact, found `SEGV_MAPERR 0000000001b0`, and wrote it up as new without grepping the backlog for `0x1b0`, which returns it immediately. **What that costs is not pride but evidence:** the prior sightings date the crash to at least 2026-09-09, across eight runs, so it predates everything shipped recently and the "one reproducible code path" reading is far better supported than one run could make it. `LB-56`'s FOURTH sighting also already settled the mechanism — `net::ERR_ABORTED` and `browser.newContext: … has been closed` are two downstream views of ONE crash, proved by an attempt and its retry producing one of each. **Read `LB-56` before adding anything here.** What this run genuinely added is below, and it is the STACK LOCATION and the OOM refutation, nothing else — read from run 36699855503 (#2016), two of whose five E2E failures are this crash:
   of that run's five E2E failures are this crash, and both carry the same line in
   `error-context.md`'s browser log:
 
@@ -8864,8 +8864,8 @@ drift.
   SIGKILL with an `Out of memory` line, so **memory is out as the explanation** and the dmesg branch
   no longer has a question to answer. Four things the backtrace establishes, and one it does not:
   - **The same fault ADDRESS in two independent shards** (`lb186-new-exercise-has-a-style` on shard
-    2, `meal-portion-scale` on shard 2), which points at one reproducible code path rather than
-    random corruption.
+    2, `meal-portion-scale` on shard 2) — and, per the correction above, **the same address in eight
+    earlier runs going back to 2026-09-09**. One reproducible code path, not random corruption.
   - **It is the BROWSER process, not a renderer.** The stack runs through
     `libglib-2.0`'s main loop (frames 16–18) into Chromium's own message pump — which is exactly
     why `browser.newContext` then fails for every later test in the shard, the cascade this entry
@@ -12874,9 +12874,21 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   anywhere in the app, the two `location.assign` call sites are behind a native-only custom event,
   and the one `beforeunload` handler mounts only mid-workout on the workout screen — none can
   supersede a navigation on `/`.
-- **The same run carried a real Chromium crash**, on `plan-rescale.spec.ts` — a native
-  `chrome-headless-shell` segfault with a full stack and `cr2: 0x1b0`. That is runner instability,
-  not app code, and it is context for how loaded that run was rather than a second bug to chase.
+- **⚠ CORRECTED 2026-09-30. This line called the same run's Chromium crash "context" and it is the
+  most likely CAUSE.** The run carried a native `chrome-headless-shell` segfault on
+  `plan-rescale.spec.ts` with `cr2: 0x1b0` — **the same fault address `LB-56` has recorded nine
+  times since 2026-09-09**, and `LB-56`'s FOURTH sighting already settled the mechanism: an attempt
+  and its retry of ONE test produced a `SIGSEGV` and a `net::ERR_ABORTED` respectively, so
+  `ERR_ABORTED` is **what a later test sees after the browser process is already gone**, not a
+  separate fault. Dismissing it as load is what left this entry saying "no cause is claimed" while
+  the cause was in its own log.
+- **What that changes here.** This entry's `ERR_ABORTED` is very likely `LB-149`/`LB-56`'s crash
+  wearing its downstream face, which explains every property that made it baffling: it never
+  reproduces locally, it lands on whichever spec happens to navigate next, and no app-side
+  suspect survived inspection. **It is still not PROVEN for this run** — the segfault was on a
+  different spec, and nobody has checked whether it preceded line 53 — so the honest next step is
+  to re-read run 34814623905's log for a `Received signal` line BEFORE the abort, which is a read
+  rather than an experiment. Do that before treating the relaunch reshape as the fix.
 - **Do NOT "fix" this by lengthening the poll timeout.** That is the change that makes a real
   hydration regression invisible — and on this evidence it would also be aimed at the wrong line.
 - **Changed 2026-09-14** (`fix/lb106-preferences-relaunch`): the relaunch is now a **new page**
@@ -15148,6 +15160,15 @@ short all day.
     `diary-nested-meal:163` both went flaky on `browser.newContext: Target page, context or browser
     has been closed` after `Received signal 11 SEGV_MAPERR 0000000001b0` — same address, fifth time.
     Both recovered; the run's one hard failure was a real fixture fault in a spec that PR added.
+  - **⚠ NINTH SIGHTING 2026-09-30 (#2016, run 36699855503), and it adds the STACK LOCATION.**
+    `lb186-new-exercise-has-a-style` and `meal-portion-scale` both died at `browser.newContext` after
+    `Received signal 11 SEGV_MAPERR 0000000001b0` — the same address for the seventh time, and the
+    first sighting in over two weeks. **What is new is where it dies:** the stack runs through
+    `libglib-2.0`'s main loop into the **BROWSER process's** message pump, not a renderer, which is
+    why every later test in that shard then fails to get a context. **And it rules OOM out** — a
+    SIGSEGV is not a kill; an OOM would be SIGKILL with an `Out of memory` line. Binary
+    `chrome-headless-shell-1234`, frames unsymbolised. `LB-149` tracks the cascade and now carries
+    this; **the two entries are the same fault and are cross-linked as of 2026-09-30.**
   - **⚠ EIGHTH SIGHTING 2026-09-14 (#1186), and it is the first with a CONTROLLED re-run.**
     `back-dismiss-sweep:171` was the hard failure — both its attempts died at `browser.newContext`
     after `Received signal 11 SEGV_MAPERR 0000000001b0`, the same address for the sixth time — beside
