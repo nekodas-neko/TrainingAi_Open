@@ -2086,30 +2086,6 @@ below threshold and left in place for next time.
   for it in Google Calendar. **Not reachable from the container**, which has no Google refresh token;
   everything short of a real credential was exercised, the live token exchange included.
 
-### [app-shell] OR-167 — two icon libraries ship; the smaller one is six files
-- ✅ **ANSWERED 2026-09-30 — KEEP BOTH icon libraries. This is AGAINST the recommendation.** The
-  entry argued for dropping the 6-file library against lucide's 270; the owner chose not to change
-  icons on screens he reads mid-run for a dependency saving. **The measurement is not a reason to
-  re-ask** — it was put to him with those numbers.
-  **Consequence to write down rather than rediscover:** two icon sets stay in the bundle, so a
-  future contributor has no rule saying which to reach for. If that becomes a real problem it is a
-  new entry about consistency, not a re-run of this one.
-
-- **Lane: B** · **Added:** 2026-09-25 · OR-165's dependency audit.
-- **Measured 2026-09-25:** `lucide-react` (**43 MB**) is imported by **270** files;
-  `@phosphor-icons/react` (**41 MB**) by **six**, for five icons — `HeartIcon`, `PauseIcon`,
-  `PlayIcon`, `StopIcon`, `FootprintsIcon` — all in the activity and run screens
-  (`components/activity/**`).
-- **Proposal:** move those five onto lucide (`Heart`, `Pause`, `Play`, `Square`, `Footprints`) and
-  drop the dependency. Two icon sets in one app is also a consistency problem independent of size.
-- **⚠ THE OWNER SEES THESE ICONS DURING A RUN, so this is a look change, not a cleanup.** Phosphor
-  and lucide draw the same concepts differently — weight, corner radius, the foot shape. **Show a
-  before/after at 384 px dark before building it**, per CLAUDE.md's mockup rule.
-- **Do not fold this into an unrelated PR.** A silent icon swap on a daily screen is exactly the
-  change that gets noticed and resented afterwards.
-- **Not established:** whether lucide has an acceptable `FootprintsIcon` equivalent — it has
-  `Footprints`, unchecked against the current glyph.
-
 ### [platform] OR-184 — the collaborator's issue and two PRs, and the channel that had no reader
 
 - **Lane: O** — the routing only. **The three are now covered by a standing rule rather than by this
@@ -10401,6 +10377,34 @@ why the count of affected entries always understated the harm.
   fixture, asserting that a two-cycle input yields "insufficient data" rather than a verdict. Browser
   is enough; no device path is involved.
 
+### [nutrition] LB-199 — store which meal types a saved meal is SUITABLE for, and seed it from history
+
+- **Lane: A** · **Added:** 2026-09-30 · Lane B, split out of `BF-183`, which said in prose that the
+  storage is Lane A's and then kept `Lane: B` — so it would have waited in the wrong queue.
+  **Postgres migration numbers and local SQLite versions are Lane A's alone.**
+- **What to store: a DECLARED, multi-valued `suitableMealTypeIds` per saved meal**, not an inferred
+  one. `BF-183`'s measurement is the proof and it is worth re-reading before designing this: the
+  owner's protein shake has **45 logs, every one at breakfast, none anywhere else**, and he names it
+  as suitable for **all four** meals. **History is a FLOOR on suitability and never the set**, so
+  anything derived from logs alone under-tags exactly the foods he uses most consistently.
+- **The seed, which is the only place history belongs:** pre-tick a meal type at **≥ 3 logs AND
+  ≥ 60%** of that meal's logs. Below that, tick nothing rather than guess — 4 of his 19 saved meals
+  have never been logged and 3 have a single log, and a pre-tick from one log is work he has to
+  undo. Server-side: one grouped query, and the threshold stays in one place.
+- **It rides the saved-meals payload** (`/api/nutrition/saved-meals`), which `BF-183` established by
+  reading the sheet: `saved-meals-sheet.tsx` fetches only `saved-meals` and `nutrition-meal-types`
+  and holds **no log history**, so a client-side seed would mean a new fetch on that screen.
+- **⚠ The local SQLite mirror is NOT optional.** That sheet reads local-first
+  (`store.getSavedMeals()`), so without the mirror the tags vanish offline on a list that otherwise
+  works offline — the exact offline-first inversion CLAUDE.md calls a recurring bug class.
+- **⚠ Deleting a meal type must not strand a reference.** Whichever shape is chosen, a removed meal
+  type has to drop out of every saved meal's set; a join table with a cascade gets this for free
+  where a JSON array does not, which is the main argument between them.
+- **Done when** a saved meal can carry any subset of the user's meal types including all of them,
+  it survives a round trip through the outbox and the local store, and the seed puts the 10
+  confident rows in `BF-183`'s table at their measured meal type with the 4 never-logged ones empty.
+- **`BF-183` (Lane B) renders it and is parked on this via `Needs:`.**
+
 ### [nutrition] BF-183 — tag My Foods rows with which meals a food CAN be used for, feeding the meal planner
 - ✅ **ANSWERED 2026-09-30 — LUCIDE ICONS, not the emoji. This is AGAINST the recommendation and
   was chosen deliberately.** The entry argued for the existing per-meal emoji as the smaller change;
@@ -10411,11 +10415,13 @@ why the count of affected entries always understated the harm.
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner: *"Can we have some sort of
   icon system to indicate which meal its good for? Maybe we could use the lucid icon pack for this.
   The tough part is when people add too many meals. But my standard of 4 it should go well."*
-- **Lane: B** — the list is `components/nutrition/saved-meals-sheet.tsx`. The affinity query is a
-  Lane A route if it is computed server-side; see the open question below.
-- **⚠ Recommend the existing per-meal-type EMOJI, not lucide — and this is the part worth arguing
-  before anyone writes code.** `meal_types` already has an `emoji` column, user-set, and the
-  Assign-to-Meal sheet already renders it. His four active types, measured 2026-09-20:
+- **Lane: B** — the RENDER half only: the tags on the rows in `components/nutrition/saved-meals-sheet.tsx`, and the picker that edits them.
+- **Needs: LB-199**
+- **✂ SPLIT 2026-09-30 (Lane B).** The entry answered its own routing question in prose — *"this is a schema change and therefore Lane A's to land"* — and then kept `Lane: B`, which is the shape CLAUDE.md warns about: **the lane field routes work and prose does not**, so the engine half would have sat in Lane B's queue indefinitely. The storage half is now **`LB-199`** and this entry waits on it.
+- **⛔ SUPERSEDED BY THE ANSWER ABOVE — kept because the DATA in it is still the build's, and
+  because a struck recommendation is how the next reader learns it was already argued.** The case
+  for the emoji is below; the owner read it and chose lucide. Do not re-propose it. His four active
+  types, measured 2026-09-20, still matter as the set a row must be able to show at once:
 
   | sort | meal type | emoji |
   |---|---|---|
@@ -10446,12 +10452,19 @@ why the count of affected entries always understated the harm.
   planner is the thing that makes the effort pay); an AI suggestion at save time he can correct
   (cheap, and the food's name and macros carry most of the signal); history as a pre-tick for meals
   it has actually been logged at (never as the full set, per above).
-- **This is a schema change and therefore Lane A's to land** — a join table or a JSON array column
-  on the saved meal, plus the local-SQLite mirror. The list rendering stays Lane B.
-- **Still true from the first version, and still the recommendation: use the meal type's own
-  emoji.** It matters more now, not less: a row may show up to four glyphs, so they must be the
-  same four he already reads in the Assign-to-Meal sheet. A second lucide vocabulary shown four at
-  a time would be unreadable.
+- **The schema half is `LB-199` (Lane A)** — a join table or a JSON array column on the saved meal,
+  plus the local-SQLite mirror and the seed query. The list rendering and the picker stay here.
+- **⛔ This paragraph said "still the recommendation: use the meal type's own emoji". The owner
+  answered lucide, so it is struck — but the RISK it names is now the build's acceptance test**, not
+  an argument: a row may show up to four glyphs at once, in a vocabulary he has not been trained on,
+  at a row's icon size. **Render four-at-once at 384 px and look at it before shipping.** If it is
+  genuinely unreadable that is a finding to take back to him with the picture, not a licence to
+  switch to the emoji on your own.
+- **⚠ Lucide has no glyph for a USER-CREATED meal type, and that is the unsolved half of his
+  answer.** Meal types are user-created — this account has carried an *"Afternoon Meal"* — so a
+  fixed lucide map cannot name a type the app did not anticipate, where the user-set emoji always
+  could. **Decide the fallback before building** (a generic `Utensils` for unmapped types is the
+  obvious one) and say so in the PR; do not let an unmapped type render nothing.
 - **His "too many meals" worry is REAL under this reading, where it was not under the first.** One
   dominant glyph never grew; a capability set does — ten meal types could mean ten glyphs on one
   row. **Cap the display** (show the first N plus "+2", or collapse "all four" to a single
@@ -10475,11 +10488,16 @@ why the count of affected entries always understated the harm.
   type is **pre-ticked** when he opens the picker — four items have never been logged and three have
   a single log, so a pre-tick from one log is a guess he then has to undo. **Proposed seed gate:
   ≥3 logs AND ≥60%.** Below that, tick nothing and let him choose.
-- **Open question for the implementer, not for the owner:** whether the affinity is computed
-  server-side (a column on the saved-meals payload) or client-side from data the sheet already
-  holds. Server-side is one grouped query and keeps the threshold in one place; client-side needs
-  the log history on that screen, which it may not have. **Decide by checking what
-  `saved-meals-sheet` already fetches** before adding a route.
+- **✅ ANSWERED 2026-09-30 by Lane B, by reading the file rather than reasoning about it —
+  SERVER-SIDE, as a field on the saved-meals payload.** `components/nutrition/saved-meals-sheet.tsx`
+  fetches exactly two things (`saved-meals` and `nutrition-meal-types`, plus a local-first
+  `store.getSavedMeals()`): **it holds no log history at all**, so a client-side seed is not a
+  trade-off, it is a new fetch on a screen that does not want one. Server-side also keeps the
+  ≥ 3 logs / ≥ 60% threshold in one place. **And the seed is the lesser half anyway** — the
+  corrected design stores a DECLARED `suitableMealTypeIds`, so the field rides the payload
+  regardless of where the pre-tick is computed.
+- **⚠ The sheet reads LOCAL-FIRST**, so the local SQLite mirror is not optional: without it the
+  tags vanish offline on a screen whose whole list already works offline.
 - **Verification:** the 10 confident rows above must arrive **pre-ticked** with the emoji named and
   the 4 never-logged rows pre-ticked with none — then both must be freely editable to any subset of
   the four, including all four. Those are real fixtures from his account, so the test can assert
