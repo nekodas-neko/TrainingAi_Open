@@ -519,6 +519,16 @@ Live at the time of writing (2026-07-30):
   12 px, no token below `text-xs` — which is why every one was a literal). The workout screens' nine
   named sites are on it; the remaining 103 across 24 files are a per-file shrink-only ratchet rather
   than a sweep.
+- **[`2026-09-30-fix-lb162-progress-bar-render`](../../overview/entries/2026-09-30-fix-lb162-progress-bar-render.md)**
+  — `RV-72`'s `width` → `scaleX` bars, finally SEEN, on the third attempt: the two earlier failures
+  were recorded in `LB-162`'s `Keep:` (Home came up on the **zero-data** account; the Health capture
+  stopped above the muscle-sets card) and each had a different fix — pin `STORAGE_STATE`, and reach
+  the card through the pushed **`/health/week`** route. Asserted on **computed style and bounding
+  boxes**, because the risk of that conversion is geometric. ⚠ **`transform-origin` computes to USED
+  PIXELS** — `origin-right` reads `"354px 4px"`, so a `startsWith('100%')` check fails against a
+  correct bar. One of the four pass-test items turned out to be a SOURCE property and left the
+  device list by being answered: `scripts/check-progress-fill-track.js` requires every rounded track
+  to clip its square fill, judging the element that DIRECTLY wraps it.
 - **[`2026-09-30-fix-lb189-duplicate-accessible-names`](../../overview/entries/2026-09-30-fix-lb189-duplicate-accessible-names.md)**
   — **the tab shell keeps every tab's tree mounted, so a name unique per SCREEN is not unique per
   DOCUMENT.** Two energy-balance ⓘ toggles shared `aria-label="How energy balance is calculated"`, and

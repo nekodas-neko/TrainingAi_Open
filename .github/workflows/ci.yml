@@ -431,6 +431,9 @@ jobs:
       - name: No two controls share one accessible name
         run: node scripts/check-duplicate-aria-labels.js
 
+      - name: A rounded progress track clips its fill
+        run: node scripts/check-progress-fill-track.js
+
       - name: A session's stored icon is never rendered as text
         run: node scripts/check-session-icon-render.js
 

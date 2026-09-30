@@ -3958,15 +3958,31 @@ which is the right shape for something that can only be validated by living with
   insert), `body-battery-card.tsx:164`, `achievements-section.tsx:55`. Each is a collapse whose
   replacement (opacity/y, or the `collapsible-down` keyframes) changes how the open reads, so it is
   a look decision per site rather than a sweep.
-- **Keep:** the device look at the three shipped bars. **Two render attempts in the Playwright
-  harness did NOT produce evidence** and the reasons are worth knowing: Home came up on the
-  **zero-data** account (Body Battery is absent there, so the bar could not be compared), and the
-  Health capture stopped above the muscle-sets card even at `fullPage: true`, while scrolling to it
-  by text timed out at 180 s against `next dev`. So the conversions are sound by construction and
-  mutation-tested at source, and **unseen**.
-- **Pass test:** on the S25, Body Battery drains from the LEFT; the warmup bar still glows and
-  still ticks once a second; each muscle-sets row shows its target marker standing proud of the
-  bar, and no fill looks oval at a low percentage.
+- ~~**Keep:** the device look at the three shipped bars.~~ **✅ THE RENDER WAS OBTAINED 2026-09-30
+  (Lane B), on the third attempt, and the pass test is down from four items to ONE.**
+  The two earlier failures were recorded here and both were avoided rather than retried: Home came
+  up on the **zero-data** account (Body Battery is absent there) — pinning `STORAGE_STATE` fixes it,
+  and a probe confirmed the card renders for the seeded user; and the Health capture stopped above
+  the muscle-sets card while scrolling to it by text timed out at 180 s — the card is reached
+  through **`/health/week`** instead, a pushed route that renders it near the top, with the digest
+  payload stubbed because the seeded week has no muscle sets.
+  `e2e/lb162-progress-bar-render.spec.ts`, **2 passing**, asserting COMPUTED STYLE and BOUNDING
+  BOXES rather than class names — the whole risk of `RV-72`'s `width` → `scaleX` conversion is
+  geometric. **Body Battery drains from the left:** at a stubbed 40%, `transform-origin` resolves to
+  the fill's right edge and the painted box is flush with the track's right edge (fill x 241.4 w
+  141.6 in a track x 29 w 354). **The muscle-sets marker stands proud:** 2 × **12** px against an
+  **8** px track, overhanging 2 px top and bottom, and clear of the fill's right edge.
+  ⚠ **`transform-origin` computes to USED PIXELS, not `100%`** — `origin-right` reads `"354px 4px"`,
+  so a `startsWith('100%')` check fails against a correct bar. Asserted as a ratio of `offsetWidth`.
+  **And "no fill looks oval at a low percentage" is now a SOURCE property, not a device one:**
+  `scripts/check-progress-fill-track.js` (Custom Rules, **Ran 86 of 86**) requires every rounded
+  track to clip its fill. All **11** call sites hold it; the baseline is empty. It judges the
+  element that DIRECTLY wraps `ProgressFill`, which is load-bearing — this card's own outer track is
+  deliberately `overflow-visible` so the markers can escape it.
+- **Keep:** **one item**, and it is the only one no container can answer — the **warmup bar's feel**
+  on the S25: the glow still reads at 2 px high, and the fill still ticks once a second at
+  `durationMs={1000}` with `ease-linear`. Also still open above: the three `height: auto`
+  collapses, each a look decision per site.
 
 ### [nutrition][app-shell] BF-61 — the swipe tray's Delete needs two presses (the fix FAILED on the device; open work)
 
