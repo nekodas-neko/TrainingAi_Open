@@ -792,6 +792,25 @@ below threshold and left in place for next time.
   either way.
 - **What happens when you answer:** Lane A builds `OR-191` on the chosen shape.
 
+### [nutrition] LA-185 — how should the calorie ring show a meal the app ASSUMED you ate?
+- **Lane: O** · **Added:** 2026-09-30 · Lane A, splitting the owner's half out of BF-203a.
+- **⚑ FOR THE OWNER.** When a planned meal's time passes with nothing logged and nothing declined,
+  BF-203a counts the plan's calories for it as an ESTIMATE, never as a food log. The ring then has to
+  show that some of "eaten" is assumed. That is a visible change to a screen used daily, so it gets a
+  mockup at 384 px before any code.
+- **Recommendation: one ring, with the assumed part drawn as a lighter, striped extension of the
+  eaten arc, and one line under the number: "incl. 480 estimated · tap to confirm".** The total stays
+  honest (the budget really is being used), the assumed share is visible at a glance, and the tap is
+  where Phase B's confirm/decline sheet lands.
+  - **Alternative: leave estimates out of the ring and show them as a separate note.** Better at never
+    overstating what was eaten. It loses because "kcal left" then over-promises on exactly the days a
+    meal went unlogged, which is the problem BF-203 exists to fix.
+  - **Alternative: a second, inner ring.** Better at separating the two numbers, but it adds a second
+    gauge to read for a number that is usually zero.
+- **Reversal cost: low.** Display only. The stored estimate and the totals do not change with the choice.
+- **Owed:** the mockup (before/after, dark, 384 px), then his pick. BF-203a's device materialiser does not
+  wait on it, but nothing should display an estimate until he has chosen.
+
 ### [workouts] LA-178 — two of your answers point opposite ways on the session-length estimate: fix the double-count, or leave it?
 
 - **Lane: O** · **Added:** 2026-09-28 · Lane A, found before starting BF-197.
@@ -6445,6 +6464,38 @@ drift.
   until now every row was one. That covers the server reads and the device's local store after a pull. Each must
   filter `answer = 'no'` before any `estimated` row can be written, or an estimate would hide the
   prompt it replaces.
+- **⛔ PAUSED 2026-09-30 after Task 5 (Lane A): the plan's Tasks 6 and 8 target a read path the phone
+  does not use.** Traced end to end before building them:
+  1. **Task 8 materialises in `GET /api/nutrition/plan-meal-answers`, but the device never calls it.**
+     `use-plan-meal-logging.ts` reads `store.getPlanMealAnswers` and only fetches when there is
+     no local store. On the APK, no estimate would ever be written.
+  2. **Task 6 adds estimates to `computeEnergyBalance` only.** The Nutrition ring's centre number
+     is summed ON THE CLIENT from local food logs (`nutrition-content.tsx` `totals`), while its zone
+     bar, "Eaten" and "kcal left" read the server's `intakeKcal`. A server-only estimate would make
+     one card show two different intakes. **That split already exists without estimates**: the
+     centre and the zone bar disagree whenever local and server food logs differ.
+  3. **The outbox push would turn a device estimate into a decline.** The `plan_meal_answers` branch
+     of `pushMutations` (`adapter.ts` ~5616) only calls `savePlanMealAnswer`/`deletePlanMealAnswer`,
+     and since Task 5 the save writes `answer = 'no'`.
+- **The corrected shape (Lane A's call, structural):**
+  - Materialise **on the device**, at the point `loadAnswers` reads the day: `dueForEstimate` over the
+    local plan, local food logs and local answers. Write it with `store.upsertPlanMealAnswer` plus
+    `queueMutation`, the offline-first write path. Keep a server-side materialiser only for the
+    no-store web fallback.
+  - The push branch must accept an `estimated` payload and route it to `upsertEstimatedAnswers`,
+    never to the decline path. The pull mapper (`adapter.ts` ~4707) and `applyDelta` must carry
+    `est_*`, which LA-137's test will then hold.
+  - Intake is counted in **both** places the ring reads: the client `totals` and
+    `computeEnergyBalance`. Otherwise the centre and the bar disagree by exactly the estimate.
+  - Task 7's learner guard must point at the real module, `packages/shared/src/nutrition/adaptive-tdee.ts`
+    (fed by `computeEnergyBalance`'s `windowDays`). The plan's two paths do not exist. Since
+    `computeEnergyBalance` builds both today's intake and the maintenance window from ONE map, the
+    estimate must be added to today's `intakeKcal` only, never to that map.
+  - **How the ring MARKS the assumed calories is a visible change to a screen the owner reads daily**,
+    so it needs a mockup before code, per the mockup rule. Filed as the next step rather than guessed.
+- **Next:** rewrite Tasks 6–8 in the plan to this shape (Lane A), then the mockup for the marking
+  (Lane O, owner). Tasks 1–5 are merged or in flight and change nothing he sees: no estimate is
+  written until the materialiser exists.
 - **The plan:** [`plans/2026-09-26-meal-plan-tracking-a-estimated-answers.md`](superpowers/plans/2026-09-26-meal-plan-tracking-a-estimated-answers.md) — nine tasks, TDD, with the migration shipping as its own PR.
 - **Adds exactly ONE state.** `plan_meal_answers` is declines-only (Q-187 phase 2) and gains
   `estimated` plus the macros that estimate carries. **`'yes'` is never stored** — *"I ate it stays
