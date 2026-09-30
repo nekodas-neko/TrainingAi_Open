@@ -85,7 +85,32 @@ still reports its full text, so `toHaveText` passes on an ellipsis nobody can re
   `Uncle Tobys — Rolled Oats Quick Sachets`. The ④ control is worth noting: it fails on the **comma**,
   not on width, so the assertion is about the form rather than about the one surface that was tight.
 - `npx tsc --noEmit` · `pnpm check:rules` **Ran 84 of 84** · `pnpm lint` **0 errors** ·
-  `check-test-typecheck` clean against its 86-file baseline · `check-backlog-pointers` exit 0.
+  `check-test-typecheck` clean against its 86-file baseline · `check-backlog-pointers` exit 0 · `pnpm build` exit 0.
+- `pnpm test` — **11,102 passed, 0 failed** (1,210 files). ⚠ An earlier run of the same tree reported
+  **4 failed**, all `Hook timed out in 10000ms` on a `lock.acquire()` in Lane A migration tests, none
+  of them anywhere near this diff. They were contention: `pnpm build` was running against the same
+  database and CPU. The one captured passed in **1.33 s** alone. Re-run serially, the suite is clean.
+
+## ⚠ One thing this session got wrong, and it will happen again to whoever is next
+
+**A stray line reached a commit, and a `finally` block is what made it invisible.**
+`scripts/__tests__/check-comment-blindness.test.ts:41` appends `// style={{ color: "#ff0000" }}` to
+the **real** `components/workout/set-card.tsx` and restores it afterwards. That restore is correct,
+and it means a tracked source file differs from `HEAD` for the seconds that case runs — inside a
+`pnpm test` that takes **nine minutes**. `git add -A` caught it, the run then put the file back, so
+`git status` read clean **with the artefact already committed**.
+
+It surfaced **twice** — committed the first time, caught before staging the second — and neither
+time did `git status` say anything useful. The first tell was `git status` reporting the file as
+*modified* when nothing had touched it, which is the artefact being **removed** relative to a commit
+that already held it. The second was `git diff origin/main --stat` listing
+`components/workout/set-card.tsx | 2 +` in a diff about dates and food names. Neither reached
+`main`: the stray line lives only in this branch's `wip` commit, and a squash merge drops it. CLAUDE.md already warns about `git add -A`, from the 2026-08-08 incident
+where a checkout carried files across — **this is a second, independent mechanism for the same
+outcome, and that rule's advice (run `git status` before staging) cannot catch it, because the
+window closes on its own.** Filed as `LB-194` (`Lane: A`) with a recommendation to write the fixture
+to a gitignored copy instead. The habit that catches it meanwhile: **diff against `origin/main`, not
+against the working tree** — `git status` is blind to a file that has already been restored.
 
 ## Not exercised
 

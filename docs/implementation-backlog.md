@@ -522,6 +522,39 @@ below threshold and left in place for next time.
 - **`e2e/tn58-vs-yesterday-no-default.spec.ts` asserts nothing is selected on open.** Whichever way
   this goes, that test is amended with the reason. It is never deleted to make a change pass.
 
+### [platform] LB-194 — a test mutates a tracked source file, so `git add -A` is unsafe for the nine minutes a suite runs
+
+- **Lane: A** · **Added:** 2026-09-30 · Lane B, found after committing the artefact once and then
+  hitting it a second time in the same session, both times noticed only because the file appeared
+  somewhere it had no business being.
+- **What happens.** `scripts/__tests__/check-comment-blindness.test.ts:41` appends
+  `// style={{ color: "#ff0000" }}` to the REAL `components/workout/set-card.tsx` and restores it in
+  a `finally`. Its docstring says so outright and the restore is correct — but for the seconds that
+  case runs, a tracked source file on disk differs from `HEAD`, and **`pnpm test` takes about nine
+  minutes**. Anything that stages the tree in that window catches it.
+- **It is not theoretical and it is not loud.** `git add -A` swept the line into a commit here. The
+  run then restored the file, so `git status` reported it as *modified* — which is the artefact being
+  **removed** relative to a commit that already held it, and reads exactly like an unrelated edit. It
+  recurred later the same session and was caught only by `git diff origin/main --stat` naming a file
+  in a diff about dates and food names. **A `finally` that restores the file makes the mistake
+  invisible rather than impossible**, and inverts the sign of the tell.
+- **CLAUDE.md already warns about `git add -A`** — the 2026-08-08 double incident, where a checkout
+  carried modified files across. **This is a second, independent mechanism for the same outcome**,
+  and the existing rule's advice ("run `git status` before staging") does not catch it, because the
+  window closes on its own.
+- **Recommendation: write to a COPY.** The check scripts take a path, so the fixture can be written
+  to a temp file inside the repo (`.tmp-comment-blindness/<name>.tsx`, gitignored) and the checker
+  pointed at it. That removes the window entirely and costs nothing the current shape provides —
+  the test's own reason for using a real file is that it wants a file the checker will actually
+  scan, not that it wants *that* file.
+- **The alternative, and what it is better at:** leave it and add `set-card.tsx` plus the second file
+  to a staging guard. It is better at keeping the test honest about scanning real source, but it
+  puts a permanent exception on two files that have nothing to do with this test, and the next test
+  that borrows the trick does not inherit the guard.
+- **Reversal cost: none.** It is a test-harness change with no product surface.
+- **Done when** no tracked file under `app/**`, `components/**`, `lib/**` or `packages/**` is written
+  to by a test in the repo, with a check that says so.
+
 ### [readiness][platform] LB-190 — rename `vs_yesterday` to `vs_normal`, and mark the boundary the rename creates
 
 - **Lane: A** · **Added:** 2026-09-30 · Lane B, moved out of `OR-206` because the whole of it is a
