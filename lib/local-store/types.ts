@@ -589,7 +589,9 @@ export interface LocalDayCheckin {
   perceivedRecoveryTouched:  boolean;
   sleepQualityFeelTouched:   boolean;
   /** TN-58 comparative self-report. NULL = not answered; there is no neutral. */
-  vsYesterday: import('@trainingai/shared/types/day-checkin').VsYesterday | null;
+  vsNormal: import('@trainingai/shared/types/day-checkin').VsNormal | null;
+  /** LB-190. Which question vsNormal answered; null when it is. Optional for writers that predate it. */
+  vsQuestion?: import('@trainingai/shared/types/day-checkin').VsQuestion | null;
   soreMuscles:       string[];
   journal:           string | null;
   /** Q-387 — ISO timestamp of "I have finished logging today"; null or absent means not marked.

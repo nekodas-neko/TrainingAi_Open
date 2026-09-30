@@ -331,7 +331,8 @@ SELECT
   t.perceived_recovery_touched,
   t.sleep_quality_feel_touched,
   t.food_logging_completed_at,
-  t.vs_yesterday
+  t.vs_normal,
+  t.vs_question
 FROM public.day_checkins t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 

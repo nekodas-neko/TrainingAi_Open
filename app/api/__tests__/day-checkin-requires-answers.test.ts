@@ -122,7 +122,7 @@ describe('POST /api/day-checkin — an untouched scale is stored as null (TN-57)
  * LB-124 / TN-58 — the comparative answer reaches the column, and counts as an answer.
  *
  * The entry filed this rather than attempting it because the failure mode is silent: `Body` is not
- * `.strict()`, so before the field existed in the schema, a sheet posting `vsYesterday` got **201**
+ * `.strict()`, so before the field existed in the schema, a sheet posting `vsNormal` got **201**
  * and wrote nothing. A control that looks like it works and stores nothing is worse than a 400 —
  * it would burn TN-58's two-week pass test and report "no self-report available from this owner"
  * when the truth was a dropped field.
@@ -132,41 +132,41 @@ describe('POST /api/day-checkin — the comparative answer (LB-124)', () => {
   const written = () => saveDayCheckin.mock.calls[0][1]
 
   it('stores the answer rather than silently dropping it', async () => {
-    const res = await post({ phase: 'morning', vsYesterday: 'worse' })
+    const res = await post({ phase: 'morning', vsNormal: 'worse' })
     expect(res.status).toBe(201)
-    expect(written().vsYesterday).toBe('worse')
+    expect(written().vsNormal).toBe('worse')
   })
 
   /**
    * The load-bearing one. TN-58's control REPLACES the absolute scale rather than joining it, so a
-   * check-in whose only answer is this one is the expected shape. Without `vsYesterday` in
+   * check-in whose only answer is this one is the expected shape. Without `vsNormal` in
    * `dayCheckinHasAnswers` that body carries "no answers" — a 400 here, and in `pushMutations` a
    * per-item rejection with no retry, which drops the check-in permanently.
    */
   it('counts on its own, with no other answer in the body', async () => {
-    expect((await post({ phase: 'morning', vsYesterday: 'same' })).status).toBe(201)
+    expect((await post({ phase: 'morning', vsNormal: 'same' })).status).toBe(201)
     expect(saveDayCheckin).toHaveBeenCalledTimes(1)
   })
 
   it('stores null when the question was skipped — there is no neutral', async () => {
     await post({ phase: 'morning', journal: 'nothing to add' })
-    expect(written().vsYesterday).toBeNull()
+    expect(written().vsNormal).toBeNull()
   })
 
   it('refuses a value outside the three, rather than storing it', async () => {
-    expect((await post({ phase: 'morning', vsYesterday: 'much better' })).status).toBe(400)
+    expect((await post({ phase: 'morning', vsNormal: 'much better' })).status).toBe(400)
     expect(saveDayCheckin).not.toHaveBeenCalled()
   })
 
   /** An explicit null is a skip, not an answer — it must not satisfy the guard by itself. */
   it('treats an explicit null as no answer at all', async () => {
-    expect((await post({ phase: 'morning', vsYesterday: null })).status).toBe(400)
+    expect((await post({ phase: 'morning', vsNormal: null })).status).toBe(400)
     expect(saveDayCheckin).not.toHaveBeenCalled()
   })
 
   it('rides alongside the scales when both are given', async () => {
-    await post({ phase: 'morning', perceivedRecovery: 2, perceivedRecoveryTouched: true, vsYesterday: 'better' })
-    expect(written().vsYesterday).toBe('better')
+    await post({ phase: 'morning', perceivedRecovery: 2, perceivedRecoveryTouched: true, vsNormal: 'better' })
+    expect(written().vsNormal).toBe('better')
     expect(written().perceivedRecovery).toBe(2)
   })
 })

@@ -8,14 +8,14 @@ import { toast } from 'sonner'
 import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { invalidateCheckinAffectsPrescription, invalidateHealthTrends } from '@/lib/cache-groups'
-import { type IllnessContext, type VsYesterday } from '@trainingai/shared/types/day-checkin'
+import { type IllnessContext, type VsNormal, CURRENT_VS_QUESTION } from '@trainingai/shared/types/day-checkin'
 import { SleepAnnouncement } from '@/components/checkin/sleep-announcement'
 import { type StoredSleepVerdict } from '@/components/health/sleep/sleep-verdict-copy'
 import { saveSleepValue } from '@/components/checkin/save-sleep-value'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { cachedFetch } from '@/lib/sqlite/cache'
 import { IllnessContextPicker } from '@/components/checkin/illness-context-picker'
-import { VsYesterdayPicker } from '@/components/checkin/vs-yesterday-picker'
+import { VsNormalPicker } from '@/components/checkin/vs-normal-picker'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 
@@ -38,7 +38,7 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
   // TN-58. No NEUTRAL_SCALES equivalent and no `touched` flag, both deliberately: the column has
   // no default, so `null` already distinguishes "not answered" from every answer, and there is no
   // seeded position for an untouched save to accept.
-  const [vsYesterday, setVsYesterday] = useState<VsYesterday | null>(null)
+  const [vsNormal, setVsNormal] = useState<VsNormal | null>(null)
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
   // Set as soon as the user taps anything — the async saved-checkin fetch below must
@@ -50,7 +50,7 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
       setLoaded(false); editedRef.current = false
       setCorrection(null)
       setAcknowledged(false)
-      setVsYesterday(null)
+      setVsNormal(null)
       setIllnessContext(null)
       return
     }
@@ -71,7 +71,7 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
           // itself — the shape TN-57 exists to prevent.
           setCorrection(saved.sleepQualityFeelTouched ? saved.sleepQualityFeel ?? null : null)
           setIllnessContext(saved.illnessContext ?? null)
-          setVsYesterday(saved.vsYesterday ?? null)
+          setVsNormal(saved.vsNormal ?? null)
         }
       }
       setLoaded(true)
@@ -123,7 +123,10 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
       sleepQualityFeel:  sleepWrite.value,
       sleepQualityFeelTouched:  sleepWrite.touched,
       illnessContext,
-      vsYesterday,
+      vsNormal,
+      // LB-190: which question the picker asked, stored beside the answer. Omitted when unanswered,
+      // because the schema takes no null here and a question nobody answered has no version.
+      ...(vsNormal != null ? { vsQuestion: CURRENT_VS_QUESTION } : {}),
       // Retired scales — always null so a re-save clears any historical value.
       motivation:        null,
       restingSoreness:   null,
@@ -253,9 +256,9 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
               is now the thing on this sheet he is meant to READ. Burying it under a question that
               collected 2 of 82 is the failure mode the plan names (§3: him not reading it), so the
               announcement leads and this follows. */}
-          <VsYesterdayPicker
-            value={vsYesterday}
-            onChange={v => { editedRef.current = true; setVsYesterday(v) }}
+          <VsNormalPicker
+            value={vsNormal}
+            onChange={v => { editedRef.current = true; setVsNormal(v) }}
           />
           <IllnessContextPicker
             value={illnessContext}

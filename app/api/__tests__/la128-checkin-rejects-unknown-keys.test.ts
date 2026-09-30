@@ -34,7 +34,7 @@ const MORNING_SHEET_PAYLOAD = {
   perceivedRecoveryTouched: true,
   sleepQualityFeelTouched: false,
   illnessContext: null,
-  vsYesterday: 'better',
+  vsNormal: 'better',
   // Retired from the sheet, still sent as null so a re-save clears a historical value — and still
   // in DayCheckinScalesSchema, which is why `.strict()` does not reject them.
   motivation: null,

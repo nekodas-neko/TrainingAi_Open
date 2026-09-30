@@ -58,7 +58,7 @@ describe('saveSleepValue', () => {
       // The real guard, called directly rather than described: a body carrying only this value must
       // still read as an answer once the two scales are gone.
       expect(
-        dayCheckinHasAnswers({ sleepQualityFeel: value, soreMuscles: [], journal: null, illnessContext: null, vsYesterday: null }),
+        dayCheckinHasAnswers({ sleepQualityFeel: value, soreMuscles: [], journal: null, illnessContext: null, vsNormal: null }),
         'the save would be rejected as empty — 400 on the route, poison pill in the outbox',
       ).toBe(true)
     }

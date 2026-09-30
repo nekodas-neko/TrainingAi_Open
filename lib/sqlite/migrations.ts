@@ -320,6 +320,8 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'day_checkins',     column: 'perceived_recovery_touched', ddl: `ALTER TABLE day_checkins ADD COLUMN perceived_recovery_touched INTEGER NOT NULL DEFAULT 0` },
   { table: 'day_checkins',     column: 'sleep_quality_feel_touched', ddl: `ALTER TABLE day_checkins ADD COLUMN sleep_quality_feel_touched INTEGER NOT NULL DEFAULT 0` },
   { table: 'day_checkins',     column: 'vs_yesterday',               ddl: `ALTER TABLE day_checkins ADD COLUMN vs_yesterday TEXT` },
+  { table: 'day_checkins',     column: 'vs_normal',                  ddl: `ALTER TABLE day_checkins ADD COLUMN vs_normal TEXT` },
+  { table: 'day_checkins',     column: 'vs_question',                ddl: `ALTER TABLE day_checkins ADD COLUMN vs_question INTEGER` },
   // Supersets — additive, delivered via reconcile per the Batch F pattern above
   // (no versioned ALTER needed; reconcileSchema runs after every open).
   { table: 'session_exercises', column: 'superset_group', ddl: `ALTER TABLE session_exercises ADD COLUMN superset_group INTEGER` },
@@ -851,6 +853,10 @@ const CREATE_DAY_CHECKINS = `CREATE TABLE IF NOT EXISTS day_checkins (
   -- so it also needs the v40 ALTER below and its RECONCILE_COLUMNS row. No DEFAULT — NULL means
   -- "not answered", and a neutral stored as an answer is the bug this question exists to escape.
   vs_yesterday        TEXT,
+  -- LB-190. vs_yesterday above is LEGACY: kept only so v46's copy runs on every device, read by
+  -- nothing. The answer lives in vs_normal, and vs_question says which question it answered.
+  vs_normal           TEXT,
+  vs_question         INTEGER,
   updated_at          TEXT NOT NULL,
   deleted_at          TEXT,
   sync_status         TEXT NOT NULL DEFAULT 'pending',
@@ -1649,6 +1655,18 @@ export const MIGRATIONS: UpgradeStatement[] = [
       `ALTER TABLE plan_meal_answers ADD COLUMN est_fat_g REAL`,
       `ALTER TABLE plan_meal_answers ADD COLUMN est_bias_kcal INTEGER`,
       `ALTER TABLE plan_meal_answers ADD COLUMN est_basis TEXT`,
+    ],
+  },
+  {
+    // LB-190, mirroring Postgres migration 202609301320. The answer moves from vs_yesterday to
+    // vs_normal, and vs_question records which question it answered. Added and copied rather than
+    // renamed, so a half-applied upgrade is repaired by RECONCILE_COLUMNS like every other column.
+    // Every answer already stored answered question 1.
+    toVersion: 46,
+    statements: [
+      `ALTER TABLE day_checkins ADD COLUMN vs_normal TEXT`,
+      `ALTER TABLE day_checkins ADD COLUMN vs_question INTEGER`,
+      `UPDATE day_checkins SET vs_normal = vs_yesterday, vs_question = 1 WHERE vs_normal IS NULL AND vs_yesterday IS NOT NULL`,
     ],
   },
 ];

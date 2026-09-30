@@ -100,6 +100,16 @@
   logged minutes. No sandbox row has that shape.
 - **Strike this row** when that is VERIFIED.
 
+### [readiness][platform] LB-190's local v46 (day_checkins.vs_normal + vs_question) is NOT device-verified
+
+- Ships with the web deploy, with no APK. On first open the S25 should migrate to **v46**. It adds
+  `day_checkins.vs_normal` and `vs_question`, and copies every stored comparative answer into them as
+  question 1.
+- **Owed (Lane DV):** after one app open, answer the morning check-in's comparison, save, and reopen the
+  sheet: the answer is still selected. A pull completes with no SQLite error naming `vs_normal` or
+  `vs_question`, and the server row carries `vs_question = 1`.
+- **Strike this row** when that is VERIFIED.
+
 ### [nutrition][platform] BF-203a's local v45 and plan-meal answer reads are NOT device-verified
 
 - Ships with the web deploy, with no APK. On first open the S25 should migrate to **v45**, which adds the six

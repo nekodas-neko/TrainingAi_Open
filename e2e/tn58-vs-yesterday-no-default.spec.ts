@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { STORAGE_STATE } from './fixtures'
 
 // TN-58. The absolute 1–5 above this control produced TWO distinct values across 96 check-ins,
-// none of them touched — and `day_checkins.vs_yesterday` has no column default precisely so a
+// none of them touched — and `day_checkins.vs_normal` has no column default precisely so a
 // skipped answer stays NULL. A source test can show the state initialises to null; only the
 // rendered control can show that nothing is *selected* when the sheet opens, which is the property
 // the whole design rests on.
