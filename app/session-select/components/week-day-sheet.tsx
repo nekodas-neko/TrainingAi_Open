@@ -11,8 +11,11 @@ import type { DayLogResult, DayExercise } from "@/app/api/day-log/route"
 import { displayBodyFat } from "@/components/health/body-fat-display"
 import { formatKg } from '@trainingai/shared/format/units'
 
+/** RV-208 ④ — `'long'`, the one day-header form. This was `'weekday-date-long'`, which pairs a
+ *  long weekday with the SHORT month (`Saturday 26 Sept`): the only internally mixed style of the
+ *  three, and `en-AU`'s short months are ragged-width (June, July and Sept are four characters). */
 function formatOverlayDate(dateKey: string): string {
-  return formatDateDisplay(dateKey, "weekday-date-long")
+  return formatDateDisplay(dateKey, "long")
 }
 
 interface WeekDaySheetProps {

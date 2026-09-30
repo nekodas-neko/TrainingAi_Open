@@ -11,12 +11,23 @@ reminders, and the nutrition screen's editing surfaces.
 | UI | `app/nutrition/` (`nutrition-content.tsx` is the offline-first **reference pattern**), `components/nutrition/` |
 | Energy balance | `lib/health/energy-balance-service.ts` (the one server-side assembly — the route and the AI tool both call it), `packages/shared/src/nutrition/calorie-balance.ts` (bands), `packages/shared/src/nutrition/adaptive-tdee.ts` (calibrated maintenance) |
 | Tables | `food_logs`, `food_items`, saved meals, supplements + supplement logs, `meal_plans` + `meal_plan_variants` + `meal_plan_meals`, `dietary_restrictions` + `user_dietary_restrictions` |
+| Food row display | `components/nutrition/food-row.tsx` (the one row shape, Q-406), `components/nutrition/food-name-line.ts` (`foodSecondaryLine` — the food's name leads, the brand rides the grey line, RV-208 ⑤) |
 | Meal Plan | `lib/data/postgres/slices/meal-plans.ts`, `packages/shared/src/nutrition/meal-split.ts`, `components/nutrition/meal-plan-*.tsx`, `app/api/nutrition/meal-plans/` |
 | Meal plan in Coach | `lib/coach/widgets.ts` (`PlanCardSchema`, `PLAN_CARD_ACTIONS`), `lib/coach/tools.ts` (`showMealPlan`), `components/coach/plan-card.tsx`, `packages/shared/src/nutrition/save-plan-meal.ts` |
 
 **`app/nutrition/nutrition-content.tsx` is the canonical local-first read pattern** for the whole
 app — its supplements reads (`getLocalStore(userId)` → `store.getSupplements()`, API only as
 fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offline-First".
+
+**Food rows: the name leads, the brand follows** (RV-208 ⑤, 2026-09-30). `foodSecondaryLine`
+(`components/nutrition/food-name-line.ts`) is the one place that joins them, across all six
+surfaces that render a brand. Two put the brand FIRST and both were SEARCH lists, where the user
+typed the food *name* — so leading with the brand pushed the matched term into `FoodRow`'s
+`line-clamp-2`. A third had its own `[brand, serving].join(' · ')`, right by coincidence; a fourth
+(`ingredient-search.tsx`) dropped the brand entirely, so the library's `Search` tab did not identify
+a food its own `Recent` tab did. `quick-edit-log-sheet.tsx` is the documented exception — a sheet
+header that already names the food and gives the brand its own line.
+See [`the journal entry`](../../overview/entries/2026-09-30-fix-rv208-date-and-brand-forms.md).
 
 ## Reference docs
 

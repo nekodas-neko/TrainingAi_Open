@@ -519,6 +519,13 @@ Live at the time of writing (2026-07-30):
   12 px, no token below `text-xs` — which is why every one was a literal). The workout screens' nine
   named sites are on it; the remaining 103 across 24 files are a per-file shrink-only ratchet rather
   than a sweep.
+- **[`2026-09-30-fix-rv208-date-and-brand-forms`](../../overview/entries/2026-09-30-fix-rv208-date-and-brand-forms.md)**
+  — RV-208 ④⑤, the last two parts. **`'long'` (`Saturday 26 September`) is the form a day-scoped
+  HEADER takes**: there were three, and `weekday-date-long` pairs a long weekday with `en-AU`'s
+  ragged-width short month while `weekday-date` is the only one carrying a comma. `25 Sept` is a ROW
+  label and a different job; the calendar's `September 2026` cannot be converted at all (no
+  month-year style — Lane A's, as `LB-126` already recorded). Rendered at 384 px because it put the
+  widest form into `BF-24`'s single band: **148.0 × 19.5 px in a 300 px row**.
 - **[`2026-09-27-rv208-numbers-and-durations`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv208-numbers-and-durations)**
   — RV-208 part one. Seven hand-rolled duration formatters onto `packages/shared/src/format/units.ts`,
   one of which floored a 45-minute nap to `0h`. Also what is left and who owns it: the time-of-day

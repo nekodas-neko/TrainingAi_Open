@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.486.4",
+    date: "2026-09-30",
+    changes: [
+      "Dates now read the same way wherever a screen is showing one particular day: Nutrition and the week-day sheet both say \"Saturday 26 September\", which is what Health \u2192 Day already said. Today and Yesterday still say Today and Yesterday.",
+      "A food is now named before its brand everywhere \u2014 \"Rolled oats\", with \"Uncle Tobys\" on the grey line under it, rather than \"Uncle Tobys \u2014 Rolled oats\" in the two search lists. Searching for a food no longer pushes the name you typed off to the right.",
+      "And the library's Search tab now shows a food's brand at all, which it had been leaving out while its own Recent tab showed it.",
+    ],
+  },
+  {
     version: "1.486.3",
     date: "2026-09-30",
     changes: [

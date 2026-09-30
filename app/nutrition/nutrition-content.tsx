@@ -72,11 +72,16 @@ function isPlanStale(plan: MealPlan): boolean {
 
 const EMPTY_LOGS: FoodLogWithItem[] = [];
 
+/** RV-208 ④. `'long'` — `Saturday 26 September` — is the ONE form a day-scoped header takes, and
+ *  this is the surface that has to change to reach it: Health → Day already ships it (`long`) and
+ *  the week-day sheet was a third form (`weekday-date-long`, `Saturday 26 Sept`). `'weekday-date'`
+ *  was the narrowest of the three and it is the one with the stray comma — `en-AU` puts one after a
+ *  SHORT weekday and not after a long one, which `formatDateDisplay`'s own docstring records. */
 function formatDateLabel(dateStr: string, todayStr: string): string {
   if (dateStr === todayStr) return 'Today';
   const yStr = shiftDateStr(todayStr, -1);
   if (dateStr === yStr) return 'Yesterday';
-  return formatDateDisplay(dateStr, 'weekday-date');
+  return formatDateDisplay(dateStr, 'long');
 }
 
 export default function NutritionContent({ userId }: { userId?: string }) {

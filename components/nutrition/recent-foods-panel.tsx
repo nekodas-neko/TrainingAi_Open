@@ -8,6 +8,7 @@ import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { getLocalStore } from '@/lib/local-store'
 import { EmptyState } from '@/components/ui/empty-state'
 import { FoodRow } from './food-row'
+import { foodSecondaryLine } from './food-name-line'
 
 interface Props {
   userId?: string
@@ -99,8 +100,8 @@ const RecentRow = memo(function RecentRow(
   const press = useCallback(() => onSelectFood(item), [item, onSelectFood])
   return (
     <FoodRow
-      name={item.brand ? `${item.brand} — ${item.name}` : item.name}
-      secondary={item.servingSizeG > 0 ? `${Math.round(item.servingSizeG)} g serving` : null}
+      name={item.name}
+      secondary={foodSecondaryLine(item.brand, item.servingSizeG > 0 ? `${Math.round(item.servingSizeG)} g serving` : null)}
       calories={item.calories}
       onPress={press}
     />

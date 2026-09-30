@@ -16,6 +16,7 @@ import { decodeMealLabelScan, type SharedMeal } from '@trainingai/shared/nutriti
 import { lookupBarcode } from '@trainingai/shared/nutrition/barcode-lookup'
 import { downscaleToJpegDataUrl, downscaleToThumbDataUrl, dataUrlToBlob, base64FromDataUrl, SCAN_IMAGE_MAX_DIM } from '@/lib/media/downscale-image'
 import { rejectMealImage, FOOD_ITEM_IMAGE_MAX_BYTES } from '@trainingai/shared/nutrition/meal-image'
+import { foodSecondaryLine } from './food-name-line'
 
 /** Enough to recognise the food you meant; more than this is a list to read rather than scan. */
 const SUGGESTION_LIMIT = 4
@@ -456,7 +457,7 @@ export function CaptureActions({ onScanResult, onManual, onScannedSavedMeal, onS
                 <FoodRow
                   key={food.id}
                   name={food.name}
-                  secondary={food.brand ? `${food.brand} · ${food.servingSizeG}g` : `${food.servingSizeG}g`}
+                  secondary={foodSecondaryLine(food.brand, `${Math.round(food.servingSizeG)} g`)}
                   calories={Math.round(food.calories)}
                   showChevron
                   onPress={onSelectFood ? () => onSelectFood(food) : undefined}

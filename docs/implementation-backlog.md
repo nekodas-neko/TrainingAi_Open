@@ -522,6 +522,39 @@ below threshold and left in place for next time.
 - **`e2e/tn58-vs-yesterday-no-default.spec.ts` asserts nothing is selected on open.** Whichever way
   this goes, that test is amended with the reason. It is never deleted to make a change pass.
 
+### [platform] LB-194 — a test mutates a tracked source file, so `git add -A` is unsafe for the nine minutes a suite runs
+
+- **Lane: A** · **Added:** 2026-09-30 · Lane B, found after committing the artefact once and then
+  hitting it a second time in the same session, both times noticed only because the file appeared
+  somewhere it had no business being.
+- **What happens.** `scripts/__tests__/check-comment-blindness.test.ts:41` appends
+  `// style={{ color: "#ff0000" }}` to the REAL `components/workout/set-card.tsx` and restores it in
+  a `finally`. Its docstring says so outright and the restore is correct — but for the seconds that
+  case runs, a tracked source file on disk differs from `HEAD`, and **`pnpm test` takes about nine
+  minutes**. Anything that stages the tree in that window catches it.
+- **It is not theoretical and it is not loud.** `git add -A` swept the line into a commit here. The
+  run then restored the file, so `git status` reported it as *modified* — which is the artefact being
+  **removed** relative to a commit that already held it, and reads exactly like an unrelated edit. It
+  recurred later the same session and was caught only by `git diff origin/main --stat` naming a file
+  in a diff about dates and food names. **A `finally` that restores the file makes the mistake
+  invisible rather than impossible**, and inverts the sign of the tell.
+- **CLAUDE.md already warns about `git add -A`** — the 2026-08-08 double incident, where a checkout
+  carried modified files across. **This is a second, independent mechanism for the same outcome**,
+  and the existing rule's advice ("run `git status` before staging") does not catch it, because the
+  window closes on its own.
+- **Recommendation: write to a COPY.** The check scripts take a path, so the fixture can be written
+  to a temp file inside the repo (`.tmp-comment-blindness/<name>.tsx`, gitignored) and the checker
+  pointed at it. That removes the window entirely and costs nothing the current shape provides —
+  the test's own reason for using a real file is that it wants a file the checker will actually
+  scan, not that it wants *that* file.
+- **The alternative, and what it is better at:** leave it and add `set-card.tsx` plus the second file
+  to a staging guard. It is better at keeping the test honest about scanning real source, but it
+  puts a permanent exception on two files that have nothing to do with this test, and the next test
+  that borrows the trick does not inherit the guard.
+- **Reversal cost: none.** It is a test-harness change with no product surface.
+- **Done when** no tracked file under `app/**`, `components/**`, `lib/**` or `packages/**` is written
+  to by a test in the repo, with a check that says so.
+
 ### [readiness][platform] LB-190 — rename `vs_yesterday` to `vs_normal`, and mark the boundary the rename creates
 
 - **Lane: A** · **Added:** 2026-09-30 · Lane B, moved out of `OR-206` because the whole of it is a
@@ -4171,14 +4204,53 @@ which is the right shape for something that can only be validated by living with
   `components/health/__tests__/rv208-movement-category-hues.test.ts` asserts the ARITHMETIC against
   `globals.css` and `SESSION_PALETTE`, not the literals; control-run against the old palette, against
   the subtler `pull` half alone, and against a raw Tailwind session name.
-  ④ **Dates** (`25 Sept` / `Saturday 26 September` / `September 2026`) and ⑤ **brand-in-food-name**
-  are copy decisions, untouched here.
+  ④ ~~**Dates** (`25 Sept` / `Saturday 26 September` / `September 2026`)~~ **✅ SHIPPED 2026-09-30
+  (Lane B) — and `September 2026` was never one of the three.** Called a copy decision here and
+  taken as a structural one, per CLAUDE.md's 2026-09-22 narrowing. The real divergence, measured by
+  rendering every style rather than reading their names: **three day-scoped headers, three forms** —
+  Health → Day `long` (`Saturday 26 September`), Nutrition `weekday-date` (`Mon, 28 Sept`), the
+  week-day sheet `weekday-date-long` (`Saturday 26 Sept`). `'long'` app-wide: the only one that is
+  internally consistent (`weekday-date-long` pairs a long weekday with the ragged-width short month)
+  and the only one without `en-AU`'s comma-after-a-short-weekday. **`25 Sept` is NOT in scope** — it
+  is a compact ROW label (activity history, goals, profile details), a different job from a heading.
+  **`September 2026` is the calendar's month label and cannot be converted at all**: `LB-126` already
+  recorded why, and it has not changed — `formatDateDisplay` takes a `YYYY-MM-DD` string and has no
+  month-year style, so adding one is Lane A's.
+  **Rendered at 384 px, because this replaced the narrowest form with the widest on the one surface
+  whose header shares its row:** Nutrition's date sits beside two 44 px chevrons inside the single
+  band `BF-24` deliberately collapsed it to. Measured **148.0 × 19.5 px in a 300 px row** — one
+  line, 52 px of slack. `e2e/rv208-date-and-brand-forms.spec.ts` keeps it, control-run against
+  `weekday-date` (fails on the comma) rather than against width alone.
+  **Two styles are now unreferenced outside tests** — `weekday-date` and `weekday-date-long`. Left
+  in place: `packages/shared/src/date-utils.ts` is Lane A's, and they are the vocabulary, not debt.
+  ⑤ ~~**brand-in-food-name**~~ **✅ SHIPPED 2026-09-30 (Lane B) — and the entry's two sites were
+  SIX.** `Uncle Tobys — Rolled oats` against the diary's `Rolled oats` over `Uncle Tobys · …`.
+  **The name leads everywhere**, through one helper (`components/nutrition/food-name-line.ts`), and
+  not only for symmetry: both brand-leading sites are SEARCH lists, where the user typed the food
+  *name*, so leading with the brand pushes the term they matched on into `FoodRow`'s `line-clamp-2`.
+  **The census found two kinds of divergence the entry could not see from its two screenshots.**
+  `food-list.tsx` was already name-leading with its own `[brand, serving].join(' · ')` — a third
+  copy agreeing by coincidence. And **`ingredient-search.tsx` dropped the brand ENTIRELY**, so the
+  library's `Search` tab did not identify a food its own `Recent` tab did. Both converted.
+  **The render answered the question the source could not:** the brand now rides `FoodRow`'s
+  secondary line, which `truncate`s where the name line clamps — so the change trades a possible
+  truncation of the NAME for one of the macros. Asserted by `scrollWidth <= clientWidth`, because a
+  truncated element still reports its full text and `toHaveText` passes on an unreadable ellipsis.
+  `quick-edit-log-sheet.tsx` is excluded with its reason: it is a sheet header that already leads
+  with the name and gives the brand its own line, so there is nothing to separate.
 - **A question this raised and did not answer:** every separator site uses a bare
   `toLocaleString()`, which follows the DEVICE locale — a phone set to German renders `1.534`. The
   fix above matches the existing convention rather than inventing a rival one. Whether counts
   should pin a locale, as clock times had to, is a `packages/shared` call and therefore Lane A's.
 
-- **Lane: B.** One PR. **Extend it from RV-206's P39 census when that lands**; this entry lists what the screenshots already show.
+- **Lane: B.** **Extend it from RV-206's P39 census when that lands**; this entry lists what the screenshots already show.
+- **Keep:** the device look at ④ and ⑤, and only that. ④ is the owner's daily Nutrition header, and
+  a 148 px measurement in Chromium is not a Samsung WebView — its font metrics differ, and the whole
+  risk here is a wrap that would undo `BF-24`'s single band. ⑤ needs one glance at a real branded
+  food in the library, which the sandbox cannot give: `food_items` is **empty** in the local seed and
+  both search lists are network-driven, so the render used a stubbed row. Pass/fail: the Nutrition
+  date stays on one line beside its chevrons two days back, and a branded food in `Recent` reads its
+  own name first with the brand legible — not ellipsised — under it.
 - **Added:** 2026-09-26 · Review sweep 63.
 - **Colour, on ONE screen.** Health → Training's calendar and load legend colour **Push orange, Pull green, Legs purple**. Two cards down, Movement balance colours **Push cyan, Pull purple, Legs green**.
   - The same three words get two colour maps within a thumb's scroll.
