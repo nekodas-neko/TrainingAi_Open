@@ -63,9 +63,13 @@ the run collected nothing and returned only seeded rows.
 
 - `bf220-rpe-load-suggestion.test.ts` — **11 tests**, including the reported set and the pinned
   12.5 kg.
-- `e2e/bf220-rpe-load-suggestion.spec.ts` — **4 passing**: the pill appears on the next set after a
-  hard short set, carries the engine's own sentence, moves the dial when taken, and leaves the
-  session untouched when dismissed.
+- `e2e/bf220-rpe-load-suggestion.spec.ts` — **2 passing**: one test drives a hard short set and
+  checks the pill appears on the next set card, carries the engine's own sentence and moves the dial
+  when taken; the other checks that dismissing it leaves the session untouched.
+  **⚠ Corrected 2026-09-30 (LB-189): this said 4.** The file holds **two** `test()` blocks — 4 was
+  Playwright's run total, which counts the `auth.setup.ts` and `zero-data.setup.ts` projects
+  alongside the specs, so every spec run here reports two more than it has. Quote
+  `grep -c '^test('`, not the runner's last line.
 - `npx tsc --noEmit` · `pnpm check:rules` **Ran 84 of 84** · `pnpm lint` 0 errors · `pnpm test`
   **11,059 passed** · `pnpm build` · memo-stability and size gates clean.
 

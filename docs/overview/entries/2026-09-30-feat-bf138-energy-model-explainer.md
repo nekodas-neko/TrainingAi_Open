@@ -61,9 +61,15 @@ Three things the run taught that reading the source did not:
 
 ## Verified
 
-`e2e/bf138-energy-model-explainer.spec.ts` — **4 passing** (2 tests × the guards-on and guards-off
-payloads). `npx tsc --noEmit` · `pnpm check:rules` **Ran 84 of 84** · `pnpm test` **11,044 passed** ·
-size gate clean.
+`e2e/bf138-energy-model-explainer.spec.ts` — **2 passing**: one test on the guards-on payload, one on
+the guards-off one. `npx tsc --noEmit` · `pnpm check:rules` **Ran 84 of 84** · `pnpm test`
+**11,044 passed** · size gate clean.
+
+> **Corrected 2026-09-30 (LB-189).** This said **"4 passing (2 tests × the guards-on and guards-off
+> payloads)"** and the file holds **two** `test()` blocks, one payload each. The 4 was Playwright's
+> run total, which counts the `auth.setup.ts` and `zero-data.setup.ts` projects alongside the specs —
+> so every spec run in this repo reports two more than it has. `grep -c '^test('` is the count to
+> quote. The same slip is corrected in `2026-09-29-chore-bf220-rpe-reaches-nothing.md`.
 
 ## Not exercised, and one thing deliberately not done
 

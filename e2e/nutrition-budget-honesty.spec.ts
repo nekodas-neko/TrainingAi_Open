@@ -78,8 +78,11 @@ test('the ⓘ panel says what the base leaves out (LA-102)', async ({ page }) =>
 
   // By its accessible name. The first draft clicked every `aria-expanded="false"` button on the
   // page instead, which opened meal accordions and never touched this one.
-  const info = page.getByRole('button', { name: 'How energy balance is calculated' })
-  await expect(info, 'the ⓘ toggle is gone or renamed').toBeVisible({ timeout: 60_000 })
+  // LB-189 renamed it: Health's bar carried the identical name and the tab shell keeps both trees
+  // mounted, so this used to match two elements and only one of them was on screen.
+  const info = page.getByRole('button', { name: "How today's calorie budget is calculated" })
+  await expect(info, 'the ⓘ toggle is gone or renamed').toHaveCount(1, { timeout: 60_000 })
+  await expect(info).toBeVisible()
   // `locator.click()` does not reach controls on this tab — a standing gotcha, and the second
   // thing that made this test fail while the panel worked.
   await info.evaluate((el: HTMLElement) => el.click())
