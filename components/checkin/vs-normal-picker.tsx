@@ -23,8 +23,18 @@ interface Props {
  *  wrote a row on close would erase the distinction without touching this file, which is why the
  *  e2e spec asserts the dismissal and not just the control.
  *
- *  ⚠ **`LB-190`'s `vs_question` marks the WORDING shift only** (1 = yesterday, 2 = normal). The
- *  seeded neutral is a SECOND boundary inside question 1, and no stored value separates the rows
+ *  **The question is now *compared to NORMAL*, not to yesterday (OR-206), on the owner's words:**
+ *  *"I dont like the comparison to the yesterday. Maybe comparison to \"normal\"."* Comparing to a
+ *  baseline he carries is also a steadier reference than a single previous day, which is what the
+ *  original was really asking him to remember.
+ *
+ *  ⛔ **The copy and `CURRENT_VS_QUESTION` move TOGETHER, always.** They are one change split
+ *  across two files: a prompt asking one question while rows record the other mislabels every row
+ *  written in between, and nothing downstream could detect it. The guard in
+ *  `__tests__/tn58-vs-normal-control.test.ts` asserts the pair for that reason.
+ *
+ *  ⚠ **`vs_question` marks the WORDING shift only** (1 = yesterday, 2 = normal). The seeded neutral
+ *  is a SECOND boundary, and it sits inside question 1 with no stored value separating the rows
  *  before it from the ones after. See `LB-198`.
  *
  *  Tapping the selected option clears it, so a mis-tap is recoverable to unanswered rather than
@@ -48,8 +58,8 @@ export const VS_NORMAL_DEFAULT: VsNormal = 'same'
 export function VsNormalPicker({ value, onChange }: Props) {
   return (
     <div className="flex flex-col gap-1.5">
-      <span id="vs-yesterday-label" className="text-sm font-medium">Compared to yesterday</span>
-      <div role="radiogroup" aria-labelledby="vs-yesterday-label" className="flex gap-1.5">
+      <span id="vs-normal-label" className="text-sm font-medium">Compared to normal</span>
+      <div role="radiogroup" aria-labelledby="vs-normal-label" className="flex gap-1.5">
         {OPTIONS.map(opt => {
           const selected = value === opt.value
           return (

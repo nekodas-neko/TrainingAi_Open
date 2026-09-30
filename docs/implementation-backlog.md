@@ -551,36 +551,6 @@ below threshold and left in place for next time.
 - **Done when** a row stored from an untouched Save is distinguishable from one the owner tapped,
   with a test — and the write path sets it from a real interaction, never inferred from Save.
 
-### [readiness][app-shell] OR-206 — the morning check-in compares to "normal", not to yesterday
-
-- **Lane: B** · **Added:** 2026-09-29 · Orchestrator, from the owner on the S25:
-  *"I dont like the comparison to the yesterday. Maybe comparison to \"normal\". So about the same;
-  better or worse. With it default selected to about the same."*
-- **Needs: LB-190**
-- **⤷ SPLIT 2026-09-30 (Lane B), and what is left here is the surface only.** Re-verifying the entry
-  found two of its three parts belonged elsewhere, each for a reason CLAUDE.md states outright:
-  the field rename and the history marker are a schema change, which is **Lane A's alone**, and are
-  now `LB-190`; ② was an owner question living inside a `Lane: B` body, where the Orchestrator was
-  never going to see it, and is now `LB-191` (`Lane: O`, ungated).
-- **The wording change is his call and is not in dispute.** `components/checkin/vs-yesterday-picker.tsx`
-  asks *"Compared to yesterday"*; he wants *compared to normal*. Same three options, same order.
-  **Rename the component and its file with the copy** — `VsYesterdayPicker` stops describing what it
-  asks the moment the prompt changes. Its `id="vs-yesterday-label"` and the `aria-labelledby` that
-  points at it move too.
-- **It cannot ship before `LB-190`.** Changing the prompt is precisely what makes the stored answers
-  mean two different things, so the marker has to be in place first. This is not sequencing for
-  tidiness: the field feeds a scoring input.
-- **Also here:** `components/morning-checkin-sheet.tsx`'s state and handler names, the
-  `components/checkin/__tests__/tn58-vs-yesterday-control.test.ts` cases, the
-  `VS_YESTERDAY_DEFAULT` constant the picker now exports, and
-  **`e2e/tn58-vs-yesterday-neutral-default.spec.ts`** — renamed from `…-no-default` when `LB-191`
-  shipped the seeded neutral (2026-09-30). It no longer asserts that nothing is selected; it asserts
-  the NEUTRAL is, that a retap still reaches NULL, and that a dismissal writes no row. Its
-  `'Compared to yesterday'` accessible-name locator is what this rename breaks, and the `GROUP`
-  constant at the top of the file is the one place to change it. **Do not delete it to make the
-  change pass.**
-
-
 ### [platform] OR-203 — the database grew 3× its trend for six days, and no per-table baseline exists to say which table did it
 
 - **Lane: A** · **Added:** 2026-09-29 · Orchestrator, from the session-start size read.
@@ -15329,6 +15299,13 @@ re-proved on 2026-09-04** — three specs pass in isolation and fail in the full
     entry because the fix is this entry's — make the spec create its own state — not a separate bug.
     ⚠ It was written up in #2023's journal as *"not reproduced"* on one data point; that read is now
     superseded, and *"flake" was correctly refused as a root cause there.*
+    **⚠ AND IT PASSED ON THE VERY NEXT RUN** (#2026, 2026-09-30, all four shards green) — recorded
+    here the same day the line above was written, because a claim that has already moved is worse
+    than none. This does NOT restore the flake reading: #2026 **renamed an e2e spec**, and the
+    shards are filled in file order, so which specs run beside `meal-type-reassign` changed between
+    the two runs. That is precisely this entry's thesis — *which specs run together decides it* —
+    so the sharper statement is that the spec is **sensitive to its shard's contents**, and passing
+    is as uninformative as failing until it creates its own state.
 
 - **⚠️ Do not trust a local full-suite run without checking the dev server survived it.** A re-run
   after the meal-plan fix reported **106 failed / 41 passed** — almost every failure at ~250ms,
@@ -33488,10 +33465,13 @@ with the recap week visibly compared against the one before it.
   that `LB-191` made it the **pre-selected** pill, so the taller, filled one is now the visual
   anchor of the sheet every morning rather than an occasional selection.
 - **The question is whether it bothers him at all**, and there is no engineering answer to it. If it
-  does, the cheapest fix is shorter copy (*"Same"*), and **the copy for this control is his** —
-  `OR-206` is already changing the prompt on his words, so a label change rides there rather than
-  arriving separately. Equalising the height instead (a fixed `min-h` on the row) keeps the full
-  wording and costs a little vertical space on a sheet that already scrolls.
+  does, the cheapest fix is shorter copy (*"Same"*), and **the copy for this control is his**.
+  Equalising the height instead (a fixed `min-h` on the row) keeps the full wording and costs a
+  little vertical space on a sheet that already scrolls.
+- **⚠ It no longer has a change to ride along with.** This said a label fix would ride `OR-206`;
+  `OR-206` **shipped on 2026-09-30** (the prompt is now *"Compared to normal"*) and deliberately did
+  not touch the three option labels, which he never asked to change. So this one arrives on its own
+  if he wants it, and the render above is on the CURRENT prompt.
 - **Do not build either without him.** A pill that reads fine to me is exactly the judgement this
   lane is told not to make on his daily screens.
 

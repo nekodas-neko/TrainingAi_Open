@@ -22,9 +22,9 @@ import { STORAGE_STATE } from './fixtures'
 // row that would close the sheet for the other.
 test.use({ storageState: STORAGE_STATE, serviceWorkers: 'block' })
 
-// The COLUMN is `vs_normal` (LB-190) but the PROMPT is still "Compared to yesterday" — `OR-206`
-// changes the wording and has not shipped. This is the one place to change when it does.
-const GROUP = 'Compared to yesterday'
+// The prompt (OR-206, 2026-09-30). This is the one place the accessible-name locator lives, so a
+// later wording change is one edit here rather than a hunt through the assertions.
+const GROUP = 'Compared to normal'
 
 test('the comparative control opens on the neutral, and can still be cleared to nothing', async ({ page }) => {
   await page.goto('/', { waitUntil: 'networkidle' })

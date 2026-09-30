@@ -13,8 +13,11 @@ export type VsNormal = 'better' | 'same' | 'worse'
  */
 export const VS_QUESTION = { YESTERDAY: 1, NORMAL: 2 } as const
 export type VsQuestion = (typeof VS_QUESTION)[keyof typeof VS_QUESTION]
-/** The question the morning sheet asks today. OR-206 moves this to NORMAL in the same change as the copy. */
-export const CURRENT_VS_QUESTION: VsQuestion = VS_QUESTION.YESTERDAY
+/** The question the morning sheet asks today. Moved to NORMAL by OR-206 (2026-09-30), in the same
+ *  change as the copy — which is the only way it may ever move: a prompt and a marker that disagree
+ *  mislabel every row written between them, silently, and the column exists to prevent exactly that.
+ *  The picker's own guard asserts the pair, so this cannot drift from what the screen asks. */
+export const CURRENT_VS_QUESTION: VsQuestion = VS_QUESTION.NORMAL
 
 export interface DayCheckin {
   id: string

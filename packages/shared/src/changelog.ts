@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.486.11",
+    date: "2026-09-30",
+    changes: [
+      "The morning check-in now asks how you compare to NORMAL rather than to yesterday \u2014 same three answers, same order. You said you didn't like comparing to one previous day.",
+      "Answers given before today are kept separate from answers given after it, so the change of question cannot quietly distort your own history.",
+    ],
+  },
+  {
     version: "1.486.10",
     date: "2026-09-30",
     changes: [
