@@ -1,10 +1,10 @@
 "use client"
 
-import type { VsYesterday } from "@trainingai/shared/types/day-checkin"
+import type { VsNormal } from "@trainingai/shared/types/day-checkin"
 
 interface Props {
-  value: VsYesterday | null
-  onChange: (v: VsYesterday | null) => void
+  value: VsNormal | null
+  onChange: (v: VsNormal | null) => void
 }
 
 /** TN-58. The absolute 1–5 "perceived recovery" above this produced **two distinct values across
@@ -12,7 +12,7 @@ interface Props {
  *  for anything, which is what blocks TN-33. People order two things more reliably than they score
  *  one, so this asks for the comparison instead.
  *
- *  **No default and no pre-selection, which is the entire point.** `day_checkins.vs_yesterday` has
+ *  **No default and no pre-selection, which is the entire point.** `day_checkins.vs_normal` has
  *  no column default for the same reason: a neutral stored as though it were an answer is the
  *  defect TN-57 just fixed, and shipping one on the question meant to escape it would recreate it
  *  under a new name. A skipped answer stores NULL and reads as "not answered".
@@ -24,13 +24,13 @@ interface Props {
  *
  *  Options live here rather than in `packages/shared` because they are display copy with one
  *  consumer, and that file belongs to the other lane. */
-const OPTIONS: { value: VsYesterday; label: string; color: string }[] = [
+const OPTIONS: { value: VsNormal; label: string; color: string }[] = [
   { value: 'better', label: 'Better',        color: 'var(--accent-green)' },
   { value: 'same',   label: 'About the same', color: 'var(--color-muted-foreground)' },
   { value: 'worse',  label: 'Worse',          color: 'var(--accent-amber)' },
 ]
 
-export function VsYesterdayPicker({ value, onChange }: Props) {
+export function VsNormalPicker({ value, onChange }: Props) {
   return (
     <div className="flex flex-col gap-1.5">
       <span id="vs-yesterday-label" className="text-sm font-medium">Compared to yesterday</span>

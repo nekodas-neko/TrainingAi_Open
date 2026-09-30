@@ -574,32 +574,6 @@ below threshold and left in place for next time.
 - **Done when** no tracked file under `app/**`, `components/**`, `lib/**` or `packages/**` is written
   to by a test in the repo, with a check that says so.
 
-### [readiness][platform] LB-190 — rename `vs_yesterday` to `vs_normal`, and mark the boundary the rename creates
-
-- **Lane: A** · **Added:** 2026-09-30 · Lane B, moved out of `OR-206` because the whole of it is a
-  schema change, and **Postgres migration numbers and local SQLite versions are Lane A's alone**.
-- **Why it leads rather than follows.** `OR-206`'s copy change is what makes the stored history
-  ambiguous, so the marker has to exist before the question changes on screen — engine half first.
-  `OR-206` waits on this via `Needs:`.
-- **The rename**, because a field whose name contradicts its question is how the next reader gets it
-  wrong: `day_checkins.vs_yesterday` → `vs_normal`, and `VsYesterday` with it. Reached by grep and
-  `tsc`: `schema.ts`, `adapter.ts` (5 sites incl. the `EXCLUDED.vs_yesterday` upsert),
-  `app/api/day-checkin/route.ts`, `app/api/food-logging-complete/route.ts`,
-  `packages/shared/src/types/day-checkin.ts`, `packages/shared/src/validation/day-checkin.ts`,
-  `lib/local-store/{types,sqlite-backend,sync-engine}.ts`, `lib/sqlite/migrations.ts` (a new local
-  version), and `claude-ro-views.sql` regenerated **in place**, not numbered (BF-214).
-- **⚠ The marker is the half that is not optional.** Rows written before the change answer *"vs
-  yesterday"*; rows after answer *"vs normal"*. Different questions, and they **must not be pooled
-  in one trend**. A deploy date cannot mark it exactly — Railway ships on merge, so a given local
-  day can hold rows from both sides of the cutover.
-- **Recommendation: a stored question-version column**, the shape `SLEEP_VERDICT_MODEL_VERSION`
-  already set on this sheet — each row says which question it answered, and a later wording change
-  costs one integer instead of another archaeology pass. A recorded cutover date is the cheaper
-  alternative and is what `OR-206` offered; it loses on the one-day ambiguity above.
-- **Done when** a row written after the rename is distinguishable from one written before it by a
-  stored value, with a test, and nothing in `app/**`, `lib/**` or `packages/**` still spells
-  `vsYesterday`.
-
 ### [readiness][app-shell] OR-206 — the morning check-in compares to "normal", not to yesterday
 
 - **Lane: B** · **Added:** 2026-09-29 · Orchestrator, from the owner on the S25:

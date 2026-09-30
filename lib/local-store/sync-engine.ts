@@ -585,7 +585,8 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     illnessContext:            (r.illnessContext as LocalDayCheckin['illnessContext']) ?? null,
     perceivedRecoveryTouched:  Boolean(r.perceivedRecoveryTouched),
     sleepQualityFeelTouched:   Boolean(r.sleepQualityFeelTouched),
-    vsYesterday:       (r.vsYesterday as import('@trainingai/shared/types/day-checkin').VsYesterday) ?? null,
+    vsNormal:       (r.vsNormal as import('@trainingai/shared/types/day-checkin').VsNormal) ?? null,
+    vsQuestion:     (r.vsQuestion as import('@trainingai/shared/types/day-checkin').VsQuestion) ?? null,
     soreMuscles:       (r.soreMuscles as string[]) ?? [],
     journal:           r.journal ? String(r.journal) : null,
     // LA-137: selected by the server and never mapped, so a completion made on another device never

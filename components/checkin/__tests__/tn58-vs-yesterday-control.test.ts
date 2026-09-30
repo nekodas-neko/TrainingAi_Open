@@ -6,7 +6,7 @@ import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /** TN-58. The absolute 1–5 produced **two distinct values across 96 check-ins**, sd 0.29, none of
  *  them touched. This is the comparative control that asks the question we actually want answered,
- *  writing the `vs_yesterday` column LB-124 shipped.
+ *  writing the `vs_normal` column LB-124 shipped.
  *
  *  **The defect this guards is a default, not a bug in the happy path.** A neutral stored as though
  *  it were an answer is exactly what TN-57 fixed, and shipping one here would recreate it under a
@@ -27,31 +27,31 @@ describe('TN-58 — a skipped comparative answer stores nothing', () => {
   it('the control has no default and no pre-selection', () => {
     const sheet = code(read('components/morning-checkin-sheet.tsx'))
     expect(sheet, 'the state is seeded with a value — the TN-57 defect under a new name')
-      .toMatch(/useState<VsYesterday \| null>\(null\)/)
-    expect(sheet, 'vsYesterday was added to the absolute scales\' neutral seed')
-      .not.toMatch(/NEUTRAL_SCALES[^\n]*vsYesterday/)
+      .toMatch(/useState<VsNormal \| null>\(null\)/)
+    expect(sheet, 'vsNormal was added to the absolute scales\' neutral seed')
+      .not.toMatch(/NEUTRAL_SCALES[^\n]*vsNormal/)
   })
 
   it('and the sheet posts it straight through, with no ?? fallback on the way', () => {
     const sheet = code(read('components/morning-checkin-sheet.tsx'))
-    expect(sheet).toMatch(/^\s*vsYesterday,\s*$/m)
+    expect(sheet).toMatch(/^\s*vsNormal,\s*$/m)
     expect(sheet, 'a ?? on the payload would turn "not answered" into an answer')
-      .not.toMatch(/vsYesterday:\s*vsYesterday\s*\?\?/)
-    // The local write hard-coded `vsYesterday: null` before the payload spread. Key order would
+      .not.toMatch(/vsNormal:\s*vsNormal\s*\?\?/)
+    // The local write hard-coded `vsNormal: null` before the payload spread. Key order would
     // decide silently which won; the placeholder is gone rather than left to that.
     expect(sheet, 'the placeholder null is still in the local write, beside the real value')
-      .not.toMatch(/vsYesterday:\s*null/)
+      .not.toMatch(/vsNormal:\s*null/)
   })
 
   it('the picker offers exactly the three values the column accepts, and can be cleared', () => {
-    const picker = code(read('components/checkin/vs-yesterday-picker.tsx'))
+    const picker = code(read('components/checkin/vs-normal-picker.tsx'))
     for (const v of ['better', 'same', 'worse']) expect(picker).toContain(`'${v}'`)
     expect(picker, 'tapping the selected option no longer clears it — a mis-tap would be stuck')
       .toMatch(/onChange\(selected \? null : opt\.value\)/)
   })
 
   it('the schema rejects anything else, rather than storing nothing and returning 201', () => {
-    const parse = (vsYesterday: unknown) => DayCheckinExtrasSchema.safeParse({ vsYesterday }).success
+    const parse = (vsNormal: unknown) => DayCheckinExtrasSchema.safeParse({ vsNormal }).success
     expect(parse('better')).toBe(true)
     expect(parse(null), 'null must parse — it is how a skipped answer reaches the column').toBe(true)
     expect(parse(undefined), 'omitted must parse too — the sheet may not send the key at all').toBe(true)
@@ -62,8 +62,8 @@ describe('TN-58 — a skipped comparative answer stores nothing', () => {
   it('a check-in whose only answer is this one still counts as an answer', () => {
     // Otherwise the cheapest possible honest check-in — three taps and nothing else — is rejected
     // as empty, and the question can never produce the variance it exists to produce.
-    expect(dayCheckinHasAnswers({ vsYesterday: 'worse' })).toBe(true)
-    expect(dayCheckinHasAnswers({ vsYesterday: null })).toBe(false)
+    expect(dayCheckinHasAnswers({ vsNormal: 'worse' })).toBe(true)
+    expect(dayCheckinHasAnswers({ vsNormal: null })).toBe(false)
     expect(dayCheckinHasAnswers({})).toBe(false)
   })
 })

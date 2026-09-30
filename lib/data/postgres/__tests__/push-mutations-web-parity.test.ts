@@ -228,20 +228,20 @@ describe.skipIf(!canRun)('pushMutations <-> web route parity', () => {
     // place it can be dropped silently, and four of them had to be edited for this to pass.
     const { POST } = await import('@/app/api/day-checkin/route')
     const res = await POST(jsonReq('http://localhost/api/day-checkin',
-      { date: '2026-02-01', phase: 'morning', vsYesterday: 'worse' }) as never)
+      { date: '2026-02-01', phase: 'morning', vsNormal: 'worse' }) as never)
     expect(res.status).toBe(201)
     const web = await pool.query(
-      `SELECT vs_yesterday FROM day_checkins WHERE user_id = $1 AND log_date = '2026-02-01'`, [TEST_USER_ID])
-    expect(web.rows[0].vs_yesterday).toBe('worse')
+      `SELECT vs_normal FROM day_checkins WHERE user_id = $1 AND log_date = '2026-02-01'`, [TEST_USER_ID])
+    expect(web.rows[0].vs_normal).toBe('worse')
 
     const result = await repo.pushMutations(TEST_USER_ID, [{
       id: 'mut-vsy-1', domain: 'day_checkins', date: '2026-02-02',
-      payload: { phase: 'morning', vsYesterday: 'better' },
+      payload: { phase: 'morning', vsNormal: 'better' },
     }])
     expect(result.processed).toBe(1)
     const push = await pool.query(
-      `SELECT vs_yesterday FROM day_checkins WHERE user_id = $1 AND log_date = '2026-02-02'`, [TEST_USER_ID])
-    expect(push.rows[0].vs_yesterday).toBe('better')
+      `SELECT vs_normal FROM day_checkins WHERE user_id = $1 AND log_date = '2026-02-02'`, [TEST_USER_ID])
+    expect(push.rows[0].vs_normal).toBe('better')
 
     // Skipped stays NULL on both paths — there is no neutral to fall back to, which is the point.
     await POST(jsonReq('http://localhost/api/day-checkin',
@@ -251,17 +251,17 @@ describe.skipIf(!canRun)('pushMutations <-> web route parity', () => {
       payload: { phase: 'morning', journal: 'nothing to add' },
     }])
     const skipped = await pool.query(
-      `SELECT vs_yesterday FROM day_checkins WHERE user_id = $1 AND log_date IN ('2026-02-03','2026-02-04')`,
+      `SELECT vs_normal FROM day_checkins WHERE user_id = $1 AND log_date IN ('2026-02-03','2026-02-04')`,
       [TEST_USER_ID])
     expect(skipped.rowCount).toBe(2)
-    expect(skipped.rows.every(r => r.vs_yesterday === null)).toBe(true)
+    expect(skipped.rows.every(r => r.vs_normal === null)).toBe(true)
 
     // And re-saving the row keeps the answer rather than clearing it.
     await POST(jsonReq('http://localhost/api/day-checkin',
-      { date: '2026-02-01', phase: 'morning', vsYesterday: 'same' }) as never)
+      { date: '2026-02-01', phase: 'morning', vsNormal: 'same' }) as never)
     const resaved = await pool.query(
-      `SELECT vs_yesterday FROM day_checkins WHERE user_id = $1 AND log_date = '2026-02-01'`, [TEST_USER_ID])
-    expect(resaved.rows[0].vs_yesterday).toBe('same')
+      `SELECT vs_normal FROM day_checkins WHERE user_id = $1 AND log_date = '2026-02-01'`, [TEST_USER_ID])
+    expect(resaved.rows[0].vs_normal).toBe('same')
 
     await pool.query(`DELETE FROM day_checkins WHERE user_id = $1`, [TEST_USER_ID])
   })
@@ -269,13 +269,13 @@ describe.skipIf(!canRun)('pushMutations <-> web route parity', () => {
   /**
    * The erase trap, which the compiler found rather than a test: `food-logging-complete` re-saves
    * the evening row to flip one flag, and `saveDayCheckin` overwrites every column it is given a
-   * value for. A route that omitted `vsYesterday` would clear the answer every time the food log
+   * value for. A route that omitted `vsNormal` would clear the answer every time the food log
    * was marked complete — silently, and only on days the lifter had answered.
    */
   it('day_checkins: marking the food log complete does not clear the comparative answer (LB-124)', async () => {
     const { POST: checkin } = await import('@/app/api/day-checkin/route')
     await checkin(jsonReq('http://localhost/api/day-checkin',
-      { date: '2026-02-05', phase: 'evening', vsYesterday: 'better' }) as never)
+      { date: '2026-02-05', phase: 'evening', vsNormal: 'better' }) as never)
 
     const { POST: complete } = await import('@/app/api/food-logging-complete/route')
     const res = await complete(jsonReq('http://localhost/api/food-logging-complete',
@@ -283,9 +283,9 @@ describe.skipIf(!canRun)('pushMutations <-> web route parity', () => {
     expect(res.status).toBe(200)
 
     const after = await pool.query(
-      `SELECT vs_yesterday, food_logging_completed_at FROM day_checkins
+      `SELECT vs_normal, food_logging_completed_at FROM day_checkins
          WHERE user_id = $1 AND log_date = '2026-02-05' AND phase = 'evening'`, [TEST_USER_ID])
-    expect(after.rows[0].vs_yesterday).toBe('better')
+    expect(after.rows[0].vs_normal).toBe('better')
     expect(after.rows[0].food_logging_completed_at).not.toBeNull()
 
     await pool.query(`DELETE FROM day_checkins WHERE user_id = $1`, [TEST_USER_ID])

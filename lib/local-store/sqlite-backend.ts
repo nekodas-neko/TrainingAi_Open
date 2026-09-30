@@ -1218,7 +1218,8 @@ export class SQLiteLocalStore implements LocalStore {
       illnessContext:            r.illness_context ? String(r.illness_context) as import('@trainingai/shared/types/day-checkin').IllnessContext : null,
       perceivedRecoveryTouched:  Number(r.perceived_recovery_touched) === 1,
       sleepQualityFeelTouched:   Number(r.sleep_quality_feel_touched) === 1,
-      vsYesterday:       r.vs_yesterday ? String(r.vs_yesterday) as import('@trainingai/shared/types/day-checkin').VsYesterday : null,
+      vsNormal:       r.vs_normal ? String(r.vs_normal) as import('@trainingai/shared/types/day-checkin').VsNormal : null,
+      vsQuestion:     r.vs_normal && r.vs_question != null ? Number(r.vs_question) as import('@trainingai/shared/types/day-checkin').VsQuestion : null,
       soreMuscles:       JSON.parse(String(r.sore_muscles ?? '[]')),
       journal:           r.journal ? String(r.journal) : null,
       updatedAt:         String(r.updated_at),
@@ -1238,9 +1239,9 @@ export class SQLiteLocalStore implements LocalStore {
          (log_date, phase, physical_tiredness, mental_drain, barely_moved,
           hydration, late_heavy_meal, wake_mood, perceived_recovery, motivation,
           sleep_quality_feel, resting_soreness, illness_context, perceived_recovery_touched,
-          sleep_quality_feel_touched, vs_yesterday, sore_muscles, journal,
+          sleep_quality_feel_touched, vs_normal, vs_question, sore_muscles, journal,
           food_logging_completed_at, updated_at, deleted_at, sync_status)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(log_date, phase) DO UPDATE SET
          physical_tiredness=excluded.physical_tiredness, mental_drain=excluded.mental_drain,
          barely_moved=excluded.barely_moved, hydration=excluded.hydration,
@@ -1250,7 +1251,7 @@ export class SQLiteLocalStore implements LocalStore {
          illness_context=excluded.illness_context,
          perceived_recovery_touched=excluded.perceived_recovery_touched,
          sleep_quality_feel_touched=excluded.sleep_quality_feel_touched,
-         vs_yesterday=excluded.vs_yesterday,
+         vs_normal=excluded.vs_normal, vs_question=excluded.vs_question,
          sore_muscles=excluded.sore_muscles,
          journal=excluded.journal,
          food_logging_completed_at=COALESCE(excluded.food_logging_completed_at, day_checkins.food_logging_completed_at),
@@ -1262,7 +1263,7 @@ export class SQLiteLocalStore implements LocalStore {
         record.wakeMood, record.perceivedRecovery, record.motivation,
         record.sleepQualityFeel, record.restingSoreness,
         record.illnessContext, record.perceivedRecoveryTouched ? 1 : 0, record.sleepQualityFeelTouched ? 1 : 0,
-        record.vsYesterday ?? null,
+        record.vsNormal ?? null, record.vsNormal == null ? null : (record.vsQuestion ?? null),
         JSON.stringify(record.soreMuscles), record.journal,
         record.foodLoggingCompletedAt ?? null, record.updatedAt,
         record.deletedAt, record.syncStatus,
@@ -2157,9 +2158,9 @@ export class SQLiteLocalStore implements LocalStore {
              (log_date, phase, physical_tiredness, mental_drain, barely_moved,
               hydration, late_heavy_meal, wake_mood, perceived_recovery, motivation,
               sleep_quality_feel, resting_soreness, illness_context, perceived_recovery_touched,
-              sleep_quality_feel_touched, vs_yesterday, sore_muscles, journal,
+              sleep_quality_feel_touched, vs_normal, vs_question, sore_muscles, journal,
               food_logging_completed_at, updated_at, deleted_at, sync_status)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
            ON CONFLICT(log_date, phase) DO UPDATE SET
              physical_tiredness=excluded.physical_tiredness, mental_drain=excluded.mental_drain,
              barely_moved=excluded.barely_moved, hydration=excluded.hydration,
@@ -2169,7 +2170,7 @@ export class SQLiteLocalStore implements LocalStore {
              illness_context=excluded.illness_context,
              perceived_recovery_touched=excluded.perceived_recovery_touched,
              sleep_quality_feel_touched=excluded.sleep_quality_feel_touched,
-             vs_yesterday=excluded.vs_yesterday,
+             vs_normal=excluded.vs_normal, vs_question=excluded.vs_question,
              sore_muscles=excluded.sore_muscles,
              journal=excluded.journal,
              food_logging_completed_at=excluded.food_logging_completed_at,
@@ -2181,7 +2182,7 @@ export class SQLiteLocalStore implements LocalStore {
            r.hydration, r.lateHeavyMeal, r.wakeMood, r.perceivedRecovery, r.motivation,
            r.sleepQualityFeel, r.restingSoreness, r.illnessContext,
            r.perceivedRecoveryTouched ? 1 : 0, r.sleepQualityFeelTouched ? 1 : 0,
-           r.vsYesterday ?? null,
+           r.vsNormal ?? null, r.vsNormal == null ? null : (r.vsQuestion ?? null),
            JSON.stringify(r.soreMuscles), r.journal, r.foodLoggingCompletedAt ?? null,
            r.updatedAt, r.deletedAt],
         );
