@@ -4710,6 +4710,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         answeredAt: a.answeredAt.toISOString(),
         updatedAt: a.updatedAt.toISOString(),
         deletedAt: a.deletedAt ? a.deletedAt.toISOString() : null,
+        estCalories: a.estCalories, estProteinG: a.estProteinG, estCarbsG: a.estCarbsG,
+        estFatG: a.estFatG, estBiasKcal: a.estBiasKcal, estBasis: a.estBasis,
       })),
     }
 

@@ -538,10 +538,18 @@ export interface LocalPlanMealAnswer {
   id: string;
   planMealId: string;
   logDate: string;
+  /** 'no' (a decline) or, since BF-203a, 'estimated'. Only 'no' means the user declined. */
   answer: string;
   answeredAt: string | null;
   updatedAt: string | null;
   deletedAt: string | null;
+  /** BF-203a. Set only on an 'estimated' answer. Optional so a decline need not spell them out. */
+  estCalories?: number | null;
+  estProteinG?: number | null;
+  estCarbsG?: number | null;
+  estFatG?: number | null;
+  estBiasKcal?: number | null;
+  estBasis?: string | null;
 }
 
 export interface LocalSavedMeal {

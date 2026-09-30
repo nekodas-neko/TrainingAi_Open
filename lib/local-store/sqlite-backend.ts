@@ -1392,9 +1392,16 @@ export class SQLiteLocalStore implements LocalStore {
     for (const a of delta.planMealAnswers ?? []) {
       await runSQL(
         `INSERT INTO plan_meal_answers
-           (id, plan_meal_id, log_date, answer, answered_at, updated_at, deleted_at, sync_status)
-         VALUES (?,?,?,?,?,?,?,'synced')
+           (id, plan_meal_id, log_date, answer, answered_at, updated_at, deleted_at,
+            est_calories, est_protein_g, est_carbs_g, est_fat_g, est_bias_kcal, est_basis, sync_status)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
          ON CONFLICT(id) DO UPDATE SET
+           est_calories=CASE WHEN sync_status='synced' THEN excluded.est_calories ELSE est_calories END,
+           est_protein_g=CASE WHEN sync_status='synced' THEN excluded.est_protein_g ELSE est_protein_g END,
+           est_carbs_g=CASE WHEN sync_status='synced' THEN excluded.est_carbs_g ELSE est_carbs_g END,
+           est_fat_g=CASE WHEN sync_status='synced' THEN excluded.est_fat_g ELSE est_fat_g END,
+           est_bias_kcal=CASE WHEN sync_status='synced' THEN excluded.est_bias_kcal ELSE est_bias_kcal END,
+           est_basis=CASE WHEN sync_status='synced' THEN excluded.est_basis ELSE est_basis END,
            plan_meal_id=CASE WHEN sync_status='synced' THEN excluded.plan_meal_id ELSE plan_meal_id END,
            log_date=CASE WHEN sync_status='synced' THEN excluded.log_date ELSE log_date END,
            answer=CASE WHEN sync_status='synced' THEN excluded.answer ELSE answer END,
@@ -1402,7 +1409,9 @@ export class SQLiteLocalStore implements LocalStore {
            updated_at=CASE WHEN sync_status='synced' THEN excluded.updated_at ELSE updated_at END,
            deleted_at=CASE WHEN sync_status='synced' THEN excluded.deleted_at ELSE deleted_at END`,
         [a.id, a.planMealId, a.logDate, a.answer ?? 'no', a.answeredAt ?? null,
-         a.updatedAt ?? null, a.deletedAt ?? null],
+         a.updatedAt ?? null, a.deletedAt ?? null,
+         a.estCalories ?? null, a.estProteinG ?? null, a.estCarbsG ?? null, a.estFatG ?? null,
+         a.estBiasKcal ?? null, a.estBasis ?? null],
       );
     }
     for (const r of delta.bodyMetrics ?? []) {
@@ -2652,7 +2661,8 @@ export class SQLiteLocalStore implements LocalStore {
 
   async getPlanMealAnswers(logDate: string): Promise<LocalPlanMealAnswer[]> {
     const rows = await querySQL<Record<string, unknown>>(
-      `SELECT id, plan_meal_id, log_date, answer, answered_at, updated_at, deleted_at
+      `SELECT id, plan_meal_id, log_date, answer, answered_at, updated_at, deleted_at,
+              est_calories, est_protein_g, est_carbs_g, est_fat_g, est_bias_kcal, est_basis
        FROM plan_meal_answers WHERE log_date = ? AND deleted_at IS NULL`, [logDate],
     );
     return rows.map(r => ({
@@ -2663,18 +2673,43 @@ export class SQLiteLocalStore implements LocalStore {
       answeredAt: r.answered_at == null ? null : String(r.answered_at),
       updatedAt: r.updated_at == null ? null : String(r.updated_at),
       deletedAt: r.deleted_at == null ? null : String(r.deleted_at),
+      estCalories: r.est_calories == null ? null : Number(r.est_calories), estProteinG: r.est_protein_g == null ? null : Number(r.est_protein_g),
+      estCarbsG: r.est_carbs_g == null ? null : Number(r.est_carbs_g), estFatG: r.est_fat_g == null ? null : Number(r.est_fat_g),
+      estBiasKcal: r.est_bias_kcal == null ? null : Number(r.est_bias_kcal), estBasis: r.est_basis == null ? null : String(r.est_basis),
     }));
   }
 
   async upsertPlanMealAnswer(a: LocalPlanMealAnswer & { syncStatus?: string }): Promise<void> {
+    const est = [a.estCalories ?? null, a.estProteinG ?? null, a.estCarbsG ?? null, a.estFatG ?? null,
+      a.estBiasKcal ?? null, a.estBasis ?? null]
+    // BF-203a. One live answer per meal and day. A decline made over an estimate must REPLACE it
+    // (answer and est_* together), or the day holds a decline and an estimate that still counts.
+    // The device mirror of the server's revive in `savePlanMealAnswer`.
+    const live = await querySQL<{ id: string }>(
+      `SELECT id FROM plan_meal_answers WHERE plan_meal_id = ? AND log_date = ? AND deleted_at IS NULL AND id <> ?`,
+      [a.planMealId, a.logDate, a.id],
+    )
+    if (live.length > 0) {
+      await runSQL(
+        `UPDATE plan_meal_answers SET answer = ?, answered_at = ?, updated_at = ?, deleted_at = ?,
+           est_calories = ?, est_protein_g = ?, est_carbs_g = ?, est_fat_g = ?, est_bias_kcal = ?, est_basis = ?,
+           sync_status = ?
+         WHERE plan_meal_id = ? AND log_date = ? AND deleted_at IS NULL`,
+        [a.answer, a.answeredAt, a.updatedAt, a.deletedAt, ...est, a.syncStatus ?? 'pending', a.planMealId, a.logDate],
+      )
+      return
+    }
     await runSQL(
-      `INSERT INTO plan_meal_answers (id, plan_meal_id, log_date, answer, answered_at, updated_at, deleted_at, sync_status)
-       VALUES (?,?,?,?,?,?,?,?)
+      `INSERT INTO plan_meal_answers (id, plan_meal_id, log_date, answer, answered_at, updated_at, deleted_at,
+         est_calories, est_protein_g, est_carbs_g, est_fat_g, est_bias_kcal, est_basis, sync_status)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(id) DO UPDATE SET
          plan_meal_id=excluded.plan_meal_id, log_date=excluded.log_date, answer=excluded.answer,
          answered_at=excluded.answered_at, updated_at=excluded.updated_at,
-         deleted_at=excluded.deleted_at, sync_status=excluded.sync_status`,
-      [a.id, a.planMealId, a.logDate, a.answer, a.answeredAt, a.updatedAt, a.deletedAt,
+         deleted_at=excluded.deleted_at, est_calories=excluded.est_calories,
+         est_protein_g=excluded.est_protein_g, est_carbs_g=excluded.est_carbs_g, est_fat_g=excluded.est_fat_g,
+         est_bias_kcal=excluded.est_bias_kcal, est_basis=excluded.est_basis, sync_status=excluded.sync_status`,
+      [a.id, a.planMealId, a.logDate, a.answer, a.answeredAt, a.updatedAt, a.deletedAt, ...est,
        a.syncStatus ?? 'pending'],
     );
   }
