@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.486.10",
+    date: "2026-09-30",
+    changes: [
+      "The morning check-in's \"Compared to yesterday\" now opens with \"About the same\" already chosen, so a normal morning is one tap on Save. You asked for this directly.",
+      "Tapping the chosen answer again clears it, and closing the sheet with the X still records nothing at all \u2014 those two are how a morning you did not answer stays distinguishable from one where you said things were the same.",
+    ],
+  },
+  {
     version: "1.486.9",
     date: "2026-09-30",
     changes: [
