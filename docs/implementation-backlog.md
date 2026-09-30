@@ -1755,6 +1755,20 @@ below threshold and left in place for next time.
   `claude/implementation-agent-lane-a-ztkb3m` and `lane-a/tn46-baseline-already-retained`. Delete
   outright. Note TN-46 is still queued while its branch is empty, so a branch matching a live entry
   is not automatically worth keeping — check the diff, not just the name.
+- **⟳ RE-MEASURED 2026-09-30 by Lane B, and it has GROWN: 54 non-main remote branches, 7 with an
+  open PR, so **47 sweepable** — against this entry's 39 on 2026-09-27.** Counted after
+  `git fetch origin --prune` (a partial fetch under-counts, which is why the prune matters) and the
+  open-PR figure is from `list_pull_requests`, not a name match — this entry's own lesson. **None of
+  the 7 is Lane B's**, and four are explicitly held for the owner (#1902, #1849, #1847, #1499 —
+  auth/security and column-dropping migrations), so the sweep must not touch them.
+- **⚠ Two of the 54 are named `claude/…`**, which the owner banned outright on 2026-09-27:
+  `claude/implementation-agent-b-s1m4qs` and `claude/implementation-agent-lane-a-ztkb3m`. Neither has
+  an open PR, so both fall inside the sweep rather than needing a separate decision — worth naming
+  because they are the visible half of the rule on a public repo.
+- **Lane B looked at this and did NOT sweep.** Deleting 47 remote branches is a wide-blast-radius
+  action on a public repo, it is this entry's (Orchestrator's) to run, and this entry itself records
+  that the first application of the rule was wrong about four branches. A refreshed count is the
+  useful thing a passing lane can contribute; the deletions are not.
 - **The remaining 32 are sweepable** once the four above are resolved: no open PR, last touched
   between 3 days and 6 weeks ago, and none had a merged PR (the cleanup would have taken it).
 - **Two of them violate the branch-naming rule outright** — `claude/implementation-agent-b-s1m4qs`
