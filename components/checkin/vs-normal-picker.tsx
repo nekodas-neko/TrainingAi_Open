@@ -1,10 +1,10 @@
 "use client"
 
-import type { VsYesterday } from "@trainingai/shared/types/day-checkin"
+import type { VsNormal } from "@trainingai/shared/types/day-checkin"
 
 interface Props {
-  value: VsYesterday | null
-  onChange: (v: VsYesterday | null) => void
+  value: VsNormal | null
+  onChange: (v: VsNormal | null) => void
 }
 
 /** TN-58. The absolute 1–5 "perceived recovery" above this produced **two distinct values across
@@ -18,10 +18,14 @@ interface Props {
  *  do not re-propose no-default here.
  *
  *  **What still separates "not answered" from "about the same" is the DISMISSAL, and it is now the
- *  only thing that does.** `day_checkins.vs_yesterday` still has no column default and the sheet
+ *  only thing that does.** `day_checkins.vs_normal` still has no column default and the sheet
  *  still writes solely on Save, so closing with the X stores nothing at all. A later change that
  *  wrote a row on close would erase the distinction without touching this file, which is why the
  *  e2e spec asserts the dismissal and not just the control.
+ *
+ *  ⚠ **`LB-190`'s `vs_question` marks the WORDING shift only** (1 = yesterday, 2 = normal). The
+ *  seeded neutral is a SECOND boundary inside question 1, and no stored value separates the rows
+ *  before it from the ones after. See `LB-198`.
  *
  *  Tapping the selected option clears it, so a mis-tap is recoverable to unanswered rather than
  *  stuck on a value the owner did not mean — the sibling `IllnessContextPicker` does the same. With
@@ -31,7 +35,7 @@ interface Props {
  *
  *  Options live here rather than in `packages/shared` because they are display copy with one
  *  consumer, and that file belongs to the other lane. */
-const OPTIONS: { value: VsYesterday; label: string; color: string }[] = [
+const OPTIONS: { value: VsNormal; label: string; color: string }[] = [
   { value: 'better', label: 'Better',        color: 'var(--accent-green)' },
   { value: 'same',   label: 'About the same', color: 'var(--color-muted-foreground)' },
   { value: 'worse',  label: 'Worse',          color: 'var(--accent-amber)' },
@@ -39,9 +43,9 @@ const OPTIONS: { value: VsYesterday; label: string; color: string }[] = [
 
 /** LB-191. The seeded answer, owned here because this file owns the option list — a constant in
  *  the sheet could drift from the labels and seed a value the control does not offer. */
-export const VS_YESTERDAY_DEFAULT: VsYesterday = 'same'
+export const VS_NORMAL_DEFAULT: VsNormal = 'same'
 
-export function VsYesterdayPicker({ value, onChange }: Props) {
+export function VsNormalPicker({ value, onChange }: Props) {
   return (
     <div className="flex flex-col gap-1.5">
       <span id="vs-yesterday-label" className="text-sm font-medium">Compared to yesterday</span>

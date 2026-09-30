@@ -523,43 +523,33 @@ below threshold and left in place for next time.
 - **Done when** no tracked file under `app/**`, `components/**`, `lib/**` or `packages/**` is written
   to by a test in the repo, with a check that says so.
 
-### [readiness][platform] LB-190 — rename `vs_yesterday` to `vs_normal`, and mark the boundary the rename creates
+### [readiness] LB-198 — `vs_question` marks the wording shift; the SECOND boundary inside question 1 is unmarked
 
-- **Lane: A** · **Added:** 2026-09-30 · Lane B, moved out of `OR-206` because the whole of it is a
-  schema change, and **Postgres migration numbers and local SQLite versions are Lane A's alone**.
-- **Why it leads rather than follows.** `OR-206`'s copy change is what makes the stored history
-  ambiguous, so the marker has to exist before the question changes on screen — engine half first.
-  `OR-206` waits on this via `Needs:`.
-- **The rename**, because a field whose name contradicts its question is how the next reader gets it
-  wrong: `day_checkins.vs_yesterday` → `vs_normal`, and `VsYesterday` with it. Reached by grep and
-  `tsc`: `schema.ts`, `adapter.ts` (5 sites incl. the `EXCLUDED.vs_yesterday` upsert),
-  `app/api/day-checkin/route.ts`, `app/api/food-logging-complete/route.ts`,
-  `packages/shared/src/types/day-checkin.ts`, `packages/shared/src/validation/day-checkin.ts`,
-  `lib/local-store/{types,sqlite-backend,sync-engine}.ts`, `lib/sqlite/migrations.ts` (a new local
-  version), and `claude-ro-views.sql` regenerated **in place**, not numbered (BF-214).
-- **⚠ The marker is the half that is not optional.** Rows written before the change answer *"vs
-  yesterday"*; rows after answer *"vs normal"*. Different questions, and they **must not be pooled
-  in one trend**. A deploy date cannot mark it exactly — Railway ships on merge, so a given local
-  day can hold rows from both sides of the cutover.
-- **⚠ THE BOUNDARY MOVED TWICE, AND ONE MARKER MUST COVER BOTH** (from `LB-191`, shipped
-  2026-09-30). The second shift is not the wording: it is that **a neutral can now arrive
-  unconsidered**, because the control seeds *"About the same"* and a one-tap Save stores it. So rows
-  divide into three eras, not two — no default and "vs yesterday"; seeded neutral and "vs yesterday";
-  seeded neutral and "vs normal" — and the middle one already exists and is accumulating. A version
-  column handles all three for free; **a recorded cutover DATE handles only one of the two shifts**,
-  which is a second reason to prefer the column. Record it as covering both, or a later reader will
-  split on one and pool the other.
-- **What still separates "not answered" from a reflexive "same" is the DISMISSAL**, and nothing
-  else does now: the column has no default and the sheet writes solely on Save. Any later change
-  that writes a row on close erases that distinction, and it would do so without touching this
-  entry or the picker.
-- **Recommendation: a stored question-version column**, the shape `SLEEP_VERDICT_MODEL_VERSION`
-  already set on this sheet — each row says which question it answered, and a later wording change
-  costs one integer instead of another archaeology pass. A recorded cutover date is the cheaper
-  alternative and is what `OR-206` offered; it loses on the one-day ambiguity above.
-- **Done when** a row written after the rename is distinguishable from one written before it by a
-  stored value, with a test, and nothing in `app/**`, `lib/**` or `packages/**` still spells
-  `vsYesterday`.
+- **Lane: A** · **Added:** 2026-09-30 · Lane B, while shipping `LB-191`. Schema, so Lane A's.
+- **`LB-190` (#2025) did exactly what it was asked and it is not enough on its own.** `vs_question`
+  says WHICH QUESTION a row answered — 1 = *vs yesterday*, 2 = *vs normal* — and the boundary it
+  marks is the wording change. **`LB-191` (shipped the same day) moved a second boundary that sits
+  INSIDE question 1**: the control now seeds *"About the same"*, so a one-tap Save stores a neutral
+  the owner may never have considered. Rows on either side of it both read `vs_question = 1`.
+- **Why it matters rather than being tidy.** Before the seed the field collected **2 answers in 82
+  check-ins**; after it, most days will carry a `'same'`. Pooled, that reads as a real change in how
+  he feels and is an artefact of the control. It feeds a scoring input, so the cost is a
+  contaminated calibration, not an untidy column.
+- **Recommendation: a `vs_normal_touched` boolean beside the value**, the shape
+  `sleep_quality_feel_touched` already uses on this same sheet — and the shape **`LB-191`'s own
+  entry predicted would be owed** if the default shipped: *"then the column needs a `touched` flag
+  beside it … or tuning cannot tell his answer from the app's."*
+- **Why a flag beats another era marker.** An era marker answers *"could this row have been
+  seeded?"*; the flag answers *"was it?"* — per row, so a considered *"about the same"* stays usable
+  instead of being discarded with the reflexive ones. Same reason `vs_question` beat a cutover date.
+- **The alternative, and what it is better at.** Recording the seed's release (v1.486.10,
+  2026-09-30) in the tuning notes costs nothing and needs no migration. It is genuinely better if
+  the answer is *"discard the whole seeded era"* — but it inherits the one-day ambiguity `LB-190`
+  rejected, since Railway ships on merge and a local day can hold rows from both sides.
+- **Reversal cost: low.** A nullable boolean; dropping it later loses only what it recorded. Rows
+  written before it are correctly unknown either way.
+- **Done when** a row stored from an untouched Save is distinguishable from one the owner tapped,
+  with a test — and the write path sets it from a real interaction, never inferred from Save.
 
 ### [readiness][app-shell] OR-206 — the morning check-in compares to "normal", not to yesterday
 

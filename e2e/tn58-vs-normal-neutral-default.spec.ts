@@ -11,7 +11,7 @@ import { STORAGE_STATE } from './fixtures'
 // now asserts: the seeded value is the NEUTRAL, NULL is still reachable by retapping, and a
 // DISMISSED sheet still writes nothing.
 //
-// That last one carries the weight the missing default used to. `day_checkins.vs_yesterday` has no
+// That last one carries the weight the missing default used to. `day_checkins.vs_normal` has no
 // column default and the sheet writes solely on Save, so closing with the X is the only remaining
 // signal of "not answered" — and a later change that wrote a row on close would erase the
 // distinction without touching the picker or the sheet's seed.
@@ -22,6 +22,8 @@ import { STORAGE_STATE } from './fixtures'
 // row that would close the sheet for the other.
 test.use({ storageState: STORAGE_STATE, serviceWorkers: 'block' })
 
+// The COLUMN is `vs_normal` (LB-190) but the PROMPT is still "Compared to yesterday" — `OR-206`
+// changes the wording and has not shipped. This is the one place to change when it does.
 const GROUP = 'Compared to yesterday'
 
 test('the comparative control opens on the neutral, and can still be cleared to nothing', async ({ page }) => {
