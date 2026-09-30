@@ -31,6 +31,27 @@
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell][nutrition] RV-208 ④⑤ are NOT device-verified: a wider header and a brand moved onto a truncating line
+
+- v1.486.4 settles two display forms that had three and six variants. Both changes were **rendered
+  and measured at 384 px** (`e2e/rv208-date-and-brand-forms.spec.ts`, control-run against the old
+  forms), and both remaining risks are ones Chromium cannot answer.
+- **Owed (Lane DV), ④ — the Nutrition header.** This replaced the narrowest of three day-header
+  forms with the widest, on the one surface whose header shares its row: the date sits beside two
+  44 px chevrons inside the single band `BF-24` deliberately collapsed it to. Chromium measured
+  **148.0 × 19.5 px in a 300 px row** — one line, 52 px of slack — but **Samsung WebView's font
+  metrics are not Chromium's**, and the failure mode is a wrap that puts the header back to two
+  bands. Pass/fail: on the S25, open Nutrition and tap `Previous day` twice; the date reads
+  `<Weekday> <D> <Month>` **on one line**, with both chevrons beside it and the gear still on the
+  first band.
+- **Owed (Lane DV), ⑤ — a branded food in the library.** The brand moved from the name line onto
+  `FoodRow`'s secondary, which `truncate`s. The render proves the stubbed row fits
+  (`scrollWidth <= clientWidth`), but `food_items` is **empty in the local seed** and both search
+  lists are network-driven, so no real branded food has ever been drawn. Pass/fail: open
+  `Log Food` → `Recent` with a real logged branded food; the row reads the **food's own name**
+  first, and the brand under it is legible rather than ellipsised into the macros.
+- **Strike this row** when both are VERIFIED.
+
 ### [workouts][app-shell] BF-220's in-session load suggestion is NOT device-verified, and it lands on the screen he reads mid-set
 
 - v1.486.0 offers a lighter next set after one logged at high RPE that fell short of its reps. The
