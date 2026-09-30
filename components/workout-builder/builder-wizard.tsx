@@ -1,6 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { TTL_LONG } from '@trainingai/shared/cache-ttl'
+import type { Program } from '@trainingai/shared/types'
+import { useCachedValue } from '@/lib/hooks/use-cached-value'
+import { ReferenceProgramPicker } from './reference-program-picker'
 import { toast } from 'sonner'
 import { ChevronLeft, ChevronRight, Wand2 } from 'lucide-react'
 import { cn } from '@trainingai/shared/utils'
@@ -81,6 +85,10 @@ const INITIAL_INPUTS: BuilderInputs = {
   weeklyDays: [0, 2, 4],
 }
 
+/** Module-level so the fallback is referentially stable — a `[]` literal at the call site would be
+ *  a new array every render and would defeat `ReferenceProgramPicker`'s `memo` (Q-490). */
+const EMPTY_PROGRAMS: Program[] = []
+
 function toggle<T>(arr: T[], val: T): T[] {
   return arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val]
 }
@@ -92,6 +100,27 @@ export default function BuilderWizard({ onClose, onSaved, registerCloseGuard }: 
   const [generating, setGenerating] = useState(false)
   const [program, setProgram] = useState<GeneratedProgram | null>(null)
   const [confirmExit, setConfirmExit] = useState(false)
+  /**
+   * BF-67 step 3. Held HERE rather than in `BuilderInputs`, and the reason is the lane split:
+   * `packages/shared/src/types/builder.ts` is Lane A's file, the route already accepts
+   * `referenceProgramId` as a top-level field of its own, and nothing but the POST reads this. It
+   * earns a place in the shared type when a second consumer wants it — the review screen naming
+   * what the program was based on would be the obvious one.
+   */
+  const [referenceProgramId, setReferenceProgramId] = useState<string | null>(null)
+  /**
+   * The same key, URL, TTL and fetch variant `config-screen.tsx` already uses for this payload —
+   * one canonical TTL per key, one variant per key. `useCachedValue` rather than a
+   * `useEffect(…, [])`: that shape never re-runs, and a program created in the config screen
+   * behind this sheet would otherwise never appear in the list (Q-402).
+   *
+   * `onError` is a deliberate no-op: the picker self-hides on an empty list, so a failed read
+   * degrades to today's behaviour — no reference offered — rather than to an error state on a
+   * step that is asking for a name.
+   */
+  const templates = useCachedValue<{ programs: Program[] }>(
+    'workout-templates', '/api/workout-templates', TTL_LONG, { onError: () => {} },
+  )
 
   // Dismissing the sheet (back / outside tap / X) routes here — confirm before throwing away
   // a generated program; otherwise just close.
@@ -162,7 +191,11 @@ export default function BuilderWizard({ onClose, onSaved, registerCloseGuard }: 
       const res = await fetch('/api/generate-program', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(inputs),
+        // The reference rides beside `inputs` rather than inside it — the route's schema is
+        // `.strict()` and declares `referenceProgramId` at the top level, so this is the shape it
+        // asks for. `null` is omitted: the field is optional and `z.string().uuid().optional()`
+        // rejects an explicit null.
+        body: JSON.stringify(referenceProgramId ? { ...inputs, referenceProgramId } : inputs),
       })
       const data = await res.json()
       if (!res.ok) { toast.error(data.error ?? 'Generation failed'); return }
@@ -255,6 +288,11 @@ export default function BuilderWizard({ onClose, onSaved, registerCloseGuard }: 
               className="w-full rounded-xl bg-muted px-4 py-3 text-sm outline-none focus:ring-2 ring-brand"
               maxLength={100}
               autoFocus
+            />
+            <ReferenceProgramPicker
+              programs={templates?.programs ?? EMPTY_PROGRAMS}
+              selectedId={referenceProgramId}
+              onSelect={setReferenceProgramId}
             />
           </div>
         )}
