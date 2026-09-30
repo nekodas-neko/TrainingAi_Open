@@ -1130,7 +1130,9 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
           </p>
         )}
 
-        {/* ── Illness advisory (elevated/fever only — self-hides otherwise) ── */}
+        {/* ── Illness advisory — TWO tiers, and it self-hides otherwise (TN-45). `watch` is a quiet
+            line right under the chips (the owner's choice: no penalty, no instruction, so no card);
+            `elevated`/`fever` are the bordered advisory. ── */}
         {readiness && <IllnessAdvisoryBanner readiness={readiness} />}
 
         {/* ── Body Battery ── */}
