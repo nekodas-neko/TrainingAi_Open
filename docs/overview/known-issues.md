@@ -31,6 +31,25 @@
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [readiness] TN-45's `watch` line has never been seen on a REAL firing, because none has happened since
+
+- v1.486.8 puts a quiet line under Home's score chips when the illness radar reads `watch` — the
+  only band that has ever fired, and the one that carried no UI at all. Both halves of the entry's
+  pass test are asserted in a browser (`e2e/tn45-watch-band-on-home.spec.ts`): a `watch` day shows
+  the line under the chips, a normal day shows nothing, and an `elevated` day still gets the bordered
+  advisory with its label and penalty.
+- **What is NOT verified, and it is not a device gate:** every render came from an **overlaid**
+  payload. There have been exactly **two** `watch` days ever — 2026-08-27 and 2026-09-16 — and none
+  since, so no real firing has reached the screen. This is an event to observe, not a task: it is
+  here rather than in the backlog because a queue entry waiting on the weather blocks instead of
+  waiting (`LB-166`'s lesson).
+- **⚠ And one of those two firings was not real.** 2026-08-27's contributors are `hrvBalance z −4.26`
+  and `restingHeartRate z +2.84` — exactly the two fields `PS-17`'s phantom afternoon "sleep"
+  corrupts (`4.75 h / HRV 26.5 / RHR 73.7` still on disk), in the directions it predicts. So the
+  usable history for this band is **one** day, not two, until PS-17's corrective recompute runs.
+- **Strike this row** when a real `watch` day has been seen on the S25 with the line on it — or when
+  the band's calibration is revisited and this surface changes with it.
+
 ### [app-shell][nutrition] RV-208 ④⑤ are NOT device-verified: a wider header and a brand moved onto a truncating line
 
 - v1.486.4 settles two display forms that had three and six variants. Both changes were **rendered

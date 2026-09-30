@@ -10970,7 +10970,24 @@ existing 65 days moves by less than 5 points on every one of them.
   (`packages/shared/src/ai-periodization/generation-dedup.ts`).
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** **THE PREMISE DOES NOT HOLD.** This entry's own 2026-09-23 re-verification says the two top-up calls aim at different targets, so they are not duplicates. The path has **zero** top-up calls in `ai_call_log` ever (sweep 56). A dedup key would be a near no-op that reads as done. RV-189 proposes removing it, or rewording it as *"top up once, re-scale for the rest variant"* and parking it until meal-plan generation is in use.
 
-### [readiness][devices] TN-45 — the only illness band that has ever fired is the one with no penalty and no UI 🔴 LIVE
+### [readiness][devices] TN-45 — the only illness band that has ever fired is the one with no penalty and no UI
+
+**✅ CLOSED 2026-09-30 — the render shipped (v1.486.8, Lane B) and the 🔴 LIVE marker is cleared.**
+The pass test is met: a `watch` day puts a quiet line under Home's score chips and a normal day puts
+nothing there, both asserted in a browser (`e2e/tn45-watch-band-on-home.spec.ts`). The line is the
+engine half's own sentence, rendered rather than re-worded.
+**⚑ AND THE ENTRY'S ONE UNEXPLAINED DAY IS EXPLAINED — it is `PS-17`'s phantom, not physiology.**
+This entry recorded 2026-08-27 (score 57, HRV z **−4.26**) as having *"no explanation on file"*,
+since `TN-46`'s Retatrutide account covers only 09-16. Read from production 2026-09-30, that day's
+two contributors are `hrvBalance z −4.26` (contribution 25) and `restingHeartRate z +2.84`
+(contribution 32) — **and `PS-17` records 08-27's stored summary as `4.75 h / HRV 26.5 / RHR 73.7`,
+a phantom AFTERNOON window classified as night, and says *"Only 08-27's summary was ever wrong"*.**
+A daytime window has lower HRV and higher heart rate than a real night, so the corruption predicts
+**both fields and both directions**. Stated at that strength and no further: the z values were not
+recomputed from 26.5/73.7 against the baseline, so this is a hypothesis confirmed in field and sign
+rather than arithmetic. **The consequence belongs to `PS-17`:** its un-run corrective recompute
+leaves a false `watch` in the history, which any later validation of this band will read as a real
+firing.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-17 · found on a routine production read after TN-34/BF-13/TN-39 shipped.
 - **Lane: A, then B** — the copy lives in `illnessAdvisory()`
@@ -11045,15 +11062,29 @@ line must name **what moved** (resting HR and HRV off baseline), never imply inf
 
 **Pass test:** a `watch` day produces something the owner can see on Home, and a normal day does not.
 
-- **Keep:** the RENDER, which is the Lane B half and the whole remaining ask. The engine half shipped
-  2026-09-18: `illnessAdvisory(flag, biomarkers?)` now names the one or two biomarkers actually
-  driving the score, so `watch` reads *"Resting HR and HRV are drifting from your baseline — worth
-  keeping an eye on."* rather than naming nothing. Verified against the biomarker maps **as persisted
-  in production** for both real firings (2026-09-16 score 41, 2026-08-27 score 57) — both name
-  resting HR and HRV. **Nothing renders it yet**, so the pass test is not met: the render guard at
-  `components/home/illness-advisory-banner.tsx:15` still returns `null` for `watch`, and the owner's
-  choice was a quiet line under the readiness score rather than that banner. Until Lane B ships that
-  line, this entry's defect is unchanged from the owner's side.
+- ~~**Keep:** the RENDER, which is the Lane B half and the whole remaining ask.~~ **✅ SHIPPED
+  2026-09-30 (Lane B, v1.486.8).** The engine half shipped 2026-09-18:
+  `illnessAdvisory(flag, biomarkers?)` names the one or two biomarkers actually driving the score, so
+  `watch` reads *"Resting HR and HRV are drifting from your baseline — worth keeping an eye on."*
+  rather than naming nothing — verified against the biomarker maps **as persisted in production** for
+  both real firings. The render guard returned `null` for `watch`, so nothing carried it.
+  **`IllnessAdvisoryBanner` now has TWO tiers**: a quiet 11 px line under Home's score chips for
+  `watch`, and the existing bordered advisory for `elevated`/`fever`. The quiet tier is the owner's
+  choice rather than a shortcut — `watch` carries **no penalty and no instruction**, so a bordered
+  advisory would overstate it on every firing, which is how a banner gets tuned out before the band
+  that matters uses it. Same two-tier reasoning as `SleepAnnouncement`'s `prominent`.
+  **It shows no band LABEL and no suppression figure** (the prominent tier shows both): `elevated`
+  and `fever` are words that mean something to a reader, while *"Watch"* beside a neutral sentence
+  reads as an instruction the band does not carry. **The copy is `illnessAdvisory`'s and is never
+  re-worded at the surface** — a source test pins the absence of a literal sentence in the branch,
+  because `TN-46`'s never-imply-infection constraint would otherwise have two homes with only one
+  under test.
+- **Keep:** **nothing buildable — one observation is owed and it waits on the weather.** The line has
+  never been seen on a **real** `watch` day: there have been exactly two ever (08-27, 09-16) and none
+  since, so every render is from an overlaid payload. Recorded in
+  [`known-issues.md`](overview/known-issues.md) rather than kept as work, because it is an event to
+  observe and not a task — and `LB-166`'s lesson is that a residue waiting on an event blocks rather
+  than waits.
 - **⚠ What the engine half deliberately did NOT do:** no threshold moved, no readiness penalty
   changed (`watch = 0` stays), and the second parameter is OPTIONAL so every existing caller keeps
   the previous wording. The entry's two "do not" warnings are intact.
@@ -15346,7 +15377,17 @@ Not a decision for a queue pass: option 1 changes how every request in the app i
      a shift worker scoring nothing, and the shortest real night in this history is 5.33 h against a
      longest nap of 1.42 h, so any new threshold is a calibration decision on n=1.
   2. **The corrective recompute.** 2026-08-27's stored summary is still 4.75 h / HRV 26.5 / RHR 73.7
-     on disk — the fix changes what a *future* aggregate writes, not what is already there. The
+     on disk — the fix changes what a *future* aggregate writes, not what is already there.
+     **⚑ AND THAT ROW FIRED THE ILLNESS RADAR — found 2026-09-30 closing `TN-45`.** 08-27 is one of
+     only two `watch` days ever, score 57, and its two contributors are `hrvBalance z −4.26`
+     (contribution 25) and `restingHeartRate z +2.84` (contribution 32) — read from production, and
+     **exactly the two fields this defect corrupts, in the directions it predicts** (a daytime
+     window has lower HRV and higher heart rate than a real night). `TN-45` had recorded that day as
+     having no explanation on file. So the recompute is not only tidying a stored summary: **until it
+     runs, a false `watch` stays in the history, and any later validation of that band reads it as a
+     real firing.** Stated at that strength and no further — the z values were not recomputed from
+     26.5/73.7 against the baseline, so this is a hypothesis confirmed in field and sign rather than
+     arithmetic. The
      re-aggregate is `POST /api/oura-ble/samples/redecode`, which is **session + admin gated with no
      bearer path**, so a session with read-only DB access cannot run it: it needs the owner, after
      this deploys.
