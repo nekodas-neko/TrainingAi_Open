@@ -649,6 +649,12 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     answeredAt:  r.answeredAt ? String(r.answeredAt) : null,
     updatedAt:   r.updatedAt ? String(r.updatedAt) : null,
     deletedAt:   r.deletedAt ? String(r.deletedAt) : null,
+    estCalories: r.estCalories == null ? null : Number(r.estCalories),
+    estProteinG: r.estProteinG == null ? null : Number(r.estProteinG),
+    estCarbsG:   r.estCarbsG == null ? null : Number(r.estCarbsG),
+    estFatG:     r.estFatG == null ? null : Number(r.estFatG),
+    estBiasKcal: r.estBiasKcal == null ? null : Number(r.estBiasKcal),
+    estBasis:    r.estBasis == null ? null : String(r.estBasis),
   } satisfies LocalPlanMealAnswer));
 
   const count = bodyMetrics.length + moodLogs.length + sleepSessions.length +
