@@ -6471,7 +6471,7 @@ drift.
 ### [nutrition] BF-203a — phase A: the `estimated` answer state, and counting it once
 - **Lane:** A — migration, `plan_meal_answers`, `packages/shared/src/nutrition/meal-estimate.ts`, `lib/health/energy-balance-service.ts`.
 - **Added:** 2026-09-26 · BugFix intake. First of BF-203's three phases.
-- **Needs: LA-172**
+- **Needs: LA-185** — Tasks 1–7′ and 8′ (1–2) are merged or in flight (#2001–#2004, #2018, #2019, #2021). What remains, 8′ (3–4), counts and displays the estimate, and waits on the owner's choice of how the ring marks it.
 - **⛔ STOPPED 2026-09-28 (Lane A) on the plan's own stop-check, and in a worse form than it
   anticipated.** The plan matches a logged meal to a plan slot **by meal type** and says to stop if
   two plan meals share one. Production: **all 8 of the owner's plan meals have `meal_type_id`

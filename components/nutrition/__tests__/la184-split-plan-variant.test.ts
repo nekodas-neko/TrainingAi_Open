@@ -66,9 +66,13 @@ describe('LA-184 — which plan variant applies', () => {
   it('and UNKNOWN reaches `pickVariant` as the REST fallback it already had — no behaviour moved', () => {
     // The guarantee that makes a today-only fix safe to ship: every case above that answers
     // `undefined` leaves `pickVariant` doing exactly what it did before this change.
+    // BF-203a moved the chooser to a shared module so the estimator and the card cannot disagree.
     const src = stripComments(
-      readFileSync(path.join(ROOT, 'components/nutrition/meal-plan-section.tsx'), 'utf8'))
+      readFileSync(path.join(ROOT, 'packages/shared/src/nutrition/plan-variant.ts'), 'utf8'))
     expect(src).toMatch(/isTrainingDay \? byType\('training'\) : byType\('rest'\)/)
+    const section = stripComments(
+      readFileSync(path.join(ROOT, 'components/nutrition/meal-plan-section.tsx'), 'utf8'))
+    expect(section).toMatch(/pickPlanVariant\(plan, isTrainingDay\)/)
   })
 
   it('the one caller now passes the prop, through the hook that survives the tab shell', () => {

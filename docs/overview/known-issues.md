@@ -108,6 +108,8 @@
 - **Owed (Lane DV):** after one app open, a pull completes with no SQLite error naming `est_`. If a meal
   plan is active, decline one planned meal, undo it and decline it again: the card shows it declined, and
   one live row exists in `plan_meal_answers` for that meal and day.
+- **Also owed since Task 8′ (1–2):** with an active plan, after a planned meal's time passes unlogged, one
+  `estimated` row appears for it, today only, and reaches the server once. Nothing displays it yet (LA-185).
 - **Strike this row** when that is VERIFIED.
 
 ### [cardio][platform] LB-179's local SQLite v44 (prescribed_runs.completed_as) is NOT device-verified
