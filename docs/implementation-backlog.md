@@ -8874,6 +8874,13 @@ drift.
     `~/.cache/ms-playwright/chromium_headless_shell-1234`.
   - **The frames are unsymbolised** (offsets into the stripped shell), so **which** code path it is
     remains unestablished — and nothing here shows the crash is our page's doing at all.
+- **⊕ IT OWNS `LB-106` AS A SYMPTOM, established 2026-09-30.** `preferences-survive-reinstall`'s
+  CI-only `net::ERR_ABORTED` was a two-week investigation for an app-side cause that does not
+  exist: this crash appears in that spec's OWN failure block (run 34814623905, job 103882629107,
+  `[pid=4243]`, same address), with `plan-rescale`'s separate crash at `[pid=5177]` in the same
+  run. **That makes it the TENTH sighting** and the first where the downstream `ERR_ABORTED` and
+  the crash are pinned to one process. Anything that re-opens `LB-106` on app-side grounds should
+  be sent back here instead.
 - **Keep — the cause is narrowed, not established, and the next step has changed.** Not another
   dmesg read: that instrument was built for an OOM hypothesis this witness rules out. A SIGSEGV in a
   pinned Chromium is a **harness** question rather than a product one — the remedy is a
@@ -12869,26 +12876,46 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   *"If the abort returns, the SW was not it."* **It returned, with the block in place.** The
   header's other claim — that `page.reload()` *"aborts the navigation every run"* — is also stale:
   measured 2026-09-14, reload and a same-URL `goto` both complete in the sandbox.
-- **No cause is claimed. It does not reproduce locally**, so the honest position is a named failure
-  POINT and not a named cause. Ruled out by reading rather than guessed at: no `storage` listener
+- **✅ THE CAUSE IS NAMED, 2026-09-30 — IT IS `LB-149`/`LB-56`'s BROWSER CRASH, READ OUT OF THIS
+  RUN'S OWN LOG.** The read this entry was waiting for has been done, on job 103882629107 of run
+  34814623905 (the log is still retained 16 days on; the ARTIFACT is not, at `retention-days: 7`).
+  **`Received signal 11 SEGV_MAPERR 0000000001b0` appears inside failure 1)'s own block —
+  `preferences-survive-reinstall` — at `[pid=4243]`, the same browser process whose `page.goto`
+  returned `net::ERR_ABORTED`.** `plan-rescale`'s crash is a SEPARATE process, `[pid=5177]`: there
+  were **two** crashes in that run, one per failing spec, not one crash plus one mystery.
+  That is `LB-56`'s FOURTH sighting exactly — `ERR_ABORTED` is what the harness reports when the
+  browser process is already gone.
+- **⚠ What is NOT claimed, because the log cannot say it.** The crash line is the last entry in
+  that process's stderr and carries **no timestamp** (Chromium's crash handler prints without the
+  `MMDD/HHMMSS` prefix its console lines have), so the log alone cannot order the SIGSEGV against
+  line 53's `goto`. The attribution is **Playwright's** — it reports that browser's stderr under
+  that test's failure — not an ordering I measured. It is strong enough to stop hunting an app-side
+  cause and not strong enough to call the sequence proven.
+- **Three things follow, and they change what this entry is for.**
+  ① **The relaunch reshape (below) is not the fix** — defensible on fidelity, as it says, but it
+  cannot address a browser that died. ② **The service-worker block should go**: the spec's header
+  carried the falsification *"If the abort returns, the SW was not it"*, the abort returned, and the
+  block is now justified by nothing. ③ **This entry is no longer its own investigation.** It is a
+  symptom of `LB-149`, whose `Keep:` says the remedy is a harness decision (a Playwright/Chromium
+  bump or a flag), and the ten-clean-runs pass test below measures the RUNNER's luck rather than
+  anything this spec does. **Do not spend another session on app-side suspects here.**
+- **The original position, kept because it was right to hold it:** *no cause is claimed, it does not
+  reproduce locally, so the honest answer is a named failure POINT and not a named cause.* Ruled out by reading rather than guessed at: no `storage` listener
   anywhere in the app, the two `location.assign` call sites are behind a native-only custom event,
   and the one `beforeunload` handler mounts only mid-workout on the workout screen — none can
   supersede a navigation on `/`.
 - **⚠ CORRECTED 2026-09-30. This line called the same run's Chromium crash "context" and it is the
-  most likely CAUSE.** The run carried a native `chrome-headless-shell` segfault on
+  CAUSE — see the resolution above, which found the same crash in THIS spec's own failure block.** The run carried a native `chrome-headless-shell` segfault on
   `plan-rescale.spec.ts` with `cr2: 0x1b0` — **the same fault address `LB-56` has recorded nine
   times since 2026-09-09**, and `LB-56`'s FOURTH sighting already settled the mechanism: an attempt
   and its retry of ONE test produced a `SIGSEGV` and a `net::ERR_ABORTED` respectively, so
   `ERR_ABORTED` is **what a later test sees after the browser process is already gone**, not a
   separate fault. Dismissing it as load is what left this entry saying "no cause is claimed" while
   the cause was in its own log.
-- **What that changes here.** This entry's `ERR_ABORTED` is very likely `LB-149`/`LB-56`'s crash
-  wearing its downstream face, which explains every property that made it baffling: it never
-  reproduces locally, it lands on whichever spec happens to navigate next, and no app-side
-  suspect survived inspection. **It is still not PROVEN for this run** — the segfault was on a
-  different spec, and nobody has checked whether it preceded line 53 — so the honest next step is
-  to re-read run 34814623905's log for a `Received signal` line BEFORE the abort, which is a read
-  rather than an experiment. Do that before treating the relaunch reshape as the fix.
+- **What that changes here.** This entry's `ERR_ABORTED` is the crash wearing its downstream face,
+  which explains every property that made it baffling: it never reproduces locally, it lands on
+  whichever spec navigates next, and no app-side suspect survived inspection. The read that
+  established it is written up above; it took one log fetch.
 - **Do NOT "fix" this by lengthening the poll timeout.** That is the change that makes a real
   hydration regression invisible — and on this evidence it would also be aimed at the wrong line.
 - **Changed 2026-09-14** (`fix/lb106-preferences-relaunch`): the relaunch is now a **new page**
