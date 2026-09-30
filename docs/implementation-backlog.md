@@ -490,35 +490,87 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [readiness][app-shell] LB-191 — does the "compared to normal" picker get a default? It contradicts TN-58's central design
+
+- **Lane: O** · **Added:** 2026-09-30 · Lane B, split out of `OR-206` ②. It was invisible to the
+  Orchestrator there, because the lane field is what routes work and that entry is `Lane: B` — the
+  same reason `RV-208` moved its Lane A half out to `LB-183`. **Ungated on purpose:** `Gate: owner`
+  would park it out of the READY list, and getting the answer is the work.
+- **The question, his words on the S25 (2026-09-29):** *"Maybe comparison to \"normal\". So about the
+  same; better or worse. **With it default selected to about the same.**"* The wording half is not in
+  dispute and ships without him (`OR-206`); only the default is.
+- **Recommendation: ship the rename with NO default, and give him `TN-82`'s announce-and-correct
+  shape instead** — the one he approved twice for the sleep rating on this same sheet.
+- **Why, a year out.** A pre-selected neutral makes a reflexive Save indistinguishable from a
+  considered *"about the same"* — and this app has measured that failure four times over: `wake_mood`
+  collected 17 answers then zero, the 1–5 sleep scale 3 of 82, `perceived_recovery` **0 touched in
+  102 check-ins**, and `vs_yesterday` itself 2 of 82. `TN-58` built this picker with no default and
+  the column has none, both for that reason; `TN-57` was the fix for a neutral stored as though it
+  were an answer. The field feeds a scoring input, so the cost is a contaminated tuning signal, not
+  an untidy screen.
+- **What he is actually asking for, and the cheaper way to give it to him.** He wants to not tap
+  three things on a normal morning. The sleep announcement already does that here: the app states
+  what it filled and why, he corrects it in one tap, and a plain Save records **unknown** rather
+  than assent. One-tap morning, and a skipped answer still distinguishable from a given one.
+- **The alternative, and what it is genuinely better at.** Defaulting to *"about the same"* produces
+  a row every day, and a dense series is easier to chart than a NULL-heavy column. If he reaffirms
+  it, it is his call and it ships — but then the column needs a `touched` flag beside it, as
+  `sleep_quality_feel` has, or tuning cannot tell his answer from the app's.
+- **Reversal cost: low, and asymmetric.** Adding a default later is one line. Removing one later
+  does not un-write the rows already stored under it, and nothing records which of those were
+  considered — so the cheap direction is to start without it.
+- **`e2e/tn58-vs-yesterday-no-default.spec.ts` asserts nothing is selected on open.** Whichever way
+  this goes, that test is amended with the reason. It is never deleted to make a change pass.
+
+### [readiness][platform] LB-190 — rename `vs_yesterday` to `vs_normal`, and mark the boundary the rename creates
+
+- **Lane: A** · **Added:** 2026-09-30 · Lane B, moved out of `OR-206` because the whole of it is a
+  schema change, and **Postgres migration numbers and local SQLite versions are Lane A's alone**.
+- **Why it leads rather than follows.** `OR-206`'s copy change is what makes the stored history
+  ambiguous, so the marker has to exist before the question changes on screen — engine half first.
+  `OR-206` waits on this via `Needs:`.
+- **The rename**, because a field whose name contradicts its question is how the next reader gets it
+  wrong: `day_checkins.vs_yesterday` → `vs_normal`, and `VsYesterday` with it. Reached by grep and
+  `tsc`: `schema.ts`, `adapter.ts` (5 sites incl. the `EXCLUDED.vs_yesterday` upsert),
+  `app/api/day-checkin/route.ts`, `app/api/food-logging-complete/route.ts`,
+  `packages/shared/src/types/day-checkin.ts`, `packages/shared/src/validation/day-checkin.ts`,
+  `lib/local-store/{types,sqlite-backend,sync-engine}.ts`, `lib/sqlite/migrations.ts` (a new local
+  version), and `claude-ro-views.sql` regenerated **in place**, not numbered (BF-214).
+- **⚠ The marker is the half that is not optional.** Rows written before the change answer *"vs
+  yesterday"*; rows after answer *"vs normal"*. Different questions, and they **must not be pooled
+  in one trend**. A deploy date cannot mark it exactly — Railway ships on merge, so a given local
+  day can hold rows from both sides of the cutover.
+- **Recommendation: a stored question-version column**, the shape `SLEEP_VERDICT_MODEL_VERSION`
+  already set on this sheet — each row says which question it answered, and a later wording change
+  costs one integer instead of another archaeology pass. A recorded cutover date is the cheaper
+  alternative and is what `OR-206` offered; it loses on the one-day ambiguity above.
+- **Done when** a row written after the rename is distinguishable from one written before it by a
+  stored value, with a test, and nothing in `app/**`, `lib/**` or `packages/**` still spells
+  `vsYesterday`.
+
 ### [readiness][app-shell] OR-206 — the morning check-in compares to "normal", not to yesterday
 
 - **Lane: B** · **Added:** 2026-09-29 · Orchestrator, from the owner on the S25:
   *"I dont like the comparison to the yesterday. Maybe comparison to \"normal\". So about the same;
   better or worse. With it default selected to about the same."*
-- **① The wording change is his call and is not in dispute.** `components/checkin/vs-yesterday-picker.tsx`
+- **Needs: LB-190**
+- **⤷ SPLIT 2026-09-30 (Lane B), and what is left here is the surface only.** Re-verifying the entry
+  found two of its three parts belonged elsewhere, each for a reason CLAUDE.md states outright:
+  the field rename and the history marker are a schema change, which is **Lane A's alone**, and are
+  now `LB-190`; ② was an owner question living inside a `Lane: B` body, where the Orchestrator was
+  never going to see it, and is now `LB-191` (`Lane: O`, ungated).
+- **The wording change is his call and is not in dispute.** `components/checkin/vs-yesterday-picker.tsx`
   asks *"Compared to yesterday"*; he wants *compared to normal*. Same three options, same order.
-  **Rename the component and the field with it** — `vsYesterday` / `day_checkins.vs_yesterday` stop
-  describing what is being asked the moment the prompt changes, and a field whose name contradicts
-  its question is how the next reader gets it wrong.
-- **⚠ IT CHANGES WHAT THE STORED HISTORY MEANS, and nothing currently marks the boundary.** Rows
-  written before the change answer *"vs yesterday"*; rows after answer *"vs normal"*. These are
-  different questions and **must not be pooled in one trend**. Whatever ships needs a marker — a
-  new column, or a recorded cutover date Tuning can split on. **This is the engineering half and it
-  is not optional**, because the field feeds a scoring input.
-- **⛔ ② THE DEFAULT SELECTION CONTRADICTS `TN-58`'s CENTRAL DESIGN — put to the owner 2026-09-29,
-  not yet answered.** That entry has **no default and no pre-selection**, deliberately, and the
-  picker's own comment says the reason: the absolute 1–5 control it replaced produced **two
-  distinct values across 96 check-ins, sd 0.29**, and *"a neutral stored as though it were an
-  answer is the defect TN-57 just fixed"*. `day_checkins.vs_yesterday` has **no column default** for
-  the same reason, so a skipped answer stays NULL and reads as *not answered*.
-  **The cost of defaulting, stated plainly:** the sheet writes only on Save, but Save is one tap, so
-  a pre-selected neutral makes a reflexive Save indistinguishable from a considered *"about the
-  same"* — which is the degeneration `TN-58` exists to escape, under a new name.
-  **`e2e/tn58-vs-yesterday-no-default.spec.ts` asserts nothing is selected on open**, so ② cannot
-  ship without deciding what happens to that test. **Do not delete it to make the change pass.**
-- **The owner's preference wins if he reaffirms it** — it is his product call. Build ① now; hold ②
-  until he answers, since the two are independent.
-
+  **Rename the component and its file with the copy** — `VsYesterdayPicker` stops describing what it
+  asks the moment the prompt changes. Its `id="vs-yesterday-label"` and the `aria-labelledby` that
+  points at it move too.
+- **It cannot ship before `LB-190`.** Changing the prompt is precisely what makes the stored answers
+  mean two different things, so the marker has to be in place first. This is not sequencing for
+  tidiness: the field feeds a scoring input.
+- **Also here:** `components/morning-checkin-sheet.tsx`'s state and handler names, the two
+  `components/checkin/__tests__/tn58-vs-yesterday-control.test.ts` cases, and
+  `e2e/tn58-vs-yesterday-no-default.spec.ts` — which keeps asserting that nothing is selected on
+  open until `LB-191` says otherwise. **Do not delete it to make the change pass.**
 
 
 ### [platform] OR-203 — the database grew 3× its trend for six days, and no per-table baseline exists to say which table did it
@@ -3169,6 +3221,64 @@ which is the right shape for something that can only be validated by living with
 - **Where the data is:** `set_logs.rpe` / `intensity_pct` / `weight_kg`, joined through
   `exercise_logs` to `workout_sessions`, day-keyed in `Australia/Brisbane`.
 
+### [readiness][platform] LB-192 — there is no readiness verdict engine, so the outlier-gated rating prompt has nothing to ask on
+
+- **Lane: A** · **Added:** 2026-09-30 · Lane B, moved out of `TN-67`'s ✅ block, which said *"Now
+  Lane B"* and could not be started from Lane B.
+- **What is missing, measured rather than assumed.** `packages/shared/src/health/` holds
+  `sleep-verdict.ts`, `readiness-composite.ts` and `live-readiness.ts`; `app/api/` holds
+  `sleep-verdict` and `readiness-score`. **There is no readiness equivalent of either half** — no
+  trailing-window outlier rule for the readiness score, and no route a sheet could ask *"is today
+  unusual?"*. `TN-67` says to copy `OR-171`'s threshold; that threshold is
+  `VERDICT_IQR_MULTIPLIER` inside a `packages/shared` engine, reaching its surface through
+  `/api/sleep-verdict`. Both files are Lane A's, so the gate is engine-first.
+- **Copy the sleep engine's shape, not just its number.** `sleep-verdict.ts` earns three things the
+  readiness one needs for the same reasons, each written down there: median ±IQR over a trailing
+  **28** days rather than mean ±sd, because the distribution is bounded and skewed and one bad day
+  must not widen the band that judges the next; a **snapshot** of the component values beside the
+  verdict, because `readiness_score` is computed on read and a later scoring change would otherwise
+  rewrite what each answer was answering; and a **model-version integer**, so a recalibration cannot
+  leave two rules sharing one version.
+- **⚠ Tune the multiplier against the real distribution — do not inherit 1.0.** That value was swept
+  over the owner's own nights to hit 4–6 prompts a month, and `TN-83` records that the first attempt
+  was measured over the wrong population (raw `sleep_sessions` rows, naps included) and understated
+  how loud the rule was. Readiness has its own spread; the **rate is the target and the multiplier is
+  only how it is reached**.
+- **⚠ And one thing that does NOT carry over.** The sleep feature asks nothing — it announces and
+  takes a correction. `TN-67`'s owner answer is an actual **prompt** on outlier days, so the honest
+  read of *"copy `OR-171`"* is copy its **threshold**, not its interaction. `OR-171` records why it
+  stopped asking, and `LB-193` is where that tension gets resolved on the surface.
+- **Done when** a route answers whether today's readiness score is unusual, against a trailing-28
+  baseline, with the components and a model version stored beside the answer, and a test pins the
+  rate over the owner's real distribution.
+
+### [readiness][app-shell] LB-193 — ask for a readiness rating only on the days it is diagnostic
+
+- **Lane: B** · **Added:** 2026-09-30 · Lane B, the surface half of `TN-67`'s ✅ answer.
+- **Needs: LB-192**
+- **The owner's answer, 2026-09-27**, choosing maybe-twice-a-week over daily and over retiring the
+  rating entirely: ask only on days the score is unusual. Today the readiness prompt
+  (`components/checkin/readiness-checkin-card.tsx`) is shown unconditionally, and `TN-67` measured
+  what that yields — `energy_level`'s agreement with the score is the app agreeing with itself on
+  **62 of 67 days**, and the clean window since `TN-50` is five days.
+- **⚠ Decide the interaction before building it, because two owner-approved designs collide here.**
+  `TN-67` says *prompt on outlier days*; `OR-171` — the entry it says to copy — concluded **it should
+  not ask at all**, and `TN-82` shipped that: the app states what it filled and why, and a
+  correction is the only interaction. `OR-171` also records the measurement behind it: three
+  affordances in three positions on this sheet all decayed to zero, and `perceived_recovery` has **0
+  touched answers in 102 check-ins**. An outlier-gated *question* is a fourth affordance on a sheet
+  where asking has failed four times.
+- **Recommendation: gate the existing prompt's PROMINENCE, not its existence** — announce on ordinary
+  days and ask on unusual ones. That satisfies his *"not daily"* without a fourth dead field, and it
+  reuses `SleepAnnouncement`'s two-tier shape (`prominent`) rather than inventing a second one.
+- **⚠ Whatever ships must not be described as validating the score.** Outlier-gated sampling selects
+  on the predictor under test, and the error that matters most — an ordinary-looking day he would
+  have called bad — is unsampled by construction. `OR-171` (b) states this; `TN-67` accepts the cost
+  knowingly. Neither licenses a later claim of agreement.
+- **Done when** the readiness prompt is quiet on an ordinary day and prominent on an unusual one,
+  driven by `LB-192`'s route, with the two states covered by a browser render — copy mounted where
+  it cannot be seen is the defect `BF-220` cost a day to find.
+
 ### [readiness][sleep] TN-67 — the readiness score has NO validated external agreement, and the r = +0.62 that says otherwise is the pre-TN-50 seeding loop
 - **✅ ANSWERED 2026-09-27 — do NOT hide the score, and the answer goes further than the question asked.**
   Verbatim: *"I dont want the rated score by me to affect the score derived for the day. It should
@@ -3187,18 +3297,28 @@ which is the right shape for something that can only be validated by living with
 - **✅ ANSWERED 2026-09-27 — outlier-only prompting. He will not rate daily again.**
   Ask for a rating only on days the score is unusual, the same shape he approved for a different
   prompt in `OR-171`. He answered maybe-twice-a-week over daily and over retiring it entirely.
-  **Now Lane B** — the prompt lives in `components/**` (`morning-checkin-sheet.tsx`). What "unusual"
-  means is an engineering call, not his: copy `OR-171`'s threshold rather than inventing a second one.
+  What "unusual" means is an engineering call, not his: copy `OR-171`'s threshold rather than
+  inventing a second one.
   **⚠ What this does NOT change: the score still has no external validation and nothing may claim it
   does.** The entry's finding stands in full. Outlier-only sampling reaches n≈30 LATER than daily
   would, so the 2026-10-20 re-measurement date in this entry is now optimistic — Tuning re-runs the
   date split when the clean sample is actually there, and re-dates this entry when the prompt ships.
+- **➡ THE PROMPT MOVED OUT 2026-09-30 (Lane B) to `LB-192` (`Lane: A`) and `LB-193` (`Lane: B`).**
+  This entry said *"Now Lane B"*, and Lane B cannot start it: **there is no readiness equivalent of
+  `sleep-verdict.ts`** — checked by listing `packages/shared/src/health/` and `app/api/`, which hold
+  `sleep-verdict` and `readiness-score` and nothing between them. `OR-171`'s threshold, which this
+  entry says to copy, lives in a `packages/shared` engine and reaches its surface through
+  `/api/sleep-verdict`; both are Lane A's. So the gate is engine-first, exactly as `OR-206` turned
+  out to be, and the two halves are filed as such rather than described here — the lane field is
+  what routes work.
 
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-24 · Tuning, immediately after TN-66, and it corrects a
   conclusion I had already drawn in this session.
-- **Lane: B** — nothing to build; it sets what may and may not be claimed about the score, and names a
-  dated point at which the real measurement becomes possible.
+- **Lane: T** — re-laned 2026-09-30 (Lane B) when the prompt moved out. Its own field said *"nothing
+  to build"* while its ✅ block said *"Now Lane B"*, so it printed at the head of an implementer's
+  READY list carrying no implementable work. What is left is a **dated re-measurement that is
+  Tuning's**, per this entry's own last line, plus the standing record of what may not be claimed.
 - **The measurement that looked like validation.** Reported `energy_level` against same-day
   `readiness_score`, **n = 67, r = +0.619**, with group means monotonic across every level present —
   drained **40.0** (n=6), low **52.1** (n=17), ok **67.8** (n=40), good **72.8** (n=4). Sleep score
