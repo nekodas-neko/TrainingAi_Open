@@ -491,11 +491,30 @@ below threshold and left in place for next time.
 > temperature-baseline cluster under it keep their order relative to each other.
 
 ### [readiness][app-shell] LB-191 — does the "compared to normal" picker get a default? It contradicts TN-58's central design
+- **✅ ANSWERED 2026-09-30 — YES, PRE-SELECT "About the same". AGAINST the recommendation, and
+  reaffirmed after the cost was put to him.** He was shown `TN-58`'s measurement — **2 distinct
+  values across 96 check-ins, sd 0.29** — and the specific cost, that a one-tap Save makes a
+  reflexive answer indistinguishable from a considered one on a field feeding readiness. He chose
+  the default anyway. **This is settled: do not re-propose no-default, and do not re-raise the
+  measurement.**
+- **⛔ `e2e/tn58-vs-yesterday-no-default.spec.ts` IS UPDATED, NEVER DELETED.** Its no-default
+  assertion is now wrong; everything else it protects is not. It still has to prove the control
+  renders three options, that a mis-tap can be cleared, and that a **dismissed sheet writes no
+  row**. Rewrite those against the new default, keep the file and its `TN-58` reference, and
+  rename it to match what it now asserts.
+- **⚠ THE NULL PATH IS NOW THE ONLY THING SEPARATING THE TWO CASES — keep it alive.** The sheet
+  writes solely on Save and `day_checkins.vs_yesterday` has **no column default**, so dismissing
+  with the X must still store nothing. With a neutral pre-selected, that dismissal is the sole
+  remaining signal of *not answered*. A later change that writes a row on close would erase the
+  distinction without touching this entry.
+- **Tuning's boundary moved TWICE, and one marker must cover both:** the question changed (`OR-206`,
+  vs yesterday → vs normal) and a neutral can now arrive unconsidered (this entry). Record the
+  marker as covering both, or a later reader will split on one and pool the other.
 
-- **Lane: O** · **Added:** 2026-09-30 · Lane B, split out of `OR-206` ②. It was invisible to the
-  Orchestrator there, because the lane field is what routes work and that entry is `Lane: B` — the
-  same reason `RV-208` moved its Lane A half out to `LB-183`. **Ungated on purpose:** `Gate: owner`
-  would park it out of the READY list, and getting the answer is the work.
+- **Lane: B** — returned 2026-09-30, the answer is in. It was `O` while the question was open
+  (split out of `OR-206` ② because the lane field is what routes work and that entry is Lane B —
+  the same reason `RV-208` moved its Lane A half out to `LB-183`), ungated on purpose so it stayed
+  in the READY list rather than being parked behind the gate. **Added:** 2026-09-30 · Lane B.
 - **The question, his words on the S25 (2026-09-29):** *"Maybe comparison to \"normal\". So about the
   same; better or worse. **With it default selected to about the same.**"* The wording half is not in
   dispute and ships without him (`OR-206`); only the default is.
@@ -2142,10 +2161,15 @@ below threshold and left in place for next time.
   everything short of a real credential was exercised, the live token exchange included.
 
 ### [app-shell] OR-167 — two icon libraries ship; the smaller one is six files
+- ✅ **ANSWERED 2026-09-30 — KEEP BOTH icon libraries. This is AGAINST the recommendation.** The
+  entry argued for dropping the 6-file library against lucide's 270; the owner chose not to change
+  icons on screens he reads mid-run for a dependency saving. **The measurement is not a reason to
+  re-ask** — it was put to him with those numbers.
+  **Consequence to write down rather than rediscover:** two icon sets stay in the bundle, so a
+  future contributor has no rule saying which to reach for. If that becomes a real problem it is a
+  new entry about consistency, not a re-run of this one.
 
 - **Lane: B** · **Added:** 2026-09-25 · OR-165's dependency audit.
-- **Gate: owner** — it changes icons on screens he uses during a run, so the look is his call and
-  not a lane's.
 - **Measured 2026-09-25:** `lucide-react` (**43 MB**) is imported by **270** files;
   `@phosphor-icons/react` (**41 MB**) by **six**, for five icons — `HeartIcon`, `PauseIcon`,
   `PlayIcon`, `StopIcon`, `FootprintsIcon` — all in the activity and run screens
@@ -10343,6 +10367,8 @@ why the count of affected entries always understated the harm.
   **Device look owed** — the toggle is the surface and the timing is what is being measured.
 
 ### [body][readiness] BF-184 — the reta dose is recorded well and joins cleanly to recovery metrics; nothing surfaces that join, and dose 1 is missing its time
+- ✅ **ANSWERED 2026-09-30 — extend the EXISTING reta response module.** One place owns reta, so
+  dose and response stay in step. Do not add a second module.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner, after his third dose:
   *"check the reta to make sure its being recorded properly … and can be matched against other
@@ -10405,9 +10431,6 @@ why the count of affected entries always understated the harm.
   A recovery-response model is the same shape over a different series. **Do not write a third
   estimator** — that file's own comment records two kg/week estimators already existing, one wrong,
   as the reason the One Formula rule exists.
-- **Gate: owner** — what the card should claim is his call, and it is a health surface. The data
-  question ("is it recorded, can it be joined") is answered above and needs no gate; what a card is
-  allowed to *assert* from two cycles does.
 - **⚠ Not a medical claim and must not become one.** The rows above are this account's own
   measurements. Nothing here interprets them clinically, and a shipped card should describe the
   series rather than advise on dosing.
@@ -10416,6 +10439,11 @@ why the count of affected entries always understated the harm.
   is enough; no device path is involved.
 
 ### [nutrition] BF-183 — tag My Foods rows with which meals a food CAN be used for, feeding the meal planner
+- ✅ **ANSWERED 2026-09-30 — LUCIDE ICONS, not the emoji. This is AGAINST the recommendation and
+  was chosen deliberately.** The entry argued for the existing per-meal emoji as the smaller change;
+  the owner picked consistency with the app's other controls instead. **Do not re-propose the emoji.**
+  ⚠ The recommendation's concern still applies and is now the build's problem, not a reason to
+  revisit: the rows are tight, so the icons must stay legible at that size. Show them before shipping.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner: *"Can we have some sort of
   icon system to indicate which meal its good for? Maybe we could use the lucid icon pack for this.
@@ -10489,9 +10517,6 @@ why the count of affected entries always understated the harm.
   holds. Server-side is one grouped query and keeps the threshold in one place; client-side needs
   the log history on that screen, which it may not have. **Decide by checking what
   `saved-meals-sheet` already fetches** before adding a route.
-- **Gate: owner** — **emoji versus lucide** (recommendation above), and **how a row with all four
-  meal types should read** — four glyphs, or one "any meal" glyph. The second is the question the
-  correction created and it decides the layout.
 - **Verification:** the 10 confident rows above must arrive **pre-ticked** with the emoji named and
   the 4 never-logged rows pre-ticked with none — then both must be freely editable to any subset of
   the four, including all four. Those are real fixtures from his account, so the test can assert
@@ -10499,6 +10524,9 @@ why the count of affected entries always understated the harm.
   glyph legibility at the row's icon size on the S25.
 
 ### [workouts] BF-182 — warm the next prescription when Home renders, not at completion and not at tab-open
+- ✅ **ANSWERED 2026-09-30 — warm on HOME RENDER, same day, `standard` preset.** This supersedes
+  the owner's 2026-07-31 call to warm at workout completion; he was shown that it revisits it and
+  chose the change. Ready when he would look at it, and no work on days the app is not opened.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner: *"when you select the ai
   generated workout plan it should be able to auto create workout as soon as your one is completed
@@ -10556,8 +10584,6 @@ why the count of affected entries always understated the harm.
 - **⚠ Check the single-flight actually covers cross-surface before shipping.** The dedupe was built
   for a poll on one screen; a Home warm plus a tab-open trigger is a different shape, and two
   concurrent generations for one session is the failure worth avoiding here.
-- **Gate: owner** — he made the 2026-07-31 call and this revisits it. Needs his yes on *warm
-  earlier* versus *generate at completion*, with the staleness argument in front of him.
 - **Verification:** open Home, wait a beat, open the workout tab, and confirm the AI card paints
   without the preparing state. **Device look owed** — the whole point is perceived latency, which
   the sandbox cannot measure.
@@ -12596,10 +12622,12 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   the body, which is the check that would have caught it.
 
 ### [devices] PS-43 — decide whether Health Connect's 30-day cold-sync cap should be a deliberate policy or extendable
+- ✅ **ANSWERED 2026-09-30 — keep the 30-day cap and add an explicit "Import more history".**
+  Capped and resumable, triggered by the owner, not a larger automatic window. The cap becomes a
+  deliberate policy rather than an accident of the default.
 
 - **Lane:** A — a sync-policy decision that lands in the Health Connect ingest path. (Assigned 2026-09-15, OR-116 lane sweep.)
 
-- **Gate:** owner — a product decision with a recommendation already written below: an explicit, resumable "Import more history" action rather than a bigger automatic first-sync window. What "connect a data source" promises the user is his call, not a technical blocker.
 - **Added:** 2026-09-14 (one-off session; owner asked specifically whether a source "that can't have
   live data" — i.e. only reachable via a one-time or infrequent sync — "should be able to backfill
   the necessary activities etc." See
@@ -15597,6 +15625,12 @@ neighbours. Until then `excludeLowWearDays` drops all 22 from the HRV/RHR baseli
 nulling the column is data-dropping, and a Redecode restores real numbers.
 
 ### [platform] PS-31 — AI calls with no data gate, a missing maxRetries, and a blind fingerprint
+- ✅ **ANSWERED 2026-09-30 (item e-ii) — KEEP the "AI confidence" bar. AGAINST the recommendation.**
+  It is honestly labelled as the model's own confidence and the owner reads it as a signal to
+  double-check a scan. **Do not remove it, and do not quietly restyle it away.**
+  **This does NOT reopen `OR-205`** — the half where that number decided `source` breaks a standing
+  rule and is being fixed regardless. Keeping the display and removing the gating are consistent:
+  the rule bans an LLM number from *gating an action*, not from being shown as the model's own.
 - **✅ 2026-09-26: (a) and (b) are CLOSED by RV-201, both halves shipped.** Neither route calls a
   model any more — `health-insight` renders from `insight-text.ts`, `weekly-digest` from
   `buildWeeklyDigestText` — so there is no prose for a data gate to withhold and no fingerprint to
@@ -15610,12 +15644,6 @@ nulling the column is data-dropping, and a Redecode restores real numbers.
 
 - **Lane:** A — `app/api/ai/health-insight/route.ts`, `app/api/weekly-digest/route.ts`,
   `app/api/running-plan/explain/route.ts`, `app/api/nutrition/scan/route.ts:184`.
-  **Gate:** owner for the confidence-bar DISPLAY only — narrowed 2026-09-29.
-  **⚑ (e) was TWO questions and only one is his.** The half where `confidence` **decides `source`**
-  is forbidden outright by `CLAUDE.md` (*"no LLM self-reported number … may gate an automatic
-  action"*), so it is a defect, not a preference — **split out as `OR-205`, shipped 2026-09-30** (no origin now means manual; confidence is no longer an input). What
-  remains here is whether the honestly-labelled bar earns its place on screen, which the repo
-  cannot answer.
 - **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §P6.
 
 (a) `health-insight`'s deterministic "nothing to interpret" gate (:180-183) is defeated in 3 of 4
@@ -15868,6 +15896,9 @@ unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge
 (led by `oura-ring-data-reference.md`, a retired-API reference with no retirement note).
 
 ### [app-shell][platform] LA-76 — a deload PHASE still decays the collection, and nothing dates one
+- ✅ **ANSWERED 2026-09-30 — STORE what the interval means.** Past intervals keep their meaning
+  when the derivation changes, the same reasoning that records a prescription rather than
+  recomputing it from today's rules. Accepts a schema change; that is Lane A's to number.
 
 - **✅ DECIDED 2026-09-14 — a deload counts as exercise, so it must not decay the collection.**
   Owner, verbatim: *"A deload week or session should still count as an \"excercise\" so it wont decay
@@ -15901,14 +15932,6 @@ unindexed handoffs and 4 unreferenced top-level docs; act on the 9 archive/merge
 
 - **Lane:** A — `app/api/collection/route.ts`, plus a migration.
 - **Added:** 2026-09-07, Lane A — the half of LB-60's `pausedDays` that did not ship with the route.
-- **Gate: owner** — and it is a DIFFERENT question from the one already answered. The old gate was
-  removed on 2026-09-14 because the owner had settled the RULE (a deload must not cost cats), and
-  that was right. What it did not settle is the ⚠ above: whether a deload span becomes **first-class
-  stored state**, which is what a dated `program_phases` interval means and what the migration would
-  commit to. Re-gated 2026-09-18 by Lane A, which reached this entry as next-up and could not start
-  it: with no gate the queue tool called it READY, while the first instruction inside it is *"put
-  that to the owner before writing the migration"*. An entry whose own text blocks it has to say so
-  in the field the tool reads.
 
 **The early-deload half SHIPPED 2026-09-07**: `pausedDays` now carries `earlyDeloadWeekDays(program)`
 beside the chosen rest days, so a confirmed early deload decays nothing. That span is the only DATED
@@ -29984,6 +30007,11 @@ its own maintenance hazard. Recorded here as the shape to re-enumerate rather th
   (behaviour across a ring reset is unchanged), but it is the honest completion of this work.
 
 ### [sleep][readiness] Q-72 — the Sleep Score's model is retuned; a partial-data flag is what's left
+- ✅ **ANSWERED 2026-09-30 — DROP the rank re-validation; keep the Sleep Score model as tuned.**
+  Of 36 mornings since 08-18, 35 held the untouched neutral and one was null — **0 real ratings**,
+  so the re-validation had nothing to rank and the clock could not supply it. **Close the loop
+  rather than leave it open**: the model stands on its 2026-08-12 tuning. **Do not re-file this as
+  a future re-validation** — if a yardstick is ever wanted it is a new entry with a new premise.
 
 - **Lane:** A — the coverage-ratio formula belongs in
   `packages/shared/src/health/sleep-score.ts` (one formula, one place), and this reaches
@@ -30035,8 +30063,6 @@ whole 1–5 scale. Concretely:
 A night the owner rated worst-of-month and a night they rated best-of-month score within a point of
 each other. The score has ~18 points of dynamic range and spends all of it above 80.
 
-- **Gate: owner** — the decision named on the next line. Added as a field 2026-09-22 (OR-122); it
-  had been prose since the entry was written, which meant the queue held it only by accident.
 - **⛔ Needs an owner decision before code.** Re-tuning the Sleep Score changes a number they read
   every morning, and "what should a bad night score" is a product judgement, not a fit. Two shapes:
   (a) rescale so the observed range spreads across 0–100, or (b) leave the score and add a separate
@@ -30555,9 +30581,15 @@ per-field merge where an AI write has no honest source rank to claim.
 
 
 ### [workouts] Q-85 — compress accessory rest at a Quick budget, and leave the compound alone
+- ⚠ **RE-CONFIRMED 2026-09-30, AND IT SHOULD NOT HAVE BEEN ASKED.** The Orchestrator put this to
+  the owner as an open question; he gave the same answer as **2026-08-23 below** — compress
+  accessory, protect the compound. **The 2026-08-23 decision is the authority, not this line**,
+  because it carries the part the re-ask omitted: **the 45-second accessory floor**, asked and
+  answered as its own question. Build to that entry.
+  **The mistake worth not repeating:** a live `Gate: owner` was read as meaning the question was
+  still open. It meant the *entry* was blocked, and the decision was three bullets further down.
+  **Read the recorded decisions before asking, not just the gate field.**
 
-- **Gate: owner** — field added 2026-09-22 (OR-122) for the decision named below, which had been
-  carried in prose only.
 - **Lane:** A — `packages/shared/src/ai-periodization/{time-budget,generate-prescription}.ts`.
 - **✅ DECIDED BY THE OWNER 2026-08-23 — option (a), with a 45-second accessory floor.** The plan's
   §4 question is answered and this entry is startable. Build §5's shape as written.
@@ -30714,6 +30746,11 @@ per-field merge where an AI write has no honest source rank to claim.
   reconcile + shorten carefully and re-verify on-device, not just visually.
 
 ### [devices][app-shell] Q-111 — device battery chips on the Home header (ring + strap shipped; scale is native, and one owner question)
+- ✅ **ANSWERED 2026-09-30 — REMOVE the refresh button from the Home header.**
+  **⛔ It cannot simply be deleted: pull-to-sync bumps `refreshTick` and the button does not, so
+  the two are NOT equivalent today.** Closing that gap comes first, or removing the button loses a
+  refresh path that currently does something the gesture does not. The measurement is in this
+  entry already; do not re-take it.
 
 - **✅ THE OWNER QUESTION IS ANSWERED, 2026-09-14 — build the scale chip.** *"I would like the scale
   battery percent somewhere; so I can prepare when its getting low."* Note what they asked for: the
@@ -30745,7 +30782,6 @@ per-field merge where an AI write has no honest source rank to claim.
      training-load, muscle-recovery and the HR chart; **the manual button does not bump it at all**,
      so it is strictly narrower, not merely redundant. That supports removing it — against the real
      counter-consideration that a visible button is discoverable and a gesture is not. **His call.**
-- **Gate:** owner — one call, measured and written up below: whether the header REFRESH BUTTON goes. Pull-to-sync bumps `refreshTick` and the button does not, so the button is strictly narrower rather than redundant — which argues for removing it, against a button being discoverable where a gesture is not. The scale chip itself is native work he already flagged a stretch.
 - **Verify:** device
 - **✅ SHIPPED** (`feat/home-device-battery-chips`, 2026-09-02, v1.430.0). `components/home/header-chips.tsx`
   renders the weather chip plus a ring chip and a strap chip, each drawn by the shared
@@ -31316,6 +31352,12 @@ whole content is that the block was released — OR-122, 2026-09-22). Struck, wi
 - **🔎 Re-read against `main` 2026-09-24 (Review sweep 59):** F3 (the `public-launch-checklist.md` consolidation, still only §1) and E6 are missing from "what remains". This is docs and planning, so `Lane: O` fits better than A.
 
 ### [app-shell][platform] 🟢 Q-44 — remove vendor naming: Phases 2 and 3 only
+- ✅ **ANSWERED 2026-09-30 — rename ONLY `oura_heartrate`.** The owner took the narrowest
+  option, on the 2026-09-15 audit's finding that the full rename does not deliver what he asked:
+  `colmi_*` already proves a second recording device did not share a table. **Do not rename the
+  rest**, and do not treat this as a first step toward doing so — it is the whole scope.
+  ⚠ Still hard to reverse: one migration, and a rename cannot be undone by a corrective one
+  without a second rename.
 
 - **Lane:** A
 > **⚑ Owner answered 2026-08-04: Phase 3 IS the goal, not optional.** *"yes your choice; but I want
@@ -31364,7 +31406,6 @@ whole content is that the block was released — OR-122, 2026-09-22). Struck, wi
   like `oura_raw_samples` already does and for the same reason)? Do it in the same PR as each
   table's rename — a generically-named table with no discriminator is the state that invites a
   later writer to assume portability the schema cannot deliver.
-- **Gate:** owner — a schema-naming decision, reopened by the 2026-09-15 audit below: the rename as planned does not deliver what he asked for, because `colmi_*` already proves a second recording device did not share a table. Whether each renamed table carries a source discriminator is his call, and it is hard to reverse once the migration lands.
 - **⚠ AUDITED 2026-09-15 (Lane A) — the rename as planned does not deliver what was asked for, and
   the decision is the owner's:**
   [`docs/reviews/2026-09-15-vendor-table-rename-discriminator-audit.md`](reviews/2026-09-15-vendor-table-rename-discriminator-audit.md).
