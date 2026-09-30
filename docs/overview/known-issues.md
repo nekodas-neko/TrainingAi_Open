@@ -103,11 +103,11 @@
 ### [nutrition][platform] BF-203a's local v45 and plan-meal answer reads are NOT device-verified
 
 - Ships with the web deploy, with no APK. On first open the S25 should migrate to **v45**, which adds the six
-   columns (#2004). The Nutrition hook now reads only  answers as declines,
+  `plan_meal_answers.est_*` columns (#2004). The Nutrition hook now reads only `'no'` answers as declines,
   and a local decline replaces an existing live answer for the same meal and day (#2018).
-- **Owed (Lane DV):** after one app open, a pull completes with no SQLite error naming . If a meal
+- **Owed (Lane DV):** after one app open, a pull completes with no SQLite error naming `est_`. If a meal
   plan is active, decline one planned meal, undo it and decline it again: the card shows it declined, and
-  one live row exists in  for that meal and day.
+  one live row exists in `plan_meal_answers` for that meal and day.
 - **Strike this row** when that is VERIFIED.
 
 ### [cardio][platform] LB-179's local SQLite v44 (prescribed_runs.completed_as) is NOT device-verified
