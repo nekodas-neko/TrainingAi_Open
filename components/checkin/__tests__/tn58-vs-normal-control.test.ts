@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { DayCheckinExtrasSchema, dayCheckinHasAnswers } from '@trainingai/shared/validation/day-checkin'
+import { CURRENT_VS_QUESTION, VS_QUESTION } from '@trainingai/shared/types/day-checkin'
 import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 /** TN-58. The absolute 1–5 produced **two distinct values across 96 check-ins**, sd 0.29, none of
@@ -59,6 +60,31 @@ describe('TN-58/LB-191 — the comparative control seeds the neutral, and NULL s
     // decide silently which won; the placeholder is gone rather than left to that.
     expect(sheet, 'the placeholder null is still in the local write, beside the real value')
       .not.toMatch(/vsNormal:\s*null/)
+  })
+
+  it('the prompt on screen and the question stamped on the row say the same thing', () => {
+    // OR-206. The single highest-cost failure available here, and it is SILENT: a prompt asking one
+    // question while `CURRENT_VS_QUESTION` records the other mislabels every row written in between,
+    // and `vs_question` exists precisely so those two populations are never pooled. Nothing
+    // downstream can detect the mismatch, because each row looks internally consistent.
+    const picker = code(read('components/checkin/vs-normal-picker.tsx'))
+    const asksNormal = /Compared to normal/.test(picker)
+    const asksYesterday = /Compared to yesterday/.test(picker)
+    expect(asksNormal !== asksYesterday, 'the picker asks both questions, or neither').toBe(true)
+    expect(
+      CURRENT_VS_QUESTION,
+      `the screen asks "compared to ${asksNormal ? 'normal' : 'yesterday'}" but rows are stamped `
+        + `${CURRENT_VS_QUESTION} — move the copy and the constant together, never one alone`,
+    ).toBe(asksNormal ? VS_QUESTION.NORMAL : VS_QUESTION.YESTERDAY)
+  })
+
+  it('the label and the control that points at it keep the same id', () => {
+    // A renamed prompt with a stale `id` leaves the radiogroup with no accessible name at all, which
+    // no rendered assertion here would catch — the e2e spec finds the group BY that name.
+    const picker = code(read('components/checkin/vs-normal-picker.tsx'))
+    const id = picker.match(/<span id="([^"]+)"/)?.[1]
+    expect(id, 'the label lost its id').toBeTruthy()
+    expect(picker, `aria-labelledby does not point at "${id}"`).toContain(`aria-labelledby="${id}"`)
   })
 
   it('the picker offers exactly the three values the column accepts, and can be cleared', () => {
