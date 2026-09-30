@@ -1737,7 +1737,7 @@ export const DERIVED_COLS: Record<keyof OuraDailyDerivedPatch, string> = {
   source: 'source', modelVersions: 'model_versions',
   sleepScore: 'sleep_score', sleepContributors: 'sleep_contributors',
   readinessScore: 'readiness_score', readinessContributors: 'readiness_contributors', readinessSource: 'readiness_source',
-  activityScore: 'activity_score', activityContributors: 'activity_contributors', activeCaloriesEst: 'active_calories_est',
+  activityScore: 'activity_score', activityContributors: 'activity_contributors',
   trainingLoadOts: 'training_load_ots', trainingLoadHigh: 'training_load_high', trainingLoadGate: 'training_load_gate',
   trainingLoadGridLen: 'training_load_grid_len', trainingLoadValidMin: 'training_load_valid_min',
   // LA-170. Server-only on the same terms as `acwr` below: absent from the device mirror, so a device
@@ -1750,7 +1750,7 @@ export const DERIVED_COLS: Record<keyof OuraDailyDerivedPatch, string> = {
   // down. The cost is that a device backup does not carry ACWR; that is acceptable for a DERIVED,
   // recomputable number in a way it would not be for a raw measurement.
   acwr: 'acwr',
-  recoveryIndexHours: 'recovery_index_hours', wornHoursBle: 'worn_hours_ble', nightHrvBaselineMs: 'night_hrv_baseline_ms',
+  recoveryIndexHours: 'recovery_index_hours', nightHrvBaselineMs: 'night_hrv_baseline_ms',
   illnessFlag: 'illness_flag', illnessScore: 'illness_score', illnessBiomarkers: 'illness_biomarkers',
   daytimeStressScaled: 'daytime_stress_scaled', stressHighMinutes: 'stress_high_minutes', recoveryHighMinutes: 'recovery_high_minutes',
   chronicStressScore: 'chronic_stress_score', chronicStressContributors: 'chronic_stress_contributors', resilienceLevel: 'resilience_level',
@@ -1758,7 +1758,7 @@ export const DERIVED_COLS: Record<keyof OuraDailyDerivedPatch, string> = {
   resilienceDailySleepRecovery: 'resilience_daily_sleep_recovery', resilienceGranular: 'resilience_granular', resilienceConfidence: 'resilience_confidence',
   daytimeStressCoverageMin: 'daytime_stress_coverage_min', chronicStressGranularNights: 'chronic_stress_granular_nights',
   bdiDerived: 'bdi_derived',
-  vascularAge: 'vascular_age', pwv: 'pwv', bodyComp: 'body_comp',
+  bodyComp: 'body_comp',
 }
 
 export async function upsertOuraDailyDerived(db: Db, userId: string, day: string, patch: OuraDailyDerivedPatch): Promise<void> {
@@ -1804,7 +1804,6 @@ export async function getOuraDailyDerived(db: Db, userId: string, from: string, 
     readinessSource: r.readinessSource,
     activityScore: r.activityScore,
     activityContributors: r.activityContributors,
-    activeCaloriesEst: r.activeCaloriesEst,
     trainingLoadOts: r.trainingLoadOts,
     acwr: r.acwr,
     trainingLoadHigh: r.trainingLoadHigh,
@@ -1813,7 +1812,6 @@ export async function getOuraDailyDerived(db: Db, userId: string, from: string, 
     trainingLoadValidMin: r.trainingLoadValidMin,
     trainingLoadEvaluatedAt: r.trainingLoadEvaluatedAt ?? null,
     recoveryIndexHours: r.recoveryIndexHours,
-    wornHoursBle: r.wornHoursBle,
     nightHrvBaselineMs: r.nightHrvBaselineMs,
     illnessFlag: r.illnessFlag,
     illnessScore: r.illnessScore,
@@ -1832,8 +1830,6 @@ export async function getOuraDailyDerived(db: Db, userId: string, from: string, 
     daytimeStressCoverageMin: r.daytimeStressCoverageMin,
     chronicStressGranularNights: r.chronicStressGranularNights,
     bdiDerived: r.bdiDerived,
-    vascularAge: r.vascularAge,
-    pwv: r.pwv,
     bodyComp: r.bodyComp,
   }))
 }
