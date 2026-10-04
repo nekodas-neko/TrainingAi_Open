@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🪐 Orchestrator 🟢`** — exactly, emoji included. A renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-09-15 · **By:** the device-pass rounds session · **Next ID:** `OR-117`
+**Updated:** 2026-10-04 · **By:** the device-pass rounds session · **Next ID:** `OR-117`
 (`grep -rhoE '\bOR-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line.)
 
 ## In-app reports — the triage watermark
@@ -23,12 +23,39 @@ never been used. That is the reason the owner chose a watermark over a status co
 and a Lane B surface is a lot of machinery for a feature with one lifetime submission, and this
 costs nothing to abandon.
 
-## Session-start reads — last taken 2026-09-29
+## ⛔ EVERY LANE STOPPED ON 2026-10-01 — read this before planning anything
+
+**Measured 2026-10-04:** commits per day ran **98 · 64 · 113 · 70 · 42** through 09-26→09-30, then
+**6 on 10-01 and ZERO on 10-02, 10-03, 10-04.** The sessions are not running. Nothing in the queue
+is wrong; there is simply nobody working it.
+
+**What that cost, and it is not nothing:** six PRs were left open mid-flight and **four have since
+gone un-mergeable against a moving base** — including **three the owner had already approved on
+2026-09-28** (`#1847`, `#1849`, `#1902`). Filed as `OR-207` with the order to rescue them in.
+**Auto-merge does not resolve conflicts**, so an approved PR with nobody watching it decays.
+
+**The restart is the owner's** — each role is a session he opens, and Device Verification must be
+opened locally with the S25 attached. Until then the queue only accumulates.
+
+## ⚠ LANE B IS STARVED — 0 READY, and the unblock is the phone
+
+`next-item.js --lane B` returns **READY (0)**: 113 entries, of which **83 carry a `Keep:`** — work
+that SHIPPED and is owed a device look — and 20 are blocked by a `Gate:` or a `Needs:`. A Lane B
+session opened today would have nothing to start.
+
+**So the device sitting is not one owner action among four; it is the thing that unblocks an entire
+lane.** Everything else Lane B could do is already done and waiting to be looked at. Plan
+[`docs/device-sitting-plan-2026-09-28.md`](../../device-sitting-plan-2026-09-28.md).
+
+Lane A (41 READY), O (62), T (23) and DV (17) are all healthy and can start immediately.
+
+## Session-start reads — last taken 2026-10-04
 
 All three run. **Feedback: 0 rows** (none of the owner's — the watermark above does not move).
-**Faults: quiet** — 143 rows in `error_events`, of which **137 are `bf110` instrumentation**; the
-six real ones span a month and are all already filed. **Size: 261 MB, off trend** — +29 MB in six
-days against 1.53 MB/day, filed as `OR-203` with the per-table baseline sweep 54 did not record.
+**Faults: ZERO non-`bf110` events in 7 days.** **Size: 263 MB** — +2 MB in 5 days, **0.4 MB/day**.
+**That retires `OR-203`'s alarm:** it was filed at 4.8 MB/day and the rate did not persist, which
+its own caveat predicted. Part of the low figure has a cause — `rr_intervals` has written nothing
+since 2026-09-28 (`OR-208`), while the ring tables wrote today.
 
 ## Now
 

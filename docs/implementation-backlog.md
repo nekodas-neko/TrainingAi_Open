@@ -490,6 +490,42 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] OR-207 — six PRs were stranded when every session stopped, and four have gone un-mergeable
+
+- **Lane: A** · **Added:** 2026-10-04 · Orchestrator, full orchestration review.
+- **⛔ THREE OF THESE THE OWNER ALREADY APPROVED ON 2026-09-28 and they never merged.** `#1847`
+  (`LA-159`, drop `program_phases.program_id`), `#1849` (`LA-142`, four dead `oura_daily_derived`
+  columns) and `#1902` (`TN-56`, the admin replay endpoint). His yes is recorded on `LA-173`. They
+  sat because the session that would have merged them stopped.
+- **State read 2026-10-04, not assumed:** `#1847` **dirty** · `#1849` **unstable** · `#1902`
+  **draft and dirty** · `#2024` (`LB-194`, test-write guard) **dirty** · `#1790`, `#1762` unknown.
+- **⚠ `#1847` and `#1849` BOTH regenerate `claude-ro-views.sql`, so they conflict with each other
+  as well as with `main`.** Whichever goes second must re-merge `main` and regenerate the file;
+  CI's views-file test enforces it. **Do not resolve that conflict by hand** — run the generator.
+- **`#1902` is a draft because it was held for the owner. He answered yes.** Flip it ready as part
+  of this, rather than leaving a merged decision behind a draft flag.
+- **Order:** `#2024` first (test harness, no schema, clears the simplest conflict and proves the
+  rebase path), then `#1847`, then `#1849` regenerating on top, then `#1902`. `#1790` and `#1762`
+  are docs-only and can go any time.
+- **Re-confirm CI green on each UPDATED head before merging.** Two are column-dropping migrations
+  with a guard; the guard is what makes them safe, not the age of the approval.
+
+### [devices][heart-rate] OR-208 — `rr_intervals` has written nothing since 2026-09-28, while the ring kept writing
+
+- **Lane: O** · **Added:** 2026-10-04 · Orchestrator, session-start reads.
+- **Measured:** latest `rr_intervals.at` is **2026-09-28 22:18**. Over the same window
+  `oura_heartrate` wrote through **2026-10-04 15:49** and `oura_raw_packed` through **16:42**, so
+  **the ring pipeline is healthy and this is specific to the strap**.
+- **The likely answer is not a defect: the Polar H10 is worn, not always-on**, so six quiet days
+  may simply be six days it was not put on. **Recorded rather than filed as a fault** — per the
+  standing rule, something that stopped is not something that was fixed, and a gap nobody wrote
+  down is a gap nobody can later date.
+- **It has a consequence that is already owed:** `PS-44` needs **a week of strap-to-bed data** the
+  owner agreed to on 2026-09-17. That week has not started. If he has been wearing it and the rows
+  are missing anyway, this stops being a note and becomes a Lane A ingest bug.
+- **One question settles it, and it is his:** has the strap been worn since 28 September?
+
+
 ### [platform] LB-194 — a test mutates a tracked source file, so `git add -A` is unsafe for the nine minutes a suite runs
 
 - **Lane: A** · **Added:** 2026-09-30 · Lane B, found after committing the artefact once and then
@@ -552,6 +588,18 @@ below threshold and left in place for next time.
   with a test — and the write path sets it from a real interaction, never inferred from Save.
 
 ### [platform] OR-203 — the database grew 3× its trend for six days, and no per-table baseline exists to say which table did it
+- **✅ RE-READ 2026-10-04 — THE RATE DID NOT PERSIST. This was a BURST, not a step change.**
+  **263 MB**, against **261 MB on 2026-09-29**: **+2 MB in 5 days ≈ 0.4 MB/day**, against the
+  **4.8 MB/day** that opened this entry and below even the 1.53 MB/day trend it was alarming about.
+  The entry's own caveat — *"six days is short and a single heavy sync day would move it"* — is what
+  happened. **Do not act on the 4.8 figure.**
+- **Part of the current low rate has a named cause, so do not read 0.4 as the new steady state
+  either:** `rr_intervals` has written **nothing since 2026-09-28 22:18** (see `OR-207`), and it is
+  one of the larger per-day contributors. The ring tables are unaffected and current —
+  `oura_heartrate` and `oura_raw_packed` both wrote today.
+- **What this entry is now worth keeping for** is the per-table baseline below, which is still the
+  only one recorded and is what made this re-read a diff rather than another guess. **Keep it, and
+  re-take it when `rr_intervals` resumes** — the next honest reading needs the strap writing again.
 
 - **Lane: A** · **Added:** 2026-09-29 · Orchestrator, from the session-start size read.
 - **Measured 2026-09-29: 261 MB**, against **232 MB on 2026-09-23** (sweep 54) and **227.4 MB on
