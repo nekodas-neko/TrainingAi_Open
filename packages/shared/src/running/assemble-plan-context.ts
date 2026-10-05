@@ -6,7 +6,7 @@ import { getRepository } from '@/lib/data'
 import {
   todayInTz, todayMidnightUtc, toAestDay, startOfWeekInTz, shiftDateStr, dateStrMidnightInTz, ageFromDob,
 } from '@trainingai/shared/date-utils'
-import { computeVolumeAcwr, computeMonotonyStrain } from '@trainingai/shared/ai-periodization/acwr'
+import { computeVolumeAcwr, computeMonotonyStrain, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
 import { resolveFitnessSnapshot } from '@trainingai/shared/running/fitness-snapshot'
 import { isLowerBodyMuscle } from '@trainingai/shared/running/lower-body'
 import { isPushSession, inferEnvironment } from '@trainingai/shared/running/push-sessions'
@@ -32,7 +32,7 @@ export async function assembleInputs(
   const weekStartIso = startOfWeekInTz(tz)
   const from28dDate = new Date(todayMid.getTime() - 28 * 86_400_000)
 
-  const [derivedRows, summaries, sessionLoads, recentSessions, sleepSessions, weekRuns] = await Promise.all([
+  const [derivedRows, summaries, sessionLoads, recentSessions, sleepSessions, weekRuns, activeProgram] = await Promise.all([
     repo.getOuraDailyDerived(userId, todayIso, todayIso),
     repo.getOuraDailySummary(userId, todayIso, todayIso),
     repo.getSessionLoadsFrom(userId, from28dDate),
@@ -40,6 +40,7 @@ export async function assembleInputs(
     // Last night only — the gate's short-sleep guard is "last night", not the week's best night (E2-5/J-4).
     repo.listSleepSessions(userId, shiftDateStr(todayIso, -1), todayIso),
     repo.getPrescribedRuns(userId, weekStartIso, todayIso),
+    repo.getActiveProgram(userId),
   ])
 
   // Readiness + provisional flag. Readiness is the own BLE-derived composite (source-checked).
@@ -116,7 +117,8 @@ export async function assembleInputs(
     hoursSinceLowerBodyStrength,
     lastLowerBodyVolumeKg,
     monotony: monotony ?? null,
-    acwr: load.acwr,
+    // OR-210: withheld while the active program is too young for its chronic baseline.
+    acwr: acwrBaselineDaysRemaining(activeProgram, todayMid) > 0 ? null : load.acwr,
     hoursSinceLastHardRun,
     sleepHoursLastNight,
   }
