@@ -45,7 +45,15 @@ function parseCsv(text) {
 
 const DOMAINS = new Set(['sleep', 'readiness', 'heart-rate', 'cardio', 'activity', 'workouts', 'nutrition', 'body', 'devices', 'app-shell', 'platform']);
 const areaLabels = (domains) => [...new Set(domains.split(/\s+/).filter((d) => DOMAINS.has(d)))].map((d) => `area: ${d}`);
-const cleanTitle = (t) => t.replace(/^\[[^\]]+\](\[[^\]]+\])*\s*/, '').replace(/\s+/g, ' ').trim();
+// A title says what the task is (owner, 2026-10-05). The backlog's titles open with `[area]` tags
+// and the entry id — `LA-180 — …` — which on GitHub are noise: the labels carry area, type and
+// lane, the issue number is the id, and "LA" means nothing to a second contributor. The old id
+// stays in the body (header and marker), so searching for it still finds the issue.
+const ENTRY_ID = /^(?:[A-Z]{1,3}-\d+[a-z]?)(?:\s*(?:\+|\/|,|and)\s*[A-Z]{1,3}-\d+[a-z]?)*\s*(?:[—–:-]\s*)?/;
+function cleanTitle(t) {
+  const plain = t.replace(/^\[[^\]]+\](\[[^\]]+\])*\s*/, '').replace(/\s+/g, ' ').trim().replace(ENTRY_ID, '');
+  return plain ? plain[0].toUpperCase() + plain.slice(1) : t.trim();
+}
 
 function typeLabel(row) {
   if (row.type === 'question') return 'type: question';
