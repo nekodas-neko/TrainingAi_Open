@@ -1005,6 +1005,14 @@ below threshold and left in place for next time.
   fitting. Its cost: every exercise stays pinned at two sets while you finish around 11 minutes
   early on a typical day, and the mixed 2/3-set sessions you asked for rarely appear.
 - **Reversal cost:** one constant and one function. Either way can be undone in a single change.
+- **⚑ NEW EVIDENCE, 2026-09-28 (BugFix, BF-218): the double-count costs you a whole session on
+  `Quick`, which neither answer above had in view.** You tapped `Quick · 30 min` on Pull and got
+  **one exercise**. Reconstructed against the shipped model — which reproduces your card's 53 min
+  to the tenth at your measured 319 s transition — the 24-minute working budget fits **2** exercises
+  as shipped and **3** corrected. So on the short preset the 14.2 phantom minutes are not a
+  finish-early margin at all; they are the difference between a session and a single movement
+  repeated. The LA-65 answer you gave ("five at two sets already fill the hour") was about the
+  60-minute case, where the over-protection is invisible. It is not invisible at 30.
 - **What your answer unblocks:** BF-197 (Lane A builds it the day this is answered).
 
 ### [app-shell][platform] LB-152 — the accent-token retune repaints ~212 readings, not zero: re-opening the answer
@@ -1192,6 +1200,82 @@ below threshold and left in place for next time.
 - **Not diagnosed here.** Whether the 66 → 77.5 change came from the model or the rules prescriber.
   The stored plan is the AI one (`Accumulation`, confidence 80%), but which component chose the pct
   was not traced, and it decides whether this is a prompt problem or a formula problem.
+
+### [workouts] BF-218 — `Quick` turned a 30-minute Pull into one exercise, because the drop loop asks "does it fit" and never "is this worth doing"
+- **Lane:** A — `packages/shared/src/ai-periodization/time-budget.ts` (`dropToBudget`), `budget-stage.ts`.
+- **Added:** 2026-09-28 · BugFix intake. Owner, straight after the `Full` fix worked: *"Noting another issue is the quick only has q workout."*
+- **Needs:** — nothing. Reads on BF-197 / LA-178 but is independently buildable.
+
+- **What he saw.** `Quick · 30 min` on Pull produced **one exercise** — Barbell Chest Supported Row —
+  and `~21 min of work`. The other four were dropped. `Normal` on the same session gives all five.
+
+- **Dropping whole exercises on a short preset is DELIBERATE and the reasoning is sound**
+  (`budget-stage.ts:126`): five exercises floored at two sets still overrun 30 minutes, and two
+  token sets each is worse training than doing fewer properly. This entry is not an argument against
+  that. It is that the loop implementing it has no notion of a floor or of value-for-time.
+
+- **Two mechanisms, both in `dropToBudget` (`time-budget.ts:306`).**
+  - **`while (kept.length > 1 && …)` — the only floor is ONE.** There is no minimum exercise count
+    and no check that what survives is a coherent session. A 30-minute slot can legally resolve to a
+    single movement repeated.
+  - **Survivors are re-fitted from their ORIGINAL set counts** (`:326`, deliberately — dropping
+    frees time, so sets cut for a more crowded session are given back). Combined with the first,
+    the loop can prefer **one exercise at its full sets** over **three at two sets**, because it
+    only ever asks whether the result fits.
+
+- **Measured against the shipped model, and the reconstruction is exact.** Feeding his stored Pull
+  plan (5 exercises, 2 sets each, rest 180/127/90/90/90) through `estimateSessionDurationSec` with
+  his measured transition median of **319 s** (BF-197's figure) reproduces the card's **53 min** to
+  the tenth — 53.1. So this is the shipped arithmetic, not a model of it. At the `Quick` working
+  budget of **24 min** (30 less the warmup fraction):
+
+  | exercises kept | shipped estimate | corrected (BF-197) |
+  |---|---|---|
+  | 1 | 12.6 | 4.3 |
+  | **2** | **23.7 ✓ fits** | 13.2 |
+  | **3** | 33.9 ✗ | **22.0 ✓ fits** |
+  | 4 | 43.5 ✗ | 30.1 ✗ |
+  | 5 | 53.1 ✗ | 38.1 ✗ |
+
+  **Two exercises fit the budget on the shipped model and he got one** — so the surviving Row must
+  have carried more than two sets, which is the second mechanism above doing exactly what it is
+  written to do. **⚠ That last link is INFERRED, not read:** the `Quick` prescription was not
+  persisted — his `Normal` regeneration at `2026-09-28T21:26:19Z` overwrote the row — so its set
+  counts are gone. Re-tapping `Quick` and reading `session_periodization` settles it in one query,
+  and should be step one for whoever takes this.
+
+- **And BF-197 is why the budget is this tight at all.** On the corrected model **three** exercises
+  fit the same 24 minutes. The phantom 14.2 min is not merely cosmetic on a short preset — it is the
+  difference between a session and a single movement. **This is the sharpest evidence yet for
+  LA-178**, the open owner question on whether to fix the double-count; noted there too.
+
+- **⭐ Recommend a floor plus a tie-break, not a rewrite.** Stop the loop at a minimum of two
+  exercises (below that the session is not a session, and the existing `budgetNote` already has
+  language for "it doesn't fit"), and when a drop would leave fewer exercises than the budget could
+  carry at floor sets, prefer trimming the survivors to their floor over dropping another. Both are
+  local to `dropToBudget`; `fitToBudget` already knows the floors.
+- **Alternatives:** (a) **leave it** — better if a single hard main lift genuinely is the right
+  30-minute session, which is a real training opinion and the owner's to hold, but it is not what
+  the drop note promises ("the remaining work keeps full sets"); (b) **expand the short path** —
+  `expandToBudget` already exists but is gated to `long` for a good documented reason (the
+  under-fill IS the finish-early margin), so reusing it here would spend that margin on the preset
+  that can least afford it.
+- **Reversal cost: low.** One loop condition and one comparison, both behind the existing tests.
+
+- **Done when** a `Quick` Pull returns at least two exercises, the drop note names what went and
+  why, and the reconstruction above is pinned as a test case so the 53-min identity cannot drift
+  silently.
+- **⚠ RE-FILED 2026-10-05, and the ARITHMETIC ABOVE PREDATES `BF-221`.** This entry was written on
+  2026-09-28 and **never reached `main`**: its commit (`68277da67`, 21:31:17Z) was pushed to
+  `bugfix/bf-217-missing-progression-styles` **after that branch's PR #1936 had already auto-merged
+  at 21:28:44Z**, so it landed on a branch with no open PR and was invisible for a week. Recovered
+  from the surviving remote branch, unchanged except this bullet.
+  **What changed underneath it:** `BF-221` shipped (#1999) and now clamps an accessory's reps to the
+  goal band *before* the load is derived, so the 5-exercise plan the table was computed against no
+  longer exists in that shape. **The two mechanisms this entry names are untouched** — `dropToBudget`
+  still has no floor but one, and still re-fits survivors from their original set counts — but
+  **re-measure the table before quoting it**, and re-tap `Quick` to capture a current prescription,
+  which is the step the entry already asked for.
 
 ### [platform] BF-222 — neither sensor retention prune has EVER fired, both horizons land inside ten weeks, and a failure logs where nothing reads it
 - **Lane:** A — `lib/data/postgres/slices/oura.ts:566` and `:1070`.
@@ -2259,6 +2343,38 @@ below threshold and left in place for next time.
 - **Reversal cost: low** — a card state and where it reads from, no stored data.
 - **Not device work:** every claim here is from source, so there is nothing for the device agent to
   reproduce. The APK pass is owed on `TN-82` when the surface is built, as that entry already states.
+
+### [sleep] TN-86 — `sleep_verdicts` snapshots each band's edges but not its MIDDLE, so "than usual" has no referent
+
+- **Lane: A** — `lib/data/postgres/schema.ts` (`sleepVerdicts`), `packages/shared/src/health/sleep-verdict.ts`, a migration + its `claude_ro` twin.
+- **Added:** 2026-10-05 · Tuning, at session wrap-up — the finding existed only inside `TN-84`'s prose
+  and had no entry of its own, which under **No orphaned findings** is a dropped finding. `TN-84` is
+  `Lane: O` (an owner copy decision), so the buildable half was invisible to Lane A.
+- **Measured:** `sleepVerdicts` stores `durationLow`/`durationHigh`, `onsetLow`/`onsetHigh`,
+  `efficiencyLow`/`efficiencyHigh` as flat columns and **no median**, while
+  `ComponentBand` carries `median` and the verdict computes it. So three nullable
+  `doublePrecision` columns and a twin — small, reversible, and it is a migration, exactly as
+  `TN-84` says.
+- **The consequence `TN-84` already hit:** the Home note cannot say *"90 min later than usual"* from a
+  stored verdict, because there is no middle to measure from. It ships *"65 min later than usual"*
+  measured to the **band edge** instead.
+- **RECOMMENDATION: snapshot the three medians, and keep the edge wording anyway.** Two separate
+  points, and conflating them is what makes this look like a copy problem.
+  **(a) The copy is arguably better as shipped.** "65 min past the late end of your usual range" is a
+  smaller, truer claim than "90 min later than usual", and it is the quantity the verdict actually
+  acted on. The implementer's deviation ② was right; this entry is not asking to reverse it.
+  **(b) The snapshot is incomplete regardless of the copy, and that is the real cost.** The design's
+  load-bearing claim is that *a correction whose paired verdict is not pinned is not evidence*
+  (`TN-81`, and the plan it came from). The median is part of what the verdict judged against, so
+  without it a correction cannot later be asked **how far from centre** the night sat — only which
+  side of a threshold it fell. Tuning will want that the moment there are corrections to analyse,
+  and by then the rows are already written and cannot be back-filled, because the bands were
+  computed from a trailing window that has since moved.
+- **So the priority is: not urgent, but it does not improve by waiting** — every night that passes
+  writes another row with no centre in it. Unblocked; needs no owner answer.
+- **Do NOT bump `SLEEP_VERDICT_MODEL_VERSION` for this.** Adding a recorded field changes nothing
+  about the rule that produced a verdict, and the version exists to pair a correction with the rule
+  it disagreed with. v2 is the `0.5 → 1.0` calibration change; a storage addition is not a third rule.
 
 ### [sleep] TN-84 — the sleep announcement's wording is the owner's call; here is the draft to approve or edit
 
