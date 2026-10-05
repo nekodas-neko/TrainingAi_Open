@@ -80,7 +80,8 @@ export async function refitPrescriptionToBudget(
       sets: baseline.sets[ex.sessionExerciseId] ?? ex.sets,
       reps: ex.reps,
       pct: ex.pct,
-      restSec: ex.restSec,
+      // Same reason as `sets`: a plan generated for a shorter day stored its shortened rest (#2284).
+      restSec: baseline.restSec?.[ex.sessionExerciseId] ?? ex.restSec,
     })),
     signals,
     validSession.timeBudgetMinutes,
@@ -92,12 +93,22 @@ export async function refitPrescriptionToBudget(
   // 30-minute ask must come back when the lifter asks for 90.
   const carried = { ...stored }
   delete carried.droppedExerciseIds
+  const fullRest = Object.fromEntries(
+    stored.exercises.map(ex => [ex.sessionExerciseId, baseline.restSec?.[ex.sessionExerciseId] ?? ex.restSec]),
+  )
+  const restShortened = stored.exercises.some(ex =>
+    (budget.restSec.get(ex.sessionExerciseId) ?? fullRest[ex.sessionExerciseId]) !== fullRest[ex.sessionExerciseId])
   const prescription: AiPrescription = {
     ...carried,
     exercises: stored.exercises.map(ex => ({
       ...ex,
       sets: budget.sets.get(ex.sessionExerciseId) ?? ex.sets,
+      restSec: budget.restSec.get(ex.sessionExerciseId) ?? fullRest[ex.sessionExerciseId],
     })),
+    refitBaseline: {
+      ...baseline,
+      ...((baseline.restSec || restShortened) && { restSec: fullRest }),
+    },
     estimatedSessionDurationMin: budget.estimatedSessionDurationMin,
     weeklyVolumeContribution: budget.weeklyVolumeContribution,
     reasoning: `${baseline.reasoning}${budget.budgetNote}`,

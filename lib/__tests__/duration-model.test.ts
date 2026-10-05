@@ -7,6 +7,7 @@ import {
   TRANSITION_SEC_BARBELL, TRANSITION_SEC_STANDARD, TRANSITION_SEC_BODYWEIGHT, TRANSITION_SEC_DEFAULT,
   transitionSecForEquipment, setWorkSec, effectiveSetWorkSec, styleWorkSec, warmupRampSectionSec,
   estimateExerciseDurationSec, estimateSessionDurationSec, estimateSessionDurationMin,
+  planningBudgetMin, fitBudgetMin, MAX_PLANNING_MARGIN,
 } from '@trainingai/shared/workout/duration-model'
 
 describe('transitionSecForEquipment', () => {
@@ -42,17 +43,17 @@ describe('duration formula', () => {
     expect(setWorkSec(5)).toBe(SET_SETUP_SEC + 5 * SECONDS_PER_REP)
   })
 
-  it('exercise duration = sets×setWork + sets×rest + transition', () => {
+  it('exercise duration = sets×setWork + (sets−1)×rest + transition', () => {
     const ex = { sets: 3, reps: 5, restSec: 120, transitionSec: 240 }
-    expect(estimateExerciseDurationSec(ex)).toBe(3 * setWorkSec(5) + 3 * 120 + 240)
+    expect(estimateExerciseDurationSec(ex)).toBe(3 * setWorkSec(5) + 2 * 120 + 240)
   })
 
-  // The last set's rest is real time, distinct from the inter-exercise transition — see the
-  // production measurement in duration-model.ts. The old `sets − 1` form conflated them and
-  // under-estimated every session by ~1 rest per exercise.
-  it('charges rest for every set, including the last', () => {
+  // #2132. The rest after the last set is not taken — the recorded trailing rest is 0 on 93.5% of
+  // 309 exercises; what follows the last set is the walk to the next station, which is the gap.
+  it('charges no rest after the last set', () => {
     expect(estimateExerciseDurationSec({ sets: 1, reps: 5, restSec: 180, transitionSec: 120 }))
-      .toBe(setWorkSec(5) + 180 + 120)
+      .toBe(setWorkSec(5) + 120)
+    expect(estimateExerciseDurationSec({ sets: 0, reps: 5, restSec: 180, transitionSec: 120 })).toBe(120)
   })
 
   it('an extra set costs one set of work plus one full rest', () => {
@@ -69,14 +70,43 @@ describe('duration formula', () => {
     expect(barbell - machine).toBe(120)
   })
 
-  it('session duration sums exercises and rounds to minutes', () => {
+  // #2132. A session has N − 1 gaps. The gap is charged on the exercise it leads INTO, so it is the
+  // FIRST exercise's that goes — its setup happens inside the warm-up.
+  it('session duration sums exercises, less the first exercise\'s transition, and rounds to minutes', () => {
     const exs = [
       { sets: 2, reps: 6, restSec: 90, transitionSec: 240 },
       { sets: 3, reps: 8, restSec: 60, transitionSec: 120 },
     ]
     expect(estimateSessionDurationSec(exs))
-      .toBe(estimateExerciseDurationSec(exs[0]) + estimateExerciseDurationSec(exs[1]))
+      .toBe(estimateExerciseDurationSec(exs[0]) + estimateExerciseDurationSec(exs[1]) - 240)
     expect(estimateSessionDurationMin(exs)).toBe(Math.round(estimateSessionDurationSec(exs) / 60))
+    expect(estimateSessionDurationSec([])).toBe(0)
+    expect(estimateSessionDurationSec([exs[1]])).toBe(3 * setWorkSec(8) + 2 * 60)
+  })
+
+  // The owner's live 5-exercise Lower, at #2132's measured medians (32 sessions, 45 days): 319 s per
+  // gap, 107 s per rest, 49 s per set. The double-count was five trailing rests and one gap that does
+  // not exist — 5 × 107 + 319 = 854 s, the 14.2 phantom minutes that held every exercise at 2 sets.
+  it("removes exactly the 14.2 phantom minutes from the owner's 5×2 Lower", () => {
+    const reps = (49 - SET_SETUP_SEC) / SECONDS_PER_REP
+    const lower = Array.from({ length: 5 }, () => ({ sets: 2, reps, restSec: 107, transitionSec: 319 }))
+    const asShipped = lower.reduce((t, ex) => t + ex.sets * 49 + ex.sets * ex.restSec + ex.transitionSec, 0)
+    expect(asShipped - estimateSessionDurationSec(lower)).toBe(5 * 107 + 319)
+    expect((asShipped - estimateSessionDurationSec(lower)) / 60).toBeCloseTo(14.2, 1)
+  })
+
+  // #2132's margin (owner 2026-10-05): plans are fitted so his 75th-percentile pace still lands.
+  it('a plan is fitted against the working budget less the learned margin, never a tighter one', () => {
+    expect(planningBudgetMin(51, 1.2)).toBeCloseTo(42.5, 5)
+    // No margin learned, or one that says he beats his medians: the working budget, unchanged.
+    expect(planningBudgetMin(51, null)).toBe(51)
+    expect(planningBudgetMin(51, undefined)).toBe(51)
+    expect(planningBudgetMin(51, 0.9)).toBe(51)
+    expect(planningBudgetMin(51, Number.NaN)).toBe(51)
+    // A noisy history cannot shrink the plan past the ceiling.
+    expect(planningBudgetMin(51, 3)).toBeCloseTo(51 / MAX_PLANNING_MARGIN, 5)
+    expect(fitBudgetMin({ effectiveTimeBudgetMin: 51 })).toBe(51)
+    expect(fitBudgetMin({ effectiveTimeBudgetMin: 51, planningBudgetMin: 42.5 })).toBe(42.5)
   })
 
   // BF-128. The trailing rest is not charged: measured over the owner's 90 days, all 517 non-final
@@ -186,10 +216,10 @@ describe('duration formula', () => {
     expect(effectiveSetWorkSec(10, null)).toBe(setWorkSec(10))
     expect(effectiveSetWorkSec(10, undefined)).toBe(setWorkSec(10))
     const ex = { sets: 3, reps: 10, restSec: 90, transitionSec: 120, measuredSecPerRep: 3, measuredRestSec: 150 }
-    expect(estimateExerciseDurationSec(ex)).toBe(3 * (SET_SETUP_SEC + 30) + 3 * 150 + 120)
+    expect(estimateExerciseDurationSec(ex)).toBe(3 * (SET_SETUP_SEC + 30) + 2 * 150 + 120)
     // rest override alone leaves work on the constant model
     expect(estimateExerciseDurationSec({ sets: 3, reps: 10, restSec: 90, transitionSec: 120, measuredRestSec: 150 }))
-      .toBe(3 * setWorkSec(10) + 3 * 150 + 120)
+      .toBe(3 * setWorkSec(10) + 2 * 150 + 120)
   })
 })
 

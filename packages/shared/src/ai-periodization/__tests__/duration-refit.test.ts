@@ -61,10 +61,11 @@ const signalsFor = (budgetOverrideMin: number | undefined) => ({
 })
 
 /** The pre-budget shape a generation would have handed the budget stage... */
-const BASELINE_SETS: Record<string, number> = { [SQUAT]: 4, [ROW]: 4, [CURL]: 3, [RAISE]: 3 }
-/** ...and what it would then have STORED, once the standard budget trimmed the accessories.
- *  The two differing is the normal case, not a contrived one — the budget stage exists to trim. */
-const STORED_SETS: Record<string, number> = { [SQUAT]: 4, [ROW]: 4, [CURL]: 2, [RAISE]: 2 }
+const BASELINE_SETS: Record<string, number> = { [SQUAT]: 5, [ROW]: 5, [CURL]: 4, [RAISE]: 4 }
+/** ...and what it would then have STORED, once the standard budget trimmed the accessories (to
+ *  5/5/3/3). Read off the real stage rather than typed in, so a change to the duration model moves
+ *  the fixture with it. The two differing is the normal case — the budget stage exists to trim. */
+const storedSets = (): Record<string, number> => Object.fromEntries(generationAnswer('standard').sets)
 
 const storedPrescription = (over: Partial<AiPrescription> = {}): AiPrescription => ({
   phase: 'accumulation',
@@ -72,7 +73,7 @@ const storedPrescription = (over: Partial<AiPrescription> = {}): AiPrescription 
   exercises: EXERCISES.map(e => ({
     sessionExerciseId: e.sessionExerciseId,
     name: e.name,
-    sets: STORED_SETS[e.sessionExerciseId],
+    sets: storedSets()[e.sessionExerciseId],
     reps: 10,
     pct: 70,
     restSec: 120,
@@ -138,6 +139,8 @@ const generationAnswer = (preset: DurationPreset) => applyBudgetStage(
 
 const setsOf = (p: AiPrescription) =>
   Object.fromEntries(p.exercises.map(e => [e.sessionExerciseId, e.sets]))
+const restOf = (p: AiPrescription) =>
+  Object.fromEntries(p.exercises.map(e => [e.sessionExerciseId, e.restSec]))
 
 describe('a duration change re-fits the stored plan instead of re-asking the model', () => {
   it('lands exactly where a generation for that preset would have', async () => {
@@ -153,14 +156,16 @@ describe('a duration change re-fits the stored plan instead of re-asking the mod
     }
   })
 
-  it('gives the sets back on the way out — short then standard is the original plan', async () => {
+  it('gives the sets and the rest back on the way out — short then standard is the original plan', async () => {
     const original = storedPrescription()
 
-    const shortened = await refit('short')
+    // 20 minutes, so the short leg has to drop as well as trim.
+    const shortened = await refit(20)
     if (!shortened.ok) throw new Error('short leg did not re-fit')
     // The short leg must actually have changed the plan, or the round trip proves nothing.
     expect(setsOf(shortened.prescription)).not.toEqual(setsOf(original))
     expect(shortened.prescription.droppedExerciseIds).toEqual([CURL, RAISE])
+    expect(restOf(shortened.prescription)).toEqual({ [SQUAT]: 120, [ROW]: 90, [CURL]: 90, [RAISE]: 90 })
 
     const restored = await refit('standard', periodizationState({ prescription: shortened.prescription }))
     if (!restored.ok) throw new Error('return leg did not re-fit')
@@ -170,19 +175,26 @@ describe('a duration change re-fits the stored plan instead of re-asking the mod
     // accessories keep the count they only ever had because they were dropped rather than
     // trimmed. Nothing on screen would say the plan is wrong.
     expect(setsOf(restored.prescription)).toEqual(setsOf(original))
+    // #2284: the stored rest was shortened, so without the baseline's copy it would stay short.
+    expect(restOf(restored.prescription)).toEqual(restOf(original))
     expect(restored.prescription.droppedExerciseIds ?? []).toEqual([])
     expect(restored.prescription.reasoning).toBe(original.reasoning)
   })
 
-  it('never touches reps, load, rest or the phase — only how many sets fit', async () => {
+  it('never touches reps, load or the phase — only sets, and rest on a shorter day', async () => {
     const res = await refit('short')
     if (!res.ok) throw new Error('did not re-fit')
     expect(res.prescription.phase).toBe('accumulation')
     expect(res.prescription.phaseAction).toBe('stay')
     expect(res.prescription.confidence).toBe(0.8)
     for (const ex of res.prescription.exercises) {
-      expect({ reps: ex.reps, pct: ex.pct, restSec: ex.restSec }).toEqual({ reps: 10, pct: 70, restSec: 120 })
+      expect({ reps: ex.reps, pct: ex.pct }).toEqual({ reps: 10, pct: 70 })
     }
+    // #2284: accessory and secondary rest is cut by a quarter; the primary keeps its full rest.
+    expect(restOf(res.prescription)).toEqual({ [SQUAT]: 120, [ROW]: 90, [CURL]: 90, [RAISE]: 90 })
+    const long = await refit('long')
+    if (!long.ok) throw new Error('did not re-fit')
+    expect(Object.values(restOf(long.prescription))).toEqual([120, 120, 120, 120])
   })
 
   it('replaces the budget note rather than stacking a second one', async () => {
@@ -207,7 +219,7 @@ describe('a duration change re-fits the stored plan instead of re-asking the mod
 
 // The two guards that make "standard" mean the session's own length. Both are one character
 // away from silently changing every plan the app produces, and neither is reachable through the
-// re-fit cases above — the round trip's standard leg happens to sit ~1 min under its budget, so
+// re-fit cases above — the round trip's standard leg happens to sit ~2 min under its budget, so
 // an expansion would not have fitted and a drop would not have been needed. That is a property
 // of that fixture, not of the code, which is exactly why these are separate.
 describe('a standard session neither expands into its slack nor drops an exercise', () => {

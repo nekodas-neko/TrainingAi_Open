@@ -16,11 +16,9 @@ export const SET_SETUP_SEC = 10
 // Warmup overhead as a fraction of the configured session budget (owner-set): it scales
 // with the session (a 30-min session doesn't need a 10-min warmup), so working time is the
 // remaining 85% — e.g. a 60-min budget buys ~51 min of working time after a ~9-min warmup.
-// There is deliberately NO separate finish-early buffer (removed 2026-07-12, owner call):
-// the margin comes for free because the plan is estimated on conservative rest/set times —
-// during the baseline period rest is generously constant, and once measured per-exercise
-// history exists the AI plans on the real (faster) numbers — so on-time execution naturally
-// lands under budget without reserving idle minutes up front.
+// The finish-early margin is not carved out here. It is applied when a plan is FITTED, sized to
+// the lifter's own 75th percentile (#2132, owner 2026-10-05) — see `planningBudgetMin` — so the
+// working budget shown to him stays the honest number.
 export const WARMUP_FRACTION = 0.15
 
 // Bounds on a *measured* warmup allowance (lib/workout/time-audit.ts feeds a learned
@@ -82,6 +80,29 @@ export function workingBudgetMin(
     return Math.max(15, totalBudgetMin - warmupBudgetMin(totalBudgetMin, measuredWarmupMin, standardBudgetMin))
   }
   return Math.max(15, Math.round(totalBudgetMin * (1 - WARMUP_FRACTION)))
+}
+
+// The finish-early margin (#2132, owner 2026-10-05: "fix the double-counts AND add the p75 margin,
+// together"). A plan is fitted so that a session at the lifter's 75th-percentile pace still lands
+// inside the working budget — about three days in four — rather than his median pace, which would
+// overrun half the time. `marginFactor` is that percentile as a ratio of actual to estimated working
+// time, learned in time-audit.ts; null below its sample threshold, and then no margin is taken,
+// because the constant model the planner falls back to is already the generous one.
+//
+// The ceiling bounds what a short or noisy history can do to a plan: at 1.5 a 51-minute budget is
+// still planned as 34 minutes. Reversal is this constant and PLANNING_PERCENTILE.
+export const PLANNING_PERCENTILE = 0.75
+export const MAX_PLANNING_MARGIN = 1.5
+
+export function planningBudgetMin(workingMin: number, marginFactor?: number | null): number {
+  if (marginFactor == null || !Number.isFinite(marginFactor) || marginFactor <= 1) return workingMin
+  return workingMin / Math.min(MAX_PLANNING_MARGIN, marginFactor)
+}
+
+/** The budget a plan is fitted against: the planning budget when one was learned, else the
+ *  working budget. Takes the two fields off a `PrescriptionSignals`. */
+export function fitBudgetMin(budget: { effectiveTimeBudgetMin: number; planningBudgetMin?: number }): number {
+  return budget.planningBudgetMin ?? budget.effectiveTimeBudgetMin
 }
 
 // A per-day override of the session's configured time budget: "I've got 30 minutes before
@@ -240,39 +261,32 @@ export interface DurationExercise {
   measuredRestSec?: number | null
 }
 
-// Rest is charged for EVERY set here, not `sets - 1` — read the BF-128 note below for the scope
-// of that, which is narrower than this paragraph reads. The old form assumed the inter-exercise
-// transition absorbed the last set's rest; production says they are separate clocks. On the
-// 2026-07-28 Push session: 11.1 min of set work + 26.0 min of per-set rest (all 14 sets) +
-// 13.2 min of inter-exercise gaps = 50.3 min against a measured 52-min working window — the
-// three sum to the window, so `rest_time_sec` and `inter_exercise_rest_sec` do not overlap.
-// Dropping one rest per exercise cost ~7-8 min on a 5-exercise session, which is why stored
-// estimates read 35-49 min while real working windows ran 41-65 min.
+// One exercise as it costs when it is NOT the first of the session: `sets` of work, `sets - 1`
+// rests, and the gap that leads into it. #2132 (BF-197) fixed two off-by-ones here, together,
+// because each was hiding the other:
 //
-// BF-128 qualifies the headline above rather than overturning it. What that session established is
-// that per-set rest and inter-exercise gaps are SEPARATE clocks — they summed to the window, and
-// that still holds. What it did not establish is `sets` vs `sets - 1`, because it summed RECORDED
-// rests, and the recorded trailing rest is 0 (93.5% of 309 exercises). So the sum was already
-// effectively `sets - 1` and reads the same either way. The distinction only bites where a
-// *planned* rest is multiplied out, which is styleWorkSec — fixed there, deliberately not here:
-// `measuredRestSec` arrives from time-audit.ts, whose median filters `> 0` and so excludes those
-// trailing zeros, and validating the same change on this path needs the transition constant
-// settled first (LA-65).
+// - **Rest after the last set is not taken.** Per-set rest and inter-exercise gaps are separate
+//   clocks (they sum to the working window, 2026-07-28 Push), and what follows the last set is the
+//   walk to the next station, which is the gap. The recorded trailing rest is 0 on 93.5% of 309
+//   exercises (BF-128); `styleWorkSec` below already plans it that way.
+// - **A session has N − 1 gaps, not N.** `transitionSec` is the gap BEFORE an exercise —
+//   `inter_exercise_rest_sec` runs from the previous exercise's last set to this one's Begin tap
+//   (`workout-screen.tsx`), and the first exercise records none because its setup happens inside
+//   the warm-up. So `estimateSessionDurationSec` drops the first exercise's.
 //
-// LA-65 measured it the same day, and the reason above needs one correction: the transition FIELD
-// is settled — `inter_exercise_rest_sec` is the whole gap and `prep_time_sec` is a sub-interval of
-// it, verified to a median 0.05 s against the independent set-timestamp clock. What is not settled
-// is the CONSTANT: the real gap is ~300 s against 240 s here, but it is charged per exercise while a
-// session has one fewer gap than exercises, so the two errors cancel at exactly five. Fixing this
-// function and fixing that off-by-one are one change, gated on the owner.
+// Together they over-charged the owner's 5-exercise Lower by 14.2 min (51.4 estimated against a
+// measured median of 39.9). That over-charge was also the only finish-early margin, so the margin
+// is now explicit and sized to his own variance — `planningMarginFactor` in time-audit.ts.
 export function estimateExerciseDurationSec(ex: DurationExercise): number {
   return ex.sets * effectiveSetWorkSec(ex.reps, ex.measuredSecPerRep)
-    + ex.sets * (ex.measuredRestSec ?? ex.restSec)
+    + Math.max(0, ex.sets - 1) * (ex.measuredRestSec ?? ex.restSec)
     + ex.transitionSec
 }
 
 export function estimateSessionDurationSec(exercises: DurationExercise[]): number {
-  return exercises.reduce((total, ex) => total + estimateExerciseDurationSec(ex), 0)
+  if (exercises.length === 0) return 0
+  const total = exercises.reduce((sum, ex) => sum + estimateExerciseDurationSec(ex), 0)
+  return total - exercises[0].transitionSec
 }
 
 export function estimateSessionDurationMin(exercises: DurationExercise[]): number {
@@ -292,8 +306,7 @@ export function estimateSessionDurationMin(exercises: DurationExercise[]): numbe
 // Dropping the trailing rest gives 598 s and 5 — and against 36 sessions with a stamped warm-up
 // the median error moves from +5.1 min over (29/36 over-estimates) to −3.6 min (14/36).
 //
-// This is the PLANNING term. estimateExerciseDurationSec still charges every set, and the comment
-// there explains why the two differ: it sums RECORDED rests, where the trailing one is already 0.
+// estimateExerciseDurationSec now charges `sets - 1` rests too (#2132), so the two agree.
 export function styleWorkSec(sets: Array<{ reps: number; restSec: number }>): number {
   return sets.reduce(
     (total, set, i) => total + setWorkSec(set.reps) + (i === sets.length - 1 ? 0 : set.restSec),

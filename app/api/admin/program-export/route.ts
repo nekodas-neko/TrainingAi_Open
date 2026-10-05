@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { requireAdmin, adminErrorResponse } from '@/lib/admin'
-import { estimateExerciseDurationSec, transitionSecForEquipment } from '@trainingai/shared/workout/duration-model'
+import { estimateSessionDurationSec, transitionSecForEquipment, type DurationExercise } from '@trainingai/shared/workout/duration-model'
 import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
 import {
   formatProgramExport,
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
   const equipmentMap = await repo.getExerciseEquipment(allNames)
 
   const sessions: ExportSession[] = program.sessions.map(s => {
-    let durationSec = 0
+    const durationInputs: DurationExercise[] = []
     const exercises = s.exercises
       .slice()
       .sort((a, b) => a.position - b.position)
@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
         if (sets.length > 0) {
           const meanReps = Math.round(sets.reduce((n, x) => n + x.reps, 0) / sets.length)
           const meanRest = Math.round(sets.reduce((n, x) => n + x.restSec, 0) / sets.length)
-          durationSec += estimateExerciseDurationSec({
+          durationInputs.push({
             sets: sets.length,
             reps: meanReps,
             restSec: meanRest,
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
     return {
       name: s.name,
       budgetMin: s.timeBudgetMinutes,
-      estMin: Math.round(durationSec / 60),
+      estMin: Math.round(estimateSessionDurationSec(durationInputs) / 60),
       exercises,
     }
   })

@@ -3,6 +3,7 @@ import {
   median, robustStats, computeExerciseStats, computeEquipmentStats, decomposeSessions,
   robustAvgSetDurationsByExercise, MIN_TRUSTED_SAMPLES, clampWindowStart,
   buildMeasuredTimeBudget, resolveTransitionSec, WARMUP_LEARN_MIN_SESSIONS,
+  planningMarginFactor, MARGIN_LEARN_MIN_SESSIONS,
   type TimingSetRow, type TimingExerciseRow, type TimingSessionRow, type EquipmentClass,
 } from '@trainingai/shared/workout/time-audit'
 import { TRANSITION_SEC_BARBELL, TRANSITION_SEC_STANDARD } from '@trainingai/shared/workout/duration-model'
@@ -269,6 +270,7 @@ describe('resolveTransitionSec', () => {
     transitionSecByExercise: { Squat: 210 },
     transitionSecByClass: { barbell: 260 } as Partial<Record<EquipmentClass, number>>,
     warmupSec: null,
+    planningMarginFactor: null,
   }
   it('prefers the per-exercise median (most specific)', () => {
     expect(resolveTransitionSec('Squat', ['barbell'], measured)).toBe(210)
@@ -281,6 +283,67 @@ describe('resolveTransitionSec', () => {
   })
   it('falls back to the constant when no measured budget is supplied', () => {
     expect(resolveTransitionSec('Squat', ['barbell'], null)).toBe(TRANSITION_SEC_BARBELL)
+  })
+})
+
+// #2132 — the finish-early margin, learned as the 75th percentile of actual ÷ median-predicted
+// working time per session.
+describe('planningMarginFactor', () => {
+  // One session: a Squat (no gap before it — it opens the session) then a Row, two sets each, with
+  // every rest and the gap scaled by `pace`. The rest after each last set is 0, as recorded.
+  const paced = (id: string, pace: number, restOverride?: number) => ({
+    session: { workoutSessionId: id, startedAt: 0, completedAt: 60 * 60_000, warmupEndedAt: 5 * 60_000 },
+    sets: [
+      set({ workoutSessionId: id, exerciseName: 'Squat', setNumber: 1, setTimeSec: 30, restTimeSec: restOverride ?? 120 * pace }),
+      set({ workoutSessionId: id, exerciseName: 'Squat', setNumber: 2, setTimeSec: 30, restTimeSec: 0 }),
+      set({ workoutSessionId: id, exerciseName: 'Row', equipment: ['cable'], setNumber: 1, setTimeSec: 40, restTimeSec: 90 * pace }),
+      set({ workoutSessionId: id, exerciseName: 'Row', equipment: ['cable'], setNumber: 2, setTimeSec: 40, restTimeSec: 0 }),
+    ],
+    exercises: [
+      exRow({ workoutSessionId: id, exerciseName: 'Squat', interExerciseRestSec: null }),
+      exRow({ workoutSessionId: id, exerciseName: 'Row', equipment: ['cable'], interExerciseRestSec: 300 * pace }),
+    ],
+  })
+  const learn = (runs: ReturnType<typeof paced>[]) => {
+    const sessions = runs.map(r => r.session)
+    const sets = runs.flatMap(r => r.sets)
+    const exercises = runs.flatMap(r => r.exercises)
+    return {
+      direct: planningMarginFactor(sessions, sets, exercises, () => 300),
+      viaBudget: buildMeasuredTimeBudget(sessions, sets, exercises).planningMarginFactor,
+    }
+  }
+
+  it("is exactly 1 when every session runs at the lifter's own medians", () => {
+    const runs = Array.from({ length: MARGIN_LEARN_MIN_SESSIONS }, (_, i) => paced(`s${i}`, 1))
+    expect(learn(runs).direct).toBe(1)
+    expect(learn(runs).viaBudget).toBe(1)
+  })
+
+  it('learns nothing below MARGIN_LEARN_MIN_SESSIONS sessions', () => {
+    const runs = Array.from({ length: MARGIN_LEARN_MIN_SESSIONS - 1 }, (_, i) => paced(`s${i}`, 1))
+    expect(learn(runs).direct).toBeNull()
+  })
+
+  it("rises above 1 with a slow tail, but stays under the slow sessions' own ratio", () => {
+    const runs = [
+      ...Array.from({ length: 6 }, (_, i) => paced(`s${i}`, 1)),
+      paced('slow1', 1.5), paced('slow2', 1.5),
+    ]
+    // Median prediction 650 s; a 1.5× session runs 905 s, ratio ~1.39. p75 of [1×6, 1.39×2].
+    const { direct, viaBudget } = learn(runs)
+    expect(direct!).toBeGreaterThan(1)
+    expect(direct!).toBeLessThan(905 / 650)
+    expect(direct!).toBeCloseTo(1 + 0.25 * (905 / 650 - 1), 5)
+    expect(viaBudget).toBeCloseTo(direct!, 5)
+  })
+
+  it('leaves out a session with a runaway timer rather than reserving minutes for it', () => {
+    const runs = [
+      ...Array.from({ length: MARGIN_LEARN_MIN_SESSIONS }, (_, i) => paced(`s${i}`, 1)),
+      paced('phone-on-the-bench', 1, 1_000),
+    ]
+    expect(learn(runs).direct).toBe(1)
   })
 })
 

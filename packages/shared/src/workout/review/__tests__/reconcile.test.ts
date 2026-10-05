@@ -53,8 +53,9 @@ describe('reconcileReview', () => {
     expect(b.reason).toContain('over')
     // Dropping 3 sets of a main-chest exercise removes 3 weighted chest sets.
     expect(p.weeklyImpact.chest).toBe(-3)
-    // Only exercise 'a' survives: 4*(10+5*4) + 4*150 + 120 = 120+600+120 = 840s -> 14 min.
-    expect(p.projectedDurationMin).toBe(14)
+    // Only exercise 'a' survives: 4*(10+5*4) + 3*150 = 120+450 = 570s -> 10 min. A lone exercise
+    // has no rest after its last set and no gap before it (#2132).
+    expect(p.projectedDurationMin).toBe(10)
     expect(p.fitsBudget).toBe(true)
   })
 

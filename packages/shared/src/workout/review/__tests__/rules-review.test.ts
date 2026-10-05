@@ -49,11 +49,11 @@ describe('buildRulesReview', () => {
 
   // Sets are the cheap lever: trimming happens before anything is dropped, because losing a whole
   // exercise is the answer of last resort.
-  // 25 minutes is inside the measured trim-only band for this fixture: 30 already fits, and 15
+  // 15 minutes is inside the measured trim-only band for this fixture: 21 already fits, and 11
   // is low enough to force a drop. Pinned to a band rather than a single value on purpose — a
-  // duration-model change that moves the boundary should show up here.
+  // duration-model change that moves the boundary should show up here (#2132 moved it from 15–30).
   it('trims sets before it drops anything', () => {
-    const r = run(25)
+    const r = run(15)
     expect(r.modelExercises.length).toBeGreaterThan(0)
     expect(r.modelExercises.every(m => m.action === 'adjust')).toBe(true)
     expect(r.reasoning).toContain('trimmed')
@@ -66,9 +66,9 @@ describe('buildRulesReview', () => {
   it('drops once trimming has run out of room, keeping the main compound lift', () => {
     const r = run(1)
     const dropped = r.modelExercises.filter(m => m.action === 'drop').map(m => m.sessionExerciseId)
-    expect(dropped.length).toBeGreaterThan(0)
-    expect(dropped).not.toContain(SQUAT)
-    expect(r.reasoning).toContain('do not fit')
+    // Never below two exercises (#2078), so one of the three goes.
+    expect(dropped).toEqual([CURL])
+    expect(r.reasoning).toContain('does not fit')
   })
 
   // The sentence per drop was the model's one irreplaceable output. It is not duplicated here —

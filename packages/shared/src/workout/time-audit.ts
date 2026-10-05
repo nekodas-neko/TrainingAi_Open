@@ -6,6 +6,7 @@
 
 import {
   transitionSecForEquipment,
+  PLANNING_PERCENTILE,
   TRANSITION_SEC_BARBELL, TRANSITION_SEC_STANDARD, TRANSITION_SEC_BODYWEIGHT, TRANSITION_SEC_DEFAULT,
 } from '@trainingai/shared/workout/duration-model'
 
@@ -290,6 +291,55 @@ export interface MeasuredTimeBudget {
   transitionSecByClass: Partial<Record<EquipmentClass, number>>
   // Learned warmup median in seconds, or null below WARMUP_LEARN_MIN_SESSIONS sessions.
   warmupSec: number | null
+  // The finish-early margin as a ratio (see planningMarginFactor), or null below
+  // MARGIN_LEARN_MIN_SESSIONS sessions.
+  planningMarginFactor: number | null
+}
+
+// Same bar as warmup, for the same reason: a session total varies more than any one set.
+export const MARGIN_LEARN_MIN_SESSIONS = WARMUP_LEARN_MIN_SESSIONS
+
+/**
+ * How much slower than his own medians the lifter's sessions run, at PLANNING_PERCENTILE (#2132).
+ *
+ * Per completed session, actual working time (set work + per-set rest + inter-exercise gaps) over
+ * what the planner's medians predict for the same recorded sets, rests and gaps; the factor is the
+ * 75th percentile of those ratios. Comparing like with like — each recorded component against its
+ * own median — measures how variable his pace is, which is what a margin is for, rather than how
+ * many exercises he happened to do. Sessions with a runaway timer are left out: the median ignores
+ * one, and a margin learned from it would reserve minutes for a phone left on a bench.
+ *
+ * Below 1 means he beats his medians three days in four; `planningBudgetMin` never plans on that,
+ * because a plan tighter than the median is the overrun this exists to prevent.
+ */
+export function planningMarginFactor(
+  sessions: TimingSessionRow[],
+  sets: TimingSetRow[],
+  exercises: TimingExerciseRow[],
+  transitionFor: (exerciseName: string, equipment: string[]) => number,
+): number | null {
+  const stats = new Map(computeExerciseStats(sets, exercises).map(s => [s.exerciseName, s]))
+  const ratios: number[] = []
+  for (const session of decomposeSessions(sessions, sets, exercises)) {
+    if (session.anomalies.some(a => a.type === 'runaway_set' || a.type === 'runaway_rest')) continue
+    let estimated = 0
+    for (const set of sets) {
+      if (set.workoutSessionId !== session.workoutSessionId) continue
+      const stat = stats.get(set.exerciseName)
+      if (set.setTimeSec != null && set.setTimeSec > 0) estimated += stat?.medianSetSec ?? set.setTimeSec
+      if (set.restTimeSec != null && set.restTimeSec > 0) estimated += stat?.medianRestSec ?? set.restTimeSec
+    }
+    for (const ex of exercises) {
+      if (ex.workoutSessionId !== session.workoutSessionId) continue
+      if (ex.interExerciseRestSec != null && ex.interExerciseRestSec > 0) {
+        estimated += transitionFor(ex.exerciseName, ex.equipment)
+      }
+    }
+    const actual = session.workSec + session.restSec + session.transitionSec
+    if (estimated > 0 && actual > 0) ratios.push(actual / estimated)
+  }
+  if (ratios.length < MARGIN_LEARN_MIN_SESSIONS) return null
+  return quantile([...ratios].sort((a, b) => a - b), PLANNING_PERCENTILE)
 }
 
 export function buildMeasuredTimeBudget(
@@ -316,7 +366,14 @@ export function buildMeasuredTimeBudget(
     .filter((v): v is number => v != null && v > 0)
   const warmupSec = warmups.length >= WARMUP_LEARN_MIN_SESSIONS ? robustStats(warmups).median : null
 
-  return { transitionSecByExercise, transitionSecByClass, warmupSec }
+  // Estimated against the same transitions the planner will use, so the ratio describes the plan.
+  const learned: MeasuredTimeBudget = { transitionSecByExercise, transitionSecByClass, warmupSec, planningMarginFactor: null }
+  const marginFactor = planningMarginFactor(
+    sessions, sets, exercises,
+    (name, equipment) => resolveTransitionSec(name, equipment, learned),
+  )
+
+  return { ...learned, planningMarginFactor: marginFactor }
 }
 
 // Transition seconds for one exercise, most-specific-first: its own learned median →

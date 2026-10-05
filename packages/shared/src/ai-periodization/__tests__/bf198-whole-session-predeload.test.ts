@@ -66,7 +66,7 @@ describe('BF-198 — a whole-session deload records what Full reverts to', () =>
   it('restores the session that FITS today’s budget, not the raw style', () => {
     // At 90 minutes nothing is trimmed, so the style's 3 sets and the fitted count agree and a test
     // there cannot tell them apart. A tight budget can.
-    const tight = signals({ effectiveTimeBudgetMin: 12 })
+    const tight = signals({ effectiveTimeBudgetMin: 5 })
     const full = buildRulesPrescription(tight, 'x')!.exercises.find(e => e.sessionExerciseId === 'se-1')!
     expect(full.sets).toBeLessThan(3)
     const pre = buildWholeSessionDeloadPrescription(tight, 'emergency')
