@@ -512,6 +512,62 @@ below threshold and left in place for next time.
 - **Do NOT fix this by banning the literal from prose.** Entries legitimately need to discuss
   `Gate:` and `Lane:` — the rules themselves do — and a convention nobody can enforce is how this
   arrived. Four such leaks have been written and caught by hand already.
+### [workouts][cardio] OR-210 — the chat tool re-bands ACWR itself, and program-age baselining has three rules
+
+- **Lane: A** · **Added:** 2026-10-05 · Orchestrator, splitting `PS-28` (b) and (c) off its gate.
+- **Neither item is an owner decision**; each is settled by a rule already in `CLAUDE.md`, which is
+  why they are out from behind `PS-28`'s window gate.
+- **(b) `getTrainingLoadRisk` returns a raw 56-day number with no band**, so the model bands it.
+  Against `acwr.ts`'s own *"never re-derive at the call site"* and against *clients render the
+  route's `interpretation`*. **32 of the owner's last 76 days disagree with the Health card.**
+  Return the banded `interpretation` the Health path already computes; do not add a second bander.
+- **(c) three baselining rules for one concept** — the route uses `startedAt ?? createdAt`,
+  readiness uses `startedAt` else **Infinity** (so it never baselines), and signals/chat/running
+  use none. **One Formula, One Place.** The owner's active program has `started_at = NULL`, which
+  is how July's early-deload ran on live ACWR while the card said "baselining".
+- **⛔ Do NOT change the acute window here.** That is `PS-28` (a), it is a scoring calibration, and
+  it owes a Tuning proposal. Touching it in this entry would ship a re-score behind a bug fix.
+- **What proves it fixed:** the chat tool and the Health card agree on the same day's band, and one
+  baselining helper has all three call sites.
+
+### [cardio] OR-211 — `sex:'other'` halves VO2max, and best pace has no distance floor
+
+- **Lane: A** · **Added:** 2026-10-05 · Orchestrator, splitting `PS-36` (a) and (b) off its gate.
+- **(a)** `sexCode = female?1 : male?0 : null` sends a **fully-profiled** `sex:'other'` user to the
+  Ross last-resort equation — **42.7 → 18.7 for identical inputs**. The fallback's own comment says
+  it is for *missing* terms, so this is the code disagreeing with its stated intent rather than a
+  modelling choice. **The owner is unaffected and that is not a reason to leave it**: it is wrong
+  for any third user, and silently.
+- **(b)** best pace is `min(avgPaceSecPerKm)` with **no distance floor**, so a 30 m GPS false-start
+  becomes the all-time best — reproduced on a live fixture. **The pattern to copy is in the same
+  file**: the 1k/5k bests are already windowed.
+- **⛔ Do NOT touch the Z3 mapping.** That is `PS-36` (c), where two files and a filed Tuning band
+  hold three readings of WHO 2020; reconciling them is Tuning's and the owner signs it off.
+- **What proves it fixed:** an `other`-sex profile with full terms gets the same equation as a
+  male/female one, and a sub-floor GPS fragment cannot become a best pace.
+
+
+### [workouts][platform] OR-209 — store the raw model prescription beside the reconciled one, so RV-65 becomes answerable
+
+- **Lane: A** · **Added:** 2026-10-05 · Orchestrator, splitting the diagnostic out of `RV-65`.
+- **Why this exists:** `RV-65` asks whether the model still earns its call in the prescription. That
+  cannot be answered today and **cannot be answered retrospectively** — measured 2026-10-05, the
+  stored prescription carries no raw-model field, and `session_periodization` keeps one row per
+  session, overwritten each time. **No query will ever produce this.** Only instrumentation will.
+- **What to store:** the raw parsed model object alongside the final reconciled one — or, if that is
+  too heavy, the **per-exercise delta** between the model's chosen pct and what the deterministic
+  chain produced. The delta is the thing the decision turns on; the full object is just the easiest
+  way to keep every later question open.
+- **It is additive and needs no owner decision** — a new column or JSON key, no behaviour change, no
+  data dropped. That is the whole reason it is split from `RV-65`.
+- **⏳ Expect WEEKS, not days.** Production ran **10 prescriptions in 5 weeks** (~2/week, 50 exercise
+  rows). A fortnight of collection is a handful of sessions, so say so when reporting rather than
+  drawing a conclusion from four.
+- **What it unblocks:** `RV-65`'s removal decision, which stays the owner's. Two answers point at
+  different work — *the model moves nothing, seed at the zone midpoint* versus *the model carries
+  real signal in compound pct* — and the diagnostic is what separates them.
+- **Do NOT remove the model, change the prompt, or touch the autoregulation chain here.** This entry
+  only adds a record. `RV-65` holds the rest.
 
 
 ### [platform] OR-207 — six PRs were stranded when every session stopped, and four have gone un-mergeable
@@ -4911,19 +4967,6 @@ which is the right shape for something that can only be validated by living with
   would catch the genuine four, but `chronic_stress_*` (gated on 21 complete nights),
   `recovery_index_hours` and the training-load pair are all legitimately written-but-empty — so it
   needs a reasoned allowlist rather than a bare scan, and is its own piece of work.
-
-### [readiness][platform] LA-159 — `program_phases.program_id` is dead and made a diagnostic query read as a clean zero
-- **Lane: A** · **Branch:** _unassigned_ · **Added:** 2026-09-27 · split out of LA-138 on closing it.
-- **What:** `program_phases.program_id` is populated on **0 of 46 rows** — phases moved under
-  `phase_set_id` and the column stayed. Dropping it is a migration.
-- **Why it is worth an entry rather than a shrug:** joining on it returns nothing, with no error
-  and no warning, and that is exactly how LA-138's first filing came to claim *"`program_phases`
-  holds 0 rows for all five programs"* when it holds 46. A dead column that silently answers
-  "none" is a trap for the next person writing a diagnostic query, not just dead weight.
-- **Shape:** one migration (`DROP COLUMN program_id`) plus the regenerated `claude_ro` twin, and
-  a check that nothing reads it first. **Ships alone, and it is data-dropping, so
-  confirm-before-merge** — see LA-142 (#1749) for the shape, including that the `claude_ro` view
-  must be dropped in the same file before the column can go.
 
 ### [readiness][devices][heart-rate] TN-79 — Q-270's route is NOT silent: it persists `insufficient_met` on 21 days while the MET data it needs is present
 
@@ -9347,8 +9390,27 @@ drift.
 
 - **Lane:** A — `packages/shared/src/ai-periodization/generate-prescription.ts`,
   `prompt.ts:124`. **Added:** 2026-09-20 · Review sweep 51.
-- **Gate: owner** — removing the model from the prescription changes what the app recommends, which
-  is the owner's call, not an implementer's.
+- **Gate: owner** — for the REMOVAL only. **Narrowed 2026-10-05 (Orchestrator).**
+- **Needs:** OR-209
+- **⚑ THE GATE WAS ON THE WRONG THING, and it was parking work nobody needed him for.** This entry
+  says in its own words *"DO NOT remove the model first — ship the measurement first"* — and then
+  gated the whole entry on the removal, so **the measurement, which is ours and needs no owner,
+  sat parked behind a decision that cannot be taken until it exists.** The diagnostic is split out
+  as `OR-209`, buildable now. What stays gated here is the removal itself, which is genuinely his
+  because it changes what the app recommends.
+- **🔬 MEASURED 2026-10-05 — the retrospective version of this measurement IS NOT POSSIBLE, so do
+  not try it.** `claude_ro.session_periodization` holds **15 rows, 10 with a prescription**, spanning
+  2026-08-30 → 2026-10-03, and its stored keys are `confidence · confidenceReasons · deload ·
+  droppedExerciseIds · durationPreset · estimatedSessionDurationMin · exercises · phase ·
+  phaseAction · reasoning · reevaluatedInputsKey · refitBaseline · weeklyVolumeContribution` —
+  **no raw-model field among them.** The table also keeps **one row per program session, overwritten
+  each time**, so there is no history to join against even where a field existed. The entry's
+  *"Not established"* line is therefore not an oversight anyone can close with a query; it needs the
+  instrumentation first.
+- **A number worth carrying into the decision: call volume is ~10 prescriptions in 5 weeks**, about
+  **2 a week**, across **50 exercise rows**. That cuts both ways and the brief should say so — it
+  makes the model cheap to keep, and it means the diagnostic needs **weeks, not days**, to collect a
+  sample worth deciding on.
 - **The prompt says so itself** (`prompt.ts:124`): *"Pick a neutral pct inside the phase zone for
   each exercise. do NOT pre-emptively lower pct for fatigue, RPE, soreness or recovery signals — **a
   deterministic autoregulation layer applies those cuts after you**, and lowering it yourself
@@ -9626,6 +9688,17 @@ drift.
   `readCacheSync`) and a sheet ignoring it is a separate finding, not a reason to keep 500 ms.
 
 ### [readiness][platform] TN-56 — one admin-gated replay endpoint is the only thing standing between Tuning and 25 unmeasurable thresholds
+
+- **✔ BUILT 2026-09-28 (Lane A), PR #1902, HELD for the owner (LA-173 ⑤) because it shares
+  db-query's auth.** `POST /api/admin/replay` and the registry in `lib/tuning/replay/registry.ts`.
+  The first function is `nightly-temperature` (`RANGE_THRESHOLD`, `MIN_WINDOWS`). On the owner's
+  real data the defaults reproduce production on 15 of 17 comparable nights. The two that miss
+  are nights `sleep_sessions` stores as a daytime nap.
+- **Keep: register the rest, one at a time.** Each needs its constant made overridable where it lives
+  (an options argument defaulting to the shipped value), then an entry. Still to add:
+  `MET_ACTIVE_THRESHOLD` (`metActiveWindows` already takes it), `APNEA_THRESHOLD` (sleepnet
+  inference), `NIGHT_BAND_*` (`sleep-night.ts`), `CONSISTENCY_*` (`meal-timing.ts`),
+  `LOW_CONFIDENCE_THRESHOLD`, and the 19 sleep-staging constants. Tuning says which comes first.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-21 · extracted from TN-52, where it sat as a
   paragraph inside a `Reference:` entry and therefore printed under *read, do not build*.
@@ -15715,7 +15788,24 @@ steps are in range; (b) and the rest latent.
 
 - **Lane:** A — `packages/shared/src/ai-periodization/acwr.ts`, `lib/ai-chat/tools.ts`,
   `lib/health/readiness-payload.ts`.
-- **Gate:** owner — the window choice.
+- **Gate:** owner — **item (a) ONLY**, the acute-window choice. Narrowed 2026-10-05 (Orchestrator).
+- **Needs:** OR-210
+- **⚑ THE GATE COVERED ONE ITEM AND PARKED THREE.** (b) and (c) are not preferences — each is
+  settled by a standing rule, so they were waiting on an answer that was never theirs to need.
+  **Split to `OR-210`, buildable now.**
+  - **(b)** the chat tool returns a raw 56-day number with **no band**, so the model bands it
+    itself — against `acwr.ts`'s own *"never re-derive at the call site"* and against `CLAUDE.md`'s
+    *clients render the route's `interpretation`, never re-band raw numbers themselves*. **32 of
+    the owner's last 76 days disagree with the Health card**, which is the defect, not a view.
+  - **(c)** three different program-age baselining rules for one concept is **One Formula, One
+    Place**. The owner's active program has `started_at = NULL`, so July's early-deload consumed
+    live ACWR while the card read "baselining".
+- **(a) is a SCORING CALIBRATION and owes a Tuning proposal before anyone builds it.** It is not a
+  yes/no: the code counts 8 inclusive days against a 28/4 chronic while the copy says "last 7
+  days", so constant load reads **1.10** trained-today and **1.20** for an every-third-day lifter —
+  landing exactly on `EARLY_DELOAD_ACWR_MIN`. **The proposal must state how many stored days the
+  change moves**, per the rule that a tuning fitted to one case silently re-scores history.
+  **The code/copy disagreement is a defect either way** and does not wait on the window choice.
 - **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §P3/P4.
 
 (a) `acwr.ts:18` counts `t >= todayMid − 7d` — 8 inclusive days against a 28/4 chronic — so constant
@@ -15994,7 +16084,20 @@ read**, so a moved device shows the old location for 30 minutes. Key it by round
 - **Lane:** A — `packages/shared/src/health/fitness-tests.ts:40`,
   `packages/shared/src/health/cardio-trends.ts:89`, `packages/shared/src/health/zone-minutes.ts` vs
   `packages/shared/src/running/zone-targets.ts`.
-- **Gate:** owner — the Z3 mapping.
+- **Gate:** owner — **item (c) ONLY**, the Z3 mapping. Narrowed 2026-10-05 (Orchestrator).
+- **Needs:** OR-211
+- **⚑ SAME SHAPE AS `PS-28`: the gate named one item and parked three.** (a) and (b) are
+  straightforward correctness and were never his. **Split to `OR-211`, buildable now.**
+  - **(a)** a fully-profiled `sex:'other'` user falls to the Ross last-resort equation —
+    **42.7 → 18.7 on identical inputs**. The comment says that fallback is for *missing* terms, so
+    the code contradicts its own stated intent. The owner is unaffected; any third user is not.
+  - **(b)** "best pace" is `min(avgPaceSecPerKm)` with **no distance floor**, so a 30 m GPS
+    false-start becomes the all-time best — reproduced on a live fixture. **The fix already exists
+    in the file**: the 1k/5k bests are windowed correctly and are the pattern to copy.
+- **(c) is the owner's and owes a Tuning proposal first.** `zone-minutes` doubles Z3 as
+  WHO-vigorous, `zone-targets` counts it once, **both cite WHO 2020**, and the filed Tuning band is
+  a **third** position naming neither file. Three readings of one guideline is not a preference to
+  pick from — Tuning reconciles them, states which days move, and the owner signs off.
 - **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §P3.
 
 (a) `sexCode = female?1 : male?0 : null` sends a fully-profiled `sex:'other'` user to the Ross
