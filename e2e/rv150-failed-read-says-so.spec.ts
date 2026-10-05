@@ -86,3 +86,40 @@ test('a healthy cold Home shows the card, not the line', async ({ page }) => {
   await expect(page.getByText(/Couldn.t load today.s timeline/)).toHaveCount(0, { timeout: 30_000 })
   await expect(page.getByText(/Couldn.t load your body battery/)).toHaveCount(0)
 })
+
+test('Health never claims "No data" for a read that failed', async ({ page }) => {
+  // LB-176. Cold at 412 px with every GET down, this screen printed BURNED / BMI / BALANCE / DIST /
+  // RESTING HR / HRV / SPO₂ all as "No data" — seven statements about his account made from seven
+  // failed requests. Asserted as a COUNT of the literal rather than per cell: the defect is the
+  // sentence appearing at all under these conditions, and a count cannot be satisfied by fixing one
+  // tile and leaving its neighbour.
+  await openCold(page, '/health')
+  await expect(page.getByText(/Couldn.t load/).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('No data', { exact: true }),
+    'a cell claimed the account has no data when the request had failed').toHaveCount(0)
+})
+
+test('Health does not tell him to re-enter profile details he already set', async ({ page }) => {
+  // The worst one in the entry. `energyBalance` is null while loading, on a failed read, AND for an
+  // account with nothing stored, and all three rendered EnergyBudgetPrompt — so a request that did
+  // not land told him to add a height, age and sex he set months ago. A genuinely incomplete profile
+  // never reaches that prompt: the service always returns `missingProfileFields`, and a non-empty one
+  // routes to CalorieBalanceBar, which names the fields actually missing.
+  await openCold(page, '/health')
+  await expect(page.getByText(/Couldn.t load/).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/Add your height, age and sex in Profile/),
+    'a failed read asked him to redo his profile').toHaveCount(0)
+  await expect(page.getByText(/Log body weight to see trend/),
+    'a failed read asked him to log a weight he has already logged').toHaveCount(0)
+})
+
+test('a healthy cold Health shows the real account, not the failure lines', async ({ page }) => {
+  // The other half, and the entry asked for it by name: without this, a component that ALWAYS
+  // rendered "Couldn't load" would pass both tests above. "No data" is deliberately not asserted
+  // here — on a sparse account it is the correct thing for a cell to say.
+  await coldStart(page)
+  await page.goto('/health')
+  await expect(page.getByText(/Couldn.t load your energy budget/)).toHaveCount(0, { timeout: 30_000 })
+  await expect(page.getByText(/Couldn.t load your training load/)).toHaveCount(0)
+  await expect(page.getByText(/Couldn.t load your goals/)).toHaveCount(0)
+})

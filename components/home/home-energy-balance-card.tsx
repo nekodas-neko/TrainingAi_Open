@@ -17,7 +17,7 @@ export function HomeEnergyBalanceCard() {
     return (
       <div className="p-4">
         <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">Energy Balance</p>
-        <div className="h-10 rounded-lg bg-muted/50 animate-pulse" aria-label="Loading energy balance" aria-busy="true" />
+        <div className="h-10 rounded-lg bg-muted/50 animate-pulse" aria-label="Loading energy balance summary" aria-busy="true" />
       </div>
     )
   }

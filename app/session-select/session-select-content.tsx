@@ -40,7 +40,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { cachedFetch, readCacheSync, setCached, cachedFetchToday, readTodayCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { useInvalidationRefetch } from "@/lib/hooks/use-invalidation-refetch";
-import { invalidateWorkoutSummaries, invalidateReadinessInputs, invalidateOuraSync, invalidateWorkoutMetaRefresh, invalidatePrescriptionChanged } from "@/lib/cache-groups";
+import { invalidateWorkoutSummaries, invalidateReadinessInputs, invalidateOuraSync, invalidateWorkoutMetaRefresh, invalidatePrescriptionChanged, invalidateUserProfile } from "@/lib/cache-groups";
 import { mergeCalendarOverlay, readLocalCalendarOverlay } from "@/lib/calendar/local-overlay";
 import { syncOuraRing } from "@/lib/oura-ble/sync";
 import { getLocalStore } from "@/lib/local-store";
@@ -49,21 +49,14 @@ import { PullToSync } from "@/components/pull-to-sync";
 import { BODY_BATTERY_TTL, TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, NEXT_SESSION_TTL, MOOD_TTL } from '@trainingai/shared/cache-ttl';
 import { GoalRecommendationSheet, type GoalRecommendationData } from '@/components/profile/goal-recommendation-sheet'
 import type { User } from '@trainingai/shared/types'
-import { EarlyDeloadCard } from "@/components/home/early-deload-card";
-import { GoalsCheckinCard } from "@/components/home/goals-checkin-card";
-import { WeeklyRecapBanner } from "@/components/weekly-recap-banner";
-import { DismissibleBanner } from "@/components/ui/dismissible-banner";
 import { HomeCardWidget } from "@/components/home/home-card-widget";
 import type { CardSectionKey } from "@/components/home/home-card-widget";
 import { OuraScoreChipRow } from "@/components/oura-score-chip-row";
 import { IllnessAdvisoryBanner } from "@/components/home/illness-advisory-banner";
+import { HomeBannerStack } from "@/components/home/home-banner-stack";
 import { BodyBatteryCard } from "@/components/body-battery-card";
 import { HomeDayTimeline } from "@/components/home-day-timeline";
 import { initialsOf } from '@/lib/initials';
-const ExerciseDetectedCard = dynamic(
-  () => import("@/components/activity/exercise-detected-card").then(m => ({ default: m.ExerciseDetectedCard })),
-  { ssr: false },
-);
 const ExerciseReviewSheet = dynamic(
   () => import("@/components/activity/exercise-review-sheet").then(m => ({ default: m.ExerciseReviewSheet })),
   { ssr: false },
@@ -924,6 +917,10 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     setGoalsCheckinDismissed(true);
     setGoalsProfile(prev => prev ? { ...prev, lastGoalReviewAt: new Date().toISOString() } : prev);
     await fetch('/api/nutrition-goals/touch-review', { method: 'POST' }).catch(() => {});
+    // RV-183. This writes `users.lastGoalReviewAt`, which is part of `/api/user/profile`'s payload
+    // and is read RIGHT HERE to decide whether to re-prompt. The optimistic line above only covers
+    // this mount; without the eviction the next one re-reads the pre-write date.
+    await invalidateUserProfile().catch(() => {});
   }, []);
 
   function handleGoalsUserSaved(updated: User) {
@@ -1133,7 +1130,9 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
           </p>
         )}
 
-        {/* ── Illness advisory (elevated/fever only — self-hides otherwise) ── */}
+        {/* ── Illness advisory — TWO tiers, and it self-hides otherwise (TN-45). `watch` is a quiet
+            line right under the chips (the owner's choice: no penalty, no instruction, so no card);
+            `elevated`/`fever` are the bordered advisory. ── */}
         {readiness && <IllnessAdvisoryBanner readiness={readiness} />}
 
         {/* ── Body Battery ── */}
@@ -1149,42 +1148,23 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
             </div>
           )}
 
-        {/* ── Auto-detected walk/run review prompt (hides itself when none pending) ── */}
-        <div className="mx-4">
-          <ExerciseDetectedCard onReview={handleExerciseDetectedReview} />
-        </div>
-
-        {readiness?.earlyDeloadRecommended && !earlyDeloadDismissed && (
-          <div className="mx-4 mb-3">
-            <EarlyDeloadCard
-              onConfirm={handleEarlyDeloadConfirm}
-              onDismiss={handleEarlyDeloadDismiss}
-              reason={readiness.earlyDeload}
-            />
-          </div>
-        )}
-
-        {showGoalsCheckin && (
-          <div className="mx-4 mb-3">
-            <GoalsCheckinCard onReviewNow={handleGoalsReviewNow} onRemindLater={handleGoalsRemindLater} />
-          </div>
-        )}
-
-        {!dayReviewDismissed && (
-          <DismissibleBanner
-            title="Your day in review is ready"
-            // Q-112a — one door. This opened a second, thinner review only Home had; the real one
-            // lives on Nutrition, with the meal types, logs and targets it needs.
-            onActivate={() => navigateToTab(router, "/nutrition?review=day")}
-            onDismiss={() => {
-              localStorage.setItem(`ta_day_review_dismissed_${todayInTz(tz)}`, '1');
-              setDayReviewDismissed(true);
-            }}
-          />
-        )}
-
-        {/* ── Weekly recap notification (self-hides once dismissed or generated) ── */}
-        <WeeklyRecapBanner />
+        {/* ── RV-119: early deload full-width, the other four behind one strip ── */}
+        <HomeBannerStack
+          readiness={readiness}
+          earlyDeloadDismissed={earlyDeloadDismissed}
+          onEarlyDeloadConfirm={handleEarlyDeloadConfirm}
+          onEarlyDeloadDismiss={handleEarlyDeloadDismiss}
+          onExerciseDetectedReview={handleExerciseDetectedReview}
+          showGoalsCheckin={showGoalsCheckin}
+          onGoalsReviewNow={handleGoalsReviewNow}
+          onGoalsRemindLater={handleGoalsRemindLater}
+          dayReviewDismissed={dayReviewDismissed}
+          onDayReviewActivate={() => navigateToTab(router, "/nutrition?review=day")}
+          onDayReviewDismiss={() => {
+            localStorage.setItem(`ta_day_review_dismissed_${todayInTz(tz)}`, '1');
+            setDayReviewDismissed(true);
+          }}
+        />
 
         {/* ── Sections ── */}
         {!showHomeSkeleton && <div className="content-fade-in">
@@ -1196,6 +1176,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
               // rendered nothing until someone remembered to add its line.
               if (key.startsWith("card_")) return (
                 <HomeCardWidget
+                  userId={userId}
                   sectionKey={key as CardSectionKey}
                   sectionEditMode={sectionEditMode}
                   activeCardWidgets={activeCardWidgets}

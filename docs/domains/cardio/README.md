@@ -18,6 +18,12 @@ prescription coach, the cardio hub/trends/picker surfaces, and guided walk.
 | Fitness & load | `packages/shared/src/health/vo2max.ts`, `vdot.ts`, `training-stress.ts`, `cardio-trends.ts`, `session-picker.ts`, `fitness-tests.ts`, `packages/shared/src/fitness-tests/` |
 | UI | `app/cardio/`, `app/running/`, `app/baselines/`, `components/cardio/`, `components/running/`, `components/guided-walk/`, `components/cadence/` |
 
+**A walk can satisfy the day's prescribed run** (RV-166, v1.482.0) — the *Today's cardio* card
+(`components/cardio/todays-cardio-card.tsx`) states the criterion in zone terms and offers both routes;
+`lib/activity/link-prescribed-run.ts` is the one writer of the completion and **always** carries
+`completedAs`, because the planner reads a null as a run (LB-179). Device pass still owed —
+[`docs/overview/known-issues.md`](../../overview/known-issues.md).
+
 **ACWR has exactly one implementation** (`computeVolumeAcwr`) and clients render the route's
 `interpretation` rather than re-banding numbers — see [`docs/module-map.md`](../../module-map.md) §6.
 

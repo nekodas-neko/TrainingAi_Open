@@ -15,6 +15,8 @@
 
 import { eq, and, asc, desc, inArray, isNull, sql } from 'drizzle-orm'
 import { UserFacingError } from '@trainingai/shared/errors'
+import { planMealTypeId } from '@trainingai/shared/nutrition/meal-type-for-time'
+import { listMealTypes } from './nutrition'
 import type { getDb } from '../client'
 import * as s from '../schema'
 import type {
@@ -230,6 +232,7 @@ export async function getActiveMealPlan(db: Db, userId: string): Promise<MealPla
 // ── Writes ─────────────────────────────────────────────────────────────────────
 
 export async function createMealPlan(db: Db, userId: string, input: CreateMealPlanInput): Promise<MealPlan> {
+  const mealTypes = await listMealTypes(db, userId)
   const planId = await db.transaction(async tx => {
     // RV-42. Inside the transaction and before the first insert, so a refusal writes nothing.
     await assertOwnedMealRefs(tx, userId, input.variants.flatMap(v => v.meals))
@@ -270,7 +273,8 @@ export async function createMealPlan(db: Db, userId: string, input: CreateMealPl
       if (v.meals.length > 0) {
         await tx.insert(s.mealPlanMeals).values(v.meals.map(m => ({
           variantId: variant.id,
-          mealTypeId: m.mealTypeId ?? null,
+          // LA-172: tag → derived from suggested time → none.
+          mealTypeId: planMealTypeId(m, mealTypes),
           savedMealId: m.savedMealId ?? null,
           position: m.position,
           name: m.name,
@@ -401,6 +405,16 @@ export async function updateMealPlanMeal(
   if (input.savedMealId !== undefined) set.savedMealId = input.savedMealId
   if (input.ingredients !== undefined) set.ingredients = input.ingredients
   if (input.suggestedTime !== undefined) set.suggestedTime = input.suggestedTime
+  // LA-172: a new time gives an UNTYPED meal a derived type. A meal that already has one keeps it,
+  // because the stored value may be the owner's own tag and a tag wins over the time.
+  if (input.suggestedTime && input.mealTypeId === undefined) {
+    const [cur] = await db.select({ mealTypeId: s.mealPlanMeals.mealTypeId })
+      .from(s.mealPlanMeals).where(eq(s.mealPlanMeals.id, mealId)).limit(1)
+    if (cur && cur.mealTypeId == null) {
+      const derived = planMealTypeId({ suggestedTime: input.suggestedTime }, await listMealTypes(db, userId))
+      if (derived) set.mealTypeId = derived
+    }
+  }
   if (Object.keys(set).length === 0) {
     const [row] = await db.select().from(s.mealPlanMeals).where(eq(s.mealPlanMeals.id, mealId)).limit(1)
     return row ? rowToMeal(row) : null
@@ -438,6 +452,7 @@ export async function replaceMealPlanStructure(
 ): Promise<MealPlan | null> {
   const owned = await ownedPlan(db, id, userId)
   if (!owned) return null
+  const mealTypes = await listMealTypes(db, userId)
 
   await db.transaction(async tx => {
     // RV-42. Before the delete below, so a refused request does not destroy the existing structure.
@@ -469,7 +484,8 @@ export async function replaceMealPlanStructure(
       if (v.meals.length > 0) {
         await tx.insert(s.mealPlanMeals).values(v.meals.map(m => ({
           variantId: variant.id,
-          mealTypeId: m.mealTypeId ?? null,
+          // LA-172: tag → derived from suggested time → none.
+          mealTypeId: planMealTypeId(m, mealTypes),
           savedMealId: m.savedMealId ?? null,
           position: m.position,
           name: m.name,
@@ -558,17 +574,31 @@ export async function replaceUserDietaryRestrictions(
 
 // ── Plan meal answers (Q-187 phase 2) ────────────────────────────────────────
 //
-// Only declines are stored; see the schema comment. The one function both the web route and the
-// outbox's `pushMutations` branch call, so the two write paths cannot drift — the failure mode the
-// sync rules exist to prevent, where web works and the APK mutation strands silently.
+// Declines, and since BF-203a estimates. Never a 'yes'; see the schema comment. The one function both
+// the web route and the outbox's `pushMutations` branch call, so the two write paths cannot drift —
+// the failure mode the sync rules exist to prevent, where web works and the APK mutation strands.
+
+export type PlanMealAnswerValue = 'no' | 'estimated'
 
 export interface PlanMealAnswer {
   id: string
   planMealId: string
   logDate: string
-  answer: 'no'
+  answer: PlanMealAnswerValue
   answeredAt: string
+  /** BF-203a. Set only on an `estimated` answer: the macros the app assumed for the slot. */
+  estCalories: number | null
+  estProteinG: number | null
+  estCarbsG: number | null
+  estFatG: number | null
+  estBiasKcal: number | null
+  estBasis: string | null
 }
+
+/** BF-203a. Clearing these is what turns an estimate into a decline; a decline carries none. */
+const NO_ESTIMATE = {
+  estCalories: null, estProteinG: null, estCarbsG: null, estFatG: null, estBiasKcal: null, estBasis: null,
+} as const
 
 /**
  * Record "I did not eat this planned meal today".
@@ -593,8 +623,11 @@ export async function savePlanMealAnswer(
   // one out, so the duplicate is invisible from the app and only shows up as row growth. Updating
   // first, unconditionally, collapses both cases — live row or tombstone — into one revive.
   const now = sql`now()`
+  // BF-203a: the row it revives may be an ESTIMATE. A decline outranks the app's assumption, so the
+  // revive writes `answer = 'no'` and clears the estimate's macros. Setting only `deletedAt` would
+  // leave an estimate the user just declined still counting in the day.
   const [revived] = await db.update(s.planMealAnswers)
-    .set({ deletedAt: null, answeredAt: now, updatedAt: now })
+    .set({ answer: 'no', ...NO_ESTIMATE, deletedAt: null, answeredAt: now, updatedAt: now })
     .where(and(
       eq(s.planMealAnswers.userId, userId),
       eq(s.planMealAnswers.logDate, input.logDate),
@@ -613,11 +646,70 @@ export async function savePlanMealAnswer(
     .onConflictDoUpdate({
       target: [s.planMealAnswers.userId, s.planMealAnswers.logDate, s.planMealAnswers.planMealId],
       targetWhere: isNull(s.planMealAnswers.deletedAt),
-      set: { deletedAt: null, answeredAt: now, updatedAt: now },
+      set: { answer: 'no', ...NO_ESTIMATE, deletedAt: null, answeredAt: now, updatedAt: now },
       setWhere: eq(s.planMealAnswers.userId, userId),
     })
     .returning()
   return row ? rowToAnswer(row) : null
+}
+
+export interface EstimateToStore {
+  /** The device's row id, so the server row and the device row are one row (BF-203a Task 8′). */
+  id?: string
+  planMealId: string
+  calories: number
+  proteinG: number
+  carbsG: number
+  fatG: number
+  biasKcal: number
+}
+
+/**
+ * BF-203a. Record the estimates for one local day, and return how many were new.
+ *
+ * Idempotent on the live-row unique index `(user_id, log_date, plan_meal_id)`, and it never touches a
+ * row that exists: a decline outranks the app's assumption that the meal was eaten, and an estimate
+ * already written is not re-derived against a model that has since moved. A decline that was UNDONE
+ * is a tombstone, which the partial index does not see, so a slot the user un-declined can be
+ * estimated. That is the undo meaning what it says.
+ *
+ * `planMealId`s come from the server's own read of the user's active plan, never from a client, so
+ * there is no ownership join here; the caller (the materialiser) is the only one.
+ */
+export async function upsertEstimatedAnswers(
+  db: Db, userId: string, logDate: string, estimates: readonly EstimateToStore[], basis: string,
+): Promise<number> {
+  if (estimates.length === 0) return 0
+  const rows = await db.insert(s.planMealAnswers)
+    .values(estimates.map(e => ({
+      ...(e.id ? { id: e.id } : {}),
+      userId, planMealId: e.planMealId, logDate, answer: 'estimated',
+      estCalories: e.calories, estProteinG: e.proteinG, estCarbsG: e.carbsG, estFatG: e.fatG,
+      estBiasKcal: e.biasKcal, estBasis: basis,
+    })))
+    .onConflictDoNothing({
+      target: [s.planMealAnswers.userId, s.planMealAnswers.logDate, s.planMealAnswers.planMealId],
+      where: isNull(s.planMealAnswers.deletedAt),
+    })
+    .returning({ id: s.planMealAnswers.id })
+  return rows.length
+}
+
+/**
+ * BF-203a Task 8′. One estimate pushed by a device. The plan-meal id comes from a CLIENT here, so it
+ * gets the same two-level ownership join `savePlanMealAnswer` uses; null when the meal is not the
+ * caller's. An existing live answer, a decline above all, is left alone, which also makes a replayed
+ * mutation a no-op.
+ */
+export async function saveClientEstimate(
+  db: Db, userId: string, logDate: string, e: EstimateToStore,
+): Promise<{ stored: boolean } | null> {
+  const [meal] = await db.select({ variantId: s.mealPlanMeals.variantId })
+    .from(s.mealPlanMeals).where(eq(s.mealPlanMeals.id, e.planMealId)).limit(1)
+  if (!meal) return null
+  if (!(await ownedVariantPlanId(db, meal.variantId, userId))) return null
+  const n = await upsertEstimatedAnswers(db, userId, logDate, [e], 'planA')
+  return { stored: n > 0 }
 }
 
 /** Undo a decline. Soft, so the reversal reaches a device that has not synced. */
@@ -653,8 +745,10 @@ function rowToAnswer(r: typeof s.planMealAnswers.$inferSelect): PlanMealAnswer {
     id: r.id,
     planMealId: r.planMealId,
     logDate: r.logDate,
-    answer: 'no',
+    answer: r.answer === 'estimated' ? 'estimated' : 'no',
     answeredAt: r.answeredAt.toISOString(),
+    estCalories: r.estCalories, estProteinG: r.estProteinG, estCarbsG: r.estCarbsG,
+    estFatG: r.estFatG, estBiasKcal: r.estBiasKcal, estBasis: r.estBasis,
   }
 }
 

@@ -3,138 +3,116 @@
 > **Successor sessions are titled `🚧 Implementation Agent (A) 🟢`** — exactly, emoji included. A
 > renamed successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-09-26 · **Next ID:** `LA-153`
+**Updated:** 2026-09-27 · **Next ID:** `LA-162`
 (`grep -rhoE '\bLA-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line.
 `LA-54` was allocated and withdrawn, so it is used rather than free.)
-**Migrations:** directory head **285**, next free **286** — claim against open PRs too. Local
-SQLite **v40**.
 
-## ⛔ Two things this baton got wrong, which is the warning
+**Schema numbers are no longer written down anywhere — run the command** (BF-211, shipped #1777):
 
-**PR #1098 merged on 2026-09-20.** This file and the 4-hourly Routine both carried it for six days
-as "the live owner-gated PR, keep rebased, never merge". Nobody was rebasing a merged branch, but
-the instruction was false and would have wasted the next session's first ten minutes. **Never carry
-a PR number as standing state — re-derive open PRs from the API.** The Routine's copy was rewritten
-2026-09-26 to identify owner-gated PRs from the PR itself rather than a list.
+```
+node scripts/next-schema-number.js
+```
 
-**That Routine also asserted READY had been "entirely exclusions" since 2026-09-12.** On 2026-09-26
-READY held **74** and four items shipped in one afternoon. A cached queue verdict is worse than
-none. Also corrected.
+It fetches, reads every ref, and reports the next free Postgres migration number, the next free
+local SQLite version, and **which numbers an unmerged branch is holding**, named by branch and file.
+`ls … | tail -1` cannot see a reservation. On 2026-09-27: migration **290**, SQLite **v44**, with
+286/287 held by #1749, 288/289 by #1608, and v42 by #1749.
 
-## Required checks — measured 2026-09-26, and this contradicts the old baton
+## Where things stand — read `docs/handoffs/handoff-2026-09-27-platform-lane-a-security-cluster.md`
+
+**Five of Lane A's own PRs are open and owner-gated. Do not merge any of them.** Keep them rebased
+and report, nothing more. Re-derive the list from the API rather than trusting these numbers —
+the last baton carried a merged PR as live for six days.
+
+| PR | entry | state |
+|---|---|---|
+| #1779 | RV-192 — an invite is not proof of the inbox | CI green |
+| #1781 | RV-193 — the Google refresh token was browser-readable | CI green |
+| #1784 | RV-195 ② — a deleted account stayed signed in | CI running when handed over |
+| #1789 | RV-197 — `connect-src` allowed a WebSocket anywhere | CI running when handed over |
+
+Plus, from earlier sessions: #1749 (LA-142, a `DROP COLUMN`), #1755 (OR-159 + RV-196, needs an APK),
+#1672, #1671, #1499.
+
+**Everything at the head of Lane A's READY list is that security cluster** — in one of those PRs, or
+recorded as not-buildable-as-written. **The first genuinely new, non-gated item is `LA-138`.**
+
+## Security items are BUILT, not skipped
+
+`CLAUDE.md` requires confirmation before **merging** an auth/session/security change, not before
+building one. Reading it the other way left the head of the queue inert for days (recorded on
+#1755). Build it, verify it, open the PR, say plainly that it needs a yes, and move on.
+
+## Required checks, and how to read CI
 
 **Required: Lint · Tests (a gate over 4 shards) · Build · Custom Rules · Migration Check.**
-`merge_pull_request` refused #1721 with *"Required status check Build is in progress"*, so Build IS
-enforced now whatever an older note said.
-
-**E2E is NOT required.** #1726 merged with E2E red. Read it anyway — it is real information.
+**E2E is NOT required** — a PR merged with E2E red. Read it anyway; it is real information.
 
 **The reliable green check is attempting the merge.** It validates against branch protection and
-refuses with the reason, so it cannot merge an unready PR. The run-level `status` lags 30+ minutes
-and has read `in_progress` on runs whose jobs had all finished — read JOB-level conclusions from
-`list_workflow_jobs`, never the run's status.
+refuses with the reason. The run-level `status` lags 30+ minutes and has read `in_progress` on runs
+whose jobs had all finished — read **job-level** conclusions. The cheapest read is
+`get_job_logs` with `run_id` + `failed_only: true`: it answers `failed_jobs: 0` in one line, where
+`list_workflow_jobs` returns every step of every job.
 
-**`main` merged eight times in three hours on 2026-09-26.** Re-merge immediately before opening a
-PR *and* again before merging. `total_count: 0` minutes after opening is a stale base, never slow CI.
+`main` merges every 10–20 minutes. Re-merge `origin/main` immediately before opening a PR **and**
+again before merging. `total_count: 0` minutes after opening is a stale base, never slow CI.
 
-## The pattern that decided every item this session
+## The local gate, in order — the middle step is the one that gets missed
 
-**Four consecutive entries had sound measurements and wrong conclusions.** Each correction came
-from re-verifying against current code, not from re-reading the entry:
+```
+npx tsc --noEmit
+pnpm lint
+pnpm build
+node scripts/check-test-typecheck.js     # a SEPARATE Build-job step; `pnpm build` passing is not enough
+pnpm check:rules                          # quote its "Ran N of N" — 83 on 2026-09-27
+DATABASE_URL='postgresql://postgres:postgres@/trainingai_dev?host=/tmp&port=5433' \
+  npx vitest run > /tmp/suite.log 2>&1; echo "EXIT=$?" >> /tmp/suite.log
+```
+
+Never pipe the suite to `tail` — that reports tail's exit code. **Run the suites for the code that
+CONSUMES what you changed, not just the directory you edited**: that is exactly how TN-78's
+regression reached CI.
+
+## The pattern that decided nearly every item, again
+
+**Six entries this session were right in their measurement and wrong in their conclusion.** Each
+correction came from re-verifying against current code, never from re-reading the entry:
 
 | entry | its claim | what was true |
 |---|---|---|
-| TN-83 | 10.9 announcements/30 nights | counted over ROWS, not nights; the fix RAISED it to 15.7 |
-| LA-148 | 4 medians, the `0`-on-empty is the defect | 14 medians; that branch was dead, the live defect was an undocumented upper-middle tie-break biasing the HR readout |
-| RV-201 | replace an AI call | the route was also feeding the model `[object Object]` for every readiness contributor, live in production |
-| LA-151 | `acwr.ts` "feeds training-load advice" | its value is never read — Q-190 took the volume lane off it. **This lane wrote that entry the same day.** |
+| TN-78 | move `ZONE_DEFS`' Light floor to 0.4 | that map also builds run prescriptions — a recovery run's ceiling would drop 134 → 106 bpm. CI caught it. |
+| TN-78 ② | "the goal will be met most days at 40 %" | met on 3 of 32 days. The prediction was inverted; the re-size it asked for was deliberately not filed. |
+| BF-211 | the pointer row can reserve a number a branch holds | a CI check pinned it to `max(merged) + 1`. Measured: 292 against head 289 fails by name. |
+| RV-193 | "the change is one line" | deleting it takes the token from the server too, and the replacement read has a silent-death trap. |
+| RV-195 ① | `/mobile-signin` sets an httpOnly cookie | it is a **client** component. The shape that works costs an APK. |
+| RV-195 ③ | return what the requester typed | not stored, and redaction must be viewer-aware. Needs a column. |
 
-**Your own entry, written hours ago, is not exempt.** Re-verify it like anyone else's.
+## Traps that cost time this session
 
-**The corollary that keeps paying:** a cast on a row read from JSONB is an assertion nothing checks.
-`as Record<string, number | null>` on `readiness_contributors` made the wrong shape typecheck, so
-compiler, tests and review all agreed with the cast while production rendered `[object Object]`.
-**It was found by running the route on `pnpm dev` and reading the output** — the merge gate doing
-exactly its job. Where two writers put different shapes in one column, take `unknown` and narrow.
+- **`secureCookie` is the decryption salt.** Auth.js derives it from the cookie NAME, so a wrong
+  value reads every valid token as invalid — a feature dies with a plain 401 and nothing in the
+  logs. One convention, now shared by `lib/auth/session-token.ts`,
+  `app/api/auth/exchange-mobile-token` and `lib/observability/request-error.ts`.
+- **A stale remote-tracking ref lies convincingly** — one reported #1608 on migrations 284/285,
+  numbers it had been renumbered off. `next-schema-number.js` fetches for that reason.
+- **`git reset --soft HEAD~2` past a merge commit** throws the merge away. Reset to `origin/main`
+  and commit once.
+- **`pkill -f '<pattern>'` matches the shell running it** and exits 144. Kill by PID.
+- **`pnpm start` cannot boot in the cloud container** — the instrumentation hook needs S3
+  credentials (`SignatureDoesNotMatch (403)`). A local session can.
+- **Version collisions are constant** (`main` took 1.477.8 → .13 in one session). Rebuild
+  `changelog.ts` from `git show origin/main:packages/shared/src/changelog.ts` and prepend; never
+  splice a conflict hunk.
+- **Never carry a PR number as standing state** — re-derive open PRs from the API.
 
-## Shipped 2026-09-26
+## Waiting on the owner
 
-TN-83 (#1719, verdict multiplier → 1.00, owner-approved) · LA-148 (#1721, six medians → one
-`packages/shared/src/stats.ts`) · RV-201 ① (#1726, computed health insight + LA-152 contributor
-fix) · LA-151 ① (`acwr.ts`, in flight).
-
-**Filed:** LA-151 (eight median copies remain; `hrv-5min.ts` deliberately excluded — it mirrors a
-`torch.quantile` citation and is equivalent at q=0.5) · LA-152 (Reference: the two contributor
-shapes) · plus a CI-evidence amendment on BF-61.
-
-## Open, and not this lane's
-
-- **BF-61's probe spec is red on `main`** (`e2e/food-log-swipe-delete.spec.ts:220`), from #1722. It
-  failed on that PR's own run too. E2E is advisory so it merged, and it now fails on every lane's
-  PR. Its failure **inverts BF-61's conclusion** — the entry says the web path passes at every
-  delay; CI says otherwise. Recorded on BF-61; the next action there is a measurement, not a fix.
-- **Owner-gated PRs exist — find them from the API, not from here.** Security, auth/session,
-  secrets, data-dropping migrations and scoring calibration are confirm-first; merging auto-deploys
-  to Railway.
-
-## Owed to the owner
-
-- **BF-13's re-derivation run.** `POST /api/admin/rederive-baselines`, `dryRun` by default, a
-  production data write. All four `temperature-baseline` entries stay queued until it runs.
-- **LA-112's effect size** — only `level` is persisted, never `dhrv`, so the magnitude could not be
-  predicted.
-- **LA-115** needs an APK and a Health Connect permission grant.
-- **RV-201's health-insight change is user-visible**: the Health detail card now reads as a
-  structured readout rather than coaching prose. Covered by his 2026-09-25 prefer-logic decision,
-  but he has not seen it yet.
-
-**LA-91 sits inside the original do-not-take band LA-84..LA-92.** Widened three times without the
-owner asking. Do not widen it again.
-
-## ⛔ A column rename is not available in this repo
-
-Learned 2026-09-16 (LA-114). Migration Check replays every migration against a schema that already
-has everything, and each `claude_ro` view migration regenerates the FULL view set, naming every
-column. Rename one and a dozen historical migrations fail on replay; editing them is not available
-because `ensureSchema` tracks by FILENAME. **A migration is not tested until applied TWICE to the
-same database**: `CREATE DATABASE ci_replay` → `migrate.js` → `TRUNCATE schema_migrations` →
-`migrate.js --replay`.
-
-## Testing
-
-- **Run the suite with `DATABASE_URL`** (`postgresql://postgres:postgres@/trainingai_dev?host=/tmp&port=5433`).
-  Without it ~190 DB-backed files skip silently. Capture the real exit code into the log; piping to
-  `tail` reports tail's.
-- **The two `claude_ro` tests need a TCP URL** (`postgresql://postgres:postgres@localhost:5433/trainingai_dev`)
-  and skip under the full suite. Run them directly for any migration adding a table or column —
-  which also needs its regenerated twin in the SAME PR, a NEW number, diffed against the previous.
-- **Mutation-test every change with at least one deliberately equivalent control.** Three survivors
-  this session were real gaps: an absent label leaking into a readout, a silently-swallowed confirm
-  error, and a calibration no behavioural test could see.
-- **A test that passes under both the old and new behaviour pins nothing.** LA-151's median test
-  used an odd-length fixture; TN-83's 33 behavioural tests passed at either multiplier. After
-  fixing, re-apply the old behaviour and confirm the new test fails.
-- **`docs/overview/entries/` has a 60-foldable-entry limit** enforced by Custom Rules, and merging
-  `main` can tip you over it through no change of your own. `node scripts/fold-journal-entries.js
-  --limit=10`, then `check-doc-links` and `check-index-doc-paths`.
-
-## A red run with ZERO failing tests is not your change
-
-- **`EnvironmentTeardownError: Closing rpc while "onUserConsoleLog" was pending`** — now retried
-  automatically in CI (`scripts/ci/vitest-retry-teardown-flake.js`).
-- **`deadlock detected` in a migration test** — ONE failing test, not zero, which tells it apart.
-
-## Gotchas
-
-- **`pkill -f <pattern>` matches the shell running it** and kills this session with exit 144. Kill
-  by PID. A killed suite also leaves fixture rows that fail the next run oddly — `git status`
-  before staging after any interrupted run.
-- **Prose in a backlog entry can be parsed as a field.** Writing "Not Lane A's to fix" inside a
-  BF-61 bullet flipped its lane and broke the batch check. Diagnose by restoring `main`'s copy of
-  the file and re-running.
-- **A dependency written as a SENTENCE is invisible to the runner.** Read the entry for a prose
-  dependency before starting; convert it to a `Needs:` field in that PR.
-- **Never `git add -A` before resolving a conflict** — it hides the conflict from `git status`.
-- **`git reset --hard` needs confirmation** per CLAUDE.md. Use `git checkout -B main origin/main`.
-- On `docs/implementation-backlog.md` a conflict is usually TWO DELETIONS — keep neither. On
-  append-only files keep both. Read the headings rather than assuming.
+1. **RV-192, product:** build email verification (a provider, a secret, a token table, a screen), or
+   **drop email-and-password registration entirely** — every current user signs in with Google, so
+   the second closes it for nothing.
+2. **RV-195 ①:** does binding the challenge to the browser defend anything, when a Chrome Custom Tab
+   shares Chrome's cookie jar?
+3. **A reply is owed to issue #1620's author (`jsboiss`)** and none was posted — commenting is
+   confirm-first.
+4. **TN-70** (`resilience_level`'s two disjoint regimes) and the bodyweight-plan question, from
+   earlier sessions.

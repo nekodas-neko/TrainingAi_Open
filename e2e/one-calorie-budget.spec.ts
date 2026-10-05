@@ -138,12 +138,13 @@ test('the Nutrition ring counts against the budget the zone bar describes', asyn
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
 
-  // BF-24 ② split this across two lines: the header reads `+N burned` and the word "movement" moved
+  // BF-24 ② split this across two lines: the header reads `+N earned` (RV-218; it said "burned", which
+  // the Day screen uses for the whole day's expenditure) and the word "movement" moved
   // down to the zone bar's detail. Both are asserted, because each carries half of what this test is
   // for — the header proves the earned figure is on screen at all, and "movement", not "cardio", is
   // the wording that matters (the figure includes strength sessions and steps, and this fixture's
   // whole contribution is a strength session — the exact case the old wording mislabelled).
-  await expect(page.getByText(`+${earned} burned`)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(`+${earned} earned`, { exact: true })).toBeVisible({ timeout: 30_000 })
   await expect(page.getByText(`${earned} earned from movement`)).toBeVisible()
 
   // The ring prints what is LEFT rather than the budget, and that remaining figure is what read

@@ -35,6 +35,7 @@ export interface Exclusion { category: ExclusionCategory; reason: string }
  *  a mismatch rather than trusting this list. Every entry is `deleted_at`; the column name stays
  *  explicit so a table that ever uses a different one needs no new shape. */
 export const SOFT_DELETED: Record<string, string> = {
+  apple_health_samples: 'deleted_at',
   activity_logs: 'deleted_at',
   body_metrics: 'deleted_at',
   day_checkins: 'deleted_at',
@@ -64,6 +65,7 @@ export const EXPORTED: Record<string, ExportScope> = {
 
   // ── Directly user-scoped ────────────────────────────────────────────────────
   activity_logs: { kind: 'user_id' },
+  apple_health_samples: { kind: 'user_id' },
   ai_health_insights: { kind: 'user_id' },
   body_battery_daily: { kind: 'user_id' },
   body_metrics: { kind: 'user_id' },
@@ -173,6 +175,7 @@ export const EXCLUDED: Record<string, Exclusion> = {
 
   // ── App-internal bookkeeping. Not the user's content, and meaningless outside this database. ─
   ai_call_log: { category: 'ops', reason: 'token/latency accounting, no user content' },
+  prescription_shadow: { category: 'ops', reason: 'BF-199 evidence: the given prescription beside what the rules prescriber would have said. Derived per model call, nothing the user wrote, and it duplicates the prescription the export already carries' },
   app_load_metrics: { category: 'ops', reason: 'page-load timing telemetry, pruned at 14 days' },
   applied_mutations: { category: 'ops', reason: 'sync idempotency ledger' },
   db_query_log: { category: 'ops', reason: 'admin SQL audit trail' },

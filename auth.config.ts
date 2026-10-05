@@ -48,7 +48,10 @@ export const authConfig: NextAuthConfig = {
     },
     session({ session, token }) {
       if (token.userId) session.user.id = token.userId
-      if (token.refreshToken) session.refreshToken = token.refreshToken
+      // The Google refresh token stays in the JWT and is deliberately NOT copied here (RV-193).
+      // This object is what `GET /api/auth/session` returns to page JavaScript, and the token is
+      // long-lived, can write to Google Calendar, and outlives sign-out. Its only consumer is the
+      // server; it reads it from the cookie via `lib/auth/session-token.ts`.
       if (typeof token.isActive === "boolean") session.isActive = token.isActive
       if (typeof token.isAdmin === "boolean") session.user.isAdmin = token.isAdmin
       if (token.timezone) session.user.timezone = token.timezone

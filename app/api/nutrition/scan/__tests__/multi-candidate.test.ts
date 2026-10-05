@@ -89,6 +89,9 @@ describe('scan returns candidates (BF-11b)', () => {
     const { candidates, sourceUrl, recipeYield, ...top } = body as Record<string, unknown>
     void sourceUrl; void recipeYield
     expect((candidates as unknown[])[0]).toEqual(top)
+    // OR-205: the route names its input, so the stored source is never inferred from confidence.
+    expect(top.origin).toBe('text')
+    for (const c of candidates as { origin?: string }[]) expect(c.origin).toBe('text')
   })
 
   it('returns each dish in order, with its own name', async () => {

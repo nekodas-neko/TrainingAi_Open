@@ -17,6 +17,8 @@ inputs — a bug in an input belongs to that input's pillar.
 | Temperature | `packages/shared/src/health/temperature-baseline.ts`, `intraday-temp.ts` |
 | Illness & baselines | `packages/shared/src/health/illness-radar.ts`, `personal-baseline.ts`, `wear-confidence.ts` |
 | Source availability | `lib/health/score-availability.ts` — which readiness inputs a user has for a day, the confidence band that follows, and `trailingBaselineZ` for building a baseline from a generic series |
+| Illness radar surface | `components/home/illness-advisory-banner.tsx` — **TWO tiers** (TN-45). `watch` is a quiet 11 px line under Home's score chips; `elevated`/`fever` get the bordered `role="status"` advisory with the band label and `readiness −N`. **The quiet tier is the owner's call:** `watch` carries no penalty and no instruction, so a card would overstate it on every firing. ⛔ **Never re-word the copy here** — `illnessAdvisory(flag, biomarkers?)` owns it, and TN-46's constraint (name what MOVED, never imply infection; the 09-16 firing was Retatrutide, not illness) would otherwise have two homes with one under test. No band label in the quiet tier: *"Watch"* beside a neutral sentence reads as an instruction |
+| Resilience surface | `components/health/resilience-tile.tsx` + `resilience-copy.ts` (LA-158). **Three states, and the gate is the DATA rather than the level:** a level from today, a level from an earlier day (named — the payload takes the most recent of a **7-day** window, so it is not always today's), and no level at all (it states what was observed instead of rendering nothing). `resilienceShortfallLine` pairs *"N of the last M days had enough daytime coverage"* with *"the model needs K of W"* and **draws no causal line between them** — the payload sees 7 days, the model gates on 14, so a shortfall here is consistent with the coverage gate having closed without establishing it. A test pins the absence of the causal words, as `readiness-payload.ts` pins the absence of a `reason` field. **⛔ Do not "fix" a shortfall by lowering the gate** — 4 hours of daytime coverage is the vendor model's own constant |
 | Body Battery UI | `components/body-battery/`, `components/body-battery-card.tsx` |
 | Body Battery inputs | `packages/shared/src/health/body-battery-inputs.ts` — `resolveBatteryHrMax` (reserve ceiling from observed daily peaks, **not** `resolveMaxHr`) and `batteryConfidence` (is the day's HR series dense enough to mean anything) |
 | Tables | `oura_daily`, `oura_daily_derived`, `body_metrics` |
@@ -251,6 +253,11 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   pass**, so a nightly incremental rollup can never satisfy it. Distinct from Q-507, which is
   *daytime* stress minutes — same word, different model. Readiness itself comes out **clean**: it is
   the reference for a good trail, storing sub-scores **plus `provisional` flags`**.)
+
+**Doses are plotted against resting HR and HRV** (TN-46, v1.483.0) — the card lives in the
+Readiness screen's `extraCards` slot and is absent unless a vial dose falls in the 60-day window.
+**The lag is the rule**: the effect was measured to peak 2–4 days after a dose, so a night counts
+as post-dose only from the day AFTER one. It annotates and never corrects; no score reads it.
 
 ## Open issues
 

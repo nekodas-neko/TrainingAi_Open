@@ -396,6 +396,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     gateAction:    r.gateAction != null ? String(r.gateAction) : 'proceed',
     status:        (r.status as LocalPrescribedRun['status']) ?? 'pending',
     activityLogId: r.activityLogId != null ? String(r.activityLogId) : null,
+    completedAs:   r.completedAs === 'run' || r.completedAs === 'walk' ? r.completedAs : null,
     updatedAt:     toIso(r.updatedAt),
     deletedAt:     r.deletedAt ? toIso(r.deletedAt) : null,
     syncStatus:    'synced' as const,
@@ -584,7 +585,8 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     illnessContext:            (r.illnessContext as LocalDayCheckin['illnessContext']) ?? null,
     perceivedRecoveryTouched:  Boolean(r.perceivedRecoveryTouched),
     sleepQualityFeelTouched:   Boolean(r.sleepQualityFeelTouched),
-    vsYesterday:       (r.vsYesterday as import('@trainingai/shared/types/day-checkin').VsYesterday) ?? null,
+    vsNormal:       (r.vsNormal as import('@trainingai/shared/types/day-checkin').VsNormal) ?? null,
+    vsQuestion:     (r.vsQuestion as import('@trainingai/shared/types/day-checkin').VsQuestion) ?? null,
     soreMuscles:       (r.soreMuscles as string[]) ?? [],
     journal:           r.journal ? String(r.journal) : null,
     // LA-137: selected by the server and never mapped, so a completion made on another device never
@@ -648,6 +650,12 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     answeredAt:  r.answeredAt ? String(r.answeredAt) : null,
     updatedAt:   r.updatedAt ? String(r.updatedAt) : null,
     deletedAt:   r.deletedAt ? String(r.deletedAt) : null,
+    estCalories: r.estCalories == null ? null : Number(r.estCalories),
+    estProteinG: r.estProteinG == null ? null : Number(r.estProteinG),
+    estCarbsG:   r.estCarbsG == null ? null : Number(r.estCarbsG),
+    estFatG:     r.estFatG == null ? null : Number(r.estFatG),
+    estBiasKcal: r.estBiasKcal == null ? null : Number(r.estBiasKcal),
+    estBasis:    r.estBasis == null ? null : String(r.estBasis),
   } satisfies LocalPlanMealAnswer));
 
   const count = bodyMetrics.length + moodLogs.length + sleepSessions.length +

@@ -100,12 +100,30 @@ export function msToHHMMInTz(at: string | number | Date, tz = DEFAULT_TZ): strin
   return formatInTimeZone(d, tz, 'HH:mm')
 }
 
-// Formats a "HH:MM" 24-hour time string as "8:30am" (12-hour, no leading zero).
+/**
+ * A clock time given as minutes since local midnight, in the app's one time-of-day form: "6:40 am".
+ *
+ * LB-183. `formatTimeOfDay` takes an INSTANT and is right for those. A value that is already a
+ * wall-clock minute (a sleep onset, a chart axis) must not be turned back into a Date to reuse it,
+ * because that re-applies a timezone to a number that has none, which is the bug this file exists to
+ * stop. This is the sibling for that shape, and it matches `formatTimeOfDay`'s output exactly.
+ *
+ * Rounds the whole value BEFORE splitting it, so 419.6 reads "7:00 am", never "6:60 am". Wraps into
+ * one day, so -20 is "11:40 pm" and 1450 is "12:10 am".
+ */
+export function formatMinutesOfDay(minutes: number): string {
+  if (!Number.isFinite(minutes)) return ''
+  const wrapped = ((Math.round(minutes) % 1440) + 1440) % 1440
+  const h24 = Math.floor(wrapped / 60)
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12
+  return `${h12}:${String(wrapped % 60).padStart(2, '0')} ${h24 < 12 ? 'am' : 'pm'}`
+}
+
+// Formats a "HH:MM" 24-hour time string in the app's one time-of-day form, "8:30 am".
+// LB-183: it used to print "8:30am", a fourth form beside formatTimeOfDay's; it now delegates.
 export function formatTime12h(hhmm: string): string {
   const [h, m] = hhmm.split(':').map(Number)
-  const period = h < 12 ? 'am' : 'pm'
-  const h12 = h % 12 === 0 ? 12 : h % 12
-  return `${h12}:${String(m).padStart(2, '0')}${period}`
+  return formatMinutesOfDay(h * 60 + m)
 }
 
 // Returns the UTC Date for midnight-in-tz today (used for accurate i-days-ago arithmetic).

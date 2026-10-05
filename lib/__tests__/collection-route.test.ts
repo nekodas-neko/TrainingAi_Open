@@ -21,10 +21,13 @@ const getActiveProgram = vi.fn(async () => null as unknown)
 // against a real Postgres. The guarantee moved with the code rather than being dropped.
 const listStepDayKeys = vi.fn(async () => [] as string[])
 const listSleepDayKeys = vi.fn(async () => [] as string[])
+const listStepTotals = vi.fn(async () => [] as { date: string; steps: number }[])
+const listFoodLogDayKeys = vi.fn(async () => [] as string[])
+const listWeightDayKeys = vi.fn(async () => [] as string[])
 
 vi.mock('@/auth', () => ({ auth: async () => ({ user: { id: 'u-1', timezone: 'Australia/Brisbane' } }) }))
 vi.mock('@/lib/data', () => ({
-  getRepository: async () => ({ listTrainedDayKeys, listRestDays, getActiveProgram, listStepDayKeys, listSleepDayKeys }),
+  getRepository: async () => ({ listTrainedDayKeys, listRestDays, getActiveProgram, listStepDayKeys, listSleepDayKeys, listStepTotals, listFoodLogDayKeys, listWeightDayKeys }),
 }))
 
 import { GET } from '@/app/api/collection/route'

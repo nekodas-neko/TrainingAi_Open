@@ -26,7 +26,7 @@ export function GoogleSignIn() {
       );
       const challenge = base64url(digest);
       localStorage.setItem(MOBILE_AUTH_VERIFIER_KEY, verifier);
-      await Browser.open({ url: `${RAILWAY_URL}/mobile-signin?challenge=${challenge}` });
+      await Browser.open({ url: `${RAILWAY_URL}/mobile-signin/begin?challenge=${challenge}` });
     } else {
       signIn("google", { callbackUrl: "/" });
     }

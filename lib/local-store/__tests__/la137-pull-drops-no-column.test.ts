@@ -50,6 +50,15 @@ const DELTA_TABLES = [
   'supplements', 'workout_sessions',
 ]
 
+// Values a CHECK needs that the first-allowed-value rule below would get wrong. BF-203a: every column
+// is populated, `est_*` included, and only an `estimated` answer may carry them. A decline with
+// macros is refused by `plan_meal_answers_estimate_shape`.
+const FIXED: Record<string, Record<string, unknown>> = {
+  plan_meal_answers: { answer: 'estimated' },
+  // LB-190: vs_question must be 1 or 2 whenever vs_normal holds an answer.
+  day_checkins: { vs_question: 1 },
+}
+
 describe.skipIf(!canRun)('a sync pull drops no column applyDelta writes (LA-137)', () => {
   let pool: import('pg').Pool
   const created: { table: string; key: string; value: unknown }[] = []
@@ -99,6 +108,7 @@ describe.skipIf(!canRun)('a sync pull drops no column applyDelta writes (LA-137)
         if (fk && building.has(fk.rt) && n === 'YES') { row[c] = null; continue }
         if (fk) { row[c] = (await rowFor(fk.rt))[fk.rc]; continue }
         if (c === 'deleted_at') { row[c] = null; continue }
+        if (FIXED[table]?.[c] !== undefined) { row[c] = FIXED[table][c]; continue }
         const allowed = checks.find(k => k.t === table && k.d.includes(`(${c} = `))?.d.match(/'([^']+)'::text/)
         if (allowed) { row[c] = allowed[1]; continue }
         row[c] = valueFor(u, c)

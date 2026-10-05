@@ -24,7 +24,8 @@ describe.skipIf(!canRun)('food-logging completeness flag (Q-387)', () => {
     sleepQualityFeel: null, restingSoreness: null, illnessContext: null,
     perceivedRecoveryTouched: false, sleepQualityFeelTouched: false,
     // LB-124. A blank check-in has no comparative answer either — null, not a neutral.
-    vsYesterday: null,
+    vsNormal: null,
+    vsQuestion: null,
     soreMuscles: [], journal: null,
   }
 

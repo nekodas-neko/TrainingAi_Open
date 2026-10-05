@@ -51,6 +51,16 @@ const EXEMPT = new Map([
     ['2026-03-10', 'page.clock pins the app clock to this instant'],
     ['2026-03-11', 'the far side of the same pinned rollover'],
   ])],
+  ['e2e/lb95-personal-records-overview.spec.ts', new Map([
+    // A personal record's date is the instant it was SET, and the app never compares it against
+    // today — `personalRecordReadings` only converts it to the user's day. So both sides of the
+    // assertion are fixed: the stub supplies the instant and the screen prints the day derived from
+    // it. The late-UTC instant is the point of the test, not an accident — 23:30Z on the 29th is
+    // already the 30th in Brisbane, which is the off-by-one a UTC slice would produce.
+    ['2026-09-29', 'the instant the fixture record was set; nothing compares it to today'],
+    ['2026-09-02', 'the same, for the second record'],
+    ['2026-09-30', 'the expected OUTPUT: the Brisbane day of the 23:30Z instant above, asserted present while the UTC day is asserted absent'],
+  ])],
   ['e2e/stress-by-hour.spec.ts', new Map([
     // `at()` builds every timestamp from `Date.UTC(2026, 8, 8, …)` and the `date` field matches it.
     // Self-consistent: the payload never disagrees with itself, and the card does not date-guard.

@@ -12,7 +12,7 @@ import { todayInTz } from '@trainingai/shared/date-utils'
 const RULES_PRESCRIPTION_TTL_MS = 6 * 60 * 60 * 1000
 import { aggregateSignals } from '@trainingai/shared/ai-periodization/signals'
 import { buildSystemPrompt, buildUserPrompt, intensityZoneForRole } from '@trainingai/shared/ai-periodization/prompt'
-import { accessoryTargetRpe } from '@trainingai/shared/ai-periodization/goal-ranges'
+import { accessoryTargetRpe, settleAccessory } from '@trainingai/shared/ai-periodization/goal-ranges'
 import { expectedRpe, pctForExpectedRpe } from '@trainingai/shared/ai-periodization/expected-rpe'
 import {
   applyAccumulationCeiling,
@@ -36,6 +36,7 @@ import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
 import { z } from 'zod'
 import { PrescriptionSchema } from '@trainingai/shared/ai-periodization/prescription-schema'
 import { reconcilePrescription } from '@trainingai/shared/ai-periodization/reconcile-prescription'
+import { buildPrescriptionShadow } from '@trainingai/shared/ai-periodization/prescription-shadow'
 import type { AiPrescription, AiPrescriptionExercise, PeriodizationPhase } from '@trainingai/shared/types/ai-periodization'
 import type { PrescriptionSignals } from '@trainingai/shared/ai-periodization/signals'
 import type { WorkoutRepository } from '@/lib/data/repository'
@@ -508,6 +509,10 @@ async function runPrescriptionGeneration(
     return { ok: false, error: 'AI generation failed', status: 502 }
   }
 
+  // BF-199 Phase 1: the model's own phase answer, before reconciliation rewrites `parsed`.
+  const modelPhase = String(parsed.phase)
+  const modelPhaseAction = String(parsed.phase_action)
+
   // Single post-parse reconciliation pass — resolves the phase for a "stay" response,
   // normalizes ambiguous pct fractions, drops hallucinated ids, de-dupes, backfills any
   // model-omitted exercise, and applies the deterministic per-exercise deload override by
@@ -594,8 +599,10 @@ async function runPrescriptionGeneration(
       // Accessories are prescribed to a target EFFORT (goal RPE); the load floats to hit that RPE
       // at the settled reps, so effort stays constant across rep ranges and progression comes from
       // the 1RM rising rather than a fixed % band. Compounds keep the phase-relative clamp below.
-      const pct = pctForExpectedRpe(accessoryTargetRpe(signals.trainingGoal), a.reps)
-      ex.pct = Math.min(85, Math.max(40, pct))
+      // BF-221: the reps it floats against are held to the goal's accessory band first.
+      const settled = settleAccessory(signals.trainingGoal, a.reps)
+      ex.reps = settled.reps
+      ex.pct = settled.pct
     } else if (role === 'secondary') {
       // Secondary compounds are worked at least as hard as an accessory (owner steer 2026-07-20)
       // — they previously had NO effort floor, so the moderate band could pass a light AI pick
@@ -776,6 +783,12 @@ async function runPrescriptionGeneration(
   // generations for this session could interleave between them and leave the status describing the
   // other run's prescription (Q-54).
   await repo.storePrescription(userId, programSessionId, prescription, expiresAt, prescriptionStatus)
+
+  // BF-199 Phase 1: record what the rules prescriber would have said beside what was given.
+  // Best-effort and after the store: evidence must never cost the lifter a plan.
+  await (async () => repo.recordPrescriptionShadow(userId, programSessionId, buildPrescriptionShadow({
+    modelPhase, modelPhaseAction, final: prescription, rules: buildRulesPrescription(signals, ''),
+  })))().catch(err => console.error('[prescribe] shadow record failed (ignored):', err))
 
   return { ok: true, prescription, prescriptionStatus, estimatedSessionDurationMin }
 }

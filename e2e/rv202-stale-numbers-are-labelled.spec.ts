@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { formatDayShort } from '@trainingai/shared/date-utils'
+import { tolerateTestEnd } from './fixtures'
 
 /**
  * RV-202 ③ — the pre-workout list must say when its numbers are not today's.
@@ -36,7 +37,7 @@ const YESTERDAY = brisbane(new Date(Date.now() - 24 * 60 * 60 * 1000))
 
 test('a payload from an earlier day is labelled with that day', async ({ page }) => {
   let body: string | null = null
-  await page.route('**/api/workout-data**', async route => {
+  await page.route('**/api/workout-data**', tolerateTestEnd(async route => {
     const res = await route.fetch()
     const json = await res.json()
     if (json?.exercises?.length) {
@@ -46,7 +47,7 @@ test('a payload from an earlier day is labelled with that day', async ({ page })
       return route.fulfill({ json: aged })
     }
     return route.fulfill({ response: res })
-  })
+  }))
 
   // The card's Start Workout only navigates; the pre-workout screen's own button begins a
   // workout, so this stops one step short of that.

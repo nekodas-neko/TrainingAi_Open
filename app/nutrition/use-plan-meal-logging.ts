@@ -5,6 +5,9 @@ import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { toast } from 'sonner'
 import type { FoodLogWithItem, MealPlan, MealPlanMeal, MealType } from '@trainingai/shared/types/nutrition'
 import { logPlanMeal } from '@trainingai/shared/nutrition/log-plan-meal'
+import { pickPlanVariant, variantForEstimates } from '@trainingai/shared/nutrition/plan-variant'
+import { dueForEstimate, estimateSlotsFor } from '@trainingai/shared/nutrition/meal-estimate'
+import { todayInTz, nowDatetimeInTz } from '@trainingai/shared/date-utils'
 import { getLocalStore } from '@/lib/local-store'
 import { pushMutations } from '@/lib/local-store/sync-engine'
 
@@ -16,6 +19,8 @@ interface Options {
   /** Read at call time, not render time — the user can change day mid-request. */
   dateRef: { current: string }
   onLogged: (log: FoodLogWithItem) => void
+  /** LA-184's answer for today: true/false, or undefined when it cannot be known. */
+  isTrainingDay?: boolean
 }
 
 /**
@@ -26,7 +31,7 @@ interface Options {
  * the user taps, so **the tap is the confirmation** — no new state, no new table, and nothing can
  * count toward the day's totals unless they said they ate it.
  */
-export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef, onLogged }: Options) {
+export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef, onLogged, isTrainingDay }: Options) {
   // Q-413: the eaten-at resolution happens in the USER's zone, not the device's.
   const tz = useUserTimezone()
   const [loggingPosition, setLoggingPosition] = useState<number | null>(null)
@@ -43,7 +48,8 @@ export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef,
     const names = new Set(
       logs.map(l => l.foodItem?.name?.toLowerCase()).filter((n): n is string => !!n),
     )
-    const variant = mealPlan?.variants[0]
+    // The variant the card shows, not `variants[0]`: on a split plan those differ (LA-184's sibling).
+    const variant = mealPlan ? pickPlanVariant(mealPlan, isTrainingDay) : undefined
     if (!variant || names.size === 0) return new Set<number>()
     return new Set(
       variant.meals
@@ -51,7 +57,7 @@ export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef,
           && m.ingredients.every(i => names.has(i.name.toLowerCase())))
         .map(m => m.position),
     )
-  }, [logs, mealPlan])
+  }, [logs, mealPlan, isTrainingDay])
 
   /**
    * Log several planned meals in one action (Q-187 step 4).
@@ -178,24 +184,72 @@ export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef,
     setDeclinedMealIds(next)
   }, [])
 
+  /**
+   * BF-203a. Record an estimate for each of TODAY's plan meals whose slot is over with nothing of its
+   * meal type logged and no answer given. On the device only: the web build is a logic-free dev
+   * surface, so with no local store there are no estimates. Written like a decline, local row plus
+   * outbox, carrying its id so the server row and the device row are one row.
+   *
+   * Never estimated: another day, a split plan whose day type is unknown, a meal with no resolvable
+   * slot. Each of those would be a guess counted as food.
+   */
+  const materialiseEstimates = useCallback(async (date: string) => {
+    if (!userId || !mealPlan) return
+    const store = getLocalStore(userId)
+    if (!store || date !== todayInTz(tz)) return
+    const variant = variantForEstimates(mealPlan, isTrainingDay)
+    if (!variant) return
+    const slots = estimateSlotsFor(variant.meals, mealTypes)
+    if (slots.length === 0) return
+    const [answers, dayLogs] = await Promise.all([store.getPlanMealAnswers(date), store.getFoodLogsWithItems(date)])
+    const [h, m] = nowDatetimeInTz(tz).slice(11, 16).split(':').map(Number)
+    const due = dueForEstimate({
+      slots,
+      loggedMealTypeIds: new Set(dayLogs.map(l => l.mealTypeId)),
+      answeredPlanMealIds: new Set(answers.map(a => a.planMealId)),
+      localHour: h + m / 60,
+      biasKcal: 0,
+    })
+    if (due.length === 0) return
+    const now = new Date().toISOString()
+    for (const e of due) {
+      const id = crypto.randomUUID()
+      const est = {
+        estCalories: e.calories, estProteinG: e.proteinG, estCarbsG: e.carbsG, estFatG: e.fatG,
+        estBiasKcal: e.biasKcal, estBasis: 'planA',
+      }
+      await store.upsertPlanMealAnswer({
+        id, planMealId: e.planMealId, logDate: date, answer: 'estimated',
+        answeredAt: now, updatedAt: now, deletedAt: null, ...est,
+      })
+      await store.queueMutation({
+        userId, domain: 'plan_meal_answers', date,
+        payload: { id, planMealId: e.planMealId, logDate: date, answer: 'estimated', ...est },
+      })
+    }
+    pushMutations(userId).catch(() => {})
+  }, [userId, mealPlan, mealTypes, isTrainingDay, tz])
+
   const loadAnswers = useCallback(async (date: string) => {
     if (!userId) return
     // Local-first: a decline made offline must survive an app restart, or the prompt reappears.
     const store = getLocalStore(userId)
     if (store) {
       try {
+        await materialiseEstimates(date).catch(() => { /* an estimate is never worth losing the read */ })
         const rows = await store.getPlanMealAnswers(date)
-        applyAnswers(date, rows.map(r => r.planMealId))
+        // BF-203a: an 'estimated' answer is the app's assumption, not the user saying no.
+        applyAnswers(date, rows.filter(r => r.answer === 'no').map(r => r.planMealId))
         return
       } catch { /* fall through to the online read */ }
     }
     try {
       const res = await fetch(`/api/nutrition/plan-meal-answers?date=${date}`)
       if (!res.ok) return
-      const data = await res.json() as { answers?: { planMealId: string }[] }
-      applyAnswers(date, (data.answers ?? []).map(a => a.planMealId))
+      const data = await res.json() as { answers?: { planMealId: string; answer?: string }[] }
+      applyAnswers(date, (data.answers ?? []).filter(a => (a.answer ?? 'no') === 'no').map(a => a.planMealId))
     } catch { /* offline and no store — leave the set as it is */ }
-  }, [userId, applyAnswers])
+  }, [userId, applyAnswers, materialiseEstimates])
 
   useEffect(() => { void loadAnswers(dateRef.current) }, [loadAnswers, dateRef, mealPlan?.id])
 

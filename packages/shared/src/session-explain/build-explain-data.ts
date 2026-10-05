@@ -14,6 +14,15 @@ export interface ExplainSignals {
   hrvTrend: number | null
   energyLevel: string | null
   soreMuscles: string[]
+  /**
+   * LB-117/LB-118 — which of `soreMuscles` the app SUGGESTED rather than the lifter choosing.
+   *
+   * `null` means the check-in predates provenance, which the scorer reads as "unknown" and scores
+   * the old way. It must never be read as "none were suggestions": that would claim every tick
+   * lowered the score, on a page whose whole rule is to show what the recommendation was actually
+   * computed from.
+   */
+  suggestedSoreMuscles?: string[] | null
 }
 
 export interface ExplainAlternative {

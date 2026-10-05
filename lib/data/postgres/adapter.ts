@@ -37,7 +37,7 @@ import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-rada
 import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
 import { extractNightlyTrainingSamples, fitDaytimeHrvModel, MIN_TRAINING_SAMPLES } from '@trainingai/shared/health/daytime-hrv-model'
 import { sleepDurationTrend } from '@trainingai/shared/health/sleep-trend'
-import { DayCheckinScalesSchema, DayCheckinExtrasSchema, dayCheckinHasAnswers } from '@trainingai/shared/validation/day-checkin'
+import { DayCheckinScalesSchema, DayCheckinExtrasSchema, dayCheckinHasAnswers, resolveVsAnswer } from '@trainingai/shared/validation/day-checkin'
 import { answeredMorningScales } from '@trainingai/shared/health/self-report'
 import { MoodFieldsSchema } from '@trainingai/shared/validation/mood-log'
 import { FoodItemPushSchema } from '@trainingai/shared/validation/food-item'
@@ -771,15 +771,22 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     await this.db.update(s.users).set({ timingBaselineDate: date }).where(eq(s.users.id, userId))
   }
 
+  // Linking CLEARS the password (RV-192). The row being linked to was created by someone who typed
+  // that address and was never asked to prove they read it; the person arriving now proved it, via
+  // Google. Leaving the hash in place leaves a credential belonging to whoever registered first.
+  // They lose nothing they are using — they are signing in with Google as this runs.
   async linkOAuthAccount(userId: string, oauthSub: string): Promise<void> {
-    await this.db.update(s.users).set({ oauthSub }).where(eq(s.users.id, userId))
+    await this.db.update(s.users).set({ oauthSub, passwordHash: null }).where(eq(s.users.id, userId))
   }
 
+  // An invite is not proof that the registrant owns that inbox (RV-192). This defaulted to
+  // `isInvited(email)`, so anyone who knew an invited address got an ACTIVE account for it, and the
+  // real invitee's later Google sign-in linked onto the row. Google's own sign-in still honours the
+  // invite — see upsertUser — because there the address is verified by Google. Here nothing
+  // verifies it, so a password account starts inactive and the owner activates it.
   async createEmailUser(email: string, passwordHash: string, name?: string, isActive?: boolean): Promise<User> {
-    const normal = normalizeEmail(email)
-    const active = isActive ?? await this.isInvited(normal)
     const [r] = await this.db.insert(s.users)
-      .values({ email: normal, passwordHash, name: name ?? null, isActive: active })
+      .values({ email: normalizeEmail(email), passwordHash, name: name ?? null, isActive: isActive ?? false })
       .returning()
     return this.rowToUser(r)
   }
@@ -2073,6 +2080,45 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return rows.map(r => r.date)
   }
 
+  /** PS-49 — per-day step totals for the Ranger's bank. */
+  async listStepTotals(userId: string, from: string, to: string): Promise<{ date: string; steps: number }[]> {
+    const rows = await this.db.select({ date: s.bodyMetrics.date, steps: s.bodyMetrics.steps }).from(s.bodyMetrics)
+      .where(and(
+        eq(s.bodyMetrics.userId, userId),
+        gte(s.bodyMetrics.date, from),
+        lte(s.bodyMetrics.date, to),
+        gt(s.bodyMetrics.steps, 0),
+        isNull(s.bodyMetrics.deletedAt),
+      ))
+      .orderBy(asc(s.bodyMetrics.date))
+    return rows.map(r => ({ date: r.date, steps: Number(r.steps) }))
+  }
+
+  /** PS-49 — days with at least one live food log (a Health cat point). */
+  async listFoodLogDayKeys(userId: string, from: string, to: string): Promise<string[]> {
+    const rows = await this.db.selectDistinct({ date: s.foodLogs.date }).from(s.foodLogs)
+      .where(and(
+        eq(s.foodLogs.userId, userId),
+        gte(s.foodLogs.date, from),
+        lte(s.foodLogs.date, to),
+        isNull(s.foodLogs.deletedAt),
+      ))
+    return rows.map(r => String(r.date))
+  }
+
+  /** PS-49 — days with a recorded weight (a Health cat point). */
+  async listWeightDayKeys(userId: string, from: string, to: string): Promise<string[]> {
+    const rows = await this.db.select({ date: s.bodyMetrics.date }).from(s.bodyMetrics)
+      .where(and(
+        eq(s.bodyMetrics.userId, userId),
+        gte(s.bodyMetrics.date, from),
+        lte(s.bodyMetrics.date, to),
+        isNotNull(s.bodyMetrics.weightKg),
+        isNull(s.bodyMetrics.deletedAt),
+      ))
+    return rows.map(r => r.date)
+  }
+
   async listBodyMetrics(userId: string, from: string, to: string): Promise<BodyMetrics[]> {
     const rows = await this.db.select().from(s.bodyMetrics)
       .where(and(
@@ -2678,13 +2724,15 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return rows.map(r => this.rowToPrescribedRun(r))
   }
 
-  async upsertPrescribedRun(userId: string, run: Omit<PrescribedRun, 'userId' | 'updatedAt'>): Promise<PrescribedRun> {
+  async upsertPrescribedRun(userId: string, run: Omit<PrescribedRun, 'userId' | 'updatedAt' | 'completedAs'>): Promise<PrescribedRun> {
     const values = {
       id: run.id, userId, planId: run.planId, date: run.date, runType: run.runType,
       durationMin: run.durationMin ?? null, distanceKm: run.distanceKm ?? null,
       targetHrLow: run.targetHrLow ?? null, targetHrHigh: run.targetHrHigh ?? null,
       targetZoneIds: run.targetZoneIds, rationale: run.rationale, gateAction: run.gateAction,
       status: run.status, activityLogId: run.activityLogId ?? null,
+      // LB-179: a fresh or regenerated prescription has not been completed by anything yet.
+      completedAs: null,
     }
     const [r] = await this.db.insert(s.prescribedRuns).values(values)
       .onConflictDoUpdate({
@@ -2700,6 +2748,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const set: Record<string, unknown> = { updatedAt: new Date() }
     if (patch.status !== undefined) set.status = patch.status
     if (patch.activityLogId !== undefined) set.activityLogId = patch.activityLogId
+    // LB-179: every status write says how it was satisfied. A client that does not send it predates
+    // walks completing a prescription, so its completion was a run (null). Leaving the old value
+    // would let a 'walk' from before a regeneration outlive it.
+    if (patch.status !== undefined) set.completedAs = patch.status === 'completed' ? (patch.completedAs ?? null) : null
+    else if (patch.completedAs !== undefined) set.completedAs = patch.completedAs
     const [r] = await this.db.update(s.prescribedRuns)
       .set(set)
       .where(and(eq(s.prescribedRuns.id, id), eq(s.prescribedRuns.userId, userId)))
@@ -2726,6 +2779,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       rationale: r.rationale, gateAction: r.gateAction,
       status: r.status as PrescribedRun['status'], activityLogId: r.activityLogId ?? null,
       updatedAt: r.updatedAt,
+      completedAs: (r.completedAs as PrescribedRun['completedAs']) ?? null,
     }
   }
 
@@ -3317,7 +3371,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       sleepQualityFeel: r.sleepQualityFeel, restingSoreness: r.restingSoreness,
       illnessContext: r.illnessContext as import('@trainingai/shared/types/day-checkin').IllnessContext | null,
       perceivedRecoveryTouched: r.perceivedRecoveryTouched, sleepQualityFeelTouched: r.sleepQualityFeelTouched,
-      vsYesterday: r.vsYesterday as import('@trainingai/shared/types/day-checkin').VsYesterday | null,
+      vsNormal: r.vsNormal as import('@trainingai/shared/types/day-checkin').VsNormal | null,
+      vsQuestion: r.vsQuestion as import('@trainingai/shared/types/day-checkin').VsQuestion | null,
       soreMuscles: r.soreMuscles ?? [],
       journal: r.journal, foodLoggingCompletedAt: r.foodLoggingCompletedAt,
       createdAt: r.createdAt, updatedAt: r.updatedAt,
@@ -3337,7 +3392,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       sleepQualityFeel: r.sleepQualityFeel, restingSoreness: r.restingSoreness,
       illnessContext: r.illnessContext as import('@trainingai/shared/types/day-checkin').IllnessContext | null,
       perceivedRecoveryTouched: r.perceivedRecoveryTouched, sleepQualityFeelTouched: r.sleepQualityFeelTouched,
-      vsYesterday: r.vsYesterday as import('@trainingai/shared/types/day-checkin').VsYesterday | null,
+      vsNormal: r.vsNormal as import('@trainingai/shared/types/day-checkin').VsNormal | null,
+      vsQuestion: r.vsQuestion as import('@trainingai/shared/types/day-checkin').VsQuestion | null,
       soreMuscles: r.soreMuscles ?? [],
       journal: r.journal, foodLoggingCompletedAt: r.foodLoggingCompletedAt,
       createdAt: r.createdAt, updatedAt: r.updatedAt,
@@ -3370,7 +3426,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         illnessContext:            checkin.illnessContext,
         perceivedRecoveryTouched:  checkin.perceivedRecoveryTouched,
         sleepQualityFeelTouched:   checkin.sleepQualityFeelTouched,
-        vsYesterday:               checkin.vsYesterday,
+        vsNormal:               checkin.vsNormal,
+        vsQuestion:             checkin.vsNormal == null ? null : checkin.vsQuestion,
         soreMuscles:       checkin.soreMuscles,
         journal:           checkin.journal,
         foodLoggingCompletedAt: checkin.foodLoggingCompletedAt ?? null,
@@ -3392,7 +3449,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           illnessContext:            sql`EXCLUDED.illness_context`,
           perceivedRecoveryTouched:  sql`EXCLUDED.perceived_recovery_touched`,
           sleepQualityFeelTouched:   sql`EXCLUDED.sleep_quality_feel_touched`,
-          vsYesterday:               sql`EXCLUDED.vs_yesterday`,
+          vsNormal:               sql`EXCLUDED.vs_normal`,
+          vsQuestion:             sql`EXCLUDED.vs_question`,
           soreMuscles:       sql`EXCLUDED.sore_muscles`,
           journal:           sql`EXCLUDED.journal`,
           // Only when the caller supplied one — otherwise keep whatever is stored (see the note
@@ -3412,7 +3470,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       sleepQualityFeel: r.sleepQualityFeel, restingSoreness: r.restingSoreness,
       illnessContext: r.illnessContext as import('@trainingai/shared/types/day-checkin').IllnessContext | null,
       perceivedRecoveryTouched: r.perceivedRecoveryTouched, sleepQualityFeelTouched: r.sleepQualityFeelTouched,
-      vsYesterday: r.vsYesterday as import('@trainingai/shared/types/day-checkin').VsYesterday | null,
+      vsNormal: r.vsNormal as import('@trainingai/shared/types/day-checkin').VsNormal | null,
+      vsQuestion: r.vsQuestion as import('@trainingai/shared/types/day-checkin').VsQuestion | null,
       soreMuscles: r.soreMuscles ?? [],
       journal: r.journal, foodLoggingCompletedAt: r.foodLoggingCompletedAt,
       createdAt: r.createdAt, updatedAt: r.updatedAt,
@@ -3920,6 +3979,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async savePlanMealAnswer(userId: string, input: { id?: string; planMealId: string; logDate: string }) { return mp.savePlanMealAnswer(this.db, userId, input) }
   async deletePlanMealAnswer(userId: string, planMealId: string, logDate: string) { return mp.deletePlanMealAnswer(this.db, userId, planMealId, logDate) }
   async listPlanMealAnswers(userId: string, logDate: string) { return mp.listPlanMealAnswers(this.db, userId, logDate) }
+  async upsertEstimatedAnswers(userId: string, logDate: string, estimates: readonly mp.EstimateToStore[], basis: string) { return mp.upsertEstimatedAnswers(this.db, userId, logDate, estimates, basis) }
   async listDietaryRestrictions() { return mp.listDietaryRestrictions(this.db) }
   async listUserDietaryRestrictions(userId: string) { return mp.listUserDietaryRestrictions(this.db, userId) }
   async replaceUserDietaryRestrictions(userId: string, entries: { restrictionId: string; severity: DietarySeverity }[]) { return mp.replaceUserDietaryRestrictions(this.db, userId, entries) }
@@ -4655,6 +4715,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         answeredAt: a.answeredAt.toISOString(),
         updatedAt: a.updatedAt.toISOString(),
         deletedAt: a.deletedAt ? a.deletedAt.toISOString() : null,
+        estCalories: a.estCalories, estProteinG: a.estProteinG, estCarbsG: a.estCarbsG,
+        estFatG: a.estFatG, estBiasKcal: a.estBiasKcal, estBasis: a.estBasis,
       })),
     }
 
@@ -4938,7 +5000,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             illnessContext:            extrasCheck.data.illnessContext ?? null,
             perceivedRecoveryTouched:  extrasCheck.data.perceivedRecoveryTouched ?? false,
             sleepQualityFeelTouched:   extrasCheck.data.sleepQualityFeelTouched ?? false,
-            vsYesterday:               extrasCheck.data.vsYesterday ?? null,
+            ...resolveVsAnswer(extrasCheck.data),
             soreMuscles:       extrasCheck.data.soreMuscles,
             journal:           extrasCheck.data.journal ?? null,
           })
@@ -5213,6 +5275,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           await this.updatePrescribedRun(userId, parsed.data.id, {
             status: parsed.data.status,
             activityLogId: parsed.data.activityLogId ?? null,
+            completedAs: parsed.data.completedAs,
           })
           processed++
         } else if (mut.domain === 'injuries') {
@@ -5569,8 +5632,30 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid plan_meal_answers payload: missing planMealId' })
             continue
           }
+          const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
           if (p.deleted) {
             await mp.deletePlanMealAnswer(this.db, userId, planMealId, logDate.replace(/\//g, '-'))
+          } else if (p.answer === 'estimated') {
+            // BF-203a. A device estimate. Routing it to `savePlanMealAnswer` would store it as a
+            // DECLINE. Calories are required, as the table's shape constraint also insists.
+            const calories = num(p.estCalories)
+            if (calories == null || calories < 0) {
+              errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'plan_meal_answers: estimate without calories' })
+              continue
+            }
+            const saved = await mp.saveClientEstimate(this.db, userId, logDate.replace(/\//g, '-'), {
+              id: typeof p.id === 'string' ? p.id : undefined,
+              planMealId,
+              calories: Math.round(calories),
+              proteinG: num(p.estProteinG) ?? 0,
+              carbsG: num(p.estCarbsG) ?? 0,
+              fatG: num(p.estFatG) ?? 0,
+              biasKcal: Math.round(num(p.estBiasKcal) ?? 0),
+            })
+            if (!saved) {
+              errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'plan_meal_answers: unknown or non-owned plan meal' })
+              continue
+            }
           } else {
             const saved = await mp.savePlanMealAnswer(this.db, userId, {
               id: typeof p.id === 'string' ? p.id : undefined,
@@ -7252,6 +7337,23 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * first when reviewing this: a meal's contribution must still be there afterwards.
    */
   // RV-45. See deleteSupplement — reports the match, does not change it.
+  async listDoseEvents(userId: string, from: string, to: string) {
+    const rows = await this.db
+      .select({ name: s.supplements.name, date: s.supplementLogs.logDate, amount: s.supplementLogs.amount, unit: s.supplementLogs.unit })
+      .from(s.supplementLogs)
+      .innerJoin(s.supplements, eq(s.supplements.id, s.supplementLogs.supplementId))
+      .where(and(
+        eq(s.supplementLogs.userId, userId),
+        gte(s.supplementLogs.logDate, from),
+        lte(s.supplementLogs.logDate, to),
+        isNull(s.supplementLogs.deletedAt),
+        isNotNull(s.supplementLogs.amount),
+        isNotNull(s.supplementLogs.vialStrengthMg),
+      ))
+      .orderBy(asc(s.supplementLogs.logDate))
+    return rows.map(r => ({ supplementName: r.name, date: r.date, amount: Number(r.amount), unit: r.unit }))
+  }
+
   async unlogSupplement(supplementId: string, userId: string, date: string): Promise<boolean> {
     const rows = await this.db.update(s.supplementLogs)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
@@ -7273,6 +7375,15 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async recordBaselineAnchors(userId: string, programSessionId: string, anchors: Record<string, Baseline1rmEntry>, complete: boolean) { return period.recordBaselineAnchors(this.db, userId, programSessionId, anchors, complete) }
   async revertAutoAdoptedBaseline(userId: string, programSessionId: string) { return period.revertAutoAdoptedBaseline(this.db, userId, programSessionId) }
   async advancePhase(userId: string, programSessionId: string, newPhase: PeriodizationPhase) { return period.advancePhase(this.db, userId, programSessionId, newPhase) }
+  async recordPrescriptionShadow(userId: string, programSessionId: string, shadow: import('@trainingai/shared/ai-periodization/prescription-shadow').PrescriptionShadow): Promise<void> {
+    await this.db.insert(s.prescriptionShadow).values({
+      userId, programSessionId,
+      modelPhase: shadow.modelPhase, modelPhaseAction: shadow.modelPhaseAction,
+      finalPhase: shadow.finalPhase, finalPhaseAction: shadow.finalPhaseAction,
+      rows: shadow.rows,
+    })
+  }
+
   async storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus) { return period.storePrescription(this.db, userId, programSessionId, prescription, expiresAt, status) }
   async clearProgramPrescriptions(userId: string, programId: string) { return period.clearProgramPrescriptions(this.db, userId, programId) }
   async updatePrescriptionStatus(userId: string, programSessionId: string, status: PrescriptionStatus) { return period.updatePrescriptionStatus(this.db, userId, programSessionId, status) }

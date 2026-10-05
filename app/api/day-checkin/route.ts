@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { z } from 'zod'
 import { todayInTz, DEFAULT_TZ, normalizeDateParamIso } from '@trainingai/shared/date-utils'
-import { DayCheckinScalesSchema, DayCheckinExtrasSchema, dayCheckinHasAnswers } from '@trainingai/shared/validation/day-checkin'
+import { DayCheckinScalesSchema, DayCheckinExtrasSchema, dayCheckinHasAnswers, resolveVsAnswer } from '@trainingai/shared/validation/day-checkin'
 import { rateLimit } from '@/lib/rate-limit'
 import { answeredMorningScales } from '@trainingai/shared/health/self-report'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
@@ -111,7 +111,7 @@ export async function POST(req: Request) {
     illnessContext: b.illnessContext ?? null,
     perceivedRecoveryTouched: b.perceivedRecoveryTouched ?? false,
     sleepQualityFeelTouched: b.sleepQualityFeelTouched ?? false,
-    vsYesterday: b.vsYesterday ?? null,
+    ...resolveVsAnswer(b),
     soreMuscles: b.soreMuscles,
     journal: b.journal ?? null,
   })

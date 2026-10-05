@@ -13,6 +13,7 @@ import { getLocalStore } from '@/lib/local-store'
 import { createFoodItem } from '@trainingai/shared/nutrition/create-food-item'
 import { useFoodDatabaseSearch, type ExternalFood } from '@/lib/hooks/use-food-database-search'
 import type { FoodItem, SavedMeal } from '@trainingai/shared/types/nutrition'
+import { foodSecondaryLine } from './food-name-line'
 
 /** Shared with `capture-actions.tsx`, which reads the same seeded list to suggest the user's own
  *  foods for a typed description (RV-203 ①). One key for one endpoint, per CLAUDE.md. */
@@ -316,9 +317,9 @@ const FoodListRow = memo(function FoodListRow(
   { item, onSelect }: { item: FoodItem; onSelect: (i: FoodItem) => void },
 ) {
   const press = useCallback(() => onSelect(item), [item, onSelect])
-  const secondary = useMemo(() => {
-    const serving = item.servingSizeG ? `${Math.round(item.servingSizeG)} g serving` : null
-    return [item.brand, serving].filter(Boolean).join(' · ') || null
-  }, [item.brand, item.servingSizeG])
+  const secondary = useMemo(() => foodSecondaryLine(
+    item.brand,
+    item.servingSizeG ? `${Math.round(item.servingSizeG)} g serving` : null,
+  ), [item.brand, item.servingSizeG])
   return <FoodRow name={item.name} secondary={secondary} calories={item.calories} onPress={press} />
 })

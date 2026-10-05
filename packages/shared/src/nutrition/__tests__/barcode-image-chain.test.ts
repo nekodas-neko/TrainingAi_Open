@@ -11,23 +11,29 @@ describe('scanOriginToSource', () => {
   // (`confidence ? 'ai' : 'manual'`) stored every barcode scan as `'ai'`. BF-38 measured the
   // consequence — 3 rows of 221 carrying `'barcode'`.
   it('labels a barcode scan as barcode, not ai', () => {
-    expect(scanOriginToSource('barcode', 'high')).toBe('barcode')
+    expect(scanOriginToSource('barcode')).toBe('barcode')
   })
 
   it('labels a photo scan as ai', () => {
-    expect(scanOriginToSource('photo', 'medium')).toBe('ai')
+    expect(scanOriginToSource('photo')).toBe('ai')
   })
 
   // Not a chosen label: `food_items.source` has no value for an OFF text lookup, and adding one is
   // a migration. Pinned so the compromise is visible rather than looking like an oversight.
   it('labels an OFF text search as ai, which is the wrong label the column cannot express', () => {
-    expect(scanOriginToSource('search', 'high')).toBe('ai')
+    expect(scanOriginToSource('search')).toBe('ai')
   })
 
-  // A producer that predates the field must behave exactly as it did.
-  it('falls back to the old confidence rule when no origin is set', () => {
-    expect(scanOriginToSource(undefined, 'high')).toBe('ai')
-    expect(scanOriginToSource(undefined, undefined)).toBe('manual')
+  it('labels a text or recipe-URL scan as ai', () => {
+    expect(scanOriginToSource('text')).toBe('ai')
+    expect(scanOriginToSource('url')).toBe('ai')
+  })
+
+  // OR-205. No origin is a hand-typed entry. The model's confidence is no longer an input at all, so
+  // it cannot decide the stored source, which is what `confidence ? 'ai' : 'manual'` let it do.
+  it('labels an entry with no origin as manual, with no confidence input', () => {
+    expect(scanOriginToSource(undefined)).toBe('manual')
+    expect(scanOriginToSource.length).toBe(1)
   })
 })
 

@@ -6,5 +6,7 @@ export const PrescribedRunPatchBody = z.object({
   id:            z.string().uuid(),
   status:        z.enum(['completed', 'skipped']),
   activityLogId: z.string().uuid().nullable().optional(),
+  // LB-179: how the run was satisfied. Absent leaves the stored value alone.
+  completedAs:   z.enum(['run', 'walk']).nullable().optional(),
 })
 export type PrescribedRunPatch = z.infer<typeof PrescribedRunPatchBody>

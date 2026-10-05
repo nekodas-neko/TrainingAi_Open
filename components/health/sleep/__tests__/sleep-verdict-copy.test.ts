@@ -37,10 +37,10 @@ describe('formatDuration', () => {
 describe('formatClock', () => {
   it('turns signed minutes from local midnight into a clock time', () => {
     // Negative is before midnight, which is what makes "later than usual" plain arithmetic.
-    expect(formatClock(-50)).toBe('11:10pm')
-    expect(formatClock(80)).toBe('1:20am')
-    expect(formatClock(0)).toBe('12:00am')
-    expect(formatClock(720)).toBe('12:00pm')
+    expect(formatClock(-50)).toBe('11:10 pm')
+    expect(formatClock(80)).toBe('1:20 am')
+    expect(formatClock(0)).toBe('12:00 am')
+    expect(formatClock(720)).toBe('12:00 pm')
   })
 })
 
@@ -54,9 +54,9 @@ describe('componentClause', () => {
     expect(componentClause(with_({ components: { ...base.components, durationHours: 9.25 } }), 'duration'))
       .toBe('slept 9h15, 1h15 over your usual')
     expect(componentClause(with_({ components: { ...base.components, onsetMinutes: 80 } }), 'onset'))
-      .toBe('asleep at 1:20am, 65 min later than usual')
+      .toBe('asleep at 1:20 am, 65 min later than usual')
     expect(componentClause(with_({ components: { ...base.components, onsetMinutes: -180 } }), 'onset'))
-      .toBe('asleep at 9:00pm, 100 min earlier than usual')
+      .toBe('asleep at 9:00 pm, 100 min earlier than usual')
   })
 
   it('reads efficiency as a percentage of the night', () => {

@@ -6,6 +6,330 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.486.11",
+    date: "2026-09-30",
+    changes: [
+      "The morning check-in now asks how you compare to NORMAL rather than to yesterday \u2014 same three answers, same order. You said you didn't like comparing to one previous day.",
+      "Answers given before today are kept separate from answers given after it, so the change of question cannot quietly distort your own history.",
+    ],
+  },
+  {
+    version: "1.486.10",
+    date: "2026-09-30",
+    changes: [
+      "The morning check-in's \"Compared to yesterday\" now opens with \"About the same\" already chosen, so a normal morning is one tap on Save. You asked for this directly.",
+      "Tapping the chosen answer again clears it, and closing the sheet with the X still records nothing at all \u2014 those two are how a morning you did not answer stays distinguishable from one where you said things were the same.",
+    ],
+  },
+  {
+    version: "1.486.9",
+    date: "2026-09-30",
+    changes: [
+      "AI Build can now base a new program on one you already have. Pick it on the first step beside the name, and the generator sees that program's sessions and exercises and builds something similar \u2014 the server had been able to do this for a month with nothing on screen to ask for it.",
+      "Optional: leave it on \"From scratch\" and nothing changes.",
+    ],
+  },
+  {
+    version: "1.486.8",
+    date: "2026-09-30",
+    changes: [
+      "Home now tells you when your biomarkers are drifting. The illness radar's quietest band \u2014 the one with no readiness penalty \u2014 has fired twice and had nowhere to appear, so both times it reached you as silence. It is a small line under the score chips naming what moved, not a banner: it carries no instruction and should not read like one.",
+    ],
+  },
+  {
+    version: "1.486.7",
+    date: "2026-09-30",
+    changes: [
+      "The Resilience tile on Readiness now tells you WHEN its number is from. It reads the most recent day in the last week that had one, which is not always today \u2014 on 27 September it was showing 22 September's level with nothing saying so.",
+      "And when there is no level at all it now says what was seen instead of disappearing: how many of the last seven days had enough daytime wear, beside how many days the model needs. Those two counts sit side by side and nothing claims one caused the other.",
+    ],
+  },
+  {
+    version: "1.486.6",
+    date: "2026-09-30",
+    changes: [
+      "The two ⓘ buttons behind your calorie figures had the same name for a screen reader — Nutrition's now says it explains today's calorie budget, and Health's says it explains your energy balance. Nothing on screen looks different.",
+    ],
+  },
+  {
+    version: "1.486.5",
+    date: "2026-09-30",
+    changes: [
+      "A meal plan split into training and rest days now shows the right one for today. It was showing the rest-day variant every day, training days included — including the \"Rest day\" label on the card and the lower calorie and carb targets underneath it.",
+      "Other days still show the rest-day variant: the app can only work out today's day type from your rotation, and answering it for last Tuesday needs a change on the server side.",
+    ],
+  },
+  {
+    version: "1.486.4",
+    date: "2026-09-30",
+    changes: [
+      "Dates now read the same way wherever a screen is showing one particular day: Nutrition and the week-day sheet both say \"Saturday 26 September\", which is what Health \u2192 Day already said. Today and Yesterday still say Today and Yesterday.",
+      "A food is now named before its brand everywhere \u2014 \"Rolled oats\", with \"Uncle Tobys\" on the grey line under it, rather than \"Uncle Tobys \u2014 Rolled oats\" in the two search lists. Searching for a food no longer pushes the name you typed off to the right.",
+      "And the library's Search tab now shows a food's brand at all, which it had been leaving out while its own Recent tab showed it.",
+    ],
+  },
+  {
+    version: "1.486.3",
+    date: "2026-09-30",
+    changes: [
+      "The \u24d8 panel behind your calorie numbers now traces where they come from: your measured resting rate, what gets added for being up and about, and what gets taken back off for the walking that already assumed \u2014 which is the figure your movement is then added to.",
+      "It also names your saved daily goal beside today's budget when they disagree, and says which of the numbers on screen is actually measured rather than estimated.",
+      "Nothing about how any of it is calculated has changed.",
+    ],
+  },
+  {
+    version: "1.486.2",
+    date: "2026-09-30",
+    changes: [
+      "Accessory exercises now stay inside their goal's rep range, so an accessory can no longer be prescribed heavy and low-rep, like 77.5% for 7",
+    ],
+  },
+  {
+    version: "1.486.1",
+    date: "2026-09-29",
+    changes: [
+      "The Sleep card now says so when a night's score is based on incomplete data: a quiet \"Partial data\" note, or a clearer one naming what is missing when heart rate or HRV was absent.",
+    ],
+  },
+  {
+    version: "1.486.0",
+    date: "2026-09-29",
+    changes: [
+      "Rate a set RPE 9 or 10 and fall short of its reps, and the next set now offers a lighter weight \u2014 one tap fills the dial in. The app already worked this out when it built next week's plan; it just never said so during the session.",
+      "It offers and never applies: ignore it and the set is exactly as prescribed. The reason it gives is the same sentence next week's adjustment would have used, so the two can't disagree.",
+      "A set you didn't rate suggests nothing, and deload and baseline weeks are left alone.",
+    ],
+  },
+  {
+    version: "1.485.2",
+    date: "2026-09-29",
+    changes: [
+      "The \"Exercise detected\" card no longer offers walks and runs picked up by the retired Oura Cloud sync \u2014 that sync is gone and could not add a new one, so the only thing it could still surface was a handful of frozen rows from July.",
+      "Detection by your phone's GPS is untouched and still shows the same card: a qualifying walk or run is finalised at the end and waits there for you to review or dismiss it.",
+    ],
+  },
+  {
+    version: "1.485.1",
+    date: "2026-09-29",
+    changes: [
+      "Naming an exercise in the program editor now pre-selects a sensible role for it \u2014 Secondary for a compound while the session still has room, Accessory otherwise, and never Primary. Bicep curls no longer arrive prescribed like a main lift. The pill is still yours to change, and a role you have already set is never overwritten.",
+    ],
+  },
+  {
+    version: "1.485.0",
+    date: "2026-09-29",
+    changes: [
+      "A food you have saved with a picture now shows it in the diary, instead of the placeholder tile. The pictures were already being stored on the device and nothing ever read them back.",
+      "Foods without a picture keep the tile, so the list does not go ragged.",
+    ],
+  },
+  {
+    version: "1.484.2",
+    date: "2026-09-29",
+    changes: [
+      "When a heart-rate zone is built on a stand-in rather than on you, the Cardio Hub and the heart-rate profile now say so. A max that fell back to a generic 190 because your age couldn\u2019t be read used to look exactly like a real age estimate.",
+      "A resting rate that has never been measured and one that failed to load now say different things \u2014 the first tells you to wear your ring overnight, the second that it should return on its own.",
+    ],
+  },
+  {
+    version: "1.484.1",
+    date: "2026-09-29",
+    changes: [
+      "The Heart Rate screen now grades your current rate against your own zones instead of fixed cuts. A reading between 60 and 100 was coloured red and called \u201cNormal\u201d; for your resting and max that is inside Zone 1, so most of a sitting day looked like an alarm.",
+      "Until your profile loads the number shows without a grade, rather than being graded by numbers that are not yours.",
+    ],
+  },
+  {
+    version: "1.484.0",
+    date: "2026-09-29",
+    changes: [
+      "More \u2192 Details now lists your personal records \u2014 the best estimated one-rep max for every exercise you have logged, each with the day it was set. They were the one thing the app measured and gave you no way to read.",
+      "Exercises you no longer train stay in the list, since a best lift does not stop being one when the program changes.",
+    ],
+  },
+  {
+    version: "1.483.1",
+    date: "2026-09-29",
+    changes: [
+      "The \u201cWhy this?\u201d screen now separates sore muscles you ticked yourself, which lowered the session score, from ones the app suggested and had already accounted for. Previously both sat on one line, so a muscle could appear as sore beside a recovery figure that had ignored it.",
+    ],
+  },
+  {
+    version: "1.483.0",
+    date: "2026-09-29",
+    changes: [
+      "The Readiness screen now plots your resting heart rate and HRV against the nights you took a vial dose, with the baseline stored for each night beside them. It states that the effect was measured to peak two to four days after a dose, so the days after a marker are the ones to read \u2014 not the marker itself.",
+      "The card only appears when there is a dose in the last 60 days to annotate, and nothing it shows feeds any score.",
+    ],
+  },
+  {
+    version: "1.482.2",
+    date: "2026-09-29",
+    changes: [
+      "Reordering your training phases, applying a workout review, or saving a program from the builder now updates every screen that shows them, instead of only the Config screen you were looking at.",
+    ],
+  },
+  {
+    version: "1.482.1",
+    date: "2026-09-29",
+    changes: [
+      "Three settings changes now take effect everywhere immediately instead of leaving a stale copy behind: setting a password, choosing \u201cremind me later\u201d on the goals check-in, and any preference toggle.",
+      "The More tab no longer re-requests your profile and seasons every time you switch back to it \u2014 a re-show inside half an hour is now free.",
+    ],
+  },
+  {
+    version: "1.482.0",
+    date: "2026-09-29",
+    changes: [
+      "Today\u2019s cardio now has its own card at the top of the Cardio Hub, and it says what actually counts \u2014 \u201c25 min in Zone 2 \u00b7 107\u2013134 bpm\u201d \u2014 with the minutes you have already banked against it, instead of an opaque done-or-not.",
+      "A walk can finish the day\u2019s prescribed run. Tapping \u201cWalk it\u201d offers a guided walk or a treadmill walk you just log from a duration chip, and either one marks the day done \u2014 previously only a run could, so no prescribed run had ever been marked done at all.",
+      "A walk that completes the day is recorded as a walk, so it no longer counts as a run when the app plans your next quality session or works out your running pace.",
+      "A treadmill walk with no heart-rate reading still counts: its logged minutes go toward the target and the day is marked estimated.",
+    ],
+  },
+  {
+    version: "1.481.13",
+    date: "2026-09-29",
+    changes: [
+      "Nutrition's energy card now says \"+N earned\" for the calories today's movement added, instead of \"burned\", which the Day screen uses for the whole day's total.",
+    ],
+  },
+  {
+    version: "1.481.12",
+    date: "2026-09-29",
+    changes: [
+      "Clock times on the sleep screens now read \u201c11:30 pm\u201d, matching the rest of the app, instead of \u201c11:30 PM\u201d on the sleep timing chart and \u201c11:30pm\u201d in the sleep verdict. A rounding fault that could print a time like \u201c6:60 AM\u201d is gone with it.",
+    ],
+  },
+  {
+    version: "1.481.11",
+    date: "2026-09-29",
+    changes: [
+      "A friend request you sent now shows under \u201cSent\u201d as \u201cRequest sent\u201d with a Cancel, instead of appearing as \u201cUnknown\u201d with Accept and Decline buttons that could never work \u2014 only the person who receives a request can accept it. The number on the Manage button also counts only the requests waiting on you.",
+    ],
+  },
+  {
+    version: "1.481.10",
+    date: "2026-09-29",
+    changes: [
+      "The 7-day nutrition chart now always shows seven days, with days you didn't log drawn as empty. Its average counts only the days you logged, and today's bar is the one highlighted.",
+    ],
+  },
+  {
+    version: "1.481.9",
+    date: "2026-09-29",
+    changes: [
+      "After creating an account, the sign-in screen no longer says \u201cSign in below\u201d. Every new account now waits for approval before it can be used, so it says that instead \u2014 the same sentence the waiting screen shows, rather than advice that sent you to a screen contradicting it.",
+    ],
+  },
+  {
+    version: "1.481.8",
+    date: "2026-09-29",
+    changes: [
+      "In an AI-built program, an exercise the generator could not match to one of your progression styles now takes the style the rest of that program uses, instead of being saved with none. Its sets and reps also show on the review screen now — a style the screen had no description for used to leave that line blank, which looked the same as having no style at all.",
+    ],
+  },
+  {
+    version: "1.481.7",
+    date: "2026-09-29",
+    changes: [
+      "An exercise you add to a program now starts on a progression style — the one that program already uses — instead of starting on none. A style-less exercise looked normal but was skipped by anything that needed a style: in a deload week one was prescribed its ordinary working weight while the rest of the session lightened correctly. You can still change the style, or clear it, in the picker.",
+    ],
+  },
+  {
+    version: "1.481.6",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: Home could crash to a \u201cSomething went wrong\u201d screen shortly after opening, if one of the notifications behind the new \u201cN ready\u201d row changed while the screen was loading \u2014 a failed week-in-review was the reliable way to hit it. Introduced earlier today in v1.481.0; nothing was lost when it happened, but the screen had to be reloaded.",
+    ],
+  },
+  {
+    version: "1.481.5",
+    date: "2026-09-28",
+    changes: [
+      "Times in the activity list and activity details now read \"6:40 am\", the same as everywhere else in the app, instead of \"6:40am\".",
+    ],
+  },
+  {
+    version: "1.481.4",
+    date: "2026-09-29",
+    changes: [
+      "Fixed: a profile picture that is not really an image — a file that says PNG but is not one — is now refused when you upload it, instead of being saved and then showing as a broken picture.",
+    ],
+  },
+  {
+    version: "1.481.3",
+    date: "2026-09-29",
+    changes: [
+      "Security: showing, replacing or deleting the Oura ring key now asks for confirmation in a system dialog, which page scripts cannot answer. Each is still one tap away in the ring console, with a confirm step in front of it.",
+      "Security: the ring, scale and chest-strap services will only upload to this app's own address (or your own machine). They previously accepted any address the app asked for, and remembered it across restarts.",
+      "Security: your signed-in session and the Oura ring key are no longer included in Google Drive backups or phone-to-phone transfers. A restore onto another device cannot arrive already signed in as you, and you will sign in again after switching phones. Keep your own copy of the ring key.",
+    ],
+  },
+  {
+    version: "1.481.2",
+    date: "2026-09-29",
+    changes: [
+      "Security: being invited no longer lets someone else claim your account. Registering with an invited email address used to activate the account straight away, with nothing checking that the person registering could actually read that inbox — so whoever got there first held the password. A new email-and-password account now waits for approval, and signing in with Google clears any password set on it beforehand. Signing in with Google is unaffected: Google has already proved the address, so an invite is honoured there as before.",
+    ],
+  },
+  {
+    version: "1.481.1",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: if part of the app failed to download \u2014 a patchy moment on mobile data, say \u2014 you got a \u201cSomething went wrong\u201d screen and had to tap Try again yourself. It now retries once on its own and you usually never see it. If it genuinely cannot load, the screen still appears, so nothing is hidden from you.",
+    ],
+  },
+  {
+    version: "1.481.0",
+    date: "2026-09-28",
+    changes: [
+      "Changed: Home no longer stacks notifications above the thing you opened it for. The four \u201cready for you\u201d ones \u2014 an activity to review, the goals check-in, your day in review and your week in review \u2014 now sit behind one row that says how many are waiting; tap it to open them in place. Warnings you should see today, signs of illness and an early deload, still get their own full-width card.",
+    ],
+  },
+  {
+    version: "1.480.1",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: on Health → Training, Movement Balance coloured Push, Pull and Legs with the same colours your session calendar uses two cards above — and mapped them to different ones, so the same three words meant two different colours on one screen. The category bars now share a single colour and are told apart by their labels, which is also the only version that stays right if you reorder your sessions.",
+    ],
+  },
+  {
+    version: "1.480.0",
+    date: "2026-09-28",
+    changes: [
+      "Changed: the morning check-in no longer asks you to rate your sleep or your recovery. It tells you what it filled in and why \u2014 \u201cSlept 5h10, 1h20 short of your usual. Marked this a poor night.\u201d \u2014 and you only tap if it got it wrong. Your correction is recorded as yours; the app's own guess never is.",
+    ],
+  },
+  {
+    version: "1.479.0",
+    date: "2026-09-28",
+    changes: [
+      "New: Home shows what you said about last night's sleep. Under the readiness card you get your own rating \u2014 Great, Good, OK, Poor or Terrible \u2014 with five dots and a \u201cYour rating, not a score\u201d caption, so it can never be mistaken for a number the app worked out. It appears only on a morning you actually rated: leave the sleep question alone in the check-in and nothing is shown.",
+    ],
+  },
+  {
+    version: "1.478.7",
+    date: "2026-09-28",
+    changes: [
+      "Changed: Home's Log tiles now fill the row as three even columns, and the Log button sits below the value instead of on top of the icon. A fourth widget wraps to a second line rather than scrolling sideways.",
+    ],
+  },
+  {
+    version: "1.478.6",
+    date: "2026-09-28",
+    changes: [
+      "Fixed: when Health couldn't reach the server it described your account instead of the problem \u2014 Burned, BMI, Balance, Resting HR, HRV and SpO\u2082 all read \"No data\", it said you had no activities this week, and it asked you to add your height, age and sex in Profile and to log a body weight you had already logged. Those cards now say they couldn't load.",
+    ],
+  },
+  {
+    version: "1.478.5",
+    date: "2026-09-28",
+    changes: [
+      "When your recovery signals are flagged within a few days of an injected dose, the message now names the dose (for example \"Retatrutide 1 mg, 3 days ago\") and says it may be the medication rather than illness. Your scores are not changed.",
+    ],
+  },
+  {
     version: "1.478.4",
     date: "2026-09-28",
     changes: [

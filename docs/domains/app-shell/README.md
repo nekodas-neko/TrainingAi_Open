@@ -19,6 +19,18 @@ split is "does it feel slow" vs "is it actually slow at the source".
 
 ## Reference docs
 
+- [`docs/admin-control-inventory.md`](../../admin-control-inventory.md) — **every admin control, grouped by what it
+  is for, with a keep/hide/delete recommendation per row (OR-115, 2026-09-29).** Three findings worth knowing before
+  touching either screen. **"The admin section" is TWO screens** — `/admin` (admin-gated, six tabs) and
+  `/more/settings/developer` — and the six maintenance cards the accretion is really about are on the *Developer*
+  one, so searching `/admin` finds half of them; the split is deliberate per `Q-531`/`Q-234` (a drain is destructive,
+  access control outranks the taxonomy). **Nothing is unreachable** — all 19 `components/admin/` components resolve
+  from a live import, checked by export name, so *delete* is never justified on dead-code grounds; ⚠ a path-shaped
+  grep first reported `hr-backfill-card.tsx` dead when it is the shared base both backfill cards import as
+  `./hr-backfill-card`. And **two cards say "One-off admin utility" in their own header and are not** — the per-set
+  HR backfill is the standing remedy for a workout whose recap was never opened. `/admin/oura-ble`'s six numbered
+  `ConsoleSection`s are the template for the six ungrouped cards, and step 1's ordering is load-bearing: both its
+  cards read the server only, because a full disk is likeliest exactly when the APK cannot be opened.
 - [`docs/device-agent-probe-checklist.md`](../../device-agent-probe-checklist.md) — **Part B added 2026-09-23: the performance half** (P11–P16), filed as RV-137…RV-142. Cold start and per-tab time-to-interactive, Q-51's lone 1086 ms `/workout` mount turned into a distribution, the per-screen network waterfall and its **chain depth** (invisible to any source-reading sweep), main-thread long tasks, path structure including **what a tab-shell teardown actually costs** (RV-110 counts 37 sites and has no number), and whether a long session slows down (the timing half of RV-133, which together decide BF-22). Cold start is measurable now because `performance.getEntriesByType` survives the page's life, so attaching *after* a normal cold start loses nothing.
 - [`docs/reviews/2026-09-23-sweep-54-reading-the-instruments.md`](../../reviews/2026-09-23-sweep-54-reading-the-instruments.md) — **sweep 54, 2026-09-23: what the instruments already recorded**, rather than what the source implies. Two findings of one shape — an instrument answered and the doc that directs people still states the question. **BF-110's reading is in** (25 `recheck stuck`, **0** `resized`, **0** `dom-lost` across 62 reported resumes) so the fix is native by the module's own criterion, but its `Keep:` still says the reading is owed, which parks it in KEEP as *"not new work"* (RV-135); the blank resume has tripled since sweep 50. **CLAUDE.md's fetch-once rule was 19 wrong** — it claimed 19 can-bite sites where the script's baseline has said **0 since 2026-08-19**; corrected in place, and it had propagated into RV-125. Measured healthy: DB **232 MB / 1.53 MB per day**, on trend; no fault of the owner's in 7 days that is not `bf110`.
 - [`docs/device-agent-probe-checklist.md`](../../device-agent-probe-checklist.md) — **what the device-verification agent should instrument, and what to send back (2026-09-22).** Ten probes for the things only CDP can answer, which is exactly what every Review sweep ends on (*nothing was rendered or reproduced*): counting requests after a write to decide the Q-402 shape mechanically (P1), a `window.fetch` census over a fixed walk to find which effects never re-run inside the persistent shell (P2), the local-store write path that `getLocalStore` returning null makes untestable in the sandbox (P3), computed-style enumeration at 384 px (P4), transition frame capture for RV-113/114/115 (P5), and an offline pass (P8). **Its contract is that every probe returns a number, a list or an artifact** — "looks fine" cannot be filed as an entry. Complements the owner's tap-list in `device-verification-queue.md` rather than repeating it.
@@ -507,6 +519,31 @@ Live at the time of writing (2026-07-30):
   12 px, no token below `text-xs` — which is why every one was a literal). The workout screens' nine
   named sites are on it; the remaining 103 across 24 files are a per-file shrink-only ratchet rather
   than a sweep.
+- **[`2026-09-30-fix-lb162-progress-bar-render`](../../overview/entries/2026-09-30-fix-lb162-progress-bar-render.md)**
+  — `RV-72`'s `width` → `scaleX` bars, finally SEEN, on the third attempt: the two earlier failures
+  were recorded in `LB-162`'s `Keep:` (Home came up on the **zero-data** account; the Health capture
+  stopped above the muscle-sets card) and each had a different fix — pin `STORAGE_STATE`, and reach
+  the card through the pushed **`/health/week`** route. Asserted on **computed style and bounding
+  boxes**, because the risk of that conversion is geometric. ⚠ **`transform-origin` computes to USED
+  PIXELS** — `origin-right` reads `"354px 4px"`, so a `startsWith('100%')` check fails against a
+  correct bar. One of the four pass-test items turned out to be a SOURCE property and left the
+  device list by being answered: `scripts/check-progress-fill-track.js` requires every rounded track
+  to clip its square fill, judging the element that DIRECTLY wraps it.
+- **[`2026-09-30-fix-lb189-duplicate-accessible-names`](../../overview/entries/2026-09-30-fix-lb189-duplicate-accessible-names.md)**
+  — **the tab shell keeps every tab's tree mounted, so a name unique per SCREEN is not unique per
+  DOCUMENT.** Two energy-balance ⓘ toggles shared `aria-label="How energy balance is calculated"`, and
+  a document-wide `.first()` clicked the off-screen one for 60 s while `aria-expanded` stayed `false`.
+  A census of every static `aria-label` found 17 repeats, **15 legitimately repeated** (one-per-surface
+  dismiss/nav controls, the admin console, and one pair where a PUSHED route is not co-mounted with its
+  tab) plus one more of the same class. `scripts/check-duplicate-aria-labels.js` holds it, printing the
+  interpolated labels it cannot compare.
+- **[`2026-09-30-fix-rv208-date-and-brand-forms`](../../overview/entries/2026-09-30-fix-rv208-date-and-brand-forms.md)**
+  — RV-208 ④⑤, the last two parts. **`'long'` (`Saturday 26 September`) is the form a day-scoped
+  HEADER takes**: there were three, and `weekday-date-long` pairs a long weekday with `en-AU`'s
+  ragged-width short month while `weekday-date` is the only one carrying a comma. `25 Sept` is a ROW
+  label and a different job; the calendar's `September 2026` cannot be converted at all (no
+  month-year style — Lane A's, as `LB-126` already recorded). Rendered at 384 px because it put the
+  widest form into `BF-24`'s single band: **148.0 × 19.5 px in a 300 px row**.
 - **[`2026-09-27-rv208-numbers-and-durations`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv208-numbers-and-durations)**
   — RV-208 part one. Seven hand-rolled duration formatters onto `packages/shared/src/format/units.ts`,
   one of which floored a 45-minute nap to `0h`. Also what is left and who owns it: the time-of-day
@@ -581,3 +618,24 @@ Live at the time of writing (2026-07-30):
   Defaults a call site must not be able to break belong on an **inner** element it cannot reach;
   `components/ui/sheet.tsx` does this for the close button's 64px corner and says why. Related:
   `SheetContent side="bottom"` bakes the bottom inset and `p-0` does not strip it.
+
+- **[`2026-09-28-movement-balance-palette-clash`](../../overview/history-2026-09-29-folded-2.md#2026-09-28-movement-balance-palette-clash)**
+  — **RV-208 ③: category colours stopped borrowing session colours, and the hue space is
+  over-subscribed.** Movement Balance coloured `legs` `--accent-green` (**0°** from session green)
+  and `pull` `--accent-purple` (**10°** from session purple, **20°** from indigo), while the calendar
+  two cards up colours sessions by POSITION — so the same three words carried two maps, transposed.
+  **The entry's "add two new hues" was not available:** a candidate must clear `SESSION_PALETTE`'s
+  six Tailwind hues *and* four `--accent-*` tokens, and scanning the wheel leaves one comfortable
+  band (~345°) at 40° separation. So the rows keep their labels and share one accent — hue was
+  redundant encoding. `rv208-movement-category-hues.test.ts` asserts the arithmetic against
+  `globals.css`, not the literals. **Before adding any category palette, scan both systems first.**
+
+- **[`2026-09-28-home-banner-strip`](../../overview/history-2026-09-29-folded-1.md#2026-09-28-home-banner-strip)**
+  — **RV-119: Home's banners split by severity, four behind one strip.** Illness advisory and early
+  deload stay full-width; activity-to-review, goals check-in, day review and weekly recap collapse.
+  **Read this before adding any Home banner:** two of the four decide their own visibility and
+  `return null`, so the strip counts a **registry** they report into
+  (`useReportBannerPresence`) rather than anything the parent can see — and the two the stack
+  controls are reported by the stack, which is the half that undercounts the strip **silently** when
+  missed. The four are hidden, never unmounted: that is what keeps them in the registry *and* keeps
+  their own dismiss controls, which the entry expected to lose.

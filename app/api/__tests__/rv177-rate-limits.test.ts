@@ -21,8 +21,12 @@ vi.mock('@/lib/nutrition/meal-top-up', () => ({
 vi.mock('@/auth', () => ({
   auth: vi.fn(async () => ({
     user: { id: USER, timezone: 'Australia/Brisbane' },
-    refreshToken: 'fake-refresh-token',
   })),
+}))
+// RV-193 — the calendar route reads the refresh token from the encrypted cookie, not from the
+// session object, which is what `GET /api/auth/session` returns to page JavaScript.
+vi.mock('@/lib/auth/session-token', () => ({
+  googleRefreshTokenFrom: vi.fn(async () => 'fake-refresh-token'),
 }))
 
 describe.skipIf(!canRun)('RV-177 — rate limits and a validated calendar body', () => {
