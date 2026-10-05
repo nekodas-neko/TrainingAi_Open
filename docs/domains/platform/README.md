@@ -134,7 +134,8 @@ layer**) through §16. Read it before building any shared helper.
   — 🆕 proposal (2026-10-05, not live): weekly releases cut as tags from `main` (merges stop
   deploying), GitHub Issues replacing the backlog file, four agent roles instead of seven, and a
   lean `CLAUDE.md`.
-  Owner decisions are its §9.
+  Owner decisions are its §9. Phase 1's per-entry verdicts:
+  [`2026-10-05-backlog-triage.md`](../../superpowers/specs/2026-10-05-backlog-triage.md).
 - **[`docs/superpowers/plans/2026-08-02-public-repo-migration-roadmap.md`](../../superpowers/plans/2026-08-02-public-repo-migration-roadmap.md)**
   — 🆕 backlog **Q-49**, the top platform item. How the gitignored models still reach Railway (they
   run server-side, and the loaders fail silently), then the repo cut itself: snapshot, CI, the
