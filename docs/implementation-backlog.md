@@ -6598,7 +6598,10 @@ drift.
   - **② merge `LA-142` (#1849) and close #1749** — yes.
   - **⑤ merge `TN-56` (#1902)** — yes, auth-touching and approved on its shared-helper shape.
   - **③ withdrawn** — not his to answer; see below.
-- **Ask** — owner: ④ only. Fresh S3 storage keys in Railway, which only he can mint and set. ⑤ Merge TN-56 (#1902)?
+- **Ask** — owner: ④ only. Fresh S3 storage keys in Railway, which only he can mint and set.
+- **⑤ is CLOSED — `TN-56` (#1902) was approved 2026-09-30 and MERGED by Lane A on 2026-10-05**
+  under `OR-207`. The `Ask:` kept listing it for five days after it was answered, which is the
+  same shape as `Q-85`: a field that outlived its answer and would have been put to him twice.
 - **Added:** 2026-09-28 · Lane A, moving the asks out of chat per the owner's instruction that
   anything needing his input is assigned to the Orchestrator.
 - **① LA-159 (#1847): drop `program_phases.program_id`. ⭐ Recommend: yes.** 0 of the owner's 46
