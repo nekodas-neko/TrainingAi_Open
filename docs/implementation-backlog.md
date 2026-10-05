@@ -491,6 +491,24 @@ below threshold and left in place for next time.
 > temperature-baseline cluster under it keep their order relative to each other.
 
 ### [platform][readiness] OR-215 — a score must record WHICH signals it was built from, or no two scores are comparable
+- **✅ THE OWNER'S NEUTRAL-DEFAULT IDEA IS MATHEMATICALLY IDENTICAL TO RENORMALISE-PLUS-COVERAGE —
+  derived 2026-10-05, and it means no choice has to be made.** With weights `wi` summing to 1,
+  present set `P`, and coverage `C = sum of wi over P`: renormalised `R = (sum wi*si)/C`, and
+  neutral-imputed `N = sum wi*si + v*(1-C)`. Substituting gives **`N = R*C + v*(1-C)`**.
+  His default-at-midpoint **is** the renormalised score shrunk toward `v` by the missing weight.
+  **So store `R` and `C`; `N` is then free at render time.** The reverse does not work — `R` is
+  not recoverable from `N`, and storing `N` bakes in one `v` that cannot change without re-scoring
+  history. Verified against the code: `renormalisedContributors` is a renormalising weighted mean,
+  which is the structure the algebra assumes.
+- **Two things this buys that the idea alone does not.** `v` becomes tunable — mid-scale is only
+  neutral if the contributor's expected value is 50, which for most is false, so **the user's own
+  rolling median is the better `v`** with 50 as cold start. And the shrinkage curve becomes a
+  formula over stored values rather than a migration.
+- **⚠ The precedent against imputing at STORAGE is already in this repo:** `TN-57`/`TN-58` —
+  *"a neutral stored as though it were an answer is the defect TN-57 just fixed"* — and `Q-499`,
+  where a card cannot tell "no data" from "the fetch failed". Coverage keeps that distinction;
+  imputation destroys it. **Shrink at render, never at write.**
+- **📄 SPEC: [`docs/architecture/ingest-and-scoring.md`](architecture/ingest-and-scoring.md)** (draft v1, 2026-10-05) — the four layers, the decisions taken with their reversal costs, and the phasing. **Read it before adding to this entry**, so the three do not drift apart.
 
 - **Lane: O** · **Added:** 2026-10-05 · Orchestrator, from the owner's question on `OR-213`:
   *"if we never have body temperature - then a new device gives that reading; what do we do with
@@ -537,6 +555,7 @@ below threshold and left in place for next time.
 
 
 ### [devices][platform] OR-214 — the connector framework: "link with X", extracted from the five we already hand-rolled
+- **📄 SPEC: [`docs/architecture/ingest-and-scoring.md`](architecture/ingest-and-scoring.md)** (draft v1, 2026-10-05) — the four layers, the decisions taken with their reversal costs, and the phasing. **Read it before adding to this entry**, so the three do not drift apart.
 
 - **Lane: O** · **Added:** 2026-10-05 · Orchestrator, from the owner's direction.
 - **Needs:** OR-213
@@ -571,6 +590,7 @@ below threshold and left in place for next time.
 
 
 ### [platform][devices] OR-213 — the four-layer ingest architecture: one normaliser, device-first storage, scored values only in the cloud
+- **📄 SPEC: [`docs/architecture/ingest-and-scoring.md`](architecture/ingest-and-scoring.md)** (draft v1, 2026-10-05) — the four layers, the decisions taken with their reversal costs, and the phasing. **Read it before adding to this entry**, so the three do not drift apart.
 - **✅ ANSWERED 2026-10-05 — all three, and two calls delegated to the Orchestrator.**
   - **① NOTHING IS EXEMPT.** Every source follows one path: ingest raw → transform → store on
     device → send calculated groupings to the cloud. **Raw never reaches Railway.** For the
