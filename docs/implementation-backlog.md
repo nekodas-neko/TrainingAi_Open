@@ -490,6 +490,30 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform] OR-212 — `next-item.js` and `parseEntries` disagree about what a field is, so the queue has two authorities
+
+- **Lane: A** · **Added:** 2026-10-05 · Orchestrator, from a Device Verification finding.
+- **Reproduced on `LB-53` 2026-10-05, before it was reworded.** Its prose contained a backticked
+  **`Gate: owner`** mid-sentence — *"running it is a ... action, not a code change"*. Asked about
+  the same entry at the same commit:
+  - `scripts/next-item.js` **PARKED it**, printing `Gate: owner` as the reason.
+  - `parseEntries` reported **`gates=[]`**.
+  **Both cannot be right, and the queue treats each as authoritative in different places.**
+- **The cost is silent and it is not hypothetical.** `LB-53` sat parked out of the device agent's
+  READY list for a sentence in its own body; it is the same run as `TN-62` and should have gone in
+  the same sitting. Nobody could have found that by reading the entry, because the entry looked
+  correct — only running both tools reveals it.
+- **`CLAUDE.md` says to verify with the tool that owns the question. This is the case where that
+  instruction has no answer**, which is why it is worth fixing rather than documenting.
+- **The fix is to make one of them the authority, not to patch both.** `parseEntries` is already
+  the library the checks share, so `next-item.js` should read fields through it rather than
+  re-deriving them. Whichever way it goes, **the regression test is `LB-53`'s old text**: a
+  backticked field name inside prose must park nothing.
+- **Do NOT fix this by banning the literal from prose.** Entries legitimately need to discuss
+  `Gate:` and `Lane:` — the rules themselves do — and a convention nobody can enforce is how this
+  arrived. Four such leaks have been written and caught by hand already.
+
+
 ### [platform] OR-207 — six PRs were stranded when every session stopped, and four have gone un-mergeable
 - **⛔ DO NOT MERGE `#1847` OR `#1849` WHILE A DEVICE SITTING IS RUNNING — added 2026-10-05.**
   Both are column-dropping migrations, and **merging auto-deploys to Railway production**, which is
@@ -2505,14 +2529,20 @@ below threshold and left in place for next time.
   Home/Health/Nutrition/More: **zero frames with neither panel painted** (sweep 3: 58–109 ms on every
   switch). Whether the switch *reads* better is the owner's call; the gallery on RV-205 has the tabs.
 
-- **Lane: DV** · **Batch: tab-switch-speed** — shipped; only the device look is owed.
+- **Lane: O** · **Batch: tab-switch-speed** — shipped; only the OWNER'S look is owed.
+- **⚑ RE-LANED DV → O, 2026-10-05.** Its objective half **passed in sweep 4a**; what is left is
+  *"does the switch read better?"*, which is a judgement about how something feels, not a
+  measurement with a pass/fail. Per the owner's 2026-09-23 rule — *"if its device testing based on
+  looks/design that should stay in orchestrator waiting for user input"* — that belongs to him,
+  even though the phone is where he will look at it. Found by the Device Verification agent while
+  planning sweep 5; it was taking slots in a sitting that could not answer it.
 - **✅ SHIPPED 2026-09-24** (LB-144, #…). The opacity ramp is gone from `ta-tab-enter`
   (`app/globals.css`); the 0.96 scale settle stays, with the comment above it rewritten — it used
   to assert this defect could not happen. OR-161's second false comment
   (`tab-shell.tsx:186`) went in the same PR.
   **Kept 0.96, not the 0.97 this entry and its relay both wrote:** the scale was never part of the
   defect, and the comment beside it records why 0.96 was chosen over the spec's 92%.
-- **Keep:** DV — does the switch read better? This removes a BLANK, not a DELAY, so
+- **Keep:** the owner's look — does the switch read better? This removes a BLANK, not a DELAY, so
   `perf.js longtasks` will show no change and that is the expected result, not a failure. The
   question is perceptual and the owner's: with the dynamic background ON, the 58–109 ms gap used
   to show the wallpaper with no content over it. Pass/fail: switch tabs on the S25 and say whether
@@ -22473,7 +22503,7 @@ without a queue entry is a dropped finding.*
 - **Keep:** one thing, and it is not what this entry was filed for. **58 of the owner's 109 derived
   rows carry no readiness score at all** — the history is more hole than trend, because the live
   route only ever writes today and nothing has back-filled the rest. The tool to fix it already
-  exists and now stamps correctly; running it is a **`Gate: owner`** action, not a code change,
+  exists and now stamps correctly; running it is an action the OWNER must take, not a code change,
   because it writes months of history in one pass and a re-scored trend is not silently reversible.
 - **✅ RELEASED BY `RV-170`(a), 2026-09-25 (Orchestrator) — the gate is struck and nothing is owed by him.**
   The gate said this was *"a PRODUCTION WRITE, not a decision"*: back-filling readiness across the 58
@@ -25511,9 +25541,15 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   it leaves is narrower.** LB-98 published the logged pairs on `/api/health-trends?view=rest-adherence`
   and the card now falls back to them, so it is **no longer absent in a browser**:
   `e2e/rest-vs-plan-card.spec.ts` exercises the rows, the deltas and the compression sentence, all
-  mutation-proven. What the S25 still owes is the LOCAL path — `getLocalStore` reading
-  `planned_rest_sec` from the device's own set logs, which no harness can reach. Nothing here
-  licenses a rest term in `expectedRpe`.
+  mutation-proven.
+  **⛔ THE LOCAL-PATH CHECK THIS ASKED FOR IS DISCHARGED — struck 2026-10-05, on sweep 4a's own
+  result recorded above in this entry.** With `/api/health-trends*` blocked, *Rest discipline*
+  showed *"Couldn't load"* rather than local data, so **`getLocalStore` is not what paints the
+  card** and there is no local path for the S25 to exercise. The ask survived its own answer
+  because the `Keep:` was never rewritten when the measurement landed. **Nothing is owed on a
+  device here.** Found by the Device Verification agent while planning sweep 5 — it was still
+  being scheduled into sittings.
+  Nothing here licenses a rest term in `expectedRpe`.
 
 ### [workouts] Q-289 — `expectedRpe` misses by more than the autoregulation dead band at both ends of its own range
 
@@ -26568,6 +26604,15 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **📊 Read 2026-09-24 (Review sweep 56, production, SELECT only):** **the title is now false in both halves.** Resilience carries a level on **30** rows (was 13, newest 09-22), falling **5 → 4 → 3 → 2 → 1** from 09-07. It sits **pinned at the bottom clamp (1.01) on 09-21 and 09-22**, and the daily sleep-recovery term is 0.0 on most recent days. So it no longer saturates at the top; it saturates at the other clamp. Re-measure before any proposal is written.
 
 ### [platform][devices] LA-56 — the full-history redecode has never once completed, and "abandoned" is a guess
+- **⚑ THIS ONE ENTRY GATES SEVEN OTHERS — recorded 2026-10-05 from the Device Verification agent.**
+  A full-history redecode would answer **`LA-171` ②, `LA-68`, `Q-525`, `TN-1`, `Q-71`, this entry
+  and `RV-169`** — but **nothing shows a full pass completing since 2026-08-17**, and the device
+  agent is **holding the run until Lane A can say it will finish**. That is the right call, not
+  caution: a pass that dies halfway leaves every job `running`, and the one-at-a-time index then
+  blocks every future redecode.
+  **So the heartbeat is not a tidy-up — it is the unblock for seven entries**, and it should be
+  read that way when picking Lane A's next item. `OR-192` measured the same thing from the other
+  side: both recorded redecode jobs, 2026-08-30 and 2026-09-03, were **abandoned**.
 
 - **⛔ A re-lane away from the device agent was proposed 2026-09-25 and is DECLINED (Orchestrator)**,
   on the ground that this is Lane A code. There *is* Lane A code here — the heartbeat in the note
@@ -26742,7 +26787,12 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Do NOT simply raise `REDECODE_JOB_STALE_MS`.** Without a heartbeat that trades a false failure
   for a longer false success, and the one-at-a-time index means a genuinely dead job then blocks
   every retry for the new window instead of the old one.
-- **Verify:** device
+- **⛔ `Verify: device` REMOVED 2026-10-05 — it was on UNBUILT work, which is the trap `CLAUDE.md`
+  names by name.** `Verify:` means SHIPPED, and this entry's own *"First action"* is to **build**
+  the heartbeat (`last_beat_at`, reaped on beat age rather than start age); `reapStaleRedecodeJobs`
+  is still a pure `startedAt` age check. Filing unbuilt work as *"done, a look is owed"* is worse
+  than the silence it was meant to fix. **The device check is owed AFTER it ships, not now.**
+  Found by the Device Verification agent, sweep 5 planning.
 
 ### [readiness][devices] ⛔ LA-57 — REFUTED: the night-HRV "step" at the re-key is a ramp
 
