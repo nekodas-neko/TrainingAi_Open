@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { CHANGELOG } from "@trainingai/shared/changelog"
 import { lookupLatestApkRelease } from "@/lib/github-release"
+import { readBuildSha } from "@/lib/build-sha"
 
 // GET — public, cacheable version endpoint.
 //
@@ -29,12 +30,13 @@ export async function GET() {
       // OR-168. The commit this WEB deploy was built from — the only field here that identifies a
       // deploy. `version` moves only when a PR bumps the changelog, which most merges do not, and
       // `nativeBuildSha` above is the APK's sha, a different artefact entirely. Railway sets this
-      // at runtime; `app/sw.js/route.ts` already keys the service-worker cache on it.
+      // at runtime for a GitHub-sourced deploy; a release pushed with `railway up` carries it in a
+      // file instead (`lib/build-sha.ts`). `app/sw.js/route.ts` keys the service-worker cache on it.
       //
       // Read it with a cache-busting param: this response is `public, max-age=300` (deliberately,
       // and the one written exemption in `check-api-no-store.js`), so an unbusted poll can answer
       // from five minutes ago and report a deploy that has not happened.
-      webBuildSha: process.env.RAILWAY_GIT_COMMIT_SHA ?? null,
+      webBuildSha: readBuildSha(),
     },
     { headers: { "Cache-Control": "public, max-age=300" } },
   )
