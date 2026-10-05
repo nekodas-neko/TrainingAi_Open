@@ -99,8 +99,16 @@ Orchestrator; once fixed, re-run with the same version.
 minutes. Nothing was rolled back, and no tag was created. Check Railway's deploy log for the
 service, then paste both to the Orchestrator.
 
-**If *Attach the APK* fails:** the release and tag are fine; only the APK is missing. Not urgent —
-the Orchestrator re-runs the Android build onto that tag.
+**If *Attach the APK* fails:** the release and tag are fine; only the APK is missing. Not urgent.
+Retry just that half: **Actions** → **Android** → **Run workflow** → `main`, **release_tag** =
+`v<version>`. It rebuilds from the tag and attaches `app-v<version>.apk`.
+
+**If *Tag and publish notes* fails after the tag was created:** production is already serving the
+release and the tag is permanent, so only the release page is missing. **Code** → **Releases** →
+**Draft a new release** → **Choose a tag** → pick the existing `v<version>` → title `v<version>` →
+**Generate release notes** → **Publish release**. Then retry the APK as above. (This happened on
+the very first release, 2026-10-05: with no earlier `v*` tag, GitHub tried to summarise the whole
+history and refused it as too long. The workflow now names the previous tag explicitly.)
 
 ### Step 4 — ☐ Turn off Railway's auto-deploy from `main`
 

@@ -40,6 +40,15 @@ on:
         description: 'Attach the APK to this release tag instead of the rolling apk-latest'
         type: string
         required: true
+  # Retrying the APK half of a release on its own, when the release itself landed but this did not.
+  # Rebuilding from the tag reproduces the same commit, so it is the same APK in every way that
+  # matters; nothing else in the release has to run again.
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'The existing v* release to attach the APK to (e.g. v1.486.11)'
+        type: string
+        required: true
 
 concurrency:
   # The release's call gets its own group. Sharing `main`'s would let an ordinary native push
