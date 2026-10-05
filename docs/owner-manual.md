@@ -161,9 +161,8 @@ gives you the version). It should go green end to end, and this time Railway dep
 2. ☐ **Glance at the dry run** — you are checking it looks like a list of real work, not reading
    every row. Say "go" or say what's wrong.
 3. 🤖 It runs for real, then moves `docs/implementation-backlog.md` into `docs/archive/`.
-4. ☐ **Pick the first release's contents.** **Issues** → **Milestones** → *Release YYYY-MM-DD* →
-   add the issues you want in it. Anything not in the milestone does not get built. That is the
-   control point — it is how you decide what happens each week.
+4. ✅ Done 2026-10-05: **251 issues**, titles prefixed with their type. (The owner then chose a
+   continuous queue over picking each week's contents — see *Choosing what gets built*, Part 4.)
 
 ### Step 8 — ☐ Read the new rules before they merge (Phase 4)
 
@@ -182,7 +181,7 @@ settles is what you use:
 |---|---|---|
 | `🪐 Orchestrator 🟢` | Cloud (claude.ai/code) | Already running — this one |
 | `🪲 BugFix Agent 🟢` | Cloud | When there are reports to process |
-| `🚧 Implementer Agent 🟢` | **Your machine**, in the local clone, phone on USB for device work | When the milestone has work in it |
+| `🚧 Implementer Agent 🟢` | **Your machine**, in the local clone, phone on USB for device work | Whenever you want work done — it works the queue |
 
 The old Lane A, Lane B, Review, Tuning and Device Verification sessions **stay archived**; their
 work is absorbed as described in Part 6.
@@ -296,8 +295,7 @@ Or just tell any agent in chat — it files the issue for you. Either way, the i
    `needs: triage`.
 2. If it is something only you can decide, it becomes a `type: question` issue with the
    recommendation written in it.
-3. It waits for you to put it in a milestone (below). BugFix's small fixes are the exception —
-   they can go straight in.
+3. It joins the queue and gets built in turn. Nothing waits on you unless it is a question.
 
 ### Answering questions
 
@@ -307,11 +305,22 @@ it.** A one-word "yes, recommendation" is a complete answer.
 
 ### Choosing what gets built
 
-**Issues** → **Milestones** → the open *Release YYYY-MM-DD* → add or remove issues. The Implementer
-builds only what is in the open milestone. This is your steering wheel — the one place that decides
-what happens next.
+**You don't have to.** The Implementer works through every ready issue continuously, in this order:
+**`hotfix`** → **`next`** → bugs → everything else, oldest first. It batches issues in the same area
+that touch the same files into one PR (owner, 2026-10-05).
 
-### Release day
+**Your one lever is the `next` label.** Put it on anything you want done before the rest — on the
+issue page, **Labels** → `next`; or just tell any agent "put `next` on #2133". Take it off to let an
+issue fall back into normal order.
+
+**Milestones are the record, not the plan.** Each Tuesday's release gets a milestone
+(`Release 2026-10-14`) holding every issue that shipped in it, so you can always see what went out
+when.
+
+### Release day — every Tuesday
+
+Everything merged during the week ships together. **A hotfix goes out off-schedule only when
+production is actually broken**; anything less waits for Tuesday.
 
 1. 🤖 The Orchestrator bumps the version, picks the candidate commit, opens a **release issue**
    with the checklist, and has the Implementer run the release test (full suite, local run of the
@@ -397,19 +406,19 @@ itself needs nothing.
 |---|---|---|---|
 | **🪐 Orchestrator** | Cloud | Triages every new issue and assigns it to BugFix or the Implementer · writes your questions as issues · prepares each release and gives you the summary · runs the release on your "approve" · production reads · merges agent PRs · on request, a **review sweep** ("look over nutrition") or a **tuning proposal** | Orchestrator, Review, Tuning |
 | **🪲 BugFix** | Cloud | Your reports and the in-app *Report an Issue* inbox → well-traced issues · fixes small, local bugs itself (`agent: bugfix`) | BugFix |
-| **🚧 Implementer** | **Your machine** (Docker, phone on USB) | Builds issues from the open milestone · tests locally · opens PRs with auto-merge on | Lane A, Lane B |
+| **🚧 Implementer** | **Your machine** (Docker, phone on USB) | Works the queue (`hotfix` → `next` → bugs → oldest), batched by area · tests locally · opens PRs with auto-merge on | Lane A, Lane B |
 | ↳ **release-test mode** | Your machine | Runs the release test on the candidate, including the device pass, and writes VERIFIED / FAILED / COULD NOT CHECK on the release issue | Device Verification |
 
 **Why local vs cloud:** an agent runs on your machine only when its work needs something physically
 attached there — the phone, Docker, the real APK. Everything else runs in the cloud. No judgement
 call involved.
 
-**How the Orchestrator directs the others:** through labels and milestones, never by messaging
+**How the Orchestrator directs the others:** through labels, never by messaging
 them. A new issue arrives `needs: triage`; the Orchestrator reads it and sets `agent: bugfix` or
-`agent: implementer`; whichever agent you start next looks for its label in the open milestone.
+`agent: implementer`; whichever agent you start next takes the next ready issue with its label.
 Nothing has to be awake at the same time, and nothing lives only in a chat.
 
-**What you still decide, and only this:** what goes in a milestone · `type: question` issues ·
+**What you still decide, and only this:** what gets the `next` label · `type: question` issues ·
 "approve" on a release · anything that destroys data, money, auth/secrets, scoring calibration, and
 genuine product preferences. Structural and engineering calls are the agents', written down with
 the reason.

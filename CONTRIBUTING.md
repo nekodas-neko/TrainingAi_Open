@@ -12,9 +12,10 @@ development; when the two behave differently, the device wins.
 
 ## Picking up work
 
-- **Work lives in [Issues](https://github.com/nekodas-neko/TrainingAi_Open/issues).** The **open
-  milestone** is what the next release contains; start there. `good first issue` and `help wanted`
-  mark things that are good to start on.
+- **Work lives in [Issues](https://github.com/nekodas-neko/TrainingAi_Open/issues).** Anything not
+  `blocked` is ready. **`next`** marks what the owner wants done first. `good first issue` and
+  `help wanted` mark things that are good to start on.
+- **Releases go out every Tuesday**, carrying everything merged that week.
 - **Claim an issue by opening a draft PR** with `Closes #N` in its description, as soon as you
   start. That is how everyone else sees it is taken.
 - **Labels:** `type:` what it is · `area:` which part of the app · `lane: engine` (storage, API,

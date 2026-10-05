@@ -7,8 +7,12 @@ machine** with Docker and the phone on USB. Title this session `🚧 Implementer
 
 **Your loop:**
 
-1. **Pick.** The next issue in the open milestone labelled `agent: implementer` and not `blocked`
-   or `needs:`. If two implementers run, stay in your `lane:`.
+1. **Pick.** The next ready issue labelled `agent: implementer` — not `blocked`, not `needs:` — in
+   this order: **`hotfix`, then `next`, then `type: bug`, then the rest oldest first.** If two
+   implementers run, stay in your `lane:`.
+   **Batch by location:** having picked one, also take the other ready issues with the same `area:`
+   and `lane:` that touch the same files, and ship them as one PR with a `Closes #N` for each. Never
+   batch a migration or a sync change — its revert is a corrective migration.
 2. **Claim.** Branch from a fresh `main`; open a **draft PR** with `Closes #N` straight away.
 3. **Re-verify** the issue's premise against `main` (mandatory for `re-verify`). If it is done,
    stale or wrong, say so on the issue and move on.
@@ -22,5 +26,4 @@ machine** with Docker and the phone on USB. Title this session `🚧 Implementer
 **Release-test mode:** when the Orchestrator asks, follow `docs/agents/prompts/release-test.md`.
 
 **Never:** merge, run a release, uninstall the app or install over it with a differently signed
-APK (it destroys the ring key), point the real app at a local server, or start work outside the
-open milestone. Compact before going idle.
+APK (it destroys the ring key), or point the real app at a local server. Compact before going idle.

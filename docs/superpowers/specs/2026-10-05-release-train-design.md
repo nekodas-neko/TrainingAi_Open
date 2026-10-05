@@ -646,6 +646,17 @@ agent ends up following half the old rules and half the new.
 | 12 | Where the ingest architecture (`OR-213`/`214`/`215`) sits | **After the workflow lands, as the first epic — except its Phase 0** | Delegated to the Orchestrator. Reasoning below |
 | 13 | Backlog triage: before or after the architecture spec | ~~After~~ → **ALREADY DONE, and correctly** | The Orchestrator advised waiting and was **wrong**; the triage had already landed and its structure defuses the objection. What is owed is a re-check, not a re-triage. §9.1 |
 
+**Decision 14 (owner, 2026-10-05) — a continuous queue, not a weekly pick; releases on Tuesday.**
+This replaces §4.2's first control point ("you add issues to the milestone; agents build only what
+is in it"). The Implementer works every ready issue continuously — `hotfix`, then `next`, then bugs,
+then the rest oldest first — batching issues of the same area and lane that touch the same files
+into one PR. The owner steers with one label, **`next`**, and otherwise does not have to choose. A
+milestone becomes the **record** of a release, filled by the Orchestrator at release prep with the
+issues that shipped. Releases go out **every Tuesday**; a hotfix only when production is broken.
+*Why it is sound:* the owner's attention is the scarce resource, and a weekly pick spends it on
+the wrong question — most issues are not contentious, and the few that are carry `type: question`.
+*Reversal cost:* nil — milestones still exist, so going back to picking is a habit, not a change.
+
 ### 9.1 Decisions 12 and 13, reasoned (Orchestrator, delegated 2026-10-05)
 
 **The ingest architecture is a second restructure running in parallel with this one**, and neither

@@ -18,8 +18,13 @@ version is kept verbatim at [`docs/archive/CLAUDE-2026-10-05.md`](docs/archive/C
   device-check), `area:` (the eleven pillars), `needs:` / `blocked` (why it is not ready),
   `lane: engine` / `lane: surface` (which half of the code), `agent: bugfix` / `agent: implementer`
   (who picks it up), `re-verify`, `hotfix`. Defined in [`.github/labels.yml`](.github/labels.yml).
-- **The open milestone is the plan.** The owner chooses a release's contents by adding issues to
-  it. **Build only what is in the open milestone.** Suggest additions in a comment; never add them.
+- **The queue is every ready issue** — not `blocked`, not `needs:`, carrying your `agent:` label.
+  Work it in order: **`hotfix`, then `next`, then bugs, then the rest oldest first**. Batch issues of
+  the same `area:` and `lane:` that touch the same files into one PR (never a migration). The owner
+  steers with the `next` label. A **milestone is the record of a release**, filled at release prep —
+  not the plan.
+- **Releases are weekly, on Tuesday** ("patch Tuesday"): everything merged that week ships together.
+  A hotfix ships off-schedule **only when production is actually broken**.
 - **A title says what the task is, in plain words** — for an issue, a PR and a one-off session
   alike. No entry IDs, lane letters or `[area]` tags: labels carry area and lane, and the issue
   number is the ID. **An issue title starts with its type** — `bug:`, `feature:`, `chore:`,
@@ -48,7 +53,7 @@ version is kept verbatim at [`docs/archive/CLAUDE-2026-10-05.md`](docs/archive/C
 
 Three, plus one mode — full contract in [`docs/agents/README.md`](docs/agents/README.md):
 **🪐 Orchestrator** (cloud: triage, owner questions, release prep, merges) · **🪲 BugFix** (cloud:
-reports → issues, small fixes) · **🚧 Implementer** (the owner's machine: builds the milestone,
+reports → issues, small fixes) · **🚧 Implementer** (the owner's machine: works the queue,
 device checks) ↳ **release-test mode**. Work out which you are first. One session per role, kept
 open; compact before going idle rather than handing off. Titles end 🟢 while live, 🔴 when wrapped.
 

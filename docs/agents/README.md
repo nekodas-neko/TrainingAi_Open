@@ -25,14 +25,16 @@ nothing lives only in a chat.
 2. The **Orchestrator triages**: adds `type:`, `area:`, `lane:` and **`agent: bugfix`** (small,
    local, one file or so) or **`agent: implementer`** (real work), and removes `needs: triage`. A
    decision only the owner can make becomes a `type: question` with the brief written in it.
-3. The **owner** puts issues into the open milestone. That is the plan; nothing outside it is built.
-   BugFix's small fixes are the one exception.
-4. **BugFix** and the **Implementer** take issues carrying their `agent:` label from the open
-   milestone, open a draft PR with `Closes #N` when they start (that is the claim), and turn on
+3. Every ready issue is in the queue. The order is **`hotfix`, then `next`, then bugs, then the rest,
+   oldest first**. The **owner** steers by adding the `next` label to anything that should jump the
+   line; nothing else needs his say before it is built.
+4. **BugFix** and the **Implementer** take ready issues carrying their `agent:` label, open a draft PR with `Closes #N` when they start (that is the claim), and turn on
    auto-merge when it is ready.
-5. The **Orchestrator** merges agent PRs on green CI, prepares the release, gives the owner the
-   summary, and runs the release on "approve". The Implementer's **release-test mode** tests the
-   candidate first.
+5. The **Orchestrator** merges agent PRs on green CI. **Every Tuesday** it prepares the release —
+   everything merged since the last one — files those issues into that release's milestone (a
+   record, not a plan), gives the owner the summary, and runs it on "approve". The Implementer's
+   **release-test mode** tests the candidate first. A hotfix goes out off-schedule only when
+   production is broken.
 
 ## Who may do what
 
@@ -49,8 +51,8 @@ A contributor's PR is merged by the **owner**. Agents may review and approve it.
 
 ## State
 
-**In GitHub, not in files.** The open milestone, the issues, their labels and the draft PRs are
-the state. There are no batons. A role that needs a durable marker keeps it in one pinned issue
+**In GitHub, not in files.** The issues, their labels and the draft PRs are the state; each
+release's milestone records what shipped in it. There are no batons. A role that needs a durable marker keeps it in one pinned issue
 (BugFix's intake watermark, for example), so it is visible to everyone and survives any session.
 
 ## Sessions

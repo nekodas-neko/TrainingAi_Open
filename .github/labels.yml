@@ -104,6 +104,11 @@
   color: 'fef2c0'
   description: Filed before 2026-08-20 — check the premise against main before building it
 
+# --- the owner's one steering lever (2026-10-05): build this before the rest of the queue ---
+- name: 'next'
+  color: '0e8a16'
+  description: The owner wants this built before the rest of the queue
+
 # --- release path ---
 - name: 'hotfix'
   color: 'b60205'
