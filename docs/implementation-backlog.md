@@ -7506,6 +7506,26 @@ drift.
 
 ### [readiness][body] LA-134 — the Body Battery's constants are provisional and nothing re-sweeps them
 
+- **▶ CHECKED 2026-10-05 (Lane A): NO FIT TO MAKE, AND NOT ENOUGH DATA TO MAKE ONE. The provisional constants already
+  pass the entry's own test on every v6 day there is.** Read from the stored rows with the new
+  `body-battery-replay.cjs --check` (the harness had no `--sweep` and could not run on Windows; both fixed or
+  stated):
+  - **12 v6 days (09-24 to 10-05): 0 end at zero, against 27 of 52 under v5.** End values run 30 to 49
+    (sd 5.6). **Median daily net −2.5**, within ±5. Both pass criteria hold.
+  - **But only 5 of the 12 are informative** (at least 1,000 heart-rate samples). The rest read 0 to 241:
+    the ring was not worn, and on those days the battery just holds where it was. A verdict resting on 5
+    days is the calibration-on-a-filling-window error BF-55 spent three weeks on, so the tool labels it
+    INSUFFICIENT rather than PASS.
+  - **`--validate` reports FAIL for a reason that is not the constants:** its one out-of-range day is
+    2026-09-22, a v5 row, and `--validate` replays under the v6 walk. Ignore that row; `--check` filters by
+    model version and has no such trap.
+  - **Nothing is to be shipped:** the walk's shape and the constants are unchanged, so no version bump.
+- **Keep:** re-run `node scripts/tuning/body-battery-replay.cjs --pull` then `--check` once **20 informative
+  v6 days** exist. At the 5-in-12 rate so far that is around **mid-November**, sooner if the ring is worn
+  more. A FAIL on either criterion with enough days is the trigger to adjust the one dial (the gain), per
+  the paragraphs below; PASS means close this entry. The 09-23 zero-HR day is a v5 row and is tracked by
+  its own entry, not this one.
+
 - **⏳ NOT STARTABLE BEFORE 2026-10-04, and it is NOT parked — read this before picking it up.**
   RV-189 tried to park it and found nothing to park it with: `next-item.js` parks only on a `Needs:`
   naming another entry, a `Gate:` of owner or device, or the legacy prose marker, and none of those is
