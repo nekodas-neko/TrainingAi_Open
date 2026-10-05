@@ -28,6 +28,8 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
 
 ## Reference docs
 
+- [`docs/architecture/adaptive-scoring.md`](../../architecture/adaptive-scoring.md) — **2026-10-05: scores that learn the person** — any new signal declared once, baselines at hour/week/month/season scale, scores as per-person configuration, and an insights engine ("how does X affect you") with accuracy guards. Epic #2321.
+
 - [`docs/architecture/scoring-structure.md`](../../architecture/scoring-structure.md) — **2026-10-05: how every score is built**: each pillar's components, weights, curves, inputs and adjustments, and how the owner's "value per component" tuning method maps onto them.
 
 - [`2026-09-02-tn1-chronic-stress-count`](../../overview/history-2026-09-10-folded-6.md#2026-09-02-tn1-chronic-stress-count) — **the chronic-stress refusal now leaves a number behind, 2026-09-02 (TN-1).** `chronic_stress_score` has been NULL on every row since the model shipped, and both gates countable from stored data pass (43 summary rows against a threshold of 21; 27 of 31 nights complete at the summary level), so the refusal is in the **granular** layer — which recomputes its intermediates in memory by design and records no reason. `chronic_stress_granular_nights` counts the nights in the model's own 31-night window carrying a non-empty hypnogram, rMSSD series **and** skin-temp run (migrations **258 + 259**, local SQLite **v36**). **The gate is untouched** — `CHRONIC_STRESS_MIN_DAYS` does not move and nothing consults the count. **⚠ Only a hand-triggered `fullHistory` pass reaches the model**, so the column stays NULL until the owner runs one; ≥ 21 with a null score then puts the fault inside the vendored model, < 21 names the granular stash.
