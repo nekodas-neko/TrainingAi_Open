@@ -457,6 +457,33 @@ Each comes with a recommendation. Anything not listed here is structural and an 
 
 ---
 
+## 10. Not in this change: bundling the shell into the APK (v2)
+
+Asked 2026-10-05: should moving the UI into the APK (Q-1a's client half plus Q-1b) ride along with
+this restructure? **Recommendation: no. Do it after this, as its own v2 milestone.**
+
+- **One big change at a time.** The shell move changes auth (a token held on the device instead of a
+  cookie), how UI reaches the phone (every UI change needs an APK instead of a Railway deploy), and
+  all 43 page routes; 32 UI files check auth on the server today (counted on `main` 2026-10-05,
+  up from the plan's 21). Landing it during the first releases of
+  a new pipeline means any failure has two suspects.
+- **The measurement hasn't changed.** It buys about 0.44 s on cold open only, and you deferred it
+  three times with "v2" as the trigger. None of the conditions set for reopening it has occurred:
+  the app feeling slow, leaving Railway (Q-551), or offline-first-on-open.
+- **This restructure makes the shell move cheaper later.** Releases already build the APK from the
+  tag, so server and UI ship as one versioned unit. The `.dev` flavor already gives the app a
+  configurable server URL and its own app ID. The server half of bearer auth shipped on 2026-09-18.
+  And a weekly release already produces an APK, so "every UI change needs an APK" stops being a new
+  cost.
+- **What to do now:** during Phase 3, file it as a **v2 milestone** whose sub-issues are bearer
+  client, `apiUrl()` across fetch sites, static-export split, then bundling. Each sub-issue ships on
+  its own while the app still loads from Railway. Phase 4's lean rules describe "UI ships through
+  Railway" as how it works today, not as a permanent rule. Start the milestone once two or three
+  releases have run cleanly. That includes deciding how UI updates reach the phone: a new APK each
+  release, or an over-the-air bundle.
+
+---
+
 ## Appendix A: planned work that's blocked (starting list for Phase 1)
 
 **Waiting on you right now (2):** LA-173 (five things Lane A needs: fresh S3 storage keys in Railway
