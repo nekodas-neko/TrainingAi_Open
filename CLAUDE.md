@@ -21,9 +21,9 @@ version is kept verbatim at [`docs/archive/CLAUDE-2026-10-05.md`](docs/archive/C
 - **The open milestone is the plan.** The owner chooses a release's contents by adding issues to
   it. **Build only what is in the open milestone.** Suggest additions in a comment; never add them.
 - **A title says what the task is, in plain words** — for an issue, a PR and a one-off session
-  alike. No entry IDs, lane letters or `[area]` tags in it: labels carry the type, area and lane,
-  and the issue number is the ID. Write it so someone who has never seen the repo knows what
-  changes.
+  alike. No entry IDs, lane letters or `[area]` tags: labels carry area and lane, and the issue
+  number is the ID. **An issue title starts with its type** — `bug:`, `feature:`, `chore:`,
+  `tuning:`, `question:`, `device-check:` — kept in step with the `type:` label automatically.
 - **A question for the owner is a `type: question` issue**, never a chat message. Write the brief
   into it: recommendation first, why it wins a year out, the alternatives and what each is better
   at, the reversal cost, plain English, under a minute to read.
