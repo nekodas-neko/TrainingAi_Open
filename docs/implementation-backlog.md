@@ -490,62 +490,126 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [workouts][cardio] OR-210 — the chat tool re-bands ACWR itself, and program-age baselining has three rules
+### [devices][platform] OR-214 — the connector framework: "link with X", extracted from the five we already hand-rolled
 
-- **Lane: A** · **Added:** 2026-10-05 · Orchestrator, splitting `PS-28` (b) and (c) off its gate.
-- **Neither item is an owner decision**; each is settled by a rule already in `CLAUDE.md`, which is
-  why they are out from behind `PS-28`'s window gate.
-- **(b) `getTrainingLoadRisk` returns a raw 56-day number with no band**, so the model bands it.
-  Against `acwr.ts`'s own *"never re-derive at the call site"* and against *clients render the
-  route's `interpretation`*. **32 of the owner's last 76 days disagree with the Health card.**
-  Return the banded `interpretation` the Health path already computes; do not add a second bander.
-- **(c) three baselining rules for one concept** — the route uses `startedAt ?? createdAt`,
-  readiness uses `startedAt` else **Infinity** (so it never baselines), and signals/chat/running
-  use none. **One Formula, One Place.** The owner's active program has `started_at = NULL`, which
-  is how July's early-deload ran on live ACWR while the card said "baselining".
-- **⛔ Do NOT change the acute window here.** That is `PS-28` (a), it is a scoring calibration, and
-  it owes a Tuning proposal. Touching it in this entry would ship a re-score behind a bug fix.
-- **What proves it fixed:** the chat tool and the Health card agree on the same day's band, and one
-  baselining helper has all three call sites.
+- **Lane: O** · **Added:** 2026-10-05 · Orchestrator, from the owner's direction.
+- **Needs:** OR-213
+- **What he asked for:** a repertoire of **connectors** — Health Connect, Renpo scale, Oura, and
+  whatever comes next — each one a thing you *"click 'link with x' and then it auto connects and
+  feeds in"*. It pulls third-party data and transforms it into the shape the app reads.
+  **Simplicity is the stated requirement**, and it is what makes adding a device for another user
+  a configuration rather than a project.
+- **✅ THIS IS AN EXTRACTION, NOT A GREENFIELD BUILD — and that is the main finding.** Five source
+  integrations already exist and each was hand-rolled with no shared contract:
+  `lib/oura-ble` · `lib/scale-ble` (Renpo) · `lib/colmi-ble` · `lib/polar-ble` ·
+  `lib/health-connect-sync.ts`, with native services under
+  `android/app/src/main/java/com/trainingai/app/{oura,scale}`.
+  **So the contract should be read out of what these five already do** — they are five worked
+  examples of the same problem — rather than designed in the abstract and then retrofitted. The
+  risk of the abstract route is a framework that fits none of them.
+- **What a connector must declare**, as the contract to extract: the **signals** it provides, each
+  one's **native resolution**, its **transport** (BLE / Health Connect / cloud API), its **link and
+  unlink** flow, its **auth or pairing** state, and its **rank** for the per-minute merge in
+  `OR-213`. One registry, so *"what are our sources"* is answerable by reading a list.
+- **Why it is gated behind `OR-213`:** a connector's output shape is the normaliser's input shape.
+  Building the registry first would freeze an interface the ingest layer has not defined yet.
+- **⚠ The hardest one is already live and must not be re-opened casually:** the Oura ring is on
+  **our own BLE key** with frozen firmware, and re-onboarding the official app risks a firmware
+  update that breaks the reverse-engineered protocol. **An Oura connector wraps the existing
+  pipeline; it does not re-pair the ring.** A naive "link with Oura" button that re-runs onboarding
+  would destroy the integration.
+- **Second constraint from the same area:** an APK uninstall destroys the ring's BLE key, which is
+  recoverable from nowhere. Any pairing UI must make that impossible to trigger by accident.
+- **Scope note:** this is the layer that makes multi-user real. Until it exists, every new user's
+  device support is bespoke work, which is the thing `OR-213` ② is trying to escape.
 
-### [cardio] OR-211 — `sex:'other'` halves VO2max, and best pace has no distance floor
 
-- **Lane: A** · **Added:** 2026-10-05 · Orchestrator, splitting `PS-36` (a) and (b) off its gate.
-- **(a)** `sexCode = female?1 : male?0 : null` sends a **fully-profiled** `sex:'other'` user to the
-  Ross last-resort equation — **42.7 → 18.7 for identical inputs**. The fallback's own comment says
-  it is for *missing* terms, so this is the code disagreeing with its stated intent rather than a
-  modelling choice. **The owner is unaffected and that is not a reason to leave it**: it is wrong
-  for any third user, and silently.
-- **(b)** best pace is `min(avgPaceSecPerKm)` with **no distance floor**, so a 30 m GPS false-start
-  becomes the all-time best — reproduced on a live fixture. **The pattern to copy is in the same
-  file**: the 1k/5k bests are already windowed.
-- **⛔ Do NOT touch the Z3 mapping.** That is `PS-36` (c), where two files and a filed Tuning band
-  hold three readings of WHO 2020; reconciling them is Tuning's and the owner signs it off.
-- **What proves it fixed:** an `other`-sex profile with full terms gets the same equation as a
-  male/female one, and a sub-floor GPS fragment cannot become a best pace.
+### [platform][devices] OR-213 — the four-layer ingest architecture: one normaliser, device-first storage, scored values only in the cloud
+- **✅ ANSWERED 2026-10-05 — all three, and two calls delegated to the Orchestrator.**
+  - **① NOTHING IS EXEMPT.** Every source follows one path: ingest raw → transform → store on
+    device → send calculated groupings to the cloud. **Raw never reaches Railway.** For the
+    redecode case it is kept **locally, outside the repo** (gitignored or equivalent) — *"it
+    doesnt need to go to the railway app"*. Calculated values upload **as soon as they exist**.
+  - **② MULTI-USER IS THE GOAL, not prospective** — 1–2 → ~5 → upward, with users warned they are
+    in a dev period. **Build for it now**, rather than treating it as a later migration.
+  - **③ Resolution left to the Orchestrator** — *"You choose here; do the best option."*
+- **⛔ THE ONE ORDERING RULE, and it is the whole safety of ①.** `oura_raw_packed` — **28 MB,
+  1.8 M frames** — is **today the only re-decodable copy** of the ring's history, and the ring's
+  buffer only moves forward. So the sequence is fixed and may not be reordered:
+  **(1)** build the local archive and **prove a restore from it**, read-back and unpack verified,
+  not merely a file that exists; **(2)** stop writing raw to Railway; **(3)** only then drop the
+  server archive. **Deleting before a proven restore is unrecoverable** — there is no re-drain.
+  The device is not that home as it stands: 31.2 MB on-device, past Android Auto Backup's 25 MB
+  quota, nothing backed up, and `pruneRaw` still has no caller.
+- **🔧 DECISION (Orchestrator, delegated) — canonical resolution is FINEST-AVAILABLE PER SOURCE,
+  tagged.** Every sample carries its **source** and its **native resolution**; nothing is resampled
+  on arrival. Health Connect's 5-minute HR bins stay 5-minute bins **marked as 5-minute**, and are
+  never interpolated to look like the strap's ~1 s.
+  **Why:** downsampling later is reversible, discarding is not — and a 5-minute bin dressed as 1 s
+  is a number the app would trust more than it should. Roll-ups are derived on the device, where
+  recomputing from the finest tier is cheap.
+  **Reversal cost: low on the write path, total on the data.** Switching to a fixed grid later is a
+  config change; recovering detail thrown away at ingest is impossible.
+- **🔧 DECISION — the per-minute winner is decided by SOURCE RANK, reusing the existing ranked
+  per-field health-write merge** rather than a new mechanism. Finest resolution does not
+  automatically win: a 1 s strap reading and a 5-minute ring bin covering the same minute are
+  resolved by rank, and the loser is **kept, not discarded**, so the choice can be revisited.
+- **⚠ Consequence of ① + ② worth pricing before the spec:** *"uploaded instantly"* × N users makes
+  the cloud write path the shared bottleneck. The pool is `max: 10` per replica and
+  `CLAUDE.md` marks it load-bearing — so the upload must be **batched and bounded per user**, not
+  a write per value. This is a design input, not a blocker.
+- **Ops/logs are the second cost nobody has counted:** 54 MB (21.8%) today is `error_events` and
+  `db_query_log`, which **do not shrink under this architecture** and are shared rather than
+  per-user. Worth a retention decision in the same spec.
 
+- **Lane: O** · **Added:** 2026-10-05 · Orchestrator, from the owner's architecture direction.
+- **His target, in his words:** raw from device / Health Connect → turn raw into values → store at
+  the finest resolution available **on the phone** → Tuning scores it → the app rolls up
+  (1s → 1min → 15min → 1h) locally → **only the scored, calculated values go to Railway**, because
+  that set is small. Driver: *"we need to make sure our railway DB can handle multiple users
+  efficiently."*
+- **✅ MEASURED 2026-10-05 — THE PREMISE HOLDS, and the number is decisive.** Production today, one
+  user, 263 MB total:
 
-### [workouts][platform] OR-209 — store the raw model prescription beside the reconciled one, so RV-65 becomes answerable
+  | bucket | size | share |
+  |---|---|---|
+  | raw / sample, device-sourced | **182 MB** | **73.3%** |
+  | ops + logs (`error_events`, `db_query_log`) | 54 MB | 21.8% |
+  | **calculated + app data** | **12 MB** | **4.9%** |
 
-- **Lane: A** · **Added:** 2026-10-05 · Orchestrator, splitting the diagnostic out of `RV-65`.
-- **Why this exists:** `RV-65` asks whether the model still earns its call in the prescription. That
-  cannot be answered today and **cannot be answered retrospectively** — measured 2026-10-05, the
-  stored prescription carries no raw-model field, and `session_periodization` keeps one row per
-  session, overwritten each time. **No query will ever produce this.** Only instrumentation will.
-- **What to store:** the raw parsed model object alongside the final reconciled one — or, if that is
-  too heavy, the **per-exercise delta** between the model's chosen pct and what the deterministic
-  chain produced. The delta is the thing the decision turns on; the full object is just the easiest
-  way to keep every later question open.
-- **It is additive and needs no owner decision** — a new column or JSON key, no behaviour change, no
-  data dropped. That is the whole reason it is split from `RV-65`.
-- **⏳ Expect WEEKS, not days.** Production ran **10 prescriptions in 5 weeks** (~2/week, 50 exercise
-  rows). A fortnight of collection is a handful of sessions, so say so when reporting rather than
-  drawing a conclusion from four.
-- **What it unblocks:** `RV-65`'s removal decision, which stays the owner's. Two answers point at
-  different work — *the model moves nothing, seed at the zone midpoint* versus *the model carries
-  real signal in compound pct* — and the diagnostic is what separates them.
-- **Do NOT remove the model, change the prompt, or touch the autoregulation chain here.** This entry
-  only adds a record. `RV-65` holds the rest.
+  **So the architecture he describes takes a user from ~263 MB to ~12 MB — about 22×.** At today's
+  shape 100 users is ~26 GB; under his model it is ~1.2 GB. **This is not a refactor for tidiness,
+  and the entry should not be argued on tidiness.**
+- **✅ CONFIRMED: there is NO shared normalisation layer, exactly as he suspected.** Searched for a
+  canonical-sample step (`normaliseSample`/`canonicalSample`/a shared sensor-ingest module) — **none
+  exists**. Ingest arrives through at least `app/api/hr-ingest`, `app/api/sync-health`,
+  `app/api/health-connect`, `app/api/oura-ble/samples` and `lib/health-connect-sync.ts`, and
+  `oura_heartrate` is written from several of them independently. **Each source defines its own
+  shape, so "what are our important sources and how do we aggregate them" has no single answer to
+  read.** That is the gap worth closing first, before any storage move.
+- **⛔ ONE HARD CONFLICT WITH AN EXISTING DECISION, and it must be resolved before anything ships.**
+  *"Everything raw on the device"* contradicts the owner's own **2026-09-28** decision to KEEP the
+  server-side Oura raw archive, taken on `OR-192`'s measurement: a redecode is **hardcoded
+  full-history**, so every protocol fix re-reads the entire archive, and **a pruned raw row cannot
+  be re-drained from the ring**. Both positions are his and they cannot both hold.
+  **The device is not currently a safe home for the only copy:** measured on-device 2026-08-18,
+  **209,326 rows / 31.2 MB, past Android Auto Backup's 25 MB quota, so none of it is backed up**,
+  and the 14-day prune (`pruneRaw`) still has no caller. A lost phone would be a permanent loss.
+- **The resolution question he raised is the real design content.** Health Connect delivers 5-minute
+  HR bins; the strap delivers ~1 s; the ring delivers its own cadence. A normaliser has to decide
+  whether the canonical store keeps **finest-available per source** (and records which) or
+  **downsamples to one grid on arrival**. Keeping the finest is reversible; picking a grid is not,
+  because the discarded detail cannot be recovered.
+- **What this entry owes before it becomes buildable work:** a written spec of the four layers with
+  the source contract named — for each source, what it provides, at what resolution, and which
+  field wins when two sources cover the same minute. **The existing ranked per-field merge for
+  health writes is prior art and should be read first, not reinvented.**
+- **Questions put to the owner 2026-10-05** (see the chat of that date): whether the raw archive is
+  genuinely exempt from "everything local"; whether multi-user is real or prospective; and whether
+  the canonical resolution is finest-available or a fixed grid.
+- **Do NOT start moving storage.** The normaliser and the source contract come first; a storage move
+  without them relocates the ambiguity rather than removing it.
+
 
 
 ### [platform] OR-207 — six PRs were stranded when every session stopped, and four have gone un-mergeable
@@ -576,6 +640,30 @@ below threshold and left in place for next time.
   are docs-only and can go any time.
 - **Re-confirm CI green on each UPDATED head before merging.** Two are column-dropping migrations
   with a guard; the guard is what makes them safe, not the age of the approval.
+- **▶ STATE 2026-10-05, ~16:35 AEST (Lane A).**
+  - **Merged:** `#2024` (LB-194), `#1902` at 16:28 (TN-56; auth only, no schema; flipped ready and
+    merged with RV-190's `runScoped` change; live-checked 401 without a token, 401 on a wrong one,
+    past-auth on the right one), and **`#1847` at 16:29** (LA-159's column drop; rehearsed on the
+    owner's snapshot, 46 phases before and after).
+  - **⚠ `#1847` MERGED EIGHT MINUTES AFTER THE HOLD ABOVE WAS ADDED (16:21), AND LANE A DID NOT SEE
+    IT.** Lane A read this entry at the start of the work, armed auto-merge, and did not re-read it
+    before the deploy. Production now runs `b32d329`. **Lane A cannot tell whether a sitting was
+    running** (the DV baton is dated 09-28 and says nothing is). If one was, an anomaly from about
+    16:29 AEST is a deploy restart, not a device finding.
+  - **`#1849` is READY AND HELD.** Brought onto `main`; its views file auto-merged to exactly what
+    the generator emits; its guard test, the claude_ro twin tests and the LB-177 rules pass (42,
+    none skipped); rehearsed on the snapshot (135 rows intact, four dead columns gone). **Auto-merge
+    is disabled.** Merge it by hand once the sitting is over.
+  - **Practice that follows: do not ARM auto-merge on a migration PR at all.** Arming it commits to a
+    deploy at a moment Lane A does not choose, which is the whole hazard of the hold above. A
+    migration PR is merged by hand when it is known to be safe.
+  - **`#1790` and `#1762` are OBSOLETE and should be closed, not merged.** Checked against `main`:
+    **all 13 questions `#1790` puts an `Ask:` on were answered or decided later on 2026-09-27**
+    (BF-144 group, Q-540, Q-297, Q-251, TN-72, TN-67, RV-166, PS-51, BF-145, BF-96/BF-139, LB-38,
+    BF-168; `LA-89` and `TN-74` have left the queue), so merging it would make the Orchestrator ask
+    him settled questions again. **`#1762` re-adds 41 journal entries that already exist folded in
+    `history-2026-09-27-folded-2.md`.**
+- **Ask:** owner — (1) is the device sitting over, so `#1849` may merge? Recommendation: yes once DV says so; it only drops four columns with 0 values in 135 rows and the migration re-checks every account. (2) May `#1790` and `#1762` be closed as obsolete? Recommendation: yes, with a one-line comment pointing here; closing a PR is the one step Lane A takes only on his word.
 
 ### [devices][heart-rate] OR-208 — `rr_intervals` has written nothing since 2026-09-28, while the ring kept writing
 - **✅ ANSWERED 2026-10-05 — NOT A FAULT. The owner has not worn the strap since 28 September.**
@@ -6569,7 +6657,10 @@ drift.
   - **② merge `LA-142` (#1849) and close #1749** — yes.
   - **⑤ merge `TN-56` (#1902)** — yes, auth-touching and approved on its shared-helper shape.
   - **③ withdrawn** — not his to answer; see below.
-- **Ask** — owner: ④ only. Fresh S3 storage keys in Railway, which only he can mint and set. ⑤ Merge TN-56 (#1902)?
+- **Ask** — owner: ④ only. Fresh S3 storage keys in Railway, which only he can mint and set.
+- **⑤ is CLOSED — `TN-56` (#1902) was approved 2026-09-30 and MERGED by Lane A on 2026-10-05**
+  under `OR-207`. The `Ask:` kept listing it for five days after it was answered, which is the
+  same shape as `Q-85`: a field that outlived its answer and would have been put to him twice.
 - **Added:** 2026-09-28 · Lane A, moving the asks out of chat per the owner's instruction that
   anything needing his input is assigned to the Orchestrator.
 - **① LA-159 (#1847): drop `program_phases.program_id`. ⭐ Recommend: yes.** 0 of the owner's 46
@@ -6940,6 +7031,12 @@ drift.
   - The rules path had nothing for the styleless Cable Chest Dips, which LA-177 has since backfilled.
   - **The model's prose said it "excluded Dumbbell Fly" while the numbers it returned included it.**
     That is evidence for Phase 2's prose-from-final-numbers.
+- **OR-209 (2026-10-05): each shadow row now also carries `model`**, the model's own sets/reps/pct/rest
+  exactly as parsed (`null` where it omitted the exercise, ABSENT on rows written before that day). **It is
+  raw, and the model often answers pct as a fraction** (0.775 for 77.5), so run `normalizePctFraction`
+  before comparing. First live row: model sets 4/4/3 against 2/2/2 given, and two of five exercises
+  omitted and backfilled. That is `RV-65`'s evidence base, and **only rows from 2026-10-05 on can have
+  it** (~2 prescriptions a week, so expect weeks).
 - **Keep:** the read, after two weeks of production prescriptions: the share where rules = given on
   reps/pct within 2.5 %, the rest distribution for each, and how often `model_phase` ≠ `final_phase`
   or `model_phase_action` ≠ `final_phase_action`. Earliest useful date **2026-10-13**. It unblocks
@@ -7466,6 +7563,26 @@ drift.
   owner's call — same footing as LA-143.
 
 ### [readiness][body] LA-134 — the Body Battery's constants are provisional and nothing re-sweeps them
+
+- **▶ CHECKED 2026-10-05 (Lane A): NO FIT TO MAKE, AND NOT ENOUGH DATA TO MAKE ONE. The provisional constants already
+  pass the entry's own test on every v6 day there is.** Read from the stored rows with the new
+  `body-battery-replay.cjs --check` (the harness had no `--sweep` and could not run on Windows; both fixed or
+  stated):
+  - **12 v6 days (09-24 to 10-05): 0 end at zero, against 27 of 52 under v5.** End values run 30 to 49
+    (sd 5.6). **Median daily net −2.5**, within ±5. Both pass criteria hold.
+  - **But only 5 of the 12 are informative** (at least 1,000 heart-rate samples). The rest read 0 to 241:
+    the ring was not worn, and on those days the battery just holds where it was. A verdict resting on 5
+    days is the calibration-on-a-filling-window error BF-55 spent three weeks on, so the tool labels it
+    INSUFFICIENT rather than PASS.
+  - **`--validate` reports FAIL for a reason that is not the constants:** its one out-of-range day is
+    2026-09-22, a v5 row, and `--validate` replays under the v6 walk. Ignore that row; `--check` filters by
+    model version and has no such trap.
+  - **Nothing is to be shipped:** the walk's shape and the constants are unchanged, so no version bump.
+- **Keep:** re-run `node scripts/tuning/body-battery-replay.cjs --pull` then `--check` once **20 informative
+  v6 days** exist. At the 5-in-12 rate so far that is around **mid-November**, sooner if the ring is worn
+  more. A FAIL on either criterion with enough days is the trigger to adjust the one dial (the gain), per
+  the paragraphs below; PASS means close this entry. The 09-23 zero-HR day is a v5 row and is tracked by
+  its own entry, not this one.
 
 - **⏳ NOT STARTABLE BEFORE 2026-10-04, and it is NOT parked — read this before picking it up.**
   RV-189 tried to park it and found nothing to park it with: `next-item.js` parks only on a `Needs:`
@@ -9330,6 +9447,8 @@ drift.
   produced the wrong figure.
 
 ### [workouts][platform] RV-65 — the prescription asks a model for numbers that deterministic code then overwrites, and nothing measures whether the model still earns the call
+- **▶ THE DIAGNOSTIC EXISTS from 2026-10-05 (OR-209):** `prescription_shadow.rows[].model` is the model's raw answer
+  beside `given` and the rules prescriber's. Read it after a few weeks; do not conclude from fewer than ~10 sessions.
 
 - **Lane:** A — `packages/shared/src/ai-periodization/generate-prescription.ts`,
   `prompt.ts:124`. **Added:** 2026-09-20 · Review sweep 51.
@@ -15735,7 +15854,7 @@ steps are in range; (b) and the rest latent.
 - **Needs:** OR-210
 - **⚑ THE GATE COVERED ONE ITEM AND PARKED THREE.** (b) and (c) are not preferences — each is
   settled by a standing rule, so they were waiting on an answer that was never theirs to need.
-  **Split to `OR-210`, buildable now.**
+  **Split to `OR-210`, which SHIPPED 2026-10-05: (b) and (c) are done; only (a) remains and it is the owner's.**
   - **(b)** the chat tool returns a raw 56-day number with **no band**, so the model bands it
     itself — against `acwr.ts`'s own *"never re-derive at the call site"* and against `CLAUDE.md`'s
     *clients render the route's `interpretation`, never re-band raw numbers themselves*. **32 of
@@ -16030,7 +16149,7 @@ read**, so a moved device shows the old location for 30 minutes. Key it by round
 - **Gate:** owner — **item (c) ONLY**, the Z3 mapping. Narrowed 2026-10-05 (Orchestrator).
 - **Needs:** OR-211
 - **⚑ SAME SHAPE AS `PS-28`: the gate named one item and parked three.** (a) and (b) are
-  straightforward correctness and were never his. **Split to `OR-211`, buildable now.**
+  straightforward correctness and were never his. **Split to `OR-211`, which SHIPPED 2026-10-05: (a) and (b) are done; only (c), the Z3 mapping, remains and it is the owner's.**
   - **(a)** a fully-profiled `sex:'other'` user falls to the Ross last-resort equation —
     **42.7 → 18.7 on identical inputs**. The comment says that fallback is for *missing* terms, so
     the code contradicts its own stated intent. The owner is unaffected; any third user is not.
