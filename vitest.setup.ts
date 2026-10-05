@@ -12,8 +12,12 @@
  */
 import { afterAll, expect } from 'vitest'
 import { ensureServerOuraConstants } from '@/lib/oura-models/constants-inject'
+import { installSourceWriteGuard } from './scripts/vitest-source-write-guard'
 
 ensureServerOuraConstants()
+
+// LB-194: a test that writes into app source fails at the write, instead of racing a `git add -A`.
+installSourceWriteGuard()
 
 /**
  * Name a console emission that escapes its own test file, instead of letting it become LB-168.

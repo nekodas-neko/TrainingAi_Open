@@ -491,6 +491,15 @@ below threshold and left in place for next time.
 > temperature-baseline cluster under it keep their order relative to each other.
 
 ### [platform] OR-207 — six PRs were stranded when every session stopped, and four have gone un-mergeable
+- **⛔ DO NOT MERGE `#1847` OR `#1849` WHILE A DEVICE SITTING IS RUNNING — added 2026-10-05.**
+  Both are column-dropping migrations, and **merging auto-deploys to Railway production**, which is
+  the database the phone is reading during a sitting. A deploy mid-sitting restarts the app under
+  the device agent and can turn a real pass into an unexplained failure nobody can reproduce
+  afterwards. The owner is running DV locally and Lane A in the background **at the same time**,
+  which is exactly the overlap this guards.
+  **Order when both are live:** take `#2024`, `#1790`, `#1762` and `#1902` — none of which change
+  the schema — and **hold the two migrations until the sitting ends**. That still clears four of
+  the six, and it is the half that needs no coordination.
 
 - **Lane: A** · **Added:** 2026-10-04 · Orchestrator, full orchestration review.
 - **⛔ THREE OF THESE THE OWNER ALREADY APPROVED ON 2026-09-28 and they never merged.** `#1847`
@@ -511,6 +520,13 @@ below threshold and left in place for next time.
   with a guard; the guard is what makes them safe, not the age of the approval.
 
 ### [devices][heart-rate] OR-208 — `rr_intervals` has written nothing since 2026-09-28, while the ring kept writing
+- **✅ ANSWERED 2026-10-05 — NOT A FAULT. The owner has not worn the strap since 28 September.**
+  Verbatim: *"No I havent worn the strap since."* The gap is explained, the ingest path is sound,
+  and **nothing is owed here**. Recorded rather than deleted so the next reader can date the gap
+  instead of rediscovering it.
+- **What it leaves behind, and it is the only live thing:** `PS-44`'s week of strap-to-bed data has
+  **not started**. That entry's gate is correct and still waiting on him.
+- **Strike this entry once `PS-44` records the week starting** — it exists only to date the gap.
 
 - **Lane: O** · **Added:** 2026-10-04 · Orchestrator, session-start reads.
 - **Measured:** latest `rr_intervals.at` is **2026-09-28 22:18**. Over the same window
@@ -525,39 +541,6 @@ below threshold and left in place for next time.
   are missing anyway, this stops being a note and becomes a Lane A ingest bug.
 - **One question settles it, and it is his:** has the strap been worn since 28 September?
 
-
-### [platform] LB-194 — a test mutates a tracked source file, so `git add -A` is unsafe for the nine minutes a suite runs
-
-- **Lane: A** · **Added:** 2026-09-30 · Lane B, found after committing the artefact once and then
-  hitting it a second time in the same session, both times noticed only because the file appeared
-  somewhere it had no business being.
-- **What happens.** `scripts/__tests__/check-comment-blindness.test.ts:41` appends
-  `// style={{ color: "#ff0000" }}` to the REAL `components/workout/set-card.tsx` and restores it in
-  a `finally`. Its docstring says so outright and the restore is correct — but for the seconds that
-  case runs, a tracked source file on disk differs from `HEAD`, and **`pnpm test` takes about nine
-  minutes**. Anything that stages the tree in that window catches it.
-- **It is not theoretical and it is not loud.** `git add -A` swept the line into a commit here. The
-  run then restored the file, so `git status` reported it as *modified* — which is the artefact being
-  **removed** relative to a commit that already held it, and reads exactly like an unrelated edit. It
-  recurred later the same session and was caught only by `git diff origin/main --stat` naming a file
-  in a diff about dates and food names. **A `finally` that restores the file makes the mistake
-  invisible rather than impossible**, and inverts the sign of the tell.
-- **CLAUDE.md already warns about `git add -A`** — the 2026-08-08 double incident, where a checkout
-  carried modified files across. **This is a second, independent mechanism for the same outcome**,
-  and the existing rule's advice ("run `git status` before staging") does not catch it, because the
-  window closes on its own.
-- **Recommendation: write to a COPY.** The check scripts take a path, so the fixture can be written
-  to a temp file inside the repo (`.tmp-comment-blindness/<name>.tsx`, gitignored) and the checker
-  pointed at it. That removes the window entirely and costs nothing the current shape provides —
-  the test's own reason for using a real file is that it wants a file the checker will actually
-  scan, not that it wants *that* file.
-- **The alternative, and what it is better at:** leave it and add `set-card.tsx` plus the second file
-  to a staging guard. It is better at keeping the test honest about scanning real source, but it
-  puts a permanent exception on two files that have nothing to do with this test, and the next test
-  that borrows the trick does not inherit the guard.
-- **Reversal cost: none.** It is a test-harness change with no product surface.
-- **Done when** no tracked file under `app/**`, `components/**`, `lib/**` or `packages/**` is written
-  to by a test in the repo, with a check that says so.
 
 ### [readiness] LB-198 — `vs_question` marks the wording shift; the SECOND boundary inside question 1 is unmarked
 
@@ -649,12 +632,22 @@ below threshold and left in place for next time.
   keys, about 3× a tightly packed btree**. The packer deletes sealed buckets all day, and a btree
   does not return emptied pages. Its heap is 33 MB and its indexes 47 MB. This is a lead, not a
   finding, because nothing recorded that index's size on 09-23 to compare with.
-- **Next read, on or after 2026-10-03:** the same per-table query plus
-  `pg_stat_user_indexes` for `oura_raw_samples`. Growth in that index alone would confirm it, and a
-  `REINDEX CONCURRENTLY` of it would be the remedy, which is a structural call and not the owner's.
-- **Then the standing question stays the same:** act on a departure from the SHAPE — a retention
-  window that stopped reclaiming — not on the daily figure. `rr_intervals` reaching its cap in late
-  October is the next scheduled step down, and **a step that does not arrive is the signal**.
+- **Third read, Lane A, 2026-10-05 06:14 UTC: 263.1 MB, up 1.6 MB in six days, about 0.27 MB/day against
+  the ~1.7 standing expectation.** The growth is not continuing.
+  - **The index lead is REFUTED.** `oura_raw_samples`' three indexes read 20,078,592 / 20,537,344 /
+    6,111,232 bytes, **identical to the byte** to the 09-29 read, though the heap moved. A btree that
+    was still bloating would have grown.
+  - **Per table, 09-29 → 10-05 (total / indexes):** `oura_raw_samples` 76.2 → 74.1 / 44.6 → 44.6 MB;
+    `oura_heartrate` 37.9 → 39.1 / 22.9 → 23.6; `oura_raw_packed` 27.5 → 29.4; `rr_intervals` 30.8 → 30.8
+    (no prune yet, as expected); `error_events` 51.8 → 51.8; `oura_ble_clock_anchors` 3.9 → 4.2. The
+    hot window holds 159,195 rows from 09-27, the 7 days it should.
+  - **The +29 MB between 09-23 and 09-29 is therefore UNEXPLAINED, and not closed.** It did not recur
+    and no table has been seen to grow faster than its inflow. Something that stopped is not something
+    that was fixed. The 09-29 table above is the per-table baseline this entry asked for; read the same
+    query again and diff it.
+- **Keep:** after **2026-10-15**, `rr_intervals` should step DOWN toward its 90-day cap (BF-222 owns the
+  prune itself). **A step that does not arrive is the signal.** Act on a departure from the SHAPE, a
+  retention window that stopped reclaiming, not on the daily figure.
 
 
 ### [readiness][heart-rate][activity][workouts] LA-171 — five runs and checks Lane A shipped on 2026-09-28 that need the phone or an admin session
