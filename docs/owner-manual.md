@@ -34,6 +34,11 @@ This file is only the steps.
 
 - ✅ Railway project token, scoped to the Railway `production` environment.
 - ✅ GitHub environment **`release`** holding it as **`RAILWAY_TOKEN`**, no required reviewer.
+- ☐ On that same environment, an **environment variable** (not a secret) **`RAILWAY_SERVICE`** = the
+  app service's name exactly as Railway shows it. The project holds several services (the app and
+  its database at least), and the CLI refuses to guess which to deploy — found on the first real
+  release, 2026-10-05. **Settings** → **Environments** → **release** → **Environment variables** →
+  **Add variable**.
 - ✅ Ruleset **`protect-release-tags`** on `v*`: restrict updates, restrict deletions. Creations open.
 - ✅ Branch sweep (52 → 3, with `archive/*` tags for the three worth keeping).
 - ✅ The freeze: all seven old agents wrapped up, routines paused.
