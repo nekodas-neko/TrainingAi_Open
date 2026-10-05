@@ -162,6 +162,8 @@ now on you are the ONLY session driving the release-train restructure ("one chef
    - the gotchas, chiefly: merge #2055 with an EXPLICIT squash message, because the early commits
      carry session-URL trailers CLAUDE.md forbids on main, and a "Tests: failure" from a
      CANCELLED run is not real.
+   Your own handoff, handoff-2026-10-05-platform-orchestrator-architecture-and-restructure.md, is
+   on the same branch. Together the two files are the combined record.
 3. Reconcile it with your own context. Where the two disagree, the spec's §9 decisions table is
    the record. Tell the owner in a few lines what changed in your picture, if anything.
 4. Then continue, in order:
