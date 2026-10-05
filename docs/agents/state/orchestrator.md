@@ -49,6 +49,30 @@ lane.** Everything else Lane B could do is already done and waiting to be looked
 
 Lane A (41 READY), O (62), T (23) and DV (17) are all healthy and can start immediately.
 
+## ⚑ A GATED ENTRY USUALLY BUNDLES BUILDABLE WORK WITH ONE OWNER QUESTION — split, don't wait
+
+**Six entries examined, five split (2026-09-28 → 10-05).** `Q-72`, `PS-31`, `RV-65`, `PS-28`,
+`PS-36` each carried a `Gate: owner` naming **one** item while parking **everything else in the
+entry** — work that was never the owner's and could have started weeks earlier. Splits:
+`OR-204`, `OR-205`, `OR-209`, `OR-210`, `OR-211`.
+
+**The three shapes the buildable half takes**, so it can be recognised rather than rediscovered:
+1. **A standing rule already decides it.** `PS-31`'s confidence value gating `source`; `PS-28`'s
+   chat tool re-banding ACWR. Both are `CLAUDE.md` violations, not preferences.
+2. **It is plain correctness.** `PS-36`'s `sex:'other'` halving VO2max; a best pace with no
+   distance floor.
+3. **It is the measurement the owner's question depends on.** `RV-65` says *"ship the measurement
+   first"* and then gated itself on the removal, so the measurement sat behind a decision that
+   cannot be taken until it exists.
+
+**Do NOT ungate the parent to free the half** — that puts an owner question back in the READY list
+as though it were buildable, the inversion `CLAUDE.md` warns about. Split, give the parent a
+`Needs:` on the split, and leave its gate naming the one item it really covers.
+
+**The counter-case stands and keeps this honest:** reading six gated entries in full on 2026-09-28
+found **five correctly gated**. The gate is usually right about *whether* the owner is needed and
+usually wrong about *how much* it parks. Read the whole entry, not just the field.
+
 ## Session-start reads — last taken 2026-10-04
 
 All three run. **Feedback: 0 rows** (none of the owner's — the watermark above does not move).
