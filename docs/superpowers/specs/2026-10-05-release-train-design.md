@@ -1,8 +1,8 @@
-# Release train: how we work from here (proposal)
+# Release train: how we work from here
 
-**Status:** proposal, written 2026-10-05, revised the same day to release from **tags** rather than a
-second branch (§3.1 says why). **Nothing in this file is live yet.** The decisions that are yours
-are in §9; everything else is a recommendation an agent can carry out once you say go.
+**Status:** **agreed 2026-10-05.** The owner answered every decision (§9) the same day, and Phase 0
+(the freeze) started that day. Phases 1–5 are not live yet. Revised the same day to release from
+**tags** rather than a second branch (§3.1 says why).
 
 ---
 
@@ -61,6 +61,13 @@ are in §9; everything else is a recommendation an agent can carry out once you 
 
 Every subagent also gets `CLAUDE.md`, so it pays the 30k-token share again.
 
+**What long-running sessions add up to.** The platform's usage figure per session (priced at API
+rates) for the five cloud standing sessions alive on 2026-10-05: Lane B **$10.1k**, Orchestrator
+**$10.0k**, Tuning **$9.9k**, Review **$9.8k**, BugFix **$4.8k**. That's about **$45k** between them,
+each holding 430k–780k tokens of context. The Lane A session archived on 2026-09-27 reads **$10.0k**
+on its own. Whatever the subscription actually bills, these figures say where the volume goes: very
+long sessions resending very large contexts.
+
 ### What it actually costs, honestly
 
 - **GitHub Actions: close to nothing in money.** The repo is public, and standard runners are free
@@ -108,8 +115,9 @@ TrainingAI closer to that.
  feature branches                     main (default)                        production (Railway)
  fix/… feat/… chore/…  ──PR, squash──▶  every agent PR lands here  ──release──▶  runs ONLY a released
                          (auto-merge     merging deploys NOTHING     vX.Y.Z on    commit, and only
-                          when CI green) tested locally + on phone   the tested   after you approve
-                                                                     commit       it in GitHub
+                          when CI green) tested locally + on phone   the tested   after you say
+                                                                     commit       "approve" to the
+                                                                                  Orchestrator
 ```
 
 **Why tags rather than a `dev` branch.** This was decided on your friend's suggestion, and it wins
@@ -120,7 +128,7 @@ on every point that matters here:
 | Branches to keep in sync | Two, plus back-merges after every hotfix | One |
 | What ships | `dev`'s head *at the moment of merging*, which may include commits that landed after the test | **The exact commit that was tested**, pinned by the tag |
 | Rollback | A revert PR, then a deploy | **Redeploy the previous tag** |
-| Setup | New branch, default-branch switch, merge-commit exception on `main`, a check blocking stray PRs to `main` | A release workflow, a Railway token, an approval gate |
+| Setup | New branch, default-branch switch, merge-commit exception on `main`, a check blocking stray PRs to `main` | A release workflow and a Railway token |
 | Agent rules to change | Every agent must learn to target `dev` | Agents keep targeting `main` |
 | Release notes | Built by hand into a release PR | GitHub generates them from the tag |
 | What it costs | n/a | `main` no longer means "what's live". The latest GitHub Release and `/api/version` tell you that instead |
@@ -132,7 +140,7 @@ on every point that matters here:
 | PR into `main` | Lint · Custom Rules · Build (includes type check) · Tests (4 shards) · Migration Check | Required, then auto-merge. **Deploys nothing** |
 | PR into `main` that touches only docs | Every heavy job **skips itself** (`if:` on a changes-detection job) | Skipped counts as passing |
 | Nightly on `main` | Full Tests (the existing schedule) | Red means `main` is broken |
-| **Release workflow** (manual trigger, given a commit and a version) | Full suite + E2E on that commit → **waits for your approval** → deploys that commit to Railway → creates the tag and the GitHub Release → deploy check → publishes the APK if native code changed | **You approve** in GitHub (the mobile app can do it) |
+| **Release workflow** (manual trigger, given a commit and a version) | Full suite + E2E on that commit → deploys that commit to Railway → creates the tag and the GitHub Release → deploy check → publishes the APK if native code changed | Started by the Orchestrator **only after your "approve"** (§3.3) |
 
 Two details that matter:
 
@@ -140,8 +148,8 @@ Two details that matter:
   is skipped, its required checks sit at "Expected" forever and the PR can never merge, which is why
   `ci.yml` runs on docs today. A *job* skipped by `if:` reports success.
 - **The release workflow starts from a button, not from a tag push.** The workflow creates the tag
-  *after* the deploy succeeds, so a stray tag deploys nothing. The Orchestrator can press the
-  button, and so can you from the Actions tab. Either way it stops and waits for your approval.
+  *after* the deploy succeeds, so a stray tag deploys nothing. The Orchestrator presses the button
+  once you've said "approve". You can also press it yourself from the Actions tab.
 - **The APK publishes at release, not on merge.** The APK loads its pages from production, so native
   code published ahead of the server it talks to is a mismatch waiting to happen.
 
@@ -161,10 +169,23 @@ Two details that matter:
    Postgres, restores a recent production snapshot locally if the release carries migrations, runs
    `pnpm dev` through the changed flows, and does the device pass (§3.6). It writes VERIFIED /
    FAILED / COULD NOT CHECK on the release issue.
-4. **The release workflow runs on the candidate.** It runs the slow checks, then waits.
-5. **You** read the release issue, take a verified production snapshot if it carries a migration, and
-   approve. Railway deploys once. The tag and the GitHub Release appear. The deploy check confirms
-   production serves that commit.
+4. **The Orchestrator gives you the release summary** in its session, and posts the same text on the
+   release issue. It's short enough to read on the phone, in this shape:
+
+   > **Release v1.487.0: ready for your OK**
+   > **New for you:** 2–5 plain-English lines, user-visible changes only
+   > **Fixed:** one line each
+   > **Behind the scenes:** one line, or "nothing worth your time"
+   > **⚠ Needs your eyes:** migrations (and whether any drop data), auth/security, secrets, or "none"
+   > **Tested:** suite ✓ · local run ✓ · device: N checks VERIFIED / FAILED / COULD NOT CHECK
+   > **Not in this release:** anything held back, and why
+   > **If it goes wrong:** roll back to v1.486.x (a migration isn't undone by a rollback, so a snapshot is taken first)
+
+5. **You read it and reply "approve" in the Orchestrator's chat.** Only then does the Orchestrator
+   take the snapshot (if there's a migration) and start the release workflow on the candidate. The
+   workflow runs the slow checks and deploys to Railway once. The tag and the GitHub Release appear,
+   and the deploy check confirms production serves that commit. The Orchestrator tells you when it
+   has landed.
 6. The Orchestrator closes the milestone and opens the next one.
 
 Anything merged to `main` after the candidate was picked simply isn't in this release. It goes in
@@ -184,7 +205,7 @@ issue, which is the one place you look each week. One review point instead of a 
 - **If not**, branch `hotfix/v1.487.1` from the last release tag, cherry-pick the fix onto it, and run
   the release workflow on that branch's commit. Delete the branch afterwards. Nothing unreleased
   rides along.
-- You approve it like any release.
+- You approve it through the Orchestrator, with a shorter summary, like any release.
 
 ### 3.5 Railway
 
@@ -206,12 +227,26 @@ the custom rules and the `claude_ro` tests all run there today.
 **The phone half needs one piece of engineering.** The APK's WebView loads production
 (`capacitor.config.ts` → `server.url`). So to run unreleased code on the phone:
 
-- **Recommended: a second app, "TrainingAi Dev"**, built as an Android product flavor with
+- **Chosen: a second app, "TrainingAi Dev"**, built as an Android product flavor with
   `applicationIdSuffix ".dev"`. Its server URL is the laptop, reached over USB with
   `adb reverse tcp:3000 tcp:3000`. Because it has its own app ID it **installs beside the real app
   and never replaces it**. It has its own local SQLite and its own login against the local database.
-  The driver in `scripts/device/` drives it the same way. This is a Lane A job (Gradle and Capacitor
-  config, then an APK cycle) and is Phase 2's only native work.
+  The driver in `scripts/device/` drives it the same way. Building it is Gradle and Capacitor config
+  plus an APK cycle, and it's Phase 2's only native work.
+- **Fully automated (owner, 2026-10-05: "as much automation as possible").** Your whole part is
+  plugging the phone in. One script, run by the Implementer Agent:
+  1. Fetches the latest Dev APK. CI builds it and publishes it as a rolling `apk-dev` release, so
+     your machine needs no Android SDK. The script keeps a local copy and only re-downloads when CI
+     has a newer one.
+  2. Installs or updates the **`.dev` package only**. The script refuses any other package name, so
+     it can't touch `com.trainingai.app`.
+  3. Sets up `adb reverse`, starts Docker Postgres and `pnpm dev`, and signs the Dev app in with the
+     local seeded test account. No Google sign-in is needed.
+  4. Runs the device checks through `scripts/device/`, then posts VERIFIED / FAILED / COULD NOT
+     CHECK on the release issue.
+
+  One-off setup on the phone: USB debugging (already on for the device agent), and accepting the
+  first install of the Dev app.
 - **What it can't test:** the Oura ring and the scale are paired to the real app, so BLE changes
   still get their device check on production after release. That is a short, named list in the
   release issue, not a gap anyone has to discover.
@@ -288,9 +323,9 @@ markdown file is then frozen as `docs/archive/implementation-backlog-2026-10.md`
 
 | Role | Where | Model | What it does | Replaces |
 |---|---|---|---|---|
-| **Orchestrator** | Cloud, prompted | Sonnet | Release prep, release issue and starting the release workflow · production reads · triage of new issues · owner questions written as issues · **Review mode** ("sweep nutrition") · **Tuning mode** (calibration proposals) | Orchestrator, Review, Tuning |
-| **BugFix** | Cloud, prompted | Sonnet | Your reports, in-app feedback, inbound GitHub issues and PRs → well-traced issues. **May fix small, local bugs itself** (recommended, §9) | BugFix |
-| **Implementer** | **Local** (Docker + phone) | Opus | Builds issues from the open milestone, tests locally, opens PRs with auto-merge on | Lane A, Lane B |
+| **Orchestrator** | Cloud, prompted | Sonnet | Release prep, release issue, **release summary for your OK**, then starting the release workflow · production reads · triage of new issues · owner questions written as issues · **Review mode** ("sweep nutrition") · **Tuning mode** (calibration proposals) | Orchestrator, Review, Tuning |
+| **BugFix** | Cloud, prompted | Sonnet | Your reports, in-app feedback, inbound GitHub issues and PRs → well-traced issues. **May fix small, local bugs itself** (§9) | BugFix |
+| **Implementer Agent** | **Local** (Docker + phone) | Opus | Builds issues from the open milestone, tests locally, opens PRs with auto-merge on, and runs the Dev-app automation (§3.6) | Lane A, Lane B |
 | ↳ **Release-test mode** | Local | Opus | Runs the release test on the candidate (§3.3 step 3), including the device pass | Device Verification |
 
 Optional: a second, cloud implementer for parallel work. The `lane:` labels keep the two out of
@@ -325,15 +360,16 @@ tokens.
 
 **The constraint to know first: every agent acts as your GitHub account (`nekodas-neko`).** GitHub
 can't tell agent from owner, so no GitHub setting can say "only the owner". The protection is built
-around the one step agents have no tool for: **approving a deployment.**
+around who may start a release, and around the Railway token living in exactly one place.
 
 | Layer | Stops | Enforced by |
 |---|---|---|
 | Railway auto-deploy off | A merge reaching production | Railway setting |
-| **`production` environment with you as required reviewer** | Any deploy you haven't approved. The release workflow is the only path to Railway, and the Railway token exists only inside that environment | GitHub. Cloud agents have no tool for approving a deployment |
+| **Only the Orchestrator starts a release, and only after your "approve" in its chat** (owner's choice, 2026-10-05) | A deploy you haven't read about | Instruction only. Every other role's prompt says it never starts a release |
+| `production` environment holding the Railway token | The token leaking into any other job. Only the release workflow's deploy job can read it | GitHub |
+| *Optional hard lock:* add yourself as required reviewer on `production` | Any deploy without a tap from you in GitHub, whoever starts it | GitHub. One setting, if you ever want it |
 | Tag ruleset on `v*`: no moving, no deleting | A release tag silently pointing at different code | GitHub ruleset |
 | `ProtectMain`: required CI, no force-push, no deletion | A red or rewritten `main` | GitHub ruleset (Active since 2026-09-25) |
-| Rule in the lean `CLAUDE.md` | A local agent approving a deployment through an authenticated `gh` | Instruction only |
 | *Optional, later:* a separate GitHub account for agents | Everything above, by identity | GitHub |
 
 Since merges no longer deploy, the `PreToolUse` hook from the first draft isn't needed.
@@ -358,6 +394,12 @@ Each phase ends with something you can check. Phases 2–4 land before anything 
 agent ends up following half the old rules and half the new.
 
 ### Phase 0: Freeze and wrap up (your friend's step 1)
+
+**Progress, 2026-10-05:** ✅ the three routines paused (Lane A, Lane B, inbound GitHub watch). ✅ The
+freeze message sent to all seven standing sessions; most were already wrapping up. ✅ #1790 and
+#1762 closed as superseded. **Held for release 1** (owner): #1849 and #1499. **Left to its own
+session to land:** #2037. **Still to do:** the branch sweep, and each session's one-line "still in
+flight" reply.
 
 - **You:** pause the **Lane A** and **Lane B 4-hourly routines** and the daily **inbound GitHub
   watch**. Leave the Gmail sweep and the other project's review watch alone; they aren't this repo.
@@ -386,8 +428,8 @@ agent ends up following half the old rules and half the new.
 
 - **You** (secrets and settings are yours):
   1. Create a Railway project token.
-  2. In GitHub, create a `production` environment with yourself as required reviewer, and store the
-     token there as a secret.
+  2. In GitHub, create a `production` environment and store the token there as a secret. A required
+     reviewer is optional (§7); by default approval happens in the Orchestrator's chat.
   3. Add a tag ruleset for `v*` that blocks updates and deletion.
 - **Agent, one PR into `main`:**
   - the release workflow
@@ -398,11 +440,11 @@ agent ends up following half the old rules and half the new.
   - a labels file plus a sync workflow
   - the `.dev` Android flavor (native, so it needs an APK cycle)
 - **First release, still with auto-deploy on:** run the workflow on `main`'s current commit. Railway
-  deploys the same commit twice, which is harmless. This proves the token and the approval gate.
+  deploys the same commit twice, which is harmless. This proves the token and the workflow.
 - **You, then:** turn off Railway's auto-deploy from `main`.
 - **Done when:**
   - a code PR merges without production changing
-  - a release deploys the chosen commit only after your approval, then tags it and publishes notes
+  - a release deploys the chosen commit only after you say "approve", then tags it and publishes notes
   - a dry-run rollback to the previous tag works
 
 ### Phase 3: Backlog to issues
@@ -424,36 +466,25 @@ agent ends up following half the old rules and half the new.
 ### Phase 5: First release, then a retro
 
 - Run one week on the new flow. The Orchestrator preps the first release, the local agent tests it,
-  you approve it.
+  you approve it in the Orchestrator's chat.
 - After it lands: what was slow, what you had to chase, what token use looked like. Adjust.
 
 ---
 
-## 9. Decisions for you
+## 9. Decisions (answered by the owner, 2026-10-05)
 
-Each comes with a recommendation. Anything not listed here is structural and an agent decides it.
-**Tags versus a `dev` branch is decided: tags** (§3.1).
-
-1. **Release day and cadence.** *Recommend:* weekly, prepped the day before you want it live, so the
-   local test and device pass have a day. Hotfixes any time. *Alternative:* every two weeks, which
-   means fewer deploys but bigger, riskier releases. *Reversal cost:* none, it's a calendar choice.
-2. **CI on every PR.** *Recommend:* keep it, on auto-merge. It costs nothing on a public repo, and
-   it's the only check that doesn't depend on an agent's word. *Alternative:* local checks only, with
-   CI only at release. That saves CI time, but a broken `main` surfaces once a week as a pile.
-   *Reversal cost:* one workflow edit.
-3. **Roles 7 → 4** (§5). *Recommend:* yes, including **BugFix fixing small bugs itself**. A one-line
-   fix today costs an intake session, an entry, and an implementer session, and a merge no longer
-   deploys. *Alternative:* keep BugFix as intake-only. *Reversal cost:* a prompt edit.
-4. **Device testing before release.** *Recommend:* the `.dev` side-by-side app over USB (free,
-   tethered). *Alternatives:* a Railway staging environment (untethered, costs a second service and
-   database), or no pre-release device test (verify on production, roll back or hotfix if needed).
-   *Reversal cost:* low. Building the flavor doesn't commit you to using it.
-5. **Backlog migration scope.** *Recommend:* triage first and migrate only live work (§4.3).
-   *Alternative:* migrate all 523 and close later. That's faster to start, but it floods the issue
-   list with 220 shipped-residue rows. *Reversal cost:* issues can be closed in bulk.
-6. **Who approves a release.** *Recommend:* you, every time. Agents prepare, test and start it.
-   *Alternative:* add the Orchestrator's account as a reviewer once a separate agent account
-   exists. That's less clicking and less control. *Reversal cost:* an environment setting.
+| # | Question | Answer | Notes |
+|---|---|---|---|
+| 1 | Branch or tags | **Tags on `main`** | The owner's friend's suggestion; §3.1 has the comparison |
+| 2 | Release cadence | **Weekly**, hotfixes any time | Prepped the day before it goes live |
+| 3 | CI on PRs | **Full CI on every PR, auto-merge, nobody watching** | The owner's concern was Railway deploys, which tags solve. Actions cost nothing on a public repo, so per-PR CI stays as the safety net. Reverting to local-only checks is one workflow edit |
+| 4 | Roles | **4 roles; BugFix may fix small bugs** | The local agent is renamed **Implementer Agent** |
+| 5 | Device testing before release | **Side-by-side "TrainingAi Dev" app over USB, fully automated** | §3.6. The owner's part is plugging the phone in |
+| 6 | Backlog migration | **Triage first, migrate live work only** | §4.3 |
+| 7 | Release approval | **The owner, through the Orchestrator**: a concise summary, then "approve" in its chat | §3.3 steps 4–5. Enforced by instruction; GitHub's required-reviewer tap is an optional hard lock (§7) |
+| 8 | Bundled shell (v2) | **Later**, as its own milestone after 2–3 clean releases | §10 |
+| 9 | #1849 and #1499 | **Held for release 1**, listed under "needs your eyes" | They merge into `main` once merges stop deploying |
+| 10 | Start Phase 0 | **Yes**, started 2026-10-05 | §8 Phase 0 progress |
 
 ---
 
@@ -514,8 +545,8 @@ sub-issues.
 
 | Routine | Schedule | Phase 0 |
 |---|---|---|
-| Lane A queue check (silent) | every 4 h | Pause |
-| Lane B queue check (silent) | every 4 h | Pause |
-| Inbound GitHub watch (not ours) | daily 08:56 AEST | Pause until Phase 3, then point at issues or drop |
+| Lane A queue check (silent) | every 4 h | ✅ Paused 2026-10-05 |
+| Lane B queue check (silent) | every 4 h | ✅ Paused 2026-10-05 |
+| Inbound GitHub watch (not ours) | daily 08:56 AEST | ✅ Paused 2026-10-05. After Phase 3, point it at issues or drop it |
 | Weekly Gmail inbox sweep | weekly | Not this repo, leave alone |
 | The other project's PR review watch | daily | Not this repo, leave alone |
