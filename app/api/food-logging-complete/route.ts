@@ -76,6 +76,7 @@ export async function POST(req: NextRequest) {
     // is the argument for `DayCheckin.vsNormal` being required rather than optional.
     vsNormal:       existing?.vsNormal ?? null,
     vsQuestion:     existing?.vsQuestion ?? null,
+    vsNormalTouched: existing?.vsNormalTouched ?? null,
     soreMuscles:       existing?.soreMuscles ?? [],
     journal:           existing?.journal ?? null,
     foodLoggingCompletedAt: parsed.data.complete ? new Date() : null,
