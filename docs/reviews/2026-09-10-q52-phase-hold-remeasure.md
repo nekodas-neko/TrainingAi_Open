@@ -1,7 +1,7 @@
 # Q-52 re-measured, 2026-09-10 — the precondition cleared, and clearing it broke the measurement
 
 **Scope:** the outstanding *"re-run this once at least two sessions have cycled"* note on
-[Q-52 — per-exercise phase hold](../implementation-backlog.md). Third measurement of this entry
+[Q-52 — per-exercise phase hold](../archive/implementation-backlog-2026-10-05.md). Third measurement of this entry
 (2026-08-03 ×2, then this one). All figures are production reads through `/api/admin/db-query`,
 which is **row-scoped to the owner** — nothing here is a claim about any other account.
 

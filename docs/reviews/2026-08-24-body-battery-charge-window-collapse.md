@@ -1,7 +1,7 @@
 # The Body Battery charge window has closed — 2026-08-24
 
 *Tuning · production data pulled 2026-08-24, ring data current to that morning. Filed as
-[`TN-2`, `TN-3a`, `TN-3b`, `TN-4`](../implementation-backlog.md). Propose-only: no scoring change is
+[`TN-2`, `TN-3a`, `TN-3b`, `TN-4`](../archive/implementation-backlog-2026-10-05.md). Propose-only: no scoring change is
 implemented here.*
 
 **Every count below is the owner's account only** — `claude_ro` views are row-scoped to one user —

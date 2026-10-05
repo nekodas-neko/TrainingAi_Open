@@ -10,7 +10,7 @@ _Domain: `platform` (also touches `app-shell`, `devices`, `readiness`, `heart-ra
 
 > **Read first:** `projectOverview.md` (status + Known Issues), then
 > [`docs/domains/platform/README.md`](../domains/platform/README.md), then
-> [`docs/implementation-backlog.md`](../implementation-backlog.md). This file covers only what *this*
+> [`docs/implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md). This file covers only what *this*
 > session did. Predecessors: [`handoff-2026-08-08-app-shell-review-backlog-ui-batch.md`](handoff-2026-08-08-app-shell-review-backlog-ui-batch.md)
 > and [`handoff-2026-08-08-platform-review-backlog-drain-and-production-audit.md`](handoff-2026-08-08-platform-review-backlog-drain-and-production-audit.md).
 

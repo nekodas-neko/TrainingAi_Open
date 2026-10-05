@@ -4,7 +4,7 @@ _Domain: `sleep` (also touches `app-shell`, `platform`) · Branch: `tuning/wrap-
 
 > **Read first:** `projectOverview.md` (status + Known Issues), then
 > [`docs/domains/sleep/README.md`](../domains/sleep/README.md), then
-> [`docs/implementation-backlog.md`](../implementation-backlog.md). The design doc is
+> [`docs/implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md). The design doc is
 > [`docs/superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md`](../superpowers/plans/2026-09-26-outlier-gated-rating-prompt.md).
 > This file covers one Tuning session (2026-09-26, wrapped 2026-10-05) and what it left behind.
 

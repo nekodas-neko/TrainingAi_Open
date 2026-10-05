@@ -65,7 +65,7 @@ _Domain: `<primary>` (also touches `<other>`, `<other>`) Â· Branch: `<branch>` Â
 
 > **Read first:** `projectOverview.md` (status + Known Issues), then
 > `docs/domains/<primary>/README.md` (that pillar's code, docs and open issues), then
-> `docs/implementation-backlog.md` (the queue). This file covers only what *this* session did
+> the open GitHub issues (`node scripts/queue.js --agent <role>`). This file covers only what *this* session did
 > and what it leaves behind.
 
 ## Goal

@@ -1,7 +1,7 @@
 # "Body temp elevated" is nearly permanent, and it is costing readiness ~16 points a day — 2026-08-24
 
 *Tuning · production data pulled 2026-08-24 (ring data through the night of 2026-08-25 local). Filed
-as [`TN-6`](../implementation-backlog.md). Propose-only. Counts are the owner's account only
+as [`TN-6`](../archive/implementation-backlog-2026-10-05.md). Propose-only. Counts are the owner's account only
 (`claude_ro` is row-scoped).*
 
 ## The report

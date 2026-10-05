@@ -331,7 +331,7 @@ session days at 100% + 2 empty days at 0% averages ~71% even when the weekly gui
 ## 7. Still open
 
 **Nothing open.** Phasing was confirmed by the owner on 2026-07-26 ("perfect for iteration 1") — the
-§9 ordering stands and is queued in [`docs/implementation-backlog.md`](../../implementation-backlog.md).
+§9 ordering stands and is queued in [`docs/implementation-backlog.md`](../../archive/implementation-backlog-2026-10-05.md).
 
 **Closed since first draft:** whether walks progress (D-1 — they don't); cross-modality anchor
 reconciliation (D-1 — not needed); the quota-shape sub-decision (D-11); cadence as a goal
@@ -383,7 +383,7 @@ Each stage independently shippable and revertible.
 **Phase 1 is planned and queued.** Plan:
 [`docs/superpowers/plans/2026-07-26-cardio-hub-phase-1.md`](../plans/2026-07-26-cardio-hub-phase-1.md)
 — 14 tasks, branch `feat/cardio-hub-phase-1`. Queued top of the cardio batch in
-[`docs/implementation-backlog.md`](../../implementation-backlog.md), alongside stub entries for
+[`docs/implementation-backlog.md`](../../archive/implementation-backlog-2026-10-05.md), alongside stub entries for
 phases 2–6 (plans not yet written; each gets its own planning pass).
 
 Risk #1 (`daily_zone_minutes` recompute) was **verified and retracted** — see §5.

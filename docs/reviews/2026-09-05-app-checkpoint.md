@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-05/06 · **Session:** 📖 Review (running the checkpoint prompt as a one-off) ·
 **IDs:** `PS-` · **Pillars:** all eleven
-**Method:** the twenty-six specialist lanes of [`docs/agents/prompts/checkpoint.md`](../agents/prompts/checkpoint.md),
+**Method:** the twenty-six specialist lanes of [`docs/agents/prompts/checkpoint.md`](../archive/agents-2026-10-05/prompts/checkpoint.md),
 run as read-only subagents where budget allowed and by the coordinator directly where it did not,
 with **every finding below re-verified by the coordinator** — re-run against the live dev server,
 production (`claude_ro`, owner-scoped), or the cited line — before it was written here. Lane raw

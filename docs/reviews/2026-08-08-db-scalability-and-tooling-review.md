@@ -175,7 +175,7 @@ account. Low severity, trivial fix, but it degrades exactly as the user count gr
 ### 3.3 Grandfathered debt surfaced by the new CI rules — mostly Q-130's, and it shipped mid-session
 
 Adding the checks in §5 surfaced two pre-existing sets. **Both belonged to the already-queued
-[Q-130](../implementation-backlog.md), (c) and (b) respectively — no new backlog entry was opened**,
+[Q-130](../archive/implementation-backlog-2026-10-05.md), (c) and (b) respectively — no new backlog entry was opened**,
 and Q-130 then shipped (#1148) while this review was being written. What survives is a
 machine-checked, shrink-only inventory in place of a hand-written file list, plus two corrections to
 the counts it carried:

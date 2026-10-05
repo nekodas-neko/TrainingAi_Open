@@ -1,6 +1,6 @@
 # The threshold sweep — 2026-08-25
 
-*Tuning · production data pulled 2026-08-25. Filed as [`TN-8`](../implementation-backlog.md), plus an
+*Tuning · production data pulled 2026-08-25. Filed as [`TN-8`](../archive/implementation-backlog-2026-10-05.md), plus an
 amendment to Q-524. Propose-only. Counts are the owner's account only (`claude_ro` is row-scoped).*
 
 ## Why

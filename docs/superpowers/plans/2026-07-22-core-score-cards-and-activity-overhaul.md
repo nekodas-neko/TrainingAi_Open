@@ -4,7 +4,7 @@ The four home score cards (Readiness / Heart Rate / Sleep / Activity) and their 
 app's central pillars. The owner walked through them on-device and directed a focused upgrade of
 **presentation** and **scoring accuracy/achievability**. This is the master plan: **one section per
 workstream (W-A…W-D)**, each self-contained enough to be its own implementer PR. Queue entries live
-in [`docs/implementation-backlog.md`](../../implementation-backlog.md).
+in [`docs/implementation-backlog.md`](../../archive/implementation-backlog-2026-10-05.md).
 
 Design was validated live with the owner via two mockups (card visual direction; a "perfect day"
 score preview proving each 100 is achievable). Decisions below are **locked**; the numeric anchors

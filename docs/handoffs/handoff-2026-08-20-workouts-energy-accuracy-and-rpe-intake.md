@@ -4,7 +4,7 @@ _Domain: `workouts` (also touches `nutrition`, `platform`) · Branch: `docs/sess
 
 > **Read first:** `projectOverview.md` (status + Known Issues), then
 > [`docs/domains/workouts/README.md`](../domains/workouts/README.md), then
-> [`docs/implementation-backlog.md`](../implementation-backlog.md) — the queue is the authority on what
+> [`docs/implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md) — the queue is the authority on what
 > is outstanding. This file covers only what *this* session did and what it leaves behind; three of its
 > six entries were built by Lane A within hours of being filed, so read it as reasoning, not status.
 

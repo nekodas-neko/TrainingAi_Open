@@ -168,7 +168,7 @@ right; the targeting was not. It landed on whichever PR happened to be open when
 it blocked #527, a docs-only intake whose diff it named none of, and merging `main` fixed it because
 another session had swept concurrently. A branch that adds none now gets a note instead, and the next
 PR adding an entry runs the sweep: it is already in the directory. The decision is
-[`scripts/lib/entries-verdict.js`](../../../scripts/lib/entries-verdict.js), unit-tested against
+[`scripts/lib/entries-verdict.js`](https://github.com/nekodas-neko/TrainingAi_Open/blob/37816671f90a/scripts/lib/entries-verdict.js), unit-tested against
 fixture counts rather than the live directory — a test reading the real count would change verdict as
 the repo does. **The total ceiling is deliberately still unattributed** and fails everyone.
 

@@ -6,7 +6,7 @@ _Domain: `platform` (also touches `devices`, `workouts`, `body`) · Branch: `cho
 > `docs/domains/platform/README.md` (that pillar's code, docs and open issues), then
 > `docs/implementation-backlog.md` (the queue). This file covers only what *this* session did
 > and what it leaves behind. The **state** it leaves is in
-> [`docs/agents/state/implementation-lane-a.md`](../agents/state/implementation-lane-a.md) — read that
+> [`docs/agents/state/implementation-lane-a.md`](../archive/agents-2026-10-05/state/implementation-lane-a.md) — read that
 > before the queue.
 
 ## Goal

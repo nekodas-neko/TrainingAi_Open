@@ -4,7 +4,7 @@
 > eight-dimension review ledger and all follow-up audit batches (A–O), preserved verbatim for
 > later review. The **active, open-items-only** version lives in
 > [`../planned_upgrades.md`](../planned_upgrades.md); ready-to-build work is queued in
-> [`../implementation-backlog.md`](../implementation-backlog.md).
+> [`../implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md).
 >
 > Most items below shipped (marked ✅ inline). Kept here so the shipped rationale, file:line
 > evidence, and design decisions remain searchable without cluttering the active ledger.
@@ -46,7 +46,7 @@
 **User-requested UI/bug-fix batch (2026-07-02):**
 [UI bug fixes — timeline, activity ring, End of Day review](../superpowers/plans/2026-07-02-ui-bugfixes-activity-eod-review.md)
 
-> **🔄 Reviewed 2026-07-03 (session 184 backlog review).** Every open item re-verified against `main` v1.85.0; ticks corrected (A6/A7 had shipped unticked; Batch M never landed and is re-queued). New findings + two new not-yet-planned batches (N ops, O features) in the **"2026-07-03 backlog review"** section near the bottom. **The ready-to-implement queue now lives in [`docs/implementation-backlog.md`](../implementation-backlog.md)** — this file remains the findings ledger.
+> **🔄 Reviewed 2026-07-03 (session 184 backlog review).** Every open item re-verified against `main` v1.85.0; ticks corrected (A6/A7 had shipped unticked; Batch M never landed and is re-queued). New findings + two new not-yet-planned batches (N ops, O features) in the **"2026-07-03 backlog review"** section near the bottom. **The ready-to-implement queue now lives in [`docs/implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md)** — this file remains the findings ledger.
 
 ---
 
@@ -534,7 +534,7 @@ Muscle-specific soreness currently forces an all-or-nothing rest/swap recommenda
 
 ## 2026-07-03 backlog review (session 184) — status re-verification + new findings
 
-Four parallel audits against `main` v1.85.0: full open-item re-verification · recent-code audit (PRs #101–#131) · mechanical rule sweep · platform/ops + feature-opportunity scan. Ready-to-implement work is queued in [`docs/implementation-backlog.md`](../implementation-backlog.md).
+Four parallel audits against `main` v1.85.0: full open-item re-verification · recent-code audit (PRs #101–#131) · mechanical rule sweep · platform/ops + feature-opportunity scan. Ready-to-implement work is queued in [`docs/implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md).
 
 ### Status corrections
 - **Shipped but unticked:** A6 (LWW `updatedAt` gating), A7 (log-exercise replay idempotency), the B5 1 Hz-interval extraction — all ticked above.

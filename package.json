@@ -50,7 +50,6 @@
     "typecheck:tests": "node scripts/check-test-typecheck.js",
     "ci:local": "pnpm lint && pnpm check:rules && pnpm typecheck && pnpm typecheck:tests && pnpm test",
     "check:rules": "node scripts/run-custom-rules.js",
-    "fix:baselines": "node scripts/check-doc-index-size.js --fix",
     "db:local": "bash scripts/local-db/setup.sh",
     "db:rebuild": "node scripts/local-db/rebuild.js",
     "db:snapshot": "node scripts/local-db/snapshot.js"

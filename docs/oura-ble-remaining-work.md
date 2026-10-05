@@ -7,7 +7,7 @@ fresh session/agent can pick up the direct-BLE Oura work without re-deriving con
 - Read this first, then the deeper references at the bottom.
 - Items are **priority-ordered**. Each says: **what**, **why**, **where** (files),
   **server-only vs needs-APK-rebuild**, and **how to verify**.
-- The canonical queue is still [`docs/implementation-backlog.md`](implementation-backlog.md)
+- The canonical queue is still [`docs/implementation-backlog.md`](archive/implementation-backlog-2026-10-05.md)
   (follow its protocol: take the top item, one per session, remove it in the PR that
   completes it). This doc is the BLE-specific expansion of those entries + the new
   findings from session 219.
@@ -208,7 +208,7 @@ surface today) — left as optional future work.
 ---
 
 ## Key references
-- **Canonical queue + protocol:** [`docs/implementation-backlog.md`](implementation-backlog.md)
+- **Canonical queue + protocol:** [`docs/implementation-backlog.md`](archive/implementation-backlog-2026-10-05.md)
 - **Protocol knowledge base (byte layouts, GATT, auth, compute tiers):** the `oura-native-ble`
   skill (`.agents/skills/oura-native-ble/SKILL.md` / `.claude/skills/oura-native-ble/`).
 - **Operations manual (failure matrix, cadence, maintenance, integrity runbook):**

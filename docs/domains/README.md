@@ -69,7 +69,7 @@ Domain tags are written as bracketed slugs and are **greppable** — that is the
 ## Global docs — not owned by any one pillar
 
 `projectOverview.md` (status + known issues) · [`docs/module-map.md`](../module-map.md) (what
-exists and where) · [`docs/implementation-backlog.md`](../implementation-backlog.md) (the queue)
+exists and where) · [`docs/implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md) (the queue)
 · [`docs/planned_upgrades.md`](../planned_upgrades.md) (open ideas) ·
 [`docs/device-smoke-checklist.md`](../device-smoke-checklist.md) (the on-device merge gate) ·
 [`docs/owner-action-required.md`](../owner-action-required.md) ·

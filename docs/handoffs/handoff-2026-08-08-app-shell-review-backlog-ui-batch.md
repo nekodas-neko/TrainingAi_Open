@@ -5,7 +5,7 @@ _Domain: `app-shell` (also touches `workouts`, `activity`, `devices`, `platform`
 
 > **Read first:** `projectOverview.md` (status + Known Issues), then
 > [`docs/domains/app-shell/README.md`](../domains/app-shell/README.md), then
-> [`docs/implementation-backlog.md`](../implementation-backlog.md). This file covers only what *this*
+> [`docs/implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md). This file covers only what *this*
 > session did. Its dispatch parent is
 > [`docs/handoffs/handoff-2026-08-07-cross-full-app-review-backlog-dispatch.md`](handoff-2026-08-07-cross-full-app-review-backlog-dispatch.md).
 

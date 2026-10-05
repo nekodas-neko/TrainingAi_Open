@@ -5,7 +5,7 @@ PR: see below — all nine merged_
 
 > **Read first:** `projectOverview.md` (status + Known Issues), then
 > [`docs/domains/platform/README.md`](../domains/platform/README.md), then
-> [`docs/implementation-backlog.md`](../implementation-backlog.md) (the queue). This file covers only
+> [`docs/implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md) (the queue). This file covers only
 > what *this* stretch did and what it leaves behind.
 
 **Continues** [`handoff-2026-08-02-platform-batch-queue-drain-run-2.md`](handoff-2026-08-02-platform-batch-queue-drain-run-2.md),

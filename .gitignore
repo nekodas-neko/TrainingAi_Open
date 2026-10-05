@@ -106,3 +106,6 @@ docs/oura-models-inventory.md
 
 # LB-194: tests write fixture copies here instead of mutating tracked source.
 __check_fixture__/
+
+# Logs from scripts/agent-runner.mjs
+.agent-runs/

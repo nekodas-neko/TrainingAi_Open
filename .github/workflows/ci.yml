@@ -533,22 +533,6 @@ jobs:
       - name: No vendor constants inlined into publishable source
         run: node scripts/check-inlined-constants.js
 
-      - name: Backlog pointers and Q numbers are accurate
-        run: node scripts/check-backlog-pointers.js
-
-      # TN-59. A `Gate:`/`Needs:` is a field a tool can read; a prose block marker is a sentence.
-      # An entry parked only by the sentence sits invisible for a reason nothing can act on, and
-      # RV-99 sat that way behind a marker that was a CORRECTION, not a block. Baselined at zero.
-      - name: No entry is parked by prose alone
-        run: node scripts/check-prose-parked-entries.js
-
-      # OR-146. `Gate: owner` parks an entry until the owner acts, without saying what he is asked
-      # FOR — a decision, a production write, or a reading. Measured 2026-09-24: 23 of 72 owner
-      # gates said nothing, so establishing what each owed meant reading up to 209 lines of body,
-      # and LA-89 sat correctly attributed and never asked for two weeks. 23 measured, cleared to zero the same day.
-      - name: An owner gate says what is owed
-        run: node scripts/check-owner-gate-states-what-is-owed.js
-
       # LA-26. A repository method nothing calls is invisible to tsc (an unused export is not an
       # error), to lint, and to the tests. It has shipped three times (Q-301, Q-270, Q-231) and was
       # only ever caught by someone asking why a production table was empty.
@@ -586,12 +570,6 @@ jobs:
         run: git rev-parse --verify --quiet origin/main >/dev/null || git fetch --depth=1 origin main || true
       - name: No stray module at the repo root
         run: node scripts/check-repo-root.js
-
-      - name: Orientation docs stay within their baselines
-        run: node scripts/check-doc-index-size.js
-
-      - name: How many implementation plans are still live
-        run: node scripts/check-plan-liveness.js
 
       - name: A Known Issue lives in exactly one list
         run: node scripts/check-known-issue-duplication.js

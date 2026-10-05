@@ -180,7 +180,7 @@ Live at the time of writing (2026-07-30) — always re-run the grep rather than 
   would show the update. See
   [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
   **Deferred, filed separately:** the BLE ingest route's own background rollup still emits no
-  invalidation signal at all for the ordinary (non-manual) flow — `docs/implementation-backlog.md`
+  invalidation signal at all for the ordinary (non-manual) flow — `docs/archive/implementation-backlog-2026-10-05.md`
   Q-91-followup. **Now scoped (2026-09-09), not yet built:**
   [`docs/superpowers/plans/2026-09-09-oura-ble-rollup-invalidation-signal.md`](../../superpowers/plans/2026-09-09-oura-ble-rollup-invalidation-signal.md)
   — the answer is that the rollup should *not* emit its own signal: the client can already hear

@@ -47,7 +47,7 @@ Everything in this section is **JS**. Open the app fresh after a deploy; no APK 
 ## N1. The delete that did nothing — BF-34 · **BF-34 PASSES; a different bug found**
 **2026-08-30 — BF-34 is device-verified.** Owner: *"Delete worked."* The dialog appears and stays.
 
-**What the same tap found instead is [BF-47](implementation-backlog.md):** *"the item vanishes then
+**What the same tap found instead is [BF-47](archive/implementation-backlog-2026-10-05.md):** *"the item vanishes then
 re-appears; then when you swap screens - it dissapears."* The loader treats the server copy as
 authoritative while the delete is still queued in the outbox, so the server puts the row back.
 Traced to `use-food-logs-loader.ts`; nothing further owed from the device until that ships, when this
@@ -69,7 +69,7 @@ a second row closes the first, tray Delete confirms. BF-29 is device-verified.
 The rebuild is verified: no tile grid, three tabs readable at 412 dp, Meals holds only meals, Photo
 and Barcode each take the full screen. LB-16 / BF-37 are device-verified.
 
-Filed from the same pass: **[BF-50](implementation-backlog.md)** (capture row too small, the describe
+Filed from the same pass: **[BF-50](archive/implementation-backlog-2026-10-05.md)** (capture row too small, the describe
 pane wastes its space, the camera opens a chooser it does not need, multi-select can only delete),
 **BF-46** (the meal tile renders but only ever the placeholder), and **LB-18 answered** — `Recent`
 goes global rather than staying scoped to the current meal bucket.
@@ -113,7 +113,7 @@ The owner's watching brief produced one change, folded into **BF-45 ②**: a col
 show its **total calories and total macros**, on a line below the header.
 
 
-## N7. The food-database mismatch warning — **BLOCKED, and the blocker is [BF-48](implementation-backlog.md)**
+## N7. The food-database mismatch warning — **BLOCKED, and the blocker is [BF-48](archive/implementation-backlog-2026-10-05.md)**
 **2026-08-30 — could not be run.** Owner: *"When I try add a food via the 'single food' section; it
 only searches saved/history food - its not checking the food data base."* Confirmed in source: the
 food database is reachable **only** from the meal builder's ingredient picker, so there is no
@@ -132,7 +132,7 @@ rather than confirms; the nest unwinds one layer per press (N2). **BF-27 is devi
 all three surface types.**
 
 
-## A2. The timeline's row taps — **FAILED 2026-08-30, filed as [BF-49](implementation-backlog.md)**
+## A2. The timeline's row taps — **FAILED 2026-08-30, filed as [BF-49](archive/implementation-backlog-2026-10-05.md)**
 Owner: *"tapping workout; then back -> leads to heath training not home. Same with tapping a food
 item from timeline."* Back resolves to the tab that owns the destination rather than unwinding to the
 origin, on both routes. Nothing further owed from the device until BF-49 ships.
@@ -264,7 +264,7 @@ only in Android SharedPreferences.
 **Reclassified as not-a-press.** LB-5 should be verified in code or with a test double, not by
 breaking the device. Moved to the "gated on a device but NOT a press" list below.
 
-**What the owner found instead is [BF-53](implementation-backlog.md), and it is live:** *"the 'not
+**What the owner found instead is [BF-53](archive/implementation-backlog-2026-10-05.md), and it is live:** *"the 'not
 me' button for weigh in's doesnt actually remove it."* Both the dismiss and confirm routes validate a
 `bigserial` id with a UUID regex, so every press returns 400 and the client swallows it.
 

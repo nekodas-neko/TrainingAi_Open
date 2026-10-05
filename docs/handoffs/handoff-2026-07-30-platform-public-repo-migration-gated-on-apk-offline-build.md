@@ -65,7 +65,7 @@ specifically, without re-deriving it.
   (already built for exactly this pattern in D5/D6). Once both land, the entire vendored tree has no
   live consumer anywhere and can be deleted outright.
 - **Backlog Q-29** (D8) and **Q-30** (DB volume cleanup) added to
-  [`docs/implementation-backlog.md`](../implementation-backlog.md). Q-30 was corrected mid-session —
+  [`docs/implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md). Q-30 was corrected mid-session —
   it originally guessed at a cold-storage-archival approach until a much more thorough existing
   investigation was found (see Gotchas below).
 - **Owner decision (2026-07-30, load-bearing):** the public-repo release itself does not start until
@@ -132,7 +132,7 @@ specifically, without re-deriving it.
 ## Files to look at
 
 - [`docs/superpowers/plans/2026-07-30-d8-own-resilience-and-energy-constants.md`](../superpowers/plans/2026-07-30-d8-own-resilience-and-energy-constants.md) — the D8 plan; read the 2026-07-30 sequencing update at the bottom, it supersedes the original sequencing text above it
-- [`docs/implementation-backlog.md`](../implementation-backlog.md) Q-29 (blocked), Q-30 (DB volume) — current queue state
+- [`docs/implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md) Q-29 (blocked), Q-30 (DB volume) — current queue state
 - [`docs/db-volume-cleanup-handover.md`](../db-volume-cleanup-handover.md) — the DB volume diagnosis with real prod numbers + the recommended bytea fix; do not re-investigate, extend this
 - [`docs/handoffs/handoff-phase-3-bundled-shell.md`](handoff-phase-3-bundled-shell.md) — the existing Phase 3 handoff. Task 3 (move auth client-side) is ready to start now; Task 4 is an unresolved owner gate (pick build-split option A/B/C) that blocks Phase 3 completion, which blocks everything in *this* handoff
 - `docs/superpowers/plans/2026-07-28-native-feel-roadmap.md`, `2026-07-28-native-feel-phase-3-bundled-shell.md` — the Phase 3 plan itself

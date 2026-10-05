@@ -7,7 +7,7 @@ start of a sitting, because the queue moves.
 **This is a plan, not an assignment.** Per `CLAUDE.md` a `Batch:` field is written when an entry is
 next touched, never in a bulk sweep, so nothing here has been stamped onto the entries themselves.
 
-Baton: [`docs/agents/state/device-verification.md`](agents/state/device-verification.md).
+Baton: [`docs/agents/state/device-verification.md`](archive/agents-2026-10-05/state/device-verification.md).
 
 **126 device checks are owed** across the queue, plus **10 entries fully BLOCKED** until the phone
 answers. That is far more than one sitting, so it is split into five below, **ordered so the ones

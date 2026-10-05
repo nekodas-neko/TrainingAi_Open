@@ -4,7 +4,7 @@ _Domain: `platform` · Branch: `docs/q530-secret-unblocked` · PRs: **#25 merged
 
 > **Read first:** `projectOverview.md` (status + Known Issues), then
 > [`docs/domains/platform/README.md`](../domains/platform/README.md), then
-> [`docs/implementation-backlog.md`](../implementation-backlog.md). This file covers only what *this*
+> [`docs/implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md). This file covers only what *this*
 > session did. The design itself lives in
 > [`plans/2026-08-17-admin-db-snapshot-endpoint.md`](../superpowers/plans/2026-08-17-admin-db-snapshot-endpoint.md)
 > — read that before implementing anything, not this.
