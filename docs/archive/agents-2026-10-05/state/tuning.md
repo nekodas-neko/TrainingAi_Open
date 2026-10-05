@@ -27,7 +27,7 @@ with asking.
 ## Now
 
 **Session wrapped 2026-10-05.** Handoff:
-[`docs/handoffs/handoff-2026-10-05-sleep-announce-and-correct.md`](../../handoffs/handoff-2026-10-05-sleep-announce-and-correct.md).
+[`docs/handoffs/handoff-2026-10-05-sleep-announce-and-correct.md`](../../../handoffs/handoff-2026-10-05-sleep-announce-and-correct.md).
 
 **⚑ TUNING HAS ITS OWN LANE as of OR-178 — start from `node scripts/next-item.js --lane T`.** 12
 entries route to it that were previously reachable only by hand-scan. Top of the lane: `OR-155`,
@@ -131,7 +131,7 @@ block, backwards), and `Gate: device` parked both — the mistake the backlog pr
 already, made a third time by a session that had read the warning. **`Verify: device` is not the fix
 either: it prints under a heading that reads *shipped*.** Startable native work carries neither field
 and states the owed check as prose. Full account:
-[`docs/overview/entries/2026-09-20-tuning-fix-tn51-needs-parse.md`](../../overview/entries/2026-09-20-tuning-fix-tn51-needs-parse.md).
+[`docs/overview/entries/2026-09-20-tuning-fix-tn51-needs-parse.md`](../../../overview/entries/2026-09-20-tuning-fix-tn51-needs-parse.md).
 
 **Corollary:** queue position is the only priority signal — an urgency claim in an entry's body is
 decoration. "Before my next trial" means move it to the top of the file.
@@ -165,7 +165,7 @@ running the code that ships.
   amendment (a dormant third step goal on Q-524). Every DEAD/STUCK column mapped to a filed entry, so
   the queue is comprehensive on that class. The four-for-four record that motivated the sweep held for
   the *investigated* thresholds and did not generalise.
-  [`review`](../../reviews/2026-08-25-threshold-sweep.md).
+  [`review`](../../../reviews/2026-08-25-threshold-sweep.md).
 - **The Body Battery does NOT charge overnight — the anchor IS the whole overnight story.**
   `walkBodyBattery` filters to `tsMs >= wakeTime`, and `resolveAnchor` sets the start to the
   readiness score. So a morning battery value is a readiness score wearing a battery label, and the
@@ -184,7 +184,7 @@ running the code that ships.
   no day moving ≥5. **The reason first given here was wrong and is corrected**: it is because the
   weight is 10% *and* it correlates with the rest, not because it is redundant.
 - **The check-in lookback is DONE (2026-08-26, n=33) — do not re-run it.**
-  [`review`](../../reviews/2026-08-26-checkin-lookback.md). Correlates restingHeartRate **+0.557**,
+  [`review`](../../../reviews/2026-08-26-checkin-lookback.md). Correlates restingHeartRate **+0.557**,
   previousNight **+0.520**, sleepBalance +0.470, temperature +0.463; yesterday's training **+0.028**.
   **Best honest model is 2 predictors, LOO R² 0.293**; all eight reach R² 0.541 with **LOO 0.047**.
   **⛔ Do NOT impute the check-in on unlogged days** — 5% out-of-sample is a fabricated number with a
@@ -270,7 +270,7 @@ running the code that ships.
   form against the check-in: **restingHeartRate −0.491**, **hrvBalance −0.331**, and the two
   correlate **+0.751 with each other (56% shared variance)**. Swapping loses a third of the
   correlation and buys almost no new information. HRV belongs on a detail screen.
-  [`review`](../../reviews/2026-08-31-hrv-as-a-tile-metric.md).
+  [`review`](../../../reviews/2026-08-31-hrv-as-a-tile-metric.md).
 - **HRV is the noisiest vital here but it IS signal** — CV **17.2%** against resting HR's **5.6%**,
   night-to-night 7.42 ms (13% of mean), yet lag-1 autocorrelation **+0.439** and |Δ|/sd **0.77**
   against 1.13 for white noise. Do not dismiss it as noise; do not read one night of it as an event.
@@ -304,7 +304,7 @@ running the code that ships.
 - **A sleep score can be reproduced EXACTLY from its stored contributors — do this before theorising.**
   2026-09-02: the ten contributors blend to **76.04**, `SCORE_CALIBRATION` ships **63**. Two minutes of
   arithmetic separated *"the model is wrong"* from *"the display curve costs 11.9 points"*.
-  [`review`](../../reviews/2026-09-03-why-a-good-night-scored-63.md).
+  [`review`](../../../reviews/2026-09-03-why-a-good-night-scored-63.md).
 - **⛔ The SLEEP score's autonomic baseline is NOT `hrv_baseline_mean_x8`.** `buildSleepAudit` calls
   `sleepScoreBaselines(prior, tz)` (`sleep-score.ts:359`) — a **trailing window over prior nights'
   own readings**, newest last, excluding the night being scored. Comparing a stored `hrv`/`hr`
@@ -325,7 +325,7 @@ running the code that ships.
   correlates **−0.438** with readiness (**−0.699** waking-only, n=8) — the correct direction — while
   the **stored** scalar reads **+0.338**. **Stored disagrees with buckets on 8 of 9 days**, storing
   **zero** against 210–270 bucket-minutes on four, and **agreeing only on the newest day**.
-  [`review`](../../reviews/2026-09-01-stress-sign-explained.md).
+  [`review`](../../../reviews/2026-09-01-stress-sign-explained.md).
 - **⛔ THREE mechanisms have now been proposed for Q-507 and two were wrong — stop proposing them.**
   Data-density (refuted 2026-08-26, r = −0.128 vs HR sample count) and TN-21's bucket-count
   (r = −0.784) both explained an **artefact of the stored value**, not a property of the model. The
@@ -375,7 +375,7 @@ running the code that ships.
   `segments` carries `distanceKm` + `avgCadenceSpm` per interval. Two extractions agree to **0.3%**
   (3 sessions, 16 segments) and `cadence × duration` reproduces recorded steps to **+0.13%**, so the
   cadence path is trustworthy where `steps` is null.
-  [`review`](../../reviews/2026-08-31-measured-stride-from-cadence.md).
+  [`review`](../../../reviews/2026-08-31-measured-stride-from-cadence.md).
 - **⛔ But one stride constant is still wrong: stride vs pace is r = −0.885**, −0.052 m per min/km —
   **0.83 m at 10:00/km, 0.62 m at 14:00/km**, a 33% spread. The measured sessions are deliberate
   walks (10–15 min/km); **incidental steps are slower and shorter**, so 0.739 over a whole day

@@ -41,7 +41,7 @@
   - **DV:** RV-220, one consolidated pass. **When its gallery lands, the next sweep is reading
     it.**
 - **Closing handoff:**
-  [`handoff-2026-10-05-platform-review-sweeps-54-64.md`](../../handoffs/handoff-2026-10-05-platform-review-sweeps-54-64.md).
+  [`handoff-2026-10-05-platform-review-sweeps-54-64.md`](../../../handoffs/handoff-2026-10-05-platform-review-sweeps-54-64.md).
 
 **The lesson of sweeps 62–64:**
 - **A web screenshot pass is worth doing first, and the phone corrects it.** Of sweep 63's web-only

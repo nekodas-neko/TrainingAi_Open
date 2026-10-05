@@ -5,7 +5,7 @@
 **Evidence:** [`docs/reviews/2026-08-17-readiness-calibration.md`](../reviews/2026-08-17-readiness-calibration.md)
 
 This is the narrative half. The baton
-([`docs/agents/state/tuning.md`](../agents/state/tuning.md)) holds current state; the review doc holds
+([`docs/agents/state/tuning.md`](../archive/agents-2026-10-05/state/tuning.md)) holds current state; the review doc holds
 the measurements. This holds the method, the dead ends, and the things a second session would
 otherwise pay for again.
 

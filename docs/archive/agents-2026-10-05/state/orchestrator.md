@@ -45,7 +45,7 @@ session opened today would have nothing to start.
 
 **So the device sitting is not one owner action among four; it is the thing that unblocks an entire
 lane.** Everything else Lane B could do is already done and waiting to be looked at. Plan
-[`docs/device-sitting-plan-2026-09-28.md`](../../device-sitting-plan-2026-09-28.md).
+[`docs/device-sitting-plan-2026-09-28.md`](../../../device-sitting-plan-2026-09-28.md).
 
 Lane A (41 READY), O (62), T (23) and DV (17) are all healthy and can start immediately.
 

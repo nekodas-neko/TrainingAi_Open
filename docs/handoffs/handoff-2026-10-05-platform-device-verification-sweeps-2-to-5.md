@@ -5,7 +5,7 @@ _Domain: `platform` (also touches `app-shell`, `nutrition`, `devices`, `workouts
 #1691, #1696, #1701, #1702 and #2036._
 
 > **Read first:** `projectOverview.md`, then [`docs/agents/README.md`](../agents/README.md) (the DV
-> role), then the baton [`docs/agents/state/device-verification.md`](../agents/state/device-verification.md),
+> role), then the baton [`docs/agents/state/device-verification.md`](../archive/agents-2026-10-05/state/device-verification.md),
 > then the current plan [`docs/device-sweep-5-plan.md`](../device-sweep-5-plan.md). This file
 > covers what this session did and leaves behind; the findings themselves live on their backlog
 > entries.
