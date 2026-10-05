@@ -99,6 +99,11 @@
   color: 'c5def5'
   description: Screens, components, hooks, stores
 
+# --- migration ---
+- name: 're-verify'
+  color: 'fef2c0'
+  description: Filed before 2026-08-20 — check the premise against main before building it
+
 # --- release path ---
 - name: 'hotfix'
   color: 'b60205'
