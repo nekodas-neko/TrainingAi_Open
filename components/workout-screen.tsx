@@ -38,7 +38,6 @@ import { useShallow } from "zustand/react/shallow";
 import { cachedFetch, readCacheSync, setCached } from "@/lib/sqlite/cache";
 import { type NumbersSource } from "@/components/workout/numbers-source";
 import { freshExercises as freshExercisesFor, seedNumbersSource, type WorkoutDataSeed } from "@/components/workout/workout-data-seed";
-import { prescribeRequestInit } from "@/components/workout/prescribe-request";
 import { playBeep } from "@/components/workout/beep";
 import { useUserTimezone } from '@/components/shell/user-timezone-provider';
 import { calendarMonthInTz } from '@/lib/calendar-month';
@@ -1521,21 +1520,10 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
         }
       });
 
-    // Generate the NEXT prescription now, at completion, so it's cached and loads instantly
-    // when this session is reopened — no "Preparing your AI workout…" wait. Client-fired for
-    // reliability: the server's /api/complete-workout route also fires this, but that
-    // container→own-origin self-fetch is unreliable in prod (same reason the open-time trigger
-    // moved client-side). Invalidate the prescription caches once it lands so the next open and
-    // the done screen's next-workout card read the fresh one. ai_dynamic programs only.
-    if (programSessionId && programPhaseMode === 'ai_dynamic') {
-      const psid = programSessionId;
-      // LA-177: exclude the session that just finished, or its own completion is read as a ~0-hour
-      // gap and can self-trigger an emergency deload for the next session. The helper carries the
-      // full reasoning, including why an empty id omits the field rather than sending `''`.
-      fetch(`/api/ai-periodization/session/${psid}/prescribe`, prescribeRequestInit(wsId))
-        .then((res) => { if (res.ok) invalidatePrescriptionChanged(psid).catch(() => {}); })
-        .catch(() => {});
-    }
+    // No prescription is generated here (#2155). The next one for this session is warmed when Home
+    // recommends it, on that day's readiness — generating now built it on today's and left it
+    // sitting until the session came round again, which is how a stale deload outlived its reason
+    // (BF-179). The owner rejected completion-time generation on 2026-07-31 and again on 2026-09-30.
 
     // Detect phase change by fetching fresh phase data after cache invalidation —
     // routed through cachedFetch on the just-invalidated key so it re-warms the
@@ -1553,7 +1541,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       },
     ).catch(() => {})
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store.workoutSessionId, sessionType, sessionDisplayName, programSessionId, programPhaseMode]);
+  }, [store.workoutSessionId, sessionType, sessionDisplayName]);
 
   const handleBack = useCallback(() => {
     store.setSoloMode(false);

@@ -85,6 +85,16 @@ export interface ReevaluationResult {
 // the previous session is consumed up to 7 days later — soreness that has since cleared
 // must drop its deload, and newly-sore muscles must pick one up, without re-running Gemini.
 // Past that window it is no longer re-evaluated but replaced: see the expiry branch below.
+/** The expiry branch on its own: a stored prescription past its window is replaced, not re-shaped.
+ *  Shared with the Home warm (#2155), so the two cannot disagree about when one is needed. */
+export function prescriptionAgedOut(
+  state: Pick<EmergencyState, 'prescriptionStatus' | 'prescriptionExpiresAt'>,
+  now = new Date(),
+): boolean {
+  const agesOutOnExpiry = state.prescriptionStatus !== 'pending' && state.prescriptionStatus !== 'none'
+  return agesOutOnExpiry && state.prescriptionExpiresAt != null && state.prescriptionExpiresAt <= now
+}
+
 export function reevaluatePrescriptionForToday(
   prescription: AiPrescription,
   signals: ReevaluationSignals,
@@ -115,11 +125,7 @@ export function reevaluatePrescriptionForToday(
   // The two exemptions, both deliberate. `pending` is an *offer* whose expiry the emergency-deload
   // suppression below already owns, and re-deriving it here would fight that. `none` means there is
   // no offer to age out at all, so regenerating on it would be a loop with nothing to show for it.
-  const agesOutOnExpiry = state.prescriptionStatus !== 'pending' && state.prescriptionStatus !== 'none'
-  if (
-    agesOutOnExpiry &&
-    state.prescriptionExpiresAt != null && state.prescriptionExpiresAt <= now
-  ) {
+  if (prescriptionAgedOut(state, now)) {
     return { prescription, changed: false, needsRegenerate: true }
   }
 
