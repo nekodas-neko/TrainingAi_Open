@@ -170,18 +170,18 @@ const GUIDE: Record<string, ContributorGuide> = {
       'Address stress before bed with journaling or breathing.',
     ],
   },
-  // RV-217 sibling sweep. `checkin` is readiness's own contributor and the ONLY one of its nine
-  // with no guide — RV-201 gave it a label and stopped there, so it was the one row on
-  // "What goes into this score" with no chevron. A label without a guide is the same defect one
-  // step along: the row reads correctly and then does nothing when tapped.
+  // RV-217 sibling sweep. `checkin` was readiness's own contributor and the ONLY one with no guide
+  // — RV-201 gave it a label and stopped there, so it was the one row on "What goes into this
+  // score" with no chevron. #2224 took it out of readiness on 2026-10-06; the guide stays for the
+  // days scored before that, whose stored contributors still list it, and says what changed.
   checkin: {
-    measures: 'What you reported this morning — your own read on how you feel, scored from the energy answer.',
-    against: 'Feeling good scores higher. Worth a tenth of readiness, so it moves the number without deciding it.',
-    high: 'You woke up feeling good, and the score reflects that alongside the measurements.',
-    low: 'You told the app you feel poor. That is real information the sensors do not always have.',
+    measures: 'What you reported that morning — your own read on how you felt, scored from the energy answer.',
+    against: 'Feeling good scored higher. It counted for a tenth of readiness on days scored before 6 October 2026, and no longer counts at all.',
+    high: 'You woke up feeling good, and that day’s score reflected it alongside the measurements.',
+    low: 'You told the app you felt poor. That is real information the sensors do not always have.',
     remediate: [
-      'Answer it honestly rather than optimistically — it is the only contributor you control directly.',
-      'If it keeps disagreeing with the other contributors, the disagreement is the interesting part.',
+      'Readiness now comes from the overnight measurements alone, so it is settled when you first open the app.',
+      'Your check-in still tunes that day’s session.',
     ],
   },
   // RV-217 — the sleep model's own three, which had no guide and so drew no chevron beside a row

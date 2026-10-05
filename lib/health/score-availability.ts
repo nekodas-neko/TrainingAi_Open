@@ -19,13 +19,13 @@ export type ReadinessInputKey =
   | 'restingHeartRate'
   | 'temperature'
   | 'activity'
-  | 'checkin'
 
 /** The baseline-relative recovery signals. Confidence is judged on these four alone — activity
- *  and the morning check-in shift the score but say nothing about how well the body recovered. */
+ *  shifts the score but says nothing about how well the body recovered. The morning check-in is
+ *  not a readiness input at all since #2224. */
 export const CORE_READINESS_INPUTS: ReadinessInputKey[] = ['sleep', 'hrv', 'restingHeartRate', 'temperature']
 
-const ALL_INPUTS: ReadinessInputKey[] = [...CORE_READINESS_INPUTS, 'activity', 'checkin']
+const ALL_INPUTS: ReadinessInputKey[] = [...CORE_READINESS_INPUTS, 'activity']
 
 export interface ScoreAvailability {
   available: ReadinessInputKey[]

@@ -23,9 +23,10 @@ const CONTRIBUTOR_LABELS: Record<string, string> = {
   training_frequency: 'Training frequency',
   training_volume: 'Training volume',
   // The app's OWN readiness composite (`READINESS_WEIGHTS`, readiness-composite.ts). Six of its
-  // nine keys are the Oura names in camelCase and resolve through `labelFor`'s fallback; these
-  // three do not, and rendered as raw keys until RV-201: `checkin` has no Oura equivalent at all,
-  // and the other two were renamed. Keep this list in step with `READINESS_WEIGHTS`.
+  // eight keys are the Oura names in camelCase and resolve through `labelFor`'s fallback; the other
+  // two were renamed and do not, and rendered as raw keys until RV-201. Keep this list in step with
+  // `READINESS_WEIGHTS`. `checkin` left the composite in #2224 and stays here for the derived rows
+  // written before that, which still carry it.
   checkin: 'Morning check-in',
   temperature: 'Body temperature',
   prevDayActivity: 'Previous day activity',
