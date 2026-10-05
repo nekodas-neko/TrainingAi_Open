@@ -14,7 +14,7 @@
 | Kind of work | Where it lives |
 |---|---|
 | **Who does what** | [`docs/agents/README.md`](docs/agents/README.md) — the six standing agents, their authority, and the two-lane file-ownership contract. Read this before starting a session. |
-| **Upcoming — ready to build** | [`docs/implementation-backlog.md`](docs/implementation-backlog.md) — a priority-ordered queue; implementer sessions take the top item per the protocol in that file |
+| **Upcoming — ready to build** | [`docs/implementation-backlog.md`](docs/archive/implementation-backlog-2026-10-05.md) — a priority-ordered queue; implementer sessions take the top item per the protocol in that file |
 | **Upcoming — ideas/findings** | [`docs/planned_upgrades.md`](docs/planned_upgrades.md) — open uplift ideas; they graduate to the backlog once a session writes their implementation plan |
 | **Completed — session journal** | `docs/overview/entries/` (current window, one file per PR) then the batched `docs/overview/history-*.md` |
 | **Completed — shipped plans/specs** | `docs/superpowers/plans/archive/` and `docs/superpowers/specs/archive/` |

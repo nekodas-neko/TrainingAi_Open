@@ -4,7 +4,7 @@ _Domain: `activity` (also touches `devices`, `platform`) · Branch: `claude/sams
 
 > **Read first:** `projectOverview.md` (status + Known Issues), then
 > [`docs/domains/activity/README.md`](../domains/activity/README.md) (that pillar's code, docs and open
-> issues), then [`docs/implementation-backlog.md`](../implementation-backlog.md) — **Q-139**, filed
+> issues), then [`docs/implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md) — **Q-139**, filed
 > directly above Q-71. This file covers only what *this* session did and what it leaves behind.
 
 ## Goal

@@ -1,7 +1,7 @@
 # Plan — admin DB snapshot endpoint (Q-530)
 
 **Written:** 2026-08-17 · **Status:** ready to implement · **Backlog:** Q-530
-**Supersedes shape (a) of** [Q-251](../../implementation-backlog.md) — the rescoped "prod-shaped
+**Supersedes shape (a) of** [Q-251](../../archive/implementation-backlog-2026-10-05.md) — the rescoped "prod-shaped
 database to run against" half. Q-251's shape (b), a second Railway service, stays deferred.
 
 **Verdict up front: build it, and it is much smaller than Q-251 implies.** The scoping map does not

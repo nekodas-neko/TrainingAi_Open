@@ -1,7 +1,7 @@
 # Can the objective signals predict a good check-in? — 2026-08-26
 
 *Tuning · production data pulled 2026-08-26, **n = 33 logged check-ins**. Feeds
-[`TN-9`](../implementation-backlog.md). Propose-only. Counts are the owner's account only.*
+[`TN-9`](../archive/implementation-backlog-2026-10-05.md). Propose-only. Counts are the owner's account only.*
 
 ## The question
 

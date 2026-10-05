@@ -142,14 +142,13 @@ describe('a file over the default spawn buffer is readable at base (LA-132)', ()
     const baseRef = resolveBaseRef()
     if (!baseRef) return // no base to read against; resolveBaseRef warns for itself
 
-    const rel = 'docs/implementation-backlog.md'
-    const onDisk = require('fs').statSync(
-      require('path').resolve(__dirname, '..', '..', rel),
-    ).size
-    expect(onDisk, 'the witness must exceed 1 MiB or it pins nothing').toBeGreaterThan(1024 * 1024)
-
-    const res = showAtBase(baseRef, rel)
-    expect(res.unreadable, `base read failed: ${res.reason ?? ''}`).toBe(false)
-    expect(res.content, 'a null here is the ENOBUFS path reporting the file as absent').not.toBeNull()
+    // The backlog was archived on 2026-10-05. Until that move reaches the base branch the base holds
+    // it at the old path, and afterwards at the new one; either is the same >1 MiB witness.
+    const candidates = ['docs/archive/implementation-backlog-2026-10-05.md', 'docs/implementation-backlog.md']
+    const reads = candidates.map((rel) => showAtBase(baseRef, rel))
+    for (const r of reads) expect(r.unreadable, `base read failed: ${r.reason ?? ''}`).toBe(false)
+    const hit = reads.find((r) => r.content != null)
+    expect(hit, 'a null here is the ENOBUFS path reporting the file as absent').toBeDefined()
+    expect(hit!.content!.length, 'the witness must exceed 1 MiB or it pins nothing').toBeGreaterThan(1024 * 1024)
   })
 })

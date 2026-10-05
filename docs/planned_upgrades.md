@@ -2,7 +2,7 @@
 
 > **The findings ledger — what's still open.** This is the curated list of uplift ideas/findings
 > that have **not** yet fully shipped. Each graduates to
-> [`docs/implementation-backlog.md`](implementation-backlog.md) (the ready-to-build queue) once a
+> [`docs/implementation-backlog.md`](archive/implementation-backlog-2026-10-05.md) (the ready-to-build queue) once a
 > session writes its implementation plan.
 >
 > **Shipped detail lives in [`docs/overview/uplift-archive.md`](overview/uplift-archive.md)** — the

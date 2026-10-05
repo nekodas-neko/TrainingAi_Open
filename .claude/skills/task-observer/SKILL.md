@@ -24,12 +24,12 @@ Observations do **not** get their own log. They land in the places the next sess
 | Observation | Destination |
 |---|---|
 | Recurring bug class, or a rule that exists but did not fire | A **CLAUDE.md rule** edit — usually sharpening an existing rule, not adding one |
-| A gap found but not fixed | `projectOverview.md` Known Issues row, domain-tagged |
-| Work worth doing later | `docs/implementation-backlog.md` entry at a judged priority |
+| A gap found but not fixed | A GitHub issue, `type: bug`, with its `area:` label |
+| Work worth doing later | A GitHub issue (`needs: triage`) — the Orchestrator triages it into the queue |
 | A repeated manual procedure | A new or extended **skill** in `.claude/skills/` |
 | Knowledge specific to one pillar | `docs/domains/<pillar>/README.md` |
 | New shared module or infrastructure | A row in `docs/module-map.md` |
-| What this session did and decided | The session's `docs/overview/entries/` file |
+| What this session did and decided | The PR description, and a comment on each issue it touched |
 
 Everything rides in the **current session's PR**. CLAUDE.md is explicit: a finding without a queue
 entry is a dropped finding, and the journal update must land in the same PR as the work so an

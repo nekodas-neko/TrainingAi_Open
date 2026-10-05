@@ -3,7 +3,7 @@
 **One implementer agent owns this whole stream.** Work the tasks **top-to-bottom** (later items
 share files with earlier ones). Sibling: [Stream 2](2026-07-19-stream-2-oura-health-ai.md) runs in
 parallel on a disjoint file set. This doc is the authoritative refinement of the high-level split in
-[`docs/implementation-backlog.md`](../../implementation-backlog.md) → *▶ Deep-review batch → ▷
+[`docs/implementation-backlog.md`](../../archive/implementation-backlog-2026-10-05.md) → *▶ Deep-review batch → ▷
 Two-stream split*.
 
 Source of every finding ID below: [`docs/reviews/2026-07-18-deep-app-review.md`](../../reviews/2026-07-18-deep-app-review.md).

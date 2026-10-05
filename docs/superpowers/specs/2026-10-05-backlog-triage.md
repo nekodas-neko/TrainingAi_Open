@@ -28,7 +28,7 @@ The backlog drifted by three entries between the triage and the move: **LB-198 s
 the v2 milestone · 11 device-check groups · 1 owner look · 1 watch list. Labels, by type: 96
 feature · 40 chore · 39 question · 37 bug · 28 tuning · 11 device-check. 37 carry `re-verify`.
 
-Run by [`scripts/backlog-to-issues.js`](../../../scripts/backlog-to-issues.js) through the
+Run by [`scripts/backlog-to-issues.js`](https://github.com/nekodas-neko/TrainingAi_Open/blob/37816671f90a/scripts/backlog-to-issues.js) through the
 *Backlog migration* workflow — **dry run by default**, idempotent on re-run.
 
 ## What the 524 become

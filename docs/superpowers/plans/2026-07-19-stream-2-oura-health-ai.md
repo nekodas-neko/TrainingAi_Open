@@ -6,7 +6,7 @@ Oura-derivation god-files (`aggregateOuraRawSamples` in `adapter.ts`,
 **cannot** be parallelised among themselves; work strictly top-to-bottom, one PR at a time. Sibling:
 [Stream 1](2026-07-19-stream-1-product-offline.md) runs in parallel on a disjoint file set. This doc
 is the authoritative refinement of the high-level split in
-[`docs/implementation-backlog.md`](../../implementation-backlog.md) → *▶ Deep-review batch → ▷
+[`docs/implementation-backlog.md`](../../archive/implementation-backlog-2026-10-05.md) → *▶ Deep-review batch → ▷
 Two-stream split*.
 
 Source of every finding ID below: [`docs/reviews/2026-07-18-deep-app-review.md`](../../reviews/2026-07-18-deep-app-review.md).

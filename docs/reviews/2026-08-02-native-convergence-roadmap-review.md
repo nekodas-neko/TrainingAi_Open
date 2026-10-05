@@ -6,7 +6,7 @@ reviewed against source on `main` (b7ecb15)._
 **Documents reviewed:** [`superpowers/plans/2026-08-02-native-convergence-goal-layout.md`](../superpowers/plans/2026-08-02-native-convergence-goal-layout.md)
 · [`offline-first-target-architecture.md`](../offline-first-target-architecture.md)
 · [`device-agnostic-source-architecture.md`](../device-agnostic-source-architecture.md)
-· [`implementation-backlog.md`](../implementation-backlog.md)
+· [`implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md)
 · [`handoff-2026-08-02-platform-batch-queue-drain.md`](../handoffs/handoff-2026-08-02-platform-batch-queue-drain.md)
 · [`handoff-phase-3-bundled-shell.md`](../handoffs/handoff-phase-3-bundled-shell.md)
 · [`public-launch-checklist.md`](../public-launch-checklist.md)

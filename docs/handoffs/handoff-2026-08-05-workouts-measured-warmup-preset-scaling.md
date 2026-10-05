@@ -4,7 +4,7 @@ _Domain: `workouts` · Branch: `fix/measured-warmup-scale-with-preset` · PR: op
 
 > **Read first:** `projectOverview.md` (status + Known Issues), then
 > [`docs/domains/workouts/README.md`](../domains/workouts/README.md), then
-> [`docs/implementation-backlog.md`](../implementation-backlog.md) (the queue). This file covers only
+> [`docs/implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md) (the queue). This file covers only
 > what *this* session did and what it leaves behind.
 
 ## Goal

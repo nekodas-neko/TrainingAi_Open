@@ -2659,7 +2659,7 @@ Last swept **2026-09-03**.
 
 ## 📋 What's Left To Do
 
-> **Ready-to-build work is queued in [`docs/implementation-backlog.md`](../implementation-backlog.md);
+> **Ready-to-build work is queued in [`docs/implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md);
 > open uplift ideas are in [`docs/planned_upgrades.md`](../planned_upgrades.md).** The list below
 > is the residual legacy backlog — mostly ✅/🚫 — plus the device-only verifications that can't be
 > exercised in the sandbox.

@@ -27,7 +27,7 @@ everything else merges freely.
 ### Implementation (Lane A · Lane B)
 
 Works the backlog queue top-down within its lane, one item per run, following the protocol at the
-top of [`docs/implementation-backlog.md`](../../implementation-backlog.md). Re-verifies each entry's
+top of [`docs/implementation-backlog.md`](../implementation-backlog-2026-10-05.md). Re-verifies each entry's
 premise against current `main` before building — entries are leads, not specs, and this queue has
 repeatedly held items that were already shipped, already refuted, or wrong about how many call
 sites existed.

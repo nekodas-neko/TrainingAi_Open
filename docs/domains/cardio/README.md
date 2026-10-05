@@ -55,7 +55,7 @@ prescription coach, the cardio hub/trends/picker surfaces, and guided walk.
 - Plans: `ls docs/superpowers/plans/*cardio*` (13 today), plus
   `docs/superpowers/plans/2026-07-20-cardio-system-remaining.md` for what's left.
 - Backlog initiatives: the **Cardiovascular system redesign** and **Guided walk** sections of
-  [`docs/implementation-backlog.md`](../../implementation-backlog.md) are owner directives.
+  [`docs/archive/implementation-backlog-2026-10-05.md`](../../archive/implementation-backlog-2026-10-05.md) are owner directives.
 
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
 

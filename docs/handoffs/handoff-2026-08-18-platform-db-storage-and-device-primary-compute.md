@@ -3,7 +3,7 @@
 _Domain: `platform` (also touches `devices`) · Branch: `fix/raw-store-measured-and-console-gate` · PR: **#82, open, docs-only**_
 
 > **Read first:** `projectOverview.md`, then [`docs/domains/devices/README.md`](../domains/devices/README.md),
-> then [`docs/implementation-backlog.md`](../implementation-backlog.md). This file covers one session.
+> then [`docs/implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md). This file covers one session.
 > Companion: [`handoff-2026-08-18-platform-database-reclaim.md`](handoff-2026-08-18-platform-database-reclaim.md)
 > (Lane A's runbook — **now marked done**, this session executed it).
 

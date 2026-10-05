@@ -1,6 +1,6 @@
 # Is HRV reliable, is it a better tile metric than HR, and is there a stable band? — 2026-08-31
 
-*Tuning · production data pulled 2026-08-31. Amends [`TN-13`](../implementation-backlog.md) with a
+*Tuning · production data pulled 2026-08-31. Amends [`TN-13`](../archive/implementation-backlog-2026-10-05.md) with a
 negative result. Propose-only. Counts are the owner's account only (`claude_ro` is row-scoped).*
 
 Owner: *"how reliable is HRV as a stat? would that be a better metric to show on the home screen

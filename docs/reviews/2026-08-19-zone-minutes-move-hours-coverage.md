@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-19 · **Agent:** Tuning 🎶 · **Pillars:** `[activity]` `[heart-rate]` `[body]`
 **Trigger:** the owner asked for this directly, and
-[Q-521](../implementation-backlog.md) had deferred it — its closing caveat said *"zone minutes and
+[Q-521](../archive/implementation-backlog-2026-10-05.md) had deferred it — its closing caveat said *"zone minutes and
 movement-per-hour were not pulled or coverage-checked… checking their coverage is the first
 implementation step, given what `active_calories` shows."*
 

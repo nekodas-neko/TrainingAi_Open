@@ -1,7 +1,7 @@
 # What the HR tile should show, and whether an Activity pace score works — 2026-08-26
 
-*Tuning · production data pulled 2026-08-26. Amends [`TN-13`](../implementation-backlog.md), files
-**TN-17**, and reconciles [`TN-3a`](../implementation-backlog.md) against what actually shipped.
+*Tuning · production data pulled 2026-08-26. Amends [`TN-13`](../archive/implementation-backlog-2026-10-05.md), files
+**TN-17**, and reconciles [`TN-3a`](../archive/implementation-backlog-2026-10-05.md) against what actually shipped.
 Propose-only. Counts are the owner's account only (`claude_ro` is row-scoped).*
 
 Owner, on the HR tile: *"Maybe it needs to show you the average awake resting HR? … or maybe its

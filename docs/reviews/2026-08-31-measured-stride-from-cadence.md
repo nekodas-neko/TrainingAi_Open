@@ -1,7 +1,7 @@
 # The owner's real stride, measured from strap cadence — 2026-08-31
 
 *Tuning · production data pulled 2026-08-31. Corrects the estimated figures published earlier the
-same day on [`Q-524`](../implementation-backlog.md). Propose-only. Counts are the owner's account
+same day on [`Q-524`](../archive/implementation-backlog-2026-10-05.md). Propose-only. Counts are the owner's account
 only (`claude_ro` is row-scoped).*
 
 Owner: *"I walk/run with the heartrate strap and we measure cadence — that + distance, can we

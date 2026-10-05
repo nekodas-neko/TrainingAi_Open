@@ -1,6 +1,6 @@
 # "The scores have been very varied lately" — measured — 2026-08-24
 
-*Tuning · production data pulled 2026-08-24. Filed as [`TN-5`](../implementation-backlog.md).
+*Tuning · production data pulled 2026-08-24. Filed as [`TN-5`](../archive/implementation-backlog-2026-10-05.md).
 Propose-only. Counts are the owner's account only (`claude_ro` is row-scoped).*
 
 ## The report

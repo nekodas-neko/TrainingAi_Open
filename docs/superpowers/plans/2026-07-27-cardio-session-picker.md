@@ -23,7 +23,7 @@ reusing the existing `Sheet` primitive, `cachedFetchToday`, and theme tokens.
 ## Spec reference
 
 Implements cardio batch item 1 from
-[`docs/implementation-backlog.md`](../../implementation-backlog.md) and spec
+[`docs/implementation-backlog.md`](../../archive/implementation-backlog-2026-10-05.md) and spec
 [`docs/superpowers/specs/2026-07-26-cardio-system-spec.md`](../specs/2026-07-26-cardio-system-spec.md):
 
 | Decision | What this plan does with it |

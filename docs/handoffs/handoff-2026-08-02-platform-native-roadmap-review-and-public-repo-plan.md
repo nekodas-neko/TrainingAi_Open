@@ -5,7 +5,7 @@ _Domain: `platform` (also touches `app-shell`, `devices`) · Branch: merged to `
 
 > **Read first:** `projectOverview.md` (status + Known Issues), then
 > [`docs/domains/platform/README.md`](../domains/platform/README.md), then
-> [`docs/implementation-backlog.md`](../implementation-backlog.md) (the queue). This file covers only
+> [`docs/implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md) (the queue). This file covers only
 > what *this* session did and what it leaves behind.
 
 > **If you are the agent working the batch queue drain** — your run-list lives in
@@ -29,7 +29,7 @@ _Domain: `platform` (also touches `app-shell`, `devices`) · Branch: merged to `
 > note says it will not make navigation faster. Recorded in `projectOverview.md`, the goal layout §4
 > and the Q-1 entry.
 >
-> **2. The queue head is Q-51, not Q-49.** [`docs/implementation-backlog.md`](../implementation-backlog.md)
+> **2. The queue head is Q-51, not Q-49.** [`docs/implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md)
 > order today: **Q-51 → Q-49 → Q-50 → Q-48 → Q-44 → Q-1**. Q-50 is *not* mine — another session
 > claimed it in parallel for the vendored-model deletion decisions, and my perf entry moved to Q-51.
 > The file now carries a "claim Q numbers against open PRs" note, because this collided twice in one

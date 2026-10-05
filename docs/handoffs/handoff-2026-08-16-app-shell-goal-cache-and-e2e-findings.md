@@ -4,7 +4,7 @@ _Domain: `app-shell` (also touches `platform`, `health`) · Branch: `docs/sessio
 
 > **Read first:** `projectOverview.md` (status + Known Issues), then
 > [`docs/domains/app-shell/README.md`](../domains/app-shell/README.md), then
-> [`docs/implementation-backlog.md`](../implementation-backlog.md).
+> [`docs/implementation-backlog.md`](../archive/implementation-backlog-2026-10-05.md).
 > Continues from [`docs/handoffs/handoff-2026-08-15-app-shell-ia-cluster-complete.md`](handoff-2026-08-15-app-shell-ia-cluster-complete.md),
 > which closed the 2026-08-14 IA cluster. This doc covers what came after: the owner-reported
 > readiness item, the two owner questions it left open, and the chain of findings the new E2E
