@@ -43,7 +43,22 @@ const OVERRIDES = {
   'LB-56': ['archive-resolved', '', 'answered by the release-train spec: E2E runs at release, not per PR'],
   'PS-4': ['obsolete-process', '', 'batons are retired by the release-train spec'],
   'PS-38': ['obsolete-process', '', 'a CLAUDE.md claims sweep; Phase 4 rewrites CLAUDE.md wholesale'],
+  'OR-213': ['epic', 'epic', 'a five-phase programme cannot live in one issue: an epic, its phases as sub-issues (docs/architecture/ingest-and-scoring.md §6)'],
 };
+
+// The ingest architecture's phases (docs/architecture/ingest-and-scoring.md §6). Two already exist as
+// entries — Phase 2 is OR-215 (the basis field), Phase 3 is OR-214 (the connector contract) — so they
+// become sub-issues as they are. The other three have no entry and are created here, so the CSV stays
+// the migration's only input.
+const PARENT = { 'OR-214': 'OR-213', 'OR-215': 'OR-213' };
+const EPIC_PHASES = [
+  { id: 'OR-213/P0', verdict: 'issue', type: 'chore', domains: 'devices platform', note: 'architecture Phase 0; blocks nothing else',
+    title: 'Ingest Phase 0 — make the raw archive safe: build the local archive and PROVE a restore, then stop writing raw to Railway, then drop the server copy' },
+  { id: 'OR-213/P1', verdict: 'issue', type: 'engine', domains: 'platform devices', note: 'architecture Phase 1',
+    title: 'Ingest Phase 1 — the normaliser and the signal catalogue: canonical sample shape, finest-available resolution, rank-decided sources (D1, D2). No storage moves' },
+  { id: 'OR-213/P4', verdict: 'issue-blocked', type: 'blocked', domains: 'platform devices', needs: 'OR-213/P0 OR-213/P1 OR-214 OR-215', note: 'architecture Phase 4; last, after the other four',
+    title: 'Ingest Phase 4 — the storage move: the device becomes the source of truth and the cloud takes scored values only' },
+];
 const rows = [];
 for (const e of entries) {
   // Mirrors next-item.js exactly, so the buckets match what the queue tool prints.
@@ -97,14 +112,26 @@ for (const e of entries) {
     } else { verdict = 'issue'; type = e.lane === 'B' ? 'surface' : 'engine'; }
   }
   let note = '';
+  // A sub-issue is not blocked by its own epic: the epic is the container, not a prerequisite.
+  if (PARENT[e.id]) {
+    const rest = needsLive.filter((n) => n !== PARENT[e.id]);
+    needsLive.length = 0;
+    needsLive.push(...rest);
+    if (!rest.length && verdict === 'issue-blocked') { verdict = 'issue'; type = 'engine'; }
+  }
   if (OVERRIDES[e.id]) { [verdict, type, note] = OVERRIDES[e.id]; group = ''; }
   const a = added(e);
   const stale = /^issue/.test(verdict) && a && a < '2026-08-20' ? 'yes' : '';
-  rows.push({ id: e.id, verdict, type, group, bucket, lane: e.lane || '', domains: e.tags.join(' '), gates: allGates.join('+'), needs: needsLive.join(' '), keepKind: kk, added: a, reverify: stale, note, title: e.title.replace(/^\[[^\]]+\](\[[^\]]+\])*\s*/, '').replace(/\s+/g, ' ').slice(0, 140) });
+  rows.push({ id: e.id, parent: PARENT[e.id] || '', verdict, type, group, bucket, lane: e.lane || '', domains: e.tags.join(' '), gates: allGates.join('+'), needs: needsLive.join(' '), keepKind: kk, added: a, reverify: stale, note, title: e.title.replace(/^\[[^\]]+\](\[[^\]]+\])*\s*/, '').replace(/\s+/g, ' ').slice(0, 140) });
+}
+
+for (const p of EPIC_PHASES) {
+  rows.push({ id: p.id, parent: 'OR-213', verdict: p.verdict, type: p.type, group: '', bucket: 'synthetic', lane: 'O',
+    domains: p.domains, gates: '', needs: p.needs || '', keepKind: '', added: '2026-10-05', reverify: '', note: p.note, title: p.title });
 }
 
 const esc = (s) => /[",\n]/.test(String(s)) ? `"${String(s).replace(/"/g, '""')}"` : String(s);
-const cols = ['id', 'verdict', 'type', 'group', 'bucket', 'lane', 'domains', 'gates', 'needs', 'keepKind', 'added', 'reverify', 'note', 'title'];
+const cols = ['id', 'parent', 'verdict', 'type', 'group', 'bucket', 'lane', 'domains', 'gates', 'needs', 'keepKind', 'added', 'reverify', 'note', 'title'];
 fs.writeFileSync(outCsv, [cols.join(','), ...rows.map((r) => cols.map((c) => esc(r[c])).join(','))].join('\n') + '\n');
 
 const count = (k) => rows.reduce((m, r) => ((m[r[k]] = (m[r[k]] || 0) + 1), m), {});
