@@ -4940,19 +4940,6 @@ which is the right shape for something that can only be validated by living with
   `recovery_index_hours` and the training-load pair are all legitimately written-but-empty — so it
   needs a reasoned allowlist rather than a bare scan, and is its own piece of work.
 
-### [readiness][platform] LA-159 — `program_phases.program_id` is dead and made a diagnostic query read as a clean zero
-- **Lane: A** · **Branch:** _unassigned_ · **Added:** 2026-09-27 · split out of LA-138 on closing it.
-- **What:** `program_phases.program_id` is populated on **0 of 46 rows** — phases moved under
-  `phase_set_id` and the column stayed. Dropping it is a migration.
-- **Why it is worth an entry rather than a shrug:** joining on it returns nothing, with no error
-  and no warning, and that is exactly how LA-138's first filing came to claim *"`program_phases`
-  holds 0 rows for all five programs"* when it holds 46. A dead column that silently answers
-  "none" is a trap for the next person writing a diagnostic query, not just dead weight.
-- **Shape:** one migration (`DROP COLUMN program_id`) plus the regenerated `claude_ro` twin, and
-  a check that nothing reads it first. **Ships alone, and it is data-dropping, so
-  confirm-before-merge** — see LA-142 (#1749) for the shape, including that the `claude_ro` view
-  must be dropped in the same file before the column can go.
-
 ### [readiness][devices][heart-rate] TN-79 — Q-270's route is NOT silent: it persists `insufficient_met` on 21 days while the MET data it needs is present
 
 - **Branch:** `tuning/training-load-gate-diagnosis`
