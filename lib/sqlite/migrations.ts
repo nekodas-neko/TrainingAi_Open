@@ -322,6 +322,7 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'day_checkins',     column: 'vs_yesterday',               ddl: `ALTER TABLE day_checkins ADD COLUMN vs_yesterday TEXT` },
   { table: 'day_checkins',     column: 'vs_normal',                  ddl: `ALTER TABLE day_checkins ADD COLUMN vs_normal TEXT` },
   { table: 'day_checkins',     column: 'vs_question',                ddl: `ALTER TABLE day_checkins ADD COLUMN vs_question INTEGER` },
+  { table: 'day_checkins',     column: 'vs_normal_touched',          ddl: `ALTER TABLE day_checkins ADD COLUMN vs_normal_touched INTEGER` },
   // Supersets — additive, delivered via reconcile per the Batch F pattern above
   // (no versioned ALTER needed; reconcileSchema runs after every open).
   { table: 'session_exercises', column: 'superset_group', ddl: `ALTER TABLE session_exercises ADD COLUMN superset_group INTEGER` },
@@ -857,6 +858,8 @@ const CREATE_DAY_CHECKINS = `CREATE TABLE IF NOT EXISTS day_checkins (
   -- nothing. The answer lives in vs_normal, and vs_question says which question it answered.
   vs_normal           TEXT,
   vs_question         INTEGER,
+  -- LB-198. 1/0 once the owner has (not) tapped the picker, NULL = unknown. No DEFAULT, on purpose.
+  vs_normal_touched   INTEGER,
   updated_at          TEXT NOT NULL,
   deleted_at          TEXT,
   sync_status         TEXT NOT NULL DEFAULT 'pending',
@@ -1667,6 +1670,15 @@ export const MIGRATIONS: UpgradeStatement[] = [
       `ALTER TABLE day_checkins ADD COLUMN vs_normal TEXT`,
       `ALTER TABLE day_checkins ADD COLUMN vs_question INTEGER`,
       `UPDATE day_checkins SET vs_normal = vs_yesterday, vs_question = 1 WHERE vs_normal IS NULL AND vs_yesterday IS NOT NULL`,
+    ],
+  },
+  {
+    // LB-198, mirroring Postgres migration 202610050636. Whether the owner tapped the morning
+    // picker. In CREATE_DAY_CHECKINS for fresh installs, this ALTER for upgraded devices, and
+    // RECONCILE_COLUMNS if it half-applies. No DEFAULT and no backfill: existing rows are UNKNOWN.
+    toVersion: 47,
+    statements: [
+      `ALTER TABLE day_checkins ADD COLUMN vs_normal_touched INTEGER`,
     ],
   },
 ];

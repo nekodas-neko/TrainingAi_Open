@@ -583,6 +583,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     sleepQualityFeelTouched:   Boolean(r.sleepQualityFeelTouched),
     vsNormal:       (r.vsNormal as import('@trainingai/shared/types/day-checkin').VsNormal) ?? null,
     vsQuestion:     (r.vsQuestion as import('@trainingai/shared/types/day-checkin').VsQuestion) ?? null,
+    vsNormalTouched: r.vsNormalTouched == null ? null : Boolean(r.vsNormalTouched),
     soreMuscles:       (r.soreMuscles as string[]) ?? [],
     journal:           r.journal ? String(r.journal) : null,
     // LA-137: selected by the server and never mapped, so a completion made on another device never

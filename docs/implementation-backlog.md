@@ -754,34 +754,6 @@ below threshold and left in place for next time.
 - **One question settles it, and it is his:** has the strap been worn since 28 September?
 
 
-### [readiness] LB-198 — `vs_question` marks the wording shift; the SECOND boundary inside question 1 is unmarked
-
-- **Lane: A** · **Added:** 2026-09-30 · Lane B, while shipping `LB-191`. Schema, so Lane A's.
-- **`LB-190` (#2025) did exactly what it was asked and it is not enough on its own.** `vs_question`
-  says WHICH QUESTION a row answered — 1 = *vs yesterday*, 2 = *vs normal* — and the boundary it
-  marks is the wording change. **`LB-191` (shipped the same day) moved a second boundary that sits
-  INSIDE question 1**: the control now seeds *"About the same"*, so a one-tap Save stores a neutral
-  the owner may never have considered. Rows on either side of it both read `vs_question = 1`.
-- **Why it matters rather than being tidy.** Before the seed the field collected **2 answers in 82
-  check-ins**; after it, most days will carry a `'same'`. Pooled, that reads as a real change in how
-  he feels and is an artefact of the control. It feeds a scoring input, so the cost is a
-  contaminated calibration, not an untidy column.
-- **Recommendation: a `vs_normal_touched` boolean beside the value**, the shape
-  `sleep_quality_feel_touched` already uses on this same sheet — and the shape **`LB-191`'s own
-  entry predicted would be owed** if the default shipped: *"then the column needs a `touched` flag
-  beside it … or tuning cannot tell his answer from the app's."*
-- **Why a flag beats another era marker.** An era marker answers *"could this row have been
-  seeded?"*; the flag answers *"was it?"* — per row, so a considered *"about the same"* stays usable
-  instead of being discarded with the reflexive ones. Same reason `vs_question` beat a cutover date.
-- **The alternative, and what it is better at.** Recording the seed's release (v1.486.10,
-  2026-09-30) in the tuning notes costs nothing and needs no migration. It is genuinely better if
-  the answer is *"discard the whole seeded era"* — but it inherits the one-day ambiguity `LB-190`
-  rejected, since Railway ships on merge and a local day can hold rows from both sides.
-- **Reversal cost: low.** A nullable boolean; dropping it later loses only what it recorded. Rows
-  written before it are correctly unknown either way.
-- **Done when** a row stored from an untouched Save is distinguishable from one the owner tapped,
-  with a test — and the write path sets it from a real interaction, never inferred from Save.
-
 ### [platform] OR-203 — the database grew 3× its trend for six days, and no per-table baseline exists to say which table did it
 - **✅ RE-READ 2026-10-04 — THE RATE DID NOT PERSIST. This was a BURST, not a step change.**
   **263 MB**, against **261 MB on 2026-09-29**: **+2 MB in 5 days ≈ 0.4 MB/day**, against the

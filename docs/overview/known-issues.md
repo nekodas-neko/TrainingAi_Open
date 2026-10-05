@@ -100,13 +100,15 @@
   logged minutes. No sandbox row has that shape.
 - **Strike this row** when that is VERIFIED.
 
-### [readiness][platform] LB-190's local v46 (day_checkins.vs_normal + vs_question) is NOT device-verified
+### [readiness][platform] LB-190's local v46 and LB-198's v47 (day_checkins.vs_normal, vs_question, vs_normal_touched) are NOT device-verified
 
 - Ships with the web deploy, with no APK. On first open the S25 should migrate to **v46**. It adds
   `day_checkins.vs_normal` and `vs_question`, and copies every stored comparative answer into them as
-  question 1.
+  question 1. **v47 (LB-198)** adds `vs_normal_touched`, left NULL (unknown) on every existing row.
 - **Owed (Lane DV):** after one app open, answer the morning check-in's comparison, save, and reopen the
-  sheet: the answer is still selected. A pull completes with no SQLite error naming `vs_normal` or
+  sheet: the answer is still selected. **For v47:** open the sheet and Save WITHOUT tapping the picker, then
+  tap it and Save again: the server row reads `vs_normal_touched` false, then true, and neither read
+  turns an older row's NULL into false. A pull completes with no SQLite error naming `vs_normal` or
   `vs_question`, and the server row carries `vs_question = 1`.
 - **Strike this row** when that is VERIFIED.
 

@@ -26,6 +26,7 @@ describe.skipIf(!canRun)('food-logging completeness flag (Q-387)', () => {
     // LB-124. A blank check-in has no comparative answer either — null, not a neutral.
     vsNormal: null,
     vsQuestion: null,
+    vsNormalTouched: null,
     soreMuscles: [], journal: null,
   }
 

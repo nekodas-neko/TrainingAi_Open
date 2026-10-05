@@ -588,6 +588,8 @@ export interface LocalDayCheckin {
   vsNormal: import('@trainingai/shared/types/day-checkin').VsNormal | null;
   /** LB-190. Which question vsNormal answered; null when it is. Optional for writers that predate it. */
   vsQuestion?: import('@trainingai/shared/types/day-checkin').VsQuestion | null;
+  /** LB-198. Did the owner tap the picker? null/absent = unknown. */
+  vsNormalTouched?: boolean | null;
   soreMuscles:       string[];
   journal:           string | null;
   /** Q-387 — ISO timestamp of "I have finished logging today"; null or absent means not marked.

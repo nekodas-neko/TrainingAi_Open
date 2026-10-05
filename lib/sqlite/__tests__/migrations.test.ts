@@ -5,7 +5,7 @@ describe('local schema', () => {
   // The describe and the title used to say v25 while the assertion said 27 — a stale label on a
   // guard whose whole job is to be the authority on the number. Named after what it checks now.
   it('tops out at the current version', () => {
-    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(46)
+    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(47)
   })
 
   // BF-39. The trap this file exists for: a column added to a `CREATE TABLE IF NOT EXISTS` body
@@ -274,5 +274,19 @@ describe('v46 — vs_normal and vs_question (LB-190)', () => {
     }
     expect(ddl).toMatch(/UPDATE day_checkins SET vs_normal = vs_yesterday, vs_question = 1 WHERE vs_normal IS NULL AND vs_yesterday IS NOT NULL/)
     expect(ddl).not.toMatch(/vs_(normal|question)[^\n]*DEFAULT/i)
+  })
+})
+
+// LB-198. Whether the owner tapped the morning picker. NULL is "unknown" and must stay reachable, so
+// the column carries no DEFAULT in the ALTER or the reconcile row, and nothing backfills it.
+describe('v47 — vs_normal_touched (LB-198)', () => {
+  it('adds the column by ALTER, reconciles it, and neither defaults nor backfills it', () => {
+    const v47 = MIGRATIONS.find(m => m.toVersion === 47)!
+    const ddl = v47.statements.join('\n')
+    expect(ddl).toContain('ALTER TABLE day_checkins ADD COLUMN vs_normal_touched')
+    expect(ddl).not.toMatch(/DEFAULT|UPDATE/i)
+    const row = RECONCILE_COLUMNS.find(c => c.table === 'day_checkins' && c.column === 'vs_normal_touched')!
+    expect(row, 'missing from RECONCILE_COLUMNS').toBeTruthy()
+    expect(row.ddl).not.toMatch(/DEFAULT/i)
   })
 })

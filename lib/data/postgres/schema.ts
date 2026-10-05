@@ -651,6 +651,8 @@ export const dayCheckins = pgTable('day_checkins', {
   vsNormal:               text('vs_normal'),
   // LB-190. Which question vs_normal answered: 1 "compared to yesterday", 2 "compared to normal".
   vsQuestion:             smallint('vs_question'),
+  // LB-198. Did the owner tap the picker? NULL = unknown (rows written before the flag existed).
+  vsNormalTouched:        boolean('vs_normal_touched'),
   soreMuscles:       text('sore_muscles').array().notNull().default([]),
   journal:           text('journal'),
   /** Q-387 — "I have finished logging today". NULL means not marked, which the maintenance
