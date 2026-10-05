@@ -2268,6 +2268,38 @@ below threshold and left in place for next time.
 - **Not device work:** every claim here is from source, so there is nothing for the device agent to
   reproduce. The APK pass is owed on `TN-82` when the surface is built, as that entry already states.
 
+### [sleep] TN-86 — `sleep_verdicts` snapshots each band's edges but not its MIDDLE, so "than usual" has no referent
+
+- **Lane: A** — `lib/data/postgres/schema.ts` (`sleepVerdicts`), `packages/shared/src/health/sleep-verdict.ts`, a migration + its `claude_ro` twin.
+- **Added:** 2026-10-05 · Tuning, at session wrap-up — the finding existed only inside `TN-84`'s prose
+  and had no entry of its own, which under **No orphaned findings** is a dropped finding. `TN-84` is
+  `Lane: O` (an owner copy decision), so the buildable half was invisible to Lane A.
+- **Measured:** `sleepVerdicts` stores `durationLow`/`durationHigh`, `onsetLow`/`onsetHigh`,
+  `efficiencyLow`/`efficiencyHigh` as flat columns and **no median**, while
+  `ComponentBand` carries `median` and the verdict computes it. So three nullable
+  `doublePrecision` columns and a twin — small, reversible, and it is a migration, exactly as
+  `TN-84` says.
+- **The consequence `TN-84` already hit:** the Home note cannot say *"90 min later than usual"* from a
+  stored verdict, because there is no middle to measure from. It ships *"65 min later than usual"*
+  measured to the **band edge** instead.
+- **RECOMMENDATION: snapshot the three medians, and keep the edge wording anyway.** Two separate
+  points, and conflating them is what makes this look like a copy problem.
+  **(a) The copy is arguably better as shipped.** "65 min past the late end of your usual range" is a
+  smaller, truer claim than "90 min later than usual", and it is the quantity the verdict actually
+  acted on. The implementer's deviation ② was right; this entry is not asking to reverse it.
+  **(b) The snapshot is incomplete regardless of the copy, and that is the real cost.** The design's
+  load-bearing claim is that *a correction whose paired verdict is not pinned is not evidence*
+  (`TN-81`, and the plan it came from). The median is part of what the verdict judged against, so
+  without it a correction cannot later be asked **how far from centre** the night sat — only which
+  side of a threshold it fell. Tuning will want that the moment there are corrections to analyse,
+  and by then the rows are already written and cannot be back-filled, because the bands were
+  computed from a trailing window that has since moved.
+- **So the priority is: not urgent, but it does not improve by waiting** — every night that passes
+  writes another row with no centre in it. Unblocked; needs no owner answer.
+- **Do NOT bump `SLEEP_VERDICT_MODEL_VERSION` for this.** Adding a recorded field changes nothing
+  about the rule that produced a verdict, and the version exists to pair a correction with the rule
+  it disagreed with. v2 is the `0.5 → 1.0` calibration change; a storage addition is not a third rule.
+
 ### [sleep] TN-84 — the sleep announcement's wording is the owner's call; here is the draft to approve or edit
 
 - **⚑ TWO DEVIATIONS FROM THE DRAFT, MADE WHILE BUILDING `TN-85` — both are here to be overruled.**

@@ -3,7 +3,7 @@
 > **Successor sessions are titled `🎶 Tuning Agent 🟢`** — exactly, both emoji. Leading emoji = role,
 > trailing = this session's status, set by the session itself. See `docs/agents/README.md` §4.
 
-**Updated:** 2026-09-26 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-86`
+**Updated:** 2026-10-05 · **By:** `session_01VVfZtbCftbwaUHtBLJoxVr` · **Next ID:** `TN-87`
 
 Find next free: `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy `Q-` numbers
 stay valid. **Rewritten in full, never appended** — narrative lives in the journal and the reviews.
@@ -26,43 +26,41 @@ with asking.
 
 ## Now
 
-**Nothing is waiting on the owner in this session.** Everything owner-facing is filed: `TN-84`
-(announcement copy, `Lane: O`, ORC's to put to him) and `OR-171`'s already-answered design.
+**Session wrapped 2026-10-05.** Handoff:
+[`docs/handoffs/handoff-2026-10-05-sleep-announce-and-correct.md`](../../handoffs/handoff-2026-10-05-sleep-announce-and-correct.md).
 
-**The live thread is the sleep verdict, and it shipped with a defect.** `TN-81` (#1697) landed the
-computation, `sleep_verdicts` and migration 284 the same day the plan merged (#1690). Measured against
-125 real nights before anything announces it:
+**⚑ TUNING HAS ITS OWN LANE as of OR-178 — start from `node scripts/next-item.js --lane T`.** 12
+entries route to it that were previously reachable only by hand-scan. Top of the lane: `OR-155`,
+`BF-174`, `LA-113`, `PS-27`, `RV-43`. **Two worth picking first:** `Q-523` (zone minutes read 0 on 90%
+of days — where the Activity work converged) and `Q-290` (logged RPE carries almost no information,
+sd 0.87, effectively two values — which weakens `TN-73`, the only validated instrument Tuning has).
 
-- It fires **10.9 prominent announcements per 30 nights** against the plan's 4–6 target, **and the rate
-  is the symptom.** It reads `sleep_sessions` rows as if one row were one night. 125 rows sit across
-  106 dates; every duplicate date is one real night plus a fragment (`7.92 / 0.00`, `8.50 / 0.00`),
-  and flagged "poor" nights include onsets of 10:44, 16:37 and 17:35 — **naps announced as bad nights**.
-- **`TN-83` is the fix and it is one import.** `nightSessions()`
-  (`packages/shared/src/health/sleep-night.ts`) already does circadian nap/night classification then
-  in-band fragment merging; **15 sites route through it and the verdict is the one that does not.**
-  This is `Q-76`'s bug class recurring — that helper's header records the outcome it prevented, *"a
-  Sleep Score of 5 on a 7.86 h night … it poisoned every later z-score too"*, which is the same
-  two-directional failure re-measured independently here.
-- **`LA-149` is parked on `TN-83`** (`Needs:`). Wiring first means the owner's first experience of the
-  feature is a false verdict, and the design depends on him trusting it enough to correct it.
-- **⛔ Do NOT reach for `VERDICT_IQR_MULTIPLIER`.** The sweep (0.25→16.6 · 0.5→10.9 · 1.0→8.1 ·
-  1.5→6.6) makes 1.5 look right and it is not: it hits the rate by muting real signal while still
-  firing on naps, and takes `good` to zero. **Those numbers measured the wrong population and are void
-  — re-run the sweep after `TN-83`.**
+**⚑ NOTHING IS ASKED OF THE OWNER HERE — owner, 2026-09-26:** *"nothing should need to be answered
+here; and if anything requires me for building; mark it for ORC."* Even a genuine tuning question is
+filed as its own `Lane: O` entry, ungated, with the decision brief inside it. **Never `Gate: owner` on
+a question** — gating parks it and nobody is tasked with asking.
 
-**And the announcement may not reach him at all — `TN-85`.** The morning sheet auto-opens **once** a
-day, only on `/session-select`, and is retired for the day `onClose`. So the verdict gets one showing on
-the one surface with a three-month record of reflexive dismissal (82 saves, 3 touched scales), and
-dismissal is indistinguishable from having read it. Recommended fix: a durable second home for the
-verdict (the Home sleep card), so a missed modal is recoverable and a correction stays possible.
-**`TN-82` must not be built modal-only** or near-zero corrections become uninterpretable.
+**The sleep-verdict thread CLOSED while this session was idle (2026-09-26 → 10-05).** The design
+shipped end to end, built by Lane A and Lane B:
+- `TN-81` → #1697 (the rule, `sleep_verdicts`, repository methods) · `LA-149` (the wiring,
+  `app/api/sleep-verdict/route.ts`) · `TN-85` → #1727
+  (`components/home/sleep-verdict-note.tsx`, the durable home, plus shared copy in
+  `components/health/sleep/sleep-verdict-copy.ts`).
+- **`TN-83` was accepted and the calibration moved: `VERDICT_IQR_MULTIPLIER` 0.5 → 1.0**,
+  owner-approved, `SLEEP_VERDICT_MODEL_VERSION` → 2. Re-measured over `nightSessions()` output:
+  0.5 → **15.7** prominent per 30 nights, 0.75 → 9.4, **1.0 → 5.8**, 1.25 → 4.9, 1.5 → 2.2. ×1.0 is the
+  only value inside the 4–6 target that keeps `good` alive; ≥1.5 takes it to zero.
+- **My own raw-rows sweep read 10.9 and was an UNDERSTATEMENT** — fragments widened the bands.
+  **Measure sleep over `nightSessions()` output, never raw `sleep_sessions` rows.**
 
-**The outcome variable is why this thread matters.** Tuning has one validated instrument (`TN-73`, RPE
-residual, sensitivity ~0.25 points) and five other validation attempts failed for want of a label. The
-verdict's **corrections** are the label — and a correction is a disagreement, which is worth more per
-point than any rating. 82 morning sheets over three months produced 3 touched sleep ratings and **0**
-touched recovery ratings, across three affordances in three positions: **asking has failed three times
-on that surface**, which is why the design announces instead.
+**Still open from that thread:** `TN-84` (`Lane: O`, the announcement copy — two deviations recorded
+for the owner to overrule, both look right) · `TN-86` (`Lane: A`, filed 2026-10-05 — `sleep_verdicts`
+snapshots band edges but no median, so "than usual" has no referent; not urgent but does not improve
+by waiting) · `TN-82` (`Lane: B`, the modal, owes the APK pass).
+
+**The thing to watch, which is not yet watchable:** near-zero corrections in the first month means the
+**instrument FAILED**, not that the model is validated — the same shape as 35 neutral 3s. Do not
+publish a validation off silence.
 
 ## Next
 
