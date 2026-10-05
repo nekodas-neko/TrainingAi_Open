@@ -507,29 +507,6 @@ below threshold and left in place for next time.
   male/female one, and a sub-floor GPS fragment cannot become a best pace.
 
 
-### [workouts][platform] OR-209 — store the raw model prescription beside the reconciled one, so RV-65 becomes answerable
-
-- **Lane: A** · **Added:** 2026-10-05 · Orchestrator, splitting the diagnostic out of `RV-65`.
-- **Why this exists:** `RV-65` asks whether the model still earns its call in the prescription. That
-  cannot be answered today and **cannot be answered retrospectively** — measured 2026-10-05, the
-  stored prescription carries no raw-model field, and `session_periodization` keeps one row per
-  session, overwritten each time. **No query will ever produce this.** Only instrumentation will.
-- **What to store:** the raw parsed model object alongside the final reconciled one — or, if that is
-  too heavy, the **per-exercise delta** between the model's chosen pct and what the deterministic
-  chain produced. The delta is the thing the decision turns on; the full object is just the easiest
-  way to keep every later question open.
-- **It is additive and needs no owner decision** — a new column or JSON key, no behaviour change, no
-  data dropped. That is the whole reason it is split from `RV-65`.
-- **⏳ Expect WEEKS, not days.** Production ran **10 prescriptions in 5 weeks** (~2/week, 50 exercise
-  rows). A fortnight of collection is a handful of sessions, so say so when reporting rather than
-  drawing a conclusion from four.
-- **What it unblocks:** `RV-65`'s removal decision, which stays the owner's. Two answers point at
-  different work — *the model moves nothing, seed at the zone midpoint* versus *the model carries
-  real signal in compound pct* — and the diagnostic is what separates them.
-- **Do NOT remove the model, change the prompt, or touch the autoregulation chain here.** This entry
-  only adds a record. `RV-65` holds the rest.
-
-
 ### [platform] OR-207 — six PRs were stranded when every session stopped, and four have gone un-mergeable
 - **⛔ DO NOT MERGE `#1847` OR `#1849` WHILE A DEVICE SITTING IS RUNNING — added 2026-10-05.**
   Both are column-dropping migrations, and **merging auto-deploys to Railway production**, which is
@@ -6978,6 +6955,12 @@ drift.
   - The rules path had nothing for the styleless Cable Chest Dips, which LA-177 has since backfilled.
   - **The model's prose said it "excluded Dumbbell Fly" while the numbers it returned included it.**
     That is evidence for Phase 2's prose-from-final-numbers.
+- **OR-209 (2026-10-05): each shadow row now also carries `model`**, the model's own sets/reps/pct/rest
+  exactly as parsed (`null` where it omitted the exercise, ABSENT on rows written before that day). **It is
+  raw, and the model often answers pct as a fraction** (0.775 for 77.5), so run `normalizePctFraction`
+  before comparing. First live row: model sets 4/4/3 against 2/2/2 given, and two of five exercises
+  omitted and backfilled. That is `RV-65`'s evidence base, and **only rows from 2026-10-05 on can have
+  it** (~2 prescriptions a week, so expect weeks).
 - **Keep:** the read, after two weeks of production prescriptions: the share where rules = given on
   reps/pct within 2.5 %, the rest distribution for each, and how often `model_phase` ≠ `final_phase`
   or `model_phase_action` ≠ `final_phase_action`. Earliest useful date **2026-10-13**. It unblocks
@@ -9368,6 +9351,8 @@ drift.
   produced the wrong figure.
 
 ### [workouts][platform] RV-65 — the prescription asks a model for numbers that deterministic code then overwrites, and nothing measures whether the model still earns the call
+- **▶ THE DIAGNOSTIC EXISTS from 2026-10-05 (OR-209):** `prescription_shadow.rows[].model` is the model's raw answer
+  beside `given` and the rules prescriber's. Read it after a few weeks; do not conclude from fewer than ~10 sessions.
 
 - **Lane:** A — `packages/shared/src/ai-periodization/generate-prescription.ts`,
   `prompt.ts:124`. **Added:** 2026-09-20 · Review sweep 51.
