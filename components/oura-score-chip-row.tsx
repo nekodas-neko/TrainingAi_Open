@@ -465,6 +465,9 @@ export const OuraScoreChipRow = memo(function OuraScoreChipRow({ readiness, slee
       // between them breaks that guard without breaking anything it guards — a comment no longer
       // does, since LB-160 made the guard collapse whitespace before measuring.
       gapReason: scoreGapText(readiness.availability, "sleep"),
+      // #2280 (OR-204, owner 2026-08-23): a night scored on incomplete inputs says so wherever the
+      // number is shown. The glyph is all the room this cell has; /health/sleep names what is missing.
+      limited: readiness.sleepScoreCoverage != null && readiness.sleepScoreCoverage.level !== "full",
     },
     {
       label: "Activity",

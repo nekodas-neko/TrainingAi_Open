@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { HealthScoreDetail } from "@/components/health/health-score-detail";
 import { ManualBedtimeCard } from "@/components/health/sleep/manual-bedtime-card";
 import { ProvisionalBadge } from "@/components/health/provisional-badge";
+import { sleepCoverageNote } from "@/components/health/body-cards/sleep-coverage-note";
 import { Hypnogram } from "@/components/health/hypnogram";
 import { TrendSparkline } from "@/components/health/trend-sparkline-lazy";
 import { SleepTrendToggleCard } from "@/components/health/sleep-trend-toggle-card-lazy";
@@ -90,8 +91,28 @@ export function SleepContent({ userId }: { userId?: string }) {
       contributorChart
       sparklineColor="#818cf8"
       contributorsTitle="Sleep Contributors"
-      extraCards={(_data, _color, trends) => (
+      extraCards={(data, _color, trends) => (
         <>
+          {/* #2280 (OR-204): the Home chip marks a night scored on incomplete inputs with a glyph and
+              leads here, so this is where it is said in words — the same note the Health screen's
+              Sleep card shows, naming what is missing once a quarter of the model's weight is. */}
+          {(() => {
+            const note = data.sleepScore != null ? sleepCoverageNote(data.sleepScoreCoverage) : null;
+            return note ? (
+              <div className="rounded-xl border border-border bg-muted/20 p-4">
+                <p
+                  className={`text-xs ${note.strong ? "" : "text-muted-foreground"}`}
+                  style={note.strong ? { color: "var(--accent-amber)" } : undefined}
+                >
+                  {note.text}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  The score above is weighted over the inputs last night did have.
+                </p>
+              </div>
+            ) : null;
+          })()}
+
           {/* Q-529: this screen is where the Home chip's marked score leads, so the caveat has to
               be here in full — the chip only has room for a glyph. The score above and every stage
               figure below it are derived from a night the rollup has not finished reading. On
