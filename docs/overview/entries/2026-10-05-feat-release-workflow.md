@@ -28,6 +28,13 @@ being "whatever merged last" and becomes a tag the owner approves.
 - **Issue templates (bug / feature / chore), a PR template, `.github/release.yml`** — the
   collaboration surface, since a second person is meant to be able to file and pick up work
   without reading the agent docs first.
+- **`.github/workflows/issue-triage.yml`** — marks any issue opened without a template
+  `status:needs-triage`, so nothing arrives looking already-considered. It labels and nothing
+  else; deciding area, priority and role is the Orchestrator's pass, and that is a judgement an
+  `if` cannot make.
+- **[`docs/release-train-cutover-checklist.md`](../../release-train-cutover-checklist.md)** — the
+  owner's ordered list, including the two steps that look like they need a settings change and do
+  not (tag-creation permission, pointing tags at Railway) and the repository rename.
 - **`scripts/check-workflow-job-timeouts.js`** — exempts jobs that are `uses:` a reusable workflow;
   GitHub rejects `timeout-minutes` on those, and the limit belongs to the called workflow's jobs.
 
