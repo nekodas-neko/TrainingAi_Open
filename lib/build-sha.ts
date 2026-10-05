@@ -12,7 +12,7 @@ import { join } from "path"
 export const BUILD_SHA_FILE = "BUILD_SHA"
 
 export function readBuildSha(
-  env: NodeJS.ProcessEnv = process.env,
+  env: { RAILWAY_GIT_COMMIT_SHA?: string } = process.env,
   root: string = process.cwd(),
 ): string | null {
   const fromEnv = env.RAILWAY_GIT_COMMIT_SHA?.trim()
