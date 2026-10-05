@@ -103,5 +103,5 @@ journal window) · PS-4 (batons) · PS-38 (a `CLAUDE.md` claims sweep, which Pha
   process being retired, a question if it reads as one, otherwise a chore issue.
 - **REFERENCE** → archive.
 
-The script that produced this lives with the Phase 3 migration, so the CSV can be regenerated right
-before the move. The backlog will have drifted by then.
+**Regenerate with `node scripts/backlog-triage.js`** (it holds the `OVERRIDES` map, each with its
+reason). Re-run it right before the Phase 3 move, because the backlog will have drifted by then.

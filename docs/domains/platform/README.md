@@ -296,6 +296,11 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- [`handoff-2026-10-05-platform-release-train-restructure.md`](../../handoffs/handoff-2026-10-05-platform-release-train-restructure.md)
+  — **Release-train restructure, 2026-10-05.** The design session's work, handed to the Orchestrator
+  as the only session driving it: the spec and the owner's decisions, the Phase 0 freeze (routines
+  paused, sessions stopped, PRs closed or held, #1849 merged through the hold), the Phase 1 triage
+  and its regenerator, the branch-sweep workflow, and the traps.
 - [`handoff-2026-10-05-platform-device-verification-sweeps-2-to-5.md`](../../handoffs/handoff-2026-10-05-platform-device-verification-sweeps-2-to-5.md)
   — **Device Verification, sweeps 2 → 4b and the sweep 5 plan, 2026-09-23 → 2026-10-05.** About 40 entries
   verified on the S25; DV-13 to DV-19 filed; the harness, its traps, and the private design gallery.
