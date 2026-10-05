@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 import { buildCsp } from "./lib/security/csp";
+import { readBuildSha } from "./lib/build-sha";
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -48,7 +49,7 @@ const nextConfig: NextConfig = {
   // Absent locally, which is correct: a `pnpm dev` build has no deploy SHA and its timings are not
   // the APK's anyway.
   env: {
-    NEXT_PUBLIC_BUILD_ID: process.env.RAILWAY_GIT_COMMIT_SHA?.slice(0, 12) ?? '',
+    NEXT_PUBLIC_BUILD_ID: readBuildSha()?.slice(0, 12) ?? '',
   },
   // onnxruntime-node is a native addon (Oura neural-model inference, server-side rollup only) —
   // keep it external so Next never tries to bundle its .node binaries.

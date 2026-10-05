@@ -159,6 +159,10 @@ jobs:
             echo "::error::RAILWAY_SERVICE is not set. Settings → Environments → release → Environment variables → add RAILWAY_SERVICE = the app service's name as Railway shows it."
             exit 1
           fi
+          # `railway up` is an upload, not a git checkout, so Railway sets no RAILWAY_GIT_COMMIT_SHA.
+          # Without this file the app reports no commit and the next job can never see the deploy
+          # land (lib/build-sha.ts). Not committed and not gitignored — the upload must include it.
+          git rev-parse HEAD > BUILD_SHA
           railway up --ci --detach --service "$RAILWAY_SERVICE"
 
   confirm:

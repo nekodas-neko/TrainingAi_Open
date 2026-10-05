@@ -586,6 +586,14 @@ agent ends up following half the old rules and half the new.
   summarised the entire history and was refused as too long, leaving the tag without a release page
   (#2059; the owner made the page by hand). ✅ **Railway auto-deploy from `main` is off**, the GitHub
   connection kept. ✅ `deploy-check.yml`'s push trigger removed in the same breath.
+- **⚠ The first release's "Production serves this commit" was a false green.** It went green at
+  t+246s on Railway's *auto*-deploy of the same commit (still on at the time); the workflow's own
+  `railway up` build replaced it afterwards and reports `webBuildSha: null`, because an upload is
+  not a git checkout and Railway sets no `RAILWAY_GIT_COMMIT_SHA` for it. With auto-deploy off,
+  every later release would have timed out at 20 minutes. Fixed by the release writing the commit
+  to `BUILD_SHA` in the upload and `lib/build-sha.ts` reading it after the env var — which also
+  restores the service worker's per-deploy cache name, which had fallen back to a per-process
+  timestamp. **The second release is therefore the first real proof of the confirm step.**
 - **Order of operations at the cutover, because two steps cannot be swapped:** merge the plumbing
   PR → run the first release → owner turns Railway auto-deploy off → *then* a one-line PR drops
   `deploy-check.yml`'s `push: [main]` trigger. Dropping it earlier leaves real deploys unwatched;
