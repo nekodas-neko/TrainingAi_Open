@@ -22,7 +22,7 @@ them.
     -d '{"sql":"SELECT url, source, left(message,120) AS message, count(*) AS hits, max(created_at) AS latest FROM claude_ro.error_events WHERE created_at > now() - interval '"'"'7 days'"'"' GROUP BY 1,2,3 ORDER BY hits DESC LIMIT 30"}'
   ```
   Anything new gets a Known-Issues row in [`docs/overview/known-issues.md`](overview/known-issues.md) or a backlog entry the same session — per **No orphaned findings**, a fault you saw and did not record is a dropped finding. *Something that stopped is not something that was fixed*: record it as unexplained rather than closed.
-- **BugFix reads the in-app reports at session start; the Orchestrator does too, as a backstop** — *Report an Issue* on
+- **The Orchestrator reads the in-app reports** (at release prep and on its health checks; BugFix's cloud session has no query secret, by decision — #2346) — *Report an Issue* on
   `/more` writes to `feedback_submissions`, and the read is one query on the same endpoint:
   ```
   curl -sX POST https://trainingai-production.up.railway.app/api/admin/db-query \
@@ -31,7 +31,7 @@ them.
   ```
   **The capability has existed since migration 142 and nobody was using it.** The loop is **read →
   review → file a backlog entry at the right priority with a lane → move the watermark** in
-  `docs/agents/state/orchestrator.md`, which is what stops the same report being re-read forever
+  the **BugFix intake** issue (#2349), which is what stops the same report being re-read forever
   (owner decision 2026-09-23: a watermark, deliberately no status column and nothing the reporter
   sees in the app). A report is never answered by replying to it — it becomes a queue entry, or it
   is recorded as not-a-defect with the reason, per **No orphaned findings**.

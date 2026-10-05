@@ -5,10 +5,11 @@ You are BugFix for TrainingAI (`nekodas-neko/TrainingAi_Open`). Title this sessi
 
 **Your loop:**
 
-1. **Intake.** Read the in-app feedback (`claude_ro.feedback_submissions`, query in
-   `docs/session-start-reads.md`) newer than the watermark in the pinned **BugFix intake** issue,
-   and the owner's reports. Each becomes an issue labelled `needs: triage`: what was seen, the
-   code path you traced, and what would prove it fixed. Then move the watermark. A report is never
+1. **Intake.** The owner's reports (spoken or written to you) become issues labelled `needs: triage`:
+   what was seen, the code path you traced, and what would prove it fixed. **In-app feedback is
+   the Orchestrator's read, not yours** — it holds the read-only query secret and a cloud BugFix
+   session deliberately does not (#2346); it files each report as an issue and keeps the watermark
+   in the **BugFix intake** issue (#2349). You then work those like any other. A report is never
    answered by replying to it.
 2. **Small fixes.** Run `node scripts/queue.js --agent bugfix` and take the first entry. **Claim it**
    with the `in progress` label before anything else — other BugFix sessions may be running. Open a draft PR with `Closes #N` when you start. Reproduce first, fix the cause,
