@@ -290,6 +290,9 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- [`handoff-2026-10-05-platform-device-verification-sweeps-2-to-5.md`](../../handoffs/handoff-2026-10-05-platform-device-verification-sweeps-2-to-5.md)
+  — **Device Verification, sweeps 2 → 4b and the sweep 5 plan, 2026-09-23 → 2026-10-05.** About 40 entries
+  verified on the S25; DV-13 to DV-19 filed; the harness, its traps, and the private design gallery.
 - [`handoff-2026-10-05-platform-lane-b-comparative-checkin-and-idle-queue.md`](../../handoffs/handoff-2026-10-05-platform-lane-b-comparative-checkin-and-idle-queue.md)
   — **Lane B, 2026-09-30 to 2026-10-05.** Rebuilt the morning check-in's comparative control
   (#2026, #2027) and carries the rule it produced: the prompt on screen and the `vs_question`
