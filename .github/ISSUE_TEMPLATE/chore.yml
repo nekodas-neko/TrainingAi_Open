@@ -1,0 +1,22 @@
+name: Chore or tech debt
+description: Maintenance, tooling, refactoring, documentation
+labels: ['kind:chore', 'status:needs-triage']
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What needs doing
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it is worth doing
+      description: What it costs to leave alone.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: What done looks like
+      description: How anyone can tell it is finished without asking.

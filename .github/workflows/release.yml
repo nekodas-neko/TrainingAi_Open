@@ -1,0 +1,165 @@
+name: Release
+
+# The release train (docs/superpowers/specs/2026-10-05-release-train-design.md).
+#
+# Merging to `main` no longer reaches production once Railway's auto-deploy is off. Production
+# changes only when this workflow runs, which happens after the owner says "approve" in the
+# Orchestrator's chat. It ships the exact commit that was tested.
+#
+# ORDER IS DELIBERATE: deploy, confirm, THEN tag. A tag means "this shipped", and the `v*` ruleset
+# blocks tag deletion — so a tag created before a failed deploy would be permanent garbage pointing
+# at a commit that never ran in production.
+#
+# That ordering is also why the `release` environment must NOT be restricted to `v*` tags: at
+# deploy time the ref is still `main`, because the tag does not exist yet.
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 'Commit on main to release (full SHA; blank = current main HEAD)'
+        type: string
+        required: false
+      version:
+        description: 'Version, without the leading v (e.g. 1.487.0)'
+        type: string
+        required: true
+      dry_run:
+        description: 'Verify and build, but do not deploy or tag'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify the commit is releasable
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      sha: ${{ steps.resolve.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Resolve the commit
+        id: resolve
+        env:
+          INPUT_SHA: ${{ inputs.sha }}
+        run: |
+          set -euo pipefail
+          SHA="${INPUT_SHA:-$(git rev-parse origin/main)}"
+          # A release must ship something already reviewed and merged. Releasing a commit that is
+          # not an ancestor of main would deploy code that never passed the PR gate.
+          if ! git merge-base --is-ancestor "$SHA" origin/main; then
+            echo "::error::$SHA is not on main. A release ships a merged commit."
+            exit 1
+          fi
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "Releasing $SHA"
+
+      - name: Refuse a version that already has a tag
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
+            echo "::error::v$VERSION already exists. Tags are immutable by ruleset; pick a new version."
+            exit 1
+          fi
+
+      - name: Require the version to match package.json
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          PKG="$(node -p "require('./package.json').version")"
+          # Catches the release being cut before the version bump merged, which would otherwise
+          # ship a build whose in-app version disagrees with its tag.
+          if [ "$PKG" != "$VERSION" ]; then
+            echo "::error::package.json is $PKG but the release says $VERSION. Bump and merge first."
+            exit 1
+          fi
+
+  deploy:
+    name: Deploy to production
+    needs: verify
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # The token lives on this environment and nowhere else, so no other job in any workflow can
+    # read it. Do NOT add a `v*` branch/tag restriction here: see the header.
+    environment: release
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+
+      - name: Install the Railway CLI
+        run: npm i -g @railway/cli
+
+      - name: Deploy the released commit
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        # `up` uploads this checkout and builds it, which is what makes the deploy the exact
+        # commit verified above rather than whatever Railway last saw. If this proves unreliable,
+        # the documented fallback is a `production` branch Railway watches, which the release moves
+        # (spec §3.5) — switch to that rather than loosening the ordering above.
+        run: railway up --ci --detach
+
+  confirm:
+    name: Production serves this commit
+    needs: [verify, deploy]
+    # The same check that used to run on every push to `main`, now that a release is what reaches
+    # production. It owns the deadline and the diagnosis; this only says which commit to expect.
+    uses: ./.github/workflows/deploy-check.yml
+    with:
+      sha: ${{ needs.verify.outputs.sha }}
+
+  tag:
+    name: Tag and publish notes
+    needs: [verify, confirm]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Create the tag
+        env:
+          VERSION: ${{ inputs.version }}
+          SHA: ${{ needs.verify.outputs.sha }}
+        # Created only now, once production is confirmed serving this commit. The ruleset blocks
+        # updates and deletions, so this is permanent — which is the point: redeploying a tag is
+        # the rollback, and it must always mean the same commit.
+        run: |
+          set -euo pipefail
+          git tag "v$VERSION" "$SHA"
+          git push origin "v$VERSION"
+
+      - name: Publish the release notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        # Sections come from .github/release.yml, grouped by the `kind:` labels on the issues the
+        # merged PRs closed.
+        run: gh release create "v$VERSION" --generate-notes --title "v$VERSION" --verify-tag
+
+  apk:
+    name: Attach the APK
+    needs: [verify, tag]
+    # The release's own copy of the APK, so installing v<x> later means installing the same bytes.
+    # It runs after the notes exist because it uploads onto that release.
+    uses: ./.github/workflows/android.yml
+    with:
+      release_tag: v${{ inputs.version }}
+    secrets: inherit
+    permissions:
+      contents: write

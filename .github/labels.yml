@@ -1,0 +1,110 @@
+# The label set for GitHub Issues, which replace docs/implementation-backlog.md
+# (docs/superpowers/specs/2026-10-05-release-train-design.md, Phase 3).
+#
+# This file is the source of truth: `.github/workflows/labels.yml` syncs it on every push to main
+# that touches it. Edit here, never in the GitHub UI — a UI edit is silently reverted on the next
+# sync, which is the point. A label removed from this file is NOT deleted (the sync is additive),
+# because deleting a label strips it from every issue that carries it.
+#
+# Four axes, and an issue should carry one of each where it applies:
+#   area:*      which pillar — the eleven in docs/domains/README.md. This is what replaces the
+#               old `[domain]` tag convention, and what lets a second contributor filter to the
+#               part of the app they are working in.
+#   kind:*      what the issue IS. Drives the release notes sections in .github/release.yml.
+#   priority:*  queue position used to be the priority; a list has no position, so it is a label.
+#   status:*    why an issue is not being worked on. Absence of a status label means "ready".
+#   role:*      which agent picks it up. Replaces the old `Lane:` field.
+
+# --- area: the eleven pillars (docs/domains/README.md) ---
+- name: 'area:sleep'
+  color: '4c5fd7'
+  description: Sleep sessions, stages, hypnogram
+- name: 'area:readiness'
+  color: '4c5fd7'
+  description: Readiness and recovery scoring
+- name: 'area:heart-rate'
+  color: '4c5fd7'
+  description: HR, HRV, RR intervals
+- name: 'area:cardio'
+  color: '4c5fd7'
+  description: Cardio sessions and zones
+- name: 'area:activity'
+  color: '4c5fd7'
+  description: Steps, active calories, activity logs
+- name: 'area:workouts'
+  color: '4c5fd7'
+  description: Programs, sessions, set logging, 1RM
+- name: 'area:nutrition'
+  color: '4c5fd7'
+  description: Food, macros, supplements
+- name: 'area:body'
+  color: '4c5fd7'
+  description: Weight, body composition, measurements
+- name: 'area:devices'
+  color: '4c5fd7'
+  description: Oura BLE, scale, Health Connect, connectors
+- name: 'area:app-shell'
+  color: '4c5fd7'
+  description: Navigation, tabs, safe area, theming
+- name: 'area:platform'
+  color: '4c5fd7'
+  description: CI, docs, data layer, auth, tooling
+
+# --- kind: what it is ---
+- name: 'kind:bug'
+  color: 'd73a4a'
+  description: Something behaves wrongly
+- name: 'kind:feature'
+  color: '0e8a16'
+  description: New capability
+- name: 'kind:chore'
+  color: 'c2e0c6'
+  description: Maintenance, tooling, dependencies
+- name: 'kind:docs'
+  color: '0075ca'
+  description: Documentation only
+- name: 'kind:tuning'
+  color: 'fbca04'
+  description: Scoring or calibration change — needs a proposal before it is built
+- name: 'kind:epic'
+  color: '5319e7'
+  description: A programme of work with sub-issues
+
+# --- priority ---
+- name: 'priority:p0'
+  color: 'b60205'
+  description: Drop everything
+- name: 'priority:p1'
+  color: 'd93f0b'
+  description: Next release
+- name: 'priority:p2'
+  color: 'fbca04'
+  description: Soon
+- name: 'priority:p3'
+  color: 'ededed'
+  description: Someday
+
+# --- status: why this is not ready to pick up (absence means ready) ---
+- name: 'status:needs-owner'
+  color: 'e99695'
+  description: Blocked on a decision only the owner can make
+- name: 'status:needs-device'
+  color: 'e99695'
+  description: Blocked on a check that needs the phone
+- name: 'status:blocked'
+  color: 'e99695'
+  description: Blocked on another issue
+- name: 'status:needs-triage'
+  color: 'ffffff'
+  description: Filed but not yet classified — the Orchestrator's inbox
+
+# --- role: who picks it up (replaces the old Lane: field) ---
+- name: 'role:orchestrator'
+  color: '1d76db'
+  description: Queue, docs, releases, owner decisions
+- name: 'role:bugfix'
+  color: '1d76db'
+  description: BugFix agent
+- name: 'role:implementer'
+  color: '1d76db'
+  description: Implementer agent (local — builds, device checks, release testing)

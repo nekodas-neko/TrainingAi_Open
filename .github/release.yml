@@ -1,0 +1,16 @@
+# Groups the auto-generated release notes (`gh release create --generate-notes`, used by
+# .github/workflows/release.yml). Categories match the `kind:` labels in .github/labels.yml.
+changelog:
+  exclude:
+    labels:
+      - 'kind:chore'
+      - 'kind:docs'
+  categories:
+    - title: Fixes
+      labels: ['kind:bug']
+    - title: New
+      labels: ['kind:feature']
+    - title: Scoring and calibration
+      labels: ['kind:tuning']
+    - title: Everything else
+      labels: ['*']

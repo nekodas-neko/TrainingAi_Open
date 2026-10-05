@@ -95,9 +95,11 @@ async function waitForDeploy({
 module.exports = { shaMatches, diagnose, waitForDeploy, DEFAULT_URL, MIN_PREFIX };
 
 if (require.main === module) {
-  const want = process.env.GITHUB_SHA;
+  // EXPECT_SHA wins over GITHUB_SHA. The release workflow ships a commit chosen at dispatch,
+  // which is not necessarily the one the run itself is checked out at, so it says which.
+  const want = process.env.EXPECT_SHA || process.env.GITHUB_SHA;
   if (!want) {
-    console.error('check-deploy-landed: GITHUB_SHA is not set; nothing to wait for.');
+    console.error('check-deploy-landed: neither EXPECT_SHA nor GITHUB_SHA is set; nothing to wait for.');
     process.exit(1);
   }
   const baseUrl = process.env.APP_URL || DEFAULT_URL;
