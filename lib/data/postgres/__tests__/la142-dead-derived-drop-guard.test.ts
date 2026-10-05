@@ -9,6 +9,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { Pool } from 'pg'
+import { withDatabase } from './migration-test-lock'
 
 const canRun = !!process.env.DATABASE_URL
 const MIGRATION = readFileSync(join(process.cwd(), 'lib/data/postgres/migrations/294_drop_dead_derived_columns.sql'), 'utf8')
@@ -20,13 +21,13 @@ describe.skipIf(!canRun)('migration 294 — the dead derived columns drop guard 
   let probe: Pool
 
   beforeAll(async () => {
-    const url = new URL(process.env.DATABASE_URL!)
-    url.pathname = '/postgres'
-    admin = new Pool({ connectionString: url.toString(), max: 1 })
+    admin = new Pool({ connectionString: withDatabase(process.env.DATABASE_URL!, 'postgres'), max: 1 })
     await admin.query(`DROP DATABASE IF EXISTS ${PROBE_DB} WITH (FORCE)`)
     await admin.query(`CREATE DATABASE ${PROBE_DB}`)
-    url.pathname = `/${PROBE_DB}`
-    probe = new Pool({ connectionString: url.toString(), max: 1 })
+    probe = new Pool({ connectionString: withDatabase(process.env.DATABASE_URL!, PROBE_DB), max: 1 })
+    // Teardown drops this database WITH (FORCE), which terminates any client still closing with
+    // 57P01. Without a listener that error is unhandled and fails the whole run (LB-177).
+    probe.on('error', () => {})
   })
 
   afterAll(async () => {
