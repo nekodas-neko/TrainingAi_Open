@@ -176,10 +176,60 @@ Steps 1–3 come after the release train settles and alongside the ingest work. 
 months of data per person to say anything, which is a reason to start collecting the baselines
 early, not to start fitting early.
 
-## Decisions that are the owner's
+## Decisions — answered by the owner, 2026-10-05 (#2328)
 
-Filed as #2328, with recommendations:
+### 1. What the scores learn from: only the days that are out of the ordinary
 
-1. **What each score is trying to match** — the target the learning fits to.
-2. **Whether past scores ever change** when a model improves.
-3. **How far learning may move on its own** before it needs your yes.
+**Never a forced rating.** Every day is scored from your own baseline by default, and that default
+stands unless something looks unusual. **When a score falls outside your normal range, the app asks**
+— *"your sleep scored 54, well below your usual; how did it feel?"* — and only then. Your answer is
+what the learning uses: it either confirms the score or tells the system it was wrong, and in which
+direction. A day you are not asked about, or do not answer, teaches nothing.
+
+This is the **outlier-gated rating prompt the sleep score already has** (`sleep-verdict.ts`: a
+trailing 28-day median ± IQR band, a prompt only outside it). Readiness has no equivalent yet —
+#2105 builds it, and it is now a prerequisite for weight fitting (step 6).
+
+*What it means for the learning:* answers arrive mostly on unusual days, so they teach the system
+most about the edges of the range — exactly where a wrong score is most noticeable — and little about
+ordinary days, which is acceptable because ordinary days are the ones the baseline already handles.
+
+### 2. Past scores may be re-scored
+
+The app is in trial mode, so **an improved model may re-score history.** Every score still records
+the model version that produced it, so a re-score is traceable and could be reversed.
+
+### 3. Refits may go live on their own
+
+**Weight refits go live automatically** once they pass the shadow test. A new component still comes
+to the owner first (D3).
+
+## Components are a multiplier and a value — the owner's model
+
+Owner, 2026-10-05: *"every component has a multiplier value and a contributing score value … rather
+than change its value, we can just change the multiplier — 'that wasn't as useful as we thought,
+drop it to 2.1' … easy to keep track of changes."*
+
+So every component, in every score, is stated as exactly two things:
+
+| | What it is | How it changes |
+|---|---|---|
+| **Multiplier** | how much this component counts (today's "weight") | the tuning knob — by the owner, or by a refit |
+| **Value** | 0–100, how good this component was *today* | never by hand — computed from the data (below) |
+
+**score = Σ (multiplier × value) ÷ Σ multiplier.** Same arithmetic as today; the change is that the
+multiplier is the one thing anyone tunes, and **every change to a multiplier is logged** — date, old,
+new, who or what changed it, and why — so the history of tuning is a list you can read.
+
+### How a 0–100 value is made — the hard part
+
+A value needs three reference points, and today's curves have only some of them:
+
+1. **The possible range** — the lowest and highest the measurement can plausibly be (sleep 0–12 h).
+2. **What is normal for you** — your percentile in the baseline windows (§B).
+3. **What is actually good** — research-backed reference ranges (adults: 7–9 h of sleep; resting
+   HR and HRV norms by age and sex), so "normal for you" cannot drift into "fine" when it is not.
+
+The value blends the second and third: research decides where *good* sits, your own data decides
+where *you* sit relative to it. Building this properly for every component is research, not coding —
+one reference sheet per component, citing its sources — and is tracked as #2331, before step 3.
