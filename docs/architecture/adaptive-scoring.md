@@ -232,4 +232,4 @@ A value needs three reference points, and today's curves have only some of them:
 
 The value blends the second and third: research decides where *good* sits, your own data decides
 where *you* sit relative to it. Building this properly for every component is research, not coding —
-one reference sheet per component, citing its sources — and is tracked as #2331, before step 3.
+one reference sheet per component, citing its sources — and is tracked as #2331, before step 3. **Done 2026-10-05:** [`component-references.md`](component-references.md) gives, for every component, its range, the research reference with sources, and whether "good" can only be personal.
