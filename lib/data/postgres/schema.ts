@@ -140,7 +140,6 @@ export const programSessions = pgTable('program_sessions', {
 
 export const programPhases = pgTable('program_phases', {
   id:               uuid('id').primaryKey().defaultRandom(),
-  programId:        uuid('program_id').references(() => programs.id, { onDelete: 'cascade' }),
   phaseSetId:       uuid('phase_set_id').references(() => phaseSets.id, { onDelete: 'cascade' }),
   position:         integer('position').notNull(),
   name:             text('name').notNull(),
@@ -1768,7 +1767,6 @@ export const ouraDailyDerived = pgTable('oura_daily_derived', {
 
   activityScore:        integer('activity_score'),
   activityContributors: jsonb('activity_contributors'),
-  activeCaloriesEst:    integer('active_calories_est'),
   trainingLoadOts:      doublePrecision('training_load_ots'),
   acwr:                 doublePrecision('acwr'),
   trainingLoadHigh:     boolean('training_load_high'),
@@ -1784,7 +1782,6 @@ export const ouraDailyDerived = pgTable('oura_daily_derived', {
   trainingLoadEvaluatedAt: timestamp('training_load_evaluated_at', { withTimezone: true }),
 
   recoveryIndexHours: doublePrecision('recovery_index_hours'),
-  wornHoursBle:       doublePrecision('worn_hours_ble'),
   nightHrvBaselineMs: doublePrecision('night_hrv_baseline_ms'),
 
   illnessFlag:       text('illness_flag'),
@@ -1811,8 +1808,6 @@ export const ouraDailyDerived = pgTable('oura_daily_derived', {
 
   bdiDerived: doublePrecision('bdi_derived'),
 
-  vascularAge: doublePrecision('vascular_age'),
-  pwv:         doublePrecision('pwv'),
   bodyComp:    jsonb('body_comp'),
 
   computedAt: timestamp('computed_at', { withTimezone: true }).notNull().defaultNow(),

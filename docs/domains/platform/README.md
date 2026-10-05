@@ -295,6 +295,9 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- [`handoff-2026-10-05-platform-device-verification-sweeps-2-to-5.md`](../../handoffs/handoff-2026-10-05-platform-device-verification-sweeps-2-to-5.md)
+  — **Device Verification, sweeps 2 → 4b and the sweep 5 plan, 2026-09-23 → 2026-10-05.** About 40 entries
+  verified on the S25; DV-13 to DV-19 filed; the harness, its traps, and the private design gallery.
 - [`handoff-2026-09-27-platform-lane-a-security-cluster.md`](../../handoffs/handoff-2026-09-27-platform-lane-a-security-cluster.md)
   — **Lane A, the Review-sweep-60 security cluster, 2026-09-27.** TN-78 and BF-211 merged;
   RV-192, RV-193, RV-195 ② and RV-197 built, CI-green and **owner-gated** (#1779, #1781, #1784,

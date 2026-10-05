@@ -9,6 +9,7 @@
  *
  *   node scripts/tuning/body-battery-replay.cjs --pull     # fetch inputs (needs CLAUDE_DB_QUERY_SECRET)
  *   node scripts/tuning/body-battery-replay.cjs --validate # prove the harness reproduces production
+ *   node scripts/tuning/body-battery-replay.cjs --check    # LA-134's pass test on the stored rows
  *   node scripts/tuning/body-battery-replay.cjs --sweep    # grid-search the constants
  *
  * ⚠ RUN --validate AND READ ITS OUTPUT BEFORE BELIEVING ANY SWEEP NUMBER. The first version of
@@ -70,7 +71,7 @@ function query(sql, out) {
 function pull(daysBack = 70) {
   fs.mkdirSync(DIR, { recursive: true })
   query(`SELECT date::date AS d, anchor, resting_hr, hr_max, total_charged, total_drained,
-          end_value, hr_sample_count
+          end_value, hr_sample_count, model_version
          FROM claude_ro.body_battery_daily
          WHERE date > now() - interval '${daysBack} days' ORDER BY date`, 'days.json')
   query(`SELECT extract(epoch from sleep_start)*1000 AS s, extract(epoch from sleep_end)*1000 AS e
@@ -94,9 +95,11 @@ function bundleShared() {
   const out = {}
   for (const [key, src] of [['walk', 'health/body-battery-walk.ts'], ['night', 'health/sleep-night.ts']]) {
     const file = path.join(DIR, `${key}.cjs`)
-    execFileSync('npx', ['esbuild', path.join(root, 'packages/shared/src', src),
+    // Windows has no bare `npx`: it is npx.cmd, which Node only spawns through a shell.
+    const win = process.platform === 'win32'
+    execFileSync(win ? 'npx.cmd' : 'npx', ['esbuild', path.join(root, 'packages/shared/src', src),
       '--bundle', '--format=cjs', '--platform=node', `--outfile=${file}`],
-      { cwd: root, stdio: ['ignore', 'ignore', 'pipe'] })
+      { cwd: root, stdio: ['ignore', 'ignore', 'pipe'], shell: win })
     Object.assign(out, require(file))
   }
   return out
@@ -173,11 +176,64 @@ function validate(ctx) {
   return bad === 0
 }
 
+/**
+ * LA-134's pass test, run on the STORED rows: no replay, so it needs no bundling and no HR pull.
+ *   median daily net within +-5 of zero · days-at-zero under 10% · the spread preserved, not flattened.
+ * A day is INFORMATIVE when it has at least MIN_SAMPLES heart-rate samples. Days with a handful of
+ * samples hold the battery where it was and say nothing about the constants, and a verdict on
+ * them is the calibration-on-a-filling-window error BF-55 spent three weeks on. So the verdict
+ * is reported beside how many informative days it rests on, and a window under MIN_INFORMATIVE_DAYS
+ * is labelled INSUFFICIENT rather than PASS.
+ */
+const MIN_SAMPLES = 1000
+const MIN_INFORMATIVE_DAYS = 20
+
+function median(xs) {
+  if (!xs.length) return null
+  const s = [...xs].sort((a, b) => a - b), m = s.length >> 1
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2
+}
+
+function summarise(rows, prefix) {
+  const mine = rows.filter(r => String(r.model_version || '').startsWith(prefix + ':'))
+  const ends = mine.map(r => Number(r.end_value))
+  const nets = mine.map(r => Number(r.total_charged) - Number(r.total_drained))
+  const informative = mine.filter(r => Number(r.hr_sample_count) >= MIN_SAMPLES)
+  const atZero = ends.filter(e => e === 0).length
+  const medNet = median(nets)
+  const mean = ends.length ? ends.reduce((a, b) => a + b, 0) / ends.length : null
+  const sd = ends.length ? Math.sqrt(ends.reduce((a, b) => a + (b - mean) ** 2, 0) / ends.length) : null
+  return {
+    prefix, days: mine.length, informativeDays: informative.length,
+    medianNet: medNet, daysAtZero: atZero, zeroShare: mine.length ? atZero / mine.length : null,
+    endMin: ends.length ? Math.min(...ends) : null, endMax: ends.length ? Math.max(...ends) : null, endSd: sd,
+    passes: {
+      medianNet: medNet != null && Math.abs(medNet) <= 5,
+      zeroShare: mine.length > 0 && atZero / mine.length < 0.10,
+    },
+    sufficient: informative.length >= MIN_INFORMATIVE_DAYS,
+  }
+}
+
+function check(prefix = 'v6') {
+  const rows = JSON.parse(fs.readFileSync(path.join(DIR, 'days.json'), 'utf8')).rows
+  const s = summarise(rows, prefix)
+  console.log(`Stored ${prefix} rows: ${s.days} days, ${s.informativeDays} informative (>= ${MIN_SAMPLES} HR samples).`)
+  console.log(`  median daily net  ${s.medianNet}  (pass: within +-5)            ${s.passes.medianNet ? 'PASS' : 'FAIL'}`)
+  console.log(`  days ending at 0  ${s.daysAtZero}/${s.days}  (pass: under 10%)       ${s.passes.zeroShare ? 'PASS' : 'FAIL'}`)
+  console.log(`  end value range   ${s.endMin}-${s.endMax}, sd ${s.endSd == null ? 'n/a' : s.endSd.toFixed(1)}  (spread: judge by eye)`)
+  console.log(s.sufficient
+    ? '\nENOUGH informative days to fit.'
+    : `\nINSUFFICIENT: ${s.informativeDays} of the ${MIN_INFORMATIVE_DAYS} informative days a fit needs. Do not fit; re-pull and re-check.`)
+  return s
+}
+
 if (require.main === module) {
   const arg = process.argv[2]
   if (arg === '--pull') pull(Number(process.argv[3]) || 70)
   else if (arg === '--validate') process.exit(validate(load()) ? 0 : 1)
+  else if (arg === '--check') check(process.argv[3] || 'v6')
   else console.log(fs.readFileSync(__filename, 'utf8').split('*/')[0])
 }
 
-module.exports = { load, buildDay, validate, SHIPPED, V5 }
+module.exports = { load, buildDay, validate, summarise, SHIPPED, V5 }

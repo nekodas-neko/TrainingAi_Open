@@ -4,54 +4,53 @@
 > and are opened **locally** by the owner in the desktop app on the machine the S25 is plugged into.
 > `create_session` makes a cloud session, which cannot reach the phone.
 
-**Updated:** 2026-09-28 · **By:** the Orchestrator, adding the sitting plan under **Next** only —
-**the sweep state above and the rules below are the sweep-4b session's (`device/sweep-4b`,
-2026-09-26) and are untouched.** · **Next ID:** `DV-20`
+**Updated:** 2026-10-05 · **By:** the sweeps-2-to-5 session, at its wrap-up · **Next ID:** `DV-23`
 (`grep -rhoE '\bDV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line.)
 
 ## For the Orchestrator — read this part
 
 - **Assign me work with `Lane: DV`** (OR-129); I read `--lane DV` first, then `--sittings`.
-- **Sweeps 4a + 4b ran** (journals `2026-09-26-device-sweep-4a.md` / `-4b.md`). 15 entries closed.
-  **Still failing:** DV-12 (OR-162 names the two HR-today charts), BF-61 ① (taps <300 ms swallowed),
-  RV-186 ②/③. **New / widened:** DV-19 (one walk, three rows); **DV-8 is common** (36 food delete
-  tombstones stuck `pending`); no `health-alerts` channel (RV-155). Q-11 ran and filled nothing.
-- **Phone:** gesture nav, APK 1.465.52. RV-205/206 gallery: private Artifact (URL on RV-205).
-**Now:** nothing running; the phone is the owner's. I message him with 🔴 before the next sitting.
+- **The current plan is [`docs/device-sweep-5-plan.md`](../../device-sweep-5-plan.md)** (2026-10-05).
+  It has six 45–60 min sittings, failure-first, and supersedes the 2026-09-28 sitting plan.
+- **The session narrative is
+  [`handoff-2026-10-05-platform-device-verification-sweeps-2-to-5`](../../handoffs/handoff-2026-10-05-platform-device-verification-sweeps-2-to-5.md)**
+  (sweeps 2 → 4b, the harness, every trap).
+- **Waiting on Lane A:**
+  - DV-13's row cap and timeout (the console stays closed until then);
+  - whether the full-history redecode can finish (it would answer 7 entries);
+  - the fixes for RV-186 ②③⑤, RV-153 and the RV-103 follow-on.
+
+**Now:** nothing running. The phone is the owner's: gesture nav, **APK 1.465.52**. Latest is
+1.481.3, and installing it is his call. I recommend yes.
 
 ## Next
 
-**The sitting plan is [`docs/device-sitting-plan-2026-09-28.md`](../../device-sitting-plan-2026-09-28.md)** —
-five sittings, **ordered so the ones most likely to FAIL come first**, covering the 126 owed checks
-and the 10 entries blocked until the phone answers. **Start at Sitting 1** (known failures and
-regressions: `BF-61` ①, `DV-12`/`OR-162`, `RV-186` ②/③, `DV-19`, `DV-8`, `RV-150`, `BF-22`).
-
-**⛔ Outranks the plan's order:** the admin console waits for `DV-13`, and until it closes **never
-open `/admin/oura-ble`** — that parks the whole `admin-console-sitting` batch.
-
-Also still owed from sweeps 4a/4b, folded into the plan: `RV-206` P29–P31 and P35–P38; `RV-155`
-station C and the rest of B/D/E/F; `BF-61`'s meal-list half; `DV-18`'s still-frame half.
+Sitting 1 of the sweep 5 plan: BF-61's instrumented probe, DV-12/OR-162, DV-8 (expect 0 stuck
+tombstones), the walk clean-up (DV-19 / LA-171 ③ / BF-191 ①), DV-21's channels, and BF-22. Then
+sitting 2's recomputes in this order: LA-126, BF-13 → TN-62, LA-171 ①.
 
 ## Rules for every message and every input
 
 - **Lead every message with 🟢 (phone may be unplugged) or 🔴 (plug in / leave plugged).**
 - **No raw `adb shell input` outside `rawTap`/`rawSwipe`/`rawSwipeThenTap`; `back()` refuses off-foreground.**
-- **Wake key `keyevent 224` every 4 min; `am start` (never a tap) to front the app; `MSYS_NO_PATHCONV=1`.**
-- **Watch prod `/api/version` every 30 s during a sweep; stop on any slowdown. Never open
+- **Wake with `keyevent 224` every 4 min; bring the app forward with `am start` (never a tap); use `MSYS_NO_PATHCONV=1`.**
+- **Poll prod `/api/version` every 30 s during a sweep, and stop on any answer over 5 s. Never open
   `/admin/oura-ble` until DV-13 closes; never `page.reload()`. Never press *Leave* on the workout dialog.**
+- **With gesture nav on, start raw swipes at x ≥ 100.** Under ~24 px is Android's back gesture.
 
-**Standing permissions (owner, 2026-09-23):** writes, each undone straight after — food, supplement
-tick, weigh-in (log today's own value), mood (overwrite allowed; restore it), activity confirm,
-RV-45-style throwaway create/delete. **Only what a check needs.** Tooling upgrades: yes.
+**Standing permissions (owner):** writes, each undone straight after — food, supplement tick,
+weigh-in (today's own value), mood (restore it), activity confirm, throwaway create/delete,
+start-and-leave a workout. Also approved: RV-206's P29/P30/P31 settings probes (2026-09-26, restore
+each) and the LA-126 targets write (2026-09-28). **Only what a check needs.** Tooling upgrades: yes.
 
 ## Decided — do not re-litigate
 
 - **`e2e/**` does not run on the phone**; Playwright is this role's driver (`pw.js`).
 - **`/api/workout-sessions/day`'s `sessionId` is the PROGRAM session**, not a workout id.
-- **A request count lies for local-first screens** — read the visible number too.
-- **`/api/nutrition/food-logs` returns a bare ARRAY**; **block SW fetches with `Network.setBlockedURLs`**.
-- **After any food delete, re-read the local row** (DV-15 fixed; DV-8 leaves some `pending`).
-- **With gesture nav on, start raw swipes at x ≥ 100** — under ~24 px is Android's back gesture.
-- **Captures never leave this machine as images** — the repo is public.
+- **A request count lies for local-first screens.** Read the visible number too.
+- **`/api/nutrition/food-logs` returns a bare ARRAY.** Block service-worker fetches with
+  `Network.setBlockedURLs`.
+- **Re-read the local row after any food delete** (DV-15, DV-8).
+- **Captures never leave this machine as images**, except into the owner's private Artifact (RV-205).
 
 **Claimed paths:** `scripts/device/**` — mine for good (the role owns the harness).
