@@ -546,7 +546,7 @@ agent ends up following half the old rules and half the new.
 | 9 | #1849 and #1499 | ⚠ **#1849 ALREADY MERGED — corrected 2026-10-05.** #1499 still held | #1849 landed as `7574d06e75`, four commits after the PR that recorded it as held, and **merges still deploy until Phase 2, so it went to production**. Its guard meant it could not drop a value, so no harm — but the hold did not hold. #1499 (auth) is the only one genuinely waiting |
 | 11 | Permanent agents vs disposable sessions | **Permanent roles, bounded context** | Reverses the earlier "one task, one session". §5 has the rule and the one thing still to measure |
 | 12 | Where the ingest architecture (`OR-213`/`214`/`215`) sits | **After the workflow lands, as the first epic — except its Phase 0** | Delegated to the Orchestrator. Reasoning below |
-| 13 | Backlog triage: before or after the architecture spec | **After, in one pass** | Delegated to the Orchestrator. Reasoning below |
+| 13 | Backlog triage: before or after the architecture spec | ~~After~~ → **ALREADY DONE, and correctly** | The Orchestrator advised waiting and was **wrong**; the triage had already landed and its structure defuses the objection. What is owed is a re-check, not a re-triage. §9.1 |
 
 ### 9.1 Decisions 12 and 13, reasoned (Orchestrator, delegated 2026-10-05)
 
@@ -562,16 +562,39 @@ demonstrably failed: **every lane stopped on 2026-10-01 and nobody noticed for t
 Starting a multi-phase programme under it repeats that. So it becomes the first epic once the new
 workflow is live.
 
+**⚠ One gap the triage exposes, and it is the §5 problem made concrete.** The CSV types `OR-213`
+as a single `chore` issue, with `OR-214` and `OR-215` blocked on it. That is a correct mechanical
+read, but **a five-phase programme cannot live in one issue** — and nothing in the issue model
+above holds a programme together. **It needs a milestone (or an epic issue with the phases as
+sub-issues), not a chore.** This is the same thing permanent roles exist to carry: work whose unit
+is longer than a sitting. Worth fixing in the CSV before Phase 3 runs, since the migration creates
+whatever the CSV says.
+
 **The exception is its Phase 0 — export the Oura raw archive and prove a restore — which should
 run during the freeze.** It is one session, it blocks nothing, and it is the only step that cannot
 be undone: `oura_raw_packed` is **28 MB / 1.8 M frames and today the only re-decodable copy**, and
 the ring's buffer only moves forward, so a row deleted before a restore is proven is gone for good.
 Waiting on a workflow change to protect it is the wrong risk to take.
 
-**#13 — triage after the architecture spec, in one pass.** §4.3's two largest buckets are KEEP
-(171) and the device ones (28 + 49) — **about 48% of the file** — and they are exactly what the
-architecture change supersedes most of. Triaging them first means triaging them twice, which costs
-more than the wait. The architecture spec is days from settled, not weeks.
+**#13 — the advice to wait was WRONG, and the correction is worth more than the advice was.**
+The Orchestrator recommended triaging after the architecture spec, reasoning that KEEP (171) and
+the device buckets (28 + 49) are ~48% of the file and are what the architecture supersedes most
+of, so they would be triaged twice.
+
+**That objection assumed a per-entry migration. [`2026-10-05-backlog-triage.md`](2026-10-05-backlog-triage.md)
+does not do one.** Those buckets are **folded, not enumerated** — 148 device rows collapse into
+**12 device-check issues, one per area**, and 88 watch rows into **one** watch-list issue. Area
+issues do not need re-cutting when the architecture supersedes individual rows behind them, so the
+expensive rework the objection predicted cannot happen.
+
+**What is actually owed is a re-check, not a re-triage.** When the architecture spec settles, diff
+the CSV against it: some `issue` rows become obsolete (storage and ingest work the new design
+replaces), and a few `archive-*` rows may become live again. That is a pass over ~194 work rows
+with a known question, not 524 rows from scratch.
+
+**The general lesson, since this is the second time:** a recommendation to defer should state what
+rework it is avoiding *and check that the rework is real*. Here it was not, because the design
+already collapsed the expensive buckets.
 
 | 10 | Start Phase 0 | **Yes**, started 2026-10-05 | §8 Phase 0 progress |
 
