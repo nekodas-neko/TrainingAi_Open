@@ -529,7 +529,14 @@ agent ends up following half the old rules and half the new.
 
 - **You** (secrets and settings are yours):
   1. Create a Railway project token.
-  2. In GitHub, create a **`release`** environment and store the token there as a secret.
+  2. In GitHub, create a **`release`** environment and store the token there as a secret named
+     **`RAILWAY_TOKEN`** — that exact name, because it is the variable Railway's own CLI reads, so
+     the release workflow needs no mapping step.
+     **Create a FRESH Railway token for this, named for its consumer** (e.g. `github-release`),
+     rather than reusing an existing one. Two reasons, both practical: Railway shows a token's
+     value **once**, so an existing one cannot be pasted into GitHub unless its plaintext was kept;
+     and one token per consumer means revoking the GitHub one later cannot break whatever else
+     holds the old one. Scope it to the `production` Railway environment.
      **⚠ NOT named `production`, and do NOT reuse the environment already listed.** Checked
      2026-10-05: `Training-Ai / production` already exists and belongs to **Railway's own GitHub
      integration** — `railway-app[bot]` created it and writes a deployment to it on every deploy
