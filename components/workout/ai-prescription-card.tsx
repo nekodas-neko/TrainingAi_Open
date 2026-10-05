@@ -338,7 +338,9 @@ export function AiPrescriptionCard({
                         ? ` @ ${formatLoadKg(weightKg)} (${ex.pct}%)`
                         : ` @ ${ex.pct}%`
                       }
-                      {" · "}{ex.restSec >= 60 ? `${Math.round(ex.restSec / 60)}min` : `${ex.restSec}s`} rest
+                      {/* Whole minutes only when the rest IS whole minutes: a Quick day shortens
+                          rest to 90 s or 70 s (#2284), and rounding that to "2min" hid it. */}
+                      {" · "}{ex.restSec >= 60 && ex.restSec % 60 === 0 ? `${ex.restSec / 60}min` : `${ex.restSec}s`} rest
                     </span>
                   </div>
                   {mode && (
