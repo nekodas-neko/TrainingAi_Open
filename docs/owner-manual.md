@@ -173,9 +173,11 @@ merges it only after you say so.
 
 ### Step 9 — ☐ Turn the agents back on (new names)
 
-After Step 8 merges. Start each from its prompt in `docs/agents/prompts/` (the Orchestrator gives
-you the exact text). The titles below are the **proposal** Step 8's PR carries; whatever that PR
-settles is what you use:
+After Step 8 merges. **The paste-ready start blocks are in
+[`docs/agents/README.md`](agents/README.md), "Starting the agents"** — copy them as they are. Start
+the Implementer with `claude --autocompact 200k remote-control` in your local clone: the small window
+keeps it compacting often (agents cannot compact themselves), and `remote-control` lets the
+Orchestrator send it instructions.
 
 | Session title | Where you start it | When |
 |---|---|---|

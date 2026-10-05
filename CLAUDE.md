@@ -55,7 +55,8 @@ Three, plus one mode — full contract in [`docs/agents/README.md`](docs/agents/
 **🪐 Orchestrator** (cloud: triage, owner questions, release prep, merges) · **🪲 BugFix** (cloud:
 reports → issues, small fixes) · **🚧 Implementer** (the owner's machine: works the queue,
 device checks) ↳ **release-test mode**. Work out which you are first. One session per role, kept
-open; compact before going idle rather than handing off. Titles end 🟢 while live, 🔴 when wrapped.
+open; compaction is automatic (launch with a small `--autocompact` window), so **write each task's
+outcome to its issue or PR** — that is what survives it. Titles end 🟢 while live, 🔴 when wrapped.
 
 ## Before you build
 
