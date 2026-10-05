@@ -395,11 +395,24 @@ agent ends up following half the old rules and half the new.
 
 ### Phase 0: Freeze and wrap up (your friend's step 1)
 
-**Progress, 2026-10-05:** ✅ the three routines paused (Lane A, Lane B, inbound GitHub watch). ✅ The
-freeze message sent to all seven standing sessions; most were already wrapping up. ✅ #1790 and
-#1762 closed as superseded. **Held for release 1** (owner): #1849 and #1499. **Left to its own
-session to land:** #2037. **Still to do:** the branch sweep, and each session's one-line "still in
-flight" reply.
+**Progress, 2026-10-05:**
+- ✅ The three routines are paused (Lane A, Lane B, inbound GitHub watch).
+- ✅ The freeze message went to all seven standing sessions, and the owner confirmed all of them
+  wrapped up.
+- ✅ #1790 and #1762 are closed as superseded.
+- **#1499 is held for release 1.**
+- **#1849 merged at 08:04Z**, three minutes before the owner's "hold" answer arrived. It merged
+  under the shared account, so which session merged it can't be told. Its migration is guarded (a
+  column drops only if no row in any account holds a value), and the deploy check confirmed
+  production serves it.
+- **Left to their own sessions to land:** the wrap-up PRs and #2037, #2040.
+- **Branch sweep:** a cloud session can push only to its own branch, so it can't delete branches or
+  push tags (measured). The sweep is therefore `.github/workflows/branch-sweep.yml`: a manual
+  trigger, a dry run by default, working from the reviewed list `.github/branch-sweep.txt`. That
+  list holds **46 deletes** (each tip matches a PR head, adds nothing to `main`, or landed under
+  another name) and **3 archives**, tagged `archive/<branch>` first because their work is on `main`
+  in no form: the Q-44 table-rename migrations, the first `CLAUDE.md` compaction (raw material for
+  Phase 4), and the obsolete Q-555 WIP. It runs once this PR merges.
 
 - **You:** pause the **Lane A** and **Lane B 4-hourly routines** and the daily **inbound GitHub
   watch**. Leave the Gmail sweep and the other project's review watch alone; they aren't this repo.
@@ -423,6 +436,11 @@ flight" reply.
   work, or "stale, drop it". Appendix A below is the starting list.
 - **You:** skim the triage. Answer or drop the owner questions; most should be quick or obsolete.
 - **Done when:** every entry has a migrate / fold / archive verdict you've seen.
+- **Progress, 2026-10-05:** ✅ the triage is written:
+  [`2026-10-05-backlog-triage.md`](2026-10-05-backlog-triage.md), with the per-entry verdicts in its
+  CSV. 524 entries become **about 245 issues**: 194 pieces of work, 38 owner questions and 12
+  device-check groups. The rest fold into a watch list, are archived, or are obsolete. Waiting on
+  the owner's skim.
 
 ### Phase 2: Release plumbing
 
