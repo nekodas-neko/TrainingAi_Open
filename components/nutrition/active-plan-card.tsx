@@ -42,10 +42,6 @@ export function ActivePlanCard({
   onStepByStep: () => void
   onViewPlan: (planId: string) => void
 }) {
-  const {
-    logMeal, logMeals, bulkLogging, loggingPosition, loggedPositions, declinedMealIds, setDeclined,
-  } = usePlanMealLogging({ mealPlan: plan, mealTypes, logs, userId, dateRef, onLogged })
-
   const { saveMeal, saveMeals, savingPositions } = usePlanMealSaving({
     mealPlan: plan, userId, onPlanChanged,
   })
@@ -75,6 +71,11 @@ export function ActivePlanCard({
   const isTrainingDay = isSplitPlan(plan)
     ? trainingDayForPlanDate(logDate, today, rec)
     : undefined
+
+  // After `isTrainingDay`: the hook needs it to pick the variant it estimates against (BF-203a).
+  const {
+    logMeal, logMeals, bulkLogging, loggingPosition, loggedPositions, declinedMealIds, setDeclined,
+  } = usePlanMealLogging({ mealPlan: plan, mealTypes, logs, userId, dateRef, onLogged, isTrainingDay })
 
   return (
     <MealPlanSection

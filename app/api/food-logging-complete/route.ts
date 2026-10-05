@@ -73,8 +73,9 @@ export async function POST(req: NextRequest) {
     sleepQualityFeelTouched:  existing?.sleepQualityFeelTouched ?? false,
     // Carried through like every field above — omitting it here would clear the answer on the
     // evening row every time the food log is marked complete. The compiler caught this one, which
-    // is the argument for `DayCheckin.vsYesterday` being required rather than optional.
-    vsYesterday:       existing?.vsYesterday ?? null,
+    // is the argument for `DayCheckin.vsNormal` being required rather than optional.
+    vsNormal:       existing?.vsNormal ?? null,
+    vsQuestion:     existing?.vsQuestion ?? null,
     soreMuscles:       existing?.soreMuscles ?? [],
     journal:           existing?.journal ?? null,
     foodLoggingCompletedAt: parsed.data.complete ? new Date() : null,

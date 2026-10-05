@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import fs, { writeFileSync, existsSync, rmSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
-import { isGuardedSourcePath } from '../../vitest.source-write-guard'
+import { isGuardedSourcePath } from '../vitest-source-write-guard'
 
 const root = process.cwd()
 const probeDir = path.join(root, 'components', '__lb194_probe__')

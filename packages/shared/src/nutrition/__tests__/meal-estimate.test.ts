@@ -1,7 +1,7 @@
 // BF-203a. Which plan meals are owed an estimate, and at what macros.
 import { describe, it, expect } from 'vitest'
 import { formatInTimeZone } from 'date-fns-tz'
-import { dueForEstimate, slotCloseHour, type EstimateSlot } from '../meal-estimate'
+import { dueForEstimate, slotCloseHour, estimateSlotsFor, type EstimateSlot } from '../meal-estimate'
 
 const slot = (id: string, closeHour: number, kcal: number, mealTypeId = `mt-${id}`): EstimateSlot => ({
   planMealId: id, mealTypeId, closeHour,
@@ -89,5 +89,30 @@ describe('estimate window boundary, user-local', () => {
 
   it('treats the close hour itself as over', () => {
     expect(dueForEstimate({ slots: [dinner], loggedMealTypeIds: none, answeredPlanMealIds: none, localHour: 21, biasKcal: 0 })).toHaveLength(1)
+  })
+})
+
+describe('estimateSlotsFor (Task 8′)', () => {
+  const types = [
+    { id: 'lunch', timeStartHour: 12, timeEndHour: 15 },
+    { id: 'dinner', timeStartHour: 18, timeEndHour: 21 },
+  ] as unknown as Parameters<typeof estimateSlotsFor>[1]
+  const meal = (id: string, mealTypeId: string | null, suggestedTime: string | null) => ({
+    id, mealTypeId, suggestedTime, targetCalories: 500, targetProteinG: 30, targetCarbsG: 50, targetFatG: 15,
+  })
+
+  it('types an untagged meal by its time and closes it after that time', () => {
+    const [s] = estimateSlotsFor([meal('m1', null, '16:20')], types)
+    expect(s.mealTypeId).toBe('lunch')
+    expect(s.closeHour).toBeCloseTo(17 + 20 / 60)
+  })
+
+  it('keeps an explicit tag and uses that type\'s end', () => {
+    const [s] = estimateSlotsFor([meal('m2', 'dinner', null)], types)
+    expect(s).toMatchObject({ mealTypeId: 'dinner', closeHour: 21 })
+  })
+
+  it('leaves out a meal it cannot place in time', () => {
+    expect(estimateSlotsFor([meal('m3', null, null)], types)).toEqual([])
   })
 })

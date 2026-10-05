@@ -77,8 +77,16 @@ test('a food never logged before is findable from Search, and carries its mismat
   // The section is headed, so the row is not mistaken for something already in your library.
   await expect(page.getByText('Food database', { exact: true })).toBeVisible({ timeout: 30_000 })
 
-  const row = page.getByRole('button', { name: new RegExp(`${BRAND} — ${PRODUCT}`) }).first()
+  // ⚠ `<name>` then `<brand> · …`, NOT `<brand> — <name>`: RV-208 ⑤ moved the brand onto
+  // `FoodRow`'s secondary line, and this assertion sat on the old string for four PRs because E2E
+  // is advisory and nothing else reads it.
+  const row = page.getByRole('button', { name: new RegExp(PRODUCT) }).first()
   await expect(row).toBeVisible({ timeout: 30_000 })
+
+  // Name first, brand under it. Asserted as two things so a row that dropped the brand entirely —
+  // which is what `ingredient-search.tsx` was doing before RV-208 ⑤ — cannot pass.
+  await expect(row.locator('span.font-medium').first()).toHaveText(PRODUCT)
+  await expect(row).toContainText(BRAND)
   // The warning the owner chose to keep in the row (Q-406). An icon alone has no hover on a phone,
   // so it would carry no explanation at all.
   await expect(row).toContainText('Its macros and calories disagree')

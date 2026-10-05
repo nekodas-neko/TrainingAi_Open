@@ -490,109 +490,83 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [readiness][app-shell] LB-191 — does the "compared to normal" picker get a default? It contradicts TN-58's central design
-- **✅ ANSWERED 2026-09-30 — YES, PRE-SELECT "About the same". AGAINST the recommendation, and
-  reaffirmed after the cost was put to him.** He was shown `TN-58`'s measurement — **2 distinct
-  values across 96 check-ins, sd 0.29** — and the specific cost, that a one-tap Save makes a
-  reflexive answer indistinguishable from a considered one on a field feeding readiness. He chose
-  the default anyway. **This is settled: do not re-propose no-default, and do not re-raise the
-  measurement.**
-- **⛔ `e2e/tn58-vs-yesterday-no-default.spec.ts` IS UPDATED, NEVER DELETED.** Its no-default
-  assertion is now wrong; everything else it protects is not. It still has to prove the control
-  renders three options, that a mis-tap can be cleared, and that a **dismissed sheet writes no
-  row**. Rewrite those against the new default, keep the file and its `TN-58` reference, and
-  rename it to match what it now asserts.
-- **⚠ THE NULL PATH IS NOW THE ONLY THING SEPARATING THE TWO CASES — keep it alive.** The sheet
-  writes solely on Save and `day_checkins.vs_yesterday` has **no column default**, so dismissing
-  with the X must still store nothing. With a neutral pre-selected, that dismissal is the sole
-  remaining signal of *not answered*. A later change that writes a row on close would erase the
-  distinction without touching this entry.
-- **Tuning's boundary moved TWICE, and one marker must cover both:** the question changed (`OR-206`,
-  vs yesterday → vs normal) and a neutral can now arrive unconsidered (this entry). Record the
-  marker as covering both, or a later reader will split on one and pool the other.
+### [platform] OR-207 — six PRs were stranded when every session stopped, and four have gone un-mergeable
 
-- **Lane: B** — returned 2026-09-30, the answer is in. It was `O` while the question was open
-  (split out of `OR-206` ② because the lane field is what routes work and that entry is Lane B —
-  the same reason `RV-208` moved its Lane A half out to `LB-183`), ungated on purpose so it stayed
-  in the READY list rather than being parked behind the gate. **Added:** 2026-09-30 · Lane B.
-- **The question, his words on the S25 (2026-09-29):** *"Maybe comparison to \"normal\". So about the
-  same; better or worse. **With it default selected to about the same.**"* The wording half is not in
-  dispute and ships without him (`OR-206`); only the default is.
-- **Recommendation: ship the rename with NO default, and give him `TN-82`'s announce-and-correct
-  shape instead** — the one he approved twice for the sleep rating on this same sheet.
-- **Why, a year out.** A pre-selected neutral makes a reflexive Save indistinguishable from a
-  considered *"about the same"* — and this app has measured that failure four times over: `wake_mood`
-  collected 17 answers then zero, the 1–5 sleep scale 3 of 82, `perceived_recovery` **0 touched in
-  102 check-ins**, and `vs_yesterday` itself 2 of 82. `TN-58` built this picker with no default and
-  the column has none, both for that reason; `TN-57` was the fix for a neutral stored as though it
-  were an answer. The field feeds a scoring input, so the cost is a contaminated tuning signal, not
-  an untidy screen.
-- **What he is actually asking for, and the cheaper way to give it to him.** He wants to not tap
-  three things on a normal morning. The sleep announcement already does that here: the app states
-  what it filled and why, he corrects it in one tap, and a plain Save records **unknown** rather
-  than assent. One-tap morning, and a skipped answer still distinguishable from a given one.
-- **The alternative, and what it is genuinely better at.** Defaulting to *"about the same"* produces
-  a row every day, and a dense series is easier to chart than a NULL-heavy column. If he reaffirms
-  it, it is his call and it ships — but then the column needs a `touched` flag beside it, as
-  `sleep_quality_feel` has, or tuning cannot tell his answer from the app's.
-- **Reversal cost: low, and asymmetric.** Adding a default later is one line. Removing one later
-  does not un-write the rows already stored under it, and nothing records which of those were
-  considered — so the cheap direction is to start without it.
-- **`e2e/tn58-vs-yesterday-no-default.spec.ts` asserts nothing is selected on open.** Whichever way
-  this goes, that test is amended with the reason. It is never deleted to make a change pass.
+- **Lane: A** · **Added:** 2026-10-04 · Orchestrator, full orchestration review.
+- **⛔ THREE OF THESE THE OWNER ALREADY APPROVED ON 2026-09-28 and they never merged.** `#1847`
+  (`LA-159`, drop `program_phases.program_id`), `#1849` (`LA-142`, four dead `oura_daily_derived`
+  columns) and `#1902` (`TN-56`, the admin replay endpoint). His yes is recorded on `LA-173`. They
+  sat because the session that would have merged them stopped.
+- **State read 2026-10-04, not assumed:** `#1847` **dirty** · `#1849` **unstable** · `#1902`
+  **draft and dirty** · `#2024` (`LB-194`, test-write guard) **dirty** · `#1790`, `#1762` unknown.
+- **⚠ `#1847` and `#1849` BOTH regenerate `claude-ro-views.sql`, so they conflict with each other
+  as well as with `main`.** Whichever goes second must re-merge `main` and regenerate the file;
+  CI's views-file test enforces it. **Do not resolve that conflict by hand** — run the generator.
+- **`#1902` is a draft because it was held for the owner. He answered yes.** Flip it ready as part
+  of this, rather than leaving a merged decision behind a draft flag.
+- **Order:** `#2024` first (test harness, no schema, clears the simplest conflict and proves the
+  rebase path), then `#1847`, then `#1849` regenerating on top, then `#1902`. `#1790` and `#1762`
+  are docs-only and can go any time.
+- **Re-confirm CI green on each UPDATED head before merging.** Two are column-dropping migrations
+  with a guard; the guard is what makes them safe, not the age of the approval.
 
-### [readiness][platform] LB-190 — rename `vs_yesterday` to `vs_normal`, and mark the boundary the rename creates
+### [devices][heart-rate] OR-208 — `rr_intervals` has written nothing since 2026-09-28, while the ring kept writing
 
-- **Lane: A** · **Added:** 2026-09-30 · Lane B, moved out of `OR-206` because the whole of it is a
-  schema change, and **Postgres migration numbers and local SQLite versions are Lane A's alone**.
-- **Why it leads rather than follows.** `OR-206`'s copy change is what makes the stored history
-  ambiguous, so the marker has to exist before the question changes on screen — engine half first.
-  `OR-206` waits on this via `Needs:`.
-- **The rename**, because a field whose name contradicts its question is how the next reader gets it
-  wrong: `day_checkins.vs_yesterday` → `vs_normal`, and `VsYesterday` with it. Reached by grep and
-  `tsc`: `schema.ts`, `adapter.ts` (5 sites incl. the `EXCLUDED.vs_yesterday` upsert),
-  `app/api/day-checkin/route.ts`, `app/api/food-logging-complete/route.ts`,
-  `packages/shared/src/types/day-checkin.ts`, `packages/shared/src/validation/day-checkin.ts`,
-  `lib/local-store/{types,sqlite-backend,sync-engine}.ts`, `lib/sqlite/migrations.ts` (a new local
-  version), and `claude-ro-views.sql` regenerated **in place**, not numbered (BF-214).
-- **⚠ The marker is the half that is not optional.** Rows written before the change answer *"vs
-  yesterday"*; rows after answer *"vs normal"*. Different questions, and they **must not be pooled
-  in one trend**. A deploy date cannot mark it exactly — Railway ships on merge, so a given local
-  day can hold rows from both sides of the cutover.
-- **Recommendation: a stored question-version column**, the shape `SLEEP_VERDICT_MODEL_VERSION`
-  already set on this sheet — each row says which question it answered, and a later wording change
-  costs one integer instead of another archaeology pass. A recorded cutover date is the cheaper
-  alternative and is what `OR-206` offered; it loses on the one-day ambiguity above.
-- **Done when** a row written after the rename is distinguishable from one written before it by a
-  stored value, with a test, and nothing in `app/**`, `lib/**` or `packages/**` still spells
-  `vsYesterday`.
+- **Lane: O** · **Added:** 2026-10-04 · Orchestrator, session-start reads.
+- **Measured:** latest `rr_intervals.at` is **2026-09-28 22:18**. Over the same window
+  `oura_heartrate` wrote through **2026-10-04 15:49** and `oura_raw_packed` through **16:42**, so
+  **the ring pipeline is healthy and this is specific to the strap**.
+- **The likely answer is not a defect: the Polar H10 is worn, not always-on**, so six quiet days
+  may simply be six days it was not put on. **Recorded rather than filed as a fault** — per the
+  standing rule, something that stopped is not something that was fixed, and a gap nobody wrote
+  down is a gap nobody can later date.
+- **It has a consequence that is already owed:** `PS-44` needs **a week of strap-to-bed data** the
+  owner agreed to on 2026-09-17. That week has not started. If he has been wearing it and the rows
+  are missing anyway, this stops being a note and becomes a Lane A ingest bug.
+- **One question settles it, and it is his:** has the strap been worn since 28 September?
 
-### [readiness][app-shell] OR-206 — the morning check-in compares to "normal", not to yesterday
 
-- **Lane: B** · **Added:** 2026-09-29 · Orchestrator, from the owner on the S25:
-  *"I dont like the comparison to the yesterday. Maybe comparison to \"normal\". So about the same;
-  better or worse. With it default selected to about the same."*
-- **Needs: LB-190**
-- **⤷ SPLIT 2026-09-30 (Lane B), and what is left here is the surface only.** Re-verifying the entry
-  found two of its three parts belonged elsewhere, each for a reason CLAUDE.md states outright:
-  the field rename and the history marker are a schema change, which is **Lane A's alone**, and are
-  now `LB-190`; ② was an owner question living inside a `Lane: B` body, where the Orchestrator was
-  never going to see it, and is now `LB-191` (`Lane: O`, ungated).
-- **The wording change is his call and is not in dispute.** `components/checkin/vs-yesterday-picker.tsx`
-  asks *"Compared to yesterday"*; he wants *compared to normal*. Same three options, same order.
-  **Rename the component and its file with the copy** — `VsYesterdayPicker` stops describing what it
-  asks the moment the prompt changes. Its `id="vs-yesterday-label"` and the `aria-labelledby` that
-  points at it move too.
-- **It cannot ship before `LB-190`.** Changing the prompt is precisely what makes the stored answers
-  mean two different things, so the marker has to be in place first. This is not sequencing for
-  tidiness: the field feeds a scoring input.
-- **Also here:** `components/morning-checkin-sheet.tsx`'s state and handler names, the two
-  `components/checkin/__tests__/tn58-vs-yesterday-control.test.ts` cases, and
-  `e2e/tn58-vs-yesterday-no-default.spec.ts` — which keeps asserting that nothing is selected on
-  open until `LB-191` says otherwise. **Do not delete it to make the change pass.**
+### [readiness] LB-198 — `vs_question` marks the wording shift; the SECOND boundary inside question 1 is unmarked
 
+- **Lane: A** · **Added:** 2026-09-30 · Lane B, while shipping `LB-191`. Schema, so Lane A's.
+- **`LB-190` (#2025) did exactly what it was asked and it is not enough on its own.** `vs_question`
+  says WHICH QUESTION a row answered — 1 = *vs yesterday*, 2 = *vs normal* — and the boundary it
+  marks is the wording change. **`LB-191` (shipped the same day) moved a second boundary that sits
+  INSIDE question 1**: the control now seeds *"About the same"*, so a one-tap Save stores a neutral
+  the owner may never have considered. Rows on either side of it both read `vs_question = 1`.
+- **Why it matters rather than being tidy.** Before the seed the field collected **2 answers in 82
+  check-ins**; after it, most days will carry a `'same'`. Pooled, that reads as a real change in how
+  he feels and is an artefact of the control. It feeds a scoring input, so the cost is a
+  contaminated calibration, not an untidy column.
+- **Recommendation: a `vs_normal_touched` boolean beside the value**, the shape
+  `sleep_quality_feel_touched` already uses on this same sheet — and the shape **`LB-191`'s own
+  entry predicted would be owed** if the default shipped: *"then the column needs a `touched` flag
+  beside it … or tuning cannot tell his answer from the app's."*
+- **Why a flag beats another era marker.** An era marker answers *"could this row have been
+  seeded?"*; the flag answers *"was it?"* — per row, so a considered *"about the same"* stays usable
+  instead of being discarded with the reflexive ones. Same reason `vs_question` beat a cutover date.
+- **The alternative, and what it is better at.** Recording the seed's release (v1.486.10,
+  2026-09-30) in the tuning notes costs nothing and needs no migration. It is genuinely better if
+  the answer is *"discard the whole seeded era"* — but it inherits the one-day ambiguity `LB-190`
+  rejected, since Railway ships on merge and a local day can hold rows from both sides.
+- **Reversal cost: low.** A nullable boolean; dropping it later loses only what it recorded. Rows
+  written before it are correctly unknown either way.
+- **Done when** a row stored from an untouched Save is distinguishable from one the owner tapped,
+  with a test — and the write path sets it from a real interaction, never inferred from Save.
 
 ### [platform] OR-203 — the database grew 3× its trend for six days, and no per-table baseline exists to say which table did it
+- **✅ RE-READ 2026-10-04 — THE RATE DID NOT PERSIST. This was a BURST, not a step change.**
+  **263 MB**, against **261 MB on 2026-09-29**: **+2 MB in 5 days ≈ 0.4 MB/day**, against the
+  **4.8 MB/day** that opened this entry and below even the 1.53 MB/day trend it was alarming about.
+  The entry's own caveat — *"six days is short and a single heavy sync day would move it"* — is what
+  happened. **Do not act on the 4.8 figure.**
+- **Part of the current low rate has a named cause, so do not read 0.4 as the new steady state
+  either:** `rr_intervals` has written **nothing since 2026-09-28 22:18** (see `OR-207`), and it is
+  one of the larger per-day contributors. The ring tables are unaffected and current —
+  `oura_heartrate` and `oura_raw_packed` both wrote today.
+- **What this entry is now worth keeping for** is the per-table baseline below, which is still the
+  only one recorded and is what made this re-read a diff rather than another guess. **Keep it, and
+  re-take it when `rr_intervals` resumes** — the next honest reading needs the strap writing again.
 
 - **Lane: A** · **Added:** 2026-09-29 · Orchestrator, from the session-start size read.
 - **Measured 2026-09-29: 261 MB**, against **232 MB on 2026-09-23** (sweep 54) and **227.4 MB on
@@ -1796,6 +1770,20 @@ below threshold and left in place for next time.
   `claude/implementation-agent-lane-a-ztkb3m` and `lane-a/tn46-baseline-already-retained`. Delete
   outright. Note TN-46 is still queued while its branch is empty, so a branch matching a live entry
   is not automatically worth keeping — check the diff, not just the name.
+- **⟳ RE-MEASURED 2026-09-30 by Lane B, and it has GROWN: 54 non-main remote branches, 7 with an
+  open PR, so **47 sweepable** — against this entry's 39 on 2026-09-27.** Counted after
+  `git fetch origin --prune` (a partial fetch under-counts, which is why the prune matters) and the
+  open-PR figure is from `list_pull_requests`, not a name match — this entry's own lesson. **None of
+  the 7 is Lane B's**, and four are explicitly held for the owner (#1902, #1849, #1847, #1499 —
+  auth/security and column-dropping migrations), so the sweep must not touch them.
+- **⚠ Two of the 54 are named `claude/…`**, which the owner banned outright on 2026-09-27:
+  `claude/implementation-agent-b-s1m4qs` and `claude/implementation-agent-lane-a-ztkb3m`. Neither has
+  an open PR, so both fall inside the sweep rather than needing a separate decision — worth naming
+  because they are the visible half of the rule on a public repo.
+- **Lane B looked at this and did NOT sweep.** Deleting 47 remote branches is a wide-blast-radius
+  action on a public repo, it is this entry's (Orchestrator's) to run, and this entry itself records
+  that the first application of the rule was wrong about four branches. A refreshed count is the
+  useful thing a passing lane can contribute; the deletions are not.
 - **The remaining 32 are sweepable** once the four above are resolved: no open PR, last touched
   between 3 days and 6 weeks ago, and none had a merged PR (the cleanup would have taken it).
 - **Two of them violate the branch-naming rule outright** — `claude/implementation-agent-b-s1m4qs`
@@ -2126,30 +2114,6 @@ below threshold and left in place for next time.
 - **Keep:** one end-to-end confirmation that an event is still created — complete a workout and look
   for it in Google Calendar. **Not reachable from the container**, which has no Google refresh token;
   everything short of a real credential was exercised, the live token exchange included.
-
-### [app-shell] OR-167 — two icon libraries ship; the smaller one is six files
-- ✅ **ANSWERED 2026-09-30 — KEEP BOTH icon libraries. This is AGAINST the recommendation.** The
-  entry argued for dropping the 6-file library against lucide's 270; the owner chose not to change
-  icons on screens he reads mid-run for a dependency saving. **The measurement is not a reason to
-  re-ask** — it was put to him with those numbers.
-  **Consequence to write down rather than rediscover:** two icon sets stay in the bundle, so a
-  future contributor has no rule saying which to reach for. If that becomes a real problem it is a
-  new entry about consistency, not a re-run of this one.
-
-- **Lane: B** · **Added:** 2026-09-25 · OR-165's dependency audit.
-- **Measured 2026-09-25:** `lucide-react` (**43 MB**) is imported by **270** files;
-  `@phosphor-icons/react` (**41 MB**) by **six**, for five icons — `HeartIcon`, `PauseIcon`,
-  `PlayIcon`, `StopIcon`, `FootprintsIcon` — all in the activity and run screens
-  (`components/activity/**`).
-- **Proposal:** move those five onto lucide (`Heart`, `Pause`, `Play`, `Square`, `Footprints`) and
-  drop the dependency. Two icon sets in one app is also a consistency problem independent of size.
-- **⚠ THE OWNER SEES THESE ICONS DURING A RUN, so this is a look change, not a cleanup.** Phosphor
-  and lucide draw the same concepts differently — weight, corner radius, the foot shape. **Show a
-  before/after at 384 px dark before building it**, per CLAUDE.md's mockup rule.
-- **Do not fold this into an unrelated PR.** A silent icon swap on a daily screen is exactly the
-  change that gets noticed and resented afterwards.
-- **Not established:** whether lucide has an acceptable `FootprintsIcon` equivalent — it has
-  `Footprints`, unchecked against the current glyph.
 
 ### [platform] OR-184 — the collaborator's issue and two PRs, and the channel that had no reader
 
@@ -4264,6 +4228,18 @@ which is the right shape for something that can only be validated by living with
   truncated element still reports its full text and `toHaveText` passes on an unreadable ellipsis.
   `quick-edit-log-sheet.tsx` is excluded with its reason: it is a sheet header that already leads
   with the name and gives the brand its own line, so there is nothing to separate.
+  **⛔ AND IT BROKE TWO E2E SPECS THAT NOBODY NOTICED FOR FOUR PRs — fixed 2026-09-30.**
+  `food-row-shared.spec.ts` and `single-foods-database-search.spec.ts` asserted the accessible name
+  `<brand> — <name>`, which is exactly the string this change retired; both were red from v1.486.4
+  to v1.486.9. **Three things had to line up for that to stay invisible:** `pnpm test` is vitest
+  only and never runs Playwright, the source guards scan `components/` and not `e2e/`, and **E2E is
+  advisory here**, so three red shards blocked no merge. They now assert the name line and the brand
+  as **two** things, so a row that dropped the brand entirely — what `ingredient-search.tsx` was
+  doing before this change — cannot pass a name-only check either.
+  The guard gained the case, scoped to those two files with the reason stated rather than dressed up
+  as a general rule: one legitimate em dash in an accessible name exists in the suite
+  (`plan-meal-log-decline.spec.ts`'s *"Didn't eat this — undo"*). **What generalises is the habit:
+  when you change a rendered string, grep `e2e/` for it.**
 - **A question this raised and did not answer:** every separator site uses a bare
   `toLocaleString()`, which follows the DEVICE locale — a phone set to German renders `1.534`. The
   fix above matches the existing convention rather than inventing a rival one. Whether counts
@@ -6426,7 +6402,7 @@ drift.
 ### [nutrition] BF-203a — phase A: the `estimated` answer state, and counting it once
 - **Lane:** A — migration, `plan_meal_answers`, `packages/shared/src/nutrition/meal-estimate.ts`, `lib/health/energy-balance-service.ts`.
 - **Added:** 2026-09-26 · BugFix intake. First of BF-203's three phases.
-- **Needs: LA-172**
+- **Needs: LA-185** — Tasks 1–7′ and 8′ (1–2) are merged or in flight (#2001–#2004, #2018, #2019, #2021). What remains, 8′ (3–4), counts and displays the estimate, and waits on the owner's choice of how the ring marks it.
 - **⛔ STOPPED 2026-09-28 (Lane A) on the plan's own stop-check, and in a worse form than it
   anticipated.** The plan matches a logged meal to a plan slot **by meal type** and says to stop if
   two plan meals share one. Production: **all 8 of the owner's plan meals have `meal_type_id`
@@ -8905,9 +8881,41 @@ drift.
   sandbox session: `curl -sSL -o a.zip https://api.github.com/repos/<owner>/<repo>/actions/artifacts/<id>/zip`
   returned **200, 15,686,307 bytes**. Get the id from `get_job_logs` (the upload step prints
   `Artifact ID …`).
-- **Keep — the cause is STILL NOT established.** The crash is now witnessed and the instrument is
-  fixed; what is owed is one more red E2E read through the repaired dmesg branch. If it reports no OOM,
-  memory is out and the next step is sampling during the run rather than after it.
+- **⚠ CORRECTED 2026-09-30, SAME DAY, BY THE SESSION THAT WROTE IT. This line said "THE WITNESS ARRIVED" and it is the NINTH sighting, not the first — `LB-56` has carried this exact fault address since 2026-09-09, six times over.** I read the artifact, found `SEGV_MAPERR 0000000001b0`, and wrote it up as new without grepping the backlog for `0x1b0`, which returns it immediately. **What that costs is not pride but evidence:** the prior sightings date the crash to at least 2026-09-09, across eight runs, so it predates everything shipped recently and the "one reproducible code path" reading is far better supported than one run could make it. `LB-56`'s FOURTH sighting also already settled the mechanism — `net::ERR_ABORTED` and `browser.newContext: … has been closed` are two downstream views of ONE crash, proved by an attempt and its retry producing one of each. **Read `LB-56` before adding anything here.** What this run genuinely added is below, and it is the STACK LOCATION and the OOM refutation, nothing else — read from run 36699855503 (#2016), two of whose five E2E failures are this crash:
+  of that run's five E2E failures are this crash, and both carry the same line in
+  `error-context.md`'s browser log:
+
+  ```
+  Received signal 11 SEGV_MAPERR 0000000001b0
+  ```
+
+  **SIGSEGV with `SEGV_MAPERR` at `0x1b0` is a near-null dereference, not a kill** — an OOM would be
+  SIGKILL with an `Out of memory` line, so **memory is out as the explanation** and the dmesg branch
+  no longer has a question to answer. Four things the backtrace establishes, and one it does not:
+  - **The same fault ADDRESS in two independent shards** (`lb186-new-exercise-has-a-style` on shard
+    2, `meal-portion-scale` on shard 2) — and, per the correction above, **the same address in eight
+    earlier runs going back to 2026-09-09**. One reproducible code path, not random corruption.
+  - **It is the BROWSER process, not a renderer.** The stack runs through
+    `libglib-2.0`'s main loop (frames 16–18) into Chromium's own message pump — which is exactly
+    why `browser.newContext` then fails for every later test in the shard, the cascade this entry
+    describes.
+  - **The binary is pinned and named:** `chrome-headless-shell-1234`, from
+    `~/.cache/ms-playwright/chromium_headless_shell-1234`.
+  - **The frames are unsymbolised** (offsets into the stripped shell), so **which** code path it is
+    remains unestablished — and nothing here shows the crash is our page's doing at all.
+- **⊕ IT OWNS `LB-106` AS A SYMPTOM, established 2026-09-30.** `preferences-survive-reinstall`'s
+  CI-only `net::ERR_ABORTED` was a two-week investigation for an app-side cause that does not
+  exist: this crash appears in that spec's OWN failure block (run 34814623905, job 103882629107,
+  `[pid=4243]`, same address), with `plan-rescale`'s separate crash at `[pid=5177]` in the same
+  run. **That makes it the TENTH sighting** and the first where the downstream `ERR_ABORTED` and
+  the crash are pinned to one process. Anything that re-opens `LB-106` on app-side grounds should
+  be sent back here instead.
+- **Keep — the cause is narrowed, not established, and the next step has changed.** Not another
+  dmesg read: that instrument was built for an OOM hypothesis this witness rules out. A SIGSEGV in a
+  pinned Chromium is a **harness** question rather than a product one — the remedy is a
+  Playwright/Chromium bump or a flag that avoids the path, which is a decision about the harness and
+  not a fix Lane B should make unilaterally. Symbolising those offsets against the shipped
+  `chrome-headless-shell` build would name the frame if it is worth the trouble.
 - **⛔ The entry's own discriminator is too weak, measured 2026-09-25.** It said 3 consecutive runs
   on an unchanged head would settle spec-pair vs runner. All **3 of 3 PASSED** (28m53s, ~34 min,
   ~33 min on run 3069 attempts 1–3), so the fault did not reproduce at all — it is rarer than
@@ -10405,6 +10413,34 @@ why the count of affected entries always understated the harm.
   fixture, asserting that a two-cycle input yields "insufficient data" rather than a verdict. Browser
   is enough; no device path is involved.
 
+### [nutrition] LB-199 — store which meal types a saved meal is SUITABLE for, and seed it from history
+
+- **Lane: A** · **Added:** 2026-09-30 · Lane B, split out of `BF-183`, which said in prose that the
+  storage is Lane A's and then kept `Lane: B` — so it would have waited in the wrong queue.
+  **Postgres migration numbers and local SQLite versions are Lane A's alone.**
+- **What to store: a DECLARED, multi-valued `suitableMealTypeIds` per saved meal**, not an inferred
+  one. `BF-183`'s measurement is the proof and it is worth re-reading before designing this: the
+  owner's protein shake has **45 logs, every one at breakfast, none anywhere else**, and he names it
+  as suitable for **all four** meals. **History is a FLOOR on suitability and never the set**, so
+  anything derived from logs alone under-tags exactly the foods he uses most consistently.
+- **The seed, which is the only place history belongs:** pre-tick a meal type at **≥ 3 logs AND
+  ≥ 60%** of that meal's logs. Below that, tick nothing rather than guess — 4 of his 19 saved meals
+  have never been logged and 3 have a single log, and a pre-tick from one log is work he has to
+  undo. Server-side: one grouped query, and the threshold stays in one place.
+- **It rides the saved-meals payload** (`/api/nutrition/saved-meals`), which `BF-183` established by
+  reading the sheet: `saved-meals-sheet.tsx` fetches only `saved-meals` and `nutrition-meal-types`
+  and holds **no log history**, so a client-side seed would mean a new fetch on that screen.
+- **⚠ The local SQLite mirror is NOT optional.** That sheet reads local-first
+  (`store.getSavedMeals()`), so without the mirror the tags vanish offline on a list that otherwise
+  works offline — the exact offline-first inversion CLAUDE.md calls a recurring bug class.
+- **⚠ Deleting a meal type must not strand a reference.** Whichever shape is chosen, a removed meal
+  type has to drop out of every saved meal's set; a join table with a cascade gets this for free
+  where a JSON array does not, which is the main argument between them.
+- **Done when** a saved meal can carry any subset of the user's meal types including all of them,
+  it survives a round trip through the outbox and the local store, and the seed puts the 10
+  confident rows in `BF-183`'s table at their measured meal type with the 4 never-logged ones empty.
+- **`BF-183` (Lane B) renders it and is parked on this via `Needs:`.**
+
 ### [nutrition] BF-183 — tag My Foods rows with which meals a food CAN be used for, feeding the meal planner
 - ✅ **ANSWERED 2026-09-30 — LUCIDE ICONS, not the emoji. This is AGAINST the recommendation and
   was chosen deliberately.** The entry argued for the existing per-meal emoji as the smaller change;
@@ -10415,11 +10451,13 @@ why the count of affected entries always understated the harm.
 - **Branch:** _unassigned_ · **Added:** 2026-09-20 (BugFix intake). Owner: *"Can we have some sort of
   icon system to indicate which meal its good for? Maybe we could use the lucid icon pack for this.
   The tough part is when people add too many meals. But my standard of 4 it should go well."*
-- **Lane: B** — the list is `components/nutrition/saved-meals-sheet.tsx`. The affinity query is a
-  Lane A route if it is computed server-side; see the open question below.
-- **⚠ Recommend the existing per-meal-type EMOJI, not lucide — and this is the part worth arguing
-  before anyone writes code.** `meal_types` already has an `emoji` column, user-set, and the
-  Assign-to-Meal sheet already renders it. His four active types, measured 2026-09-20:
+- **Lane: B** — the RENDER half only: the tags on the rows in `components/nutrition/saved-meals-sheet.tsx`, and the picker that edits them.
+- **Needs: LB-199**
+- **✂ SPLIT 2026-09-30 (Lane B).** The entry answered its own routing question in prose — *"this is a schema change and therefore Lane A's to land"* — and then kept `Lane: B`, which is the shape CLAUDE.md warns about: **the lane field routes work and prose does not**, so the engine half would have sat in Lane B's queue indefinitely. The storage half is now **`LB-199`** and this entry waits on it.
+- **⛔ SUPERSEDED BY THE ANSWER ABOVE — kept because the DATA in it is still the build's, and
+  because a struck recommendation is how the next reader learns it was already argued.** The case
+  for the emoji is below; the owner read it and chose lucide. Do not re-propose it. His four active
+  types, measured 2026-09-20, still matter as the set a row must be able to show at once:
 
   | sort | meal type | emoji |
   |---|---|---|
@@ -10450,12 +10488,19 @@ why the count of affected entries always understated the harm.
   planner is the thing that makes the effort pay); an AI suggestion at save time he can correct
   (cheap, and the food's name and macros carry most of the signal); history as a pre-tick for meals
   it has actually been logged at (never as the full set, per above).
-- **This is a schema change and therefore Lane A's to land** — a join table or a JSON array column
-  on the saved meal, plus the local-SQLite mirror. The list rendering stays Lane B.
-- **Still true from the first version, and still the recommendation: use the meal type's own
-  emoji.** It matters more now, not less: a row may show up to four glyphs, so they must be the
-  same four he already reads in the Assign-to-Meal sheet. A second lucide vocabulary shown four at
-  a time would be unreadable.
+- **The schema half is `LB-199` (Lane A)** — a join table or a JSON array column on the saved meal,
+  plus the local-SQLite mirror and the seed query. The list rendering and the picker stay here.
+- **⛔ This paragraph said "still the recommendation: use the meal type's own emoji". The owner
+  answered lucide, so it is struck — but the RISK it names is now the build's acceptance test**, not
+  an argument: a row may show up to four glyphs at once, in a vocabulary he has not been trained on,
+  at a row's icon size. **Render four-at-once at 384 px and look at it before shipping.** If it is
+  genuinely unreadable that is a finding to take back to him with the picture, not a licence to
+  switch to the emoji on your own.
+- **⚠ Lucide has no glyph for a USER-CREATED meal type, and that is the unsolved half of his
+  answer.** Meal types are user-created — this account has carried an *"Afternoon Meal"* — so a
+  fixed lucide map cannot name a type the app did not anticipate, where the user-set emoji always
+  could. **Decide the fallback before building** (a generic `Utensils` for unmapped types is the
+  obvious one) and say so in the PR; do not let an unmapped type render nothing.
 - **His "too many meals" worry is REAL under this reading, where it was not under the first.** One
   dominant glyph never grew; a capability set does — ten meal types could mean ten glyphs on one
   row. **Cap the display** (show the first N plus "+2", or collapse "all four" to a single
@@ -10479,11 +10524,16 @@ why the count of affected entries always understated the harm.
   type is **pre-ticked** when he opens the picker — four items have never been logged and three have
   a single log, so a pre-tick from one log is a guess he then has to undo. **Proposed seed gate:
   ≥3 logs AND ≥60%.** Below that, tick nothing and let him choose.
-- **Open question for the implementer, not for the owner:** whether the affinity is computed
-  server-side (a column on the saved-meals payload) or client-side from data the sheet already
-  holds. Server-side is one grouped query and keeps the threshold in one place; client-side needs
-  the log history on that screen, which it may not have. **Decide by checking what
-  `saved-meals-sheet` already fetches** before adding a route.
+- **✅ ANSWERED 2026-09-30 by Lane B, by reading the file rather than reasoning about it —
+  SERVER-SIDE, as a field on the saved-meals payload.** `components/nutrition/saved-meals-sheet.tsx`
+  fetches exactly two things (`saved-meals` and `nutrition-meal-types`, plus a local-first
+  `store.getSavedMeals()`): **it holds no log history at all**, so a client-side seed is not a
+  trade-off, it is a new fetch on a screen that does not want one. Server-side also keeps the
+  ≥ 3 logs / ≥ 60% threshold in one place. **And the seed is the lesser half anyway** — the
+  corrected design stores a DECLARED `suitableMealTypeIds`, so the field rides the payload
+  regardless of where the pre-tick is computed.
+- **⚠ The sheet reads LOCAL-FIRST**, so the local SQLite mirror is not optional: without it the
+  tags vanish offline on a screen whose whole list already works offline.
 - **Verification:** the 10 confident rows above must arrive **pre-ticked** with the emoji named and
   the 4 never-logged rows pre-ticked with none — then both must be freely editable to any subset of
   the four, including all four. Those are real fixtures from his account, so the test can assert
@@ -12855,14 +12905,46 @@ deload; and over a month the recommendation rate sits nearer 20% than 80%.
   *"If the abort returns, the SW was not it."* **It returned, with the block in place.** The
   header's other claim — that `page.reload()` *"aborts the navigation every run"* — is also stale:
   measured 2026-09-14, reload and a same-URL `goto` both complete in the sandbox.
-- **No cause is claimed. It does not reproduce locally**, so the honest position is a named failure
-  POINT and not a named cause. Ruled out by reading rather than guessed at: no `storage` listener
+- **✅ THE CAUSE IS NAMED, 2026-09-30 — IT IS `LB-149`/`LB-56`'s BROWSER CRASH, READ OUT OF THIS
+  RUN'S OWN LOG.** The read this entry was waiting for has been done, on job 103882629107 of run
+  34814623905 (the log is still retained 16 days on; the ARTIFACT is not, at `retention-days: 7`).
+  **`Received signal 11 SEGV_MAPERR 0000000001b0` appears inside failure 1)'s own block —
+  `preferences-survive-reinstall` — at `[pid=4243]`, the same browser process whose `page.goto`
+  returned `net::ERR_ABORTED`.** `plan-rescale`'s crash is a SEPARATE process, `[pid=5177]`: there
+  were **two** crashes in that run, one per failing spec, not one crash plus one mystery.
+  That is `LB-56`'s FOURTH sighting exactly — `ERR_ABORTED` is what the harness reports when the
+  browser process is already gone.
+- **⚠ What is NOT claimed, because the log cannot say it.** The crash line is the last entry in
+  that process's stderr and carries **no timestamp** (Chromium's crash handler prints without the
+  `MMDD/HHMMSS` prefix its console lines have), so the log alone cannot order the SIGSEGV against
+  line 53's `goto`. The attribution is **Playwright's** — it reports that browser's stderr under
+  that test's failure — not an ordering I measured. It is strong enough to stop hunting an app-side
+  cause and not strong enough to call the sequence proven.
+- **Three things follow, and they change what this entry is for.**
+  ① **The relaunch reshape (below) is not the fix** — defensible on fidelity, as it says, but it
+  cannot address a browser that died. ② **The service-worker block should go**: the spec's header
+  carried the falsification *"If the abort returns, the SW was not it"*, the abort returned, and the
+  block is now justified by nothing. ③ **This entry is no longer its own investigation.** It is a
+  symptom of `LB-149`, whose `Keep:` says the remedy is a harness decision (a Playwright/Chromium
+  bump or a flag), and the ten-clean-runs pass test below measures the RUNNER's luck rather than
+  anything this spec does. **Do not spend another session on app-side suspects here.**
+- **The original position, kept because it was right to hold it:** *no cause is claimed, it does not
+  reproduce locally, so the honest answer is a named failure POINT and not a named cause.* Ruled out by reading rather than guessed at: no `storage` listener
   anywhere in the app, the two `location.assign` call sites are behind a native-only custom event,
   and the one `beforeunload` handler mounts only mid-workout on the workout screen — none can
   supersede a navigation on `/`.
-- **The same run carried a real Chromium crash**, on `plan-rescale.spec.ts` — a native
-  `chrome-headless-shell` segfault with a full stack and `cr2: 0x1b0`. That is runner instability,
-  not app code, and it is context for how loaded that run was rather than a second bug to chase.
+- **⚠ CORRECTED 2026-09-30. This line called the same run's Chromium crash "context" and it is the
+  CAUSE — see the resolution above, which found the same crash in THIS spec's own failure block.** The run carried a native `chrome-headless-shell` segfault on
+  `plan-rescale.spec.ts` with `cr2: 0x1b0` — **the same fault address `LB-56` has recorded nine
+  times since 2026-09-09**, and `LB-56`'s FOURTH sighting already settled the mechanism: an attempt
+  and its retry of ONE test produced a `SIGSEGV` and a `net::ERR_ABORTED` respectively, so
+  `ERR_ABORTED` is **what a later test sees after the browser process is already gone**, not a
+  separate fault. Dismissing it as load is what left this entry saying "no cause is claimed" while
+  the cause was in its own log.
+- **What that changes here.** This entry's `ERR_ABORTED` is the crash wearing its downstream face,
+  which explains every property that made it baffling: it never reproduces locally, it lands on
+  whichever spec navigates next, and no app-side suspect survived inspection. The read that
+  established it is written up above; it took one log fetch.
 - **Do NOT "fix" this by lengthening the poll timeout.** That is the change that makes a real
   hydration regression invisible — and on this evidence it would also be aimed at the wrong line.
 - **Changed 2026-09-14** (`fix/lb106-preferences-relaunch`): the relaunch is now a **new page**
@@ -15134,6 +15216,15 @@ short all day.
     `diary-nested-meal:163` both went flaky on `browser.newContext: Target page, context or browser
     has been closed` after `Received signal 11 SEGV_MAPERR 0000000001b0` — same address, fifth time.
     Both recovered; the run's one hard failure was a real fixture fault in a spec that PR added.
+  - **⚠ NINTH SIGHTING 2026-09-30 (#2016, run 36699855503), and it adds the STACK LOCATION.**
+    `lb186-new-exercise-has-a-style` and `meal-portion-scale` both died at `browser.newContext` after
+    `Received signal 11 SEGV_MAPERR 0000000001b0` — the same address for the seventh time, and the
+    first sighting in over two weeks. **What is new is where it dies:** the stack runs through
+    `libglib-2.0`'s main loop into the **BROWSER process's** message pump, not a renderer, which is
+    why every later test in that shard then fails to get a context. **And it rules OOM out** — a
+    SIGSEGV is not a kill; an OOM would be SIGKILL with an `Out of memory` line. Binary
+    `chrome-headless-shell-1234`, frames unsymbolised. `LB-149` tracks the cascade and now carries
+    this; **the two entries are the same fault and are cross-linked as of 2026-09-30.**
   - **⚠ EIGHTH SIGHTING 2026-09-14 (#1186), and it is the first with a CONTROLLED re-run.**
     `back-dismiss-sweep:171` was the hard failure — both its attempts died at `browser.newContext`
     after `Received signal 11 SEGV_MAPERR 0000000001b0`, the same address for the sixth time — beside
@@ -15294,6 +15385,22 @@ re-proved on 2026-09-04** — three specs pass in isolation and fail in the full
   - **Start from the `error-context.md` Playwright writes beside each failure**, not from the spec:
     it carries the accessibility snapshot of the screen at the moment it gave up, and that is what
     identified both drifts here in minutes after hours of theorising.
+  - **`meal-type-reassign:65` is a THIRD confirmed sharding casualty, and it now has the second data
+    point it was owed** (2026-09-30, Lane B, from #2016's and #2023's shard 3). The *"Move N
+    entries"* dialog resolves **0 radios where 6 are expected**, and it **failed its automatic retry
+    in the same run** — so it is not shard state that a re-run shakes off. It **passes locally in a
+    full run**, which is the exact signature this entry describes: it needs the six meal types an
+    earlier spec creates, and sharding took that spec away. Recorded here rather than as its own
+    entry because the fix is this entry's — make the spec create its own state — not a separate bug.
+    ⚠ It was written up in #2023's journal as *"not reproduced"* on one data point; that read is now
+    superseded, and *"flake" was correctly refused as a root cause there.*
+    **⚠ AND IT PASSED ON THE VERY NEXT RUN** (#2026, 2026-09-30, all four shards green) — recorded
+    here the same day the line above was written, because a claim that has already moved is worse
+    than none. This does NOT restore the flake reading: #2026 **renamed an e2e spec**, and the
+    shards are filled in file order, so which specs run beside `meal-type-reassign` changed between
+    the two runs. That is precisely this entry's thesis — *which specs run together decides it* —
+    so the sharper statement is that the spec is **sensitive to its shard's contents**, and passing
+    is as uninformative as failing until it creates its own state.
 
 - **⚠️ Do not trust a local full-suite run without checking the dev server survived it.** A re-run
   after the meal-plan fix reported **106 failed / 41 passed** — almost every failure at ~250ms,
@@ -33440,6 +33547,28 @@ intake traced it, it did not design it.
 **Done looks like:** a week-in-review page reachable from the notification and from a permanent
 Health entry point, drawing its charts from values the route returned rather than from parsed prose,
 with the recap week visibly compared against the one before it.
+
+### [readiness][app-shell] LB-197 — "About the same" wraps to two lines, and it is now the pill selected every morning
+
+- **Lane: O** · **Added:** 2026-09-30 · Lane B, seen while rendering `LB-191`. **Filed low on
+  purpose: it blocks nothing and is cosmetic.** It is `O` rather than a build lane because it is a
+  **looks judgement**, which CLAUDE.md puts with the owner even though the phone is where he will
+  see it — not a measurement, so not `DV`.
+- **What was seen.** Rendered at **384 px dark, portrait**, in the Playwright harness (not on the
+  S25): the three pills are `flex-1`, so *Better* and *Worse* sit on one line while *About the same*
+  wraps to two and sets the row's height. It has looked like this since `TN-58`; what changed is
+  that `LB-191` made it the **pre-selected** pill, so the taller, filled one is now the visual
+  anchor of the sheet every morning rather than an occasional selection.
+- **The question is whether it bothers him at all**, and there is no engineering answer to it. If it
+  does, the cheapest fix is shorter copy (*"Same"*), and **the copy for this control is his**.
+  Equalising the height instead (a fixed `min-h` on the row) keeps the full wording and costs a
+  little vertical space on a sheet that already scrolls.
+- **⚠ It no longer has a change to ride along with.** This said a label fix would ride `OR-206`;
+  `OR-206` **shipped on 2026-09-30** (the prompt is now *"Compared to normal"*) and deliberately did
+  not touch the three option labels, which he never asked to change. So this one arrives on its own
+  if he wants it, and the render above is on the CURRENT prompt.
+- **Do not build either without him.** A pill that reads fine to me is exactly the judgement this
+  lane is told not to make on his daily screens.
 
 ### [nutrition] LA-119 — a mixed-unit supplement day renders as "no amount", which reads as "no number was logged"
 

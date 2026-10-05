@@ -12,7 +12,7 @@
  */
 import { afterAll, expect } from 'vitest'
 import { ensureServerOuraConstants } from '@/lib/oura-models/constants-inject'
-import { installSourceWriteGuard } from './vitest.source-write-guard'
+import { installSourceWriteGuard } from './scripts/vitest-source-write-guard'
 
 ensureServerOuraConstants()
 

@@ -82,6 +82,33 @@ describe('RV-208 ⑤ — one brand form', () => {
     }
   })
 
+  it('⛔ and the e2e specs that drive a FoodRow do not assert the retired joined name', () => {
+    /**
+     * This is the case that was missing, and its absence cost four PRs.
+     *
+     * RV-208 ⑤ moved the brand off the name line, and **two e2e specs went on asserting
+     * `<brand> — <name>` as one accessible name** — `food-row-shared.spec.ts` and
+     * `single-foods-database-search.spec.ts`. Nothing caught it: `pnpm test` is vitest only, the
+     * source guards above scan `components/`, and **E2E is advisory here**, so three red shards
+     * blocked no merge. They were red from v1.486.4 to v1.486.9.
+     *
+     * Scoped to these two files with the reason stated, rather than dressed up as a general rule:
+     * one legitimate em dash in an accessible name exists in the suite
+     * (`plan-meal-log-decline.spec.ts`'s *"Didn't eat this — undo"*), so a blanket ban would be
+     * noise. What generalises is the habit, not this assertion: **when you change a rendered
+     * string, grep `e2e/` for it.**
+     */
+    for (const f of ['e2e/food-row-shared.spec.ts', 'e2e/single-foods-database-search.spec.ts']) {
+      const src = stripComments(readFileSync(path.join(ROOT, f), 'utf8'))
+      expect(src, `${f} joins the brand and the name into one accessible name again`)
+        .not.toMatch(/getByRole\([^)]*name:[^)]*—/)
+      // And it asserts the two halves separately, so a row that DROPPED the brand cannot pass a
+      // name-only check — which is what `ingredient-search.tsx` was doing before RV-208 ⑤.
+      expect(src, `${f} no longer checks the name line and the brand as two things`)
+        .toMatch(/span\.font-medium/)
+    }
+  })
+
   it('and the quick-edit header is deliberately NOT converted', () => {
     // It already leads with the name; the brand is its own grey line below, not a secondary string,
     // because this is a sheet header rather than a `FoodRow`. Converting it would mean inventing a

@@ -654,6 +654,8 @@ export async function savePlanMealAnswer(
 }
 
 export interface EstimateToStore {
+  /** The device's row id, so the server row and the device row are one row (BF-203a Task 8′). */
+  id?: string
   planMealId: string
   calories: number
   proteinG: number
@@ -680,6 +682,7 @@ export async function upsertEstimatedAnswers(
   if (estimates.length === 0) return 0
   const rows = await db.insert(s.planMealAnswers)
     .values(estimates.map(e => ({
+      ...(e.id ? { id: e.id } : {}),
       userId, planMealId: e.planMealId, logDate, answer: 'estimated',
       estCalories: e.calories, estProteinG: e.proteinG, estCarbsG: e.carbsG, estFatG: e.fatG,
       estBiasKcal: e.biasKcal, estBasis: basis,
@@ -690,6 +693,23 @@ export async function upsertEstimatedAnswers(
     })
     .returning({ id: s.planMealAnswers.id })
   return rows.length
+}
+
+/**
+ * BF-203a Task 8′. One estimate pushed by a device. The plan-meal id comes from a CLIENT here, so it
+ * gets the same two-level ownership join `savePlanMealAnswer` uses; null when the meal is not the
+ * caller's. An existing live answer, a decline above all, is left alone, which also makes a replayed
+ * mutation a no-op.
+ */
+export async function saveClientEstimate(
+  db: Db, userId: string, logDate: string, e: EstimateToStore,
+): Promise<{ stored: boolean } | null> {
+  const [meal] = await db.select({ variantId: s.mealPlanMeals.variantId })
+    .from(s.mealPlanMeals).where(eq(s.mealPlanMeals.id, e.planMealId)).limit(1)
+  if (!meal) return null
+  if (!(await ownedVariantPlanId(db, meal.variantId, userId))) return null
+  const n = await upsertEstimatedAnswers(db, userId, logDate, [e], 'planA')
+  return { stored: n > 0 }
 }
 
 /** Undo a decline. Soft, so the reversal reaches a device that has not synced. */

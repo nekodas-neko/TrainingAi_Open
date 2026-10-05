@@ -15,7 +15,7 @@ and the restore then made the file read as an unrelated edit.
   in a gitignored `__check_fixture__/` folder beside it. It compares three runs made WITH the copy, so
   the copy's own pre-existing findings cancel out. All 11 positive controls still fire, so every
   checker scans the copy.
-- **`vitest.source-write-guard.ts`**, installed from `vitest.setup.ts`, makes any test write, copy,
+- **`scripts/vitest-source-write-guard.ts`**, installed from `vitest.setup.ts`, makes any test write, copy,
   rename or delete under `app/`, `components/`, `lib/` or `packages/` throw, except inside
   `__check_fixture__/` or `node_modules`. It uses `syncBuiltinESMExports`, so named imports from
   `node:fs` are covered too. `lb194-source-write-guard.test.ts` pins it, and it fails with the guard

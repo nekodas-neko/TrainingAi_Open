@@ -100,6 +100,16 @@
   logged minutes. No sandbox row has that shape.
 - **Strike this row** when that is VERIFIED.
 
+### [readiness][platform] LB-190's local v46 (day_checkins.vs_normal + vs_question) is NOT device-verified
+
+- Ships with the web deploy, with no APK. On first open the S25 should migrate to **v46**. It adds
+  `day_checkins.vs_normal` and `vs_question`, and copies every stored comparative answer into them as
+  question 1.
+- **Owed (Lane DV):** after one app open, answer the morning check-in's comparison, save, and reopen the
+  sheet: the answer is still selected. A pull completes with no SQLite error naming `vs_normal` or
+  `vs_question`, and the server row carries `vs_question = 1`.
+- **Strike this row** when that is VERIFIED.
+
 ### [nutrition][platform] BF-203a's local v45 and plan-meal answer reads are NOT device-verified
 
 - Ships with the web deploy, with no APK. On first open the S25 should migrate to **v45**, which adds the six
@@ -108,6 +118,8 @@
 - **Owed (Lane DV):** after one app open, a pull completes with no SQLite error naming `est_`. If a meal
   plan is active, decline one planned meal, undo it and decline it again: the card shows it declined, and
   one live row exists in `plan_meal_answers` for that meal and day.
+- **Also owed since Task 8′ (1–2):** with an active plan, after a planned meal's time passes unlogged, one
+  `estimated` row appears for it, today only, and reaches the server once. Nothing displays it yet (LA-185).
 - **Strike this row** when that is VERIFIED.
 
 ### [cardio][platform] LB-179's local SQLite v44 (prescribed_runs.completed_as) is NOT device-verified
