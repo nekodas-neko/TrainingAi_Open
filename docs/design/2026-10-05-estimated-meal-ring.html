@@ -1,0 +1,236 @@
+<title>Estimated Meals on the Ring</title>
+<style>
+/* Layout: one column of decision sections; each holds side-by-side 384 px phone panes that scroll inside their own row. */
+:root{
+  color-scheme: dark;
+  --page-bg:#0c1110; --page-panel:#131a18; --page-line:#22302c;
+  --page-fg:#e8efec; --page-dim:#93a49e; --page-accent:#00e07a; --page-warn:#ff8f6b;
+  --background: oklch(0.145 0.020 149);
+  --card: oklch(0.185 0.028 149);
+  --muted: oklch(0.21 0.02 149);
+  --foreground: oklch(0.985 0 0);
+  --muted-foreground: oklch(0.75 0 0);
+  --border: oklch(1 0 0 / 9%);
+  --brand: oklch(0.723 0.219 149.579);
+  --protein:#22c55e; --carbs:#3b82f6; --fat:#f97316;
+  --est: oklch(0.80 0.03 149);
+  --font-page:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,monospace;
+  --font-app:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--page-bg);color:var(--page-fg);font-family:var(--font-page);line-height:1.55;padding-block:28px;padding-inline:16px}
+.wrap{max-width:1240px;margin:0 auto}
+h1{font-size:26px;line-height:1.2;margin:0 0 6px;font-weight:700;text-wrap:balance}
+.sub{color:var(--page-dim);margin:0 0 6px;max-width:66ch}
+.meta{font-family:var(--font-mono);font-size:11px;color:var(--page-dim);text-transform:uppercase;letter-spacing:.09em;margin:0 0 22px}
+section{border-top:1px solid var(--page-line);padding-block:24px 8px}
+h2{font-size:18px;margin:0 0 8px;font-weight:600;text-wrap:balance}
+.ask{margin:0 0 16px;max-width:66ch;color:var(--page-fg)}
+.pair{display:flex;gap:18px;overflow-x:auto;padding-bottom:12px}
+.pane{flex:0 0 auto;display:flex;flex-direction:column;gap:8px}
+.cap{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.chip{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:999px;font-weight:600}
+.chip.now{background:rgba(255,143,107,.14);color:var(--page-warn);border:1px solid rgba(255,143,107,.3)}
+.chip.rec{background:rgba(0,224,122,.13);color:var(--page-accent);border:1px solid rgba(0,224,122,.32)}
+.chip.alt{background:rgba(255,255,255,.07);color:var(--page-fg);border:1px solid var(--page-line)}
+.cap .w{font-family:var(--font-mono);font-size:10px;color:var(--page-dim)}
+.phone{width:384px;background:var(--background);border:1px solid var(--page-line);border-radius:22px;overflow:hidden;font-family:var(--font-app);color:var(--foreground);padding:14px 12px}
+.why{max-width:384px;font-size:13px;color:var(--page-dim);margin:0}
+.why b{color:var(--page-fg);font-weight:600}
+/* the app's energy card, copied from components/nutrition/energy-card.tsx */
+.card{border-radius:16px;border:1px solid var(--border);background:color-mix(in oklch,var(--muted) 60%,transparent);padding:14px}
+.row{display:flex;align-items:center;gap:16px}
+.donut{position:relative;width:104px;height:104px;flex:none}
+.donut svg{position:absolute;inset:0;transform:rotate(-90deg)}
+.center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.big{font-size:22px;font-weight:700;letter-spacing:-.01em;font-variant-numeric:tabular-nums;line-height:1}
+.of{font-size:9.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-foreground)}
+.nums{flex:1;min-width:0;display:flex;flex-direction:column;gap:10px}
+.left{display:flex;align-items:baseline;gap:6px}
+.left .n{font-size:18px;font-weight:700;font-variant-numeric:tabular-nums}
+.left .u{font-size:11.5px;color:var(--muted-foreground)}
+.left .sp{flex:1}
+.left .earned{font-size:11px;color:var(--muted-foreground);font-variant-numeric:tabular-nums}
+.macros{display:flex;gap:4px}
+.mc{flex:1;display:flex;flex-direction:column;align-items:center;gap:1px}
+.mc .p{font-size:11.5px;font-weight:600;font-variant-numeric:tabular-nums}
+.mc .g{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.mc .g small{font-size:10.5px;font-weight:400;color:var(--muted-foreground)}
+.mc .l{font-size:10.5px;color:var(--muted-foreground)}
+.estline{margin-top:10px;border-top:1px solid color-mix(in oklch,var(--border) 50%,transparent);padding-top:10px;display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted-foreground)}
+.estline .sw{width:16px;height:8px;border-radius:2px;background:repeating-linear-gradient(45deg,var(--est) 0 2px,transparent 2px 4px);opacity:.85;flex:none}
+.estline .t{flex:1;min-width:0}
+.estline .btn{font-weight:600;color:var(--foreground);font-size:11.5px;padding:6px 10px;border-radius:999px;background:oklch(1 0 0 / 7%)}
+.note{margin-top:10px;border-top:1px solid color-mix(in oklch,var(--border) 50%,transparent);padding-top:10px;font-size:11.5px;color:var(--muted-foreground);display:flex;flex-direction:column;gap:8px}
+.note .acts{display:flex;gap:6px}
+.note .btn{font-weight:600;color:var(--foreground);font-size:11.5px;padding:6px 12px;border-radius:999px;background:oklch(1 0 0 / 7%)}
+.diary{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+.meal{display:flex;justify-content:space-between;font-size:12.5px;padding:8px 10px;border-radius:12px;background:var(--card);border:1px solid var(--border)}
+.meal.planned{border-style:dashed;color:var(--muted-foreground)}
+.meal span:last-child{font-variant-numeric:tabular-nums}
+.verdict{margin-top:6px;padding:14px 16px;background:var(--page-panel);border:1px solid var(--page-line);border-left:3px solid var(--page-accent);border-radius:0 8px 8px 0;max-width:72ch}
+.verdict p{margin:0}
+.verdict p+p{margin-top:8px}
+@media (prefers-reduced-motion:no-preference){.phone{transition:border-color .2s}.phone:hover{border-color:var(--page-dim)}}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <pattern id="stripes" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="2" height="4" fill="oklch(0.80 0.03 149)"></rect>
+    </pattern>
+  </defs>
+</svg>
+
+<div class="wrap">
+  <h1>A meal the app assumed you ate</h1>
+  <p class="sub">When a planned meal's time passes with nothing logged and nothing skipped, the app will count the plan's calories as an <b>estimate</b>, never as a food log. The calorie ring then has to show that part of "eaten" is assumed. Pick how.</p>
+  <p class="meta">Issue #2072 · drawn at 384 px, dark · 2026-10-05</p>
+
+  <section>
+    <h2>The day in every pane</h2>
+    <p class="ask">Budget <b>1,618 kcal</b>. Logged so far: breakfast 520 and a snack 300, so <b>820 eaten</b>. Lunch was planned for 1 pm at <b>480 kcal</b>; it is now 3:30 pm and nothing has been logged or skipped.</p>
+    <div class="pair">
+
+      <div class="pane">
+        <div class="cap"><span class="chip now">Today</span><span class="w">no estimates</span></div>
+        <div class="phone">
+          <div class="card">
+            <div class="row">
+              <div class="donut">
+                <svg viewBox="0 0 104 104" width="104" height="104">
+                  <circle cx="52" cy="52" r="41" fill="none" stroke="oklch(0.75 0 0 / 0.3)" stroke-width="10"></circle>
+                  <circle cx="52" cy="52" r="41" fill="none" stroke="#22c55e" stroke-width="10" stroke-dasharray="37.9 257.6" stroke-dashoffset="0"></circle>
+                  <circle cx="52" cy="52" r="41" fill="none" stroke="#3b82f6" stroke-width="10" stroke-dasharray="50.9 257.6" stroke-dashoffset="-37.9"></circle>
+                  <circle cx="52" cy="52" r="41" fill="none" stroke="#f97316" stroke-width="10" stroke-dasharray="41.8 257.6" stroke-dashoffset="-88.8"></circle>
+                </svg>
+                <div class="center"><span class="big">820</span><span class="of">of 1,618</span></div>
+              </div>
+              <div class="nums">
+                <div class="left"><span class="n">798</span><span class="u">kcal left</span><span class="sp"></span><span class="earned">+120 earned</span></div>
+                <div class="macros">
+                  <div class="mc"><span class="p" style="color:#22c55e">29%</span><span class="g">60<small>/150</small><small> g</small></span><span class="l">Protein</span></div>
+                  <div class="mc"><span class="p" style="color:#3b82f6">39%</span><span class="g">80<small>/180</small><small> g</small></span><span class="l">Carbs</span></div>
+                  <div class="mc"><span class="p" style="color:#f97316">32%</span><span class="g">30<small>/55</small><small> g</small></span><span class="l">Fat</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="diary">
+            <div class="meal"><span>Breakfast</span><span>520 kcal</span></div>
+            <div class="meal planned"><span>Lunch · planned, not logged</span><span>480 kcal</span></div>
+            <div class="meal"><span>Snack</span><span>300 kcal</span></div>
+          </div>
+        </div>
+        <p class="why"><b>The problem.</b> "798 left" over-promises: you probably did eat lunch. This is what the estimate exists to fix.</p>
+      </div>
+
+      <div class="pane">
+        <div class="cap"><span class="chip rec">Recommended</span><span class="w">striped extension</span></div>
+        <div class="phone">
+          <div class="card">
+            <div class="row">
+              <div class="donut">
+                <svg viewBox="0 0 104 104" width="104" height="104">
+                  <circle cx="52" cy="52" r="41" fill="none" stroke="oklch(0.75 0 0 / 0.3)" stroke-width="10"></circle>
+                  <circle cx="52" cy="52" r="41" fill="none" stroke="#22c55e" stroke-width="10" stroke-dasharray="37.9 257.6" stroke-dashoffset="0"></circle>
+                  <circle cx="52" cy="52" r="41" fill="none" stroke="#3b82f6" stroke-width="10" stroke-dasharray="50.9 257.6" stroke-dashoffset="-37.9"></circle>
+                  <circle cx="52" cy="52" r="41" fill="none" stroke="#f97316" stroke-width="10" stroke-dasharray="41.8 257.6" stroke-dashoffset="-88.8"></circle>
+                  <circle cx="52" cy="52" r="41" fill="none" stroke="url(#stripes)" stroke-width="10" stroke-dasharray="76.4 257.6" stroke-dashoffset="-130.6" opacity="0.85"></circle>
+                </svg>
+                <div class="center"><span class="big">1,300</span><span class="of">of 1,618</span></div>
+              </div>
+              <div class="nums">
+                <div class="left"><span class="n">318</span><span class="u">kcal left</span><span class="sp"></span><span class="earned">+120 earned</span></div>
+                <div class="macros">
+                  <div class="mc"><span class="p" style="color:#22c55e">29%</span><span class="g">60<small>/150</small><small> g</small></span><span class="l">Protein</span></div>
+                  <div class="mc"><span class="p" style="color:#3b82f6">39%</span><span class="g">80<small>/180</small><small> g</small></span><span class="l">Carbs</span></div>
+                  <div class="mc"><span class="p" style="color:#f97316">32%</span><span class="g">30<small>/55</small><small> g</small></span><span class="l">Fat</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="estline"><span class="sw"></span><span class="t">incl. 480 estimated · lunch</span><span class="btn">Confirm</span></div>
+          </div>
+          <div class="diary">
+            <div class="meal"><span>Breakfast</span><span>520 kcal</span></div>
+            <div class="meal planned"><span>Lunch · estimated</span><span>480 kcal</span></div>
+            <div class="meal"><span>Snack</span><span>300 kcal</span></div>
+          </div>
+        </div>
+        <p class="why"><b>Why.</b> "Left" is honest, the assumed part is visible at a glance, and tapping <b>Confirm</b> opens the confirm-or-skip sheet. Macros stay on what you actually logged: the plan's macros are a guess.</p>
+      </div>
+
+      <div class="pane">
+        <div class="cap"><span class="chip alt">Alternative</span><span class="w">a note, ring unchanged</span></div>
+        <div class="phone">
+          <div class="card">
+            <div class="row">
+              <div class="donut">
+                <svg viewBox="0 0 104 104" width="104" height="104">
+                  <circle cx="52" cy="52" r="41" fill="none" stroke="oklch(0.75 0 0 / 0.3)" stroke-width="10"></circle>
+                  <circle cx="52" cy="52" r="41" fill="none" stroke="#22c55e" stroke-width="10" stroke-dasharray="37.9 257.6" stroke-dashoffset="0"></circle>
+                  <circle cx="52" cy="52" r="41" fill="none" stroke="#3b82f6" stroke-width="10" stroke-dasharray="50.9 257.6" stroke-dashoffset="-37.9"></circle>
+                  <circle cx="52" cy="52" r="41" fill="none" stroke="#f97316" stroke-width="10" stroke-dasharray="41.8 257.6" stroke-dashoffset="-88.8"></circle>
+                </svg>
+                <div class="center"><span class="big">820</span><span class="of">of 1,618</span></div>
+              </div>
+              <div class="nums">
+                <div class="left"><span class="n">798</span><span class="u">kcal left</span><span class="sp"></span><span class="earned">+120 earned</span></div>
+                <div class="macros">
+                  <div class="mc"><span class="p" style="color:#22c55e">29%</span><span class="g">60<small>/150</small><small> g</small></span><span class="l">Protein</span></div>
+                  <div class="mc"><span class="p" style="color:#3b82f6">39%</span><span class="g">80<small>/180</small><small> g</small></span><span class="l">Carbs</span></div>
+                  <div class="mc"><span class="p" style="color:#f97316">32%</span><span class="g">30<small>/55</small><small> g</small></span><span class="l">Fat</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="note"><span>Lunch was planned for 1 pm (480 kcal) and isn't logged. Did you eat it?</span><span class="acts"><span class="btn">Yes, count it</span><span class="btn">Skipped</span></span></div>
+          </div>
+        </div>
+        <p class="why"><b>Better at</b> never counting food you didn't eat. <b>Loses because</b> "798 left" still over-promises until you tap, which is the exact gap this feature closes.</p>
+      </div>
+
+      <div class="pane">
+        <div class="cap"><span class="chip alt">Alternative</span><span class="w">a second, inner ring</span></div>
+        <div class="phone">
+          <div class="card">
+            <div class="row">
+              <div class="donut">
+                <svg viewBox="0 0 104 104" width="104" height="104">
+                  <circle cx="52" cy="52" r="41" fill="none" stroke="oklch(0.75 0 0 / 0.3)" stroke-width="10"></circle>
+                  <circle cx="52" cy="52" r="41" fill="none" stroke="#22c55e" stroke-width="10" stroke-dasharray="37.9 257.6" stroke-dashoffset="0"></circle>
+                  <circle cx="52" cy="52" r="41" fill="none" stroke="#3b82f6" stroke-width="10" stroke-dasharray="50.9 257.6" stroke-dashoffset="-37.9"></circle>
+                  <circle cx="52" cy="52" r="41" fill="none" stroke="#f97316" stroke-width="10" stroke-dasharray="41.8 257.6" stroke-dashoffset="-88.8"></circle>
+                  <circle cx="52" cy="52" r="31" fill="none" stroke="oklch(0.75 0 0 / 0.18)" stroke-width="4"></circle>
+                  <circle cx="52" cy="52" r="31" fill="none" stroke="oklch(0.80 0.03 149)" stroke-width="4" stroke-dasharray="57.8 194.8" stroke-dashoffset="-98.7"></circle>
+                </svg>
+                <div class="center"><span class="big">1,300</span><span class="of">of 1,618</span></div>
+              </div>
+              <div class="nums">
+                <div class="left"><span class="n">318</span><span class="u">kcal left</span><span class="sp"></span><span class="earned">+120 earned</span></div>
+                <div class="macros">
+                  <div class="mc"><span class="p" style="color:#22c55e">29%</span><span class="g">60<small>/150</small><small> g</small></span><span class="l">Protein</span></div>
+                  <div class="mc"><span class="p" style="color:#3b82f6">39%</span><span class="g">80<small>/180</small><small> g</small></span><span class="l">Carbs</span></div>
+                  <div class="mc"><span class="p" style="color:#f97316">32%</span><span class="g">30<small>/55</small><small> g</small></span><span class="l">Fat</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <p class="why"><b>Better at</b> keeping the two numbers apart. <b>Loses because</b> it adds a second gauge to read for a number that is usually zero, and the inner ring has no room for a label.</p>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>What to answer</h2>
+    <div class="verdict">
+      <p><b>Recommendation: the striped extension.</b> One ring, total kept honest, the assumed part visible, one tap to confirm. Reply "striped", "note" or "inner ring".</p>
+      <p>Reversal cost is low: it is display only. The stored estimate and the totals are the same whichever you pick.</p>
+    </div>
+  </section>
+</div>
