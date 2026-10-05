@@ -543,7 +543,8 @@ agent ends up following half the old rules and half the new.
 | 6 | Backlog migration | **Triage first, migrate live work only** | §4.3 |
 | 7 | Release approval | **The owner, through the Orchestrator**: a concise summary, then "approve" in its chat | §3.3 steps 4–5. Enforced by instruction; GitHub's required-reviewer tap is an optional hard lock (§7) |
 | 8 | Bundled shell (v2) | **Later**, as its own milestone after 2–3 clean releases | §10 |
-| 9 | #1849 and #1499 | ⚠ **#1849 ALREADY MERGED — corrected 2026-10-05.** #1499 still held | #1849 landed as `7574d06e75`, four commits after the PR that recorded it as held, and **merges still deploy until Phase 2, so it went to production**. Its guard meant it could not drop a value, so no harm — but the hold did not hold. #1499 (auth) is the only one genuinely waiting |
+| 9 | #1849 and #1499 | ⚠ **#1849 ALREADY MERGED.** #1499 still held | **#1849 merged at 08:04Z, three minutes BEFORE the hold answer arrived** — so it was a race, not a hold that was ignored; an earlier note here saying "the hold did not hold" was unfair and is corrected. Merges still deploy until Phase 2, so it did reach production; its migration is guarded (a column drops only if no row in **any** account holds a value) and the deploy check passed, so nothing was lost. #1499 (auth) is the only one genuinely waiting |
+| 10 | Start Phase 0 | **Yes**, started 2026-10-05 | §8 Phase 0 progress |
 | 11 | Permanent agents vs disposable sessions | **Permanent roles, bounded context** | Reverses the earlier "one task, one session". §5 has the rule and the one thing still to measure |
 | 12 | Where the ingest architecture (`OR-213`/`214`/`215`) sits | **After the workflow lands, as the first epic — except its Phase 0** | Delegated to the Orchestrator. Reasoning below |
 | 13 | Backlog triage: before or after the architecture spec | ~~After~~ → **ALREADY DONE, and correctly** | The Orchestrator advised waiting and was **wrong**; the triage had already landed and its structure defuses the objection. What is owed is a re-check, not a re-triage. §9.1 |
@@ -596,7 +597,6 @@ with a known question, not 524 rows from scratch.
 rework it is avoiding *and check that the rework is real*. Here it was not, because the design
 already collapsed the expensive buckets.
 
-| 10 | Start Phase 0 | **Yes**, started 2026-10-05 | §8 Phase 0 progress |
 
 ---
 
