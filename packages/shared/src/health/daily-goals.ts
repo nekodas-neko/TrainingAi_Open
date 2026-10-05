@@ -66,6 +66,10 @@ export interface GoalProfile {
   ageYears?: number | null
   sex?: string | null
   activityLevel?: ActivityLevel | null
+  /** The user's own step goal (`users.steps_goal`). Q-524: when set it IS the goal, everywhere —
+   *  the owner decided one number, and that a goal he set (or accepted) wins over the derived one.
+   *  Null means "not chosen", and the derived value below applies. Clearing it is the way back. */
+  stepsGoal?: number | null
 }
 
 export interface DailyGoals {
@@ -79,9 +83,11 @@ export interface DailyGoals {
 /** Derive the user's daily activity goals from their profile, with evidence-based fallbacks for any
  *  missing field. Pure — no defaults leak in from elsewhere, so every reader gets the same targets. */
 export function getDailyGoals(profile: GoalProfile): DailyGoals {
-  const { weightKg, heightCm, ageYears, sex, activityLevel } = profile
+  const { weightKg, heightCm, ageYears, sex, activityLevel, stepsGoal } = profile
 
-  const stepGoal = activityLevel ? STEP_GOAL_BY_ACTIVITY[activityLevel] : DEFAULT_STEP_GOAL
+  const stepGoal = stepsGoal != null && stepsGoal > 0
+    ? stepsGoal
+    : activityLevel ? STEP_GOAL_BY_ACTIVITY[activityLevel] : DEFAULT_STEP_GOAL
 
   const activeEnergyGoal =
     weightKg != null && weightKg > 0 && heightCm != null && ageYears != null && sex != null

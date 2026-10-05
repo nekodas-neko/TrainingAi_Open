@@ -58,12 +58,28 @@ export function useWeightTrend(metaRecent: BodyMetaRow[]) {
  * `useCachedValue` is that missing half. Do not replace it with a hand-rolled effect here, and do
  * not reach for a shorter `ENERGY_BALANCE_TTL` — an effect that never runs never consults a TTL.
  */
-export function useEnergyBalanceToday(): EnergyBalanceResponse | null {
+/**
+ * `opts` is optional so the existing callers keep working unchanged.
+ *
+ * **LB-176 — why a caller needs `onError` here.** `useCachedValue` swallows `!res.ok`, so a failed
+ * read returns `null`, which is the same thing this hook returns while loading and for an account
+ * with nothing stored. On the Health screen those three cases rendered identically, and the fallback
+ * for the null case was a card telling the owner to add profile details he set months ago. A caller
+ * that draws anything other than a skeleton for `null` has to be able to tell them apart.
+ *
+ * There is no `onLoaded` counterpart because `useCachedValue` has none, and it is not needed: a
+ * caller clears its flag by ANDing it with `value == null`, so a retry that lands removes the failure
+ * line by itself. `() => void` is assignable where the hook expects an info argument.
+ */
+export function useEnergyBalanceToday(
+  opts?: { onError?: () => void },
+): EnergyBalanceResponse | null {
   const tz = useUserTimezone();
   const today = todayInTz(tz);
   return useCachedValue<EnergyBalanceResponse>(
     `energy-balance:${today}`,
     `/api/nutrition/energy-balance?date=${today}`,
     ENERGY_BALANCE_TTL,
+    opts,
   );
 }

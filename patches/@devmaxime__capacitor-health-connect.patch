@@ -1,17 +1,20 @@
 diff --git a/android/src/main/java/com/devmaxime/capacitor/health/connect/RecordConverter.kt b/android/src/main/java/com/devmaxime/capacitor/health/connect/RecordConverter.kt
-index 2953566eabb2d3ec1dddfbbffa2d8a3954b4b4b5..5a653ed62912fb7e58b08b5f98b4dfea0e367337 100644
+index 2953566eabb2d3ec1dddfbbffa2d8a3954b4b4b5..a64920491e36d81082c088b9f379b18e2140bb84 100644
 --- a/android/src/main/java/com/devmaxime/capacitor/health/connect/RecordConverter.kt
 +++ b/android/src/main/java/com/devmaxime/capacitor/health/connect/RecordConverter.kt
-@@ -8,6 +8,8 @@ import androidx.health.connect.client.records.ExerciseSessionRecord
+@@ -8,6 +8,11 @@ import androidx.health.connect.client.records.ExerciseSessionRecord
  import androidx.health.connect.client.records.StepsRecord
  import androidx.health.connect.client.records.SleepSessionRecord
  import androidx.health.connect.client.records.RestingHeartRateRecord
 +import androidx.health.connect.client.records.BodyFatRecord
 +import androidx.health.connect.client.records.NutritionRecord
++import androidx.health.connect.client.records.HeartRateRecord
++import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
++import androidx.health.connect.client.records.OxygenSaturationRecord
  import androidx.health.connect.client.records.ExerciseSegment
  import androidx.health.connect.client.records.ExerciseLap
  import androidx.health.connect.client.records.ExerciseRoute
-@@ -96,7 +98,28 @@ fun convertRecordToJson(record: Record): Any {
+@@ -96,7 +101,63 @@ fun convertRecordToJson(record: Record): Any {
              obj.put("metadata", convertMetadataToJson(record.metadata))
              obj
          }
@@ -38,11 +41,46 @@ index 2953566eabb2d3ec1dddfbbffa2d8a3954b4b4b5..5a653ed62912fb7e58b08b5f98b4dfea
 +            obj.put("metadata", convertMetadataToJson(record.metadata))
 +            obj
 +        }
++        // LA-115. Field names from connect-client 1.1.0-alpha11's own sources, not memory: the
++        // three record types TrainingAI reads that used to fall to `record.toString()`.
++        is HeartRateVariabilityRmssdRecord -> {
++            val obj = JSObject()
++            obj.put("time", record.time.toString())
++            obj.put("zoneOffset", record.zoneOffset?.toString() ?: "")
++            obj.put("heartRateVariabilityMillis", record.heartRateVariabilityMillis)
++            obj.put("metadata", convertMetadataToJson(record.metadata))
++            obj
++        }
++        is OxygenSaturationRecord -> {
++            val obj = JSObject()
++            obj.put("time", record.time.toString())
++            obj.put("zoneOffset", record.zoneOffset?.toString() ?: "")
++            obj.put("percentage", record.percentage.value)
++            obj.put("metadata", convertMetadataToJson(record.metadata))
++            obj
++        }
++        is HeartRateRecord -> {
++            val obj = JSObject()
++            obj.put("startTime", record.startTime.toString())
++            obj.put("startZoneOffset", record.startZoneOffset?.toString() ?: "")
++            obj.put("endTime", record.endTime.toString())
++            obj.put("endZoneOffset", record.endZoneOffset?.toString() ?: "")
++            val samplesArray = JSArray()
++            for (sample in record.samples) {
++                val sampleObj = JSObject()
++                sampleObj.put("time", sample.time.toString())
++                sampleObj.put("beatsPerMinute", sample.beatsPerMinute)
++                samplesArray.put(sampleObj)
++            }
++            obj.put("samples", samplesArray)
++            obj.put("metadata", convertMetadataToJson(record.metadata))
++            obj
++        }
          else -> record.toString()
      }
  }
 diff --git a/dist/esm/definitions.d.ts b/dist/esm/definitions.d.ts
-index d0960a9ddc422de7191092996aadd41e5caed96f..7b2e02c24e076db5a102ace5dee517b104a0a068 100644
+index d0960a9ddc422de7191092996aadd41e5caed96f..c778737cfde49b0b31c02b7186aa6cb0bb94628a 100644
 --- a/dist/esm/definitions.d.ts
 +++ b/dist/esm/definitions.d.ts
 @@ -37,7 +37,7 @@ export interface HealthConnectPlugin {
@@ -50,7 +88,7 @@ index d0960a9ddc422de7191092996aadd41e5caed96f..7b2e02c24e076db5a102ace5dee517b1
  }
  export declare type HealthConnectAvailability = 'Available' | 'NotSupported' | 'NotInstalled';
 -export declare type RecordType = 'Steps' | 'Weight' | 'ActivitySession' | 'SleepSession' | 'RestingHeartRate';
-+export declare type RecordType = 'Steps' | 'Weight' | 'ActivitySession' | 'SleepSession' | 'RestingHeartRate' | 'BodyFat' | 'Nutrition' | 'HeartRateVariabilitySdnn' | 'OxygenSaturation';
++export declare type RecordType = 'Steps' | 'Weight' | 'ActivitySession' | 'SleepSession' | 'RestingHeartRate' | 'BodyFat' | 'Nutrition' | 'HeartRateVariabilityRmssd' | 'OxygenSaturation' | 'HeartRateSeries';
  export declare type AggregateRecordType = 'Steps' | 'Distance' | 'TotalCaloriesBurned' | 'ActiveCaloriesBurned' | 'HeartRate';
  export declare type AggregateGroupBy = 'day' | 'hour' | 'week' | 'month';
  /**

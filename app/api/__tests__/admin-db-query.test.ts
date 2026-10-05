@@ -10,14 +10,26 @@ const getUserById = vi.fn(async () => ({ id: 'admin-1', isAdmin: true }))
 vi.mock('@/lib/data', () => ({ getRepository: vi.fn(async () => ({ getUserById })) }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: vi.fn(() => true) }))
 
-const auditInsert = vi.fn(async () => ({ rows: [] }))
+// Same reason as `roQuery` below: the cases read `calls[0][1]` (the bind parameters), which is a
+// type error while the mock declares no arguments.
+const auditInsert = vi.fn(async (_sql?: string, _params?: unknown[]) => ({ rows: [] }))
 vi.mock('@/lib/data/postgres/client', () => ({ getPool: () => ({ query: auditInsert }) }))
 
-const roQuery = vi.fn(async () => ({ rows: [{ n: 1 }], fields: [{ name: 'n' }] }) as { rows: unknown[]; fields: { name: string }[] })
+// Typed with the sql it receives (RV-190). It was declared taking no arguments, so every
+// `roQuery.mock.calls[0][0]` below was a type error against an empty tuple — three of them, carried
+// in the test-typecheck baseline. Naming the parameter fixes those as well as the call through
+// `runScoped`.
+const roQuery = vi.fn(async (_sql?: string) => ({ rows: [{ n: 1 }], fields: [{ name: 'n' }] }) as { rows: unknown[]; fields: { name: string }[] })
 let configured = true
 vi.mock('@/lib/data/postgres/readonly-client', () => ({
   isReadonlyDbConfigured: () => configured,
-  getReadonlyPool: () => ({ query: roQuery }),
+  // RV-190: the pool deliberately has NO `query`. Every read on it goes through `runScoped`, which
+  // reasserts the role's protections per query — and a route that went back to `pool.query` would
+  // fail here with "query is not a function" rather than passing quietly. The wrapper's own
+  // behaviour is exercised against a real database in `claude-ro-readonly-role.test.ts`; these
+  // cases are about the route's logic, so it is a spy.
+  getReadonlyPool: () => ({}),
+  runScoped: (_pool: unknown, sql: string) => roQuery(sql),
   describeReadonlyConnection: () => ({ configured, user: 'claude_readonly', host: 'db', port: '5432', database: 'railway' }),
 }))
 

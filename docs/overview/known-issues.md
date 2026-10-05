@@ -6,7 +6,301 @@
 > Nothing here was rewritten, reordered or archived: the section moved whole.
 >
 > **The domain-tag grep is unchanged and is why this is ONE file rather than one per pillar.**
-> `grep -n '^### [devices] ⚠️ The strap pairing screen's battery read changed shape and no phone has run it (BF-216, 2026-09-28)
+> `grep -n '^### .*\[sleep\]' docs/overview/known-issues.md` works exactly as it did against
+> `projectOverview.md`, and the standing rule depends on it. Per-pillar files would have forced an
+> issue tagged `[sleep][platform]` to live in one and go missing from the other.
+>
+> **Resolved issues are NOT here** — they live in
+> [`known-issues-resolved.md`](known-issues-resolved.md). **Grep the archive before concluding
+> something has never been looked at.** An entry moves there only when nothing is still owed: no
+> open work, no pending owner or device check, no un-run follow-up. A fix that shipped but is not
+> device-verified stays in this file, because that check is the outstanding thing.
+>
+> **Adding one:** a new heading carries its `[domain]` tag(s), primary first.
+
+> **This section is the OPEN issues. Resolved ones live in
+> [`docs/overview/known-issues-resolved.md`](../overview/known-issues-resolved.md)** — 53 entries,
+> 1,092 lines, moved out 2026-08-13. **Grep the archive before concluding something has never been
+> looked at**; "we already fixed that, and here is what it turned out to be" is why they are kept.
+>
+> **Striking an issue means MOVING it there, not marking it ✅ in place** (`CLAUDE.md`, Session
+> Wrap-Up step 2). Without that rule this regrows — 72 ✅ entries had accumulated before the first
+> sweep, and 53 of them had nothing outstanding at all.
+>
+> An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
+> check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
+> below.
+
+### [readiness] TN-45's `watch` line has never been seen on a REAL firing, because none has happened since
+
+- v1.486.8 puts a quiet line under Home's score chips when the illness radar reads `watch` — the
+  only band that has ever fired, and the one that carried no UI at all. Both halves of the entry's
+  pass test are asserted in a browser (`e2e/tn45-watch-band-on-home.spec.ts`): a `watch` day shows
+  the line under the chips, a normal day shows nothing, and an `elevated` day still gets the bordered
+  advisory with its label and penalty.
+- **What is NOT verified, and it is not a device gate:** every render came from an **overlaid**
+  payload. There have been exactly **two** `watch` days ever — 2026-08-27 and 2026-09-16 — and none
+  since, so no real firing has reached the screen. This is an event to observe, not a task: it is
+  here rather than in the backlog because a queue entry waiting on the weather blocks instead of
+  waiting (`LB-166`'s lesson).
+- **⚠ And one of those two firings was not real.** 2026-08-27's contributors are `hrvBalance z −4.26`
+  and `restingHeartRate z +2.84` — exactly the two fields `PS-17`'s phantom afternoon "sleep"
+  corrupts (`4.75 h / HRV 26.5 / RHR 73.7` still on disk), in the directions it predicts. So the
+  usable history for this band is **one** day, not two, until PS-17's corrective recompute runs.
+- **Strike this row** when a real `watch` day has been seen on the S25 with the line on it — or when
+  the band's calibration is revisited and this surface changes with it.
+
+### [app-shell][nutrition] RV-208 ④⑤ are NOT device-verified: a wider header and a brand moved onto a truncating line
+
+- v1.486.4 settles two display forms that had three and six variants. Both changes were **rendered
+  and measured at 384 px** (`e2e/rv208-date-and-brand-forms.spec.ts`, control-run against the old
+  forms), and both remaining risks are ones Chromium cannot answer.
+- **Owed (Lane DV), ④ — the Nutrition header.** This replaced the narrowest of three day-header
+  forms with the widest, on the one surface whose header shares its row: the date sits beside two
+  44 px chevrons inside the single band `BF-24` deliberately collapsed it to. Chromium measured
+  **148.0 × 19.5 px in a 300 px row** — one line, 52 px of slack — but **Samsung WebView's font
+  metrics are not Chromium's**, and the failure mode is a wrap that puts the header back to two
+  bands. Pass/fail: on the S25, open Nutrition and tap `Previous day` twice; the date reads
+  `<Weekday> <D> <Month>` **on one line**, with both chevrons beside it and the gear still on the
+  first band.
+- **Owed (Lane DV), ⑤ — a branded food in the library.** The brand moved from the name line onto
+  `FoodRow`'s secondary, which `truncate`s. The render proves the stubbed row fits
+  (`scrollWidth <= clientWidth`), but `food_items` is **empty in the local seed** and both search
+  lists are network-driven, so no real branded food has ever been drawn. Pass/fail: open
+  `Log Food` → `Recent` with a real logged branded food; the row reads the **food's own name**
+  first, and the brand under it is legible rather than ellipsised into the macros.
+- **Strike this row** when both are VERIFIED.
+
+### [workouts][app-shell] BF-220's in-session load suggestion is NOT device-verified, and it lands on the screen he reads mid-set
+
+- v1.486.0 offers a lighter next set after one logged at high RPE that fell short of its reps. The
+  decision is unit-tested to the number (13.75 → **12.5 kg**, the figure the entry predicted from the
+  same function) and the pill's appearance, acceptance and dismissal are covered in the browser
+  (`e2e/bf220-rpe-load-suggestion.spec.ts`). **What no sandbox can answer is whether it belongs
+  there.**
+- **Owed (Lane DV):** on the S25 at 412 dp, log a set at RPE 10 two reps short and look at the next
+  set card. Pass/fail is the entry's own: **the suggestion must not shift the layout or compete with
+  `Start Set 2`**, which is the control he is reaching for with a rest timer running. Check also that
+  the row does not push `Start Set 2` under the gesture bar.
+- **A second reading is owed at the same time:** the pill sits above the card, so on a short viewport
+  it may arrive off-screen and be missed entirely — the opposite failure from crowding, and equally
+  invisible from here.
+- **Strike this row** when both are VERIFIED.
+
+### [cardio][activity] RV-166's walk completion is NOT device-verified, and the local store is the whole path
+
+- v1.482.0 lets a walk finish the day's prescribed run from the new *Today's cardio* card. The link
+  writes through `store.upsertPrescribedRun` + the outbox, and **`getLocalStore` returns null in the
+  browser** — so the write, the `completedAs: 'walk'` payload and the pull-back have never run
+  anywhere but a unit test. The card's rendering IS covered (`e2e/rv166-todays-cardio-card.spec.ts`).
+- **Owed (Lane DV):** from the Cardio Hub, `Walk it` → a duration chip → Save. The card must then
+  read **Done · Completed as a walk**, `prescribed_runs.completed_as` must be `'walk'`, and the next
+  prescription must be unaffected by it (a walk must not satisfy the planner as a run, LB-179).
+- Also unexercised: the **estimated** path — a treadmill walk with no heart rate counting from its
+  logged minutes. No sandbox row has that shape.
+- **Strike this row** when that is VERIFIED.
+
+### [readiness][platform] LB-190's local v46 (day_checkins.vs_normal + vs_question) is NOT device-verified
+
+- Ships with the web deploy, with no APK. On first open the S25 should migrate to **v46**. It adds
+  `day_checkins.vs_normal` and `vs_question`, and copies every stored comparative answer into them as
+  question 1.
+- **Owed (Lane DV):** after one app open, answer the morning check-in's comparison, save, and reopen the
+  sheet: the answer is still selected. A pull completes with no SQLite error naming `vs_normal` or
+  `vs_question`, and the server row carries `vs_question = 1`.
+- **Strike this row** when that is VERIFIED.
+
+### [nutrition][platform] BF-203a's local v45 and plan-meal answer reads are NOT device-verified
+
+- Ships with the web deploy, with no APK. On first open the S25 should migrate to **v45**, which adds the six
+  `plan_meal_answers.est_*` columns (#2004). The Nutrition hook now reads only `'no'` answers as declines,
+  and a local decline replaces an existing live answer for the same meal and day (#2018).
+- **Owed (Lane DV):** after one app open, a pull completes with no SQLite error naming `est_`. If a meal
+  plan is active, decline one planned meal, undo it and decline it again: the card shows it declined, and
+  one live row exists in `plan_meal_answers` for that meal and day.
+- **Also owed since Task 8′ (1–2):** with an active plan, after a planned meal's time passes unlogged, one
+  `estimated` row appears for it, today only, and reaches the server once. Nothing displays it yet (LA-185).
+- **Strike this row** when that is VERIFIED.
+
+### [cardio][platform] LB-179's local SQLite v44 (prescribed_runs.completed_as) is NOT device-verified
+
+- Shipped with the web deploy, with no APK. On first open after deploy the S25 should migrate to **v44**,
+  adding the `prescribed_runs.completed_as` column.
+- **Owed (Lane DV):** after one app open, the running plan tab still shows today's prescription, and a
+  pull completes without error. Check the WebView console for a SQLite error naming `completed_as`.
+- **Strike this row** when that is VERIFIED.
+
+### [app-shell] Home's banner registry has no guard against an unstable `report`
+
+- **The crash it prevents shipped and was fixed the same day** (RV-119 in v1.481.0, fixed in
+  v1.481.2): `report` was rebuilt on every presence change, the reporting effect depends on it, so a
+  banner whose presence changed after mount re-ran every other banner's effect — **"Maximum update
+  depth exceeded"**, Home on the root error boundary.
+- **What is missing:** nothing fails if `report` becomes unstable again. The protection is
+  `card-429-error-state.spec.ts`, which only catches it when a banner's presence genuinely changes
+  during a run. A stability test would need a React renderer for components, which this repo does
+  not use.
+- **Not device-verified, and the crash was never seen on the device.** The reproduction is a 429 stub
+  on `/api/weekly-digest`. Nothing about the loop requires a *failure* — only a presence change — so
+  real timing could reach it; whether it does is unknown.
+- **If a Home crash is ever reported,** this is the first thing to check: open Home with a banner
+  that resolves late and watch for the error boundary.
+
+### [devices][platform] The native security batch (RV-196, OR-159) is NOT device-verified, and ring uploads are the half that matters
+
+- **Shipped in #1755, Kotlin, so it needs the CI APK installed as an UPDATE.** Never uninstall first:
+  the ring key exists only on the phone.
+- **Owed on the S25 (Lane DV):**
+  1. **After the update and one app open, the ring, the scale and the strap still upload.**
+     `setIngestUrl` now refuses any origin but the app's own. A wrong refusal is swallowed by the
+     caller, and the previously stored URL keeps working, so the failure would be silent rather
+     than an outage. Check `oura_raw_samples` for rows newer than the install.
+  2. **Show key** and **Clear key** in the Oura BLE console each open a system dialog. For Clear,
+     **tap Cancel and never confirm**; the pass is that the dialog appears and the key survives.
+  3. The backup exclusion cannot be observed while backup sits over its 25 MB quota (see OR-159's
+     Keep).
+- **Strike this row** when 1 and 2 are VERIFIED.
+
+### [app-shell] Home's banner strip is NOT device-verified, and the multi-banner case was never rendered
+
+- **Shipped 2026-09-28 (RV-119, v1.481.0), web-verified with ONE banner present.** The four
+  "ready for you" banners collapse behind one strip; illness advisory and early deload stay
+  full-width. The harness run had exactly **one** of the four waiting, so the strip rendered as
+  `1 ready` with a single icon — **the multi-icon row and the four-banner expansion have never been
+  drawn**, and the mockup's heights are relative, not measured on a device.
+- **What a device pass must answer:**
+  1. The strip with **three or four** icons at 384 px: do the chips, the count and the chevron still
+     fit on one line without wrapping or clipping?
+  2. Expand it with several banners waiting — does the stack push the recommendation below the fold
+     again, which is the whole thing this entry exists to stop?
+  3. With an illness advisory **and** an early deload both live, plus the strip: three elements
+     above the first real card. That is the worst realistic case and the one the split was chosen
+     for.
+  4. Each expanded banner's own dismiss still works, and dismissing one drops the strip's count.
+- **Why it is here rather than in a lane:** nothing is known to be broken. The entry states the
+  device look is owed at the end, and no sandbox can arrange six banner conditions at once.
+
+### [sleep][app-shell] The rebuilt morning check-in is NOT device-verified, and its save path is the untested half
+
+- **Shipped 2026-09-28 (TN-82, v1.480.0), web-verified only.** `components/morning-checkin-sheet.tsx`
+  no longer asks for sleep quality or recovery; it announces the night's verdict and takes a one-tap
+  correction. The sheet is the **canonical daily surface** and the local store is on its write path,
+  but `getLocalStore` returns null in the web sandbox, so every test run took the **API fallback**
+  and `store.upsertDayCheckin` + `queueMutation` never executed for this payload.
+- **What a device pass must answer**, most likely to fail first:
+  1. **Save with no verdict to announce** (a day before the baseline fills). A row must still be
+     written. If it is not, `dayCheckinHasAnswers` rejected it — a 400, or a no-retry poison pill in
+     the outbox — and the sheet will re-prompt every visit, because auto-open keys on a row existing.
+  2. **Correct it offline**, then reopen the sheet. The chip must still be selected, and Home's sleep
+     line (LA-136) must show the corrected word.
+  3. **Save without touching the announcement.** `sleep_verdicts.response_state` must stay `none`,
+     NOT `acknowledged` — Save is the reflex, not assent, and promoting it destroys the instrument.
+  4. The announcement's prominent and quiet forms at 384 px in a Samsung WebView, including whether
+     five correction chips wrap acceptably.
+- **Why it is here rather than in a lane:** nothing is known to be broken. This is the device gate the
+  canonical-runtime rule owes for a change touching an offline-first domain, recorded because no
+  device was available in-session. It is the same sitting TN-85's `Keep:` ① already owes.
+
+### [sleep][app-shell] Home's sleep line is NOT device-verified, and the offline path is the untested half
+
+- **Shipped 2026-09-28 (LA-136, v1.479.0), web-verified only.** `components/home/sleep-feel-line.tsx`
+  + `lib/hooks/use-morning-sleep-feel.ts`. The line reads `day_checkins` **local-first** because the
+  morning sheet writes `upsertDayCheckin` + `queueMutation` before the network — but
+  `getLocalStore` returns null in the web sandbox, so every test run took the **API fallback**. The
+  local branch has not executed once.
+- **What a device pass must answer**, in order of what is most likely to fail:
+  1. Rate sleep in the morning check-in **with the phone offline**. The line appears on Home
+     immediately (the invalidation fires whether or not the push succeeded) and is **still there
+     after force-killing and reopening the app**. A blank here means the local read is not running.
+  2. Rate it online, then leave the tab and come back — the value updates **without** the app being
+     killed. A stale value is the Q-402 shape returning through the escape hatch.
+  3. Leave the sleep question **untouched** in the sheet and save. Home must show **nothing**. A
+     line reading *"OK · 3/5"* means the neutral seed reached the screen and the fabricated
+     `Sleep: OK` is back.
+- **Why it is here rather than in a lane:** nothing is known to be broken. This is the device gate
+  the canonical-runtime rule owes for a change touching an offline-first domain, recorded because no
+  device was available in-session.
+
+### [app-shell] ⚠️ A native relayout on resume targets the blank screen, and only telemetry from the phone can say if it worked (BF-110, 2026-09-28)
+
+`MainActivity.onResume` now re-measures the WebView on resume. It is Java, so it reaches the phone only
+in the APK this merge publishes. The pass test reads `bf110 resume recheck` rows in `error_events`
+after that APK is installed: `resized` means fixed, and `stuck` plus the new native heights says
+which layer to fix next (the entry's `Verify:` spells out each case).
+
+### [devices][readiness] ⚠️ The app now drains the ring on open and resume, and no phone has run it (BF-187, 2026-09-28)
+
+`drainIfStale` is Kotlin, so it reaches the phone only in the APK this merge publishes. Until that
+is installed, the JS call is a no-op and the hourly drain is unchanged. The whole path is
+native-only, so nothing here ran outside a compile and a unit test. **Pass test on the S25:** the
+backlog entry's `Verify:` line (one drain after a >10-min background, one drain for three quick tab
+switches, cards refreshing within ~10–40 s).
+
+### [workouts] ⚠️ A missing exercise role now reads as Accessory, and no phone has run the device half (BF-15, 2026-09-28)
+
+The local store's fallbacks (`program-assembler.ts`, `sqlite-backend.ts`, `sync-engine.ts`) and the
+local `session_exercises` default flipped from `primary` to `accessory`. Stored roles are NOT NULL,
+so this only changes a row that genuinely has none. An existing install keeps its old SQLite column
+default, but every local insert names the role. **Pass test on the S25:** open a program in the editor
+and the workout screen; every exercise keeps the role it showed before. Add one without picking a role:
+it shows Accessory.
+
+
+### [platform][workouts][readiness] ⚠️ Two sync-pull fields now reach the phone, and no phone has pulled them (LA-137, 2026-09-28)
+
+LA-137's pull guard found two fields the client's pull mapper lost:
+- `workout_sessions.session_id`. The server sends it as `programSessionId` and the mapper read
+  `sessionId`, so every pull NULLed the device's link from a workout to its program session. Q-131's
+  "fix" had read the wrong key.
+- `day_checkins.food_logging_completed_at`. It was never mapped, so a completion made on another
+  device never arrived.
+
+Both mappers run only in the app, so the sandbox exercised them on `node:sqlite` against a real
+pull. No device reads the session link today (the push omits it when null, so the server's copy
+was never harmed). **Pass test on the S25:** after a pull, a synced workout's local row carries its
+`session_id`, readable through the admin local-DB view, or via any screen that lists workouts
+without error.
+
+### [nutrition][devices] ⚠️ The device's food reads now return the stored picture, and no phone has run them (LA-36, 2026-09-28)
+
+`searchFoodItems`, the recent-foods read and the day's logs now select and map `image_data_uri` on
+the device's SQLite. Nothing renders it yet, so the screen should look the same. What could break is
+the read itself. The queries are plain SQLite and pass on `node:sqlite`, but the Capacitor plugin
+is not that engine. **Pass test on the S25:** open Nutrition, search foods, open Recent, and scroll a
+logged day. All three must list as before, with no error toast and no empty list.
+
+### [workouts] ⚠️ Offline edits and deletes of logged work now queue, and only a phone can prove it (LA-166, 2026-09-28)
+
+The three handlers in `use-day-entry-mutations.ts` used to `fetch` first and mirror locally only
+after a 2xx, so offline they toasted "Updated"/"Deleted", then "Failed to …", and queued nothing —
+the change was simply lost. They now write locally in pending mode and queue `exercise_log_edit`,
+`exercise_log_delete` or `workout_session_delete`, the same shape `handleDeleteActivity` has had
+since Q-328. **Nothing in the sandbox can exercise this:** `getLocalStore` returns null on the web,
+so every run here takes the fetch fallback, and the repo has no React hook renderer — the guards are
+source-level, plus Lane A's engine tests from LA-165.
+
+**Pass test on the S25, in aeroplane mode:** edit a logged exercise, delete one, and delete a whole
+session. Each should toast **once**, stay changed after force-quitting and reopening the app, and
+reach the server when the connection returns. **One known difference from the online path:** deleting
+a session's last exercise leaves the empty session shell visible on that device until the next pull
+reaps it. Online the response says the server cascaded; offline nothing can know that, and queuing a
+second `workout_session_delete` to close the window would double-delete whenever the guess is wrong.
+
+### [devices][heart-rate] ⚠️ Health Connect HRV, SpO₂ and the HR series now convert, and no phone has run it (LA-115, 2026-09-28)
+
+The Health Connect plugin's `RecordConverter` had no branch for three types the sync reads:
+`HeartRateVariabilityRmssd`, `OxygenSaturation` and `HeartRateSeries`. It returned
+`record.toString()` for them, so every field read as `undefined` and the date filter dropped every
+record, silently. The patch adds the three branches, with field names read from
+connect-client 1.1.0-alpha11's own sources jar. It compiles locally, and a deliberate typo fails
+the compile, which proves the patched file is the one built. **It is Kotlin, so it reaches the phone
+only in the CI-built APK that this merge publishes.** **Pass test on the S25:** install that APK,
+confirm Health Connect grants HRV and SpO₂, and run a sync with the ring's overnight data present.
+Then show a non-null HRV or SpO₂ from `health_connect` in `body_metrics`. The ring outranks Health
+Connect in the ranked merge, so check `source_map` or read the sync's own output: a zero in
+`source_map` alone proves nothing.
+
+### [devices] ⚠️ The strap pairing screen's battery read changed shape and no phone has run it (BF-216, 2026-09-28)
 
 `chest-strap-pairing.tsx` read the battery level as `new Uint8Array(batt.buffer)[0]`, which discards
 the `DataView`'s offset; it now reads `batt.getUint8(0)`. **Today's value is identical** — the BLE
@@ -35,31 +329,6 @@ percent by `onBattery`) and nothing in this change is native, but it is the thin
 The 14-day window is a judgement, not a measurement — it is long enough to span several workouts and
 short enough that a replaced cell clears itself, and nothing can detect a cell change because a
 fresh CR2025 and a dying one both read 100 at rest.
-
-### .*\[sleep\]' docs/overview/known-issues.md` works exactly as it did against
-> `projectOverview.md`, and the standing rule depends on it. Per-pillar files would have forced an
-> issue tagged `[sleep][platform]` to live in one and go missing from the other.
->
-> **Resolved issues are NOT here** — they live in
-> [`known-issues-resolved.md`](known-issues-resolved.md). **Grep the archive before concluding
-> something has never been looked at.** An entry moves there only when nothing is still owed: no
-> open work, no pending owner or device check, no un-run follow-up. A fix that shipped but is not
-> device-verified stays in this file, because that check is the outstanding thing.
->
-> **Adding one:** a new heading carries its `[domain]` tag(s), primary first.
-
-> **This section is the OPEN issues. Resolved ones live in
-> [`docs/overview/known-issues-resolved.md`](../overview/known-issues-resolved.md)** — 53 entries,
-> 1,092 lines, moved out 2026-08-13. **Grep the archive before concluding something has never been
-> looked at**; "we already fixed that, and here is what it turned out to be" is why they are kept.
->
-> **Striking an issue means MOVING it there, not marking it ✅ in place** (`CLAUDE.md`, Session
-> Wrap-Up step 2). Without that rule this regrows — 72 ✅ entries had accumulated before the first
-> sweep, and 53 of them had nothing outstanding at all.
->
-> An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
-> check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
-> below.
 
 ### [workouts][platform] ⚠️ A session given an RPE now returns to "synced" on the phone, and only the phone runs it (LA-165, 2026-09-28)
 
@@ -2577,10 +2846,9 @@ sleep. Joined against `sleep_sessions` directly — no clock-hour inference:
   carries little signal — **not** a reason to re-wire the override.
 - **Two further findings from the same measurement are queued, not open issues:** **LA-113** (the
   imputation reads ~⅓ of measured HRV — real but confounded, owner-gated) and **LA-114**
-  (`bucket_start` stores the bucket midpoint — **documented, not fixed**: the rename was attempted
-  and reverted because every historical `claude_ro` view migration names the old column and CI
-  replays them all. `claude_ro` still says `bucket_start`, so a join on the :00/:30 grid needs 15
-  minutes added).
+  (the stress bucket column holds the midpoint; **renamed to `bucket_mid` on 2026-09-28** once
+  BF-214 had removed the view migrations that blocked it. A join on the :00/:30 grid still subtracts
+  15 minutes, but the name now says so).
 - **What shipped (v1.457.2).** `buildDaytimeStressSeriesFromModel` drops sleeping buckets **before**
   `scoreStressPoints`, so they reach neither the levels nor the day-median baseline. The ordering is
   the fix: filtering only the summary would drop them from the count and leave the waking buckets

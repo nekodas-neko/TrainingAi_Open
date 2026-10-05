@@ -5,7 +5,7 @@ describe('local schema', () => {
   // The describe and the title used to say v25 while the assertion said 27 — a stale label on a
   // guard whose whole job is to be the authority on the number. Named after what it checks now.
   it('tops out at the current version', () => {
-    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(43)
+    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(46)
   })
 
   // BF-39. The trap this file exists for: a column added to a `CREATE TABLE IF NOT EXISTS` body
@@ -20,6 +20,19 @@ describe('local schema', () => {
       expect(
         RECONCILE_COLUMNS.some(c => c.table === 'food_logs' && c.column === column),
         `food_logs.${column} missing from RECONCILE_COLUMNS`,
+      ).toBe(true)
+    }
+  })
+
+  // BF-203a. An upgraded device must be able to hold an estimate's macros, not only a fresh install.
+  it('v45 adds the plan-meal estimate columns by ALTER and reconciles them', () => {
+    const v45 = MIGRATIONS.find(m => m.toVersion === 45)!
+    const ddl = v45.statements.join('\n')
+    for (const column of ['est_calories', 'est_protein_g', 'est_carbs_g', 'est_fat_g', 'est_bias_kcal', 'est_basis']) {
+      expect(ddl).toContain(`ALTER TABLE plan_meal_answers ADD COLUMN ${column}`)
+      expect(
+        RECONCILE_COLUMNS.some(c => c.table === 'plan_meal_answers' && c.column === column),
+        `plan_meal_answers.${column} missing from RECONCILE_COLUMNS`,
       ).toBe(true)
     }
   })
@@ -246,5 +259,20 @@ describe('local schema', () => {
         if (m) expect(mirror.has(`${m[1]}.${m[2]}`), `RECONCILE_COLUMNS missing ${m[1]}.${m[2]}`).toBe(true)
       }
     }
+  })
+})
+
+// LB-190. The answer moves to vs_normal with the question it answered. Added and copied rather than
+// renamed, so the three-part rule applies to both new columns, and every stored answer is question 1.
+describe('v46 — vs_normal and vs_question (LB-190)', () => {
+  it('adds both columns by ALTER, reconciles them, and copies existing answers as question 1', () => {
+    const v46 = MIGRATIONS.find(m => m.toVersion === 46)!
+    const ddl = v46.statements.join('\n')
+    for (const column of ['vs_normal', 'vs_question']) {
+      expect(ddl).toContain(`ALTER TABLE day_checkins ADD COLUMN ${column}`)
+      expect(RECONCILE_COLUMNS.some(c => c.table === 'day_checkins' && c.column === column), column).toBe(true)
+    }
+    expect(ddl).toMatch(/UPDATE day_checkins SET vs_normal = vs_yesterday, vs_question = 1 WHERE vs_normal IS NULL AND vs_yesterday IS NOT NULL/)
+    expect(ddl).not.toMatch(/vs_(normal|question)[^\n]*DEFAULT/i)
   })
 })

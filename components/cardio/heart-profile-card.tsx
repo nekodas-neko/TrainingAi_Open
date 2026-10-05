@@ -1,6 +1,8 @@
 'use client'
 
 import { memo } from 'react'
+import type { HrProfile } from '@trainingai/shared/health/hr-profile'
+import { maxHrSourceNote, restingHrSourceNote } from '@/components/health/hr-source-copy'
 
 interface Props {
   restingHr: number
@@ -10,6 +12,9 @@ interface Props {
   maxHr: number | null
   maxHrDeltaBpm: number | null
   isReliable: boolean
+  /** LA-82 — `/api/cardio-week` sends both; absent on a payload cached before it did. */
+  maxHrSource?: HrProfile['maxHrSource']
+  restingHrSource?: HrProfile['restingHrSource']
 }
 
 function DeltaLabel({ deltaBpm }: { deltaBpm: number | null }) {
@@ -36,7 +41,16 @@ function Tile({ value, label, deltaBpm }: { value: string; label: string; deltaB
   )
 }
 
-function HeartProfileCardImpl({ restingHr, restingHrDeltaBpm, avgHr, avgHrDeltaBpm, maxHr, maxHrDeltaBpm, isReliable }: Props) {
+function HeartProfileCardImpl({ restingHr, restingHrDeltaBpm, avgHr, avgHrDeltaBpm, maxHr, maxHrDeltaBpm, isReliable, maxHrSource, restingHrSource }: Props) {
+  // LA-82. A zone quota measured against a stand-in max or resting HR has to say so — until now
+  // both substitutions were silent, which is the quiet wrong answer the owner ruled out.
+  const maxNote = maxHrSourceNote(maxHrSource)
+  const restingNote = restingHrSourceNote(restingHrSource)
+  const standIns = [
+    restingNote?.standIn ? restingNote.detail : null,
+    maxNote.standIn ? maxNote.detail : null,
+  ].filter((d): d is string => !!d)
+
   return (
     <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--card)] p-3.5">
       <p className="mb-2.5 flex items-center font-mono text-[10px] uppercase tracking-widest text-[color:var(--muted-foreground)]">
@@ -48,7 +62,14 @@ function HeartProfileCardImpl({ restingHr, restingHrDeltaBpm, avgHr, avgHrDeltaB
         <Tile value={avgHr != null ? String(avgHr) : '—'} label="Avg" deltaBpm={avgHrDeltaBpm} />
         <Tile value={maxHr != null ? String(maxHr) : '—'} label="Max" deltaBpm={maxHrDeltaBpm} />
       </div>
-      {!isReliable && (
+      {standIns.map(detail => (
+        <p key={detail} className="mt-2.5 text-[11px] leading-snug" style={{ color: 'var(--accent-amber)' }}>
+          {detail}
+        </p>
+      ))}
+      {/* Suppressed while a stand-in is showing: "still learning your range" describes a profile
+          that is being built, and a value that could not be READ is a different thing to say. */}
+      {!isReliable && standIns.length === 0 && (
         <p className="mt-2.5 text-[11px] leading-snug text-[color:var(--muted-foreground)]">
           Still learning your range — wear your ring or strap for a few more days.
         </p>

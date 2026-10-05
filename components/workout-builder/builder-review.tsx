@@ -20,6 +20,8 @@ import type { MuscleSetsEntry } from '@/app/api/weekly-muscle-sets/route'
 import { EXERCISE_ROLES, EXERCISE_ROLE_LABEL, exerciseRoleLabel, exerciseRoleBadge } from '@/components/workout/exercise-role-labels'
 import type { ExerciseRole } from '@trainingai/shared/types/program'
 import { mustBypassImageOptimizer } from '@trainingai/shared/media/private-media'
+import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
+import { fillGeneratedStyles } from '@/components/workout-builder/fill-generated-styles'
 
 interface Props {
   program: GeneratedProgram
@@ -139,6 +141,10 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
     () => [...new Set(program.sessions.flatMap(s => s.exercises.map(e => e.name)))],
     [program]
   )
+  // What this screen SHOWS and SAVES, which is the generated program with no style-less exercise left
+  // in it (LA-183). Derived rather than written back through `onProgramChange`: an effect that fills
+  // state it also depends on is the shape that crashed Home in RV-119.
+  const shown = useMemo(() => fillGeneratedStyles(program), [program])
   const { media: exerciseMedia } = useExerciseMedia(exerciseNames)
 
   // A name that resolves to a different clip deserves a fresh chance at rendering it; the failed
@@ -288,7 +294,7 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
     if (saving) return
     setSaving(true)
     try {
-      const programSessions = program.sessions.map((session, si) => {
+      const programSessions = shown.sessions.map((session, si) => {
         const sid = crypto.randomUUID()
         return {
           id: sid,
@@ -500,7 +506,7 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
 
         {/* Sessions */}
         <div className="px-4 py-3 space-y-4">
-          {program.sessions.map((session, si) => (
+          {shown.sessions.map((session, si) => (
             <div key={si} className="rounded-xl bg-muted p-3 space-y-2">
               <p className="flex items-center gap-1.5 font-bold text-sm">
                 <SessionGlyph icon={session.icon} palettePosition={si} className="h-4 w-4" />
@@ -564,9 +570,11 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
                           <p className="text-[10px] text-brand/70 mt-0.5 tabular-nums">
                             {formatGoalRange(goalRange(inputs.goal, ex.exerciseRole))} · AI sets each phase
                           </p>
-                        ) : ex.progressionStyleName && STYLE_DISPLAY[ex.progressionStyleName] ? (
+                        ) : ex.progressionStyleName ? (
+                          // A style the table does not know — a renamed or user-made one — used to
+                          // render NOTHING here, which reads the same as having no style at all.
                           <p className="text-[10px] text-muted-foreground/70 mt-0.5 tabular-nums">
-                            {STYLE_DISPLAY[ex.progressionStyleName]}
+                            {STYLE_DISPLAY[ex.progressionStyleName] ?? ex.progressionStyleName}
                           </p>
                         ) : null}
                       </div>
@@ -615,10 +623,10 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
                             key={role}
                             type="button"
                             onClick={() => setExerciseRole(si, ei, role)}
-                            aria-pressed={(ex.exerciseRole ?? 'primary') === role}
+                            aria-pressed={(ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE) === role}
                             className={cn(
                               'tap-dense tap-target-44 px-2.5 py-1.5 rounded text-xs border transition',
-                              (ex.exerciseRole ?? 'primary') === role
+                              (ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE) === role
                                 ? 'bg-brand text-brand-foreground border-brand font-semibold'
                                 : 'bg-muted text-muted-foreground border-border hover:bg-background',
                             )}
@@ -654,7 +662,7 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
         {/* Projected weekly volume */}
         <div className="px-4 pb-3">
           <WeeklyMuscleSetsCard
-            muscles={projectMuscleSets(program)}
+            muscles={projectMuscleSets(shown)}
             loading={false}
             title="Projected Weekly Volume"
           />

@@ -122,8 +122,17 @@ test('the external food-database row is the shared row, and keeps its mismatch w
   const sources = page.getByRole('tablist').filter({ hasText: 'Food database' }).first()
   await tap(page, sources.getByRole('tab', { name: 'Food database' }))
 
-  const row = page.getByRole('button', { name: /Spec Dairy — Spec Mismatch Yoghurt/ }).first()
+  // ⚠ The accessible name is `<name>` then `<brand> · …`, NOT `<brand> — <name>` — RV-208 ⑤ moved
+  // the brand off the name line and onto `FoodRow`'s secondary, and this assertion was left on the
+  // old string for four PRs while E2E stayed advisory. Matched on the name alone, with the brand
+  // asserted separately below, so a future move of either half fails on the half that moved.
+  const row = page.getByRole('button', { name: /Spec Mismatch Yoghurt/ }).first()
   await expect(row).toBeVisible({ timeout: 30_000 })
+
+  // The food's own name leads; the brand follows it on the grey line. Both are still present —
+  // the change was the ORDER, and a row that dropped the brand would pass a name-only check.
+  await expect(row.locator('span.font-medium').first()).toHaveText('Spec Mismatch Yoghurt')
+  await expect(row).toContainText('Spec Dairy')
 
   // Shared shape: calories in their own right-hand column, not inline in the grey line.
   const calorieCell = row.locator('span.tabular-nums')

@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { expect, type Locator, type Page } from '@playwright/test'
+import { expect, type Locator, type Page, type Route } from '@playwright/test'
 
 /** Seeded by `scripts/local-db/seed.sql`. Idempotent — `pnpm db:local` will not re-seed. */
 export const SEED_EMAIL = 'test@local.dev'
@@ -503,4 +503,51 @@ export async function suppressMorningCheckin(page: Page): Promise<void> {
     ([storageKey, value]) => localStorage.setItem(storageKey, value),
     ['ta_morning_checkin', today] as const,
   )
+}
+
+/**
+ * Wrap a `page.route` callback so a request still in flight when the test ends cannot fail the run.
+ *
+ * **A handler that calls `route.fetch()` is doing a real round trip**, so the page can fire a request
+ * the callback is still serving when Playwright tears the context down. The rejection that produces
+ * — `route.fetch: Test ended.` — is raised **outside any test**, which is the part that makes it
+ * expensive: the run reports `74 expected · 0 unexpected · ok: true` and exits **1** anyway, with
+ * `1 error was not a part of any test`. Measured on runs 36594986970, 36598412525 and 36602819608,
+ * where it took `E2E shard 4` red on three PRs in a row from one spec's `/api/readiness-score`
+ * overlay. Because E2E is advisory it merged three times without blocking anything, and because the
+ * error names no test it reads as CI infrastructure — the standing suspicion was `LB-149`'s browser
+ * death, which this is not.
+ *
+ * Playwright's own hint is `page.unrouteAll({ behavior: 'ignoreErrors' })` before the test ends. That
+ * is per-test and has to be remembered at every exit path, including a failing assertion; catching at
+ * the source cannot be forgotten, which is why the rule lives here rather than in six spec files.
+ *
+ * **Only the end-of-test rejections are swallowed.** A handler that genuinely cannot serve its
+ * overlay must still fail the test that depends on it, or a spec silently asserts against the real
+ * payload it meant to replace.
+ */
+export function tolerateTestEnd(
+  handler: (route: Route) => Promise<void>,
+): (route: Route) => Promise<void> {
+  return async (route: Route) => {
+    try {
+      await handler(route)
+    } catch (error) {
+      if (!isTestEndedError(error)) throw error
+    }
+  }
+}
+
+/**
+ * The wordings Playwright uses when the test's context goes away under a pending call. Matched on the
+ * message rather than a class, because they all arrive as a plain `Error`.
+ *
+ * **Deliberately not a loose `/has been closed/`.** That would also swallow a handler's error when the
+ * browser PROCESS dies mid-run — `LB-149`'s open failure, whose whole difficulty is that it leaves no
+ * witness. A test whose browser died fails on its own awaits regardless, so nothing here needs to
+ * report it; what matters is not quietly widening this to cover it.
+ */
+function isTestEndedError(error: unknown): boolean {
+  return /Test ended|Target page, context or browser has been closed|Request context disposed/
+    .test(String(error instanceof Error ? error.message : error))
 }

@@ -18,6 +18,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import type { User } from '@trainingai/shared/types'
+import { invalidateUserProfile } from '@/lib/cache-groups'
 
 interface EditProfileSheetProps {
   user: User | null
@@ -136,6 +137,10 @@ export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
       setNewPassword('')
       setConfirmPassword('')
       setHasPassword(true)
+      // RV-183. `users.password_hash` is what `/api/user/profile` reports as `hasPassword`, and this
+      // sheet reads that key itself — a stale `false` re-offers "set a password" and stops asking
+      // for the current one.
+      await invalidateUserProfile().catch(() => {})
     } catch {
       toast.error('Failed to update password')
     } finally {

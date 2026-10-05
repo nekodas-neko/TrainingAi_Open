@@ -183,7 +183,7 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
           servingSizeG: form.servingSizeG, calories: form.calories,
           proteinG: form.proteinG, carbsG: form.carbsG, fatG: form.fatG,
           fiberG: form.fiberG, sugarG: form.sugarG, sodiumMg: form.sodiumMg, satFatG: form.satFatG,
-          source: scanOriginToSource(scanResult?.origin, scanResult?.confidence),
+          source: scanOriginToSource(scanResult?.origin),
           quantityMultiplier: quantity,
           // LB-158. Read off the scan result rather than the form, because the form is the
           // editable macros and a code is not one of them. Absent on every path but a barcode.

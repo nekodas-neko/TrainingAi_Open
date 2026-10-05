@@ -180,7 +180,7 @@ const CREATE_SESSION_EXERCISES = `CREATE TABLE IF NOT EXISTS session_exercises (
   style_id      TEXT,
   muscle_groups TEXT,
   position      INTEGER NOT NULL,
-  exercise_role TEXT NOT NULL DEFAULT 'primary',
+  exercise_role TEXT NOT NULL DEFAULT 'accessory',
   updated_at    TEXT
 )`;
 
@@ -229,6 +229,13 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'saved_meals',     column: 'image_data_uri',  ddl: `ALTER TABLE saved_meals ADD COLUMN image_data_uri TEXT` },
   { table: 'food_items',      column: 'image_data_uri',  ddl: `ALTER TABLE food_items ADD COLUMN image_data_uri TEXT` },
   { table: 'food_items',      column: 'barcode',         ddl: `ALTER TABLE food_items ADD COLUMN barcode TEXT` },
+  { table: 'prescribed_runs', column: 'completed_as',    ddl: `ALTER TABLE prescribed_runs ADD COLUMN completed_as TEXT` },
+  { table: 'plan_meal_answers', column: 'est_calories', ddl: `ALTER TABLE plan_meal_answers ADD COLUMN est_calories INTEGER` },
+  { table: 'plan_meal_answers', column: 'est_protein_g', ddl: `ALTER TABLE plan_meal_answers ADD COLUMN est_protein_g REAL` },
+  { table: 'plan_meal_answers', column: 'est_carbs_g', ddl: `ALTER TABLE plan_meal_answers ADD COLUMN est_carbs_g REAL` },
+  { table: 'plan_meal_answers', column: 'est_fat_g', ddl: `ALTER TABLE plan_meal_answers ADD COLUMN est_fat_g REAL` },
+  { table: 'plan_meal_answers', column: 'est_bias_kcal', ddl: `ALTER TABLE plan_meal_answers ADD COLUMN est_bias_kcal INTEGER` },
+  { table: 'plan_meal_answers', column: 'est_basis', ddl: `ALTER TABLE plan_meal_answers ADD COLUMN est_basis TEXT` },
   { table: 'food_logs',       column: 'saved_meal_id',  ddl: `ALTER TABLE food_logs ADD COLUMN saved_meal_id TEXT` },
   { table: 'food_logs',       column: 'meal_group_id',  ddl: `ALTER TABLE food_logs ADD COLUMN meal_group_id TEXT` },
   { table: 'food_logs',       column: 'meal_group_name', ddl: `ALTER TABLE food_logs ADD COLUMN meal_group_name TEXT` },
@@ -313,6 +320,8 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'day_checkins',     column: 'perceived_recovery_touched', ddl: `ALTER TABLE day_checkins ADD COLUMN perceived_recovery_touched INTEGER NOT NULL DEFAULT 0` },
   { table: 'day_checkins',     column: 'sleep_quality_feel_touched', ddl: `ALTER TABLE day_checkins ADD COLUMN sleep_quality_feel_touched INTEGER NOT NULL DEFAULT 0` },
   { table: 'day_checkins',     column: 'vs_yesterday',               ddl: `ALTER TABLE day_checkins ADD COLUMN vs_yesterday TEXT` },
+  { table: 'day_checkins',     column: 'vs_normal',                  ddl: `ALTER TABLE day_checkins ADD COLUMN vs_normal TEXT` },
+  { table: 'day_checkins',     column: 'vs_question',                ddl: `ALTER TABLE day_checkins ADD COLUMN vs_question INTEGER` },
   // Supersets — additive, delivered via reconcile per the Batch F pattern above
   // (no versioned ALTER needed; reconcileSchema runs after every open).
   { table: 'session_exercises', column: 'superset_group', ddl: `ALTER TABLE session_exercises ADD COLUMN superset_group INTEGER` },
@@ -769,7 +778,8 @@ const CREATE_MEAL_PLAN_MEALS = `CREATE TABLE IF NOT EXISTS meal_plan_meals (
   ingredients       TEXT NOT NULL DEFAULT '[]',
   suggested_time    TEXT
 )`;
-// Q-187 phase 2. Declines only — "I ate it" is the food log itself. `sync_status` is what stops a
+// Q-187 phase 2. Declines, and since BF-203a estimates (`answer = 'estimated'` with its `est_*`
+// macros). Never a 'yes' — "I ate it" is the food log itself. `sync_status` is what stops a
 // pull clobbering an answer the user just gave offline: applyDelta only overwrites a row that is
 // already 'synced'.
 const CREATE_PLAN_MEAL_ANSWERS = `CREATE TABLE IF NOT EXISTS plan_meal_answers (
@@ -778,6 +788,12 @@ const CREATE_PLAN_MEAL_ANSWERS = `CREATE TABLE IF NOT EXISTS plan_meal_answers (
   log_date      TEXT NOT NULL,
   answer        TEXT NOT NULL DEFAULT 'no',
   answered_at   TEXT,
+  est_calories  INTEGER,
+  est_protein_g REAL,
+  est_carbs_g   REAL,
+  est_fat_g     REAL,
+  est_bias_kcal INTEGER,
+  est_basis     TEXT,
   deleted_at    TEXT,
   updated_at    TEXT,
   sync_status   TEXT NOT NULL DEFAULT 'pending'
@@ -837,6 +853,10 @@ const CREATE_DAY_CHECKINS = `CREATE TABLE IF NOT EXISTS day_checkins (
   -- so it also needs the v40 ALTER below and its RECONCILE_COLUMNS row. No DEFAULT — NULL means
   -- "not answered", and a neutral stored as an answer is the bug this question exists to escape.
   vs_yesterday        TEXT,
+  -- LB-190. vs_yesterday above is LEGACY: kept only so v46's copy runs on every device, read by
+  -- nothing. The answer lives in vs_normal, and vs_question says which question it answered.
+  vs_normal           TEXT,
+  vs_question         INTEGER,
   updated_at          TEXT NOT NULL,
   deleted_at          TEXT,
   sync_status         TEXT NOT NULL DEFAULT 'pending',
@@ -877,6 +897,7 @@ const CREATE_PRESCRIBED_RUNS = `CREATE TABLE IF NOT EXISTS prescribed_runs (
   gate_action     TEXT,
   status          TEXT,
   activity_log_id TEXT,
+  completed_as    TEXT,
   updated_at      TEXT NOT NULL,
   deleted_at      TEXT,
   sync_status     TEXT NOT NULL DEFAULT 'pending'
@@ -1611,6 +1632,41 @@ export const MIGRATIONS: UpgradeStatement[] = [
     statements: [
       `ALTER TABLE oura_daily_derived ADD COLUMN training_load_grid_len INTEGER`,
       `ALTER TABLE oura_daily_derived ADD COLUMN training_load_valid_min INTEGER`,
+    ],
+  },
+  {
+    // LB-179, mirroring Postgres migration 202609282225. How a prescribed run was satisfied, so the
+    // on-device planner can tell a walk from a run. In CREATE_PRESCRIBED_RUNS for fresh installs,
+    // this ALTER for upgraded devices, and RECONCILE_COLUMNS if it half-applies.
+    toVersion: 44,
+    statements: [
+      `ALTER TABLE prescribed_runs ADD COLUMN completed_as TEXT`,
+    ],
+  },
+  {
+    // BF-203a, mirroring Postgres migration 202609292220. The macros an `estimated` plan-meal answer
+    // assumed. In CREATE_PLAN_MEAL_ANSWERS for fresh installs, these ALTERs for upgraded devices, and
+    // RECONCILE_COLUMNS if the version half-applies.
+    toVersion: 45,
+    statements: [
+      `ALTER TABLE plan_meal_answers ADD COLUMN est_calories INTEGER`,
+      `ALTER TABLE plan_meal_answers ADD COLUMN est_protein_g REAL`,
+      `ALTER TABLE plan_meal_answers ADD COLUMN est_carbs_g REAL`,
+      `ALTER TABLE plan_meal_answers ADD COLUMN est_fat_g REAL`,
+      `ALTER TABLE plan_meal_answers ADD COLUMN est_bias_kcal INTEGER`,
+      `ALTER TABLE plan_meal_answers ADD COLUMN est_basis TEXT`,
+    ],
+  },
+  {
+    // LB-190, mirroring Postgres migration 202609301320. The answer moves from vs_yesterday to
+    // vs_normal, and vs_question records which question it answered. Added and copied rather than
+    // renamed, so a half-applied upgrade is repaired by RECONCILE_COLUMNS like every other column.
+    // Every answer already stored answered question 1.
+    toVersion: 46,
+    statements: [
+      `ALTER TABLE day_checkins ADD COLUMN vs_normal TEXT`,
+      `ALTER TABLE day_checkins ADD COLUMN vs_question INTEGER`,
+      `UPDATE day_checkins SET vs_normal = vs_yesterday, vs_question = 1 WHERE vs_normal IS NULL AND vs_yesterday IS NOT NULL`,
     ],
   },
 ];

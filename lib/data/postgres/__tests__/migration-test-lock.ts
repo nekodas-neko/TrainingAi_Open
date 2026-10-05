@@ -139,3 +139,20 @@ export function migrationTestLock(getPool: () => Pool): MigrationLock {
     },
   }
 }
+
+/**
+ * `url` with its database swapped for `database`, for tests that create a throwaway probe database
+ * (LB-177). `new URL()` cannot do this for the Unix-socket form `scripts/local-db/setup.sh` writes
+ * (`postgresql://u:p@/db?host=/tmp&port=5433`): the empty host makes it throw `Invalid URL`, which
+ * failed the whole file while its tests read as skipped. This rewrites only the path segment after
+ * the `@`, so the host, port and `?host=` socket parameter pass through untouched.
+ */
+export function withDatabase(url: string, database: string): string {
+  const at = url.lastIndexOf('@')
+  const head = url.slice(0, at + 1)
+  const tail = url.slice(at + 1)
+  const slash = tail.indexOf('/')
+  if (slash < 0) throw new Error(`withDatabase: no database segment in the URL`)
+  const query = tail.indexOf('?', slash)
+  return head + tail.slice(0, slash + 1) + database + (query < 0 ? '' : tail.slice(query))
+}

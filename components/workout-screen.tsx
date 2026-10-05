@@ -38,6 +38,8 @@ import { useShallow } from "zustand/react/shallow";
 import { cachedFetch, readCacheSync, setCached } from "@/lib/sqlite/cache";
 import { type NumbersSource } from "@/components/workout/numbers-source";
 import { freshExercises as freshExercisesFor, seedNumbersSource, type WorkoutDataSeed } from "@/components/workout/workout-data-seed";
+import { prescribeRequestInit } from "@/components/workout/prescribe-request";
+import { playBeep } from "@/components/workout/beep";
 import { useUserTimezone } from '@/components/shell/user-timezone-provider';
 import { calendarMonthInTz } from '@/lib/calendar-month';
 import { useDeloadChoice } from "@/components/workout/use-deload-choice";
@@ -84,23 +86,6 @@ function computeInitialWeights(ex: WorkoutExercise | undefined, sets: number): n
     if (ex?.latestWeight != null) return mroundStep(ex.latestWeight, step);
     return 60;
   });
-}
-
-function playBeep() {
-  try {
-    const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.type = "sine";
-    osc.frequency.value = 880;
-    gain.gain.setValueAtTime(0.4, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.4);
-    osc.onended = () => ctx.close();
-  } catch { /* AudioContext unavailable */ }
 }
 
 interface WorkoutScreenProps {
@@ -1544,7 +1529,10 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
     // the done screen's next-workout card read the fresh one. ai_dynamic programs only.
     if (programSessionId && programPhaseMode === 'ai_dynamic') {
       const psid = programSessionId;
-      fetch(`/api/ai-periodization/session/${psid}/prescribe`, { method: "POST" })
+      // LA-177: exclude the session that just finished, or its own completion is read as a ~0-hour
+      // gap and can self-trigger an emergency deload for the next session. The helper carries the
+      // full reasoning, including why an empty id omits the field rather than sending `''`.
+      fetch(`/api/ai-periodization/session/${psid}/prescribe`, prescribeRequestInit(wsId))
         .then((res) => { if (res.ok) invalidatePrescriptionChanged(psid).catch(() => {}); })
         .catch(() => {});
     }
@@ -1789,6 +1777,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
   return (
     <>
     <ActiveWorkoutScreen
+      isDeload={deload}
       exercise={effectiveExercises[store.currentIdx]}
       exerciseIndex={store.currentIdx}
       totalExercises={effectiveExercises.length}

@@ -19,6 +19,7 @@ the DB id, never the name. See CLAUDE.md, "No Hardcoded Session Names or Trainin
 | Formulas | `packages/shared/src/1rm.ts`, `packages/shared/src/health/soreness-volume.ts`, `workout-density.ts`, `workout-energy.ts`, `strength-progress.ts`, `strength-projection.ts`, `workout-activities.ts` |
 | Prescription / AI | `packages/shared/src/ai-periodization/`, `packages/shared/src/session-explain/` |
 | Muscle names and their movement pattern | `packages/shared/src/muscles.ts` — `normalizeMuscle` (synonym folding), `movementPattern` / `CLASSIFIED_MUSCLES` (push / pull / legs / other, LB-103). **Do not re-derive either in a component**: Q-305 rejected a private push/pull copy in `components/`, which is why the shared one exists. `shoulders` counts as push and `lower back` as neither — both judgement calls, argued in the module and pinned by tests. |
+| Building a program with AI | `components/workout-builder/builder-wizard.tsx` (ten steps, seven in AI Dynamic mode) → `POST /api/generate-program`. **`referenceProgramId` builds the new program similar to an existing one** (BF-67): `ReferenceProgramPicker` on step 1, optional, and the list comes from `GET /api/workout-templates` through the same `workout-templates` key/TTL `config-screen.tsx` uses. ⛔ **An ID crosses the boundary, never a program object** — the structure is read server-side under `listPrograms(userId)`, because accepting it from the client would be an ownership hole and a prompt-injection surface. **`null` is omitted, not sent:** the schema is `.strict()` and the field `.optional()`, so an explicit null is a 400 for the whole generation. ⚠ Step 3 is a `WeightDial` and **`tapInView` scrolls it** — an e2e that asserts a dial's value must set it after the last scroll |
 | UI routes | `app/workout/` (the tab, and the full-screen session when `?session=` is set), `app/program/` (the Builder). **PS-35a deleted four aliases** — the routes `/config`, `/stats`, `/session-select` and `/workout-select` no longer exist. The last two keep their **directories**, holding content only: `app/workout-select/workout-select-content.tsx` and `app/session-select/session-select-content.tsx` are mounted by the tab shell (`components/shell/tab-shell.tsx`), so the files are live while the URLs are gone. |
 | Past-workout surfaces | No `app/history/` route exists (removed; the row listing it was stale until 2026-08-18), and PS-35a removed `/stats` too — it was an alias redirecting to `/health?tab=training`. History is rendered in place — `components/exercise-history-sheet.tsx`, opened from `app/session-select/session-select-content.tsx`. |
 | Tables | `programs`, `program_sessions`, `session_exercises`, `progression_styles`, `style_sets`, `schedules`, `workout_sessions`, `exercise_logs`, `set_logs`, `personal_records`, `exercise_library` |
@@ -173,6 +174,7 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
 
 - [`docs/reviews/2026-08-18-production-verification.md`](../../reviews/2026-08-18-production-verification.md) — **this run's own findings checked against production, 2026-08-18** (Q-460 cannot be adjudicated from production — 74% of completed sessions lack an RPE, which is consistent with both a dropped write and a skipped prompt). Filed Q-472; **amended Q-460, Q-465, Q-467, Q-468** — one refuted, two re-scoped to zero exposure, one shown unprovable either way.
 - [`docs/reviews/2026-08-20-non-workout-write-surface-ownership.md`](../../reviews/2026-08-20-non-workout-write-surface-ownership.md) — **the non-workout write surface, probed live with two accounts, 2026-08-20** (RV-32 — `POST /api/phase-sets`, `POST /api/workout-templates` and `POST /api/log-exercise` all persist a **progression-style id owned by another user**, while the `PUT` twin of the first rejects the identical value 400; the unscoped join at `programs.ts:427` then returns the other user's style *name*. RV-34 — a client-supplied `program_sessions.id` that is not yours is a raw `pg 23505` 500). **Rule (b) came back clean** — 325 `.set()` sites, zero raw request bodies. Six more clean results recorded, including Q-129's guard verified live.
+- [Rules prescription engine plan (BF-199)](../../superpowers/plans/2026-09-29-rules-prescription-engine.md) — sets/reps/pct/rest from rules, the model kept for the prose; shadow, then switch, then represcribe offline.
 
 ## Open issues
 
@@ -346,15 +348,15 @@ Live at the time of writing (2026-07-30):
   (Q-63 — skip button needs a confirm; Q-64 — voice logging dead on the APK; Q-65 — PiP missing the
   rest countdown on the exercise-summary screen), same reason.
 - Journal: `grep -rl 'workout\|prescription\|1RM' docs/overview/entries/` — including
-  [`2026-09-27-rv219-day-workout-card.md`](../../overview/entries/2026-09-27-rv219-day-workout-card.md)
+  [`2026-09-27-rv219-day-workout-card.md`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv219-day-workout-card)
   (RV-219 ② — the Day card's exercise name wraps instead of cutting the distinguishing words; why
   shrinking the icons was ruled out by the 48 px tap-target floor; and why the "0 kg" half needs a
   field on `day-log`, since `DayExercise` carries no `exerciseType` and nothing resolves one
   client-side),
-  [`docs/overview/entries/2026-09-27-rv214-session-card.md`](../../overview/entries/2026-09-27-rv214-session-card.md)
+  [`2026-09-27-rv214-session-card`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv214-session-card)
   (RV-214 ①③④ — three surfaces printed `session.icon` as text because they bypassed the map A-7's
   comment said everyone used; plus why the check is keyed narrowly, and what ②⑤ still need),
-  [`docs/overview/entries/2026-09-27-rv202-label-the-numbers-source.md`](../../overview/entries/2026-09-27-rv202-label-the-numbers-source.md)
+  [`2026-09-27-rv202-label-the-numbers-source`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv202-label-the-numbers-source)
   (RV-202 ③ — the pre-workout list names which day its numbers came from; and `LB-165`, the
   five-link trace showing RV-202 ①'s rules fallback reaches no screen at all, so the ~30 s
   "Preparing your AI workout…" wait it was written to remove is still there),

@@ -138,12 +138,13 @@ test('the Nutrition ring counts against the budget the zone bar describes', asyn
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
 
-  // BF-24 ② split this across two lines: the header reads `+N burned` and the word "movement" moved
+  // BF-24 ② split this across two lines: the header reads `+N earned` (RV-218; it said "burned", which
+  // the Day screen uses for the whole day's expenditure) and the word "movement" moved
   // down to the zone bar's detail. Both are asserted, because each carries half of what this test is
   // for — the header proves the earned figure is on screen at all, and "movement", not "cardio", is
   // the wording that matters (the figure includes strength sessions and steps, and this fixture's
   // whole contribution is a strength session — the exact case the old wording mislabelled).
-  await expect(page.getByText(`+${earned} burned`)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(`+${earned} earned`, { exact: true })).toBeVisible({ timeout: 30_000 })
   await expect(page.getByText(`${earned} earned from movement`)).toBeVisible()
 
   // The ring prints what is LEFT rather than the budget, and that remaining figure is what read
@@ -185,5 +186,12 @@ test('Home\'s nutrition card counts against that same budget', async ({ page }) 
 
   // `N / M kcal`, where M is the budget — the line that read `1458 / 2447` above a subtitle saying
   // `1,629 base + 547 earned from movement`, which sums to 2,176.
-  await expect(page.getByText(new RegExp(`\\d[\\d,]* / ${total} kcal`))).toBeVisible({ timeout: 30_000 })
+  //
+  // **The budget is interpolated GROUPED (LA-176).** This read `${total}` bare until 2026-09-28 and
+  // had been failing since RV-208 ① gave this exact card thousands separators: the card renders
+  // `goalDisplay.toLocaleString()`, so a 2548 budget is `2,548` and a bare `2548` matches nothing.
+  // Pinned to `en-US` because that is the locale the harness's browser runs — the card's bare
+  // `toLocaleString()` following the device is RV-208's own open question, not this spec's to answer.
+  const grouped = total.toLocaleString('en-US')
+  await expect(page.getByText(new RegExp(`\\d[\\d,]* / ${grouped} kcal`))).toBeVisible({ timeout: 30_000 })
 })

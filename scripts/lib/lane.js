@@ -16,6 +16,13 @@
 // shadowed by a one-letter alternative matching its prefix.
 const LANE_FIELD_RE = /\*{0,2}Lane:\*{0,2}\s*\*{0,2}(DV\b|A\b|B\b|O\b|T\b|\?)/;
 const LANE_LOOSE_RE = /\*{0,2}Lane:?\*{0,2}\s*\*{0,2}(DV\b|A\b|B\b|O\b|T\b|\?)/;
+// A lane FIELD that OPENS a bullet (`- **Lane:** B`, `- **Lane: B**`) is the entry's declaration, and
+// it outranks a field-shaped mention anywhere else. The field form alone was not enough: prose quotes
+// it in backticks. Measured 2026-09-30: RV-208's body said "moved to LB-183 (`Lane: A`)" forty lines
+// above its `- **Lane: B.**`, and it was served to Lane A. TN-67 and TN-33 had the same shape, and
+// no other entry of 520 changed lane under this rule. The bare bullet (`- **Lane B**`) is not
+// included: with no colon it stays a loose mention, and disagreeing loose mentions still read `?`.
+const LANE_BULLET_RE = /^\s*[-*]\s+\*{0,2}Lane:\*{0,2}\s*\*{0,2}(DV\b|A\b|B\b|O\b|T\b|\?)/;
 
 /**
  * @returns `'A'` · `'B'` · `'O'` · `'DV'` · `'?'` · or `null` for "not stated".
@@ -57,14 +64,18 @@ const LANE_LOOSE_RE = /\*{0,2}Lane:?\*{0,2}\s*\*{0,2}(DV\b|A\b|B\b|O\b|T\b|\?)/;
  * through hid 96 of 203 entries from both lanes at once.
  */
 function laneFromLines(lines) {
+  let bullet = null;
   let field = null;
   const loose = [];
   for (const line of lines) {
+    const b = line.match(LANE_BULLET_RE);
+    if (b && bullet === null) bullet = b[1].trim();
     const f = line.match(LANE_FIELD_RE);
     if (f && field === null) field = f[1].trim();
     const l = line.match(LANE_LOOSE_RE);
     if (l) loose.push(l[1].trim());
   }
+  if (bullet !== null) return bullet;
   if (field !== null) return field;
   if (loose.length === 0) return null;
 
@@ -109,4 +120,4 @@ function laneFieldProblem(line) {
   return value === '' ? '(empty)' : value.slice(0, 60);
 }
 
-module.exports = { laneFromLines, laneFieldProblem, LANE_FIELD_RE, LANE_LOOSE_RE };
+module.exports = { laneFromLines, laneFieldProblem, LANE_FIELD_RE, LANE_LOOSE_RE, LANE_BULLET_RE };

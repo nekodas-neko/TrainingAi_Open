@@ -94,6 +94,26 @@ SELECT
 FROM public.app_load_metrics t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
+CREATE VIEW claude_ro.apple_health_samples AS
+SELECT
+  t.user_id,
+  t.sample_id,
+  t.sample_type,
+  t.start_at,
+  t.end_at,
+  t.quantity_value,
+  t.quantity_unit,
+  t.category_value,
+  t.source_bundle_id,
+  t.source_name,
+  t.device_name,
+  t.device_model,
+  t.deleted_at,
+  t.received_at,
+  t.updated_at
+FROM public.apple_health_samples t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.applied_mutations AS
 SELECT
   t.user_id,
@@ -311,7 +331,8 @@ SELECT
   t.perceived_recovery_touched,
   t.sleep_quality_feel_touched,
   t.food_logging_completed_at,
-  t.vs_yesterday
+  t.vs_normal,
+  t.vs_question
 FROM public.day_checkins t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
@@ -940,7 +961,7 @@ CREATE VIEW claude_ro.oura_daytime_stress_buckets AS
 SELECT
   t.user_id,
   t.day,
-  t.bucket_start,
+  t.bucket_mid,
   t.level,
   t.updated_at
 FROM public.oura_daytime_stress_buckets t
@@ -1093,7 +1114,13 @@ SELECT
   t.answered_at,
   t.deleted_at,
   t.created_at,
-  t.updated_at
+  t.updated_at,
+  t.est_calories,
+  t.est_protein_g,
+  t.est_carbs_g,
+  t.est_fat_g,
+  t.est_bias_kcal,
+  t.est_basis
 FROM public.plan_meal_answers t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
@@ -1115,8 +1142,23 @@ SELECT
   t.activity_log_id,
   t.created_at,
   t.updated_at,
-  t.deleted_at
+  t.deleted_at,
+  t.completed_as
 FROM public.prescribed_runs t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
+CREATE VIEW claude_ro.prescription_shadow AS
+SELECT
+  t.id,
+  t.user_id,
+  t.program_session_id,
+  t.model_phase,
+  t.model_phase_action,
+  t.final_phase,
+  t.final_phase_action,
+  t.rows,
+  t.created_at
+FROM public.prescription_shadow t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
 CREATE VIEW claude_ro.program_phases AS
@@ -1651,7 +1693,8 @@ WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 CREATE VIEW claude_ro._meta_excluded_tables AS
 SELECT * FROM (VALUES
   ('invited_emails'),
-  ('rate_limits')
+  ('rate_limits'),
+  ('email_normalisation_preimage')
 ) AS t(table_name);
 
 -- Q-530: every column withheld from an emitted view, so a drift check can be column-level.

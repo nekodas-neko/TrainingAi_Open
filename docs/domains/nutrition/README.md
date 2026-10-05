@@ -11,12 +11,37 @@ reminders, and the nutrition screen's editing surfaces.
 | UI | `app/nutrition/` (`nutrition-content.tsx` is the offline-first **reference pattern**), `components/nutrition/` |
 | Energy balance | `lib/health/energy-balance-service.ts` (the one server-side assembly — the route and the AI tool both call it), `packages/shared/src/nutrition/calorie-balance.ts` (bands), `packages/shared/src/nutrition/adaptive-tdee.ts` (calibrated maintenance) |
 | Tables | `food_logs`, `food_items`, saved meals, supplements + supplement logs, `meal_plans` + `meal_plan_variants` + `meal_plan_meals`, `dietary_restrictions` + `user_dietary_restrictions` |
+| Food row display | `components/nutrition/food-row.tsx` (the one row shape, Q-406), `components/nutrition/food-name-line.ts` (`foodSecondaryLine` — the food's name leads, the brand rides the grey line, RV-208 ⑤) |
 | Meal Plan | `lib/data/postgres/slices/meal-plans.ts`, `packages/shared/src/nutrition/meal-split.ts`, `components/nutrition/meal-plan-*.tsx`, `app/api/nutrition/meal-plans/` |
+| Which plan variant applies | `components/nutrition/plan-variant-day.ts` (`trainingDayForPlanDate` — three values, `undefined` meaning UNKNOWN) → `MealPlanSection`'s `pickVariant`. **Only TODAY is answerable**: `getNextSession` takes no date, and the owner's programs are all `rotation` with zero `schedule_days` (LA-184; per-date is `LB-195`) |
 | Meal plan in Coach | `lib/coach/widgets.ts` (`PlanCardSchema`, `PLAN_CARD_ACTIONS`), `lib/coach/tools.ts` (`showMealPlan`), `components/coach/plan-card.tsx`, `packages/shared/src/nutrition/save-plan-meal.ts` |
 
 **`app/nutrition/nutrition-content.tsx` is the canonical local-first read pattern** for the whole
 app — its supplements reads (`getLocalStore(userId)` → `store.getSupplements()`, API only as
 fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offline-First".
+
+**A meal plan's day type is only knowable for TODAY** (LA-184, 2026-09-30) — and the reason is the
+owner's own data, measured in production: **all five of his programs are `type: 'rotation'` with
+`rest_after_n: 3` and ZERO `schedule_days` rows**, so the weekly day-of-week branch of
+`getNextSession` has never been taken for him, and a rotation's day type for a date comes from
+workout history the client does not hold. `getNextSession(userId, timezone?)` also takes no date,
+which is why `next-session` is a `cachedFetchToday` key. `trainingDayForPlanDate` therefore answers
+`undefined` for any other day, and `pickVariant` treats that as the rest variant it already showed.
+**⛔ `!isRestDay` is not "training day"** — with no active program the recommendation is
+`{ isRestDay: false, reason: 'No active program configured' }` with no session, a claim about
+nothing. Per-date is `LB-195`, which first has to settle that a PAST day type is a fact and a future
+one is a projection.
+See [`the journal entry`](../../overview/entries/2026-09-30-fix-la184-split-plan-training-variant.md).
+
+**Food rows: the name leads, the brand follows** (RV-208 ⑤, 2026-09-30). `foodSecondaryLine`
+(`components/nutrition/food-name-line.ts`) is the one place that joins them, across all six
+surfaces that render a brand. Two put the brand FIRST and both were SEARCH lists, where the user
+typed the food *name* — so leading with the brand pushed the matched term into `FoodRow`'s
+`line-clamp-2`. A third had its own `[brand, serving].join(' · ')`, right by coincidence; a fourth
+(`ingredient-search.tsx`) dropped the brand entirely, so the library's `Search` tab did not identify
+a food its own `Recent` tab did. `quick-edit-log-sheet.tsx` is the documented exception — a sheet
+header that already names the food and gives the brand its own line.
+See [`the journal entry`](../../overview/entries/2026-09-30-fix-rv208-date-and-brand-forms.md).
 
 ## Reference docs
 
@@ -268,6 +293,7 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
 - [`docs/reviews/2026-08-18-ai-double-trips.md`](../../reviews/2026-08-18-ai-double-trips.md) — **the AI-usage screen's double-trips traced to cause, 2026-08-18** (Q-471 — the meal-plan reroll path is correctly guarded; its double-trip count is a fingerprint artefact, not tap-spam). Findings Q-469…Q-471; corroborates **Q-295** exactly and confirms **Q-170's latency fix is holding** (7-day Coach average 2,307 ms).
 
 - [`docs/reviews/2026-08-18-nutrition-tdee-calibration.md`](../../reviews/2026-08-18-nutrition-tdee-calibration.md) — **the TDEE outcome check, 2026-08-18** (Q-517 — the food log captures **~45%** of actual intake, so taking it at face value implies a maintenance *below the owner's own BMR*. `adaptive-tdee.ts` already anticipated this and its gates refuse **75%** of windows — but `MIN_PLAUSIBLE_MAINTENANCE = 1000` sits **52 kcal below** where the artefact lands (1,052), and `MIN_LOGGED_FRACTION` counts logged *days* rather than log *completeness*, so a 45%-complete record passes a 70% gate. Proposed: floor at the user's own BMR — blocks every harmful value, tightening the range to 1,902–2,219).
+- [Shared food library plan (BF-77)](../../superpowers/plans/2026-09-28-shared-food-library.md) — browse an opted-in friend's meals and copy them; why not a group library or a share code.
 
 ## Open issues
 
@@ -520,12 +546,12 @@ Live at the time of writing (2026-07-30):
   with a three-step instrumented probe instead of a third speculative fix.
 - Handoffs: `ls docs/handoffs/handoff-*-nutrition-*.md`
 - Journal: `grep -rl 'nutrition\|food\|supplement' docs/overview/entries/`
-  [`2026-09-27-rv218-nutrition-copy.md`](../../overview/entries/2026-09-27-rv218-nutrition-copy.md)
+  [`2026-09-27-rv218-nutrition-copy.md`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv218-nutrition-copy)
   (RV-218's copy bugs: "205 workouts" was 205 kcal, and a signed `net` printed "−1,694 deficit" —
   sign and word both meaning "under". Also why items ①②④ are Lane A's, established from the route
   rather than assumed),
   — including
-  [`2026-09-27-rv212-nutrition-tone.md`](../../overview/entries/2026-09-27-rv212-nutrition-tone.md)
+  [`2026-09-27-rv212-nutrition-tone.md`](../../overview/history-2026-09-28-folded-1.md#2026-09-27-rv212-nutrition-tone)
   (RV-212 ①②: the energy-balance headline stops reading a partial day as a fault, following
   `energy-card.tsx`'s own earlier split which keeps the colour on the " so far"-qualified label; a
   taken supplement is muted rather than struck through, while the manage sheet's `!s.active`
@@ -533,6 +559,28 @@ Live at the time of writing (2026-07-30):
   `meal-thumb.tsx` records his instruction for the placeholder it asked to remove).
 
 ## Decided, and deliberately not built
+
+- **⛔ ON THE DIARY, VERTICAL SPACE BETWEEN MEAL CARDS IS THE GROUPING MECHANISM — a density change
+  needs a NEW argument (owner, 2026-09-27 — RV-213, declined and struck).** A sweep measured four
+  (really six) empty meal slots at roughly 320 px of mostly-blank card and proposed collapsing each
+  to a single name-plus-`+` row, taking ~1,400 px to ~800 px and pulling two below-the-fold cards
+  onto the screen. A before/after was rendered at 384 px dark and shown. **He said no:**
+  *"I like the original look; it shows the grouping nicely with the space."*
+  - **So the empty height is doing work.** It is what separates one meal from the next, and the
+    saving was real but paid for in the thing the screen exists to show.
+  - **This is a principle, not a one-off no.** Any future sweep measuring blank space on the diary
+    will reach the same finding and should stop here. Re-opening it takes a **new entry with a new
+    reason** — not a second run at this one.
+  - **The finding's other half is on the record and is also not a to-do:** in
+    `components/nutrition/meal-card.tsx`, an empty meal renders a header `+` **and** a body
+    `+ Add food`. Two affordances, one action — but the header `+` is the control that is present in
+    **every** meal state and the body row is the empty-state one, so the pair is consistency rather
+    than duplication. Filing it separately would be re-opening a declined entry through a side door.
+    (Named without line numbers deliberately: `check-index-doc-paths` reads a `file:line` suffix as
+    part of the path, and a pinned line in an orientation doc goes stale on the next edit anyway.)
+  - The declined mockup is kept at
+    [`docs/design/2026-09-27-four-screen-mockups.html`](../../design/2026-09-27-four-screen-mockups.html),
+    so the next person can see what was rejected rather than re-drawing it.
 
 - **A plan meal's `suggestedTime` stays a LABEL — it schedules nothing (owner, 2026-08-24 — Q-201,
   removed from the queue).** *"For now it can stay as a label; we already have the notification

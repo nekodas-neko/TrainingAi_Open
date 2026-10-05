@@ -12,6 +12,7 @@ import { FoodRow } from './food-row'
 import { DiaryMealGroup } from './diary-meal-group'
 import { groupDiaryEntries, sumLogs, type DiaryEntry } from './diary-groups'
 import type { SavedMealSummary } from '@/lib/hooks/use-saved-meal-summaries'
+import { foodSecondaryLine } from './food-name-line'
 
 interface Props {
   mealType: MealType
@@ -128,6 +129,7 @@ export const MealCard = memo(function MealCard({ mealType, logs, onAdd, onQuickE
                         name={entry.log.foodItem.name}
                         secondary={logAmountLabel(entry.log)}
                         calories={entry.log.calories}
+                        thumbSrc={entry.log.foodItem.imageDataUri ?? null}
                         onEdit={onQuickEdit}
                         onDelete={onDeleteLog}
                       />
@@ -161,7 +163,7 @@ function logAmountLabel(log: FoodLogWithItem): string {
   const servingG = log.foodItem.servingSizeG ?? 0
   const q = Math.round(log.quantityMultiplier * 100) / 100
   const amount = `${q} ${q === 1 ? 'serving' : 'servings'}${servingG > 0 ? ` · ${Math.round(servingG * log.quantityMultiplier)} g` : ''}`
-  return log.foodItem.brand ? `${log.foodItem.brand} · ${amount}` : amount
+  return foodSecondaryLine(log.foodItem.brand, amount) ?? amount
 }
 
 /**
@@ -197,6 +199,7 @@ const MealGroupEntry = memo(function MealGroupEntry(
           name={log.foodItem.name}
           secondary={logAmountLabel(log)}
           calories={log.calories}
+          thumbSrc={log.foodItem.imageDataUri ?? null}
           onEdit={onQuickEdit}
           onDelete={onDeleteLog}
         />
@@ -208,9 +211,11 @@ const MealGroupEntry = memo(function MealGroupEntry(
 /** Wrapper so the memoised row gets a stable `onPress` from inside a `.map()`, where a hook cannot
  *  live and an inline arrow would defeat `React.memo` silently (Q-490). Scalars only. */
 const DiaryRow = memo(function DiaryRow(
-  { id, name, secondary, calories, onEdit, onDelete }:
+  { id, name, secondary, calories, thumbSrc, onEdit, onDelete }:
   {
     id: string; name: string; secondary: string; calories: number
+    /** LA-36 — the logged item's stored `data:` URI. Null keeps the placeholder. */
+    thumbSrc: string | null
     onEdit: (id: string) => void; onDelete: (id: string) => void
   },
 ) {
@@ -218,10 +223,10 @@ const DiaryRow = memo(function DiaryRow(
   const actions = useMemo<SwipeAction[]>(() => [
     { key: 'delete', label: 'Delete', icon: <Trash2 className="h-4 w-4" />, onPress: () => onDelete(id), destructive: true },
   ], [id, onDelete])
-  // Artboard 1 draws the tile on every diary row. `food_items` carries no image column, so today
-  // this is always the placeholder — which is the state the drawing shows, and the box is what stops
-  // the list reading as ragged once any row does have a photo.
-  const row = <FoodRow name={name} secondary={secondary} calories={calories} showChevron showThumb thumbSrc={null} onPress={press} />
+  // Artboard 1 draws the tile on every diary row, and LA-36 fills it: `food_items.image_data_uri`
+  // was written to the device and read back by nothing. The box stays on rows without a picture,
+  // which is what stops the list reading as ragged now that some rows have one.
+  const row = <FoodRow name={name} secondary={secondary} calories={calories} showChevron showThumb thumbSrc={thumbSrc} onPress={press} />
   // BF-45 ⑤. One action, not the meal list's three: label and edit belong to a saved meal, and a
   // logged row's edit is the tap it already has. `bg-muted` because the meal card is `bg-muted/60`
   // — `bg-card` is two steps darker and would draw a band around the rows.

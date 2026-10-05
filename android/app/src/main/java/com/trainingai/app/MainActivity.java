@@ -86,6 +86,18 @@ public class MainActivity extends BridgeActivity {
         public String consumeRenderProcessGone() {
             return RenderProcessRecovery.consumePending(MainActivity.this);
         }
+
+        /** BF-110: the WebView's own height and its parent's, in CSS pixels, so the resume breadcrumb
+         *  can say which layer is stuck when `window.innerHeight` reads the 667 fallback. */
+        @JavascriptInterface
+        public String viewHeights() {
+            android.webkit.WebView wv = getBridge().getWebView();
+            float density = getResources().getDisplayMetrics().density;
+            android.view.View parent = (android.view.View) wv.getParent();
+            int view = Math.round(wv.getHeight() / density);
+            int par = parent == null ? -1 : Math.round(parent.getHeight() / density);
+            return "view=" + view + " parent=" + par;
+        }
     }
 
     // Exposed to JS as window.AndroidScreen — lets the workout screen keep the
@@ -569,6 +581,28 @@ public class MainActivity extends BridgeActivity {
     public void onResume() {
         super.onResume();
         com.trainingai.app.scale.ScaleForegroundScanner.INSTANCE.setAppResumed(this, true);
+        relayoutWebViewAfterResume();
+    }
+
+    /**
+     * BF-110. Every blank resume the breadcrumb caught (25 of 25) held the WebView at 384×667, the
+     * size a WebView falls back to before it is told the real one, against the S25's 826; half a
+     * second later it was still 667. So the viewport is stuck rather than late, which puts the fix
+     * here. Ask the view to re-measure against its parent now and again shortly after, since a
+     * window returning from PiP or the recents screen can settle its insets a frame or two late.
+     * Harmless when nothing is wrong: a layout pass with an unchanged size resizes nothing. The JS
+     * recheck at 500 ms (`lib/resume-repaint.ts`) then reads `resized` if this worked, and carries
+     * `viewHeights()` so a miss says whether the view or only Chromium's viewport was stuck.
+     */
+    private void relayoutWebViewAfterResume() {
+        final android.webkit.WebView wv = getBridge().getWebView();
+        if (wv == null) return;
+        final Runnable relayout = () -> {
+            wv.requestLayout();
+            wv.invalidate();
+        };
+        wv.post(relayout);
+        wv.postDelayed(relayout, 250);
     }
 
     @Override

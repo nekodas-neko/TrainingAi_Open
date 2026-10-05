@@ -72,6 +72,23 @@ test.describe('TN-53 — the trend sparkline states its gaps instead of drawing 
          WHERE user_id = $1 AND date >= ${LOCAL_TODAY} - 14`, [userId])
       preExisting = had.map(r => r.d)
 
+      // ⛔ CLEAR THE WINDOW FIRST — the gaps are what this spec asserts, and it cannot create one by
+      // only writing the days it wants. `seed.sql` gives EVERY one of the last 14 days a
+      // `resting_heart_rate` (58), so on a freshly seeded database the chart has no gap to disclose:
+      // the note is absent entirely and the assertion reads
+      // `Received string: "Resting Heart Rate — 14 days"`.
+      //
+      // **This is why it was flaky in CI and green locally, in all three censuses.** CI seeds a new
+      // database every run, so attempt 1 met a full window and failed; the `afterAll` below then
+      // NULLed those seeded values, and the retry — which re-runs `beforeAll` — met an empty window
+      // and passed. A local database is persistent, so one earlier run had already emptied it and
+      // the spec could never fail here again. Measured 2026-09-28: 0 of 15 rows in the window
+      // carried a reading locally, against 15 of 15 on a fresh seed.
+      await db.query(
+        `UPDATE body_metrics SET resting_heart_rate = NULL
+         WHERE user_id = $1 AND date >= ${LOCAL_TODAY} - 14`,
+        [userId])
+
       // Distinct values so the line has a shape rather than a flat run.
       for (const [i, offset] of SEEDED.entries()) {
         await db.query(

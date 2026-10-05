@@ -3,8 +3,20 @@ import { FlameIcon, ChevronRightIcon } from 'lucide-react'
 
 /**
  * Shown in place of the energy-budget card when it can't be computed — the budget needs weight,
- * height, age and sex, and one of those isn't set in the profile. Prompts the user to complete it
- * instead of the card silently vanishing.
+ * height, age and sex, and one of those isn't set in the profile.
+ *
+ * **⚠ LB-176: this is harder to reach than the line above suggests, and it used to render for the
+ * wrong reason.** `health-sections.tsx` chose it whenever `energyBalance` was null — which is true
+ * while loading, on a FAILED read, and for an empty account alike. So a request that did not land told
+ * the owner to re-enter details he set months ago, and a cold load flashed the same instruction before
+ * the payload arrived. That branch now splits by cause and this component only renders with a payload
+ * in hand.
+ *
+ * **And the case it documents routes elsewhere:** the service always returns `missingProfileFields`,
+ * and a non-empty one goes to `CalorieBalanceBar`, which names the fields actually missing instead of
+ * guessing these three. That leaves this component's remaining branch hard to reach — but
+ * "unreachable" was not proven, so it was kept rather than deleted on an assumption. If you are here
+ * to change the copy, check first whether anything still renders it.
  */
 export function EnergyBudgetPrompt() {
   return (

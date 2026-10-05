@@ -11,6 +11,8 @@ interface Props {
   metaToday: BodyMetaRow | null;
   metaRecent: BodyMetaRow[];
   metaLoading: boolean;
+  /** LB-176 — the body-metadata read FAILED, as opposed to having returned nothing. */
+  metaFailed?: boolean;
   onOpenSheet: (kind: "restingHR" | "hrv" | "spo2") => void;
 }
 
@@ -29,7 +31,7 @@ function latestWithDate(
 
 // The resting-HR / HRV / SpO2 grid card — extracted from health-sections.tsx
 // (Task 4.4) as a pure move, no behaviour change.
-export function RhrHrvSpo2Card({ metaToday, metaRecent, metaLoading, onOpenSheet }: Props) {
+export function RhrHrvSpo2Card({ metaToday, metaRecent, metaLoading, metaFailed = false, onOpenSheet }: Props) {
   const router = useTransitionRouter();
   // Warm the detail route before it's tapped — see oura-score-chip-row.
   useEffect(() => { router.prefetch("/health/heart-rate"); }, [router]);
@@ -51,7 +53,7 @@ export function RhrHrvSpo2Card({ metaToday, metaRecent, metaLoading, onOpenSheet
         ) : rhr != null ? (
           <p className="text-xl font-bold tabular-nums" style={{ color: "#ef4444" }}>{rhr.value}</p>
         ) : (
-          <p className="text-xs text-muted-foreground">No data</p>
+          <p className="text-xs text-muted-foreground">{metaFailed ? "Couldn't load" : 'No data'}</p>
         )}
         <p className="text-[9px] text-muted-foreground mt-0.5">bpm{rhr?.staleDate ? ` · ${formatDayShort(rhr.staleDate)}` : ''}</p>
       </button>
@@ -67,7 +69,7 @@ export function RhrHrvSpo2Card({ metaToday, metaRecent, metaLoading, onOpenSheet
         ) : hrv != null ? (
           <p className="text-xl font-bold tabular-nums" style={{ color: "#f97316" }}>{hrv.value.toFixed(0)}</p>
         ) : (
-          <p className="text-xs text-muted-foreground">No data</p>
+          <p className="text-xs text-muted-foreground">{metaFailed ? "Couldn't load" : 'No data'}</p>
         )}
         <p className="text-[9px] text-muted-foreground mt-0.5">ms rMSSD · overnight{hrv?.staleDate ? ` · ${formatDayShort(hrv.staleDate)}` : ''}</p>
       </button>
@@ -83,7 +85,7 @@ export function RhrHrvSpo2Card({ metaToday, metaRecent, metaLoading, onOpenSheet
         ) : spo2 != null ? (
           <p className="text-xl font-bold tabular-nums" style={{ color: "#06b6d4" }}>{spo2.value.toFixed(1)}</p>
         ) : (
-          <p className="text-xs text-muted-foreground">No data</p>
+          <p className="text-xs text-muted-foreground">{metaFailed ? "Couldn't load" : 'No data'}</p>
         )}
         <p className="text-[9px] text-muted-foreground mt-0.5">% O₂{spo2?.staleDate ? ` · ${formatDayShort(spo2.staleDate)}` : ''}</p>
       </button>

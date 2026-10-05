@@ -20,6 +20,9 @@ import { DragDropProvider, PointerSensor, type DragOverEvent } from "@dnd-kit/re
 import type { ProgressionStyle } from "@trainingai/shared/types";
 import type { ExerciseRole, PhaseSetWithPhases } from "@trainingai/shared/types/program";
 import type { EditablePhase } from "@/components/config/phase-editor";
+import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role';
+import { roleForSelectedExercise, musclesForSelectedExercise } from "./recommended-exercise-role";
+import { defaultStyleIdForSlot } from '@/components/config/default-exercise-style';
 
 export interface EditableSet { pct: number; reps: number; restSec?: number; useFor1rm?: boolean }
 export interface EditableExercise {
@@ -215,8 +218,10 @@ export function ProgramEditorSheet({
   };
 
   const addExercise = (si: number) => {
+    // A new slot starts on the style this program already uses, never styleless — see LB-186.
+    const styleId = defaultStyleIdForSlot(programSessions, styles);
     onProgramSessionsChange(programSessions.map((s, i) =>
-      i === si ? { ...s, exercises: [...s.exercises, { key: nextEditKey(), name: "" }] } : s
+      i === si ? { ...s, exercises: [...s.exercises, { key: nextEditKey(), name: "", styleId }] } : s
     ));
   };
 
@@ -228,20 +233,20 @@ export function ProgramEditorSheet({
 
   const selectExerciseName = (si: number, ei: number, name: string) => {
     const match = exerciseLibrary.find(l => l.name.toLowerCase() === name.toLowerCase());
-    const mainMuscles = match ? match.muscles.filter(m => m.role === "main").map(m => m.muscle) : undefined;
-    const secondaryMuscles = match ? match.muscles.filter(m => m.role === "secondary").map(m => m.muscle) : undefined;
+    const muscles = musclesForSelectedExercise(match);
     onProgramSessionsChange(programSessions.map((s, i) =>
       i === si ? {
         ...s,
         exercises: s.exercises.map((e, j) => j !== ei ? e : {
           ...e,
           name,
+          // BF-15 — here, not in `addExercise`: that adds an EMPTY slot and the role needs a
+          // catalogue muscle count, which exists only once a name resolves.
+          exerciseRole: roleForSelectedExercise(match, programSessions[si], ei),
           libraryId: match?.id,
-          mainMuscles: mainMuscles ?? e.mainMuscles,
-          secondaryMuscles: secondaryMuscles ?? e.secondaryMuscles,
-          muscleGroups: match
-            ? match.muscles.map(m => m.muscle)
-            : e.muscleGroups,
+          mainMuscles: muscles.mainMuscles ?? e.mainMuscles,
+          secondaryMuscles: muscles.secondaryMuscles ?? e.secondaryMuscles,
+          muscleGroups: muscles.muscleGroups ?? e.muscleGroups,
         }),
       } : s
     ));
@@ -262,10 +267,13 @@ export function ProgramEditorSheet({
   };
 
   const updateExerciseRole = (si: number, ei: number, role: ExerciseRole) => {
+    // A slot with no style takes the one this role already uses here; a style the user picked stands.
+    const styled = (e: EditableExercise): EditableExercise =>
+      e.styleId ? e : { ...e, styleId: defaultStyleIdForSlot(programSessions, styles, role) };
     onProgramSessionsChange(programSessions.map((s, i) =>
       i === si ? {
         ...s,
-        exercises: s.exercises.map((e, j) => j === ei ? { ...e, exerciseRole: role } : e),
+        exercises: s.exercises.map((e, j) => j === ei ? { ...styled(e), exerciseRole: role } : e),
       } : s
     ));
   };
@@ -812,10 +820,10 @@ export function ProgramEditorSheet({
                                               key={role}
                                               type="button"
                                               onClick={() => updateExerciseRole(si, ei, role)}
-                                              aria-pressed={(ex.exerciseRole ?? 'primary') === role}
+                                              aria-pressed={(ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE) === role}
                                               className={cn(
                                                 "tap-dense tap-target-44 px-2.5 py-1.5 rounded text-xs border transition",
-                                                (ex.exerciseRole ?? 'primary') === role
+                                                (ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE) === role
                                                   ? "bg-brand text-brand-foreground border-brand font-semibold"
                                                   : "bg-muted text-muted-foreground border-border hover:bg-background"
                                               )}

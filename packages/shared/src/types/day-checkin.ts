@@ -2,7 +2,22 @@
 // End of Day review. All scale fields are 1–5; journal is the only free text.
 export type CheckinPhase = 'evening' | 'morning'
 
-export type VsYesterday = 'better' | 'same' | 'worse'
+export type VsNormal = 'better' | 'same' | 'worse'
+
+/**
+ * LB-190. Which comparative question a `vsNormal` answer replied to. Stored on every answered row,
+ * because the two questions are different measurements and must never be pooled in one trend:
+ * "compared to yesterday" (TN-58, the original) and "compared to normal" (OR-206). A deploy date
+ * cannot mark the boundary, because Railway ships on merge and one local day can hold rows from both
+ * sides. So each row says which question it answered.
+ */
+export const VS_QUESTION = { YESTERDAY: 1, NORMAL: 2 } as const
+export type VsQuestion = (typeof VS_QUESTION)[keyof typeof VS_QUESTION]
+/** The question the morning sheet asks today. Moved to NORMAL by OR-206 (2026-09-30), in the same
+ *  change as the copy — which is the only way it may ever move: a prompt and a marker that disagree
+ *  mislabel every row written between them, silently, and the column exists to prevent exactly that.
+ *  The picker's own guard asserts the pair, so this cannot drift from what the screen asks. */
+export const CURRENT_VS_QUESTION: VsQuestion = VS_QUESTION.NORMAL
 
 export interface DayCheckin {
   id: string
@@ -29,7 +44,9 @@ export interface DayCheckin {
   sleepQualityFeelTouched: boolean
   // TN-58: is today better, the same, or worse than yesterday? NULL = not answered. A comparative
   // question because the absolute 1-5 above produced two distinct values in 81 days.
-  vsYesterday: VsYesterday | null
+  vsNormal: VsNormal | null
+  /** LB-190. The question `vsNormal` answered; null exactly when `vsNormal` is null. */
+  vsQuestion: VsQuestion | null
   soreMuscles: string[]
   journal: string | null
   /**

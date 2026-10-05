@@ -14,6 +14,7 @@ import type { LogExercisePayload } from '@trainingai/shared/workout/log-exercise
 import { resolveLoggedDose } from '@trainingai/shared/nutrition/supplement-dose-freeze';
 import { defaultUseFor1rm } from '@trainingai/shared/workout/default-use-for-1rm';
 import { assembleLocalActiveProgram, type LocalActiveProgram } from './program-assembler';
+import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role';
 
 /**
  * The local `ingredients` column is a TEXT mirror of the server's JSONB. A row written by an older
@@ -61,10 +62,9 @@ function foodItemRowToItem(r: Record<string, unknown>): FoodItem {
     satFatG: r.sat_fat_g != null ? Number(r.sat_fat_g) : undefined,
     source: (r.source ? String(r.source) : 'manual') as FoodItem['source'],
     barcode: r.barcode ? String(r.barcode) : undefined,
-    // `image_data_uri` is deliberately NOT read here — see LA-36. It is stored locally and the
-    // server's own searchFoodItems returns it, so the device's local-first read is the one surface
-    // that loses the picture. Fixing that is a visible change on two Lane B screens and wants its
-    // own entry rather than riding a de-duplication PR.
+    // LA-36: the picture BF-35 stores as bytes so it renders offline. The server's rowToFoodItem
+    // returns it from every read, and the local-first read now does too.
+    imageDataUri: r.image_data_uri ? String(r.image_data_uri) : null,
     region: '', createdAt: new Date(String(r.updated_at)),
   };
 }
@@ -981,6 +981,7 @@ export class SQLiteLocalStore implements LocalStore {
       gateAction:    r.gate_action != null ? String(r.gate_action) : 'proceed',
       status:        (r.status as LocalPrescribedRun['status']) ?? 'pending',
       activityLogId: r.activity_log_id != null ? String(r.activity_log_id) : null,
+      completedAs:   r.completed_as === 'run' || r.completed_as === 'walk' ? r.completed_as : null,
       updatedAt:     String(r.updated_at),
       deletedAt:     r.deleted_at != null ? String(r.deleted_at) : null,
       syncStatus:    (r.sync_status as 'pending' | 'synced') ?? 'synced',
@@ -992,21 +993,23 @@ export class SQLiteLocalStore implements LocalStore {
       `INSERT INTO prescribed_runs
          (id, plan_id, date, run_type, duration_min, distance_km, target_hr_low,
           target_hr_high, target_zone_ids, rationale, gate_action, status,
-          activity_log_id, updated_at, deleted_at, sync_status)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+          activity_log_id, completed_as, updated_at, deleted_at, sync_status)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(id) DO UPDATE SET
          plan_id=excluded.plan_id, date=excluded.date, run_type=excluded.run_type,
          duration_min=excluded.duration_min, distance_km=excluded.distance_km,
          target_hr_low=excluded.target_hr_low, target_hr_high=excluded.target_hr_high,
          target_zone_ids=excluded.target_zone_ids, rationale=excluded.rationale,
          gate_action=excluded.gate_action, status=excluded.status,
-         activity_log_id=excluded.activity_log_id, updated_at=excluded.updated_at,
+         activity_log_id=excluded.activity_log_id, completed_as=excluded.completed_as,
+         updated_at=excluded.updated_at,
          deleted_at=excluded.deleted_at, sync_status=excluded.sync_status`,
       [
         record.id, record.planId, record.date, record.runType, record.durationMin,
         record.distanceKm, record.targetHrLow, record.targetHrHigh,
         JSON.stringify(record.targetZoneIds ?? []), record.rationale, record.gateAction,
-        record.status, record.activityLogId, record.updatedAt, record.deletedAt, record.syncStatus,
+        record.status, record.activityLogId, record.completedAs ?? null,
+        record.updatedAt, record.deletedAt, record.syncStatus,
       ],
     );
   }
@@ -1065,7 +1068,7 @@ export class SQLiteLocalStore implements LocalStore {
         styleId:      r.style_id ? String(r.style_id) : null,
         muscleGroups: JSON.parse(String(r.muscle_groups ?? '[]')),
         position:     Number(r.position),
-        exerciseRole: String(r.exercise_role ?? 'primary'),
+        exerciseRole: String(r.exercise_role ?? UNCLASSIFIED_EXERCISE_ROLE),
         supersetGroup: r.superset_group != null ? Number(r.superset_group) : null,
       })),
       styles:    styleRows.map(r => ({
@@ -1215,7 +1218,8 @@ export class SQLiteLocalStore implements LocalStore {
       illnessContext:            r.illness_context ? String(r.illness_context) as import('@trainingai/shared/types/day-checkin').IllnessContext : null,
       perceivedRecoveryTouched:  Number(r.perceived_recovery_touched) === 1,
       sleepQualityFeelTouched:   Number(r.sleep_quality_feel_touched) === 1,
-      vsYesterday:       r.vs_yesterday ? String(r.vs_yesterday) as import('@trainingai/shared/types/day-checkin').VsYesterday : null,
+      vsNormal:       r.vs_normal ? String(r.vs_normal) as import('@trainingai/shared/types/day-checkin').VsNormal : null,
+      vsQuestion:     r.vs_normal && r.vs_question != null ? Number(r.vs_question) as import('@trainingai/shared/types/day-checkin').VsQuestion : null,
       soreMuscles:       JSON.parse(String(r.sore_muscles ?? '[]')),
       journal:           r.journal ? String(r.journal) : null,
       updatedAt:         String(r.updated_at),
@@ -1235,9 +1239,9 @@ export class SQLiteLocalStore implements LocalStore {
          (log_date, phase, physical_tiredness, mental_drain, barely_moved,
           hydration, late_heavy_meal, wake_mood, perceived_recovery, motivation,
           sleep_quality_feel, resting_soreness, illness_context, perceived_recovery_touched,
-          sleep_quality_feel_touched, vs_yesterday, sore_muscles, journal,
+          sleep_quality_feel_touched, vs_normal, vs_question, sore_muscles, journal,
           food_logging_completed_at, updated_at, deleted_at, sync_status)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(log_date, phase) DO UPDATE SET
          physical_tiredness=excluded.physical_tiredness, mental_drain=excluded.mental_drain,
          barely_moved=excluded.barely_moved, hydration=excluded.hydration,
@@ -1247,7 +1251,7 @@ export class SQLiteLocalStore implements LocalStore {
          illness_context=excluded.illness_context,
          perceived_recovery_touched=excluded.perceived_recovery_touched,
          sleep_quality_feel_touched=excluded.sleep_quality_feel_touched,
-         vs_yesterday=excluded.vs_yesterday,
+         vs_normal=excluded.vs_normal, vs_question=excluded.vs_question,
          sore_muscles=excluded.sore_muscles,
          journal=excluded.journal,
          food_logging_completed_at=COALESCE(excluded.food_logging_completed_at, day_checkins.food_logging_completed_at),
@@ -1259,7 +1263,7 @@ export class SQLiteLocalStore implements LocalStore {
         record.wakeMood, record.perceivedRecovery, record.motivation,
         record.sleepQualityFeel, record.restingSoreness,
         record.illnessContext, record.perceivedRecoveryTouched ? 1 : 0, record.sleepQualityFeelTouched ? 1 : 0,
-        record.vsYesterday ?? null,
+        record.vsNormal ?? null, record.vsNormal == null ? null : (record.vsQuestion ?? null),
         JSON.stringify(record.soreMuscles), record.journal,
         record.foodLoggingCompletedAt ?? null, record.updatedAt,
         record.deletedAt, record.syncStatus,
@@ -1389,9 +1393,16 @@ export class SQLiteLocalStore implements LocalStore {
     for (const a of delta.planMealAnswers ?? []) {
       await runSQL(
         `INSERT INTO plan_meal_answers
-           (id, plan_meal_id, log_date, answer, answered_at, updated_at, deleted_at, sync_status)
-         VALUES (?,?,?,?,?,?,?,'synced')
+           (id, plan_meal_id, log_date, answer, answered_at, updated_at, deleted_at,
+            est_calories, est_protein_g, est_carbs_g, est_fat_g, est_bias_kcal, est_basis, sync_status)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
          ON CONFLICT(id) DO UPDATE SET
+           est_calories=CASE WHEN sync_status='synced' THEN excluded.est_calories ELSE est_calories END,
+           est_protein_g=CASE WHEN sync_status='synced' THEN excluded.est_protein_g ELSE est_protein_g END,
+           est_carbs_g=CASE WHEN sync_status='synced' THEN excluded.est_carbs_g ELSE est_carbs_g END,
+           est_fat_g=CASE WHEN sync_status='synced' THEN excluded.est_fat_g ELSE est_fat_g END,
+           est_bias_kcal=CASE WHEN sync_status='synced' THEN excluded.est_bias_kcal ELSE est_bias_kcal END,
+           est_basis=CASE WHEN sync_status='synced' THEN excluded.est_basis ELSE est_basis END,
            plan_meal_id=CASE WHEN sync_status='synced' THEN excluded.plan_meal_id ELSE plan_meal_id END,
            log_date=CASE WHEN sync_status='synced' THEN excluded.log_date ELSE log_date END,
            answer=CASE WHEN sync_status='synced' THEN excluded.answer ELSE answer END,
@@ -1399,7 +1410,9 @@ export class SQLiteLocalStore implements LocalStore {
            updated_at=CASE WHEN sync_status='synced' THEN excluded.updated_at ELSE updated_at END,
            deleted_at=CASE WHEN sync_status='synced' THEN excluded.deleted_at ELSE deleted_at END`,
         [a.id, a.planMealId, a.logDate, a.answer ?? 'no', a.answeredAt ?? null,
-         a.updatedAt ?? null, a.deletedAt ?? null],
+         a.updatedAt ?? null, a.deletedAt ?? null,
+         a.estCalories ?? null, a.estProteinG ?? null, a.estCarbsG ?? null, a.estFatG ?? null,
+         a.estBiasKcal ?? null, a.estBasis ?? null],
       );
     }
     for (const r of delta.bodyMetrics ?? []) {
@@ -1841,20 +1854,21 @@ export class SQLiteLocalStore implements LocalStore {
         `INSERT INTO prescribed_runs
            (id, plan_id, date, run_type, duration_min, distance_km, target_hr_low,
             target_hr_high, target_zone_ids, rationale, gate_action, status,
-            activity_log_id, updated_at, deleted_at, sync_status)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
+            activity_log_id, completed_as, updated_at, deleted_at, sync_status)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
          ON CONFLICT(id) DO UPDATE SET
            plan_id=excluded.plan_id, date=excluded.date, run_type=excluded.run_type,
            duration_min=excluded.duration_min, distance_km=excluded.distance_km,
            target_hr_low=excluded.target_hr_low, target_hr_high=excluded.target_hr_high,
            target_zone_ids=excluded.target_zone_ids, rationale=excluded.rationale,
            gate_action=excluded.gate_action, status=excluded.status,
-           activity_log_id=excluded.activity_log_id, updated_at=excluded.updated_at,
+           activity_log_id=excluded.activity_log_id, completed_as=excluded.completed_as,
+           updated_at=excluded.updated_at,
            deleted_at=excluded.deleted_at, sync_status='synced'
          WHERE prescribed_runs.sync_status='synced' AND prescribed_runs.deleted_at IS NULL`,
         [r.id, r.planId, r.date, r.runType, r.durationMin, r.distanceKm, r.targetHrLow,
          r.targetHrHigh, JSON.stringify(r.targetZoneIds ?? []), r.rationale, r.gateAction,
-         r.status, r.activityLogId, r.updatedAt, r.deletedAt],
+         r.status, r.activityLogId, r.completedAs ?? null, r.updatedAt, r.deletedAt],
       );
     }
 
@@ -2144,9 +2158,9 @@ export class SQLiteLocalStore implements LocalStore {
              (log_date, phase, physical_tiredness, mental_drain, barely_moved,
               hydration, late_heavy_meal, wake_mood, perceived_recovery, motivation,
               sleep_quality_feel, resting_soreness, illness_context, perceived_recovery_touched,
-              sleep_quality_feel_touched, vs_yesterday, sore_muscles, journal,
+              sleep_quality_feel_touched, vs_normal, vs_question, sore_muscles, journal,
               food_logging_completed_at, updated_at, deleted_at, sync_status)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
            ON CONFLICT(log_date, phase) DO UPDATE SET
              physical_tiredness=excluded.physical_tiredness, mental_drain=excluded.mental_drain,
              barely_moved=excluded.barely_moved, hydration=excluded.hydration,
@@ -2156,7 +2170,7 @@ export class SQLiteLocalStore implements LocalStore {
              illness_context=excluded.illness_context,
              perceived_recovery_touched=excluded.perceived_recovery_touched,
              sleep_quality_feel_touched=excluded.sleep_quality_feel_touched,
-             vs_yesterday=excluded.vs_yesterday,
+             vs_normal=excluded.vs_normal, vs_question=excluded.vs_question,
              sore_muscles=excluded.sore_muscles,
              journal=excluded.journal,
              food_logging_completed_at=excluded.food_logging_completed_at,
@@ -2168,7 +2182,7 @@ export class SQLiteLocalStore implements LocalStore {
            r.hydration, r.lateHeavyMeal, r.wakeMood, r.perceivedRecovery, r.motivation,
            r.sleepQualityFeel, r.restingSoreness, r.illnessContext,
            r.perceivedRecoveryTouched ? 1 : 0, r.sleepQualityFeelTouched ? 1 : 0,
-           r.vsYesterday ?? null,
+           r.vsNormal ?? null, r.vsNormal == null ? null : (r.vsQuestion ?? null),
            JSON.stringify(r.soreMuscles), r.journal, r.foodLoggingCompletedAt ?? null,
            r.updatedAt, r.deletedAt],
         );
@@ -2437,7 +2451,7 @@ export class SQLiteLocalStore implements LocalStore {
       `SELECT fl.id, fl.date, fl.meal_type_id, fl.food_item_id, fl.quantity_multiplier, fl.logged_at,
               fl.saved_meal_id, fl.meal_group_id, fl.meal_group_name,
               fi.name, fi.brand, fi.serving_size_g, fi.calories, fi.protein_g, fi.carbs_g, fi.fat_g,
-              fi.fiber_g, fi.sugar_g, fi.sodium_mg, fi.sat_fat_g, fi.source
+              fi.fiber_g, fi.sugar_g, fi.sodium_mg, fi.sat_fat_g, fi.source, fi.image_data_uri
          FROM food_logs fl
          JOIN food_items fi ON fi.id = fl.food_item_id
         WHERE fl.date = ? AND fl.deleted_at IS NULL
@@ -2467,6 +2481,7 @@ export class SQLiteLocalStore implements LocalStore {
           sugarG: r.sugar_g != null ? Number(r.sugar_g) : undefined,
           sodiumMg: r.sodium_mg != null ? Number(r.sodium_mg) : undefined,
           satFatG: r.sat_fat_g != null ? Number(r.sat_fat_g) : undefined,
+          imageDataUri: r.image_data_uri ? String(r.image_data_uri) : null,
           source: (r.source ? String(r.source) : 'manual') as 'ai' | 'barcode' | 'manual' | 'text',
           region: '', createdAt: new Date(String(r.logged_at)),
         },
@@ -2548,7 +2563,7 @@ export class SQLiteLocalStore implements LocalStore {
     const rows = await querySQL<Record<string, unknown>>(
       `SELECT fi.id, fi.name, fi.brand, fi.serving_size_g, fi.calories, fi.protein_g,
               fi.carbs_g, fi.fat_g, fi.fiber_g, fi.sugar_g, fi.sodium_mg, fi.sat_fat_g,
-              fi.source, fi.updated_at
+              fi.source, fi.image_data_uri, fi.updated_at
          FROM food_logs fl
          JOIN food_items fi ON fi.id = fl.food_item_id
         WHERE ${mealTypeId ? 'fl.meal_type_id = ? AND ' : ''}fl.deleted_at IS NULL
@@ -2570,6 +2585,7 @@ export class SQLiteLocalStore implements LocalStore {
         sugarG: r.sugar_g != null ? Number(r.sugar_g) : undefined,
         sodiumMg: r.sodium_mg != null ? Number(r.sodium_mg) : undefined,
         satFatG: r.sat_fat_g != null ? Number(r.sat_fat_g) : undefined,
+        imageDataUri: r.image_data_uri ? String(r.image_data_uri) : null,
         source: (r.source ? String(r.source) : 'manual') as FoodItem['source'],
         region: '', createdAt: new Date(String(r.updated_at)),
       } satisfies FoodItem);
@@ -2646,7 +2662,8 @@ export class SQLiteLocalStore implements LocalStore {
 
   async getPlanMealAnswers(logDate: string): Promise<LocalPlanMealAnswer[]> {
     const rows = await querySQL<Record<string, unknown>>(
-      `SELECT id, plan_meal_id, log_date, answer, answered_at, updated_at, deleted_at
+      `SELECT id, plan_meal_id, log_date, answer, answered_at, updated_at, deleted_at,
+              est_calories, est_protein_g, est_carbs_g, est_fat_g, est_bias_kcal, est_basis
        FROM plan_meal_answers WHERE log_date = ? AND deleted_at IS NULL`, [logDate],
     );
     return rows.map(r => ({
@@ -2657,18 +2674,43 @@ export class SQLiteLocalStore implements LocalStore {
       answeredAt: r.answered_at == null ? null : String(r.answered_at),
       updatedAt: r.updated_at == null ? null : String(r.updated_at),
       deletedAt: r.deleted_at == null ? null : String(r.deleted_at),
+      estCalories: r.est_calories == null ? null : Number(r.est_calories), estProteinG: r.est_protein_g == null ? null : Number(r.est_protein_g),
+      estCarbsG: r.est_carbs_g == null ? null : Number(r.est_carbs_g), estFatG: r.est_fat_g == null ? null : Number(r.est_fat_g),
+      estBiasKcal: r.est_bias_kcal == null ? null : Number(r.est_bias_kcal), estBasis: r.est_basis == null ? null : String(r.est_basis),
     }));
   }
 
   async upsertPlanMealAnswer(a: LocalPlanMealAnswer & { syncStatus?: string }): Promise<void> {
+    const est = [a.estCalories ?? null, a.estProteinG ?? null, a.estCarbsG ?? null, a.estFatG ?? null,
+      a.estBiasKcal ?? null, a.estBasis ?? null]
+    // BF-203a. One live answer per meal and day. A decline made over an estimate must REPLACE it
+    // (answer and est_* together), or the day holds a decline and an estimate that still counts.
+    // The device mirror of the server's revive in `savePlanMealAnswer`.
+    const live = await querySQL<{ id: string }>(
+      `SELECT id FROM plan_meal_answers WHERE plan_meal_id = ? AND log_date = ? AND deleted_at IS NULL AND id <> ?`,
+      [a.planMealId, a.logDate, a.id],
+    )
+    if (live.length > 0) {
+      await runSQL(
+        `UPDATE plan_meal_answers SET answer = ?, answered_at = ?, updated_at = ?, deleted_at = ?,
+           est_calories = ?, est_protein_g = ?, est_carbs_g = ?, est_fat_g = ?, est_bias_kcal = ?, est_basis = ?,
+           sync_status = ?
+         WHERE plan_meal_id = ? AND log_date = ? AND deleted_at IS NULL`,
+        [a.answer, a.answeredAt, a.updatedAt, a.deletedAt, ...est, a.syncStatus ?? 'pending', a.planMealId, a.logDate],
+      )
+      return
+    }
     await runSQL(
-      `INSERT INTO plan_meal_answers (id, plan_meal_id, log_date, answer, answered_at, updated_at, deleted_at, sync_status)
-       VALUES (?,?,?,?,?,?,?,?)
+      `INSERT INTO plan_meal_answers (id, plan_meal_id, log_date, answer, answered_at, updated_at, deleted_at,
+         est_calories, est_protein_g, est_carbs_g, est_fat_g, est_bias_kcal, est_basis, sync_status)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(id) DO UPDATE SET
          plan_meal_id=excluded.plan_meal_id, log_date=excluded.log_date, answer=excluded.answer,
          answered_at=excluded.answered_at, updated_at=excluded.updated_at,
-         deleted_at=excluded.deleted_at, sync_status=excluded.sync_status`,
-      [a.id, a.planMealId, a.logDate, a.answer, a.answeredAt, a.updatedAt, a.deletedAt,
+         deleted_at=excluded.deleted_at, est_calories=excluded.est_calories,
+         est_protein_g=excluded.est_protein_g, est_carbs_g=excluded.est_carbs_g, est_fat_g=excluded.est_fat_g,
+         est_bias_kcal=excluded.est_bias_kcal, est_basis=excluded.est_basis, sync_status=excluded.sync_status`,
+      [a.id, a.planMealId, a.logDate, a.answer, a.answeredAt, a.updatedAt, a.deletedAt, ...est,
        a.syncStatus ?? 'pending'],
     );
   }
