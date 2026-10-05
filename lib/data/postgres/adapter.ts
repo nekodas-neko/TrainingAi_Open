@@ -5491,7 +5491,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             readinessSource:       str(p.readinessSource),
             activityScore:         int(p.activityScore),
             activityContributors:  json(p.activityContributors),
-            activeCaloriesEst:     int(p.activeCaloriesEst),
             trainingLoadOts:       num(p.trainingLoadOts),
             acwr:                  num(p.acwr),
             trainingLoadHigh:      bool(p.trainingLoadHigh),
@@ -5500,7 +5499,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             trainingLoadValidMin:  int(p.trainingLoadValidMin),
             trainingLoadEvaluatedAt: ts(p.trainingLoadEvaluatedAt),
             recoveryIndexHours:    num(p.recoveryIndexHours),
-            wornHoursBle:          num(p.wornHoursBle),
             nightHrvBaselineMs:    num(p.nightHrvBaselineMs),
             illnessFlag:           str(p.illnessFlag),
             illnessScore:          int(p.illnessScore),
@@ -5524,8 +5522,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             daytimeStressCoverageMin:      int(p.daytimeStressCoverageMin),
             chronicStressGranularNights:   int(p.chronicStressGranularNights),
             bdiDerived:            num(p.bdiDerived),
-            vascularAge:           num(p.vascularAge),
-            pwv:                   num(p.pwv),
             bodyComp:              json(p.bodyComp),
           })
           processed++

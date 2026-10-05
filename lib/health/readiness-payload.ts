@@ -17,7 +17,7 @@ import type { OuraDailyDerivedPatch } from '@/lib/data/repository'
 import { todayInTz, todayMidnightUtc, toAestDay, ageFromDob, shiftDateStr } from '@trainingai/shared/date-utils'
 import { recentDoses, withDoseContext, DOSE_EFFECT_LOOKBACK_DAYS, type RecentDose } from '@trainingai/shared/health/dose-context'
 import { getCurrentPhase } from '@trainingai/shared/phase-engine'
-import { computeVolumeAcwr, ACWR_THRESHOLDS } from '@trainingai/shared/ai-periodization/acwr'
+import { computeVolumeAcwr, ACWR_THRESHOLDS, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
 import { scoreBand } from '@trainingai/shared/health/score-band'
 import { computeSleepScore, sleepComponentsToContributors, sleepScoreBaselines } from '@trainingai/shared/health/sleep-score'
 import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
@@ -444,10 +444,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
 
   // Skip ACWR for the first 28 days of a new program — chronic load baseline not yet valid.
   // Resolved here (ahead of the activity score) so the over-exertion taper can read it.
-  const programAgeMs = program?.startedAt
-    ? todayMid.getTime() - new Date(program.startedAt).getTime()
-    : Infinity
-  const acwr = programAgeMs >= 28 * 86_400_000 ? load.acwr : null
+  const acwr = acwrBaselineDaysRemaining(program, todayMid) > 0 ? null : load.acwr
 
   // Goal-anchored Activity score (W-B) — scored against the user's personalised daily goals
   // (single source: getDailyGoals) rather than their own trailing average. Two lanes: today's

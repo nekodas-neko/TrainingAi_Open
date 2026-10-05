@@ -93,9 +93,7 @@ export const OuraDailyDerivedPushSchema = z.object({
   illnessScore:    score(),
   chronicStressScore: score(),
 
-  activeCaloriesEst:   optInt(0, 30_000),
   recoveryIndexHours:  optNum(0, HOURS_IN_DAY),
-  wornHoursBle:        optNum(0, HOURS_IN_DAY),
   nightHrvBaselineMs:  optNum(0, HRV_MS_MAX),
   stressHighMinutes:   optInt(0, MINUTES_IN_DAY),
   recoveryHighMinutes: optInt(0, MINUTES_IN_DAY),

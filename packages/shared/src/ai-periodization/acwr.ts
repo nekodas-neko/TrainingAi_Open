@@ -52,6 +52,37 @@ export function computeVolumeAcwr(sessions: AcwrSession[], todayMid: Date, opts:
   }
 }
 
+/**
+ * OR-210. How long a program must have run before its chronic load is a valid baseline. Until then
+ * the chronic window still holds the PREVIOUS routine, so the ratio is unreliable and is withheld.
+ */
+export const ACWR_BASELINE_DAYS = 28
+
+export interface ProgramAgeInput { startedAt?: Date | string | null; createdAt?: Date | string | null }
+
+/**
+ * Whole days since the program began, as of `asOf`: `startedAt`, else `createdAt`. A program with
+ * no start date is still as old as its row, and that fallback is the whole point: three rules
+ * existed for this one question. The Health route fell back to `createdAt`; readiness and the
+ * score audit read `startedAt` alone and treated a missing one as INFINITELY old, so they never
+ * baselined; and signals, chat and running did not ask. The owner's active program has
+ * `started_at = NULL`, which is how July's early-deload card ran on live ACWR while the Health card
+ * said "baselining". Null when there is no program or no usable date.
+ */
+export function programAgeDays(program: ProgramAgeInput | null | undefined, asOf: Date): number | null {
+  const began = program?.startedAt ?? program?.createdAt ?? null
+  if (began == null) return null
+  const t = new Date(began).getTime()
+  if (!Number.isFinite(t)) return null
+  return Math.floor((asOf.getTime() - t) / 86_400_000)
+}
+
+/** Days until the chronic baseline is valid. 0 when it already is, and when there is no program to judge. */
+export function acwrBaselineDaysRemaining(program: ProgramAgeInput | null | undefined, asOf: Date): number {
+  const age = programAgeDays(program, asOf)
+  return age == null ? 0 : Math.max(0, ACWR_BASELINE_DAYS - age)
+}
+
 export interface AcwrBand {
   key: 'low' | 'optimal' | 'high' | 'very_high'
   label: string
@@ -96,6 +127,33 @@ const ACWR_BAND_BY_KEY: Record<AcwrBand['key'], AcwrBand> = {
 }
 export function acwrBandByKey(key: AcwrBand['key']): AcwrBand {
   return ACWR_BAND_BY_KEY[key]
+}
+
+export type TrainingLoadInterpretation = AcwrBand['key'] | 'insufficient_data' | 'baselining'
+
+export interface TrainingLoadBand {
+  /** The ratio, or null while it is insufficient or baselining. */
+  acwr: number | null
+  acuteLoad: number
+  chronicLoad: number
+  interpretation: TrainingLoadInterpretation
+  baselineDaysRemaining?: number
+}
+
+/**
+ * OR-210. The ONE place a volume-load ACWR becomes a band the user is shown. The Health route and
+ * the chat tool both call this, so they cannot disagree: before it, the chat tool returned a raw
+ * number over a 56-day window and the model banded it itself, and **32 of the owner's last 76 days
+ * disagreed with the Health card**. Order matters and is the route's: too little data first, then a
+ * program too young for its chronic baseline, then the band.
+ */
+export function trainingLoadBand(load: AcwrResult, program: ProgramAgeInput | null | undefined, todayMid: Date): TrainingLoadBand {
+  const acuteLoad = Math.round(load.acuteLoadKg)
+  const chronicLoad = Math.round(load.chronicWeeklyAvgKg)
+  if (load.acwr == null) return { acwr: null, acuteLoad, chronicLoad, interpretation: 'insufficient_data' }
+  const remaining = acwrBaselineDaysRemaining(program, todayMid)
+  if (remaining > 0) return { acwr: null, acuteLoad, chronicLoad, interpretation: 'baselining', baselineDaysRemaining: remaining }
+  return { acwr: parseFloat(load.acwr.toFixed(2)), acuteLoad, chronicLoad, interpretation: acwrBand(load.acwr).key }
 }
 
 export interface MonotonyStrainResult {

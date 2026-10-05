@@ -56,7 +56,7 @@ describe('OuraDailySummaryPushSchema', () => {
 })
 
 describe('OuraDailyDerivedPushSchema', () => {
-  const derived = { sleepScore: 78, readinessScore: 71, activityScore: 64, illnessScore: 12, wornHoursBle: 21.5 }
+  const derived = { sleepScore: 78, readinessScore: 71, activityScore: 64, illnessScore: 12, recoveryIndexHours: 6.5 }
 
   it('accepts an ordinary day', () => {
     expect(OuraDailyDerivedPushSchema.safeParse(derived).success).toBe(true)
@@ -69,7 +69,8 @@ describe('OuraDailyDerivedPushSchema', () => {
 
   it('rejects more minutes than a day contains', () => {
     expect(OuraDailyDerivedPushSchema.safeParse({ ...derived, stressHighMinutes: 100000 }).success).toBe(false)
-    expect(OuraDailyDerivedPushSchema.safeParse({ ...derived, wornHoursBle: 99 }).success).toBe(false)
+    // LA-142 dropped `wornHoursBle`; `recoveryIndexHours` carries the same 0-24 bound.
+    expect(OuraDailyDerivedPushSchema.safeParse({ ...derived, recoveryIndexHours: 99 }).success).toBe(false)
   })
 
   it('leaves the open-ended research metrics alone rather than inventing a ceiling', () => {
