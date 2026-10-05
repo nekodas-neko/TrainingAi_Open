@@ -254,12 +254,14 @@ export function AiPrescriptionCard({
                 </p>
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
                   {/* LB-47. `blocked.length === 0` used to render the "every exercise is back" line
-                      for BOTH "everything reverted" and "there was nothing to revert" — and the
-                      second is what a SESSION-level deload always looks like, because its low
-                      intensities are baked into the prescription's own pcts and no exercise carries
-                      a `preDeload` block. So the card confirmed an override that had not happened. */}
+                      for BOTH "everything reverted" and "there was nothing to revert", so the card
+                      confirmed an override that had not happened.
+                      #2131. Nothing to revert used to be every whole-session deload; since BF-198
+                      those record `preDeload` for each exercise with a progression style, so what is
+                      left is a prescription stored before that, or exercises with no style. The old
+                      line sent him to "a new prescription", which nothing on screen can ask for. */}
                   {overrideOutcome === 'nothing-to-revert'
-                    ? "This prescription lowered the whole session rather than individual exercises, so there are no pre-deload numbers recorded to go back to. Turning Full on does not change today's targets — you would need a new prescription for that."
+                    ? "This prescription has no full numbers recorded to go back to, so today's targets stay as they are and these sets are logged as a deload. Full numbers are recorded for every exercise with a progression style — give any exercise without one a style in the program editor, and the next prescription will have them."
                     : overrideBlockedNames.length === 0
                     ? "Every exercise is back to its pre-deload weights and sets, and these sets count toward your 1RM."
                     : `Most exercises are back to their pre-deload weights and sets. ${
