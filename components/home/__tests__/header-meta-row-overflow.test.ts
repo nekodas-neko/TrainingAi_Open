@@ -23,9 +23,23 @@ const code = (s: string) => stripComments(s);
 describe('the header meta row can absorb a shortfall', () => {
   const row = code(src('components/home/header-meta-row.tsx'));
 
-  it('lets the date shrink and truncate — it is the item that gives', () => {
-    expect(row).toMatch(/className="text-xs text-muted-foreground truncate min-w-0"/);
-    // `shrink-0` on the date is what made the row unshrinkable; `truncate` supplies its own nowrap.
+  /**
+   * #2174. Measured at 412 dp: the row is 224 px and the daytime chips take 200–209 of it, so a date
+   * sharing that row had 7–16 px — nothing fits, and the two width fixes before this each re-broke on
+   * a sunny day. The owner chose placement A: the chips keep the row, the date gets its own line
+   * below. The assertion is structural on purpose — the date must not be a child of the chip row,
+   * because any layout where it is makes its width depend on the weather chip again.
+   */
+  it('puts the date on its own line below the chips, outside the chip row (#2174)', () => {
+    const chipRow = row.match(/<div className="flex items-center gap-2 min-w-0 overflow-hidden">([\s\S]*?)<\/div>/);
+    expect(chipRow, 'the chip row should be findable').not.toBeNull();
+    expect(chipRow![1].trim(), 'the chip row holds the chips and nothing else').toBe('<HeaderChips />');
+    const dateAt = row.indexOf("formatInTimeZone(new Date(), tz, 'EEEE d MMMM')");
+    expect(dateAt, 'the date renders after the chip row, i.e. below it').toBeGreaterThan(row.indexOf(chipRow![0]) + chipRow![0].length);
+  });
+
+  it('still lets the date truncate against the full column', () => {
+    expect(row).toMatch(/className="[^"]*text-xs text-muted-foreground truncate"/);
     expect(row).not.toMatch(/text-muted-foreground[^"]*shrink-0/);
   });
 

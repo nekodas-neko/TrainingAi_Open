@@ -8,39 +8,35 @@ import dynamic from 'next/dynamic'
 const HeaderChips = dynamic(() => import('@/components/home/header-chips').then(m => m.HeaderChips), { ssr: false })
 
 /**
- * Home's header meta row: today's date, then the chips.
+ * Home's header meta rows: the chips on one line, today's date on its own line below them.
  *
- * **It is a component because the row needed an overflow strategy and the header could not grow.**
- * `session-select-content.tsx` is a shrink-only hotspot, and the rule there is to extract rather
- * than append — the same reason `HeaderChips` exists.
+ * **It is a component because the header could not grow.** `session-select-content.tsx` is a
+ * shrink-only hotspot, and the rule there is to extract rather than append — the same reason
+ * `HeaderChips` exists.
  *
- * **BF-116: every item in this row is `shrink-0`.** BF-96 gave the weather chip
- * `whitespace-nowrap shrink-0` on 2026-09-01, correctly — it was the only compressible item, took
- * 100% of any shortfall, and broke `UV 5` across two lines. The device chips carry the same pair
- * (Q-111, the day after), and the date already had it. With nothing left to compress the shortfall
- * had nowhere to go, so instead of wrapping the row overflowed across the action buttons: the
- * owner's *"the grid and battery pill still intersect"*.
+ * **#2174: the date and the chips no longer share a row.** At 412 dp the row is 224 px and the
+ * daytime chips take 200–209 of it, so the date had 7–16 px left — not two characters. BF-96 and
+ * BF-116 each shipped a width fix and each re-broke on a sunny day, because the slack they spent was
+ * the date's. The owner chose (2026-09-26) to give the date its own line: the chips keep the header
+ * row and the date moves below it (placement A in `docs/design/2026-09-29-home-header-date-line.html`).
+ * That costs one ~18 px line of Home once, and the date's width stops depending on the weather chip.
  *
- * **The date is what gives.** It is the longest item, the least informative, and the only one whose
- * length varies — `EEEE d MMMM` runs 12–20 characters across the year, which BF-96 had already
- * identified as the variable that runs the row out of width. `min-w-0` is what lets a flex item
- * shrink below its content at all; `truncate` supplies the ellipsis and its own `nowrap`.
+ * **Every chip stays `shrink-0`.** BF-96 gave the weather chip `whitespace-nowrap shrink-0`; dropping
+ * it restores the two-line wrap it fixed. `overflow-hidden` on the chip row is the floor for a future
+ * fourth chip — clipped inside the row rather than spilling across the action buttons.
  *
- * **`overflow-hidden` is the floor, not the fix.** Once the date has truncated to nothing, chips
- * alone can still outgrow the width — a third is already expected, since anything with a battery is
- * a candidate and only the scale deliberately has none. Clipping inside this row keeps that case off
- * the buttons rather than letting it spill.
- *
- * **Do not solve a future recurrence by dropping `shrink-0` from the chips.** That restores the
- * two-line wrap BF-96 fixed. This row wants an overflow strategy, not more shrinking.
+ * **The date still truncates**, but now only against the full column, which `EEEE d MMMM` (at most
+ * 158.7 px) fits with room to spare.
  */
 export function HeaderMetaRow({ tz }: { tz: string }) {
   return (
-    <div className="flex items-center gap-2 min-w-0 overflow-hidden">
-      <p className="text-xs text-muted-foreground truncate min-w-0">
+    <div className="min-w-0">
+      <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+        <HeaderChips />
+      </div>
+      <p className="mt-[3px] text-xs text-muted-foreground truncate">
         {formatInTimeZone(new Date(), tz, 'EEEE d MMMM')}
       </p>
-      <HeaderChips />
     </div>
   )
 }
