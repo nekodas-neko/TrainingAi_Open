@@ -199,9 +199,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
-        # Sections come from .github/release.yml, grouped by the `type:` labels on the issues the
-        # merged PRs closed.
-        run: gh release create "v$VERSION" --generate-notes --title "v$VERSION" --verify-tag
+        # Sections come from .github/release.yml, grouped by the `type:` labels on the PRs.
+        #
+        # The start point is named EXPLICITLY as the previous v* tag. Left to itself, GitHub starts
+        # from "the latest release", and the only release that existed before the first v* tag was
+        # the rolling `apk-latest` prerelease, which it skips — so the first release (run #3,
+        # 2026-10-05) tried to list the repository's entire history and GitHub refused the body as
+        # over 125,000 characters. That left a tag with no release, because the tag is pushed
+        # first and cannot be withdrawn. With no previous v* tag there is nothing to diff against,
+        # so the first release gets a fixed note instead.
+        run: |
+          set -euo pipefail
+          git fetch --quiet --tags origin
+          PREV="$(git tag -l 'v*' --sort=-v:refname | grep -vx "v$VERSION" | head -1 || true)"
+          if [ -n "$PREV" ]; then
+            gh release create "v$VERSION" --verify-tag --title "v$VERSION" \
+              --generate-notes --notes-start-tag "$PREV"
+          else
+            gh release create "v$VERSION" --verify-tag --title "v$VERSION" \
+              --notes "The first release under the release train. Later releases list the PRs merged since the previous one."
+          fi
 
   apk:
     name: Attach the APK
