@@ -145,11 +145,21 @@ jobs:
       - name: Deploy the released commit
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          # The project holds more than one service (the app and its database at least), and the CLI
+          # refuses to guess. The name lives as a VARIABLE on the `release` environment, next to the
+          # token, so renaming the service in Railway is a settings change rather than a PR.
+          RAILWAY_SERVICE: ${{ vars.RAILWAY_SERVICE }}
         # `up` uploads this checkout and builds it, which is what makes the deploy the exact
         # commit verified above rather than whatever Railway last saw. If this proves unreliable,
         # the documented fallback is a `production` branch Railway watches, which the release moves
         # (spec §3.5) — switch to that rather than loosening the ordering above.
-        run: railway up --ci --detach
+        run: |
+          set -euo pipefail
+          if [ -z "$RAILWAY_SERVICE" ]; then
+            echo "::error::RAILWAY_SERVICE is not set. Settings → Environments → release → Environment variables → add RAILWAY_SERVICE = the app service's name as Railway shows it."
+            exit 1
+          fi
+          railway up --ci --detach --service "$RAILWAY_SERVICE"
 
   confirm:
     name: Production serves this commit
