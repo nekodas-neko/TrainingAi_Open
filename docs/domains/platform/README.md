@@ -130,9 +130,10 @@ layer**) through §16. Read it before building any shared helper.
     [`…-tier3-and-widgets`](../../overview/history-2026-08-08.md) ·
     [`…-early-deload`](../../overview/history-2026-08-08.md). Six write domains;
     remaining follow-ups (device verification, cardio goals) are **Q-168**.
-- **[`docs/superpowers/specs/2026-10-05-dev-main-release-train-design.md`](../../superpowers/specs/2026-10-05-dev-main-release-train-design.md)**
-  — 🆕 proposal (2026-10-05, not live): a `dev`/`main` release train with weekly releases, GitHub
-  Issues replacing the backlog file, four agent roles instead of seven, and a lean `CLAUDE.md`.
+- **[`docs/superpowers/specs/2026-10-05-release-train-design.md`](../../superpowers/specs/2026-10-05-release-train-design.md)**
+  — 🆕 proposal (2026-10-05, not live): weekly releases cut as tags from `main` (merges stop
+  deploying), GitHub Issues replacing the backlog file, four agent roles instead of seven, and a
+  lean `CLAUDE.md`.
   Owner decisions are its §9.
 - **[`docs/superpowers/plans/2026-08-02-public-repo-migration-roadmap.md`](../../superpowers/plans/2026-08-02-public-repo-migration-roadmap.md)**
   — 🆕 backlog **Q-49**, the top platform item. How the gitignored models still reach Railway (they
