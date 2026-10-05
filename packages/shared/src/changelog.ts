@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.487.0",
+    date: "2026-10-05",
+    changes: [
+      "Updates now arrive as weekly releases you approve, rather than every time a change is merged. Nothing on screen changes because of this \u2014 it changes when new versions reach you.",
+      "Offline mode keeps its saved copy of the app for a whole release again. It had been throwing that copy away whenever the server restarted, so the first launch after a restart could need the network.",
+    ],
+  },
+  {
     version: "1.486.11",
     date: "2026-09-30",
     changes: [
