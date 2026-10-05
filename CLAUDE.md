@@ -18,11 +18,11 @@ version is kept verbatim at [`docs/archive/CLAUDE-2026-10-05.md`](docs/archive/C
   device-check), `area:` (the eleven pillars), `needs:` / `blocked` (why it is not ready),
   `lane: engine` / `lane: surface` (which half of the code), `agent: bugfix` / `agent: implementer`
   (who picks it up), `re-verify`, `hotfix`. Defined in [`.github/labels.yml`](.github/labels.yml).
-- **The queue is every ready issue** — not `blocked`, not `needs:`, carrying your `agent:` label.
-  Work it in order: **`hotfix`, then `next`, then bugs, then the rest oldest first**. Batch issues of
-  the same `area:` and `lane:` that touch the same files into one PR (never a migration). The owner
-  steers with the `next` label. A **milestone is the record of a release**, filled at release prep —
-  not the plan.
+- **Work is built in batches.** The Orchestrator scans every ready issue (not `blocked`, not
+  `needs:`) in order — **`hotfix`, then `next`, then bugs, then the rest oldest first** — and groups
+  1–10 related ones into a **milestone titled `Batch: …`**. **One batch is one PR**, merged to `main`
+  and released on Tuesday. Never put a migration in a batch with anything else. The owner steers with
+  the `next` label. `node scripts/queue.js` shows the queue and the next batch.
 - **Releases are weekly, on Tuesday** ("patch Tuesday"): everything merged that week ships together.
   A hotfix ships off-schedule **only when production is actually broken**.
 - **A title says what the task is, in plain words** — for an issue, a PR and a one-off session
@@ -53,10 +53,11 @@ version is kept verbatim at [`docs/archive/CLAUDE-2026-10-05.md`](docs/archive/C
 
 Three, plus one mode — full contract in [`docs/agents/README.md`](docs/agents/README.md):
 **🪐 Orchestrator** (cloud: triage, owner questions, release prep, merges) · **🪲 BugFix** (cloud:
-reports → issues, small fixes) · **🚧 Implementer** (the owner's machine: works the queue,
+reports → issues, small fixes) · **🚧 Implementer** (the owner's machine: builds batches,
 device checks) ↳ **release-test mode**. Work out which you are first. One session per role, kept
-open; compaction is automatic (launch with a small `--autocompact` window), so **write each task's
-outcome to its issue or PR** — that is what survives it. Titles end 🟢 while live, 🔴 when wrapped.
+open, except the Implementer, which runs **one fresh session per batch** (`scripts/agent-runner.mjs`)
+so it never carries context forward. **Write each task's outcome to its issue or PR** — that is the
+state, for any agent. Titles end 🟢 while live, 🔴 when wrapped.
 
 ## Before you build
 

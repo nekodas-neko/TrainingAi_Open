@@ -173,11 +173,11 @@ merges it only after you say so.
 
 ### Step 9 — ☐ Turn the agents back on (new names)
 
-After Step 8 merges. **The paste-ready start blocks are in
-[`docs/agents/README.md`](agents/README.md), "Starting the agents"** — copy them as they are. Start
-the Implementer with `claude --autocompact 200k remote-control` in your local clone: the small window
-keeps it compacting often (agents cannot compact themselves), and `remote-control` lets the
-Orchestrator send it instructions.
+After Step 8 merges. **The start blocks are in [`docs/agents/README.md`](agents/README.md),
+"Starting the agents"** — copy them as they are. For the Implementer the recommended way is one
+command in your local clone, **`node scripts/agent-runner.mjs`**: it builds each batch in a fresh
+session, exits, and waits for the next — so nothing ever needs compacting. (Once per machine, open
+`claude` in that folder and accept "trust this folder" first.)
 
 | Session title | Where you start it | When |
 |---|---|---|
@@ -307,17 +307,18 @@ it.** A one-word "yes, recommendation" is a complete answer.
 
 ### Choosing what gets built
 
-**You don't have to.** The Implementer works through every ready issue continuously, in this order:
-**`hotfix`** → **`next`** → bugs → everything else, oldest first. It batches issues in the same area
-that touch the same files into one PR (owner, 2026-10-05).
+**You don't have to.** The Orchestrator reads every ready issue in order — **`hotfix`** → **`next`**
+→ bugs → everything else, oldest first — and groups 1–10 related ones into a **batch**: a milestone
+titled `Batch: …`. The Implementer builds one batch as one PR, merges it to `main`, and the week's
+batches ship together on Tuesday (owner, 2026-10-05).
 
 **Your one lever is the `next` label.** Put it on anything you want done before the rest — on the
 issue page, **Labels** → `next`; or just tell any agent "put `next` on #2133". Take it off to let an
 issue fall back into normal order.
 
-**Milestones are the record, not the plan.** Each Tuesday's release gets a milestone
-(`Release 2026-10-14`) holding every issue that shipped in it, so you can always see what went out
-when.
+**Milestones are the batches.** **Issues** → **Milestones** shows each `Batch: …` with a progress bar
+as its issues close. To see what a release shipped, open it under **Code** → **Releases** — it lists
+every PR it carried. You can reorder, add to or split a batch yourself, or ask in chat.
 
 ### Release day — every Tuesday
 

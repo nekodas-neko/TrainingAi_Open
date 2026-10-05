@@ -3,8 +3,19 @@
 // The work queue: every ready issue for one agent, in order, grouped into batches by the files the
 // issues touch. Replaces next-item.js now that the backlog lives in GitHub Issues.
 //
-//   node scripts/queue.js --agent implementer        the ordered, batched queue
+//   node scripts/queue.js --agent implementer        the ordered queue, with suggested batches
 //   node scripts/queue.js --agent bugfix --json      machine-readable
+//   node scripts/queue.js --next-batch [--lane engine|surface]
+//                                                    the next unclaimed BATCH MILESTONE, or NO_BATCH
+//
+// CLAIMING: several sessions of a role may run at once. A session labels its issues `in progress`
+// when it starts, and both modes here skip anything already claimed. Two Implementers split by
+// `--lane` so they never edit the same half of the code.
+//
+// BATCH MILESTONES (owner, 2026-10-05): the Orchestrator groups 1–10 related ready issues into a
+// milestone titled `Batch: <what it is>`. The Implementer builds one batch as one PR. Batches are
+// taken oldest milestone first. Creating a batch milestone is how the Orchestrator hands the
+// Implementer its next job; the agent runner (scripts/agent-runner.mjs) waits for one.
 //
 // READY means open, carrying `agent: <name>`, and neither `blocked` nor any `needs:` label.
 // ORDER (owner, 2026-10-05): `hotfix`, then `next`, then `type: bug`, then everything else, oldest
@@ -37,7 +48,7 @@ function rank(labels) {
 
 function isReady(issue, agent) {
   const l = issue.labelSet;
-  return l.has(`agent: ${agent}`) && !l.has('blocked') && ![...l].some((n) => n.startsWith('needs:'));
+  return l.has(`agent: ${agent}`) && !l.has('blocked') && !l.has('in progress') && ![...l].some((n) => n.startsWith('needs:'));
 }
 
 /** Pure: ordered batches from issues already filtered to one agent's ready set. */
@@ -81,11 +92,37 @@ module.exports = { plan, rank };
 if (require.main === module) {
   const args = process.argv.slice(2);
   const agent = args[args.indexOf('--agent') + 1];
-  if (!args.includes('--agent') || !agent) {
-    console.error('Usage: queue.js --agent <implementer|bugfix|orchestrator> [--json]');
+  if (!args.includes('--next-batch') && (!args.includes('--agent') || !agent)) {
+    console.error('Usage: queue.js --agent <implementer|bugfix|orchestrator> [--json]  |  queue.js --next-batch [--json]');
     process.exit(2);
   }
   const repo = process.env.GH_REPO || 'nekodas-neko/TrainingAi_Open';
+  const api = (p) => JSON.parse(execFileSync('gh', ['api', p], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }));
+
+  const lane = args.includes('--lane') ? args[args.indexOf('--lane') + 1] : null;
+  if (args.includes('--next-batch')) {
+    const milestones = api(`repos/${repo}/milestones?state=open&sort=due_on&direction=asc&per_page=100`)
+      .filter((m) => /^Batch\b/i.test(m.title))
+      .sort((a, b) => a.number - b.number);
+    for (const m of milestones) {
+      const issues = api(`repos/${repo}/issues?state=open&milestone=${m.number}&per_page=100`).filter((i) => !i.pull_request);
+      const has = (i, name) => i.labels.some((l) => l.name === name);
+      if (issues.some((i) => has(i, 'in progress'))) continue; // another session has this batch
+      if (lane && !issues.some((i) => has(i, `lane: ${lane}`))) continue;
+      const blocked = issues.filter((i) => i.labels.some((l) => l.name === 'blocked' || l.name.startsWith('needs:')));
+      if (!issues.length || blocked.length === issues.length) continue;
+      if (args.includes('--json')) {
+        console.log(JSON.stringify({ milestone: m.number, title: m.title, issues: issues.map((i) => ({ number: i.number, title: i.title, blocked: blocked.includes(i) })) }, null, 2));
+      } else {
+        console.log(`NEXT BATCH: milestone #${m.number} — ${m.title}`);
+        for (const i of issues) console.log(`  #${i.number}  ${i.title}${blocked.includes(i) ? '   (blocked — leave it, say so in the PR)' : ''}`);
+      }
+      process.exit(0);
+    }
+    console.log('NO_BATCH');
+    process.exit(0);
+  }
+
   const all = [];
   for (let page = 1; ; page++) {
     const batch = JSON.parse(execFileSync('gh', ['api', `repos/${repo}/issues?state=open&per_page=100&page=${page}`], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }));
@@ -93,12 +130,12 @@ if (require.main === module) {
     if (batch.length < 100) break;
   }
   for (const i of all) i.labelSet = new Set(i.labels.map((l) => l.name));
-  const ready = all.filter((i) => isReady(i, agent));
+  const ready = all.filter((i) => isReady(i, agent) && (!lane || i.labelSet.has(`lane: ${lane}`)));
   const batches = plan(ready);
   if (args.includes('--json')) {
     console.log(JSON.stringify(batches, null, 2));
   } else {
-    console.log(`${ready.length} ready for ${agent}, in ${batches.length} batches. Take the first.\n`);
+    console.log(`${ready.length} ready for ${agent}, in ${batches.length} suggested batches (issues sharing files).\n`);
     batches.slice(0, args.includes('--all') ? batches.length : 15).forEach((b, n) => {
       if (b.members.length === 1) console.log(`${n + 1}. #${b.members[0].number}  ${b.members[0].title}`);
       else {

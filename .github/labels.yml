@@ -109,6 +109,11 @@
   color: '0e8a16'
   description: The owner wants this built before the rest of the queue
 
+# --- claiming: several sessions of one role can run at once, so work is claimed before it starts ---
+- name: 'in progress'
+  color: 'fbca04'
+  description: Claimed by a running agent session — others skip it
+
 # --- release path ---
 - name: 'hotfix'
   color: 'b60205'

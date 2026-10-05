@@ -7,14 +7,13 @@ machine** with Docker and the phone on USB. Title this session `🚧 Implementer
 
 **Your loop:**
 
-1. **Pick.** Run `node scripts/queue.js --agent implementer` and take the first entry. It lists the
-   ready issues (not `blocked`, not `needs:`) in order — **`hotfix`, then `next`, then `type: bug`,
-   then the rest oldest first** — already grouped into batches. If two implementers run, stay in
-   your `lane:`.
-   **Batch by location:** having picked one, also take the other ready issues with the same `area:`
-   and `lane:` that touch the same files, and ship them as one PR with a `Closes #N` for each. Never
-   batch a migration or a sync change — its revert is a corrective migration.
-2. **Claim.** Branch from a fresh `main`; open a **draft PR** with `Closes #N` straight away.
+1. **Pick the next batch:** `node scripts/queue.js --next-batch` — the oldest open milestone titled
+   `Batch: …`. **Build the whole batch as one PR**, with a `Closes #N` line per issue. An issue in it
+   that turns out blocked or wrong is left out and said so in the PR, not forced. No batch → stop and
+   say so; the Orchestrator makes the batches. If two implementers run, stay in your `lane:`.
+2. **Claim.** First add the label **`in progress`** to every issue in the batch, so other sessions
+   skip it. Then branch from a fresh `main` and open a **draft PR** with the `Closes #N` lines. If you
+   stop without a PR, remove the label.
 3. **Re-verify** the issue's premise against `main` (mandatory for `re-verify`). If it is done,
    stale or wrong, say so on the issue and move on.
 4. **Build** it. Check `docs/module-map.md` first. A daily-use screen rearrangement needs a mockup

@@ -657,6 +657,17 @@ issues that shipped. Releases go out **every Tuesday**; a hotfix only when produ
 the wrong question — most issues are not contentious, and the few that are carry `type: question`.
 *Reversal cost:* nil — milestones still exist, so going back to picking is a habit, not a change.
 
+**Decision 15 (owner, 2026-10-05) — batch milestones, and a fresh Implementer session per batch.**
+Refines decision 14. The Orchestrator groups 1–10 related ready issues into a milestone titled
+`Batch: …`; one batch is one PR, merged to `main` and released with the week on Tuesday. Milestones
+are therefore batches, not release records — a GitHub Release already lists every PR it shipped. The
+Implementer runs **one headless session per batch** (`scripts/agent-runner.mjs`, `claude -p`): it
+builds the batch, opens the PR, exits, and the runner waits for the next batch milestone. *Why:* the
+owner asked for the agent to "clear after each PR and wait for instructions", and no agent can
+compact or clear itself — a session that ends and a new one that starts is the only mechanism that
+does it, and it costs nothing because the issues hold the state. *Reversal cost:* nil — the
+interactive start (`--remote-control`) remains for watching or steering by hand.
+
 ### 9.1 Decisions 12 and 13, reasoned (Orchestrator, delegated 2026-10-05)
 
 **The ingest architecture is a second restructure running in parallel with this one**, and neither

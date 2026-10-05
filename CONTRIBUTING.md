@@ -15,6 +15,8 @@ development; when the two behave differently, the device wins.
 - **Work lives in [Issues](https://github.com/nekodas-neko/TrainingAi_Open/issues).** Anything not
   `blocked` is ready. **`next`** marks what the owner wants done first. `good first issue` and
   `help wanted` mark things that are good to start on.
+- **Agent work is grouped into batches** — milestones titled `Batch: …`. Pick single issues outside
+  them freely; say on the issue that you have it.
 - **Releases go out every Tuesday**, carrying everything merged that week.
 - **Claim an issue by opening a draft PR** with `Closes #N` in its description, as soon as you
   start. That is how everyone else sees it is taken.
