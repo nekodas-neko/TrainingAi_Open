@@ -279,6 +279,8 @@ the custom rules and the `claude_ro` tests all run there today.
 | `needs: owner` · `needs: device` · `blocked` | `Gate: owner` · `Gate: device` · `Needs:` | Write "Blocked by #N" in the body. Phased work (BF-199 → b → c) becomes **sub-issues** |
 | `lane: engine` · `lane: surface` | `Lane: A` · `Lane: B` | Only matters when two implementers run at once |
 | `hotfix` | n/a | Marks the off-schedule release path |
+| `needs: triage` | n/a | Added 2026-10-05 in Phase 2. Every new issue arrives with it (templates set it; `issue-triage.yml` catches blank and API-filed issues) and the Orchestrator's triage pass removes it. Without a marker, a raw report looks identical to one already thought about |
+| `agent: bugfix` · `agent: implementer` | `Lane:` as the hand-off channel | Added 2026-10-05 at the owner's request: triage assigns each issue to one of the two. Every agent acts as the owner's GitHub account, so a GitHub *assignee* cannot tell them apart — a label can |
 | Linked **draft PR** | "Claimed" in a baton | An agent opens a draft PR with `Closes #N` when it starts, and the issue page shows it |
 | **Issue templates** (`.github/ISSUE_TEMPLATE/`) | Entry-format rules in `CLAUDE.md` | Bug · feature · owner question · device check · tuning proposal |
 | **PR template** | Journal entries | What changed, why, how it was tested (local / device / not device-verified), migration yes/no |

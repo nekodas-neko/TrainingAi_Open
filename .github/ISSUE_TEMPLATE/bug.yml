@@ -1,11 +1,11 @@
 name: Bug
 description: Something behaves wrongly
-labels: ['kind:bug', 'status:needs-triage']
+labels: ['type: bug', 'needs: triage']
 body:
   - type: markdown
     attributes:
       value: |
-        The Orchestrator triages this and adds the `area:`, `priority:` and `role:` labels, so
+        The Orchestrator triages this and adds the `area:`, `lane:` and `agent:` labels and puts it in a milestone, so
         leave those alone unless you already know. Don't assign it — picking it up is what the
         role label is for.
   - type: textarea

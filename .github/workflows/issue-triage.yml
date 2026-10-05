@@ -2,7 +2,7 @@ name: Issue intake
 
 # Everything that arrives as an issue has to be *visible as untriaged*, or it sits in the list
 # looking the same as work somebody has already thought about. The three issue templates apply
-# `status:needs-triage` themselves; this catches the two cases they cannot — a blank issue, and an
+# `needs: triage` themselves; this catches the two cases they cannot — a blank issue, and an
 # issue opened through the API by an agent.
 #
 # It labels and nothing else. Deciding the area, the priority and which role takes it is the
@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Add status:needs-triage unless it is already classified
+      - name: "Add 'needs: triage' unless it is already classified"
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -30,14 +30,14 @@ jobs:
           LABELS: ${{ join(github.event.issue.labels.*.name, ',') }}
         run: |
           set -euo pipefail
-          # An issue that already carries a role: label was filed by someone who knew where it
+          # An issue that already carries an agent: label was filed by someone who knew where it
           # goes — typically the Orchestrator splitting work out of another issue. Re-marking it
           # untriaged would send it back through a pass it has already had.
           case ",$LABELS," in
-            *,role:*) echo "Already assigned to a role; leaving it alone."; exit 0 ;;
+            *,agent:*) echo "Already assigned to an agent; leaving it alone."; exit 0 ;;
           esac
           case ",$LABELS," in
-            *,status:needs-triage,*) echo "Already marked."; exit 0 ;;
+            *",needs: triage,"*) echo "Already marked."; exit 0 ;;
           esac
-          gh api -X POST "repos/$REPO/issues/$NUMBER/labels" -f "labels[]=status:needs-triage"
+          gh api -X POST "repos/$REPO/issues/$NUMBER/labels" -f "labels[]=needs: triage"
           echo "Marked #$NUMBER as needing triage."

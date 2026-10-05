@@ -13,19 +13,30 @@ name: Release
 # That ordering is also why the `release` environment must NOT be restricted to `v*` tags: at
 # deploy time the ref is still `main`, because the tag does not exist yet.
 
+# THREE MODES, one workflow, because all three are "make production serve commit X":
+#   release   `version` set              — deploy, confirm, tag v<version>, notes, APK.
+#   hotfix    `sha` on a hotfix/* branch — the same, from a branch cut off the last tag (spec §3.4).
+#   rollback  `rollback_to` set          — redeploy an EXISTING tag's commit and confirm it. No new
+#                                          tag: the old one already names that commit, and the
+#                                          ruleset would refuse to move it anyway.
+
 on:
   workflow_dispatch:
     inputs:
-      sha:
-        description: 'Commit on main to release (full SHA; blank = current main HEAD)'
+      version:
+        description: 'Release: the version, without the leading v (e.g. 1.487.0). Blank for a rollback.'
         type: string
         required: false
-      version:
-        description: 'Version, without the leading v (e.g. 1.487.0)'
+      sha:
+        description: 'Release: commit to ship (full SHA). Blank = current main. Ignored for a rollback.'
         type: string
-        required: true
+        required: false
+      rollback_to:
+        description: 'Rollback: an existing tag to redeploy (e.g. v1.486.11). Leave version blank.'
+        type: string
+        required: false
       dry_run:
-        description: 'Verify and build, but do not deploy or tag'
+        description: 'Run the checks only — no deploy, no tag'
         type: boolean
         default: false
 
@@ -43,49 +54,76 @@ jobs:
     timeout-minutes: 10
     outputs:
       sha: ${{ steps.resolve.outputs.sha }}
+      mode: ${{ steps.resolve.outputs.mode }}
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - name: Resolve the commit
+      - name: Resolve the commit and the mode
         id: resolve
         env:
           INPUT_SHA: ${{ inputs.sha }}
+          VERSION: ${{ inputs.version }}
+          ROLLBACK_TO: ${{ inputs.rollback_to }}
         run: |
           set -euo pipefail
+          git fetch --quiet --tags origin
+
+          if [ -n "$ROLLBACK_TO" ] && [ -n "$VERSION" ]; then
+            echo "::error::Give a version (to release) OR rollback_to (to redeploy a tag), not both."
+            exit 1
+          fi
+          if [ -z "$ROLLBACK_TO" ] && [ -z "$VERSION" ]; then
+            echo "::error::Nothing to do: give a version to release, or rollback_to to redeploy a tag."
+            exit 1
+          fi
+
+          if [ -n "$ROLLBACK_TO" ]; then
+            # Only a release tag: anything else would let a rollback deploy a commit that never
+            # shipped, which is a release without the release checks.
+            case "$ROLLBACK_TO" in v*) ;; *) echo "::error::rollback_to must be a v* release tag."; exit 1 ;; esac
+            if ! SHA="$(git rev-parse --verify --quiet "refs/tags/$ROLLBACK_TO^{commit}")"; then
+              echo "::error::No tag $ROLLBACK_TO. Tags that exist: $(git tag -l 'v*' --sort=-v:refname | head -5 | tr '\n' ' ')"
+              exit 1
+            fi
+            echo "mode=rollback" >> "$GITHUB_OUTPUT"
+            echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+            echo "Rolling production back to $ROLLBACK_TO ($SHA)"
+            exit 0
+          fi
+
           SHA="${INPUT_SHA:-$(git rev-parse origin/main)}"
-          # A release must ship something already reviewed and merged. Releasing a commit that is
-          # not an ancestor of main would deploy code that never passed the PR gate.
-          if ! git merge-base --is-ancestor "$SHA" origin/main; then
-            echo "::error::$SHA is not on main. A release ships a merged commit."
-            exit 1
-          fi
-          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-          echo "Releasing $SHA"
+          SHA="$(git rev-parse --verify --quiet "$SHA^{commit}")" || { echo "::error::$INPUT_SHA is not a commit here."; exit 1; }
 
-      - name: Refuse a version that already has a tag
-        env:
-          VERSION: ${{ inputs.version }}
-        run: |
-          set -euo pipefail
-          if git ls-remote --exit-code --tags origin "refs/tags/v$VERSION" >/dev/null 2>&1; then
-            echo "::error::v$VERSION already exists. Tags are immutable by ruleset; pick a new version."
+          # A release ships something that already passed the PR gate: a commit on main, or on a
+          # hotfix/* branch cut from the last tag (spec §3.4). Anything else never had CI.
+          if git merge-base --is-ancestor "$SHA" origin/main; then
+            MODE=release
+          elif git branch -r --contains "$SHA" | grep -qE '^\s*origin/hotfix/'; then
+            MODE=hotfix
+          else
+            echo "::error::$SHA is not on main or a hotfix/* branch. A release ships a merged commit."
             exit 1
           fi
 
-      - name: Require the version to match package.json
-        env:
-          VERSION: ${{ inputs.version }}
-        run: |
-          set -euo pipefail
-          PKG="$(node -p "require('./package.json').version")"
-          # Catches the release being cut before the version bump merged, which would otherwise
-          # ship a build whose in-app version disagrees with its tag.
+          if git rev-parse --verify --quiet "refs/tags/v$VERSION" >/dev/null; then
+            echo "::error::v$VERSION already exists, and the ruleset makes tags permanent. To redeploy it, use rollback_to: v$VERSION. To ship something new, bump the version."
+            exit 1
+          fi
+
+          # Read package.json AT THE COMMIT BEING SHIPPED, not at whatever this run checked out:
+          # the two differ whenever `sha` is not main's head. Catches a release cut before its
+          # version bump merged, which would ship a build whose in-app version disagrees with its tag.
+          PKG="$(git show "$SHA:package.json" | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version")"
           if [ "$PKG" != "$VERSION" ]; then
-            echo "::error::package.json is $PKG but the release says $VERSION. Bump and merge first."
+            echo "::error::package.json at ${SHA:0:12} says $PKG, but this release says $VERSION. Bump and merge first, or fix the input."
             exit 1
           fi
+
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          echo "$MODE of v$VERSION from $SHA"
 
   deploy:
     name: Deploy to production
@@ -125,6 +163,9 @@ jobs:
   tag:
     name: Tag and publish notes
     needs: [verify, confirm]
+    # A rollback redeploys a commit that already has its tag. The APK job needs this one, so it is
+    # skipped with it.
+    if: needs.verify.outputs.mode != 'rollback'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -148,7 +189,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
-        # Sections come from .github/release.yml, grouped by the `kind:` labels on the issues the
+        # Sections come from .github/release.yml, grouped by the `type:` labels on the issues the
         # merged PRs closed.
         run: gh release create "v$VERSION" --generate-notes --title "v$VERSION" --verify-tag
 

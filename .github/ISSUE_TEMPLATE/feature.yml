@@ -1,6 +1,6 @@
 name: Feature or change
 description: A new capability, or a change to how something works
-labels: ['kind:feature', 'status:needs-triage']
+labels: ['type: feature', 'needs: triage']
 body:
   - type: textarea
     id: want

@@ -21,18 +21,21 @@ being "whatever merged last" and becomes a tag the owner approves.
   tag, and attaches `app-v<x>.apk` to that release. The stable-signing-key condition had to widen
   with it: a release APK signed with a throwaway per-runner key cannot install over the owner's
   copy, and the way through would be an uninstall, which destroys the ring's BLE key.
-- **`.github/labels.yml` + `scripts/sync-labels.js` + `.github/workflows/labels.yml`** — 28 labels
-  on five axes (`area:` for the eleven pillars, `kind:`, `priority:`, `status:`, `role:`),
-  synced additively from the file. They are what replaces the backlog's `Lane:`, queue position
-  and `[domain]` tag once Phase 3 migrates.
+- **`.github/labels.yml` + `scripts/sync-labels.js` + `.github/workflows/labels.yml`** — 26 labels
+  using the names agreed in spec §4.1 (`type:`, `area:` for the eleven pillars, `needs:`,
+  `lane:`, `hotfix`) plus `agent: bugfix` / `agent: implementer`, which is how triage hands an
+  issue to one of the two. Synced additively from the file. **No priority label, on purpose**: a
+  release's contents are its milestone, and a priority label would be a second answer to "what's
+  next". A first draft invented its own `kind:`/`status:`/`role:`/`priority:` scheme; it was
+  caught before any label was created and replaced with the spec's names.
 - **Issue templates (bug / feature / chore), a PR template, `.github/release.yml`** — the
   collaboration surface, since a second person is meant to be able to file and pick up work
   without reading the agent docs first.
 - **`.github/workflows/issue-triage.yml`** — marks any issue opened without a template
-  `status:needs-triage`, so nothing arrives looking already-considered. It labels and nothing
+  `needs: triage`, so nothing arrives looking already-considered. It labels and nothing
   else; deciding area, priority and role is the Orchestrator's pass, and that is a judgement an
   `if` cannot make.
-- **[`docs/release-train-cutover-checklist.md`](../../release-train-cutover-checklist.md)** — the
+- **[`docs/owner-manual.md`](../../owner-manual.md)** — the
   owner's ordered list, including the two steps that look like they need a settings change and do
   not (tag-creation permission, pointing tags at Railway) and the repository rename.
 - **`scripts/check-workflow-job-timeouts.js`** — exempts jobs that are `uses:` a reusable workflow;
@@ -49,7 +52,7 @@ leave nothing installable between releases until the `.dev` app exists.
 
 `pnpm check:rules` ran **86 of 86**, all passed. `check-doc-links` and `check-doc-index-size`
 clean. `scripts/__tests__/deploy-landed.test.ts` (13), `run-custom-rules` and `github-release` (15)
-pass. `node scripts/sync-labels.js --dry-run` reads all 28 labels and resolves each against the
+pass. `node scripts/sync-labels.js --dry-run` reads all 26 labels and resolves each against the
 live repo.
 
 **Not exercised:** none of the new workflows has run. `release.yml` cannot be until the first

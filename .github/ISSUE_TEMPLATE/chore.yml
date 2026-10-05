@@ -1,6 +1,6 @@
 name: Chore or tech debt
 description: Maintenance, tooling, refactoring, documentation
-labels: ['kind:chore', 'status:needs-triage']
+labels: ['type: chore', 'needs: triage']
 body:
   - type: textarea
     id: what
