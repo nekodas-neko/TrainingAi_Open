@@ -512,6 +512,11 @@ async function runPrescriptionGeneration(
   // BF-199 Phase 1: the model's own phase answer, before reconciliation rewrites `parsed`.
   const modelPhase = String(parsed.phase)
   const modelPhaseAction = String(parsed.phase_action)
+  // OR-209. And its per-exercise numbers, copied now because the loop below overwrites
+  // `parsed.exercises` in place. This is the only moment the raw answer exists.
+  const modelExercises = parsed.exercises.map(ex => ({
+    sessionExerciseId: ex.session_exercise_id, sets: ex.sets, reps: ex.reps, pct: ex.pct, restSec: ex.rest_sec,
+  }))
 
   // Single post-parse reconciliation pass — resolves the phase for a "stay" response,
   // normalizes ambiguous pct fractions, drops hallucinated ids, de-dupes, backfills any
@@ -787,7 +792,7 @@ async function runPrescriptionGeneration(
   // BF-199 Phase 1: record what the rules prescriber would have said beside what was given.
   // Best-effort and after the store: evidence must never cost the lifter a plan.
   await (async () => repo.recordPrescriptionShadow(userId, programSessionId, buildPrescriptionShadow({
-    modelPhase, modelPhaseAction, final: prescription, rules: buildRulesPrescription(signals, ''),
+    modelPhase, modelPhaseAction, final: prescription, rules: buildRulesPrescription(signals, ''), modelExercises,
   })))().catch(err => console.error('[prescribe] shadow record failed (ignored):', err))
 
   return { ok: true, prescription, prescriptionStatus, estimatedSessionDurationMin }
