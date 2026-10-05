@@ -508,23 +508,6 @@ below threshold and left in place for next time.
 - **What proves it fixed:** the chat tool and the Health card agree on the same day's band, and one
   baselining helper has all three call sites.
 
-### [cardio] OR-211 — `sex:'other'` halves VO2max, and best pace has no distance floor
-
-- **Lane: A** · **Added:** 2026-10-05 · Orchestrator, splitting `PS-36` (a) and (b) off its gate.
-- **(a)** `sexCode = female?1 : male?0 : null` sends a **fully-profiled** `sex:'other'` user to the
-  Ross last-resort equation — **42.7 → 18.7 for identical inputs**. The fallback's own comment says
-  it is for *missing* terms, so this is the code disagreeing with its stated intent rather than a
-  modelling choice. **The owner is unaffected and that is not a reason to leave it**: it is wrong
-  for any third user, and silently.
-- **(b)** best pace is `min(avgPaceSecPerKm)` with **no distance floor**, so a 30 m GPS false-start
-  becomes the all-time best — reproduced on a live fixture. **The pattern to copy is in the same
-  file**: the 1k/5k bests are already windowed.
-- **⛔ Do NOT touch the Z3 mapping.** That is `PS-36` (c), where two files and a filed Tuning band
-  hold three readings of WHO 2020; reconciling them is Tuning's and the owner signs it off.
-- **What proves it fixed:** an `other`-sex profile with full terms gets the same equation as a
-  male/female one, and a sub-floor GPS fragment cannot become a best pace.
-
-
 ### [platform] OR-207 — six PRs were stranded when every session stopped, and four have gone un-mergeable
 - **⛔ DO NOT MERGE `#1847` OR `#1849` WHILE A DEVICE SITTING IS RUNNING — added 2026-10-05.**
   Both are column-dropping migrations, and **merging auto-deploys to Railway production**, which is
@@ -16071,7 +16054,7 @@ read**, so a moved device shows the old location for 30 minutes. Key it by round
 - **Gate:** owner — **item (c) ONLY**, the Z3 mapping. Narrowed 2026-10-05 (Orchestrator).
 - **Needs:** OR-211
 - **⚑ SAME SHAPE AS `PS-28`: the gate named one item and parked three.** (a) and (b) are
-  straightforward correctness and were never his. **Split to `OR-211`, buildable now.**
+  straightforward correctness and were never his. **Split to `OR-211`, which SHIPPED 2026-10-05: (a) and (b) are done; only (c), the Z3 mapping, remains and it is the owner's.**
   - **(a)** a fully-profiled `sex:'other'` user falls to the Ross last-resort equation —
     **42.7 → 18.7 on identical inputs**. The comment says that fallback is for *missing* terms, so
     the code contradicts its own stated intent. The owner is unaffected; any third user is not.

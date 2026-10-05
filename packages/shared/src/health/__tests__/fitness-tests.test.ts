@@ -14,6 +14,23 @@ describe('sixMwtVo2max', () => {
     expect(sixMwtVo2max({ distanceM: 600, age: 30, sex: 'female', weightKg: 65, restingHr: 60 })).toBe(41.9)
   })
 
+  // OR-211. 'other' is a stated answer, not a missing one, so it must not reach the last-resort Ross
+  // equation (which read 42.7 as 18.7 for the same inputs). It sits between the two coded values.
+  it('keeps a fully profiled sex:other user on Burr, between the male and female readings', () => {
+    const base = { distanceM: 600, age: 30, weightKg: 70, restingHr: 60 }
+    const male = sixMwtVo2max({ ...base, sex: 'male' })
+    const female = sixMwtVo2max({ ...base, sex: 'female' })
+    const other = sixMwtVo2max({ ...base, sex: 'other' })
+    expect(other).toBeLessThan(male)
+    expect(other).toBeGreaterThan(female)
+    expect(other).toBeCloseTo((male + female) / 2, 1)
+    expect(other).toBeGreaterThan(30) // nowhere near Ross's ~18.7
+  })
+
+  it('still uses Ross for an other-sex user whose OTHER terms are missing', () => {
+    expect(sixMwtVo2max({ distanceM: 600, age: 30, sex: 'other', weightKg: null, restingHr: 60 })).toBe(18.7)
+  })
+
   it('falls back to Ross 2010 (distance-only) when profile terms are missing', () => {
     // 4.948 + 0.023·500 = 16.448 → 16.4
     expect(sixMwtVo2max({ distanceM: 500, age: null, sex: null, weightKg: null, restingHr: null })).toBe(16.4)
