@@ -1,0 +1,105 @@
+# The label set for GitHub Issues, which replace docs/implementation-backlog.md.
+# The names are the ones agreed in docs/superpowers/specs/2026-10-05-release-train-design.md §4.1;
+# change them there first, then here.
+#
+# This file is the source of truth: `.github/workflows/labels.yml` syncs it on every push to main
+# that touches it. Edit here, never in the GitHub UI — a UI edit is reverted on the next sync. The
+# sync is ADDITIVE: a label removed from this file is not deleted, because deleting a label strips
+# it from every issue carrying it.
+#
+# GitHub's defaults (bug, enhancement, question, documentation, good first issue, help wanted, …)
+# are left in place. `good first issue` and `help wanted` are used as-is (§4.4); the rest are
+# superseded by `type:` and simply go unused.
+#
+# What is deliberately NOT a label: priority. A release's contents are chosen by adding issues to
+# its milestone (§4.2) — a priority label would be a second, competing answer to "what's next".
+
+# --- type: what the issue is. Groups the release notes (.github/release.yml) ---
+- name: 'type: bug'
+  color: 'd73a4a'
+  description: Something behaves wrongly
+- name: 'type: feature'
+  color: '0e8a16'
+  description: New capability or a change in behaviour
+- name: 'type: chore'
+  color: 'c2e0c6'
+  description: Maintenance, tooling, refactoring, docs
+- name: 'type: tuning'
+  color: 'fbca04'
+  description: Scoring or calibration — a proposal the owner signs off before anyone builds it
+- name: 'type: question'
+  color: 'd876e3'
+  description: A decision for the owner, with the brief written in the body
+- name: 'type: device-check'
+  color: 'bfd4f2'
+  description: A check that needs the phone, with an objective pass or fail
+
+# --- area: the eleven pillars (docs/domains/README.md) ---
+- name: 'area: sleep'
+  color: '4c5fd7'
+  description: Sleep sessions, stages, hypnogram
+- name: 'area: readiness'
+  color: '4c5fd7'
+  description: Readiness and recovery scoring
+- name: 'area: heart-rate'
+  color: '4c5fd7'
+  description: HR, HRV, RR intervals
+- name: 'area: cardio'
+  color: '4c5fd7'
+  description: Cardio sessions and zones
+- name: 'area: activity'
+  color: '4c5fd7'
+  description: Steps, active calories, activity logs
+- name: 'area: workouts'
+  color: '4c5fd7'
+  description: Programs, sessions, set logging, 1RM
+- name: 'area: nutrition'
+  color: '4c5fd7'
+  description: Food, macros, supplements
+- name: 'area: body'
+  color: '4c5fd7'
+  description: Weight, body composition, measurements
+- name: 'area: devices'
+  color: '4c5fd7'
+  description: Oura BLE, scale, Health Connect, connectors
+- name: 'area: app-shell'
+  color: '4c5fd7'
+  description: Navigation, tabs, safe area, theming
+- name: 'area: platform'
+  color: '4c5fd7'
+  description: CI, docs, data layer, auth, tooling
+
+# --- why an issue is not ready. Absence of all four means "ready" ---
+- name: 'needs: triage'
+  color: 'ffffff'
+  description: Filed but not yet classified — the Orchestrator's inbox
+- name: 'needs: owner'
+  color: 'e99695'
+  description: Waiting on a decision only the owner can make
+- name: 'needs: device'
+  color: 'e99695'
+  description: Waiting on a check that needs the phone
+- name: 'blocked'
+  color: 'e99695'
+  description: Waiting on another issue — say which in the body ("Blocked by #N")
+
+# --- who picks it up (owner request, 2026-10-05: triage assigns to BugFix or the Implementer) ---
+- name: 'agent: bugfix'
+  color: '1d76db'
+  description: Small and local — BugFix may fix it itself
+- name: 'agent: implementer'
+  color: '1d76db'
+  description: Built by the Implementer Agent from the open milestone
+
+# --- which half of the code, so two implementers stay out of each other's files ---
+- name: 'lane: engine'
+  color: 'c5def5'
+  description: Storage, API routes, migrations, shared packages, native
+- name: 'lane: surface'
+  color: 'c5def5'
+  description: Screens, components, hooks, stores
+
+# --- release path ---
+- name: 'hotfix'
+  color: 'b60205'
+  description: Production is broken now — the off-schedule release path

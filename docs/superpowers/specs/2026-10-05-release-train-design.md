@@ -279,6 +279,8 @@ the custom rules and the `claude_ro` tests all run there today.
 | `needs: owner` · `needs: device` · `blocked` | `Gate: owner` · `Gate: device` · `Needs:` | Write "Blocked by #N" in the body. Phased work (BF-199 → b → c) becomes **sub-issues** |
 | `lane: engine` · `lane: surface` | `Lane: A` · `Lane: B` | Only matters when two implementers run at once |
 | `hotfix` | n/a | Marks the off-schedule release path |
+| `needs: triage` | n/a | Added 2026-10-05 in Phase 2. Every new issue arrives with it (templates set it; `issue-triage.yml` catches blank and API-filed issues) and the Orchestrator's triage pass removes it. Without a marker, a raw report looks identical to one already thought about |
+| `agent: bugfix` · `agent: implementer` | `Lane:` as the hand-off channel | Added 2026-10-05 at the owner's request: triage assigns each issue to one of the two. Every agent acts as the owner's GitHub account, so a GitHub *assignee* cannot tell them apart — a label can |
 | Linked **draft PR** | "Claimed" in a baton | An agent opens a draft PR with `Closes #N` when it starts, and the issue page shows it |
 | **Issue templates** (`.github/ISSUE_TEMPLATE/`) | Entry-format rules in `CLAUDE.md` | Bug · feature · owner question · device check · tuning proposal |
 | **PR template** | Journal entries | What changed, why, how it was tested (local / device / not device-verified), migration yes/no |
@@ -558,6 +560,30 @@ agent ends up following half the old rules and half the new.
   - the `.dev` Android flavor (native, so it needs an APK cycle)
 - **First release, still with auto-deploy on:** run the workflow on `main`'s current commit. Railway
   deploys the same commit twice, which is harmless. This proves the token and the workflow.
+- **Progress, 2026-10-05:** ✅ the owner's three settings are done (`release` environment holding
+  `RAILWAY_TOKEN`, the `protect-release-tags` ruleset on `v*` restricting updates and deletions).
+  The plumbing PR carries the release workflow, `.github/release.yml`, the issue and PR templates,
+  the label set plus its sync, and the deploy check and APK publishing wired into the release.
+  **Three deliberate deviations from the bullet list above, each with its reason:**
+  - **The `ci.yml` docs-skip ships as its own PR, not this one.** The naive version — `paths-ignore`
+    on the trigger — is the exact thing `ci.yml`'s own header warns against: the workflow never
+    runs, so the five required checks stay *Expected* forever and the PR can never merge. The
+    version that works splits each required job into a gated worker plus an `if: always()`
+    aggregator carrying the required name, which is the `Tests`/`E2E` shape already in the file —
+    five jobs restructured inside 950 lines. A CI change that is wrong blocks the merge of its own
+    fix, so it gets a PR that can be reverted on its own.
+  - **E2E stays on the PR and is not moved into the release**, for the same reason: `ci.yml` is not
+    a reusable workflow, so moving E2E means extracting it as one. That belongs with the docs-skip
+    restructure, in the same PR, not duplicated into `release.yml`.
+  - **The rolling `apk-latest` build stays on native pushes to `main`.** Moving APK publishing into
+    the release wholesale would leave no installable build between releases, and the `.dev` app
+    that is supposed to cover that gap does not exist yet. So a release now attaches its own
+    immutable `app-v<x>.apk`, built from the tagged commit, *in addition* to the rolling one.
+    Retire `apk-latest` once `.dev` ships.
+- **Order of operations at the cutover, because two steps cannot be swapped:** merge the plumbing
+  PR → run the first release → owner turns Railway auto-deploy off → *then* a one-line PR drops
+  `deploy-check.yml`'s `push: [main]` trigger. Dropping it earlier leaves real deploys unwatched;
+  dropping it later makes every merge fail a check for a deploy that never happened.
 - **You, then:** turn off Railway's auto-deploy from `main`.
 - **Done when:**
   - a code PR merges without production changing

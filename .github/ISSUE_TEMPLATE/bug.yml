@@ -1,0 +1,56 @@
+name: Bug
+description: Something behaves wrongly
+labels: ['type: bug', 'needs: triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The Orchestrator triages this and adds the `area:`, `lane:` and `agent:` labels and puts it in a milestone, so
+        leave those alone unless you already know. Don't assign it — picking it up is what the
+        role label is for.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+      description: What you saw, not what you think caused it.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should happen instead
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce it
+      placeholder: |
+        1. Open /home
+        2. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where you saw it
+      description: >
+        The APK on the S25 is the only supported runtime; the web build is a dev surface. A bug
+        seen only on the web may not be a bug.
+      options:
+        - APK on the device
+        - Web (pnpm dev or the Railway URL in a browser)
+        - Both
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: From More → the version line.
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Screenshots, the time it happened (so logs can be found), what you were doing before.

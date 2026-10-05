@@ -1,0 +1,35 @@
+name: Feature or change
+description: A new capability, or a change to how something works
+labels: ['type: feature', 'needs: triage']
+body:
+  - type: textarea
+    id: want
+    attributes:
+      label: What you want
+      description: The outcome, not the implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: What is hard or missing today.
+    validations:
+      required: true
+  - type: textarea
+    id: shape
+    attributes:
+      label: What it might look like
+      description: >
+        Optional. If this visibly rearranges a screen used daily, a mockup is required before any
+        code is written — say so here and it will be produced first.
+  - type: checkboxes
+    id: flags
+    attributes:
+      label: Does this touch any of these?
+      description: Each one changes who has to sign it off.
+      options:
+        - label: Scoring or calibration (needs a tuning proposal first)
+        - label: Stored data, migrations, or anything that drops rows
+        - label: Auth, sessions, or secrets
+        - label: A screen layout the owner uses daily (needs a mockup first)

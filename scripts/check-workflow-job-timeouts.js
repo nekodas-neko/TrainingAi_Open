@@ -32,11 +32,16 @@ for (const file of fs.readdirSync(dir).filter(f => /\.ya?ml$/.test(f))) {
   let current = null;
   let currentLine = 0;
   let sawTimeout = false;
+  let callsWorkflow = false;
 
   const close = () => {
-    if (current && !sawTimeout) missing.push(`${file}:${currentLine}  ${current}`);
+    // A job that is `uses: ./.github/workflows/x.yml` calls a reusable workflow, and GitHub
+    // rejects `timeout-minutes` on one — the limit belongs to the jobs inside the called
+    // workflow, which this script checks on their own file.
+    if (current && !sawTimeout && !callsWorkflow) missing.push(`${file}:${currentLine}  ${current}`);
     current = null;
     sawTimeout = false;
+    callsWorkflow = false;
   };
 
   lines.forEach((line, i) => {
@@ -48,6 +53,7 @@ for (const file of fs.readdirSync(dir).filter(f => /\.ya?ml$/.test(f))) {
     const job = line.match(/^ {2}([A-Za-z0-9_-]+):\s*$/);
     if (job) { close(); current = job[1]; currentLine = i + 1; jobCount++; return; }
     if (current && /^ {4}timeout-minutes:\s*\d+\s*$/.test(line)) sawTimeout = true;
+    if (current && /^ {4}uses:\s*\S/.test(line)) callsWorkflow = true;
   });
   close();
 }

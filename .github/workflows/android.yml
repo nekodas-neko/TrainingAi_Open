@@ -31,9 +31,21 @@ on:
   push:
     branches: [main]
     paths: *native-paths
+  # Called by .github/workflows/release.yml after a release is tagged, so the tag carries an APK
+  # built from exactly that commit. No `paths` here on purpose: a release always publishes an APK,
+  # native change or not, so that `v<x>` is a complete, self-contained thing to install.
+  workflow_call:
+    inputs:
+      release_tag:
+        description: 'Attach the APK to this release tag instead of the rolling apk-latest'
+        type: string
+        required: true
 
 concurrency:
-  group: android-${{ github.ref }}
+  # The release's call gets its own group. Sharing `main`'s would let an ordinary native push
+  # cancel the APK build of a release that is already tagged, which cannot be retried into the
+  # same tag.
+  group: android-${{ inputs.release_tag || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -46,6 +58,11 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v5
+        with:
+          # A called run checks out the CALLER's ref by default, which is `main` — so a release of
+          # an older commit would otherwise ship an APK built from main's HEAD. The tag exists by
+          # the time this runs. Empty means "the default ref", which is the push/PR behaviour.
+          ref: ${{ inputs.release_tag }}
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
         with:
           version: 10.33.0
@@ -78,11 +95,17 @@ jobs:
       # and is a script-injection surface. `secrets` is also unavailable in a step-level `if`,
       # so the absent case is handled in the script instead of as a condition.
       - name: Restore the stable debug signing key
-        # RV-198. `push` only. A PR run builds an APK that is never published, so decoding the
-        # signing key there put the credential the owner's installed APK is signed with into every
-        # run a workflow change could reach, for no gain. On a PR the step is skipped and the build
-        # falls back to a per-runner key — the same path already taken when the secret is unset.
-        if: github.event_name == 'push'
+        # RV-198. Published builds only. A PR run builds an APK that is never published, so
+        # decoding the signing key there put the credential the owner's installed APK is signed
+        # with into every run a workflow change could reach, for no gain. On a PR the step is
+        # skipped and the build falls back to a per-runner key — the same path already taken when
+        # the secret is unset.
+        #
+        # The release call needs it just as much as a push does: an APK attached to a tag and
+        # signed with a throwaway key cannot install over the one already on the phone, and the
+        # way through would be an uninstall, which destroys the Oura ring's BLE key. On a `push`
+        # run `inputs` is undefined, and GitHub coerces that to '' — so this is false there.
+        if: github.event_name == 'push' || inputs.release_tag != ''
         env:
           KEY_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}
         run: |
@@ -142,3 +165,16 @@ jobs:
               --notes "$NOTES" \
               --prerelease
           fi
+
+      # A release tag gets its own copy, named for the version. apk-latest keeps tracking `main`
+      # for the between-releases dev loop; this one never moves, so re-installing a given release
+      # later means installing the same bytes.
+      - name: Attach the APK to the release
+        if: inputs.release_tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          cp android/app/build/outputs/apk/debug/app-debug.apk "app-${TAG}.apk"
+          gh release upload "$TAG" "app-${TAG}.apk" --clobber
