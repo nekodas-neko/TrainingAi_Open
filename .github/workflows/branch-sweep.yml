@@ -1,0 +1,56 @@
+name: Branch sweep
+
+# Deletes the branches listed in `.github/branch-sweep.txt`, archiving the ones marked `archive` as a
+# tag first. A workflow because a cloud agent session can push only to its own branch, so it can
+# neither delete a branch nor push a tag (measured 2026-10-05). Manual trigger only, and a dry run
+# unless told otherwise. The Orchestrator or the owner starts it from the Actions tab.
+#
+# The list is reviewed in a PR; this job only re-checks the one thing that can change after review:
+# a branch that has since gained an open PR is skipped, never deleted.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Print what would happen, change nothing'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  sweep:
+    name: Sweep listed branches
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Archive and delete
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          while read -r action branch; do
+            case "$action" in ''|\#*) continue ;; esac
+            if ! git ls-remote --exit-code --heads origin "$branch" >/dev/null; then
+              echo "gone     $branch"
+              continue
+            fi
+            open=$(gh pr list --head "$branch" --state open --json number --jq 'length')
+            if [ "$open" != "0" ]; then
+              echo "SKIP     $branch (has an open PR)"
+              continue
+            fi
+            sha=$(git rev-parse "origin/$branch")
+            if [ "$action" = "archive" ]; then
+              echo "archive  $branch @ $sha -> archive/$branch"
+              if [ "$DRY_RUN" != "true" ]; then git push origin "$sha:refs/tags/archive/$branch"; fi
+            fi
+            echo "delete   $branch"
+            if [ "$DRY_RUN" != "true" ]; then git push origin --delete "$branch"; fi
+          done < .github/branch-sweep.txt

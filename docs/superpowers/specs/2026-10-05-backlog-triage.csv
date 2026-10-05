@@ -1,0 +1,525 @@
+id,verdict,type,group,bucket,lane,domains,gates,needs,keepKind,added,reverify,note,title
+OR-215,issue-blocked,blocked,,parked,O,platform readiness,,OR-213,,2026-10-05,,,"OR-215 — a score must record WHICH signals it was built from, or no two scores are comparable"
+OR-214,issue-blocked,blocked,,parked,O,devices platform,,OR-213,,2026-10-05,,,"OR-214 — the connector framework: ""link with X"", extracted from the five we already hand-rolled"
+OR-213,issue,chore,,ready,O,platform devices,,,,2026-10-05,,,"OR-213 — the four-layer ingest architecture: one normaliser, device-first storage, scored values only in the cloud"
+OR-207,archive-resolved,,,ask,A,platform,,,,2026-10-04,,"the freeze settled the stranded PRs: #1849 merged, #1790/#1762 closed, #1499 held for release 1","OR-207 — six PRs were stranded when every session stopped, and four have gone un-mergeable"
+OR-208,issue,chore,,ready,O,devices heart-rate,,,,2026-10-04,,,"OR-208 — `rr_intervals` has written nothing since 2026-09-28, while the ring kept writing"
+LB-198,issue,engine,,ready,A,readiness,,,,2026-09-30,,,LB-198 — `vs_question` marks the wording shift; the SECOND boundary inside question 1 is unmarked
+OR-203,fold-watch,,watch-list,keep,A,platform,,,unclear,2026-09-29,,,"OR-203 — the database grew 3× its trend for six days, and no per-table baseline exists to say which table did it"
+LA-171,fold-device,,device-check:readiness,ready,DV,readiness heart-rate activity workouts,,,,2026-09-28,,,LA-171 — five runs and checks Lane A shipped on 2026-09-28 that need the phone or an admin session
+LB-168,fold-watch,,watch-list,keep,B,platform,,,unclear,2026-09-27,,,"LB-168 — `pnpm test` exits 1 with ZERO tests failed, about one full run in five"
+LA-180,question,question,,ready,O,nutrition body,,,,2026-09-28,,,"LA-180 — your one calorie number: taken literally, it lands at 1,034 kcal today and 797 on a rest day"
+LA-185,question,question,,ready,O,nutrition,,,,2026-09-30,,,LA-185 — how should the calorie ring show a meal the app ASSUMED you ate?
+LA-178,question,question,,ready,O,workouts,,,,2026-09-28,,,"LA-178 — two of your answers point opposite ways on the session-length estimate: fix the double-count, or leave it?"
+LB-152,issue,chore,,ready,O,app-shell platform,,,,2026-09-25,,,"LB-152 — the accent-token retune repaints ~212 readings, not zero: re-opening the answer"
+LB-167,question,question,,ready,O,nutrition,,,,2026-09-27,,,LB-167 — does the meal tile read as a failed image to you? (RV-212 ④)
+BF-224,issue,chore,,ready,O,platform,,,,2026-09-29,,,"BF-224 — the two inbound PRs merged unreviewed, and one of them is live auth: a bearer token with the session cookie's own 7-day life"
+BF-219,issue,tuning,,ready,T,workouts,,,,2026-09-29,,,"BF-219 — Cable Preacher Curl has been prescribed 13.75 kg four times and returned RPE 10 three of them, with the reps falling 9 → 8 → 7 → 6"
+BF-222,fold-watch,,watch-list,keep,A,platform,,,unclear,2026-09-29,,,"BF-222 — neither sensor retention prune has EVER fired, both horizons land inside ten weeks, and a failure logs where nothing reads it"
+BF-223,issue,chore,,ready,O,platform,,,,2026-09-29,,,BF-223 — `oura_heartrate_pkey` is 7.2 MB of index that has never been scanned in the database's lifetime
+BF-214,fold-watch,,watch-list,keep,O,platform,,,unclear,2026-09-27,,,"BF-214 — the `claude_ro` twin is 92% of the migration corpus, and it is why migration numbers collide twice as fast as they need to"
+OR-191,issue-blocked,blocked,,parked,A,nutrition body,,LA-180,,2026-09-27,,,"OR-191 — the owner wants ONE calorie number, and none of the three on screen is it"
+LA-167,issue,chore,,ready,O,platform,,,,2026-09-28,,,"LA-167 — every base-comparison ratchet starts one `git` process per file, which is 98% of its runtime"
+OR-195,obsolete-process,,,ready,O,platform,,,,2026-09-27,,,"OR-195 — move Lane A to a persistent local session, where it can finally build the Kotlin it owns"
+OR-196,issue,chore,,ready,O,platform,,,,2026-09-27,,,"OR-196 — docs-only PRs run the full suite, and the obvious fix would block every merge"
+OR-199,archive-reference,,,reference,O,platform,,,,2026-09-27,,,OR-199 — Reference: do NOT compact `CLAUDE.md` the way `projectOverview.md` was compacted
+OR-200,issue,tuning,,ready,T,readiness,,,,2026-09-27,,,"OR-200 — the owner's own check-in is 10% of the readiness score, and he has said it must not be"
+OR-201,issue,chore,,ready,O,nutrition body,,,,2026-09-28,,,OR-201 — a target the app can compute should not wait on a tap
+PS-48,question,question,,ready,O,app-shell,,,,2026-09-26,,,PS-48 — two owner questions that finish the collection v2 rules
+PS-53,question,question,,ready,O,app-shell,,,,2026-09-26,,,"PS-53 — review the finished cat-collection designs, and decide what awards what"
+BF-204,fold-device,,device-check:app-shell,keep,B,app-shell,,,check,2026-09-26,,,"BF-204 — the pen always draws its TWELVE LARGEST cats on one line, so it is crowded by construction"
+BF-205,fold-device,,device-check:app-shell,keep,B,app-shell,,,check,2026-09-26,,,"BF-205 — the home ""Reorder sections"" button cannot reorder anything; every part of the feature exists except the gesture"
+BF-206,fold-watch,,watch-list,keep,B,app-shell,,,unclear,2026-09-26,,,BF-206 — the Coach button covers 56 px of Home that nothing reserves
+BF-207,issue-blocked,blocked,,parked,B,app-shell,,PS-49,,2026-09-26,,,BF-207 — the collection's explanation is 177 words of 12 px grey prose for a mechanic that is entirely visual
+BF-208,fold-device,,device-check:app-shell,keep,B,app-shell,,,check,2026-09-26,,,"BF-208 — the ""button"" on the collection widget is the MOON, and the one thing beside it that looks tappable is a `<span>`"
+BF-209,issue-blocked,blocked,,parked,B,app-shell,,PS-49,,2026-09-26,,,BF-209 — `/collection` is 2.2 screens of scroll whose main layout element is a 59 % empty row
+OR-174,issue,chore,,ready,O,platform,,,,2026-09-26,,,"OR-174 — 38 branches survive with no open PR, and four of them hold live queued work"
+OR-172,question,question,,ready,O,devices,,,,2026-09-25,,,"OR-172 — the Oura BLE path is the OWNER'S setup, not a product feature"
+OR-173,question,question,,ready,O,devices platform,,,,2026-09-25,,,"OR-173 — the owner's storage principle vs the archive rule: computed on Railway, raw on the ring"
+OR-169,issue,chore,,ready,O,nutrition,,,,2026-09-25,,,OR-169 — the calorie recommendation was not declined; it was not TRUSTED
+OR-170,question,question,,parked,O,cardio activity,owner,,,2026-09-25,,,"OR-170 — he wants ""prescribed heart-health activity"", not ""prescribed run"""
+OR-171,fold-device,,device-check:sleep,keep,O,sleep,,,check,2026-09-25,,,OR-171 — ask for a sleep rating only when the score is surprising
+LA-151,archive-reference,,,reference,A,platform,,,,2026-09-26,,,"LA-151 — Reference: one `median`, one `lowerMedian`, and the four that stay private"
+TN-85,fold-watch,,watch-list,keep,B,sleep app-shell,,,unclear,2026-09-26,,,TN-85 — the announcement's only home is a one-shot modal he has trained himself to dismiss
+TN-84,question,question,,ready,O,sleep,,,,2026-09-26,,,TN-84 — the sleep announcement's wording is the owner's call; here is the draft to approve or edit
+OR-166,fold-owner-look,,owner-look,verify,A,platform,,,,2026-09-25,,,OR-166 — `googleapis` was 203 MB for one `google.calendar()` call
+OR-184,issue,chore,,ready,O,platform,,,,2026-09-27,,,"OR-184 — the collaborator's issue and two PRs, and the channel that had no reader"
+TN-80,obsolete-process,,,ready,O,platform,,,,2026-09-25,,,TN-80 — three open PRs need the owner and are tracked NOWHERE in the queue
+OR-155,issue,tuning,,ready,T,readiness,,,,2026-09-24,,,"OR-155 — `activityBalance` unsettles readiness too, and choosing its fix is a scoring call"
+OR-156,issue,chore,,ready,O,readiness platform,,,,2026-09-24,,,"OR-156 — TN-37 step 3 has no plan, and its own text forbids starting without one"
+OR-157,issue,chore,,ready,O,platform,,,,2026-09-24,,,"OR-157 — an entry blocked until a DATE has no field to say so, so it prints as READY"
+OR-158,fold-owner-look,,owner-look,verify,O,platform,,,,2026-09-24,,,"OR-158 — the E2E detector looked for client roots where they are not, so browser code skipped the suite"
+RV-161,question,question,,ready,O,platform,,,,2026-09-24,,,RV-161 — five owner decisions the reads just made answerable
+RV-157,obsolete-process,,,ready,O,platform,,,,2026-09-24,,,"RV-157 — about 55 device checks need the owner, and they fit in six sittings rather than fifty-five asks"
+RV-113,fold-device,,device-check:app-shell,keep,DV,app-shell,,,check,2026-09-26,,,RV-113 — the tab switch blanks the panel for 58–109 ms; drop the opacity ramp
+DV-12,fold-device,,device-check:app-shell,verify,B,app-shell platform,,,,2026-09-23,,,DV-12 — every tab tap holds the main thread 68–118 ms in one task
+DV-21,fold-device,,device-check:platform,verify,B,platform app-shell,,,,2026-09-26,,,"DV-21 — health alerts schedule to a notification channel that is never created, so none of them can ever appear"
+OR-162,fold-watch,,watch-list,keep,B,app-shell platform,,,unclear,2026-09-26,,,"OR-162 — every responsive chart re-measures on every tab switch; this is DV-12's mechanism, from source"
+OR-163,issue,chore,,ready,O,app-shell platform,,,,2026-09-24,,,"OR-163 — sweep the whole app for the two latency classes, with a stated method"
+RV-199,issue,follow-up,,keep,O,platform,,,build,2026-09-24,,,"RV-199 — three privacy decisions: ANSWERED 2026-09-24, one half shipped here"
+OR-159,fold-device,,device-check:devices,keep,A,devices platform,,,check,2026-09-24,,,OR-159 — Android backup carries the WebView session cookie; exclude it
+OR-145,question,question,,ready,O,platform,,,,2026-09-24,,,OR-145 — the owner questions that are correctly gated and have never been asked
+TN-64,fold-watch,,watch-list,keep,A,readiness workouts,,,unclear,2026-09-24,,,"TN-64 — readiness gates NOTHING: its one automatic protective action has never fired in 117 sessions, and on the active program it structura"
+TN-65,issue,chore,,ready,O,readiness workouts,,,,2026-09-24,,,"TN-65 — set RPE is a dense lived-feedback signal nobody is validating scores against, and the first measurement against it is a null"
+LB-192,issue,engine,,ready,A,readiness platform,,,,2026-09-30,,,"LB-192 — there is no readiness verdict engine, so the outlier-gated rating prompt has nothing to ask on"
+LB-193,issue-blocked,blocked,,parked,B,readiness app-shell,,LB-192,,2026-09-30,,,LB-193 — ask for a readiness rating only on the days it is diagnostic
+TN-67,issue,tuning,,ready,T,readiness sleep,,,,2026-09-24,,,"TN-67 — the readiness score has NO validated external agreement, and the r = +0.62 that says otherwise is the pre-TN-50 seeding loop"
+TN-68,issue,chore,,ready,O,sleep,,,,2026-09-24,,,"TN-68 — the sleep score's two autonomic contributors are one axis: r = +0.873, 25% of the model, and both pinned at 100 on 17% of nights"
+TN-69,issue,chore,,ready,O,readiness heart-rate,,,,2026-09-24,,,"TN-69 — the daytime-stress scalar has no day-to-day structure, and the RPE residual cannot settle its sign either"
+RV-188,fold-watch,,watch-list,keep,A,platform,,,unclear,2026-09-24,,,"RV-188 — production has not deployed 22 merges, including tonight's fixes: unblock the Railway build, then take it off the memory boundary"
+RV-191,fold-device,,device-check:platform,keep,A,platform app-shell,,,check,2026-09-24,,,RV-191 — the feedback screenshot is stored unchecked and the admin panel opens it as a URL
+RV-196,fold-device,,device-check:devices,keep,A,devices platform,,,check,2026-09-24,,,"RV-196 — any script in the app's origin can read, clear or redirect the Oura ring key through the native plugin"
+RV-200,fold-device,,device-check:platform,keep,A,platform,,,check,2026-09-25,,,RV-200 — four AI calls only reword numbers the app already computed: replace them with the computed text
+LA-152,archive-reference,,,reference,A,readiness platform,,,,2026-09-26,,,"LA-152 — Reference: two contributor shapes, one reader, and `[object Object]` in production"
+LB-165,issue,follow-up,,keep,A,workouts,,,build,2026-09-27,,,"LB-165 — the rules prescription is built, returned, and reaches no screen at all"
+RV-202,fold-watch,,watch-list,keep,B,workouts,,,unclear,2026-09-25,,,"RV-202 — the prescription has no fallback: offline shows stale numbers as ""Recommended"", a model failure costs ~30 s, and changing the durat"
+RV-203,fold-device,,device-check:nutrition,keep,B,nutrition app-shell,,,check,2026-09-25,,,RV-203 — food capture asks the model before checking the user's own foods
+RV-204,issue-blocked,blocked,,parked,A,workouts,,LA-155,,2026-09-25,,,"RV-204 — the recap half, once LA-155 says why the screen is never reached"
+LA-155,fold-device,,device-check:workouts,ready,DV,workouts app-shell,,,,2026-09-26,,,"LA-155 — the workout recap has not run since July, across 43 completed workouts"
+LB-162,fold-device,,device-check:app-shell,keep,B,app-shell,,,check,2026-09-26,,,LB-162 — the three `height: auto` collapses; the three bars are done
+BF-61,fold-device,,device-check:nutrition,ready,DV,nutrition app-shell,,,,2026-08-30,,,BF-61 — the swipe tray's Delete needs two presses (the fix FAILED on the device; open work)
+RV-208,fold-device,,device-check:app-shell,keep,B,app-shell platform,,,check,2026-09-26,,,"RV-208 — the same thing is written, formatted and coloured differently on different screens"
+RV-209,fold-watch,,watch-list,keep,B,app-shell,,,unclear,2026-09-26,,,"RV-209 — 42 font sizes and 1,035 uses of text under 12 px: give the scale a floor, starting with the workout screens"
+RV-210,fold-device,,device-check:app-shell,keep,B,app-shell,,,check,2026-09-26,,,"RV-210 — the keyboard: nothing tells the WebView to resize, sheets are sized in `vh`, and no field says what its Enter key does"
+RV-211,fold-watch,,watch-list,keep,B,app-shell readiness,,,unclear,2026-09-26,,,"RV-211 — Home tells an empty account things that are not true, and draws a few stray marks"
+RV-218,issue-blocked,blocked,,parked,A,nutrition,,LA-180 LA-180,,2026-09-26,,,"RV-218 — one Nutrition screen shows three calorie targets, the Day screen a fourth ""burned"", and ""205 workouts"" means 205 kcal"
+RV-220,fold-device,,device-check:platform,ready,DV,platform,,,,2026-09-26,,,"RV-220 — DEVICE: two faults in the design gallery itself — a Health set of the home screen, and scrolls that never scrolled"
+RV-198,fold-watch,,watch-list,keep,A,platform,,,unclear,2026-09-24,,,"RV-198 — CI: actions pinned to mutable tags, the signing keystore on PR runs, and no default token scope"
+TN-70,question,question,,parked,A,readiness devices,owner,,,2026-09-24,,,"TN-70 — `resilience_level` published two disjoint regimes: exclusively 5 for five weeks, then never 5 again"
+LA-160,fold-device,,device-check:readiness,ready,DV,readiness devices,,,,2026-09-27,,,"LA-160 — is the ring actually worn in the daytime, or has daytime-stress ingest degraded?"
+TN-71,issue,chore,,ready,O,readiness,,,,2026-09-24,,,"TN-71 — `temperature` holds 10% of the readiness weight and moves 1.1% of the score, and the model file says a 14%-of-movement contributor i"
+TN-78,fold-device,,device-check:activity,keep,A,activity heart-rate,,,check,2026-09-27,,,"TN-78 — the zone-minutes goal is WHO's MODERATE target scored at a VIGOROUS threshold, so walking can never earn it"
+TN-79,issue,tuning,,ready,T,readiness devices heart-rate,,,,2026-09-24,,,TN-79 — Q-270's route is NOT silent: it persists `insufficient_met` on 21 days while the MET data it needs is present
+TN-76,issue,tuning,,ready,T,activity,,,,2026-09-24,,,"TN-76 — four of the Activity Score's six contributors do not behave as the model documents, measured off its own stored breakdown"
+TN-77,fold-watch,,watch-list,keep,A,readiness activity,,,unclear,2026-09-24,,,"TN-77 — ""previous day's activity"" is computed from TODAY's training window, and on a different weight base from the score it is compared wit"
+TN-72,fold-watch,,watch-list,keep,A,readiness heart-rate,,,unclear,2026-09-24,,,"TN-72 — v6 will never re-score a single stored day, and TN-55's plan said it would. That claim was mine and is retracted here"
+TN-73,archive-reference,,,reference,O,readiness sleep workouts,,,,2026-09-24,,,"TN-73 — the RPE residual PASSES a positive control, which turns the scores' null into a measured ceiling: they move perceived effort ~5× les"
+TN-62,fold-device,,device-check:readiness,ready,DV,readiness,,,,2026-09-24,,,"TN-62 — the batched recompute has a cost nobody priced: while it waits, a worse HRV night scores HIGHER than a milder one 🔴 LIVE"
+RV-186,issue,engine,,ready,A,platform app-shell,,,,2026-09-24,,,"RV-186 — DEVICE: the performance sitting, run BEFORE the fixes so each one has a ""before"""
+RV-205,fold-device,,device-check:app-shell,ready,DV,app-shell platform,,,,2026-09-25,,,"RV-205 — DEVICE: the design and feel pass — a screen gallery Review can see, plus tap latency, scroll, keyboard, token and motion numbers"
+RV-206,fold-device,,device-check:app-shell,ready,DV,app-shell platform,,,,2026-09-26,,,"RV-206 — DEVICE: stress the design — large text, display size, slow phone, bad network, one hand, keyboards, launch, charts, overscroll, lon"
+DV-18,fold-device,,device-check:platform,verify,A,platform app-shell,,,,2026-09-26,,,"DV-18 — private media went through Next's image optimizer, which cannot authenticate"
+DV-19,issue,engine,,ready,A,activity platform,,,,2026-09-26,,,"DV-19 — one treadmill walk is three rows on the device, and the list shows it twice"
+DV-15,fold-device,,device-check:nutrition,keep,A,nutrition platform,,,check,2026-09-23,,,"DV-15 — a deleted food came back on the device as ""synced"" while the server had deleted it"
+DV-13,fold-device,,device-check:devices,keep,A,devices platform,,,check,2026-09-23,,,DV-13 — opening the Oura BLE admin console coincided with production going unresponsive for ~8 minutes
+OR-138,issue,engine,,ready,A,platform,,,,2026-09-23,,,OR-138 — let the triaging agent read the data of the user who filed the feedback
+BF-195,fold-device,,device-check:platform,keep,A,platform app-shell,,,check,2026-09-24,,,"BF-195 — the app handles OFFLINE and hangs on BARELY ONLINE, which is the state a gym is in"
+BF-192,issue,engine,,ready,A,platform app-shell,,,,2026-09-24,,,"BF-192 — there is no way for a user to delete their account, and the one delete path that exists throws"
+BF-193,archive-reference,,,reference,O,platform,,,,2026-09-24,,,"BF-193 — three questions BF-192 cannot answer: what ""delete"" means for logs, the ring key, and whether it is instant"
+BF-196,fold-device,,device-check:workouts,verify,B,workouts,,,,2026-09-26,,,"BF-196 — ""~51 min"" is WORKING minutes and reads as whole-session minutes, so a full session looks nine short"
+BF-203,archive-reference,,,reference,A,nutrition,,,,2026-09-26,,,"BF-203 — meal-plan tracking: estimated meals when a window passes, and a weight-corrected estimator"
+LB-195,issue,engine,,ready,A,nutrition workouts,,,,2026-09-30,,,"LB-195 — a meal plan's day type is only knowable for TODAY, and the owner's schedule is the reason"
+LA-184,fold-watch,,watch-list,keep,B,nutrition,,,unclear,2026-09-30,,,"LA-184 — a split meal plan always shows its rest-day variant, because nothing passes `isTrainingDay`"
+BF-203a,issue-blocked,blocked,,parked,A,nutrition,,LA-185,,2026-09-26,,,"BF-203a — phase A: the `estimated` answer state, and counting it once"
+BF-203b,issue-blocked,blocked,,parked,B,nutrition app-shell,,BF-203a,,2026-09-26,,,BF-203b — phase B: the resolve surface
+BF-203c,issue-blocked,blocked,,parked,A,nutrition,,BF-203b,,2026-09-26,,,BF-203c — phase C: the rolling corrector
+LA-173,question,question,,ask,O,platform workouts,,,,2026-09-28,,,"LA-173 — five things Lane A needs from the owner (three merge yeses, a style, a key)"
+LA-175,issue,tuning,,ready,T,workouts readiness,,,,2026-09-28,,,"LA-175 — Q-279's ACWR switch, re-measured before building: the deload card's direction reversed"
+LB-172,question,question,,parked,O,app-shell heart-rate,owner,,,2026-09-27,,,"LB-172 — Resting HR is drawn as a score, and neither proposed fix fits"
+BF-201,issue,tuning,,ready,T,workouts,,,,2026-09-26,,,"BF-201 — two decisions about the loads he actually trains at, split out of BF-197 and BF-199 so they reach him"
+BF-200,fold-watch,,watch-list,keep,A,workouts,,,unclear,2026-09-26,,,BF-200 — the deload applied to four exercises and not the fifth: Skull Crusher was loaded at 30 kg where 52% of its 1RM is 19
+BF-199,fold-watch,,watch-list,keep,A,workouts,,,unclear,2026-09-26,,,"BF-199 — prescription from rules, Phase 1: shadow the rules path beside the model and measure"
+BF-199b,issue-blocked,blocked,,parked,A,workouts,,BF-199 BF-201,,2026-09-29,,,"BF-199b — prescription from rules, Phase 2: rules own sets/reps/pct/rest; the model writes only the prose"
+BF-199c,issue-blocked,blocked,,parked,A,workouts,,BF-199b,,2026-09-29,,,"BF-199c — prescription from rules, Phase 3: represcribe on the device with no round trip"
+BF-198,issue,follow-up,,keep,A,workouts,,,build,2026-09-26,,,"BF-198 — `Full` cannot override a WHOLE-SESSION deload, and the card's stated remedy does not exist"
+BF-197,issue-blocked,blocked,,parked,A,workouts,,LA-178,,2026-09-24,,,"BF-197 — the duration estimate charges a rest he never takes and a transition that does not exist, and those 14.2 phantom minutes are what h"
+BF-189,question,question,,ready,O,workouts,,,,2026-09-23,,,"BF-189 — every exercise sits on the 2-set floor, and weekly volume lands at 66% of the owner's own targets"
+BF-191,fold-device,,device-check:activity,keep,DV,activity,,,check,2026-09-24,,,BF-191 — the walk-end fix shipped; three phantom rows are still in the history
+LB-174,issue,chore,,ready,O,activity app-shell,,,,2026-09-27,,,"LB-174 — the guided walk has no tab bar, so one of the two exits LB-141 fixed cannot fire"
+OR-139,issue,chore,,ready,O,platform,,,,2026-09-24,,,OR-139 — a device FAILURE does not clear the field that makes an entry read as finished
+RV-143,obsolete-process,,,ready,O,platform,,,,2026-09-23,,,"RV-143 — 24 entries are blocked ON the device agent and invisible TO it, because `--sittings` does not select `Gate: device`"
+LA-144,issue,tuning,,ready,T,readiness body,,,,2026-09-25,,,LA-144 — the Body Battery's wake anchor discards the whole day when the main sleep is a daytime block
+LA-134,fold-watch,,watch-list,keep,A,readiness body,,,unclear,2026-09-24,,,LA-134 — the Body Battery's constants are provisional and nothing re-sweeps them
+OR-132,issue,chore,,ready,O,platform,,,,2026-09-23,,,OR-132 — five PRs are dead from the shallow-fetch defect and need closing
+RV-124,fold-device,,device-check:nutrition,verify,DV,nutrition app-shell,,,,2026-09-24,,,"RV-124 — DEVICE PROBE: does a write repaint the surfaces that show it, without a tab switch?"
+RV-146,fold-device,,device-check:app-shell,keep,DV,app-shell platform,,,check,2026-09-26,,,RV-146 — two fonts only the meal-label printer uses are preloaded on every page
+RV-147,issue,chore,,ready,O,platform,,,,2026-09-24,,,RV-147 — `docs/data-layer-rules.md` still names `metric-log-sheet` as the save that overwrites every column
+RV-156,obsolete-process,,,ready,O,platform,,,,2026-09-24,,,"RV-156 — about 30 Known-Issues rows are already answered, several state things that are no longer true, and the old device queue has five li"
+RV-158,obsolete-process,,,ready,O,platform,,,,2026-09-24,,,RV-158 — a Known-Issues row can owe a device check that no queue lists; stop new ones at CI
+RV-159,issue,chore,,ready,O,readiness platform,,,,2026-09-24,,,"RV-159 — 106 of 129 stored derived-score rows were rewritten at 02:37 UTC today, and nothing records who ran it"
+RV-160,issue,chore,,ready,O,platform,,,,2026-09-24,,,RV-160 — nine entries and four Known-Issues rows are answered by a read or a commit; close them
+RV-162,issue,chore,,ready,O,platform,,,,2026-09-24,,,"RV-162 — an owed read has no date and no reminder, so it waits until someone happens to look"
+RV-165,fold-device,,device-check:body,keep,A,body nutrition,,,check,2026-09-24,,,"RV-165 — the height correction (160 → 158 cm) never reached the stored scale body composition, so the DEXA offset is fitted to the old heigh"
+RV-166,fold-device,,device-check:cardio,verify,B,cardio activity,,,,2026-09-24,,,"RV-166 — no prescribed run has ever been marked done, although the owner does most of them as walks"
+RV-167,fold-watch,,watch-list,keep,DV,activity devices,,,unclear,2026-09-24,,,"RV-167 — a walk whose strap cadence stream started late stores a fifth of its steps, and nothing flags it"
+RV-169,fold-device,,device-check:readiness,ready,DV,readiness,,,,2026-09-24,,,"RV-169 — #1256's ""history self-heals across the trailing 21 days"" did not happen, and the span is 24 days, not 16"
+RV-185,issue-blocked,blocked,,parked,B,app-shell,,RV-186 RV-186,,2026-09-24,,,RV-185 — every tab downloads 457 kB of JavaScript before first paint; two libraries load eagerly that the first paint may not need
+RV-179,issue,chore,,ready,O,platform,,,,2026-09-24,,,"RV-179 — five Custom Rules checks have blind spots the census walked through, and one CLAUDE.md count is stale"
+RV-130,fold-device,,device-check:platform,verify,DV,platform app-shell,,,,2026-09-24,,,"RV-130 — DEVICE PROBE: the console, and what `bf110 resume dom-intact` is actually recording"
+RV-131,fold-device,,device-check:platform,verify,DV,platform nutrition,,,,2026-09-23,,,RV-131 — DEVICE PROBE: the offline mode the whole architecture is built for
+RV-132,fold-device,,device-check:app-shell,verify,DV,app-shell,,,,2026-09-26,,,RV-132 — DEVICE PROBE: route census on a fresh install
+DV-8,fold-device,,device-check:workouts,keep,A,workouts nutrition platform,,,check,2026-09-23,,,"DV-8 — heal the rows already stuck at `pending`, and the one `set_logs` row that is a different bug"
+DV-6,fold-device,,device-check:app-shell,verify,B,app-shell,,,,2026-09-23,,,"DV-6 — content scrolls under the status bar with no backing, so text runs through the clock"
+DV-1,issue,chore,,ready,O,platform,,,,2026-09-23,,,"DV-1 — `pnpm ci:local` cannot pass on Windows, which is where the Device Verification agent always runs"
+LB-131,fold-device,,device-check:sleep,verify,B,sleep,,,,2026-09-23,,,LB-131 — the sleep-timing chart takes the owner's zone by default; nothing passes the user's
+DV-9,fold-device,,device-check:sleep,verify,B,sleep,,,,2026-09-23,,,"DV-9 — the Sleep screen's bedtime consistency is computed in the phone's timezone, not the user's"
+DV-11,fold-device,,device-check:nutrition,verify,B,nutrition app-shell,,,,2026-09-23,,,DV-11 — Manage Supplements' on/off switches have no accessible name
+RV-155,fold-device,,device-check:platform,ready,DV,platform app-shell,,,,2026-09-24,,,RV-155 — about 60 shipped changes owe a device look that no queue shows DV: run them as six stations
+RV-151,fold-device,,device-check:platform,ready,DV,platform,,,,2026-09-24,,,RV-151 — DEVICE PROBE: how long the phone keeps running old code after a deploy
+RV-153,issue,engine,,ready,A,app-shell platform,,,,2026-09-24,,,"RV-153 — DEVICE PROBE: which localStorage keys a tab tap writes, and how full the store is"
+RV-154,fold-device,,device-check:app-shell,ready,DV,app-shell platform,,,,2026-09-24,,,RV-154 — DEVICE PROBE: the app left open across local midnight
+RV-103,fold-watch,,watch-list,keep,A,nutrition platform,,,unclear,2026-09-22,,,RV-103 — the balance refetch that could not report its own failure
+LB-132,fold-device,,device-check:platform,keep,B,platform,,,check,2026-09-23,,,LB-132 — write paths that invalidate for this device but not after the push
+RV-108,fold-device,,device-check:body,verify,B,body devices,,,,2026-09-22,,,"RV-108 — on the device, a weigh-in invalidates almost nothing"
+LB-133,fold-device,,device-check:platform,keep,B,platform,,,check,2026-09-23,,,LB-133 — the guard for the post-push class cannot see the class
+LB-129,fold-device,,device-check:nutrition,verify,B,nutrition app-shell,,,,2026-09-23,,,LB-129 — the day-review sheet does not open on a first flip into Nutrition
+RV-114,fold-device,,device-check:app-shell,keep,B,app-shell,,,check,2026-09-22,,,"RV-114 — six pushed routes have no transition, and one pair opens hard then animates closed"
+RV-115,fold-watch,,watch-list,keep,B,app-shell,,,unclear,2026-09-22,,,RV-115 — More's Profile ↔ Friends swap is a hard `display:none` toggle that carries the other view's scroll
+RV-117,issue,chore,,ready,O,readiness body,,,,2026-09-22,,,RV-117 — Health → Body shows two different energy answers nine cards apart
+RV-118,issue,chore,,ready,O,body,,,,2026-09-22,,,"RV-118 — ""Weight Trend"" exists twice in Health, and the card with that title has no trend number"
+OR-136,obsolete-process,,,ready,O,platform,,,,2026-09-23,,,OR-136 — the 4-hourly Lane A Routine still tells every firing to maintain a PR that merged three days ago
+TN-58,fold-watch,,watch-list,keep,B,readiness app-shell,,,unclear,2026-09-21,,,"TN-58 — the comparative check-in: KEEP, the two-week pass test is owed"
+LB-149,fold-watch,,watch-list,keep,B,platform,,,unclear,2026-09-25,,,"LB-149 — the E2E browser dies mid-run, and the run records nothing about why"
+RV-99,issue,engine,,ready,A,platform app-shell,,,,2026-09-21,,,RV-99 — the hex band triad is still copy-pasted at ~180 sites
+RV-101,fold-device,,device-check:workouts,verify,B,workouts app-shell,,,,2026-09-21,,,"RV-101 — the muscle heatmap's volume ramp: SHIPPED, the device look is owed"
+LA-122,issue,follow-up,,keep,A,platform,,,build,2026-09-20,,,LA-122 — Reference: the six owner decisions Lane A is currently blocked on
+LB-155,fold-watch,,watch-list,keep,B,platform,,,unclear,2026-09-25,,,"LB-155 — the bare-`fetch` rule is ENFORCED; what is left is 8 per-query reads, not a conversion backlog"
+RV-65,question,question,,parked,A,workouts platform,owner,,,2026-09-20,,,"RV-65 — the prescription asks a model for numbers that deterministic code then overwrites, and nothing measures whether the model still earn"
+LA-126,fold-device,,device-check:body,ready,DV,body nutrition,,,,2026-09-21,,,LA-126 — the owner's live nutrition targets are numbers a model invented 🔴 LIVE
+RV-68,fold-device,,device-check:nutrition,verify,B,nutrition app-shell,,,,2026-09-20,,,RV-68 — the supplement tick now paints before the writes; the device look is owed
+RV-71,fold-device,,device-check:app-shell,keep,B,app-shell,,,check,2026-09-20,,,"RV-71 — the shared Button has no press state on a touch-only product, while 45 files hand-roll one"
+RV-72,fold-device,,device-check:app-shell,keep,B,app-shell,,,check,2026-09-20,,,"RV-72 — about ten progress bars animate `width`, a layout property, and twenty-six more snap"
+RV-74,fold-device,,device-check:readiness,verify,B,readiness app-shell,,,,2026-09-20,,,RV-74 — the health hero's ring is eased now; the device look is owed
+RV-75,fold-watch,,watch-list,keep,B,app-shell,,,unclear,2026-09-20,,,RV-75 — sheets take 500 ms to open; the app's own tuned target elsewhere is 180–200 ms
+TN-56,fold-watch,,watch-list,keep,A,readiness platform,,,unclear,2026-09-21,,,TN-56 — one admin-gated replay endpoint is the only thing standing between Tuning and 25 unmeasurable thresholds
+TN-54,fold-device,,device-check:devices,keep,A,devices heart-rate,,,check,2026-09-20,,,"TN-54 — the chest strap has been dark for five days and nothing server-side records that, so PS-44's window cannot be counted 🔴 LIVE"
+TN-51,fold-device,,device-check:devices,keep,A,devices heart-rate,,,check,2026-09-19,,,"TN-51 — overnight strap wear lands in ambient mode, which discards 29 of every 30 seconds of beats, so PS-44's HRV comparison cannot be made"
+LA-121,issue,tuning,,ready,T,readiness devices,,,,2026-09-20,,,"LA-121 — four readiness branches are permanently dead, and one carries a temperature ladder"
+OR-137,archive-reference,,,reference,A,platform,,,,2026-09-23,,,"OR-137 — a reported UI bug arrives without its screenshot, which is usually the whole report"
+LB-121,obsolete-process,,,ready,O,platform,,,,2026-09-22,,,"LB-121 — Reference: the queue parser's ""blocked"" marker, filed three times before it was fixed"
+LB-120,obsolete-process,,,ready,O,platform,,,,2026-09-18,,,LB-120 — the backlog's doc-size baseline collides on every pair of concurrent implementer PRs
+BF-188,fold-watch,,watch-list,keep,O,platform,,,unclear,2026-09-23,,,BF-188 — a second fold into the same history file silently deletes the first agent's 41 entries
+BF-187,fold-device,,device-check:devices,verify,A,devices readiness platform,,,,2026-09-23,,,BF-187 — opening the app never asks the ring for anything; the only drain triggers are two gestures and an hourly timer
+BF-185,fold-device,,device-check:body,keep,A,body nutrition,,,check,2026-09-20,,,BF-185 — un-ticking and re-ticking a dose silently rewrites the time it was taken
+BF-184,issue,engine,,ready,A,body readiness,,,,2026-09-20,,,"BF-184 — the reta dose is recorded well and joins cleanly to recovery metrics; nothing surfaces that join, and dose 1 is missing its time"
+LB-199,issue,engine,,ready,A,nutrition,,,,2026-09-30,,,"LB-199 — store which meal types a saved meal is SUITABLE for, and seed it from history"
+BF-183,issue-blocked,blocked,,parked,B,nutrition,,LB-199,,2026-09-20,,,"BF-183 — tag My Foods rows with which meals a food CAN be used for, feeding the meal planner"
+BF-182,issue,engine,,ready,A,workouts,,,,2026-09-20,,,"BF-182 — warm the next prescription when Home renders, not at completion and not at tab-open"
+BF-180,issue-blocked,blocked,,parked,A,workouts,,BF-179,,2026-09-20,,,"BF-180 — a session-level deload stores no ""what full would have been"", so declining it drops to the STATIC program, not an AI full"
+BF-181,issue-blocked,blocked,,parked,A,workouts,,BF-180,,2026-09-20,,,"BF-181 — NINE exercises in the active program have no progression style, and one whole session has none at all"
+BF-179,fold-watch,,watch-list,keep,A,workouts,,,unclear,2026-09-20,,,BF-179 — a DISMISSED prescription that expired three days ago is still prescribing today's deload
+TN-50,fold-device,,device-check:readiness,keep,B,readiness app-shell,,,check,2026-09-18,,,"TN-50 — the ""self-report"" that scores 10% of readiness is auto-filled FROM readiness, and `pumped` is unreachable"
+TN-48,archive-reference,,,reference,A,body nutrition,,,,2026-09-18,,,"TN-48 — the body-composition suite is collected daily, interpreted nowhere, and the one reading that frightens is the one the app can alread"
+TN-47,issue-blocked,blocked,,parked,A,readiness,,Q-506,,2026-09-18,,,"TN-47 — half the readiness weight is measured against four differently-stretched rulers, and the breakdown rails on 46% of days 🔴 LIVE"
+TN-49,fold-watch,,watch-list,keep,A,readiness platform,,,unclear,2026-09-18,,,TN-49 — seven days show a readiness score that contradicts its own stored breakdown
+RV-77,archive-reference,,,reference,A,nutrition platform,,,,2026-09-20,,,RV-77 — meal-plan generation can fire the same top-up model call twice for one meal
+TN-45,fold-watch,,watch-list,keep,A,readiness devices,,,unclear,2026-09-17,,,TN-45 — the only illness band that has ever fired is the one with no penalty and no UI
+LB-116,fold-device,,device-check:workouts,verify,B,workouts app-shell,,,,2026-09-17,,,LB-116 — the check-in sheet knows which sore ticks it suggested and throws it away (fixed; device check owed)
+TN-34,fold-watch,,watch-list,keep,A,readiness,,,unclear,2026-09-10,,,"TN-34 — the stress-deload override fires on 83% of days, off the one number measured to carry no signal"
+BF-13,issue,follow-up,,keep,DV,readiness devices,,,build,2026-08-24,,,"BF-13 — the baseline EMA seeds at ZERO: the line under TN-6 and Q-506, and it is shared by all six baselines"
+TN-6,fold-watch,,watch-list,keep,A,readiness devices,,,unclear,2026-08-24,,,"TN-6 — the temperature baseline is 0.36 °C too low, so readiness carries a −16 pt penalty on 89% of days"
+BF-175,issue,follow-up,,keep,B,nutrition,,,build,2026-09-23,,,"BF-175 — the log-food sheet prints the stored GOAL as today's budget, so it reads 1660 beside the card's 1506"
+BF-174,issue,tuning,,ready,T,workouts readiness,,,,2026-09-16,,,"BF-174 — every muscle recovers on the same 24 h base constant, so abs and quads are modelled identically"
+BF-170,fold-device,,device-check:nutrition,verify,B,nutrition,,,,2026-09-16,,,BF-170 — a lone saved meal shows its macros nowhere (fixed; the device look is what is left)
+BF-169,fold-device,,device-check:workouts,verify,B,workouts,,,,2026-09-16,,,BF-169 — the COMPLETED stamp is gated on the exercise library loading (fixed; the device look is what is left)
+BF-168,fold-device,,device-check:workouts,verify,B,workouts,,,,2026-09-16,,,"BF-168 — ""Leave workout?"" fires on the session-select tab after the workout is finished (fixed; device look owed)"
+BF-167,fold-device,,device-check:workouts,verify,B,workouts,,,,2026-09-16,,,"BF-167 — the deload toggle read the phase flag, not the loads (fixed; device look owed)"
+LA-113,issue,tuning,,ready,T,readiness devices,,,,2026-09-16,,,"LA-113 — the daytime-HRV imputation reads ~⅓ of measured HRV, and its heart-rate slope is ~2× too steep"
+TN-40,archive-reference,,,reference,A,devices heart-rate,,,,2026-09-15,,,"TN-40 — the strap's 136,440 beats produce exactly one number, while three models that could use them run on the ring alone"
+TN-41,question,question,,parked,A,devices,owner,,,2026-09-15,,,"TN-41 — four raw tags are stored and never decoded, and one of them has no decoder at all"
+TN-42,issue-blocked,blocked,,parked,A,readiness,,TN-6,,2026-09-15,,,"TN-42 — readiness has never reached 90 in 62 days, and the cap is a contributor that cannot reach its own optimum 🔴 LIVE"
+TN-43,issue-blocked,blocked,,parked,A,platform readiness,,TN-38,,2026-09-15,,,"TN-43 — four composite metrics from values already computed, two of which work on the base set"
+LA-115,fold-device,,device-check:devices,verify,A,devices,,,,2026-09-16,,,"LA-115 — Health Connect reads three record types the plugin cannot parse, and fails silently on all three"
+LB-119,issue,chore,,ready,O,platform,,,,2026-09-17,,,"LB-119 — chromium SIGSEGVs mid-suite in CI, so an E2E result has to be read twice before it means anything"
+LB-113,fold-device,,device-check:platform,verify,B,platform devices,,,,2026-09-16,,,LB-113 — the Health Connect sync took the user's timezone and nothing passed it (fixed; device look owed)
+TN-44,fold-watch,,watch-list,keep,A,devices,,,unclear,2026-09-15,,,"TN-44 — Health Connect record types the pillars want, and what it would actually take to read them"
+TN-38,archive-reference,,,reference,A,platform devices,,,,2026-09-15,,,TN-38 — normalisation is implemented three different ways and nothing names them as one concept
+TN-37,issue-blocked,blocked,,parked,A,platform readiness,,OR-156,,2026-09-15,,,TN-37 — the connector guide states an invariant the pillars do not hold: readiness reads four device-specific stores
+TN-36,archive-reference,,,reference,A,workouts readiness,,,,2026-09-14,,,"TN-36 — the deload engine has ONE way to say ""train normally"", and a bug fix switched on its loudest trigger 🔴 LIVE"
+PS-40,archive-reference,,,reference,A,devices,,,,2026-09-14,,,"PS-40 — formalize the data-source connector convention as a typed, checkable declaration"
+PS-41,question,question,,parked,A,devices activity,owner,,,2026-09-14,,,PS-41 — normalize Health Connect's intraday HR series into `oura_heartrate` so Activity Score works for non-ring users
+PS-43,issue,engine,,ready,A,devices,,,,2026-09-14,,,PS-43 — decide whether Health Connect's 30-day cold-sync cap should be a deliberate policy or extendable
+PS-44,question,question,,parked,A,devices heart-rate,owner,,,2026-09-14,,,PS-44 — compute nightly/readiness HRV from raw beat intervals instead of trusting the ring's own figure
+PS-45,question,question,,parked,A,devices platform,owner,,,2026-09-14,,,PS-45 — a per-user API key/token for external programmatic health-data ingestion
+PS-46,question,question,,parked,A,devices,owner,,,2026-09-14,,,PS-46 — build the Apple HealthKit connector (iOS)
+BF-163,fold-device,,device-check:workouts,keep,B,workouts,,,check,2026-09-15,,,BF-163 — the intensity chip is computed from load alone (card half shipped; the blend rule is Lane A's)
+LB-106,fold-watch,,watch-list,keep,B,platform,,,unclear,2026-09-14,,,"LB-106 — `preferences-survive-reinstall` fails on CI and passes everywhere else, twice in one day"
+LB-104,issue,chore,,ready,O,platform,,,,2026-09-14,,,"LB-104 — four more entries may be buried under `Reference:`, and the field now says what it means"
+LB-157,question,question,,parked,B,app-shell,owner,,,2026-09-29,,,LB-157 — Home's header row cannot hold a date AND three chips at 412 dp: which reading moves?
+BF-139,issue-blocked,blocked,,parked,B,app-shell,,LB-157,,2026-09-10,,,BF-139 — three header chips no longer fit beside the date (the fix FAILED on device; open work)
+BF-142,fold-owner-look,,owner-look,verify,B,nutrition,,,,2026-09-11,,,BF-142 — the gap explainer gave a reason its own module rules out (fixed; the owner says whether it reads true)
+BF-143,fold-watch,,watch-list,keep,A,workouts,,,unclear,2026-09-11,,,"BF-143 — a crash-recovery path fires on a recreated session, so a never-trained Lower is marked baseline-complete on borrowed PRs (FIXED; th"
+BF-148,fold-watch,,watch-list,keep,A,workouts,,,unclear,2026-09-12,,,"BF-148 — the header says Baseline and the set card prescribes 3×8, because a name-keyed guard vetoes the periodization state (FIXED)"
+BF-147,issue,follow-up,,keep,B,platform app-shell,,,build,2026-09-11,,,BF-147 — the admin Exercises tab: the four UI defects shipped; the S3 credentials are still unchecked
+BF-145,fold-device,,device-check:app-shell,keep,B,app-shell,,,check,2026-09-11,,,BF-145 — the palette half shipped; the sheet half is refuted as specified and needs a decision
+BF-144,fold-watch,,watch-list,keep,A,workouts,,,unclear,2026-09-11,,,"BF-144 — the dead `program_session_id` column that misled BF-143, and whether to drop it"
+TN-35,issue,follow-up,,keep,B,readiness,,,build,2026-09-10,,,"TN-35 — make stress answer ""what stressed me"", by joining the series to the day's events and letting the owner mark a moment"
+TN-33,question,question,,parked,A,readiness,owner,,,2026-09-10,,,TN-33 — the stress storage defect is fixed and the SIGN is not; TN-22's reversal was an eight-day artefact
+LB-94,obsolete-process,,,ready,O,platform,,,,2026-09-09,,,"LB-94 — the journal's recent window is 332 entries, and 297 of them are pinned by a citation"
+LB-96,issue-blocked,blocked,,parked,A,body platform,,OR-102b,,2026-09-09,,,"LB-96 — no route returns a weight series longer than seven days, so a browser cannot see a dosing period"
+LB-97,issue-blocked,blocked,,parked,A,body,,OR-102b,,2026-09-09,,,LB-97 — the weight-response band is a constant; the owner asked for it to be their setting
+LB-98,fold-watch,,watch-list,keep,A,platform,,,unclear,2026-09-09,,,"LB-98 — local-only data has no read path, so a whole class of surface cannot be verified in CI"
+LA-95,question,question,,parked,A,workouts,owner,,,2026-09-09,,,LA-95 — the rest-discipline bars grade past sessions against today's prescription
+TN-30,issue-blocked,blocked,,parked,A,heart-rate cardio,,TN-25,,2026-09-09,,,"TN-30 — one zone model, four max-HR anchors: the walk, the zone bar and the Body Battery grade the same heartbeat against three different ce"
+TN-31,issue-blocked,blocked,,parked,A,cardio,,TN-30,,2026-09-09,,,"TN-31 — split the interval JOG out of Guided Walk into a Run type; a walk and a jog are two sessions, not two speeds"
+BF-137,issue,tuning,,ready,T,nutrition body,,,,2026-09-10,,,BF-137 — the maintenance estimator is fitting a GLP-1 weight drop and calling it metabolic rate 🔴 LIVE
+TN-29,fold-watch,,watch-list,keep,A,nutrition,,,unclear,2026-09-09,,,"TN-29 — the app measures this owner's activity factor at 1.41 and then accepts a maintenance implying 1.67, because nothing cross-checks the"
+TN-27,archive-reference,,,reference,A,nutrition,,,,2026-09-09,,,"TN-27 — the maintenance estimator rejects its reliable window and falls back to its noisiest one, and the owner is shown 2,245 kcal instead "
+TN-26,archive-reference,,,reference,A,cardio heart-rate,,,,2026-09-08,,,TN-26 — the walk prescribes a control that means something different on every surface; prescribe heart rate and record the rest
+TN-25,fold-device,,device-check:cardio,keep,B,cardio heart-rate,,,check,2026-09-08,,,"TN-25 — the guided walk's fast target has never been met in 44 attempts, and the live pacer says ""push"" every time"
+TN-24,archive-reference,,,reference,A,cardio activity heart-rate,,,,2026-09-08,,,"TN-24 — Zone 2 is unreachable on foot, so the walk's zone bar carries no information (and this is Q-523's mechanism)"
+OR-102b,issue,follow-up,,keep,B,nutrition body,,,build,2026-09-06,,,"OR-102b — the reta tracker: vial setup, dose calculator, dose timeline, weight response"
+LB-68,archive-reference,,,reference,O,platform,,,,2026-09-08,,,"LB-68 — Playwright's synthetic input does not reach the Nutrition day-tools buttons, and two sessions have now lost time to it"
+OR-106,fold-watch,,watch-list,keep,O,platform,,,unclear,2026-09-10,,,OR-106 — the `Lane:` field is at 95% and the gap is all shipped residue
+OR-105,issue,chore,,ready,O,platform,,,,2026-09-08,,,OR-105 — five premature `Verify:` fields fixed; four entries still unresolved
+BF-126,fold-owner-look,,owner-look,verify,O,app-shell,,,,2026-09-07,,,"BF-126 — the cat collection's drawn art: shipped, the owner's look at 56 px is owed"
+PS-49,issue-blocked,blocked,,parked,B,app-shell,,PS-48 PS-48,,2026-09-26,,,PS-49 — collection rules v2: switch the surface to the v2 block the engine now returns
+PS-52,issue,chore,,ready,O,app-shell,,,,2026-09-26,,,PS-52 — make people attached to their cats: pick which of these to build next
+PS-51,issue-blocked,blocked,,parked,A,app-shell,,PS-49,,2026-09-26,,,PS-51 — titles that unlock the collection pen's backdrop scenes
+PS-50,issue-blocked,blocked,,parked,A,app-shell devices,,PS-49,,2026-09-26,,,PS-50 — the collection as an Android home-screen widget
+LA-65,archive-reference,,,reference,A,workouts,,,,2026-09-07,,,"LA-65 — the transition constant is charged once too often at a value that is too low, and the two errors cancel at five exercises"
+BF-134,issue-blocked,blocked,,parked,A,nutrition,,LA-180,,2026-09-09,,,"BF-134 — the macro targets and the calorie budget on one card are anchored to different days, and disagree by 406 kcal before you move"
+LB-56,archive-resolved,,,ready,O,platform,,,,2026-09-04,,"answered by the release-train spec: E2E runs at release, not per PR",LB-56 — E2E costs 26 minutes a UI PR and currently gates nothing; decide which of those to change
+LB-55,archive-reference,,,reference,O,platform,,,,2026-09-04,,,"LB-55 — E2E fails as a timeout, not as an error, and a red E2E does not actually block a merge"
+PS-24,fold-device,,device-check:platform,verify,A,platform,,,,2026-09-06,,,🟡 PS-24 — deactivation is immediate now; the middleware's claim is still stale
+PS-17,issue,follow-up,,keep,A,sleep platform,,,build,2026-08-30,,,"PS-17 — a phantom afternoon ""sleep"" replaced a real night in the daily summary, and it is scoring 🔴 LIVE"
+PS-21,fold-device,,device-check:devices,parked,A,devices platform,device,,,2026-09-03,,,"PS-21 — the Colmi background sync service: Kotlin carries bytes, the server reads them"
+PS-27,issue,tuning,,ready,T,workouts,,,,2026-09-06,,,"PS-27 — 1RM arithmetic: non-monotone in reps, bodyweight ratchets down, two rep-ceiling behaviours"
+PS-28,question,question,,parked,A,workouts cardio,owner,,,2026-09-06,,,"PS-28 — ACWR: an 8-day acute window, a 56-day unbanded chat tool, three baselining rules"
+LA-68,fold-device,,device-check:devices,ready,DV,devices readiness,,,,2026-09-07,,,LA-68 — restore the 22 wear-time days PS-30 overwrote
+PS-31,issue,engine,,ready,A,platform,,,,2026-09-06,,,"PS-31 — AI calls with no data gate, a missing maxRetries, and a blind fingerprint"
+LA-71,question,question,,parked,A,body devices,owner,,,2026-09-07,,,LA-71 — `scale_raw_samples` still has no unique key
+LA-63,fold-watch,,watch-list,keep,A,platform,,,unclear,2026-09-06,,,LA-63 — E2E's 9 failing specs
+LA-77,issue,chore,,ready,O,platform,,,,2026-09-08,,,"LA-77 — 60% of the lint warnings are deliberate, so the 60 real ones are invisible"
+PS-35b,fold-device,,device-check:app-shell,verify,B,app-shell,,,,2026-09-06,,,"PS-35b — a wrong PWA start_url, a doubled boot fetch, a dead branch and a stuck weather chip"
+PS-36,question,question,,parked,A,cardio,owner,,,2026-09-06,,,"PS-36 — sex='other' silently halves VO2max, best pace has no distance floor, and WHO minutes have three mappings"
+PS-38,obsolete-process,,,ready,O,platform,,,,2026-09-06,,a CLAUDE.md claims sweep; Phase 4 rewrites CLAUDE.md wholesale,"PS-38 — checkpoint docs sweep: seven stale CLAUDE.md claims, a duplicated Q-479 row, 13 Needs→KEEP edges"
+LA-76,issue,engine,,ready,A,app-shell platform,,,,2026-09-07,,,"LA-76 — a deload PHASE still decays the collection, and nothing dates one"
+RV-43,issue,tuning,,ready,T,workouts,,,,2026-09-03,,,"RV-43 — hitting the prescription exactly is scored as progress, and the PR is permanent"
+PS-47,archive-reference,,,reference,A,devices,,,,2026-09-22,,,"PS-47 — the Colmi runs flat in about five days, and a flat ring is indistinguishable from a broken one"
+PS-22,archive-reference,,,reference,A,devices,,,,2026-09-03,,,"PS-22 — a fifth of the ring's heart-rate log is discarded as future-dated, every sync"
+RV-38,fold-device,,device-check:readiness,keep,T,readiness app-shell,,,check,2026-09-03,,,"RV-38 — Body Battery printed 50 and called it ""Good"" for an empty account (treatment fixed; the NUMBER is Tuning's)"
+BF-109,fold-watch,,watch-list,keep,B,nutrition,,,unclear,2026-09-13,,,BF-109 — the Review sheet's macro/calorie cross-check (shipped; a real scan and the device owed)
+BF-107,fold-device,,device-check:activity,verify,DV,activity,,,,2026-09-26,,,BF-107 — the walk summary shows its calories (REOPENED 2026-09-24 — reported blank again)
+BF-118,issue-blocked,blocked,,parked,A,platform workouts nutrition,,BF-41,,2026-09-04,,,"🔵 BF-118 — ""User Information"": one place the app knows you from, and one assembler every AI route reads"
+BF-114,fold-watch,,watch-list,keep,A,body nutrition,,,unclear,2026-09-03,,,BF-114 — the resting rate behind the calorie targets still names no source (UI half shipped)
+BF-115,fold-watch,,watch-list,keep,A,sleep,,,unclear,2026-09-03,,,BF-115 — the hypnogram is missing from the sleep tile's detail (the proposed fix would make it worse)
+BF-110,fold-device,,device-check:app-shell,verify,A,app-shell platform,,,,2026-09-02,,,"BF-110 — the blank resume survives a scroll, which means the renderer never died"
+BF-111,fold-device,,device-check:app-shell,keep,A,app-shell,,,check,2026-09-02,,,"BF-111 — ""Up to date — v1.414.1 is the newest build"" sits under a v1.436.2 badge, and both are right"
+BF-106,question,question,,parked,O,platform,owner,,,2026-09-01,,,BF-106 — press the `VACUUM FULL` on `oura_raw_samples`; the packer freed the space and nothing returned it
+BF-105,fold-device,,device-check:activity,keep,A,activity app-shell,,,check,2026-09-01,,,BF-105 — the interval-walk phase change fires one generic ping and nothing in-app (in-app half shipped; spoken cues need an APK)
+BF-102,issue-blocked,blocked,,parked,B,nutrition platform,,LB-50,,2026-09-01,,,"BF-102 — ""Calibrated"" activity level, and a prompt that tells the model something false"
+BF-97,fold-device,,device-check:nutrition,verify,B,nutrition,,,,2026-09-01,,,BF-97 — a scanned meal groups in the diary: the rendering half
+BF-98,fold-watch,,watch-list,keep,B,nutrition,,,unclear,2026-09-01,,,BF-98 — a section holding one grouped meal draws its macros twice (fixed; the reproduction is not understood)
+BF-94,issue-blocked,blocked,,parked,B,workouts app-shell,,BF-61,,2026-09-01,,,"BF-94 — swipe the Start button to reveal Rest, instead of a permanent two-button row"
+LA-50,archive-reference,,,reference,A,platform,,,,2026-09-01,,,"LA-50 — pixel baselines need a CI-side job, because a session cannot generate one"
+LB-42,fold-device,,device-check:platform,keep,A,platform body,,,check,2026-09-01,,,LB-42 — `weight_goal_kg` and `target_weight_kg` are two columns for one goal
+BF-86,fold-device,,device-check:app-shell,verify,B,app-shell platform,,,,2026-09-01,,,"BF-86 — the morning check-in never re-prompts (fixed; the ""close/reset"" half is answered, not built)"
+BF-83,fold-device,,device-check:sleep,keep,A,sleep,,,check,2026-09-01,,,BF-83 — a night still filling says so; the morning that proves it has not happened
+BF-84,issue-blocked,blocked,,parked,B,workouts,,BF-94,,2026-09-01,,,"BF-84 — the Rest button on Home's card, when the app has not suggested rest"
+BF-96,issue-blocked,blocked,,parked,B,app-shell,,LB-157,,2026-09-01,,,BF-96 — the temperature/UV pill wrapped (the fix FAILED on device; open work)
+BF-81,fold-device,,device-check:readiness,keep,A,readiness devices,,,check,2026-08-31,,,BF-81 — two producers write the daytime-stress metric and they disagree on every day measured
+BF-80,fold-device,,device-check:app-shell,parked,A,app-shell platform,device,,,2026-08-31,,,"BF-80 — the app comes back blank after backgrounding, and nothing is recorded when it does"
+BF-1,fold-watch,,watch-list,keep,A,nutrition body,,,unclear,2026-08-23,,,"🔵 BF-1 — blood panels: the extraction route, the consumers and the UI"
+BF-41,issue,follow-up,,keep,A,body nutrition platform,,,build,2026-08-27,,,"BF-41 — RMR, DEXA and blood are one intake shape; build the pipeline once"
+BF-74,fold-device,,device-check:nutrition,verify,B,nutrition app-shell,,,,2026-08-31,,,"BF-74 — the meal photo's remove control (corner, glyph and confirm all fixed; device check owed)"
+LB-50,issue,follow-up,,keep,A,nutrition platform,,,build,2026-09-01,,,"LB-50 — the measured activity factor, and a prompt that tells the model something false"
+OR-100,fold-watch,,watch-list,keep,A,platform,,,unclear,2026-09-01,,,OR-100 — `Keep:` files buildable work under a heading that tells the lane not to look
+PS-11,issue,follow-up,,keep,A,devices,,,build,2026-08-26,,,"PS-11 — the overnight acceptance test, and what it left owing"
+PS-18,issue-blocked,blocked,,parked,A,sleep platform,,PS-17,,2026-08-30,,,PS-18 — an Oura sleep revision is undetectable after the fact
+PS-19,issue,follow-up,,keep,A,devices,,,build,2026-08-30,,,PS-19 — three Colmi metrics have never been compared at all
+PS-15,issue-blocked,blocked,,parked,A,devices,,PS-16,,2026-08-27,,,"PS-15 — the comparison endpoint cannot pair the two rings' stress, and cannot see steps at all"
+PS-16,fold-device,,device-check:devices,parked,A,devices,device,,,2026-08-27,,,"PS-16 — settle whether the Colmi's activity buckets are cumulative, with a counted walk"
+PS-20,fold-watch,,watch-list,keep,A,devices,,,unclear,2026-08-30,,,"PS-20 — the ring pushes an unidentified 0x73 frame, and a busy radio reports as a missing ring"
+PS-12,fold-device,,device-check:devices,parked,A,devices,device,PS-11,,2026-08-26,,,"PS-12 — baseline the three-device comparison, and write down what ""agreement"" was"
+PS-9,fold-device,,device-check:devices,parked,A,devices cardio,device,,,2026-08-26,,,"PS-9 — the R09 streams raw accelerometer on stock firmware, which makes it a tier-1 source"
+PS-8,fold-device,,device-check:devices,parked,A,devices platform,device,,,2026-08-26,,,"PS-8 — the Colmi R09 in learning mode: ingest it, compare it, score nothing with it"
+BF-44,issue-blocked,blocked,,parked,A,workouts platform,,BF-43,,2026-08-27,,,BF-44 — the chat AI has no idea you are injured; the workout engine has known all along
+BF-43,issue-blocked,blocked,,parked,A,body nutrition platform,,BF-41,,2026-08-27,,,"BF-43 — the clinical results the app stores are invisible to every AI surface, and one of them must stay that way"
+BF-59,fold-device,,device-check:workouts,verify,A,workouts,,,,2026-08-30,,,BF-59 — the AI's set prescription still steers off the flat binary
+BF-56,issue,engine,,ready,A,workouts,,,,2026-08-30,,,"BF-56 — swapping an exercise silently changes its role, which changes the prescribed sets and percentages"
+BF-69,issue,follow-up,,keep,A,nutrition platform,,,build,2026-08-30,,,BF-69 — dosed substances are stored but nothing reads them; make exposure an analysable variable
+BF-68,fold-watch,,watch-list,keep,A,workouts platform,,,unclear,2026-08-30,,,"BF-68 — the program builder does not know you are injured, and typing it into the chat does not make it stick"
+BF-67,fold-watch,,watch-list,keep,A,workouts,,,unclear,2026-08-30,,,"BF-67 — building a new program cannot reference an old one, so every program starts from nothing"
+LB-46,archive-reference,,,reference,A,workouts,,,,2026-09-01,,,"LB-46 — how a deload reaches the AI Prescription card, and why a hand-built fixture misleads"
+LB-32,archive-reference,,,reference,B,platform app-shell,,,,2026-08-31,,,"LB-32 — `min-h-[Npx]` is inert on every button in the app, and one comment already describes a size that never applied"
+BF-63,fold-device,,device-check:nutrition,keep,B,nutrition,,,check,2026-08-30,,,BF-63 — barcode scan in the meal builder (shipped; the scan itself needs the device)
+BF-62,fold-device,,device-check:nutrition,keep,B,nutrition app-shell,,,check,2026-08-30,,,"BF-62 — the meal detail sheet's action row sits close to the gesture bar (fixed, NOT the way this entry proposed)"
+BF-51,fold-watch,,watch-list,keep,B,nutrition app-shell,,,unclear,2026-08-30,,,"BF-51 — back from Edit exits the tab, and `Recently used` is not a tab (④ shipped)"
+BF-38,fold-watch,,watch-list,keep,A,nutrition,,,unclear,2026-08-26,,,BF-38 — logging the same food twice creates a second `food_items` row: 19 of 209 are redundant
+BF-77,issue,engine,,ready,A,nutrition platform,,,,2026-08-31,,,BF-77 — a friend's meal library: the read route and the opt-in
+BF-77a,issue-blocked,blocked,,parked,B,nutrition app-shell,,BF-77,,2026-09-28,,,"BF-77a — a friend's meal library: toggle, profile row, library screen"
+BF-49,fold-device,,device-check:nutrition,verify,B,nutrition app-shell,,,,2026-08-30,,,"BF-49 — back from a timeline row lands on Health, not where you started"
+BF-35,issue,follow-up,,keep,A,nutrition,,,build,2026-08-26,,,BF-35 — fill the food placeholder: two of the three sources are already free
+BF-3,fold-watch,,watch-list,keep,A,nutrition body,,,unclear,2026-08-30,,,"🔵 BF-3 — track dosed substances (GLP-1s, creatine) — the supplements model cannot represent a titrating or weekly drug"
+BF-58,fold-watch,,watch-list,keep,A,body devices platform,,,unclear,2026-08-30,,,"BF-58 — one scale, two people: the two device answers the weight bands could not give"
+LA-108,fold-device,,device-check:body,verify,B,body devices,,,,2026-09-14,,,"LA-108 — a declined weigh-in had no screen, so the recovery path could not be reached (both halves shipped; device check owed)"
+BF-28,archive-reference,,,reference,B,nutrition app-shell,,,,2026-08-25,,,"BF-28 — mockup parity: the artboards are the spec, and this is the map"
+BF-24,fold-watch,,watch-list,keep,O,nutrition,,,unclear,2026-08-25,,,BF-24 — artboard 1 parity: the header and the meal grouping shipped; the energy block and the tile row did not
+BF-33,issue,follow-up,,keep,A,body nutrition,,,build,2026-08-26,,,"BF-33 — a measured RMR has nowhere to go, and the four-number panel the test sheet already draws"
+Q-395,issue,chore,,ready,O,nutrition app-shell,,,,2026-08-18,yes,,"Q-395 — the nutrition rework: the spec every phase reads, and the final checkpoint"
+LB-18,issue,follow-up,,keep,A,nutrition,,,build,2026-08-26,,,LB-18 — `Recent` on Log Food is scoped to a meal bucket; it may want to be global
+BF-11,fold-device,,device-check:nutrition,verify,,nutrition,,,,2026-08-24,,,"BF-11 — the meal creator/planner redesign: the spec every phase reads, and the final checkpoint"
+Q-407,fold-device,,device-check:nutrition,keep,A,nutrition platform,,,check,2026-08-19,,,"Q-407 — the meal-plan wizard is seven screens for six answers, and the one piece the Coach lacks is multi-select"
+LB-13,fold-device,,device-check:platform,keep,A,platform workouts,,,check,2026-08-25,,,"LB-13 — two API routes call a CLIENT cache helper, so a Coach swap leaves every program-structure key stale"
+LA-22,fold-device,,device-check:platform,keep,A,platform,,,check,2026-08-25,,,"LA-22 — E2E is not a required check, and a PR merged with it red"
+TN-8,issue,follow-up,,keep,A,readiness devices,,,build,2026-08-25,,,TN-8 — the chronic-stress fever mask is a FOURTH consumer of the broken temperature baseline
+TN-9,issue,engine,,ready,A,readiness,,,,2026-08-26,,,TN-9 — readiness moves when the check-in is logged; the owner wants it final on first open
+TN-23,archive-reference,,,reference,A,sleep,,,,2026-09-03,,,"TN-23 — `hrv` and `hr` are the same autonomic event scored twice, for 25% of the sleep score"
+TN-10,issue-blocked,blocked,,parked,A,sleep,,TN-5 TN-5,,2026-08-26,,,"TN-10 — `TOTAL_SLEEP`'s comment and its curve disagree by ~15 points, on the heaviest contributor"
+TN-11,issue,tuning,,ready,T,activity heart-rate,,,,2026-08-26,,,"TN-11 — ""moved this hour"" is really ""the ring recorded something this hour"": 99.8% of waking hours qualify"
+TN-12,issue-blocked,blocked,,parked,B,activity,,TN-11,,2026-08-26,,,"TN-12 — there is no way to see hourly movement, and the one surface that exists is pinned at full"
+OR-116,fold-device,,device-check:heart-rate,keep,B,heart-rate app-shell,,,check,2026-09-15,,,OR-116 — one metric name over two metrics (labels fixed; the third surface's CONTEXT is still open)
+TN-17,issue-blocked,blocked,,parked,A,activity,,Q-524,,2026-08-26,,,"TN-17 — Activity as a pace-to-goal score: the mechanic works, the goals make it punishing"
+TN-14,issue-blocked,blocked,,parked,A,sleep devices,,Q-520,,2026-08-26,,,TN-14 — the 2026-08-19 partial night (3.50 h) is still stored and still feeds every baseline
+TN-20,issue,follow-up,,keep,A,readiness body devices,,,build,2026-09-01,,,"TN-20 — a recompute overwrites a completed day with an empty result, and the inputs to rebuild it still exist"
+TN-22,fold-watch,,watch-list,keep,A,readiness,,,unclear,2026-09-01,,,"TN-22 — the stored `stress_high_minutes` disagrees with the model's own buckets on 8 of 9 days, and that is Q-507"
+TN-21,archive-reference,,,reference,A,readiness,,,,2026-09-01,,,"TN-21 — ""daytime stress"" is 55% night buckets, and night and day carry opposite signs"
+TN-19,issue-blocked,blocked,,parked,A,readiness body app-shell,,TN-15 TN-15,,2026-08-31,,,TN-19 — the Body Battery explainer promises five mechanisms; four are inert or backwards
+TN-15,issue-blocked,blocked,,parked,A,readiness body,,TN-2,,2026-08-26,,,"TN-15 — Body Battery: drain that ignores exercise, and no recharge at all"
+TN-16,issue-blocked,blocked,,parked,T,readiness,,Q-507,,2026-08-26,,,"TN-16 — a prolonged-stress warning and a calm-down prompt, blocked on the metric's sign"
+TN-18,fold-device,,device-check:readiness,keep,A,readiness,,,check,2026-08-31,,,"TN-18 — TN-6a's suspension covers the readiness ladder but NOT the deload banner, which is the one the owner sees"
+TN-6a,fold-watch,,watch-list,keep,A,readiness,,,unclear,2026-08-24,,,TN-6a — suspend the temperature penalty until its baseline is centred
+TN-53,issue,engine,,ready,A,heart-rate workouts,,,,2026-09-20,,,TN-53 — the HR-recovery trend has no density gate
+TN-52,archive-reference,,,reference,A,readiness heart-rate body,,,,2026-09-20,,,"TN-52 — thresholds are set in bpm and fixed fractions, so they break when the user changes; define them in units of the user's own variabili"
+TN-2,question,question,,parked,A,readiness heart-rate,owner,,,2026-08-24,,,"TN-2 — the Body Battery charge window has closed, so the tank only drains"
+TN-3a,issue,follow-up,,keep,A,readiness,,,build,2026-08-24,,,TN-3a — the per-bucket daytime-stress series is computed and thrown away
+TN-3b,fold-device,,device-check:readiness,keep,B,readiness,,,check,2026-08-24,,,"TN-3b — surface stress by hour, and on the HR charts"
+TN-5,issue,engine,,ready,A,sleep,,,,2026-08-24,,,"TN-5 — the sleep calibration's gain varies 8-fold, so the same real improvement is worth 4 points or 0.5"
+TN-4,fold-device,,device-check:readiness,keep,A,readiness platform,,,check,2026-08-24,,,"TN-4 — /api/body-battery threw 31 × 500 for ten hours, then stopped on its own"
+LB-54,issue-blocked,blocked,,parked,O,platform,,LB-56 LB-56,,2026-09-03,,,LB-54 — E2E still has no green baseline on `main` to compare a red PR against
+LB-53,question,question,,parked,DV,sleep platform,owner,,,2026-09-02,,,"LB-53 — `oura_daily_derived`: what actually writes it, and the one thing still owed"
+PS-4,obsolete-process,,,unclassified,?,platform,,,,2026-08-19,,batons are retired by the release-train spec,PS-4 — the batons are the cross-lane coordination mechanism and none of them fits on a screen
+BF-14,archive-reference,,,reference,A,devices readiness,,,,2026-08-24,,,BF-14 — ❌ REFUTED 2026-08-24: the breathing baseline is fed rpm×10 on purpose; it is correct
+BF-17,issue,engine,,ready,A,workouts platform,,,,2026-08-24,,,"BF-17 — `main` and `primary` are two axes wearing the same word, and the UI labels them backwards"
+BF-22,fold-device,,device-check:platform,ready,DV,platform app-shell,,,,2026-08-25,,,"BF-22 — the slow loads clear on a force restart, so they are in-memory client state; the server-distance theory was measured wrong"
+BF-10,fold-device,,device-check:devices,parked,B,devices heart-rate,device,,,2026-09-16,,,"BF-10 — the admin Device Metrics sparklines plot by sample index, not by time, so a night-only signal renders as if it ran all day"
+LA-21,fold-device,,device-check:workouts,keep,A,workouts platform,,,check,2026-08-24,,,LA-21 — ✅ SHIPPED 2026-08-24: implausible session durations are culled from statistics
+Q-420,fold-watch,,watch-list,keep,T,workouts,,,unclear,2026-08-19,,,"Q-420 — drop the session-RPE prompt, derive the intensity, and let it correct the HR burn estimate"
+Q-422,issue-blocked,blocked,,parked,T,workouts nutrition,,Q-420,,2026-08-19,yes,,Q-422 — calibrate the burn estimate against the owner's own energy balance
+Q-418,fold-device,,device-check:cardio,parked,A,cardio devices,device,,,2026-08-23,,,Q-418 — the free walk's Android pill still cannot show the time (the screen half shipped)
+LA-48,issue,follow-up,,keep,A,cardio devices,,,build,2026-08-31,,,LA-48 — the walk's pacer creates an adherence number and nothing stores it
+Q-486,fold-device,,device-check:workouts,parked,B,workouts devices,device,,,2026-08-24,,,"Q-486 — the outbox enqueue for a workout is the only write in the app that fails silently, and it is the last line of defence"
+Q-499,fold-device,,device-check:app-shell,parked,B,app-shell,device,,,2026-08-30,,,"Q-499 — self-fetching cards cannot tell ""no data"" from ""the fetch failed"""
+Q-359,fold-watch,,watch-list,keep,B,app-shell,,,unclear,2026-08-19,,,Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
+Q-491,fold-device,,device-check:app-shell,keep,B,app-shell,,,check,2026-09-23,,,"Q-491 — nine collapsible toggles still ship no `aria-expanded`, and the hand-maintained list of them has drifted"
+Q-477,fold-device,,device-check:app-shell,parked,B,app-shell platform,device,,,2026-08-25,,,"Q-477 — the Profile ""Auto-detect timezone"" button is what breaks the app's dates: the server honours the new zone, the client did not"
+Q-551,question,question,,parked,O,platform,owner,,,2026-08-18,,,"Q-551 — OWNER DECISION: stay on Railway or leave, once the D-track has shrunk the server"
+Q-545,fold-device,,device-check:devices,parked,A,devices platform,device,,,2026-08-18,,,Q-545 — OWNER-DIRECTED FOCUS: move the Oura rollup onto the device (D2 Task 5) — the D-track's missing middle
+Q-547,issue-blocked,blocked,,parked,A,platform,,Q-551,,2026-08-18,yes,,"Q-547 — ANSWERED 2026-08-18: the app CPU is spiky (so Q-545 fixes it), and much of it is deploy churn"
+Q-476,fold-device,,device-check:platform,parked,A,platform devices,device,,,2026-08-18,,,"Q-476 — a schema-rejected mutation is deleted forever with no badge, no toast and no retry"
+PS-5,issue-blocked,blocked,,parked,A,app-shell platform,,Q-467,,2026-08-24,,,PS-5 — the Coach proposes a change once in eight replies; find out why before calling the write path unwanted
+Q-467,fold-device,,device-check:app-shell,parked,B,app-shell workouts platform,device,,,2026-08-30,,,Q-467 — the Coach can change your programme and nothing in the app can undo it
+Q-403,fold-watch,,watch-list,keep,B,workouts platform,,,unclear,2026-08-18,,,"Q-403 — the Coach calls an already-applied swap a ""proposal"", and says it after the fact"
+LB-5,fold-device,,device-check:devices,parked,B,devices app-shell,device,,,2026-09-16,,,LB-5 — the Devices card calls the ring healthy while the service has no key
+LA-53,fold-watch,,watch-list,keep,A,platform,,,unclear,2026-09-01,,,LA-53 — split the two lane-drift cases a script cannot see
+Q-535,issue-blocked,blocked,,parked,B,platform devices,,Q-318,,2026-08-17,yes,,"Q-535 — Redecode reports ""failed: 502"" for work that succeeded"
+Q-318,fold-device,,device-check:app-shell,parked,B,app-shell devices,device,,,2026-08-18,,,"Q-318 — poll the redecode job, and stop the two consoles reporting ""done"" for work that has started"
+Q-316,fold-device,,device-check:app-shell,parked,B,app-shell devices,device,,,2026-08-18,,,Q-316 — the frame packer has no button: `POST /api/oura-ble/samples/pack` can only be driven by curl
+Q-544,fold-device,,device-check:app-shell,parked,B,app-shell platform,device,,,2026-08-18,,,"Q-544 — server-side disk maintenance is trapped behind a native-plugin gate, so it cannot be run from a desktop"
+LA-179,issue,engine,,ready,A,devices platform,,,,2026-09-28,,,"LA-179 — a 2-second raw-frame read runs ~1.5 times a minute, and its caller is not yet identified"
+OR-123,issue,engine,,ready,A,devices platform,,,,2026-09-22,,,"OR-123 — nothing on the device ever marks a raw row `rolled_up`, so the local prune is wired to a flag with no writer"
+Q-538,fold-device,,device-check:devices,parked,A,devices platform,device,OR-123,,2026-08-17,,,"Q-538 — `oura_raw.db` grows without bound on the phone: `pruneRaw` has no caller, and `rolled_up` is never set"
+Q-540,archive-reference,,,reference,A,devices platform,,,,2026-08-17,,,"Q-540 — narrow the `oura_raw_samples` row: drop `event_name`, `body_hex` → `bytea`"
+Q-533,fold-device,,device-check:devices,parked,A,devices app-shell,device,,,2026-09-14,,,Q-533 — the drain now reports its own ending; nobody has seen it do so
+OR-121,issue,chore,,ready,O,platform,,,,2026-09-20,,,"OR-121 — a Custom Rules step failed once, passed on every re-run, and the evidence was thrown away"
+OR-115,question,question,,ask,O,app-shell platform,,,,2026-09-14,,,OR-115 — the admin surface has accumulated buttons nobody uses
+Q-531,fold-device,,device-check:app-shell,keep,B,app-shell devices,,,check,2026-08-17,,,"Q-531 — Q-234 moved the device consoles out of /admin, and in use that made them worse"
+Q-461,fold-device,,device-check:workouts,parked,B,workouts app-shell platform,device,,,2026-08-18,,,"Q-461 — the workout flow cannot be automated past set 1: the Start Set button animates forever, so Playwright never sees it as stable"
+Q-388,fold-device,,device-check:devices,parked,A,devices heart-rate,device,,,2026-08-17,,,Q-388 — the ring runs SpO₂ permanently at ~3.5× stock drain; the decision is binary
+Q-319,fold-device,,device-check:body,parked,B,body app-shell,device,,,2026-08-18,,,"Q-319 — the Water widget's web fallback posts to a route that has no water field, and the value is discarded behind a 200"
+Q-298,fold-device,,device-check:workouts,keep,A,workouts,,,check,2026-09-16,,,Q-298 — the 10 historical zero-1RM rows: recompute or null (the code fixes shipped 2026-08-24)
+Q-306,issue-blocked,blocked,,parked,T,workouts,,Q-289,,2026-08-16,yes,,Q-306 — the emergency-deload RPE trigger sits 0.07 inside a known measurement error
+LA-27,fold-watch,,watch-list,keep,A,workouts platform,,,unclear,2026-08-25,,,LA-27 — ANSWERED: the un-re-derivable estimates predate `set_logs.planned_pct`
+Q-305,fold-watch,,watch-list,keep,B,workouts,,,unclear,2026-08-15,,,Q-305 — the volume landmarks are computed and never shown to anyone
+LA-118,fold-watch,,watch-list,keep,A,workouts platform,,,unclear,2026-09-18,,,LA-118 — the muscle-attribution query exists FOUR times and the copies disagree
+Q-300,fold-device,,device-check:workouts,keep,A,workouts,,,check,2026-08-15,,,"Q-300 — 37% of sets are taken with materially less rest than prescribed, and the RPE model has no rest term"
+Q-289,issue-blocked,blocked,,parked,T,workouts,,Q-290,,2026-08-15,yes,,Q-289 — `expectedRpe` misses by more than the autoregulation dead band at both ends of its own range
+Q-290,issue,tuning,,ready,T,workouts,,,,2026-08-15,yes,,"Q-290 — logged RPE carries almost no information: sd 0.87, and effectively two values"
+Q-292,fold-watch,,watch-list,keep,A,platform,,,unclear,2026-08-15,,,"Q-292 — the AI stated a score that is false, and gave an imperial measurement to a metric user"
+Q-293,fold-watch,,watch-list,keep,A,platform,,,unclear,2026-08-15,,,Q-293 — `ai_health_insights.context_hash` is NULL on 109 of 117 rows
+Q-287,issue-blocked,blocked,,parked,A,platform,,Q-288,,2026-08-15,yes,,"Q-287 — self-service account deletion, all seven plan decisions resolved"
+Q-288,fold-watch,,watch-list,keep,A,platform,,,unclear,2026-08-15,,,Q-288 — `/api/export` covers 27 domains of 80 tables and presents as complete
+Q-295,fold-watch,,watch-list,keep,A,platform,,,unclear,2026-08-15,,,Q-295 — Coach's prompt is mostly a static prefix; the latency that motivated caching it is already gone
+Q-296,fold-watch,,watch-list,keep,A,platform,,,unclear,2026-08-15,,,Q-296 — the docs say Coach runs `gemini-3.6-flash`; production says otherwise
+Q-294,archive-reference,,,reference,A,platform app-shell,,,,2026-08-15,,,Q-294 — the failure cells whose intended behaviour is undefined
+Q-274,fold-device,,device-check:sleep,keep,A,sleep devices,,,check,2026-08-15,,,"Q-274 — fragment ""nights"" reach the sleep score, and on two dates the fragment is the ONLY record"
+Q-275,issue,tuning,,ready,T,readiness workouts,,,,2026-08-15,yes,,"Q-275 — readiness is structurally blind to training load, and every incumbent treats load as primary"
+Q-273,fold-watch,,watch-list,keep,A,readiness platform,,,unclear,2026-08-15,,,"Q-273 — five scoring pillars, one `model_version`, no backfill: the history is not comparable to itself"
+Q-505,issue-blocked,blocked,,parked,A,activity,,Q-523,,2026-08-18,yes,,"Q-505 — Activity Score: redesign as a daily effort meter with a target (decisions resolved, ready to build)"
+Q-501,issue,follow-up,,keep,A,readiness platform,,,build,2026-08-17,yes,,Q-501 — historical derived rows still carry no inputs
+Q-506,fold-device,,device-check:devices,keep,A,devices readiness,,,check,2026-08-18,,,Q-506 — the illness radar cannot fire: the temperature baseline's deviation is 18.7× too large
+Q-507,issue-blocked,blocked,,parked,A,readiness activity,,TN-33 TN-33,,2026-08-18,yes,,Q-507 — the stress override fires on the best days: high-stress minutes correlate +0.40 with readiness
+Q-508,issue,tuning,,ready,T,readiness,,,,2026-08-18,yes,,"Q-508 — resilience has emitted exactly one value in its lifetime (level 5, granular pinned at the 5.99 clamp)"
+LA-56,fold-device,,device-check:platform,verify,DV,platform devices,,,,2026-09-02,,,"LA-56 — the full-history redecode has never once completed, and ""abandoned"" is a guess"
+LA-57,fold-device,,device-check:readiness,verify,A,readiness devices,,,,2026-09-03,,,"⛔ LA-57 — REFUTED: the night-HRV ""step"" at the re-key is a ramp"
+Q-509,issue,follow-up,,keep,A,devices readiness,,,build,2026-08-18,yes,,"Q-509 — the BLE-era Recovery Index refit lands at 3.31 h against a shipped anchor of 5: the input moved, not the physiology"
+Q-510,fold-watch,,watch-list,keep,A,devices readiness,,,unclear,2026-08-18,,,"Q-510 — resilience's missing days are the daytime-stress coverage gate, and that coverage is not persisted anywhere"
+Q-511,archive-reference,,,reference,A,body sleep,,,,2026-08-18,,,"Q-511 — the Body Battery anchor flip is worth 17.7 points, and the sleep recalibration removed 82% of it"
+Q-513,question,question,,parked,A,workouts platform,owner,,,2026-08-18,,,Q-513 — the score-audit panel and the next-session engine disagree on the ACWR band on 38% of days
+Q-514,issue,follow-up,,keep,A,workouts,,,build,2026-08-18,yes,,Q-514 — 64% of the engine's back-off load cuts are an expected-RPE clamp artefact
+Q-515,issue,tuning,,ready,T,heart-rate body,,,,2026-08-18,yes,,Q-515 — the rest/active boundary shrank 3× because the owner got fitter
+Q-516,fold-watch,,watch-list,keep,T,heart-rate,,,unclear,2026-08-18,,,Q-516 — `PEAK_BANDS` is calibrated for a heart-rate range strength training never reaches
+Q-517,fold-watch,,watch-list,keep,A,nutrition,,,unclear,2026-08-18,,,Q-517 — adaptive-TDEE can hand the user a maintenance below their own BMR
+Q-519,issue,follow-up,,keep,A,sleep,,,build,2026-08-19,yes,,Q-519 — manual bedtime: both halves shipped; one route field is all that is left
+Q-520,issue-blocked,blocked,,parked,A,sleep,,Q-519,,2026-08-19,yes,,"Q-520 — a partial-night flag, so an unworn night stops distorting the scores"
+Q-524,issue,tuning,,ready,T,activity nutrition,,,,2026-08-19,yes,,"Q-524 — two different step goals, and the personalised one contradicts the evidence its own file cites"
+Q-529,fold-device,,device-check:sleep,parked,B,sleep,device,,,2026-08-20,,,Q-529 — a provisional sleep score is displayed as final while the night is still syncing
+Q-525,fold-device,,device-check:devices,ready,DV,devices readiness,,,,2026-08-19,,,"Q-525 — chronic stress has never produced a value, and an incremental rollup can never make it"
+TN-1,fold-watch,,watch-list,keep,DV,devices readiness,,,unclear,2026-08-20,,,"TN-1 — chronic stress refuses inside the granular layer, and records no reason why"
+Q-527,fold-device,,device-check:body,keep,A,body platform,,,check,2026-08-19,,,"Q-527 — one corrupt body-composition row, and it becomes load-bearing the moment Body Battery uses BMR"
+Q-522,issue-blocked,blocked,,parked,T,activity heart-rate,,Q-515,,2026-08-19,yes,,"Q-522 — the movement-per-hour contributor is saturated: it measures ring wear, not movement"
+Q-523,issue,tuning,,ready,T,activity heart-rate,,,,2026-08-19,yes,,Q-523 — zone minutes read 0 on 90% of days: the Zone 2 floor sits above where strength training lives
+Q-521,issue-blocked,blocked,,parked,A,body,,Q-515,,2026-08-19,yes,,"Q-521 — Body Battery's drain tracks how long the ring was worn, not what the owner did"
+Q-278,fold-watch,,watch-list,keep,A,platform readiness,,,unclear,2026-08-15,,,Q-278 — a score that could not be computed is rendered identically to a score of 76
+Q-279,issue-blocked,blocked,,parked,A,workouts readiness,,LA-175 LA-175,,2026-08-15,yes,,Q-279 — ACWR drives two user-facing behaviours on evidence that has substantially collapsed
+Q-281,fold-device,,device-check:app-shell,parked,B,app-shell readiness,device,,,2026-08-15,,,Q-281 — audit every surface that renders a score bare
+Q-354,archive-reference,,,reference,B,app-shell,,,,2026-08-17,,,Q-354 — the date-swipe `useDrag` swallows MOUSE clicks on Nutrition (touch is fine)
+Q-297,fold-device,,device-check:platform,keep,A,platform,,,check,2026-08-15,,,"Q-297 — cover Nutrition's day navigation (done; two residues, one of them owner's)"
+Q-250,question,question,,parked,A,platform devices,owner,,,2026-08-14,,,"Q-250 — an Android emulator job in CI, to close the 17 rows that need an Android runtime and nothing else"
+LB-31,fold-watch,,watch-list,keep,A,platform,,,unclear,2026-08-31,,,"LB-31 — a merge queue, if the nightly ever shows the gap is real"
+Q-251,issue,engine,,ready,A,platform,,,,2026-08-14,yes,,"Q-251 — a staging environment, so a migration's first real run is not production"
+Q-252,issue,engine,,ready,A,platform,,,,2026-08-14,yes,,"Q-252 — error tracking with session replay, for the bug class that cannot be reproduced from source"
+Q-254,issue-blocked,blocked,,parked,B,platform app-shell,,Q-297,,2026-08-14,yes,,Q-254 — strike the device-verification rows an E2E spec can now cover (re-tagging landed 2026-08-15; the striking half remains)
+Q-231,issue,engine,,ready,A,activity devices,,,,2026-08-14,yes,,"Q-231 — the ""Exercise detected"" card can never show anything again; its only writer was the Oura Cloud sync"
+Q-222,issue,engine,,ready,A,activity devices,,,,2026-08-14,yes,,Q-222 — auto activity-detection false positives trace to a classifier the codebase already flags as unvalidated
+Q-220,issue,chore,,ready,O,platform,,,,2026-08-10,yes,,"Q-220 — every session pays ~194,000 tokens of orientation before it starts"
+Q-219,issue-blocked,blocked,,parked,A,platform,,Q-30,,2026-08-13,yes,,Q-219 — re-measure `oura_raw_samples`’s 183 MB of indexes (the `oura_heartrate` REINDEX is behind us)
+Q-214a,fold-device,,device-check:platform,verify,A,platform,,,,2026-08-13,,,Q-214a — a tap during the sync pull queues behind the whole delta on the one SQLite connection
+Q-187,fold-device,,device-check:nutrition,keep,B,nutrition,,,check,2026-08-11,,,Q-187 — the day recalculates against what was actually eaten (shipped; device check owed)
+Q-181,fold-watch,,watch-list,keep,A,platform,,,unclear,2026-08-10,,,"⏳ Q-181 — a schema per vitest worker: WATCH ONLY, deferral re-confirmed by measurement"
+Q-155,fold-watch,,watch-list,keep,A,platform,,,unclear,2026-08-08,,,"🟠 Q-155 — a cross-user data leak passes all 3,270 tests"
+Q-151,fold-watch,,watch-list,keep,A,app-shell,,,unclear,2026-08-08,,,"⏳ Q-151 — WATCH ONLY, nothing to implement — the sign-in React #418 did not reproduce and the whole series stopped"
+Q-71,issue,follow-up,,keep,DV,devices platform sleep,,,build,2026-08-04,yes,,🟡 Q-71 — the historical redecode that rewrites stored ring history has not been run
+Q-72,issue,engine,,ready,A,sleep readiness,,,,2026-08-04,yes,,Q-72 — the Sleep Score's model is retuned; a partial-data flag is what's left
+Q-168,fold-device,,device-check:platform,ready,DV,platform workouts nutrition,,,,2026-08-09,,,Q-168 — AI Coach follow-ups (Q-157 is complete)
+Q-204,issue-blocked,blocked,,parked,A,activity readiness heart-rate,,Q-270,,2026-08-11,yes,,"Q-204 — the HR-derived load lane (Q-137 direction B), gates now measured"
+Q-270,issue,engine,,ready,A,readiness devices,,,,2026-08-30,,,"🔴 Q-270 — `training_load_ots` is still 0 of 104 days, and the route is neither failing nor succeeding"
+LA-40,fold-watch,,watch-list,keep,A,platform devices,,,unclear,2026-08-30,,,"LA-40 — `runTrainingStressScore` throws for a young user, out of a function that documents itself as infallible"
+Q-184,issue-blocked,blocked,,parked,A,devices activity,,Q-204,,2026-08-11,yes,,Q-184 — `active_calories_est` is plumbed end-to-end and never written
+Q-138,archive-reference,,,reference,B,platform app-shell,,,,2026-08-07,,,"Q-138 — component-size hotspots, with concrete extractions"
+Q-85,issue,engine,,ready,A,workouts,,,,2026-08-05,yes,,"Q-85 — compress accessory rest at a Quick budget, and leave the compound alone"
+Q-116,issue-blocked,blocked,,parked,B,heart-rate devices,,Q-388,,2026-08-06,yes,,"Q-116 — Health tab's ""Live HR"" shows a live reading without tapping ""Measure now""; likely tied to overnight ring drain"
+Q-114,fold-device,,device-check:devices,parked,A,devices body,device,,,2026-08-06,,,"Q-114 — scale ""Weighing you…"" progress bar has already drifted from the real native timeout; shorten both together"
+Q-111,fold-device,,device-check:devices,verify,B,devices app-shell,,,,2026-08-06,,,"Q-111 — device battery chips on the Home header (ring + strap shipped; scale is native, and one owner question)"
+Q-104,fold-device,,device-check:devices,verify,A,devices body,,,,2026-08-05,,,"Q-104 — ""Weighing you…"" toast still fires on a plain Home-tab visit, despite the 2026-08-01 fix"
+Q-51,question,question,,ready,O,app-shell,,,,2026-08-02,,,🔴 Q-51 — the perf work is not aimed at the screen the owner actually uses
+Q-49,question,question,,parked,A,platform,owner,,,2026-08-02,,,🔴 Q-49 — public repo migration (Phase A: model delivery · Phase B: the cut)
+Q-50,fold-watch,,watch-list,keep,A,platform,,,unclear,2026-08-02,,,🟡 Q-50 — two vendored-model deletion decisions the dormancy sweep could not make
+Q-48,issue,chore,,ready,O,platform app-shell,,,,2026-08-02,yes,,🟠 Q-48 — roadmap gaps found by the 2026-08-02 native-convergence review
+Q-44,issue,engine,,ready,A,app-shell platform,,,,2026-09-30,,,🟢 Q-44 — remove vendor naming: Phases 2 and 3 only
+LA-58,fold-watch,,watch-list,keep,A,platform,,,unclear,2026-09-04,,,🟡 LA-58 — deactivation now covers API routes; the 403 itself is unverified
+Q-1a,milestone-v2,feature,,parked,A,app-shell,owner,,,2026-08-03,,"v2 bundled-shell milestone (owner, 2026-10-05; spec §10)",🟢 Q-1a — client bearer auth + `apiUrl()` (SPLIT OUT 2026-08-03 — startable now)
+Q-1b,milestone-v2,feature,,parked,A,app-shell,owner,,,2026-09-22,,"v2 bundled-shell milestone (owner, 2026-10-05; spec §10)","Q-1b — native (""Swift-like"") feel: Phase 3 (bundle the shell into the APK) — HELD by the owner, who has now seen the measurement"
+Q-29,issue,engine,,ready,A,devices readiness app-shell,,,,2026-09-27,,,"🟠 Q-29 — Oura on-device rollup migration — Task 4 built, Task 5 next"
+Q-30,question,question,,parked,A,platform,owner,,,2026-09-27,,,"🟠 Q-30 — DB volume: finish the diagnosed fix, and resolve the O1 tension with D4's raw-drop-vs-bytea decision"
+Q-31,issue-blocked,blocked,,parked,A,devices platform,,Q-30 Q-1a,,2026-09-26,,,"➡️ Q-31 — own resilience weights & own workout-energy MET table — RE-SCOPED by #999, gates released"
+Q-4,issue,engine,,ready,A,sleep,,,,2026-09-28,,,🟠 Q-4 — `respiratory_rate` is persisted from an estimator its own docs call uncalibrated
+Q-7b,issue-blocked,blocked,,parked,A,devices readiness,,Q-545,,2026-09-23,,,🟠 Q-7b — the **ten** device-owned `oura_daily_derived` columns have no producer
+Q-34,fold-device,,device-check:sleep,parked,A,sleep,device,,,2026-09-14,,,🟢 Q-34 — sleep-staging Phase 1b: items 2 and 4 remain
+LA-110,issue,engine,,ready,A,workouts platform,,,,2026-09-15,,,"LA-110 — a phase change makes every compound read as a strength decline, and three surfaces believe it"
+Q-52,issue-blocked,blocked,,parked,A,workouts,,LA-110,,2026-09-15,,,🟡 Q-52 — per-exercise phase hold: a stalled compound stays behind while the session moves on
+Q-149,issue,tuning,,ready,T,heart-rate workouts,,,,2026-09-16,,,Q-149 — is 15 bpm the right HRR bar for this user?
+Q-28,archive-reference,,,reference,A,platform,,,,2026-09-24,,,"🟢 Q-28 — `applyDelta` crosses the Capacitor bridge once per row (measured 2026-08-02 — deprioritised, not dead)"
+LB-61,fold-device,,device-check:app-shell,verify,B,app-shell,,,,2026-09-07,,,"LB-61 — every switch in the app was white when it was on, for the reason the role pill was"
+LA-86,fold-watch,,watch-list,keep,A,platform,,,unclear,2026-09-09,,,"LA-86 — a Postgres DEADLOCK between parallel DB test files, seen once"
+LA-85,fold-watch,,watch-list,keep,A,platform,,,unclear,2026-09-09,,,LA-85 — the calendar route's scope check may not match what Google actually throws
+LA-84,fold-watch,,watch-list,keep,A,platform,,,unclear,2026-09-08,,,LA-84 — a failed export produces a truncated file that looks complete
+LB-37,fold-watch,,watch-list,keep,A,platform,,,unclear,2026-08-31,,,LB-37 — bring the 320 recorded test-file type errors down
+LB-38,fold-device,,device-check:platform,verify,B,platform nutrition,,,,2026-09-27,,,"LB-38 — the share-code e2e ""flake"" was a zxing decoder bug (shipped; device owed)"
+BF-9,issue,engine,,ready,A,platform workouts,,,,2026-09-22,,,🔵 BF-9 — a trainer role: build a program for someone else and assign it to them
+BF-7,fold-watch,,watch-list,keep,A,workouts,,,unclear,2026-09-22,,,🔵 BF-7 — a 45-minute session cannot be chosen; the length picker offers three relative presets
+BF-5,fold-device,,device-check:app-shell,verify,B,app-shell platform,,,,2026-09-23,,,🔵 BF-5 — the week in review is a page (both PRs shipped; the device look is what is left)
+LB-197,issue,chore,,ready,O,readiness app-shell,,,,2026-09-30,,,"LB-197 — ""About the same"" wraps to two lines, and it is now the pill selected every morning"
+LA-119,archive-reference,,,reference,B,nutrition,,,,2026-09-18,,,"LA-119 — a mixed-unit supplement day renders as ""no amount"", which reads as ""no number was logged"""
+PS-7,fold-device,,device-check:workouts,parked,A,workouts devices,device,,,2026-08-26,,,"🔵 PS-7 — camera form capture, Phase 0 only: can the S25 WebView run a pose landmarker at all?"

@@ -130,6 +130,12 @@ layer**) through §16. Read it before building any shared helper.
     [`…-tier3-and-widgets`](../../overview/history-2026-08-08.md) ·
     [`…-early-deload`](../../overview/history-2026-08-08.md). Six write domains;
     remaining follow-ups (device verification, cardio goals) are **Q-168**.
+- **[`docs/superpowers/specs/2026-10-05-release-train-design.md`](../../superpowers/specs/2026-10-05-release-train-design.md)**
+  — 🆕 proposal (2026-10-05, not live): weekly releases cut as tags from `main` (merges stop
+  deploying), GitHub Issues replacing the backlog file, four agent roles instead of seven, and a
+  lean `CLAUDE.md`.
+  Owner decisions are its §9. Phase 1's per-entry verdicts:
+  [`2026-10-05-backlog-triage.md`](../../superpowers/specs/2026-10-05-backlog-triage.md).
 - **[`docs/superpowers/plans/2026-08-02-public-repo-migration-roadmap.md`](../../superpowers/plans/2026-08-02-public-repo-migration-roadmap.md)**
   — 🆕 backlog **Q-49**, the top platform item. How the gitignored models still reach Railway (they
   run server-side, and the loaders fail silently), then the repo cut itself: snapshot, CI, the
@@ -289,6 +295,17 @@ Live at the time of writing (2026-07-30):
   critical older than a week), not every session.
 
 ## History
+
+- [`handoff-2026-10-05-platform-release-train-restructure.md`](../../handoffs/handoff-2026-10-05-platform-release-train-restructure.md)
+  — **Release-train restructure, 2026-10-05.** The design session's work, handed to the Orchestrator
+  as the only session driving it: the spec and the owner's decisions, the Phase 0 freeze (routines
+  paused, sessions stopped, PRs closed or held, #1849 merged through the hold), the Phase 1 triage
+  and its regenerator, the branch-sweep workflow, and the traps.
+- [`handoff-2026-10-05-platform-orchestrator-architecture-and-restructure.md`](../../handoffs/handoff-2026-10-05-platform-orchestrator-architecture-and-restructure.md)
+  — **Orchestrator: the ingest/scoring architecture and the restructure review, 2026-09-28 → 10-05.**
+  The 263 MB → ~12 MB measurement behind device-first storage; the coverage identity showing a
+  neutral default equals a renormalised score shrunk by missing weight; permanent roles with bounded
+  context; and two corrections the session made to its own earlier advice.
 
 - [`handoff-2026-10-05-platform-device-verification-sweeps-2-to-5.md`](../../handoffs/handoff-2026-10-05-platform-device-verification-sweeps-2-to-5.md)
   — **Device Verification, sweeps 2 → 4b and the sweep 5 plan, 2026-09-23 → 2026-10-05.** About 40 entries

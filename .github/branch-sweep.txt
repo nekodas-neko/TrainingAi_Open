@@ -1,0 +1,56 @@
+# Branch sweep list — read by .github/workflows/branch-sweep.yml (manual trigger, dry run by default).
+# Built 2026-10-05: every remote branch with no OPEN PR. Each was checked first:
+#   - 'delete': its tip matches a PR head (GitHub keeps those commits under refs/pull/N), or merging it
+#     into main changes nothing, or its work landed on main under another branch name.
+#   - 'archive': work that is on main in no form. Tagged archive/<branch> at its tip, then deleted.
+# The workflow re-checks for an open PR before touching each branch, and skips any that has one.
+
+archive lane-a/q44-phase3-pr1-table-rename
+archive chore/or-188-repo-cleanup
+archive fix/offline-tab-tap-native-fallback
+delete bugfix/bf-217-missing-progression-styles
+delete bugfix/tn-80-pr-register
+delete chore/fold-journal-entries
+delete chore/fold-journal-entries-2026-09-24
+delete chore/fold-journal-window
+delete chore/lane-a-handoff
+delete chore/nutrition-to-the-top
+delete chore/or-127-device-cdp-harness
+delete chore/or-128-device-agent-coordination
+delete chore/or-137-device-routing-batch-1
+delete chore/or-178-clear-o-lane
+delete chore/or-surface-buried-owner-questions
+delete claude/implementation-agent-b-s1m4qs
+delete claude/implementation-agent-lane-a-ztkb3m
+delete debug/share-code-ink-probe
+delete docs/session-handoff-e2e-harness
+delete docs/session-handoff-public-repo-migration
+delete feat/capture-one-screen
+delete feat/household-scale-and-dosing
+delete feat/nutrition-q395c-startable
+delete fix/bugfix-prompt-github-intake
+delete fix/home-banner-stack
+delete fix/keep-gate-snapshot-q317
+delete fix/meal-label-repaint-race
+delete fix/meal-label-style-repaint
+delete fix/outgoing-friend-requests
+delete fix/supplement-reminder-gap
+delete lane-a/coach-plan-widget
+delete lane-a/fix-cardio-week-span-hour-dependence
+delete lane-a/fix-gate-pin-q305
+delete lane-a/la128-strict-checkin
+delete lane-a/la128-strict-checkin-body
+delete lane-a/la142-drop-dead-derived-columns
+delete lane-a/rv105-fetch-once-stable-deps
+delete lane-a/rv105-stable-deps-clean
+delete lane-a/rv99-score-band-theme-tokens
+delete lane-a/tn46-baseline-already-retained
+delete lane-b/rv207-design-quick-wins
+delete request/bugfix-review-no-escalation
+delete sync/docs-catchup
+delete test/day-timeline-export-routes
+delete test/next-lane-a
+delete tuning/hrv-tile-question
+delete tuning/step-goal-provenance
+delete tuning/temp-alert-ungated
+delete tuning/walk-intensity-calibration
