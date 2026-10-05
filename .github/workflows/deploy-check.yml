@@ -15,15 +15,12 @@ name: Deploy check
 # Deliberately NOT a required status check: it runs after the deploy, so gating on it is circular.
 #
 # The release workflow calls this, because a release is what reaches production under the release
-# train. The `push: [main]` trigger is STILL HERE on purpose: auto-deploy from `main` is turned off
-# only after the first release has proven the workflow (spec §8, Phase 2), so until the owner
-# confirms that, a merge still deploys and still needs watching. Removing this trigger is a
-# one-line PR at that moment — doing it earlier leaves real deploys unwatched, doing it later makes
-# every merge fail a check for a deploy that never happened.
+# train. It ran on every push to `main` until Railway's auto-deploy from `main` was switched off
+# (owner, 2026-10-05, after the first release had deployed through the workflow). After that a merge
+# deploys nothing, so a per-merge check would wait 20 minutes for a deploy that never comes and
+# report a failure each time. `workflow_dispatch` stays, for checking production by hand.
 
 on:
-  push:
-    branches: [main]
   workflow_call:
     inputs:
       sha:
