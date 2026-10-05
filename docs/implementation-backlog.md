@@ -576,6 +576,30 @@ below threshold and left in place for next time.
   are docs-only and can go any time.
 - **Re-confirm CI green on each UPDATED head before merging.** Two are column-dropping migrations
   with a guard; the guard is what makes them safe, not the age of the approval.
+- **▶ STATE 2026-10-05, ~16:35 AEST (Lane A).**
+  - **Merged:** `#2024` (LB-194), `#1902` at 16:28 (TN-56; auth only, no schema; flipped ready and
+    merged with RV-190's `runScoped` change; live-checked 401 without a token, 401 on a wrong one,
+    past-auth on the right one), and **`#1847` at 16:29** (LA-159's column drop; rehearsed on the
+    owner's snapshot, 46 phases before and after).
+  - **⚠ `#1847` MERGED EIGHT MINUTES AFTER THE HOLD ABOVE WAS ADDED (16:21), AND LANE A DID NOT SEE
+    IT.** Lane A read this entry at the start of the work, armed auto-merge, and did not re-read it
+    before the deploy. Production now runs `b32d329`. **Lane A cannot tell whether a sitting was
+    running** (the DV baton is dated 09-28 and says nothing is). If one was, an anomaly from about
+    16:29 AEST is a deploy restart, not a device finding.
+  - **`#1849` is READY AND HELD.** Brought onto `main`; its views file auto-merged to exactly what
+    the generator emits; its guard test, the claude_ro twin tests and the LB-177 rules pass (42,
+    none skipped); rehearsed on the snapshot (135 rows intact, four dead columns gone). **Auto-merge
+    is disabled.** Merge it by hand once the sitting is over.
+  - **Practice that follows: do not ARM auto-merge on a migration PR at all.** Arming it commits to a
+    deploy at a moment Lane A does not choose, which is the whole hazard of the hold above. A
+    migration PR is merged by hand when it is known to be safe.
+  - **`#1790` and `#1762` are OBSOLETE and should be closed, not merged.** Checked against `main`:
+    **all 13 questions `#1790` puts an `Ask:` on were answered or decided later on 2026-09-27**
+    (BF-144 group, Q-540, Q-297, Q-251, TN-72, TN-67, RV-166, PS-51, BF-145, BF-96/BF-139, LB-38,
+    BF-168; `LA-89` and `TN-74` have left the queue), so merging it would make the Orchestrator ask
+    him settled questions again. **`#1762` re-adds 41 journal entries that already exist folded in
+    `history-2026-09-27-folded-2.md`.**
+- **Ask:** owner — (1) is the device sitting over, so `#1849` may merge? Recommendation: yes once DV says so; it only drops four columns with 0 values in 135 rows and the migration re-checks every account. (2) May `#1790` and `#1762` be closed as obsolete? Recommendation: yes, with a one-line comment pointing here; closing a PR is the one step Lane A takes only on his word.
 
 ### [devices][heart-rate] OR-208 — `rr_intervals` has written nothing since 2026-09-28, while the ring kept writing
 - **✅ ANSWERED 2026-10-05 — NOT A FAULT. The owner has not worn the strap since 28 September.**
@@ -6570,7 +6594,10 @@ drift.
   - **② merge `LA-142` (#1849) and close #1749** — yes.
   - **⑤ merge `TN-56` (#1902)** — yes, auth-touching and approved on its shared-helper shape.
   - **③ withdrawn** — not his to answer; see below.
-- **Ask** — owner: ④ only. Fresh S3 storage keys in Railway, which only he can mint and set. ⑤ Merge TN-56 (#1902)?
+- **Ask** — owner: ④ only. Fresh S3 storage keys in Railway, which only he can mint and set.
+- **⑤ is CLOSED — `TN-56` (#1902) was approved 2026-09-30 and MERGED by Lane A on 2026-10-05**
+  under `OR-207`. The `Ask:` kept listing it for five days after it was answered, which is the
+  same shape as `Q-85`: a field that outlived its answer and would have been put to him twice.
 - **Added:** 2026-09-28 · Lane A, moving the asks out of chat per the owner's instruction that
   anything needing his input is assigned to the Orchestrator.
 - **① LA-159 (#1847): drop `program_phases.program_id`. ⭐ Recommend: yes.** 0 of the owner's 46
