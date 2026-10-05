@@ -212,7 +212,7 @@ export async function runOuraRollup(
   // durations — 07-09 showed a 15.7h "time asleep" (two windows added). Merge windows less than
   // MERGE_GAP_DS apart into one span (still capped at MAX_SLEEP_DS), so each night is one row.
   const MERGE_GAP_DS = 3 * 3600 * 10
-  const nightWindows = [...windows.values()]
+  const mergedWindows = [...windows.values()]
     .sort((a, b) => a.startDs - b.startDs)
     .reduce<{ startDs: number; endDs: number }[]>((acc, w) => {
       const prev = acc[acc.length - 1]
@@ -223,12 +223,52 @@ export async function runOuraRollup(
       }
       return acc
     }, [])
-    // When windowing, drop any night that could be TRUNCATED by the read cutoff — a night whose
-    // raw data began before the cutoff would be missing its early hours and re-derive to a wrong
-    // (shorter) row. Keep only nights fully clear of the boundary (their prior-run rows, already
-    // persisted, stay correct). The baseline fold is seeded from the persisted checkpoint before
-    // the earliest KEPT night, so those skipped boundary nights still count toward the baselines.
-    .filter(w => rollupCutoffDs == null || w.startDs >= rollupCutoffDs + MAX_SLEEP_DS)
+
+  // Tighten each window to the span the ring was actually sleep-sensing, by HR-sample density
+  // per 5-min epoch. The window (bedtime event / 0x72/0x75 cluster) can lead real sleep by hours:
+  // the ring spot-checks HR (a few beats/epoch) and can briefly wake its sensors during evening
+  // wind-down, but only streams DENSE continuous HR (hundreds/epoch) while asleep. Keep only the
+  // longest dense run — an isolated evening burst drops out (2026-07-14 & 07-15 dumps: bedtime was
+  // shown ~1.5–2h early, time-asleep inflated). No-op when there's no HR at all, so a real night
+  // is never trimmed to nothing. Done before the guard below so a dropped window's wake-day is the
+  // one its persisted row actually carries.
+  const CLAMP_EPOCH_DS = 5 * 60 * 10
+  const clampWindow = (w: { startDs: number; endDs: number }) => {
+    const winEpochs = Math.max(1, Math.ceil((w.endDs - w.startDs) / CLAMP_EPOCH_DS))
+    const perEpochBeats = new Array<number>(winEpochs).fill(0)
+    for (const r of ibiRows) {
+      const ds = Number(r.ds)
+      if (ds < w.startDs || ds > w.endDs) continue
+      const e = Math.min(winEpochs - 1, Math.floor((ds - w.startDs) / CLAMP_EPOCH_DS))
+      perEpochBeats[e] += numArr(r.decoded, 'hr_bpm').filter(v => v >= 35 && v <= 150).length
+    }
+    return clampToDenseSensing(w, perEpochBeats, CLAMP_EPOCH_DS)
+  }
+  const wakeDayOf = (endDs: number) => toAestDay(toDate(endDs), timezone)
+
+  // When windowing, drop any night that could be TRUNCATED by the read cutoff — a night whose
+  // raw data began before the cutoff would be missing its early hours and re-derive to a wrong
+  // (shorter) row. Keep only nights fully clear of the boundary (their prior-run rows, already
+  // persisted, stay correct). The baseline fold is seeded from the persisted checkpoint before
+  // the earliest KEPT night, so those skipped boundary nights still count toward the baselines.
+  //
+  // #2192 (PS-17): a dropped window FREEZES its whole wake-day for this run. Every per-night write
+  // below is keyed on the wake-day — the sleep write deletes all of a date's BLE rows before
+  // inserting — so re-deriving any other window on that date deleted the row the guard had just
+  // protected. A night and that afternoon's nap share a wake-day, and for the runs where the cutoff
+  // sits between them the nap came back alone: 15 of the owner's 30 dates to 2026-10-06 held a
+  // daytime fragment as their only sleep row. A frozen date was written in full by the earlier runs
+  // that saw all of it, and nothing it holds can still change, so skipping it loses nothing. Both
+  // the clamped and the raw end are frozen, because which one the persisted row used depends on HR
+  // the truncated read may not have.
+  const clampedWindows = mergedWindows.map(w => ({ raw: w, clamped: clampWindow(w) }))
+  const isTruncatable = (w: { startDs: number }) => rollupCutoffDs != null && w.startDs < rollupCutoffDs + MAX_SLEEP_DS
+  const frozenWakeDays = new Set(clampedWindows
+    .filter(({ raw }) => isTruncatable(raw))
+    .flatMap(({ raw, clamped }) => [wakeDayOf(raw.endDs), wakeDayOf(clamped.endDs)]))
+  const nightWindows = clampedWindows
+    .filter(({ raw, clamped }) => !isTruncatable(raw) && !frozenWakeDays.has(wakeDayOf(clamped.endDs)))
+    .map(({ clamped }) => clamped)
 
   const sleepRows: import('@/lib/data/repository').OuraSleepUpsertRow[] = []
   const nightInputsByDate = new Map<string, NightInput>()
@@ -249,28 +289,6 @@ export async function runOuraRollup(
   // DailySummaryRow). Populated in the night loop; consumed by the chronic_stress step below.
   const chronicStressSignalsByDate = new Map<string, ChronicStressNightSignals>()
   for (const w of nightWindows) {
-    // Tighten the window to the span the ring was actually sleep-sensing, by HR-sample density
-    // per 5-min epoch. The window (bedtime event / 0x72/0x75 cluster) can lead real sleep by hours:
-    // the ring spot-checks HR (a few beats/epoch) and can briefly wake its sensors during evening
-    // wind-down, but only streams DENSE continuous HR (hundreds/epoch) while asleep. Keep only the
-    // longest dense run — an isolated evening burst drops out (2026-07-14 & 07-15 dumps: bedtime was
-    // shown ~1.5–2h early, time-asleep inflated). No-op when there's no HR at all, so a real night
-    // is never trimmed to nothing.
-    {
-      const CLAMP_EPOCH_DS = 5 * 60 * 10
-      const winEpochs = Math.max(1, Math.ceil((w.endDs - w.startDs) / CLAMP_EPOCH_DS))
-      const perEpochBeats = new Array<number>(winEpochs).fill(0)
-      for (const r of ibiRows) {
-        const ds = Number(r.ds)
-        if (ds < w.startDs || ds > w.endDs) continue
-        const e = Math.min(winEpochs - 1, Math.floor((ds - w.startDs) / CLAMP_EPOCH_DS))
-        perEpochBeats[e] += numArr(r.decoded, 'hr_bpm').filter(v => v >= 35 && v <= 150).length
-      }
-      const clamped = clampToDenseSensing(w, perEpochBeats, CLAMP_EPOCH_DS)
-      w.startDs = clamped.startDs
-      w.endDs = clamped.endDs
-    }
-
     const inWindow = <T extends { ds: number }>(rows: T[], slackDs = 0) =>
       rows.filter(r => Number(r.ds) >= w.startDs && Number(r.ds) <= w.endDs + slackDs)
 
