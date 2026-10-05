@@ -490,7 +490,77 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [devices][platform] OR-214 — the connector framework: "link with X", extracted from the five we already hand-rolled
+
+- **Lane: O** · **Added:** 2026-10-05 · Orchestrator, from the owner's direction.
+- **Needs:** OR-213
+- **What he asked for:** a repertoire of **connectors** — Health Connect, Renpo scale, Oura, and
+  whatever comes next — each one a thing you *"click 'link with x' and then it auto connects and
+  feeds in"*. It pulls third-party data and transforms it into the shape the app reads.
+  **Simplicity is the stated requirement**, and it is what makes adding a device for another user
+  a configuration rather than a project.
+- **✅ THIS IS AN EXTRACTION, NOT A GREENFIELD BUILD — and that is the main finding.** Five source
+  integrations already exist and each was hand-rolled with no shared contract:
+  `lib/oura-ble` · `lib/scale-ble` (Renpo) · `lib/colmi-ble` · `lib/polar-ble` ·
+  `lib/health-connect-sync.ts`, with native services under
+  `android/app/src/main/java/com/trainingai/app/{oura,scale}`.
+  **So the contract should be read out of what these five already do** — they are five worked
+  examples of the same problem — rather than designed in the abstract and then retrofitted. The
+  risk of the abstract route is a framework that fits none of them.
+- **What a connector must declare**, as the contract to extract: the **signals** it provides, each
+  one's **native resolution**, its **transport** (BLE / Health Connect / cloud API), its **link and
+  unlink** flow, its **auth or pairing** state, and its **rank** for the per-minute merge in
+  `OR-213`. One registry, so *"what are our sources"* is answerable by reading a list.
+- **Why it is gated behind `OR-213`:** a connector's output shape is the normaliser's input shape.
+  Building the registry first would freeze an interface the ingest layer has not defined yet.
+- **⚠ The hardest one is already live and must not be re-opened casually:** the Oura ring is on
+  **our own BLE key** with frozen firmware, and re-onboarding the official app risks a firmware
+  update that breaks the reverse-engineered protocol. **An Oura connector wraps the existing
+  pipeline; it does not re-pair the ring.** A naive "link with Oura" button that re-runs onboarding
+  would destroy the integration.
+- **Second constraint from the same area:** an APK uninstall destroys the ring's BLE key, which is
+  recoverable from nowhere. Any pairing UI must make that impossible to trigger by accident.
+- **Scope note:** this is the layer that makes multi-user real. Until it exists, every new user's
+  device support is bespoke work, which is the thing `OR-213` ② is trying to escape.
+
+
 ### [platform][devices] OR-213 — the four-layer ingest architecture: one normaliser, device-first storage, scored values only in the cloud
+- **✅ ANSWERED 2026-10-05 — all three, and two calls delegated to the Orchestrator.**
+  - **① NOTHING IS EXEMPT.** Every source follows one path: ingest raw → transform → store on
+    device → send calculated groupings to the cloud. **Raw never reaches Railway.** For the
+    redecode case it is kept **locally, outside the repo** (gitignored or equivalent) — *"it
+    doesnt need to go to the railway app"*. Calculated values upload **as soon as they exist**.
+  - **② MULTI-USER IS THE GOAL, not prospective** — 1–2 → ~5 → upward, with users warned they are
+    in a dev period. **Build for it now**, rather than treating it as a later migration.
+  - **③ Resolution left to the Orchestrator** — *"You choose here; do the best option."*
+- **⛔ THE ONE ORDERING RULE, and it is the whole safety of ①.** `oura_raw_packed` — **28 MB,
+  1.8 M frames** — is **today the only re-decodable copy** of the ring's history, and the ring's
+  buffer only moves forward. So the sequence is fixed and may not be reordered:
+  **(1)** build the local archive and **prove a restore from it**, read-back and unpack verified,
+  not merely a file that exists; **(2)** stop writing raw to Railway; **(3)** only then drop the
+  server archive. **Deleting before a proven restore is unrecoverable** — there is no re-drain.
+  The device is not that home as it stands: 31.2 MB on-device, past Android Auto Backup's 25 MB
+  quota, nothing backed up, and `pruneRaw` still has no caller.
+- **🔧 DECISION (Orchestrator, delegated) — canonical resolution is FINEST-AVAILABLE PER SOURCE,
+  tagged.** Every sample carries its **source** and its **native resolution**; nothing is resampled
+  on arrival. Health Connect's 5-minute HR bins stay 5-minute bins **marked as 5-minute**, and are
+  never interpolated to look like the strap's ~1 s.
+  **Why:** downsampling later is reversible, discarding is not — and a 5-minute bin dressed as 1 s
+  is a number the app would trust more than it should. Roll-ups are derived on the device, where
+  recomputing from the finest tier is cheap.
+  **Reversal cost: low on the write path, total on the data.** Switching to a fixed grid later is a
+  config change; recovering detail thrown away at ingest is impossible.
+- **🔧 DECISION — the per-minute winner is decided by SOURCE RANK, reusing the existing ranked
+  per-field health-write merge** rather than a new mechanism. Finest resolution does not
+  automatically win: a 1 s strap reading and a 5-minute ring bin covering the same minute are
+  resolved by rank, and the loser is **kept, not discarded**, so the choice can be revisited.
+- **⚠ Consequence of ① + ② worth pricing before the spec:** *"uploaded instantly"* × N users makes
+  the cloud write path the shared bottleneck. The pool is `max: 10` per replica and
+  `CLAUDE.md` marks it load-bearing — so the upload must be **batched and bounded per user**, not
+  a write per value. This is a design input, not a blocker.
+- **Ops/logs are the second cost nobody has counted:** 54 MB (21.8%) today is `error_events` and
+  `db_query_log`, which **do not shrink under this architecture** and are shared rather than
+  per-user. Worth a retention decision in the same spec.
 
 - **Lane: O** · **Added:** 2026-10-05 · Orchestrator, from the owner's architecture direction.
 - **His target, in his words:** raw from device / Health Connect → turn raw into values → store at
