@@ -1,11 +1,11 @@
-// Q-405 — a Coach swap carried the OUTGOING exercise's role onto the incoming one. `exercise_role`
-// selects the progression style, so the role decides the prescribed percentages and sets: the
-// owner's Barbell Romanian Deadlift → Barbell Jefferson Curl swap kept `secondary` and prescribed
-// 60 kg x 6 at 80% on a slow spinal-flexion movement.
+// #2215 — a Coach swap keeps the SLOT's role. `exercise_role` selects the progression style, so the
+// role decides the prescribed percentages and sets, and it belongs to the slot in the programme.
 //
-// The recommender itself has its own unit tests. This pins the WRITE PATH, which is what silently
-// inherited — including the case the owner actually hit, where the incoming exercise is not in the
-// catalogue at all and its muscles come from the model.
+// The history is two defects in opposite directions. Q-405: a swap silently inherited `secondary`
+// onto a Barbell Jefferson Curl and prescribed 60 kg x 6 at 80%, so the swap was made to recompute
+// the role from the catalogue. Then the owner swapped Good Morning → Jefferson Curl on `Shikai /
+// Lower`, a session with no Primary by design, and the recommender PROMOTED the curl to primary —
+// "nobody asked for that". So the role is kept, the card says so, and Q-405's concern is a warning.
 //
 // Runs only against a real local dev Postgres — skips cleanly in CI's "Tests" job.
 import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest'
@@ -13,7 +13,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest'
 const canRun = !!process.env.DATABASE_URL
 const TEST_USER_ID = '00000000-0000-4000-8000-000000000405'
 
-describe.skipIf(!canRun)('Coach swap sets the exercise role (Q-405)', () => {
+describe.skipIf(!canRun)('Coach swap keeps the slot\'s role (#2215)', () => {
   let pool: import('pg').Pool
   let db: typeof import('@/lib/data/postgres/client').getDb extends () => infer T ? T : never
   let handler: typeof import('@/lib/coach/domains/session-exercise').sessionExerciseHandler
@@ -71,61 +71,72 @@ describe.skipIf(!canRun)('Coach swap sets the exercise role (Q-405)', () => {
     await pool.query('DELETE FROM users WHERE id=$1', [TEST_USER_ID])
   })
 
-  it('does not inherit the outgoing role — it recommends from the catalogue', async () => {
+  it('keeps the slot\'s role when a catalogued compound comes in — no Primary appears', async () => {
     expect(await roleOf(targetId)).toBe('secondary')
     const changes = swapTo('Q405 Barbell Bench Press')
     const res = await handler.apply(db, TEST_USER_ID, { targetId, changes } as never, changes as never)
     expect(res.ok).toBe(true)
-    // A barbell compound is a session anchor, not the outgoing 'secondary'.
-    expect(await roleOf(targetId)).toBe('primary')
+    // The recommender calls a barbell compound a primary. The slot was secondary and stays so.
+    expect(await roleOf(targetId)).toBe('secondary')
+    const { rows } = await pool.query('SELECT exercise_name FROM session_exercises WHERE id=$1', [targetId])
+    expect(rows[0].exercise_name).toBe('Q405 Barbell Bench Press')
   })
 
-  it('demotes to accessory when the incoming exercise is an isolation', async () => {
+  it('keeps the slot\'s role for an isolation too', async () => {
     const changes = swapTo('Q405 Cable Lateral Raise')
     expect((await handler.apply(db, TEST_USER_ID, { targetId, changes } as never, changes as never)).ok).toBe(true)
-    expect(await roleOf(targetId)).toBe('accessory')
+    expect(await roleOf(targetId)).toBe('secondary')
   })
 
-  it('the owner\'s case: an exercise the catalogue has never seen gets the LIGHTEST role', async () => {
-    // Barbell Jefferson Curl is not in the library, so this goes through `createMissingExercise` and
-    // its muscles are model-proposed. Deriving a role from those would launder model output into a
-    // prescription; inheriting `secondary` is what produced 60 kg x 6 at 80%.
+  it('keeps the slot\'s role for an exercise the catalogue has never seen', async () => {
     const changes = swapTo('Q405 Barbell Jefferson Curl', [
       { field: 'newExerciseMuscles', from: null, to: 'lower back, hamstrings' },
     ])
     await pool.query(`DELETE FROM exercise_library WHERE name = 'Q405 Barbell Jefferson Curl'`)
     const res = await handler.apply(db, TEST_USER_ID, { targetId, changes } as never, changes as never)
     expect(res.ok).toBe(true)
-    expect(await roleOf(targetId)).toBe('accessory')
+    expect(await roleOf(targetId)).toBe('secondary')
   })
 
-  it('undo puts the original role back, not just the name', async () => {
+  it('undo puts the name back and leaves the role where it was', async () => {
     const changes = swapTo('Q405 Barbell Bench Press')
     const res = await handler.apply(db, TEST_USER_ID, { targetId, changes } as never, changes as never)
-    expect(await roleOf(targetId)).toBe('primary')
-
     await handler.undo(db, TEST_USER_ID, targetId, (res as { beforeState: Record<string, unknown> }).beforeState)
-    // Restoring the name while leaving the role behind would leave the old exercise under the new
-    // exercise's prescription — a different wrong answer, not a fix.
     expect(await roleOf(targetId)).toBe('secondary')
     const { rows } = await pool.query('SELECT exercise_name FROM session_exercises WHERE id=$1', [targetId])
     expect(rows[0].exercise_name).toBe('Q405 Barbell Romanian Deadlift')
   })
 
-  it('says the role change out loud in the preview, before it is written', async () => {
-    const changes = swapTo('Q405 Barbell Bench Press')
-    const preview = await handler.preview(db, TEST_USER_ID, { targetId, changes } as never)
-    const roleLine = preview.consequences.find(c => /role/i.test(c.text))
-    expect(roleLine, 'the preview must name the role change').toBeTruthy()
-    expect(roleLine!.text).toMatch(/primary/)
-    expect(roleLine!.text).toMatch(/prescribed/)
+  it('says the role is unchanged on the card, whichever exercise comes in', async () => {
+    for (const name of ['Q405 Barbell Bench Press', 'Q405 Cable Lateral Raise']) {
+      const preview = await handler.preview(db, TEST_USER_ID, { targetId, changes: swapTo(name) } as never)
+      const roleLine = preview.consequences.find(c => /^Role unchanged/.test(c.text))
+      expect(roleLine, `the preview must name the kept role for ${name}`).toBeTruthy()
+      expect(roleLine!.text).toContain('(secondary)')
+      expect(preview.consequences.some(c => /Sets the role to/.test(c.text))).toBe(false)
+    }
   })
 
-  it('warns rather than informs when nothing is known about the incoming exercise', async () => {
-    const changes = swapTo('Q405 Something Nobody Has Catalogued')
-    const preview = await handler.preview(db, TEST_USER_ID, { targetId, changes } as never)
-    const roleLine = preview.consequences.find(c => /role/i.test(c.text))!
-    expect(roleLine.kind).toBe('warn')
-    expect(roleLine.text).toMatch(/lightest/)
+  it('warns when the incoming movement looks lighter than the slot it inherits', async () => {
+    const preview = await handler.preview(db, TEST_USER_ID, { targetId, changes: swapTo('Q405 Cable Lateral Raise') } as never)
+    const warn = preview.consequences.find(c => c.kind === 'warn' && /loaded as this slot/.test(c.text))
+    expect(warn, 'an isolation in a secondary slot should be flagged').toBeTruthy()
+    expect(warn!.text).toMatch(/an accessory/)
+    expect(warn!.text).toMatch(/program editor/)
+  })
+
+  it('does not warn when the incoming movement is at least as heavy as the slot', async () => {
+    const preview = await handler.preview(db, TEST_USER_ID, { targetId, changes: swapTo('Q405 Barbell Bench Press') } as never)
+    expect(preview.consequences.some(c => /loaded as this slot/.test(c.text))).toBe(false)
+  })
+
+  it('warns when nothing is known about the incoming exercise, unless the slot is already the lightest', async () => {
+    const unknown = swapTo('Q405 Something Nobody Has Catalogued')
+    const preview = await handler.preview(db, TEST_USER_ID, { targetId, changes: unknown } as never)
+    const warn = preview.consequences.find(c => c.kind === 'warn' && /Nothing is known/.test(c.text))
+    expect(warn).toBeTruthy()
+    await pool.query(`UPDATE session_exercises SET exercise_role='accessory' WHERE id=$1`, [targetId])
+    const accessorySlot = await handler.preview(db, TEST_USER_ID, { targetId, changes: unknown } as never)
+    expect(accessorySlot.consequences.some(c => /Nothing is known/.test(c.text))).toBe(false)
   })
 })

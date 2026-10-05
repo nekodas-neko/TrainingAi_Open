@@ -20,6 +20,13 @@ export function sessionAnchorRole(roles: string[]): string | null {
   return ROLE_SENIORITY.find(r => roles.includes(r)) ?? null
 }
 
+/** Is `role` loaded lighter than `than`? An unknown role is treated as neither. */
+export function isLighterRole(role: string, than: string): boolean {
+  const a = ROLE_SENIORITY.indexOf(role)
+  const b = ROLE_SENIORITY.indexOf(than)
+  return a >= 0 && b >= 0 && a > b
+}
+
 // Ceiling on sets an exercise may carry, by role. The AI's own prescription is the intended
 // shape of the session; a longer budget should deepen it, not turn an accessory into a main
 // lift. Roles differ because the useful marginal set differs: a primary compound tolerates

@@ -1,5 +1,6 @@
 import { and, eq, isNotNull, isNull, sql } from 'drizzle-orm'
 import { recommendExerciseRole, UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
+import { isLighterRole } from '@trainingai/shared/ai-periodization/role-plausibility'
 import type { ExerciseRole } from '@trainingai/shared/types/program'
 import * as s from '@/lib/data/postgres/schema'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
@@ -202,23 +203,29 @@ export const sessionExerciseHandler: DomainHandler = {
         })
       }
 
-      // **The role, said out loud before it is written (Q-405).** It selects the progression style,
-      // so it decides the prescribed percentages and sets — and the swap used to carry the OUTGOING
-      // exercise's role across in silence, which put a heavy secondary loading on a Jefferson Curl.
-      // Surfacing it here is what turns the write into something the user confirms.
+      // **The role stays with the slot (#2215), and the card says so either way.** The role is the
+      // slot's place in the programme and selects the progression style, so it decides the
+      // prescribed sets and percentages. Q-405 made a swap recompute it from the catalogue, after an
+      // inherited `secondary` loaded a Jefferson Curl at 80%; the owner then met the reverse — on a
+      // session with no Primary by design, the recommender PROMOTED the incoming exercise to primary
+      // without being asked. A role change is now its own, asked-for edit. What Q-405 guarded against
+      // survives as a warning when the incoming movement looks lighter than the slot it inherits.
+      consequences.push({
+        kind: 'info',
+        text: `Role unchanged (${row.exerciseRole}) — the prescribed sets and percentages stay this slot's`,
+      })
       const recommended = existing
         ? recommendExerciseRole({
             muscles: (existing.muscles as { muscle: string }[] | null) ?? [],
             equipment: existing.equipment ?? [],
           })
         : null
-      const role = recommended ?? UNCLASSIFIED_EXERCISE_ROLE
-      if (role !== row.exerciseRole) {
+      if (recommended ? isLighterRole(recommended, row.exerciseRole) : row.exerciseRole !== 'accessory') {
         consequences.push({
-          kind: recommended ? 'info' : 'warn',
+          kind: 'warn',
           text: recommended
-            ? `Sets the role to ${role} (was ${row.exerciseRole}) — this changes the prescribed sets and percentages`
-            : `Sets the role to ${role}, the lightest option, because nothing is known about "${swap.to}" yet — check it if this should be a heavier lift`,
+            ? `"${swap.to}" is usually trained as ${recommended === 'accessory' ? 'an accessory' : `a ${recommended}`}, and will be loaded as this slot's ${row.exerciseRole} — if that is too heavy for it, change its role in the program editor afterwards`
+            : `Nothing is known about "${swap.to}" yet, and it will be loaded as this slot's ${row.exerciseRole} — if it should be lighter, change its role in the program editor afterwards`,
         })
       }
     }
@@ -270,10 +277,7 @@ export const sessionExerciseHandler: DomainHandler = {
     // leaving a half-applied patch behind.
     const swap = accepted.find(c => c.field === 'exerciseName')
     let replacement: { id: string; muscles: { muscle: string }[] } | null = null
-    // The role the incoming exercise should carry. Never the outgoing one: `exercise_role` selects
-    // the progression style, so inheriting it prescribed a heavy secondary loading on a Jefferson
-    // Curl (Q-405).
-    let newRole: ExerciseRole | null = null
+    // No role is written: the slot keeps its own (#2215 — see `preview`).
     if (swap) {
       const [entry] = await db
         .select({
@@ -289,18 +293,11 @@ export const sessionExerciseHandler: DomainHandler = {
         const created = await createMissingExercise(db, userId, swap.to as string, accepted)
         if ('error' in created) return { ok: false, reason: 'invalid', detail: created.error }
         replacement = created
-        // Just invented by the Coach, so its muscles are model-proposed and cannot be turned into a
-        // prescription (Q-405). Not the outgoing role either — inheriting is the defect.
-        newRole = UNCLASSIFIED_EXERCISE_ROLE
       } else {
         // A merged-away catalogue row is kept only so historical FKs stay valid (migration 165) — it
         // must never become a new selection.
         if (entry.mergedInto) return { ok: false, reason: 'invalid', detail: `"${swap.to}" has been merged into another exercise` }
         replacement = { id: entry.id, muscles: (entry.muscles as { muscle: string }[] | null) ?? [] }
-        newRole = recommendExerciseRole({
-          muscles: (entry.muscles as { muscle: string }[] | null) ?? [],
-          equipment: entry.equipment ?? [],
-        }) ?? UNCLASSIFIED_EXERCISE_ROLE
       }
     }
 
@@ -320,7 +317,6 @@ export const sessionExerciseHandler: DomainHandler = {
           set.exerciseName = c.to
           set.exerciseId = replacement.id
           set.muscleGroups = replacement.muscles.map(m => m.muscle)
-          if (newRole) set.exerciseRole = newRole
         } else if (c.field === 'styleId') set.styleId = c.to
         else if (c.field === 'position') set.position = c.to
       }
@@ -390,8 +386,8 @@ function captureBefore(accepted: PatchChange[], target: TargetRow): Record<strin
       // name left the row reading "Barbell Romanian Deadlift" while `exercise_id` still pointed at
       // the replacement — observed 2026-08-09, and invisible to anything that reads the name.
       before.exerciseId = target.exerciseId
-      // The role moves with the swap now (Q-405), so an undo that left it behind would restore the
-      // old exercise under the new exercise's prescription.
+      // Captured though a swap no longer writes the role (#2215): restoring an unchanged value is a
+      // no-op, and an undo that ever has to put a role back still can.
       before.exerciseRole = target.exerciseRole
     } else if (c.field === 'styleId') before.styleId = target.styleId
     else if (c.field === 'position') before.position = target.position
