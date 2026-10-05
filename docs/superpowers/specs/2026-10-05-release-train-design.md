@@ -214,7 +214,7 @@ issue, which is the one place you look each week. One review point instead of a 
 - **Turn off Railway's auto-deploy from `main`.** This is the single switch that makes merges stop
   reaching production. Do it *after* the release workflow has deployed once successfully.
 - The release workflow deploys with the Railway CLI, using a Railway project token stored as a GitHub
-  secret on the `production` environment. **You create the token**, because secrets are yours.
+  secret on the **`release`** environment. **You create the token**, because secrets are yours.
 - If CLI deploys misbehave, there's a fallback: Railway watches a `production` branch that only the
   release workflow moves to the released commit. Nobody works on it; it's a pointer.
 - **No staging environment needed.** Unreleased code is tested on your machine. A Railway staging
@@ -449,7 +449,7 @@ around who may start a release, and around the Railway token living in exactly o
 |---|---|---|
 | Railway auto-deploy off | A merge reaching production | Railway setting |
 | **Only the Orchestrator starts a release, and only after your "approve" in its chat** (owner's choice, 2026-10-05) | A deploy you haven't read about | Instruction only. Every other role's prompt says it never starts a release |
-| `production` environment holding the Railway token | The token leaking into any other job. Only the release workflow's deploy job can read it | GitHub |
+| **`release`** environment holding the Railway token | The token leaking into any other job. Only the release workflow's deploy job can read it | GitHub |
 | *Optional hard lock:* add yourself as required reviewer on `production` | Any deploy without a tap from you in GitHub, whoever starts it | GitHub. One setting, if you ever want it |
 | Tag ruleset on `v*`: no moving, no deleting | A release tag silently pointing at different code | GitHub ruleset |
 | `ProtectMain`: required CI, no force-push, no deletion | A red or rewritten `main` | GitHub ruleset (Active since 2026-09-25) |
@@ -529,8 +529,24 @@ agent ends up following half the old rules and half the new.
 
 - **You** (secrets and settings are yours):
   1. Create a Railway project token.
-  2. In GitHub, create a `production` environment and store the token there as a secret. A required
-     reviewer is optional (§7); by default approval happens in the Orchestrator's chat.
+  2. In GitHub, create a **`release`** environment and store the token there as a secret named
+     **`RAILWAY_TOKEN`** — that exact name, because it is the variable Railway's own CLI reads, so
+     the release workflow needs no mapping step.
+     **Create a FRESH Railway token for this, named for its consumer** (e.g. `github-release`),
+     rather than reusing an existing one. Two reasons, both practical: Railway shows a token's
+     value **once**, so an existing one cannot be pasted into GitHub unless its plaintext was kept;
+     and one token per consumer means revoking the GitHub one later cannot break whatever else
+     holds the old one. Scope it to the `production` Railway environment.
+     **⚠ NOT named `production`, and do NOT reuse the environment already listed.** Checked
+     2026-10-05: `Training-Ai / production` already exists and belongs to **Railway's own GitHub
+     integration** — `railway-app[bot]` created it and writes a deployment to it on every deploy
+     (five on 2026-10-05 alone). Putting our secret there would hang it on an environment an
+     external integration owns and can recreate, and a second row also called "production" is a
+     trap for whoever reads the settings page next. `release` also says what it gates: the release
+     workflow. One word to change if you prefer otherwise.
+     A required reviewer is **not** being added — the owner is reviewer through the Orchestrator's
+     chat (confirmed 2026-10-05), and a required reviewer would also block him when he is the one
+     releasing (§7).
   3. Add a tag ruleset for `v*` that blocks updates and deletion.
 - **Agent, one PR into `main`:**
   - the release workflow
