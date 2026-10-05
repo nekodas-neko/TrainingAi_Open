@@ -490,6 +490,52 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform][readiness] OR-215 — a score must record WHICH signals it was built from, or no two scores are comparable
+
+- **Lane: O** · **Added:** 2026-10-05 · Orchestrator, from the owner's question on `OR-213`:
+  *"if we never have body temperature - then a new device gives that reading; what do we do with
+  it; how does it affect calculations when it wasnt there for anyone else?"*
+- **✅ HALF OF THIS IS ALREADY SOLVED, and the spec should build on it rather than restate it.**
+  Absent contributors are **excluded and the weights renormalised** — `activity-score.ts`,
+  `sleep-night.ts`, with `renormalisedContributors`/`contributionSum` in
+  `packages/shared/src/health/score-audit/`, which can already explain a score's composition.
+  The pattern is deliberate and reasoned: a lifting day with zero zone-2 minutes *"takes the path
+  absent data already takes: excluded, weights renormalised"*.
+- **⛔ WHAT RENORMALISATION DOES NOT GIVE YOU IS COMPARABILITY, and that is the real question.**
+  It makes a score **computable** from whatever arrived. It does not make two scores **mean the
+  same thing**. A 72 built from six contributors and a 72 built from three are both rendered as
+  "72" and read as the same claim. Three ways that bites, all of them live under `OR-213`/`OR-214`:
+  - **Across users** — the whole point of multi-user. One user's ring gives temperature and HRV;
+    another's phone gives steps. Their scores are not on one scale, so any comparison, ranking or
+    shared default is wrong by construction.
+  - **Within one user, across time** — the day a new device arrives, the basis changes and the
+    score steps. **This is exactly the `vs_yesterday` → `vs_normal` boundary** handled days ago,
+    and it was solved by recording which question each row answered (`vs_question`, `LB-190`).
+  - **Against a tuning** — a calibration fitted when a signal was present silently re-scores days
+    when it was not. `CLAUDE.md` already requires a proposal to state how many days it moves; it
+    cannot, if nothing records which days had which inputs.
+- **🔧 THE FIX GENERALISES AN EXISTING ONE: store the BASIS with every score.** Each stored score
+  records the set of contributors actually present and their renormalised weights — the thing
+  `score-audit` computes today and then discards. Then:
+  - comparability is **checkable** rather than assumed (same basis → comparable; different → say so
+    or do not compare);
+  - a new signal arriving is a **visible basis change**, not a silent step;
+  - a Tuning proposal can finally answer *"how many days does this move"* restricted to the days
+    that actually had the input.
+  **Reversal cost: low now, high later.** It is a field on the write path today; retrofitting it
+  means every historical score has an unknown basis forever.
+- **⚠ THE OWNER'S "START STRONG" HAS A PRICE WORTH NAMING, not a reason to refuse it.** Enumerating
+  every plausible tracker signal up front is right for the *catalogue* — a signal should be a
+  registry entry, never a schema change. But it is **wrong for the scoring weights**: a contributor
+  nobody has ever supplied cannot be weighted on evidence, and a guessed weight that later goes
+  live silently re-scores everyone. **So: declare the full signal catalogue, admit signals into a
+  score only when there is data to calibrate them**, and let the basis field record the difference.
+- **What this entry owes:** the signal catalogue itself (name, unit, native resolutions seen,
+  which pillar it feeds, whether it is scored yet) and the basis field's shape. Both belong in the
+  `OR-213` spec rather than in separate work.
+- **Needs:** OR-213
+
+
 ### [devices][platform] OR-214 — the connector framework: "link with X", extracted from the five we already hand-rolled
 
 - **Lane: O** · **Added:** 2026-10-05 · Orchestrator, from the owner's direction.
