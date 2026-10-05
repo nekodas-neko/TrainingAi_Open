@@ -293,6 +293,15 @@ Live at the time of writing (2026-07-30):
 - [`handoff-2026-10-05-platform-device-verification-sweeps-2-to-5.md`](../../handoffs/handoff-2026-10-05-platform-device-verification-sweeps-2-to-5.md)
   — **Device Verification, sweeps 2 → 4b and the sweep 5 plan, 2026-09-23 → 2026-10-05.** About 40 entries
   verified on the S25; DV-13 to DV-19 filed; the harness, its traps, and the private design gallery.
+- [`handoff-2026-10-05-platform-lane-b-comparative-checkin-and-idle-queue.md`](../../handoffs/handoff-2026-10-05-platform-lane-b-comparative-checkin-and-idle-queue.md)
+  — **Lane B, 2026-09-30 to 2026-10-05.** Rebuilt the morning check-in's comparative control
+  (#2026, #2027) and carries the rule it produced: the prompt on screen and the `vs_question`
+  marker stamped on the row move together, or every row in between is mislabelled with nothing
+  downstream able to detect it. Then four days with `READY 0`, which the doc establishes as a real
+  state and separates from the repo-wide stall in #2032. Also records four git traps worth
+  avoiding — a backlog conflict that is a deletion against a modification, gating with unmerged
+  paths in the tree, `git checkout HEAD --` on a conflicted file, and a mid-flight rename landing
+  under an open green PR.
 - [`handoff-2026-09-27-platform-lane-a-security-cluster.md`](../../handoffs/handoff-2026-09-27-platform-lane-a-security-cluster.md)
   — **Lane A, the Review-sweep-60 security cluster, 2026-09-27.** TN-78 and BF-211 merged;
   RV-192, RV-193, RV-195 ② and RV-197 built, CI-green and **owner-gated** (#1779, #1781, #1784,
