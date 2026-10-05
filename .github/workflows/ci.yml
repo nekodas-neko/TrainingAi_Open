@@ -19,7 +19,8 @@ permissions:
 on:
   # PRs always run CI: with all jobs as required status checks, skipping CI on a
   # markdown-only PR would leave those checks "Expected" forever and block the
-  # merge. Cheap on a docs change; correctness over a few saved minutes.
+  # merge. A docs-only PR still triggers this workflow; the `changes` job below
+  # then skips the expensive jobs while every required check still reports.
   #
   # There is deliberately no `push: [main]` trigger. `main` is protected and only
   # reached through an already-green PR, so re-running the full suite on the
@@ -50,10 +51,52 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A docs-only PR skips the expensive half of the required checks (release-train spec §8, the owner
+  # approved the spec 2026-10-05; design from the 2026-09-28 Lane A brief). `paths-ignore` on the
+  # trigger is NOT the way — see the header: the required checks would never report.
+  #
+  # This job decides `code`. Lint, Build, Migration Check and the four test shards are skipped when
+  # it is `false`; a skipped job reports success to a required check, so the PR still merges. `Tests`
+  # still RUNS on a docs-only PR — it runs `scripts/__tests__`, which is where every test that reads
+  # a real markdown file lives (checked 2026-10-05: no other spec reads one). Custom Rules always runs
+  # in full, because eight of its rules are doc rules.
+  #
+  # It fails SAFE: not a PR, an API error, an empty list, or 3,000+ files (the API's cap) all give
+  # `code=true` and the full suite. Renames count their OLD path too, so moving code into `docs/`
+  # is not a docs-only change.
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.classify.outputs.code }}
+    steps:
+      - id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          code=true
+          if [ "$EVENT" = pull_request ] && files=$(gh api --paginate "repos/$REPO/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)'); then
+            n=$(printf '%s\n' "$files" | grep -c . || true)
+            if [ "$n" -gt 0 ] && [ "$n" -lt 3000 ] && ! printf '%s\n' "$files" | grep -vE '^docs/|\.md$' | grep -q .; then
+              code=false
+            fi
+            echo "$n changed paths"
+          fi
+          echo "code=$code"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
   lint:
     name: Lint
     # LB-31: the nightly verifies `main`'s test suite only — see the `schedule` trigger.
-    if: github.event_name != 'schedule'
+    needs: changes
+    if: ${{ !cancelled() && github.event_name != 'schedule' && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -88,6 +131,8 @@ jobs:
   # shard means FEWER files share one — which is the LA-32 collision class, not more of it.
   test-shard:
     name: Tests shard ${{ matrix.shard }}
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
@@ -149,22 +194,47 @@ jobs:
     name: Tests
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: test-shard
+    needs: [changes, test-shard, test-docs]
     # `always()` so this still reports when a shard fails — without it the job is SKIPPED, the
     # required check never arrives, and the PR hangs exactly as it would with no aggregator at all.
     # Deliberately NOT guarded on `schedule`: LB-31's nightly runs the suite and nothing else, so
     # this is the only job that can report its result.
     if: always()
     steps:
-      - name: Every shard passed
+      - name: Every shard passed (or, docs-only, the doc-reading tests passed)
         run: |
-          echo "shards: ${{ needs.test-shard.result }}"
-          test "${{ needs.test-shard.result }}" = "success"
+          echo "code: ${{ needs.changes.outputs.code }} · shards: ${{ needs.test-shard.result }} · docs: ${{ needs.test-docs.result }}"
+          if [ "${{ needs.changes.outputs.code }}" = "false" ]; then
+            test "${{ needs.test-docs.result }}" = "success"
+          else
+            test "${{ needs.test-shard.result }}" = "success"
+          fi
+
+  # The docs-only half of `Tests`: the specs that read real markdown (the backlog archive, the
+  # Known-Issues header, doc-size and index-path rules) all live in `scripts/__tests__`. ~30 s.
+  test-docs:
+    name: Tests (docs-only)
+    needs: changes
+    if: ${{ !cancelled() && needs.changes.outputs.code == 'false' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm vitest run scripts/__tests__
 
   build:
     name: Build
     # LB-31: the nightly verifies `main`'s test suite only — see the `schedule` trigger.
-    if: github.event_name != 'schedule'
+    needs: changes
+    if: ${{ !cancelled() && github.event_name != 'schedule' && needs.changes.outputs.code != 'false' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
@@ -612,7 +682,8 @@ jobs:
 
   migrations:
     # LB-31: the nightly verifies `main`'s test suite only — see the `schedule` trigger.
-    if: github.event_name != 'schedule'
+    needs: changes
+    if: ${{ !cancelled() && github.event_name != 'schedule' && needs.changes.outputs.code != 'false' }}
     name: Migration Check
     runs-on: ubuntu-latest
     timeout-minutes: 10
