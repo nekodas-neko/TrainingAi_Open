@@ -18,7 +18,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { surveyClaims } = require('./lib/migration-claims');
+const { surveyClaims, summariseClaims, refList } = require('./lib/migration-claims');
 
 const DIR = 'lib/data/postgres/migrations';
 const root = path.join(__dirname, '..');
@@ -62,7 +62,7 @@ try {
     .split('\n')
     .filter((r) => r && !r.endsWith('/HEAD') && r !== 'origin/main');
 } catch {
-  console.log('next-migration-number: no git refs readable — falling back to the working tree alone.');
+  console.log('next-schema-number: no git refs readable — falling back to the working tree alone.');
 }
 
 const merged = filesIn('origin/main');
@@ -71,16 +71,21 @@ const branches = refs.map((ref) => ({ ref, files: filesIn(ref) }));
 // The working tree is a claim like any other — a migration written but not yet committed counts.
 branches.push({ ref: 'working tree', files: worktree });
 
-const { next, reserved, collisions } = surveyClaims(base, branches);
+const survey = surveyClaims(base, branches, undefined, new Date());
+const { next } = survey;
+const { reserved, collisions, deadRefs } = summariseClaims(survey);
 
-console.log(`Next free Postgres migration number: ${next}`);
+console.log(`Next free Postgres migration number: ${next}   (name the file ${next}_<what_it_does>.sql)`);
 console.log(
   `  ${base.length} on ${merged.length ? 'origin/main' : 'the working tree'}, ` +
     `${refs.length} other ref(s) read.`,
 );
 if (reserved.length) {
   console.log('\nClaimed by a branch that has not merged:');
-  for (const r of reserved) console.log(`  ${r.num}  ${r.file}  (${r.ref})`);
+  for (const r of reserved) console.log(`  ${r.num}  ${r.file}  (${refList(r.refs)})`);
+}
+if (deadRefs) {
+  console.log(`  (${deadRefs} stale branch(es) still hold deleted claude_ro_views migrations; not counted as claims.)`);
 }
 const mainVersions = new Set(sqliteVersionsIn('origin/main'));
 const sqliteOnMain = Math.max(0, ...mainVersions);
@@ -100,6 +105,8 @@ for (const { ref, versions } of sqliteClaims) {
 
 if (collisions.length) {
   console.log('\n⚠ Already colliding — two branches claim one number:');
-  for (const c of collisions) console.log(`  ${c.num}: ${c.claims.join('  vs  ')}`);
+  for (const c of collisions) {
+    console.log(`  ${c.num}: ${c.files.map((f) => `${f.file} (${refList(f.refs)})`).join('  vs  ')}`);
+  }
   console.log('  The later branch must renumber; check-migration-numbers.js fails once both are in one tree.');
 }

@@ -20,7 +20,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { readFileSync, writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
 
 const root = path.join(__dirname, '..', '..')
@@ -61,27 +61,36 @@ const run = (check: string): string => {
 }
 
 /**
- * Appends to a REAL source file and restores it in `finally`. The two files used here are read from
- * disk by no other spec (checked), and each mutation window is a couple of seconds — but it is a
- * shared-tree mutation, so a new case must pick a file nothing else scans during a parallel run.
+ * Runs `fn` with a COPY of a real source file beside it, in a gitignored `__check_fixture__/` folder
+ * the checks scan like any other, with `line` appended (or nothing, for the clean run).
+ *
+ * LB-194. This used to append to the real file and restore it in `finally`, so for the length of a
+ * case a TRACKED file differed from HEAD, inside a suite that takes ~9 minutes. `git add -A` in that
+ * window committed the fixture, twice in one session, and the restore then made the file read as an
+ * unrelated edit. A copy removes the window rather than narrowing it. The copy keeps the original's
+ * content so every check sees a realistic file. Each case compares runs made WITH the copy present,
+ * so the copy's own pre-existing findings cancel out.
  */
-const withAppended = (rel: string, line: string, fn: () => string): string => {
-  const abs = path.join(root, rel)
-  const original = readFileSync(abs, 'utf8')
+const FIXTURE_DIR = '__check_fixture__'
+const withCopy = (rel: string, line: string | null, fn: () => string): string => {
+  const dir = path.join(root, path.dirname(rel), FIXTURE_DIR)
+  const copy = path.join(dir, path.basename(rel))
+  const original = readFileSync(path.join(root, rel), 'utf8')
   try {
-    writeFileSync(abs, `${original}\n${line}\n`)
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(copy, line == null ? original : `${original}\n${line}\n`)
     return fn()
   } finally {
-    writeFileSync(abs, original)
+    rmSync(dir, { recursive: true, force: true })
   }
 }
 
 describe.each(CASES)('$check ignores its banned pattern inside a comment', ({ check, file, fixture }) => {
   // Three full scans of app/ + components/ per case; `check-hex-literals` alone needs ~6s.
   it('is not fooled by a comment, and the fixture genuinely reaches it', () => {
-    const clean = run(check)
-    const asCode = withAppended(file, fixture, () => run(check))
-    const asComment = withAppended(file, `// ${fixture}`, () => run(check))
+    const clean = withCopy(file, null, () => run(check))
+    const asCode = withCopy(file, fixture, () => run(check))
+    const asComment = withCopy(file, `// ${fixture}`, () => run(check))
 
     // Positive control. Without it, "the comment changed nothing" is indistinguishable from
     // "this check never looked at that file", which is the reading that makes the whole pass wrong.

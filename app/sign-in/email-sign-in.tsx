@@ -9,6 +9,7 @@ import { signIn } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { clearAllCache, enableCacheWrites } from '@/lib/sqlite/cache'
+import { AWAITING_APPROVAL_SENTENCE } from '@/lib/approval-copy'
 
 export default function EmailSignIn() {
   const searchParams = useSearchParams()
@@ -27,7 +28,9 @@ export default function EmailSignIn() {
 
   useEffect(() => {
     if (searchParams.get('registered') === '1') {
-      toast.success('Account created', { description: 'Sign in below — or wait for approval if not yet invited.' })
+      // LA-162: since RV-192 EVERY password registration starts inactive, invited or not, so the old
+      // "Sign in below" half sent an invited registrant into /pending, reading the opposite advice.
+      toast.success('Account created', { description: AWAITING_APPROVAL_SENTENCE })
     }
     if (searchParams.get('error') === 'CredentialsSignin') {
       toast.error('Invalid email or password')

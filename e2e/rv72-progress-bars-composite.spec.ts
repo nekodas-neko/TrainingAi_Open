@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { settleRouteBoundary } from './fixtures'
+import { settleRouteBoundary, tolerateTestEnd } from './fixtures'
 
 /**
  * RV-72 — progress fills composite instead of forcing layout.
@@ -23,7 +23,7 @@ import { settleRouteBoundary } from './fixtures'
 test.setTimeout(180_000)
 
 test('the contributor bars composite, and their radius survives', async ({ page }) => {
-  await page.route(u => new URL(u).pathname === '/api/readiness-score', async r => {
+  await page.route(u => new URL(u).pathname === '/api/readiness-score', tolerateTestEnd(async r => {
     // Built from the real response so everything else on the screen stays honest — only the
     // contributors are guaranteed.
     const real = await r.fetch()
@@ -36,7 +36,7 @@ test('the contributor bars composite, and their radius survives', async ({ page 
         readinessContributors: { hrv_balance: 42, resting_heart_rate: 71, sleep_balance: 88 },
       }),
     })
-  })
+  }))
 
   await page.goto('/health/readiness')
   await settleRouteBoundary(page)

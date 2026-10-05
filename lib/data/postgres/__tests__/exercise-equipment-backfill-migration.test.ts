@@ -10,7 +10,7 @@
 //
 // Runs only against a real Postgres. CI's "Tests" job sets DATABASE_URL, so these run there.
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest'
-import { migrationTestLock } from './migration-test-lock'
+import { migrationTestLock, runMigrationSql } from './migration-test-lock'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -42,7 +42,7 @@ describe.skipIf(!canRun)('migration 269 — exercise_library equipment backfill 
   afterAll(async () => {
     // Leave the catalogue as the migration would: re-run it so a reset row does not outlive the file.
     if (!canRun) return
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
   })
 
   const equipmentOf = async (name: string): Promise<string[] | null> => {
@@ -57,7 +57,7 @@ describe.skipIf(!canRun)('migration 269 — exercise_library equipment backfill 
       expect(await equipmentOf(name)).toEqual([])
     }
 
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
 
     const expected: Record<string, string[]> = {
       'Machine Chest Press': ['machine'],
@@ -77,7 +77,7 @@ describe.skipIf(!canRun)('migration 269 — exercise_library equipment backfill 
     if (await equipmentOf('Rack Pull') === null) return
     await pool.query(`UPDATE exercise_library SET equipment = $1 WHERE name = 'Rack Pull'`, [['kettlebell']])
 
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
 
     // The UPDATE is guarded on the row still being unlabelled, so a later correction survives a
     // replay. Migration Check replays every file against the schema it just built.
@@ -86,7 +86,7 @@ describe.skipIf(!canRun)('migration 269 — exercise_library equipment backfill 
 
   it('leaves no selectable row unlabelled among the names it covers', async () => {
     await pool.query(`UPDATE exercise_library SET equipment = '{}' WHERE name = ANY($1)`, [NAMED])
-    await pool.query(migrationSql())
+    await runMigrationSql(pool, migrationSql())
 
     const { rows } = await pool.query(
       `SELECT name FROM exercise_library

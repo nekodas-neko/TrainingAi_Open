@@ -1,8 +1,7 @@
-import { getToken } from 'next-auth/jwt'
-import type { JWT } from 'next-auth/jwt'
 import type { Session } from 'next-auth'
 import { authConfig } from '@/auth.config'
 import { refreshIsActiveClaim } from './is-active-refresh'
+import { sessionTokenFrom } from './session-token'
 
 /**
  * Q-1a — resolving a session from `Authorization: Bearer <session jwt>`.
@@ -33,16 +32,10 @@ export async function bearerSession(
 ): Promise<Session | null> {
   // `getToken` prefers the cookie and only falls back to the Authorization header, so a browser
   // request is resolved exactly as it was before this existed. It returns null rather than
-  // throwing on a malformed, re-signed or expired token.
-  //
-  // `secureCookie` is not cosmetic: the salt defaults to the cookie NAME, so getting it wrong
-  // derives a different decryption key and every valid token reads as invalid. It matches what
-  // `app/api/auth/exchange-mobile-token/route.ts` writes.
-  const token = (await getToken({
-    req: { headers },
-    secret: process.env.AUTH_SECRET,
-    secureCookie: process.env.NODE_ENV === 'production',
-  })) as JWT | null
+  // throwing on a malformed, re-signed or expired token. The call itself now lives in
+  // `session-token.ts`, shared with the calendar route — the `secureCookie`/salt pairing is the
+  // part that must not drift between them.
+  const token = await sessionTokenFrom(headers)
   if (!token?.userId) return null
 
   await refreshIsActiveClaim(token, lookup)

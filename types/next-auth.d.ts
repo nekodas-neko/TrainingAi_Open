@@ -4,7 +4,8 @@ import type { ActivityLevel } from "@trainingai/shared/types/user"
 
 declare module "next-auth" {
   interface Session {
-    refreshToken?: string
+    // No `refreshToken` here on purpose (RV-193) — this interface is the shape handed to page
+    // JavaScript by `GET /api/auth/session`. It stays on `JWT` below, where the server reads it.
     isActive?: boolean
     user: {
       id: string

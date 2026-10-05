@@ -33,15 +33,60 @@ class OuraBlePlugin : Plugin() {
     @PluginMethod fun setKey(call: PluginCall) {
         val hex = call.getString("hex") ?: return call.reject("hex required")
         if (OuraAuth.parseKeyHex(hex) == null) return call.reject("key must be 32 hex chars")
-        prefs().edit().putString("key_hex", hex.trim().lowercase()).apply()
-        call.resolve()
+        val store = { prefs().edit().putString("key_hex", hex.trim().lowercase()).apply(); call.resolve() }
+        // RV-196: overwriting a stored key destroys it exactly as clearKey does, so it asks the same
+        // way. First-time storage (no key yet) destroys nothing and needs no tap.
+        if (!prefs().contains("key_hex")) return store()
+        confirmNatively(
+            "Replace the ring key?",
+            "The current key will be overwritten and cannot be recovered from the app or the server.",
+            "Replace",
+        ) { confirmed ->
+            if (!confirmed) return@confirmNatively call.reject("cancelled")
+            store()
+        }
     }
 
     @PluginMethod fun hasKey(call: PluginCall) =
         call.resolve(JSObject().put("hasKey", prefs().contains("key_hex")))
 
+    /**
+     * RV-196: both of the key's dangerous doors now need a native tap that script cannot reach.
+     *
+     * The Kotlin comment below is right that every caller is already app JavaScript — and that is
+     * exactly the problem, because it makes the CSP the only boundary and the CSP allows
+     * `'unsafe-inline'`. A dialog drawn by the system is outside the WebView, so a script in the
+     * origin can open it and cannot answer it. Both callers are explicit buttons in the debug
+     * console, so the cost to the owner is one deliberate extra tap.
+     *
+     * Refusing when there is no resumed activity is the safe direction: the only thing lost is a
+     * key read or delete that nobody is present to confirm.
+     */
+    private fun confirmNatively(title: String, message: String, positive: String, onResult: (Boolean) -> Unit) {
+        val act = activity
+        if (act == null || act.isFinishing) return onResult(false)
+        act.runOnUiThread {
+            android.app.AlertDialog.Builder(act)
+                .setTitle(title)
+                .setMessage(message)
+                .setCancelable(false)
+                .setPositiveButton(positive) { _, _ -> onResult(true) }
+                .setNegativeButton("Cancel") { _, _ -> onResult(false) }
+                .show()
+        }
+    }
+
     @PluginMethod fun clearKey(call: PluginCall) {
-        prefs().edit().remove("key_hex").apply(); call.resolve()
+        confirmNatively(
+            "Delete the ring key?",
+            "This cannot be undone. Without the key the ring cannot be read, and re-pairing it " +
+                "through the official Oura app can change the firmware this app depends on.",
+            "Delete",
+        ) { confirmed ->
+            if (!confirmed) return@confirmNatively call.reject("cancelled")
+            prefs().edit().remove("key_hex").apply()
+            call.resolve()
+        }
     }
 
     /**
@@ -65,7 +110,14 @@ class OuraBlePlugin : Plugin() {
     @PluginMethod fun revealKey(call: PluginCall) {
         val hex = prefs().getString("key_hex", null)
             ?: return call.reject("no key stored")
-        call.resolve(JSObject().put("hex", hex))
+        confirmNatively(
+            "Show the ring key?",
+            "The key will be displayed on screen so it can be copied somewhere durable.",
+            "Show",
+        ) { confirmed ->
+            if (!confirmed) return@confirmNatively call.reject("cancelled")
+            call.resolve(JSObject().put("hex", hex))
+        }
     }
 
     // ---- permissions ----
@@ -210,6 +262,14 @@ class OuraBlePlugin : Plugin() {
         call.resolve(JSObject().put("sent", svc.startDrain(fromZero)).put("cursor", cursor))
     }
 
+    /** BF-187: drain on app open/resume unless the service drained within `maxAgeMs`
+     *  (default 10 min). The service makes the call; see OuraRingService.drainIfStale. */
+    @PluginMethod fun drainIfStale(call: PluginCall) {
+        val svc = OuraRingService.instance ?: return call.resolve(JSObject().put("result", "not-running"))
+        val maxAgeMs = (call.getDouble("maxAgeMs") ?: 600_000.0).toLong()
+        call.resolve(JSObject().put("result", svc.drainIfStale(maxAgeMs)))
+    }
+
     /** Advance the persisted resume cursor after the server confirms storage.
      *  `ds` is deciseconds (can exceed Int32) so it arrives as a JS number (double).
      *  Normally driven by the service's own native ingest; kept as a plugin method so
@@ -224,8 +284,14 @@ class OuraBlePlugin : Plugin() {
      *  app shell on every open (window.location.origin), so the running service
      *  always has a current target; persisted so a restarted service has it too. */
     @PluginMethod fun setIngestUrl(call: PluginCall) {
-        val url = call.getString("url")?.trim()?.trimEnd('/') ?: return call.reject("url required")
-        if (!url.startsWith("http")) return call.reject("url must be absolute")
+        val url = com.trainingai.app.IngestUrlPolicy.normalize(call.getString("url"))
+            ?: return call.reject("url required")
+        // RV-196: an absolute URL was the only requirement, so a script in the origin could
+        // point this at any host and the choice survived restarts. The allowlist lives in
+        // IngestUrlPolicy so it is one decision across all three plugins, and unit-testable.
+        if (!com.trainingai.app.IngestUrlPolicy.isAllowed(url)) {
+            return call.reject("url origin not allowed")
+        }
         prefs().edit().putString("ingest_url", url).apply()
         OuraRingService.instance?.setIngestUrl(url)
         call.resolve()

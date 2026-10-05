@@ -27,6 +27,17 @@ import { SEED_EMAIL, settleRouteBoundary, stableBox, swipeRowLeft, tapCentre } f
  */
 
 const ITEM_ID = '77777777-7777-4777-8777-777777777771'
+/**
+ * The spec owns its meal type rather than borrowing one (LA-176).
+ *
+ * `food_logs.meal_type_id` is NOT NULL, and the six defaults are created **lazily by the app** on
+ * the first nutrition read (`lib/data/postgres/slices/nutrition.ts`), never by the database seed.
+ * So on a fresh database — which is every CI run — the old
+ * `(SELECT id FROM meal_types … LIMIT 1)` resolved to NULL and the insert died on the not-null
+ * constraint. It passed locally only because an earlier run had already made the app create them,
+ * which is exactly why this spec failed on every full CI run and on nobody's machine.
+ */
+const MEAL_TYPE_ID = '77777777-7777-4777-8777-777777777772'
 const FOOD = 'Spec Swipe Yoghurt'
 
 async function withDb<T>(fn: (db: Client) => Promise<T>): Promise<T> {
@@ -38,8 +49,11 @@ async function withDb<T>(fn: (db: Client) => Promise<T>): Promise<T> {
 }
 
 async function cleanup(db: Client) {
+  // Logs first: `food_logs.meal_type_id` is ON DELETE RESTRICT, so the meal type cannot go before
+  // the rows pointing at it — including soft-deleted ones, which this spec creates by design.
   await db.query('DELETE FROM food_logs WHERE food_item_id = $1', [ITEM_ID])
   await db.query('DELETE FROM food_items WHERE id = $1', [ITEM_ID])
+  await db.query('DELETE FROM meal_types WHERE id = $1', [MEAL_TYPE_ID])
 }
 
 /**
@@ -58,13 +72,17 @@ async function seedLog(db: Client, daysAgo: number): Promise<void> {
     [ITEM_ID, userId, FOOD],
   )
   await db.query(
+    `INSERT INTO meal_types (id, user_id, name, sort_order) VALUES ($1, $2, 'Spec Meal', 0)`,
+    [MEAL_TYPE_ID, userId],
+  )
+  await db.query(
     `INSERT INTO food_logs (user_id, date, meal_type_id, food_item_id, quantity_multiplier, logged_at)
      SELECT $1,
-            to_char((now() AT TIME ZONE u.timezone) - ($3 || ' days')::interval, 'YYYY-MM-DD'),
-            (SELECT id FROM meal_types WHERE user_id = $1 ORDER BY sort_order LIMIT 1),
-            $2, 1.0, now() - ($3 || ' days')::interval
+            to_char((now() AT TIME ZONE u.timezone) - ($4 || ' days')::interval, 'YYYY-MM-DD'),
+            $3,
+            $2, 1.0, now() - ($4 || ' days')::interval
        FROM users u WHERE u.id = $1`,
-    [userId, ITEM_ID, daysAgo],
+    [userId, ITEM_ID, MEAL_TYPE_ID, daysAgo],
   )
 }
 
@@ -199,44 +217,35 @@ test('the first tap on Delete opens the confirmation, even mid-animation', async
   expect(await logCount(), 'the tap deleted the entry with no confirmation').toBe(1)
 })
 
-/**
- * BF-61, sweep 4a — the delayed tap the DEVICE fails, which the web passes at every delay.
+/*
+ * **BF-61, sweep 4a — REMOVED 2026-09-29 (LB-178), and this note is the record of why.**
  *
- * Sweep 4a put a number on the remaining defect: from a verified-closed tray, a real `adb input
- * tap` on Delete's own rect at **0 / 100 / 200 / 300 ms after the swipe is swallowed, 8 of 8**, and
- * at **500 ms it works, 2 of 2**. That window is far wider than a CDP round-trip, so unlike sweep
- * 3's it is reachable here — and **it does not reproduce**: probed at 0, 100, 300 and 500 ms with
- * the natural 220 ms transition, the confirmation appeared every single time.
+ * A test lived here asserting that a tap issued the *instant* the swipe ends opens the confirmation.
+ * It failed **6 of 6 on CI** and passed **8 of 8 locally**, for six consecutive runs, and two
+ * diagnostics established that none of that was the app:
+ *   - `document.elementFromPoint` at its tap coordinate read `button "Delete"` on CI, first attempt
+ *     and retry — the tap landed exactly where it meant to;
+ *   - the events that followed were `pointerdown → touchstart → touchend` on that button with **no
+ *     `click` at all**. Chromium does not synthesise one from a CDP tap issued inside its
+ *     tap-suppression window after a CDP swipe. The sibling at `:192` taps the same way just outside
+ *     that window, gets its click, and has stayed green throughout.
  *
- * **That is the finding, and it is why this test is here rather than a third fix.** The cause is
- * not in the shared JS: the gesture maths, the `z-10` raise, the `aria-hidden` flag and the wiring
- * all behave. Whatever swallows the press lives below them, in the Samsung WebView — and
- * structurally this harness cannot see it, because `page.touchscreen.tap()` is a CDP dispatch into
- * the renderer, not a real touch travelling through the compositor's hit test.
+ * So its unique content was Chromium's tap-suppression behaviour, and every app-side claim it made is
+ * held by a named sibling — checked before removing it, not asserted afterwards:
+ *   - the tray is raised while the row is displaced → *the tray is hit-testable the moment the row
+ *     moves*, which holds the row mid-drag at 36 px, where the old `isOpen` gating measurably fails;
+ *   - pressing the tray opens a confirmation rather than deleting → *a swipe reveals Delete, and
+ *     Delete asks before it deletes*;
+ *   - the same, mid-animation → *the first tap on Delete opens the confirmation, even mid-animation*.
  *
- * So this pins the half that IS ours: a tap immediately after the release, no stretched transition,
- * must open the confirmation. It would fail if a future change put a JS-level cause back.
+ * A narrowed version was written and rejected rather than shipped: asserting the hit test **at rest**
+ * passes under the very `isOpen` regression it would claim to guard, because at rest `isOpen` and
+ * `displaced` are both true. A test whose assertion is weaker than its name is worse than none.
+ *
+ * What is genuinely lost is the device half — the press the S25 swallows — and that was never
+ * reachable here: the docstring above says so, and sweep 4a's own probing at 0/100/300/500 ms could
+ * not reproduce it on the web path either.
  */
-test('a tap the instant the swipe ends opens the confirmation', async ({ page }) => {
-  await withDb(db => seedLog(db, 1))
-  await openYesterday(page)
-
-  const row = diaryRow(page)
-  await expect(row).toBeVisible({ timeout: 30_000 })
-  await row.evaluate(el => el.scrollIntoView({ block: 'center' }))
-  const box = await stableBox(row)
-  // The tray's own centre, computed from the row's box rather than measured off the button: a
-  // measurement is a round-trip, and spending one is the opposite of what this test is timing.
-  // One action, `ACTION_WIDTH` = 64, pinned right — see `swipe-actions-math.ts`.
-  await swipeRowLeft(page, row, { distance: 200, releaseWithPoint: true })
-  await page.touchscreen.tap(box.x + box.width - 32, box.y + box.height / 2)
-
-  await expect(
-    page.getByRole('heading', { name: 'Delete food log?' }),
-    'the press right after the release was swallowed on the web path too — the cause is now ours',
-  ).toBeVisible({ timeout: 5_000 })
-  expect(await logCount(), 'the tap deleted the entry with no confirmation').toBe(1)
-})
 
 /**
  * BF-61, sweep 3 — the invariant, rather than a timing window.

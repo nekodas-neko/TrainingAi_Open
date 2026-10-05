@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react'
 import { FoodRow } from './food-row'
 import type { ExternalFood } from '@/lib/hooks/use-food-database-search'
 import { macroCalorieDisagreement, MACRO_MISMATCH_VISIBLE_LIMIT } from '@trainingai/shared/nutrition/scan-totals'
+import { foodSecondaryLine } from './food-name-line'
 
 interface Props {
   results: ExternalFood[]
@@ -72,11 +73,11 @@ const ExternalFoodRow = memo(function ExternalFoodRow(
   { food: ExternalFood; mismatched: boolean; adding: boolean; pending: boolean; onAdd: (f: ExternalFood) => void },
 ) {
   const press = useCallback(() => onAdd(food), [food, onAdd])
-  const secondary = `${Math.round(food.proteinG ?? 0)}P · ${Math.round(food.carbsG ?? 0)}C · ${Math.round(food.fatG ?? 0)}F per ${Math.round(food.servingSizeG)} g`
+  const macros = `${Math.round(food.proteinG ?? 0)}P · ${Math.round(food.carbsG ?? 0)}C · ${Math.round(food.fatG ?? 0)}F per ${Math.round(food.servingSizeG)} g`
   return (
     <FoodRow
-      name={food.brand ? `${food.brand} — ${food.name}` : food.name}
-      secondary={secondary}
+      name={food.name}
+      secondary={foodSecondaryLine(food.brand, macros)}
       calories={food.calories}
       warning={mismatched ? 'Its macros and calories disagree — check before using' : null}
       highlighted={pending}

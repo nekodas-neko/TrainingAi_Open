@@ -1,0 +1,239 @@
+<title>Accent Token Retune</title>
+<style>
+  /* Layout: one column of stacked comparison panes, each a real 384px app surface beside its
+     alternative. Dark-only by choice — the app is dark-only (forcedTheme="dark"), and light chrome
+     around these swatches would misrepresent the colours being decided. */
+  :root {
+    color-scheme: dark;
+    /* The app's own dark tokens, copied from app/globals.css so the panes are honest. */
+    --app-bg:      oklch(0.145 0.020 149);
+    --app-card:    oklch(0.185 0.028 149);
+    --app-muted:   oklch(0.225 0.034 149);
+    --app-fg:      oklch(0.985 0 0);
+    --app-dim:     oklch(0.75 0 0);
+    --app-border:  oklch(1 0 0 / 7%);
+    /* The four values under decision. */
+    --green-token: oklch(0.84 0.22 145);   /* rgb(86,238,102)  — live today */
+    --green-hex:   #22c55e;                 /* rgb(34,197,94)   — the literals */
+    --red-token:   oklch(0.704 0.191 22.216); /* rgb(255,100,103) — live today */
+    --red-hex:     #ef4444;                 /* rgb(239,68,68)   — the literals */
+
+    --page-bg:   oklch(0.12 0.012 149);
+    --page-fg:   oklch(0.96 0 0);
+    --page-dim:  oklch(0.68 0.01 149);
+    --page-rule: oklch(1 0 0 / 10%);
+    --page-warn: oklch(0.79 0.18 85);
+
+    --font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
+    --font-body: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+  }
+  body {
+    background: var(--page-bg);
+    color: var(--page-fg);
+    font-family: var(--font-body);
+    line-height: 1.55;
+    padding-block: 40px 64px;
+    padding-inline: 20px;
+  }
+  .wrap { max-width: 62ch; margin: 0 auto; display: flex; flex-direction: column; gap: 30px; }
+  h1 {
+    font-family: var(--font-display); font-weight: 400; font-size: clamp(30px, 7vw, 42px);
+    line-height: 1.1; margin: 0; text-wrap: balance; letter-spacing: -0.01em;
+  }
+  .eyebrow {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--page-dim); margin: 0 0 10px;
+  }
+  h2 {
+    font-family: var(--font-display); font-weight: 400; font-size: 23px; line-height: 1.2;
+    margin: 0 0 4px; text-wrap: balance;
+  }
+  p { margin: 0 0 10px; }
+  p:last-child { margin-bottom: 0; }
+  strong { font-weight: 650; }
+  code { font-family: var(--font-mono); font-size: 0.87em; }
+  section { border-top: 1px solid var(--page-rule); padding-top: 22px; }
+  .lede { color: var(--page-dim); font-size: 15px; }
+
+  .correction {
+    border: 1px solid color-mix(in oklch, var(--page-warn) 40%, transparent);
+    background: color-mix(in oklch, var(--page-warn) 9%, var(--page-bg));
+    border-radius: 12px; padding: 16px 18px;
+  }
+  .correction .eyebrow { color: var(--page-warn); }
+
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 7px 10px 7px 0; border-bottom: 1px solid var(--page-rule); vertical-align: top; }
+  th { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--page-dim); font-weight: 500; }
+  td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .scroll { overflow-x: auto; }
+
+  /* Two real app surfaces side by side; stacks under ~460px. */
+  .panes { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px; }
+  .pane { min-width: 0; }
+  .pane-label {
+    font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--page-dim); margin: 0 0 7px; display: flex; justify-content: space-between; gap: 8px;
+  }
+  .screen {
+    background: var(--app-bg); border: 1px solid var(--app-border); border-radius: 16px;
+    padding: 13px; display: flex; flex-direction: column; gap: 10px; color: var(--app-fg);
+    font-size: 12px;
+  }
+  .card {
+    background: var(--app-card); border: 1px solid var(--app-border);
+    border-radius: 12px; padding: 10px;
+  }
+  .card .k {
+    font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--app-dim); margin: 0 0 5px;
+  }
+  .row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .verdict { font-weight: 700; font-size: 13px; }
+  .track { margin-top: 7px; height: 6px; border-radius: 999px; background: var(--app-muted); display: flex; overflow: hidden; }
+  .fill { height: 100%; border-radius: 999px; }
+  .btn {
+    border: 0; border-radius: 8px; padding: 7px 12px; font: inherit; font-size: 12px; font-weight: 600;
+    color: #fff; width: 100%;
+  }
+  .err { font-size: 11px; margin: 0; }
+  .swatch-row { display: flex; gap: 6px; align-items: center; font-family: var(--font-mono); font-size: 10px; color: var(--app-dim); }
+  .chip { width: 15px; height: 15px; border-radius: 4px; flex: none; }
+
+  .a .verdict, .a .ontrack { color: var(--green-token); }
+  .a .fill { background: var(--green-token); }
+  .a .btn { background: var(--red-token); color: #2a0000; }
+  .a .err { color: var(--red-token); }
+  .a .chip.g { background: var(--green-token); }
+  .a .chip.r { background: var(--red-token); }
+
+  .b .verdict, .b .ontrack { color: var(--green-hex); }
+  .b .fill { background: var(--green-hex); }
+  .b .btn { background: var(--red-hex); }
+  .b .err { color: var(--red-hex); }
+  .b .chip.g { background: var(--green-hex); }
+  .b .chip.r { background: var(--red-hex); }
+
+  ul { margin: 0; padding-left: 1.15em; }
+  li { margin-bottom: 7px; }
+  li:last-child { margin-bottom: 0; }
+  .rec { font-size: 15px; }
+  .foot { font-size: 12.5px; color: var(--page-dim); }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">LB-152 · 2026-09-29 · re-opened</p>
+    <h1>Accent token retune</h1>
+    <p class="lede">You answered this on 2026-09-26: retune the token to today&rsquo;s <code>#22c55e</code> and
+      <code>#ef4444</code> first, then migrate the literal sites onto it &mdash; on the understanding that the
+      app&rsquo;s appearance would not change. I measured it before building. It changes a great deal.</p>
+  </header>
+
+  <div class="correction">
+    <p class="eyebrow">The correction</p>
+    <p>The entry counted the <em>literal</em> sites and never counted the sites already using the
+      token. Retuning the token repaints every one of those. It is the larger change of the two, not
+      the neutral one.</p>
+  </div>
+
+  <section>
+    <p class="eyebrow">What each option actually repaints</p>
+    <h2>Fourteen readings, or about two hundred and twelve</h2>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>Option</th><th>What moves</th><th class="num">Sites</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>(a)</strong> migrate to the token</td>
+            <td>The 14 true bands go from mid to bright. Everything already on the token is untouched.</td>
+            <td class="num">14</td>
+          </tr>
+          <tr>
+            <td><strong>(b)</strong> retune, then migrate</td>
+            <td><code>var(--accent-green)</code> across 30 files, plus <code>var(--destructive)</code> and the
+              <code>bg-/text-/border-destructive</code> classes across 58 &mdash; every destructive button, error
+              line and delete affordance in the app &mdash; all go from bright to mid. The 14 then join them
+              with no further change.</td>
+            <td class="num">62<br>+&nbsp;150</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="foot" style="margin-top:12px">Counted with <code>grep</code> over <code>app/**</code> and
+      <code>components/**</code>, excluding the definitions in <code>globals.css</code>. The green sites span
+      Home, Health, Nutrition, Workout, Cardio, Coach and More.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">The two candidates, on the app&rsquo;s own surfaces</p>
+    <h2>What each one looks like</h2>
+    <div class="panes">
+      <div class="pane a">
+        <p class="pane-label"><span>(a) token &mdash; today</span></p>
+        <div class="screen">
+          <div class="card">
+            <p class="k">Body fat</p>
+            <div class="row"><span>14.2%</span><span class="verdict">&minus;0.4</span></div>
+          </div>
+          <div class="card">
+            <p class="k">Weekly muscle sets</p>
+            <div class="row"><span>Chest</span><span class="ontrack">16 / 14</span></div>
+            <div class="track"><span class="fill" style="width:100%"></span></div>
+          </div>
+          <button class="btn" type="button">Delete workout</button>
+          <p class="err">Couldn&rsquo;t save &mdash; try again</p>
+          <div class="swatch-row"><span class="chip g"></span>86 238 102<span class="chip r"></span>255 100 103</div>
+        </div>
+      </div>
+
+      <div class="pane b">
+        <p class="pane-label"><span>(b) retuned</span></p>
+        <div class="screen">
+          <div class="card">
+            <p class="k">Body fat</p>
+            <div class="row"><span>14.2%</span><span class="verdict">&minus;0.4</span></div>
+          </div>
+          <div class="card">
+            <p class="k">Weekly muscle sets</p>
+            <div class="row"><span>Chest</span><span class="ontrack">16 / 14</span></div>
+            <div class="track"><span class="fill" style="width:100%"></span></div>
+          </div>
+          <button class="btn" type="button">Delete workout</button>
+          <p class="err">Couldn&rsquo;t save &mdash; try again</p>
+          <div class="swatch-row"><span class="chip g"></span>34 197 94<span class="chip r"></span>239 68 68</div>
+        </div>
+      </div>
+    </div>
+    <p class="foot" style="margin-top:12px">Both panes use the real dark background, card and muted tokens
+      from <code>globals.css</code>. Today you see the left column on most screens and the right column on the
+      14 band readings; each option makes one of them universal.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">Recommendation</p>
+    <h2>Take (a) &mdash; migrate to the token</h2>
+    <p class="rec">It gets the same one-source benefit for a fifteenth of the visual change, and it keeps the
+      design system&rsquo;s own values rather than overwriting them with copies that drifted. Every component
+      written in the last several months already renders the bright token, so (a) is also the direction the
+      app has been moving on its own.</p>
+    <ul>
+      <li><strong>(b) is still right if you prefer the mid green and red</strong> &mdash; that is a real
+        preference and only you can hold it. It is worth knowing it is an app-wide restyle of roughly 212
+        readings, not a no-op, and that the brighter red is the one you see on every delete button.</li>
+      <li><strong>(c) leave it</strong> loses the one-source benefit and keeps 116 literal sites drifting
+        against the tokens. It also reverts a change already made in <code>warmup-screen.tsx</code>.</li>
+      <li><strong>Reversal</strong> is cheap in effort either way &mdash; one token value, then a mechanical
+        diff &mdash; but you have to look at a screen to judge it, which is the reason for this page.</li>
+    </ul>
+  </section>
+
+  <section>
+    <p class="foot">One thing this page does not settle: amber. The difference is
+      <code>rgb(234,179,8)</code> against <code>rgb(239,175,0)</code>, which is below what the eye picks up on
+      a phone, so it follows whichever option you take.</p>
+  </section>
+</div>

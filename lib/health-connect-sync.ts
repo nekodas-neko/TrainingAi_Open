@@ -158,8 +158,7 @@ async function getSessionMetrics(
 
   if (canRead.has('HeartRateSeries')) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { records } = await hc.readRecords({ start, end, type: 'HeartRateSeries' } as any);
+      const { records } = await hc.readRecords({ start, end, type: 'HeartRateSeries' });
       const bpms: number[] = [];
       for (const r of records as Array<{ samples?: Array<{ beatsPerMinute: number }> }>) {
         for (const sample of r.samples ?? []) bpms.push(sample.beatsPerMinute);
@@ -309,8 +308,7 @@ export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metr
   // ── Body fat % (latest per day) ───────────────────────────────────────────
   if (canRead.has('BodyFat')) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'BodyFat' } as any);
+      const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'BodyFat' });
       for (const r of records as Array<{ time: string; percentage: number }>)
         bucket(toLocalDate(r.time, tz)).bodyFatPct = Math.round(r.percentage * 10) / 10;
     } catch { /* ignore */ }
@@ -319,8 +317,7 @@ export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metr
   // ── Nutrition macros (sum per day) ────────────────────────────────────────
   if (canRead.has('Nutrition')) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'Nutrition' } as any);
+      const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'Nutrition' });
       for (const r of records as Array<{
         startTime: string; calories?: number;
         proteinG?: number; carbsG?: number; fatG?: number;
@@ -347,8 +344,7 @@ export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metr
   // ── HRV (mean overnight RMSSD, midnight–8am) ─────────────────────────────
   if (canRead.has('HeartRateVariabilityRmssd')) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'HeartRateVariabilityRmssd' } as any);
+      const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'HeartRateVariabilityRmssd' });
       const overnightHrv: Record<string, number[]> = {};
       for (const r of records as Array<{ time: string; heartRateVariabilityMillis: number }>) {
         const h = hourInTz(r.time, tz);
@@ -368,8 +364,7 @@ export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metr
   // ── SpO2 (daily mean of overnight readings, midnight–8am) ────────────────
   if (canRead.has('OxygenSaturation')) {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'OxygenSaturation' } as any);
+      const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'OxygenSaturation' });
       const overnightSpo2: Record<string, number[]> = {};
       for (const r of records as Array<{ time: string; percentage: number }>) {
         const h = hourInTz(r.time, tz);

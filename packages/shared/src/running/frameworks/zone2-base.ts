@@ -3,7 +3,7 @@ import type { FrameworkContext, Prescription, RunFramework, RunType } from '../t
 
 // Heart-health framework — general cardiovascular fitness. Almost all Zone-2 aerobic
 // work with a weekly slightly-longer aerobic run, no intervals. Grounded in the brief:
-// Zone-2 emphasis (60–70% HRmax) builds the aerobic/mitochondrial base at low injury and
+// Zone-2 emphasis (60–70% of heart-rate reserve in the engine's Karvonen bands) builds the aerobic/mitochondrial base at low injury and
 // overtraining risk; the target is simply meeting the ACSM/WHO/AHA 150 min/week
 // moderate-activity guideline consistently. Slow, sustainable progression.
 const KEY = 'zone2-base'

@@ -17,6 +17,7 @@ const getOuraDailyDerived = empty()
 const getOuraDailySummary = empty()
 const getWorkoutSessionsFrom = empty()
 const getUserById = vi.fn(async (_u: string) => ({ dob: null }) as unknown)
+const getUserGoals = vi.fn(async (_u: string) => ({ stepsGoal: null }))
 const upsertAiHealthInsight = vi.fn(async () => undefined)
 const readFreshInsight = vi.fn(async (..._a: unknown[]) => null as string | null)
 const generateText = vi.fn(async (_o: unknown) => ({ text: '  a measured reading  ' }))
@@ -26,7 +27,7 @@ let userId = 'u-0'
 vi.mock('@/auth', () => ({ auth: async () => ({ user: { id: userId, timezone: 'Australia/Brisbane' } }) }))
 const repo = () => ({
   getOuraDaily, listSleepSessions, listBodyMetrics, getOuraDailyDerived, getOuraDailySummary,
-  getWorkoutSessionsFrom, getUserById, upsertAiHealthInsight,
+  getWorkoutSessionsFrom, getUserById, getUserGoals, upsertAiHealthInsight,
 })
 vi.mock('@/lib/data', () => ({ getRepository: async () => repo(), getRepositoryAsync: async () => repo() }))
 vi.mock('ai', () => ({ generateText: (o: unknown) => generateText(o) }))

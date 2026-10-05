@@ -2,6 +2,7 @@ import { getLocalStore } from './index';
 import { reconcileDeadLetters } from './dead-letter-signal';
 import { resolveFailedOutboxIds, serverBackoffMs, buildWorkoutLogPayload } from './sync-helpers';
 import type { SyncDelta } from '@/lib/data/repository';
+import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role';
 import type {
   LocalBodyMetric, LocalMoodLog, LocalSleepSession,
   LocalWorkoutSession, LocalActivityLog, LocalFitnessTest, LocalPrescribedRun, LocalProgram, LocalProgressionStyle,
@@ -176,7 +177,9 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     syncStatus:  'synced' as const,
     // Q-131: present on both ends' schemas but dropped here, so a restored device replayed its
     // outbox with no program-session link and fell back to matching by name.
-    sessionId:      r.sessionId ? String(r.sessionId) : null,
+    // LA-137: the server's `session_id` column is the Drizzle property `programSessionId`, so that is
+    // the key the pull JSON carries. Reading `r.sessionId` alone bound NULL over the link on every pull.
+    sessionId:      (r.programSessionId ?? r.sessionId) ? String(r.programSessionId ?? r.sessionId) : null,
     intensityMode:  r.intensityMode ? String(r.intensityMode) : null,
     wasOverride:    Boolean(r.wasOverride),
   } satisfies LocalWorkoutSession));
@@ -389,6 +392,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     gateAction:    r.gateAction != null ? String(r.gateAction) : 'proceed',
     status:        (r.status as LocalPrescribedRun['status']) ?? 'pending',
     activityLogId: r.activityLogId != null ? String(r.activityLogId) : null,
+    completedAs:   r.completedAs === 'run' || r.completedAs === 'walk' ? r.completedAs : null,
     updatedAt:     toIso(r.updatedAt),
     deletedAt:     r.deletedAt ? toIso(r.deletedAt) : null,
     syncStatus:    'synced' as const,
@@ -424,7 +428,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     styleId:      r.styleId ? String(r.styleId) : null,
     muscleGroups: (r.muscleGroups as string[]) ?? [],
     position:     Number(r.position),
-    exerciseRole: String(r.exerciseRole ?? 'primary'),
+    exerciseRole: String(r.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE),
     supersetGroup: r.supersetGroup != null ? Number(r.supersetGroup) : null,
   } satisfies LocalSessionExercise));
 
@@ -577,9 +581,13 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     illnessContext:            (r.illnessContext as LocalDayCheckin['illnessContext']) ?? null,
     perceivedRecoveryTouched:  Boolean(r.perceivedRecoveryTouched),
     sleepQualityFeelTouched:   Boolean(r.sleepQualityFeelTouched),
-    vsYesterday:       (r.vsYesterday as import('@trainingai/shared/types/day-checkin').VsYesterday) ?? null,
+    vsNormal:       (r.vsNormal as import('@trainingai/shared/types/day-checkin').VsNormal) ?? null,
+    vsQuestion:     (r.vsQuestion as import('@trainingai/shared/types/day-checkin').VsQuestion) ?? null,
     soreMuscles:       (r.soreMuscles as string[]) ?? [],
     journal:           r.journal ? String(r.journal) : null,
+    // LA-137: selected by the server and never mapped, so a completion made on another device never
+    // arrived (applyDelta COALESCEs this column, so the local value survived; the remote one did not).
+    foodLoggingCompletedAt: r.foodLoggingCompletedAt ? toIso(r.foodLoggingCompletedAt) : null,
     updatedAt:         toIso(r.updatedAt),
     deletedAt:         r.deletedAt ? toIso(r.deletedAt) : null,
     syncStatus:        'synced' as const,
@@ -638,6 +646,12 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     answeredAt:  r.answeredAt ? String(r.answeredAt) : null,
     updatedAt:   r.updatedAt ? String(r.updatedAt) : null,
     deletedAt:   r.deletedAt ? String(r.deletedAt) : null,
+    estCalories: r.estCalories == null ? null : Number(r.estCalories),
+    estProteinG: r.estProteinG == null ? null : Number(r.estProteinG),
+    estCarbsG:   r.estCarbsG == null ? null : Number(r.estCarbsG),
+    estFatG:     r.estFatG == null ? null : Number(r.estFatG),
+    estBiasKcal: r.estBiasKcal == null ? null : Number(r.estBiasKcal),
+    estBasis:    r.estBasis == null ? null : String(r.estBasis),
   } satisfies LocalPlanMealAnswer));
 
   const count = bodyMetrics.length + moodLogs.length + sleepSessions.length +

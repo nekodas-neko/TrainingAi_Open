@@ -15,7 +15,7 @@ import type {
   MealPlan, MealPlanMeal, DietaryRestriction, UserDietaryRestriction, DietarySeverity,
 } from '@trainingai/shared/types/nutrition'
 import type {
-  CreateMealPlanInput, UpdateMealPlanInput, UpdateMealInput, ReplaceStructureInput, PlanMealAnswer,
+  CreateMealPlanInput, UpdateMealPlanInput, UpdateMealInput, ReplaceStructureInput, PlanMealAnswer, EstimateToStore,
 } from './postgres/slices/meal-plans'
 import type { Friendship, Season } from '@trainingai/shared/types/friends'
 import type {
@@ -355,10 +355,13 @@ export interface PrescribedRun {
   targetHrLow: number | null; targetHrHigh: number | null; targetZoneIds: number[]
   rationale: string; gateAction: string; status: 'pending' | 'completed' | 'skipped'
   activityLogId: string | null; updatedAt: Date
+  /** LB-179: how it was satisfied; null = before this was tracked, i.e. a run. */
+  completedAs: 'run' | 'walk' | null
 }
 export interface PrescribedRunUpdate {   // Zod-whitelisted PATCH body — never a raw request body into .set()
   status?: 'completed' | 'skipped'
   activityLogId?: string | null
+  completedAs?: 'run' | 'walk' | null
 }
 
 export interface IncomingMutation {
@@ -698,7 +701,7 @@ export interface WorkoutRepository {
   getActiveRunningPlan(userId: string): Promise<RunningPlan | null>
   saveRunningPlan(userId: string, plan: Omit<RunningPlan, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { id?: string }): Promise<RunningPlan>
   getPrescribedRuns(userId: string, from: string, to: string): Promise<PrescribedRun[]>
-  upsertPrescribedRun(userId: string, run: Omit<PrescribedRun, 'userId' | 'updatedAt'>): Promise<PrescribedRun>
+  upsertPrescribedRun(userId: string, run: Omit<PrescribedRun, 'userId' | 'updatedAt' | 'completedAs'>): Promise<PrescribedRun>
   updatePrescribedRun(userId: string, id: string, patch: PrescribedRunUpdate): Promise<PrescribedRun | null>
   listActivityTypes(): Promise<ActivityType[]>
   createActivityType(data: { label: string; icon: string; isDistanceBased: boolean; sortOrder: number }): Promise<ActivityType>
@@ -753,6 +756,9 @@ export interface WorkoutRepository {
   listRecentPersonalRecords(userId: string, from: Date, to: Date): Promise<{ exerciseName: string; estimated1rm: number; achievedAt: Date; exerciseType: string | null }[]>
   // All-time best estimated1rm per exercise, keyed by exercise name.
   listPersonalRecords(userId: string): Promise<Map<string, number>>
+  // LB-95: every all-time record WITH the date it was achieved, newest first — for a surface that
+  // must say when each value was read. `listPersonalRecords` drops the date and keeps its callers.
+  listPersonalRecordsDated(userId: string): Promise<{ exerciseName: string; estimated1rm: number; achievedAt: Date }[]>
   // All-time max reps logged per exercise, keyed by exercise name.
   listMaxReps(userId: string): Promise<Map<string, number>>
   // Second-most-recent estimated 1RM per exercise, keyed by exercise name (for trend detection).
@@ -879,6 +885,10 @@ export interface WorkoutRepository {
   listStepDayKeys(userId: string, from: string, to: string): Promise<string[]>
   /** RV-63 — dates with a recorded sleep duration. See `listStepDayKeys`. */
   listSleepDayKeys(userId: string, from: string, to: string): Promise<string[]>
+  /** PS-49 — the collection v2 faucets. Narrow on purpose (RV-63): a date, and steps where needed. */
+  listStepTotals(userId: string, from: string, to: string): Promise<{ date: string; steps: number }[]>
+  listFoodLogDayKeys(userId: string, from: string, to: string): Promise<string[]>
+  listWeightDayKeys(userId: string, from: string, to: string): Promise<string[]>
   /** The chosen rest days in `[from, to]`, ascending — dates only, `YYYY-MM-DD`. */
   listRestDays(userId: string, from: string, to: string): Promise<string[]>
 
@@ -960,6 +970,8 @@ export interface WorkoutRepository {
   /** Undo a decline. Soft, so the reversal reaches a device that has not synced. */
   deletePlanMealAnswer(userId: string, planMealId: string, logDate: string): Promise<boolean>
   listPlanMealAnswers(userId: string, logDate: string): Promise<PlanMealAnswer[]>
+  /** BF-203a. Store estimates for one local day, never over an existing live answer. Returns how many were new. */
+  upsertEstimatedAnswers(userId: string, logDate: string, estimates: readonly EstimateToStore[], basis: string): Promise<number>
   listDietaryRestrictions(): Promise<DietaryRestriction[]>
   listUserDietaryRestrictions(userId: string): Promise<UserDietaryRestriction[]>
   replaceUserDietaryRestrictions(userId: string, entries: { restrictionId: string; severity: DietarySeverity }[]): Promise<UserDietaryRestriction[]>
@@ -1052,6 +1064,9 @@ export interface WorkoutRepository {
    *  Windowed on the ingest-stamped measured_at (no anchor math) — feeds the admin device-metrics
    *  compute-on-read route. Rows with a null decoded/measured_at are excluded. */
   getOuraRawSamplesForTags(userId: string, tags: number[], days: number): Promise<OuraRawSampleRow[]>
+  /** TN-56: raw frames by tag and ring-clock range, across both tiers (hot and packed). Read-only,
+   *  for the admin replay; the rollup reads through its own IO. */
+  readOuraRawFrames(userId: string, q: import('./postgres/slices/oura-raw-frames').RawFrameQuery): Promise<import('./postgres/slices/oura-raw-frames').RawFrameRow[]>
   /** Phase-B feasibility probe: what motion/HR the ring captured during one workout's window
    *  (accel-chunk coverage, HR count, raw tags present) — tells us whether the neural energy
    *  model's inputs are capturable during waking workouts. Read-only diagnostic. */
@@ -1172,6 +1187,10 @@ export interface WorkoutRepository {
   deleteSupplementVial(id: string, userId: string): Promise<boolean>
   /** RV-45: false when nothing matched. */
   unlogSupplement(supplementId: string, userId: string, date: string): Promise<boolean>
+  /** TN-46: administered doses of VIAL-DOSED supplements in [from, to]. The dose is the log's own
+   *  `amount`/`unit`, never `supplements.dose` (the vial). Vial-dosed only, so a daily oral
+   *  supplement does not annotate every day. */
+  listDoseEvents(userId: string, from: string, to: string): Promise<import('@trainingai/shared/health/dose-context').DoseEvent[]>
 
   // ── AI Periodization ───────────────────────────────────────────────────────
   getSessionPeriodization(userId: string, programSessionId: string): Promise<SessionPeriodization | null>
@@ -1187,6 +1206,8 @@ export interface WorkoutRepository {
   advancePhase(userId: string, programSessionId: string, newPhase: PeriodizationPhase): Promise<SessionPeriodization>
   /** `status` is written atomically with the prescription — see the slice for why (Q-54). */
   storePrescription(userId: string, programSessionId: string, prescription: AiPrescription, expiresAt: Date, status?: PrescriptionStatus): Promise<void>
+  /** BF-199 Phase 1. Evidence only: nothing reads it to decide anything. */
+  recordPrescriptionShadow(userId: string, programSessionId: string, shadow: import('@trainingai/shared/ai-periodization/prescription-shadow').PrescriptionShadow): Promise<void>
   clearProgramPrescriptions(userId: string, programId: string): Promise<void>
   updatePrescriptionStatus(userId: string, programSessionId: string, status: PrescriptionStatus): Promise<void>
   updatePrescriptionExercisesCache(userId: string, programSessionId: string, prescription: AiPrescription): Promise<void>

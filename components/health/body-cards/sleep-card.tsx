@@ -8,6 +8,8 @@ import { useTransitionRouter } from "@/lib/view-transition";
 import { actualSleepWindow } from "@/lib/sleep/actual-window";
 import type { SleepRow } from "@/app/health/health-sections";
 import { ProvisionalBadge } from "@/components/health/provisional-badge";
+import type { SleepScoreCoverage } from "@trainingai/shared/health/sleep-score";
+import { sleepCoverageNote } from "./sleep-coverage-note";
 
 interface Props {
   recentSleep: SleepRow | null;
@@ -16,13 +18,15 @@ interface Props {
    *  Home chip shows. The stored sleep_sessions.sleep_score is Cloud-only (NULL on
    *  BLE nights) and is kept only as a fallback. */
   computedSleepScore: number | null;
+  /** OR-204: how complete the computed score's inputs were; null for a fallback score. */
+  sleepScoreCoverage?: SleepScoreCoverage | null;
   metaLoading: boolean;
   onOpenSheet: () => void;
 }
 
 // The Body tab's Sleep card — extracted from health-sections.tsx (Task 4.4) as a
 // pure move, no behaviour change.
-export function SleepCard({ recentSleep, lastSleep, computedSleepScore, metaLoading, onOpenSheet }: Props) {
+export function SleepCard({ recentSleep, lastSleep, computedSleepScore, sleepScoreCoverage, metaLoading, onOpenSheet }: Props) {
   const userTz = useUserTimezone();
   const router = useTransitionRouter();
   // Warm the detail route before it's tapped — see oura-score-chip-row.
@@ -80,6 +84,14 @@ export function SleepCard({ recentSleep, lastSleep, computedSleepScore, metaLoad
           <span className="text-[9px] text-muted-foreground opacity-60">↗</span>
         </div>
       </div>
+      {(() => {
+        // OR-204: say so when the score stands on incomplete inputs, and how much. Only for our own
+        // computed score; a stored fallback has no coverage to report.
+        const note = computedSleepScore != null ? sleepCoverageNote(sleepScoreCoverage) : null;
+        return note ? (
+          <p className={`text-[9px] mb-1 ${note.strong ? "text-amber-400" : "text-muted-foreground"}`}>{note.text}</p>
+        ) : null;
+      })()}
       {recentSleep ? (
         <div className="space-y-1.5">
           <div className="flex gap-1.5 flex-wrap">

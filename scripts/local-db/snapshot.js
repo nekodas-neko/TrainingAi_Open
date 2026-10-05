@@ -170,6 +170,12 @@ async function main() {
         [table],
       )
       const jsonCols = new Set(typeRows.map(r => r.column_name))
+      const { rows: byteaRows } = await client.query(
+        `SELECT column_name FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = $1 AND data_type = 'bytea'`,
+        [table],
+      )
+      const byteaCols = new Set(byteaRows.map(r => r.column_name))
       // Batched parameterized INSERTs rather than the binary COPY protocol — no new dependency,
       // and 500 rows/statement keeps each within Postgres's bind-parameter limits comfortably.
       const BATCH = 500
@@ -179,7 +185,7 @@ async function main() {
         const values = []
         const tuples = batch.map((row, ri) => {
           const placeholders = columns.map((c, ci) => {
-            values.push(jsonCols.has(c) && row[c] != null ? JSON.stringify(row[c]) : row[c])
+            values.push(restoreValue(row[c], { json: jsonCols.has(c), bytea: byteaCols.has(c) }))
             return `$${ri * columns.length + ci + 1}`
           })
           return `(${placeholders.join(', ')})`
@@ -253,11 +259,31 @@ async function main() {
   }
 }
 
+/**
+ * One NDJSON value, back into what its column needs.
+ * - json/jsonb: stringified, because node-postgres binds a JS array as an ARRAY literal.
+ * - bytea: the export serialises a Buffer as `{"type":"Buffer","data":[…]}`, and binding that object
+ *   stored its JSON TEXT as the bytes. Every `oura_raw_packed.blob` in a local snapshot was
+ *   corrupt (TN-56 found it: `frame-pack: unsupported format version 0x7b`, 0x7b being `{`).
+ *   A `\x…` hex string, Postgres's own text form, is accepted too.
+ */
+function restoreValue(v, { json, bytea }) {
+  if (v == null) return v
+  if (bytea) {
+    if (typeof v === 'object' && v.type === 'Buffer' && Array.isArray(v.data)) return Buffer.from(v.data)
+    if (typeof v === 'string' && v.startsWith(String.raw`\x`)) return Buffer.from(v.slice(2), 'hex')
+    return v
+  }
+  return json ? JSON.stringify(v) : v
+}
+
 function quoteIdent(id) {
   return `"${String(id).replace(/"/g, '""')}"`
 }
 
-main().catch(err => {
+if (require.main === module) main().catch(err => {
   console.error('[snapshot] failed:', err.message ?? err)
   process.exit(1)
 })
+
+module.exports = { restoreValue }

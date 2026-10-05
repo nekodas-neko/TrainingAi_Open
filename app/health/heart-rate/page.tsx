@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { HeartIcon, HistoryIcon } from "lucide-react";
 import { cachedFetch, cachedFetchToday, readCacheSync, readTodayCacheSync } from "@/lib/sqlite/cache";
-import { HEALTH_TRENDS_SUMMARY_TTL, READINESS_SCORE_TTL, TTL_MEDIUM } from '@trainingai/shared/cache-ttl';
+import { HEALTH_TRENDS_SUMMARY_TTL, HR_PROFILE_TTL, READINESS_SCORE_TTL, TTL_MEDIUM } from '@trainingai/shared/cache-ttl';
 import { todayInTz, formatDayShort } from "@trainingai/shared/date-utils";
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { useStressDay } from "@/lib/hooks/use-stress-day";
@@ -14,6 +14,8 @@ import { DetailHero, usePageGradient, useHeroColorScheme } from "@/components/he
 import { TrendSparkline } from "@/components/health/trend-sparkline-lazy";
 import { ObservedHrCard } from "@/components/health/observed-hr-card";
 import { HrFactorsCard } from "@/components/health/hr-factors-card";
+import { gradeHeartRate, type HrProfileInput } from "@/components/health/hr-grade";
+import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { ProgressMarkersCard } from "@/components/health/progress-markers-card";
 import type { HrSleepWindow } from "@trainingai/shared/health/hr-sleep-band";
 
@@ -33,6 +35,7 @@ export default function HeartRateDetailPage() {
   const [data, setData] = useState<ReadinessScoreResponse | null>(null);
   const [trends, setTrends] = useState<HealthTrendsResponse | null>(null);
   const [hrReadings, setHrReadings] = useState<HrReading[]>([]);
+  const [hrFailed, setHrFailed] = useState(false);
   const [sleepWindow, setSleepWindow] = useState<HrSleepWindow | null>(null);
   // Seed synchronously from cache before paint — in a useLayoutEffect, never a useState lazy
   // initializer (cache reads in initializers caused hydration mismatches, session 165). The
@@ -67,17 +70,32 @@ export default function HeartRateDetailPage() {
       d => {
         if (d?.readings?.length) setHrReadings(d.readings)
         setSleepWindow(d?.sleep ?? null)
+        setHrFailed(false)
       },
+      // LB-176 — same line, same fix as `hr-day-card.tsx`: do not explain an absence that did not
+      // happen. This page is the sibling surface for that card and carries the identical copy.
+      { onError: () => setHrFailed(true) },
     ).catch(() => {});
   }, [today]);
+
+  // TN-32 — the same key, route and TTL every other HR surface uses, so there is one canonical
+  // freshness for the profile rather than a second opinion on this page. `useCachedValue` rather
+  // than a mount-time `cachedFetch`: a fetch-once effect holds its first payload for the life of
+  // the process, so a resting-HR baseline that moved would grade against the old bands until the
+  // app was killed (Q-402).
+  const hrProfile = useCachedValue<HrProfileInput>('hr-profile', '/api/hr-profile', HR_PROFILE_TTL);
 
   const scheme = useHeroColorScheme();
   const pageGradient = usePageGradient("heart-rate");
   const hr = data?.hrCurrent ?? null;
-  const hrZoneLabel = hr != null ? (hr < 60 ? "Resting" : hr < 100 ? "Normal" : "Elevated") : null;
-  const hrColor = hr != null
-    ? hr < 60 ? "#22c55e" : hr < 100 ? "#f87171" : "#f59e0b"
-    : scheme === "light" ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.7)";
+  // TN-32. Was `<60 Resting / <100 Normal / else Elevated` with its own three colours — the only
+  // place in the app a heart rate was graded without the user's own resting and max, and it painted
+  // 60–100 a red the zone palette uses for nothing in that range. Now the bands and the colours are
+  // both the user's own, and with no profile there is no grade rather than an invented one.
+  const hrGrade = gradeHeartRate(hr, hrProfile);
+  const neutralColor = scheme === "light" ? "rgba(0,0,0,0.5)" : "rgba(255,255,255,0.7)";
+  const hrZoneLabel = hrGrade?.label ?? null;
+  const hrColor = hrGrade?.color ?? neutralColor;
   const labelColor = scheme === "light" ? "rgba(0,0,0,0.55)" : "rgba(255,255,255,0.6)";
 
   const stats = [
@@ -143,7 +161,11 @@ export default function HeartRateDetailPage() {
           {hrReadings.length > 0 ? (
             <HrDayChart readings={hrReadings} date={today} sleepWindow={sleepWindow} stressSeries={stress?.series} stressTimezone={tz} />
           ) : (
-            <p className="text-xs text-muted-foreground">No HR captured yet today — the ring records periodically while worn.</p>
+            <p className="text-xs text-muted-foreground">
+              {hrFailed
+                ? "Couldn't load today's heart rate."
+                : 'No HR captured yet today — the ring records periodically while worn.'}
+            </p>
           )}
         </div>
 

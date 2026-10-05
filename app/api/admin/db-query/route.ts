@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { auth } from '@/auth'
 import { getPool } from '@/lib/data/postgres/client'
-import { getReadonlyPool, isReadonlyDbConfigured, describeReadonlyConnection } from '@/lib/data/postgres/readonly-client'
-import { requireAdmin, adminFailureOutcome } from '@/lib/admin'
-import { rateLimit } from '@/lib/rate-limit'
-import { safeCompare } from '@/lib/security/constant-time'
+import { getReadonlyPool, isReadonlyDbConfigured, describeReadonlyConnection, runScoped } from '@/lib/data/postgres/readonly-client'
+import { authorizeAdminRequest } from '@/lib/admin/claude-token-auth'
 import { reportServerError } from '@/lib/observability'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { clientIp } from '@trainingai/shared/http/client-ip'
@@ -33,44 +30,9 @@ const MAX_ROWS = 1000
 /** Serialised-payload ceiling, so a wide SELECT can't return tens of megabytes. */
 const MAX_BYTES = 5_000_000
 
-type AuthOutcome =
-  | { ok: true; via: 'session' | 'token' }
-  | { ok: false; status: number; error: string }
-
-async function authorize(req: NextRequest): Promise<AuthOutcome> {
-  const bearer = req.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1]
-
-  if (bearer) {
-    const ip = clientIp(req)
-    // Bound every attempt per IP BEFORE the compare so a brute-force can't run at full throughput,
-    // and return the same 401 on trip as for a bad token.
-    if (!rateLimit(`db-query-token:${ip}`, 10, 60_000)) {
-      return { ok: false, status: 401, error: 'Unauthorized' }
-    }
-    const expected = process.env.CLAUDE_DB_QUERY_SECRET
-    const exportUserId = process.env.ADMIN_EXPORT_USER_ID ?? process.env.WEBHOOK_USER_ID
-    if (!expected || !exportUserId || !safeCompare(bearer, expected)) {
-      return { ok: false, status: 401, error: 'Unauthorized' }
-    }
-    // The token names a caller; it does not confer a role. The user it resolves to must be an admin.
-    try {
-      await requireAdmin(exportUserId)
-    } catch (err) {
-      return adminFailureOutcome(err)
-    }
-    return { ok: true, via: 'token' }
-  }
-
-  const session = await auth()
-  const userId = session?.user?.id
-  if (!userId) return { ok: false, status: 401, error: 'Unauthorized' }
-  try {
-    await requireAdmin(userId, session.user?.isAdmin)
-  } catch (err) {
-    return adminFailureOutcome(err)
-  }
-  return { ok: true, via: 'session' }
-}
+/** The shared admin authorisation (session, or the Claude token resolving to an admin). The rate
+ *  key prefix is this route's own, unchanged from before the helper existed. */
+const authorize = (req: NextRequest) => authorizeAdminRequest(req, 'db-query-token')
 
 /** Best-effort audit row. A logging failure must never change the response. */
 async function logQuery(entry: {
@@ -121,7 +83,10 @@ export async function POST(req: NextRequest) {
     // Wrapping in a subquery bounds ANY submitted query without parsing it. MAX_ROWS + 1 detects
     // truncation rather than silently returning a capped set as if it were complete.
     const wrapped = `SELECT * FROM (${sql.replace(/;\s*$/, '')}) _q LIMIT ${MAX_ROWS + 1}`
-    const result = await getReadonlyPool().query(wrapped)
+    // RV-190: through `runScoped`, never `pool.query`. The role's read-only flag, statement
+    // timeout and owner scope are session DEFAULTS that a submitted query can simply `SET` — and
+    // on a pool that is never reset, the override rode the connection into the next request.
+    const result = await runScoped(getReadonlyPool(), wrapped)
 
     const truncated = result.rows.length > MAX_ROWS
     const rows = truncated ? result.rows.slice(0, MAX_ROWS) : result.rows
@@ -162,7 +127,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const { rows } = await getReadonlyPool().query(`
+    const { rows } = await runScoped(getReadonlyPool(), `
       SELECT table_name, column_name, data_type
       FROM information_schema.columns
       WHERE table_schema = 'claude_ro'

@@ -154,9 +154,10 @@ export const EnergyCard = memo(function EnergyCard({
             <span className="flex-1" />
             {earnedKcal != null && earnedKcal > 0 && (
               // The same addend the zone bar names, taken from the same call, so the ring and the
-              // bar below cannot disagree about it.
+              // bar below cannot disagree about it. RV-218: "earned", not "burned". The Day screen's
+              // "Burned" is the whole day's expenditure, and one word for two numbers read as a disagreement.
               <span className="text-[11px] tabular-nums text-muted-foreground">
-                +{Math.round(earnedKcal).toLocaleString()} burned
+                +{Math.round(earnedKcal).toLocaleString()} earned
               </span>
             )}
           </div>
@@ -214,7 +215,7 @@ export const EnergyCard = memo(function EnergyCard({
             <button
               type="button"
               onClick={() => setShowInfo(v => !v)}
-              aria-label="How energy balance is calculated"
+              aria-label="How today's calorie budget is calculated"
               aria-expanded={showInfo}
               className="-m-1 rounded-full p-2.5 text-muted-foreground/70 transition-colors hover:text-muted-foreground"
             >

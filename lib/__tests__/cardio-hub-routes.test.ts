@@ -34,6 +34,7 @@ const getZoneMinutesRange = vi.fn(async (..._a: unknown[]) => [] as Day[])
 const listActivityLogs = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getHrForWindow = vi.fn(async (..._a: unknown[]) => [] as { bpm: number; timestamp: Date; source: string | null }[])
 const getObservedHrProfile = vi.fn(async (..._a: unknown[]) => computeObservedHr([]))
+const getUserGoals = vi.fn(async (_u: string) => ({ stepsGoal: null as number | null }))
 const getUserById = vi.fn(async (_u: string) => ({ dateOfBirth: '1990-01-01', heightCm: 180, sex: 'male', activityLevel: 'moderate' }) as Row | null)
 const listBodyMetrics = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getActiveRunningPlan = vi.fn(async (_u: string) => null as Row | null)
@@ -44,7 +45,7 @@ vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser 
 vi.mock('@/lib/data', () => {
   // Built inside the factory: `vi.mock` is hoisted above the consts above.
   const repo = async () => ({
-    getZoneMinutesRange, listActivityLogs, getHrForWindow, getObservedHrProfile, getUserById,
+    getZoneMinutesRange, listActivityLogs, getHrForWindow, getObservedHrProfile, getUserById, getUserGoals,
     listBodyMetrics, getActiveRunningPlan, getDayExerciseNames,
   })
   return { getRepository: repo, getRepositoryAsync: repo }
@@ -250,6 +251,14 @@ describe('/api/cardio-week', () => {
 
     expect(body.steps.weekGoal).toBe(body.steps.todayGoal * 7)
     expect(body.steps.weekGoalSoFar).toBe(body.steps.todayGoal * 3)
+  })
+
+  // Q-524: the steps target is the user's own goal when they set one.
+  it('uses the step goal the user set for today and the week', async () => {
+    getUserGoals.mockResolvedValueOnce({ stepsGoal: 7000 })
+    const body = await (await getWeek()).json()
+    expect(body.steps.todayGoal).toBe(7000)
+    expect(body.steps.weekGoal).toBe(49000)
   })
 
   // Q-88: either a lifting session or any logged cardio means today was not a lazy day.

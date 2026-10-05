@@ -87,6 +87,11 @@ survives from one PR to the next. The shape that gives it:
   rehearsal, and snapshot when a bug needs real data.** The fresh seed is exactly what hides drifted
   production rows. A load on 2026-09-28 brought 120 sessions, 1,317 sets, 127 nights and 91 Body
   Battery days.
+- **Rebuild the suite database when you switch between branches that carry different migrations.**
+  A branch's migration stays applied after you leave it. Measured 2026-09-28: LA-159's 293 was still in
+  `trainingai_lane_a` when LA-142's branch ran, so that branch's `claude-ro-views.sql` (built without
+  293) failed to apply, and 11 `claude_ro`/export tests failed for a reason that was not in the diff.
+  `pnpm db:rebuild` on the switch is about 20 s and takes the question away.
 - **vitest does not read `.env.local`.** A DB-gated test skips quietly unless `DATABASE_URL` is
   exported, even in the lane worktree. Run the suite as
   `DATABASE_URL=postgresql://postgres:postgres@localhost:5434/trainingai_lane_a DATABASE_SSL=false npx vitest run`.

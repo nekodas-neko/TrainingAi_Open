@@ -33,6 +33,22 @@ describe('backlog lane resolution', () => {
     ])).toBe('B')
   })
 
+  // RV-208, 2026-09-30: the prose QUOTED the field form, so "the field wins" chose the quotation.
+  it('lets the bullet that declares the lane outrank a quoted field in the prose', () => {
+    expect(laneFromLines([
+      '  **➡ MOVED OUT 2026-09-28 to `LB-183` (`Lane: A`).** It stayed described here.',
+      '- **Lane: B.** One PR.',
+    ])).toBe('B')
+    expect(laneFromLines([
+      '  scoring change, filed as **`OR-200`** (`Lane: T`).',
+      '- **Lane: B** — nothing to build.',
+    ])).toBe('B')
+    expect(laneFromLines([
+      '  `Lane: O` as work, not behind a gate that hides it.',
+      '- **Lane:** B',
+    ])).toBe('B')
+  })
+
   it('still takes the first field when an entry states one twice', () => {
     expect(laneFromLines(['- **Lane:** A', '- **Lane:** B'])).toBe('A')
   })

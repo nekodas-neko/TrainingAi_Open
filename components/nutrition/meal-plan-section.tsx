@@ -4,7 +4,8 @@ import { memo, useState, type CSSProperties } from 'react'
 import { ChevronDown, UtensilsCrossed, BookmarkPlus, Loader2, CheckCheck } from 'lucide-react'
 import { cn } from '@trainingai/shared/utils'
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
-import type { MealPlan, MealPlanVariant, MealPlanMeal, MealPlanDayType, MealType } from '@trainingai/shared/types/nutrition'
+import type { MealPlan, MealPlanMeal, MealType } from '@trainingai/shared/types/nutrition'
+import { pickPlanVariant } from '@trainingai/shared/nutrition/plan-variant'
 import { fillableMeals } from './plan-day-fill'
 import { rescaleRemaining } from './plan-rescale'
 import { PlanMealRow } from './plan-meal-row'
@@ -133,7 +134,7 @@ export const MealPlanSection = memo(function MealPlanSection({
     )
   }
 
-  const variant = pickVariant(plan, isTrainingDay)
+  const variant = pickPlanVariant(plan, isTrainingDay)
   // A meal with no ingredients has nothing to copy — plans generated before Q-192 stored only names
   // and macros, and a saved meal built from those would be an empty recipe.
   const unsaved = variant.meals.filter(m => m.savedMealId == null && m.ingredients.length > 0)
@@ -297,20 +298,6 @@ export const MealPlanSection = memo(function MealPlanSection({
     </div>
   )
 })
-
-/**
- * Which variant applies today. A plan with no split has one 'all' variant; a split plan is keyed
- * off the caller's `isTrainingDay`, which comes from the user's existing schedule. Falls back to
- * the first variant so an unexpected shape renders something rather than nothing.
- */
-function pickVariant(plan: MealPlan, isTrainingDay?: boolean): MealPlanVariant {
-  const byType = (t: MealPlanDayType) => plan.variants.find(v => v.dayType === t)
-  return (
-    byType('all')
-    ?? (isTrainingDay ? byType('training') : byType('rest'))
-    ?? plan.variants[0]
-  )
-}
 
 function MacroRow(
   { label, eaten, target, color }:

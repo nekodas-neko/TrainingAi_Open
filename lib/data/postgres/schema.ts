@@ -1,7 +1,7 @@
 import {
   pgTable, text, boolean, timestamp, uuid,
   integer, doublePrecision, date, time, primaryKey, unique, uniqueIndex, jsonb, bigint, bigserial, smallint,
-  customType,
+  customType, check, index,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
@@ -62,6 +62,14 @@ export const invitedEmails = pgTable('invited_emails', {
   email:     text('email').primaryKey(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+// LA-61 (migration 296): the undo record for the email backfill. Nothing reads it in the app.
+export const emailNormalisationPreimage = pgTable('email_normalisation_preimage', {
+  tableName:  text('table_name').notNull(),
+  oldEmail:   text('old_email').notNull(),
+  newEmail:   text('new_email').notNull(),
+  recordedAt: timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.tableName, t.oldEmail] })])
 
 export const progressionStyles = pgTable('progression_styles', {
   id:        uuid('id').primaryKey().defaultRandom(),
@@ -132,7 +140,6 @@ export const programSessions = pgTable('program_sessions', {
 
 export const programPhases = pgTable('program_phases', {
   id:               uuid('id').primaryKey().defaultRandom(),
-  programId:        uuid('program_id').references(() => programs.id, { onDelete: 'cascade' }),
   phaseSetId:       uuid('phase_set_id').references(() => phaseSets.id, { onDelete: 'cascade' }),
   position:         integer('position').notNull(),
   name:             text('name').notNull(),
@@ -150,7 +157,7 @@ export const sessionExercises = pgTable('session_exercises', {
   styleId:      uuid('style_id').references(() => progressionStyles.id, { onDelete: 'set null' }),
   muscleGroups: text('muscle_groups').array().notNull().default([]),
   position:     integer('position').notNull(),
-  exerciseRole: text('exercise_role').notNull().default('primary'),
+  exerciseRole: text('exercise_role').notNull().default('accessory'), // BF-15: unclassified under-loads
   supersetGroup: smallint('superset_group'),
   deletedAt:    timestamp('deleted_at', { withTimezone: true }),
   updatedAt:    timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
@@ -451,6 +458,8 @@ export const prescribedRuns = pgTable('prescribed_runs', {
   gateAction:    text('gate_action').notNull().default('proceed'),
   status:        text('status').notNull().default('pending'),
   activityLogId: uuid('activity_log_id').references(() => activityLogs.id, { onDelete: 'set null' }),
+  /** LB-179: 'run' | 'walk' | null (null = completed before this was tracked, i.e. a run). */
+  completedAs:   text('completed_as'),
   createdAt:     timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:     timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt:     timestamp('deleted_at', { withTimezone: true }),
@@ -639,7 +648,9 @@ export const dayCheckins = pgTable('day_checkins', {
   // answered, and there is deliberately NO DEFAULT — a neutral stored as an answer is the bug
   // TN-57 fixed on the scales above, and this is the question meant to escape it. It needs no
   // `*_touched` twin either: the control has no seeded position that leaving it alone would accept.
-  vsYesterday:               text('vs_yesterday'),
+  vsNormal:               text('vs_normal'),
+  // LB-190. Which question vs_normal answered: 1 "compared to yesterday", 2 "compared to normal".
+  vsQuestion:             smallint('vs_question'),
   soreMuscles:       text('sore_muscles').array().notNull().default([]),
   journal:           text('journal'),
   /** Q-387 — "I have finished logging today". NULL means not marked, which the maintenance
@@ -854,6 +865,14 @@ export const planMealAnswers = pgTable('plan_meal_answers', {
   logDate:    date('log_date').notNull(),
   answer:     text('answer').notNull().default('no'),
   answeredAt: timestamp('answered_at', { withTimezone: true }).notNull().defaultNow(),
+  // BF-203a. Set only when `answer = 'estimated'`; a DB constraint enforces the pairing. The bias and
+  // basis record how the estimate was made, so it can be explained later without re-deriving it.
+  estCalories: integer('est_calories'),
+  estProteinG: doublePrecision('est_protein_g'),
+  estCarbsG:   doublePrecision('est_carbs_g'),
+  estFatG:     doublePrecision('est_fat_g'),
+  estBiasKcal: integer('est_bias_kcal'),
+  estBasis:    text('est_basis'),
   // Undo is a soft delete: "no" is one mis-tap from losing the meal for the day, and a hard DELETE
   // would never reach a device that has not synced.
   deletedAt:  timestamp('deleted_at', { withTimezone: true }),
@@ -1067,6 +1086,19 @@ export const appLoadMetrics = pgTable('app_load_metrics', {
 
 // AI call observability — one row per @ai-sdk/google model call (metadata only,
 // written best-effort by lib/ai/instrument.ts). See migration 136.
+/** BF-199 Phase 1 — the given prescription beside the rules prescriber's, per model call. Evidence only. */
+export const prescriptionShadow = pgTable('prescription_shadow', {
+  id:               uuid('id').primaryKey().defaultRandom(),
+  userId:           uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  programSessionId: uuid('program_session_id').references(() => programSessions.id, { onDelete: 'set null' }),
+  modelPhase:       text('model_phase').notNull(),
+  modelPhaseAction: text('model_phase_action').notNull(),
+  finalPhase:       text('final_phase').notNull(),
+  finalPhaseAction: text('final_phase_action').notNull(),
+  rows:             jsonb('rows').notNull(),
+  createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export const aiCallLog = pgTable('ai_call_log', {
   id:           uuid('id').primaryKey().defaultRandom(),
   userId:       uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
@@ -1484,17 +1516,10 @@ export const ouraDaytimeStressBuckets = pgTable('oura_daytime_stress_buckets', {
    * The bucket's MIDPOINT, not its start — `daytimeHrvEstimatesPerBucket` emits
    * `t = bStart + bucketMs / 2` and that is what is written here.
    *
-   * **The SQL column is still `bucket_start` and cannot be renamed** (LA-114). Every historical
-   * `claude_ro` view migration selects `t.bucket_start`, and they are replayed against the final
-   * schema by Migration Check's idempotency step, so a rename fails all of them — and editing an
-   * already-applied migration is forbidden because `ensureSchema` tracks by filename. Migration 275
-   * carries the full reasoning and a `COMMENT ON COLUMN` so the database says so too.
-   *
-   * The property is named for what it holds so TypeScript, at least, does not lie. A join on the
-   * :00/:30 grid against the raw column returns zero rows, which reads as missing data rather than
-   * a 15-minute offset — that is the defect, and it survives in `claude_ro`.
+   * The SQL column was `bucket_start` until LA-114 renamed it to `bucket_mid` (migration
+   * 202609280647). A join against a series on the :00/:30 grid must subtract 15 minutes first.
    */
-  bucketMid:   timestamp('bucket_start', { withTimezone: true }).notNull(),
+  bucketMid:   timestamp('bucket_mid', { withTimezone: true }).notNull(),
   level:       doublePrecision('level').notNull(),
   updatedAt:   timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [primaryKey({ columns: [t.userId, t.bucketMid] })])
@@ -1938,3 +1963,28 @@ export const colmiSleepSegments = pgTable('colmi_sleep_segments', {
   minutes:   integer('minutes').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [unique('colmi_sleep_segments_unique').on(t.userId, t.startedAt, t.stage)])
+
+export const appleHealthSamples = pgTable('apple_health_samples', {
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  sampleId: uuid('sample_id').notNull(),
+  sampleType: text('sample_type').notNull(),
+  startAt: timestamp('start_at', { withTimezone: true }),
+  endAt: timestamp('end_at', { withTimezone: true }),
+  quantityValue: doublePrecision('quantity_value'),
+  quantityUnit: text('quantity_unit'),
+  categoryValue: integer('category_value'),
+  sourceBundleId: text('source_bundle_id'),
+  sourceName: text('source_name'),
+  deviceName: text('device_name'),
+  deviceModel: text('device_model'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  primaryKey({ columns: [t.userId, t.sampleId] }),
+  check('apple_health_samples_type', sql`length(trim(${t.sampleType})) > 0`),
+  check('apple_health_samples_interval', sql`(${t.startAt} IS NULL OR isfinite(${t.startAt})) AND (${t.endAt} IS NULL OR isfinite(${t.endAt})) AND (${t.startAt} IS NULL OR ${t.endAt} IS NULL OR ${t.endAt} >= ${t.startAt})`),
+  check('apple_health_samples_value', sql`${t.quantityValue} IS NULL OR (${t.quantityValue} > '-Infinity'::double precision AND ${t.quantityValue} < 'Infinity'::double precision)`),
+  check('apple_health_samples_payload', sql`${t.deletedAt} IS NOT NULL OR (${t.startAt} IS NOT NULL AND ${t.endAt} IS NOT NULL AND ${t.sourceBundleId} IS NOT NULL AND length(trim(${t.sourceBundleId})) > 0 AND ((${t.quantityValue} IS NOT NULL AND ${t.quantityUnit} IS NOT NULL AND length(trim(${t.quantityUnit})) > 0 AND ${t.categoryValue} IS NULL) OR (${t.categoryValue} IS NOT NULL AND ${t.quantityValue} IS NULL AND ${t.quantityUnit} IS NULL)))`),
+  index('apple_health_samples_history_idx').on(t.userId, t.sampleType, t.startAt).where(sql`${t.deletedAt} IS NULL`),
+])

@@ -21,6 +21,8 @@ const repoRoot = path.resolve(__dirname, '..', '..')
 const run = (...args: string[]) =>
   execFileSync('node', [path.join(repoRoot, 'scripts', 'next-item.js'), ...args], {
     cwd: repoRoot, encoding: 'utf8',
+    // No network in a test: the open-PR lookup is exercised in next-item-open-prs.test.ts instead.
+    env: { ...process.env, NEXT_ITEM_NO_PRS: '1' },
   })
 
 // The cap is on ROWS, and a batch is one row carrying several entries — so "READY (12)" can be

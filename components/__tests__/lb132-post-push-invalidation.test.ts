@@ -47,8 +47,11 @@ const SITES: { file: string; revalidate: RegExp; immediate: RegExp }[] = [
   },
   {
     file: 'components/activity/exercise-review-sheet.tsx',
-    revalidate: /pushThenRevalidate\(userId!, \(\) => Promise\.all\(\[invalidateActivityWrites\(\), invalidateOuraWorkoutReview\(\)\]\)\)/,
-    immediate: /invalidateActivityWrites\(\), invalidateOuraWorkoutReview\(\)\]\)/,
+    // Q-231 dropped `invalidateOuraWorkoutReview` from both sides with the Cloud sync that fed it.
+    // The rule this file guards is unchanged — revalidate on the far side of the push, and still
+    // invalidate immediately for the writing device offline — so only the group list narrowed.
+    revalidate: /pushThenRevalidate\(userId!, \(\) => invalidateActivityWrites\(\)\)/,
+    immediate: /await invalidateActivityWrites\(\)/,
   },
 ]
 

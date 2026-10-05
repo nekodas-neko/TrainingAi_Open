@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { STORAGE_STATE, settleRouteBoundary, suppressMorningCheckin } from './fixtures'
+import { STORAGE_STATE, settleRouteBoundary, suppressMorningCheckin, tolerateTestEnd } from './fixtures'
 
 /**
  * RV-49 — confirming a deload on Home must evict the caches the visible screen reads.
@@ -43,7 +43,7 @@ test('confirming an early deload evicts the workout-card and next-session caches
   // The card renders only when the readiness payload recommends it. Reaching that state from real
   // data takes a multi-table fixture; the handler under test does not read this payload, so stubbing
   // it changes nothing about what is being asserted.
-  await page.route('**/api/readiness-score*', async route => {
+  await page.route('**/api/readiness-score*', tolerateTestEnd(async route => {
     const res = await route.fetch()
     const body = await res.json().catch(() => ({}))
     await route.fulfill({
@@ -53,7 +53,7 @@ test('confirming an early deload evicts the workout-card and next-session caches
         earlyDeload: { score: 55, acwr: 1.6, scoreThreshold: 60, acwrThreshold: 1.5 },
       },
     })
-  })
+  }))
 
   // The morning check-in sheet covers Home on a fresh profile and hides everything behind it, so
   // the card renders and its button is still unreachable — the fixture exists for exactly this.

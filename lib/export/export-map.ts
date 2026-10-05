@@ -35,6 +35,7 @@ export interface Exclusion { category: ExclusionCategory; reason: string }
  *  a mismatch rather than trusting this list. Every entry is `deleted_at`; the column name stays
  *  explicit so a table that ever uses a different one needs no new shape. */
 export const SOFT_DELETED: Record<string, string> = {
+  apple_health_samples: 'deleted_at',
   activity_logs: 'deleted_at',
   body_metrics: 'deleted_at',
   day_checkins: 'deleted_at',
@@ -64,6 +65,7 @@ export const EXPORTED: Record<string, ExportScope> = {
 
   // ── Directly user-scoped ────────────────────────────────────────────────────
   activity_logs: { kind: 'user_id' },
+  apple_health_samples: { kind: 'user_id' },
   ai_health_insights: { kind: 'user_id' },
   body_battery_daily: { kind: 'user_id' },
   body_metrics: { kind: 'user_id' },
@@ -151,7 +153,7 @@ export const EXPORTED: Record<string, ExportScope> = {
   meal_plan_meals: { kind: 'via', predicate: 'EXISTS (SELECT 1 FROM public.meal_plan_variants v JOIN public.meal_plans mp ON mp.id = v.meal_plan_id WHERE v.id = t.variant_id AND mp.user_id = $1)' },
   // Both arms, for the reason the generator documents at length: `program_id` is nullable and the
   // modern write path sets only `phase_set_id`, so a program_id-only predicate hides every row.
-  program_phases: { kind: 'via', predicate: 'EXISTS (SELECT 1 FROM public.phase_sets ps WHERE ps.id = t.phase_set_id AND ps.user_id = $1) OR EXISTS (SELECT 1 FROM public.programs p WHERE p.id = t.program_id AND p.user_id = $1)' },
+  program_phases: { kind: 'via', predicate: 'EXISTS (SELECT 1 FROM public.phase_sets ps WHERE ps.id = t.phase_set_id AND ps.user_id = $1)' },
 }
 
 /** Columns never written to a takeout, even from an exported table. */
@@ -173,6 +175,7 @@ export const EXCLUDED: Record<string, Exclusion> = {
 
   // ── App-internal bookkeeping. Not the user's content, and meaningless outside this database. ─
   ai_call_log: { category: 'ops', reason: 'token/latency accounting, no user content' },
+  prescription_shadow: { category: 'ops', reason: 'BF-199 evidence: the given prescription beside what the rules prescriber would have said. Derived per model call, nothing the user wrote, and it duplicates the prescription the export already carries' },
   app_load_metrics: { category: 'ops', reason: 'page-load timing telemetry, pruned at 14 days' },
   applied_mutations: { category: 'ops', reason: 'sync idempotency ledger' },
   db_query_log: { category: 'ops', reason: 'admin SQL audit trail' },
@@ -202,4 +205,5 @@ export const EXCLUDED: Record<string, Exclusion> = {
   // ── Jointly about another account. ───────────────────────────────────────────
   friendships: { category: 'third-party', reason: 'each row is also the other account\'s relationship record, and the counterparty is an opaque uuid here' },
   invited_emails: { category: 'third-party', reason: 'other people\'s email addresses' },
+  email_normalisation_preimage: { category: 'third-party', reason: 'LA-61\'s undo record: every account\'s pre-backfill email address' },
 }

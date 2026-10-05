@@ -93,7 +93,7 @@ export async function ensureSchema(): Promise<void> {
   const applied = new Set(rows.map(r => r.filename))
 
   const migrationsDir = join(process.cwd(), 'lib/data/postgres/migrations')
-  const files = readdirSync(migrationsDir).filter(f => f.endsWith('.sql')).sort()
+  const files = sortMigrationFiles(readdirSync(migrationsDir).filter(f => f.endsWith('.sql')))
   let ran = 0
   const alreadyPresent: string[] = []
   const failed: string[] = []
@@ -178,4 +178,17 @@ export async function applyClaudeRoViews(
   } finally {
     client.release()
   }
+}
+
+/**
+ * Migration apply order: by the LEADING INTEGER, then by filename (BF-214 ②). A plain string sort
+ * puts `202609280612_x.sql` before `289_y.sql` because '0' < '8', so a timestamp-named migration
+ * would run before every numbered one. Every existing prefix is three digits, so for those files this
+ * is the order a string sort always gave, and the tie-break by filename keeps the grandfathered
+ * duplicate numbers (081, 087, 146, 161) in the order production applied them.
+ * `scripts/local-db/migrate.js` carries the same function, and a test holds the two to one order.
+ */
+export function sortMigrationFiles(files: string[]): string[] {
+  const lead = (f: string) => Number(/^(\d+)/.exec(f)?.[1] ?? 0)
+  return [...files].sort((a, b) => lead(a) - lead(b) || (a < b ? -1 : a > b ? 1 : 0))
 }

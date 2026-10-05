@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 import { PREFERENCE_STORAGE, type UserPreferences } from '@trainingai/shared/user/preferences'
+import { invalidateUserProfile } from '@/lib/cache-groups'
 
 /**
  * The device half of server-backed preferences (Q-392).
@@ -271,6 +272,12 @@ function patchServer(patch: PreferencePatch, names: string[]): Promise<void> {
     const still = readUnsynced()
     for (const n of names) still.delete(n)
     writeUnsynced(still)
+    // RV-183. The bag is a column on the users row, so a merged patch changes
+    // `/api/user/profile`'s payload. Nothing reads it back through that key today, which is exactly
+    // why it would be missed — and a writer outside the group disqualifies the key's proof.
+    // `.catch` is not optional on a fire-and-forget here: this runs inside a `.then` with no
+    // handler above it, and in a non-browser context the cache layer throws on `sessionStorage`.
+    invalidateUserProfile().catch(() => {})
   }).catch(() => {
     // Offline or signed out. The mark persists, so the next launch re-sends it.
   })

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  OR-159 — keep the WebView session cookie out of Google Drive backup.
+
+  `android:allowBackup="true"` with no rules meant Auto Backup took whatever the app stored,
+  including `app_webview/Cookies`. That cookie is a live credential: restored onto another
+  device it is a signed-in session.
+
+  The Oura ring key (`shared_prefs/oura_ble.xml`) is excluded too. The owner decided OR-160 on
+  2026-09-26: the key is his alone and he holds his own copy, so his Google account stays out of
+  its custody chain. That file also holds the history cursor and the ingest URL, and neither is
+  useful without the key.
+
+  This is the API 23-30 format; `data_extraction_rules.xml` is its API 31+ counterpart, and both
+  are needed because minSdk is 26 and targetSdk is 36.
+-->
+<full-backup-content>
+    <exclude domain="root" path="app_webview" />
+    <exclude domain="sharedpref" path="oura_ble.xml" />
+</full-backup-content>

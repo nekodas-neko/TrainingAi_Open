@@ -92,12 +92,27 @@ export default function MoreContent({ friendCode }: MoreContentProps) {
       // RV-150: `cachedFetch` swallows `!res.ok`, and the `.catch` cannot fire — it resolves a
       // boolean rather than rejecting (RV-84). Measured on a cold start with the routes down: the
       // whole identity block, level, XP and trophy case were absent, reading as an empty account.
-      { onError: () => setProfileFailed(true) },
+      { onError: () => setProfileFailed(true), freshWithinTtl: true },
     ).catch(() => {});
+    // `freshWithinTtl` — RV-183, with the written proof CLAUDE.md requires:
+    //  - RV-67 purity: `listSeasonsWithResults` is two plain selects (`seasons`, then this user's
+    //    `season_results`) mapped to the payload. No `now()`, nothing derived, nothing that decays
+    //    with the clock — so it is a pure function of stored rows, unlike every other candidate on
+    //    this screen.
+    //  - Writers: there are NONE. `grep` over `lib/`, `app/` and `scripts/` finds no insert, update
+    //    or delete against either table, and `/api/seasons` is GET-only. Nothing this device can do
+    //    changes the payload, so the "every writer's group holds the key" half of the proof is
+    //    vacuous rather than unproven. `more-user-profile` had to earn that half the hard way; see
+    //    the block below `useRefreshOnTabShow`.
+    //  - A cleared entry still fetches: `cachedFetchCore` only short-circuits when a cached value
+    //    exists AND is fresh, so a future group that starts clearing this key needs no change here.
+    // The residual risk is bounded and stated: a season result written server-side appears up to
+    // TTL_MEDIUM (30 min) late. `pullDelta` does not carry seasons either, so that delay is already
+    // the status quo for anything but a cold start.
     cachedFetch<{ seasons: Season[] }>(
       'more-seasons', '/api/seasons', TTL_MEDIUM,
       (d) => { if (d?.seasons) { _seasons = d.seasons; setSeasons(d.seasons); } },
-      { onError: () => setProfileFailed(true) },
+      { onError: () => setProfileFailed(true), freshWithinTtl: true },
     ).catch(() => {});
   }, []);
 
@@ -109,16 +124,32 @@ export default function MoreContent({ friendCode }: MoreContentProps) {
   // More was the one tab the persistent-shell plan never wired up (the other four thread `epoch`
   // through their own effects), so with every tab permanently mounted its profile, stats and season
   // badges were fetched once per app launch and never again — an app restart was the only refresh.
-  // ⚠ A re-show costs TWO GETs, not nothing (RV-183). An earlier version of this comment said
-  // "cachedFetch honours TTL_MEDIUM, so a re-show inside the window costs nothing" — it does not.
-  // `cachedFetchCore` paints the cached value and then ALWAYS revalidates over the network; the TTL
-  // governs whether the cached paint is used, never whether the request is sent. Only
-  // `freshWithinTtl: true` skips the round trip, and neither call in `refresh` passes it.
+  // ⚠ A re-show costs a GET per unflagged key, not nothing (RV-183). An earlier version of this
+  // comment said "cachedFetch honours TTL_MEDIUM, so a re-show inside the window costs nothing" — it
+  // does not. `cachedFetchCore` paints the cached value and then ALWAYS revalidates over the network;
+  // the TTL governs whether the cached paint is used, never whether the request is sent. Only
+  // `freshWithinTtl: true` skips the round trip.
   //
-  // Left as-is deliberately. Adding `freshWithinTtl` to `more-user-profile` and `more-seasons`
-  // needs the written invalidation proof CLAUDE.md requires — every write that changes either
-  // payload, shown to be in a group that clears the key — and a missed writer turns a brief stale
-  // paint into hours of hard staleness on the screen that shows who you are.
+  // RV-183: both keys now carry `freshWithinTtl`, so a re-show inside 30 minutes costs NO GET
+  // rather than two. `more-seasons`'s proof is at its call site above.
+  //
+  // `more-user-profile` now carries it too, and the proof is this, because a missed writer here is
+  // 30 minutes of a wrong identity block rather than a flash:
+  //
+  //   PURE — `GET /api/user/profile` is `getUserByEmail` plus `hasPassword`, one stored row. No
+  //   clock, no `today`, no derivation. `workoutCount` was the disqualifier and `LB-180` removed it
+  //   (`user-account-routes.test.ts` asserts the body no longer has it).
+  //
+  //   EVERY WRITER — the payload spreads the whole users row, so all eleven `update(s.users)` sites
+  //   count. Nine reach a group holding this key: the profile PATCH and the goals sheet's
+  //   `activityLevel` write (`invalidateGoalRecommendations`), the avatar, the equipped title and
+  //   the details save (`invalidateUserProfile`), and — closed by THIS change — the goal-review
+  //   touch, the password set and the preference-bag PATCH. The remaining two cannot be reached from
+  //   a client write and cannot go stale here: `friendCode` is generated inside `upsertUser` at
+  //   sign-in and returned by that same call, and `isActive` is an admin action on another account.
+  //
+  // The other three readers of this key deliberately keep revalidating — `edit-profile-sheet` is
+  // where `hasPassword` is acted on, and the two one-shot reads save nothing worth the risk.
   useRefreshOnTabShow(refresh);
 
   const handlePullSync = useCallback(async () => {

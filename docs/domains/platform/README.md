@@ -290,6 +290,13 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- [`handoff-2026-09-27-platform-lane-a-security-cluster.md`](../../handoffs/handoff-2026-09-27-platform-lane-a-security-cluster.md)
+  — **Lane A, the Review-sweep-60 security cluster, 2026-09-27.** TN-78 and BF-211 merged;
+  RV-192, RV-193, RV-195 ② and RV-197 built, CI-green and **owner-gated** (#1779, #1781, #1784,
+  #1789). Two entries could not be built as written and say why: RV-195 ① names a client
+  component that cannot set an httpOnly cookie, and RV-195 ③ needs a column the schema does not
+  have. Carries the `secureCookie`-is-the-salt trap, the separate `check-test-typecheck` gate,
+  and why `pnpm start` cannot boot in the cloud container.
 - **[`2026-08-30-meal-label-style-gate`](../../overview/history-2026-09-10-folded-4.md#2026-08-30-meal-label-style-gate)**
   — 🆕 **LB-19**: the meal-label spec's style gate was releasing on the **previous** style's canvas,
   4 of 4 measured, so its decode loop had effectively never checked three of its four layouts — and
@@ -531,3 +538,12 @@ Live at the time of writing (2026-07-30):
 - [`2026-08-24-metric-bounds-at-keyboard`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-metric-bounds-at-keyboard) — **Q-321, bounds asked at the keyboard, 2026-08-24** (`validation/body-metrics.ts` held every threshold and nothing under `components/`/`app/` imported it, so a 5,000 kg weight was queued and dropped server-side. Three sheets now share `components/health/metric-bounds.ts`; `log-value-sheet.tsx` had no check at all across seven fields.) **Device path not exercised.**
 - [`2026-08-24-activity-log-delete-outbox`](../../overview/history-2026-09-10-folded-2.md#2026-08-24-activity-log-delete-outbox) — **Q-328, the activity delete goes through the outbox, 2026-08-24** (the one activity-log write with no outbox domain; `softDeleteActivityLogPending` not `deleteActivityLog`, because a queued delete must stay `pending` until its push is confirmed). **Offline path not exercised** — `Gate: device`.
   — the A4b journal entry.
+
+- **[`2026-09-28-error-boundary-retries-chunk-load`](../../overview/history-2026-09-29-folded-1.md#2026-09-28-error-boundary-retries-chunk-load)**
+  — **LB-184: the root boundary retries a failed chunk load once.** Found as `LB-178`'s third E2E
+  cause — a `next/dynamic` chunk failing under `next dev` crashed Home to the boundary and the
+  running spec reported *"element(s) not found"*, reading as a broken feature. The fix is
+  user-facing too: online, a transient chunk fetch used to dead-end until the owner tapped.
+  **The retry guard is module-level and must stay so** — `reset()` remounts the boundary, so a
+  state or ref guard reloads forever. Classifier in `lib/chunk-load-error.ts`, matched narrowly
+  because a false positive silently reloads a genuinely broken screen.

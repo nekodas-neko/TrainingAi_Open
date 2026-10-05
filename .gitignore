@@ -103,3 +103,6 @@ docs/oura-models-inventory.md
 # Device harness captures (scripts/device) — screenshots of the owner's real account.
 # This repository is public: they are never committed. See scripts/device/README.md.
 /device-probe/
+
+# LB-194: tests write fixture copies here instead of mutating tracked source.
+__check_fixture__/

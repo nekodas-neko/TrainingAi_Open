@@ -2,6 +2,7 @@
 
 import { createContext, useContext } from 'react'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
+import { setCacheTimezone } from '@/lib/sqlite/cache'
 
 /**
  * The user's configured timezone, made readable from client components (Q-148).
@@ -24,6 +25,9 @@ export function UserTimezoneProvider({
   timezone: string | undefined
   children: React.ReactNode
 }) {
+  // LB-150: the "today" cache envelope keys on the user's day. Set during render, not in an effect,
+  // so it is in place before any child's mount-time seed read runs.
+  setCacheTimezone(timezone)
   return (
     <UserTimezoneContext.Provider value={timezone || DEFAULT_TZ}>
       {children}
