@@ -19,10 +19,12 @@
    prep. BugFix keeps intake. One local implementer, which can run Docker and drive the phone,
    does the building and the release testing. Device Verification becomes a mode of that local
    agent.
-4. **Sessions become short and disposable.** State lives in GitHub (issues, PRs, milestones,
-   releases), not in batons, journals and a 2.7 MB backlog. A session reads about 6k tokens of rules
-   plus one issue, does the work, opens a PR and ends. No 4-hourly routines and no 2–3 minute
-   check-ins.
+4. **Roles are permanent; contexts stay small.** The agents stay open and the Orchestrator wakes
+   them from a schedule — permanence is what carries work spanning several sittings. What is
+   bounded is the *context*, not the session: an agent compacts **before going idle**, so it wakes
+   near 6–8k tokens rather than cold-reading whatever it was holding. State lives in GitHub
+   (issues, PRs, milestones, releases), not in batons, journals and a 2.7 MB backlog. No 4-hourly
+   resume routines and no 2–3 minute check-ins.
 5. **CI keeps running on PRs, but nobody watches it.** On a public repo, Actions minutes cost
    nothing. What CI costs here is agent tokens spent polling and rebasing. Auto-merge removes that
    cost. The slow jobs (E2E, APK publishing) move into the release.
@@ -331,12 +333,52 @@ markdown file is then frozen as `docs/archive/implementation-backlog-2026-10.md`
 Optional: a second, cloud implementer for parallel work. The `lane:` labels keep the two out of
 each other's files.
 
-**Session model: one task, one session.** A session gets an issue number, reads the lean rules and
-that issue, does the work, opens a PR and ends. Nothing needs carrying over, because the issue, the
-PR and the milestone hold the state. That retires batons, handoffs-as-routine, the "one continuous
-session per role" policy and the 4-hourly routines. It's cheaper per turn, too: a long-running
-session resends its whole accumulated context every turn, and a fresh one starts at a few thousand
-tokens.
+**Local vs Cloud is decided by hardware, not preference (owner, 2026-10-05).** An agent runs
+**local** when its work needs something physically attached — the phone over USB, Docker, the real
+APK. It runs **cloud** when its work is reading production and writing issues, docs and PRs. That
+puts Implementer and its release-test mode local, Orchestrator and BugFix cloud, and it leaves no
+judgement call: if a task needs the phone it cannot run in a container, and if it does not, a
+container is the cheaper place for it.
+
+**Session model: permanent ROLES, bounded CONTEXT — revised 2026-10-05 (owner).** An earlier draft
+said "one task, one session" and treated session lifetime as the thing to control. That was the
+wrong variable.
+
+**The agents are permanent and stay open.** Each has a name, a queue and a schedule; the
+Orchestrator checks what is outstanding and wakes the others. Permanence is what carries work that
+spans sittings — a five-phase programme does not fit in one issue, and batons carried that badly
+rather than unnecessarily.
+
+**What actually costs money is not how long a session lives. It is how much context it is holding
+when it takes a turn, and whether that context is still cached.** Two consequences, and they point
+the same way:
+
+- Compaction already bounds a long session: it does not carry 780k tokens forever, it summarises
+  and drops back down. So permanence on its own is not the expense the §1 figures suggest.
+- **But a scheduled agent is the one pattern where a large held context costs most.** If the wake
+  interval is longer than the prompt-cache TTL, every wake is a *cold* read of whatever the session
+  happens to be holding. An agent woken every four hours carrying 300k tokens pays a full 300k read
+  to do ten minutes of work, and does it again four hours later.
+
+**So the rule is: bound the context you WAKE WITH.**
+
+| Situation | Rule |
+|---|---|
+| Working continuously, wake gap inside the cache TTL | Keep going. Normal compaction is enough; the cache is doing its job |
+| Woken on a schedule, wake gap beyond the cache TTL — **the model above** | **Compact before going idle, not when full.** The agent finishes its task, compacts down to the lean rules plus its queue position, *then* sleeps |
+
+The second line is the load-bearing one. Compaction triggered by *filling up* leaves an agent
+asleep holding whatever it happened to have; compaction triggered by *going idle* means every wake
+starts near the ≈6–8k floor in §6. Same permanence, none of the cold-read cost.
+
+**⚠ Not yet measured.** The mechanism is sound but the numbers are not ours: the cache TTL and
+what a cold wake actually costs should be measured on one real agent over a week before the
+schedule intervals are fixed. The §1 figures are cumulative session usage, which is evidence about
+long fat contexts, not about permanence.
+
+**What this retires is unchanged:** batons, handoffs-as-routine, and the 4-hourly resume routines.
+State still lives in the issue, the PR and the milestone — that is what makes a small wake context
+sufficient.
 
 ---
 
@@ -483,7 +525,36 @@ flight" reply.
 | 6 | Backlog migration | **Triage first, migrate live work only** | §4.3 |
 | 7 | Release approval | **The owner, through the Orchestrator**: a concise summary, then "approve" in its chat | §3.3 steps 4–5. Enforced by instruction; GitHub's required-reviewer tap is an optional hard lock (§7) |
 | 8 | Bundled shell (v2) | **Later**, as its own milestone after 2–3 clean releases | §10 |
-| 9 | #1849 and #1499 | **Held for release 1**, listed under "needs your eyes" | They merge into `main` once merges stop deploying |
+| 9 | #1849 and #1499 | ⚠ **#1849 ALREADY MERGED — corrected 2026-10-05.** #1499 still held | #1849 landed as `7574d06e75`, four commits after the PR that recorded it as held, and **merges still deploy until Phase 2, so it went to production**. Its guard meant it could not drop a value, so no harm — but the hold did not hold. #1499 (auth) is the only one genuinely waiting |
+| 11 | Permanent agents vs disposable sessions | **Permanent roles, bounded context** | Reverses the earlier "one task, one session". §5 has the rule and the one thing still to measure |
+| 12 | Where the ingest architecture (`OR-213`/`214`/`215`) sits | **After the workflow lands, as the first epic — except its Phase 0** | Delegated to the Orchestrator. Reasoning below |
+| 13 | Backlog triage: before or after the architecture spec | **After, in one pass** | Delegated to the Orchestrator. Reasoning below |
+
+### 9.1 Decisions 12 and 13, reasoned (Orchestrator, delegated 2026-10-05)
+
+**The ingest architecture is a second restructure running in parallel with this one**, and neither
+document referenced the other until now. This one changes *how we work*; `OR-213`/`214`/`215` and
+[`docs/architecture/ingest-and-scoring.md`](../../architecture/ingest-and-scoring.md) change *how
+data flows* — raw stays on the device, only scored values reach the cloud, measured at **263 MB →
+~12 MB per user, about 22×**.
+
+**#12 — the architecture waits, with one exception.** It is five phases of work spanning many
+sittings. The model that would have to carry it is the one this spec is replacing, and that model
+demonstrably failed: **every lane stopped on 2026-10-01 and nobody noticed for three days.**
+Starting a multi-phase programme under it repeats that. So it becomes the first epic once the new
+workflow is live.
+
+**The exception is its Phase 0 — export the Oura raw archive and prove a restore — which should
+run during the freeze.** It is one session, it blocks nothing, and it is the only step that cannot
+be undone: `oura_raw_packed` is **28 MB / 1.8 M frames and today the only re-decodable copy**, and
+the ring's buffer only moves forward, so a row deleted before a restore is proven is gone for good.
+Waiting on a workflow change to protect it is the wrong risk to take.
+
+**#13 — triage after the architecture spec, in one pass.** §4.3's two largest buckets are KEEP
+(171) and the device ones (28 + 49) — **about 48% of the file** — and they are exactly what the
+architecture change supersedes most of. Triaging them first means triaging them twice, which costs
+more than the wait. The architecture spec is days from settled, not weeks.
+
 | 10 | Start Phase 0 | **Yes**, started 2026-10-05 | §8 Phase 0 progress |
 
 ---
