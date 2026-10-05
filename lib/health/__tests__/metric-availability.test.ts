@@ -60,14 +60,15 @@ describe('metricAvailability', () => {
 // contributors by hand, which would still pass if `computeReadinessComposite` never set a gap at
 // all — the exact shape of a taxonomy nothing populates.
 describe('metricAvailability against the real producer', () => {
-  // Every contributor supplied, deliberately. A first draft omitted `checkinScore` and the cold
-  // case then reported `no_input` — correctly, because a missing check-in IS missing data. The
-  // failure was the fixture's, not the code's, and it is worth keeping as the reason this fixture
-  // is exhaustive: an incomplete one silently tests a different question.
+  // Every contributor supplied, deliberately. A first draft omitted one (the check-in, which has
+  // since left the model in #2224) and the cold case then reported `no_input` — correctly, because
+  // a missing input IS missing data. The failure was the fixture's, not the code's, and it is worth
+  // keeping as the reason this fixture is exhaustive: an incomplete one silently tests a different
+  // question.
   const FULL = {
     rhrZ: -0.5, hrvZ: 0.8, tempZ: 0.1, sleepBalanceZ: 0.4,
     previousNightScore: 80, prevDayActivityScore: 70, activityBalanceScore: 60,
-    recoveryIndexHours: 4, checkinScore: 72,
+    recoveryIndexHours: 4,
   }
 
   it('a cold baseline reports awaiting_baseline, from a real composite', () => {

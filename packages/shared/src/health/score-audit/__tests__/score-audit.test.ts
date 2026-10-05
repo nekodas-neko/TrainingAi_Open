@@ -198,7 +198,7 @@ describe('buildActivityAudit', () => {
 describe('buildReadinessAudit', () => {
   const common = {
     date: '2026-07-24', sleepScore: 82, activityScore: 70, prevDayActivityScore: 65,
-    checkinEnergy: 'good', ouraDaily: null, derived: null,
+    ouraDaily: null, derived: null,
   }
 
   // Readiness weights are absolute and its sub-scores are already integers, so this is exact
@@ -247,10 +247,11 @@ describe('buildReadinessAudit', () => {
     expect(audit.gaps.join(' ')).toContain('No oura_daily_summary row')
   })
 
-  it('notes a missing check-in as a hard cap on attainable readiness', () => {
-    const audit = buildReadinessAudit({ ...common, checkinEnergy: null, summary: summary(), priorSummary: summary({ date: '2026-07-23' }) })
-    expect(audit.gaps.join(' ')).toContain('No morning check-in')
-    expect(audit.contributors.find(c => c.key === 'checkin')!.subScore).toBe(50)
+  // #2224. The audit reports the model the app runs, and that model no longer has a check-in term.
+  it('carries no check-in contributor and names no check-in gap', () => {
+    const audit = buildReadinessAudit({ ...common, summary: summary(), priorSummary: summary({ date: '2026-07-23' }) })
+    expect(audit.contributors.map(c => c.key)).not.toContain('checkin')
+    expect(audit.gaps.join(' ')).not.toMatch(/check-in/i)
   })
 
   // Q-501 — the panel used to pair a STORED score with TODAY's raw inputs and call them "the inputs
@@ -265,16 +266,44 @@ describe('buildReadinessAudit', () => {
     }
 
     it('calls it an INPUT change when the stored score re-derives from its own stored inputs', () => {
-      // The row is self-consistent, so the model is not what moved — the summary was re-rolled after
-      // the derived row was written and nothing recomputed it in step.
+      // The row is self-consistent — written from an earlier summary whose HRV was lower — so the
+      // model is not what moved: the summary was re-rolled after the derived row was written and
+      // nothing recomputed it in step.
+      const earlier = buildReadinessAudit({ ...common, summary: summary({ hrvAvgMs: 38 }), priorSummary: summary({ date: '2026-07-23' }) }).persist!
       const derived = {
-        day: '2026-07-24', readinessScore: 41, readinessSource: 'ble-derived',
-        readinessContributors: storedContributors(),
+        day: '2026-07-24', readinessScore: earlier.score, readinessSource: 'ble-derived',
+        readinessContributors: earlier.contributors,
       } as never
       const audit = buildReadinessAudit({ ...withPrior, derived })
       expect(audit.storedMatchesRecompute).toBe(false)
       expect(audit.notes.join(' ')).toContain('INPUT change')
       expect(audit.stored.rederived!.drifted).toEqual([])
+    })
+
+    // #2224. A row scored before the check-in left the model: every term it stores still reproduces,
+    // and the total it stores does not, because it was weighted with the check-in's 0.10 in the sum.
+    // That is a change of WEIGHTS, and calling it an input change would send the reader looking at
+    // the summary for a cause that is not there.
+    it('calls it a WEIGHTS change when every term reproduces and the total does not', () => {
+      const live = buildReadinessAudit(withPrior).persist!.contributors as Record<string, { score: number }>
+      const oldWeights: Record<string, number> = {
+        restingHeartRate: 0.15, previousNight: 0.16, hrvBalance: 0.15, temperature: 0.10,
+        sleepBalance: 0.10, prevDayActivity: 0.09, recoveryIndex: 0.09, activityBalance: 0.06,
+      }
+      const checkin = { score: 88, provisional: false, input: 88, gap: null }
+      const oldScore = Math.round(
+        Object.entries(oldWeights).reduce((sum, [k, w]) => sum + live[k].score * w, 0) + checkin.score * 0.10)
+      const derived = {
+        day: '2026-07-24', readinessScore: oldScore, readinessSource: 'ble-derived',
+        modelVersions: { readiness: 'v4:tail20:2026-09-23' },
+        readinessContributors: storedContributors({ checkin }),
+      } as never
+      const audit = buildReadinessAudit({ ...withPrior, derived })
+      expect(audit.stored.rederived!.score).not.toBe(oldScore)
+      expect(audit.notes.join(' ')).toContain('WEIGHTS moved')
+      expect(audit.notes.join(' ')).toContain('v4:tail20:2026-09-23')
+      expect(audit.notes.join(' ')).not.toContain('INPUT change')
+      expect(audit.notes.join(' ')).not.toContain('IS reproducible')
     })
 
     it('calls it a MODEL change when a stored contributor does not follow from its own input', () => {

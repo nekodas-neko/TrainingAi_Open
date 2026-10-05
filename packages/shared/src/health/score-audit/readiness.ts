@@ -1,6 +1,5 @@
 import {
   computeReadinessComposite,
-  checkinScoreFromEnergy,
   rederiveReadinessFromStored,
   READINESS_MODEL,
   READINESS_WEIGHTS,
@@ -23,16 +22,17 @@ export interface ReadinessAuditInput {
   /** Our own PRE-taper activity score for `date` and for the day before. */
   activityScore: number | null
   prevDayActivityScore: number | null
-  /** The morning check-in's energy level, if logged. */
-  checkinEnergy: string | null
   ouraDaily: OuraDailyRow | null
   derived: OuraDailyDerivedRow | null
 }
 
 const r3 = (n: number | null) => (n == null ? null : Math.round(n * 1000) / 1000)
+const pct = (w: number) => `${Math.round(w * 100)}%`
+const BASELINE_RELATIVE_WEIGHT = READINESS_WEIGHTS.restingHeartRate + READINESS_WEIGHTS.hrvBalance
+  + READINESS_WEIGHTS.temperature + READINESS_WEIGHTS.sleepBalance
 
 export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
-  const { date, summary, priorSummary, sleepScore, activityScore, prevDayActivityScore, checkinEnergy, ouraDaily, derived } = input
+  const { date, summary, priorSummary, sleepScore, activityScore, prevDayActivityScore, ouraDaily, derived } = input
 
   const gaps: string[] = []
   const notes: string[] = []
@@ -45,7 +45,6 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
     ? baselineZ(priorSummary.sleepBaseline, Math.round(summary.sleepDurationHours * 60))
     : null
 
-  const checkinScore = checkinScoreFromEnergy(checkinEnergy)
   const nHistory = summary?.nHistory ?? 0
 
   const composite = summary ? computeReadinessComposite({
@@ -53,7 +52,6 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
     previousNightScore: sleepScore,
     prevDayActivityScore,
     activityBalanceScore: activityScore,
-    checkinScore,
     nHistory,
     recoveryIndexHours: summary.recoveryIndexHours,
   }) : null
@@ -70,18 +68,12 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
   } else if (nHistory < BASELINE_MIN_NIGHTS) {
     gaps.push(
       `Baselines are still cold (${nHistory}/${BASELINE_MIN_NIGHTS} nights). All four baseline-relative ` +
-      'contributors — resting HR, HRV balance, temperature, sleep balance (50% of the total weight) — are ' +
-      'pinned to a neutral 50, so the score is driven almost entirely by the sleep/activity/check-in terms.',
-    )
-  }
-  if (checkinScore == null) {
-    gaps.push(
-      'No morning check-in logged — the check-in contributor (weight 0.10) sits at a neutral 50, which ' +
-      'caps the attainable readiness at 95 even on a perfect day.',
+      `contributors — resting HR, HRV balance, temperature, sleep balance (${pct(BASELINE_RELATIVE_WEIGHT)} of the total weight) — are ` +
+      'pinned to a neutral 50, so the score is driven almost entirely by the sleep and activity terms.',
     )
   }
   if (summary?.recoveryIndexHours == null) gaps.push('No Recovery Index (needs an overnight HR series) — contributor neutral at 50.')
-  if (sleepScore == null) gaps.push('No sleep score for the previous night — its 0.16 weight sits neutral at 50.')
+  if (sleepScore == null) gaps.push(`No sleep score for the previous night — its ${pct(READINESS_WEIGHTS.previousNight)} weight sits neutral at 50.`)
 
   if (illness && illness.readinessSuppression > 0) {
     notes.push(
@@ -166,15 +158,6 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
       subScore: c.activityBalance.score, provisional: c.activityBalance.provisional,
       excludedReason: 'nothing scoreable for today → neutral 50',
     },
-    {
-      key: 'checkin', label: 'Morning check-in',
-      input: {
-        value: checkinEnergy, source: 'mood_logs.energy_level',
-        note: `Mapped via ${JSON.stringify(READINESS_MODEL.checkinEnergyScore)}.`,
-      },
-      subScore: c.checkin.score, provisional: c.checkin.provisional,
-      excludedReason: 'no check-in logged → neutral 50',
-    },
   ] satisfies (ContributorSpec & { subScore: number; provisional: boolean })[]) : []
 
   const contributors = fixedWeightContributors(specs, READINESS_WEIGHTS)
@@ -200,7 +183,8 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
       // the stored map used to have its WEIGHT dropped from a sum defined to total 1, so `score`
       // came out low by about `weight × 50` and the row below then announced that the score "IS
       // reproducible" while printing a number that was not the stored one. Seven production rows
-      // (2026-07-16 → 07-22) are missing `checkin` and read 4–6 points low for that reason alone.
+      // (2026-07-16 → 07-22) were missing `checkin` and read 4–6 points low for that reason alone,
+      // until #2224 took `checkin` out of the model.
       notes.push(
         `The stored contributors do not include ${rederived.missing.join(', ')} at all, so this row ` +
         'cannot be checked against its own inputs in full. The re-derivation assumes the neutral 50 ' +
@@ -215,6 +199,20 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
         rederived.drifted.map(d => `${d.key} stored ${d.stored}, current model gives ${d.rederived}`).join('; ') +
         `. The current model rebuilds this row's inputs into ${rederived.score} against a stored ` +
         `${storedScore} — so the MODEL moved since this day was scored, not the inputs.`,
+      )
+    } else if (
+      rederived.uncheckable.length === 0 && rederived.missing.length === 0 && rederived.score !== storedScore
+    ) {
+      // Every contributor reproduces and the total still does not: the WEIGHTS moved, which no
+      // per-contributor check can see. Every row scored before #2224 lands here, because it was
+      // weighted with the check-in's 0.10 still in the sum. Without this branch the one below would
+      // call those rows reproducible and blame the difference on the inputs.
+      const version = (derived?.modelVersions as { readiness?: unknown } | null)?.readiness
+      notes.push(
+        `Every stored contributor reproduces under the current model, but they combine to ` +
+        `${rederived.score} against a stored ${storedScore}: the WEIGHTS moved since this day was ` +
+        `scored (stored model ${typeof version === 'string' ? version : 'unstamped'}, current ` +
+        `${READINESS_MODEL.modelVersion}), not the inputs.`,
       )
     } else if (
       rederived.uncheckable.length === 0 && rederived.missing.length === 0 &&

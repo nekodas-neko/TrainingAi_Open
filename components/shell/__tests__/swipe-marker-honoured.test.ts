@@ -64,9 +64,11 @@ describe('BF-96 — the header chip resists compression like its sibling', () =>
   // crossed the action buttons instead of wrapping, so the date is now the item that gives.
   // The chip must still resist — its wrapping is the bug BF-96 fixed — but the reason changed, and
   // the row moved to `components/home/header-meta-row.tsx`.
-  it('the sibling date is now the item that absorbs a shortfall (BF-116)', () => {
+  // #2174 then moved the date onto its own line below the chips, so it no longer competes with the
+  // chip for width at all; it still truncates, against the full column.
+  it('the date no longer shares the chip row (BF-116, #2174)', () => {
     const row = code('components/home/header-meta-row.tsx')
-    expect(row, 'the date truncates rather than refusing to shrink').toMatch(/truncate min-w-0/)
+    expect(row, 'the date still truncates rather than wrapping').toMatch(/text-muted-foreground truncate/)
     expect(row, 'and the row clips, so chips alone cannot reach the buttons').toMatch(/overflow-hidden/)
     // The page must no longer own the row, or two copies of this contract can drift apart.
     expect(code('app/session-select/session-select-content.tsx')).toMatch(/<HeaderMetaRow tz=\{tz\} \/>/)

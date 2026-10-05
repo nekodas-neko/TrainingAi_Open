@@ -2666,6 +2666,15 @@ wake gate on the detector, a night-picking rule in the summary, **and** a correc
 27th is already wrong on disk. Found while validating the Colmi ring, which is unrelated and
 isolated.
 
+**Amended 2026-10-06 (#2344, issue #2192): the missing nights were a pipeline delete, now fixed;
+two things remain.** The night-picking rule shipped 2026-09-02. The larger harm since then (15 of
+30 dates holding only a daytime fragment) came from the incremental rollup's date-keyed delete: it
+removed a night its own truncation guard was protecting, whenever it re-derived the same date's
+afternoon window. #2344 freezes such a date for the run, with a test that fails on the old code.
+**Still owed:** the corrective Redecode, which restores the deleted rows and 08-27's summary, the
+owner's after release (#2347); and the detector writing daytime windows at all, now a tuning
+question (#2348). Strike this row when both close.
+
 ### [devices] ⚠️ Colmi auto-sync is not device-verified (2026-08-30)
 
 v1.395.1 syncs the ring on app open, on resume and every 30 minutes, because four of its metrics are

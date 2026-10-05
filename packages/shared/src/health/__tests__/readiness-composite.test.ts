@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeReadinessComposite, BASELINE_MIN_NIGHTS } from '../readiness-composite'
+import { computeReadinessComposite, BASELINE_MIN_NIGHTS, READINESS_WEIGHTS } from '../readiness-composite'
 
 const FULL_HISTORY = BASELINE_MIN_NIGHTS + 1
 
@@ -151,53 +151,66 @@ describe('computeReadinessComposite', () => {
 
   // **TN-60 makes 100 unreachable, and that is the cost of the change rather than a bug.** A
   // saturating curve and a reachable ceiling are mutually exclusive: the ceiling IS the rail. A
-  // 1.5σ-on-everything day now reads ~95 rather than 100, because the z-driven contributors carry
-  // 0.59 of the weight and each tops out at 90 there. Milder than the ~86 the 2026-07-22 note
-  // called a defect, and reversible with one constant (TAIL_BAND_POINTS).
+  // 1.5σ-on-everything day now reads ~94 rather than 100, because the z-driven contributors carry
+  // about two thirds of the weight and each tops out at 90 there. Milder than the ~86 the 2026-07-22
+  // note called a defect, and reversible with one constant (TAIL_BAND_POINTS). It read 95 while the
+  // check-in held 0.10 at 100; #2224 renormalised the other eight over that share.
   it('puts a genuinely perfect day just under the ceiling rather than on it', () => {
-    const r = computeReadinessComposite({
-      rhrZ: -1.5, hrvZ: 1.5, tempZ: 0, sleepBalanceZ: 1.5,
-      previousNightScore: 100, prevDayActivityScore: 100, activityBalanceScore: 100,
-      recoveryIndexHours: 6, checkinScore: 100,
-      nHistory: FULL_HISTORY,
-    })
-    expect(r.score).toBe(95)
-  })
-
-  it('still rewards a day better than 1.5σ on every axis — the ceiling is approached, not hit', () => {
-    const at = (z: number) => computeReadinessComposite({
-      rhrZ: -z, hrvZ: z, tempZ: 0, sleepBalanceZ: z,
-      previousNightScore: 100, prevDayActivityScore: 100, activityBalanceScore: 100,
-      recoveryIndexHours: 6, checkinScore: 100,
-      nHistory: FULL_HISTORY,
-    }).score
-    expect(at(3)).toBeGreaterThan(at(1.5))
-    expect(at(3)).toBeLessThan(100)
-  })
-
-  it('maps the check-in as a contributor; a good one lifts the composite over a drained one', () => {
-    const base = {
-      rhrZ: null, hrvZ: null, tempZ: null, sleepBalanceZ: null,
-      previousNightScore: null, prevDayActivityScore: null, activityBalanceScore: null,
-      nHistory: 0,
-    }
-    const good = computeReadinessComposite({ ...base, checkinScore: 100 })
-    const drained = computeReadinessComposite({ ...base, checkinScore: 30 })
-    expect(good.contributors.checkin.score).toBe(100)
-    expect(good.score).toBeGreaterThan(drained.score)
-  })
-
-  it('caps below 100 without a check-in but never tanks readiness for skipping it', () => {
-    // No check-in → neutral 50 → a perfect-biometrics day tops out at 90 (check-in unlocks the last
-    // 5, same relationship as before TN-60 — both ends simply moved down with the tail).
     const r = computeReadinessComposite({
       rhrZ: -1.5, hrvZ: 1.5, tempZ: 0, sleepBalanceZ: 1.5,
       previousNightScore: 100, prevDayActivityScore: 100, activityBalanceScore: 100,
       recoveryIndexHours: 6,
       nHistory: FULL_HISTORY,
     })
-    expect(r.score).toBeGreaterThanOrEqual(89)
-    expect(r.score).toBeLessThan(100)
+    expect(r.score).toBe(94)
+  })
+
+  it('still rewards a day better than 1.5σ on every axis — the ceiling is approached, not hit', () => {
+    const at = (z: number) => computeReadinessComposite({
+      rhrZ: -z, hrvZ: z, tempZ: 0, sleepBalanceZ: z,
+      previousNightScore: 100, prevDayActivityScore: 100, activityBalanceScore: 100,
+      recoveryIndexHours: 6,
+      nHistory: FULL_HISTORY,
+    }).score
+    expect(at(3)).toBeGreaterThan(at(1.5))
+    expect(at(3)).toBeLessThan(100)
+  })
+
+  // #2224. The owner's requirement is that readiness is settled on first open. The morning check-in
+  // is answered after that, so a check-in contributor is a number that moves once he has read it.
+  describe('the morning check-in is not a readiness input (#2224)', () => {
+    it('has no weight and produces no contributor', () => {
+      expect(Object.keys(READINESS_WEIGHTS)).not.toContain('checkin')
+      const r = computeReadinessComposite({
+        rhrZ: null, hrvZ: null, tempZ: null, sleepBalanceZ: null,
+        previousNightScore: 70, prevDayActivityScore: 60, activityBalanceScore: 55,
+        nHistory: FULL_HISTORY,
+      })
+      expect(Object.keys(r.contributors).sort()).toEqual(Object.keys(READINESS_WEIGHTS).sort())
+    })
+
+    it('renormalises the other eight over the 0.90 they held, keeping every ratio between them', () => {
+      const total = Object.values(READINESS_WEIGHTS).reduce((a, b) => a + b, 0)
+      expect(total).toBeCloseTo(1, 12)
+      // The pre-#2224 weights, which summed to 0.90 without the check-in.
+      const before = {
+        restingHeartRate: 0.15, previousNight: 0.16, hrvBalance: 0.15, temperature: 0.10,
+        sleepBalance: 0.10, prevDayActivity: 0.09, recoveryIndex: 0.09, activityBalance: 0.06,
+      }
+      for (const [key, w] of Object.entries(before)) {
+        expect(READINESS_WEIGHTS[key as keyof typeof READINESS_WEIGHTS], key).toBeCloseTo(w / 0.9, 12)
+      }
+    })
+
+    it('an all-neutral day still maps to exactly 50', () => {
+      // One of the invariants the 2026-08-18 range review found the composite genuinely holds.
+      const r = computeReadinessComposite({
+        rhrZ: null, hrvZ: null, tempZ: null, sleepBalanceZ: null,
+        previousNightScore: null, prevDayActivityScore: null, activityBalanceScore: null,
+        nHistory: FULL_HISTORY,
+      })
+      expect(r.score).toBe(50)
+    })
   })
 
   describe('recovery-index contributor (calibrated curve, was dead NEUTRAL)', () => {

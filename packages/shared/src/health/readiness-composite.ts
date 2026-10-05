@@ -14,20 +14,25 @@
 
 export const BASELINE_MIN_NIGHTS = 14
 
-// Weights recalibrated 2026-07-22 (core-cards overhaul, W-D): rebalanced to sum EXACTLY 1.00 (was
-// 0.99, so the old composite could never reach 100) and made room for a `checkin` contributor — the
-// user's morning mood/energy self-report — so a genuinely great day (great biometrics + a good
-// check-in) can reach a true 100. See docs/superpowers/plans/2026-07-22-core-score-cards-and-activity-overhaul.md.
+// Weights recalibrated 2026-07-22 (core-cards overhaul, W-D) to sum EXACTLY 1.00 (was 0.99, so the
+// old composite could never reach 100). See docs/superpowers/plans/2026-07-22-core-score-cards-and-activity-overhaul.md.
+//
+// #2224 (TN-9, owner 2026-08-26: *"the numbers should be fully set on first open/load"*): the
+// morning check-in's 0.10 is gone. While it was here, an unanswered card held 10% of readiness at a
+// neutral 50 and answering it moved a score the owner had already read. The other eight are
+// renormalised over the 0.90 they held, so every ratio between them is unchanged. Measured over the
+// 35 days with stored contributors: mean +0.44, largest single-day move 3.84, none ≥ 5. The check-in
+// still tunes the session prescription; it no longer touches this number.
+const WEIGHT_WITHOUT_CHECKIN = 0.90
 export const READINESS_WEIGHTS = {
-  restingHeartRate: 0.15,
-  previousNight:    0.16,
-  hrvBalance:        0.15,
-  temperature:       0.10,
-  sleepBalance:      0.10,
-  prevDayActivity:   0.09,
-  recoveryIndex:     0.09,
-  activityBalance:   0.06,
-  checkin:           0.10,
+  restingHeartRate: 0.15 / WEIGHT_WITHOUT_CHECKIN,
+  previousNight:    0.16 / WEIGHT_WITHOUT_CHECKIN,
+  hrvBalance:       0.15 / WEIGHT_WITHOUT_CHECKIN,
+  temperature:      0.10 / WEIGHT_WITHOUT_CHECKIN,
+  sleepBalance:     0.10 / WEIGHT_WITHOUT_CHECKIN,
+  prevDayActivity:  0.09 / WEIGHT_WITHOUT_CHECKIN,
+  recoveryIndex:    0.09 / WEIGHT_WITHOUT_CHECKIN,
+  activityBalance:  0.06 / WEIGHT_WITHOUT_CHECKIN,
 } as const
 
 export interface ReadinessCompositeInputs {
@@ -47,9 +52,6 @@ export interface ReadinessCompositeInputs {
   prevDayActivityScore: number | null
   /** Our own 0-100 activity score for today. */
   activityBalanceScore: number | null
-  /** The user's morning mood/energy check-in mapped to 0-100 (drained→30 … pumped→100). Null when
-   *  there's no check-in that day → neutral 50 (so a perfect 100 needs a logged good check-in). */
-  checkinScore?: number | null
   /** Nights of baseline history accrued (oura_daily_summary.n_history). */
   nHistory: number
   /** Recovery Index — hours between the overnight HR minimum and wake
@@ -142,20 +144,6 @@ export const Z_POINTS_PER_UNIT = 50 / 1.5
 export const TAIL_BAND_POINTS = 20
 
 /**
- * The morning check-in's energy level → 0-100 sub-score. Lives here, next to the weight it feeds,
- * so the readiness route and the admin day-review audit can't map the same check-in differently.
- */
-export const CHECKIN_ENERGY_SCORE: Record<string, number> = {
-  drained: 30, low: 50, ok: 72, good: 88, pumped: 100,
-}
-
-/** Map a logged energy level to its readiness sub-score; null when unrecognised or not logged. */
-export function checkinScoreFromEnergy(energyLevel: string | null | undefined): number | null {
-  if (!energyLevel) return null
-  return CHECKIN_ENERGY_SCORE[energyLevel] ?? null
-}
-
-/**
  * Linear through the middle, algebraic tails at both ends — the TN-60 shape.
  *
  * Takes a score already in linear points, so one implementation covers `higher-better`,
@@ -205,7 +193,7 @@ function plainScore(v: number | null): ReadinessContributor {
 /** Stamped onto `oura_daily_derived.model_versions.readiness` so a score can be attributed to the
  *  model that produced it. Bump whenever the weights, curves or z-slope change — Q-273.
  *  Rows written before 2026-08-18 carry no stamp at all. */
-export const READINESS_MODEL_VERSION = 'v4:tail20:2026-09-23'
+export const READINESS_MODEL_VERSION = 'v5:no-checkin:2026-10-06'
 
 /** Recovery Index hours at which this contributor scores 100. `hoursToSettle` is measured from the
  *  overnight HR minimum to wake, so MORE hours = the heart settled earlier = better.
@@ -259,7 +247,6 @@ export const READINESS_MODEL = {
   baselineMinNights: BASELINE_MIN_NIGHTS,
   recoveryIndexOptimalHours: RECOVERY_INDEX_OPTIMAL_HOURS,
   modelVersion: READINESS_MODEL_VERSION,
-  checkinEnergyScore: CHECKIN_ENERGY_SCORE,
   neutralScore: NEUTRAL.score,
   directions: {
     restingHeartRate: 'lower-better',
@@ -270,7 +257,6 @@ export const READINESS_MODEL = {
     prevDayActivity: 'passthrough',
     recoveryIndex: 'hours-curve',
     activityBalance: 'passthrough',
-    checkin: 'passthrough',
   },
 } as const
 
@@ -287,9 +273,6 @@ export function computeReadinessComposite(input: ReadinessCompositeInputs): Read
     // (approximation) and falls back to neutral when there's no overnight HR series.
     recoveryIndex:     recoveryIndexScore(input.recoveryIndexHours),
     activityBalance:   plainScore(input.activityBalanceScore),
-    // Subjective morning check-in (mood/energy). Neutral 50 when not logged — so a perfect 100
-    // requires a good check-in, but skipping it doesn't tank readiness.
-    checkin:           plainScore(input.checkinScore ?? null),
   }
 
   const score = Math.round(
@@ -325,9 +308,14 @@ export interface ReadinessRederivation {
    *
    * These used to be skipped, which dropped their WEIGHT from the sum and made `score` come out
    * low by roughly `weight × 50` — indistinguishable, from outside, from a real disagreement.
-   * Measured on production 2026-09-18: seven rows (2026-07-16 → 07-22) store eight of the nine
-   * contributors, missing `checkin` (weight 0.10), and read 4 to 6 points below their stored score
-   * for that reason alone. Every other row stores nine and reproduces exactly.
+   * Measured on production 2026-09-18: seven rows (2026-07-16 → 07-22) stored eight of the then
+   * nine contributors, missing `checkin` (weight 0.10), and read 4 to 6 points below their stored
+   * score for that reason alone. `checkin` has since left the model (#2224), so those rows now hold
+   * every current key; the rule stands for the next one that goes missing.
+   *
+   * The opposite case is not reported: a stored key the current model no longer has (every row
+   * written before #2224 carries `checkin`) is ignored, and `score` is what the current model gives.
+   * That is a model change, which `model_versions.readiness` on the row already records.
    *
    * A missing key now contributes the model's own NEUTRAL 50, which is what
    * `computeReadinessComposite` uses for a contributor with no input — so `score` is the closest
@@ -381,8 +369,7 @@ export function rederiveReadinessFromStored(stored: unknown): ReadinessRederivat
 
     // TN-49 — a key that is ABSENT carries the model's NEUTRAL rather than being skipped. Skipping
     // dropped its WEIGHT from a sum defined to total 1, so the result came out low by about
-    // `weight × 50` and read as a disagreement the row did not have. Seven production rows are
-    // missing `checkin` for this reason.
+    // `weight × 50` and read as a disagreement the row did not have.
     if (entry === undefined) {
       missing.push(key)
       weighted += NEUTRAL.score * READINESS_WEIGHTS[key]
