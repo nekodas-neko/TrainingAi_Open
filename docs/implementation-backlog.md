@@ -491,6 +491,15 @@ below threshold and left in place for next time.
 > temperature-baseline cluster under it keep their order relative to each other.
 
 ### [platform] OR-207 — six PRs were stranded when every session stopped, and four have gone un-mergeable
+- **⛔ DO NOT MERGE `#1847` OR `#1849` WHILE A DEVICE SITTING IS RUNNING — added 2026-10-05.**
+  Both are column-dropping migrations, and **merging auto-deploys to Railway production**, which is
+  the database the phone is reading during a sitting. A deploy mid-sitting restarts the app under
+  the device agent and can turn a real pass into an unexplained failure nobody can reproduce
+  afterwards. The owner is running DV locally and Lane A in the background **at the same time**,
+  which is exactly the overlap this guards.
+  **Order when both are live:** take `#2024`, `#1790`, `#1762` and `#1902` — none of which change
+  the schema — and **hold the two migrations until the sitting ends**. That still clears four of
+  the six, and it is the half that needs no coordination.
 
 - **Lane: A** · **Added:** 2026-10-04 · Orchestrator, full orchestration review.
 - **⛔ THREE OF THESE THE OWNER ALREADY APPROVED ON 2026-09-28 and they never merged.** `#1847`
@@ -511,6 +520,13 @@ below threshold and left in place for next time.
   with a guard; the guard is what makes them safe, not the age of the approval.
 
 ### [devices][heart-rate] OR-208 — `rr_intervals` has written nothing since 2026-09-28, while the ring kept writing
+- **✅ ANSWERED 2026-10-05 — NOT A FAULT. The owner has not worn the strap since 28 September.**
+  Verbatim: *"No I havent worn the strap since."* The gap is explained, the ingest path is sound,
+  and **nothing is owed here**. Recorded rather than deleted so the next reader can date the gap
+  instead of rediscovering it.
+- **What it leaves behind, and it is the only live thing:** `PS-44`'s week of strap-to-bed data has
+  **not started**. That entry's gate is correct and still waiting on him.
+- **Strike this entry once `PS-44` records the week starting** — it exists only to date the gap.
 
 - **Lane: O** · **Added:** 2026-10-04 · Orchestrator, session-start reads.
 - **Measured:** latest `rr_intervals.at` is **2026-09-28 22:18**. Over the same window
