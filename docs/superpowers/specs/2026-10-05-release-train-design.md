@@ -580,6 +580,12 @@ agent ends up following half the old rules and half the new.
     that is supposed to cover that gap does not exist yet. So a release now attaches its own
     immutable `app-v<x>.apk`, built from the tagged commit, *in addition* to the rolling one.
     Retire `apk-latest` once `.dev` ships.
+- **Cutover, 2026-10-05:** ✅ the first release (`v1.486.11`, run #3) deployed `b86892f` through
+  `railway up` and confirmed production serving it. Two faults surfaced and were fixed on the way:
+  the CLI needs `--service` because the project holds three services (#2058), and the notes step
+  summarised the entire history and was refused as too long, leaving the tag without a release page
+  (#2059; the owner made the page by hand). ✅ **Railway auto-deploy from `main` is off**, the GitHub
+  connection kept. ✅ `deploy-check.yml`'s push trigger removed in the same breath.
 - **Order of operations at the cutover, because two steps cannot be swapped:** merge the plumbing
   PR → run the first release → owner turns Railway auto-deploy off → *then* a one-line PR drops
   `deploy-check.yml`'s `push: [main]` trigger. Dropping it earlier leaves real deploys unwatched;
