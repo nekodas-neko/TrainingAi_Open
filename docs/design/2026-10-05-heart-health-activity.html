@@ -1,0 +1,139 @@
+<title>Heart-Health Activity</title>
+<style>
+/* Layout: one column of decision sections; each holds side-by-side 384 px phone panes that scroll inside their own row. */
+:root{
+  color-scheme: dark;
+  --page-bg:#0c1110; --page-panel:#131a18; --page-line:#22302c;
+  --page-fg:#e8efec; --page-dim:#93a49e; --page-accent:#00e07a; --page-warn:#ff8f6b;
+  --background: oklch(0.145 0.020 149);
+  --card: oklch(0.185 0.028 149);
+  --muted: oklch(0.21 0.02 149);
+  --foreground: oklch(0.985 0 0);
+  --muted-foreground: oklch(0.75 0 0);
+  --border: oklch(1 0 0 / 9%);
+  --brand: oklch(0.723 0.219 149.579);
+  --protein:#22c55e; --carbs:#3b82f6; --fat:#f97316;
+  --est: oklch(0.80 0.03 149);
+  --font-page:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,monospace;
+  --font-app:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--page-bg);color:var(--page-fg);font-family:var(--font-page);line-height:1.55;padding-block:28px;padding-inline:16px}
+.wrap{max-width:1240px;margin:0 auto}
+h1{font-size:26px;line-height:1.2;margin:0 0 6px;font-weight:700;text-wrap:balance}
+.sub{color:var(--page-dim);margin:0 0 6px;max-width:66ch}
+.meta{font-family:var(--font-mono);font-size:11px;color:var(--page-dim);text-transform:uppercase;letter-spacing:.09em;margin:0 0 22px}
+section{border-top:1px solid var(--page-line);padding-block:24px 8px}
+h2{font-size:18px;margin:0 0 8px;font-weight:600;text-wrap:balance}
+.ask{margin:0 0 16px;max-width:66ch;color:var(--page-fg)}
+.pair{display:flex;gap:18px;overflow-x:auto;padding-bottom:12px}
+.pane{flex:0 0 auto;display:flex;flex-direction:column;gap:8px}
+.cap{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.chip{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:999px;font-weight:600}
+.chip.now{background:rgba(255,143,107,.14);color:var(--page-warn);border:1px solid rgba(255,143,107,.3)}
+.chip.rec{background:rgba(0,224,122,.13);color:var(--page-accent);border:1px solid rgba(0,224,122,.32)}
+.chip.alt{background:rgba(255,255,255,.07);color:var(--page-fg);border:1px solid var(--page-line)}
+.cap .w{font-family:var(--font-mono);font-size:10px;color:var(--page-dim)}
+.phone{width:384px;background:var(--background);border:1px solid var(--page-line);border-radius:22px;overflow:hidden;font-family:var(--font-app);color:var(--foreground);padding:14px 12px}
+.why{max-width:384px;font-size:13px;color:var(--page-dim);margin:0}
+.why b{color:var(--page-fg);font-weight:600}
+/* the app's prescribed-run card, from components/running/prescribed-run-card.tsx */
+.acard{border-radius:16px;border:1px solid var(--border);background:var(--card);padding:16px}
+.ahead{display:flex;align-items:center;gap:8px}
+.ahead h3{font-size:18px;font-weight:700;margin:0}
+.ahead .ic{width:20px;height:20px;border-radius:6px;background:oklch(0.62 0.18 210 / .18);color:oklch(0.62 0.18 210);display:grid;place-items:center;font-size:12px;font-weight:700}
+.tag{margin-left:auto;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:999px;background:oklch(0.62 0.18 210 / .15);color:oklch(0.72 0.14 210)}
+.ameta{margin-top:8px;display:flex;flex-wrap:wrap;gap:4px 16px;font-size:14px;color:var(--muted-foreground)}
+.arat{margin:12px 0 0;font-size:14px;line-height:1.5}
+.prog{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+.prog .lbl{display:flex;justify-content:space-between;font-size:12.5px}
+.prog .lbl span:last-child{font-variant-numeric:tabular-nums;color:var(--muted-foreground)}
+.bar{height:8px;border-radius:999px;background:oklch(1 0 0 / 8%);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--brand);border-radius:999px}
+.from{font-size:12px;color:var(--muted-foreground)}
+.from b{color:var(--foreground);font-weight:600}
+.abtn{margin-top:16px;width:100%;text-align:center;font-weight:600;font-size:14px;padding:11px;border-radius:12px;background:var(--brand);color:oklch(0.15 0.02 149)}
+.hist{margin-top:14px;display:flex;flex-direction:column;gap:6px}
+.hist h4{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted-foreground);margin:0 0 2px;font-weight:600}
+.hrow{display:flex;gap:10px;align-items:center;font-size:12.5px;padding:8px 10px;border-radius:12px;background:var(--card);border:1px solid var(--border)}
+.hrow .d{width:30px;color:var(--muted-foreground);font-variant-numeric:tabular-nums}
+.hrow .w{flex:1;min-width:0}
+.hrow .w small{display:block;color:var(--muted-foreground);font-size:11px}
+.hrow .s{font-size:11px;font-weight:600}
+.s.ok{color:var(--protein)} .s.no{color:var(--page-warn)} .s.mute{color:var(--muted-foreground)}
+.verdict{margin-top:6px;padding:14px 16px;background:var(--page-panel);border:1px solid var(--page-line);border-left:3px solid var(--page-accent);border-radius:0 8px 8px 0;max-width:72ch}
+.verdict p{margin:0}
+.verdict p+p{margin-top:8px}
+</style>
+
+<div class="wrap">
+  <h1>Heart-health activity, not "prescribed run"</h1>
+  <p class="sub">You said the prescription should be a <b>heart-health activity</b> that a run, walk or anything else can complete. Production has <b>26 prescribed runs and 0 completed</b>, while walks were happening on 17 of those days. Two things to choose; the third is already answered.</p>
+  <p class="meta">Issue #2093 · drawn at 384 px, dark · 2026-10-05</p>
+
+  <section>
+    <h2>(a) What counts as done?</h2>
+    <p class="ask">The same week in each pane: a brisk treadmill walk on Monday, a slow evening stroll on Wednesday, and today's walk so far.</p>
+    <div class="pair">
+      <div class="pane"><div class="cap"><span class="chip now">Today</span><span class="w">a run, or nothing</span></div><div class="phone">
+  <div class="acard">
+    <div class="ahead"><span class="ic">R</span><h3>Easy run</h3><span class="tag">Zone 2</span></div>
+    <div class="ameta"><span>30 min</span><span>Base building</span></div>
+    <p class="arat">Easy aerobic volume to build your base this week.</p>
+    <div class="abtn">Start run</div>
+  </div>
+  <div class="hist"><h4>This week</h4>
+    <div class="hrow"><span class="d">Mon</span><span class="w">Easy run<small>a 34-min treadmill walk was logged separately</small></span><span class="s no">Not done</span></div>
+    <div class="hrow"><span class="d">Wed</span><span class="w">Easy run<small>a 41-min walk was logged separately</small></span><span class="s no">Not done</span></div>
+    <div class="hrow"><span class="d">Fri</span><span class="w">Easy run</span><span class="s mute">Today</span></div>
+  </div>
+</div><p class="why"><b>The problem.</b> Every walk is invisible to the plan, so it reads as never done.</p></div>
+      <div class="pane"><div class="cap"><span class="chip rec">Recommended</span><span class="w">minutes in zone 2+</span></div><div class="phone">
+  <div class="acard">
+    <div class="ahead"><span class="ic">♥</span><h3>Heart-health activity</h3><span class="tag">Zone 2</span></div>
+    <div class="ameta"><span>30 min in zone 2 or above</span><span>Run, walk or anything</span></div>
+    <p class="arat">Easy aerobic time to build your base. Any activity counts.</p>
+    <div class="prog"><div class="lbl"><span>Zone 2+ minutes today</span><span>22 of 30</span></div><div class="bar"><i style="width:73%"></i></div><span class="from">from <b>Treadmill walk</b> this morning · 34 min</span></div>
+    <div class="abtn">Start an activity</div>
+  </div>
+  <div class="hist"><h4>This week</h4>
+    <div class="hrow"><span class="d">Mon</span><span class="w">Treadmill walk · 34 min<small>31 min in zone 2+</small></span><span class="s ok">Counted ✓</span></div>
+    <div class="hrow"><span class="d">Wed</span><span class="w">Evening stroll · 41 min<small>6 min in zone 2+</small></span><span class="s no">Didn't count</span></div>
+    <div class="hrow"><span class="d">Fri</span><span class="w">Treadmill walk · 34 min so far<small>22 min in zone 2+</small></span><span class="s mute">Today</span></div>
+  </div>
+</div><p class="why"><b>Why.</b> It counts what actually trains the heart: a brisk walk counts, a slow stroll doesn't yet. It uses the zone minutes the app already measures from your heart rate.</p></div>
+      <div class="pane"><div class="cap"><span class="chip alt">Alternative</span><span class="w">any 30 min counts</span></div><div class="phone">
+  <div class="acard">
+    <div class="ahead"><span class="ic">♥</span><h3>Heart-health activity</h3><span class="tag">Zone 2</span></div>
+    <div class="ameta"><span>30 min of activity</span><span>Run, walk or anything</span></div>
+    <p class="arat">Easy aerobic time to build your base. Any activity counts.</p>
+    <div class="prog"><div class="lbl"><span>Activity minutes today</span><span>34 of 30</span></div><div class="bar"><i style="width:100%"></i></div><span class="from">from <b>Treadmill walk</b> this morning · 34 min · done</span></div>
+    <div class="abtn">Start an activity</div>
+  </div>
+  <div class="hist"><h4>This week</h4>
+    <div class="hrow"><span class="d">Mon</span><span class="w">Treadmill walk · 34 min<small>31 min in zone 2+</small></span><span class="s ok">Counted ✓</span></div>
+    <div class="hrow"><span class="d">Wed</span><span class="w">Evening stroll · 41 min<small>any 30+ min activity counts</small></span><span class="s ok">Counted ✓</span></div>
+    <div class="hrow"><span class="d">Fri</span><span class="w">Treadmill walk · 34 min so far<small>22 min in zone 2+</small></span><span class="s mute">Today</span></div>
+  </div>
+</div><p class="why"><b>Better at</b> working with no heart-rate data at all. <b>Loses because</b> a stroll completes the plan as fully as a hard session, so "done" stops meaning trained.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>(b) What history shows</h2>
+    <p class="ask">Both new panes above show <b>what you actually did</b> ("Treadmill walk · 34 min · Counted ✓") rather than "Run: complete". That is the recommendation: a record that says "run" for a walk would be a record you can't trust later.</p>
+  </section>
+
+  <section>
+    <h2>What to answer</h2>
+    <div class="verdict">
+      <p><b>Recommendation: count minutes in zone 2 or above, and show what was actually done.</b> Reply "zone minutes" or "any 30 min".</p>
+      <p><b>(c) is answered:</b> past days are re-scored under the new definition, by your rule that re-scoring is fine during the trial.</p>
+      <p>Reversal cost is low. The threshold is one setting, and the rename is copy and one card.</p>
+    </div>
+  </section>
+</div>
