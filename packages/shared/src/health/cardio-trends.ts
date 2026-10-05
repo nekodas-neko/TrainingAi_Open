@@ -59,6 +59,14 @@ export function buildCadenceTrend(
     .sort((a, b) => a.date.localeCompare(b.date))
 }
 
+/**
+ * OR-211. The shortest run that can set the all-time best average pace. The 1k and 5k bests are
+ * already windowed, so a pace needs no less than the smallest of those. Without a floor a 30 m GPS
+ * false start (a pace read from a few metres of drift) becomes the all-time best, reproduced on a
+ * live fixture.
+ */
+export const BEST_PACE_MIN_DISTANCE_KM = 1
+
 export interface RunningBests {
   /** Fastest 1km, in seconds — `bestEfforts['1km']` is already a per-km pace, so this
    *  doubles as "best pace over 1km". */
@@ -86,7 +94,9 @@ export function computeRunningBests(
     if (e1k != null && (best1kSec == null || e1k < best1kSec)) best1kSec = e1k
     const e5k = log.bestEfforts?.['5km']
     if (e5k != null && (best5kSec == null || e5k < best5kSec)) best5kSec = e5k
-    if (log.avgPaceSecPerKm != null && (bestAvgPaceSecPerKm == null || log.avgPaceSecPerKm < bestAvgPaceSecPerKm)) {
+    // A run with no recorded distance cannot show it cleared the floor, so it does not count either.
+    const longEnough = log.distanceKm != null && log.distanceKm >= BEST_PACE_MIN_DISTANCE_KM
+    if (longEnough && log.avgPaceSecPerKm != null && (bestAvgPaceSecPerKm == null || log.avgPaceSecPerKm < bestAvgPaceSecPerKm)) {
       bestAvgPaceSecPerKm = log.avgPaceSecPerKm
     }
     if (log.distanceKm != null && (longestDistanceKm == null || log.distanceKm > longestDistanceKm)) {

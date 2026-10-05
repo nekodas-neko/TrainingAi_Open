@@ -224,6 +224,10 @@ curve). **Before writing anything that treats one row as one night, call the hel
 ## History
 
 - Handoffs: `ls docs/handoffs/handoff-*-sleep-*.md` — most recent:
+  [`2026-10-05-sleep-announce-and-correct.md`](../../handoffs/handoff-2026-10-05-sleep-announce-and-correct.md)
+  (the sleep verdict: the app fills the category and announces it, the owner only corrects it —
+  `TN-81`/`TN-83`/`TN-85` shipped, `VERDICT_IQR_MULTIPLIER` settled at 1.0, and the record of **why
+  three in-sheet rating questions each decayed to zero**);
   [`2026-08-03-sleep-asymmetric-interruption-window-fix.md`](../../handoffs/handoff-2026-08-03-sleep-asymmetric-interruption-window-fix.md)
   (a real mid-night interruption could get its earlier sleep bout silently dropped, reading as a
   much later bedtime; fixed in `lib/sleep/sensing-span.ts`, PR #1043)

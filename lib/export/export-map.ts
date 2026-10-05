@@ -153,7 +153,7 @@ export const EXPORTED: Record<string, ExportScope> = {
   meal_plan_meals: { kind: 'via', predicate: 'EXISTS (SELECT 1 FROM public.meal_plan_variants v JOIN public.meal_plans mp ON mp.id = v.meal_plan_id WHERE v.id = t.variant_id AND mp.user_id = $1)' },
   // Both arms, for the reason the generator documents at length: `program_id` is nullable and the
   // modern write path sets only `phase_set_id`, so a program_id-only predicate hides every row.
-  program_phases: { kind: 'via', predicate: 'EXISTS (SELECT 1 FROM public.phase_sets ps WHERE ps.id = t.phase_set_id AND ps.user_id = $1) OR EXISTS (SELECT 1 FROM public.programs p WHERE p.id = t.program_id AND p.user_id = $1)' },
+  program_phases: { kind: 'via', predicate: 'EXISTS (SELECT 1 FROM public.phase_sets ps WHERE ps.id = t.phase_set_id AND ps.user_id = $1)' },
 }
 
 /** Columns never written to a takeout, even from an exported table. */

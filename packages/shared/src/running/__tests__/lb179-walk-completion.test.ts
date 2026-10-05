@@ -32,6 +32,7 @@ describe('assembleInputs ignores a walk-completed prescription (LB-179)', () => 
     getWorkoutSessionsFrom: async () => [],
     listSleepSessions: async () => [],
     getPrescribedRuns: async () => runs,
+    getActiveProgram: async () => null,
   }) as never
   const plan = {
     id: 'p', userId: 'u', goalKind: 'general', targetDistanceKm: null, targetDate: null,

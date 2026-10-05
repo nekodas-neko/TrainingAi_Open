@@ -24,24 +24,24 @@
 
 ## Now — idle, waiting for the owner's next review brief
 
-**Nothing is open.** Every PR from sweeps 54–64 is merged. This session's last three: #1686 (sweep
-63), #1707 (sweep 64), and the routing PR that wrote this baton.
+**Nothing is open.** Every PR from sweeps 54–64 is merged: the last were #1686 (sweep 63), #1707
+(sweep 64) and #1709 (routing). The session closed on 2026-10-05.
 
-**Handed off, so do not re-file:**
-- **Lane O, owner items: RV-221.** One mockup (RV-213), the daily calorie target (RV-218), and a
-  merge-time yes on six security fixes. It sits beside the older **RV-161 / RV-170 / RV-157**.
-- **Lane DV, one pass: RV-220.** It fixes the gallery's capture faults and then runs everything
-  still owed: P41 before/after on RV-207's shipped fixes, RV-206 P29–P38, the rest of RV-205, and
-  whether hidden tabs keep animating. **When its result lands, the next sweep is reading that
-  gallery.**
-- **Security, Lane A:** RV-190, 191, 192, 193, 195, 196, 197, 198 (partly shipped).
-  - **RV-191 first:** any user can reach it, and it is the precondition for 193 and 196.
-  - **RV-190 before OR-138.** Open PR #1499 must not merge ahead of it.
-- **AI to logic, Lane A/B:** RV-200 (partly shipped), 201, 202, 203, 204.
-- **Design, Lane B:** RV-208 to RV-219.
-  - **RV-207 shipped 5 of 7.** Its ⑤ remainder is LB-162, and ⑥ is a Lane O mockup.
-  - **RV-216** (the two streak functions) and **RV-217** (raw sleep keys) are Lane A,
-    code-certain.
+**Handed off, so do not re-file.** Status re-read on 2026-10-05 when the session closed.
+- **Shipped and gone from the queue:**
+  - security: RV-190, 192, 193, 195, 197;
+  - RV-201;
+  - design: RV-213, 214, 215, 216, 217, 219;
+  - RV-221: the owner answered it.
+- **Still queued:**
+  - **Security, Lane A:** RV-191 (do it first: any user can reach it), RV-196 (needs an APK) and
+    RV-198 (the remainder of the job split).
+  - **AI to logic:** RV-200 (partly shipped), 202, 203, 204.
+  - **Design, Lane B:** RV-208, 209, 210, 211, 212, 218.
+  - **DV:** RV-220, one consolidated pass. **When its gallery lands, the next sweep is reading
+    it.**
+- **Closing handoff:**
+  [`handoff-2026-10-05-platform-review-sweeps-54-64.md`](../../handoffs/handoff-2026-10-05-platform-review-sweeps-54-64.md).
 
 **The lesson of sweeps 62–64:**
 - **A web screenshot pass is worth doing first, and the phone corrects it.** Of sweep 63's web-only

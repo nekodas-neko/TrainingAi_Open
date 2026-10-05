@@ -295,6 +295,18 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- [`handoff-2026-10-05-platform-device-verification-sweeps-2-to-5.md`](../../handoffs/handoff-2026-10-05-platform-device-verification-sweeps-2-to-5.md)
+  — **Device Verification, sweeps 2 → 4b and the sweep 5 plan, 2026-09-23 → 2026-10-05.** About 40 entries
+  verified on the S25; DV-13 to DV-19 filed; the harness, its traps, and the private design gallery.
+- [`handoff-2026-10-05-platform-lane-b-comparative-checkin-and-idle-queue.md`](../../handoffs/handoff-2026-10-05-platform-lane-b-comparative-checkin-and-idle-queue.md)
+  — **Lane B, 2026-09-30 to 2026-10-05.** Rebuilt the morning check-in's comparative control
+  (#2026, #2027) and carries the rule it produced: the prompt on screen and the `vs_question`
+  marker stamped on the row move together, or every row in between is mislabelled with nothing
+  downstream able to detect it. Then four days with `READY 0`, which the doc establishes as a real
+  state and separates from the repo-wide stall in #2032. Also records four git traps worth
+  avoiding — a backlog conflict that is a deletion against a modification, gating with unmerged
+  paths in the tree, `git checkout HEAD --` on a conflicted file, and a mid-flight rename landing
+  under an open green PR.
 - [`handoff-2026-09-27-platform-lane-a-security-cluster.md`](../../handoffs/handoff-2026-09-27-platform-lane-a-security-cluster.md)
   — **Lane A, the Review-sweep-60 security cluster, 2026-09-27.** TN-78 and BF-211 merged;
   RV-192, RV-193, RV-195 ② and RV-197 built, CI-green and **owner-gated** (#1779, #1781, #1784,
@@ -533,6 +545,7 @@ Live at the time of writing (2026-07-30):
 - [`handoff-2026-08-16-platform-public-repo-cut-a4b.md`](../../handoffs/handoff-2026-08-16-platform-public-repo-cut-a4b.md)
 - [`docs/handoffs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md`](../../handoffs/handoff-2026-08-25-platform-lane-b-nineteen-prs.md) — **Lane B, nineteen PRs, 2026-08-25.** Q-406, LB-10, Q-499, Q-467, Q-315, Q-538, Q-305, Q-281, Q-282, Q-138, Q-477 complete, E2E restored to green, and five queue-tooling fixes (LB-11, LB-12, PS-6). **The lesson worth carrying: five entries were wrong about their own premise** — Q-282 ("no a11y check in CI"; there is one), Q-305 ("never shown"; shown against a made-up band), Q-315 ("just needs a press"; nothing could press it), Q-138 (two rows already done), Q-555 (does not reproduce). A grep count is not a violator list. Nothing device-verified.
 - [`docs/handoffs/handoff-2026-08-24-platform-lane-b-nine-prs.md`](../../handoffs/handoff-2026-08-24-platform-lane-b-nine-prs.md) — **Lane B, nine PRs, 2026-08-24.** Q-486, Q-321, Q-357, Q-328, LB-3, LB-6, LB-7 and Q-359's demotion. Carries the two lessons that cost the most: read the CI *server* log before fixing a CI-only failure, and a spec stubbing an `/api/` route needs `serviceWorkers: 'block'`. **Q-555's fix is written, unmerged and unverified** on `fix/offline-tab-tap-native-fallback`.
+- [`docs/handoffs/handoff-2026-10-05-platform-review-sweeps-54-64.md`](../../handoffs/handoff-2026-10-05-platform-review-sweeps-54-64.md) — **Review sweeps 54–64, closed 2026-10-05:** security (RV-190 to RV-199), AI to logic (RV-200 to RV-204), the DV design loop (RV-205 to RV-221). Notes what shipped, what is still queued, and the screenshot channel.
   — Q-49 public-repo cut. **Updated at the Phase B boundary:** A4b has shipped, Oura's material is
   out of the tree, and the handoff now carries what A4b cost beyond the plan — the constants were
   still a build-time dependency and `publish-dry-run` has no build gate to see it (Q-313), the

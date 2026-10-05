@@ -54,15 +54,15 @@ const ouraDerivedRow = {
   day: '2026-07-01', source: 'ble', modelVersions: { sleepnet: 'v1' }, sleepScore: 84,
   sleepContributors: { deep: 90 }, readinessScore: 80, readinessContributors: { hrv: 88 },
   readinessSource: 'derived', activityScore: 77, activityContributors: { move: 70 },
-  activeCaloriesEst: 450, trainingLoadOts: 1.2, trainingLoadGate: 'ok', trainingLoadHigh: true,
+  trainingLoadOts: 1.2, trainingLoadGate: 'ok', trainingLoadHigh: true,
   trainingLoadGridLen: 1421, trainingLoadValidMin: 1073, recoveryIndexHours: 6,
-  wornHoursBle: 22, nightHrvBaselineMs: 60, illnessFlag: 'none', illnessScore: 3,
+  nightHrvBaselineMs: 60, illnessFlag: 'none', illnessScore: 3,
   illnessBiomarkers: { temp: 0.1 }, daytimeStressScaled: 40, stressHighMinutes: 30,
   recoveryHighMinutes: 120, chronicStressScore: 25, chronicStressContributors: { load: 20 },
   resilienceLevel: 3, resilienceDailyStress: 40, resilienceDailyRestorativeTime: 300,
   resilienceDailySleepRecovery: 80, resilienceGranular: 2.5, resilienceConfidence: 0.9,
   daytimeStressCoverageMin: 240, chronicStressGranularNights: 27,
-  bdiDerived: 1.1, vascularAge: 32, pwv: 6.5, bodyComp: { ffm: 65 },
+  bdiDerived: 1.1, bodyComp: { ffm: 65 },
   syncStatus: 'synced' as const, updatedAt: '2026-07-01T09:00:00.000Z',
 }
 
@@ -621,10 +621,12 @@ describe('D2 prep — Oura local read/write accessors (Phase-1 Task 1)', () => {
     await store.upsertOuraDailyDerived(ouraDerivedRow)
     const params = runSQL.mock.calls.find(c => String(c[0]).includes('INTO oura_daily_derived'))![1] as unknown[]
     expect(params[2]).toBe(JSON.stringify({ sleepnet: 'v1' })) // model_versions
-    // Positional, so it moves whenever a column is inserted before it — Q-270's `training_load_gate`
-    // went in at 12 and pushed this to 13. The index is the point of the assertion (it proves the
-    // value list still lines up with the column list), so it is corrected rather than made robust.
-    expect(params[13]).toBe(1) // training_load_high: true -> 1
+    // Positional, so it moves whenever a column is inserted or REMOVED before it — Q-270's
+    // `training_load_gate` went in at 12 and pushed this to 13, and LA-142 dropped
+    // `active_calories_est` from earlier in the list and pulled it back to 12. The index is the
+    // point of the assertion (it proves the value list still lines up with the column list), so
+    // it is corrected rather than made robust.
+    expect(params[12]).toBe(1) // training_load_high: true -> 1
   })
 
   it('getOuraDailyDerived round-trips JSON columns and the boolean back correctly', async () => {
@@ -640,7 +642,7 @@ describe('D2 prep — Oura local read/write accessors (Phase-1 Task 1)', () => {
       daytime_stress_scaled: 40, stress_high_minutes: 30, recovery_high_minutes: 120, chronic_stress_score: 25,
       chronic_stress_contributors: JSON.stringify({ load: 20 }), resilience_level: 3, resilience_daily_stress: 40,
       resilience_daily_restorative_time: 300, resilience_daily_sleep_recovery: 80, resilience_granular: 2.5,
-      resilience_confidence: 0.9, daytime_stress_coverage_min: 240, chronic_stress_granular_nights: 27, bdi_derived: 1.1, vascular_age: 32, pwv: 6.5,
+      resilience_confidence: 0.9, daytime_stress_coverage_min: 240, chronic_stress_granular_nights: 27, bdi_derived: 1.1,
       body_comp: JSON.stringify({ ffm: 65 }), sync_status: 'synced', updated_at: '2026-07-01T09:00:00.000Z',
     }])
     const [row] = await store.getOuraDailyDerived('2026-07-01', '2026-07-01')

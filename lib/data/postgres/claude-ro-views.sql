@@ -871,11 +871,9 @@ SELECT
   t.readiness_source,
   t.activity_score,
   t.activity_contributors,
-  t.active_calories_est,
   t.training_load_ots,
   t.training_load_high,
   t.recovery_index_hours,
-  t.worn_hours_ble,
   t.night_hrv_baseline_ms,
   t.illness_flag,
   t.illness_score,
@@ -886,8 +884,6 @@ SELECT
   t.chronic_stress_score,
   t.chronic_stress_contributors,
   t.resilience_level,
-  t.vascular_age,
-  t.pwv,
   t.body_comp,
   t.computed_at,
   t.created_at,
@@ -1164,7 +1160,6 @@ WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 CREATE VIEW claude_ro.program_phases AS
 SELECT
   t.id,
-  t.program_id,
   t.position,
   t.name,
   t.duration_cycles,
@@ -1173,7 +1168,7 @@ SELECT
   t.secondary_style_id,
   t.phase_set_id
 FROM public.program_phases t
-WHERE EXISTS (SELECT 1 FROM public.phase_sets ps WHERE ps.id = t.phase_set_id AND ps.user_id = current_setting('app.claude_ro_owner', true)::uuid) OR EXISTS (SELECT 1 FROM public.programs p WHERE p.id = t.program_id AND p.user_id = current_setting('app.claude_ro_owner', true)::uuid);
+WHERE EXISTS (SELECT 1 FROM public.phase_sets ps WHERE ps.id = t.phase_set_id AND ps.user_id = current_setting('app.claude_ro_owner', true)::uuid);
 
 CREATE VIEW claude_ro.program_sessions AS
 SELECT

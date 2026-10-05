@@ -490,6 +490,194 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform][readiness] OR-215 — a score must record WHICH signals it was built from, or no two scores are comparable
+- **✅ THE OWNER'S NEUTRAL-DEFAULT IDEA IS MATHEMATICALLY IDENTICAL TO RENORMALISE-PLUS-COVERAGE —
+  derived 2026-10-05, and it means no choice has to be made.** With weights `wi` summing to 1,
+  present set `P`, and coverage `C = sum of wi over P`: renormalised `R = (sum wi*si)/C`, and
+  neutral-imputed `N = sum wi*si + v*(1-C)`. Substituting gives **`N = R*C + v*(1-C)`**.
+  His default-at-midpoint **is** the renormalised score shrunk toward `v` by the missing weight.
+  **So store `R` and `C`; `N` is then free at render time.** The reverse does not work — `R` is
+  not recoverable from `N`, and storing `N` bakes in one `v` that cannot change without re-scoring
+  history. Verified against the code: `renormalisedContributors` is a renormalising weighted mean,
+  which is the structure the algebra assumes.
+- **Two things this buys that the idea alone does not.** `v` becomes tunable — mid-scale is only
+  neutral if the contributor's expected value is 50, which for most is false, so **the user's own
+  rolling median is the better `v`** with 50 as cold start. And the shrinkage curve becomes a
+  formula over stored values rather than a migration.
+- **⚠ The precedent against imputing at STORAGE is already in this repo:** `TN-57`/`TN-58` —
+  *"a neutral stored as though it were an answer is the defect TN-57 just fixed"* — and `Q-499`,
+  where a card cannot tell "no data" from "the fetch failed". Coverage keeps that distinction;
+  imputation destroys it. **Shrink at render, never at write.**
+- **📄 SPEC: [`docs/architecture/ingest-and-scoring.md`](architecture/ingest-and-scoring.md)** (draft v1, 2026-10-05) — the four layers, the decisions taken with their reversal costs, and the phasing. **Read it before adding to this entry**, so the three do not drift apart.
+
+- **Lane: O** · **Added:** 2026-10-05 · Orchestrator, from the owner's question on `OR-213`:
+  *"if we never have body temperature - then a new device gives that reading; what do we do with
+  it; how does it affect calculations when it wasnt there for anyone else?"*
+- **✅ HALF OF THIS IS ALREADY SOLVED, and the spec should build on it rather than restate it.**
+  Absent contributors are **excluded and the weights renormalised** — `activity-score.ts`,
+  `sleep-night.ts`, with `renormalisedContributors`/`contributionSum` in
+  `packages/shared/src/health/score-audit/`, which can already explain a score's composition.
+  The pattern is deliberate and reasoned: a lifting day with zero zone-2 minutes *"takes the path
+  absent data already takes: excluded, weights renormalised"*.
+- **⛔ WHAT RENORMALISATION DOES NOT GIVE YOU IS COMPARABILITY, and that is the real question.**
+  It makes a score **computable** from whatever arrived. It does not make two scores **mean the
+  same thing**. A 72 built from six contributors and a 72 built from three are both rendered as
+  "72" and read as the same claim. Three ways that bites, all of them live under `OR-213`/`OR-214`:
+  - **Across users** — the whole point of multi-user. One user's ring gives temperature and HRV;
+    another's phone gives steps. Their scores are not on one scale, so any comparison, ranking or
+    shared default is wrong by construction.
+  - **Within one user, across time** — the day a new device arrives, the basis changes and the
+    score steps. **This is exactly the `vs_yesterday` → `vs_normal` boundary** handled days ago,
+    and it was solved by recording which question each row answered (`vs_question`, `LB-190`).
+  - **Against a tuning** — a calibration fitted when a signal was present silently re-scores days
+    when it was not. `CLAUDE.md` already requires a proposal to state how many days it moves; it
+    cannot, if nothing records which days had which inputs.
+- **🔧 THE FIX GENERALISES AN EXISTING ONE: store the BASIS with every score.** Each stored score
+  records the set of contributors actually present and their renormalised weights — the thing
+  `score-audit` computes today and then discards. Then:
+  - comparability is **checkable** rather than assumed (same basis → comparable; different → say so
+    or do not compare);
+  - a new signal arriving is a **visible basis change**, not a silent step;
+  - a Tuning proposal can finally answer *"how many days does this move"* restricted to the days
+    that actually had the input.
+  **Reversal cost: low now, high later.** It is a field on the write path today; retrofitting it
+  means every historical score has an unknown basis forever.
+- **⚠ THE OWNER'S "START STRONG" HAS A PRICE WORTH NAMING, not a reason to refuse it.** Enumerating
+  every plausible tracker signal up front is right for the *catalogue* — a signal should be a
+  registry entry, never a schema change. But it is **wrong for the scoring weights**: a contributor
+  nobody has ever supplied cannot be weighted on evidence, and a guessed weight that later goes
+  live silently re-scores everyone. **So: declare the full signal catalogue, admit signals into a
+  score only when there is data to calibrate them**, and let the basis field record the difference.
+- **What this entry owes:** the signal catalogue itself (name, unit, native resolutions seen,
+  which pillar it feeds, whether it is scored yet) and the basis field's shape. Both belong in the
+  `OR-213` spec rather than in separate work.
+- **Needs:** OR-213
+
+
+### [devices][platform] OR-214 — the connector framework: "link with X", extracted from the five we already hand-rolled
+- **📄 SPEC: [`docs/architecture/ingest-and-scoring.md`](architecture/ingest-and-scoring.md)** (draft v1, 2026-10-05) — the four layers, the decisions taken with their reversal costs, and the phasing. **Read it before adding to this entry**, so the three do not drift apart.
+
+- **Lane: O** · **Added:** 2026-10-05 · Orchestrator, from the owner's direction.
+- **Needs:** OR-213
+- **What he asked for:** a repertoire of **connectors** — Health Connect, Renpo scale, Oura, and
+  whatever comes next — each one a thing you *"click 'link with x' and then it auto connects and
+  feeds in"*. It pulls third-party data and transforms it into the shape the app reads.
+  **Simplicity is the stated requirement**, and it is what makes adding a device for another user
+  a configuration rather than a project.
+- **✅ THIS IS AN EXTRACTION, NOT A GREENFIELD BUILD — and that is the main finding.** Five source
+  integrations already exist and each was hand-rolled with no shared contract:
+  `lib/oura-ble` · `lib/scale-ble` (Renpo) · `lib/colmi-ble` · `lib/polar-ble` ·
+  `lib/health-connect-sync.ts`, with native services under
+  `android/app/src/main/java/com/trainingai/app/{oura,scale}`.
+  **So the contract should be read out of what these five already do** — they are five worked
+  examples of the same problem — rather than designed in the abstract and then retrofitted. The
+  risk of the abstract route is a framework that fits none of them.
+- **What a connector must declare**, as the contract to extract: the **signals** it provides, each
+  one's **native resolution**, its **transport** (BLE / Health Connect / cloud API), its **link and
+  unlink** flow, its **auth or pairing** state, and its **rank** for the per-minute merge in
+  `OR-213`. One registry, so *"what are our sources"* is answerable by reading a list.
+- **Why it is gated behind `OR-213`:** a connector's output shape is the normaliser's input shape.
+  Building the registry first would freeze an interface the ingest layer has not defined yet.
+- **⚠ The hardest one is already live and must not be re-opened casually:** the Oura ring is on
+  **our own BLE key** with frozen firmware, and re-onboarding the official app risks a firmware
+  update that breaks the reverse-engineered protocol. **An Oura connector wraps the existing
+  pipeline; it does not re-pair the ring.** A naive "link with Oura" button that re-runs onboarding
+  would destroy the integration.
+- **Second constraint from the same area:** an APK uninstall destroys the ring's BLE key, which is
+  recoverable from nowhere. Any pairing UI must make that impossible to trigger by accident.
+- **Scope note:** this is the layer that makes multi-user real. Until it exists, every new user's
+  device support is bespoke work, which is the thing `OR-213` ② is trying to escape.
+
+
+### [platform][devices] OR-213 — the four-layer ingest architecture: one normaliser, device-first storage, scored values only in the cloud
+- **📄 SPEC: [`docs/architecture/ingest-and-scoring.md`](architecture/ingest-and-scoring.md)** (draft v1, 2026-10-05) — the four layers, the decisions taken with their reversal costs, and the phasing. **Read it before adding to this entry**, so the three do not drift apart.
+- **✅ ANSWERED 2026-10-05 — all three, and two calls delegated to the Orchestrator.**
+  - **① NOTHING IS EXEMPT.** Every source follows one path: ingest raw → transform → store on
+    device → send calculated groupings to the cloud. **Raw never reaches Railway.** For the
+    redecode case it is kept **locally, outside the repo** (gitignored or equivalent) — *"it
+    doesnt need to go to the railway app"*. Calculated values upload **as soon as they exist**.
+  - **② MULTI-USER IS THE GOAL, not prospective** — 1–2 → ~5 → upward, with users warned they are
+    in a dev period. **Build for it now**, rather than treating it as a later migration.
+  - **③ Resolution left to the Orchestrator** — *"You choose here; do the best option."*
+- **⛔ THE ONE ORDERING RULE, and it is the whole safety of ①.** `oura_raw_packed` — **28 MB,
+  1.8 M frames** — is **today the only re-decodable copy** of the ring's history, and the ring's
+  buffer only moves forward. So the sequence is fixed and may not be reordered:
+  **(1)** build the local archive and **prove a restore from it**, read-back and unpack verified,
+  not merely a file that exists; **(2)** stop writing raw to Railway; **(3)** only then drop the
+  server archive. **Deleting before a proven restore is unrecoverable** — there is no re-drain.
+  The device is not that home as it stands: 31.2 MB on-device, past Android Auto Backup's 25 MB
+  quota, nothing backed up, and `pruneRaw` still has no caller.
+- **🔧 DECISION (Orchestrator, delegated) — canonical resolution is FINEST-AVAILABLE PER SOURCE,
+  tagged.** Every sample carries its **source** and its **native resolution**; nothing is resampled
+  on arrival. Health Connect's 5-minute HR bins stay 5-minute bins **marked as 5-minute**, and are
+  never interpolated to look like the strap's ~1 s.
+  **Why:** downsampling later is reversible, discarding is not — and a 5-minute bin dressed as 1 s
+  is a number the app would trust more than it should. Roll-ups are derived on the device, where
+  recomputing from the finest tier is cheap.
+  **Reversal cost: low on the write path, total on the data.** Switching to a fixed grid later is a
+  config change; recovering detail thrown away at ingest is impossible.
+- **🔧 DECISION — the per-minute winner is decided by SOURCE RANK, reusing the existing ranked
+  per-field health-write merge** rather than a new mechanism. Finest resolution does not
+  automatically win: a 1 s strap reading and a 5-minute ring bin covering the same minute are
+  resolved by rank, and the loser is **kept, not discarded**, so the choice can be revisited.
+- **⚠ Consequence of ① + ② worth pricing before the spec:** *"uploaded instantly"* × N users makes
+  the cloud write path the shared bottleneck. The pool is `max: 10` per replica and
+  `CLAUDE.md` marks it load-bearing — so the upload must be **batched and bounded per user**, not
+  a write per value. This is a design input, not a blocker.
+- **Ops/logs are the second cost nobody has counted:** 54 MB (21.8%) today is `error_events` and
+  `db_query_log`, which **do not shrink under this architecture** and are shared rather than
+  per-user. Worth a retention decision in the same spec.
+
+- **Lane: O** · **Added:** 2026-10-05 · Orchestrator, from the owner's architecture direction.
+- **His target, in his words:** raw from device / Health Connect → turn raw into values → store at
+  the finest resolution available **on the phone** → Tuning scores it → the app rolls up
+  (1s → 1min → 15min → 1h) locally → **only the scored, calculated values go to Railway**, because
+  that set is small. Driver: *"we need to make sure our railway DB can handle multiple users
+  efficiently."*
+- **✅ MEASURED 2026-10-05 — THE PREMISE HOLDS, and the number is decisive.** Production today, one
+  user, 263 MB total:
+
+  | bucket | size | share |
+  |---|---|---|
+  | raw / sample, device-sourced | **182 MB** | **73.3%** |
+  | ops + logs (`error_events`, `db_query_log`) | 54 MB | 21.8% |
+  | **calculated + app data** | **12 MB** | **4.9%** |
+
+  **So the architecture he describes takes a user from ~263 MB to ~12 MB — about 22×.** At today's
+  shape 100 users is ~26 GB; under his model it is ~1.2 GB. **This is not a refactor for tidiness,
+  and the entry should not be argued on tidiness.**
+- **✅ CONFIRMED: there is NO shared normalisation layer, exactly as he suspected.** Searched for a
+  canonical-sample step (`normaliseSample`/`canonicalSample`/a shared sensor-ingest module) — **none
+  exists**. Ingest arrives through at least `app/api/hr-ingest`, `app/api/sync-health`,
+  `app/api/health-connect`, `app/api/oura-ble/samples` and `lib/health-connect-sync.ts`, and
+  `oura_heartrate` is written from several of them independently. **Each source defines its own
+  shape, so "what are our important sources and how do we aggregate them" has no single answer to
+  read.** That is the gap worth closing first, before any storage move.
+- **⛔ ONE HARD CONFLICT WITH AN EXISTING DECISION, and it must be resolved before anything ships.**
+  *"Everything raw on the device"* contradicts the owner's own **2026-09-28** decision to KEEP the
+  server-side Oura raw archive, taken on `OR-192`'s measurement: a redecode is **hardcoded
+  full-history**, so every protocol fix re-reads the entire archive, and **a pruned raw row cannot
+  be re-drained from the ring**. Both positions are his and they cannot both hold.
+  **The device is not currently a safe home for the only copy:** measured on-device 2026-08-18,
+  **209,326 rows / 31.2 MB, past Android Auto Backup's 25 MB quota, so none of it is backed up**,
+  and the 14-day prune (`pruneRaw`) still has no caller. A lost phone would be a permanent loss.
+- **The resolution question he raised is the real design content.** Health Connect delivers 5-minute
+  HR bins; the strap delivers ~1 s; the ring delivers its own cadence. A normaliser has to decide
+  whether the canonical store keeps **finest-available per source** (and records which) or
+  **downsamples to one grid on arrival**. Keeping the finest is reversible; picking a grid is not,
+  because the discarded detail cannot be recovered.
+- **What this entry owes before it becomes buildable work:** a written spec of the four layers with
+  the source contract named — for each source, what it provides, at what resolution, and which
+  field wins when two sources cover the same minute. **The existing ranked per-field merge for
+  health writes is prior art and should be read first, not reinvented.**
+- **Questions put to the owner 2026-10-05** (see the chat of that date): whether the raw archive is
+  genuinely exempt from "everything local"; whether multi-user is real or prospective; and whether
+  the canonical resolution is finest-available or a fixed grid.
+- **Do NOT start moving storage.** The normaliser and the source contract come first; a storage move
+  without them relocates the ambiguity rather than removing it.
+
+
+
 ### [platform] OR-207 — six PRs were stranded when every session stopped, and four have gone un-mergeable
 - **⛔ DO NOT MERGE `#1847` OR `#1849` WHILE A DEVICE SITTING IS RUNNING — added 2026-10-05.**
   Both are column-dropping migrations, and **merging auto-deploys to Railway production**, which is
@@ -518,6 +706,30 @@ below threshold and left in place for next time.
   are docs-only and can go any time.
 - **Re-confirm CI green on each UPDATED head before merging.** Two are column-dropping migrations
   with a guard; the guard is what makes them safe, not the age of the approval.
+- **▶ STATE 2026-10-05, ~16:35 AEST (Lane A).**
+  - **Merged:** `#2024` (LB-194), `#1902` at 16:28 (TN-56; auth only, no schema; flipped ready and
+    merged with RV-190's `runScoped` change; live-checked 401 without a token, 401 on a wrong one,
+    past-auth on the right one), and **`#1847` at 16:29** (LA-159's column drop; rehearsed on the
+    owner's snapshot, 46 phases before and after).
+  - **⚠ `#1847` MERGED EIGHT MINUTES AFTER THE HOLD ABOVE WAS ADDED (16:21), AND LANE A DID NOT SEE
+    IT.** Lane A read this entry at the start of the work, armed auto-merge, and did not re-read it
+    before the deploy. Production now runs `b32d329`. **Lane A cannot tell whether a sitting was
+    running** (the DV baton is dated 09-28 and says nothing is). If one was, an anomaly from about
+    16:29 AEST is a deploy restart, not a device finding.
+  - **`#1849` is READY AND HELD.** Brought onto `main`; its views file auto-merged to exactly what
+    the generator emits; its guard test, the claude_ro twin tests and the LB-177 rules pass (42,
+    none skipped); rehearsed on the snapshot (135 rows intact, four dead columns gone). **Auto-merge
+    is disabled.** Merge it by hand once the sitting is over.
+  - **Practice that follows: do not ARM auto-merge on a migration PR at all.** Arming it commits to a
+    deploy at a moment Lane A does not choose, which is the whole hazard of the hold above. A
+    migration PR is merged by hand when it is known to be safe.
+  - **`#1790` and `#1762` are OBSOLETE and should be closed, not merged.** Checked against `main`:
+    **all 13 questions `#1790` puts an `Ask:` on were answered or decided later on 2026-09-27**
+    (BF-144 group, Q-540, Q-297, Q-251, TN-72, TN-67, RV-166, PS-51, BF-145, BF-96/BF-139, LB-38,
+    BF-168; `LA-89` and `TN-74` have left the queue), so merging it would make the Orchestrator ask
+    him settled questions again. **`#1762` re-adds 41 journal entries that already exist folded in
+    `history-2026-09-27-folded-2.md`.**
+- **Ask:** owner — (1) is the device sitting over, so `#1849` may merge? Recommendation: yes once DV says so; it only drops four columns with 0 values in 135 rows and the migration re-checks every account. (2) May `#1790` and `#1762` be closed as obsolete? Recommendation: yes, with a one-line comment pointing here; closing a PR is the one step Lane A takes only on his word.
 
 ### [devices][heart-rate] OR-208 — `rr_intervals` has written nothing since 2026-09-28, while the ring kept writing
 - **✅ ANSWERED 2026-10-05 — NOT A FAULT. The owner has not worn the strap since 28 September.**
@@ -821,6 +1033,14 @@ below threshold and left in place for next time.
   fitting. Its cost: every exercise stays pinned at two sets while you finish around 11 minutes
   early on a typical day, and the mixed 2/3-set sessions you asked for rarely appear.
 - **Reversal cost:** one constant and one function. Either way can be undone in a single change.
+- **⚑ NEW EVIDENCE, 2026-09-28 (BugFix, BF-218): the double-count costs you a whole session on
+  `Quick`, which neither answer above had in view.** You tapped `Quick · 30 min` on Pull and got
+  **one exercise**. Reconstructed against the shipped model — which reproduces your card's 53 min
+  to the tenth at your measured 319 s transition — the 24-minute working budget fits **2** exercises
+  as shipped and **3** corrected. So on the short preset the 14.2 phantom minutes are not a
+  finish-early margin at all; they are the difference between a session and a single movement
+  repeated. The LA-65 answer you gave ("five at two sets already fill the hour") was about the
+  60-minute case, where the over-protection is invisible. It is not invisible at 30.
 - **What your answer unblocks:** BF-197 (Lane A builds it the day this is answered).
 
 ### [app-shell][platform] LB-152 — the accent-token retune repaints ~212 readings, not zero: re-opening the answer
@@ -1008,6 +1228,82 @@ below threshold and left in place for next time.
 - **Not diagnosed here.** Whether the 66 → 77.5 change came from the model or the rules prescriber.
   The stored plan is the AI one (`Accumulation`, confidence 80%), but which component chose the pct
   was not traced, and it decides whether this is a prompt problem or a formula problem.
+
+### [workouts] BF-218 — `Quick` turned a 30-minute Pull into one exercise, because the drop loop asks "does it fit" and never "is this worth doing"
+- **Lane:** A — `packages/shared/src/ai-periodization/time-budget.ts` (`dropToBudget`), `budget-stage.ts`.
+- **Added:** 2026-09-28 · BugFix intake. Owner, straight after the `Full` fix worked: *"Noting another issue is the quick only has q workout."*
+- **Needs:** — nothing. Reads on BF-197 / LA-178 but is independently buildable.
+
+- **What he saw.** `Quick · 30 min` on Pull produced **one exercise** — Barbell Chest Supported Row —
+  and `~21 min of work`. The other four were dropped. `Normal` on the same session gives all five.
+
+- **Dropping whole exercises on a short preset is DELIBERATE and the reasoning is sound**
+  (`budget-stage.ts:126`): five exercises floored at two sets still overrun 30 minutes, and two
+  token sets each is worse training than doing fewer properly. This entry is not an argument against
+  that. It is that the loop implementing it has no notion of a floor or of value-for-time.
+
+- **Two mechanisms, both in `dropToBudget` (`time-budget.ts:306`).**
+  - **`while (kept.length > 1 && …)` — the only floor is ONE.** There is no minimum exercise count
+    and no check that what survives is a coherent session. A 30-minute slot can legally resolve to a
+    single movement repeated.
+  - **Survivors are re-fitted from their ORIGINAL set counts** (`:326`, deliberately — dropping
+    frees time, so sets cut for a more crowded session are given back). Combined with the first,
+    the loop can prefer **one exercise at its full sets** over **three at two sets**, because it
+    only ever asks whether the result fits.
+
+- **Measured against the shipped model, and the reconstruction is exact.** Feeding his stored Pull
+  plan (5 exercises, 2 sets each, rest 180/127/90/90/90) through `estimateSessionDurationSec` with
+  his measured transition median of **319 s** (BF-197's figure) reproduces the card's **53 min** to
+  the tenth — 53.1. So this is the shipped arithmetic, not a model of it. At the `Quick` working
+  budget of **24 min** (30 less the warmup fraction):
+
+  | exercises kept | shipped estimate | corrected (BF-197) |
+  |---|---|---|
+  | 1 | 12.6 | 4.3 |
+  | **2** | **23.7 ✓ fits** | 13.2 |
+  | **3** | 33.9 ✗ | **22.0 ✓ fits** |
+  | 4 | 43.5 ✗ | 30.1 ✗ |
+  | 5 | 53.1 ✗ | 38.1 ✗ |
+
+  **Two exercises fit the budget on the shipped model and he got one** — so the surviving Row must
+  have carried more than two sets, which is the second mechanism above doing exactly what it is
+  written to do. **⚠ That last link is INFERRED, not read:** the `Quick` prescription was not
+  persisted — his `Normal` regeneration at `2026-09-28T21:26:19Z` overwrote the row — so its set
+  counts are gone. Re-tapping `Quick` and reading `session_periodization` settles it in one query,
+  and should be step one for whoever takes this.
+
+- **And BF-197 is why the budget is this tight at all.** On the corrected model **three** exercises
+  fit the same 24 minutes. The phantom 14.2 min is not merely cosmetic on a short preset — it is the
+  difference between a session and a single movement. **This is the sharpest evidence yet for
+  LA-178**, the open owner question on whether to fix the double-count; noted there too.
+
+- **⭐ Recommend a floor plus a tie-break, not a rewrite.** Stop the loop at a minimum of two
+  exercises (below that the session is not a session, and the existing `budgetNote` already has
+  language for "it doesn't fit"), and when a drop would leave fewer exercises than the budget could
+  carry at floor sets, prefer trimming the survivors to their floor over dropping another. Both are
+  local to `dropToBudget`; `fitToBudget` already knows the floors.
+- **Alternatives:** (a) **leave it** — better if a single hard main lift genuinely is the right
+  30-minute session, which is a real training opinion and the owner's to hold, but it is not what
+  the drop note promises ("the remaining work keeps full sets"); (b) **expand the short path** —
+  `expandToBudget` already exists but is gated to `long` for a good documented reason (the
+  under-fill IS the finish-early margin), so reusing it here would spend that margin on the preset
+  that can least afford it.
+- **Reversal cost: low.** One loop condition and one comparison, both behind the existing tests.
+
+- **Done when** a `Quick` Pull returns at least two exercises, the drop note names what went and
+  why, and the reconstruction above is pinned as a test case so the 53-min identity cannot drift
+  silently.
+- **⚠ RE-FILED 2026-10-05, and the ARITHMETIC ABOVE PREDATES `BF-221`.** This entry was written on
+  2026-09-28 and **never reached `main`**: its commit (`68277da67`, 21:31:17Z) was pushed to
+  `bugfix/bf-217-missing-progression-styles` **after that branch's PR #1936 had already auto-merged
+  at 21:28:44Z**, so it landed on a branch with no open PR and was invisible for a week. Recovered
+  from the surviving remote branch, unchanged except this bullet.
+  **What changed underneath it:** `BF-221` shipped (#1999) and now clamps an accessory's reps to the
+  goal band *before* the load is derived, so the 5-exercise plan the table was computed against no
+  longer exists in that shape. **The two mechanisms this entry names are untouched** — `dropToBudget`
+  still has no floor but one, and still re-fits survivors from their original set counts — but
+  **re-measure the table before quoting it**, and re-tap `Quick` to capture a current prescription,
+  which is the step the entry already asked for.
 
 ### [platform] BF-222 — neither sensor retention prune has EVER fired, both horizons land inside ten weeks, and a failure logs where nothing reads it
 - **Lane:** A — `lib/data/postgres/slices/oura.ts:566` and `:1070`.
@@ -2075,6 +2371,38 @@ below threshold and left in place for next time.
 - **Reversal cost: low** — a card state and where it reads from, no stored data.
 - **Not device work:** every claim here is from source, so there is nothing for the device agent to
   reproduce. The APK pass is owed on `TN-82` when the surface is built, as that entry already states.
+
+### [sleep] TN-86 — `sleep_verdicts` snapshots each band's edges but not its MIDDLE, so "than usual" has no referent
+
+- **Lane: A** — `lib/data/postgres/schema.ts` (`sleepVerdicts`), `packages/shared/src/health/sleep-verdict.ts`, a migration + its `claude_ro` twin.
+- **Added:** 2026-10-05 · Tuning, at session wrap-up — the finding existed only inside `TN-84`'s prose
+  and had no entry of its own, which under **No orphaned findings** is a dropped finding. `TN-84` is
+  `Lane: O` (an owner copy decision), so the buildable half was invisible to Lane A.
+- **Measured:** `sleepVerdicts` stores `durationLow`/`durationHigh`, `onsetLow`/`onsetHigh`,
+  `efficiencyLow`/`efficiencyHigh` as flat columns and **no median**, while
+  `ComponentBand` carries `median` and the verdict computes it. So three nullable
+  `doublePrecision` columns and a twin — small, reversible, and it is a migration, exactly as
+  `TN-84` says.
+- **The consequence `TN-84` already hit:** the Home note cannot say *"90 min later than usual"* from a
+  stored verdict, because there is no middle to measure from. It ships *"65 min later than usual"*
+  measured to the **band edge** instead.
+- **RECOMMENDATION: snapshot the three medians, and keep the edge wording anyway.** Two separate
+  points, and conflating them is what makes this look like a copy problem.
+  **(a) The copy is arguably better as shipped.** "65 min past the late end of your usual range" is a
+  smaller, truer claim than "90 min later than usual", and it is the quantity the verdict actually
+  acted on. The implementer's deviation ② was right; this entry is not asking to reverse it.
+  **(b) The snapshot is incomplete regardless of the copy, and that is the real cost.** The design's
+  load-bearing claim is that *a correction whose paired verdict is not pinned is not evidence*
+  (`TN-81`, and the plan it came from). The median is part of what the verdict judged against, so
+  without it a correction cannot later be asked **how far from centre** the night sat — only which
+  side of a threshold it fell. Tuning will want that the moment there are corrections to analyse,
+  and by then the rows are already written and cannot be back-filled, because the bands were
+  computed from a trailing window that has since moved.
+- **So the priority is: not urgent, but it does not improve by waiting** — every night that passes
+  writes another row with no centre in it. Unblocked; needs no owner answer.
+- **Do NOT bump `SLEEP_VERDICT_MODEL_VERSION` for this.** Adding a recorded field changes nothing
+  about the rule that produced a verdict, and the version exists to pair a correction with the rule
+  it disagreed with. v2 is the `0.5 → 1.0` calibration change; a storage addition is not a third rule.
 
 ### [sleep] TN-84 — the sleep announcement's wording is the owner's call; here is the draft to approve or edit
 
@@ -4852,48 +5180,6 @@ which is the right shape for something that can only be validated by living with
 - **Keep:** the device check. Zone minutes appear on the Activity surfaces, and the new floor
   changes what those read for every past day; nothing here was seen on the phone.
 
-### [readiness][platform] LA-142 — four `oura_daily_derived` columns have no writer (and the two that looked worst DO have one)
-
-- **Lane: A** — `lib/oura-ble/rollup/run.ts`, `oura_daily_derived`.
-- **Rebase note (2026-09-27):** `#1749` carries `287_claude_ro_views_drop_dead_derived.sql`. If
-  BF-214 merges first, delete that twin and regenerate `lib/data/postgres/claude-ro-views.sql`.
-- **Added:** 2026-09-25, Lane A — found while fixing LA-140, by asking how many columns share its
-  shape. **Corrected the same day; the first version of this entry was wrong, see below.**
-- **Measured on production 2026-09-25: 11 of `oura_daily_derived`'s columns are NULL on every row.**
-  All-NULL is not proof of a missing writer — so each was checked against the code.
-- **Four have no writer at all:** `active_calories_est`, `pwv`, `worn_hours_ble`, and the derived
-  `vascular_age` (distinct from `oura_daily.vascular_age`, which is a different table and is
-  written). None of the four has a reader either, so **deleting them and their plumbing is probably
-  right** — the ~40-member push path stops carrying dead fields. That is a migration plus a local
-  SQLite version bump, so it ships alone and is not a drive-by.
-- **⚠ RETRACTION — `training_load_ots` and `training_load_high` are NOT unwritten.** This entry first
-  said six columns had no writer and that two of them were read by live surfaces, making them
-  LA-140's trap with consumers. **`app/api/training-stress/route.ts:89` writes both**, on the
-  success branch. The repo-wide grep behind the original claim truncated its output per column and
-  that file never surfaced — the same "measured the wrong thing" failure this entry was filed to
-  describe.
-- **The symptom is real and belongs to TN-79, not here.** Both columns ARE all-NULL, so
-  `weekly-digest/route.ts:192`'s `otsHigh` is permanently false and `ai-chat/tools.ts:121`'s
-  `trainingStress` always returns an empty array. The cause is that the route's gate never reaches
-  `ok` and persists a reason instead — which is exactly what **TN-79** is already open for. Fixing
-  the gate fills the columns; nothing here needs a new writer.
-- **A ratchet is worth considering and is NOT free.** A check that every derived column has a writer
-  would catch the genuine four, but `chronic_stress_*` (gated on 21 complete nights),
-  `recovery_index_hours` and the training-load pair are all legitimately written-but-empty — so it
-  needs a reasoned allowlist rather than a bare scan, and is its own piece of work.
-
-### [readiness][platform] LA-159 — `program_phases.program_id` is dead and made a diagnostic query read as a clean zero
-- **Lane: A** · **Branch:** _unassigned_ · **Added:** 2026-09-27 · split out of LA-138 on closing it.
-- **What:** `program_phases.program_id` is populated on **0 of 46 rows** — phases moved under
-  `phase_set_id` and the column stayed. Dropping it is a migration.
-- **Why it is worth an entry rather than a shrug:** joining on it returns nothing, with no error
-  and no warning, and that is exactly how LA-138's first filing came to claim *"`program_phases`
-  holds 0 rows for all five programs"* when it holds 46. A dead column that silently answers
-  "none" is a trap for the next person writing a diagnostic query, not just dead weight.
-- **Shape:** one migration (`DROP COLUMN program_id`) plus the regenerated `claude_ro` twin, and
-  a check that nothing reads it first. **Ships alone, and it is data-dropping, so
-  confirm-before-merge** — see LA-142 (#1749) for the shape, including that the `claude_ro` view
-  must be dropped in the same file before the column can go.
 
 ### [readiness][devices][heart-rate] TN-79 — Q-270's route is NOT silent: it persists `insufficient_met` on 21 days while the MET data it needs is present
 
@@ -6553,7 +6839,10 @@ drift.
   - **② merge `LA-142` (#1849) and close #1749** — yes.
   - **⑤ merge `TN-56` (#1902)** — yes, auth-touching and approved on its shared-helper shape.
   - **③ withdrawn** — not his to answer; see below.
-- **Ask** — owner: ④ only. Fresh S3 storage keys in Railway, which only he can mint and set. ⑤ Merge TN-56 (#1902)?
+- **Ask** — owner: ④ only. Fresh S3 storage keys in Railway, which only he can mint and set.
+- **⑤ is CLOSED — `TN-56` (#1902) was approved 2026-09-30 and MERGED by Lane A on 2026-10-05**
+  under `OR-207`. The `Ask:` kept listing it for five days after it was answered, which is the
+  same shape as `Q-85`: a field that outlived its answer and would have been put to him twice.
 - **Added:** 2026-09-28 · Lane A, moving the asks out of chat per the owner's instruction that
   anything needing his input is assigned to the Orchestrator.
 - **① LA-159 (#1847): drop `program_phases.program_id`. ⭐ Recommend: yes.** 0 of the owner's 46
@@ -6924,6 +7213,12 @@ drift.
   - The rules path had nothing for the styleless Cable Chest Dips, which LA-177 has since backfilled.
   - **The model's prose said it "excluded Dumbbell Fly" while the numbers it returned included it.**
     That is evidence for Phase 2's prose-from-final-numbers.
+- **OR-209 (2026-10-05): each shadow row now also carries `model`**, the model's own sets/reps/pct/rest
+  exactly as parsed (`null` where it omitted the exercise, ABSENT on rows written before that day). **It is
+  raw, and the model often answers pct as a fraction** (0.775 for 77.5), so run `normalizePctFraction`
+  before comparing. First live row: model sets 4/4/3 against 2/2/2 given, and two of five exercises
+  omitted and backfilled. That is `RV-65`'s evidence base, and **only rows from 2026-10-05 on can have
+  it** (~2 prescriptions a week, so expect weeks).
 - **Keep:** the read, after two weeks of production prescriptions: the share where rules = given on
   reps/pct within 2.5 %, the rest distribution for each, and how often `model_phase` ≠ `final_phase`
   or `model_phase_action` ≠ `final_phase_action`. Earliest useful date **2026-10-13**. It unblocks
@@ -7450,6 +7745,26 @@ drift.
   owner's call — same footing as LA-143.
 
 ### [readiness][body] LA-134 — the Body Battery's constants are provisional and nothing re-sweeps them
+
+- **▶ CHECKED 2026-10-05 (Lane A): NO FIT TO MAKE, AND NOT ENOUGH DATA TO MAKE ONE. The provisional constants already
+  pass the entry's own test on every v6 day there is.** Read from the stored rows with the new
+  `body-battery-replay.cjs --check` (the harness had no `--sweep` and could not run on Windows; both fixed or
+  stated):
+  - **12 v6 days (09-24 to 10-05): 0 end at zero, against 27 of 52 under v5.** End values run 30 to 49
+    (sd 5.6). **Median daily net −2.5**, within ±5. Both pass criteria hold.
+  - **But only 5 of the 12 are informative** (at least 1,000 heart-rate samples). The rest read 0 to 241:
+    the ring was not worn, and on those days the battery just holds where it was. A verdict resting on 5
+    days is the calibration-on-a-filling-window error BF-55 spent three weeks on, so the tool labels it
+    INSUFFICIENT rather than PASS.
+  - **`--validate` reports FAIL for a reason that is not the constants:** its one out-of-range day is
+    2026-09-22, a v5 row, and `--validate` replays under the v6 walk. Ignore that row; `--check` filters by
+    model version and has no such trap.
+  - **Nothing is to be shipped:** the walk's shape and the constants are unchanged, so no version bump.
+- **Keep:** re-run `node scripts/tuning/body-battery-replay.cjs --pull` then `--check` once **20 informative
+  v6 days** exist. At the 5-in-12 rate so far that is around **mid-November**, sooner if the ring is worn
+  more. A FAIL on either criterion with enough days is the trigger to adjust the one dial (the gain), per
+  the paragraphs below; PASS means close this entry. The 09-23 zero-HR day is a v5 row and is tracked by
+  its own entry, not this one.
 
 - **⏳ NOT STARTABLE BEFORE 2026-10-04, and it is NOT parked — read this before picking it up.**
   RV-189 tried to park it and found nothing to park it with: `next-item.js` parks only on a `Needs:`
@@ -9314,11 +9629,32 @@ drift.
   produced the wrong figure.
 
 ### [workouts][platform] RV-65 — the prescription asks a model for numbers that deterministic code then overwrites, and nothing measures whether the model still earns the call
+- **▶ THE DIAGNOSTIC EXISTS from 2026-10-05 (OR-209):** `prescription_shadow.rows[].model` is the model's raw answer
+  beside `given` and the rules prescriber's. Read it after a few weeks; do not conclude from fewer than ~10 sessions.
 
 - **Lane:** A — `packages/shared/src/ai-periodization/generate-prescription.ts`,
   `prompt.ts:124`. **Added:** 2026-09-20 · Review sweep 51.
-- **Gate: owner** — removing the model from the prescription changes what the app recommends, which
-  is the owner's call, not an implementer's.
+- **Gate: owner** — for the REMOVAL only. **Narrowed 2026-10-05 (Orchestrator).**
+- **Needs:** OR-209
+- **⚑ THE GATE WAS ON THE WRONG THING, and it was parking work nobody needed him for.** This entry
+  says in its own words *"DO NOT remove the model first — ship the measurement first"* — and then
+  gated the whole entry on the removal, so **the measurement, which is ours and needs no owner,
+  sat parked behind a decision that cannot be taken until it exists.** The diagnostic is split out
+  as `OR-209`, buildable now. What stays gated here is the removal itself, which is genuinely his
+  because it changes what the app recommends.
+- **🔬 MEASURED 2026-10-05 — the retrospective version of this measurement IS NOT POSSIBLE, so do
+  not try it.** `claude_ro.session_periodization` holds **15 rows, 10 with a prescription**, spanning
+  2026-08-30 → 2026-10-03, and its stored keys are `confidence · confidenceReasons · deload ·
+  droppedExerciseIds · durationPreset · estimatedSessionDurationMin · exercises · phase ·
+  phaseAction · reasoning · reevaluatedInputsKey · refitBaseline · weeklyVolumeContribution` —
+  **no raw-model field among them.** The table also keeps **one row per program session, overwritten
+  each time**, so there is no history to join against even where a field existed. The entry's
+  *"Not established"* line is therefore not an oversight anyone can close with a query; it needs the
+  instrumentation first.
+- **A number worth carrying into the decision: call volume is ~10 prescriptions in 5 weeks**, about
+  **2 a week**, across **50 exercise rows**. That cuts both ways and the brief should say so — it
+  makes the model cheap to keep, and it means the diagnostic needs **weeks, not days**, to collect a
+  sample worth deciding on.
 - **The prompt says so itself** (`prompt.ts:124`): *"Pick a neutral pct inside the phase zone for
   each exercise. do NOT pre-emptively lower pct for fatigue, RPE, soreness or recovery signals — **a
   deterministic autoregulation layer applies those cuts after you**, and lowering it yourself
@@ -9596,6 +9932,17 @@ drift.
   `readCacheSync`) and a sheet ignoring it is a separate finding, not a reason to keep 500 ms.
 
 ### [readiness][platform] TN-56 — one admin-gated replay endpoint is the only thing standing between Tuning and 25 unmeasurable thresholds
+
+- **✔ BUILT 2026-09-28 (Lane A), PR #1902, HELD for the owner (LA-173 ⑤) because it shares
+  db-query's auth.** `POST /api/admin/replay` and the registry in `lib/tuning/replay/registry.ts`.
+  The first function is `nightly-temperature` (`RANGE_THRESHOLD`, `MIN_WINDOWS`). On the owner's
+  real data the defaults reproduce production on 15 of 17 comparable nights. The two that miss
+  are nights `sleep_sessions` stores as a daytime nap.
+- **Keep: register the rest, one at a time.** Each needs its constant made overridable where it lives
+  (an options argument defaulting to the shipped value), then an entry. Still to add:
+  `MET_ACTIVE_THRESHOLD` (`metActiveWindows` already takes it), `APNEA_THRESHOLD` (sleepnet
+  inference), `NIGHT_BAND_*` (`sleep-night.ts`), `CONSISTENCY_*` (`meal-timing.ts`),
+  `LOW_CONFIDENCE_THRESHOLD`, and the 19 sleep-staging constants. Tuning says which comes first.
 
 - **Branch:** _unassigned_ · **Added:** 2026-09-21 · extracted from TN-52, where it sat as a
   paragraph inside a `Reference:` entry and therefore printed under *read, do not build*.
@@ -15685,7 +16032,24 @@ steps are in range; (b) and the rest latent.
 
 - **Lane:** A — `packages/shared/src/ai-periodization/acwr.ts`, `lib/ai-chat/tools.ts`,
   `lib/health/readiness-payload.ts`.
-- **Gate:** owner — the window choice.
+- **Gate:** owner — **item (a) ONLY**, the acute-window choice. Narrowed 2026-10-05 (Orchestrator).
+- **Needs:** OR-210
+- **⚑ THE GATE COVERED ONE ITEM AND PARKED THREE.** (b) and (c) are not preferences — each is
+  settled by a standing rule, so they were waiting on an answer that was never theirs to need.
+  **Split to `OR-210`, which SHIPPED 2026-10-05: (b) and (c) are done; only (a) remains and it is the owner's.**
+  - **(b)** the chat tool returns a raw 56-day number with **no band**, so the model bands it
+    itself — against `acwr.ts`'s own *"never re-derive at the call site"* and against `CLAUDE.md`'s
+    *clients render the route's `interpretation`, never re-band raw numbers themselves*. **32 of
+    the owner's last 76 days disagree with the Health card**, which is the defect, not a view.
+  - **(c)** three different program-age baselining rules for one concept is **One Formula, One
+    Place**. The owner's active program has `started_at = NULL`, so July's early-deload consumed
+    live ACWR while the card read "baselining".
+- **(a) is a SCORING CALIBRATION and owes a Tuning proposal before anyone builds it.** It is not a
+  yes/no: the code counts 8 inclusive days against a 28/4 chronic while the copy says "last 7
+  days", so constant load reads **1.10** trained-today and **1.20** for an every-third-day lifter —
+  landing exactly on `EARLY_DELOAD_ACWR_MIN`. **The proposal must state how many stored days the
+  change moves**, per the rule that a tuning fitted to one case silently re-scores history.
+  **The code/copy disagreement is a defect either way** and does not wait on the window choice.
 - **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §P3/P4.
 
 (a) `acwr.ts:18` counts `t >= todayMid − 7d` — 8 inclusive days against a 28/4 chronic — so constant
@@ -15964,7 +16328,20 @@ read**, so a moved device shows the old location for 30 minutes. Key it by round
 - **Lane:** A — `packages/shared/src/health/fitness-tests.ts:40`,
   `packages/shared/src/health/cardio-trends.ts:89`, `packages/shared/src/health/zone-minutes.ts` vs
   `packages/shared/src/running/zone-targets.ts`.
-- **Gate:** owner — the Z3 mapping.
+- **Gate:** owner — **item (c) ONLY**, the Z3 mapping. Narrowed 2026-10-05 (Orchestrator).
+- **Needs:** OR-211
+- **⚑ SAME SHAPE AS `PS-28`: the gate named one item and parked three.** (a) and (b) are
+  straightforward correctness and were never his. **Split to `OR-211`, which SHIPPED 2026-10-05: (a) and (b) are done; only (c), the Z3 mapping, remains and it is the owner's.**
+  - **(a)** a fully-profiled `sex:'other'` user falls to the Ross last-resort equation —
+    **42.7 → 18.7 on identical inputs**. The comment says that fallback is for *missing* terms, so
+    the code contradicts its own stated intent. The owner is unaffected; any third user is not.
+  - **(b)** "best pace" is `min(avgPaceSecPerKm)` with **no distance floor**, so a 30 m GPS
+    false-start becomes the all-time best — reproduced on a live fixture. **The fix already exists
+    in the file**: the 1k/5k bests are windowed correctly and are the pattern to copy.
+- **(c) is the owner's and owes a Tuning proposal first.** `zone-minutes` doubles Z3 as
+  WHO-vigorous, `zone-targets` counts it once, **both cite WHO 2020**, and the filed Tuning band is
+  a **third** position naming neither file. Three readings of one guideline is not a preference to
+  pick from — Tuning reconciles them, states which days move, and the owner signs off.
 - **Added:** 2026-09-06, app checkpoint — [report](reviews/2026-09-05-app-checkpoint.md) §P3.
 
 (a) `sexCode = female?1 : male?0 : null` sends a fully-profiled `sex:'other'` user to the Ross

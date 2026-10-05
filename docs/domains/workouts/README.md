@@ -257,6 +257,19 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- [`handoff-2026-10-05-workouts-bugfix-intake-prescription-cluster`](../../handoffs/handoff-2026-10-05-workouts-bugfix-intake-prescription-cluster.md)
+  — **BugFix intake, the prescription cluster (2026-09-28 → 10-05).** Five owner reports traced to
+  source: the `Full` toggle dead on a stored whole-session deload (`BF-198`'s fix could not reach a
+  prescription already generated; changing the duration preset forces a rebuild, confirmed on his
+  phone); **9 of 25 exercises in the active program silently missing a progression style**, `Lower`
+  all five (`BF-217`, shipped #1937); **the accessory rep band enforced nowhere** — 7 reps at 77.5%
+  against a band of 8–12 at 66–75%, and the two violations are one, since accessory load floats to
+  hold a target RPE at whatever reps arrive (`BF-221`, shipped #1999); a load that returned **RPE 10
+  three times with reps falling 9→6** while nothing in load selection reads that history (`BF-219`,
+  `Lane: T`); and **nothing in a live session consults RPE at all** (`BF-220`, shipped #1993).
+  **`BF-218` was lost for a week** — pushed to a branch whose PR had auto-merged three minutes
+  earlier — and is restored there; its arithmetic predates `BF-221` and needs re-measuring.
+
 - [`2026-09-15-bf163-intensity-chip-load-only`](../../overview/history-2026-09-17-folded-1.md#2026-09-15-bf163-intensity-chip-load-only)
   — **BF-163 (2026-09-15): the intensity chip was correct and still had to change.**
   `intensityZoneForPct` reads %1RM only, so 72.5% → Hypertrophy is right by the band's own

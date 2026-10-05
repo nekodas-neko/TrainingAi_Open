@@ -1064,6 +1064,9 @@ export interface WorkoutRepository {
    *  Windowed on the ingest-stamped measured_at (no anchor math) — feeds the admin device-metrics
    *  compute-on-read route. Rows with a null decoded/measured_at are excluded. */
   getOuraRawSamplesForTags(userId: string, tags: number[], days: number): Promise<OuraRawSampleRow[]>
+  /** TN-56: raw frames by tag and ring-clock range, across both tiers (hot and packed). Read-only,
+   *  for the admin replay; the rollup reads through its own IO. */
+  readOuraRawFrames(userId: string, q: import('./postgres/slices/oura-raw-frames').RawFrameQuery): Promise<import('./postgres/slices/oura-raw-frames').RawFrameRow[]>
   /** Phase-B feasibility probe: what motion/HR the ring captured during one workout's window
    *  (accel-chunk coverage, HR count, raw tags present) — tells us whether the neural energy
    *  model's inputs are capturable during waking workouts. Read-only diagnostic. */
@@ -1502,7 +1505,6 @@ export interface OuraDailyDerivedRow {
   readinessSource: string | null
   activityScore: number | null
   activityContributors: unknown | null
-  activeCaloriesEst: number | null
   trainingLoadOts: number | null
   trainingLoadHigh: boolean | null
   /** TN-64: acute:chronic workload ratio, the half of the early-deload gate nothing recorded. */
@@ -1517,7 +1519,6 @@ export interface OuraDailyDerivedRow {
   /** LA-170: when the training-load verdict was computed. Server-only, like `acwr`. */
   trainingLoadEvaluatedAt: Date | null
   recoveryIndexHours: number | null
-  wornHoursBle: number | null
   nightHrvBaselineMs: number | null
   illnessFlag: string | null
   illnessScore: number | null
@@ -1537,8 +1538,6 @@ export interface OuraDailyDerivedRow {
   daytimeStressCoverageMin: number | null
   chronicStressGranularNights: number | null
   bdiDerived: number | null
-  vascularAge: number | null
-  pwv: number | null
   bodyComp: unknown | null
 }
 

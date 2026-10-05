@@ -1,5 +1,5 @@
 import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, toAestDay, ageFromDob } from '@trainingai/shared/date-utils'
-import { computeVolumeAcwr } from '@trainingai/shared/ai-periodization/acwr'
+import { computeVolumeAcwr, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { hrMaxFromAge, computeHrZones, moderateIntensityBpm } from '@trainingai/shared/health/hr-zones'
@@ -119,8 +119,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     })),
     dayMid,
   )
-  const programAgeMs = program?.startedAt ? dayMid.getTime() - new Date(program.startedAt).getTime() : Infinity
-  const programTooNew = programAgeMs < 28 * 86_400_000
+  const programTooNew = acwrBaselineDaysRemaining(program, dayMid) > 0
   const acwr = programTooNew ? null : load.acwr
   const acwrExcludedReason = programTooNew
     ? 'program is younger than 28 days, so the chronic-load baseline is not yet valid'

@@ -78,8 +78,26 @@ export interface SixMwtInputs {
  * reads ~18), so it is the last resort, used only when the profile terms are
  * missing. Ross RM et al. BMC Pulm Med. 2010;10:31.
  */
+/**
+ * OR-211. Burr's sex term is coded male = 0, female = 1, and there is no published value for
+ * anyone else. A fully profiled `sex: 'other'` user used to fall through to the Ross last-resort
+ * equation, which read **42.7 as 18.7 for identical inputs**: the code disagreeing with the fallback's
+ * own stated intent (it is for MISSING terms), and wrong for any user who is not male or female.
+ * The midpoint keeps them on the real equation with an error bounded at half the sex term, about
+ * ±3.4 mL/kg/min, and without silently classifying them either way. The alternative is `vo2max.ts`'s
+ * Jackson convention (anything but male codes as the female side), which is simpler and always wrong
+ * in one direction by the full 6.79.
+ */
+export const BURR_SEX_CODE_OTHER = 0.5
+
+function burrSexCode(sex: string | null): number | null {
+  if (sex === 'female') return 1
+  if (sex === 'male') return 0
+  return sex === 'other' ? BURR_SEX_CODE_OTHER : null
+}
+
 export function sixMwtVo2max(input: SixMwtInputs): number {
-  const sexCode = input.sex === 'female' ? 1 : input.sex === 'male' ? 0 : null
+  const sexCode = burrSexCode(input.sex)
   if (
     input.age != null && input.weightKg != null && input.weightKg > 0 &&
     input.restingHr != null && input.restingHr > 0 && sexCode != null
