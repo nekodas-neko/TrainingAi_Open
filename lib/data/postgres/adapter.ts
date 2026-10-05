@@ -6886,6 +6886,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    *
    * Decodes from `body_hex` now, preferring the stored column if it is ever populated.
    */
+  async readOuraRawFrames(userId: string, q: import('./slices/oura-raw-frames').RawFrameQuery) {
+    return readRawFrames(this.db, userId, q)
+  }
+
   async getOuraRawSamplesForTags(userId: string, tags: number[], days: number): Promise<OuraRawSampleRow[]> {
     if (tags.length === 0) return []
     const windowDays = Math.min(Math.max(Math.floor(days), 1), MAX_RAW_SAMPLE_WINDOW_DAYS)

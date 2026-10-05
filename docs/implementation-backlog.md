@@ -9674,6 +9674,17 @@ drift.
 
 ### [readiness][platform] TN-56 — one admin-gated replay endpoint is the only thing standing between Tuning and 25 unmeasurable thresholds
 
+- **✔ BUILT 2026-09-28 (Lane A), PR #1902, HELD for the owner (LA-173 ⑤) because it shares
+  db-query's auth.** `POST /api/admin/replay` and the registry in `lib/tuning/replay/registry.ts`.
+  The first function is `nightly-temperature` (`RANGE_THRESHOLD`, `MIN_WINDOWS`). On the owner's
+  real data the defaults reproduce production on 15 of 17 comparable nights. The two that miss
+  are nights `sleep_sessions` stores as a daytime nap.
+- **Keep: register the rest, one at a time.** Each needs its constant made overridable where it lives
+  (an options argument defaulting to the shipped value), then an entry. Still to add:
+  `MET_ACTIVE_THRESHOLD` (`metActiveWindows` already takes it), `APNEA_THRESHOLD` (sleepnet
+  inference), `NIGHT_BAND_*` (`sleep-night.ts`), `CONSISTENCY_*` (`meal-timing.ts`),
+  `LOW_CONFIDENCE_THRESHOLD`, and the 19 sleep-staging constants. Tuning says which comes first.
+
 - **Branch:** _unassigned_ · **Added:** 2026-09-21 · extracted from TN-52, where it sat as a
   paragraph inside a `Reference:` entry and therefore printed under *read, do not build*.
 - **Lane: A** — a new admin-only route under `app/api/admin/`, owner-triggered, no schedule.
