@@ -301,6 +301,12 @@ Live at the time of writing (2026-07-30):
   as the only session driving it: the spec and the owner's decisions, the Phase 0 freeze (routines
   paused, sessions stopped, PRs closed or held, #1849 merged through the hold), the Phase 1 triage
   and its regenerator, the branch-sweep workflow, and the traps.
+- [`handoff-2026-10-05-platform-orchestrator-architecture-and-restructure.md`](../../handoffs/handoff-2026-10-05-platform-orchestrator-architecture-and-restructure.md)
+  — **Orchestrator: the ingest/scoring architecture and the restructure review, 2026-09-28 → 10-05.**
+  The 263 MB → ~12 MB measurement behind device-first storage; the coverage identity showing a
+  neutral default equals a renormalised score shrunk by missing weight; permanent roles with bounded
+  context; and two corrections the session made to its own earlier advice.
+
 - [`handoff-2026-10-05-platform-device-verification-sweeps-2-to-5.md`](../../handoffs/handoff-2026-10-05-platform-device-verification-sweeps-2-to-5.md)
   — **Device Verification, sweeps 2 → 4b and the sweep 5 plan, 2026-09-23 → 2026-10-05.** About 40 entries
   verified on the S25; DV-13 to DV-19 filed; the harness, its traps, and the private design gallery.
