@@ -11,6 +11,26 @@ The sort is mechanical, on purpose. It uses the repo's own parser and the exact 
 REFERENCE 36 · WAITING 3 · UNCLASSIFIED 1). Six verdicts were then overridden by hand, each with a
 written reason in the CSV's `note` column.
 
+## ⟳ Re-run before the move, 2026-10-05 (Phase 3)
+
+The backlog drifted by three entries between the triage and the move: **LB-198 shipped** (#2040),
+**BF-218 and TN-86 were added**. No existing verdict changed. Two corrections to what is below:
+
+- **OR-213 is an epic, not a chore.** A five-phase programme cannot live in one issue. Its phases
+  are sub-issues: Phase 2 **is** OR-215 (the basis field) and Phase 3 **is** OR-214 (the connector
+  contract), so those two become sub-issues as they are and lose the "blocked by OR-213" they
+  carried — a sub-issue is not blocked by its own epic. Phases 0, 1 and 4 had no entry and are
+  created by the migration (`OR-213/P0`, `/P1`, `/P4` in the CSV). Phase 4 is blocked by the other
+  four.
+- **The device checks fold into 11 issues, not 12** — the table below lists eleven areas.
+
+**What the migration creates: 251 issues** — 128 work · 69 blocked · 38 questions · 1 epic · 2 in
+the v2 milestone · 11 device-check groups · 1 owner look · 1 watch list. Labels, by type: 96
+feature · 40 chore · 39 question · 37 bug · 28 tuning · 11 device-check. 37 carry `re-verify`.
+
+Run by [`scripts/backlog-to-issues.js`](../../../scripts/backlog-to-issues.js) through the
+*Backlog migration* workflow — **dry run by default**, idempotent on re-run.
+
 ## What the 524 become
 
 | Verdict | Count | Becomes |
@@ -19,7 +39,7 @@ written reason in the CSV's `note` column.
 | `issue-blocked` | **70** | One issue each, labelled `blocked`, with "Blocked by #N" (45 engine, 17 surface, 5 tuning, 3 chore) |
 | `question` | **38** | `type: question` issues for you, each with the decision brief written. Listed below |
 | `milestone-v2` | **2** | Q-1a and Q-1b, into the v2 bundled-shell milestone (spec §10) |
-| `fold-device` | **148** | **12 device-check issues**, one per area: app-shell 34 · platform 24 · devices 24 · nutrition 16 · workouts 16 · readiness 12 · sleep 7 · body 7 · activity 4 · cardio 3 · heart-rate 1. The Implementer Agent works them in the release test |
+| `fold-device` | **148** | **11 device-check issues**, one per area: app-shell 34 · platform 24 · devices 24 · nutrition 16 · workouts 16 · readiness 12 · sleep 7 · body 7 · activity 4 · cardio 3 · heart-rate 1. The Implementer Agent works them in the release test |
 | `fold-owner-look` | **4** | One "owner look" issue: things already shipped that you said you'd look at (OR-166, OR-158, BF-142, BF-126) |
 | `fold-watch` | **88** | One **watch-list** issue. These are shipped entries whose residue is "confirm it later". The Orchestrator prunes it during the first release prep |
 | `archive-reference` | **36** | Not work. They stay readable in the frozen archive |
