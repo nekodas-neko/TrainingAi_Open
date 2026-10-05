@@ -649,12 +649,22 @@ below threshold and left in place for next time.
   keys, about 3× a tightly packed btree**. The packer deletes sealed buckets all day, and a btree
   does not return emptied pages. Its heap is 33 MB and its indexes 47 MB. This is a lead, not a
   finding, because nothing recorded that index's size on 09-23 to compare with.
-- **Next read, on or after 2026-10-03:** the same per-table query plus
-  `pg_stat_user_indexes` for `oura_raw_samples`. Growth in that index alone would confirm it, and a
-  `REINDEX CONCURRENTLY` of it would be the remedy, which is a structural call and not the owner's.
-- **Then the standing question stays the same:** act on a departure from the SHAPE — a retention
-  window that stopped reclaiming — not on the daily figure. `rr_intervals` reaching its cap in late
-  October is the next scheduled step down, and **a step that does not arrive is the signal**.
+- **Third read, Lane A, 2026-10-05 06:14 UTC: 263.1 MB, up 1.6 MB in six days, about 0.27 MB/day against
+  the ~1.7 standing expectation.** The growth is not continuing.
+  - **The index lead is REFUTED.** `oura_raw_samples`' three indexes read 20,078,592 / 20,537,344 /
+    6,111,232 bytes, **identical to the byte** to the 09-29 read, though the heap moved. A btree that
+    was still bloating would have grown.
+  - **Per table, 09-29 → 10-05 (total / indexes):** `oura_raw_samples` 76.2 → 74.1 / 44.6 → 44.6 MB;
+    `oura_heartrate` 37.9 → 39.1 / 22.9 → 23.6; `oura_raw_packed` 27.5 → 29.4; `rr_intervals` 30.8 → 30.8
+    (no prune yet, as expected); `error_events` 51.8 → 51.8; `oura_ble_clock_anchors` 3.9 → 4.2. The
+    hot window holds 159,195 rows from 09-27, the 7 days it should.
+  - **The +29 MB between 09-23 and 09-29 is therefore UNEXPLAINED, and not closed.** It did not recur
+    and no table has been seen to grow faster than its inflow. Something that stopped is not something
+    that was fixed. The 09-29 table above is the per-table baseline this entry asked for; read the same
+    query again and diff it.
+- **Keep:** after **2026-10-15**, `rr_intervals` should step DOWN toward its 90-day cap (BF-222 owns the
+  prune itself). **A step that does not arrive is the signal.** Act on a departure from the SHAPE, a
+  retention window that stopped reclaiming, not on the daily figure.
 
 
 ### [readiness][heart-rate][activity][workouts] LA-171 — five runs and checks Lane A shipped on 2026-09-28 that need the phone or an admin session
