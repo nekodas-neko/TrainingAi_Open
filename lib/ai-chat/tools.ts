@@ -4,7 +4,7 @@ import { formatInTimeZone } from 'date-fns-tz'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { pearsonCorrelation, averageByDayOfWeek, type TrendClassification } from './analytics'
 import { summarizePeriod } from './period-comparison'
-import { computeVolumeAcwr } from '@trainingai/shared/ai-periodization/acwr'
+import { computeVolumeAcwr, trainingLoadBand, acwrBandByKey } from '@trainingai/shared/ai-periodization/acwr'
 import { projectRm } from '@trainingai/shared/health/strength-projection'
 import { aggregateExerciseHrTrend, summarizeHrByExercise } from '@trainingai/shared/workout/exercise-hr-trend'
 import { computeHrRecoveryProfile } from '@trainingai/shared/health/compute-hr-recovery-profile'
@@ -404,13 +404,21 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
       description: 'Current training-load risk band (ACWR — acute:chronic workload ratio) and HRV deviation from baseline. Use for "am I overtraining" type questions.',
       inputSchema: z.object({}),
       execute: async () => {
-        const from56d = daysAgo(56)
-        const loads = await repo.getSessionLoadsFrom(userId, from56d)
-        const acwr = computeVolumeAcwr(
+        // OR-210. The SAME 28-day window and the SAME band builder as the Health card, so the two
+        // cannot disagree. This used to return a raw ratio over 56 days and leave the banding to the
+        // model, which disagreed with the card on 32 of the owner's last 76 days.
+        const from28d = new Date(todayMid.getTime() - 28 * 86_400_000)
+        const [loads, program] = await Promise.all([
+          repo.getSessionLoadsFrom(userId, from28d),
+          repo.getActiveProgram(userId),
+        ])
+        const load = computeVolumeAcwr(
           loads.map(l => ({ startedAt: l.startedAt, volumeKg: l.volume })),
           todayMid,
         )
-        return { acwr }
+        const band = trainingLoadBand(load, program, todayMid)
+        const k = band.interpretation
+        return { ...band, bandLabel: k === 'insufficient_data' || k === 'baselining' ? null : acwrBandByKey(k).label }
       },
     }),
 

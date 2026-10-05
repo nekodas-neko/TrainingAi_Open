@@ -490,24 +490,6 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
-### [workouts][cardio] OR-210 — the chat tool re-bands ACWR itself, and program-age baselining has three rules
-
-- **Lane: A** · **Added:** 2026-10-05 · Orchestrator, splitting `PS-28` (b) and (c) off its gate.
-- **Neither item is an owner decision**; each is settled by a rule already in `CLAUDE.md`, which is
-  why they are out from behind `PS-28`'s window gate.
-- **(b) `getTrainingLoadRisk` returns a raw 56-day number with no band**, so the model bands it.
-  Against `acwr.ts`'s own *"never re-derive at the call site"* and against *clients render the
-  route's `interpretation`*. **32 of the owner's last 76 days disagree with the Health card.**
-  Return the banded `interpretation` the Health path already computes; do not add a second bander.
-- **(c) three baselining rules for one concept** — the route uses `startedAt ?? createdAt`,
-  readiness uses `startedAt` else **Infinity** (so it never baselines), and signals/chat/running
-  use none. **One Formula, One Place.** The owner's active program has `started_at = NULL`, which
-  is how July's early-deload ran on live ACWR while the card said "baselining".
-- **⛔ Do NOT change the acute window here.** That is `PS-28` (a), it is a scoring calibration, and
-  it owes a Tuning proposal. Touching it in this entry would ship a re-score behind a bug fix.
-- **What proves it fixed:** the chat tool and the Health card agree on the same day's band, and one
-  baselining helper has all three call sites.
-
 ### [cardio] OR-211 — `sex:'other'` halves VO2max, and best pace has no distance floor
 
 - **Lane: A** · **Added:** 2026-10-05 · Orchestrator, splitting `PS-36` (a) and (b) off its gate.
@@ -15776,7 +15758,7 @@ steps are in range; (b) and the rest latent.
 - **Needs:** OR-210
 - **⚑ THE GATE COVERED ONE ITEM AND PARKED THREE.** (b) and (c) are not preferences — each is
   settled by a standing rule, so they were waiting on an answer that was never theirs to need.
-  **Split to `OR-210`, buildable now.**
+  **Split to `OR-210`, which SHIPPED 2026-10-05: (b) and (c) are done; only (a) remains and it is the owner's.**
   - **(b)** the chat tool returns a raw 56-day number with **no band**, so the model bands it
     itself — against `acwr.ts`'s own *"never re-derive at the call site"* and against `CLAUDE.md`'s
     *clients render the route's `interpretation`, never re-band raw numbers themselves*. **32 of

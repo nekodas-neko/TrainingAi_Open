@@ -3,7 +3,7 @@ import type { SessionPeriodization } from '@trainingai/shared/types/ai-periodiza
 import { todayInTz, todayMidnightUtc, toAestDay, startOfWeekInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 import { confidenceFactors, computeConfidence } from '@trainingai/shared/ai-periodization/confidence'
 import { perExerciseRpeDelta, rpeTrendFromSets } from '@trainingai/shared/ai-periodization/expected-rpe'
-import { computeVolumeAcwr } from '@trainingai/shared/ai-periodization/acwr'
+import { computeVolumeAcwr, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
 import { latestIllnessFromDerived, illnessZScores, type IllnessFlag } from '@trainingai/shared/health/illness-radar'
 import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
 import { sleepDurationTrend, sleepScoreTrend } from '@trainingai/shared/health/sleep-trend'
@@ -453,13 +453,15 @@ export async function aggregateSignals(
   // real acute:chronic load is spread across every session type they train, not just
   // this one, and the shared helper's own gates (≥21d span, ≥6 sessions) replace the
   // old flat-÷4 chronic divisor that inflated ACWR ~2x on young programs.
-  const acwr = computeVolumeAcwr(
+  // OR-210: withheld for a program too young for its chronic baseline, as everywhere else.
+  const acwrRaw = computeVolumeAcwr(
     allRecentSessions.map(ws => ({
       startedAt: ws.startedAt,
       volumeKg: ws.exercises.reduce((sum, ex) => sum + (ex.volume ?? 0), 0),
     })),
     todayMid,
   ).acwr
+  const acwr = acwrBaselineDaysRemaining(program, todayMid) > 0 ? null : acwrRaw
 
   // Sleep trends — duration ratio + our-own-sleep-score quality ratio over the same
   // recent-3-vs-baseline windows (lib/health/sleep-trend.ts — One Formula, One Place).
