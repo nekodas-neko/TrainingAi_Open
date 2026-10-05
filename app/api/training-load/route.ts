@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { computeVolumeAcwr, computeMonotonyStrain, acwrBand } from '@trainingai/shared/ai-periodization/acwr'
+import { computeVolumeAcwr, computeMonotonyStrain, trainingLoadBand } from '@trainingai/shared/ai-periodization/acwr'
 import { toAestDay, todayInTz, todayMidnightUtc, shiftDateStr, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 
 export interface TrainingLoadResponse {
@@ -30,9 +30,6 @@ export async function GET() {
     sessions.map(ws => ({ startedAt: ws.startedAt, volumeKg: ws.volume })),
     todayMid,
   )
-  const acuteLoad = load.acuteLoadKg
-  const chronicAvg = load.chronicWeeklyAvgKg
-
   // Training monotony (Foster) — mean/SD of the last 7 local calendar days' load.
   // Independent of the ACWR gates below: it only needs a week of history, so it
   // can render even while ACWR itself is still "insufficient_data"/"baselining".
@@ -45,43 +42,14 @@ export async function GET() {
   }
   const { monotony, strain } = computeMonotonyStrain([...loadByDay.values()])
 
-  if (load.acwr == null) {
-    return NextResponse.json({
-      acwr: null,
-      acuteLoad: Math.round(acuteLoad),
-      chronicLoad: Math.round(chronicAvg),
-      interpretation: 'insufficient_data',
-      monotony, strain,
-    } satisfies TrainingLoadResponse, { headers: { "Cache-Control": "private, no-store" } })
-  }
-
-  // If the active program started within the last 28 days, the chronic baseline
-  // still includes sessions from the previous routine — ACWR is unreliable.
+  // One band builder shared with the chat tool (OR-210): insufficient data, then a program too young
+  // for its chronic baseline, then the band. The program is read for every response so a young program
+  // is reported as baselining rather than as a number.
   const program = await repo.getActiveProgram(userId)
-  const programStart = program?.startedAt
-    ? new Date(program.startedAt)
-    : program?.createdAt ?? null
-  if (programStart) {
-    const daysSinceStart = Math.floor((todayMid.getTime() - programStart.getTime()) / 86_400_000)
-    if (daysSinceStart < 28) {
-      return NextResponse.json({
-        acwr: null,
-        acuteLoad: Math.round(acuteLoad),
-        chronicLoad: Math.round(chronicAvg),
-        interpretation: 'baselining',
-        baselineDaysRemaining: 28 - daysSinceStart,
-        monotony, strain,
-      } satisfies TrainingLoadResponse, { headers: { "Cache-Control": "private, no-store" } })
-    }
-  }
-
-  const acwr = load.acwr
+  const band = trainingLoadBand(load, program, todayMid)
 
   return NextResponse.json({
-    acwr: parseFloat(acwr.toFixed(2)),
-    acuteLoad: Math.round(acuteLoad),
-    chronicLoad: Math.round(chronicAvg),
-    interpretation: acwrBand(acwr).key,
+    ...band,
     monotony, strain,
   } satisfies TrainingLoadResponse, { headers: { "Cache-Control": "private, no-store" } })
 }
