@@ -7,16 +7,16 @@ import { VS_QUESTION, CURRENT_VS_QUESTION } from '@trainingai/shared/types/day-c
 
 describe('resolveVsAnswer', () => {
   it('stamps an answer with the question the client says it asked, else the current one', () => {
-    expect(resolveVsAnswer({ vsNormal: 'better', vsQuestion: 2 })).toEqual({ vsNormal: 'better', vsQuestion: 2 })
-    expect(resolveVsAnswer({ vsNormal: 'same' })).toEqual({ vsNormal: 'same', vsQuestion: CURRENT_VS_QUESTION })
+    expect(resolveVsAnswer({ vsNormal: 'better', vsQuestion: 2 })).toEqual({ vsNormal: 'better', vsQuestion: 2, vsNormalTouched: null })
+    expect(resolveVsAnswer({ vsNormal: 'same' })).toEqual({ vsNormal: 'same', vsQuestion: CURRENT_VS_QUESTION, vsNormalTouched: null })
   })
   // A mutation queued offline before the rename deployed carries the old key and answered the old question.
   it('reads the legacy key as an answer to "compared to yesterday", whatever is current', () => {
-    expect(resolveVsAnswer({ vsYesterday: 'worse' })).toEqual({ vsNormal: 'worse', vsQuestion: VS_QUESTION.YESTERDAY })
+    expect(resolveVsAnswer({ vsYesterday: 'worse' })).toEqual({ vsNormal: 'worse', vsQuestion: VS_QUESTION.YESTERDAY, vsNormalTouched: null })
   })
   it('stores no question for no answer', () => {
-    expect(resolveVsAnswer({})).toEqual({ vsNormal: null, vsQuestion: null })
-    expect(resolveVsAnswer({ vsNormal: null, vsQuestion: 2 })).toEqual({ vsNormal: null, vsQuestion: null })
+    expect(resolveVsAnswer({})).toEqual({ vsNormal: null, vsQuestion: null, vsNormalTouched: null })
+    expect(resolveVsAnswer({ vsNormal: null, vsQuestion: 2 })).toEqual({ vsNormal: null, vsQuestion: null, vsNormalTouched: null })
   })
 })
 

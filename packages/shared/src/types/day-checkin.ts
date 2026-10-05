@@ -47,6 +47,12 @@ export interface DayCheckin {
   vsNormal: VsNormal | null
   /** LB-190. The question `vsNormal` answered; null exactly when `vsNormal` is null. */
   vsQuestion: VsQuestion | null
+  /**
+   * LB-198. Did the owner tap the picker, or is `vsNormal` the seeded neutral saved untouched?
+   * null = UNKNOWN: every row written before the flag, and any row with no answer. Never read null
+   * as false, and never infer true from Save.
+   */
+  vsNormalTouched: boolean | null
   soreMuscles: string[]
   journal: string | null
   /**

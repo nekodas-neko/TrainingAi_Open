@@ -37,6 +37,8 @@ export const DayCheckinExtrasSchema = z.object({
   vsNormal: z.enum(['better', 'same', 'worse']).nullable().optional(),
   // LB-190. Which question the sheet asked. Absent means the current one.
   vsQuestion: z.union([z.literal(1), z.literal(2)]).optional(),
+  // LB-198. Set from a real tap on the picker by the sheet. Absent or null = unknown.
+  vsNormalTouched: z.boolean().nullable().optional(),
   // LB-190. The pre-rename key. An outbox mutation queued before the rename deployed still carries
   // it and must not be rejected as unknown or lose its answer. It always answered the ORIGINAL
   // question. Retire it once no device can hold such a mutation.
@@ -50,11 +52,20 @@ export const DayCheckinExtrasSchema = z.object({
 export function resolveVsAnswer(body: {
   vsNormal?: 'better' | 'same' | 'worse' | null
   vsQuestion?: 1 | 2
+  vsNormalTouched?: boolean | null
   vsYesterday?: 'better' | 'same' | 'worse' | null
-}): { vsNormal: 'better' | 'same' | 'worse' | null; vsQuestion: VsQuestion | null } {
-  if (body.vsNormal != null) return { vsNormal: body.vsNormal, vsQuestion: body.vsQuestion ?? CURRENT_VS_QUESTION }
-  if (body.vsYesterday != null) return { vsNormal: body.vsYesterday, vsQuestion: VS_QUESTION.YESTERDAY }
-  return { vsNormal: null, vsQuestion: null }
+}): {
+  vsNormal: 'better' | 'same' | 'worse' | null
+  vsQuestion: VsQuestion | null
+  vsNormalTouched: boolean | null
+} {
+  // LB-198. `touched` is carried as sent and never defaulted: a client that does not say gets
+  // UNKNOWN, not false. A legacy-key mutation predates the flag, so it is unknown too.
+  if (body.vsNormal != null) {
+    return { vsNormal: body.vsNormal, vsQuestion: body.vsQuestion ?? CURRENT_VS_QUESTION, vsNormalTouched: body.vsNormalTouched ?? null }
+  }
+  if (body.vsYesterday != null) return { vsNormal: body.vsYesterday, vsQuestion: VS_QUESTION.YESTERDAY, vsNormalTouched: null }
+  return { vsNormal: null, vsQuestion: null, vsNormalTouched: null }
 }
 
 /**
