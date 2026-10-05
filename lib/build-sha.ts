@@ -12,7 +12,7 @@ import { join } from "path"
 export const BUILD_SHA_FILE = "BUILD_SHA"
 
 export function readBuildSha(
-  env: { RAILWAY_GIT_COMMIT_SHA?: string } = process.env,
+  env: Record<string, string | undefined> = process.env,
   root: string = process.cwd(),
 ): string | null {
   const fromEnv = env.RAILWAY_GIT_COMMIT_SHA?.trim()
