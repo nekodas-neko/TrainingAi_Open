@@ -1,5 +1,6 @@
 name: Feature or change
 description: A new capability, or a change to how something works
+title: 'feature: '
 labels: ['type: feature', 'needs: triage']
 body:
   - type: textarea

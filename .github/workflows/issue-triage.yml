@@ -11,7 +11,7 @@ name: Issue intake
 
 on:
   issues:
-    types: [opened, reopened]
+    types: [opened, reopened, labeled, unlabeled]
 
 permissions:
   issues: write
@@ -19,6 +19,7 @@ permissions:
 jobs:
   mark-untriaged:
     name: Mark as needing triage
+    if: github.event.action == 'opened' || github.event.action == 'reopened'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -41,3 +42,20 @@ jobs:
           esac
           gh api -X POST "repos/$REPO/issues/$NUMBER/labels" -f "labels[]=needs: triage"
           echo "Marked #$NUMBER as needing triage."
+
+  # Every title starts with its type — `bug: …`, `feature: …` — so the issue list reads at a glance
+  # (owner, 2026-10-05). The `type:` label is the authority; this keeps the prefix in step with it,
+  # including when someone relabels an issue. An edit made here with GITHUB_TOKEN does not trigger
+  # another run, so this cannot loop.
+  title-prefix:
+    name: Keep the title's type prefix in step with its label
+    if: github.event.action == 'opened' || startsWith(github.event.label.name, 'type:')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - run: node scripts/sync-title-prefixes.js --issue "$NUMBER"
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
