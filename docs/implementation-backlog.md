@@ -490,6 +490,57 @@ below threshold and left in place for next time.
 > batches — so BF-171 waits on it via `Needs:`. They displaced nothing: TN-34 and the
 > temperature-baseline cluster under it keep their order relative to each other.
 
+### [platform][devices] OR-213 — the four-layer ingest architecture: one normaliser, device-first storage, scored values only in the cloud
+
+- **Lane: O** · **Added:** 2026-10-05 · Orchestrator, from the owner's architecture direction.
+- **His target, in his words:** raw from device / Health Connect → turn raw into values → store at
+  the finest resolution available **on the phone** → Tuning scores it → the app rolls up
+  (1s → 1min → 15min → 1h) locally → **only the scored, calculated values go to Railway**, because
+  that set is small. Driver: *"we need to make sure our railway DB can handle multiple users
+  efficiently."*
+- **✅ MEASURED 2026-10-05 — THE PREMISE HOLDS, and the number is decisive.** Production today, one
+  user, 263 MB total:
+
+  | bucket | size | share |
+  |---|---|---|
+  | raw / sample, device-sourced | **182 MB** | **73.3%** |
+  | ops + logs (`error_events`, `db_query_log`) | 54 MB | 21.8% |
+  | **calculated + app data** | **12 MB** | **4.9%** |
+
+  **So the architecture he describes takes a user from ~263 MB to ~12 MB — about 22×.** At today's
+  shape 100 users is ~26 GB; under his model it is ~1.2 GB. **This is not a refactor for tidiness,
+  and the entry should not be argued on tidiness.**
+- **✅ CONFIRMED: there is NO shared normalisation layer, exactly as he suspected.** Searched for a
+  canonical-sample step (`normaliseSample`/`canonicalSample`/a shared sensor-ingest module) — **none
+  exists**. Ingest arrives through at least `app/api/hr-ingest`, `app/api/sync-health`,
+  `app/api/health-connect`, `app/api/oura-ble/samples` and `lib/health-connect-sync.ts`, and
+  `oura_heartrate` is written from several of them independently. **Each source defines its own
+  shape, so "what are our important sources and how do we aggregate them" has no single answer to
+  read.** That is the gap worth closing first, before any storage move.
+- **⛔ ONE HARD CONFLICT WITH AN EXISTING DECISION, and it must be resolved before anything ships.**
+  *"Everything raw on the device"* contradicts the owner's own **2026-09-28** decision to KEEP the
+  server-side Oura raw archive, taken on `OR-192`'s measurement: a redecode is **hardcoded
+  full-history**, so every protocol fix re-reads the entire archive, and **a pruned raw row cannot
+  be re-drained from the ring**. Both positions are his and they cannot both hold.
+  **The device is not currently a safe home for the only copy:** measured on-device 2026-08-18,
+  **209,326 rows / 31.2 MB, past Android Auto Backup's 25 MB quota, so none of it is backed up**,
+  and the 14-day prune (`pruneRaw`) still has no caller. A lost phone would be a permanent loss.
+- **The resolution question he raised is the real design content.** Health Connect delivers 5-minute
+  HR bins; the strap delivers ~1 s; the ring delivers its own cadence. A normaliser has to decide
+  whether the canonical store keeps **finest-available per source** (and records which) or
+  **downsamples to one grid on arrival**. Keeping the finest is reversible; picking a grid is not,
+  because the discarded detail cannot be recovered.
+- **What this entry owes before it becomes buildable work:** a written spec of the four layers with
+  the source contract named — for each source, what it provides, at what resolution, and which
+  field wins when two sources cover the same minute. **The existing ranked per-field merge for
+  health writes is prior art and should be read first, not reinvented.**
+- **Questions put to the owner 2026-10-05** (see the chat of that date): whether the raw archive is
+  genuinely exempt from "everything local"; whether multi-user is real or prospective; and whether
+  the canonical resolution is finest-available or a fixed grid.
+- **Do NOT start moving storage.** The normaliser and the source contract come first; a storage move
+  without them relocates the ambiguity rather than removing it.
+
+
 ### [cardio] OR-211 — `sex:'other'` halves VO2max, and best pace has no distance floor
 
 - **Lane: A** · **Added:** 2026-10-05 · Orchestrator, splitting `PS-36` (a) and (b) off its gate.
