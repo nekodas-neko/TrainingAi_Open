@@ -321,6 +321,47 @@ markdown file is then frozen as `docs/archive/implementation-backlog-2026-10.md`
 
 ---
 
+### 4.4 The second human contributor — why this move exists at all
+
+**Owner, 2026-10-05: the point of GitHub Issues is collaboration with another person working on
+the app.** That reframes several choices below, so it is recorded before them rather than as a
+footnote. A second human cannot read a 2.7 MB backlog file, agent batons, or `Lane:`/`Gate:`
+fields — which is the strongest argument for the move, stronger than the token saving.
+
+**Measured 2026-10-05: there is no entry point today.** No `CONTRIBUTING.md`, no issue templates,
+no PR template — `.github/` holds only `branch-sweep.txt`, `dependabot.yml` and `workflows/`. An
+outside contributor currently has to infer the whole process.
+
+**⛔ A rule conflict this creates, which must be settled before the first inbound PR.** Two
+standing rules now collide:
+- `CLAUDE.md`: **never merge a pull request we did not author** — the ceiling is review, comment,
+  approve, and the merge belongs to the author or the owner.
+- Owner, 2026-10-05: **only the Orchestrator merges to `main`** during the restructure.
+
+Taken together those would mean a contributor's PR can never merge. **The split that resolves it:
+the Orchestrator merges OUR PRs; the OWNER merges a contributor's.** The "only the Orchestrator
+merges" instruction exists to stop agent-vs-agent races (see `#1849` in §9), not to put the owner
+behind an agent on someone else's work.
+
+**What a contributor needs, and none of it exists yet (Phase 2):**
+
+| Thing | Why it is not optional with a second person |
+|---|---|
+| `CONTRIBUTING.md` | How to pick up an issue, branch naming, what CI checks, and **who merges their PR** |
+| Issue templates (bug · feature · question) | A report that lands triage-ready instead of needing a round trip |
+| PR template | The repo already expects a description shape; nothing states it |
+| `area:` labels (the 11 pillars) | **`lane: engine`/`surface` is agent routing and means nothing to a human.** Ship both: `lane:` for assignment, `area:` for humans |
+| `good first issue` · `help wanted` | The only way a contributor can self-serve work without asking |
+| A visible milestone | What is in the next release, readable without the chat history |
+
+**⚠ Agent and owner are indistinguishable on GitHub.** Every agent acts as the owner's account, so
+a contributor cannot tell whether a review came from a person or a session, and `#1849` shows the
+same ambiguity causing a race internally. With an outside collaborator this is a courtesy problem
+as well as a process one: **agent-authored comments say so in the footer**, which the existing
+attribution line already does. Keep it.
+
+---
+
 ## 5. The agents after the change
 
 | Role | Where | Model | What it does | Replaces |
