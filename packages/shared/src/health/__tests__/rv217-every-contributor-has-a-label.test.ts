@@ -87,9 +87,8 @@ describe('every sleep contributor the model emits is presentable', () => {
 describe('every readiness contributor is presentable too', () => {
   const keys = Object.keys(READINESS_WEIGHTS)
 
-  it('covers all nine', () => {
-    expect(keys).toHaveLength(9)
-    expect(keys).toContain('checkin')
+  it('covers all eight', () => {
+    expect(keys).toHaveLength(8)
   })
 
   it('has a label and an explanation for every one', () => {
@@ -97,5 +96,13 @@ describe('every readiness contributor is presentable too', () => {
       expect(labelFor(key), `${key} renders as its raw key`).not.toBe(key)
       expect(guideFor(key), `${key} has no contributor-guide entry`).not.toBeNull()
     }
+  })
+
+  // #2224 took `checkin` out of the model, and every derived row written before that still stores
+  // it. Those rows are rendered too, so the retired key keeps both its label and its guide.
+  it('still presents the retired check-in term on rows written before #2224', () => {
+    expect(keys).not.toContain('checkin')
+    expect(labelFor('checkin')).not.toBe('checkin')
+    expect(guideFor('checkin')).not.toBeNull()
   })
 })

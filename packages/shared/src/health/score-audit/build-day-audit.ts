@@ -199,7 +199,6 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     sleepScore: sleep?.score ?? null,
     activityScore: preTaperActivity,
     prevDayActivityScore,
-    checkinEnergy: mood?.energyLevel ?? null,
     ouraDaily: ouraToday,
     derived: derivedForDay,
   }))

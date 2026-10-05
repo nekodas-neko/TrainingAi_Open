@@ -28,7 +28,7 @@ import {
 const FULL: ReadinessCompositeInputs = {
   rhrZ: -0.8, hrvZ: 1.1, tempZ: 0.3, sleepBalanceZ: -0.4,
   previousNightScore: 81, prevDayActivityScore: 64, activityBalanceScore: 72,
-  checkinScore: 88, nHistory: BASELINE_MIN_NIGHTS + 6, recoveryIndexHours: 3.2,
+  nHistory: BASELINE_MIN_NIGHTS + 6, recoveryIndexHours: 3.2,
 }
 
 describe('every contributor records the number it was computed from', () => {
@@ -45,7 +45,6 @@ describe('every contributor records the number it was computed from', () => {
     expect(c.previousNight.input).toBe(81)
     expect(c.prevDayActivity.input).toBe(64)
     expect(c.activityBalance.input).toBe(72)
-    expect(c.checkin.input).toBe(88)
   })
 
   it('records raw hours for the recovery index', () => {
@@ -75,11 +74,11 @@ describe('every contributor records the number it was computed from', () => {
 
   it('records null when there was no input at all', () => {
     const none = computeReadinessComposite({
-      ...FULL, previousNightScore: null, recoveryIndexHours: null, checkinScore: null,
+      ...FULL, previousNightScore: null, recoveryIndexHours: null, activityBalanceScore: null,
     }).contributors
     expect(none.previousNight.input).toBeNull()
     expect(none.recoveryIndex.input).toBeNull()
-    expect(none.checkin.input).toBeNull()
+    expect(none.activityBalance.input).toBeNull()
   })
 })
 
@@ -141,9 +140,24 @@ describe('it tells a model change from an input change', () => {
     const check = rederiveReadinessFromStored({
       ...c,
       hrvBalance: { ...c.hrvBalance, score: 1 },
-      checkin: { ...c.checkin, score: 2 },
+      activityBalance: { ...c.activityBalance, score: 2 },
     })!
-    expect(check.drifted.map(d => d.key).sort()).toEqual(['checkin', 'hrvBalance'])
+    expect(check.drifted.map(d => d.key).sort()).toEqual(['activityBalance', 'hrvBalance'])
+  })
+
+  // #2224. Every row written before the check-in left the model still stores a `checkin` term. It
+  // is not drift and not a missing key: the current model has no such term, and the score it
+  // reports is the current model's, which the row's stamped model version already distinguishes.
+  it('ignores a stored term the current model no longer has', () => {
+    const result = computeReadinessComposite(FULL)
+    const check = rederiveReadinessFromStored({
+      ...result.contributors,
+      checkin: { score: 30, provisional: false, input: 30, gap: null },
+    })!
+    expect(check.drifted).toEqual([])
+    expect(check.missing).toEqual([])
+    expect(check.uncheckable).toEqual([])
+    expect(check.score).toBe(result.score)
   })
 
   // An input change leaves the row self-consistent — which is exactly what says "the model is fine,
@@ -208,12 +222,12 @@ describe('it refuses to invent a verdict', () => {
 
   it('skips a contributor whose stored score is not a finite number', () => {
     const c = computeReadinessComposite(FULL).contributors
-    const check = rederiveReadinessFromStored({ ...c, checkin: { score: null, provisional: false } })!
+    const check = rederiveReadinessFromStored({ ...c, activityBalance: { score: null, provisional: false } })!
     expect(check.drifted).toEqual([])
     expect(check.uncheckable).toEqual([])
-    // checkin carried 0.10 of the weight and is now absent from the sum entirely.
-    expect(check.score).toBe(Math.round(
-      computeReadinessComposite(FULL).score - c.checkin.score * READINESS_WEIGHTS.checkin))
+    // activityBalance's weight is now absent from the sum entirely.
+    const keys = (Object.keys(READINESS_WEIGHTS) as (keyof typeof READINESS_WEIGHTS)[]).filter(k => k !== 'activityBalance')
+    expect(check.score).toBe(Math.round(keys.reduce((sum, k) => sum + c[k].score * READINESS_WEIGHTS[k], 0)))
   })
 })
 

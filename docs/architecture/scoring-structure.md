@@ -61,19 +61,21 @@ records reaches the sleep score.
 
 ## Readiness — `packages/shared/src/health/readiness-composite.ts`
 
-**Weights** (fractions, total 1.00):
+**Weights** (fractions, total 1.00). Since 2026-10-06 (#2224) the morning check-in is not part of
+readiness: its 0.10 was removed and the other eight renormalised over the 0.90 they held, so their
+ratios are unchanged. The check-in still tunes the day's session. Rows scored before that carry a
+`checkin` term and the model version `v4:…`.
 
 | Component | Weight | Raw input | How it becomes 0–100 |
 |---|---|---|---|
-| Previous night | 0.16 | last night's Sleep score | passed straight through |
-| Resting HR | 0.15 | z-score vs your baseline (`oura_daily_summary`) | 50 at baseline; lower HR scores higher |
-| HRV balance | 0.15 | z-score vs your baseline | 50 at baseline; higher HRV scores higher |
-| Temperature | 0.10 | z-score vs your baseline | 100 at baseline; falls with deviation **either way** (a fever signal) |
-| Sleep balance | 0.10 | recent sleep duration vs your baseline | 50 at baseline; more scores higher |
-| Morning check-in | 0.10 | your energy answer | drained 30 · low 50 · ok 72 · good 88 · pumped 100 |
-| Previous-day activity | 0.09 | yesterday's Activity score (before taper) | passed through |
-| Recovery index | 0.09 | hours from the night's lowest HR to waking | 5 h = 100, linear |
-| Activity balance | 0.06 | today's Activity score | passed through |
+| Previous night | 0.178 (0.16 ÷ 0.90) | last night's Sleep score | passed straight through |
+| Resting HR | 0.167 (0.15 ÷ 0.90) | z-score vs your baseline (`oura_daily_summary`) | 50 at baseline; lower HR scores higher |
+| HRV balance | 0.167 (0.15 ÷ 0.90) | z-score vs your baseline | 50 at baseline; higher HRV scores higher |
+| Temperature | 0.111 (0.10 ÷ 0.90) | z-score vs your baseline | 100 at baseline; falls with deviation **either way** (a fever signal) |
+| Sleep balance | 0.111 (0.10 ÷ 0.90) | recent sleep duration vs your baseline | 50 at baseline; more scores higher |
+| Previous-day activity | 0.100 (0.09 ÷ 0.90) | yesterday's Activity score (before taper) | passed through |
+| Recovery index | 0.100 (0.09 ÷ 0.90) | hours from the night's lowest HR to waking | 5 h = 100, linear |
+| Activity balance | 0.067 (0.06 ÷ 0.90) | today's Activity score | passed through — still moves through the day; open as #2097 |
 
 **z-scores to points:** 33 points per standard deviation around 50, with the last 20 points at each
 end compressed rather than clipped, so the worst days keep their order instead of all reading 0.
@@ -81,9 +83,8 @@ end compressed rather than clipped, so the worst days keep their order instead o
 **Baselines:** the baseline-relative inputs need 14 nights of history.
 
 **⚠ Missing data is handled differently here than in Sleep and Activity.** A missing input becomes
-a **neutral 50** instead of dropping out. No check-in, for example, means a 50 in a 10% slot, so a
-day with no check-in can never score above roughly 95, and a missing input pulls the score toward
-the middle. Sleep and Activity instead drop the component and spread its weight over the rest. The
+a **neutral 50** instead of dropping out. No Recovery Index, for example, means a 50 in a 10% slot,
+and a missing input pulls the score toward the middle. Sleep and Activity instead drop the component and spread its weight over the rest. The
 ingest architecture ([`ingest-and-scoring.md`](ingest-and-scoring.md) §3) shows the two are the
 same family and how to unify them by storing the score together with its **coverage**.
 

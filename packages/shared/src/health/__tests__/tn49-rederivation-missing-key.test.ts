@@ -11,6 +11,10 @@
  * The missing key is `checkin` (weight 0.10) on every one of them. All 58 nine-key rows reproduce
  * exactly. The entry that reported this proposed rewriting the seven stored scores to the
  * under-weighted numbers, which would have written a 4–6 point error into production.
+ *
+ * `checkin` left the model in #2224, so those seven rows are no longer missing anything. The rule
+ * stands for the next key that goes missing; the cases below use `temperature` (weight 1/9) as the
+ * absent key, and the last one shows the 2026-07-20 row under the current model.
  */
 import { describe, it, expect } from 'vitest'
 import { rederiveReadinessFromStored, READINESS_WEIGHTS } from '../readiness-composite'
@@ -51,28 +55,26 @@ describe('TN-49 — a contributor key absent from the stored map', () => {
   })
 
   it('does not drop the weight of a key that is absent', () => {
-    const eight = completeMap(50)
-    delete eight.checkin
+    const seven = completeMap(50)
+    delete seven.temperature
 
-    const r = rederiveReadinessFromStored(eight)
-    // Skipping the key left 0.90 of weight and gave 45. The row's own score was 50.
+    const r = rederiveReadinessFromStored(seven)
+    // Skipping the key left 8/9 of the weight and gave 44. The row's own score was 50.
     expect(r?.score).toBe(50)
-    expect(r?.missing).toEqual(['checkin'])
+    expect(r?.missing).toEqual(['temperature'])
   })
 
   /**
-   * The same thing where it is visible in more than the last digit: eight contributors at 80 and
-   * `checkin` absent. The neutral 50 stands in for the missing key, so 0.90×80 + 0.10×50 = 77.
-   * Dropping the weight gave 72 — a five-point hole with nothing on the row to explain it.
+   * The same thing where it is visible in more than the last digit: seven contributors at 80 and
+   * `temperature` absent. The neutral 50 stands in for the missing key, so 8/9×80 + 1/9×50 = 77.
+   * Dropping the weight gave 71 — a six-point hole with nothing on the row to explain it.
    */
   it('stands the model neutral in for the missing key rather than renormalising', () => {
-    const eight = Object.fromEntries(
-      Object.keys(READINESS_WEIGHTS).filter(k => k !== 'checkin').map(k => [k, stored(80)]),
+    const seven = Object.fromEntries(
+      Object.keys(READINESS_WEIGHTS).filter(k => k !== 'temperature').map(k => [k, stored(80)]),
     )
 
-    // 0.90 × 80 + 0.10 × 50 = 77. Dropping the key's weight gave 72 — a five-point hole with
-    // nothing on the row to explain it.
-    expect(rederiveReadinessFromStored(eight)?.score).toBe(77)
+    expect(rederiveReadinessFromStored(seven)?.score).toBe(77)
   })
 
   /**
@@ -82,12 +84,12 @@ describe('TN-49 — a contributor key absent from the stored map', () => {
    */
   it('separates a key that is absent from one that is present without an input', () => {
     const map = completeMap(50) as Record<string, unknown>
-    map.temperature = { score: 64, provisional: false }   // present, no `input` → uncheckable
-    delete map.checkin                                    // absent → missing
+    map.sleepBalance = { score: 64, provisional: false }  // present, no `input` → uncheckable
+    delete map.temperature                                // absent → missing
 
     const r = rederiveReadinessFromStored(map)
-    expect(r?.uncheckable).toEqual(['temperature'])
-    expect(r?.missing).toEqual(['checkin'])
+    expect(r?.uncheckable).toEqual(['sleepBalance'])
+    expect(r?.missing).toEqual(['temperature'])
   })
 
   it('still detects a contributor whose stored score does not follow from its stored input', () => {
@@ -105,8 +107,7 @@ describe('TN-49 — a contributor key absent from the stored map', () => {
   /**
    * The asymmetry, pinned deliberately. An ABSENT key gets the model's neutral; a key that is
    * PRESENT with an unusable score stays skipped, which is what `readiness-stored-inputs.test.ts`
-   * has asserted since before this fix — *"checkin carried 0.10 of the weight and is now absent
-   * from the sum entirely."*
+   * has asserted since before this fix — the unusable term's weight is absent from the sum entirely.
    *
    * The two look alike and are not. An absent key has no score, so standing the model's own neutral
    * in reproduces what the composite did. A present key with a corrupt score is a value that cannot
@@ -116,16 +117,16 @@ describe('TN-49 — a contributor key absent from the stored map', () => {
    */
   it('treats a present-but-unusable score differently from an absent key', () => {
     const present = completeMap(50) as Record<string, unknown>
-    present.checkin = { score: null, provisional: false }   // present, unreadable → skipped
+    present.temperature = { score: null, provisional: false }   // present, unreadable → skipped
     const absent = completeMap(50)
-    delete absent.checkin                                   // absent → neutral 50 stands in
+    delete absent.temperature                                   // absent → neutral 50 stands in
 
-    // Skipped: 0.90 of weight at 50 = 45. Stood in for: the full 1.00 at 50 = 50.
-    expect(rederiveReadinessFromStored(present)?.score).toBe(45)
+    // Skipped: 8/9 of the weight at 50 = 44. Stood in for: the full 1.00 at 50 = 50.
+    expect(rederiveReadinessFromStored(present)?.score).toBe(44)
     expect(rederiveReadinessFromStored(absent)?.score).toBe(50)
     // And only the absent one is reported as missing — the skipped one is not claimed either way.
     expect(rederiveReadinessFromStored(present)?.missing).toEqual([])
-    expect(rederiveReadinessFromStored(absent)?.missing).toEqual(['checkin'])
+    expect(rederiveReadinessFromStored(absent)?.missing).toEqual(['temperature'])
   })
 
   it('returns null when nothing in the map is a contributor at all', () => {
@@ -135,15 +136,17 @@ describe('TN-49 — a contributor key absent from the stored map', () => {
 
   /**
    * The production shape, reconstructed from the real row of 2026-07-20: the eight stored
-   * contributors weight to 43.26 and the stored score is 48. Under the old code the row read 43 and
-   * was reported as a 5-point model drift; the neutral 50 for the absent `checkin` gives 48 exactly.
+   * contributors weighted to 43.26 under the old 0.90 they held, and the stored score is 48. Under
+   * the old code the row read 43 and was reported as a 5-point model drift; TN-49's neutral 50 for
+   * the absent `checkin` gave 48. Since #2224 the model has exactly these eight keys, so nothing is
+   * missing and their renormalised weight gives 43.26 / 0.90 = 48.07 — still 48.
    *
-   * **Three of the seven rows keep a 1-point residual that this does NOT explain** (07-16, 07-17,
-   * 07-21) and no value in `CHECKIN_ENERGY_SCORE` reproduces them, so that remainder is recorded as
-   * unexplained rather than fitted. This case uses one of the four that resolve exactly.
+   * **Three of the seven rows kept a 1-point residual that TN-49 did NOT explain** (07-16, 07-17,
+   * 07-21), recorded as unexplained rather than fitted. This case uses one of the four that resolve
+   * exactly.
    */
   it('resolves the production row of 2026-07-20', () => {
-    // 43.26 of stored weight across the eight present keys, as measured.
+    // 43.26 of stored weight across the eight present keys, under the pre-#2224 weights.
     const map: Record<string, unknown> = {
       restingHeartRate: stored(40),   // 6.00
       previousNight:    stored(45),   // 7.20
@@ -156,7 +159,7 @@ describe('TN-49 — a contributor key absent from the stored map', () => {
     }                                 // → 43.26
 
     const r = rederiveReadinessFromStored(map)
-    expect(r?.missing).toEqual(['checkin'])
+    expect(r?.missing).toEqual([])
     expect(r?.score).toBe(48)
   })
 })

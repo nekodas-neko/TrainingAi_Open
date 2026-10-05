@@ -19,7 +19,6 @@ const WEIGHT_LABELS: Record<keyof typeof READINESS_WEIGHTS, string> = {
   prevDayActivity: 'Previous day activity',
   recoveryIndex: 'Recovery index',
   activityBalance: 'Activity balance',
-  checkin: 'Morning check-in',
 }
 
 /**
@@ -94,7 +93,6 @@ const INPUT_LABELS: Record<ReadinessInputKey, string> = {
   restingHeartRate: 'resting heart rate',
   temperature: 'body temperature',
   activity: 'daily activity',
-  checkin: 'your morning check-in',
 }
 
 /**
@@ -104,7 +102,7 @@ const INPUT_LABELS: Record<ReadinessInputKey, string> = {
  */
 function LimitedInputsNote({ readiness }: { readiness: ReadinessScoreResponse }) {
   if (!readiness.limited) return null
-  const missing = readiness.inputsMissing.filter(k => k !== 'checkin')
+  const missing = readiness.inputsMissing
   if (missing.length === 0) return null
   const names = missing.map(k => INPUT_LABELS[k])
   const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`

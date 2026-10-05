@@ -4,7 +4,7 @@ import { seedOrUpdateBaseline, baselineZ } from '@trainingai/shared/health/perso
 
 describe('scoreAvailability', () => {
   it('reports full and unlimited when every core signal is present', () => {
-    const a = scoreAvailability({ sleep: true, hrv: true, restingHeartRate: true, temperature: true, activity: true, checkin: true })
+    const a = scoreAvailability({ sleep: true, hrv: true, restingHeartRate: true, temperature: true, activity: true })
     expect(a.confidence).toBe('full')
     expect(a.limited).toBe(false)
     expect(a.missing).toEqual([])
@@ -14,7 +14,7 @@ describe('scoreAvailability', () => {
     const a = scoreAvailability({ sleep: true, hrv: true, restingHeartRate: true, temperature: true })
     expect(a.confidence).toBe('full')
     expect(a.limited).toBe(false)
-    expect(a.missing).toEqual(['activity', 'checkin'])
+    expect(a.missing).toEqual(['activity'])
   })
 
   it('is partial for the typical Health Connect user — no body temperature', () => {
@@ -28,12 +28,12 @@ describe('scoreAvailability', () => {
   it('is minimal with one core signal or none', () => {
     expect(scoreAvailability({ sleep: true }).confidence).toBe('minimal')
     expect(scoreAvailability({}).confidence).toBe('minimal')
-    expect(scoreAvailability({ activity: true, checkin: true }).confidence).toBe('minimal')
+    expect(scoreAvailability({ activity: true }).confidence).toBe('minimal')
   })
 
-  it('counts activity and check-in as available without letting them raise confidence', () => {
-    const a = scoreAvailability({ sleep: true, hrv: true, activity: true, checkin: true })
-    expect(a.available).toEqual(['sleep', 'hrv', 'activity', 'checkin'])
+  it('counts activity as available without letting it raise confidence', () => {
+    const a = scoreAvailability({ sleep: true, hrv: true, activity: true })
+    expect(a.available).toEqual(['sleep', 'hrv', 'activity'])
     expect(a.confidence).toBe('partial')
   })
 

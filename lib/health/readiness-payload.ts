@@ -28,7 +28,7 @@ import { accumulateZoneSeconds, activeMinutesFromReadings } from '@trainingai/sh
 import { computeMovedHours, moveHoursGoal } from '@trainingai/shared/health/hourly-movement'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { baselineZ } from '@trainingai/shared/health/personal-baseline'
-import { computeReadinessComposite, checkinScoreFromEnergy, READINESS_MODEL_VERSION, type ReadinessCompositeResult } from '@trainingai/shared/health/readiness-composite'
+import { computeReadinessComposite, READINESS_MODEL_VERSION, type ReadinessCompositeResult } from '@trainingai/shared/health/readiness-composite'
 import { resilienceLevelToBand, observeResilienceCoverage } from '@/lib/health/stress-resilience'
 import { computeIllnessRadar, illnessAdvisory, illnessZScores, type IllnessFlag, type IllnessBiomarker, type IllnessBiomarkerKey } from '@trainingai/shared/health/illness-radar'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
@@ -348,7 +348,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   const from28dIso  = toAestDay(from28dDate, tz)
   const from7dIso   = toAestDay(new Date(todayMid.getTime() - 7 * 86_400_000), tz)
 
-  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, todayMood, userProfile, userGoals, doseEvents] = await Promise.all([
+  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents] = await Promise.all([
     repo.listBodyMetrics(userId, from28dIso, todayIso),
     repo.listSleepSessions(userId, from28dIso, todayIso),
     repo.getWorkoutSessionsFrom(userId, from28dDate),
@@ -358,7 +358,6 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     repo.getOuraDailySummary(userId, from28dIso, todayIso),
     repo.getOuraDailyDerived(userId, from7dIso, todayIso),
     repo.getLatestOuraCloudVitals(userId),
-    repo.getMoodLog(userId, todayIso),
     repo.getUserById(userId),
     // Q-524: the step goal the user set, which wins over the activity-level default.
     repo.getUserGoals(userId).catch(() => null),
@@ -570,11 +569,6 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   const { rhrZ, hrvZ, tempZ, breathZ } = latestSummary
     ? illnessZScores(priorSummary, latestSummary)
     : { rhrZ: null, hrvZ: null, tempZ: null, breathZ: null }
-  // Morning check-in (mood/energy) → 0-100 for the readiness composite. Null when not logged today
-  // → the composite treats it as neutral 50 (so a perfect 100 needs a logged good check-in, but
-  // skipping it doesn't tank readiness).
-  const checkinScore = checkinScoreFromEnergy(todayMood?.energyLevel)
-
   // Generic-source fallback (Q-43): a user without a ring has no oura_daily_summary, so the
   // composite above never ran and every readiness surface rendered blank. Health Connect and
   // manual logs do supply HRV, resting HR and sleep duration in the generic tables — enough for
@@ -613,7 +607,6 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
         previousNightScore: sleepScore100,
         prevDayActivityScore,
         activityBalanceScore: ownActivityScore,
-        checkinScore,
         nHistory: genericNHistory,
       })
     : null
@@ -627,7 +620,6 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     previousNightScore: sleepScore100,
     prevDayActivityScore,
     activityBalanceScore: ownActivityScore,
-    checkinScore,
     nHistory: latestSummary.nHistory,
     recoveryIndexHours: latestSummary.recoveryIndexHours,
   }) : genericComposite
@@ -897,14 +889,13 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // An Oura readiness score is a whole-picture number by construction, so it reports as full
   // regardless of which of our own inputs happen to be present today.
   const availability: ScoreAvailability = ouraToday?.readinessScore != null
-    ? { available: ['sleep', 'hrv', 'restingHeartRate', 'temperature', 'activity', 'checkin'], missing: [], confidence: 'full', limited: false }
+    ? { available: ['sleep', 'hrv', 'restingHeartRate', 'temperature', 'activity'], missing: [], confidence: 'full', limited: false }
     : scoreAvailability({
         sleep: sleepScore100 != null,
         hrv: baselineHrv != null || hrvZ != null,
         restingHeartRate: baselineRhr != null || rhrZ != null,
         temperature: temperatureDeviation != null || tempZ != null,
         activity: ownActivityScore != null,
-        checkin: checkinScore != null,
       })
 
   return {

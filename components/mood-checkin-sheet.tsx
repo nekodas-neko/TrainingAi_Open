@@ -84,7 +84,7 @@ export function MoodCheckInSheet({
   // of them (73%, against ~20-25% by chance), so most of the contributor was a re-reading of the
   // score it feeds. Seeding a FIXED level instead would not fix it — the value would still be one
   // the lifter did not choose, and the column would stay impossible to read. Unanswered now means
-  // no log, which `checkinScoreFromEnergy(null)` already scores as the documented NEUTRAL 50.
+  // no log. The check-in has not fed readiness at all since #2224, so the loop cannot re-form.
   const [energy, setEnergy]           = useState<EnergyLevel | null>(null)
   const [soreMuscles, setSoreMuscles] = useState<string[]>([])
   const [issues, setIssues]           = useState<BodyState[]>([])
