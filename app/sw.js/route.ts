@@ -1,6 +1,7 @@
 import { readFileSync } from "fs";
 import { join } from "path";
 import { buildPrecacheList, renderServiceWorker } from "@/lib/sw/manifest";
+import { readBuildSha } from "@/lib/build-sha";
 
 // Serves the service worker from a template with the cache name build-stamped in
 // (one cache name per deploy — no manual bump, forgotten twice historically) and
@@ -9,7 +10,7 @@ import { buildPrecacheList, renderServiceWorker } from "@/lib/sw/manifest";
 // `public/sw.js`) so Next's static file serving never shadows this route.
 const TEMPLATE_PATH = join(process.cwd(), "public", "sw-template.js");
 const STATIC_DIR = join(process.cwd(), ".next", "static");
-const BUILD_ID = process.env.RAILWAY_GIT_COMMIT_SHA ?? String(Date.now());
+const BUILD_ID = readBuildSha() ?? String(Date.now());
 
 // BUILD_ID is constant for the process lifetime, so the (potentially large)
 // static-dir walk runs once, not on every SW fetch.
