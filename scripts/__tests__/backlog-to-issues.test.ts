@@ -64,9 +64,15 @@ describe('backlog-to-issues buildPlan', () => {
     expect(byKey['LA-2'].body).toContain('**Blocked by** {{LA-1}}')
   })
 
+  it('titles say what the task is: no area tags, no entry id', () => {
+    expect(byKey['LA-2'].title).toBe('Depends on LA-1')
+    expect(byKey['OR-5'].title).toBe('What does the owner want?')
+    expect(byKey['LA-1'].body).toContain('**`LA-1`**')
+  })
+
   it('carries the entry text and a pinned link to its source line', () => {
     expect(byKey['LA-1'].body).toContain('The body of LA-1.')
     expect(byKey['LA-1'].body).toContain('/blob/abc123/docs/implementation-backlog.md#L5')
-    expect(byKey['LA-1'].title).toBe('LA-1 — fix the nap split')
+    expect(byKey['LA-1'].title).toBe('Fix the nap split')
   })
 })

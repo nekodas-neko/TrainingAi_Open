@@ -141,6 +141,12 @@ merged one. (Or ask the Orchestrator to read `/api/version` for you.)
 gives you the version). It should go green end to end, and this time Railway deploys only once.
 
 **6c. A rollback works — before you ever need it in anger.**
+
+> ⚠ **`v1.486.11` is the one release whose rollback cannot be confirmed automatically.** Its code
+> predates the build stamp (#2061), so it cannot report which commit it is, and *Production serves
+> this commit* waits 20 minutes and goes red even though the rollback worked (seen 2026-10-05, run
+> #5). Check it by hand instead: the app's **More** → version reads `1.486.11`. Every release from
+> `v1.487.0` on carries the stamp, so its rollback is confirmed like a release.
 1. **Actions** → **Release** → **Run workflow**.
 2. **version** blank, **sha** blank, **rollback_to** = the release from Step 3 (e.g. `v1.486.11`).
 3. **You should see** *Verify* → *Deploy* → *Production serves this commit* green, and *Tag* and
