@@ -60,6 +60,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--panel);padding:1px 
 
 <section>
 <h2>2 · Proposed pillar model: 100 is rare, but reachable</h2>
+<div class="callout"><p><b>Superseded by Level + Day (owner, 2026-10-06).</b> The curve below scores "your normal" as 70, so someone who is perfect every day would read 70 forever. The agreed model grades your normal itself against absolute standards (Level) and adds today versus your normal (Day). Details and 15 edge cases: <code>docs/architecture/readiness-tree.md</code>. The test cases below stay as a record of why it changed.</p></div>
 <p>Readiness = Σ (pillar × weight). Each pillar = Σ (component × weight). Every component uses one curve, scored against your <b>30-day normal</b>. The numbers are a proposal for your sign-off:</p>
 <div class="tbl"><table>
 <tr><th>Where you are vs your 30-day normal</th><th>Component score</th><th>Reads as</th></tr>
