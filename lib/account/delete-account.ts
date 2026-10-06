@@ -44,6 +44,13 @@ export async function deleteAccountAndSignOut(
     return { ok: false, error }
   }
   onDeleted?.()
-  await signOutAndClearDevice()
+  try {
+    await signOutAndClearDevice()
+  } catch {
+    // Only the server sign-out can throw here — the two clears swallow their own failures — and by
+    // now the account is gone and the device wiped. Leave by hand rather than strand the screen on
+    // "Signing you out…".
+    window.location.replace('/sign-in')
+  }
   return { ok: true }
 }

@@ -7,6 +7,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
+import { reportServerError } from '@/lib/observability'
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -87,8 +88,15 @@ export async function DELETE(req: NextRequest) {
 
   // #2120: the same deletion the user's own `DELETE /api/account` runs. This used to be a bare
   // `DELETE FROM users`, which threw for any account with a custom exercise or a saved meal.
-  const repo = await getRepository()
-  const result = await repo.deleteAccount(userId)
+  let result
+  try {
+    const repo = await getRepository()
+    result = await repo.deleteAccount(userId)
+  } catch (err) {
+    console.error('[admin/users] deletion failed', err)
+    reportServerError(err, { userId: session.user.id, url: req.nextUrl.pathname })
+    return NextResponse.json({ error: 'The account could not be deleted, and nothing was removed.' }, { status: 500 })
+  }
   if (!result.deleted) return NextResponse.json({ error: 'User not found' }, { status: 404 })
   return NextResponse.json({ ok: true })
 }

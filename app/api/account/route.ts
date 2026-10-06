@@ -50,7 +50,11 @@ export async function DELETE(req: NextRequest) {
   }
   const parsed = BodySchema.safeParse(read.body)
   if (!parsed.success) {
-    return NextResponse.json({ error: `Type ${ACCOUNT_DELETION_PHRASE} to confirm.` }, { status: 400 })
+    const namedSomethingElse = parsed.error.issues.some(i => i.code === 'unrecognized_keys')
+    return NextResponse.json(
+      { error: namedSomethingElse ? 'This deletes only your own account. Send the phrase and nothing else.' : `Type ${ACCOUNT_DELETION_PHRASE} to confirm.` },
+      { status: 400 },
+    )
   }
 
   // The limiter writes its row in the background; let this request's land before the deletion

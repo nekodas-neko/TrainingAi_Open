@@ -3,19 +3,21 @@
 import { useState } from "react";
 import { Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { phraseMatches } from "@/components/ui/confirm-phrase";
 import { ACCOUNT_DELETION_PHRASE } from "@trainingai/shared/user/account-deletion";
 import { deleteAccountAndSignOut } from "@/lib/account/delete-account";
 
 const DELETED = [
-  "Your profile, sign-in and settings",
+  "Your profile and sign-in",
   "Workouts, programs, sets and personal records",
   "Food, supplement, body, mood and sleep logs",
   "Heart-rate and ring data stored on the server",
   "AI coach conversations, goals and insights",
-  "Friends, seasons and achievements",
-  "Everything stored for your account on this phone",
+  "Friends, season results and achievements",
+  "The app's copy of your data on this phone, including anything not yet synced",
 ];
 
 const KEPT = [
@@ -25,8 +27,8 @@ const KEPT = [
 
 /**
  * #2120 — the one irreversible control in the app, so it asks for a TYPED phrase rather than a tap
- * (owner, 2026-09-24). Store-compliance wording deliberately cites no guideline clause: the entry
- * was not able to verify one, and a wrong number in front of a reviewer is worse than none.
+ * (owner, 2026-09-24). The copy cites no store guideline: none was verified, and a wrong number in
+ * front of a reviewer is worse than none.
  */
 export function DeleteAccountSheet() {
   const [open, setOpen] = useState(false);
@@ -64,7 +66,12 @@ export function DeleteAccountSheet() {
       </Button>
 
       <Sheet open={open} onOpenChange={handleOpenChange}>
-        <SheetContent side="bottom" className="rounded-t-2xl max-h-[90dvh] flex flex-col" hideCloseButton={state !== "idle"}>
+        <SheetContent
+          side="bottom"
+          bottomInset="takeover"
+          className="rounded-t-2xl max-h-[90dvh] flex flex-col"
+          hideCloseButton={state !== "idle"}
+        >
           <SheetHeader className="border-b border-border/30 pb-3 shrink-0">
             <SheetTitle>Delete your account</SheetTitle>
             <SheetDescription>
@@ -96,11 +103,12 @@ export function DeleteAccountSheet() {
               More → Data &amp; Sync before you delete.
             </p>
 
-            <label className="block">
-              <span className="text-xs font-semibold text-muted-foreground">
+            <div className="space-y-1.5">
+              <Label htmlFor="delete-account-phrase" className="text-xs font-semibold text-muted-foreground">
                 Type {ACCOUNT_DELETION_PHRASE} to confirm
-              </span>
-              <input
+              </Label>
+              <Input
+                id="delete-account-phrase"
                 value={typed}
                 onChange={e => setTyped(e.target.value)}
                 disabled={state !== "idle"}
@@ -109,16 +117,21 @@ export function DeleteAccountSheet() {
                 autoComplete="off"
                 autoCorrect="off"
                 spellCheck={false}
-                className="mt-1.5 w-full rounded-xl bg-muted/60 border border-border px-3 py-2.5 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                className="h-11 font-mono"
               />
-            </label>
+            </div>
 
             {error && <p role="alert" className="text-destructive">{error}</p>}
             {state === "deleted" && <p role="status">Your account has been deleted. Signing you out…</p>}
           </div>
 
-          <div className="p-4 pt-0 shrink-0">
-            <Button variant="destructive" className="w-full" disabled={!unlocked || state !== "idle"} onClick={() => { void confirm(); }}>
+          <div className="px-4 shrink-0">
+            <Button
+              variant="destructive"
+              className="w-full h-11"
+              disabled={!unlocked || state !== "idle"}
+              onClick={() => { void confirm(); }}
+            >
               {state === "idle" ? "Delete my account" : (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{state === "deleting" ? "Deleting…" : "Signing out…"}</>
               )}
