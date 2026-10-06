@@ -85,8 +85,10 @@ export async function DELETE(req: NextRequest) {
   if (badId) return badId
   if (userId === session.user.id) return NextResponse.json({ error: 'Cannot delete yourself' }, { status: 400 })
 
+  // #2120: the same deletion the user's own `DELETE /api/account` runs. This used to be a bare
+  // `DELETE FROM users`, which threw for any account with a custom exercise or a saved meal.
   const repo = await getRepository()
-  const deleted = await repo.deleteUser(userId)
-  if (!deleted) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  const result = await repo.deleteAccount(userId)
+  if (!result.deleted) return NextResponse.json({ error: 'User not found' }, { status: 404 })
   return NextResponse.json({ ok: true })
 }

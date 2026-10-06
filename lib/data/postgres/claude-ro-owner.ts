@@ -26,11 +26,18 @@ import { getPool } from './client'
  * **Unset is not an error.** No variable, no `ALTER ROLE`, and the views keep returning nothing —
  * the same fail-closed state, announced rather than mysterious.
  */
+export function resolveClaudeRoOwner(env: NodeJS.ProcessEnv = process.env): { owner: string; source: string } | null {
+  const source = (['CLAUDE_RO_OWNER_USER_ID', 'ADMIN_EXPORT_USER_ID', 'WEBHOOK_USER_ID'] as const)
+    .find(k => env[k])
+  const owner = source ? env[source] : undefined
+  return source && owner ? { owner, source } : null
+}
+
 export async function bootstrapClaudeRoOwner(): Promise<void> {
   if (!process.env.DATABASE_URL) return
-  const source = (['CLAUDE_RO_OWNER_USER_ID', 'ADMIN_EXPORT_USER_ID', 'WEBHOOK_USER_ID'] as const)
-    .find(k => process.env[k])
-  const owner = source ? process.env[source] : undefined
+  const resolved = resolveClaudeRoOwner()
+  const source = resolved?.source
+  const owner = resolved?.owner
   if (!owner) {
     console.warn('[instrumentation] claude_ro owner not configured — the audit views will return ZERO rows. ' +
       'Set CLAUDE_RO_OWNER_USER_ID (or ADMIN_EXPORT_USER_ID / WEBHOOK_USER_ID).')
