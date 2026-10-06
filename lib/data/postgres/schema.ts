@@ -2030,6 +2030,32 @@ export const colmiSleepSegments = pgTable('colmi_sleep_segments', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [unique('colmi_sleep_segments_unique').on(t.userId, t.startedAt, t.stage)])
 
+/** #2462 (migration 202610061624). Health Connect movement at the source's own resolution: `steps`
+ *  and `active_kcal` one row per record over [startAt, endAt], `cadence_spm` one row per series
+ *  sample (startAt = endAt). Keyed by Health Connect's record id, so a re-read window upserts. Rows
+ *  from different apps covering the same minutes are all kept; overlap is resolved at read time
+ *  (`stepCandidates` → `dedupeOverlappingWindows`). Server-only: Health Connect is the device copy. */
+export const HEALTH_CONNECT_INTERVAL_KINDS = ['steps', 'active_kcal', 'cadence_spm'] as const
+export const healthConnectIntervals = pgTable('health_connect_intervals', {
+  userId:     uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  kind:       text('kind', { enum: HEALTH_CONNECT_INTERVAL_KINDS }).notNull(),
+  recordId:   text('record_id').notNull(),
+  startAt:    timestamp('start_at', { withTimezone: true }).notNull(),
+  endAt:      timestamp('end_at', { withTimezone: true }).notNull(),
+  value:      doublePrecision('value').notNull(),
+  dataOrigin: text('data_origin'),
+  deviceType: text('device_type'),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:  timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  primaryKey({ columns: [t.userId, t.kind, t.recordId, t.startAt] }),
+  check('health_connect_intervals_kind', sql`${t.kind} IN ('steps', 'active_kcal', 'cadence_spm')`),
+  check('health_connect_intervals_record_id', sql`length(trim(${t.recordId})) > 0`),
+  check('health_connect_intervals_span', sql`isfinite(${t.startAt}) AND isfinite(${t.endAt}) AND ${t.endAt} >= ${t.startAt}`),
+  check('health_connect_intervals_value', sql`${t.value} >= 0 AND ${t.value} < 'Infinity'::double precision`),
+  index('health_connect_intervals_range_idx').on(t.userId, t.kind, t.startAt),
+])
+
 export const appleHealthSamples = pgTable('apple_health_samples', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   sampleId: uuid('sample_id').notNull(),

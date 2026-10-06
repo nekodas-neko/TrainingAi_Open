@@ -98,6 +98,7 @@ import * as bodyBattery from './slices/body-battery'
 import * as accountDeletion from './slices/account-deletion'
 import type { AccountDeletionResult } from './slices/account-deletion'
 import * as colmi from './slices/colmi'
+import * as hcIntervals from './slices/health-connect-intervals'
 import { mergeSet, initialSourceMap, HEALTH_SOURCES, sourceRank, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
 import type {
   SessionPeriodization, PeriodizationPhase, AiPrescription,
@@ -7581,6 +7582,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async upsertOuraSleep(userId: string, sessions: import('../repository').OuraSleepUpsertRow[], source: HealthSource) { return oura.upsertOuraSleep(this.db, userId, sessions, source) }
   async upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]) { return oura.upsertOuraHeartrate(this.db, userId, rows) }
   async upsertAggregatorHeartrate(userId: string, rows: { timestamp: Date; bpm: number }[], source: HealthSource, tz: string) { return oura.upsertAggregatorHeartrate(this.db, userId, rows, source, tz) }
+  async upsertHealthConnectIntervals(userId: string, rows: readonly import('../repository').HealthConnectIntervalRow[]) { return hcIntervals.upsertHealthConnectIntervals(this.db, userId, rows) }
+  async getHealthConnectIntervals(userId: string, kind: import('../repository').HealthConnectIntervalKind, from: Date, to: Date) { return hcIntervals.getHealthConnectIntervals(this.db, userId, kind, from, to) }
   async getHrForWindow(userId: string, from: Date, to: Date) { return oura.getHrForWindow(this.db, userId, from, to) }
   async getObservedHrProfile(userId: string, from: Date, to: Date) { return oura.getObservedHrProfile(this.db, userId, from, to) }
   async getZoneMinutesRange(userId: string, fromDay: string, toDay: string, tz: string, profile: { maxHr: number; restingHr: number }) { return oura.getZoneMinutesRange(this.db, userId, fromDay, toDay, tz, profile) }

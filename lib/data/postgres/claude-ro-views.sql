@@ -614,6 +614,21 @@ SELECT
 FROM public.goal_recommendations t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
+CREATE VIEW claude_ro.health_connect_intervals AS
+SELECT
+  t.user_id,
+  t.kind,
+  t.record_id,
+  t.start_at,
+  t.end_at,
+  t.value,
+  t.data_origin,
+  t.device_type,
+  t.received_at,
+  t.updated_at
+FROM public.health_connect_intervals t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.injuries AS
 SELECT
   t.id,
