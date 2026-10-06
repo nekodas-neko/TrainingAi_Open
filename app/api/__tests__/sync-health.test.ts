@@ -7,6 +7,7 @@ const mockRepo = vi.hoisted(() => ({
   saveActivityLog: vi.fn(),
   upsertBodyMetrics: vi.fn(),
   upsertAggregatorHeartrate: vi.fn(),
+  upsertHealthConnectIntervals: vi.fn(async (_u: string, rows: unknown[]) => rows.length),
 }))
 
 vi.mock('@/auth', () => ({
@@ -16,6 +17,7 @@ vi.mock('@/lib/data', () => ({
   getRepositoryAsync: vi.fn(async () => ({
     upsertBodyMetrics: mockRepo.upsertBodyMetrics,
     upsertAggregatorHeartrate: mockRepo.upsertAggregatorHeartrate,
+    upsertHealthConnectIntervals: mockRepo.upsertHealthConnectIntervals,
     saveActivityLog: mockRepo.saveActivityLog,
     saveSleepSession: vi.fn(),
     listActivityLogs: vi.fn(async () => []),
@@ -238,6 +240,113 @@ describe('POST /api/sync-health — heartRateSamples', () => {
     const { HR_UPLOAD_CHUNK } = await import('@/lib/health-connect-sync')
     const at = Date.now() - MIN
     const res = await post({ heartRateSamples: Array.from({ length: HR_UPLOAD_CHUNK + 1 }, (_, i) => ({ at: at - i, bpm: 70 })) })
+    expect(res.status).toBe(400)
+  })
+})
+
+// #2462. Per-interval steps, active kcal and cadence. The DB half (the value lands, a re-read is
+// idempotent, the user scope holds) is in `health-connect-intervals.test.ts`; this pins the route's
+// half — structure as a batch, plausibility and the clock per row, each kind through the helper the
+// codebase already owns for it.
+describe('POST /api/sync-health — activityIntervals', () => {
+  const MIN = 60_000
+  const row = (o: Record<string, unknown>) => ({ recordId: 'rec-1', origin: 'com.sec.android.app.shealth', device: 'TYPE_WATCH', ...o })
+
+  beforeEach(() => { mockRepo.upsertHealthConnectIntervals.mockClear() })
+
+  it('writes each kind with its record id, origin and device, as Dates', async () => {
+    const t = Date.now() - 10 * MIN
+    const res = await post({ activityIntervals: [
+      row({ kind: 'steps', startMs: t, endMs: t + MIN, value: 96 }),
+      row({ kind: 'active_kcal', recordId: 'rec-2', startMs: t, endMs: t + 5 * MIN, value: 21.4 }),
+      row({ kind: 'cadence_spm', recordId: 'rec-3', startMs: t, endMs: t, value: 112.5, device: undefined }),
+    ] })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.intervalsAccepted).toBe(3)
+    expect(body.rejected).toEqual([])
+    const [userId, rows] = mockRepo.upsertHealthConnectIntervals.mock.calls[0]
+    expect(userId).toBe('u1')
+    expect(rows).toEqual([
+      { kind: 'steps', recordId: 'rec-1', startAt: new Date(t), endAt: new Date(t + MIN), value: 96, dataOrigin: 'com.sec.android.app.shealth', deviceType: 'TYPE_WATCH' },
+      { kind: 'active_kcal', recordId: 'rec-2', startAt: new Date(t), endAt: new Date(t + 5 * MIN), value: 21.4, dataOrigin: 'com.sec.android.app.shealth', deviceType: 'TYPE_WATCH' },
+      { kind: 'cadence_spm', recordId: 'rec-3', startAt: new Date(t), endAt: new Date(t), value: 112.5, dataOrigin: 'com.sec.android.app.shealth', deviceType: null },
+    ])
+  })
+
+  it('drops implausible rows and broken clocks per row, grouped in the report, never the batch', async () => {
+    const t = Date.now() - 10 * MIN
+    const DAY = 24 * 60 * MIN
+    const res = await post({ activityIntervals: [
+      row({ kind: 'steps', startMs: t, endMs: t + MIN, value: 3605 }),                   // isPlausibleStepWindow
+      row({ kind: 'steps', recordId: 'b', startMs: t, endMs: t + MIN, value: 4000 }),    // same reason, grouped
+      row({ kind: 'steps', recordId: 'c', startMs: t, endMs: t, value: 10 }),            // zero-length window
+      row({ kind: 'steps', recordId: 'd', startMs: t, endMs: t + MIN, value: 10.5 }),    // not a count
+      row({ kind: 'active_kcal', startMs: t, endMs: t + MIN, value: 500 }),              // 500 kcal/min
+      row({ kind: 'active_kcal', recordId: 'e', startMs: t, endMs: t + MIN, value: -1 }),
+      row({ kind: 'cadence_spm', startMs: t, endMs: t, value: 400 }),                    // isPlausibleCadence
+      row({ kind: 'cadence_spm', recordId: 'f', startMs: t, endMs: t + 1, value: 110 }), // not an instant
+      row({ kind: 'steps', recordId: 'g', startMs: t - 40 * DAY, endMs: t - 40 * DAY + MIN, value: 50 }), // older than the cold sync
+      row({ kind: 'steps', recordId: 'h', startMs: t + 20 * MIN, endMs: t + 25 * MIN, value: 50 }),       // ahead of clock skew
+      row({ kind: 'steps', recordId: 'ok', startMs: t, endMs: t + MIN, value: 80 }),     // the one good row
+    ] })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.intervalsAccepted).toBe(1)
+    expect(mockRepo.upsertHealthConnectIntervals.mock.calls[0][1]).toEqual([
+      expect.objectContaining({ kind: 'steps', recordId: 'ok', value: 80 }),
+    ])
+    expect(body.rejected).toHaveLength(8)
+    expect(body.rejected).toEqual(expect.arrayContaining([
+      'intervals steps: N steps in N s (2 row(s))',
+      'intervals steps: endMs is not after startMs (1 row(s))',
+      'intervals steps: steps N is not a whole count (1 row(s))',
+      expect.stringMatching(/^intervals active_kcal: calories imply N kcal\/min/),
+      expect.stringMatching(/^intervals active_kcal: value -N is not a non-negative number/),
+      expect.stringMatching(/^intervals cadence_spm: cadence N spm is outside/),
+      expect.stringMatching(/^intervals cadence_spm: a cadence sample is an instant/),
+      'intervals steps: outside the sync window (2 row(s))',
+    ]))
+  })
+
+  it('does not write at all when every row is dropped', async () => {
+    const t = Date.now() - MIN
+    const res = await post({ activityIntervals: [row({ kind: 'cadence_spm', startMs: t, endMs: t, value: 10 })] })
+    expect(res.status).toBe(200)
+    expect(mockRepo.upsertHealthConnectIntervals).not.toHaveBeenCalled()
+  })
+
+  it('ignores the rows from a non-Health Connect caller, and says so', async () => {
+    const t = Date.now() - 2 * MIN
+    const res = await post({ source: 'apple_health', activityIntervals: [row({ kind: 'steps', startMs: t, endMs: t + MIN, value: 80 })] })
+    expect(res.status).toBe(200)
+    expect((await res.json()).rejected).toEqual([expect.stringContaining('only Health Connect')])
+    expect(mockRepo.upsertHealthConnectIntervals).not.toHaveBeenCalled()
+  })
+
+  it('400s on a structurally broken row (fail closed)', async () => {
+    const t = Date.now() - 2 * MIN
+    for (const bad of [
+      [row({ kind: 'distance', startMs: t, endMs: t + MIN, value: 1 })],     // unknown kind
+      [row({ kind: 'steps', startMs: String(t), endMs: t + MIN, value: 1 })],
+      [row({ kind: 'steps', startMs: t + 0.5, endMs: t + MIN, value: 1 })],
+      [row({ kind: 'steps', startMs: t, endMs: 9e15, value: 1 })],
+      [row({ kind: 'steps', startMs: t, endMs: t + MIN, value: '80' })],
+      [row({ kind: 'steps', startMs: t, endMs: t + MIN, value: 1, recordId: '  ' })],
+      [row({ kind: 'steps', startMs: t, endMs: t + MIN, value: 1, recordId: 'x'.repeat(201) })],
+      [row({ kind: 'steps', startMs: t, endMs: t + MIN, value: 1, userId: 'someone-else' })], // a row cannot name its owner
+      [{ kind: 'steps', startMs: t, endMs: t + MIN, value: 1 }],             // no record id
+    ]) {
+      expect((await post({ activityIntervals: bad })).status, JSON.stringify(bad)).toBe(400)
+    }
+    expect(mockRepo.upsertHealthConnectIntervals).not.toHaveBeenCalled()
+  })
+
+  it('400s past the per-request cap, which is the client chunk size', async () => {
+    const { INTERVAL_UPLOAD_CHUNK } = await import('@/lib/health-connect-sync')
+    const t = Date.now() - 2 * MIN
+    const res = await post({ activityIntervals: Array.from({ length: INTERVAL_UPLOAD_CHUNK + 1 }, (_, i) =>
+      ({ kind: 'cadence_spm', startMs: t - i, endMs: t - i, value: 100, recordId: 'r' })) })
     expect(res.status).toBe(400)
   })
 })

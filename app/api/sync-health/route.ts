@@ -5,13 +5,17 @@ import { rateLimit } from "@/lib/rate-limit";
 import { DEFAULT_TZ, toAestDay, todayInTz, todayMidnightUtc } from "@trainingai/shared/date-utils";
 import { z } from "zod";
 import { activityImplausibleReason, sleepImplausibleReason, MIN_PLAUSIBLE_BPM, MAX_PLAUSIBLE_BPM } from "@trainingai/shared/validation/plausibility";
+import { isPlausibleStepWindow } from "@trainingai/shared/health/step-estimate";
+import { isPlausibleCadence, MIN_PLAUSIBLE_SPM, MAX_PLAUSIBLE_SPM } from "@trainingai/shared/health/cadence";
 import { ingestDayRejection, INGEST_FUTURE_TOLERANCE_MS } from "@trainingai/shared/validation/ingest-clock";
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
-import { HR_UPLOAD_CHUNK, SYNC_DAYS_COLD } from '@/lib/health-connect-sync'
+import { HR_UPLOAD_CHUNK, INTERVAL_UPLOAD_CHUNK, SYNC_DAYS_COLD, type ActivityInterval } from '@/lib/health-connect-sync'
+import type { HealthConnectIntervalRow } from '@/lib/data/repository'
 
 // Three arrays of at most MAX_ITEMS (400) rows of bounded numbers — about 300 KB at the schema's
 // own limit — plus MAX_HR_SAMPLES heart-rate points of ~30 bytes each, another ~300 KB. 1 MB is
-// still generous past both.
+// still generous past both. The client never sends the heart-rate or interval arrays alongside the
+// daily payload or each other: each goes in requests of its own, an interval chunk being ~700 KB.
 const MAX_BODY_BYTES = 1024 * 1024
 
 // One request's share of a heart-rate series. The client's own chunk size, imported rather than
@@ -21,6 +25,11 @@ const MAX_HR_SAMPLES = HR_UPLOAD_CHUNK
 // day of slack), or ahead of ordinary clock skew, is a broken clock or a crafted call — dropped per
 // sample, never a 400 for the batch (the poison-pill rule).
 const HR_PAST_TOLERANCE_MS = (SYNC_DAYS_COLD + 1) * 24 * 60 * 60_000
+// One request's share of the per-interval rows (#2462), the client's own chunk size for the same
+// reason as MAX_HR_SAMPLES.
+const MAX_INTERVALS = INTERVAL_UPLOAD_CHUNK
+// A Health Connect id is a UUID; package names are short. Generous, finite.
+const MAX_ID_LEN = 200
 
 // Receives aggregate health data. Legacy Android callers default to Health Connect.
 // The JS layer pre-aggregates data into daily buckets and sends individual
@@ -87,7 +96,40 @@ const SyncHealthSchema = z.object({
     at:  z.number().int().min(0).max(8_640_000_000_000_000), // epoch ms
     bpm: z.number(),
   }).strict()).max(MAX_HR_SAMPLES).optional(),
+  // #2462. Health Connect steps / active kcal per record and cadence per sample. Structural bounds
+  // only, as for heartRateSamples: plausibility and the clock are judged per row below, so one bad
+  // row is dropped and reported rather than failing the chunk.
+  activityIntervals: z.array(z.object({
+    kind:     z.enum(['steps', 'active_kcal', 'cadence_spm']),
+    startMs:  z.number().int().min(0).max(8_640_000_000_000_000),
+    endMs:    z.number().int().min(0).max(8_640_000_000_000_000),
+    value:    z.number(),
+    recordId: z.string().trim().min(1).max(MAX_ID_LEN),
+    origin:   z.string().max(MAX_ID_LEN).optional(),
+    device:   z.string().max(MAX_ID_LEN).optional(),
+  }).strict()).max(MAX_INTERVALS).optional(),
 }).strict();
+
+/**
+ * Why one interval row cannot be stored, or null. Each kind goes through the bound the codebase
+ * already owns for it, never a new one: a step window through `isPlausibleStepWindow` (the gate every
+ * step source and `stepCandidates` use), active kcal through `activityImplausibleReason`'s kcal/min
+ * ceiling, and cadence through `isPlausibleCadence`. A cadence below the gait floor is "not walking"
+ * rather than a cadence, which is what that helper already says.
+ */
+function intervalRejection(r: Pick<ActivityInterval, 'kind' | 'startMs' | 'endMs' | 'value'>): string | null {
+  if (!(r.value >= 0) || !Number.isFinite(r.value)) return `value ${r.value} is not a non-negative number`
+  if (r.kind === 'cadence_spm') {
+    if (r.endMs !== r.startMs) return 'a cadence sample is an instant (startMs = endMs)'
+    return isPlausibleCadence(r.value) ? null : `cadence ${r.value} spm is outside ${MIN_PLAUSIBLE_SPM}-${MAX_PLAUSIBLE_SPM}`
+  }
+  if (!(r.endMs > r.startMs)) return 'endMs is not after startMs'
+  if (r.kind === 'steps') {
+    if (!Number.isInteger(r.value)) return `steps ${r.value} is not a whole count`
+    return isPlausibleStepWindow(r.value, r.startMs, r.endMs) ? null : `${r.value} steps in ${Math.round((r.endMs - r.startMs) / 1000)} s`
+  }
+  return activityImplausibleReason({ durationMin: (r.endMs - r.startMs) / 60_000, caloriesBurned: r.value })
+}
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -259,6 +301,38 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ── Per-interval steps, active kcal, cadence → health_connect_intervals (#2462) ─
+  // Every app's rows are kept, overlapping or not: overlap is resolved when the steps are read
+  // (`stepCandidates` → `dedupeOverlappingWindows`), as for every other step source. Only Health
+  // Connect writes these; an Apple Health caller has its own sample table.
+  let intervalsAccepted = 0
+  if (body.activityIntervals?.length) {
+    if (body.source !== 'health_connect') {
+      rejected.push(`intervals: ${body.activityIntervals.length} row(s) ignored — only Health Connect sends these`)
+    } else {
+      const now = Date.now()
+      const usable: HealthConnectIntervalRow[] = []
+      const reasons = new Map<string, number>()
+      for (const r of body.activityIntervals) {
+        const reason = (r.startMs < now - HR_PAST_TOLERANCE_MS || r.endMs > now + INGEST_FUTURE_TOLERANCE_MS)
+          ? 'outside the sync window'
+          : intervalRejection(r)
+        if (reason) {
+          const key = `${r.kind}: ${reason.replace(/[\d.]+/g, 'N')}`
+          reasons.set(key, (reasons.get(key) ?? 0) + 1)
+          continue
+        }
+        usable.push({
+          kind: r.kind, recordId: r.recordId, startAt: new Date(r.startMs), endAt: new Date(r.endMs), value: r.value,
+          dataOrigin: r.origin?.trim() || null, deviceType: r.device?.trim() || null,
+        })
+      }
+      // Grouped, so a chunk of 4,000 implausible rows reports one line, not 4,000.
+      for (const [reason, n] of reasons) rejected.push(`intervals ${reason} (${n} row(s))`)
+      if (usable.length) intervalsAccepted = await repo.upsertHealthConnectIntervals(userId, usable)
+    }
+  }
+
   // ── Enrichment candidates: recent activity logs missing HR/distance/calories ─
   const from3d = toAestDay(new Date(todayMidnightUtc(tz).getTime() - 3 * 86_400_000), tz);
   const recent = await repo.listActivityLogs(userId, from3d, todayInTz(tz));
@@ -266,5 +340,5 @@ export async function POST(req: NextRequest) {
     .filter(a => a.avgHr == null && a.distanceKm == null && a.caloriesBurned == null && a.startTime && a.endTime)
     .map(a => ({ id: a.id, date: a.date, startTime: a.startTime, endTime: a.endTime }));
 
-  return NextResponse.json({ ok: true, enrichmentCandidates, rejected, heartRateAccepted });
+  return NextResponse.json({ ok: true, enrichmentCandidates, rejected, heartRateAccepted, intervalsAccepted });
 }
