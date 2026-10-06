@@ -53,6 +53,8 @@ describe.skipIf(!canRun)('energy balance — calibration window', () => {
   })
 
   beforeEach(async () => {
+    await pool.query(`DELETE FROM supplement_logs WHERE user_id = $1`, [TEST_USER_ID])
+    await pool.query(`DELETE FROM supplements WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM food_logs WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM body_metrics WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM day_checkins WHERE user_id = $1`, [TEST_USER_ID])
@@ -60,6 +62,8 @@ describe.skipIf(!canRun)('energy balance — calibration window', () => {
 
   afterAll(async () => {
     if (!canRun) return
+    await pool.query(`DELETE FROM supplement_logs WHERE user_id = $1`, [TEST_USER_ID])
+    await pool.query(`DELETE FROM supplements WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM food_logs WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM body_metrics WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM day_checkins WHERE user_id = $1`, [TEST_USER_ID])
@@ -135,6 +139,62 @@ describe.skipIf(!canRun)('energy balance — calibration window', () => {
     const r = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
 
     expect(r.maintenance?.source).toBe('formula')
+  })
+
+  /**
+   * #2184 — the owner chose a caveat over a pause: *"If I start taking more or less fish oil or
+   * creatine it will need to rebaseline? Not exactly good."* So a dose change inside the window adds
+   * one sentence and moves NO number. Pinned as whole-payload equality with the caveat set aside,
+   * rather than on `maintenance.kcal` alone, because the calibrated figure feeds the resting base,
+   * the expenditure, the projection and the recommended target — any of which a later change could
+   * route the dose log into.
+   */
+  it('names a dose change inside the window and changes no computed number (#2184)', async () => {
+    await seedCalibratableHistory()
+    const without = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
+    expect(without.maintenance?.source).toBe('calibrated')
+    expect(without.maintenance?.doseCaveat).toBeNull()
+
+    const sup = await pool.query(
+      `INSERT INTO supplements (user_id, name, dose) VALUES ($1, 'Test Peptide', '10mg') RETURNING id`,
+      [TEST_USER_ID],
+    )
+    const supplementId = sup.rows[0].id as string
+    const startDay = shiftDateStr(TODAY, -10)
+    const changeDay = shiftDateStr(TODAY, -4)
+    for (const [day, amount] of [[startDay, 0.5], [changeDay, 1]] as const) {
+      await pool.query(
+        `INSERT INTO supplement_logs (supplement_id, user_id, log_date, amount, unit, dose_text, source)
+         VALUES ($1, $2, $3::date, $4, 'mg', '10mg', 'manual')`,
+        [supplementId, TEST_USER_ID, day, amount],
+      )
+    }
+
+    const withDoses = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
+    const caveat = withDoses.maintenance?.doseCaveat
+    expect(caveat).toMatch(/^You started Test Peptide on .+ and changed your Test Peptide dose on .+, so weight changes since .+ may not reflect your metabolism\.$/)
+
+    const strip = (r: typeof without) => ({ ...r, maintenance: { ...r.maintenance!, doseCaveat: undefined } })
+    expect(strip(withDoses)).toEqual(strip(without))
+  })
+
+  it('carries no dose caveat on the formula path, which reads no weight (#2184)', async () => {
+    await pool.query(
+      `INSERT INTO body_metrics (user_id, date, weight_kg) VALUES ($1, $2::date, 80)`,
+      [TEST_USER_ID, TODAY],
+    )
+    const sup = await pool.query(
+      `INSERT INTO supplements (user_id, name) VALUES ($1, 'Test Peptide') RETURNING id`,
+      [TEST_USER_ID],
+    )
+    await pool.query(
+      `INSERT INTO supplement_logs (supplement_id, user_id, log_date, amount, unit, source)
+       VALUES ($1, $2, $3::date, 1, 'mg', 'manual')`,
+      [sup.rows[0].id, TEST_USER_ID, shiftDateStr(TODAY, -3)],
+    )
+    const r = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
+    expect(r.maintenance?.source).toBe('formula')
+    expect(r.maintenance?.doseCaveat).toBeNull()
   })
 
   it('calibrates once those same days ARE marked complete', async () => {

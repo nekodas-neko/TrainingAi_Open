@@ -16,6 +16,9 @@ import {
 import {
   resolveMaintenance, maintenanceGapMessage, activityFactor, MAX_WINDOW_DAYS, type MaintenanceDay,
 } from '@trainingai/shared/nutrition/adaptive-tdee'
+import {
+  doseChangesInWindow, doseChangeCaveat, DOSE_HISTORY_LOOKBACK_DAYS,
+} from '@trainingai/shared/health/dose-change-caveat'
 import type { FitnessGoal } from '@trainingai/shared/types/user'
 import type { RestingRateSource } from '@trainingai/shared/nutrition/resting-rate-source'
 import type { WorkoutRepository } from '@/lib/data/repository'
@@ -65,6 +68,13 @@ export interface EnergyBalanceResult {
       measuredMovement: { factor: number; windowDays: number } | null
       gapMessage: string | null
     }
+    /**
+     * #2184. A plain sentence when a logged supplement or medication started, stopped or changed
+     * dose inside the window this calibrated figure was learned from — weight moved by a drug is
+     * not metabolism. **Text only: no number above reads it.** Null on the formula path, which does
+     * not read the scale. Optional so a payload cached before this existed still types.
+     */
+    doseCaveat?: string | null
   } | null
   target: {
     recommendedKcal: number | null
@@ -131,6 +141,12 @@ export async function computeEnergyBalance(
     repo.getBodyFatCalibration(userId).catch(() => null),
     repo.getLatestMeasuredRmr(userId).catch(() => null),
   ])
+  // #2184. Read beside the window, never into it: the caveat names a dose change, and nothing the
+  // estimator computes sees this. Wrapped so a repository without the method (a test double) or a
+  // failed read costs the sentence, never the balance.
+  const doseHistoryP = (async () =>
+    repo.listDoseHistory(userId, shiftDateStr(windowStart, -DOSE_HISTORY_LOOKBACK_DAYS), date))()
+    .catch(() => ({ logs: [], courses: [] }))
 
   // Q-421: one batch read for the whole window rather than a query per session. Sessions with no
   // usable HR are absent from the map and fall back to the MET estimate inside `computeActiveEnergy`.
@@ -373,6 +389,16 @@ export async function computeEnergyBalance(
   // `measuredMovementMaintenance`, which adds the movement to `formulaBaseline` — that still holds
   // the BF-88 step credit the movement total now counts too, so it reads ~one credit high.
   const gapMessage = source === 'formula' ? maintenanceGapMessage(estimate) : null
+  // #2184. Over the days the ACCEPTED estimate actually used — the long or the short window, both
+  // ending yesterday — so a change only the 28-day window saw is not blamed on a 14-day figure.
+  // The formula path reads no weight, so a dose change has nothing to caveat there.
+  const doseHistory = await doseHistoryP
+  const doseCaveat = source === 'calibrated'
+    ? doseChangeCaveat(doseChangesInWindow(
+        doseHistory.logs, doseHistory.courses,
+        shiftDateStr(date, -estimate.daysInWindow), shiftDateStr(date, -1),
+      ))
+    : null
   const formulaRestingBaseKcal = Math.max(Math.round(bmr), formulaBaseline - stepBaseCreditKcal)
   const calibratedFactor = source === 'calibrated' ? activityFactor(maintenanceKcal, bmr) : null
   const measuredFactor = windowDays.length > 0
@@ -399,6 +425,7 @@ export async function computeEnergyBalance(
         measuredMovement: measuredFactor == null ? null : { factor: measuredFactor, windowDays: windowDays.length },
         gapMessage,
       },
+      doseCaveat,
     },
     target: {
       recommendedKcal,
