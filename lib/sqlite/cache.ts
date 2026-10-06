@@ -209,6 +209,27 @@ function notifyInvalidated(keyPrefix: string): void {
 
 // In-flight fetch requests per key — prevents concurrent fetches for same cache key
 const inFlightRequests = new Map<string, Promise<void>>();
+// #2410. Which invalidation a request was sent after. A delete invalidates twice (before and after
+// its push lands); the second round used to join the first round's GET, which was sent before the
+// push and so carried the pre-delete answer. Not a per-key counter because invalidation is by
+// PREFIX: `invalidationSeq` ticks on every `invalidateCache`, `invalidatedAt` remembers the tick of
+// each prefix's latest one, and a request is stale if any prefix matching its key ticked after it
+// started. Bounded — dropping the oldest prefix only forgets staleness older than that many writes.
+let invalidationSeq = 0;
+const invalidatedAt = new Map<string, number>();
+const INVALIDATED_AT_MAX = 200;
+const inFlightStartSeq = new Map<string, number>();
+// A stale response is discarded and the key fetched again. Capped so a key invalidated
+// continuously cannot loop; the invalidation that made it stale also notifies its listeners,
+// whose own refetch is what the screen ends up showing.
+const MAX_FETCH_ATTEMPTS = 3;
+
+function invalidatedSince(key: string, seq: number): boolean {
+  for (const [prefix, at] of invalidatedAt) {
+    if (at > seq && key.startsWith(prefix)) return true;
+  }
+  return false;
+}
 // Callers that called cachedFetch while a request for the same key was already
 // in flight — without this they'd return with only the (possibly null) cached
 // value and never learn the fresh result the in-flight request eventually got.
@@ -278,6 +299,13 @@ export async function updateCache<T>(key: string, ttlSeconds: number, fn: (data:
 }
 
 export async function invalidateCache(keyPrefix: string): Promise<void> {
+  // First, before any await: a request sent before this line is answering a question asked before
+  // the write, whatever order the deletes below land in.
+  invalidatedAt.delete(keyPrefix);
+  invalidatedAt.set(keyPrefix, ++invalidationSeq);
+  if (invalidatedAt.size > INVALIDATED_AT_MAX) {
+    invalidatedAt.delete(invalidatedAt.keys().next().value as string);
+  }
   // Clear all sync mirrors so readCacheSync doesn't serve stale data after invalidation
   if (typeof window !== 'undefined') {
     const ssFullPrefix = SS_PREFIX + keyPrefix;
@@ -299,6 +327,7 @@ export async function invalidateCache(keyPrefix: string): Promise<void> {
 
 export async function clearAllCache(): Promise<void> {
   inFlightRequests.clear();
+  inFlightStartSeq.clear();
   if (typeof window !== 'undefined') {
     Object.keys(sessionStorage).filter(k => k.startsWith(SS_PREFIX)).forEach(k => sessionStorage.removeItem(k));
     Object.keys(localStorage).filter(k => k.startsWith('ta_')).forEach(k => localStorage.removeItem(k));
@@ -394,7 +423,9 @@ async function cachedFetchCore<T>(
   // class Q-499 fixed at the component level, reachable here too whenever two
   // callers race for the same key, which React StrictMode's double effect-invoke
   // does on every render in dev).
-  if (inFlightRequests.has(key)) {
+  // #2410: not one that was sent before the latest invalidation of this key — it would hand back
+  // the answer to a question asked before the write. That one runs on; this call fetches its own.
+  if (inFlightRequests.has(key) && !invalidatedSince(key, inFlightStartSeq.get(key) ?? 0)) {
     const waiters = pendingWaiters.get(key) ?? [];
     waiters.push({ onData: onData as (data: unknown) => void, onError, onRevalidateError, hadCached: cached !== null });
     pendingWaiters.set(key, waiters);
@@ -407,7 +438,15 @@ async function cachedFetchCore<T>(
   }
 
   // Create the fetch promise and store it
+  const firstSeq = invalidationSeq;
+  // A holder rather than a `let`: the IIFE below reads it after it has been assigned, which no
+  // `const` initialiser can express, and a lone late assignment trips `prefer-const`.
+  const self: { promise?: Promise<void> } = {};
   const fetchPromise = (async () => {
+   for (let attempt = 1; ; attempt++) {
+    const startSeq = attempt === 1 ? firstSeq : invalidationSeq;
+    if (attempt > 1 && inFlightRequests.get(key) === self.promise) inFlightStartSeq.set(key, startSeq);
+    let retry = false;
     try {
       // `cache: 'no-store'` because the browser's HTTP cache is a SECOND cache layer under this
       // one, and it is the only cache in the app that `invalidateCache()` cannot reach. Aggregate
@@ -451,6 +490,14 @@ async function cachedFetchCore<T>(
         return;
       }
       const data = await res.json() as T;
+      // #2410: the key was invalidated after this request was sent, so `data` predates the write.
+      // Painting or caching it would put the old figure back (and, if it lands after the fresh
+      // one, over it). Discard and ask again; joined waiters stay queued for the answer that counts.
+      if (invalidatedSince(key, startSeq)) {
+        if (attempt >= MAX_FETCH_ATTEMPTS) return;
+        retry = true;
+        continue;
+      }
       onData(data);
       const waiters = pendingWaiters.get(key);
       if (waiters) {
@@ -492,15 +539,24 @@ async function cachedFetchCore<T>(
         }
       }
     } finally {
-      pendingWaiters.delete(key);
+      // Not while retrying, and not for a request a newer one has replaced: the waiters it would
+      // clear are queued for the newer request's answer.
+      if (!retry && inFlightRequests.get(key) === self.promise) pendingWaiters.delete(key);
     }
+    if (!retry) return;
+   }
   })();
 
+  self.promise = fetchPromise;
   inFlightRequests.set(key, fetchPromise);
+  inFlightStartSeq.set(key, firstSeq);
   try {
     await fetchPromise;
   } finally {
-    inFlightRequests.delete(key);
+    if (inFlightRequests.get(key) === fetchPromise) {
+      inFlightRequests.delete(key);
+      inFlightStartSeq.delete(key);
+    }
   }
 
   return cached !== null;
