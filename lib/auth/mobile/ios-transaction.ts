@@ -1,5 +1,5 @@
 import { SignJWT, jwtVerify } from 'jose'
-import { PKCE_CHALLENGE_RE } from '@/lib/pkce'
+import { PKCE_CHALLENGE_RE } from './pkce'
 
 export const IOS_TRANSACTION_COOKIE = 'ta_mobile_ios'
 export const IOS_TRANSACTION_MAX_AGE = 10 * 60
@@ -51,7 +51,7 @@ export function iosBridgePath(transaction: IosTransaction) {
   return `/auth-mobile-bridge?${new URLSearchParams({ client: 'ios', ...transaction })}`
 }
 
-export function iosReturnUrl(transaction: IosTransaction, result: { token: string } | { error: string }) {
+export function iosReturnUrl(transaction: IosTransaction, result: { token: string } | { error: 'account_pending' | 'authentication_failed' }) {
   return `${IOS_CALLBACK}?${new URLSearchParams({ state: transaction.state, ...result })}`
 }
 

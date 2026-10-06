@@ -1,13 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PKCE_CHALLENGE_RE } from '@/lib/pkce'
-import { MOBILE_CHALLENGE_COOKIE, MOBILE_CHALLENGE_MAX_AGE_S } from '@/lib/mobile-auth-challenge-cookie'
-import { IOS_STATE_RE, IOS_TRANSACTION_COOKIE, IOS_TRANSACTION_MAX_AGE, signIosTransaction } from '@/lib/mobile-ios-transaction'
+import { PKCE_CHALLENGE_RE } from '@/lib/auth/mobile/pkce'
+import { MOBILE_CHALLENGE_COOKIE, MOBILE_CHALLENGE_MAX_AGE_S } from '@/lib/auth/mobile/challenge-cookie'
+import { IOS_STATE_RE, IOS_TRANSACTION_COOKIE, IOS_TRANSACTION_MAX_AGE, signIosTransaction } from '@/lib/auth/mobile/ios-transaction'
 
-/**
- * The first stop of the APK's Google sign-in (RV-195 ①): remember the challenge in an httpOnly
- * cookie on this tab, then continue to `/mobile-signin`, which starts the Google flow. The bridge
- * at the end refuses a challenge this cookie does not hold.
- */
 export async function GET(req: NextRequest) {
   const challenge = req.nextUrl.searchParams.get('challenge') ?? ''
   const client = req.nextUrl.searchParams.get('client')
@@ -35,7 +30,6 @@ export async function GET(req: NextRequest) {
   res.cookies.set(MOBILE_CHALLENGE_COOKIE, challenge, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    // Lax, not Strict: the tab comes back from Google as a cross-site top-level GET, which Lax allows.
     sameSite: 'lax',
     path: '/',
     maxAge: MOBILE_CHALLENGE_MAX_AGE_S,

@@ -451,15 +451,19 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const [r] = await this.db.insert(s.users)
       .values({ oauthSub: user.oauthSub ?? null, email, name: user.name ?? null, isActive: invited })
       .onConflictDoUpdate({
-        // Conflict on email — works for both OAuth and password users.
-        // oauthSub UNIQUE doesn't fire when oauthSub is NULL (NULL != NULL in Postgres).
         target: s.users.email,
         set: {
           name: sql`EXCLUDED.name`,
-          oauthSub: sql`COALESCE(EXCLUDED.oauth_sub, ${s.users.oauthSub})`,
+          oauthSub: sql`COALESCE(${s.users.oauthSub}, EXCLUDED.oauth_sub)`,
+          passwordHash: sql`CASE WHEN ${s.users.oauthSub} IS NULL AND EXCLUDED.oauth_sub IS NOT NULL
+            THEN NULL ELSE ${s.users.passwordHash} END`,
         },
+        setWhere: or(isNull(s.users.oauthSub), eq(s.users.oauthSub, user.oauthSub ?? '')),
       })
       .returning()
+    if (!r) {
+      throw new Error('Email is already linked to another Google account')
+    }
 
     // Generate friend code if the user doesn't have one yet
     if (!r.friendCode) {
@@ -700,6 +704,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return r ? this.rowToUser(r) : null
   }
 
+  async getUserByOAuthSub(oauthSub: string): Promise<User | null> {
+    const [r] = await this.db.select().from(s.users).where(eq(s.users.oauthSub, oauthSub)).limit(1)
+    return r ? this.rowToUser(r) : null
+  }
+
+  async getUserCredentials(userId: string): Promise<(User & { passwordHash?: string }) | null> {
+    const [r] = await this.db.select().from(s.users).where(eq(s.users.id, userId)).limit(1)
+    return r ? { ...this.rowToUser(r), passwordHash: r.passwordHash ?? undefined } : null
+  }
+
   async deleteUser(userId: string): Promise<boolean> {
     const rows = await this.db.delete(s.users).where(eq(s.users.id, userId)).returning({ id: s.users.id })
     return rows.length > 0
@@ -771,12 +785,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     await this.db.update(s.users).set({ timingBaselineDate: date }).where(eq(s.users.id, userId))
   }
 
-  // Linking CLEARS the password (RV-192). The row being linked to was created by someone who typed
-  // that address and was never asked to prove they read it; the person arriving now proved it, via
-  // Google. Leaving the hash in place leaves a credential belonging to whoever registered first.
-  // They lose nothing they are using — they are signing in with Google as this runs.
-  async linkOAuthAccount(userId: string, oauthSub: string): Promise<void> {
-    await this.db.update(s.users).set({ oauthSub, passwordHash: null }).where(eq(s.users.id, userId))
+  async linkOAuthAccount(userId: string, oauthSub: string): Promise<boolean> {
+    const rows = await this.db.update(s.users).set({ oauthSub, passwordHash: null })
+      .where(and(eq(s.users.id, userId), isNull(s.users.oauthSub)))
+      .returning({ id: s.users.id })
+    return rows.length > 0
   }
 
   // An invite is not proof that the registrant owns that inbox (RV-192). This defaulted to

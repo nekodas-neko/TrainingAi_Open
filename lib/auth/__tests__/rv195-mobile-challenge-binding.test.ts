@@ -1,7 +1,3 @@
-// RV-195 ① — a mobile sign-in token is minted only for the challenge this browser tab registered.
-//
-// The bridge used to mint for any `?challenge=` it was handed, so a link straight to it, opened where
-// the user was already signed in, produced a token for a challenge the user never chose.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
@@ -9,13 +5,13 @@ const CHALLENGE = 'A'.repeat(43)
 const OTHER = 'B'.repeat(43)
 
 let cookieJar: Record<string, string> = {}
-const store = { get: (name: string) => (name in cookieJar ? { value: cookieJar[name] } : undefined) }
-const createMobileAuthToken = vi.fn((_c: string, _ch: string) => 'minted-token')
-vi.mock('@/lib/mobile-auth-tokens', () => ({ createMobileAuthToken: (c: string, ch: string) => createMobileAuthToken(c, ch) }))
+const store = { getAll: () => Object.entries(cookieJar).map(([name, value]) => ({ name, value })), get: (name: string) => (name in cookieJar ? { value: cookieJar[name] } : undefined) }
+const createMobileAuthToken = vi.fn<(cookie: string, challenge: string) => string>(() => 'minted-token')
+vi.mock('@/lib/auth/mobile/tokens', () => ({ createMobileAuthToken: (c: string, ch: string) => createMobileAuthToken(c, ch) }))
 
-import { challengeMatchesCookie, MOBILE_CHALLENGE_COOKIE } from '@/lib/mobile-auth-challenge-cookie'
+import { challengeMatchesCookie, MOBILE_CHALLENGE_COOKIE } from '@/lib/auth/mobile/challenge-cookie'
 import { GET as begin } from '@/app/mobile-signin/begin/route'
-import { mintMobileBridgeToken } from '@/lib/mobile-auth-bridge'
+import { mintMobileBridgeToken } from '@/lib/auth/mobile/bridge'
 
 const bridge = (challenge: string) => mintMobileBridgeToken(challenge, store)
 
@@ -55,6 +51,18 @@ describe('/auth-mobile-bridge (mintMobileBridgeToken)', () => {
     cookieJar[MOBILE_CHALLENGE_COOKIE] = CHALLENGE
     expect(bridge(CHALLENGE)).toBe('minted-token')
     expect(createMobileAuthToken).toHaveBeenCalledWith('session-jwt', CHALLENGE)
+  })
+
+  it('assembles chunked Auth.js cookies in numeric order', () => {
+    cookieJar = { [MOBILE_CHALLENGE_COOKIE]: CHALLENGE, 'authjs.session-token.1': 'second', 'authjs.session-token.0': 'first' }
+    expect(bridge(CHALLENGE)).toBe('minted-token')
+    expect(createMobileAuthToken).toHaveBeenCalledWith('firstsecond', CHALLENGE)
+  })
+
+  it('refuses a missing cookie chunk', () => {
+    cookieJar = { [MOBILE_CHALLENGE_COOKIE]: CHALLENGE, 'authjs.session-token.0': 'first', 'authjs.session-token.2': 'third' }
+    expect(bridge(CHALLENGE)).toBeNull()
+    expect(createMobileAuthToken).not.toHaveBeenCalled()
   })
 
   it('refuses a challenge the tab never registered, and one that differs from it', async () => {

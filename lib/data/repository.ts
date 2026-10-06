@@ -571,6 +571,8 @@ export interface WorkoutRepository {
   activateUser(userId: string): Promise<boolean>
   deactivateUser(userId: string): Promise<boolean>
   getUserById(userId: string): Promise<User | null>
+  getUserByOAuthSub(oauthSub: string): Promise<User | null>
+  getUserCredentials(userId: string): Promise<(User & { passwordHash?: string }) | null>
   /** True when a user row was removed. */
   deleteUser(userId: string): Promise<boolean>
   getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null>
@@ -578,7 +580,7 @@ export interface WorkoutRepository {
   touchLastGoalReviewAt(userId: string): Promise<void>
   updateUserAvatar(userId: string, avatar: string): Promise<User>
   updateUserPassword(userId: string, passwordHash: string): Promise<void>
-  linkOAuthAccount(userId: string, oauthSub: string): Promise<void>
+  linkOAuthAccount(userId: string, oauthSub: string): Promise<boolean>
   getTimingBaselineDate(userId: string): Promise<string | null>
   setTimingBaselineDate(userId: string, date: string | null): Promise<void>
   createEmailUser(email: string, passwordHash: string, name?: string, isActive?: boolean): Promise<User>

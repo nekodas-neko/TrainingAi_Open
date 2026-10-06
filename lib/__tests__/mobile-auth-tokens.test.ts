@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { createMobileAuthToken, consumeMobileAuthToken } from '../mobile-auth-tokens'
+import { createMobileAuthToken, consumeMobileAuthToken } from '../auth/mobile/tokens'
 
 afterEach(() => vi.useRealTimers())
 

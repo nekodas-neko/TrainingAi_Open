@@ -10,7 +10,7 @@ export function IosLoginForm({ callbackUrl, state }: { callbackUrl: string; stat
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  async function google() {
+  async function signInWithGoogle() {
     setBusy(true)
     setError(null)
     try {
@@ -20,7 +20,7 @@ export function IosLoginForm({ callbackUrl, state }: { callbackUrl: string; stat
       setBusy(false)
     }
   }
-  async function submit(event: React.FormEvent) {
+  async function signInWithEmail(event: React.FormEvent) {
     event.preventDefault()
     setBusy(true)
     setError(null)
@@ -45,13 +45,37 @@ export function IosLoginForm({ callbackUrl, state }: { callbackUrl: string; stat
       setBusy(false)
     }
   }
-  return <div className="space-y-4">
-    <Button type="button" variant="outline" className="w-full" disabled={busy} onClick={google}>Sign in with Google</Button>
-    <form onSubmit={submit} className="space-y-3">
-      <Input type="email" aria-label="Email" placeholder="Email" autoComplete="email" required value={email} disabled={busy} onChange={event => setEmail(event.target.value)} />
-      <Input type="password" aria-label="Password" placeholder="Password" autoComplete="current-password" required value={password} disabled={busy} onChange={event => setPassword(event.target.value)} />
-      <Button type="submit" variant="outline" className="w-full" disabled={busy}>{busy ? 'Signing in…' : 'Sign in with email'}</Button>
-    </form>
-    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-  </div>
+  return (
+    <div className="space-y-4">
+      <Button type="button" variant="outline" className="w-full" disabled={busy} onClick={signInWithGoogle}>
+        Sign in with Google
+      </Button>
+      <form onSubmit={signInWithEmail} className="space-y-3">
+        <Input
+          type="email"
+          aria-label="Sign-in email"
+          placeholder="Email"
+          autoComplete="email"
+          required
+          value={email}
+          disabled={busy}
+          onChange={event => setEmail(event.target.value)}
+        />
+        <Input
+          type="password"
+          aria-label="Sign-in password"
+          placeholder="Password"
+          autoComplete="current-password"
+          required
+          value={password}
+          disabled={busy}
+          onChange={event => setPassword(event.target.value)}
+        />
+        <Button type="submit" variant="outline" className="w-full" disabled={busy}>
+          {busy ? 'Signing in…' : 'Sign in with email'}
+        </Button>
+      </form>
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    </div>
+  )
 }

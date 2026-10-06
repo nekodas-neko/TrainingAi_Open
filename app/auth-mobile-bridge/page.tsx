@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { cookies } from "next/headers";
-import { mintMobileBridgeToken } from "@/lib/mobile-auth-bridge";
+import { mintMobileBridgeToken } from "@/lib/auth/mobile/bridge";
 import { MobileBridgeRedirect } from "./redirect-client";
-import { iosReturnUrl, readIosTransaction } from '@/lib/mobile-ios-transaction';
+import { iosReturnUrl, readIosTransaction } from '@/lib/auth/mobile/ios-transaction';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,8 +28,8 @@ export default async function AuthMobileBridgePage({
 
   const token = mintMobileBridgeToken(challenge, cookieStore);
   if (!token) redirect("/sign-in");
-
-  // Render a client component that uses window.location.href — the only
-  // reliable way to fire a custom URL scheme from a Chrome Custom Tab.
-  return transaction ? <MobileBridgeRedirect returnUrl={iosReturnUrl(transaction, { token })} /> : <MobileBridgeRedirect token={token} />;
+  const returnUrl = transaction
+    ? iosReturnUrl(transaction, { token })
+    : `trainingai://auth-complete?token=${token}`;
+  return <MobileBridgeRedirect returnUrl={returnUrl} />;
 }
