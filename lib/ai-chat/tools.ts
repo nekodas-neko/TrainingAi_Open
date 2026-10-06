@@ -172,6 +172,9 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
         'The maintenance figure is measured from their own logged intake against their weight trend ' +
         'when `maintenance.source` is "calibrated" — prefer it over any formula. When it is "formula", ' +
         'say so and quote `maintenance.gapMessage`, which explains what is still needed to calibrate. ' +
+        'When `maintenance.doseCaveat` is set, a logged supplement or medication started, stopped or ' +
+        'changed dose inside the calibration window: quote it beside any maintenance figure or target ' +
+        'you give, because weight moved by a dose change is not metabolism. ' +
         'Quote these numbers; never recompute them.',
       inputSchema: z.object({
         date: z.string().nullable().describe('YYYY-MM-DD; null = today'),

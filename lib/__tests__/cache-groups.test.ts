@@ -137,7 +137,8 @@ describe('cache group helpers', () => {
 
   it('invalidateSupplements clears the supplements cache', async () => {
     await invalidateSupplements()
-    expect(invalidated).toEqual(expect.arrayContaining(['supplements']))
+    // #2184: a dose start/stop/change reaches the maintenance caveat on the energy-balance payload.
+    expect(invalidated).toEqual(expect.arrayContaining(['supplements', 'energy-balance:']))
   })
 
   it('invalidateHealthTrends clears the health-trends prefix', async () => {

@@ -7514,6 +7514,48 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return rows.map(r => ({ supplementName: r.name, date: r.date, amount: Number(r.amount), unit: r.unit }))
   }
 
+  /**
+   * #2184 — every live dose log of EVERY supplement in [from, to], plus the definitions that were
+   * stopped in that span, for the maintenance recommendation's dose-change caveat. Unlike
+   * `listDoseEvents` this is not vial-only and keeps null amounts: creatine through a meal and a
+   * vitamin logged as "2 capsules" are doses too. Both `manual` and `meal` contributions count.
+   */
+  async listDoseHistory(userId: string, from: string, to: string) {
+    const [logRows, courseRows] = await Promise.all([
+      this.db
+        .select({
+          supplementId: s.supplementLogs.supplementId, name: s.supplements.name, date: s.supplementLogs.logDate,
+          amount: s.supplementLogs.amount, unit: s.supplementLogs.unit, doseText: s.supplementLogs.doseText,
+        })
+        .from(s.supplementLogs)
+        .innerJoin(s.supplements, eq(s.supplements.id, s.supplementLogs.supplementId))
+        .where(and(
+          eq(s.supplementLogs.userId, userId),
+          gte(s.supplementLogs.logDate, from),
+          lte(s.supplementLogs.logDate, to),
+          isNull(s.supplementLogs.deletedAt),
+          isNull(s.supplements.deletedAt),
+        ))
+        .orderBy(asc(s.supplementLogs.logDate)),
+      this.db
+        .select({ supplementId: s.supplements.id, name: s.supplements.name, stoppedOn: s.supplements.stoppedOn })
+        .from(s.supplements)
+        .where(and(
+          eq(s.supplements.userId, userId),
+          isNull(s.supplements.deletedAt),
+          gte(s.supplements.stoppedOn, from),
+          lte(s.supplements.stoppedOn, to),
+        )),
+    ])
+    return {
+      logs: logRows.map(r => ({
+        supplementId: r.supplementId, supplementName: r.name, date: r.date,
+        amount: r.amount == null ? null : Number(r.amount), unit: r.unit, doseText: r.doseText,
+      })),
+      courses: courseRows.map(r => ({ supplementId: r.supplementId, supplementName: r.name, stoppedOn: r.stoppedOn })),
+    }
+  }
+
   async unlogSupplement(supplementId: string, userId: string, date: string): Promise<boolean> {
     const rows = await this.db.update(s.supplementLogs)
       .set({ deletedAt: new Date(), updatedAt: new Date() })

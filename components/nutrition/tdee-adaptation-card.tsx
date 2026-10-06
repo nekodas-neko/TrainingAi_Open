@@ -132,6 +132,12 @@ export function TdeeAdaptationCard({ energyBalance, onApplied }: Props) {
         so your goal works out to <span className="font-semibold">{recommended.toLocaleString()} kcal/day</span>
         {current != null && <> — your target is set to {current.toLocaleString()}</>}.
       </p>
+      {/* #2184. The measured maintenance is read off the scale, and a dose started, stopped or
+          changed inside its window moves the scale for reasons that are not metabolism. Said here
+          because this is the surface that WRITES the goal; the figure itself is unchanged. */}
+      {maintenance!.doseCaveat && (
+        <p className="text-[11px] leading-snug text-muted-foreground">{maintenance!.doseCaveat}</p>
+      )}
       <div className="flex items-center gap-2">
         <button
           onClick={handleApply}
