@@ -23,7 +23,7 @@ async function googleUser(email: string, name: string | null | undefined, oauthS
   }
   const existing = await repository.getUserByEmail(email)
   if (existing) {
-    if (existing.oauthSub || (existing.isActive && !authoritativeEmail)) {
+    if (existing.oauthSub || !authoritativeEmail) {
       return null
     }
     if (!await repository.linkOAuthAccount(existing.id, oauthSub)) {
