@@ -20,6 +20,6 @@ export interface EndOfDayBattery {
  * slider from its "Good" label. The Body Battery card already refuses to present that default as a
  * reading (`components/body-battery-card.tsx`, `noData`); every use on this screen goes through here.
  */
-export function measuredBattery<T extends Pick<EndOfDayBattery, 'hasData'>>(bb: T | null | undefined): T | null {
+export function measuredBattery<T extends Pick<EndOfDayBattery, 'current' | 'hasData'>>(bb: T | null | undefined): T | null {
   return bb != null && bb.hasData !== false ? bb : null
 }

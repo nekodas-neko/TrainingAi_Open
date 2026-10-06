@@ -334,7 +334,8 @@ describe('/api/cardio-week', () => {
     it('leaves every quota number unchanged for a user with an HR source', async () => {
       const today = todayInTz(TZ)
       getObservedHrProfile.mockResolvedValue(computeObservedHr(reliableBpms(120)))
-      getZoneMinutesRange.mockResolvedValue([{ day: today, seconds: [1800, 2400, 300, 120, 0] }])
+      const days: Day[] = [{ day: today, seconds: [1800, 2400, 300, 120, 0] }]
+      getZoneMinutesRange.mockResolvedValue(days)
       const body = await (await getWeek()).json()
       expect(body.quota.hasHrSource).toBe(true)
       expect(body.dayQuota.hasHrSource).toBe(true)
@@ -344,7 +345,7 @@ describe('/api/cardio-week', () => {
       const { hasHrSource: _d, ...day } = body.dayQuota
       const { computeZoneQuota } = await import('@trainingai/shared/health/zone-quota')
       const targets = body.quota.zones.map((z: { zoneId: 1 | 2 | 3 | 4 | 5; targetMin: number }) => ({ zoneId: z.zoneId, minutes: z.targetMin }))
-      expect(week).toEqual(computeZoneQuota(targets, [{ day: today, seconds: [1800, 2400, 300, 120, 0] }]))
+      expect(week).toEqual(computeZoneQuota(targets, days))
       expect(day.zones.map((z: { doneMin: number }) => z.doneMin)).toEqual(week.zones.map((z: { doneMin: number }) => z.doneMin))
     })
   })

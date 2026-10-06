@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { computeZoneQuota, quotaHasNoHrSource } from '@trainingai/shared/health/zone-quota'
 import { zoneStacksUnmeasured } from '@trainingai/shared/health/cardio-trends'
-import { measuredBattery } from '@/components/nutrition/end-of-day/measured-battery'
+import { measuredBattery, type EndOfDayBattery } from '@/components/nutrition/end-of-day/measured-battery'
 import { buildTodayInsight } from '@trainingai/shared/nutrition/day-insight'
 
 // #2337 — three surfaces showed "no data" for a user with no ring or HR source as a real value.
@@ -67,10 +67,10 @@ describe('cardio trends — zone stacks', () => {
 })
 
 describe('end-of-day review — Body Battery', () => {
-  const noRing = { current: 50, label: 'Good' as const, trend: 'steady', charged: 0, drained: 0, hasData: false }
-  const measured = { ...noRing, current: 38, label: 'Low' as const, drained: 22, hasData: true }
+  const noRing: EndOfDayBattery = { current: 50, label: 'Good', trend: 'steady', charged: 0, drained: 0, hasData: false }
+  const measured: EndOfDayBattery = { ...noRing, current: 38, label: 'Low', drained: 22, hasData: true }
   const scales = { physicalTiredness: 3, mentalDrain: 3, barelyMoved: 3, hydration: 3, lateHeavyMeal: 3 }
-  const insightFor = (bb: typeof noRing | null) => {
+  const insightFor = (bb: EndOfDayBattery | null) => {
     const m = measuredBattery(bb)
     return buildTodayInsight({ batteryCurrent: m?.current ?? null, batteryDrained: m?.drained ?? null, scales, soreMuscles: [] })
   }
