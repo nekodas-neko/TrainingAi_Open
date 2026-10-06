@@ -22,6 +22,7 @@ import {
   applyDeloadReverts,
   deloadRevertNames,
   deloadOverrideBlocked,
+  deloadOverrideOutcome,
   exerciseSetCount,
   sessionContextLabel,
 } from "@/components/workout/utils";
@@ -238,6 +239,14 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
   const overrideBlockedNames = useMemo(
     () => deloadOverrideBlocked(exercises, overrideFull),
     [exercises, overrideFull],
+  );
+  // #2360: from `exercises`, never `effectiveExercises` — once the revert has worked, nothing in the
+  // reverted list is deloaded, and the card read that as "nothing to revert".
+  const overrideOutcome = useMemo(
+    () => deloadOverrideOutcome(exercises, overrideFull, {
+      periodization: periodization?.state, deloadWeek: phaseStatus?.isDeloadActive ?? false,
+    }),
+    [exercises, overrideFull, periodization?.state, phaseStatus?.isDeloadActive],
   );
   // Full set-by-set order for the session, honoring supersetGroup alternation.
   // AI-dynamic programs already arrive with supersetGroup nulled (workout-data
@@ -1623,6 +1632,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
         deloadRecommended={deloadRecommended}
         overrideFull={overrideFull}
         overrideBlockedNames={overrideBlockedNames}
+        overrideOutcome={overrideOutcome}
         onDeloadChange={programPhaseMode === 'ai_dynamic' ? setDeload : undefined}
         onPrescriptionStatusChange={(newStatus) => {
           if (periodization) {

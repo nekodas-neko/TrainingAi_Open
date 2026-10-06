@@ -12,7 +12,7 @@ import type { AiPrescription, PrescriptionStatus, PeriodizationPhase } from "@tr
 import { LOW_CONFIDENCE_THRESHOLD } from "@trainingai/shared/ai-periodization/confidence";
 import { explainExerciseChoice } from "@trainingai/shared/ai-periodization/explain";
 import { prescriptionDrivesLoad } from "@trainingai/shared/ai-periodization/apply-prescription";
-import { mroundStepUp, weightStepFor, type DeloadOverrideOutcome } from "@/components/workout/utils";
+import { mroundStepUp, weightStepFor, overrideRunsFull, prescriptionRowAsTrained, type DeloadOverrideOutcome } from "@/components/workout/utils";
 import { intensityZoneForPct } from "@trainingai/shared/workout/intensity-zone";
 import { isBodyweightType } from "@trainingai/shared/1rm";
 import { RoleChip } from "./role-chip";
@@ -41,9 +41,11 @@ interface AiPrescriptionCardProps {
   exerciseTypeById?: Record<string, string | undefined>;
   // Per session-exercise id: signals that shaped the choice (role, 1RM trend).
   exerciseSignalsById?: Record<string, ExerciseSignal | undefined>;
-  /** BF-64: the user picked `Full` over a deload prescription and the revert is running. The card's
-   *  own heading stays true — the PRESCRIPTION is still a deload — so the override is stated
-   *  separately rather than by rewriting what the prescription says. */
+  /** BF-64: the user picked `Full` over a deload prescription and the revert is running. Once the
+   *  revert has actually put the session back on full numbers (`overrideOutcome` all or partial),
+   *  the header, the rows and their tags describe that session rather than the deload it replaced
+   *  (#2360) — the card is read as "what am I about to train", and the override box keeps the fact
+   *  that a deload was recommended. */
   overrideFull?: boolean;
   /** Deloaded exercises the override could not revert (the prescription carried no `preDeload` for
    *  them). Named, because silently reverting some and not others is what would mislead. */
@@ -127,6 +129,7 @@ export function AiPrescriptionCard({
   // A transition whose target is accumulation means the deload (recovery) block is done
   // and a fresh cycle is starting — offer building a new program as an alternative.
   const isCycleRestart = isTransitionRecommended && prescription.phase === 'accumulation';
+  const runsFull = overrideFull && overrideRunsFull(overrideOutcome);
 
   // Exercises dropped for this cycle are not part of today's session — workout-data filters
   // them out of what actually loads, so the card must not advertise them either (the
@@ -205,13 +208,15 @@ export function AiPrescriptionCard({
               "text-sm font-semibold truncate",
               isDismissed ? "text-muted-foreground" : (isAccepted || isAutoApplied) ? "text-green-600 dark:text-green-400" : "text-brand",
             )}>
-              AI Prescription · {phaseLabel[prescription.phase] ?? prescription.phase}
+              AI Prescription · {runsFull ? "Full" : (phaseLabel[prescription.phase] ?? prescription.phase)}
               {isAutoApplied && " · Auto-applied"}
               {isAccepted && " · Accepted"}
               {isDismissed && " · Dismissed"}
             </p>
             <p className="text-[11px] text-muted-foreground truncate">
-              {prescription.deload ? "Deload session" : `Confidence ${Math.round(prescription.confidence * 100)}%`}
+              {prescription.deload
+                ? (runsFull ? "Deload overridden" : "Deload session")
+                : `Confidence ${Math.round(prescription.confidence * 100)}%`}
               {/* "of work", not a bare number (BF-196). The estimate is measured against the
                   WORKING budget — the session budget minus the measured warm-up carve-out — so on a
                   60-minute session it reads 51 and the only available reading was "nine short". It
@@ -228,8 +233,9 @@ export function AiPrescriptionCard({
                 : ` · Moved to ${phaseLabel[prescription.phase] ?? prescription.phase}`)}
               {isDeloadRecommended && isPending && " · Deload recommended"}
               {/* The prescription is still a deload; the session about to run is not. Both facts,
-                  because the card describing only the first is what made the toggle read as a lie. */}
-              {overrideFull && " · Full override on"}
+                  because the card describing only the first is what made the toggle read as a lie.
+                  Once the override has worked, "Deload overridden" above already says both. */}
+              {overrideFull && !runsFull && " · Full override on"}
             </p>
           </div>
         </div>
@@ -291,7 +297,10 @@ export function AiPrescriptionCard({
             </div>
           )}
           <div className="space-y-1.5">
-            {shownExercises.map(ex => {
+            {shownExercises.map(prescribed => {
+              // #2360: under a working Full override the row shows what the bar will load. It kept
+              // listing 2×6 @ 50% with a Deload tag above a session already back at 3×8 @ 75%.
+              const ex = prescriptionRowAsTrained(prescribed, runsFull);
               const oneRm = liveOneRm[ex.sessionExerciseId] ?? null;
               // A bodyweight 1RM is an internal index derived from reps (BF-149), not a load, so a
               // percentage of it is not kilograms — the card was printing `@ 85kg (66%)` against a
@@ -427,8 +436,9 @@ export function AiPrescriptionCard({
           {isPending && (isTransitionRecommended || isDeloadRecommended) && (
             <div className="space-y-1.5 pt-1">
               {/* Both actions land here and they disagree: a transition's numbers are already
-                  loaded, a deload's are not. */}
-              <ConsequenceLine drivesLoad={drivesLoad} action="move" />
+                  loaded, a deload's are not. Not under a working Full override: the rows above
+                  are then the program's normal loads, so "not these" would be false (#2360). */}
+              {!runsFull && <ConsequenceLine drivesLoad={drivesLoad} action="move" />}
               <div className="flex gap-2">
                 <Button
                   size="sm"

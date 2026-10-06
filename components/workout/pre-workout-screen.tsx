@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@trainingai/shared/utils";
 import type { WorkoutExercise } from "@/app/api/workout-data/route";
 import type { SessionLogEntry } from "./types";
-import { formatSheetDate, modalWeight, avgReps, deloadOverrideOutcome } from "./utils";
+import { formatSheetDate, modalWeight, avgReps, type DeloadOverrideOutcome } from "./utils";
 import { baselineHint } from "@/components/workout/baseline-hints";
 import { displayOneRm } from "@trainingai/shared/1rm";
 import { RoleChip } from "./role-chip";
@@ -87,6 +87,8 @@ interface PreWorkoutScreenProps {
   overrideFull?: boolean;
   /** Deloaded exercises the override could not revert — no `preDeload` block was recorded. */
   overrideBlockedNames?: string[];
+  /** What the override did, worked out by the caller from the list BEFORE the revert (#2360). */
+  overrideOutcome?: DeloadOverrideOutcome;
   onPrescriptionStatusChange?: (status: PrescriptionStatus) => void;
   onPhaseChanged?: () => void;
   onToggleDeloadRevert?: (name: string) => void;
@@ -117,6 +119,7 @@ export function PreWorkoutScreen({
   deloadRecommended = false,
   overrideFull = false,
   overrideBlockedNames = [],
+  overrideOutcome = 'none',
   onPrescriptionStatusChange,
   onPhaseChanged,
   onToggleDeloadRevert,
@@ -302,7 +305,7 @@ export function PreWorkoutScreen({
                 onPhaseChanged={onPhaseChanged}
                 overrideFull={overrideFull}
                 overrideBlockedNames={overrideBlockedNames}
-                overrideOutcome={deloadOverrideOutcome(exercises, overrideFull)}
+                overrideOutcome={overrideOutcome}
               />
               </>
             ) : null}
@@ -414,8 +417,12 @@ export function PreWorkoutScreen({
                         <p className="text-xs text-muted-foreground mt-0.5">No previous data</p>
                       )}
                     </button>
-                    {/* Sibling real button, not nested in the stats button above (UI-1) */}
-                    {(ex.deloaded || ex.deloadReverted) && (
+                    {/* Sibling real button, not nested in the stats button above (UI-1).
+                        #2360: under the session-level Full override a reverted exercise gets no
+                        chip — the toggle already says Full, and the sheet's "Use deload weights"
+                        cannot undo a revert the override applies to every exercise. One the
+                        override could not revert is still deloaded, and still says so. */}
+                    {(ex.deloaded || (ex.deloadReverted && !overrideFull)) && (
                       <button
                         type="button"
                         onClick={() => setDeloadExercise(ex)}

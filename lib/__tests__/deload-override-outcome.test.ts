@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { deloadOverrideOutcome, deloadRevertNames, deloadOverrideBlocked } from '@/components/workout/utils'
+import {
+  deloadOverrideOutcome, deloadRevertNames, deloadOverrideBlocked, overrideRunsFull, prescriptionRowAsTrained,
+} from '@/components/workout/utils'
 import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 /**
@@ -25,6 +27,13 @@ const ex = (name: string, deloaded: boolean, hasPre: boolean) => ({
   preDeloadStyle: hasPre ? ({ id: 'p' } as never) : undefined,
 })
 
+const prescribed = (phaseAction: string, prescriptionStatus: string) => ({
+  prescription: { phaseAction, deload: true, phase: 'deload', exercises: [] } as never,
+  prescriptionStatus: prescriptionStatus as never,
+})
+/** The LB-47 cases below are all prescriptions that reach the bar — a stored deload in force. */
+const DRIVES = { periodization: prescribed('stay', 'auto_applied'), deloadWeek: false }
+
 describe('the shape the only real session deload takes', () => {
   // Production 2026-09-02: prescription 429b91a9, `deload: true`, 5 exercises, 0 with `deloaded`,
   // 0 with `preDeload`. The low intensities are in the LLM's own pct values.
@@ -36,32 +45,107 @@ describe('the shape the only real session deload takes', () => {
   })
 
   it('is now distinguishable from a clean full revert', () => {
-    expect(deloadOverrideOutcome(sessionDeload, true)).toBe('nothing-to-revert')
-    expect(deloadOverrideOutcome([ex('Squat', true, true)], true)).toBe('all')
+    expect(deloadOverrideOutcome(sessionDeload, true, DRIVES)).toBe('nothing-to-revert')
+    expect(deloadOverrideOutcome([ex('Squat', true, true)], true, DRIVES)).toBe('all')
   })
 
   it('a deload with no pre-deload numbers anywhere is the same honest answer', () => {
     // Not the session-level shape, but the same thing is true of it: there is nothing to go back to.
-    expect(deloadOverrideOutcome([ex('Squat', true, false), ex('Bench', true, false)], true))
+    expect(deloadOverrideOutcome([ex('Squat', true, false), ex('Bench', true, false)], true, DRIVES))
       .toBe('nothing-to-revert')
   })
 })
 
 describe('the cases that already worked must not move', () => {
   it('a mixed prescription is partial, not one of the two absolutes', () => {
-    expect(deloadOverrideOutcome([ex('Squat', true, true), ex('Bench', true, false)], true)).toBe('partial')
+    expect(deloadOverrideOutcome([ex('Squat', true, true), ex('Bench', true, false)], true, DRIVES)).toBe('partial')
   })
 
   it('no override means no claim at all', () => {
-    expect(deloadOverrideOutcome([ex('Squat', true, true)], false)).toBe('none')
-    expect(deloadOverrideOutcome([], false)).toBe('none')
+    expect(deloadOverrideOutcome([ex('Squat', true, true)], false, DRIVES)).toBe('none')
+    expect(deloadOverrideOutcome([], false, DRIVES)).toBe('none')
   })
 
   it('an undeloaded exercise beside a revertible one does not make it partial', () => {
     // `partial` has to mean "some deloaded exercises could not revert", never "some exercises were
     // not deloaded" — otherwise every ordinary prescription with one deloaded lift reads as partial
     // and the card starts naming exercises that were never deloaded.
-    expect(deloadOverrideOutcome([ex('Squat', true, true), ex('Bench', false, false)], true)).toBe('all')
+    expect(deloadOverrideOutcome([ex('Squat', true, true), ex('Bench', false, false)], true, DRIVES)).toBe('all')
+  })
+})
+
+/**
+ * #2360 — after Full overrode a whole-session deload, the card still said it was a deload.
+ *
+ * Release test of v1.488.0, reproduced on the local dev server: an emergency deload pending from a
+ * sick check-in, Full chosen. The bar ran 3×8 @ 75% with sets counting toward 1RM, and the card said
+ * *"Full is on, but these weights are unchanged"* and *"these sets are logged as a deload"*, over a
+ * list still reading 2×6 @ 50% with a Deload tag on every row.
+ *
+ * Two inputs were wrong. The outcome was read from the list AFTER the revert, where nothing is
+ * deloaded once it has worked. And on the pending emergency deload itself, nothing is deloaded even
+ * before it: choosing Full refetches without `aiDeload`, and a pending `deload_recommended` does not
+ * drive the load, so the program's own numbers arrive undeloaded. An empty deloaded list only means
+ * "nothing to revert" when the prescription is the thing on the bar.
+ */
+describe('#2360 — the outcome follows the session that will actually run', () => {
+  const BF198 = [ex('Bench Press', true, true), ex('Overhead Press', true, true), ex('Tricep Pushdown', true, true)]
+  const program = [ex('Bench Press', false, false), ex('Overhead Press', false, false), ex('Tricep Pushdown', false, false)]
+  const pendingEmergency = { periodization: prescribed('deload_recommended', 'pending'), deloadWeek: false }
+
+  it('a pending emergency deload under Full runs the program, so it is a full session', () => {
+    // The release-test shape. Fails on main, which ignored the prescription and said nothing-to-revert.
+    expect(deloadOverrideOutcome(program, true, pendingEmergency)).toBe('all')
+  })
+
+  it('a deload in force, read before the revert, is a full revert', () => {
+    expect(deloadOverrideOutcome(BF198, true, DRIVES)).toBe('all')
+  })
+
+  it('the same deload read AFTER the revert is the bug, which is why the input is pinned below', () => {
+    const reverted = BF198.map(e => ({ ...e, deloaded: false }))
+    expect(deloadOverrideOutcome(reverted, true, DRIVES)).toBe('nothing-to-revert')
+  })
+
+  it('still says nothing changed when nothing could — no recorded full numbers, deload in force', () => {
+    expect(deloadOverrideOutcome([ex('Skull Crusher', true, false)], true, DRIVES)).toBe('nothing-to-revert')
+    expect(deloadOverrideOutcome([ex('Skull Crusher', true, false)], true, pendingEmergency)).toBe('nothing-to-revert')
+  })
+
+  it('a deload week is never called full — every set of it is logged as a deload', () => {
+    expect(deloadOverrideOutcome(BF198, true, { ...DRIVES, deloadWeek: true })).toBe('nothing-to-revert')
+    expect(deloadOverrideOutcome(program, true, { ...pendingEmergency, deloadWeek: true })).toBe('nothing-to-revert')
+  })
+
+  it('no prescription at all cannot be on the bar', () => {
+    expect(deloadOverrideOutcome(program, true, { periodization: null, deloadWeek: false })).toBe('all')
+  })
+})
+
+describe('#2360 — the card rows show the numbers the bar will load', () => {
+  const row = {
+    sessionExerciseId: 'se-1', name: 'Bench Press', sets: 2, reps: 6, pct: 50, restSec: 120,
+    deloaded: true, deloadNote: 'Deload', preDeload: { sets: 3, reps: 8, pct: 75, restSec: 90 },
+  }
+
+  it('a reverted row reads at its recorded full numbers, with no Deload flag', () => {
+    expect(prescriptionRowAsTrained(row, true)).toMatchObject({ sets: 3, reps: 8, pct: 75, restSec: 90, deloaded: false })
+  })
+
+  it('a row with no recorded full numbers stays the deload it still is', () => {
+    const { preDeload: _omit, ...noRecord } = row
+    expect(prescriptionRowAsTrained(noRecord, true)).toEqual(noRecord)
+  })
+
+  it('without a working override the row is the prescription, untouched', () => {
+    expect(prescriptionRowAsTrained(row, false)).toBe(row)
+  })
+
+  it('only all/partial count as running full', () => {
+    expect(overrideRunsFull('all')).toBe(true)
+    expect(overrideRunsFull('partial')).toBe(true)
+    expect(overrideRunsFull('nothing-to-revert')).toBe(false)
+    expect(overrideRunsFull('none')).toBe(false)
   })
 })
 
@@ -112,8 +196,27 @@ describe('the card says the honest thing', () => {
     // above passing while the honest branch can never render -- the same "text present, feature
     // off" shape as the {false ? ...} mutation, one file up. Pinned to the derivation, not just to
     // the prop name: `overrideOutcome={'none'}` would satisfy a looser matcher.
+    //
+    // #2360: this used to pin `deloadOverrideOutcome(exercises, overrideFull)` inside
+    // pre-workout-screen, where `exercises` is the list AFTER the revert — the test was guarding the
+    // bug. The derivation now lives beside the revert, on the list it reverts.
+    const screen = source('components/workout-screen.tsx')
+    expect(screen).toMatch(/deloadOverrideOutcome\(exercises, overrideFull, \{/)
+    expect(screen).not.toMatch(/deloadOverrideOutcome\(effectiveExercises/)
+    expect(screen).toMatch(/overrideOutcome=\{overrideOutcome\}/)
+    expect(source('components/workout/pre-workout-screen.tsx')).toMatch(/overrideOutcome=\{overrideOutcome\}/)
+  })
+
+  it('#2360: a working override changes the header and the rows, and nothing else does', () => {
+    const c = card()
+    expect(c).toMatch(/const runsFull = overrideFull && overrideRunsFull\(overrideOutcome\)/)
+    expect(c).toMatch(/AI Prescription · \{runsFull \? "Full" : \(phaseLabel/)
+    expect(c).toMatch(/const ex = prescriptionRowAsTrained\(prescribed, runsFull\)/)
+  })
+
+  it('#2360: a reverted exercise gets no chip under the session override; a blocked one keeps its', () => {
     expect(source('components/workout/pre-workout-screen.tsx'))
-      .toMatch(/overrideOutcome=\{deloadOverrideOutcome\(exercises, overrideFull\)\}/)
+      .toMatch(/\(ex\.deloaded \|\| \(ex\.deloadReverted && !overrideFull\)\) && \(/)
   })
 
   it('the heading changes too, guarded on the same outcome', () => {
