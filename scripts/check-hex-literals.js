@@ -44,8 +44,8 @@ const BASELINE = {
   // net -5 because the extraction folded five repeats of the card's rose into one BF_COLOR const.
   // The per-card health palette is literals throughout this file and tokenising one card while its
   // siblings keep theirs would be worse than either; that is a palette job, not this entry's.
-  'app/health/health-sections.tsx': 43,
-  'components/health/body-fat-card.tsx': 2,
+  'app/health/health-sections.tsx': 39,
+  'components/health/body-fat-card.tsx': 1,
   'app/health/heart-rate/page.tsx': 6,
   'app/health/readiness/readiness-content.tsx': 1,
   'app/health/sleep/sleep-content.tsx': 2,
@@ -55,13 +55,12 @@ const BASELINE = {
   'app/session-select/components/deload-banner.tsx': 2,  // RV-100 took the third amber to --accent-amber
   'app/session-select/components/deload-explanation.tsx': 3,
   'app/session-select/components/recommendation-card.tsx': 6,
-  'app/session-select/components/streak-card.tsx': 4,
+  'app/session-select/components/streak-card.tsx': 3,
   'components/activity/activity-route-map.tsx': 4,
   'components/admin/calibration-card.tsx': 5,
   'components/body-battery-card.tsx': 2,
   'components/cardio/modality-picker.tsx': 3,
   'components/checkin/readiness-checkin-card.tsx': 1,
-  'components/exercise-history-sheet.tsx': 1,
   'components/google-sign-in.tsx': 4,
   'components/health/body-cards/rhr-hrv-spo2-card.tsx': 15,
   'components/health/body-cards/sleep-card.tsx': 5,
@@ -79,8 +78,7 @@ const BASELINE = {
   'components/health/training-load-card.tsx': 5,
   'components/health/training-stress-line.tsx': 2,
   'components/health/trend-sparkline.tsx': 6,
-  'components/health/trends-section.tsx': 2,
-  'components/health/weekly-muscle-sets-card.tsx': 6,
+  'components/health/trends-section.tsx': 1,
   'components/health/workout-density-card.tsx': 1,
   'components/health/zone-gauge.tsx': 8,
   'components/home/early-deload-card.tsx': 2,

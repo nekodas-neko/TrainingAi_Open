@@ -234,7 +234,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
           {targetWeightKg != null && latestWeight != null && (() => {
             const diff = parseFloat((latestWeight - targetWeightKg).toFixed(1))
             return (
-              <p className="text-xs font-semibold mt-1" style={{ color: diff <= 0 ? '#22c55e' : '#f97316' }}>
+              <p className="text-xs font-semibold mt-1" style={{ color: diff <= 0 ? 'var(--accent-green)' : '#f97316' }}>
                 {diff <= 0 ? '✓ Goal reached' : `↓ ${diff} kg to go`}
               </p>
             )
@@ -246,7 +246,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
               : status === 'too_slow' ? 'Slower than ideal pace'
               : status === 'too_fast' ? 'Faster than ideal pace'
               : 'Trending away from goal'
-            const color = status === 'on_track' ? '#22c55e' : status === 'wrong_direction' ? '#ef4444' : '#f59e0b'
+            const color = status === 'on_track' ? 'var(--accent-green)' : status === 'wrong_direction' ? 'var(--destructive)' : 'var(--accent-amber)'
             return (
               <p className="text-[10px] mt-1" style={{ color }}>
                 {label} · {rateKgPerWeek >= 0 ? '+' : ''}{rateKgPerWeek} kg/wk

@@ -100,7 +100,7 @@ export function BodyFatCard({
       {targetBfPct != null && (() => {
         const diff = parseFloat((latest - targetBfPct).toFixed(1));
         return (
-          <p className="text-xs font-semibold mt-1" style={{ color: diff <= 0 ? "#22c55e" : BF_COLOR }}>
+          <p className="text-xs font-semibold mt-1" style={{ color: diff <= 0 ? "var(--accent-green)" : BF_COLOR }}>
             {diff <= 0 ? "✓ Goal reached" : `↓ ${diff}% to go`}
           </p>
         );

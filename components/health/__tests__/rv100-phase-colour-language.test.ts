@@ -60,9 +60,10 @@ describe('RV-100 — phase identity does not borrow the state colours', () => {
     expect(src, '#fbbf24 is back — that is a third amber beside #f59e0b and --accent-amber')
       .not.toContain('#fbbf24')
     expect(src).toContain('var(--accent-amber)')
-    // The red and orange literals stay: they carry the escalation and the repo has no orange
-    // token, so converting one of a pair would read worse than converting neither.
-    expect(src).toContain('#ef4444')
+    // Red moved onto `--destructive` with the rest of the band literals (#2074). Orange stays a
+    // literal because the repo has no orange token.
+    expect(src).toContain('var(--destructive)')
+    expect(src).not.toContain('#ef4444')
     expect(src).toContain('#f97316')
   })
 })
