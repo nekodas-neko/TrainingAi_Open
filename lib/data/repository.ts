@@ -1,3 +1,4 @@
+import type { AuthProvider, AppleAuthAttempt } from '@/lib/auth/identity'
 import type { SyncedMutationDomain } from '@trainingai/shared/sync/mutation-schema'
 import type { UserPreferences } from '@trainingai/shared/user/preferences'
 import type {
@@ -572,6 +573,13 @@ export interface WorkoutRepository {
   deactivateUser(userId: string): Promise<boolean>
   getUserById(userId: string): Promise<User | null>
   getUserByOAuthSub(oauthSub: string): Promise<User | null>
+  getUserByProvider(provider: AuthProvider, subject: string): Promise<User | null>
+  getUserProviders(userId: string): Promise<AuthProvider[]>
+  linkIdentity(userId: string, provider: AuthProvider, subject: string, email?: string): Promise<boolean>
+  createProviderUser(provider: AuthProvider, subject: string, email: string, name?: string): Promise<User>
+  createAppleAuthAttempt(nonceHash: string, userId: string | null): Promise<AppleAuthAttempt>
+  getAppleAuthAttempt(id: string): Promise<AppleAuthAttempt | null>
+  consumeAppleAuthAttempt(id: string): Promise<AppleAuthAttempt | null>
   getUserCredentials(userId: string): Promise<(User & { passwordHash?: string }) | null>
   /** True when a user row was removed. */
   deleteUser(userId: string): Promise<boolean>

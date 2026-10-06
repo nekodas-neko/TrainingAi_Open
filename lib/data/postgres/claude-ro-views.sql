@@ -1710,6 +1710,8 @@ WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 -- Q-530: the tables this generator deliberately excludes (no view at all).
 CREATE VIEW claude_ro._meta_excluded_tables AS
 SELECT * FROM (VALUES
+  ('auth_identities'),
+  ('apple_auth_attempts'),
   ('invited_emails'),
   ('rate_limits'),
   ('email_normalisation_preimage')

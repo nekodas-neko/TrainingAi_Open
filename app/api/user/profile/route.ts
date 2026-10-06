@@ -36,7 +36,7 @@ export async function GET() {
 
   const { passwordHash, ...user } = userWithHash
   return NextResponse.json(
-    { user, hasPassword: !!passwordHash },
+    { user, hasPassword: !!passwordHash, signInProviders: await repo.getUserProviders(user.id) },
     { headers: { "Cache-Control": "private, no-store" } },
   )
 }

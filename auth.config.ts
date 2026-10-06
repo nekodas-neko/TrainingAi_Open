@@ -1,12 +1,12 @@
 import type { NextAuthConfig } from "next-auth"
 import Google from "next-auth/providers/google"
-import { sessionFromToken } from '@/lib/auth/session'
+import { sessionFromToken, SESSION_MAX_AGE_SECONDS } from '@/lib/auth/session'
 
 // Middleware dependencies must support the Edge runtime.
 export const authConfig = {
   secret: process.env.AUTH_SECRET,
   trustHost: true,
-  session: { strategy: "jwt", maxAge: 7 * 24 * 60 * 60, updateAge: 24 * 60 * 60 },
+  session: { strategy: "jwt", maxAge: SESSION_MAX_AGE_SECONDS, updateAge: 24 * 60 * 60 },
   pages: {
     signIn: "/sign-in",
     error: "/sign-in",

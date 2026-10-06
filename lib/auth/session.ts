@@ -1,3 +1,5 @@
+export const SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
+
 import type { Session } from 'next-auth'
 import type { JWT } from 'next-auth/jwt'
 

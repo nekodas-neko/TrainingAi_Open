@@ -22,7 +22,7 @@ vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser 
 vi.mock('@/lib/data', () => {
   const repo = async () => ({
     getUserCredentials, getUserById, updateUserPassword, updateUserProfile, updateUserAvatar,
-    countWorkoutSessions, getUserPreferences, updateUserPreferences,
+    countWorkoutSessions, getUserPreferences, updateUserPreferences, getUserProviders: async () => ['google'],
   })
   return { getRepository: repo, getRepositoryAsync: repo }
 })
