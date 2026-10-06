@@ -1046,6 +1046,11 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   // True only on a genuinely cold cache (first-ever visit / cleared cache) while the
   // initial fetch is still in flight — never flashes over cache-seeded content.
   const showHomeSkeleton = refreshing && activeSessions.length === 0 && recommendation === null && readiness === null;
+  // #2101: the sections fade in only when they replace that skeleton. Applied unconditionally, the
+  // fade ran on every mount — each cold launch and each return from a pushed route — and held
+  // cache-seeded sections under full opacity for 232 ms after they were already there.
+  const [sectionsReplaceSkeleton, setSectionsReplaceSkeleton] = useState(false);
+  useEffect(() => { if (showHomeSkeleton) setSectionsReplaceSkeleton(true); }, [showHomeSkeleton]);
 
   return (
     <div className="flex h-screen flex-col bg-page">
@@ -1175,7 +1180,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         />
 
         {/* ── Sections ── */}
-        {!showHomeSkeleton && <div className="content-fade-in">
+        {!showHomeSkeleton && <div className={sectionsReplaceSkeleton ? "content-fade-in" : undefined}>
           <DragDropProvider sensors={[PointerSensor]} onDragOver={sectionDrag.onDragOver} onDragEnd={sectionDrag.onDragEnd}>
           {sectionOrder.filter(key => !hiddenSections.has(key)).map((key, idx) => {
             const content = (() => {

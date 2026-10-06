@@ -29,6 +29,10 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
 
 ## Reference docs
 
+- [`docs/reviews/2026-10-06-perceived-latency-sweep.md`](../../reviews/2026-10-06-perceived-latency-sweep.md)
+  — **the perceived-latency sweep (#2101).** Opening a workout flashes the tab skeleton when the route
+  was not prefetched (#2441). Logging a set is clean on screen, but the persisted workout store is
+  rewritten 7–20 times per tap, which is on the device list (D1).
 - [`docs/superpowers/plans/2026-09-15-trainer-role.md`](../../superpowers/plans/2026-09-15-trainer-role.md)
   — **BF-9, the trainer role.** A trainer relationship table beside `friendships`, the friendship
   consent handshake copied as-is, and workout programs only (meal plans deferred by the owner).
