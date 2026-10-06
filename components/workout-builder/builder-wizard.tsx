@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { navigateToTab } from '@/lib/shell-nav'
+import { releaseTopSurfaceEntry } from '@/lib/hooks/sheet-back-stack'
 import { InjuryAvoidanceNotice } from './injury-avoidance-notice'
 import { TTL_LONG } from '@trainingai/shared/cache-ttl'
 import type { Program } from '@trainingai/shared/types'
@@ -220,6 +221,17 @@ export default function BuilderWizard({ onClose, onSaved, registerCloseGuard, us
     setStep(next)
   }
 
+  // #2415 — close-then-navigate from inside a sheet, the BF-165 shape: the sheet pops its own history
+  // entry on close, which lands on the entry the navigation just pushed and undoes it (verified here:
+  // `push /health?tab=body` then `replace /program`, screen unchanged). Release the entry first and
+  // `replace` over it — see `releaseTopSurfaceEntry`.
+  function openHealth() {
+    const tookSheetEntry = releaseTopSurfaceEntry()
+    onClose()
+    if (tookSheetEntry) router.replace('/health?tab=body')
+    else navigateToTab(router, '/health?tab=body')
+  }
+
   function handleBack() {
     if (step === 1) { onClose(); return }
     let prev = step - 1
@@ -418,7 +430,7 @@ export default function BuilderWizard({ onClose, onSaved, registerCloseGuard, us
             </div>
             <InjuryAvoidanceNotice
               userId={userId}
-              onOpenHealth={() => { onClose(); navigateToTab(router, '/health?tab=body') }}
+              onOpenHealth={openHealth}
             />
           </div>
         )}

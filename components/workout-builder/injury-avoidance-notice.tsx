@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { TriangleAlertIcon } from 'lucide-react'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { todayInTz } from '@trainingai/shared/date-utils'
@@ -26,7 +26,7 @@ import { useUserTimezone } from '@/components/shell/user-timezone-provider'
  *
  * Renders nothing when nothing is active: an empty notice explaining itself is furniture.
  */
-export const InjuryAvoidanceNotice = memo(function InjuryAvoidanceNotice({
+export function InjuryAvoidanceNotice({
   userId, onOpenHealth,
 }: {
   userId?: string
@@ -79,4 +79,4 @@ export const InjuryAvoidanceNotice = memo(function InjuryAvoidanceNotice({
       </button>
     </div>
   )
-})
+}
