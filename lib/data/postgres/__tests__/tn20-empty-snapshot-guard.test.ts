@@ -156,4 +156,36 @@ describe.skipIf(!canRun)('an empty snapshot never flattens a populated day (TN-2
     expect(row.hr_sample_count).toBe(0)
     expect(Number(row.end_value)).toBe(61)
   })
+
+  // #2230. The upsert now says whether it wrote, and the re-derive's dry run predicts that with
+  // `isMeasuredBatteryDay`. The SQL is the rule, so every pairing of shapes runs through the real
+  // statement and the TypeScript restatement must agree with it.
+  it('reports whether it wrote, and the TypeScript rule agrees with the SQL on every pairing', async () => {
+    const { isMeasuredBatteryDay } = await import('@/lib/data/postgres/slices/body-battery')
+    const shapes: Record<string, Row> = {
+      measured:   snapshot(3767),
+      flat:       snapshot(0, { hrSampleCount: 2 }),
+      empty:      snapshot(0),
+      drainOnly:  snapshot(0, { hrSampleCount: 2, totalDrained: 1, endValue: 54 }),
+      chargeOnly: snapshot(0, { hrSampleCount: 5, totalCharged: 3, endValue: 58 }),
+      noSamples:  snapshot(0, { totalCharged: 5, endValue: 60 }),
+    }
+    let pairs = 0
+    for (const [storedName, stored] of Object.entries(shapes)) {
+      for (const [incomingName, incoming] of Object.entries(shapes)) {
+        await pool.query(`DELETE FROM body_battery_daily WHERE user_id = $1`, [USER])
+        expect(await repo.upsertBodyBatteryDaily(USER, stored), `insert ${storedName}`).toBe(true)
+        const marked = { ...incoming, modelVersion: 'incoming' }
+        const wrote = await repo.upsertBodyBatteryDaily(USER, marked)
+        const predicted = isMeasuredBatteryDay(marked) || !isMeasuredBatteryDay(stored)
+        const label = `${incomingName} over ${storedName}`
+        expect(wrote, label).toBe(predicted)
+        const { rows } = await pool.query(
+          `SELECT model_version FROM body_battery_daily WHERE user_id = $1 AND date = $2`, [USER, DATE])
+        expect(rows[0].model_version === 'incoming', label).toBe(wrote)
+        pairs++
+      }
+    }
+    expect(pairs).toBe(36)
+  })
 })
