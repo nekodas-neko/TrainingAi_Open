@@ -1,0 +1,13 @@
+-- #2445 (step 1 of #2200): the bar weight the app prescribed for each set, after plate rounding.
+--
+-- The prescription is `mroundStepUp(basis x pct/100, step)` — a ceiling round to the plate step —
+-- so the bar the lifter is shown is heavier than `planned_pct` says, by up to a whole plate step.
+-- Scoring a set against `planned_pct` turns that round-up into a 1RM gain on exact adherence
+-- (#2200). Fixing that needs the bar actually prescribed, and the edit path can only reproduce the
+-- estimate later if the bar is stored, so it gets its own column rather than overloading
+-- `planned_pct` (which would change what an existing column means).
+--
+-- Additive and nullable. No backfill: historical rows stay NULL, and #2200 falls back to today's
+-- arithmetic for them. A reconstructed bar would need the 1RM basis as it stood at the time, which
+-- has since moved — an honest NULL beats a plausible invention.
+ALTER TABLE set_logs ADD COLUMN IF NOT EXISTS planned_weight_kg double precision;
