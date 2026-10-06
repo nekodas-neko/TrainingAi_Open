@@ -75,7 +75,7 @@ const BASELINE = {
   'components/health/sleep-vs-performance-card.tsx': 2,
   'components/health/strength-progress-card.tsx': 8,
   'components/health/strength-trend-card.tsx': 3,
-  'components/health/training-load-card.tsx': 1,
+  'components/health/training-load-card.tsx': 5,
   'components/health/training-stress-line.tsx': 2,
   'components/health/trend-sparkline.tsx': 6,
   'components/health/trends-section.tsx': 1,

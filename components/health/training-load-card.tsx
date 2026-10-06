@@ -8,7 +8,7 @@ import { TrainingStressLine } from '@/components/health/training-stress-line'
 import type { TrainingLoadResponse } from '@/app/api/training-load/route'
 
 function monotonyColor(m: number): string {
-  return m > 2 ? 'var(--destructive)' : m > 1.5 ? 'var(--accent-amber)' : 'var(--accent-green)'
+  return m > 2 ? '#ef4444' : m > 1.5 ? '#f59e0b' : '#22c55e'
 }
 
 // Monotony meter — where daily-load sameness sits on a 0→2.5 scale. Low (varied) is good;
