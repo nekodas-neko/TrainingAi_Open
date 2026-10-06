@@ -4467,53 +4467,13 @@ the next device change.
   the S25 at the next engine-chosen deload: header "Deload", reduced weights, no PR badge. Local
   SQLite rows written during the bug window self-heal on the next pull; not observed on device.
 
-### [activity][workouts][app-shell] 🔴 The first sweep to RUN the app since the six-round review — two dead primary actions, one of which loses data (Q-450…Q-455, 2026-08-17)
+### [activity][app-shell] ⚠️ `/activity` opened without a type: the Q-450 fix still needs its device look (2026-08-17) · needs: device
 
-- **Why this found things six rounds of review did not.** The comprehensive review that closed the
-  same morning states its own limit: *"Nothing in six rounds was rendered — no device, emulator,
-  browser, or `pnpm dev` run."* This sweep took the **failure-cells** lens — the error path, the
-  empty state, the first-run path, the entry point reached out of order — against `pnpm dev` on the
-  seeded local Postgres, driven through the repo's Playwright harness at 412×915 and with `curl`
-  against a live session cookie. Full write-up, with every query and the reproduction:
-  [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](../reviews/2026-08-17-failure-cells-running-the-app.md).
-- **✅ Q-450 FIXED (v1.318.2) — `/activity` without a type recorded an activity and discarded it on
-  Save**, with no toast, error or network request, because `done-activity-screen.tsx` bailed on
-  `!activityType` before the local write, the outbox and the web fallback alike. Reached from the
-  Coach handoff, the guided-walk Done button, a cold open or a refresh — and `resetSession()` leaves
-  the store untyped after **every** save. It now shows a type picker instead of a recordable blank
-  screen, and the bail-out toasts. Guarded by `e2e/activity-untyped-entry.spec.ts`, mutation-checked.
-  **Not device-verified** — the web fallback ran, not SQLite+outbox. The spec exposed a second defect
-  the bail-out was masking, filed as **Q-351** (Lane A): a sub-3-second activity rounds `durationMin`
-  to 0, which `.positive()` rejects as a bare 400. [Journal](../overview/history-2026-09-10-folded-1.md#2026-08-17-activity-untyped-entry).
-- **✅ Q-451 FIXED (v1.318.3) — a new account's Workout tab was a ~1,400 px empty card with a dead
-  button** whose onClick short-circuited on the missing `currentSession`. Now "No program yet" + a
-  **Create a program** CTA; the inert button is gone rather than disabled, and a `programLoaded` flag
-  separates "no program" from "still loading" so it cannot flash. **Now guarded** by
-  `e2e/first-run-empty-states.spec.ts` against the zero-data account Q-352 added (mutation-checked).
-  Home's syntactic sibling is guarded upstream and is not a bug.
-  [Journal](../overview/history-2026-09-10-folded-1.md#2026-08-17-workout-select-empty-state).
-- **✅ Q-452 HALF-FIXED (v1.318.6)** — the AI insight card ran an LLM over literal `"no data"` strings,
-  telling a day-one account *"…shows zero movement… this inactivity creates a significant gap"*.
-  `AiInsightCard` now takes a required `hasData` and neither fetches nor renders without it. **Now
-  guarded** by `e2e/first-run-empty-states.spec.ts`, which asserts on the *request* (asserting on the
-  rendered card passes with the gate deleted). **Prompt half is Lane A's — Q-353.**
-- **🟡 Q-453/454/455 — three low-severity ones,** filed mid-low: `/api/training-stress` silently
-  answers for *today* on a malformed `date` where its ten siblings all 400; `/api/day-log` and
-  `/api/exercise-history` validate params before checking auth (**no data leaks** — verified 401 once
-  the param is supplied); and an unhandled throw returns a **bodiless 500** rather than a JSON error.
-- **Four areas came back CLEAN and are recorded so the next sweep skips them.** (1) The `[-/]`
-  date-separator class — all 11 date-taking routes accept **both** separators live. (2) The
-  unauthenticated surface — 122 GET routes, **114 exact 401**, 3 admin 403, 2 deliberately public;
-  **no route served user data unauthenticated**. (3) A zero-data account against all 122 GET routes —
-  **exactly one route differs**, a clean `404 {"error":"No active program"}`. (4) 51 screen renders
-  (30 seeded + 21 zero-data) — **zero uncaught page errors, zero console errors, zero failing `/api/`
-  responses**, and the empty states are genuinely well built apart from Q-451.
-- **NOT device-verified, and structurally cannot be here.** This is the **web** build:
-  `getLocalStore()` returns null, so every offline-first domain took its web fallback and the device
-  branch — the canonical runtime — was never exercised. No safe-area, Samsung-WebView, native-plugin
-  or native-SQLite claim is made, and a fresh correct local seed cannot speak to prod data drift.
-- **Q-450 and Q-451 have since shipped (Lane B, v1.318.1/v1.318.3) and are struck above; the other
-  four stay queued** (Q-452's client half shipped too; its prompt half is Q-353, Lane A).
+- **Q-450** (v1.318.2): an untyped `/activity` used to discard the activity on Save; it now shows a
+  type picker and the bail-out toasts. Guarded by `e2e/activity-untyped-entry.spec.ts`, but only the
+  web fallback has run — **the SQLite + outbox branch on the device is still owed** (RV-155 station E).
+- The rest of the 2026-08-17 sweep (Q-451…Q-455, Q-351, Q-353) has shipped and is archived in
+  [`known-issues-resolved.md`](known-issues-resolved.md) (#2140).
 ### [devices][heart-rate] 🔴 The ring records SpO₂ and daytime HR permanently — ~3.5× stock battery drain (Q-388, 2026-08-17)
 
 - Owner: stock ring lasts 7 days; on our build it loses ~20% overnight and needs charging every 2
