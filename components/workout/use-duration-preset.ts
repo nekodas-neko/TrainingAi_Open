@@ -16,7 +16,7 @@ type Args = {
 };
 
 /**
- * The per-day time-budget choice (short / standard / long) and the warm-up countdown that has to
+ * The per-day time-budget choice (30/45/60/90 minutes around the session own length) and the warm-up countdown that has to
  * agree with it.
  *
  * Changing the preset regenerates today's prescription against that budget and swaps it in — the
