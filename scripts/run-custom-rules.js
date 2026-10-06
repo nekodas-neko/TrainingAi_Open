@@ -16,6 +16,7 @@
 // ran/total count printed at the end is what makes that failure visible.
 const fs = require('fs')
 const path = require('path')
+const os = require('os')
 const { spawnSync } = require('child_process')
 const yaml = require('js-yaml')
 
@@ -52,6 +53,11 @@ if (process.argv.includes('--list')) {
 console.log(`Custom Rules — ${steps.length} run-steps in ${WORKFLOW}\n`)
 
 const failures = []
+// #2249: a failure that does not reproduce is only diagnosable from its own output, and a gate
+// run piped through `tail` keeps none of it. Every failing step's full output, exit status and
+// signal is written to a file whose path is the LAST line printed, so even a five-line tail
+// points at the evidence.
+const failureLogs = []
 let ran = 0
 
 for (const step of steps) {
@@ -68,6 +74,10 @@ for (const step of steps) {
     failures.push(step.name)
     const out = `${res.stdout ?? ''}${res.stderr ?? ''}`.trimEnd()
     if (out) console.log(out.replace(/^/gm, '        '))
+    failureLogs.push(
+      `=== ${step.name}\nexit=${res.status} signal=${res.signal ?? 'none'}` +
+        `${res.error ? ` error=${res.error.message}` : ''}\n${out || '(no output)'}\n`
+    )
   }
 }
 
@@ -79,6 +89,14 @@ if (ran !== steps.length) {
 }
 if (failures.length) {
   console.error(`\n${failures.length} failed:\n  ${failures.join('\n  ')}`)
+  const logPath = path.join(os.tmpdir(), `custom-rules-failure-${new Date().toISOString().replace(/[:.]/g, '-')}.log`)
+  const status = spawnSync('git', ['status', '--short'], { cwd: repoRoot, encoding: 'utf8' }).stdout ?? ''
+  try {
+    fs.writeFileSync(logPath, `${new Date().toISOString()}\n\n${failureLogs.join('\n')}\n=== git status --short\n${status}`)
+    console.error(`Full failure output: ${logPath}`)
+  } catch (e) {
+    console.error(`(could not write the failure log: ${e.message})`)
+  }
   process.exit(1)
 }
 console.log('All Custom Rules steps passed.')
