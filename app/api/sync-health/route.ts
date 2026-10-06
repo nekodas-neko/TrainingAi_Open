@@ -4,13 +4,23 @@ import { getRepositoryAsync } from "@/lib/data";
 import { rateLimit } from "@/lib/rate-limit";
 import { DEFAULT_TZ, toAestDay, todayInTz, todayMidnightUtc } from "@trainingai/shared/date-utils";
 import { z } from "zod";
-import { activityImplausibleReason, sleepImplausibleReason } from "@trainingai/shared/validation/plausibility";
-import { ingestDayRejection } from "@trainingai/shared/validation/ingest-clock";
+import { activityImplausibleReason, sleepImplausibleReason, MIN_PLAUSIBLE_BPM, MAX_PLAUSIBLE_BPM } from "@trainingai/shared/validation/plausibility";
+import { ingestDayRejection, INGEST_FUTURE_TOLERANCE_MS } from "@trainingai/shared/validation/ingest-clock";
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { HR_UPLOAD_CHUNK, SYNC_DAYS_COLD } from '@/lib/health-connect-sync'
 
 // Three arrays of at most MAX_ITEMS (400) rows of bounded numbers — about 300 KB at the schema's
-// own limit. 1 MB is generous past that.
+// own limit — plus MAX_HR_SAMPLES heart-rate points of ~30 bytes each, another ~300 KB. 1 MB is
+// still generous past both.
 const MAX_BODY_BYTES = 1024 * 1024
+
+// One request's share of a heart-rate series. The client's own chunk size, imported rather than
+// repeated, so the two cannot drift into every chunk being a 400.
+const MAX_HR_SAMPLES = HR_UPLOAD_CHUNK
+// The client reads `SYNC_DAYS_COLD` days on a cold sync. A sample further back than that (plus a
+// day of slack), or ahead of ordinary clock skew, is a broken clock or a crafted call — dropped per
+// sample, never a 400 for the batch (the poison-pill rule).
+const HR_PAST_TOLERANCE_MS = (SYNC_DAYS_COLD + 1) * 24 * 60 * 60_000
 
 // Receives aggregate health data. Legacy Android callers default to Health Connect.
 // The JS layer pre-aggregates data into daily buckets and sends individual
@@ -70,6 +80,13 @@ const SyncHealthSchema = z.object({
     // single session — anything longer is malformed, not a long night.
     sleepPhase5Min:  z.string().regex(/^[1-4]+$/).max(288).optional(),
   }).strict()).max(MAX_ITEMS).optional(),
+  // Intraday HR, one entry per sample at the source's own resolution (never resampled). Structural
+  // bounds only: `at` is capped so `new Date(at)` cannot go Invalid at the driver; range and clock
+  // are filtered per sample below.
+  heartRateSamples: z.array(z.object({
+    at:  z.number().int().min(0).max(8_640_000_000_000_000), // epoch ms
+    bpm: z.number(),
+  }).strict()).max(MAX_HR_SAMPLES).optional(),
 }).strict();
 
 export async function POST(req: NextRequest) {
@@ -221,6 +238,27 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ── Intraday heart rate → the shared HR table (#2168) ─────────────────────
+  // Written whatever else covers the same minutes: a ring or strap row nearby wins at read time
+  // (`mergeHrSources`), so this adds a series for a user without one and leaves a ring user's
+  // scores where they were.
+  let heartRateAccepted = 0
+  if (body.heartRateSamples?.length) {
+    const now = Date.now()
+    const usable = body.heartRateSamples
+      .filter(s => s.at >= now - HR_PAST_TOLERANCE_MS && s.at <= now + INGEST_FUTURE_TOLERANCE_MS)
+      .map(s => ({ timestamp: new Date(s.at), bpm: Math.round(s.bpm) }))
+      .filter(s => s.bpm >= MIN_PLAUSIBLE_BPM && s.bpm <= MAX_PLAUSIBLE_BPM)
+    const dropped = body.heartRateSamples.length - usable.length
+    if (dropped > 0) {
+      rejected.push(`heart rate: ${dropped} sample(s) outside ${MIN_PLAUSIBLE_BPM}-${MAX_PLAUSIBLE_BPM} bpm or the sync window`)
+    }
+    if (usable.length) {
+      await repo.upsertAggregatorHeartrate(userId, usable, body.source, tz)
+      heartRateAccepted = usable.length
+    }
+  }
+
   // ── Enrichment candidates: recent activity logs missing HR/distance/calories ─
   const from3d = toAestDay(new Date(todayMidnightUtc(tz).getTime() - 3 * 86_400_000), tz);
   const recent = await repo.listActivityLogs(userId, from3d, todayInTz(tz));
@@ -228,5 +266,5 @@ export async function POST(req: NextRequest) {
     .filter(a => a.avgHr == null && a.distanceKm == null && a.caloriesBurned == null && a.startTime && a.endTime)
     .map(a => ({ id: a.id, date: a.date, startTime: a.startTime, endTime: a.endTime }));
 
-  return NextResponse.json({ ok: true, enrichmentCandidates, rejected });
+  return NextResponse.json({ ok: true, enrichmentCandidates, rejected, heartRateAccepted });
 }

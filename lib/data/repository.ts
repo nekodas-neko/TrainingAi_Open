@@ -1295,6 +1295,10 @@ export interface WorkoutRepository {
   getBodyBatteryHistory(userId: string, startDate: string, endDate: string): Promise<BodyBatteryDailyRow[]>
   upsertOuraSleep(userId: string, sessions: OuraSleepUpsertRow[], source: HealthSource): Promise<void>
   upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]): Promise<void>
+  /** A platform aggregator's (Health Connect's) HR series into the shared HR table. Never displaces
+   *  a device row at the same timestamp; device rows win at read time (#2168). `tz` dates the
+   *  zone-minutes cache invalidation. */
+  upsertAggregatorHeartrate(userId: string, rows: { timestamp: Date; bpm: number }[], source: HealthSource, tz: string): Promise<void>
   getHrForWindow(userId: string, from: Date, to: Date): Promise<{ timestamp: Date; bpm: number; source: string | null }[]>
   /** The corroboration-gated observed HR profile for a window, aggregated in the database — the
    *  same answer as `computeObservedHr` over `getHrForWindow`'s rows, without materialising them

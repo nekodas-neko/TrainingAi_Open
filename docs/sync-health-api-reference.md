@@ -36,6 +36,7 @@ type SyncHealthRequest = {
   dailyMetrics?:     DailyMetric[]      // max 400 entries
   exerciseSessions?: ExerciseSession[]  // max 400 entries
   sleepRecords?:     SleepRecord[]      // max 400 entries
+  heartRateSamples?: HeartRateSample[]  // max 10,000 entries — see 2d
 }
 ```
 
@@ -133,6 +134,26 @@ from a real one downstream and actively misleads the sleep-scoring formula. `dee
 - `durationHours` exceeding that span by more than 30 minutes
 - an unparseable `sleepStart`/`sleepEnd` string
 
+### 2d. `heartRateSamples` — intraday heart rate, one entry per reading
+
+```ts
+type HeartRateSample = {
+  at: number    // REQUIRED — epoch milliseconds, an integer
+  bpm: number   // REQUIRED — rounded to an integer on the way in
+}
+```
+
+Send readings at your device's own resolution — don't average them into bins first. They land in
+the shared HR table (`oura_heartrate`) under the request's `source`, where Activity Score's
+zone-minutes and move-hours read them. **A ring or chest strap covering the same minutes wins**: your
+readings are stored but not read for any minute a ring or strap reading sits within five minutes of
+(see `docs/data-source-connector-guide.md` §3a).
+
+At most 10,000 per request; split a longer series across requests. A malformed entry (a string
+timestamp, a non-integer `at`, an extra field) fails the request with `400`. A well-formed entry
+outside 20–250 bpm, more than 31 days old, or more than a minute in the future is **dropped on its
+own** and counted in one `rejected` line (`"heart rate: 3 sample(s) outside …"`).
+
 ## 3. Response
 
 ```ts
@@ -140,6 +161,7 @@ type SyncHealthResponse = {
   ok: true
   enrichmentCandidates: { id: string, date: string, startTime: string, endTime: string }[]
   rejected: string[]   // one human-readable string per skipped record; empty array if everything saved
+  heartRateAccepted: number  // heart-rate samples that passed the checks and went to the write (0 if none)
 }
 ```
 
