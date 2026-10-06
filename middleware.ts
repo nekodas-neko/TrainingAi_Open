@@ -10,7 +10,7 @@ const { auth } = NextAuth(authConfig)
 // trainingai:// deep link never firing. Note "/mobile-signin".startsWith("/sign-in") is
 // false, so the existing entry never covered it. It grants no authority /sign-in doesn't
 // already grant: the page's only action is signIn("google").
-const PUBLIC_PATHS = ["/sign-in", "/mobile-signin", "/pending", "/register", "/offline"]
+const PUBLIC_PATHS = ["/sign-in", "/mobile-signin", "/auth-mobile-bridge", "/pending", "/register", "/offline"]
 
 export default auth((req) => {
   const { pathname } = req.nextUrl

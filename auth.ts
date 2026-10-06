@@ -10,7 +10,17 @@ import type { JWT } from "next-auth/jwt"
 import type { Session } from "next-auth"
 import { refreshIsActiveClaim } from "@/lib/auth/is-active-refresh"
 import { bearerSession } from "@/lib/auth/bearer-session"
-import { headers } from "next/headers"
+import { cookies, headers } from "next/headers"
+import { iosLoginContinuation, readIosTransaction } from '@/lib/mobile-ios-transaction'
+
+async function approvalRedirect(provider: 'google' | 'credentials', mobileState?: string) {
+  const cookieStore = await cookies()
+  const transaction = provider === 'google' ? await iosLoginContinuation(cookieStore) : await readIosTransaction(cookieStore)
+  if (provider === 'credentials' && (!transaction || transaction.state !== mobileState)) {
+    return '/pending'
+  }
+  return transaction ? '/mobile-signin/ios?error=account_pending' : '/pending'
+}
 
 const nextAuth = NextAuth({
   ...authConfig,
@@ -20,6 +30,7 @@ const nextAuth = NextAuth({
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        mobileState: { type: 'hidden' },
       },
       async authorize(credentials, request) {
         const submitted = credentials?.email as string | undefined
@@ -74,6 +85,7 @@ const nextAuth = NextAuth({
           activityLevel: user.activityLevel ?? null,
           friendCode: user.friendCode ?? null,
           equippedTitle: user.equippedTitle ?? null,
+          mobileState: typeof credentials?.mobileState === 'string' ? credentials.mobileState : undefined,
         }
       },
     }),
@@ -113,7 +125,7 @@ const nextAuth = NextAuth({
           ;(user as any).activityLevel = existing.activityLevel ?? null
           ;(user as any).friendCode = existing.friendCode ?? null
           ;(user as any).equippedTitle = existing.equippedTitle ?? null
-          if (!existing.isActive) return "/pending"
+          if (!existing.isActive) return approvalRedirect('google')
           return true
         }
 
@@ -132,11 +144,11 @@ const nextAuth = NextAuth({
         ;(user as any).activityLevel = dbUser.activityLevel ?? null
         ;(user as any).friendCode = dbUser.friendCode ?? null
         ;(user as any).equippedTitle = dbUser.equippedTitle ?? null
-        if (!dbUser.isActive) return "/pending"
+        if (!dbUser.isActive) return approvalRedirect('google')
       }
 
       if (account?.provider === "credentials") {
-        if (!user.isActive) return "/pending"
+        if (!user.isActive) return approvalRedirect('credentials', (user as typeof user & { mobileState?: string }).mobileState)
       }
 
       return true

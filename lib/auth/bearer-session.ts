@@ -43,6 +43,9 @@ export async function bearerSession(
   // The claim → session mapping is `authConfig`'s, not a copy of it. A claim added there must
   // reach a bearer caller too, and the way to guarantee that is to run the same callback rather
   // than to remember to update a second list.
-  const session = { user: {}, expires: '' } as unknown as Session
+  const session = {
+    user: { name: token.name ?? null, email: token.email ?? null, image: token.picture ?? null },
+    expires: typeof token.exp === 'number' ? new Date(token.exp * 1000).toISOString() : '',
+  } as unknown as Session
   return (await authConfig.callbacks!.session!({ session, token } as never)) as Session
 }

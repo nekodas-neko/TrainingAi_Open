@@ -16,7 +16,8 @@ interface TokenEntry {
   expiresAt: number;
 }
 
-const tokens = new Map<string, TokenEntry>();
+const processStore = globalThis as typeof globalThis & { trainingAiMobileAuthTokens?: Map<string, TokenEntry> };
+const tokens = processStore.trainingAiMobileAuthTokens ??= new Map<string, TokenEntry>();
 
 function pruneExpired() {
   const now = Date.now()
