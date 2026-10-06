@@ -45,6 +45,10 @@ See [`the journal entry`](../../overview/entries/2026-09-30-fix-rv208-date-and-b
 
 ## Reference docs
 
+- [`docs/reviews/2026-10-06-perceived-latency-sweep.md`](../../reviews/2026-10-06-perceived-latency-sweep.md)
+  — **the perceived-latency sweep (#2101).** Opening Nutrition and adding a food are clean on screen.
+  On the device, the Log Food sheet closes only after a serial chain of local-store awaits, which is
+  on the device list (D2).
 - **[`docs/superpowers/plans/2026-09-01-dosed-substance-exposure.md`](../../superpowers/plans/2026-09-01-dosed-substance-exposure.md)**
   — 🆕 **BF-69**, the plan: dosed substances (creatine, retatrutide) as an analysable exposure
   variable. Read it before touching `supplement_logs` — a day's exposure is a **sum of
