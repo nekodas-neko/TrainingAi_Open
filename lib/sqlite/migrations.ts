@@ -283,6 +283,8 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'set_logs',         column: 'planned_pct',             ddl: `ALTER TABLE set_logs ADD COLUMN planned_pct REAL` },
   { table: 'set_logs',         column: 'planned_reps',            ddl: `ALTER TABLE set_logs ADD COLUMN planned_reps INTEGER` },
   { table: 'set_logs',         column: 'planned_rest_sec',        ddl: `ALTER TABLE set_logs ADD COLUMN planned_rest_sec INTEGER` },
+  // #2445 (v48).
+  { table: 'set_logs',         column: 'planned_weight_kg',       ddl: `ALTER TABLE set_logs ADD COLUMN planned_weight_kg REAL` },
   // Program-mirror columns added to the v4 local_programs stub in v9.
   { table: 'local_programs',   column: 'phase_mode',               ddl: `ALTER TABLE local_programs ADD COLUMN phase_mode TEXT NOT NULL DEFAULT 'manual'` },
   { table: 'local_programs',   column: 'training_goal',            ddl: `ALTER TABLE local_programs ADD COLUMN training_goal TEXT NOT NULL DEFAULT 'strength'` },
@@ -1679,6 +1681,16 @@ export const MIGRATIONS: UpgradeStatement[] = [
     toVersion: 47,
     statements: [
       `ALTER TABLE day_checkins ADD COLUMN vs_normal_touched INTEGER`,
+    ],
+  },
+  {
+    // #2445, mirroring Postgres migration 202610061354. The bar the app prescribed for each set
+    // after plate rounding. Same shape as v19 (planned_reps): CREATE_SET_LOGS predates every
+    // planned_* column, so this ALTER is how fresh installs AND upgraded devices both get it, and
+    // RECONCILE_COLUMNS is the authority if the version half-applies. No backfill: old rows are NULL.
+    toVersion: 48,
+    statements: [
+      `ALTER TABLE set_logs ADD COLUMN planned_weight_kg REAL`,
     ],
   },
 ];

@@ -16,6 +16,8 @@ export interface SetLog {
   plannedPct?: number
   plannedReps?: number
   plannedRestSec?: number
+  /** #2445: the bar prescribed for this set after plate rounding (`set_logs.planned_weight_kg`). */
+  plannedWeightKg?: number
 }
 
 export interface ExerciseLog {

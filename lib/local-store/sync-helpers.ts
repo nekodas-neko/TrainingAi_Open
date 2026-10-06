@@ -111,6 +111,9 @@ export function buildWorkoutLogPayload(
       // planned_reps. Rows written before planned_reps existed carry null, and fall back to the
       // actual reps exactly as this line did before — a replay of an old row is unchanged.
       ...(everySetHasPlanned ? { progressionStyle: sets.map(s => ({ pct: s.plannedPct!, reps: s.plannedReps ?? s.reps, restSec: s.plannedRestSec!, useFor1rm: s.useFor1rm })) } : {}),
+      // #2445: per-set and nullable, so it is re-sent whenever ANY set carries one — unlike the
+      // all-or-nothing arrays above, a null here is a real value (no bar prescribed for that set).
+      ...(sets.some(s => s.plannedWeightKg != null) ? { plannedWeights: sets.map(s => s.plannedWeightKg ?? null) } : {}),
       ...(el.styleId ? { styleId: el.styleId } : {}),
       ...(el.styleName ? { styleName: el.styleName } : {}),
       ...(el.muscleGroups.length ? { muscleGroups: el.muscleGroups } : {}),

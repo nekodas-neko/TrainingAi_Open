@@ -222,6 +222,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     plannedPct:    (r.plannedPct as number) ?? null,
     plannedReps:   (r.plannedReps as number) ?? null,
     plannedRestSec: (r.plannedRestSec as number) ?? null,
+    plannedWeightKg: (r.plannedWeightKg as number) ?? null,
     updatedAt:     toIso(r.updatedAt),
     deletedAt:     r.deletedAt ? toIso(r.deletedAt) : null,
     syncStatus:    'synced' as const,
