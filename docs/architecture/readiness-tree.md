@@ -134,6 +134,33 @@ progress shows in the score itself as well as in the 90-day window.
 | 14 | Fewer than 14 valid days | fake precision | Level from population defaults, Day shown as "learning"; settles at 30 days |
 | 15 | Ceiling — great normal and a great day | sum exceeds 100 | clamp at 100; a great normal keeps its room to show 100 |
 
+## Inputs are device-agnostic — the input cascade (owner, 2026-10-06)
+
+**Scoring never reads a device.** Every unit reads one or more **named, normalised inputs** —
+`steps/min`, `MET/min`, `HR/min`, `HR drop 60 s after a set`, `sleep stages`, `temperature
+deviation`, … — and each input has an ordered **cascade** of ways to obtain it. Any source that can
+fill a rung does; the best available rung wins.
+
+| Rung | Meaning | Example: `MET/min` | Example: `steps/min` | Example: `HRR60` |
+|---|---|---|---|---|
+| 1 · provided | the device reports it | Oura MET | Oura / Health Connect steps | — |
+| 2 · derived | computed from rawer data we hold | from raw accelerometer | counted from raw accelerometer | from dense HR (strap, or any ≥1 Hz series) around the set |
+| 3 · estimated | inferred from a coarser signal | from heart rate (HR reserve), or a logged activity's compendium MET | — | — |
+| 4 · missing | nothing can fill it | unit not scored | unit not scored | unit not scored |
+
+Rules (owner, 2026-10-06):
+
+- **Per minute, best rung wins.** A day can mix sources: ring MET in the morning, strap-derived
+  values through a workout. Each minute takes the best rung that has it.
+- **Every value carries its provenance** (source + rung). Lower rungs **score the same**, and the
+  screen says where the number came from ("estimated from heart rate"). Baselines keep provenance so
+  a measured normal is never silently mixed with an estimated one (edge case #11).
+- **Missing is missing, never zero.** A unit with no input on any rung drops out and its pillar
+  renormalises over the units that have data, and says so (edge case #12).
+- **A new device only has to fill inputs.** Adding a source means writing its adapter to the named
+  inputs, never touching a scorer. If a unit uses an input, the cascade must name at least one
+  rung-2 or rung-3 route, or say plainly that the unit is device-limited.
+
 ## Too much activity costs twice, and that is correct
 
 Activity is a sweet spot, so overdoing it lowers **today's Activity score**. If the body was
