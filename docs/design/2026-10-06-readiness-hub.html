@@ -113,6 +113,97 @@ h2{font-size:18px;margin:0 0 8px;font-weight:600;text-wrap:balance}
 .sum b{color:var(--foreground)}
 .below{margin-top:12px}
 
+/* ── More screens ── */
+.meas{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.04em;color:var(--page-warn);margin:0 4px 5px;display:flex;align-items:center;gap:6px}
+.meas::after{content:"";flex:1;border-top:1px dashed rgba(255,143,107,.45)}
+.hubc{border-radius:16px;border:1px solid var(--border);background:var(--card);padding:12px}
+.hubc .row{display:flex;align-items:center;gap:12px}
+.mini{position:relative;width:110px;height:110px;flex:none}
+.mini svg{position:absolute;inset:0}
+.mini .in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.mini .big{font-size:30px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.mini .k{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-foreground)}
+.mini .s{font-size:10px;color:var(--muted-foreground);font-variant-numeric:tabular-nums}
+.hubc .txt{flex:1;min-width:0}
+.hubc .txt .hh{margin-bottom:4px}
+.hubc .txt p{margin:0;font-size:11.5px;line-height:1.4;color:var(--muted-foreground);font-variant-numeric:tabular-nums}
+.hubc .txt p b{color:var(--foreground);font-weight:600}
+.pchips{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.pc{display:flex;align-items:center;gap:5px;border-radius:10px;border:1px solid var(--border);background:color-mix(in oklch,var(--muted) 60%,transparent);padding:5px 7px;font-size:10.5px;color:var(--muted-foreground)}
+.pc .dot{width:7px;height:7px;border-radius:50%;flex:none}
+.pc b{margin-left:auto;font-size:14px;font-weight:700;color:var(--foreground);font-variant-numeric:tabular-nums}
+.card2{border-radius:14px;border:1px solid var(--border);background:var(--card);padding:12px;margin-top:10px}
+.card2 .lab{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-foreground);margin-bottom:6px;display:flex;justify-content:space-between}
+.card2 .ttl{font-size:15px;font-weight:700}
+.card2 .meta2{font-size:11.5px;color:var(--muted-foreground);margin-top:2px;font-variant-numeric:tabular-nums}
+.done{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:999px;background:color-mix(in oklch,var(--accent-green) 15%,transparent);color:var(--accent-green)}
+.nut{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;text-align:center}
+.nut .r{position:relative;width:54px;height:54px;margin:0 auto 3px}
+.nut .r svg{position:absolute;inset:0}
+.nut .r span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;font-variant-numeric:tabular-nums}
+.nut small{display:block;font-size:10.5px;color:var(--muted-foreground);font-variant-numeric:tabular-nums}
+.tl{list-style:none;margin:0;padding:0}
+.tl li{display:grid;grid-template-columns:44px 10px 1fr;gap:8px;align-items:center;font-size:12px;padding:5px 0;font-variant-numeric:tabular-nums}
+.tl li .t{color:var(--muted-foreground);font-size:11px}
+.tl li i{width:8px;height:8px;border-radius:50%;display:block}
+.tabbar{display:flex;justify-content:space-around;margin:12px -12px 0;padding:10px 0 2px;border-top:1px solid var(--border);font-size:10px;color:var(--muted-foreground)}
+.tabbar span{display:flex;flex-direction:column;align-items:center;gap:2px}
+.tabbar .on{color:var(--brand)}
+.back{display:flex;align-items:center;gap:8px;margin:2px 4px 10px;font-size:13px;color:var(--muted-foreground)}
+.back b{font-size:18px;color:var(--foreground);font-weight:700}
+.back .r2{margin-left:auto;font-size:11px}
+.sect{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-foreground);margin:14px 0 6px}
+.ev{display:grid;grid-template-columns:76px 1fr auto;gap:6px;align-items:center;font-size:11.5px;padding:5px 0;border-top:1px solid var(--border);font-variant-numeric:tabular-nums}
+.ev .t{color:var(--muted-foreground)}
+.ev .d{font-weight:700}
+.ev .neg{color:#ef4444}.ev .pos{color:var(--accent-green)}
+.stack{display:flex;height:14px;border-radius:7px;overflow:hidden;background:oklch(1 0 0 / 6%)}
+.stack i{display:block;height:100%}
+.stack i+i{border-left:2px solid var(--card)}
+.stl{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-top:8px;font-size:11px;color:var(--muted-foreground);font-variant-numeric:tabular-nums}
+.stl span{display:flex;align-items:center;gap:6px}
+.stl b{color:var(--foreground);margin-left:auto}
+.stl .dot{width:8px;height:8px;border-radius:2px;flex:none}
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.week .col{position:relative;height:70px;width:20px;margin:0 auto 4px;border-radius:5px;background:oklch(1 0 0 / 5%)}
+.week .col .f{position:absolute;left:0;right:0;bottom:0;border-radius:0 0 5px 5px;background:var(--accent-green)}
+.week .col .h{position:absolute;left:0;right:0;background:repeating-linear-gradient(45deg,oklch(0.84 0.22 145 / .5) 0 2px,transparent 2px 4px)}
+.week .col .m{position:absolute;left:-3px;right:-3px;height:2px;border-radius:1px;background:#60a5fa}
+.week .dl{font-size:10px;color:var(--muted-foreground)}
+.week .dv{font-size:10px;font-variant-numeric:tabular-nums;line-height:1.25}
+.week .dv b{display:block;font-size:12px}
+.week .today .dl{color:var(--foreground);font-weight:700}
+.comp{padding:9px 0 8px;border-top:1px solid var(--border)}
+.comp .h{display:flex;align-items:baseline;gap:8px}
+.comp .nm{font-size:12.5px;font-weight:600}
+.comp .val{font-size:11.5px;color:var(--muted-foreground);font-variant-numeric:tabular-nums}
+.comp .ss{margin-left:auto;font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+.comp .bar{height:3px;border-radius:999px;background:oklch(1 0 0 / 8%);margin:5px 0 0;overflow:hidden}
+.comp .bar i{display:block;height:100%;border-radius:999px;background:var(--c-body)}
+.comp .note{font-size:10.5px;color:var(--muted-foreground);margin-top:3px;line-height:1.35;font-variant-numeric:tabular-nums}
+.win{display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-top:6px;font-size:9.5px;font-variant-numeric:tabular-nums;color:var(--muted-foreground)}
+.win span{padding:1px 6px;border-radius:999px;background:oklch(1 0 0 / 5%);border:1px solid transparent;white-space:nowrap}
+.win .vs{background:none;padding:0 2px 0 0}
+.win em{font-style:normal;font-weight:700}
+.win .up{color:var(--accent-green)}.win .dn{color:var(--accent-amber)}.win .eq{color:var(--muted-foreground)}
+.win .s30{border-color:color-mix(in oklch,var(--accent-green) 55%,transparent);background:color-mix(in oklch,var(--accent-green) 12%,transparent);color:var(--foreground);font-weight:600}
+.win .s30::after{content:"scored";margin-left:5px;font-size:8px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-green)}
+.bighead{display:flex;align-items:center;gap:14px;margin:0 2px 4px}
+.bighead .num{font-size:52px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;color:var(--c-body)}
+.bighead p{margin:0;font-size:11.5px;line-height:1.4;color:var(--muted-foreground)}
+.bighead p b{color:var(--foreground)}
+.learnbar{display:flex;gap:3px;justify-content:center;margin:8px 0 2px}
+.learnbar i{width:14px;height:5px;border-radius:3px;background:oklch(1 0 0 / 10%)}
+.learnbar i.on{background:var(--c-ready)}
+.band.learn{background:color-mix(in oklch,var(--c-ready) 18%,transparent);color:var(--c-ready)}
+.band.part{background:oklch(1 0 0 / 8%);color:var(--muted-foreground)}
+.tile .sc b.lw{font-size:15px;font-weight:600;color:var(--c-ready)}
+.tile.off{background:none;border-style:dashed}
+.tile.off .sc b{font-size:13px;font-weight:600;color:var(--muted-foreground)}
+.connect{display:inline-block;margin-top:6px;font-size:11px;font-weight:600;color:var(--brand);border:1px solid color-mix(in oklch,var(--brand) 45%,transparent);border-radius:999px;padding:3px 10px}
+.explain{margin-top:10px;border-radius:12px;border:1px solid var(--border);background:var(--brand-card-bg);padding:10px 12px;font-size:11.5px;line-height:1.45;color:var(--muted-foreground)}
+.explain b{color:var(--foreground)}
+
 /* notes */
 .verdict{margin-top:6px;padding:14px 16px;background:var(--page-panel);border:1px solid var(--page-line);border-left:3px solid var(--page-accent);border-radius:0 8px 8px 0;max-width:72ch}
 .verdict p{margin:0}
@@ -272,6 +363,293 @@ table.math tr.tot td{font-weight:700;border-bottom:none}
           </div>
         </div>
         <p class="why"><b>Why.</b> "Drained 21" reads straight off the ring: the hatched arc is what the day has used since the morning mark. The sparkline shows where it went (gym, then a stressful afternoon).</p>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>More screens</h2>
+    <p class="ask">The same Tuesday, followed past the Home card: the hub in its compact form on the full Home screen, the two screens a tap opens, and the two states where the four-pillar blend cannot run in full. Every signal is compared with your own history at four windows: <b>1d</b> (vs yesterday), <b>7d</b> (this week), <b>30d</b> (your normal, the one that scores) and <b>90d</b> (season).</p>
+    <div class="pair">
+
+      <!-- ───────── 4. Home in context ───────── -->
+      <div class="pane">
+        <div class="cap"><span class="chip rec">Home in context</span><span class="w">15:00 · compact hub, full screen</span></div>
+        <div class="phone">
+          <div class="sb"><span>15:00</span><span class="r">5G <span class="bat"><i></i></span></span></div>
+          <div class="scr">
+            <div class="hello"><h3>Home</h3><span>Tue 6 Oct</span></div>
+            <div class="meas">compact hub 180 px · today's row + Battery card 203 px · full hub 570 px</div>
+            <div class="hubc" id="m-hubc">
+              <div class="row">
+                <div class="mini">
+                  <svg viewBox="0 0 110 110" aria-hidden="true">
+                    <defs><pattern id="drain-h" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2" height="4" fill="oklch(0.84 0.22 145 / .45)"/></pattern></defs>
+                    <circle cx="55" cy="55" r="46" fill="none" stroke="oklch(0.75 0 0 / .14)" stroke-width="9"/>
+                    <circle cx="55" cy="55" r="46" fill="none" stroke="url(#drain-h)" stroke-width="9" stroke-dasharray="60.70 289.03" stroke-dashoffset="-150.30" transform="rotate(-90 55 55)"/>
+                    <circle cx="55" cy="55" r="46" fill="none" stroke="oklch(0.84 0.22 145)" stroke-width="9" stroke-linecap="round" stroke-dasharray="150.30 289.03" transform="rotate(-90 55 55)"/>
+                    <line x1="16.31" y1="59.89" x2="2.42" y2="61.64" stroke="#60a5fa" stroke-width="2.5" stroke-linecap="round"/>
+                    <circle cx="2.42" cy="61.64" r="2.4" fill="#60a5fa"/>
+                  </svg>
+                  <div class="in"><span class="k">Ready</span><span class="big">73</span><span class="s">now 52</span></div>
+                </div>
+                <div class="txt">
+                  <div class="hh"><span class="t" style="color:var(--c-ready)">Readiness</span><span class="band">High</span><span class="when" style="color:#ef4444">↓</span></div>
+                  <p><b>Now 52</b> · drained 21 since 06:30</p>
+                  <p>Heart is the drag: HRV 38 ms vs your 46.</p>
+                </div>
+                <span class="chev" style="color:var(--muted-foreground)">›</span>
+              </div>
+              <div class="pchips">
+                <span class="pc"><span class="dot" style="background:var(--c-sleep)"></span>Sleep<b>82</b></span>
+                <span class="pc"><span class="dot" style="background:var(--c-heart)"></span>Heart<b>70</b></span>
+                <span class="pc"><span class="dot" style="background:var(--c-act)"></span>Act<b>65</b></span>
+                <span class="pc"><span class="dot" style="background:var(--c-body)"></span>Body<b>74</b></span>
+              </div>
+            </div>
+
+            <div class="card2">
+              <div class="lab"><span>Today's session</span><span class="done">Done</span></div>
+              <div class="ttl">Upper B · Push focus</div>
+              <div class="meta2">09:00–10:15 · 6 exercises · 21 sets · 9,840 kg volume</div>
+            </div>
+
+            <div class="card2">
+              <div class="lab"><span>Nutrition</span><span>150 kcal left</span></div>
+              <div class="nut">
+                <div><div class="r"><svg viewBox="0 0 54 54"><circle cx="27" cy="27" r="23" fill="none" stroke="oklch(1 0 0 / .08)" stroke-width="5"/><circle cx="27" cy="27" r="23" fill="none" stroke="oklch(0.84 0.22 145)" stroke-width="5" stroke-linecap="round" stroke-dasharray="130.64 144.51" transform="rotate(-90 27 27)"/></svg><span>90%</span></div><small>1,420 / 1,570 kcal</small></div>
+                <div><div class="r"><svg viewBox="0 0 54 54"><circle cx="27" cy="27" r="23" fill="none" stroke="oklch(1 0 0 / .08)" stroke-width="5"/><circle cx="27" cy="27" r="23" fill="none" stroke="oklch(0.79 0.18 85)" stroke-width="5" stroke-linecap="round" stroke-dasharray="106.72 144.51" transform="rotate(-90 27 27)"/></svg><span>74%</span></div><small>96 / 130 g protein</small></div>
+                <div><div class="r"><svg viewBox="0 0 54 54"><circle cx="27" cy="27" r="23" fill="none" stroke="oklch(1 0 0 / .08)" stroke-width="5"/><circle cx="27" cy="27" r="23" fill="none" stroke="oklch(0.84 0.15 210)" stroke-width="5" stroke-linecap="round" stroke-dasharray="69.36 144.51" transform="rotate(-90 27 27)"/></svg><span>48%</span></div><small>1.2 / 2.5 L water</small></div>
+              </div>
+            </div>
+
+            <div class="card2">
+              <div class="lab"><span>Timeline</span><span>Tue 6 Oct</span></div>
+              <ul class="tl">
+                <li><span class="t">06:30</span><i style="background:var(--c-sleep)"></i>Woke · 7 h 42 m asleep</li>
+                <li><span class="t">07:15</span><i style="background:var(--accent-amber)"></i>Breakfast · 520 kcal · 38 g protein</li>
+                <li><span class="t">09:00</span><i style="background:var(--c-act)"></i>Gym · Upper B · 75 min</li>
+                <li><span class="t">11:40</span><i style="background:var(--c-ready)"></i>Nap · 25 min · battery +4</li>
+                <li><span class="t">12:30</span><i style="background:var(--c-act)"></i>Walk · 30 min · 3,100 steps</li>
+                <li><span class="t">13:00</span><i style="background:#ef4444"></i>Stress high · ongoing</li>
+              </ul>
+            </div>
+
+            <div class="tabbar"><span class="on">⌂<b style="font-weight:600">Home</b></span><span>▤Train</span><span>◔Food</span><span>☾Sleep</span><span>⋯More</span></div>
+          </div>
+        </div>
+        <p class="why"><b>Space.</b> Collapsed, the hub takes about the same height as today's score row plus Body Battery card, so the session card stays above the fold. The full hub (pane 2) is one tap away, not the default.</p>
+      </div>
+
+      <!-- ───────── 5. Readiness detail ───────── -->
+      <div class="pane">
+        <div class="cap"><span class="chip rec">Readiness detail</span><span class="w">tap the ring · 15:00</span></div>
+        <div class="phone">
+          <div class="sb"><span>15:00</span><span class="r">5G <span class="bat"><i></i></span></span></div>
+          <div class="scr">
+            <div class="back">‹ <b>Readiness</b><span class="band">High</span><span class="r2">Tue 6 Oct</span></div>
+            <div class="gauge">
+              <svg viewBox="0 0 180 180" aria-hidden="true">
+                <defs><pattern id="drain-d" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2" height="4" fill="oklch(0.84 0.22 145 / .45)"/></pattern></defs>
+                <circle cx="90" cy="90" r="70" fill="none" stroke="oklch(0.75 0 0 / .14)" stroke-width="12"/>
+                <circle cx="90" cy="90" r="70" fill="none" stroke="url(#drain-d)" stroke-width="12" stroke-dasharray="92.36 439.82" stroke-dashoffset="-228.71" transform="rotate(-90 90 90)"/>
+                <circle cx="90" cy="90" r="70" fill="none" stroke="oklch(0.84 0.22 145)" stroke-width="12" stroke-linecap="round" stroke-dasharray="228.71 439.82" transform="rotate(-90 90 90)"/>
+                <line x1="30.47" y1="97.52" x2="10.63" y2="100.03" stroke="#60a5fa" stroke-width="3" stroke-linecap="round"/>
+                <circle cx="10.63" cy="100.03" r="3.2" fill="#60a5fa"/>
+              </svg>
+              <div class="in"><span class="k">Ready 73</span><span class="big">52</span><span class="s">energy left now</span></div>
+            </div>
+            <p class="capline"><b>drained 21</b> · recharged 4</p>
+            <p class="capline" style="margin-top:0;font-size:11px">25 used − 4 back = 21 net since 06:30</p>
+
+            <div class="sect">Today's drain</div>
+            <div style="position:relative;height:14px;font-size:9px;font-weight:700;color:var(--muted-foreground)">
+              <span style="position:absolute;left:18%">G</span><span style="position:absolute;left:34.3%;color:#60a5fa">N</span><span style="position:absolute;left:39.6%">W</span><span style="position:absolute;left:48%;color:#ef4444">S</span>
+            </div>
+            <svg viewBox="0 0 300 70" width="100%" height="70" preserveAspectRatio="none" aria-hidden="true">
+              <defs><linearGradient id="sf-d" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="oklch(0.84 0.22 145)" stop-opacity=".28"/><stop offset="1" stop-color="oklch(0.84 0.22 145)" stop-opacity="0"/></linearGradient></defs>
+              <rect x="48.4" y="0" width="24.2" height="70" fill="oklch(1 0 0 / .06)"/>
+              <rect x="100" y="0" width="8.1" height="70" fill="rgba(96,165,250,.18)"/>
+              <rect x="116.1" y="0" width="9.7" height="70" fill="oklch(1 0 0 / .06)"/>
+              <rect x="125.8" y="0" width="38.7" height="70" fill="rgba(239,68,68,.12)"/>
+              <line x1="0" y1="13.1" x2="300" y2="13.1" stroke="#60a5fa" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
+              <polygon points="0,70 0,13.1 48.4,15.7 72.6,32.6 100,35.2 108.1,30 116.1,30 125.8,33.9 164.5,40.4 164.5,70" fill="url(#sf-d)"/>
+              <polyline points="0,13.1 48.4,15.7 72.6,32.6 100,35.2 108.1,30 116.1,30 125.8,33.9 164.5,40.4" fill="none" stroke="oklch(0.84 0.22 145)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+              <polyline points="164.5,40.4 300,63.8" fill="none" stroke="oklch(0.84 0.22 145 / .4)" stroke-width="1.5" stroke-dasharray="4 4" vector-effect="non-scaling-stroke"/>
+              <line x1="164.5" y1="0" x2="164.5" y2="70" stroke="oklch(0.75 0 0 / .35)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+            </svg>
+            <div class="spark" style="margin-top:0"><div class="ax"><span>06:30 · 73</span><span>now 15:00 · 52</span><span>22:00 · ~34 if it continues</span></div></div>
+            <div style="margin-top:8px">
+              <div class="ev"><span class="t">G · 09:00</span><span>Gym · Upper B · 75 min</span><span class="d neg">−13</span></div>
+              <div class="ev"><span class="t" style="color:#60a5fa">N · 11:40</span><span>Nap · 25 min</span><span class="d pos">+4</span></div>
+              <div class="ev"><span class="t">W · 12:30</span><span>Walk · 30 min</span><span class="d neg">−3</span></div>
+              <div class="ev"><span class="t" style="color:#ef4444">S · 13:00</span><span>Stress high · 13:00–15:00</span><span class="d neg">−5</span></div>
+              <div class="ev"><span class="t">all day</span><span>Background (awake, resting)</span><span class="d neg">−4</span></div>
+            </div>
+
+            <div class="sect">How 73 was built</div>
+            <div class="stack">
+              <i style="width:24.6%;background:var(--c-sleep)"></i><i style="width:21%;background:var(--c-heart)"></i><i style="width:13%;background:var(--c-act)"></i><i style="width:14.8%;background:var(--c-body)"></i>
+            </div>
+            <div class="stl">
+              <span><i class="dot" style="background:var(--c-sleep)"></i>Sleep 82 × 30%<b>24.6</b></span>
+              <span><i class="dot" style="background:var(--c-heart)"></i>Heart 70 × 30%<b>21.0</b></span>
+              <span><i class="dot" style="background:var(--c-act)"></i>Activity 65 × 20%<b>13.0</b></span>
+              <span><i class="dot" style="background:var(--c-body)"></i>Body 74 × 20%<b>14.8</b></span>
+            </div>
+            <div class="sum" style="margin-top:8px">= <b>73.4 → 73</b>. Left on the table: Heart 9.0, Activity 7.0, Sleep 5.4, Body 5.2.</div>
+
+            <div class="sect">Last 7 days · morning readiness / lowest point</div>
+            <div class="week">
+              <div><div class="col"><i class="f" style="height:41%"></i><i class="h" style="bottom:41%;height:37%"></i><i class="m" style="bottom:78%"></i></div><div class="dl">W</div><div class="dv"><b>78</b>41</div></div>
+              <div><div class="col"><i class="f" style="height:38%"></i><i class="h" style="bottom:38%;height:33%"></i><i class="m" style="bottom:71%"></i></div><div class="dl">T</div><div class="dv"><b>71</b>38</div></div>
+              <div><div class="col"><i class="f" style="height:45%"></i><i class="h" style="bottom:45%;height:21%"></i><i class="m" style="bottom:66%"></i></div><div class="dl">F</div><div class="dv"><b>66</b>45</div></div>
+              <div><div class="col"><i class="f" style="height:50%"></i><i class="h" style="bottom:50%;height:30%"></i><i class="m" style="bottom:80%"></i></div><div class="dl">S</div><div class="dv"><b>80</b>50</div></div>
+              <div><div class="col"><i class="f" style="height:61%"></i><i class="h" style="bottom:61%;height:23%"></i><i class="m" style="bottom:84%"></i></div><div class="dl">S</div><div class="dv"><b>84</b>61</div></div>
+              <div><div class="col"><i class="f" style="height:35%"></i><i class="h" style="bottom:35%;height:41%"></i><i class="m" style="bottom:76%"></i></div><div class="dl">M</div><div class="dv"><b>76</b>35</div></div>
+              <div class="today"><div class="col"><i class="f" style="height:52%"></i><i class="h" style="bottom:52%;height:21%"></i><i class="m" style="bottom:73%"></i></div><div class="dl">T</div><div class="dv"><b>73</b>52 now</div></div>
+            </div>
+            <div class="win" style="justify-content:center"><span class="vs">Readiness vs</span><span>1d <em class="dn">↓3</em></span><span>7d <em class="eq">↓2</em></span><span class="s30">30d <em class="dn">↓5</em></span><span>90d <em class="eq">↓1</em></span></div>
+          </div>
+        </div>
+        <p class="why"><b>Why.</b> The tap answers both questions on one screen: where today's energy went (each event with its cost), and what built the morning number (the four contributions add up on screen to 73.4).</p>
+      </div>
+
+      <!-- ───────── 6. Pillar detail — Body ───────── -->
+      <div class="pane">
+        <div class="cap"><span class="chip rec">Pillar detail — Body</span><span class="w">tap the Body tile · 15:00</span></div>
+        <div class="phone">
+          <div class="sb"><span>15:00</span><span class="r">5G <span class="bat"><i></i></span></span></div>
+          <div class="scr">
+            <div class="back">‹ <b>Body</b><span class="r2">20% of readiness · +14.8</span></div>
+            <div class="bighead">
+              <span class="num">74</span>
+              <p><b>Fair, below your normal.</b> A slightly warm night and a short protein day pull it down. Six inputs, equal weight.</p>
+            </div>
+            <div class="win"><span class="vs">Body vs</span><span>1d <em class="up">↑2</em></span><span>7d <em class="dn">↓4</em></span><span class="s30">30d <em class="dn">↓8</em></span><span>90d <em class="dn">↓3</em></span></div>
+            <div class="sect">Inputs · each 0–100 against your own history</div>
+
+            <div class="comp">
+              <div class="h"><span class="nm">Temperature</span><span class="val">+0.3 °C</span><span class="ss">68</span></div>
+              <div class="bar"><i style="width:68%"></i></div>
+              <div class="win"><span class="vs">vs</span><span>1d <em class="dn">↑0.1</em></span><span>7d <em class="dn">↑0.2</em></span><span class="s30">30d <em class="dn">↑0.3</em></span><span>90d <em class="dn">↑0.2</em></span></div>
+            </div>
+            <div class="comp">
+              <div class="h"><span class="nm">Respiratory rate</span><span class="val">14.8 /min</span><span class="ss">78</span></div>
+              <div class="bar"><i style="width:78%"></i></div>
+              <div class="win"><span class="vs">vs</span><span>1d <em class="dn">↑0.2</em></span><span>7d <em class="dn">↑0.3</em></span><span class="s30">30d <em class="dn">↑0.6</em></span><span>90d <em class="dn">↑0.5</em></span></div>
+            </div>
+            <div class="comp">
+              <div class="h"><span class="nm">SpO₂</span><span class="val">96 % overnight</span><span class="ss">88</span></div>
+              <div class="bar"><i style="width:88%"></i></div>
+              <div class="win"><span class="vs">vs</span><span>1d <em class="eq">→0</em></span><span>7d <em class="dn">↓1</em></span><span class="s30">30d <em class="dn">↓1</em></span><span>90d <em class="eq">→0</em></span></div>
+            </div>
+            <div class="comp">
+              <div class="h"><span class="nm">Weight trend</span><span class="val">−0.2 kg/wk</span><span class="ss">84</span></div>
+              <div class="bar"><i style="width:84%"></i></div>
+              <div class="note">On your recomp pace of −0.21 kg/wk · lean mass held</div>
+              <div class="win"><span class="vs">vs</span><span>1d <em class="up">↓0.1 kg</em></span><span>7d <em class="up">↓0.2</em></span><span class="s30">30d <em class="up">↓0.9</em></span><span>90d <em class="up">↓2.4</em></span></div>
+            </div>
+            <div class="comp">
+              <div class="h"><span class="nm">Daytime stress</span><span class="val">52 min high</span><span class="ss">60</span></div>
+              <div class="bar"><i style="width:60%"></i></div>
+              <div class="win"><span class="vs">vs</span><span>1d <em class="dn">↑12 min</em></span><span>7d <em class="dn">↑8</em></span><span class="s30">30d <em class="dn">↑17</em></span><span>90d <em class="dn">↑14</em></span></div>
+            </div>
+            <div class="comp">
+              <div class="h"><span class="nm">Fuel</span><span class="val">so far today</span><span class="ss">66</span></div>
+              <div class="bar"><i style="width:66%"></i></div>
+              <div class="note">1,420 of 1,570 kcal · protein 96 / 130 g · water 1.2 / 2.5 L</div>
+              <div class="win"><span class="vs">protein by 15:00 vs</span><span>1d <em class="up">↑6 g</em></span><span>7d <em class="dn">↓9</em></span><span class="s30">30d <em class="dn">↓21</em></span><span>90d <em class="dn">↓15</em></span></div>
+            </div>
+            <div class="sum">(68 + 78 + 88 + 84 + 60 + 66) ÷ 6 = <b>74</b> · green arrow = better than that baseline, amber = worse.</div>
+          </div>
+        </div>
+        <p class="why"><b>Why.</b> Each input says how far it sits from <i>your</i> history, not a population norm. Only the 30-day window scores; 1d, 7d and 90d are there to show whether a dip is new, a week-long slide or a seasonal drift.</p>
+      </div>
+
+      <!-- ───────── 7. Still learning you ───────── -->
+      <div class="pane">
+        <div class="cap"><span class="chip alt">Still learning you</span><span class="w">new user · day 6 of 14 · 08:10</span></div>
+        <div class="phone">
+          <div class="sb"><span>08:10</span><span class="r">5G <span class="bat"><i></i></span></span></div>
+          <div class="scr">
+            <div class="hello"><h3>Home</h3><span>Tue 6 Oct</span></div>
+            <div class="hub">
+              <div class="hh"><span class="t" style="color:var(--c-ready)">Readiness</span><span class="band learn">Learning · day 6 of 14</span></div>
+              <div class="gauge">
+                <svg viewBox="0 0 180 180" aria-hidden="true">
+                  <defs><pattern id="drain-l" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2" height="4" fill="oklch(0.84 0.22 145 / .45)"/></pattern></defs>
+                  <circle cx="90" cy="90" r="70" fill="none" stroke="oklch(0.75 0 0 / .14)" stroke-width="12"/>
+                  <circle cx="90" cy="90" r="70" fill="none" stroke="url(#drain-l)" stroke-width="12" stroke-dasharray="8.80 439.82" stroke-dashoffset="-303.48" transform="rotate(-90 90 90)"/>
+                  <circle cx="90" cy="90" r="70" fill="none" stroke="oklch(0.84 0.22 145)" stroke-width="12" stroke-linecap="round" stroke-dasharray="303.48 439.82" transform="rotate(-90 90 90)"/>
+                  <line x1="31.89" y1="104.92" x2="12.51" y2="109.90" stroke="#60a5fa" stroke-width="3" stroke-linecap="round" stroke-dasharray="3 3"/>
+                  <circle cx="12.51" cy="109.90" r="3.2" fill="#60a5fa"/>
+                </svg>
+                <div class="in"><span class="k">Provisional</span><span class="big">71</span><span class="s">now 69</span></div>
+              </div>
+              <div class="learnbar" aria-label="6 of 14 nights"><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+              <p class="capline" style="margin-top:4px;font-size:11.5px">6 of 14 nights recorded</p>
+              <div class="tiles">
+                <div class="tile"><div class="nm"><span class="dot" style="background:var(--c-sleep)"></span>Sleep</div>
+                  <div class="sc"><b>78</b><small>30% · +23.4</small></div><div class="bar"><i style="width:78%;background:var(--c-sleep)"></i></div>
+                  <div class="y">7 h 18 m · scored on last night alone</div><span class="cv">›</span></div>
+                <div class="tile"><div class="nm"><span class="dot" style="background:var(--c-heart)"></span>Heart</div>
+                  <div class="sc"><b class="lw">learning</b></div><div class="bar"><i style="width:43%;background:repeating-linear-gradient(90deg,var(--c-heart) 0 3px,transparent 3px 5px)"></i></div>
+                  <div class="y">HRV and resting HR need your 14-night norm</div><span class="cv">›</span></div>
+                <div class="tile"><div class="nm"><span class="dot" style="background:var(--c-act)"></span>Activity</div>
+                  <div class="sc"><b>61</b><small>20% · +12.2</small></div><div class="bar"><i style="width:61%;background:var(--c-act)"></i></div>
+                  <div class="y">6,950 steps yesterday · load builds over 28 days</div><span class="cv">›</span></div>
+                <div class="tile"><div class="nm"><span class="dot" style="background:var(--c-body)"></span>Body</div>
+                  <div class="sc"><b class="lw">learning</b></div><div class="bar"><i style="width:43%;background:repeating-linear-gradient(90deg,var(--c-body) 0 3px,transparent 3px 5px)"></i></div>
+                  <div class="y">Temperature and breathing need a baseline</div><span class="cv">›</span></div>
+              </div>
+              <div class="win" style="justify-content:center;margin-top:10px"><span class="vs">Sleep vs</span><span>1d <em class="up">↑3</em></span><span>7d <em class="eq">6 days</em></span><span class="s30" style="opacity:.6">30d <em class="eq">learning</em></span><span>90d <em class="eq">—</em></span></div>
+              <div class="sum">(23.4 + 12.2) ÷ 50% = <b>71.2 → 71</b> · from 2 of 4 pillars until day 14</div>
+            </div>
+            <div class="explain"><b>Still learning you.</b> Scores firm up after 14 nights, once there's a normal to compare against. Until then readiness blends only the pillars that can be scored, and Heart and Body show "learning" instead of a guess.</div>
+          </div>
+        </div>
+        <p class="why"><b>Why.</b> A new user never sees a made-up 50. The ring works from day one and is marked provisional; each pillar switches from "learning" to a number on the night its own baseline is ready.</p>
+      </div>
+
+      <!-- ───────── 8. No ring connected ───────── -->
+      <div class="pane">
+        <div class="cap"><span class="chip alt">No ring connected</span><span class="w">no ring, no HR strap · 15:00</span></div>
+        <div class="phone">
+          <div class="sb"><span>15:00</span><span class="r">5G <span class="bat"><i></i></span></span></div>
+          <div class="scr">
+            <div class="hello"><h3>Home</h3><span>Tue 6 Oct</span></div>
+            <div class="hub">
+              <div class="hh"><span class="t" style="color:var(--c-ready)">Readiness</span><span class="band part">2 of 4 pillars</span><span class="when">updated 06:41</span></div>
+              <div class="gauge">
+                <svg viewBox="0 0 180 180" aria-hidden="true">
+                  <circle cx="90" cy="90" r="70" fill="none" stroke="oklch(0.75 0 0 / .14)" stroke-width="12"/>
+                  <circle cx="90" cy="90" r="70" fill="none" stroke="#60a5fa" stroke-width="12" stroke-linecap="round" stroke-dasharray="307.87 439.82" transform="rotate(-90 90 90)"/>
+                </svg>
+                <div class="in"><span class="k">Ready</span><span class="big">70</span><span class="s">from 2 of 4 pillars</span></div>
+              </div>
+              <p class="capline">Battery needs a heart-rate sensor</p>
+              <div class="legend"><span><i style="background:#60a5fa"></i>morning readiness only, no live fill</span></div>
+              <div class="tiles">
+                <div class="tile off"><div class="nm"><span class="dot" style="background:var(--c-sleep)"></span>Sleep</div>
+                  <div class="sc"><b>Connect a sensor</b></div>
+                  <div class="y">Needs a ring or watch overnight</div><span class="connect">Connect</span></div>
+                <div class="tile off"><div class="nm"><span class="dot" style="background:var(--c-heart)"></span>Heart</div>
+                  <div class="sc"><b>Connect a sensor</b></div>
+                  <div class="y">Needs HRV and resting HR</div><span class="connect">Connect</span></div>
+                <div class="tile"><div class="nm"><span class="dot" style="background:var(--c-act)"></span>Activity</div>
+                  <div class="sc"><b>65</b><small>20% · +13.0</small></div><div class="bar"><i style="width:65%;background:var(--c-act)"></i></div>
+                  <div class="y">Phone steps 8,412 · logged workouts</div><span class="cv">›</span></div>
+                <div class="tile"><div class="nm"><span class="dot" style="background:var(--c-body)"></span>Body</div>
+                  <div class="sc"><b>75</b><small>20% · +15.0</small></div><div class="bar"><i style="width:75%;background:var(--c-body)"></i></div>
+                  <div class="y">Weight 84 · fuel 66 · 2 of 6 inputs</div><span class="cv">›</span></div>
+              </div>
+              <div class="sum">(13.0 + 15.0) ÷ 40% = <b>70.0 → 70</b> · readiness from 2 of 4 pillars. Sleep and Heart are left out, not counted as zero or 50.</div>
+            </div>
+          </div>
+        </div>
+        <p class="why"><b>Why.</b> Without a sensor the app scores what it can see (steps, workouts, food, weight) and says how much of the picture that is. Body Battery is hidden rather than faked, since it runs on heart rate.</p>
       </div>
 
     </div>
