@@ -1,5 +1,6 @@
 import type { MealPlan } from '@trainingai/shared/types/nutrition'
 import type { NextSessionRecommendation } from '@trainingai/shared/types/program'
+import { trainingDayForDate } from '@trainingai/shared/workout/day-type'
 
 /**
  * Whether a plan has training/rest variants at all (LA-184).
@@ -13,33 +14,19 @@ export function isSplitPlan(plan: MealPlan | null): boolean {
 }
 
 /**
- * Is `logDate` a training day? `undefined` means **unknown**, and that is a third answer rather
- * than a soft `false` (LA-184).
+ * Is `logDate` a training day, for choosing a split plan's variant? `undefined` means **unknown**,
+ * and `pickVariant` shows the rest variant for it, as it always has.
  *
- * `MealPlanSection` took `isTrainingDay?: boolean` from the day it was written and **no caller ever
- * passed it**, so a split plan showed its REST variant every day, training days included. This is
- * the caller.
- *
- * ⚠ **It can only answer for TODAY, and that is a property of the data rather than a shortcut
- * taken here.** `getNextSession(userId, timezone?)` has no date parameter — the whole recommendation
- * is about today — and the `next-session` cache key is `cachedFetchToday` for the same reason. The
- * owner's schedule makes this structural rather than incidental: measured in production
- * 2026-09-30, **all five of his programs are `type: 'rotation'` with `rest_after_n: 3` and ZERO
- * `schedule_days` rows**, so there is no weekly day-of-week map to read and a rotation's day type
- * for an arbitrary date depends on workout history the client does not hold. Answering per-date is
- * therefore a server change, filed as `LB-195`.
- *
- * ⚠ **`isRestDay: false` is NOT the same as "training day", and treating it as one was the trap.**
- * With no active program `getNextSession` returns `{ isRestDay: false, reason: 'No active program
- * configured' }` and no `session` — a claim about nothing. Only a recommendation that names a
- * session says today is a training day.
+ * LA-184 answered today only, because `getNextSession` takes no date. LB-195 adds PAST dates from
+ * workout history, which is a fact rather than a projection; a future date stays unknown. The rule
+ * itself lives beside the schedule logic in `@trainingai/shared/workout/day-type`, not here — this
+ * is the nutrition card's call into it.
  */
 export function trainingDayForPlanDate(
   logDate: string,
   today: string,
   rec: NextSessionRecommendation | null,
+  trainedDays: Record<string, string[]> | null = null,
 ): boolean | undefined {
-  if (logDate !== today || rec == null) return undefined
-  if (rec.isRestDay) return false
-  return rec.session != null ? true : undefined
+  return trainingDayForDate({ date: logDate, today, todayRecommendation: rec, trainedDays })
 }

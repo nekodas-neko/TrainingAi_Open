@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { nowDatetimeInTz } from '@trainingai/shared/date-utils'
 import type { FoodLogWithItem, MealPlan, MealType } from '@trainingai/shared/types/nutrition'
 import type { NextSessionRecommendation } from '@trainingai/shared/types/program'
-import { NEXT_SESSION_TTL } from '@trainingai/shared/cache-ttl'
+import { NEXT_SESSION_TTL, TTL_LONG } from '@trainingai/shared/cache-ttl'
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { isSplitPlan, trainingDayForPlanDate } from './plan-variant-day'
 import { usePlanMealLogging } from '@/app/nutrition/use-plan-meal-logging'
@@ -68,8 +68,16 @@ export function ActivePlanCard({
   const rec = useCachedValue<NextSessionRecommendation>(
     'next-session', '/api/next-session', NEXT_SESSION_TTL, { today: true, onError: () => {} },
   )
+  /**
+   * LB-195. A PAST day's type is a fact — did he train — and only the server's history holds it,
+   * so it comes from `streak-data`, the key the home streak already fetches and every workout write
+   * already invalidates (`TTL_LONG` there too: one TTL per key). A future day stays unknown.
+   */
+  const streak = useCachedValue<{ trainedDays: Record<string, string[]> }>(
+    'streak-data', '/api/streak-data', TTL_LONG, { onError: () => {} },
+  )
   const isTrainingDay = isSplitPlan(plan)
-    ? trainingDayForPlanDate(logDate, today, rec)
+    ? trainingDayForPlanDate(logDate, today, rec, streak?.trainedDays ?? null)
     : undefined
 
   // After `isTrainingDay`: the hook needs it to pick the variant it estimates against (BF-203a).
