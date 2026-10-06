@@ -29,7 +29,7 @@
  * through the admin read endpoint, and is not re-derived here.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { updateBaseline, type Baseline } from '@trainingai/shared/health/personal-baseline'
+import { updateBaseline, seedOrUpdateBaseline, type Baseline } from '@trainingai/shared/health/personal-baseline'
 import { temperatureDeviationCentiC } from '@trainingai/shared/health/temperature-baseline'
 import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite'
 import { TEMP_DEV_FEVER_LIMIT_C } from '@trainingai/shared/health/chronic-stress-assembly'
@@ -262,11 +262,10 @@ describe("TN-8's mask premise, asserted here because that entry asked for it her
 describe('the control: a history that is already correct', () => {
   // Deliberately equivalent — the same nights, folded with the seed the route itself would apply.
   // Every other case here would also pass against a route that rewrote all 28 rows unconditionally;
-  // this is the one that would not.
-  const seeded = (b: Baseline | null, sample: number, age: number): Baseline =>
-    b == null ? { meanX8: sample << 3, devX8: 0 } : updateBaseline(b, sample, age)
-
-  beforeEach(() => { getOuraDailySummary.mockResolvedValue(storedHistory(TEMPS, seeded)) })
+  // this is the one that would not. It folds through `seedOrUpdateBaseline` itself rather than a
+  // copy of it: a hand copy of the mean-only seed sat here until #2159 warmed the dev up, and the
+  // control then reported 27 changes against a route that was behaving correctly.
+  beforeEach(() => { getOuraDailySummary.mockResolvedValue(storedHistory(TEMPS, seedOrUpdateBaseline)) })
 
   it('finds nothing to change and writes nothing, even with dryRun=false', async () => {
     const res = await body(await call('?dryRun=false'))
