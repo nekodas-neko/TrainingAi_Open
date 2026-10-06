@@ -642,8 +642,9 @@ Live at the time of writing (2026-07-30):
   automatic action may depend on the filtering having worked.
 - **Dietary restrictions belong to the USER, not the plan.** Putting them on the plan means the
   next plan silently forgets an allergy.
-- **Single-field saves must read-merge first** — local upserts overwrite all columns by default;
-  copy `water-log-sheet`'s pattern, not `metric-log-sheet`'s.
+- **A partial save must merge** — most local upserts overwrite every column. `upsertBodyMetric`
+  merges for every caller; which other store methods merge, and which columns, is listed in
+  [`../../data-layer-rules.md`](../../data-layer-rules.md).
 - **The daily calorie target lives in `nutrition_targets.calories`.** `users.calorie_goal` is a
   denormalised mirror that the Health tab and Home tiles read, kept in step by write-through in
   both `/api/nutrition/targets` and `/api/user/goals`. They drifted 200 kcal apart in production
