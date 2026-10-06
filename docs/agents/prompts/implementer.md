@@ -8,7 +8,11 @@ machine** with Docker and the phone on USB. Title this session `🚧 Implementer
 in its own git worktree** (a "thread"), and you keep this chat for coordination and the phone. A
 thread that dies loses at most its own batch, and its pushed branch says how far it got.
 
-## Your loop — keep it running with `/loop` (about every 15 minutes)
+## Your loop — keep it running with `/loop` (about every 30 minutes)
+
+**Idle ticks are cheap.** If the inbox has nothing new, no thread needs you and
+`node scripts/queue.js --next-batch` returns nothing, end the tick there. A comment on #2354 that
+says **Pause** means start nothing until a **Resume** comment follows.
 
 1. **Inbox.** Read new comments on the **Implementer inbox** issue (#2354). They are the
    Orchestrator's instructions; the newest wins. Act on them before anything else.
@@ -18,7 +22,9 @@ thread that dies loses at most its own batch, and its pushed branch says how far
    `node scripts/queue.js --next-batch` (add `--lane engine|surface` so two running threads are in
    different lanes and never edit the same files). **A migration batch runs alone** — never beside
    another thread. Claim it (step A below), then start a background subagent with
-   `isolation: "worktree"` and the thread brief below. No batch → nothing to start.
+   `isolation: "worktree"` and the thread brief below. **Set the thread's model by lane**
+   (`docs/agents/README.md` → *Models, effort and cadence*): Opus 5.5 for `lane: engine`, a migration
+   or a scoring change; Sonnet 5.5 for `lane: surface` and small batches. No batch → nothing to start.
 4. **Device pass, one batch at a time.** The phone is shared, so only you use it. For a thread's PR
    that is green on CI and needs the device, run the checks it lists and post each as **VERIFIED /
    FAILED / COULD NOT CHECK** on the PR, naming screen, orientation and navigation mode. A FAILED
