@@ -1,6 +1,8 @@
 'use client'
 
 import { memo, useRef, useMemo } from 'react'
+import { useUserTimezone } from '@/components/shell/user-timezone-provider'
+import { dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -85,6 +87,7 @@ interface WindowDef { window: TimeWindow; fill: string; stroke: string; label: s
 
 function HrDayChartBase({ readings, date, workoutSessions = [], compact = false, showLegend, lineColor, sleepWindow, bucketMinutes, showBackfill, stressSeries, stressTimezone }: Props) {
   const scheme = useHeroColorScheme()
+  const tz = useUserTimezone()
   const isLight = scheme === 'light'
   const windowDefsRef = useRef<WindowDef[]>([])
   const shadingPlugin = useMemo((): Plugin<'line'> => ({
@@ -107,8 +110,10 @@ function HrDayChartBase({ readings, date, workoutSessions = [], compact = false,
 
   if (readings.length === 0) return null
 
-  const [y, m, d] = date.split('-').map(Number)
-  const midnightMs = new Date(y, m - 1, d, 0, 0, 0).getTime()
+  // #2519: the user's midnight on `date`, not the device's. `date` is the user's day, and the x axis
+  // is minutes since that midnight, so a device in another zone shifted every reading, the sleep
+  // band and the workout windows by the difference.
+  const midnightMs = dateStrMidnightInTz(date, tz).getTime()
 
   const smoothed     = toBuckets(readings, midnightMs, bucketMinutes)
   const backfill     = showBackfill ? interpolateGaps(smoothed) : []

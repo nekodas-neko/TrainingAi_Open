@@ -156,8 +156,8 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
 
   async function saveWalk() {
     const date = todayInTz(tz)
-    const startTime = msToHHMMInTz(startedAtMs)
-    const endTime = msToHHMMInTz(startedAtMs + actualSec * 1000)
+    const startTime = msToHHMMInTz(startedAtMs, tz)
+    const endTime = msToHHMMInTz(startedAtMs + actualSec * 1000, tz)
 
     // Treadmill walks save as the `treadmill` activity type (is_distance_based=false), so the
     // cardio aggregates that filter on a non-null distance/pace exclude them automatically —
