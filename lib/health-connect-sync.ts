@@ -106,6 +106,73 @@ export interface SyncPayload {
   dailyMetrics: DailyMetric[];
   exerciseSessions: ExerciseSession[];
   sleepRecords: SleepRecord[];
+  heartRateSamples?: HeartRateSample[];
+}
+
+/** One intraday heart-rate reading, at the source's own resolution. `at` is epoch ms. */
+export interface HeartRateSample { at: number; bpm: number }
+
+/** One request's share of the heart-rate series. Must not exceed the route's `MAX_HR_SAMPLES`. */
+export const HR_UPLOAD_CHUNK = 10_000
+/** Heart-rate requests per sync. The route allows 60 a minute, so a dense 30-day cold sync is
+ *  bounded rather than run into a 429 halfway; newest samples go first, so a cap drops the oldest. */
+export const HR_UPLOAD_MAX_CHUNKS = 20
+
+/**
+ * The samples inside the plugin's `HeartRateSeries` records, newest first (#2168).
+ *
+ * Field names are the patched converter's (`patches/@devmaxime__capacitor-health-connect.patch`,
+ * LA-115): each record carries `samples[]` of `{ time, beatsPerMinute }`, from `HeartRateRecord
+ * .Sample`'s `getTime(): Instant` and `getBeatsPerMinute(): long` in the pinned connect-client
+ * 1.1.0-alpha11. Before LA-115 the record came back as a `toString()` blob, which is why anything
+ * that does not have this shape is skipped rather than trusted — and a sample whose time does not
+ * parse or whose bpm is not a finite number is dropped here, never sent as NaN.
+ */
+export function flattenHeartRateRecords(records: unknown[]): HeartRateSample[] {
+  const out: HeartRateSample[] = []
+  for (const r of records) {
+    const samples = (r as { samples?: unknown } | null)?.samples
+    if (!Array.isArray(samples)) continue
+    for (const s of samples as Array<{ time?: unknown; beatsPerMinute?: unknown }>) {
+      const at = typeof s?.time === 'string' ? Date.parse(s.time) : NaN
+      const bpm = s?.beatsPerMinute
+      if (!Number.isFinite(at) || typeof bpm !== 'number' || !Number.isFinite(bpm)) continue
+      out.push({ at, bpm })
+    }
+  }
+  return out.sort((a, b) => b.at - a.at)
+}
+
+/** Split samples into request-sized chunks, keeping at most `maxChunks` of them. */
+export function chunkHeartRateSamples(
+  samples: HeartRateSample[], size: number = HR_UPLOAD_CHUNK, maxChunks: number = HR_UPLOAD_MAX_CHUNKS,
+): HeartRateSample[][] {
+  const chunks: HeartRateSample[][] = []
+  for (let i = 0; i < samples.length && chunks.length < maxChunks; i += size) {
+    chunks.push(samples.slice(i, i + size))
+  }
+  return chunks
+}
+
+/** Post the heart-rate series in chunks; stops at the first failure. The window is re-read on every
+ *  sync, so anything not sent this time goes next time while it is still inside the window. */
+async function uploadHeartRate(samples: HeartRateSample[]): Promise<{ sent: number; note?: string }> {
+  let sent = 0
+  for (const chunk of chunkHeartRateSamples(samples)) {
+    try {
+      const res = await fetch('/api/sync-health', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ heartRateSamples: chunk }),
+      })
+      if (!res.ok) return { sent, note: `heart rate stopped at sync-health ${res.status}` }
+    } catch (err) {
+      return { sent, note: `heart rate stopped: ${err instanceof Error ? err.message : String(err)}` }
+    }
+    sent += chunk.length
+  }
+  const left = samples.length - sent
+  return left > 0 ? { sent, note: `heart rate: ${left} older samples over the per-sync cap` } : { sent }
 }
 
 /**
@@ -225,14 +292,14 @@ export async function enrichActivityLogs(candidates: EnrichmentCandidate[], tz: 
   }
 }
 
-export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metrics: number; sessions: number; sleep: number; note?: string } | null> {
+export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metrics: number; sessions: number; sleep: number; heartRate: number; note?: string } | null> {
   const { Capacitor } = await import('@capacitor/core');
   if (!Capacitor.isNativePlatform()) return null;
 
   const { HealthConnect } = await import('@devmaxime/capacitor-health-connect');
 
   const { availability } = await HealthConnect.checkAvailability();
-  if (availability !== 'Available') return { metrics: 0, sessions: 0, sleep: 0, note: `HC ${availability}` };
+  if (availability !== 'Available') return { metrics: 0, sessions: 0, sleep: 0, heartRate: 0, note: `HC ${availability}` };
 
   const perms = await HealthConnect.requestPermissions({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -445,23 +512,43 @@ export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metr
     } catch { /* ignore */ }
   }
 
-  const dailyMetrics = Object.values(dayBuckets);
-  if (!dailyMetrics.length && !exerciseSessions.length && !sleepRecords.length) {
-    localStorage.setItem(LAST_SYNC_KEY, end.toISOString());
-    return { metrics: 0, sessions: 0, sleep: 0, note: 'no data from HC' };
+  // ── Heart-rate series (#2168) ─────────────────────────────────────────────
+  // Into the shared HR table, where a ring or strap row covering the same minutes wins at read time
+  // and this one is kept. The read is not wrapped in a silent catch like the ones above: a
+  // HeartRateSeries read that fails while the permission is granted is a fault worth a log line.
+  let heartRateSamples: HeartRateSample[] = [];
+  if (canRead.has('HeartRateSeries')) {
+    try {
+      const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type: 'HeartRateSeries' });
+      heartRateSamples = flattenHeartRateRecords(records);
+    } catch (err) {
+      console.warn('[health-connect] HeartRateSeries read failed:', err);
+    }
   }
 
-  const res = await fetch('/api/sync-health', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ dailyMetrics, exerciseSessions, sleepRecords } satisfies SyncPayload),
-  });
+  const dailyMetrics = Object.values(dayBuckets);
+  const hasDaily = dailyMetrics.length > 0 || exerciseSessions.length > 0 || sleepRecords.length > 0;
+  if (!hasDaily && !heartRateSamples.length) {
+    localStorage.setItem(LAST_SYNC_KEY, end.toISOString());
+    return { metrics: 0, sessions: 0, sleep: 0, heartRate: 0, note: 'no data from HC' };
+  }
 
-  if (!res.ok) throw new Error(`sync-health ${res.status}: ${await res.text()}`);
+  let enrichmentCandidates: EnrichmentCandidate[] | undefined;
+  if (hasDaily) {
+    const res = await fetch('/api/sync-health', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dailyMetrics, exerciseSessions, sleepRecords } satisfies SyncPayload),
+    });
+
+    if (!res.ok) throw new Error(`sync-health ${res.status}: ${await res.text()}`);
+    ({ enrichmentCandidates } = await res.json() as { enrichmentCandidates?: EnrichmentCandidate[] });
+  }
 
   localStorage.setItem(LAST_SYNC_KEY, end.toISOString());
 
-  const { enrichmentCandidates } = await res.json() as { enrichmentCandidates?: EnrichmentCandidate[] };
+  const heartRate = await uploadHeartRate(heartRateSamples);
+
   if (enrichmentCandidates?.length) {
     // `tz`, not the default — this call is INSIDE `syncHealthConnect`, so the timezone the caller
     // passed is already in scope and dropping it here would leave enrichment bucketing in Brisbane
@@ -469,5 +556,8 @@ export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metr
     try { await enrichActivityLogs(enrichmentCandidates, tz); } catch { /* ignore */ }
   }
 
-  return { metrics: dailyMetrics.length, sessions: exerciseSessions.length, sleep: sleepRecords.length };
+  return {
+    metrics: dailyMetrics.length, sessions: exerciseSessions.length, sleep: sleepRecords.length,
+    heartRate: heartRate.sent, ...(heartRate.note ? { note: heartRate.note } : {}),
+  };
 }
