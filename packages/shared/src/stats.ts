@@ -25,6 +25,23 @@ export function quantile(values: number[], q: number): number | null {
 }
 
 /**
+ * The "is this value strange?" band: median, and the interquartile range widened by `multiplier`
+ * IQRs on each side (`p25 − k·IQR`, `p75 + k·IQR`). Empty → null.
+ *
+ * Median and IQR rather than mean and sd because the distributions it judges are bounded and
+ * skewed, and one bad day must not widen the band that judges the next. Shared by the sleep and
+ * readiness verdicts so the two outlier rules cannot drift into two definitions of one band.
+ */
+export function iqrBand(values: number[], multiplier: number): { median: number; low: number; high: number } | null {
+  const p25 = quantile(values, 0.25)
+  const p75 = quantile(values, 0.75)
+  const mid = median(values)
+  if (p25 === null || p75 === null || mid === null) return null
+  const iqr = p75 - p25
+  return { median: mid, low: p25 - multiplier * iqr, high: p75 + multiplier * iqr }
+}
+
+/**
  * The LOWER of the two middle values on an even count — `torch.median`'s definition, and an
  * actually-observed value rather than one invented between two. Empty → null.
  *

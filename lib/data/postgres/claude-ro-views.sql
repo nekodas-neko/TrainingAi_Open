@@ -1222,6 +1222,27 @@ SELECT
 FROM public.progression_styles t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
+CREATE VIEW claude_ro.readiness_verdicts AS
+SELECT
+  t.id,
+  t.user_id,
+  t.date,
+  t.verdict,
+  t.score,
+  t.band_median,
+  t.band_low,
+  t.band_high,
+  t.baseline_days,
+  t.baseline_same_version_days,
+  t.contributors,
+  t.readiness_model_version,
+  t.model_version,
+  t.response_state,
+  t.created_at,
+  t.updated_at
+FROM public.readiness_verdicts t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.rest_days AS
 SELECT
   t.id,

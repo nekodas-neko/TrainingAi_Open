@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { lowerMedian, median, quantile } from '@trainingai/shared/stats'
+import { iqrBand, lowerMedian, median, quantile } from '@trainingai/shared/stats'
 
 describe('median', () => {
   it('averages the two middle values on an even count', () => {
@@ -87,5 +87,21 @@ describe('lowerMedian', () => {
 
   it('returns null for empty — the callers that need NaN convert it themselves', () => {
     expect(lowerMedian([])).toBe(null)
+  })
+})
+
+describe('iqrBand', () => {
+  it('widens the interquartile range by the multiplier on each side', () => {
+    // p25 = 2, p75 = 4, IQR = 2.
+    expect(iqrBand([1, 2, 3, 4, 5], 1)).toEqual({ median: 3, low: 0, high: 6 })
+    expect(iqrBand([1, 2, 3, 4, 5], 0.5)).toEqual({ median: 3, low: 1, high: 5 })
+  })
+
+  it('collapses to the median when every value is equal', () => {
+    expect(iqrBand([7, 7, 7], 1)).toEqual({ median: 7, low: 7, high: 7 })
+  })
+
+  it('returns null for empty rather than a band at zero', () => {
+    expect(iqrBand([], 1)).toBe(null)
   })
 })

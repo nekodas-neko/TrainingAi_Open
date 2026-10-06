@@ -20,7 +20,7 @@
 // It computes nothing about the owner's opinion and must never be mistaken for it: an auto-filled
 // value writes `touched: false`, and only a correction writes `touched: true` (TN-57).
 
-import { median, quantile } from '@trainingai/shared/stats'
+import { iqrBand } from '@trainingai/shared/stats'
 import { msToHHMMInTz, toAestDay, daysBetweenDateStrs, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 
 /**
@@ -136,17 +136,8 @@ const POOR_SIDE: Record<SleepComponent, 'low' | 'high'> = {
 
 function bandFor(values: number[]): ComponentBand | null {
   if (values.length < VERDICT_BASELINE_NIGHTS) return null
-  const p25 = quantile(values, 0.25)
-  const p75 = quantile(values, 0.75)
-  const mid = median(values)
-  if (p25 === null || p75 === null || mid === null) return null
-  const iqr = p75 - p25
-  return {
-    median: mid,
-    low: p25 - VERDICT_IQR_MULTIPLIER * iqr,
-    high: p75 + VERDICT_IQR_MULTIPLIER * iqr,
-    nights: values.length,
-  }
+  const band = iqrBand(values, VERDICT_IQR_MULTIPLIER)
+  return band ? { ...band, nights: values.length } : null
 }
 
 /** A stored sleep session, reduced to what the verdict reads. `undefined` and `null` both mean
