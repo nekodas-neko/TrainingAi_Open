@@ -779,6 +779,22 @@ SELECT
 FROM public.oura_ble_clock_anchors t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
+CREATE VIEW claude_ro.oura_ble_link_stats AS
+SELECT
+  t.id,
+  t.user_id,
+  t.recorded_at,
+  t.service_started_at,
+  t.service_uptime_ms,
+  t.state,
+  t.connect_count,
+  t.drop_count,
+  t.total_connected_ms,
+  t.last_time_to_connect_ms,
+  t.consecutive_failures
+FROM public.oura_ble_link_stats t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.oura_ble_rekey_declarations AS
 SELECT
   t.id,

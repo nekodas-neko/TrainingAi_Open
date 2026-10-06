@@ -1644,6 +1644,23 @@ export const strapStatus = pgTable('strap_status', {
   worn:                boolean('worn'),
 })
 
+// #2469 (migration 202610061553). `OuraRingService`'s link counters, which it kept in memory only.
+// Cumulative since `serviceStartedAt` — they reset with the service, so a reader groups by that
+// instant (seconds tolerance) and differences within a group. `recordedAt` is server-stamped.
+export const ouraBleLinkStats = pgTable('oura_ble_link_stats', {
+  id:                   bigserial('id', { mode: 'number' }).primaryKey(),
+  userId:               uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  recordedAt:           timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+  serviceStartedAt:     timestamp('service_started_at', { withTimezone: true }).notNull(),
+  serviceUptimeMs:      bigint('service_uptime_ms', { mode: 'number' }).notNull(),
+  state:                text('state').notNull(),
+  connectCount:         integer('connect_count').notNull(),
+  dropCount:            integer('drop_count').notNull(),
+  totalConnectedMs:     bigint('total_connected_ms', { mode: 'number' }).notNull(),
+  lastTimeToConnectMs:  integer('last_time_to_connect_ms'),
+  consecutiveFailures:  integer('consecutive_failures'),
+})
+
 // One (anchor_ds ↔ anchor_utc) correspondence per ring-clock epoch (migration 115).
 // A ring reset (re-key / dead battery) starts a new epoch → a new row; older rows
 // keep dating their epoch's samples via created_at ordering.

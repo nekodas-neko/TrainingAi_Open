@@ -32,6 +32,7 @@ import { getStepOrchestrator } from '@/lib/oura-ble/step-orchestrator';
 import { getContinuousCapture, isContinuousCaptureEnabled } from '@/lib/oura-ble/continuous-capture';
 import { getOuraBle } from '@/lib/oura-ble/plugin';
 import { readRollupState, announceOuraSynced, syncOuraRingIfStale } from '@/lib/oura-ble/sync';
+import { reportRingLinkStats, LINK_STATS_PERIOD_MS } from '@/lib/oura-ble/link-stats';
 import { waitForRollup, type RollupState } from '@/lib/oura-ble/rollup-wait';
 
 interface CacheTask {
@@ -253,6 +254,29 @@ export function SyncProvider({ userId }: SyncProviderProps) {
     })();
 
     return () => { handle?.remove(); };
+  }, [userId]);
+
+  // #2469: the ring link's connect/drop/connected-time counters, posted on open, resume and hourly
+  // while open (throttled inside). Read-only — it calls getStatus() and nothing else on the plugin.
+  useEffect(() => {
+    if (!userId) return;
+
+    let handle: { remove: () => void } | undefined;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    let cancelled = false;
+    const report = () => { void reportRingLinkStats(); };
+
+    (async () => {
+      const { Capacitor } = await import('@capacitor/core');
+      if (cancelled || !Capacitor.isNativePlatform()) return;
+      report();
+      timer = setInterval(report, LINK_STATS_PERIOD_MS);
+      const { App } = await import('@capacitor/app');
+      handle = await App.addListener('resume', report);
+      if (cancelled) handle.remove();
+    })();
+
+    return () => { cancelled = true; handle?.remove(); if (timer) clearInterval(timer); };
   }, [userId]);
 
   // Reconcile meal reminder notifications on app open and on resume from background

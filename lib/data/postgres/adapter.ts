@@ -64,7 +64,7 @@ import {
 import { sleepImplausibleReason } from '@trainingai/shared/validation/plausibility'
 import { ActivityLogBody, deriveEndTime } from '@trainingai/shared/validation/activity-log'
 import { describeZodFailure } from './push-error-detail'
-import type { WorkoutRepository, UserGoals, EnsuredWorkoutSession, SessionLoad, YearReviewTotals, YearReviewTopExercise, UnitFixResult, SyncDelta, IncomingMutation, PushResult, OuraRawSampleInput, OuraRawSampleSummary, OuraRawSampleLatest, OuraRawSampleRow, FitnessTest, RunningPlan, PrescribedRun, PrescribedRunUpdate, AiCallLogInput, AiCallUsageSummary, ScaleRawSampleInput, ScalePendingSample, LastRealOneRm, BloodPanel, BloodPanelInput, BloodAnalyte, StrapStatusWrite, StrapStatusRow } from '../repository'
+import type { WorkoutRepository, UserGoals, EnsuredWorkoutSession, SessionLoad, YearReviewTotals, YearReviewTopExercise, UnitFixResult, SyncDelta, IncomingMutation, PushResult, OuraRawSampleInput, OuraRawSampleSummary, OuraRawSampleLatest, OuraRawSampleRow, FitnessTest, RunningPlan, PrescribedRun, PrescribedRunUpdate, AiCallLogInput, AiCallUsageSummary, ScaleRawSampleInput, ScalePendingSample, LastRealOneRm, BloodPanel, BloodPanelInput, BloodAnalyte, StrapStatusWrite, StrapStatusRow, OuraLinkStatsWrite } from '../repository'
 import { FitnessTestBody } from '@trainingai/shared/validation/fitness-test'
 import { PrescribedRunPatchBody } from '@trainingai/shared/validation/prescribed-run'
 import type {
@@ -6399,6 +6399,23 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       lastBatteryPollPrune = now
       this.db.execute(sql`DELETE FROM oura_ble_battery_poll WHERE measured_at < now() - interval '90 days'`).catch(err => console.error('[prune] oura_ble_battery_poll failed:', err))
     }
+  }
+
+  // #2469. Unpruned, like `strap_status`: the client posts at most hourly while the app is open, so
+  // the table grows by a few rows a day, and its value is looking back over a churn window nobody
+  // knew to watch. A retention prune is a delete, which is the owner's call, not this PR's.
+  async insertOuraLinkStats(userId: string, stats: OuraLinkStatsWrite): Promise<void> {
+    await this.db.insert(s.ouraBleLinkStats).values({
+      userId,
+      serviceStartedAt: stats.serviceStartedAt,
+      serviceUptimeMs: stats.serviceUptimeMs,
+      state: stats.state,
+      connectCount: stats.connectCount,
+      dropCount: stats.dropCount,
+      totalConnectedMs: stats.totalConnectedMs,
+      lastTimeToConnectMs: stats.lastTimeToConnectMs,
+      consecutiveFailures: stats.consecutiveFailures,
+    })
   }
 
   // TN-54. Deliberately unpruned for now: the whole table is a handful of rows per day and its

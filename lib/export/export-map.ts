@@ -183,6 +183,7 @@ export const EXCLUDED: Record<string, Exclusion> = {
   error_events: { category: 'ops', reason: 'fault telemetry, pruned at 30 days' },
   feedback_submissions: { category: 'ops', reason: 'support tickets, not part of the user\'s record' },
   oura_ble_battery_poll: { category: 'ops', reason: 'ring battery poll bookkeeping' },
+  oura_ble_link_stats: { category: 'ops', reason: 'ring link connect/drop counters (#2469)' },
   oura_ble_clock_anchors: { category: 'ops', reason: 'ring-epoch↔UTC anchors; decoder state' },
   oura_ble_rekey_declarations: { category: 'ops', reason: 'ring re-key bookkeeping' },
   oura_bucket: { category: 'ops', reason: 'rollup working set' },
