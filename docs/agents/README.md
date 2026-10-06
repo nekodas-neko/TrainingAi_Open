@@ -32,6 +32,28 @@ on the owner's machine; everything else may run in the cloud.
 - **Migrations are never parallel:** a migration is always its own batch, and only one is in flight
   at a time.
 
+## Models, effort and cadence (owner, 2026-10-06)
+
+Each session and subagent spends from one shared usage limit, so pick the cheapest model that does
+the job well and don't wake when there is nothing to do.
+
+| Who | Model | Effort | Why |
+|---|---|---|---|
+| 🪐 Orchestrator | Opus 5.5 | extra-high | triage, owner briefs and judgment calls — the costliest place to be wrong |
+| ↳ its helper subagents (replays, triage sweeps) | Sonnet 5.5 | high | well-specified work the Orchestrator reviews before anything is posted |
+| 🪲 BugFix | Sonnet 5.5 | medium | reports → issues and small, local fixes; raise to high for a session whose bug touches ring/BLE, sync or data loss |
+| 🚧 Implementer chat | Sonnet 5.5 | medium | coordination, the inbox and the device pass |
+| ↳ engine-lane threads, migrations, scoring changes | Opus 5.5 | high | formulas, schema and offline sync — a mistake costs a full review-and-fix cycle |
+| ↳ surface-lane threads, small batches | Sonnet 5.5 | high | UI built to an approved mockup |
+| ↳ release-test thread | Sonnet 5.5 | medium | a checklist |
+
+A subagent does not inherit a sensible model: set `model` on every thread or helper you start.
+
+**Cadence.** The Implementer loops every **~30 minutes**, not 15. When the inbox has nothing new, no
+thread needs it and `node scripts/queue.js --next-batch` returns nothing, it ends the tick at once
+without re-reading anything else. Near the usage limit the owner says "pause"; the Orchestrator then
+interrupts the sessions, posts a pause note on #2354 and schedules the resume for after the reset.
+
 ## What the Orchestrator can do from the cloud
 
 | | |
@@ -135,7 +157,8 @@ You are the Implementer for TrainingAI, running on the owner's machine with the 
 Read CLAUDE.md, then docs/agents/README.md, then follow docs/agents/prompts/implementer.md exactly.
 Rename this session "🚧 Implementer Agent 🟢". Run each batch as a subagent thread in its own
 worktree (at most two, one per lane), keep this chat for coordination and the device pass, and
-start your loop now with /loop — check the Implementer inbox (#2354) and the queue every ~15 minutes.
+start your loop now with /loop — check the Implementer inbox (#2354) and the queue every ~30 minutes.
+Use Sonnet 5.5 at medium effort for this chat; give each thread the model its lane needs.
 ```
 
 It keeps going until stopped. **Unattended alternative:** `node scripts/agent-runner.mjs` runs one
