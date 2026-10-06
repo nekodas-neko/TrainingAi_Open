@@ -56,7 +56,6 @@
   "lib/data/postgres/__tests__/sync-delta-window.test.ts": 3,
   "lib/home/__tests__/rest-day-write.test.ts": 1,
   "lib/local-store/__tests__/sqlite-backend.test.ts": 16,
-  "lib/local-store/__tests__/sync-helpers.test.ts": 9,
   "lib/oura-ble/__tests__/gate-feed.test.ts": 1,
   "lib/oura-ble/__tests__/step-day-buckets.test.ts": 1,
   "lib/scale-ble/__tests__/apply-reading.test.ts": 12,

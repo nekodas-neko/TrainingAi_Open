@@ -17,6 +17,8 @@ import {
   DEFAULT_REPS,
   mroundStep,
   mroundStepUp,
+  prescribedBarWeights,
+  plannedWeightsPayload,
   weightStepFor,
   defaultRpeFromPct,
   applyDeloadReverts,
@@ -75,11 +77,10 @@ function computeInitialWeights(ex: WorkoutExercise | undefined, sets: number): n
     return Array.from({ length: sets }, () => 0);
   }
   const step = weightStepFor(ex?.equipment);
+  const prescribed = prescribedBarWeights(ex, sets);
   return Array.from({ length: sets }, (_, i) => {
-    if (ex?.progressionStyle && ex?.estimated1rm) {
-      const sc = ex.progressionStyle[i];
-      if (sc) return mroundStepUp(ex.estimated1rm * sc.pct / 100, step);
-    }
+    const bar = prescribed[i];
+    if (bar != null) return bar;
     if (ex?.target80 != null) return mroundStep(ex.target80, step);
     // Fallback for old logs that predate the target_80 column: derive from 1RM or last weight
     if (ex?.estimated1rm) return mroundStepUp(ex.estimated1rm * 0.8, step);
@@ -1261,6 +1262,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       // has no clean meaning (same reason interExerciseRestSec is gated above).
       prepTimeSec: ex.supersetGroup == null ? (prepSecRef.current ?? undefined) : undefined,
       progressionStyle: ex.progressionStyle ?? undefined,
+      plannedWeights: plannedWeightsPayload(ex, snapWeights.length), // #2445
       styleName: ex.styleName ?? undefined,
       styleId: ex.styleId,
       muscleGroups: ex.muscleGroups?.length ? ex.muscleGroups : undefined,

@@ -1063,6 +1063,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           plannedPct: set.plannedPct ?? null,
           plannedReps: set.plannedReps ?? null,
           plannedRestSec: set.plannedRestSec ?? null,
+          plannedWeightKg: set.plannedWeightKg ?? null,
         })))
         .onConflictDoUpdate({
           target: s.setLogs.id,
@@ -1081,6 +1082,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             plannedPct: sql`EXCLUDED.planned_pct`,
             plannedReps: sql`EXCLUDED.planned_reps`,
             plannedRestSec: sql`EXCLUDED.planned_rest_sec`,
+            plannedWeightKg: sql`EXCLUDED.planned_weight_kg`,
           },
         })
         .returning()
@@ -4629,6 +4631,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         plannedPct:    s.setLogs.plannedPct,
         plannedReps:   s.setLogs.plannedReps,
         plannedRestSec: s.setLogs.plannedRestSec,
+        plannedWeightKg: s.setLogs.plannedWeightKg,
         updatedAt:     s.setLogs.updatedAt,
         deletedAt:     s.setLogs.deletedAt,
       }).from(s.setLogs)

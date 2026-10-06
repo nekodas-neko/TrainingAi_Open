@@ -817,3 +817,48 @@ describe('D2 prep — Oura local read/write accessors (Phase-1 Task 1)', () => {
   })
 
 })
+
+// #2445: the prescribed bar has to land in the on-device row on every path that writes one — the
+// local log, and the pull — or the local store (the source of truth) silently loses it.
+describe('set_logs.planned_weight_kg (#2445)', () => {
+  beforeEach(() => { vi.clearAllMocks(); querySQL.mockResolvedValue([]) })
+
+  /** The value bound to `column` in the nth `INTO set_logs` statement. */
+  function boundSetLogValue(column: string, nth = 0): unknown {
+    const calls = runSQL.mock.calls.filter(c => /INTO set_logs/.test(String(c[0])))
+    const [sql, params] = calls[nth] as [string, unknown[]]
+    const cols = sql.slice(sql.indexOf('(') + 1, sql.indexOf(')')).split(',').map(c => c.trim())
+    return params[cols.indexOf(column)]
+  }
+
+  it('logWorkoutLocally writes the bar per set, null where none was sent', async () => {
+    await store.logWorkoutLocally({
+      sessionName: 'S', exercise: 'Skull Crusher', weights: [27.5, 25], sets: 2, reps: [10, 12],
+      workoutSessionId: '00000000-0000-4000-8000-000000000001',
+      plannedWeights: [27.5, null],
+    }, 'pending')
+    expect(boundSetLogValue('planned_weight_kg', 0)).toBe(27.5)
+    expect(boundSetLogValue('planned_weight_kg', 1)).toBeNull()
+  })
+
+  it('logWorkoutLocally writes null when the payload carries no plannedWeights', async () => {
+    await store.logWorkoutLocally({
+      sessionName: 'S', exercise: 'Curl', weights: [20], sets: 1, reps: [12],
+      workoutSessionId: '00000000-0000-4000-8000-000000000001',
+    }, 'pending')
+    expect(boundSetLogValue('planned_weight_kg')).toBeNull()
+  })
+
+  it('applyDelta carries the pulled bar into the local row', async () => {
+    await store.applyDelta({ setLogs: [{
+      id: 'sl-1', exerciseLogId: 'el-1', setNumber: 1, weightKg: 27.5, reps: 10,
+      setTimeSec: null, restTimeSec: null, intensityPct: null, useFor1rm: true,
+      setStartMs: null, setEndMs: null, rpe: null, plannedPct: 70.5, plannedReps: 10,
+      plannedRestSec: 90, plannedWeightKg: 27.5,
+      updatedAt: '2026-10-06T09:00:00.000Z', deletedAt: null, syncStatus: 'synced',
+    }] })
+    expect(boundSetLogValue('planned_weight_kg')).toBe(27.5)
+    expect(runSQL.mock.calls.map(c => String(c[0])).find(s => /INTO set_logs/.test(s)))
+      .toContain('planned_weight_kg=excluded.planned_weight_kg')
+  })
+})

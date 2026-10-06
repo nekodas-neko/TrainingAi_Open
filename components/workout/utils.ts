@@ -71,6 +71,27 @@ export function mroundStepUp(value: number, step: number): number {
   return Math.max(5, Math.min(250, Math.ceil(value / step) * step));
 }
 
+type BarInputs = Pick<WorkoutExercise, "exerciseType" | "progressionStyle" | "estimated1rm" | "equipment">;
+
+/** The bar the style prescribes for each set, after plate rounding — `null` where no style
+ *  percentage sets it (bodyweight, no 1RM yet, a set past the style's length). The workout screen
+ *  opens each set on this number, and `set_logs.planned_weight_kg` stores it (#2445), so the stored
+ *  prescription is the bar the lifter was shown. */
+export function prescribedBarWeights(ex: BarInputs | undefined, sets: number): (number | null)[] {
+  const style = ex?.progressionStyle;
+  const basis = ex?.estimated1rm;
+  if (ex?.exerciseType === "bodyweight" || !style || !basis) return Array.from({ length: sets }, () => null);
+  const step = weightStepFor(ex.equipment);
+  return Array.from({ length: sets }, (_, i) => (style[i] ? mroundStepUp(basis * style[i].pct / 100, step) : null));
+}
+
+/** `plannedWeights` for the log payload: omitted when no set had a prescribed bar, so a freeform
+ *  log stays bare. mroundStepUp's 5-250 clamp keeps every value inside the payload schema's bound. */
+export function plannedWeightsPayload(ex: BarInputs | undefined, sets: number): (number | null)[] | undefined {
+  const bars = prescribedBarWeights(ex, sets);
+  return bars.some((w) => w != null) ? bars : undefined;
+}
+
 // Same formula used everywhere sets/reps are initialized for an exercise —
 // progressionStyle's length is authoritative when present, else defaultSets.
 export function exerciseSetCount(ex: { progressionStyle?: { reps: number }[] | null; defaultSets?: number | null }): number {

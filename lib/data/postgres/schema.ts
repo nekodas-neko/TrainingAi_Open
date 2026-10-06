@@ -263,6 +263,10 @@ export const setLogs = pgTable('set_logs', {
   plannedPct:     doublePrecision('planned_pct'),
   plannedReps:    integer('planned_reps'),
   plannedRestSec: integer('planned_rest_sec'),
+  // #2445: the bar the app prescribed after plate rounding (`mroundStepUp`), which is heavier than
+  // `planned_pct` implies. NULL where no style percentage set the bar (bodyweight, freeform, extra
+  // sets) and on every row logged before the column existed.
+  plannedWeightKg: doublePrecision('planned_weight_kg'),
   updatedAt:     timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt:     timestamp('deleted_at', { withTimezone: true }),
 }, t => [unique().on(t.exerciseLogId, t.setNumber)])

@@ -87,7 +87,7 @@ describe('buildWorkoutLogPayload', () => {
   const session = {
     id: 'ws-9', sessionName: 'Session B', startedAt: '2026-06-30T08:30:00.000Z',
     completedAt: null, updatedAt: '2026-06-30T09:10:00.000Z', deletedAt: null,
-    syncStatus: 'pending' as const,
+    syncStatus: 'pending' as const, sessionRpe: null,
   }
   const exerciseLog = {
     id: 'el-9', workoutSessionId: 'ws-9', exerciseName: 'Squat',
@@ -99,10 +99,12 @@ describe('buildWorkoutLogPayload', () => {
       { id: 's-2', exerciseLogId: 'el-9', setNumber: 2, weightKg: 120, reps: 5,
         setTimeSec: 40, restTimeSec: 120, intensityPct: null, useFor1rm: true,
         setStartMs: null, setEndMs: null, rpe: 8, updatedAt: '2026-06-30T08:45:00.000Z',
+        plannedPct: null, plannedReps: null, plannedRestSec: null, plannedWeightKg: null,
         deletedAt: null, syncStatus: 'pending' as const },
       { id: 's-1', exerciseLogId: 'el-9', setNumber: 1, weightKg: 100, reps: 5,
         setTimeSec: 35, restTimeSec: 90, intensityPct: null, useFor1rm: false,
         setStartMs: null, setEndMs: null, rpe: null, updatedAt: '2026-06-30T08:45:00.000Z',
+        plannedPct: null, plannedReps: null, plannedRestSec: null, plannedWeightKg: null,
         deletedAt: null, syncStatus: 'pending' as const },
     ],
   }
@@ -213,6 +215,25 @@ describe('buildWorkoutLogPayload', () => {
       { pct: 75, reps: 5, restSec: 90, useFor1rm: false },
       { pct: 82.5, reps: 5, restSec: 120, useFor1rm: true },
     ])
+  })
+
+  // #2445: a stranded replay must re-send the bar it was given, or the server would store NULL.
+  it('#2445: replays the prescribed bar per set, keeping a null for a set that had none', () => {
+    const withBar = {
+      ...exerciseLog,
+      sets: [
+        { ...exerciseLog.sets[0], plannedWeightKg: 27.5 },
+        { ...exerciseLog.sets[1], plannedWeightKg: null },
+      ],
+    }
+    const { payload } = buildWorkoutLogPayload(session, withBar)
+    // Same set order as `weights` (sorted by set number), so index i is still set i.
+    expect(payload.plannedWeights).toEqual([null, 27.5])
+  })
+
+  it('#2445: omits plannedWeights when no set carries one (every row from before the column)', () => {
+    const { payload } = buildWorkoutLogPayload(session, exerciseLog)
+    expect(payload.plannedWeights).toBeUndefined()
   })
 })
 

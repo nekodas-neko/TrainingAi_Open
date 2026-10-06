@@ -133,6 +133,8 @@ export interface LocalSetLog {
   plannedPct:    number | null;
   plannedReps:   number | null;
   plannedRestSec: number | null;
+  /** #2445: the bar prescribed after plate rounding; null where no style percentage set it. */
+  plannedWeightKg: number | null;
   updatedAt:    string;
   deletedAt:    string | null;
   syncStatus:   'pending' | 'synced';
