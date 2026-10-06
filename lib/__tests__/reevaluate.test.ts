@@ -281,3 +281,52 @@ describe('reevaluatePrescriptionForToday — an applied prescription ages out (Q
     expect(result.changed).toBe(false)
   })
 })
+
+// #2402. `!isDeloaded && wasDeloaded && preDeload` reads as "the soreness or illness that deloaded
+// this exercise has cleared, put it back". That is right for a row THIS function deloaded. But a
+// whole-session deload (BF-198) and a deload PHASE (the rules fallback since #2512) also record
+// `deloaded` + `preDeload` per row, and nothing here is flagging those rows: per-exercise deloads
+// are off in a deload phase by design. So the very first read of the day turned a stored 2×6 @ 50%
+// back into 3×8 @ 75% and wrote it back, while the bar kept deloading it. The card then described
+// a session that never runs, which is the bug #2402 was filed for, arriving through a second door.
+describe('reevaluatePrescriptionForToday — a whole-session or phase deload is not "soreness cleared" (#2402)', () => {
+  const deloadedRow = (id: string) => ex(id, {
+    sets: 2, reps: 6, pct: 50, restSec: 120, deloaded: true,
+    preDeload: { sets: 3, reps: 8, pct: 75, restSec: 90 },
+  })
+
+  it('leaves the rows of a deload PHASE prescription deloaded', () => {
+    const prescription = { ...basePrescription([deloadedRow('bench'), deloadedRow('squat')]), phase: 'deload' as const, deload: true }
+    const result = reevaluatePrescriptionForToday(prescription, baseSignals, { ...baseState, phase: 'deload' })
+    expect(result.changed).toBe(false)
+    expect(result.prescription).toBe(prescription)
+    expect(result.prescription.exercises.every(e => e.deloaded === true && e.sets === 2 && e.pct === 50)).toBe(true)
+  })
+
+  it('leaves the rows of a whole-session deload prescription alone even before the phase flips', () => {
+    // An emergency deload is generated while the phase is still accumulation; accepting it flips
+    // the phase later. Until then the stored plan is the deload and must read as one.
+    const prescription = { ...basePrescription([deloadedRow('bench'), deloadedRow('squat')]), deload: true, phaseAction: 'deload_recommended' as const }
+    const result = reevaluatePrescriptionForToday(
+      prescription, baseSignals, { ...baseState, prescriptionStatus: 'auto_applied' },
+    )
+    expect(result.changed).toBe(false)
+    expect(result.prescription.exercises.every(e => e.deloaded === true)).toBe(true)
+  })
+
+  it('still reverts a per-exercise deload once its soreness clears (unchanged)', () => {
+    const prescription = basePrescription([deloadedRow('bench'), ex('squat')])
+    const result = reevaluatePrescriptionForToday(prescription, baseSignals, baseState)
+    expect(result.changed).toBe(true)
+    expect(result.prescription.exercises.find(e => e.sessionExerciseId === 'bench')).toMatchObject({ sets: 3, reps: 8, pct: 75, deloaded: false })
+  })
+
+  it('still refreshes the note on a deload-phase row that is flagged sore', () => {
+    // Per-exercise deloads are off in a deload phase, so nothing is flagged and nothing changes;
+    // the guard must not stop the other two branches from running for rows that ARE flagged.
+    const prescription = basePrescription([deloadedRow('bench'), ex('squat')])
+    const signals: ReevaluationSignals = { ...baseSignals, soreMusclesInSession: ['chest'] }
+    const result = reevaluatePrescriptionForToday(prescription, signals, baseState)
+    expect(result.prescription.exercises.find(e => e.sessionExerciseId === 'bench')!.deloaded).toBe(true)
+  })
+})
