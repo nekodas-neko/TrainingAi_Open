@@ -30,7 +30,7 @@ beforeEach(() => {
       id TEXT PRIMARY KEY, exercise_log_id TEXT NOT NULL, set_number INTEGER NOT NULL,
       weight_kg REAL NOT NULL, reps INTEGER NOT NULL, set_time_sec INTEGER, rest_time_sec INTEGER,
       intensity_pct REAL, use_for_1rm INTEGER NOT NULL DEFAULT 0, set_start_ms INTEGER, set_end_ms INTEGER,
-      rpe REAL, planned_pct REAL, planned_reps INTEGER, planned_rest_sec INTEGER,
+      rpe REAL, planned_pct REAL, planned_reps INTEGER, planned_rest_sec INTEGER, planned_weight_kg REAL,
       updated_at TEXT, synced INTEGER NOT NULL DEFAULT 0, sync_status TEXT, deleted_at TEXT);
     INSERT INTO workout_sessions VALUES ('ws-1', 'synced', '2026-09-20T00:00:00Z', NULL);
     INSERT INTO exercise_logs VALUES ('el-1', 'ws-1', 'synced', '2026-09-20T00:00:00Z', NULL);
