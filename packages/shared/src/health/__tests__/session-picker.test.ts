@@ -98,4 +98,34 @@ describe('recommendSession', () => {
     })
     expect(rec.reason).toContain('Z3')
   })
+
+  // #2337 — with nothing recording HR every zone reads fully open; the zeros are not a deficit.
+  describe('with no HR source', () => {
+    const noPlan = { hasPlan: false, runPending: false, prescriptionDurationMin: null, prescriptionType: null, gateAction: null, gateReasons: [] }
+    const open = quotaWith({ 2: { remainingMin: 108, status: 'open' } })
+
+    it('never claims a walk would dent a zone nothing can measure', () => {
+      const rec = recommendSession({ minutesAvailable: 30, runningPlan: noPlan, quota: { ...open, hasHrSource: false } })
+      expect(rec.modality).toBe('activity')
+      expect(rec.reason).not.toMatch(/Z\d/)
+      expect(rec.reason).toMatch(/heart-rate source/)
+      expect(rec.estimateMin).toBeUndefined()
+    })
+
+    it('answers exactly as before for a user WITH a source, and for an older payload without the flag', () => {
+      const before = recommendSession({ minutesAvailable: 30, runningPlan: noPlan, quota: open })
+      expect(recommendSession({ minutesAvailable: 30, runningPlan: noPlan, quota: { ...open, hasHrSource: true } })).toEqual(before)
+      expect(recommendSession({ minutesAvailable: 30, runningPlan: noPlan, quota: { ...open, hasHrSource: null } })).toEqual(before)
+      expect(before.modality).toBe('walk')
+    })
+
+    it('still lets a fitting prescribed run win — the run does not depend on zone minutes', () => {
+      const rec = recommendSession({
+        minutesAvailable: 30,
+        runningPlan: { ...noPlan, hasPlan: true, runPending: true, prescriptionDurationMin: 28, prescriptionType: 'easy', gateAction: 'proceed' },
+        quota: { ...open, hasHrSource: false },
+      })
+      expect(rec.modality).toBe('run')
+    })
+  })
 })

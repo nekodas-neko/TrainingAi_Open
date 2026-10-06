@@ -1,4 +1,4 @@
-import type { ZoneQuota } from './zone-quota'
+import { quotaHasNoHrSource, type ZoneQuota } from './zone-quota'
 import { HR_ZONE_META, type HrZone } from './hr-zones'
 
 // Recommends which cardio modality to open for a given time budget, combining the running
@@ -61,6 +61,15 @@ export function recommendSession(input: {
       rec.gate = { action: runningPlan.gateAction, reasons: runningPlan.gateReasons }
     }
     return rec
+  }
+
+  // #2337: with nothing recording heart rate every zone reads fully open, and "a walk would put a
+  // dent in your Z2 minutes" is a claim about a week nothing measured. Say what is true instead.
+  if (quotaHasNoHrSource(quota)) {
+    return {
+      modality: 'activity',
+      reason: 'Zone minutes need a heart-rate source, so there is no week to measure against — log whatever you feel like.',
+    }
   }
 
   const openZones = quota.zones.filter(

@@ -91,4 +91,21 @@ describe('recommendWalkPattern (TN-25)', () => {
     const q = quota(30)
     expect(recommendWalkPattern(q)).toEqual(recommendWalkPattern(q))
   })
+
+  // #2337 — an unmeasured Zone-2 gap is not an open one; intervals off no data is what `noTarget`
+  // already refuses.
+  it('walks for steps when there is no HR source, however open Zone 2 looks', () => {
+    const rec = recommendWalkPattern({ ...quota(60), hasHrSource: false }, { shortOnTime: true })
+    expect(rec.pattern).toBe(WALK_PATTERNS.easy_steps)
+    expect(rec.reason).toMatch(/heart-rate source/)
+    expect(rec.reason).not.toMatch(/\d+ min/)
+  })
+
+  it('answers exactly as before for a user WITH a source, and for an older payload without the flag', () => {
+    for (const open of [0, 30, 60]) {
+      const before = recommendWalkPattern(quota(open))
+      expect(recommendWalkPattern({ ...quota(open), hasHrSource: true })).toEqual(before)
+      expect(recommendWalkPattern({ ...quota(open), hasHrSource: null })).toEqual(before)
+    }
+  })
 })

@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz, todayMidnightUtc, toAestDay } from '@trainingai/shared/date-utils'
-import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
+import { resolveHrProfile, hasHrSource } from '@trainingai/shared/health/hr-profile'
 import { bucketZoneMinutesByWeek, buildEfficiencyCurve, buildCadenceTrend } from '@trainingai/shared/health/cardio-trends'
 
 const ZONE_WEEKS = 8
@@ -36,6 +36,8 @@ export async function GET() {
   return NextResponse.json(
     {
       weeklyZoneStacks: bucketZoneMinutesByWeek(days),
+      // #2337: all-zero stacks from a user with nothing recording HR are absence, not eight idle weeks.
+      hasHrSource: hasHrSource(profile),
       efficiencyCurve: buildEfficiencyCurve(runLogs),
       cadenceTrend: buildCadenceTrend(runLogs),
     },
