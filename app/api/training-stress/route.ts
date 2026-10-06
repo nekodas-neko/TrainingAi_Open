@@ -5,9 +5,11 @@ import type { WorkoutRepository } from '@/lib/data/repository'
 import { DEFAULT_TZ, todayInTz, normalizeDateParamIso, ageFromDob, dateStrMidnightInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 import { rateLimit } from '@/lib/rate-limit'
 import { computeTrainingStress, metGridFromDaytimeSamples, type TrainingStressResult } from '@trainingai/shared/health/training-stress'
+import { restingHrForDay, TRAINING_STRESS_RHR_WINDOW_DAYS } from '@trainingai/shared/health/training-stress-rhr'
 import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite'
 
-export type TrainingStressResponse = TrainingStressResult
+/** `rhrFromDay` is set only when the day had no resting heart rate of its own and an earlier one was used (#2401). */
+export type TrainingStressResponse = TrainingStressResult & { rhrFromDay?: string }
 
 // GET /api/training-stress?date=YYYY-MM-DD — assembles the day's OTS from our own derived
 // readiness + derived VO₂max + the ring's MET stream, persists it (best-effort) to
@@ -59,14 +61,15 @@ export async function GET(req: Request) {
 /** Computes one day's verdict and persists it, stamped with when it was computed (LA-170). */
 async function evaluateTrainingStressDay(
   repo: WorkoutRepository, userId: string, tz: string, date: string,
-): Promise<TrainingStressResult> {
+): Promise<TrainingStressResponse> {
   const dayStart = dateStrMidnightInTz(date, tz)
   const dayEnd = new Date(dayStart.getTime() + 86_400_000)
+  const rhrWindowStart = shiftDateStr(date, -TRAINING_STRESS_RHR_WINDOW_DAYS)
 
   const [derivedRows, summaryRows, bodyMetrics, user, daytime] = await Promise.all([
     repo.getOuraDailyDerived(userId, date, date),
     repo.getOuraDailySummary(userId, date, date),
-    repo.listBodyMetrics(userId, date, date),
+    repo.listBodyMetrics(userId, rhrWindowStart, date),
     repo.getUserById(userId),
     repo.getOuraDaytimeSignals(userId, dayStart, dayEnd),
   ])
@@ -76,7 +79,9 @@ async function evaluateTrainingStressDay(
   const readiness = derived?.readinessSource === 'ble-derived' ? derived.readinessScore : null
   const readinessProvisional = (summaryRows[0]?.nHistory ?? 0) < BASELINE_MIN_NIGHTS
 
-  const latestBm = bodyMetrics[bodyMetrics.length - 1] ?? null
+  // Weight stays the day's own; only the resting heart rate borrows from earlier days (#2401).
+  const latestBm = bodyMetrics.filter(m => m.date === date).at(-1) ?? null
+  const rhr = restingHrForDay(bodyMetrics, date, rhrWindowStart)
   const age = ageFromDob(user?.dateOfBirth, new Date())
 
   // Build a true 1-min MET grid keyed on each bin's wall-clock minute (J-6): non-wear/charger
@@ -89,11 +94,11 @@ async function evaluateTrainingStressDay(
     metsPerMinute: grid.metsPerMinute,
     age,
     sex: user?.sex ?? null,
-    rhr: latestBm?.restingHeartRate ?? null,
+    rhr: rhr?.value ?? null,
     readiness,
     readinessProvisional,
     vo2maxInputs: {
-      restingHr: latestBm?.restingHeartRate ?? null,
+      restingHr: rhr?.value ?? null,
       measuredMaxHr: null,
       age,
       sex: user?.sex ?? null,
@@ -124,5 +129,5 @@ async function evaluateTrainingStressDay(
   } catch (err) {
     console.error('[training-stress] persist failed (read still served):', err)
   }
-  return result
+  return rhr != null && rhr.day !== date ? { ...result, rhrFromDay: rhr.day } : result
 }
