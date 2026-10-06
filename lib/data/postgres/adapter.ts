@@ -64,7 +64,7 @@ import {
 import { sleepImplausibleReason } from '@trainingai/shared/validation/plausibility'
 import { ActivityLogBody, deriveEndTime } from '@trainingai/shared/validation/activity-log'
 import { describeZodFailure } from './push-error-detail'
-import type { WorkoutRepository, UserGoals, EnsuredWorkoutSession, SessionLoad, YearReviewTotals, YearReviewTopExercise, UnitFixResult, SyncDelta, IncomingMutation, PushResult, OuraRawSampleInput, OuraRawSampleSummary, OuraRawSampleLatest, OuraRawSampleRow, FitnessTest, RunningPlan, PrescribedRun, PrescribedRunUpdate, AiCallLogInput, AiCallUsageSummary, ScaleRawSampleInput, ScalePendingSample, LastRealOneRm, BloodPanel, BloodPanelInput, BloodAnalyte, StrapStatusWrite, StrapStatusRow, OuraLinkStatsWrite } from '../repository'
+import type { WorkoutRepository, UserGoals, EnsuredWorkoutSession, SessionLoad, YearReviewTotals, YearReviewTopExercise, UnitFixResult, SyncDelta, IncomingMutation, PushResult, OuraRawSampleInput, OuraRawSampleSummary, OuraRawSampleLatest, OuraRawSampleRow, FitnessTest, RunningPlan, PrescribedRun, PrescribedRunUpdate, AiCallLogInput, AiCallUsageSummary, ScaleRawSampleInput, ScalePendingSample, LastRealOneRm, BloodPanel, BloodPanelInput, BloodAnalyte, StrapStatusWrite, StrapStatusRow, OuraLinkStatsWrite, DetectionEventWrite } from '../repository'
 import { FitnessTestBody } from '@trainingai/shared/validation/fitness-test'
 import { PrescribedRunPatchBody } from '@trainingai/shared/validation/prescribed-run'
 import type {
@@ -6405,6 +6405,19 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   // #2469. Unpruned, like `strap_status`: the client posts at most hourly while the app is open, so
   // the table grows by a few rows a day, and its value is looking back over a churn window nobody
   // knew to watch. A retention prune is a delete, which is the owner's call, not this PR's.
+  // #2478. Insert-only and idempotent: the conflict target includes user_id, so a client-supplied
+  // detection id can only ever name this user's own rows, and a repeat is skipped rather than
+  // updated. Unpruned for now, like `oura_ble_link_stats`: a few rows per probe, and a prune is a
+  // delete, which is the owner's call.
+  async insertDetectionEvents(userId: string, events: DetectionEventWrite[]): Promise<number> {
+    if (events.length === 0) return 0
+    const inserted = await this.db.insert(s.detectionEvents)
+      .values(events.map(e => ({ userId, ...e })))
+      .onConflictDoNothing({ target: [s.detectionEvents.userId, s.detectionEvents.detectionId, s.detectionEvents.kind] })
+      .returning({ id: s.detectionEvents.id })
+    return inserted.length
+  }
+
   async insertOuraLinkStats(userId: string, stats: OuraLinkStatsWrite): Promise<void> {
     await this.db.insert(s.ouraBleLinkStats).values({
       userId,

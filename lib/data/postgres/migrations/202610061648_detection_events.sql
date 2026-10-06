@@ -32,13 +32,13 @@ CREATE TABLE IF NOT EXISTS detection_events (
   occurred_at       TIMESTAMPTZ NOT NULL,
   recorded_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   -- What armed or confirmed the detection: 'ring' or 'sensor'.
-  trigger           TEXT,
+  trigger_source    TEXT,
   activity_type     TEXT,
   session_start_at  TIMESTAMPTZ,
-  distance_m        REAL,
-  elapsed_sec       REAL,
+  distance_m        DOUBLE PRECISION,
+  elapsed_sec       DOUBLE PRECISION,
   point_count       INTEGER,
-  avg_speed_ms      REAL
+  avg_speed_ms      DOUBLE PRECISION
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS detection_events_user_detection_kind_uq

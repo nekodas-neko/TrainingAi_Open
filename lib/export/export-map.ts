@@ -75,6 +75,7 @@ export const EXPORTED: Record<string, ExportScope> = {
   daily_zone_minutes: { kind: 'user_id' },
   health_connect_intervals: { kind: 'user_id' },
   day_checkins: { kind: 'user_id' },
+  detection_events: { kind: 'user_id' },
   dexa_scans: { kind: 'user_id' },
   exercise_estimates: { kind: 'user_id' },
   fitness_tests: { kind: 'user_id' },

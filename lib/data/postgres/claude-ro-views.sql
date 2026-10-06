@@ -351,6 +351,25 @@ SELECT
   t.caller_ip
 FROM public.db_query_log t;
 
+CREATE VIEW claude_ro.detection_events AS
+SELECT
+  t.id,
+  t.user_id,
+  t.detection_id,
+  t.kind,
+  t.gate,
+  t.occurred_at,
+  t.recorded_at,
+  t.trigger_source,
+  t.activity_type,
+  t.session_start_at,
+  t.distance_m,
+  t.elapsed_sec,
+  t.point_count,
+  t.avg_speed_ms
+FROM public.detection_events t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.dexa_scan_regions AS
 SELECT
   t.id,

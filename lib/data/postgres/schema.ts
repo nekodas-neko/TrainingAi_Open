@@ -1661,6 +1661,30 @@ export const ouraBleLinkStats = pgTable('oura_ble_link_stats', {
   consecutiveFailures:  integer('consecutive_failures'),
 })
 
+// #2478 (migration 202610061648). Walk auto-detection's funnel, one row per kind per detection:
+// candidate → confirmed → notified → offered → saved | dismissed, each with the gate that decided
+// it. `detectionId` is minted on the phone when a probe starts; (user, detection, kind) is the
+// natural key, so a retried post inserts nothing new. `occurredAt` is device time.
+export const detectionEvents = pgTable('detection_events', {
+  id:             bigserial('id', { mode: 'number' }).primaryKey(),
+  userId:         uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  detectionId:    uuid('detection_id').notNull(),
+  kind:           text('kind').notNull(),
+  gate:           text('gate').notNull(),
+  occurredAt:     timestamp('occurred_at', { withTimezone: true }).notNull(),
+  recordedAt:     timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+  triggerSource:  text('trigger_source'),
+  activityType:   text('activity_type'),
+  sessionStartAt: timestamp('session_start_at', { withTimezone: true }),
+  distanceM:      doublePrecision('distance_m'),
+  elapsedSec:     doublePrecision('elapsed_sec'),
+  pointCount:     integer('point_count'),
+  avgSpeedMs:     doublePrecision('avg_speed_ms'),
+}, t => [
+  uniqueIndex('detection_events_user_detection_kind_uq').on(t.userId, t.detectionId, t.kind),
+  index('detection_events_user_time_idx').on(t.userId, t.occurredAt),
+])
+
 // One (anchor_ds ↔ anchor_utc) correspondence per ring-clock epoch (migration 115).
 // A ring reset (re-key / dead battery) starts a new epoch → a new row; older rows
 // keep dating their epoch's samples via created_at ordering.
