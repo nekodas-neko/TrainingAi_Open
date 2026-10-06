@@ -12,7 +12,8 @@ import { omitNullFields } from '@/lib/local-store/sync-helpers'
 import dynamic from 'next/dynamic'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { toast } from 'sonner'
-import { useAutoDetectionStore } from '@/lib/stores/auto-detection-store'
+import { useAutoDetectionStore, type PendingSession } from '@/lib/stores/auto-detection-store'
+import { recordDetectionEvent } from '@/lib/activity/detection-events'
 import { decodeRoute } from '@/lib/activity/route-encoding'
 import { invalidateActivityWrites } from '@/lib/cache-groups'
 import { buildRouteZoneSegments } from '@/lib/activity/route-hr-zones'
@@ -193,6 +194,8 @@ export function ExerciseReviewSheet({ sessionId, userId, onClose }: Props) {
       // Q-231: the Oura mark-reviewed PATCH and the overlapping-Oura-session sweep went with the
       // Cloud sync that wrote those rows. A detected session is phone-only now, so saving one needs
       // nothing beyond the activity write.
+      // The type the user saved it as, which may differ from the detected one.
+      reportReviewOutcome(session, 'saved', activityType)
       removeSession(session.id)
       await invalidateActivityWrites()
       toast.success('Activity saved')
@@ -206,6 +209,7 @@ export function ExerciseReviewSheet({ sessionId, userId, onClose }: Props) {
 
   function handleDismiss() {
     if (!session) return
+    reportReviewOutcome(session, 'dismissed', session.activityType)
     removeSession(session.id)
     onClose()
   }
@@ -314,4 +318,15 @@ export function ExerciseReviewSheet({ sessionId, userId, onClose }: Props) {
       </SheetContent>
     </Sheet>
   )
+}
+
+/** #2478. The review sheet's verdict on a detected session, as a funnel event. Telemetry only;
+ *  never throws, and sends nothing for a session from before detection ids existed. */
+function reportReviewOutcome(session: PendingSession, kind: 'saved' | 'dismissed', activityType: 'walk' | 'run'): void {
+  recordDetectionEvent(session.detectionId, kind, 'user_review', {
+    sessionStartAt: session.startMs,
+    activityType,
+    distanceM: session.distanceKm * 1000,
+    elapsedSec: (session.endMs - session.startMs) / 1000,
+  })
 }

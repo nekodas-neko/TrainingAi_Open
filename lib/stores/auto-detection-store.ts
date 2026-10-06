@@ -6,6 +6,7 @@ import type { RoutePoint } from '@/lib/activity/route-encoding'
 import { computeTotalDistanceKm, haversineDistanceKm } from '@/lib/activity/activity-metrics'
 import { encodeRoute, simplifyRoute } from '@/lib/activity/route-encoding'
 import { MIN_DISTANCE_M, MIN_AVG_SPEED_MS, MIN_DURATION_SEC } from '@/lib/activity/detection-thresholds'
+import { recordDetectionEvent } from '@/lib/activity/detection-events'
 
 export interface PendingSession {
   id: string
@@ -22,6 +23,9 @@ export interface PendingSession {
    * rather than letting them render as phone sessions with no route.
    */
   source: 'phone'
+  /** #2478. The detection this session came from, for the funnel events its save or dismissal
+   *  sends. Absent on a session finalized before that shipped, which then sends none. */
+  detectionId?: string
 }
 
 export interface DetectionDiag {
@@ -42,11 +46,14 @@ interface AutoDetectionState {
   // over the GPS-avg-speed guess below. Null when the session started via the ring-disconnected
   // GPS-speed fallback (AD-1), which still derives the type from avg speed as before.
   pendingActivityType: 'walk' | 'run' | null
+  /** #2478. The in-flight session's detection id (telemetry only; see detection-events.ts). Persisted
+   *  so a session finalized on rehydrate still reports which gate ended it. */
+  sessionDetectionId: string | null
 }
 
 interface AutoDetectionActions {
   setDetecting(v: boolean): void
-  startSession(ms: number, activityType?: 'walk' | 'run'): void
+  startSession(ms: number, activityType?: 'walk' | 'run', detectionId?: string | null): void
   addPoint(point: RoutePoint): void
   endSession(): void
   /** Throw an in-flight session away without finalizing it. Distinct from `endSession`, which
@@ -96,26 +103,43 @@ export const useAutoDetectionStore = create<AutoDetectionState & AutoDetectionAc
       detectionError: null,
       detectionDiag: null,
       pendingActivityType: null,
+      sessionDetectionId: null,
 
       setDetecting: (v) => set({ isDetecting: v }),
       setDetectionError: (message) => set({ detectionError: message }),
       setDetectionDiag: (diag) => set({ detectionDiag: diag }),
 
-      startSession: (ms, activityType) => set({ sessionStartMs: ms, sessionPoints: [], pendingActivityType: activityType ?? null }),
+      startSession: (ms, activityType, detectionId) => set({
+        sessionStartMs: ms, sessionPoints: [], pendingActivityType: activityType ?? null, sessionDetectionId: detectionId ?? null,
+      }),
 
       addPoint: (point) => set(s => ({ sessionPoints: [...s.sessionPoints, point] })),
 
-      discardSession: () => set({ sessionStartMs: null, sessionPoints: [], pendingActivityType: null }),
+      discardSession: () => {
+        const { sessionStartMs, sessionDetectionId } = get()
+        if (sessionStartMs !== null) recordDetectionEvent(sessionDetectionId, 'dismissed', 'session_owned', { sessionStartAt: sessionStartMs })
+        set({ sessionStartMs: null, sessionPoints: [], pendingActivityType: null, sessionDetectionId: null })
+      },
 
       endSession: () => {
-        const { sessionStartMs, sessionPoints, pendingActivityType } = get()
+        const { sessionStartMs, sessionPoints, pendingActivityType, sessionDetectionId } = get()
+        // #2478: every return below reports the gate that decided it. Telemetry only — the gates
+        // themselves are unchanged, and recordDetectionEvent never throws.
+        const reject = (gate: string, detail: Parameters<typeof recordDetectionEvent>[3] = {}) => {
+          if (sessionStartMs) {
+            recordDetectionEvent(sessionDetectionId, 'dismissed', gate, {
+              sessionStartAt: sessionStartMs, pointCount: sessionPoints.length, activityType: pendingActivityType, ...detail,
+            })
+          }
+          set({ sessionStartMs: null, sessionPoints: [], pendingActivityType: null, sessionDetectionId: null })
+        }
         if (!sessionStartMs || sessionPoints.length < 2) {
-          set({ sessionStartMs: null, sessionPoints: [], pendingActivityType: null })
+          reject('too_few_points')
           return
         }
         const endMs = sessionPoints[sessionPoints.length - 1].t
         if (endMs - sessionStartMs < MIN_DURATION_MS) {
-          set({ sessionStartMs: null, sessionPoints: [], pendingActivityType: null })
+          reject('min_duration', { elapsedSec: (endMs - sessionStartMs) / 1000 })
           return
         }
 
@@ -129,21 +153,22 @@ export const useAutoDetectionStore = create<AutoDetectionState & AutoDetectionAc
         // Lower-bound quality gates (Balanced) — the phone path previously had only upper
         // bounds, so a slow short shuffle around the house qualified as a walk. Discard
         // anything under the shared minimum distance or pace.
+        const measured = { distanceM: distanceKm * 1000, elapsedSec: (endMs - sessionStartMs) / 1000, avgSpeedMs }
         if (distanceKm * 1000 < MIN_DISTANCE_M || avgSpeedMs < MIN_AVG_SPEED_MS) {
-          set({ sessionStartMs: null, sessionPoints: [], pendingActivityType: null })
+          reject(distanceKm * 1000 < MIN_DISTANCE_M ? 'min_distance' : 'min_avg_speed', measured)
           return
         }
 
         // Above MAX_SPEED_MS this is driving/cycling, not a walk or run — discard
         if (avgSpeedMs > MAX_SPEED_MS) {
-          set({ sessionStartMs: null, sessionPoints: [], pendingActivityType: null })
+          reject('max_avg_speed', measured)
           return
         }
         // Trains/buses average under MAX_SPEED_MS due to station stops, but their 80th-percentile
         // GPS segment speed is still well above walking pace. GPS jitter spikes can't lift the
         // 80th percentile on a genuine walk, so this filter is robust to city multipath noise.
         if (segmentSpeedP80(sessionPoints) > MOTORISED_P80_SPEED_MS) {
-          set({ sessionStartMs: null, sessionPoints: [], pendingActivityType: null })
+          reject('motorised_p80', measured)
           return
         }
 
@@ -161,19 +186,33 @@ export const useAutoDetectionStore = create<AutoDetectionState & AutoDetectionAc
           durationMin,
           activityType,
           source: 'phone',
+          ...(sessionDetectionId ? { detectionId: sessionDetectionId } : {}),
         }
 
+        recordDetectionEvent(sessionDetectionId, 'offered', 'quality_gates', {
+          ...measured, sessionStartAt: sessionStartMs, pointCount: sessionPoints.length, activityType,
+        })
         set(s => ({
           pendingSessions: [...s.pendingSessions, session],
           sessionStartMs: null,
           sessionPoints: [],
           pendingActivityType: null,
+          sessionDetectionId: null,
         }))
       },
 
-      dismissSession: (id) => set(s => ({
-        pendingSessions: s.pendingSessions.filter(p => p.id !== id),
-      })),
+      // The confirm card's Dismiss / Dismiss all. The review sheet's own Dismiss goes through
+      // removeSession and reports itself (exercise-review-sheet.tsx).
+      dismissSession: (id) => {
+        const dismissed = get().pendingSessions.find(p => p.id === id)
+        if (dismissed) {
+          recordDetectionEvent(dismissed.detectionId, 'dismissed', 'user_card', {
+            sessionStartAt: dismissed.startMs, activityType: dismissed.activityType,
+            distanceM: dismissed.distanceKm * 1000, elapsedSec: (dismissed.endMs - dismissed.startMs) / 1000,
+          })
+        }
+        set(s => ({ pendingSessions: s.pendingSessions.filter(p => p.id !== id) }))
+      },
 
       removeSession: (id) => set(s => ({
         pendingSessions: s.pendingSessions.filter(p => p.id !== id),
@@ -198,6 +237,7 @@ export const useAutoDetectionStore = create<AutoDetectionState & AutoDetectionAc
         sessionPoints: s.sessionPoints,
         pendingSessions: s.pendingSessions,
         pendingActivityType: s.pendingActivityType,
+        sessionDetectionId: s.sessionDetectionId,
       }),
       // isDetecting reflects whether a live background watcher is currently
       // running — that watcher can't possibly still be running after a fresh

@@ -588,6 +588,22 @@ export interface OuraLinkStatsWrite {
   consecutiveFailures: number | null
 }
 
+/** #2478. One walk auto-detection funnel event (see `detection_events`). `occurredAt` is the
+ *  phone's clock; `recorded_at` is stamped by the server. */
+export interface DetectionEventWrite {
+  detectionId: string
+  kind: string
+  gate: string
+  occurredAt: Date
+  triggerSource: string | null
+  activityType: string | null
+  sessionStartAt: Date | null
+  distanceM: number | null
+  elapsedSec: number | null
+  pointCount: number | null
+  avgSpeedMs: number | null
+}
+
 export interface StrapStatusRow extends StrapStatusWrite {
   id: number
   recordedAt: Date
@@ -1142,6 +1158,10 @@ export interface WorkoutRepository {
   /** #2469. One row of the ring link's connect/drop/connected-time counters. `recorded_at` is
    *  server-stamped. Read through `claude_ro.oura_ble_link_stats`; nothing in the app reads it. */
   insertOuraLinkStats(userId: string, stats: OuraLinkStatsWrite): Promise<void>
+  /** #2478. Insert walk-detection funnel events for `userId`, ignoring any (detection, kind) the
+   *  user already has, so a retried batch is a no-op. Returns how many rows were new. Read through
+   *  `claude_ro.detection_events`; nothing in the app reads it. */
+  insertDetectionEvents(userId: string, events: DetectionEventWrite[]): Promise<number>
   /** TN-54. One row per chest-strap connection attempt or state change (migration 278). The
    *  service knew all of this already and kept it in memory, so a strap that died was
    *  indistinguishable from one that was not worn. `recordedAt` is server-stamped. */
