@@ -65,7 +65,10 @@ describe('D6 dHRV adapter bucket-grid alignment', () => {
     expect(estimates).toHaveLength(1)
     const oursBucketStart = new Date(estimates[0].t - 2.5 * 60_000).toISOString()
 
-    const rrRows = Array.from({ length: 300 }, (_, i) => ({ at: new Date(fromMs + 60_000 + i * 100), rrMs: 800 }))
+    // Beats spaced by their own interval (#2488): `rmssdFromRr` only differences beats that are
+    // adjacent, so 800 ms intervals 100 ms apart would describe no heart. Alternating 790/810 so the
+    // value is non-zero and the bucket survives.
+    const rrRows = Array.from({ length: 300 }, (_, i) => ({ at: new Date(fromMs + 60_000 + i * 800), rrMs: i % 2 ? 810 : 790 }))
     const reference = bucketRrToRmssd(rrRows)
     expect(reference.map(r => r.bucketStart)).toContain(oursBucketStart)
   })
