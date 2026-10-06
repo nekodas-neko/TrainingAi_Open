@@ -35,30 +35,58 @@ excluded from every window.
 
 ## The tree
 
-| Pillar | Unit | Shape | Notes |
-|---|---|---|---|
-| **Sleep** | duration | sweet spot | default 7–9 h, refit per person |
-| | efficiency | directional ↑ | |
-| | deep + REM share | sweet spot vs normal | |
-| | latency | sweet spot | falling asleep instantly is a sign of debt, not health |
-| | timing / consistency | steady | vs the person's usual bed and wake times |
-| | sleep balance (7-day debt) | sweet spot | |
-| **Heart** | overnight HRV | directional ↑ | |
-| | overnight resting HR | directional ↓ | |
-| | overnight settling (recovery index) | directional | |
-| | daytime resting HR, still periods | directional ↓ | **new** |
-| | HR recovery after exercise | directional ↑ | **new** — the density gate in #2234 first |
-| **Activity** | yesterday's movement | sweet spot | too much lowers it — see below |
-| | zone minutes (week) | sweet spot | WHO 150–300 moderate-equivalent; vigorous line per #2198 |
-| | training load 7:28 | sweet spot | 0.8–1.3 = 100 (#2194) |
-| | block trend 28:90 | sweet spot | #2340 |
-| **Body** | temperature | steady | 100 at normal — fixes #2359 |
-| | breathing rate | steady | |
-| | SpO₂ | threshold | fine above ~95 %, falls below |
-| | weight vs plan | steady | against the goal pace (#2071: recomp 0.3 % BW/week) |
-| | energy balance | sweet spot | near the #2071 budget; a large deficit or surplus both fall |
-| | protein, hydration | reach target | |
-| | daytime stress | directional ↓ | elevated HR while still — counted here only, not again in Heart |
+| Pillar | Unit | Shape | Reference | Notes |
+|---|---|---|---|---|
+| **Sleep** | duration | sweet spot | guarded | default 7–9 h, refit per person |
+| | efficiency | directional ↑ | learned | |
+| | deep + REM share | sweet spot vs normal | constant | |
+| | latency | sweet spot | constant | falling asleep instantly is a sign of debt, not health |
+| | timing / consistency | steady | learned | vs the person's usual bed and wake times |
+| | sleep balance (7-day debt) | sweet spot | guarded | |
+| **Heart** | overnight HRV | directional ↑ | learned | |
+| | overnight resting HR | directional ↓ | learned | |
+| | overnight settling (recovery index) | directional | learned | |
+| | daytime resting HR, still periods | directional ↓ | learned | **new** |
+| | HR recovery after exercise | directional ↑ | learned | **new** — the density gate in #2234 first |
+| **Activity** | yesterday's movement | sweet spot | guarded | too much lowers it — see below |
+| | zone minutes (week) | sweet spot | constant | WHO 150–300 moderate-equivalent; vigorous line per #2198 |
+| | training load 7:28 | sweet spot | constant | 0.8–1.3 = 100 (#2194) |
+| | block trend 28:90 | sweet spot | constant | #2340 |
+| **Body** | temperature | steady | learned | 100 at normal — fixes #2359 |
+| | breathing rate | steady | learned | |
+| | SpO₂ | threshold | constant | fine above ~95 %, falls below |
+| | weight vs plan | steady | constant | against the goal pace (#2071: recomp 0.3 % BW/week) |
+| | energy balance | sweet spot | guarded | near the #2071 budget; a large deficit or surplus both fall |
+| | protein, hydration | reach target | constant | |
+| | daytime stress | directional ↓ | learned | elevated HR while still — counted here only, not again in Heart |
+
+## Where each number comes from — self-tuning (owner, 2026-10-06)
+
+Most references are **learned from the person's own data**, so the model tunes itself as data arrives.
+Each unit's reference is one of three kinds (the *Reference* column above):
+
+| Kind | How it works |
+|---|---|
+| **learned** | The person's own distribution sets the scale: p10 ≈ 30, median = 70, p90 and above = 100 (mirrored for lower-is-better). Medians and percentiles, not means, so one bad week can't redefine "normal". |
+| **constant** | A research value that does not change per person — weekly zone minutes, SpO₂ ≥ 95 %, protein g/kg, hydration, training load 0.8–1.3, sleep-stage ratio ranges (`component-references.md`). |
+| **guarded** | Learned, but only **inside** the research range: the person's own sweet spot, clamped to the guardrails (e.g. sleep duration learned within 7–9 h). |
+
+**Why guarded exists.** Pure self-relative scoring normalises a bad habit: a month of 5½-hour nights
+would make 5½ h the median and score it 70. Wherever a real health target exists, the personal band
+may only move inside it, so a chronic shortfall keeps scoring low however consistent it is.
+
+**Maturity**
+
+| Days of data (per unit, valid days only) | What scores |
+|---|---|
+| 0–13 | research defaults; the unit shows "learning", never a fake number |
+| 14–29 | the person's own baseline, marked provisional |
+| 30+ | settled; refit monthly, shadow-scored a week before it replaces the live values |
+
+Excluded from every window: low-wear nights, nap fragments (#2192), and days the person flagged as
+unwell. **Progress is shown, not scored away:** as fitness improves the median rises and a good day
+still reads ~70; the gain appears in the 90-day window ("HRV normal up 6 ms this season") on the
+pillar screen.
 
 ## Too much activity costs twice, and that is correct
 
