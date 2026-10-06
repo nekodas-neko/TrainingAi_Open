@@ -12,6 +12,13 @@ export const STALL_GAP_MS = 3 * 60 * 1000
 /** Grace past the gate's own probe timeout, so when timers ARE alive the
  *  gate's normal path wins and this never fires. */
 export const PROBE_HARD_MAX_MS = PROBE_TIMEOUT_MS + 60 * 1000
+/** #2477. How long a CONFIRMED session may run without a single GPS point before it is ended.
+ *  The stall rule needs a last point to be old, so a session confirmed by ring cadence with the
+ *  phone still indoors (no fix, no point) could never stall and held GPS to the absolute cap.
+ *  Measured from when GPS started, and confirmation can land anywhere inside the probe, so this
+ *  is the probe's own hard cap plus the stall gap: the confirmed session always gets at least a
+ *  stall gap of its own to produce a first point. */
+export const NO_FIX_MAX_MS = PROBE_HARD_MAX_MS + STALL_GAP_MS
 /** Absolute cap on one continuous watcher run: longest valid activity + slack.
  *  Nothing legitimate survives this. */
 export const WATCHER_MAX_MS = MAX_DURATION_SEC * 1000 + 30 * 60 * 1000
@@ -28,7 +35,7 @@ export interface WatchdogInput {
 
 export type WatchdogVerdict =
   | { action: 'none' }
-  | { action: 'end-session'; reason: 'stall' }
+  | { action: 'end-session'; reason: 'stall' | 'no-fix' }
   | { action: 'force-stop'; reason: 'probe-timeout' | 'watcher-cap' }
 
 export function evaluateWatchdog(input: WatchdogInput): WatchdogVerdict {
@@ -40,6 +47,9 @@ export function evaluateWatchdog(input: WatchdogInput): WatchdogVerdict {
   }
   if (sessionActive && lastPointMs !== null && nowMs - lastPointMs > STALL_GAP_MS) {
     return { action: 'end-session', reason: 'stall' }
+  }
+  if (sessionActive && lastPointMs === null && nowMs - gpsStartedMs > NO_FIX_MAX_MS) {
+    return { action: 'end-session', reason: 'no-fix' }
   }
   return { action: 'none' }
 }
