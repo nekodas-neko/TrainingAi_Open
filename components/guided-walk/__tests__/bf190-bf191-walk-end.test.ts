@@ -31,8 +31,9 @@ describe('BF-190 — the elapsed time reaches the summary', () => {
     // the call and the assertion below passes on nothing.
     const calls = src(ACTIVE).match(/onFinishRef\.current\(.*\)$/gm) ?? []
     expect(calls).toHaveLength(2)
-    // `elapsedRef.current` since LB-141: the early exit moved into a stable `endWalk` callback so
-    // the finish-request effect does not re-run once a second, and a ref is what keeps it stable.
+    // `elapsedRef.current` since LB-141: the early exit lives in a stable `endWalk` callback so the
+    // back-gesture registration effect does not re-run once a second, and a ref is what keeps it
+    // stable.
     for (const c of calls) expect(c).toMatch(/,\s*(e|elapsedSec|elapsedRef\.current)\)$/)
   })
 
@@ -58,16 +59,14 @@ describe('BF-190 — the elapsed time reaches the summary', () => {
   })
 })
 
-const EXIT_PATHS = ['components/mobile-auth-handler.tsx', 'components/shell/bottom-nav.tsx']
-
 describe('BF-191 — a sub-minute walk is offered as a discard, in ONE dialog', () => {
   const ACTIVE = 'components/guided-walk/walk-active.tsx'
   const DIALOG = 'components/guided-walk/leave-walk-dialog.tsx'
   const STORE = 'lib/stores/guided-walk-store.ts'
 
   it('below the floor the early exit discards instead of finishing', () => {
-    // The constant moved to the store in LB-141 — the tab bar needs the same floor, and importing
-    // the walk screen into the shell would pull the whole screen in for one integer.
+    // The constant lives in the store because the dialog and the screen both read it, and neither
+    // should import the other for one integer.
     expect(src(STORE)).toMatch(/export const MIN_WALK_SEC = 60/)
     expect(src(ACTIVE)).toMatch(
       /if \((?:elapsedSec|elapsedRef\.current) < MIN_WALK_SEC\) \{\s*\n\s*onDiscardRef\.current\(\)/,
@@ -81,64 +80,80 @@ describe('BF-191 — a sub-minute walk is offered as a discard, in ONE dialog', 
     expect(dialogs).toHaveLength(1)
   })
 
-  it('every caller states what ending does, because the three genuinely differ', () => {
-    // `git ls-files app components -- '*.tsx'` UNIONS its pathspecs, so it also returns every
-    // `.test.ts` under those directories — including this file, whose own regex literal contains
-    // `<LeaveWalkDialog`. It passed locally only because the file was still untracked. Filter here.
-    const callers = execFileSync('git', ['ls-files', 'app', 'components'], { cwd: ROOT, encoding: 'utf8' })
-      .split('\n').filter(Boolean)
-      .filter(f => f.endsWith('.tsx') && !f.includes('__tests__'))
-      .filter(f => f !== DIALOG && src(f).includes('<LeaveWalkDialog'))
-    // Three today: the End-walk button, the back gesture, the tab bar.
-    expect(callers.length).toBeGreaterThanOrEqual(3)
-    for (const f of callers) {
-      const tag = src(f).slice(src(f).indexOf('<LeaveWalkDialog'))
-      expect(tag.slice(0, tag.indexOf('/>')), `${f} must name its outcome`).toMatch(/outcome=/)
-    }
-  })
-
-  /**
-   * ⚠ This assertion used to read `outcome="discard"` at both paths, pinning the policy LB-141
-   * changed: the owner decided on 2026-09-26 that the back gesture and the tab bar ASK rather than
-   * discarding silently. What BF-191 actually guarantees — one prompt, and no offer to save a walk
-   * too short to record — is what is asserted now, and it still holds.
-   */
-  it('the two reset-and-leave paths ask above the floor and discard below it (LB-141)', () => {
-    for (const f of EXIT_PATHS) {
-      const body = src(f)
-      expect(body, `${f} must offer the choice`).toMatch(/outcome="choose"/)
-      expect(body, `${f} must keep the short-walk discard`).toMatch(/outcome="discard"/)
-      // Guarded against both prompts firing on one exit: the two elements are the arms of a single
-      // ternary on the floor, so exactly one can be mounted.
-      expect(body.match(/<LeaveWalkDialog/g) ?? []).toHaveLength(2)
-      expect(body).toMatch(/>= MIN_WALK_SEC \?/)
-    }
-  })
-
-  it('saving from an exit runs the walk screen\'s own finish, and does not navigate away', () => {
-    // The samples and cadence live in `WalkActive`'s refs and the row is written by
-    // `WalkSummary`'s mount, so a save that left the screen would write nothing. These paths must
-    // therefore REQUEST the finish rather than reach for `finish()` or a navigation.
-    for (const f of EXIT_PATHS) {
-      const onSave = src(f).slice(src(f).indexOf('onSave='))
-      const body = onSave.slice(0, onSave.indexOf('onStay='))
-      // `requestWalkFinish` in the shell, which holds three stores' actions and aliases each.
-      expect(body, `${f}'s save must request the finish`).toMatch(/request(?:Walk)?Finish\(\)/)
-      expect(body, `${f}'s save must not navigate or leave`).not.toMatch(/navigateWithTransition|leaveScreen/)
-    }
-  })
-
-  it('the request flag never survives a reload, or it ends the next walk on launch', () => {
-    const store = src(STORE)
-    expect(store).toMatch(/state\.finishRequested = false/)
-    // Cleared before the finish runs, since the finish unmounts the screen that would clear it.
-    expect(src(ACTIVE)).toMatch(/clearFinishRequest\(\)\s*\n\s*endWalk\(\)/)
+  it('the dialog offers a save only at or above the floor, and a discard confirm below it', () => {
+    const body = stripComments(src(DIALOG))
+    expect(body).toMatch(/elapsedSec >= MIN_WALK_SEC/)
+    // The save lives inside the `>=` branch; the fall-through is the plain discard confirm.
+    const above = body.slice(body.indexOf('elapsedSec >= MIN_WALK_SEC'), body.indexOf('<ConfirmDialog'))
+    expect(above).toContain('Save walk')
+    expect(body.slice(body.indexOf('<ConfirmDialog'))).not.toContain('Save walk')
   })
 
   it('no dialog still promises the old sentence the app did not keep', () => {
-    // Comments stripped first: this file's own docblock quotes the retired copy to explain why the
-    // `outcome` prop exists, and asserting over it would fail on the explanation rather than a use.
+    // Comments stripped first: a docblock that quotes the retired copy to explain why the dialog
+    // decides what exiting offers would otherwise fail this on the explanation rather than a use.
     const body = stripComments(src(DIALOG))
     expect(body).not.toMatch(/will stop it early/)
+  })
+})
+
+/**
+ * #2134 — the guided walk is immersive on purpose: no tab bar, and ONE Exit.
+ *
+ * LB-141 gave the walk three places that could raise the leave prompt — the End button, the back
+ * gesture and the tab bar — and the tab bar's could never fire, because the walk route renders no
+ * tab bar. The owner's answer was to keep the walk immersive with a single Exit and delete the dead
+ * one. What these pin is that the three did not grow back as three: the button and the gesture are
+ * the same prompt, mounted once, on the walk screen that holds what a save needs.
+ */
+describe('#2134 — one Exit for a walk in progress', () => {
+  const ACTIVE = 'components/guided-walk/walk-active.tsx'
+  const HANDLER = 'components/mobile-auth-handler.tsx'
+  const NAV = 'components/shell/bottom-nav.tsx'
+
+  it('the Exit prompt is mounted in exactly one place, the walk screen', () => {
+    // `git ls-files app components -- '*.tsx'` UNIONS its pathspecs, so it also returns every
+    // `.test.ts` under those directories — including this file, whose own regex literal contains
+    // `<LeaveWalkDialog`. Filter to .tsx outside __tests__.
+    const mounts = execFileSync('git', ['ls-files', 'app', 'components'], { cwd: ROOT, encoding: 'utf8' })
+      .split('\n').filter(Boolean)
+      .filter(f => f.endsWith('.tsx') && !f.includes('__tests__'))
+      .filter(f => f !== 'components/guided-walk/leave-walk-dialog.tsx' && src(f).includes('<LeaveWalkDialog'))
+    expect(mounts).toEqual([ACTIVE])
+  })
+
+  it('the Exit button and the back gesture open the same prompt', () => {
+    const body = stripComments(src(ACTIVE))
+    // The button calls the same function the registry hands the back gesture.
+    expect(body).toMatch(/onClick=\{openExit\}/)
+    expect(body).toMatch(/registerWalkExit\(openExit\)/)
+    // …and the handler asks that screen rather than raising a dialog of its own.
+    const handler = stripComments(src(HANDLER))
+    expect(handler).toMatch(/if \(requestWalkExit\(\)\) return/)
+    expect(handler).not.toContain('LeaveWalkDialog')
+    expect(handler).not.toMatch(/guided-walk-store/)
+  })
+
+  it('the tab bar knows nothing about a walk — the walk route renders none', () => {
+    const nav = stripComments(src(NAV))
+    expect(nav).not.toContain('LeaveWalkDialog')
+    expect(nav).not.toMatch(/guided-walk/)
+  })
+
+  it('discarding a walk above the floor is its own action, not the save path', () => {
+    // `endWalk` saves (or discards below the floor); a Discard tapped on a 20-minute walk must
+    // reach `onDiscard` whatever the clock says, and must not write a row.
+    const body = stripComments(src(ACTIVE))
+    expect(body).toMatch(/const discardWalk = useCallback\(\(\) => \{[\s\S]*?onDiscardRef\.current\(\)[\s\S]*?\}, \[\]\)/)
+    expect(body).toMatch(/onDiscard=\{discardWalk\}/)
+    expect(body).toMatch(/onSave=\{endWalk\}/)
+  })
+
+  it('the prompt reads one snapshot of the clock, so its choices cannot change while it is up', () => {
+    const body = stripComments(src(ACTIVE))
+    expect(body).toMatch(/setExitElapsedSec\(elapsedRef\.current\)/)
+    expect(body).toMatch(/elapsedSec=\{exitElapsedSec\}/)
+    // Not the ticking value: the 1 Hz state would flip the dialog's variant at the floor.
+    expect(body).not.toMatch(/<LeaveWalkDialog[^>]*elapsedSec=\{elapsedSec\}/)
   })
 })

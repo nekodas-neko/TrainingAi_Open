@@ -8,13 +8,12 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWorkoutStore, isWorkoutActive } from "@/lib/stores/workout-store";
 import { LeaveWorkoutDialog } from "@/components/workout/leave-workout-dialog";
-import { useGuidedWalkStore, isGuidedWalkActive, walkElapsedSec, MIN_WALK_SEC } from "@/lib/stores/guided-walk-store";
-import { LeaveWalkDialog } from "@/components/guided-walk/leave-walk-dialog";
 import { useActivityStore, isActivityActive } from "@/lib/stores/activity-store";
 import { LeaveActivityDialog } from "@/components/activity/leave-activity-dialog";
 import { backActionForPath } from "@/components/shell/tabs";
 import { hasOpenSurface, releaseAllSurfaceEntries } from "@/lib/hooks/sheet-back-stack";
 import { navigateToTab } from "@/lib/shell-nav";
+import { requestWalkExit } from "@/lib/walk/walk-exit";
 
 /**
  * DV-2 — *Leave* on "Leave workout?" did not leave.
@@ -42,9 +41,6 @@ function leaveScreen(): void {
 
 export function MobileAuthHandler({ hasSession }: { hasSession: boolean }) {
   const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
-  // Not a boolean: the dialog quotes the elapsed seconds back and decides from them whether a save
-  // is offered at all, so the two must be one reading taken when the gesture fired.
-  const [leaveWalk, setLeaveWalk] = useState<{ elapsedSec: number } | null>(null);
   const [confirmLeaveActivityOpen, setConfirmLeaveActivityOpen] = useState(false);
 
   // A confirm dialog is cleared ONLY by the user tapping Stay or Leave, so one raised
@@ -58,10 +54,8 @@ export function MobileAuthHandler({ hasSession }: { hasSession: boolean }) {
   // `usePathname` effect would not fire for the case this was filed on. Each of these is a
   // boolean selector, so the store only re-renders this handler when the answer flips.
   const workoutActive = useWorkoutStore(isWorkoutActive);
-  const walkActive = useGuidedWalkStore(isGuidedWalkActive);
   const activityActive = useActivityStore(isActivityActive);
   useEffect(() => { if (!workoutActive) setConfirmLeaveOpen(false); }, [workoutActive]);
-  useEffect(() => { if (!walkActive) setLeaveWalk(null); }, [walkActive]);
   useEffect(() => { if (!activityActive) setConfirmLeaveActivityOpen(false); }, [activityActive]);
 
   // Held in a ref rather than an effect dependency: adding the router to the deps below would
@@ -104,10 +98,11 @@ export function MobileAuthHandler({ hasSession }: { hasSession: boolean }) {
           setConfirmLeaveOpen(true);
           return;
         }
-        if (isGuidedWalkActive(useGuidedWalkStore.getState()) && window.location.pathname.startsWith("/activity/guided-walk")) {
-          setLeaveWalk({ elapsedSec: walkElapsedSec(useGuidedWalkStore.getState().startedAtMs) });
-          return;
-        }
+        // The guided walk is immersive (#2134): back is its one Exit, raised by the walk screen
+        // itself so the gesture and the button cannot offer different choices. When that screen is
+        // not mounted — config, summary, or the route's error boundary — nothing answers and this
+        // falls through to the ordinary back below.
+        if (requestWalkExit()) return;
         if (isActivityActive(useActivityStore.getState()) && window.location.pathname === "/activity") {
           setConfirmLeaveActivityOpen(true);
           return;
@@ -196,12 +191,6 @@ export function MobileAuthHandler({ hasSession }: { hasSession: boolean }) {
     return () => cleanup?.();
   }, [hasSession]);
 
-  const leaveWalkDiscarding = () => {
-    setLeaveWalk(null);
-    useGuidedWalkStore.getState().reset();
-    leaveScreen();
-  };
-
   return (
     <>
       <LeaveWorkoutDialog
@@ -213,34 +202,6 @@ export function MobileAuthHandler({ hasSession }: { hasSession: boolean }) {
           leaveScreen();
         }}
       />
-      {/* LB-141: this used to call reset() with no prompt, so the back gesture threw the walk away
-          whatever its length. The owner chose a prompt over a silent save. Two elements rather than
-          one with spread props, so `outcome=` stays literal here — BF-191's guard reads the source. */}
-      {leaveWalk && leaveWalk.elapsedSec >= MIN_WALK_SEC ? (
-        <LeaveWalkDialog
-          open
-          outcome="choose"
-          elapsedSec={leaveWalk.elapsedSec}
-          // Deliberately does NOT leave the screen. The walk is written by WalkSummary's mount, so
-          // going back here would save nothing — the summary is both the write and its confirmation.
-          onSave={() => {
-            setLeaveWalk(null);
-            useGuidedWalkStore.getState().requestFinish();
-          }}
-          onStay={() => setLeaveWalk(null)}
-          onLeave={leaveWalkDiscarding}
-        />
-      ) : (
-        /* Under the floor this stays the plain discard confirm the End button shows, rather than
-           offering to save a walk too short to record (BF-191). */
-        <LeaveWalkDialog
-          open={!!leaveWalk}
-          outcome="discard"
-          elapsedSec={leaveWalk?.elapsedSec}
-          onStay={() => setLeaveWalk(null)}
-          onLeave={leaveWalkDiscarding}
-        />
-      )}
       <LeaveActivityDialog
         open={confirmLeaveActivityOpen}
         onStay={() => setConfirmLeaveActivityOpen(false)}

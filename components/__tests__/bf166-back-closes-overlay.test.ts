@@ -82,7 +82,13 @@ describe('BF-166 — the back listener consults the surface stack it already has
     // `indexOf('setConfirmLeaveOpen')` matches those instead and this ordering check would pass on
     // a file where the listener's guards had moved below the overlay check. Same trap as the
     // import-vs-call-site one in the test above.
-    for (const mode of ['setConfirmLeaveOpen(true)', 'setConfirmLeaveWalkOpen(true)', 'setConfirmLeaveActivityOpen(true)']) {
+    //
+    // The walk's entry is `requestWalkExit()` — the walk screen raises its own Exit prompt (#2134).
+    // This list used to name `setConfirmLeaveWalkOpen(true)`, a setter that no longer existed after
+    // LB-141 reshaped the walk's state, so `indexOf` returned -1 and the assertion passed on a name
+    // that matched nothing. `toBeGreaterThan(-1)` is what stops that recurring.
+    for (const mode of ['setConfirmLeaveOpen(true)', 'requestWalkExit()', 'setConfirmLeaveActivityOpen(true)']) {
+      expect(handler.indexOf(mode), `${mode} must be in the listener`).toBeGreaterThan(-1)
       expect(handler.indexOf(mode), `${mode} must be checked before the overlay stack`).toBeLessThan(guard)
     }
   })

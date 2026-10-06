@@ -12,6 +12,7 @@ import { hrReserveTarget, walkFastBandBpm } from '@trainingai/shared/health/hr-z
 import { hapticSuccess, hapticLight } from '@/lib/haptics'
 import type { LiveHrSample } from '@/lib/live-hr/types'
 import { LeaveWalkDialog } from './leave-walk-dialog'
+import { registerWalkExit } from '@/lib/walk/walk-exit'
 import { CadenceTracker } from '@/lib/activity/cadence-tracker'
 import { CadenceReadout } from '@/components/activity/cadence-readout'
 import { ActivitySecondaryMetrics } from '@/components/activity/activity-secondary-metrics'
@@ -35,10 +36,6 @@ export interface WalkHrSample { at: number; bpm: number }
 
 const STALE_MS = 8_000
 
-// MIN_WALK_SEC moved to the store (LB-141) so the tab bar can read it; re-exported because
-// this is where callers have always found it.
-export { MIN_WALK_SEC }
-
 export function WalkActive({ userProfile, onFinish, onDiscard }: {
   userProfile: { age: number | null; restingHr: number; hrMax: number }
   // BF-190: the elapsed seconds travel WITH the callback. Both exits used to be the same two-arg
@@ -50,8 +47,6 @@ export function WalkActive({ userProfile, onFinish, onDiscard }: {
 }) {
   const config = useGuidedWalkStore(s => s.config)
   const startedAtMs = useGuidedWalkStore(s => s.startedAtMs)
-  const finishRequested = useGuidedWalkStore(s => s.finishRequested)
-  const clearFinishRequest = useGuidedWalkStore(s => s.clearFinishRequest)
   const { rawPoints, distanceKm, currentPaceSecPerKm, recentSpeedKmh } = useGuidedWalkStore(useShallow(s => ({
     rawPoints: s.rawPoints, distanceKm: s.distanceKm, currentPaceSecPerKm: s.currentPaceSecPerKm,
     recentSpeedKmh: s.recentSpeedKmh,
@@ -68,13 +63,18 @@ export function WalkActive({ userProfile, onFinish, onDiscard }: {
   const onDiscardRef = useRef(onDiscard)
   onDiscardRef.current = onDiscard
   const [elapsedSec, setElapsedSec] = useState(0)
-  // Read by `endWalk`, which must stay stable: the finish-request effect below would otherwise
-  // re-run once a second.
+  // Read by `openExit` and `endWalk`, which must stay stable: the registration effect below would
+  // otherwise re-run once a second.
   const elapsedRef = useRef(0)
   elapsedRef.current = elapsedSec
   const [liveBpm, setLiveBpm] = useState<number | null>(null)
   const [lastBeatAt, setLastBeatAt] = useState<number | null>(null)
-  const [confirmEndOpen, setConfirmEndOpen] = useState(false)
+  const [exitOpen, setExitOpen] = useState(false)
+  // Read at the press, not per render: the dialog quotes it and decides from it whether a save is
+  // offered, and both must be one reading (see LeaveWalkDialog).
+  const [exitElapsedSec, setExitElapsedSec] = useState(0)
+  const exitOpenRef = useRef(false)
+  exitOpenRef.current = exitOpen
   const [cue, setCue] = useState<{ index: number; color: string } | null>(null)
   const cuedIndexRef = useRef<number | null>(null)
   const reducedMotion = useReducedMotion()
@@ -150,15 +150,22 @@ export function WalkActive({ userProfile, onFinish, onDiscard }: {
     }
   }, [startedAtMs])
 
-  /**
-   * End the walk the way the End button does: save it, or discard it below the floor.
-   *
-   * LB-141 made this reachable from outside this screen — the tab bar and the back gesture now ask
-   * rather than discarding silently, and their Save has to run THIS, because the HR samples and the
-   * cadence tracker live in refs here and the write happens on `WalkSummary`'s mount.
-   */
+  /** The one way out of a walk in progress. It only asks; `endWalk` and `discardWalk` are what act. */
+  const openExit = useCallback(() => {
+    // A second request while the prompt is up (back pressed again) must not re-read the clock: the
+    // choices on screen would change under the user's thumb.
+    if (exitOpenRef.current) return
+    setExitElapsedSec(elapsedRef.current)
+    setExitOpen(true)
+  }, [])
+
+  // The Android back gesture is the same Exit. `MobileAuthHandler` sits outside this tree, so it
+  // asks through the registry rather than raising a dialog of its own (#2134).
+  useEffect(() => registerWalkExit(openExit), [openExit])
+
+  /** Save the walk and show its summary — or discard it below the floor, which is never recorded. */
   const endWalk = useCallback(() => {
-    setConfirmEndOpen(false)
+    setExitOpen(false)
     if (finishedRef.current) return
     finishedRef.current = true
     if (elapsedRef.current < MIN_WALK_SEC) {
@@ -168,13 +175,12 @@ export function WalkActive({ userProfile, onFinish, onDiscard }: {
     onFinishRef.current(samplesRef.current, cadenceRef.current?.summary() ?? null, elapsedRef.current)
   }, [])
 
-  useEffect(() => {
-    if (!finishRequested) return
-    // Cleared first: `endWalk` unmounts this screen, and a flag left set would end the next walk
-    // the moment it started.
-    clearFinishRequest()
-    endWalk()
-  }, [finishRequested, clearFinishRequest, endWalk])
+  const discardWalk = useCallback(() => {
+    setExitOpen(false)
+    if (finishedRef.current) return
+    finishedRef.current = true
+    onDiscardRef.current()
+  }, [])
 
   // 1 Hz tick resyncing from wall-clock so backgrounding never desyncs the timer.
   useEffect(() => {
@@ -312,20 +318,20 @@ export function WalkActive({ userProfile, onFinish, onDiscard }: {
         />
       )}
 
-      <Button variant="outline" className="mt-2 h-12 w-full max-w-xs" onClick={() => setConfirmEndOpen(true)}>
-        End walk
+      <Button variant="outline" className="mt-2 h-12 w-full max-w-xs" onClick={openExit}>
+        Exit walk
       </Button>
 
-      {/* BF-191: one dialog, not two. Implemented literally — a floor, then a confirm — a mis-tap
-          would raise "End walk?" and then "Discard this short walk?", which is the two-prompt
-          objection the confirm-on-exit alternative lost on. Below the floor this dialog becomes
-          the confirm instead of being followed by one. */}
+      {/* The one Exit prompt, for the button above and for the back gesture. BF-191: a single
+          dialog — below the floor it becomes the discard confirm rather than being followed by one,
+          because a mis-tap that raised "Exit?" and then "Discard this short walk?" is the
+          two-prompt objection the confirm-on-exit alternative lost on. */}
       <LeaveWalkDialog
-        open={confirmEndOpen}
-        outcome={elapsedSec < MIN_WALK_SEC ? 'discard' : 'save'}
-        elapsedSec={elapsedSec}
-        onStay={() => setConfirmEndOpen(false)}
-        onLeave={endWalk}
+        open={exitOpen}
+        elapsedSec={exitElapsedSec}
+        onSave={endWalk}
+        onDiscard={discardWalk}
+        onStay={() => setExitOpen(false)}
       />
     </div>
   )

@@ -399,19 +399,23 @@ tabs, in both themes; at rest there is nothing. **What Chromium cannot answer** 
 gradient composites on Samsung's WebView and how it reads against the real status bar — the two
 things the phone is for.
 
-### [activity][app-shell] ⚠️ Leaving a walk by the back gesture now asks, and the phone is the only place it can be seen (LB-141, 2026-09-27)
+### [activity][app-shell] ⚠️ The guided walk has one Exit, and the back gesture half of it is unseen on the phone (#2134, LB-141, 2026-10-06)
 
-The back gesture used to call `reset()` and throw a walk away silently, whatever its length; it now
-raises a save-or-discard prompt (the owner's decision, 2026-09-26). **The prompt itself is a
-Capacitor `backButton` listener with no web equivalent, so the sandbox cannot press it** — the
-harness verified the dialog's three options and their 336×48 hit areas by mounting it from the tab
-bar at 384 px, which is a different trigger reaching the same component, and the source guards pin
-the wiring. **Pass test:** on the S25, with a walk more than a minute old, press back — "Leave this
-walk?" appears with Save walk / Discard / Keep walking; **Save must land on the walk summary and
-produce a row in history**, not return to the previous screen; under a minute the same gesture shows
-the plain "Discard this walk?" confirm with no offer to save. **The save path is the half worth
-checking hardest**: it runs the walk screen's own finish, so a walk saved this way should read the
-same duration and calories as one ended with the End button.
+The walk is immersive on purpose (owner, 2026-10-06): no tab bar, one **Exit walk** button, and a
+confirm before quitting a walk in progress. The Exit prompt is mounted once, by the walk screen
+(`walk-active.tsx`), and the Android back gesture opens **that same prompt** through
+`lib/walk/walk-exit.ts` instead of raising a dialog of its own. The tab-bar exit LB-141 wired could
+never fire — the walk route renders no tab bar — and is deleted. Exercised in a browser at 384 px
+(`e2e/walk-exit.spec.ts`): no `nav`, one button, the prompt's three choices, Keep walking, Discard
+(no row written, lands on the setup screen), Save (one row, duration is what was walked) and the
+under-a-minute discard confirm. **The back gesture was driven through a stub of Capacitor's native
+bridge**, which exercises our listener, the registry and the dialog and none of Android.
+**Pass test on the S25:** start a walk, wait over a minute, press back — "Exit this walk?" appears
+with Save walk / Discard / Keep walking, the screen behind has not navigated, and a second press leaves
+it as it is; Save lands on the walk summary and produces a history row with the walked duration;
+Discard returns to the setup screen with a "Walk discarded" toast; under a minute the same press shows
+the plain "Discard this walk?" confirm. Also: on the route's **error screen** (`app/error.tsx` keeps a
+tab bar), back and the tabs now simply leave — nothing prompts, because nothing is mounted to answer.
 
 ### [workouts] ⚠️ The session card's icon, elapsed label and recovery strip are fixed but unseen on the phone (RV-214, 2026-09-27)
 

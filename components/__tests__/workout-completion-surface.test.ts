@@ -72,10 +72,10 @@ describe('BF-168 — "Leave workout?" must not fire on the session-select tab', 
     // is the SAME pathname, so a usePathname effect would not fire for the reported case.
     expect(src).toContain('const workoutActive = useWorkoutStore(isWorkoutActive)')
     expect(src).toContain('if (!workoutActive) setConfirmLeaveOpen(false)')
-    // All three guards can outlive their screen, not just the workout one. The walk's state stopped
-    // being a boolean in LB-141 — it carries the elapsed seconds the prompt is decided from — so
-    // this pins that the effect CLEARS it, not what the setter is called.
-    expect(src).toMatch(/if \(!walkActive\) set\w+\((?:false|null)\)/)
+    // The guided walk is not in this list any more (#2134): its Exit prompt is mounted by the walk
+    // screen itself, so it goes when the screen does and nothing here can carry it across a
+    // navigation. What would reintroduce the bug is the handler holding walk state again.
+    expect(src).not.toMatch(/walkActive|setLeaveWalk/)
     expect(src).toContain('if (!activityActive) setConfirmLeaveActivityOpen(false)')
   })
 })
