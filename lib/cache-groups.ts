@@ -334,6 +334,8 @@ export async function invalidateActivityWrites(): Promise<void> {
     invalidateCache('run-type-stats'),
     invalidateCache('walk-segment-stats'),
     invalidateCache('cardio-trends'),
+    // #2085 — a cardio session feeds the collection's Rogue bank
+    invalidateCache('collection'),
   ])
 }
 
@@ -605,6 +607,9 @@ export async function invalidateNutritionWrite(): Promise<void> {
     // W1: food_logs + nutrition_targets feed computeAchievements (nutrition milestones),
     // same as invalidateActivityWrites — keeps the Profile achievements card fresh.
     invalidateCache('achievements:'),
+    // a day with a food log is a Health cat point in the collection (PS-49); this group was missed
+    // when that faucet was added
+    invalidateCache('collection'),
   ])
 }
 

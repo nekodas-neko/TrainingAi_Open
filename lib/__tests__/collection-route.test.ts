@@ -9,7 +9,7 @@
  * as `pausedDays`, and the faucet thresholds applied to the right field.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { COLLECTION_RULES_VERSION, STEPS_MAX_REST_GAP } from '@trainingai/shared/collection/ladder'
+import { COLLECTION_RULES_VERSION, STEPS_MAX_REST_GAP, CARDIO_ACTIVITY_TYPES } from '@trainingai/shared/collection/ladder'
 import { shiftDateStr } from '@trainingai/shared/date-utils'
 
 const listTrainedDayKeys = vi.fn(async () => [] as string[])
@@ -24,10 +24,11 @@ const listSleepDayKeys = vi.fn(async () => [] as string[])
 const listStepTotals = vi.fn(async () => [] as { date: string; steps: number }[])
 const listFoodLogDayKeys = vi.fn(async () => [] as string[])
 const listWeightDayKeys = vi.fn(async () => [] as string[])
+const listCardioSessionCounts = vi.fn(async () => [] as { date: string; sessions: number }[])
 
 vi.mock('@/auth', () => ({ auth: async () => ({ user: { id: 'u-1', timezone: 'Australia/Brisbane' } }) }))
 vi.mock('@/lib/data', () => ({
-  getRepository: async () => ({ listTrainedDayKeys, listRestDays, getActiveProgram, listStepDayKeys, listSleepDayKeys, listStepTotals, listFoodLogDayKeys, listWeightDayKeys }),
+  getRepository: async () => ({ listTrainedDayKeys, listRestDays, getActiveProgram, listStepDayKeys, listSleepDayKeys, listStepTotals, listFoodLogDayKeys, listWeightDayKeys, listCardioSessionCounts }),
 }))
 
 import { GET } from '@/app/api/collection/route'
@@ -42,6 +43,7 @@ const body = async () => {
     collections: Record<'workout' | 'steps' | 'sleep', { stock: number[]; decayEvents: number }>
     rulesVersion: number
     today: string
+    v2: { collections: Record<'workout' | 'steps' | 'cardio' | 'health', { stock: number[]; bank?: number } | null> }
   }>
 }
 
@@ -56,12 +58,13 @@ const runTo = (endExclusiveOffset: number, n: number, today: string) => {
 }
 
 beforeEach(() => {
-  for (const m of [listTrainedDayKeys, listRestDays, getActiveProgram, listStepDayKeys, listSleepDayKeys]) m.mockClear()
+  for (const m of [listTrainedDayKeys, listRestDays, getActiveProgram, listStepDayKeys, listSleepDayKeys, listCardioSessionCounts]) m.mockClear()
   listTrainedDayKeys.mockResolvedValue([])
   listRestDays.mockResolvedValue([])
   getActiveProgram.mockResolvedValue(null)
   listStepDayKeys.mockResolvedValue([])
   listSleepDayKeys.mockResolvedValue([])
+  listCardioSessionCounts.mockResolvedValue([])
 })
 
 describe('GET /api/collection assembles what the fold needs', () => {
@@ -200,5 +203,30 @@ describe('GET /api/collection assembles what the fold needs', () => {
     const scheduled = await body()
 
     expect(scheduled.collections.workout.decayEvents).toBeLessThan(unscheduled.collections.workout.decayEvents)
+  })
+})
+
+/**
+ * #2085 — the Rogue, at the owner's provisional 1 session = 1 T1, draining ⅕ of a session a day.
+ * The fold is covered in `ps49-v2-bank.test.ts`; what this pins is the assembly: all history, the
+ * engine's own list of cardio types, and a SESSION count rather than a day count.
+ */
+describe('GET /api/collection feeds the v2 Rogue', () => {
+  it("reads cardio sessions over all history, with the engine's list of cardio types", async () => {
+    const { today } = await body()
+    expect(listCardioSessionCounts).toHaveBeenCalledWith('u-1', '2000-01-01', today, CARDIO_ACTIVITY_TYPES)
+  })
+
+  it('pays one T1 per session, so two runs in a day are two cats', async () => {
+    const { today } = await body()
+    listCardioSessionCounts.mockResolvedValue([{ date: today, sessions: 2 }])
+
+    const json = await body()
+    expect(json.v2.collections.cardio?.stock[0]).toBe(2)
+  })
+
+  it('returns an empty Rogue rather than null when nothing was logged', async () => {
+    const json = await body()
+    expect(json.v2.collections.cardio?.stock.every(n => n === 0)).toBe(true)
   })
 })
