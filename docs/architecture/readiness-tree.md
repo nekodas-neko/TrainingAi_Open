@@ -6,7 +6,9 @@
 
 Read with [`adaptive-scoring.md`](adaptive-scoring.md) (how bands and normals are learned per
 person) and [`component-references.md`](component-references.md) (the research default for each
-unit). Today's shipped model is described in [`scoring-structure.md`](scoring-structure.md).
+unit). Today's shipped model is described in [`scoring-structure.md`](scoring-structure.md). Every
+threshold in the app, classed as learned / guarded / constant / model with its gaps, is in
+[`threshold-inventory.md`](threshold-inventory.md) (gaps filed as #2371–#2375, #2341).
 
 ## The rule
 
