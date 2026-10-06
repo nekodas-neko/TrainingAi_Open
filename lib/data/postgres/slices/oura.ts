@@ -1361,7 +1361,8 @@ export async function getSetDetailsForSession(db: Db, userId: string, workoutSes
 
 /** Batch persist per-set HR snapshots. COALESCE upsert gated on readings_count, exactly like
  *  workout_hr_stats: a partial early recompute (recap opened mid-drain) never clobbers a later fuller
- *  one; a later fuller compute that gained a value fills the gap without wiping fields it lost. */
+ *  one; a later fuller compute that gained a value fills the gap without wiping fields it lost.
+ *  `hrr1_bpm` and `rest_adequate` are the exception: written as computed, so null can clear (#2457). */
 export async function upsertSetHrStats(db: Db, userId: string, workoutSessionId: string, rows: SetHrRow[]): Promise<void> {
   if (!rows.length) return
   // Conflict target is `set_log_id`, so a batch naming one set twice rejects every set in the
@@ -1383,6 +1384,7 @@ export async function upsertSetHrStats(db: Db, userId: string, workoutSessionId:
       secToPreset: r.secToPreset, recoveredPreset: r.recoveredPreset,
       secToResting: r.secToResting, recoveredResting: r.recoveredResting,
       pctHrrAtRestEnd: r.pctHrrAtRestEnd, secToHrr50: r.secToHrr50,
+      hrr1Bpm: r.hrr1Bpm,
       restAdequate: r.restAdequate, readingsCount: r.readingsCount, coverageOk: r.coverageOk,
       source: r.source,
     })))
@@ -1403,7 +1405,12 @@ export async function upsertSetHrStats(db: Db, userId: string, workoutSessionId:
         recoveredResting:sql`COALESCE(excluded.recovered_resting, ${s.setHrStats.recoveredResting})`,
         pctHrrAtRestEnd: sql`COALESCE(excluded.pct_hrr_at_rest_end, ${s.setHrStats.pctHrrAtRestEnd})`,
         secToHrr50:      sql`COALESCE(excluded.sec_to_hrr50, ${s.setHrStats.secToHrr50})`,
-        restAdequate:    sql`COALESCE(excluded.rest_adequate, ${s.setHrStats.restAdequate})`,
+        // Written as computed, never COALESCEd (#2457). Both read the same dense-HR measurement, and
+        // null is a real answer ("not measured"): under COALESCE a stale verdict from the older
+        // nearest-reading rule — 132 ring verdicts and the shortcut-era `true`s in production —
+        // could never clear. The `setWhere` gate below still keeps a sparser recompute from writing.
+        hrr1Bpm:         sql`excluded.hrr1_bpm`,
+        restAdequate:    sql`excluded.rest_adequate`,
         readingsCount:   sql`GREATEST(excluded.readings_count, ${s.setHrStats.readingsCount})`,
         coverageOk:      sql`(excluded.coverage_ok OR ${s.setHrStats.coverageOk})`,
         source:          sql`COALESCE(excluded.source, ${s.setHrStats.source})`,
@@ -1426,6 +1433,7 @@ function toSetHrStatsRow(r: typeof s.setHrStats.$inferSelect): SetHrStatsRow {
     secToPreset: r.secToPreset, recoveredPreset: r.recoveredPreset,
     secToResting: r.secToResting, recoveredResting: r.recoveredResting,
     pctHrrAtRestEnd: r.pctHrrAtRestEnd, secToHrr50: r.secToHrr50,
+    hrr1Bpm: r.hrr1Bpm,
     restAdequate: r.restAdequate, readingsCount: r.readingsCount, coverageOk: r.coverageOk,
     source: r.source,
     computedAt: r.computedAt,
@@ -1467,6 +1475,46 @@ export async function getSetHrStatsSince(db: Db, userId: string, since: Date, li
     .orderBy(asc(s.setHrStats.loggedAt), asc(s.setHrStats.setNumber))
     .limit(limit)
   return rows.map(toSetHrStatsRow)
+}
+
+/** Every stored per-set row's HRR60 inputs — the work-list for the `hrr1_bpm` backfill (#2457),
+ *  grouped by session by the caller so each session's HR window is fetched once. Oldest first. */
+export async function listSetHrStatsForHrr1Backfill(db: Db, userId: string) {
+  return db
+    .select({
+      setLogId: s.setHrStats.setLogId, workoutSessionId: s.setHrStats.workoutSessionId,
+      loggedAt: s.setHrStats.loggedAt, hrr1Bpm: s.setHrStats.hrr1Bpm, restAdequate: s.setHrStats.restAdequate,
+    })
+    .from(s.setHrStats)
+    .where(eq(s.setHrStats.userId, userId))
+    .orderBy(asc(s.setHrStats.loggedAt), asc(s.setHrStats.setLogId))
+}
+
+/**
+ * Write re-measured `hrr1_bpm` / `rest_adequate` onto stored rows (#2457), null included — a direct
+ * SET, not the COALESCE upsert, because clearing a stale verdict is the purpose. One transaction:
+ * every row is matched on its id AND the caller's user, and if the number of rows written differs
+ * from the number asked for, the whole write rolls back and this throws. Returns the count written.
+ */
+export async function writeSetHrr1(
+  db: Db, userId: string,
+  updates: readonly { setLogId: string; hrr1Bpm: number | null; restAdequate: boolean | null }[],
+): Promise<number> {
+  if (!updates.length) return 0
+  return db.transaction(async tx => {
+    let written = 0
+    for (const u of updates) {
+      const res = await tx.update(s.setHrStats)
+        .set({ hrr1Bpm: u.hrr1Bpm, restAdequate: u.restAdequate })
+        .where(and(eq(s.setHrStats.setLogId, u.setLogId), eq(s.setHrStats.userId, userId)))
+        .returning({ id: s.setHrStats.setLogId })
+      written += res.length
+    }
+    if (written !== updates.length) {
+      throw new Error(`writeSetHrr1: wrote ${written} rows, expected ${updates.length}; rolled back`)
+    }
+    return written
+  })
 }
 
 /** Completed sessions (inside retention) that have logged sets but no *usable* per-set snapshot yet

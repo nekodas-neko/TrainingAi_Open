@@ -9,8 +9,8 @@ function row(over: Partial<SetHrStatsRow>): SetHrStatsRow {
     loggedAt: new Date('2026-07-10T00:00:00Z'),
     peakBpm: 170, avgBpm: 150, bpmAtEnd: 165, drop30s: 20, drop60s: 30, drop90s: 40, drop120s: 45,
     troughBpm: 120, secToPreset: 50, recoveredPreset: true, secToResting: null, recoveredResting: false,
-    pctHrrAtRestEnd: 60, secToHrr50: 25, restAdequate: true, readingsCount: 40, coverageOk: true,
-    computedAt: new Date(), ...over,
+    pctHrrAtRestEnd: 60, secToHrr50: 25, hrr1Bpm: null, restAdequate: true, readingsCount: 40, coverageOk: true,
+    plannedReps: null, source: null, computedAt: new Date(), ...over,
   }
 }
 

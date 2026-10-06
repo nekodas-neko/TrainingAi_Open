@@ -1490,7 +1490,8 @@ SELECT
   t.coverage_ok,
   t.source,
   t.computed_at,
-  t.planned_reps
+  t.planned_reps,
+  t.hrr1_bpm
 FROM public.set_hr_stats t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 

@@ -1535,6 +1535,8 @@ export const setHrStats = pgTable('set_hr_stats', {
   recoveredResting:  boolean('recovered_resting'),
   pctHrrAtRestEnd:   doublePrecision('pct_hrr_at_rest_end'),
   secToHrr50:        integer('sec_to_hrr50'),
+  // HRR60 from dense HR (migration 202610061533, #2457) — null when the series could not see it.
+  hrr1Bpm:           integer('hrr1_bpm'),
   restAdequate:      boolean('rest_adequate'),
   readingsCount:     integer('readings_count').notNull().default(0),
   coverageOk:        boolean('coverage_ok').notNull().default(false),
