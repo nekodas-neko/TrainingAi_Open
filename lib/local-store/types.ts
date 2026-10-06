@@ -1,4 +1,5 @@
 import type { SyncedMutationDomain } from '@trainingai/shared/sync/mutation-schema';
+import type { RpeSource } from '@trainingai/shared/workout/rpe-source';
 
 export interface LocalBodyMetric {
   date:             string;       // primary key — YYYY-MM-DD
@@ -133,6 +134,10 @@ export interface LocalSetLog {
   plannedPct:    number | null;
   plannedReps:   number | null;
   plannedRestSec: number | null;
+  /** #2445: the bar prescribed after plate rounding; null where no style percentage set it. */
+  plannedWeightKg: number | null;
+  /** #2450: `rated` (tapped) or `expected` (the untouched pre-fill); null with no RPE, or unknown. */
+  rpeSource:    RpeSource | null;
   updatedAt:    string;
   deletedAt:    string | null;
   syncStatus:   'pending' | 'synced';

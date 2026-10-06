@@ -53,6 +53,8 @@ describe.skipIf(!canRun)('energy balance — calibration window', () => {
   })
 
   beforeEach(async () => {
+    await pool.query(`DELETE FROM supplement_logs WHERE user_id = $1`, [TEST_USER_ID])
+    await pool.query(`DELETE FROM supplements WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM food_logs WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM body_metrics WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM day_checkins WHERE user_id = $1`, [TEST_USER_ID])
@@ -60,6 +62,8 @@ describe.skipIf(!canRun)('energy balance — calibration window', () => {
 
   afterAll(async () => {
     if (!canRun) return
+    await pool.query(`DELETE FROM supplement_logs WHERE user_id = $1`, [TEST_USER_ID])
+    await pool.query(`DELETE FROM supplements WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM food_logs WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM body_metrics WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM day_checkins WHERE user_id = $1`, [TEST_USER_ID])
@@ -135,6 +139,62 @@ describe.skipIf(!canRun)('energy balance — calibration window', () => {
     const r = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
 
     expect(r.maintenance?.source).toBe('formula')
+  })
+
+  /**
+   * #2184 — the owner chose a caveat over a pause: *"If I start taking more or less fish oil or
+   * creatine it will need to rebaseline? Not exactly good."* So a dose change inside the window adds
+   * one sentence and moves NO number. Pinned as whole-payload equality with the caveat set aside,
+   * rather than on `maintenance.kcal` alone, because the calibrated figure feeds the resting base,
+   * the expenditure, the projection and the recommended target — any of which a later change could
+   * route the dose log into.
+   */
+  it('names a dose change inside the window and changes no computed number (#2184)', async () => {
+    await seedCalibratableHistory()
+    const without = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
+    expect(without.maintenance?.source).toBe('calibrated')
+    expect(without.maintenance?.doseCaveat).toBeNull()
+
+    const sup = await pool.query(
+      `INSERT INTO supplements (user_id, name, dose) VALUES ($1, 'Test Peptide', '10mg') RETURNING id`,
+      [TEST_USER_ID],
+    )
+    const supplementId = sup.rows[0].id as string
+    const startDay = shiftDateStr(TODAY, -10)
+    const changeDay = shiftDateStr(TODAY, -4)
+    for (const [day, amount] of [[startDay, 0.5], [changeDay, 1]] as const) {
+      await pool.query(
+        `INSERT INTO supplement_logs (supplement_id, user_id, log_date, amount, unit, dose_text, source)
+         VALUES ($1, $2, $3::date, $4, 'mg', '10mg', 'manual')`,
+        [supplementId, TEST_USER_ID, day, amount],
+      )
+    }
+
+    const withDoses = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
+    const caveat = withDoses.maintenance?.doseCaveat
+    expect(caveat).toMatch(/^You started Test Peptide on .+ and changed your Test Peptide dose on .+, so weight changes since .+ may not reflect your metabolism\.$/)
+
+    const strip = (r: typeof without) => ({ ...r, maintenance: { ...r.maintenance!, doseCaveat: undefined } })
+    expect(strip(withDoses)).toEqual(strip(without))
+  })
+
+  it('carries no dose caveat on the formula path, which reads no weight (#2184)', async () => {
+    await pool.query(
+      `INSERT INTO body_metrics (user_id, date, weight_kg) VALUES ($1, $2::date, 80)`,
+      [TEST_USER_ID, TODAY],
+    )
+    const sup = await pool.query(
+      `INSERT INTO supplements (user_id, name) VALUES ($1, 'Test Peptide') RETURNING id`,
+      [TEST_USER_ID],
+    )
+    await pool.query(
+      `INSERT INTO supplement_logs (supplement_id, user_id, log_date, amount, unit, source)
+       VALUES ($1, $2, $3::date, 1, 'mg', 'manual')`,
+      [sup.rows[0].id, TEST_USER_ID, shiftDateStr(TODAY, -3)],
+    )
+    const r = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
+    expect(r.maintenance?.source).toBe('formula')
+    expect(r.maintenance?.doseCaveat).toBeNull()
   })
 
   it('calibrates once those same days ARE marked complete', async () => {
@@ -351,6 +411,49 @@ describe.skipIf(!canRun)('energy balance — calibration window', () => {
     expect(many.recommendedKcal).toBe(none.recommendedKcal)
     // The base is the same on both days too — the credit is a property of the user, not the day.
     expect(many.balance.restingBaseKcal).toBe(none.balance.restingBaseKcal)
+  })
+
+  // LB-50 — the activity factor the picker (BF-102) shows, and its not-enough-data state.
+  const bmrAt79 = () => mifflinStJeorBmr(79, 175, ageFromDob('1993-01-01', new Date())!, 'male')
+
+  it('LB-50: the calibrated activity factor is maintenance / BMR over the calibration window', async () => {
+    await seedCalibratableHistory()
+    const r = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
+    expect(r.maintenance?.source).toBe('calibrated')
+    const f = r.maintenance!.activityFactor
+    // Latest weigh-in is day 27 of the fixture: 80 − 27/27 = 79 kg; no body fat, no RMR → Mifflin.
+    expect(f.calibrated).toEqual({
+      factor: Math.round((r.maintenance!.kcal / bmrAt79()) * 100) / 100,
+      windowDays: r.maintenance!.daysInWindow,
+    })
+    expect(f.gapMessage).toBeNull()
+  })
+
+  it('LB-50: an under-calibrated account gets the REASON, not a calibrated factor that is really a guess', async () => {
+    // Weighs in, has logged no food: the formula path, and where the owner starts.
+    await pool.query(
+      `INSERT INTO body_metrics (user_id, date, weight_kg) VALUES ($1, $2::date, 80)`,
+      [TEST_USER_ID, TODAY],
+    )
+    const r = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
+    expect(r.maintenance?.source).toBe('formula')
+    const f = r.maintenance!.activityFactor
+    expect(f.calibrated).toBeNull()
+    expect(f.gapMessage).toMatch(/Log food on 10 more days to calibrate/)
+    expect(f.gapMessage).toBe(r.maintenance!.gapMessage)
+  })
+
+  it('LB-50: the measured-movement factor does not echo the calibration back', async () => {
+    // Every fixture day has zero steps, so the measured factor is the formula resting base alone —
+    // well under the calibrated figure, which carries the 2,000 kcal intake and the weight loss.
+    await seedCalibratableHistory()
+    const r = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
+    const f = r.maintenance!.activityFactor
+    expect(f.measuredMovement).not.toBeNull()
+    expect(f.measuredMovement!.windowDays).toBe(28)
+    expect(f.measuredMovement!.factor).toBeLessThanOrEqual(SEDENTARY_MULTIPLIER)
+    expect(f.measuredMovement!.factor).toBeGreaterThanOrEqual(1)
+    expect(f.measuredMovement!.factor).toBeLessThan(f.calibrated!.factor)
   })
 
   it('scopes every read to the user', async () => {

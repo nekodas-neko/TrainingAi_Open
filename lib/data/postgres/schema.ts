@@ -159,6 +159,9 @@ export const programSessions = pgTable('program_sessions', {
     .where(sql`deleted_at IS NULL`),
 ])
 
+// #2120: every FK on this table, workout_sessions and meal_plan_meals is DEFERRABLE INITIALLY
+// IMMEDIATE in the database (Drizzle cannot declare it). Each has two or more SET NULL keys the
+// account-deletion cascade fires; account-deletion.test.ts fails if one is recreated without it.
 export const programPhases = pgTable('program_phases', {
   id:               uuid('id').primaryKey().defaultRandom(),
   phaseSetId:       uuid('phase_set_id').references(() => phaseSets.id, { onDelete: 'cascade' }),
@@ -217,6 +220,8 @@ export const scheduleDays = pgTable('schedule_days', {
 //
 // It has already cost a session: a repro fixture populated `program_session_id`, the periodization
 // block took its `null` branch, and the honest reading of that run was "the race does not exist".
+//
+// #2120: every FK here is DEFERRABLE in the database — see the note above `programPhases`.
 export const workoutSessions = pgTable('workout_sessions', {
   id:                uuid('id').primaryKey().defaultRandom(),
   userId:            uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -279,6 +284,13 @@ export const setLogs = pgTable('set_logs', {
   plannedPct:     doublePrecision('planned_pct'),
   plannedReps:    integer('planned_reps'),
   plannedRestSec: integer('planned_rest_sec'),
+  // #2445: the bar the app prescribed after plate rounding (`mroundStepUp`), which is heavier than
+  // `planned_pct` implies. NULL where no style percentage set the bar (bodyweight, freeform, extra
+  // sets) and on every row logged before the column existed.
+  plannedWeightKg: doublePrecision('planned_weight_kg'),
+  // #2450: 'rated' (tapped on the picker) | 'expected' (the untouched pre-fill). CHECK-constrained
+  // in migration 202610061516. NULL on a set with no RPE and on every row logged before it existed.
+  rpeSource:     text('rpe_source').$type<import('@trainingai/shared/workout/rpe-source').RpeSource>(),
   updatedAt:     timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt:     timestamp('deleted_at', { withTimezone: true }),
 }, t => [unique().on(t.exerciseLogId, t.setNumber)])
@@ -339,7 +351,8 @@ export const exerciseLibrary = pgTable('exercise_library', {
   muscles:      jsonb('muscles').notNull().default([]),
   equipment:    text('equipment').array().notNull().default([]),
   instructions: text('instructions'),
-  createdBy:    uuid('created_by').references(() => users.id),
+  // #2120: SET NULL, so deleting an account keeps the exercises it added to the shared catalogue.
+  createdBy:    uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
   exerciseType: text('exercise_type').notNull().default('weighted'),
   // Nullable, set only for a catalogue entry a data migration merged into another (migration 165).
   // The picker filters these out; historical exercise_id FKs stay valid since the row is kept.
@@ -766,8 +779,9 @@ export const mealTypes = pgTable('meal_types', {
   remindersEnabled: boolean('reminders_enabled').notNull().default(true),
   required:      boolean('required').notNull().default(true),
   createdAt:     timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  // Meal types soft-delete (Q-179). `food_logs.meal_type_id` is ON DELETE RESTRICT, so a hard
-  // DELETE fails the moment any log — including a soft-deleted one — still points here.
+  // Meal types soft-delete (Q-179). `food_logs.meal_type_id` refuses the delete (NO ACTION since
+  // #2120, RESTRICT before), so a hard DELETE fails the moment any log — including a soft-deleted
+  // one — still points here.
   deletedAt:     timestamp('deleted_at', { withTimezone: true }),
 })
 
@@ -798,8 +812,11 @@ export const foodLogs = pgTable('food_logs', {
   id:                 uuid('id').primaryKey().defaultRandom(),
   userId:             uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   date:               text('date').notNull(),
-  mealTypeId:         uuid('meal_type_id').notNull().references(() => mealTypes.id, { onDelete: 'restrict' }),
-  foodItemId:         uuid('food_item_id').notNull().references(() => foodItems.id, { onDelete: 'restrict' }),
+  // #2120: these two and saved_meal_items.food_item_id are NO ACTION DEFERRABLE in the database
+  // (Drizzle cannot declare DEFERRABLE). A lone delete of a referenced row is still refused; only
+  // account deletion defers the check to COMMIT so its own cascade can finish first.
+  mealTypeId:         uuid('meal_type_id').notNull().references(() => mealTypes.id, { onDelete: 'no action' }),
+  foodItemId:         uuid('food_item_id').notNull().references(() => foodItems.id, { onDelete: 'no action' }),
   // BF-39 (migration 238). `savedMealId` is WHAT was eaten; `mealGroupId` is WHICH TIME. Two
   // servings of the same meal on one day share the first and must not share the second, so the
   // diary groups on the group and names the group from the meal. `ON DELETE SET NULL` on the FK:
@@ -845,7 +862,7 @@ export const savedMealMealTypes = pgTable('saved_meal_meal_types', {
 export const savedMealItems = pgTable('saved_meal_items', {
   id:                 uuid('id').primaryKey().defaultRandom(),
   savedMealId:        uuid('saved_meal_id').notNull().references(() => savedMeals.id, { onDelete: 'cascade' }),
-  foodItemId:         uuid('food_item_id').notNull().references(() => foodItems.id, { onDelete: 'restrict' }),
+  foodItemId:         uuid('food_item_id').notNull().references(() => foodItems.id, { onDelete: 'no action' }),
   quantityMultiplier: doublePrecision('quantity_multiplier').notNull().default(1.0),
 })
 
@@ -885,6 +902,7 @@ export const mealPlanVariants = pgTable('meal_plan_variants', {
   targetFatG:      doublePrecision('target_fat_g').notNull(),
 })
 
+// #2120: every FK here is DEFERRABLE in the database — see the note above `programPhases`.
 export const mealPlanMeals = pgTable('meal_plan_meals', {
   id:              uuid('id').primaryKey().defaultRandom(),
   variantId:       uuid('variant_id').notNull().references(() => mealPlanVariants.id, { onDelete: 'cascade' }),
@@ -1647,6 +1665,47 @@ export const strapStatus = pgTable('strap_status', {
   worn:                boolean('worn'),
 })
 
+// #2469 (migration 202610061553). `OuraRingService`'s link counters, which it kept in memory only.
+// Cumulative since `serviceStartedAt` — they reset with the service, so a reader groups by that
+// instant (seconds tolerance) and differences within a group. `recordedAt` is server-stamped.
+export const ouraBleLinkStats = pgTable('oura_ble_link_stats', {
+  id:                   bigserial('id', { mode: 'number' }).primaryKey(),
+  userId:               uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  recordedAt:           timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+  serviceStartedAt:     timestamp('service_started_at', { withTimezone: true }).notNull(),
+  serviceUptimeMs:      bigint('service_uptime_ms', { mode: 'number' }).notNull(),
+  state:                text('state').notNull(),
+  connectCount:         integer('connect_count').notNull(),
+  dropCount:            integer('drop_count').notNull(),
+  totalConnectedMs:     bigint('total_connected_ms', { mode: 'number' }).notNull(),
+  lastTimeToConnectMs:  integer('last_time_to_connect_ms'),
+  consecutiveFailures:  integer('consecutive_failures'),
+})
+
+// #2478 (migration 202610061648). Walk auto-detection's funnel, one row per kind per detection:
+// candidate → confirmed → notified → offered → saved | dismissed, each with the gate that decided
+// it. `detectionId` is minted on the phone when a probe starts; (user, detection, kind) is the
+// natural key, so a retried post inserts nothing new. `occurredAt` is device time.
+export const detectionEvents = pgTable('detection_events', {
+  id:             bigserial('id', { mode: 'number' }).primaryKey(),
+  userId:         uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  detectionId:    uuid('detection_id').notNull(),
+  kind:           text('kind').notNull(),
+  gate:           text('gate').notNull(),
+  occurredAt:     timestamp('occurred_at', { withTimezone: true }).notNull(),
+  recordedAt:     timestamp('recorded_at', { withTimezone: true }).notNull().defaultNow(),
+  triggerSource:  text('trigger_source'),
+  activityType:   text('activity_type'),
+  sessionStartAt: timestamp('session_start_at', { withTimezone: true }),
+  distanceM:      doublePrecision('distance_m'),
+  elapsedSec:     doublePrecision('elapsed_sec'),
+  pointCount:     integer('point_count'),
+  avgSpeedMs:     doublePrecision('avg_speed_ms'),
+}, t => [
+  uniqueIndex('detection_events_user_detection_kind_uq').on(t.userId, t.detectionId, t.kind),
+  index('detection_events_user_time_idx').on(t.userId, t.occurredAt),
+])
+
 // One (anchor_ds ↔ anchor_utc) correspondence per ring-clock epoch (migration 115).
 // A ring reset (re-key / dead battery) starts a new epoch → a new row; older rows
 // keep dating their epoch's samples via created_at ordering.
@@ -2015,6 +2074,32 @@ export const colmiSleepSegments = pgTable('colmi_sleep_segments', {
   minutes:   integer('minutes').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [unique('colmi_sleep_segments_unique').on(t.userId, t.startedAt, t.stage)])
+
+/** #2462 (migration 202610061624). Health Connect movement at the source's own resolution: `steps`
+ *  and `active_kcal` one row per record over [startAt, endAt], `cadence_spm` one row per series
+ *  sample (startAt = endAt). Keyed by Health Connect's record id, so a re-read window upserts. Rows
+ *  from different apps covering the same minutes are all kept; overlap is resolved at read time
+ *  (`stepCandidates` → `dedupeOverlappingWindows`). Server-only: Health Connect is the device copy. */
+export const HEALTH_CONNECT_INTERVAL_KINDS = ['steps', 'active_kcal', 'cadence_spm'] as const
+export const healthConnectIntervals = pgTable('health_connect_intervals', {
+  userId:     uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  kind:       text('kind', { enum: HEALTH_CONNECT_INTERVAL_KINDS }).notNull(),
+  recordId:   text('record_id').notNull(),
+  startAt:    timestamp('start_at', { withTimezone: true }).notNull(),
+  endAt:      timestamp('end_at', { withTimezone: true }).notNull(),
+  value:      doublePrecision('value').notNull(),
+  dataOrigin: text('data_origin'),
+  deviceType: text('device_type'),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:  timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  primaryKey({ columns: [t.userId, t.kind, t.recordId, t.startAt] }),
+  check('health_connect_intervals_kind', sql`${t.kind} IN ('steps', 'active_kcal', 'cadence_spm')`),
+  check('health_connect_intervals_record_id', sql`length(trim(${t.recordId})) > 0`),
+  check('health_connect_intervals_span', sql`isfinite(${t.startAt}) AND isfinite(${t.endAt}) AND ${t.endAt} >= ${t.startAt}`),
+  check('health_connect_intervals_value', sql`${t.value} >= 0 AND ${t.value} < 'Infinity'::double precision`),
+  index('health_connect_intervals_range_idx').on(t.userId, t.kind, t.startAt),
+])
 
 export const appleHealthSamples = pgTable('apple_health_samples', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),

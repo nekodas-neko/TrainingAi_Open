@@ -138,7 +138,7 @@ export function ExerciseHistorySheet({ exerciseName, muscles = [], userId, onClo
               </div>
               {gainThisMonth != null && (
                 <div className="flex-1 rounded-xl bg-muted/60 border border-border p-3 text-center">
-                  <p className="text-xl font-bold tabular-nums" style={{ color: gainThisMonth >= 0 ? "var(--color-brand)" : "#ef4444" }}>
+                  <p className="text-xl font-bold tabular-nums" style={{ color: gainThisMonth >= 0 ? "var(--color-brand)" : "var(--destructive)" }}>
                     {gainThisMonth >= 0 ? "+" : ""}{gainThisMonth}
                     <span className="text-[10px] font-normal text-muted-foreground ml-1">{unitSuffix}</span>
                   </p>

@@ -32,6 +32,7 @@ import { useWorkoutStore } from '@/lib/stores/workout-store'
 import type { WorkoutMode } from '@/components/workout/types'
 import { useGuidedWalkStore, isGuidedWalkActive } from '@/lib/stores/guided-walk-store'
 import { useActivityStore, isActivityActive } from '@/lib/stores/activity-store'
+import { recordDetectionEvent, newDetectionId, flushDetectionEvents } from './detection-events'
 
 const MIN_MOVE_SPEED_MS = 0.8           // 2.9 km/h — below this = stationary noise
 const SESSION_END_GAP_MS = 3 * 60 * 1000  // 3-min silence = session ended
@@ -178,6 +179,25 @@ let gaitConfirmCtx: GaitConfirmContext = initGaitConfirm()
 const probeBuffer: RoutePoint[] = []
 const PROBE_BUFFER_CAP = 400 // generous vs. the ~3-min probe timeout at typical GPS point rates
 
+// #2478: funnel telemetry (lib/activity/detection-events.ts). READ-ONLY — these record what the
+// gates above already decided and are never read back by detection. One detection = one GPS probe
+// (or, under always-on GPS, one session). `probeEndGate` names why GPS is about to stop, set just
+// before the dispatch that stops it, so a probe that never confirmed reports the rule that ended it.
+let detectionId: string | null = null
+let detectionConfirmed = false
+let probeEndGate: string | null = null
+
+/** The detection a session about to start belongs to. Under always-on GPS (or a session with no
+ *  probe of its own) a fresh one is minted here, with its own candidate event. */
+function claimDetectionForSession(): string | null {
+  if (!detectionId || detectionConfirmed) {
+    detectionId = newDetectionId()
+    recordDetectionEvent(detectionId, 'candidate', ungated ? 'always_on_gps' : 'no_probe', { trigger: triggerSource })
+  }
+  detectionConfirmed = true
+  return detectionId
+}
+
 /**
  * The decoded column's middle FINITE value, as a plain number for `classifyGait`.
  *
@@ -224,9 +244,11 @@ function runWatchdog(now: number): void {
   if (verdict.action === 'none') { publishDiag(); return }
   const store = useAutoDetectionStore.getState()
   if (store.sessionStartMs !== null) store.endSession()
+  probeEndGate = verdict.action === 'force-stop' && verdict.reason === 'watcher-cap' ? 'watcher_cap' : 'probe_timeout'
   // 'sessionEnded' collapses probing OR tracking back to idle:
   // stopGps + re-arm the motion trigger.
   dispatchGate({ type: 'sessionEnded' })
+  probeEndGate = null
   publishDiag()
 }
 
@@ -243,6 +265,13 @@ function avgSpeedMs(points: RoutePoint[]): number {
 
 async function startGps(): Promise<void> {
   if (watcher) return
+  detectionId = newDetectionId()
+  detectionConfirmed = false
+  recordDetectionEvent(
+    detectionId, 'candidate',
+    ungated ? 'always_on_gps' : triggerSource === 'ring' ? 'ring_gait_window' : 'phone_motion',
+    { trigger: triggerSource },
+  )
   recentPoints.length = 0
   lastPointMs = null
   activityNotified = false
@@ -264,6 +293,12 @@ function onWatcherError(message: string): void {
 }
 
 async function stopGps(): Promise<void> {
+  // Before the first await, so the dispatch that set probeEndGate is still the caller.
+  if (detectionId && !detectionConfirmed) {
+    recordDetectionEvent(detectionId, 'dismissed', probeEndGate ?? 'probe_timeout', { trigger: triggerSource })
+  }
+  detectionId = null
+  detectionConfirmed = false
   if (stallTimer) { clearTimeout(stallTimer); stallTimer = null }
   if (watcher) { await watcher.stop(); watcher = null }
   gpsStartedMs = null
@@ -295,9 +330,11 @@ function abortInFlightIfSessionOwned(): void {
     activityActive: isActivityActive(useActivityStore.getState()),
   })) return
   if (sessionActive) store.discardSession()
+  probeEndGate = 'session_owned'
   // Collapses probing OR tracking back to idle (stopGps + re-arm the motion trigger). Re-arming
   // during the owning session is safe — dispatchGate already refuses its motionTrigger.
   dispatchGate({ type: 'sessionEnded' })
+  probeEndGate = null
 }
 
 function dispatchGate(event: MotionGateEvent): void {
@@ -405,7 +442,9 @@ function onPoint(point: RoutePoint) {
     // When the ring is live, confirmation comes from the gait-confirm accumulator in the gate-feed
     // subscription below — a single, real cadence signal, not a speed guess.
     if (store.sessionStartMs === null && triggerSource === 'sensor') {
-      store.startSession(point.t)
+      const id = claimDetectionForSession()
+      store.startSession(point.t, undefined, id)
+      recordDetectionEvent(id, 'confirmed', 'gps_speed', { trigger: 'sensor', sessionStartAt: point.t, avgSpeedMs: speed })
     }
     if (store.sessionStartMs !== null) {
       // Dispatched unconditionally (not just on first confirm) so a session that
@@ -434,6 +473,9 @@ function onPoint(point: RoutePoint) {
         activityNotified = true
         // Cleared when GPS stops in stopGps().
         void notifyActivityDetected()
+        recordDetectionEvent(s.sessionDetectionId, 'notified', 'gps_distance_elapsed', {
+          trigger: 'sensor', sessionStartAt: s.sessionStartMs, distanceM, elapsedSec, pointCount: pts.length,
+        })
       }
     }
   }
@@ -455,6 +497,8 @@ export async function startAutoDetection(): Promise<void> {
   gate = initGate()
   // Reconcile any stale "detected" ping left over from a killed session.
   void clearActivityDetected()
+  // #2478: post any funnel events a previous run queued (best-effort, never awaited).
+  void flushDetectionEvents()
   publishDiag()
 
   // Ticks and resume both drive the watchdog regardless of mode (harmless in
@@ -471,6 +515,7 @@ export async function startAutoDetection(): Promise<void> {
     abortInFlightIfSessionOwned()
     dispatchGate({ type: 'tick', now })
     runWatchdog(now)
+    void flushDetectionEvents()
   })
 
   // Prefer the battery-cheap path: keep GPS off and let the significant-motion
@@ -527,7 +572,9 @@ export async function startAutoDetection(): Promise<void> {
         gaitConfirmCtx = result.ctx
         if (result.confirmed && triggerSource === 'ring' && useAutoDetectionStore.getState().sessionStartMs === null) {
           const { activityType, startMs } = result.confirmed
-          useAutoDetectionStore.getState().startSession(startMs, activityType)
+          const id = claimDetectionForSession()
+          useAutoDetectionStore.getState().startSession(startMs, activityType, id)
+          recordDetectionEvent(id, 'confirmed', 'ring_cadence', { trigger: 'ring', activityType, sessionStartAt: startMs })
           // Backfill probe-phase points from the true (backdated) onset so the route isn't
           // clipped to the ~90s-later confirm instant.
           for (const p of probeBuffer) {
@@ -545,6 +592,9 @@ export async function startAutoDetection(): Promise<void> {
           })) {
             activityNotified = true
             void notifyActivityDetected()
+            recordDetectionEvent(id, 'notified', pts.length < 2 ? 'ring_cadence_no_fix' : 'ring_cadence_gps', {
+              trigger: 'ring', activityType, sessionStartAt: startMs, distanceM, elapsedSec, pointCount: pts.length,
+            })
           }
         }
       }
@@ -562,12 +612,14 @@ export async function stopAutoDetection(): Promise<void> {
   unsubGateFeed?.(); unsubGateFeed = null
   triggerSource = 'sensor'
   disarmMotionTrigger()
+  probeEndGate = 'detection_stopped'
   dispatchGate({ type: 'stop' })
   gate = initGate()
   activityNotified = false
   gaitConfirmCtx = initGaitConfirm()
   probeBuffer.length = 0
   await stopGps()
+  probeEndGate = null
 
   const store = useAutoDetectionStore.getState()
   store.setDetecting(false)

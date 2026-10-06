@@ -130,7 +130,6 @@ export interface HealthSectionsCtx {
   /** Whether the reading the BMI band was chosen from carried a DEXA calibration (BF-113). */
   latestBfIsCorrected: boolean;
   weightTrendKgPerWeek: number | null;
-  energyBalanceKcal: number | null;
   energyBalance: import('@/app/api/nutrition/energy-balance/route').EnergyBalanceResponse | null;
   trainingLoad: TrainingLoadResponse | null;
   sleepCorr: SleepCorrelationResponse | null;
@@ -170,7 +169,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
     latestDistanceKm, targetWeightKg, targetBfPct, openInfo, toggleInfo, openLog,
     setMetricSheet, setWaterLogOpen, recentSleep, lastSleep, readiness,
     todayWaterMl, waterGoalMl, activeEnergyKcalToday, bmi, bmiLabel, bmiUsesBf, latestBfIsCorrected,
-    weightTrendKgPerWeek, energyBalanceKcal, energyBalance, trainingLoad, sleepCorr, injuries,
+    weightTrendKgPerWeek, energyBalance, trainingLoad, sleepCorr, injuries,
     setInjuries, userId, recoveryMuscles, handleDayClick, weeklyStats, weeklyStatsError, retryWeeklyStats,
     metaFailed, energyBalanceFailed, trainingLoadFailed, sleepCorrFailed, goalsFailed,
     activeSessions, trainingGoal, muscleSets, strengthTrend, weekToDate, userGoals,
@@ -234,7 +233,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
           {targetWeightKg != null && latestWeight != null && (() => {
             const diff = parseFloat((latestWeight - targetWeightKg).toFixed(1))
             return (
-              <p className="text-xs font-semibold mt-1" style={{ color: diff <= 0 ? '#22c55e' : '#f97316' }}>
+              <p className="text-xs font-semibold mt-1" style={{ color: diff <= 0 ? 'var(--accent-green)' : '#f97316' }}>
                 {diff <= 0 ? '✓ Goal reached' : `↓ ${diff} kg to go`}
               </p>
             )
@@ -246,7 +245,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
               : status === 'too_slow' ? 'Slower than ideal pace'
               : status === 'too_fast' ? 'Faster than ideal pace'
               : 'Trending away from goal'
-            const color = status === 'on_track' ? '#22c55e' : status === 'wrong_direction' ? '#ef4444' : '#f59e0b'
+            const color = status === 'on_track' ? 'var(--accent-green)' : status === 'wrong_direction' ? 'var(--destructive)' : 'var(--accent-amber)'
             return (
               <p className="text-[10px] mt-1" style={{ color }}>
                 {label} · {rateKgPerWeek >= 0 ? '+' : ''}{rateKgPerWeek} kg/wk
@@ -542,67 +541,18 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
         );
       }
 
-      case "weightTrend": {
-        return (
-          <div key="weightTrend" className="grid grid-cols-2 gap-3">
-            <div className="rounded-2xl p-4 relative overflow-hidden" style={accentCardStyle('#22c55e')}>
-              <div className="absolute -top-3 -right-3 w-14 h-14 rounded-full pointer-events-none" style={{ background: "#22c55e", filter: "blur(20px)", opacity: 0.2 }} />
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#22c55e" }}>Trend</p>
-                <button onClick={() => toggleInfo('trend')} aria-label="Weight trend info" className="p-2.5 rounded-full text-muted-foreground/70 hover:text-muted-foreground transition-colors">
-                  <InfoIcon className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              {metaLoading ? (
-                <div className="h-7 w-16 animate-pulse rounded-lg bg-muted" />
-              ) : weightTrendKgPerWeek != null ? (
-                <p className="text-2xl font-bold tabular-nums" style={{ color: "#22c55e" }}>
-                  {weightTrendKgPerWeek >= 0 ? '+' : ''}{weightTrendKgPerWeek}
-                  <span className="text-xs font-normal ml-1">kg/wk</span>
-                </p>
-              ) : (
-                <p className="text-xs text-muted-foreground">Need more data</p>
-              )}
-              {openInfo === 'trend' && (
-                <div className="mt-3 rounded-xl bg-muted/50 p-2.5">
-                  <p className="text-[10px] text-muted-foreground leading-relaxed">
-                    Linear regression slope across your recent weight readings. Positive = gaining, negative = losing. Needs at least 3 readings to calculate.
-                  </p>
-                </div>
-              )}
-            </div>
-            <div className="rounded-2xl p-4 relative overflow-hidden" style={accentCardStyle('#00d4ff')}>
-              <div className="absolute -top-3 -right-3 w-14 h-14 rounded-full pointer-events-none" style={{ background: "#00d4ff", filter: "blur(20px)", opacity: 0.2 }} />
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#00d4ff" }}>Balance</p>
-                <button onClick={() => toggleInfo('balance')} aria-label="Energy balance info" className="p-2.5 rounded-full text-muted-foreground/70 hover:text-muted-foreground transition-colors">
-                  <InfoIcon className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              {metaLoading ? (
-                <div className="h-7 w-16 animate-pulse rounded-lg bg-muted" />
-              ) : energyBalanceKcal != null ? (
-                <>
-                  <p className="text-2xl font-bold tabular-nums" style={{ color: "#00d4ff" }}>
-                    {energyBalanceKcal >= 0 ? '+' : ''}{Math.round(energyBalanceKcal)}
-                    <span className="text-sm font-normal ml-1">kcal</span>
-                  </p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">vs TDEE est.</p>
-                </>
-              ) : (
-                <CellEmpty failed={energyBalanceFailed} />
-              )}
-              {openInfo === 'balance' && (
-                <div className="mt-3 rounded-xl bg-muted/50 p-2.5">
-                  <p className="text-[10px] text-muted-foreground leading-relaxed">
-                    Calories eaten minus estimated daily expenditure. TDEE = Mifflin-St Jeor BMR × activity factor (based on your Activity Level in Profile, or 1.4 if unset). Requires age, height, sex, and today&apos;s food log.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      }
+      // The one Weight Trend card (#2147). It used to be two: a slope tile here with no chart, and a
+      // sparkline-and-goal-bars card on Progress with no slope. The old "Balance" tile beside the
+      // slope is gone with it (#2146) — its net kcal is the Net stat of the Energy Balance card.
+      case "weightTrend": return (
+        <WeightTrendCard key="weightTrend"
+          metaRecent={metaRecent} metaFailed={metaFailed} latestWeight={latestWeight} latestBf={latestBf}
+          targetWeightKg={targetWeightKg} targetBfPct={targetBfPct} bodyBaseline={bodyBaseline}
+          bodyFatBarColor="#2dd4bf"
+          kgPerWeek={weightTrendKgPerWeek} loading={metaLoading}
+          infoOpen={openInfo === 'trend'} onToggleInfo={() => toggleInfo('trend')}
+        />
+      );
 
       case "rhr": return (
         <RhrHrvSpo2Card
@@ -738,13 +688,6 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
           userGoals={userGoals}
           progressSummary={progressSummary}
           failed={goalsFailed}
-        />
-      );
-      case "weightTrendProgress": return (
-        <WeightTrendCard key="weightTrendProgress"
-          metaRecent={metaRecent} metaFailed={metaFailed} latestWeight={latestWeight} latestBf={latestBf}
-          targetWeightKg={targetWeightKg} targetBfPct={targetBfPct} bodyBaseline={bodyBaseline}
-          bodyFatBarColor="#2dd4bf"
         />
       );
       case "strengthTrend": return <StrengthTrendCard key="strengthTrend" exercises={strengthTrend ?? []} loading={strengthTrend === null} />;

@@ -33,7 +33,8 @@ describe.skipIf(!canRun)('set_logs planned snapshot (migration 126)', () => {
 
   async function readSets(exercise: string) {
     const { rows } = await pool.query(
-      `SELECT sl.set_number, sl.intensity_pct, sl.planned_pct, sl.planned_reps, sl.rest_time_sec, sl.planned_rest_sec
+      `SELECT sl.set_number, sl.intensity_pct, sl.planned_pct, sl.planned_reps, sl.rest_time_sec, sl.planned_rest_sec,
+              sl.planned_weight_kg, sl.rpe, sl.rpe_source
          FROM set_logs sl
          JOIN exercise_logs el ON el.id = sl.exercise_log_id
          JOIN workout_sessions ws ON ws.id = el.workout_session_id
@@ -118,5 +119,75 @@ describe.skipIf(!canRun)('set_logs planned snapshot (migration 126)', () => {
     const rows = await readSets('Snapshot Bench')
     expect(rows[0].planned_reps).toBe(5)
     expect(rows[1].planned_reps).toBe(8)
+  })
+
+  // #2445: the bar the app put up after plate rounding, not the pct's arithmetic. The Skull Crusher
+  // case from #2200: 36.5 x 70.5% = 25.73, rounded UP to 27.5 on a 2.5 kg step.
+  it('stores the prescribed bar per set, null where no bar was prescribed', async () => {
+    await logExerciseFromPayload(TEST_USER_ID, {
+      sessionName: 'Snapshot Test',
+      exercise: 'Snapshot Skull Crusher',
+      weights: [27.5, 27.5, 25],
+      sets: 3,
+      reps: [10, 10, 12],
+      progressionStyle: [
+        { pct: 70.5, reps: 10, restSec: 90 },
+        { pct: 70.5, reps: 10, restSec: 90 },
+      ],
+      plannedWeights: [27.5, 27.5, null],
+    }, 'Australia/Brisbane')
+
+    const rows = await readSets('Snapshot Skull Crusher')
+    expect(rows.map(r => r.planned_weight_kg)).toEqual([27.5, 27.5, null])
+  })
+
+  it('leaves planned_weight_kg NULL on a log that sends none, as every pre-#2445 row is', async () => {
+    const rows = await readSets('Snapshot Bench')
+    expect(rows.map(r => r.planned_weight_kg)).toEqual([null, null])
+  })
+
+  it('never stores a bar for a bodyweight movement, even if one is sent', async () => {
+    await logExerciseFromPayload(TEST_USER_ID, {
+      sessionName: 'Snapshot Test',
+      exercise: 'Snapshot Chin',
+      weights: [0],
+      sets: 1,
+      reps: [6],
+      progressionStyle: [{ pct: 75, reps: 7, restSec: 150 }],
+      plannedWeights: [40],
+    }, 'Australia/Brisbane')
+
+    const rows = await readSets('Snapshot Chin')
+    expect(rows.every(r => r.planned_weight_kg === null)).toBe(true)
+  })
+
+  // #2450: whether each RPE was tapped on the picker or left at its pre-fill.
+  it('stores rpe_source beside each RPE, and none on a set without one', async () => {
+    await logExerciseFromPayload(TEST_USER_ID, {
+      sessionName: 'Snapshot Test',
+      exercise: 'Snapshot Row',
+      weights: [60, 60, 60],
+      sets: 3,
+      reps: [8, 8, 8],
+      rpeValues: [7, 9],
+      rpeSources: ['expected', 'rated', 'rated'],
+    }, 'Australia/Brisbane')
+
+    const rows = await readSets('Snapshot Row')
+    expect(rows.map(r => [r.rpe, r.rpe_source])).toEqual([[7, 'expected'], [9, 'rated'], [null, null]])
+  })
+
+  it('leaves rpe_source NULL on a log that sends none, as every pre-#2450 row is', async () => {
+    const rows = await readSets('Snapshot Bench')
+    expect(rows.map(r => r.rpe_source)).toEqual([null, null])
+  })
+
+  it('rejects any other value at the column, not just at the payload schema', async () => {
+    const { rows: [set] } = await pool.query(
+      `SELECT sl.id FROM set_logs sl JOIN exercise_logs el ON el.id = sl.exercise_log_id
+        JOIN workout_sessions ws ON ws.id = el.workout_session_id
+        WHERE ws.user_id = $1 AND el.exercise_name = 'Snapshot Row' LIMIT 1`, [TEST_USER_ID])
+    await expect(pool.query(`UPDATE set_logs SET rpe_source = 'guessed' WHERE id = $1`, [set.id]))
+      .rejects.toThrow(/rpe_source/)
   })
 })

@@ -21,6 +21,7 @@ sleep score is not.
 | Background & SW | `lib/background/`, `lib/sw/`, `app/sw.js/route.ts` |
 | Admin & ops | `lib/admin/`, `app/admin/`, `lib/export/`, `scripts/` |
 | User preferences (server-authoritative) | `packages/shared/src/user/preferences.ts`, `app/api/user/preferences/route.ts`, `users.preferences` JSONB (mig 206) |
+| Account deletion (#2120) | `lib/data/postgres/slices/account-deletion.ts` (`deleteAccount`, `OUTSIDE_THE_CASCADE`), `app/api/account/route.ts`, `lib/account/delete-account.ts`, `components/more/delete-account-sheet.tsx`, migration `202610060645_account_deletion_fk_rules.sql`; schema-derived test `lib/data/postgres/__tests__/account-deletion.test.ts` |
 
 **[`docs/module-map.md`](../../module-map.md) is this pillar's real index** — §0 (there is **no cron
 layer**) through §16. Read it before building any shared helper.

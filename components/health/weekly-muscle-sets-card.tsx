@@ -21,9 +21,9 @@ function capitalize(s: string) {
 
 function barColor(sets: number): string {
   if (sets >= 15) return "var(--color-brand)";
-  if (sets >= MIN_TARGET) return "#22c55e";
-  if (sets >= 6) return "#f59e0b";
-  return "#ef4444";
+  if (sets >= MIN_TARGET) return "var(--accent-green)";
+  if (sets >= 6) return "var(--accent-amber)";
+  return "var(--destructive)";
 }
 
 interface Props {
@@ -104,7 +104,7 @@ export const WeeklyMuscleSetsCard = memo(function WeeklyMuscleSetsCard({ muscles
           const targetLinePct = (markSets / maxSets) * 100;
           const ceilingPct = verdict ? (verdict.mrv / maxSets) * 100 : null;
           const color = target != null
-            ? (sets >= target ? "#22c55e" : sets >= target * 0.6 ? "#f59e0b" : "#ef4444")
+            ? (sets >= target ? "var(--accent-green)" : sets >= target * 0.6 ? "var(--accent-amber)" : "var(--destructive)")
             : verdict?.color ?? barColor(sets);
           const tonnageValues = trend?.muscles[muscle];
           return (

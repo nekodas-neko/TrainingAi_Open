@@ -19,6 +19,7 @@ import type {
   CreateMealPlanInput, UpdateMealPlanInput, UpdateMealInput, ReplaceStructureInput, PlanMealAnswer, EstimateToStore,
 } from './postgres/slices/meal-plans'
 import type { Friendship, Season } from '@trainingai/shared/types/friends'
+import type { AccountDeletionResult } from './postgres/slices/account-deletion'
 import type {
   SessionPeriodization, PeriodizationPhase, AiPrescription,
   Baseline1rmEntry, PendingTransition, PrescriptionStatus, ProgramVolumeTarget,
@@ -558,6 +559,52 @@ export interface StrapStatusWrite {
   worn: boolean | null
 }
 
+/** #2462. The Health Connect movement kinds stored per interval: a step count or active kilocalories
+ *  over [startAt, endAt], or a cadence sample in steps/min at startAt (= endAt). */
+export type HealthConnectIntervalKind = 'steps' | 'active_kcal' | 'cadence_spm'
+
+/** #2462. One row of `health_connect_intervals`. `recordId` is Health Connect's own record id;
+ *  `dataOrigin` the writing app's package, `deviceType` the plugin's TYPE_* string. */
+export interface HealthConnectIntervalRow {
+  kind: HealthConnectIntervalKind
+  recordId: string
+  startAt: Date
+  endAt: Date
+  value: number
+  dataOrigin: string | null
+  deviceType: string | null
+}
+
+/** #2469. `OuraRingService.status()`'s link counters, cumulative since `serviceStartedAt` (they
+ *  reset with the service). The one device-supplied instant is `serviceStartedAt`, computed on the
+ *  device as now − uptime; it identifies the service instance so a reader can see a reset. */
+export interface OuraLinkStatsWrite {
+  serviceStartedAt: Date
+  serviceUptimeMs: number
+  state: string
+  connectCount: number
+  dropCount: number
+  totalConnectedMs: number
+  lastTimeToConnectMs: number | null
+  consecutiveFailures: number | null
+}
+
+/** #2478. One walk auto-detection funnel event (see `detection_events`). `occurredAt` is the
+ *  phone's clock; `recorded_at` is stamped by the server. */
+export interface DetectionEventWrite {
+  detectionId: string
+  kind: string
+  gate: string
+  occurredAt: Date
+  triggerSource: string | null
+  activityType: string | null
+  sessionStartAt: Date | null
+  distanceM: number | null
+  elapsedSec: number | null
+  pointCount: number | null
+  avgSpeedMs: number | null
+}
+
 export interface StrapStatusRow extends StrapStatusWrite {
   id: number
   recordedAt: Date
@@ -581,8 +628,9 @@ export interface WorkoutRepository {
   getAppleAuthAttempt(id: string): Promise<AppleAuthAttempt | null>
   consumeAppleAuthAttempt(id: string): Promise<AppleAuthAttempt | null>
   getUserCredentials(userId: string): Promise<(User & { passwordHash?: string }) | null>
-  /** True when a user row was removed. */
-  deleteUser(userId: string): Promise<boolean>
+  /** #2120. Deletes the account and everything that cascades from it, in one transaction; the
+   *  one path for both self-service and admin deletion. `deleted: false` means no row matched. */
+  deleteAccount(userId: string): Promise<AccountDeletionResult>
   getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null>
   updateUserProfile(userId: string, profile: Partial<Pick<User, 'displayName' | 'heightCm' | 'dateOfBirth' | 'weightGoalKg' | 'timezone' | 'sex' | 'activityLevel' | 'fitnessGoal'>>): Promise<User>
   touchLastGoalReviewAt(userId: string): Promise<void>
@@ -1117,6 +1165,13 @@ export interface WorkoutRepository {
    *  captured only while the app holds the BLE link. measured_at is server-stamped. */
   insertOuraBatteryPoll(userId: string, percent: number, charging: boolean | null): Promise<void>
   getOuraBatteryPolls(userId: string, from: Date, to: Date): Promise<Array<{ tsMs: number; percent: number; charging: boolean | null }>>
+  /** #2469. One row of the ring link's connect/drop/connected-time counters. `recorded_at` is
+   *  server-stamped. Read through `claude_ro.oura_ble_link_stats`; nothing in the app reads it. */
+  insertOuraLinkStats(userId: string, stats: OuraLinkStatsWrite): Promise<void>
+  /** #2478. Insert walk-detection funnel events for `userId`, ignoring any (detection, kind) the
+   *  user already has, so a retried batch is a no-op. Returns how many rows were new. Read through
+   *  `claude_ro.detection_events`; nothing in the app reads it. */
+  insertDetectionEvents(userId: string, events: DetectionEventWrite[]): Promise<number>
   /** TN-54. One row per chest-strap connection attempt or state change (migration 278). The
    *  service knew all of this already and kept it in memory, so a strap that died was
    *  indistinguishable from one that was not worn. `recordedAt` is server-stamped. */
@@ -1210,6 +1265,12 @@ export interface WorkoutRepository {
    *  `amount`/`unit`, never `supplements.dose` (the vial). Vial-dosed only, so a daily oral
    *  supplement does not annotate every day. */
   listDoseEvents(userId: string, from: string, to: string): Promise<import('@trainingai/shared/health/dose-context').DoseEvent[]>
+  /** #2184: every live dose log of ANY supplement in [from, to] (null amounts kept), and the
+   *  definitions whose `stoppedOn` falls in it — the inputs to the maintenance dose-change caveat. */
+  listDoseHistory(userId: string, from: string, to: string): Promise<{
+    logs: import('@trainingai/shared/health/dose-change-caveat').DoseLogEntry[]
+    courses: import('@trainingai/shared/health/dose-change-caveat').SupplementCourse[]
+  }>
 
   // ── AI Periodization ───────────────────────────────────────────────────────
   getSessionPeriodization(userId: string, programSessionId: string): Promise<SessionPeriodization | null>
@@ -1301,7 +1362,8 @@ export interface WorkoutRepository {
   getColmiSleepSegments(userId: string, fromDate: string, toDate: string): Promise<{ localDate: string; startedAt: Date; endedAt: Date; stage: number; minutes: number }[]>
   getColmiLatestReadingAt(userId: string): Promise<Date | null>
 
-  upsertBodyBatteryDaily(userId: string, row: BodyBatteryDailyRow): Promise<void>
+  /** `false` when the TN-20 guard kept the stored day instead. */
+  upsertBodyBatteryDaily(userId: string, row: BodyBatteryDailyRow): Promise<boolean>
   getBodyBatteryHistory(userId: string, startDate: string, endDate: string): Promise<BodyBatteryDailyRow[]>
   upsertOuraSleep(userId: string, sessions: OuraSleepUpsertRow[], source: HealthSource): Promise<void>
   upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]): Promise<void>
@@ -1309,6 +1371,12 @@ export interface WorkoutRepository {
    *  a device row at the same timestamp; device rows win at read time (#2168). `tz` dates the
    *  zone-minutes cache invalidation. */
   upsertAggregatorHeartrate(userId: string, rows: { timestamp: Date; bpm: number }[], source: HealthSource, tz: string): Promise<void>
+  /** #2462. Health Connect steps / active kcal per record and cadence per sample, upserted by
+   *  `(kind, recordId, startAt)` so a re-read window is idempotent. Returns rows written after the
+   *  in-batch collapse. Overlap between apps is kept and resolved by the reader. */
+  upsertHealthConnectIntervals(userId: string, rows: readonly HealthConnectIntervalRow[]): Promise<number>
+  /** #2462. One kind's rows starting in [from, to), oldest first, overlap NOT resolved. */
+  getHealthConnectIntervals(userId: string, kind: HealthConnectIntervalKind, from: Date, to: Date): Promise<HealthConnectIntervalRow[]>
   getHrForWindow(userId: string, from: Date, to: Date): Promise<{ timestamp: Date; bpm: number; source: string | null }[]>
   /** The corroboration-gated observed HR profile for a window, aggregated in the database — the
    *  same answer as `computeObservedHr` over `getHrForWindow`'s rows, without materialising them

@@ -271,6 +271,13 @@ points:
   history does not un-compromise a leaked secret.
 
 ### Stage 5 — Invert local-store ownership to native
+
+> **Status, 2026-10-06 (#2288):** **unscheduled.** Nothing in `android/` uses Room or WorkManager
+> yet, and no issue tracks this stage. It starts only when there is a concrete need for it: sync
+> that has to run with the app closed, or a watch companion. Two things are done ahead of it,
+> because they are worth having anyway: a table-residency matrix that CI keeps complete (#2489),
+> and language-neutral parity vectors for the TypeScript sync engine (#2490). The Kotlin runner
+> for those vectors is filed only once this stage gets an issue.
 Make the local store a **Kotlin/Room module** with the sync engine on **WorkManager**, exposed to the
 WebView through a Capacitor plugin facade.
 
@@ -344,6 +351,9 @@ Deliberate decision points where the plan can legitimately stop or change:
   native rendering feels meaningfully better *on this app, on this device*. If it does not, stop —
   the native data layer from Stage 5 is still a win on its own.
 - **If the target surface shrinks to ~10 screens:** re-open the clean-slate rewrite decision in §2.
+- **Stage 5 without Stage 6 (added 2026-10-06, #2288):** if background sync or a watch companion
+  justifies the native data layer but the screens feel fine in the WebView, do Stage 5 and stop.
+  The WebView becomes a client of the native store, and no Compose screens are built.
 
 ---
 

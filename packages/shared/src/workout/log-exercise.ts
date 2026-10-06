@@ -8,6 +8,7 @@ import { computeSetAggregates, computeIntensityPct } from '@trainingai/shared/wo
 import { bodyweightSetLoadKg } from '@trainingai/shared/workout/bodyweight-load';
 import { defaultUseFor1rm } from '@trainingai/shared/workout/default-use-for-1rm';
 import type { ProgramPhaseType } from '@trainingai/shared/types/program';
+import { RPE_SOURCES } from '@trainingai/shared/workout/rpe-source';
 
 export const LogExercisePayloadSchema = z.object({
   sessionName:          z.string().min(1).max(200),
@@ -36,12 +37,18 @@ export const LogExercisePayloadSchema = z.object({
     restSec:   z.number(),
     useFor1rm: z.boolean().optional(),
   })).optional(),
+  // #2445: the bar the app put up for each set, after plate rounding — `null` where no style
+  // percentage set it. Stored as set_logs.planned_weight_kg; same bounds as `weights`.
+  plannedWeights:       z.array(z.number().min(0).max(500).nullable()).max(20).optional(),
   styleName:            z.string().optional(),
   styleId:              z.string().optional(),
   muscleGroups:         z.array(z.string()).optional(),
   workoutStartedAt:     z.number().optional(),
   warmupEndedAtMs:      z.number().optional(),
   rpeValues:            z.array(z.number().int().min(5).max(10)).optional(),
+  // #2450: per set, whether `rpeValues[i]` was tapped (`rated`) or left at the picker's pre-fill
+  // (`expected`); `null` where unknown. Stored as set_logs.rpe_source, only beside a stored RPE.
+  rpeSources:           z.array(z.enum(RPE_SOURCES).nullable()).max(20).optional(),
   intensityMode:        z.enum(['full', 'deload']).optional(),
   wasOverride:          z.boolean().optional(),
   exerciseDeloaded:     z.boolean().optional(),
@@ -87,8 +94,8 @@ export async function logExerciseFromPayload(
     exercise, weights, reps,
     localDate, timeToCompleteSet, setTimes, restTimes,
     setStartTimes, setEndTimes, interExerciseRestSec, prepTimeSec,
-    progressionStyle, styleName, styleId, muscleGroups, workoutStartedAt, warmupEndedAtMs,
-    rpeValues, intensityMode, wasOverride, exerciseDeloaded,
+    progressionStyle, plannedWeights, styleName, styleId, muscleGroups, workoutStartedAt, warmupEndedAtMs,
+    rpeValues, rpeSources, intensityMode, wasOverride, exerciseDeloaded,
   } = payload;
 
   // Lazy import: `@/lib/data` compiles as a Turbopack async module (it pulls in pg /
@@ -264,6 +271,8 @@ export async function logExerciseFromPayload(
       setStartMs: setStartTimes?.[i],
       setEndMs: setEndTimes?.[i],
       rpe: rpeValues?.[i],
+      // #2450: a source with no RPE beside it would describe nothing, so it is dropped.
+      rpeSource: rpeValues?.[i] != null ? (rpeSources?.[i] ?? undefined) : undefined,
       // Q-14: a bodyweight movement is never prescribed a %1RM — resolveBodyweightStyle turns the
       // style's pct into a rep target instead. Storing that pct here put it alongside a
       // BW_REF-relative intensity_pct on a different basis, so every bodyweight set recorded a
@@ -271,6 +280,10 @@ export async function logExerciseFromPayload(
       plannedPct:     exerciseType === 'bodyweight' ? undefined : (progressionStyle?.[i]?.pct ?? undefined),
       plannedReps:    progressionStyle?.[i]?.reps ?? undefined,
       plannedRestSec: progressionStyle?.[i]?.restSec ?? undefined,
+      // #2445: a bodyweight bar is never prescribed (the prescription route returns null for one),
+      // so a stray value there is dropped rather than stored as a load target. Same reasoning as
+      // planned_pct above.
+      plannedWeightKg: exerciseType === 'bodyweight' ? undefined : (plannedWeights?.[i] ?? undefined),
     };
   });
 

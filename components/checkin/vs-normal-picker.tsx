@@ -51,6 +51,12 @@ const OPTIONS: { value: VsNormal; label: string; color: string }[] = [
   { value: 'worse',  label: 'Worse',          color: 'var(--accent-amber)' },
 ]
 
+/** #2301. The three pills are `flex-1` (about 112 px each at 384 px), and `px-3` left "About the same"
+ *  just short of fitting, so it wrapped and set the row's height — and since LB-191 it is the pill
+ *  selected every morning. `px-2` plus `whitespace-nowrap` keeps one line with the wording intact;
+ *  `e2e/checkin-pills-one-line.spec.ts` measures it at 384 px, so a longer label fails there
+ *  rather than wrapping again. */
+
 /** LB-191. The seeded answer, owned here because this file owns the option list — a constant in
  *  the sheet could drift from the labels and seed a value the control does not offer. */
 export const VS_NORMAL_DEFAULT: VsNormal = 'same'
@@ -69,7 +75,7 @@ export function VsNormalPicker({ value, onChange }: Props) {
               role="radio"
               aria-checked={selected}
               onClick={() => onChange(selected ? null : opt.value)}
-              className="min-h-9 flex-1 rounded-full border px-3 py-1.5 text-xs font-medium transition-all active:scale-95"
+              className="min-h-9 min-w-0 flex-1 whitespace-nowrap rounded-full border px-2 py-1.5 text-xs font-medium transition-all active:scale-95"
               style={{
                 borderColor: selected ? opt.color : undefined,
                 background: selected ? `color-mix(in oklch, ${opt.color} 16%, transparent)` : undefined,

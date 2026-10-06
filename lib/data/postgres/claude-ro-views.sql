@@ -351,6 +351,25 @@ SELECT
   t.caller_ip
 FROM public.db_query_log t;
 
+CREATE VIEW claude_ro.detection_events AS
+SELECT
+  t.id,
+  t.user_id,
+  t.detection_id,
+  t.kind,
+  t.gate,
+  t.occurred_at,
+  t.recorded_at,
+  t.trigger_source,
+  t.activity_type,
+  t.session_start_at,
+  t.distance_m,
+  t.elapsed_sec,
+  t.point_count,
+  t.avg_speed_ms
+FROM public.detection_events t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.dexa_scan_regions AS
 SELECT
   t.id,
@@ -614,6 +633,21 @@ SELECT
 FROM public.goal_recommendations t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
+CREATE VIEW claude_ro.health_connect_intervals AS
+SELECT
+  t.user_id,
+  t.kind,
+  t.record_id,
+  t.start_at,
+  t.end_at,
+  t.value,
+  t.data_origin,
+  t.device_type,
+  t.received_at,
+  t.updated_at
+FROM public.health_connect_intervals t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.injuries AS
 SELECT
   t.id,
@@ -777,6 +811,22 @@ SELECT
   t.epoch,
   t.observed_source
 FROM public.oura_ble_clock_anchors t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
+CREATE VIEW claude_ro.oura_ble_link_stats AS
+SELECT
+  t.id,
+  t.user_id,
+  t.recorded_at,
+  t.service_started_at,
+  t.service_uptime_ms,
+  t.state,
+  t.connect_count,
+  t.drop_count,
+  t.total_connected_ms,
+  t.last_time_to_connect_ms,
+  t.consecutive_failures
+FROM public.oura_ble_link_stats t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
 CREATE VIEW claude_ro.oura_ble_rekey_declarations AS
@@ -1462,7 +1512,9 @@ SELECT
   t.deleted_at,
   t.planned_pct,
   t.planned_rest_sec,
-  t.planned_reps
+  t.planned_reps,
+  t.planned_weight_kg,
+  t.rpe_source
 FROM public.set_logs t
 WHERE EXISTS (SELECT 1 FROM public.exercise_logs e JOIN public.workout_sessions p ON p.id = e.workout_session_id WHERE e.id = t.exercise_log_id AND p.user_id = current_setting('app.claude_ro_owner', true)::uuid);
 

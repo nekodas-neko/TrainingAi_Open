@@ -48,7 +48,7 @@ function CorrelationBars({ buckets, signed }: { buckets: TrendsResponse["buckets
           <p className="text-[10px] text-muted-foreground">{b.label}</p>
           <p
             className="text-sm font-bold"
-            style={{ color: signed && b.avg < 0 ? "#ef4444" : "var(--color-brand)" }}
+            style={{ color: signed && b.avg < 0 ? "var(--destructive)" : "var(--color-brand)" }}
           >
             {signed && b.avg >= 0 ? `+${b.avg}` : b.avg}
           </p>

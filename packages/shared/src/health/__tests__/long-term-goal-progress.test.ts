@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { goalProgressPct, computeWeightRateKgPerWeek, computeWeightRateFit, evaluateWeightRateVsGoalBand } from '../long-term-goal-progress'
+import { goalProgressPct, computeWeightRateKgPerWeek, computeWeightRateFit, evaluateWeightRateVsGoalBand, weightTrendWindowStart } from '../long-term-goal-progress'
 
 describe('goalProgressPct', () => {
   it('returns 100 when starting equals target (already at goal)', () => {
@@ -209,5 +209,18 @@ describe('evaluateWeightRateVsGoalBand', () => {
 
   it('returns a null status when there is no rate data yet', () => {
     expect(evaluateWeightRateVsGoalBand(82, 78, null)).toEqual({ rateKgPerWeek: null, status: null })
+  })
+})
+
+describe('weightTrendWindowStart (#2480)', () => {
+  it('starts 29 calendar days back, so the window is 30 local days with today included', () => {
+    expect(weightTrendWindowStart('2026-10-07')).toBe('2026-09-08')
+  })
+
+  it('counts calendar days across a DST change and a month/year boundary, not 24-hour blocks', () => {
+    // Sydney leaves DST on 2026-04-05: subtracting milliseconds from a local midnight lands an hour
+    // into the wrong day there; calendar arithmetic on the date string cannot.
+    expect(weightTrendWindowStart('2026-04-20')).toBe('2026-03-22')
+    expect(weightTrendWindowStart('2027-01-10')).toBe('2026-12-12')
   })
 })

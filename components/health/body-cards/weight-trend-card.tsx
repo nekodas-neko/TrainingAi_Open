@@ -1,5 +1,6 @@
+import { InfoIcon } from "lucide-react";
 import { Sparkline } from "@/components/ui/sparkline";
-import { goalProgressPct } from "@trainingai/shared/health/long-term-goal-progress";
+import { goalProgressPct, WEIGHT_TREND_WINDOW_DAYS } from "@trainingai/shared/health/long-term-goal-progress";
 import type { BodyMetaRow } from "@/app/api/body-metadata/route";
 
 interface Props {
@@ -21,6 +22,13 @@ interface Props {
    * already carries this value for the Dist tile.
    */
   bodyFatBarColor: string;
+  /** The regression slope from `useWeightTrend`, fitted over `WEIGHT_TREND_WINDOW_DAYS` — the card
+   *  renders it, never re-fits it. `metaRecent` (7 days) is the sparkline's input, not the slope's. */
+  kgPerWeek: number | null;
+  /** The body-metadata read has not landed yet (drives the headline's skeleton, not the sparkline). */
+  loading: boolean;
+  infoOpen: boolean;
+  onToggleInfo: () => void;
 }
 
 /**
@@ -33,11 +41,34 @@ interface Props {
  */
 export function WeightTrendCard({
   metaRecent, metaFailed, latestWeight, latestBf, targetWeightKg, targetBfPct, bodyBaseline, bodyFatBarColor,
+  kgPerWeek, loading, infoOpen, onToggleInfo,
 }: Props) {
   const trendWeightPoints = [...metaRecent].reverse().map(r => r.weightKg).filter((w): w is number => w != null);
   return (
   <div className="rounded-2xl p-4 bg-muted/30 border border-border/40">
-    <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">Weight Trend</p>
+    <div className="flex items-center justify-between mb-2">
+      <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Weight Trend</p>
+      <button onClick={onToggleInfo} aria-label="Weight trend info" aria-expanded={infoOpen} className="p-2.5 rounded-full text-muted-foreground/70 hover:text-muted-foreground transition-colors">
+        <InfoIcon className="h-3.5 w-3.5" />
+      </button>
+    </div>
+    {loading ? (
+      <div className="h-7 w-24 animate-pulse rounded-lg bg-muted" />
+    ) : kgPerWeek != null ? (
+      <p className="text-2xl font-bold tabular-nums leading-tight" style={{ color: "var(--accent-green)" }}>
+        {kgPerWeek >= 0 ? '+' : ''}{kgPerWeek}
+        <span className="text-xs font-normal ml-1 text-muted-foreground">kg/wk · last {WEIGHT_TREND_WINDOW_DAYS} days</span>
+      </p>
+    ) : (
+      <p className="text-xs text-muted-foreground">Need more data</p>
+    )}
+    {infoOpen && (
+      <div className="mt-3 rounded-xl bg-muted/50 p-2.5">
+        <p className="text-[10px] text-muted-foreground leading-relaxed">
+          Linear regression slope across your weight readings from the last {WEIGHT_TREND_WINDOW_DAYS} days. Positive = gaining, negative = losing. Needs at least 3 readings to calculate.
+        </p>
+      </div>
+    )}
     {trendWeightPoints.length >= 2 ? (
       <Sparkline values={trendWeightPoints} width={160} height={48} color="var(--color-brand)" showDots />
     ) : (

@@ -4,14 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useWorkoutStore, isWorkoutActive } from "@/lib/stores/workout-store";
 import { LeaveWorkoutDialog } from "@/components/workout/leave-workout-dialog";
-import { useGuidedWalkStore, isGuidedWalkActive, walkElapsedSec, MIN_WALK_SEC } from "@/lib/stores/guided-walk-store";
-import { LeaveWalkDialog } from "@/components/guided-walk/leave-walk-dialog";
 import { useActivityStore, isActivityActive } from "@/lib/stores/activity-store";
 import { LeaveActivityDialog } from "@/components/activity/leave-activity-dialog";
 import { backActionForPath } from "@/components/shell/tabs";
 import { hasOpenSurface, releaseAllSurfaceEntries } from "@/lib/hooks/sheet-back-stack";
 import { navigateToTab } from "@/lib/shell-nav";
 import { useMobileAuth } from '@/components/auth/use-mobile-auth';
+import { requestWalkExit } from "@/lib/walk/walk-exit";
 
 function leaveScreen(): void {
   window.history.go(-(1 + releaseAllSurfaceEntries()));
@@ -20,13 +19,10 @@ function leaveScreen(): void {
 export function MobileAuthHandler({ hasSession }: { hasSession: boolean }) {
   useMobileAuth(hasSession);
   const [confirmLeaveOpen, setConfirmLeaveOpen] = useState(false);
-  const [leaveWalk, setLeaveWalk] = useState<{ elapsedSec: number } | null>(null);
   const [confirmLeaveActivityOpen, setConfirmLeaveActivityOpen] = useState(false);
   const workoutActive = useWorkoutStore(isWorkoutActive);
-  const walkActive = useGuidedWalkStore(isGuidedWalkActive);
   const activityActive = useActivityStore(isActivityActive);
   useEffect(() => { if (!workoutActive) setConfirmLeaveOpen(false); }, [workoutActive]);
-  useEffect(() => { if (!walkActive) setLeaveWalk(null); }, [walkActive]);
   useEffect(() => { if (!activityActive) setConfirmLeaveActivityOpen(false); }, [activityActive]);
   const router = useRouter();
   const routerRef = useRef(router);
@@ -51,10 +47,11 @@ export function MobileAuthHandler({ hasSession }: { hasSession: boolean }) {
           setConfirmLeaveOpen(true);
           return;
         }
-        if (isGuidedWalkActive(useGuidedWalkStore.getState()) && window.location.pathname.startsWith("/activity/guided-walk")) {
-          setLeaveWalk({ elapsedSec: walkElapsedSec(useGuidedWalkStore.getState().startedAtMs) });
-          return;
-        }
+        // The guided walk is immersive (#2134): back is its one Exit, raised by the walk screen
+        // itself so the gesture and the button cannot offer different choices. When that screen is
+        // not mounted — config, summary, or the route's error boundary — nothing answers and this
+        // falls through to the ordinary back below.
+        if (requestWalkExit()) return;
         if (isActivityActive(useActivityStore.getState()) && window.location.pathname === "/activity") {
           setConfirmLeaveActivityOpen(true);
           return;
@@ -89,12 +86,6 @@ export function MobileAuthHandler({ hasSession }: { hasSession: boolean }) {
     };
   }, []);
 
-  const leaveWalkDiscarding = () => {
-    setLeaveWalk(null);
-    useGuidedWalkStore.getState().reset();
-    leaveScreen();
-  };
-
   return (
     <>
       <LeaveWorkoutDialog
@@ -106,29 +97,6 @@ export function MobileAuthHandler({ hasSession }: { hasSession: boolean }) {
           leaveScreen();
         }}
       />
-
-      {leaveWalk && leaveWalk.elapsedSec >= MIN_WALK_SEC ? (
-        <LeaveWalkDialog
-          open
-          outcome="choose"
-          elapsedSec={leaveWalk.elapsedSec}
-          onSave={() => {
-            setLeaveWalk(null);
-            useGuidedWalkStore.getState().requestFinish();
-          }}
-          onStay={() => setLeaveWalk(null)}
-          onLeave={leaveWalkDiscarding}
-        />
-      ) : (
-
-        <LeaveWalkDialog
-          open={!!leaveWalk}
-          outcome="discard"
-          elapsedSec={leaveWalk?.elapsedSec}
-          onStay={() => setLeaveWalk(null)}
-          onLeave={leaveWalkDiscarding}
-        />
-      )}
       <LeaveActivityDialog
         open={confirmLeaveActivityOpen}
         onStay={() => setConfirmLeaveActivityOpen(false)}

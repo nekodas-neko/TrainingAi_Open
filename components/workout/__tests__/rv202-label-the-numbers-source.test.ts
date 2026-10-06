@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import { cachedNumbersSource, numbersSourceLabel } from '@/components/workout/numbers-source';
+import { payloadNumbersSource, numbersSourceLabel } from '@/components/workout/numbers-source';
 import { stripComments } from '../../../scripts/lib/strip-comments.js';
 
 const read = (p: string) =>
@@ -19,6 +19,11 @@ describe('numbersSourceLabel — RV-202 ③ wording', () => {
     expect(numbersSourceLabel({ kind: 'base' })).toBe('Base program');
   });
 
+  // #2110: today's plan, built from the program because the model could not be reached.
+  it('names the program when today\'s plan is a rules plan', () => {
+    expect(numbersSourceLabel({ kind: 'rules' })).toBe('From your program');
+  });
+
   // Today's payload is the one state that must stay unlabelled: a permanent note beside
   // "Recommended workout" would be furniture, and the lifter would stop reading it on the day
   // it meant something.
@@ -28,23 +33,43 @@ describe('numbersSourceLabel — RV-202 ③ wording', () => {
   });
 });
 
-describe('cachedNumbersSource — RV-202 ③ trigger', () => {
+describe('payloadNumbersSource — RV-202 ③ trigger', () => {
   it('labels a payload built on an earlier day', () => {
-    expect(cachedNumbersSource({ dataDate: '2026-09-26' }, false))
+    expect(payloadNumbersSource({ dataDate: '2026-09-26' }, false))
       .toEqual({ kind: 'cached', date: '2026-09-26' });
   });
 
   it('does not label today', () => {
-    expect(cachedNumbersSource({ dataDate: '2026-09-27' }, true)).toBeNull();
+    expect(payloadNumbersSource({ dataDate: '2026-09-27' }, true)).toBeNull();
   });
 
   // `isWorkoutDataToday` treats a dataDate-less payload as NOT today, which is right for the
   // `loggedTodayInSession` strip it was written for and wrong as a label trigger: there is no day
   // to name. Silence beats a guessed date.
   it('stays silent on a payload with no dataDate rather than inventing one', () => {
-    expect(cachedNumbersSource({}, false)).toBeNull();
-    expect(cachedNumbersSource(null, false)).toBeNull();
-    expect(cachedNumbersSource(undefined, false)).toBeNull();
+    expect(payloadNumbersSource({}, false)).toBeNull();
+    expect(payloadNumbersSource(null, false)).toBeNull();
+    expect(payloadNumbersSource(undefined, false)).toBeNull();
+  });
+});
+
+describe('payloadNumbersSource — a rules plan (#2110)', () => {
+  it('labels today\'s payload when its prescription is a rules plan', () => {
+    expect(payloadNumbersSource({ dataDate: '2026-10-06', prescriptionSource: 'rules' }, true))
+      .toEqual({ kind: 'rules' });
+  });
+
+  // A coached plan is the normal case, and a plan stored before `source` existed carries none.
+  it('stays silent for a model plan or an unmarked one', () => {
+    expect(payloadNumbersSource({ dataDate: '2026-10-06', prescriptionSource: 'model' }, true)).toBeNull();
+    expect(payloadNumbersSource({ dataDate: '2026-10-06' }, true)).toBeNull();
+  });
+
+  // An earlier day is the fact that can mislead more, and that day's rules plan may already have
+  // been replaced by a coached one.
+  it('names the earlier day rather than the rules plan on a stale payload', () => {
+    expect(payloadNumbersSource({ dataDate: '2026-10-05', prescriptionSource: 'rules' }, false))
+      .toEqual({ kind: 'cached', date: '2026-10-05' });
   });
 });
 

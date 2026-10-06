@@ -66,7 +66,7 @@ import {
 import { sleepImplausibleReason } from '@trainingai/shared/validation/plausibility'
 import { ActivityLogBody, deriveEndTime } from '@trainingai/shared/validation/activity-log'
 import { describeZodFailure } from './push-error-detail'
-import type { WorkoutRepository, UserGoals, EnsuredWorkoutSession, SessionLoad, YearReviewTotals, YearReviewTopExercise, UnitFixResult, SyncDelta, IncomingMutation, PushResult, OuraRawSampleInput, OuraRawSampleSummary, OuraRawSampleLatest, OuraRawSampleRow, FitnessTest, RunningPlan, PrescribedRun, PrescribedRunUpdate, AiCallLogInput, AiCallUsageSummary, ScaleRawSampleInput, ScalePendingSample, LastRealOneRm, BloodPanel, BloodPanelInput, BloodAnalyte, StrapStatusWrite, StrapStatusRow } from '../repository'
+import type { WorkoutRepository, UserGoals, EnsuredWorkoutSession, SessionLoad, YearReviewTotals, YearReviewTopExercise, UnitFixResult, SyncDelta, IncomingMutation, PushResult, OuraRawSampleInput, OuraRawSampleSummary, OuraRawSampleLatest, OuraRawSampleRow, FitnessTest, RunningPlan, PrescribedRun, PrescribedRunUpdate, AiCallLogInput, AiCallUsageSummary, ScaleRawSampleInput, ScalePendingSample, LastRealOneRm, BloodPanel, BloodPanelInput, BloodAnalyte, StrapStatusWrite, StrapStatusRow, OuraLinkStatsWrite, DetectionEventWrite } from '../repository'
 import { FitnessTestBody } from '@trainingai/shared/validation/fitness-test'
 import { PrescribedRunPatchBody } from '@trainingai/shared/validation/prescribed-run'
 import type {
@@ -97,7 +97,10 @@ import { nodeModelRuntime } from '@/lib/oura-models/inference/runtime-node'
 import { ensureServerOuraConstants } from '@/lib/oura-models/constants-inject'
 import { packOuraRawBuckets, countPackableBuckets, claimAutoPackSlot, AUTOPACK_MAX_BUCKETS } from './slices/oura-raw-pack'
 import * as bodyBattery from './slices/body-battery'
+import * as accountDeletion from './slices/account-deletion'
+import type { AccountDeletionResult } from './slices/account-deletion'
 import * as colmi from './slices/colmi'
+import * as hcIntervals from './slices/health-connect-intervals'
 import { mergeSet, initialSourceMap, HEALTH_SOURCES, sourceRank, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
 import type {
   SessionPeriodization, PeriodizationPhase, AiPrescription,
@@ -745,9 +748,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return r ? { ...this.rowToUser(r), passwordHash: r.passwordHash ?? undefined } : null
   }
 
-  async deleteUser(userId: string): Promise<boolean> {
-    const rows = await this.db.delete(s.users).where(eq(s.users.id, userId)).returning({ id: s.users.id })
-    return rows.length > 0
+  async deleteAccount(userId: string): Promise<AccountDeletionResult> {
+    return accountDeletion.deleteAccount(this.db, userId)
   }
 
   async getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null> {
@@ -1112,6 +1114,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           plannedPct: set.plannedPct ?? null,
           plannedReps: set.plannedReps ?? null,
           plannedRestSec: set.plannedRestSec ?? null,
+          plannedWeightKg: set.plannedWeightKg ?? null,
+          rpeSource: set.rpeSource ?? null,
         })))
         .onConflictDoUpdate({
           target: s.setLogs.id,
@@ -1130,6 +1134,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             plannedPct: sql`EXCLUDED.planned_pct`,
             plannedReps: sql`EXCLUDED.planned_reps`,
             plannedRestSec: sql`EXCLUDED.planned_rest_sec`,
+            plannedWeightKg: sql`EXCLUDED.planned_weight_kg`,
+            rpeSource: sql`EXCLUDED.rpe_source`,
           },
         })
         .returning()
@@ -1327,7 +1333,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
               weightKg: ss.weightKg, reps: ss.reps,
               setTimeSec: ss.setTimeSec ?? undefined, restTimeSec: ss.restTimeSec ?? undefined,
               intensityPct: ss.intensityPct ?? undefined, useFor1rm: ss.useFor1rm,
-              rpe: ss.rpe ?? undefined, plannedRestSec: ss.plannedRestSec ?? undefined,
+              rpe: ss.rpe ?? undefined, rpeSource: ss.rpeSource ?? undefined,
+              plannedRestSec: ss.plannedRestSec ?? undefined,
             })),
         })),
     }))
@@ -1725,14 +1732,33 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * 34 exercises, every one of them flagged deload.
    *
    * So `latest` here is the most recent estimate that *is* one — not the most recent row.
+   *
+   * **A baseline estimate is never one half of the pair (#2297).** A baseline session — the first
+   * run of each session after a program is built, `phase_type = 'baseline'` since TN-75 — logs one
+   * unprescribed set, so its estimate goes through the AMRAP scaling, while every prescribed set is
+   * divided back up by its own %1RM. The two are different measurements, and comparing across them
+   * read as a decline straight after a rebuild and as the same amount "gained" one session later:
+   * the owner's 09-07 → 09-12 window, where every compound "declined" at once.
+   *
+   * It stays the `latest` value — after a rebuild it is the newest measurement there is, and for a
+   * new lifter the only one. What changes is the comparison: a baseline `latest` reports no
+   * `previous`, and a prescribed `latest` is compared with the last prescribed estimate before it,
+   * reaching past any baseline in between. Those two are like for like by construction, because
+   * dividing by the prescription is what makes an estimate phase-independent. No stored value moves.
    */
   async listRecent1rm(userId: string): Promise<Map<string, { latest: number; previous?: number }>> {
-    type Row = { exercise_name: string; estimated_1rm: number; rn: number }
+    type Row = { exercise_name: string; estimated_1rm: number; is_baseline: boolean; rn: number; rn_kind: number }
     const result = await this.db.execute<Row>(sql`
-      SELECT exercise_name, estimated_1rm, rn
+      SELECT exercise_name, estimated_1rm, is_baseline, rn, rn_kind
       FROM (
-        SELECT el.exercise_name, el.estimated_1rm,
-          ROW_NUMBER() OVER (PARTITION BY el.exercise_name ORDER BY el.logged_at DESC) AS rn
+        SELECT el.exercise_name, el.estimated_1rm, ws.phase_type IS NOT DISTINCT FROM 'baseline' AS is_baseline,
+          -- The same total order in both windows (id breaks a logged_at tie), so the newest
+          -- prescribed row is rn=1 and rn_kind=1 at once and can never be paired with itself.
+          ROW_NUMBER() OVER (PARTITION BY el.exercise_name ORDER BY el.logged_at DESC, el.id DESC) AS rn,
+          ROW_NUMBER() OVER (
+            PARTITION BY el.exercise_name, ws.phase_type IS NOT DISTINCT FROM 'baseline'
+            ORDER BY el.logged_at DESC, el.id DESC
+          ) AS rn_kind
         FROM exercise_logs el
         JOIN workout_sessions ws ON ws.id = el.workout_session_id
         WHERE ws.user_id = ${userId} AND el.estimated_1rm > 0
@@ -1742,17 +1768,22 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           AND el.exercise_deloaded = false
           AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
       ) ranked
-      WHERE rn <= 2
+      WHERE rn = 1 OR (NOT is_baseline AND rn_kind = 2)
     `)
-    const out = new Map<string, { latest: number; previous?: number }>()
+    const latest = new Map<string, { value: number; isBaseline: boolean }>()
+    const previousPrescribed = new Map<string, number>()
     for (const r of result.rows) {
-      const entry = out.get(r.exercise_name) ?? { latest: 0 }
-      if (Number(r.rn) === 1) entry.latest = r.estimated_1rm
-      else entry.previous = r.estimated_1rm
-      out.set(r.exercise_name, entry)
+      if (Number(r.rn) === 1) latest.set(r.exercise_name, { value: r.estimated_1rm, isBaseline: r.is_baseline })
+      else previousPrescribed.set(r.exercise_name, r.estimated_1rm)
     }
-    // An exercise with only an rn=2 row cannot exist — ranks are dense from 1 — so `latest` is
-    // always filled by the time the loop ends.
+    // Every exercise with a row has an rn=1 row — ranks are dense from 1 — so iterating `latest`
+    // covers them all. A non-baseline rn=1 row is also rn_kind=1, so the rn_kind=2 row is the one
+    // before it among the prescribed estimates.
+    const out = new Map<string, { latest: number; previous?: number }>()
+    for (const [name, l] of latest) {
+      const previous = l.isBaseline ? undefined : previousPrescribed.get(name)
+      out.set(name, previous == null ? { latest: l.value } : { latest: l.value, previous })
+    }
     return out
   }
 
@@ -4654,6 +4685,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         plannedPct:    s.setLogs.plannedPct,
         plannedReps:   s.setLogs.plannedReps,
         plannedRestSec: s.setLogs.plannedRestSec,
+        plannedWeightKg: s.setLogs.plannedWeightKg,
+        rpeSource:     s.setLogs.rpeSource,
         updatedAt:     s.setLogs.updatedAt,
         deletedAt:     s.setLogs.deletedAt,
       }).from(s.setLogs)
@@ -6419,6 +6452,36 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     }
   }
 
+  // #2469. Unpruned, like `strap_status`: the client posts at most hourly while the app is open, so
+  // the table grows by a few rows a day, and its value is looking back over a churn window nobody
+  // knew to watch. A retention prune is a delete, which is the owner's call, not this PR's.
+  // #2478. Insert-only and idempotent: the conflict target includes user_id, so a client-supplied
+  // detection id can only ever name this user's own rows, and a repeat is skipped rather than
+  // updated. Unpruned for now, like `oura_ble_link_stats`: a few rows per probe, and a prune is a
+  // delete, which is the owner's call.
+  async insertDetectionEvents(userId: string, events: DetectionEventWrite[]): Promise<number> {
+    if (events.length === 0) return 0
+    const inserted = await this.db.insert(s.detectionEvents)
+      .values(events.map(e => ({ userId, ...e })))
+      .onConflictDoNothing({ target: [s.detectionEvents.userId, s.detectionEvents.detectionId, s.detectionEvents.kind] })
+      .returning({ id: s.detectionEvents.id })
+    return inserted.length
+  }
+
+  async insertOuraLinkStats(userId: string, stats: OuraLinkStatsWrite): Promise<void> {
+    await this.db.insert(s.ouraBleLinkStats).values({
+      userId,
+      serviceStartedAt: stats.serviceStartedAt,
+      serviceUptimeMs: stats.serviceUptimeMs,
+      state: stats.state,
+      connectCount: stats.connectCount,
+      dropCount: stats.dropCount,
+      totalConnectedMs: stats.totalConnectedMs,
+      lastTimeToConnectMs: stats.lastTimeToConnectMs,
+      consecutiveFailures: stats.consecutiveFailures,
+    })
+  }
+
   // TN-54. Deliberately unpruned for now: the whole table is a handful of rows per day and its
   // entire value is being able to look back over a window the owner did not know they would need.
   // If it ever grows, prune it like its ring sibling rather than by shortening what it records.
@@ -7501,6 +7564,48 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return rows.map(r => ({ supplementName: r.name, date: r.date, amount: Number(r.amount), unit: r.unit }))
   }
 
+  /**
+   * #2184 — every live dose log of EVERY supplement in [from, to], plus the definitions that were
+   * stopped in that span, for the maintenance recommendation's dose-change caveat. Unlike
+   * `listDoseEvents` this is not vial-only and keeps null amounts: creatine through a meal and a
+   * vitamin logged as "2 capsules" are doses too. Both `manual` and `meal` contributions count.
+   */
+  async listDoseHistory(userId: string, from: string, to: string) {
+    const [logRows, courseRows] = await Promise.all([
+      this.db
+        .select({
+          supplementId: s.supplementLogs.supplementId, name: s.supplements.name, date: s.supplementLogs.logDate,
+          amount: s.supplementLogs.amount, unit: s.supplementLogs.unit, doseText: s.supplementLogs.doseText,
+        })
+        .from(s.supplementLogs)
+        .innerJoin(s.supplements, eq(s.supplements.id, s.supplementLogs.supplementId))
+        .where(and(
+          eq(s.supplementLogs.userId, userId),
+          gte(s.supplementLogs.logDate, from),
+          lte(s.supplementLogs.logDate, to),
+          isNull(s.supplementLogs.deletedAt),
+          isNull(s.supplements.deletedAt),
+        ))
+        .orderBy(asc(s.supplementLogs.logDate)),
+      this.db
+        .select({ supplementId: s.supplements.id, name: s.supplements.name, stoppedOn: s.supplements.stoppedOn })
+        .from(s.supplements)
+        .where(and(
+          eq(s.supplements.userId, userId),
+          isNull(s.supplements.deletedAt),
+          gte(s.supplements.stoppedOn, from),
+          lte(s.supplements.stoppedOn, to),
+        )),
+    ])
+    return {
+      logs: logRows.map(r => ({
+        supplementId: r.supplementId, supplementName: r.name, date: r.date,
+        amount: r.amount == null ? null : Number(r.amount), unit: r.unit, doseText: r.doseText,
+      })),
+      courses: courseRows.map(r => ({ supplementId: r.supplementId, supplementName: r.name, stoppedOn: r.stoppedOn })),
+    }
+  }
+
   async unlogSupplement(supplementId: string, userId: string, date: string): Promise<boolean> {
     const rows = await this.db.update(s.supplementLogs)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
@@ -7582,6 +7687,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async upsertOuraSleep(userId: string, sessions: import('../repository').OuraSleepUpsertRow[], source: HealthSource) { return oura.upsertOuraSleep(this.db, userId, sessions, source) }
   async upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]) { return oura.upsertOuraHeartrate(this.db, userId, rows) }
   async upsertAggregatorHeartrate(userId: string, rows: { timestamp: Date; bpm: number }[], source: HealthSource, tz: string) { return oura.upsertAggregatorHeartrate(this.db, userId, rows, source, tz) }
+  async upsertHealthConnectIntervals(userId: string, rows: readonly import('../repository').HealthConnectIntervalRow[]) { return hcIntervals.upsertHealthConnectIntervals(this.db, userId, rows) }
+  async getHealthConnectIntervals(userId: string, kind: import('../repository').HealthConnectIntervalKind, from: Date, to: Date) { return hcIntervals.getHealthConnectIntervals(this.db, userId, kind, from, to) }
   async getHrForWindow(userId: string, from: Date, to: Date) { return oura.getHrForWindow(this.db, userId, from, to) }
   async getObservedHrProfile(userId: string, from: Date, to: Date) { return oura.getObservedHrProfile(this.db, userId, from, to) }
   async getZoneMinutesRange(userId: string, fromDay: string, toDay: string, tz: string, profile: { maxHr: number; restingHr: number }) { return oura.getZoneMinutesRange(this.db, userId, fromDay, toDay, tz, profile) }

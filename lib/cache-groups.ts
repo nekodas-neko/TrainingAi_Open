@@ -400,6 +400,9 @@ export async function invalidateSupplements(): Promise<void> {
     // TN-46 — a vial-dosed log is one of the two inputs to the dose/vitals overlay, so logging a
     // dose has to reach the chart that annotates it.
     invalidateCache('dose-vitals:'),
+    // #2184 — the calibrated maintenance carries a caveat naming a dose that started, stopped or
+    // changed inside its window, so a supplement write has to reach the card that prints it.
+    invalidateCache('energy-balance:'),
   ])
 }
 

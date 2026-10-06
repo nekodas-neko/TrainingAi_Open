@@ -817,3 +817,81 @@ describe('D2 prep — Oura local read/write accessors (Phase-1 Task 1)', () => {
   })
 
 })
+
+// #2445: the prescribed bar has to land in the on-device row on every path that writes one — the
+// local log, and the pull — or the local store (the source of truth) silently loses it.
+describe('set_logs.planned_weight_kg (#2445)', () => {
+  beforeEach(() => { vi.clearAllMocks(); querySQL.mockResolvedValue([]) })
+
+  /** The value bound to `column` in the nth `INTO set_logs` statement. */
+  function boundSetLogValue(column: string, nth = 0): unknown {
+    const calls = runSQL.mock.calls.filter(c => /INTO set_logs/.test(String(c[0])))
+    const [sql, params] = calls[nth] as [string, unknown[]]
+    const cols = sql.slice(sql.indexOf('(') + 1, sql.indexOf(')')).split(',').map(c => c.trim())
+    return params[cols.indexOf(column)]
+  }
+
+  it('logWorkoutLocally writes the bar per set, null where none was sent', async () => {
+    await store.logWorkoutLocally({
+      sessionName: 'S', exercise: 'Skull Crusher', weights: [27.5, 25], sets: 2, reps: [10, 12],
+      workoutSessionId: '00000000-0000-4000-8000-000000000001',
+      plannedWeights: [27.5, null],
+    }, 'pending')
+    expect(boundSetLogValue('planned_weight_kg', 0)).toBe(27.5)
+    expect(boundSetLogValue('planned_weight_kg', 1)).toBeNull()
+  })
+
+  it('logWorkoutLocally writes null when the payload carries no plannedWeights', async () => {
+    await store.logWorkoutLocally({
+      sessionName: 'S', exercise: 'Curl', weights: [20], sets: 1, reps: [12],
+      workoutSessionId: '00000000-0000-4000-8000-000000000001',
+    }, 'pending')
+    expect(boundSetLogValue('planned_weight_kg')).toBeNull()
+  })
+
+  it('applyDelta carries the pulled bar into the local row', async () => {
+    await store.applyDelta({ setLogs: [{
+      id: 'sl-1', exerciseLogId: 'el-1', setNumber: 1, weightKg: 27.5, reps: 10,
+      setTimeSec: null, restTimeSec: null, intensityPct: null, useFor1rm: true,
+      setStartMs: null, setEndMs: null, rpe: null, plannedPct: 70.5, plannedReps: 10,
+      plannedRestSec: 90, plannedWeightKg: 27.5, rpeSource: null,
+      updatedAt: '2026-10-06T09:00:00.000Z', deletedAt: null, syncStatus: 'synced',
+    }] })
+    expect(boundSetLogValue('planned_weight_kg')).toBe(27.5)
+    expect(runSQL.mock.calls.map(c => String(c[0])).find(s => /INTO set_logs/.test(s)))
+      .toContain('planned_weight_kg=excluded.planned_weight_kg')
+  })
+
+  // #2450: whether each RPE was tapped, on the same two write paths.
+  it('logWorkoutLocally writes rpe_source per set, and none beside a missing RPE', async () => {
+    await store.logWorkoutLocally({
+      sessionName: 'S', exercise: 'Bench', weights: [80, 80, 80], sets: 3, reps: [5, 5, 5],
+      workoutSessionId: '00000000-0000-4000-8000-000000000001',
+      rpeValues: [8, 9], rpeSources: ['expected', 'rated', 'rated'],
+    }, 'pending')
+    expect(boundSetLogValue('rpe_source', 0)).toBe('expected')
+    expect(boundSetLogValue('rpe_source', 1)).toBe('rated')
+    expect(boundSetLogValue('rpe_source', 2)).toBeNull()
+  })
+
+  it('logWorkoutLocally writes null when the payload carries no rpeSources', async () => {
+    await store.logWorkoutLocally({
+      sessionName: 'S', exercise: 'Curl', weights: [20], sets: 1, reps: [12], rpeValues: [8],
+      workoutSessionId: '00000000-0000-4000-8000-000000000001',
+    }, 'pending')
+    expect(boundSetLogValue('rpe_source')).toBeNull()
+  })
+
+  it('applyDelta carries the pulled rpe_source into the local row', async () => {
+    await store.applyDelta({ setLogs: [{
+      id: 'sl-2', exerciseLogId: 'el-1', setNumber: 1, weightKg: 80, reps: 5,
+      setTimeSec: null, restTimeSec: null, intensityPct: null, useFor1rm: true,
+      setStartMs: null, setEndMs: null, rpe: 9, plannedPct: 80, plannedReps: 5,
+      plannedRestSec: 180, plannedWeightKg: 80, rpeSource: 'rated',
+      updatedAt: '2026-10-07T09:00:00.000Z', deletedAt: null, syncStatus: 'synced',
+    }] })
+    expect(boundSetLogValue('rpe_source')).toBe('rated')
+    expect(runSQL.mock.calls.map(c => String(c[0])).find(s => /INTO set_logs/.test(s)))
+      .toContain('rpe_source=excluded.rpe_source')
+  })
+})

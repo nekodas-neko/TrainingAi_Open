@@ -13,6 +13,7 @@ import type {
 import type { LogExercisePayload } from '@trainingai/shared/workout/log-exercise';
 import { resolveLoggedDose } from '@trainingai/shared/nutrition/supplement-dose-freeze';
 import { defaultUseFor1rm } from '@trainingai/shared/workout/default-use-for-1rm';
+import { asRpeSource } from '@trainingai/shared/workout/rpe-source';
 import { assembleLocalActiveProgram, type LocalActiveProgram } from './program-assembler';
 import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role';
 
@@ -256,6 +257,8 @@ export class SQLiteLocalStore implements LocalStore {
       plannedPct:    (r.planned_pct as number) ?? null,
       plannedReps:   (r.planned_reps as number) ?? null,
       plannedRestSec: (r.planned_rest_sec as number) ?? null,
+      plannedWeightKg: (r.planned_weight_kg as number) ?? null,
+      rpeSource:     asRpeSource(r.rpe_source),
       updatedAt:     String(r.updated_at),
       deletedAt:     r.deleted_at ? String(r.deleted_at) : null,
       syncStatus:    (r.sync_status as 'pending' | 'synced') ?? 'synced',
@@ -495,8 +498,9 @@ export class SQLiteLocalStore implements LocalStore {
           `INSERT OR REPLACE INTO set_logs
              (id, exercise_log_id, set_number, weight_kg, reps, set_time_sec,
               rest_time_sec, intensity_pct, use_for_1rm, set_start_ms, set_end_ms,
-              rpe, planned_pct, planned_reps, planned_rest_sec, updated_at, synced, sync_status)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?)`,
+              rpe, planned_pct, planned_reps, planned_rest_sec, planned_weight_kg, rpe_source,
+              updated_at, synced, sync_status)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,0,?)`,
           [
             setId,
             exerciseLogId,
@@ -520,6 +524,11 @@ export class SQLiteLocalStore implements LocalStore {
             payload.progressionStyle?.[i]?.pct ?? null,
             payload.progressionStyle?.[i]?.reps ?? null,
             payload.progressionStyle?.[i]?.restSec ?? null,
+            // #2445: the bar as the client prescribed it. Unlike planned_pct this needs no
+            // exercise-type decision here — the client sends null for a bodyweight movement.
+            payload.plannedWeights?.[i] ?? null,
+            // #2450: the same rule the server applies — a source only beside a stored RPE.
+            payload.rpeValues?.[i] != null ? (payload.rpeSources?.[i] ?? null) : null,
             now,
             syncStatus,
           ],
@@ -1586,8 +1595,8 @@ export class SQLiteLocalStore implements LocalStore {
              (id, exercise_log_id, set_number, weight_kg, reps,
               set_time_sec, rest_time_sec, intensity_pct, use_for_1rm,
               set_start_ms, set_end_ms, rpe, planned_pct, planned_reps, planned_rest_sec,
-              updated_at, synced, sync_status)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'synced')
+              planned_weight_kg, rpe_source, updated_at, synced, sync_status)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'synced')
            ON CONFLICT(id) DO UPDATE SET
              exercise_log_id=excluded.exercise_log_id, set_number=excluded.set_number,
              weight_kg=excluded.weight_kg, reps=excluded.reps,
@@ -1596,12 +1605,14 @@ export class SQLiteLocalStore implements LocalStore {
              set_start_ms=excluded.set_start_ms, set_end_ms=excluded.set_end_ms,
              rpe=excluded.rpe, planned_pct=excluded.planned_pct,
              planned_reps=excluded.planned_reps, planned_rest_sec=excluded.planned_rest_sec,
+             planned_weight_kg=excluded.planned_weight_kg, rpe_source=excluded.rpe_source,
              updated_at=excluded.updated_at, synced=1, sync_status='synced'
            WHERE set_logs.sync_status='synced'`,
           [
             r.id, r.exerciseLogId, r.setNumber, r.weightKg, r.reps,
             r.setTimeSec, r.restTimeSec, r.intensityPct, r.useFor1rm ? 1 : 0,
-            r.setStartMs, r.setEndMs, r.rpe, r.plannedPct, r.plannedReps, r.plannedRestSec, r.updatedAt,
+            r.setStartMs, r.setEndMs, r.rpe, r.plannedPct, r.plannedReps, r.plannedRestSec,
+            r.plannedWeightKg ?? null, r.rpeSource ?? null, r.updatedAt,
           ],
         );
       }

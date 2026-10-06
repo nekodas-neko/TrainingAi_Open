@@ -26,6 +26,7 @@ import { TitlePickerSheet } from './title-picker-sheet'
 import { TrophyCase } from './trophy-case'
 import { StatsGrid } from './stats-grid'
 import { FeedbackSection } from './feedback-section'
+import { DeleteAccountSheet } from './delete-account-sheet'
 import { MoreRow, MoreRowGroup } from './more-row'
 import { initialsOf } from '@/lib/initials'
 
@@ -515,6 +516,8 @@ export function ProfileTab({ user, profileFailed, seasons, equippedTitle, friend
           <LogOut className="w-4 h-4 mr-2" />
           Sign Out
         </Button>
+        {/* #2120. Last and quietest: the one irreversible action in the app, behind a typed phrase. */}
+        <DeleteAccountSheet />
       </div>
 
       <TitlePickerSheet

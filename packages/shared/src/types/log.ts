@@ -1,5 +1,8 @@
 import type { ProgramPhaseType } from './program'
 
+import type { RpeSource } from '../workout/rpe-source'
+export type { RpeSource }
+
 export interface SetLog {
   id: string
   exerciseLogId: string
@@ -16,6 +19,10 @@ export interface SetLog {
   plannedPct?: number
   plannedReps?: number
   plannedRestSec?: number
+  /** #2445: the bar prescribed for this set after plate rounding (`set_logs.planned_weight_kg`). */
+  plannedWeightKg?: number
+  /** #2450: whether `rpe` was tapped or left at the pre-fill (`set_logs.rpe_source`). */
+  rpeSource?: RpeSource
 }
 
 export interface ExerciseLog {

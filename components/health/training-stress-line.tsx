@@ -4,7 +4,7 @@ import { ActivityIcon } from 'lucide-react'
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { TRAINING_STRESS_TTL } from '@trainingai/shared/cache-ttl'
-import { todayInTz } from '@trainingai/shared/date-utils'
+import { todayInTz, formatDayShort } from '@trainingai/shared/date-utils'
 import type { TrainingStressResponse } from '@/app/api/training-stress/route'
 
 // Daily Training Stress Score line on the health Training-Load card. Reuses the same
@@ -27,6 +27,9 @@ export function TrainingStressLine() {
       <span className="text-muted-foreground">Training stress (today)</span>
       <span className="font-semibold tabular-nums" style={{ color: '#f59e0b' }}>{data.ots.toFixed(1)}</span>
       {data.high && <span className="text-[11px] text-muted-foreground">· high load</span>}
+      {data.rhrFromDay && (
+        <span className="text-[11px] text-muted-foreground">· resting HR from {formatDayShort(data.rhrFromDay)}</span>
+      )}
     </div>
   )
 }
