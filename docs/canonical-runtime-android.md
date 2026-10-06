@@ -57,16 +57,27 @@ changes need a new APK. A session should say which half its PR touches; if it's 
 merging *is* the delivery.
 
 **When one IS needed, download it — don't build it.** `.github/workflows/android.yml` compiles the
-Kotlin, runs the JVM protocol tests, and builds a debug APK on every PR touching native paths. On
-merge to `main` it publishes that build to a single rolling release at a stable URL:
+Kotlin, runs the JVM protocol tests, and builds two debug APKs on every PR touching native paths:
+the real app (`prod` flavour) and **TrainingAi Dev** (`dev` flavour, below). On merge to `main` it
+publishes each to its own rolling release at a stable URL:
 
 ```
 https://github.com/nekodas-neko/TrainingAi_Open/releases/download/apk-latest/app-debug.apk
+https://github.com/nekodas-neko/TrainingAi_Open/releases/download/apk-dev-latest/app-dev-debug.apk
 ```
 
 Always the newest `main` build, non-expiring, and genuinely no login required — verified in a
-logged-out browser on 2026-08-17, which is the entire point of the public-repo migration (Q-49). For an unmerged PR the APK is a
-workflow artifact (`app-debug-apk`) on that PR's Android run, kept 14 days.
+logged-out browser on 2026-08-17, which is the entire point of the public-repo migration (Q-49). For an unmerged PR the APKs are
+workflow artifacts (`app-debug-apk`, `app-dev-debug-apk`) on that PR's Android run, kept 14 days.
+**A PR's real-app artifact is signed with a throwaway key** (the signing key is restored on
+published runs only, RV-198), so it will not install over the owner's app — never uninstall to get
+past that.
+
+- **The Dev APK never goes on `apk-latest`.** `lib/github-release.ts` serves the first `.apk` there
+  to the in-app update card, so a second one could offer the owner the Dev app as an "update".
+- **Published runs check the certificate before releasing anything.** Both APKs must carry the
+  SHA-256 in `EXPECTED_CERT_SHA256` (android.yml), the installed app's; a mismatch, including an
+  unset signing secret, fails the job and publishes nothing.
 
 > ### ⛔ Before telling anyone to uninstall the app, read this
 >
@@ -113,7 +124,8 @@ base64 -w0 debug-signing.keystore    # macOS: base64 -i debug-signing.keystore
 Paste the output into **Settings → Secrets and variables → Actions → New repository secret**, named
 `ANDROID_DEBUG_KEYSTORE_B64`. It is a credential: never commit it (`android/.gitignore` excludes
 it), and never reuse it as a release/Play Store key. **Changing it invalidates in-place upgrades
-once more**, so a device carrying an APK signed by the old key has to uninstall one final time.
+once more**, so a device carrying an APK signed by the old key has to uninstall one final time, and
+`EXPECTED_CERT_SHA256` in android.yml changes in the same PR or every publish fails.
 
 Note the workflow is **path-gated** on `android/**`, `capacitor.config.ts`, `pnpm-lock.yaml` and its
 own file — **not** `package.json` (this line claimed it until 2026-08-31): a version bump must not
@@ -130,15 +142,52 @@ cd "$(git rev-parse --show-toplevel)" && \
 git checkout main && git pull origin main && \
 npx cap sync android && \
 export JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" && \
-cd android && ./gradlew assembleDebug && cd ..
+cd android && ./gradlew :app:assembleProdDebug :app:assembleDevDebug && cd ..
 ```
 
-Install the result (`android/app/build/outputs/apk/debug/app-debug.apk`) with `adb install -r`, or
-transfer it over. If `pnpm`-managed deps changed, run `pnpm install` before `npx cap sync android`.
+The real app lands at `android/app/build/outputs/apk/prod/debug/app-prod-debug.apk` and the Dev app
+at `.../apk/dev/debug/app-dev-debug.apk`. **Without `android/debug-signing.keystore` a local build
+is signed with this machine's own debug key**, so the real-app APK will not install over the
+owner's app: compare `apksigner verify --print-certs` against `apk-latest` before installing it, and
+never uninstall to get past a mismatch. The Dev APK has no such risk. If `pnpm`-managed deps
+changed, run `pnpm install` before `npx cap sync android`.
 
 The `JAVA_HOME` export points Gradle at the JDK bundled inside Android Studio (git-bash/Windows
 path — adjust if Android Studio is installed elsewhere, or drop the line entirely once `JAVA_HOME`
 is set permanently via Windows Environment Variables).
+
+### TrainingAi Dev — unreleased code on the phone (#2367)
+
+The real app loads production and holds the owner's data and the ring key, so it never runs
+unreleased code and never points at a local server. **TrainingAi Dev** is the same APK built as a
+second Android product flavour, for device passes on PRs and release candidates.
+
+- **It installs beside the real app and can never replace it.** Package `com.trainingai.app.dev`,
+  label "TrainingAi Dev", the dumbbell on an amber icon, its own storage, login and local SQLite.
+  Uninstalling *it* loses nothing that matters.
+- **It loads `http://localhost:3000`**, which `adb reverse tcp:3000 tcp:<port>` carries to the
+  laptop's `pnpm dev`. Cleartext is allowed for localhost only (`src/dev/res/xml/network_security_config.xml`).
+  Sign in with the seeded test user; Google sign-in returns to the real app, so it does not work here.
+- **The real app's `server.url` is untouched.** The Dev app's Capacitor config and plugin list are
+  generated at build time from what `npx cap sync` wrote (`android/app/build.gradle`), so a sync
+  can never overwrite them or move the real app.
+- **It can never talk to the ring, the strap or the scale, or read Health Connect.** The ring's
+  history only moves forward, so a Dev app that drained it would lose those nights from production.
+  `src/dev/AndroidManifest.xml` removes the three BLE services, their boot and scan receivers, and
+  every Bluetooth and Health Connect permission; `MainActivity` skips the three device plugins
+  (`BuildConfig.DEVICE_BLE_ENABLED`); the in-WebView BLE and Health Connect plugins are left out of
+  its plugin list. BLE and Health Connect changes are therefore still checked on the real app.
+- **The build enforces it.** `verifyDevDebugFlavour` reads the merged manifest and assets and fails
+  if any of that comes back; `verifyProdDebugFlavour` fails if the real app's package or Capacitor
+  config drifts from the synced one. Both run in their own CI step and before every assemble.
+- **Airplane mode does not take it offline** — `adb reverse` runs over USB. Stop `pnpm dev` or run
+  `adb reverse --remove tcp:3000` to test offline.
+- **Reinstall it only when `android/**` changes**, the same rule as the real app. Install it from
+  `apk-dev-latest` (the stable key, so it upgrades in place); a PR's `app-dev-debug-apk` artifact
+  has a throwaway key and needs a Dev-app uninstall to swap, which is harmless.
+- **The device driver targets it with `TRAININGAI_APP_ID=com.trainingai.app.dev`**
+  ([`scripts/device/README.md`](../scripts/device/README.md)); with that set it never falls back
+  to the real app's WebView.
 
 ---
 

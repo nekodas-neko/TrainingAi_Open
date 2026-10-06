@@ -1,7 +1,10 @@
 name: Android
 
 # The Android job compiles the Kotlin plugin/service, runs the JVM protocol tests,
-# and builds a debug APK. The APK loads the UI remotely from Railway
+# and builds two debug APKs: the real app (`prod` flavour, com.trainingai.app) and
+# TrainingAi Dev (`dev` flavour, com.trainingai.app.dev, #2367), which loads the
+# laptop's dev server over `adb reverse` and never touches the ring, strap or scale.
+# The real app loads the UI remotely from Railway
 # (capacitor.config.ts server.url), so JS/server/docs changes never require an APK
 # rebuild — only native/Kotlin/Capacitor changes do. Path-gating this whole workflow
 # keeps ~6 billed minutes off the vast majority of runs, which are non-native.
@@ -121,8 +124,8 @@ jobs:
           if [ -z "$KEY_B64" ]; then
             echo "::warning::ANDROID_DEBUG_KEYSTORE_B64 is not set, so this APK is signed with a"
             echo "::warning::throwaway per-runner key and will NOT install over an existing copy."
-            echo "::warning::The device has to uninstall first, which drops any unsynced outbox"
-            echo "::warning::mutations. See android/app/build.gradle for how to set it."
+            echo "::warning::The certificate check below will refuse to publish it. See"
+            echo "::warning::docs/canonical-runtime-android.md for how to set the secret."
             exit 0
           fi
           printf '%s' "$KEY_B64" | base64 -d > android/debug-signing.keystore
@@ -132,16 +135,68 @@ jobs:
           fi
           echo "Stable debug key restored; APKs will upgrade in place."
 
+      # The unit tests cover src/main, which both flavours share, so one variant runs them.
       - name: Kotlin unit tests
         working-directory: android
-        run: ./gradlew :app:testDebugUnitTest --no-daemon
-      - name: Assemble debug APK
+        run: ./gradlew :app:testProdDebugUnitTest --no-daemon
+
+      # #2367. Reads what each APK will actually package — the merged manifest and the merged
+      # Capacitor assets — and fails if TrainingAi Dev regains a ring, strap or scale service or
+      # receiver, a connectedDevice service, a Bluetooth or Health Connect permission, the in-WebView
+      # BLE or Health Connect plugin, the real app's sign-in scheme, or a non-localhost server; or if
+      # the real app's Capacitor config is anything but the one `npx cap sync` wrote. The ring's
+      # history only moves forward, so a Dev app that drained it would lose those nights from
+      # production. The rules live in android/app/build.gradle (VerifyFlavour), and assembling either
+      # APK depends on them too, so a local build cannot skip them; this step only names the failure.
+      - name: Check the Dev app cannot reach the ring, strap or scale
         working-directory: android
-        run: ./gradlew :app:assembleDebug --no-daemon
+        run: ./gradlew :app:verifyDevDebugFlavour :app:verifyProdDebugFlavour --no-daemon
+
+      - name: Assemble both debug APKs
+        working-directory: android
+        run: ./gradlew :app:assembleProdDebug :app:assembleDevDebug --no-daemon
+
+      # Flavours moved the outputs to apk/<flavour>/debug/app-<flavour>-debug.apk. The real app keeps
+      # the name it has always been published under: the More -> update card and Download APK find it
+      # as the `.apk` on apk-latest, and the stable download URL ends in app-debug.apk.
+      - name: Name the APKs
+        run: |
+          set -euo pipefail
+          cp android/app/build/outputs/apk/prod/debug/app-prod-debug.apk app-debug.apk
+          cp android/app/build/outputs/apk/dev/debug/app-dev-debug.apk app-dev-debug.apk
+
+      # Published builds only (the key is not restored on a PR, RV-198). The installed app is signed
+      # with this certificate, and an APK signed by anything else cannot install over it — the way
+      # through would be an uninstall, which destroys the Oura ring's BLE key. So a mismatch fails
+      # here, before either release is touched, rather than reaching the owner's update card. This
+      # includes the secret being unset, which used to publish a throwaway-signed APK with a warning.
+      # If the key is ever deliberately rotated (docs/canonical-runtime-android.md), change the digest
+      # in the same PR. Forks have their own key, so the check runs on this repository only.
+      - name: Check the signing certificate before anything is published
+        if: (github.event_name == 'push' || inputs.release_tag != '') && github.repository == 'nekodas-neko/TrainingAi_Open'
+        env:
+          EXPECTED_CERT_SHA256: d390062e367da6eee52ee74ca18632eae7686e5edb9c0c25e2fc98a3744d893c
+        run: |
+          set -euo pipefail
+          APKSIGNER="$ANDROID_HOME/build-tools/$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -1)/apksigner"
+          for apk in app-debug.apk app-dev-debug.apk; do
+            got=$("$APKSIGNER" verify --print-certs "$apk" | grep -oE 'certificate SHA-256 digest: [0-9a-f]{64}' | awk '{print $NF}' | sort -u)
+            if [ "$got" != "$EXPECTED_CERT_SHA256" ]; then
+              echo "::error::$apk is signed by '${got:-nothing}', not the installed app's certificate ($EXPECTED_CERT_SHA256). Nothing was published."
+              exit 1
+            fi
+            echo "$apk is signed by $got, the installed app's certificate."
+          done
+
       - uses: actions/upload-artifact@v6
         with:
           name: app-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: app-debug.apk
+          retention-days: 14
+      - uses: actions/upload-artifact@v6
+        with:
+          name: app-dev-debug-apk
+          path: app-dev-debug.apk
           retention-days: 14
 
       # On merge to main only (not PRs): publish the freshly-built APK to a single
@@ -165,19 +220,44 @@ jobs:
           # window a delete-release-and-recreate used to open.
           if gh release view apk-latest >/dev/null 2>&1; then
             gh release delete-asset apk-latest app-debug.apk --yes 2>/dev/null || true
-            gh release upload apk-latest android/app/build/outputs/apk/debug/app-debug.apk
+            gh release upload apk-latest app-debug.apk
             gh release edit apk-latest --title "Latest debug APK (v$VERSION)" --notes "$NOTES"
           else
             gh release create apk-latest \
-              android/app/build/outputs/apk/debug/app-debug.apk \
+              app-debug.apk \
               --title "Latest debug APK (v$VERSION)" \
               --notes "$NOTES" \
               --prerelease
           fi
 
-      # A release tag gets its own copy, named for the version. apk-latest keeps tracking `main`
-      # for the between-releases dev loop; this one never moves, so re-installing a given release
-      # later means installing the same bytes.
+      # TrainingAi Dev gets a rolling release of its own and NEVER goes on apk-latest:
+      # lib/github-release.ts serves the first `.apk` it finds there to the in-app update card, so a
+      # second APK on it could offer the owner the Dev app as an "update".
+      # Stable URL: /releases/download/apk-dev-latest/app-dev-debug.apk
+      - name: Publish the Dev APK to its own rolling release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "require('./package.json').version")
+          NOTES="Auto-built from \`main\` @ ${GITHUB_SHA::7} (v$VERSION). TrainingAi Dev (com.trainingai.app.dev): installs beside the real app, never over it, and loads the laptop's dev server over \`adb reverse\`. Download \`app-dev-debug.apk\` below."
+          if gh release view apk-dev-latest >/dev/null 2>&1; then
+            gh release delete-asset apk-dev-latest app-dev-debug.apk --yes 2>/dev/null || true
+            gh release upload apk-dev-latest app-dev-debug.apk
+            gh release edit apk-dev-latest --title "Latest TrainingAi Dev APK (v$VERSION)" --notes "$NOTES"
+          else
+            gh release create apk-dev-latest \
+              app-dev-debug.apk \
+              --title "Latest TrainingAi Dev APK (v$VERSION)" \
+              --notes "$NOTES" \
+              --prerelease
+          fi
+
+      # A release tag gets its own copy of the real app, named for the version. apk-latest keeps
+      # tracking `main` for the between-releases dev loop; this one never moves, so re-installing a
+      # given release later means installing the same bytes. The Dev app is not attached: it is a
+      # WebView pointed at the laptop, the same for every release.
       - name: Attach the APK to the release
         if: inputs.release_tag != ''
         env:
@@ -185,5 +265,5 @@ jobs:
           TAG: ${{ inputs.release_tag }}
         run: |
           set -euo pipefail
-          cp android/app/build/outputs/apk/debug/app-debug.apk "app-${TAG}.apk"
+          cp app-debug.apk "app-${TAG}.apk"
           gh release upload "$TAG" "app-${TAG}.apk" --clobber

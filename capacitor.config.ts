@@ -5,6 +5,8 @@ const config: CapacitorConfig = {
   appName: 'TrainingAi',
   // Load from Railway — all server-side features (API routes, auth) stay on Railway.
   // UI changes deploy via Railway and appear in the APK without a rebuild.
+  // This is the REAL app's server and must never point at a local one. TrainingAi Dev (#2367) gets
+  // http://localhost:3000 from android/app/build.gradle at build time; nothing here changes for it.
   server: {
     url: 'https://trainingai-production.up.railway.app',
     cleartext: false,
@@ -16,7 +18,7 @@ const config: CapacitorConfig = {
     // — so every SQLite result set is stringified on the main thread whether or
     // not DevTools is attached. A device profile put that one function at 16.4%
     // of main-thread time. The default is `debug`, which means "on in debug
-    // builds", and the APK is built with assembleDebug.
+    // builds", and both APKs are debug builds (assembleProdDebug, assembleDevDebug).
     // This does NOT silence the Kotlin plugins: they log via android.util.Log,
     // not com.getcapacitor.Logger. Remote DevTools is a separate switch
     // (webContentsDebuggingEnabled) and is unaffected.

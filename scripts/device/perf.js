@@ -23,7 +23,7 @@
 // the system back — which `dev.back()` refuses unless the app holds the foreground. No raw adb taps.
 
 const { attach, saveResult, sleep } = require('./pw');
-const { adb } = require('./cdp');
+const { adb, APP_ID } = require('./cdp');
 
 const TABS = ['/', '/health', '/workout', '/nutrition', '/more'];
 // Pushed routes reachable from a tab, as [route, from-tab, control text].
@@ -154,9 +154,9 @@ async function ttiPass(dev, net, label) {
 }
 
 async function coldstart() {
-  await adb(['shell', 'am', 'force-stop', 'com.trainingai.app']);
+  await adb(['shell', 'am', 'force-stop', APP_ID]);
   await sleep(1500);
-  await adb(['shell', 'am', 'start', '-n', 'com.trainingai.app/.MainActivity']);
+  await adb(['shell', 'am', 'start', '-n', `${APP_ID}/com.trainingai.app.MainActivity`]);
   await sleep(9000);
   const dev = await attach();
   if (!(await dev.inForeground())) throw new Error('cold start: the app did not come to the foreground');

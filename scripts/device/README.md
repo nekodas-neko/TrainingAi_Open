@@ -104,6 +104,14 @@ Run `probe.js` first; if it cannot connect, nothing else here will either. It ch
 `ADB_PATH` and `DEVICE_CDP_PORT` override the `adb` binary and the forwarded port;
 `DEVICE_PROBE_OUT` moves the output directory.
 
+**Driving TrainingAi Dev (#2367).** Unreleased code runs in the Dev app, never the real one: start
+`pnpm dev`, `adb reverse tcp:3000 tcp:<port>`, sign in as the seeded test user, then prefix every
+command with `TRAININGAI_APP_ID=com.trainingai.app.dev`. With it set, `findSocket` refuses rather
+than falling back to another app's WebView, and the foreground guard and `am start` name the Dev app
+exactly, so a raw tap can never land on the real app. Unset, everything drives the real app as
+before. `localQuery()` then reads the Dev app's store, which holds test data. Background:
+[`docs/canonical-runtime-android.md`](../../docs/canonical-runtime-android.md#trainingai-dev--unreleased-code-on-the-phone-2367).
+
 ### Why there is a recorder as well as a screenshot
 
 `chrome://inspect`'s mirrored phone screen is `Page.startScreencast` (the compositor's own frames)

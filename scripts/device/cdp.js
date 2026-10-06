@@ -26,6 +26,10 @@ const run = promisify(execFile);
 
 const ADB = process.env.ADB_PATH || 'adb';
 const PORT = Number(process.env.DEVICE_CDP_PORT || 9222);
+// Which app to drive. The real app by default; `TRAININGAI_APP_ID=com.trainingai.app.dev` drives
+// TrainingAi Dev (#2367), and then nothing here will fall back to the real app's WebView.
+const APP_ID = process.env.TRAININGAI_APP_ID || 'com.trainingai.app';
+const APP_ID_EXPLICIT = Boolean(process.env.TRAININGAI_APP_ID);
 
 async function adb(args, opts = {}) {
   const { stdout } = await run(ADB, args, { maxBuffer: 8 << 20, ...opts });
@@ -76,9 +80,12 @@ async function findSocket() {
   }
   // A dead process's socket can linger after a force-stop, and pids are not monotonic (sweep 4 found
   // _7270 listed beside the live app's _5093), so match the app's own pid rather than the largest.
-  const pid = (await adb(['shell', 'pidof', 'com.trainingai.app']).catch(() => '')).trim().split(/\s+/)[0];
+  const pid = (await adb(['shell', 'pidof', APP_ID]).catch(() => '')).trim().split(/\s+/)[0];
   const live = pid && unique.find((n) => n.endsWith(`_${pid}`));
   if (live) return live;
+  // With both apps installed, the newest socket can be the other app's. An explicit choice is never
+  // traded for it.
+  if (APP_ID_EXPLICIT) throw new Error(`${APP_ID} has no live WebView. Open it and bring it to the foreground.`);
   return unique.sort((a, b) => Number(b.split('_').pop()) - Number(a.split('_').pop()))[0];
 }
 
@@ -252,4 +259,4 @@ async function connect(opts = {}) {
   return { device, socket, target, session };
 }
 
-module.exports = { connect, systemBack, adb, requireOneDevice, findSocket, forward, Session };
+module.exports = { connect, systemBack, adb, requireOneDevice, findSocket, forward, Session, APP_ID };

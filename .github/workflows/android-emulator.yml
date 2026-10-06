@@ -215,7 +215,7 @@ jobs:
         run: |
           mkdir -p www
           npx cap sync android
-          cd android && ./gradlew :app:assembleDebug --no-daemon
+          cd android && ./gradlew :app:assembleProdDebug --no-daemon
 
       # Q-250. Maestro drives the sign-in the assertion depends on. Installed on the HOST, not in
       # the emulator: it drives the device over adb from outside, the same way the smoke script does.

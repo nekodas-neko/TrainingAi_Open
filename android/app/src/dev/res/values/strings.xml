@@ -1,0 +1,6 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <!-- The launcher reads the activity's label, so both have to say Dev. -->
+    <string name="app_name">TrainingAi Dev</string>
+    <string name="title_activity_main">TrainingAi Dev</string>
+</resources>

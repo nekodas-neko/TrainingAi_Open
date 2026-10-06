@@ -18,7 +18,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { adb, systemBack, requireOneDevice, findSocket, forward } = require('./cdp');
+const { adb, systemBack, requireOneDevice, findSocket, forward, APP_ID } = require('./cdp');
 
 const OUT = process.env.DEVICE_PROBE_OUT || path.join(process.cwd(), 'device-probe');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -114,7 +114,9 @@ class Device {
   /** Whether the app still holds the foreground. `adb()` returns stdout as a STRING. */
   async inForeground() {
     if (!this.onPhone) return true;
-    return /mCurrentFocus=[^\n]*com\.trainingai\.app/.test(await adb(['shell', 'dumpsys', 'window']));
+    // The package and its `/`, so `com.trainingai.app` never matches TrainingAi Dev's window or the reverse.
+    const focus = new RegExp(`mCurrentFocus=[^\\n]*\\b${APP_ID.replace(/\./g, '\\.')}/`);
+    return focus.test(await adb(['shell', 'dumpsys', 'window']));
   }
 
   /**
@@ -152,7 +154,7 @@ class Device {
   }
 
   async bringToFront() {
-    if (this.onPhone) await adb(['shell', 'am', 'start', '-n', 'com.trainingai.app/.MainActivity']);
+    if (this.onPhone) await adb(['shell', 'am', 'start', '-n', `${APP_ID}/com.trainingai.app.MainActivity`]);
     await sleep(2000);
   }
 

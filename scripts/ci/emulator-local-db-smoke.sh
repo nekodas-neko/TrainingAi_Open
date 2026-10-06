@@ -12,7 +12,7 @@
 set -euo pipefail
 
 PKG='com.trainingai.app'
-APK='android/app/build/outputs/apk/debug/app-debug.apk'
+APK='android/app/build/outputs/apk/prod/debug/app-prod-debug.apk'
 
 # The expected version comes from the source, not a constant duplicated here — a hardcoded number
 # would silently stop matching the day someone adds a migration, which is exactly the change this
