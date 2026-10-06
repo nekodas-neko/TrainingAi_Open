@@ -29,10 +29,22 @@ import { GET } from '../route'
 const today = () => todayInTz(TZ)
 const yesterday = () => shiftDateStr(today(), -1)
 const writtenDays = () => upsertOuraDailyDerived.mock.calls.map(c => c[1])
-/** Yesterday's stored row, as `getOuraDailyDerived` returns it for that day only. */
-const yesterdayStampedAt = (at: Date | null) =>
-  getOuraDailyDerived.mockImplementation(async (_u: unknown, from: unknown) =>
-    from === yesterday() ? [{ day: yesterday(), trainingLoadEvaluatedAt: at }] : [])
+const endOf = (day: string) => dateStrMidnightInTz(shiftDateStr(day, 1), TZ)
+/** Stored rows for the look-back, as `getOuraDailyDerived` returns them for a range; a day not
+ *  named is "never evaluated". The single-day reads inside an evaluation get nothing. */
+const storedStamps = (stamps: Record<string, Date | null>) =>
+  getOuraDailyDerived.mockImplementation(async (_u: unknown, from: unknown, to: unknown) =>
+    from === to ? [] : Object.entries(stamps).map(([day, at]) => ({ day, trainingLoadEvaluatedAt: at })))
+/** Every day in the look-back already final, so only the day under test can be stale. */
+const allFinalExcept = (except: Record<string, Date | null>) => {
+  const stamps: Record<string, Date | null> = {}
+  for (let back = 1; back <= 7; back++) {
+    const day = shiftDateStr(today(), -back)
+    stamps[day] = new Date(endOf(day).getTime() + 60_000)
+  }
+  storedStamps({ ...stamps, ...except })
+}
+const yesterdayStampedAt = (at: Date | null) => allFinalExcept({ [yesterday()]: at })
 
 beforeEach(() => {
   upsertOuraDailyDerived.mockClear()
@@ -65,6 +77,27 @@ describe('/api/training-stress — a finished day gets a whole-day verdict (LA-1
     await GET(new Request('http://localhost/api/training-stress'))
     await new Promise(r => setTimeout(r, 50))
     expect(writtenDays()).toEqual([today()])
+  })
+
+  // #2400: only yesterday was ever re-checked, so a day the app was not opened after stayed on its
+  // partial-day verdict. 2026-10-02 sat on a 06:25 verdict (grid 326) because 10-03 was never opened.
+  it('re-evaluates an older day whose verdict was taken mid-day, not only yesterday', async () => {
+    const missed = shiftDateStr(today(), -4)
+    allFinalExcept({ [missed]: new Date(endOf(missed).getTime() - 17 * 3_600_000) })
+    await GET(new Request('http://localhost/api/training-stress'))
+    await vi.waitFor(() => expect(writtenDays()).toContain(missed))
+    await new Promise(r => setTimeout(r, 50))
+    expect(writtenDays().sort()).toEqual([missed, today()].sort())
+  })
+
+  it('looks back seven days and no further', async () => {
+    const edge = shiftDateStr(today(), -7)
+    const beyond = shiftDateStr(today(), -8)
+    allFinalExcept({ [edge]: null, [beyond]: null })
+    await GET(new Request('http://localhost/api/training-stress'))
+    await vi.waitFor(() => expect(writtenDays()).toContain(edge))
+    await new Promise(r => setTimeout(r, 50))
+    expect(writtenDays()).not.toContain(beyond)
   })
 
   it('does not reach for yesterday when a specific date was asked for', async () => {
