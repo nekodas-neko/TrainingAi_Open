@@ -5,6 +5,7 @@ import type { WorkoutRepository } from '@/lib/data/repository'
 import { DEFAULT_TZ, todayInTz, normalizeDateParamIso, ageFromDob, dateStrMidnightInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 import { rateLimit } from '@/lib/rate-limit'
 import { computeTrainingStress, metGridFromDaytimeSamples, type TrainingStressResult } from '@trainingai/shared/health/training-stress'
+import { staleTrainingStressDays, TRAINING_STRESS_RECHECK_DAYS } from '@trainingai/shared/health/training-stress-recheck'
 import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite'
 
 export type TrainingStressResponse = TrainingStressResult
@@ -38,17 +39,23 @@ export async function GET(req: Request) {
 
   // LA-170. The route is only ever asked about TODAY, so a day's stored verdict used to be whichever
   // evaluation ran last WHILE it was happening — and a morning one cannot clear the 720-minute MET
-  // floor. Once yesterday has ended, evaluate it once more over the whole day. The stamp is what
+  // floor. Once a day has ended, evaluate it once more over the whole day. The stamp is what
   // makes this finite: a verdict computed after the day's end is final and is never redone.
-  // Fire-and-forget, so the read never waits on it.
+  // #2400: every finished day in the look-back, not only yesterday — a day the app was not opened
+  // after kept its partial-day verdict. One at a time and fire-and-forget, so the read never waits
+  // on it and a first visit does not open seven evaluations at once.
   if (!raw) {
-    const yesterday = shiftDateStr(date, -1)
-    const [row] = await repo.getOuraDailyDerived(userId, yesterday, yesterday).catch(() => [])
-    const evaluatedAt = row?.trainingLoadEvaluatedAt ?? null
-    if (evaluatedAt == null || evaluatedAt < dateStrMidnightInTz(date, tz)) {
-      evaluateTrainingStressDay(repo, userId, tz, yesterday)
-        .catch(err => console.error('[training-stress] re-evaluating yesterday failed:', err))
-    }
+    const from = shiftDateStr(date, -TRAINING_STRESS_RECHECK_DAYS)
+    const rows = await repo.getOuraDailyDerived(userId, from, shiftDateStr(date, -1)).catch(() => [])
+    const stale = staleTrainingStressDays(
+      date, tz, new Map(rows.map(r => [r.day, r.trainingLoadEvaluatedAt ?? null])),
+    )
+    void (async () => {
+      for (const day of stale) {
+        await evaluateTrainingStressDay(repo, userId, tz, day)
+          .catch(err => console.error(`[training-stress] re-evaluating ${day} failed:`, err))
+      }
+    })()
   }
 
   return NextResponse.json(result satisfies TrainingStressResponse, {
