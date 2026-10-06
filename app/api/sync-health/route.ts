@@ -242,7 +242,7 @@ export async function POST(req: NextRequest) {
   // Written whatever else covers the same minutes: a ring or strap row nearby wins at read time
   // (`mergeHrSources`), so this adds a series for a user without one and leaves a ring user's
   // scores where they were.
-  let heartRateStored = 0
+  let heartRateAccepted = 0
   if (body.heartRateSamples?.length) {
     const now = Date.now()
     const usable = body.heartRateSamples
@@ -255,7 +255,7 @@ export async function POST(req: NextRequest) {
     }
     if (usable.length) {
       await repo.upsertAggregatorHeartrate(userId, usable, body.source, tz)
-      heartRateStored = usable.length
+      heartRateAccepted = usable.length
     }
   }
 
@@ -266,5 +266,5 @@ export async function POST(req: NextRequest) {
     .filter(a => a.avgHr == null && a.distanceKm == null && a.caloriesBurned == null && a.startTime && a.endTime)
     .map(a => ({ id: a.id, date: a.date, startTime: a.startTime, endTime: a.endTime }));
 
-  return NextResponse.json({ ok: true, enrichmentCandidates, rejected, heartRateStored });
+  return NextResponse.json({ ok: true, enrichmentCandidates, rejected, heartRateAccepted });
 }

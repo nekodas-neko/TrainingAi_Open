@@ -179,7 +179,7 @@ describe('POST /api/sync-health — heartRateSamples', () => {
     const now = Date.now()
     const res = await post({ heartRateSamples: [{ at: now - 2 * MIN, bpm: 71 }, { at: now - MIN, bpm: 128.6 }] })
     expect(res.status).toBe(200)
-    expect((await res.json()).heartRateStored).toBe(2)
+    expect((await res.json()).heartRateAccepted).toBe(2)
 
     expect(mockRepo.upsertAggregatorHeartrate).toHaveBeenCalledTimes(1)
     const [userId, rows, source, tz] = mockRepo.upsertAggregatorHeartrate.mock.calls[0]
@@ -210,7 +210,7 @@ describe('POST /api/sync-health — heartRateSamples', () => {
     })
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.heartRateStored).toBe(1)
+    expect(body.heartRateAccepted).toBe(1)
     expect(body.rejected).toEqual([expect.stringContaining('heart rate: 4 sample(s)')])
     expect(mockRepo.upsertAggregatorHeartrate.mock.calls[0][1]).toEqual([{ timestamp: new Date(now - 3 * MIN), bpm: 66 }])
   })
