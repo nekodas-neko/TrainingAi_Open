@@ -29,8 +29,7 @@ Every unit uses exactly one:
 | **Directional** | ≥ 1.5σ past the normal in the good direction | it moves the bad way |
 
 For steady and directional units, "normal" is the **30-day** baseline. A sweet-spot band starts from
-the research default and is refit to the person. A unit at the person's normal scores **70**; 100
-is reached at +1.5σ (the curve in the scoring-cases page). Low-wear nights and nap fragments are
+the research default and is refit to the person. How a unit is scored is **Level + Day**, below. Low-wear nights and nap fragments are
 excluded from every window.
 
 ## The tree
@@ -87,6 +86,51 @@ Excluded from every window: low-wear nights, nap fragments (#2192), and days the
 unwell. **Progress is shown, not scored away:** as fitness improves the median rises and a good day
 still reads ~70; the gain appears in the 90-day window ("HRV normal up 6 ms this season") on the
 pillar screen.
+
+## Level + Day — how a unit is scored (owner, 2026-10-06)
+
+**Supersedes "70 at your normal, 100 at +1.5σ".** That curve fails the owner's own test: someone with
+perfect sleep and activity every day would read 70 forever, with no way to see improvement. So the
+reference cannot also be the scale. Every unit is scored in two parts:
+
+| Part | Question | Compared against |
+|---|---|---|
+| **Level** | How good is your *normal*? | absolute yardsticks — research ranges (sleep 7–9 h, WHO zone minutes, protein g/kg, SpO₂) or population norms for age and sex (HRV, resting HR) |
+| **Day** | How is today versus your normal? | your own history — your median and spread, 30-day window |
+
+`unit score = clamp(Level + Day, 0, 100)`. The normal and the spread are learned per person (the
+self-tuning above); only the yardstick that grades the normal is fixed.
+
+| Person | Level | Day | Score |
+|---|---|---|---|
+| Sleeps 8 h of great sleep every night | ~95 | ±0 | ~95; a slightly better night reaches 100 |
+| Average sleeper, great night | ~70 | +15 | 85 |
+| 5½ h every night, consistently | ~40 | ±0 | 40 — a habit is not excused by being consistent |
+| Average sleeper, bad night | ~70 | −25 | 45 |
+
+Units that only mean something as a change (temperature, breathing rate) have **no Level**: steady
+at your normal is 100, and Day only subtracts. As a person improves, Level rises with them, so
+progress shows in the score itself as well as in the 90-day window.
+
+### Edge cases this must survive — each becomes a test
+
+| # | Case | What would go wrong | Rule |
+|---|---|---|---|
+| 1 | Perfect and consistent (the owner's case) | stuck at "average" | Level grades the normal: ~95–100 |
+| 2 | Bad habit, consistently | 5½ h scored as fine | Level grades the normal against the research range |
+| 3 | Genetically low HRV, perfect lifestyle | capped forever by population norms | for highly genetic units (HRV, resting HR) Level spans only **60–90**, so Day and the other units decide; genetics cannot pin a pillar |
+| 4 | Very consistent person — tiny spread | a 2 ms HRV wobble reads as a crisis | **minimum meaningful change per unit** (e.g. HRV ±3 ms, resting HR ±2 bpm, temperature ±0.15 °C) floors the spread |
+| 5 | Too much of a good thing (10 h sleep, very high load) | rewarded as "more" | sweet-spot units grade *both* Level and Day on the range shape: above the band falls |
+| 6 | Chronic overload that has become normal | ACWR adapts and reads fine | 28:90 block trend falls out of band; Heart's Level drifts down; the 90-day window flags it |
+| 7 | Sick weeks drag the normal down | recovery then scores as "great" | flagged unwell days and low-wear nights are excluded; medians, not means |
+| 8 | New routine — shift work, travel, new program | every day scores as an anomaly | a step change that holds 7+ days is treated as a **regime change**: re-baseline faster, ask once ("new routine?") |
+| 9 | Menstrual cycle | temperature/HRV/resting HR penalised every luteal phase | cycle-aware normal (per-phase baseline) when the cycle is tracked, or a detected ~28-day rhythm; never scored as illness |
+| 10 | Medication, altitude, pregnancy | population Level misleads (beta-blockers lower HR; altitude lowers SpO₂) | a declared **context** adjusts the yardstick; asked once when a unit sits out of range for 14+ days unexplained |
+| 11 | Sensor change (ring → strap → Health Connect) | measurement method shifts the normal | baselines are kept **per source**; a source change restarts that unit as provisional |
+| 12 | Unlogged food or hydration | counted as zero intake | not logged = missing, not zero: the unit drops out and its pillar renormalises, and says so |
+| 13 | Daytime sleeper (night shift) | main sleep labelled a nap | the main sleep period is the longest of the 24 h, not a clock window (and #2192's freeze holds) |
+| 14 | Fewer than 14 valid days | fake precision | Level from population defaults, Day shown as "learning"; settles at 30 days |
+| 15 | Ceiling — great normal and a great day | sum exceeds 100 | clamp at 100; a great normal keeps its room to show 100 |
 
 ## Too much activity costs twice, and that is correct
 
