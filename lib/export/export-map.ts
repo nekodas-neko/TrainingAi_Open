@@ -73,6 +73,7 @@ export const EXPORTED: Record<string, ExportScope> = {
   coach_messages: { kind: 'user_id' },
   coach_threads: { kind: 'user_id' },
   daily_zone_minutes: { kind: 'user_id' },
+  health_connect_intervals: { kind: 'user_id' },
   day_checkins: { kind: 'user_id' },
   dexa_scans: { kind: 'user_id' },
   exercise_estimates: { kind: 'user_id' },

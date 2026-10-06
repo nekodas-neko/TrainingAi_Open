@@ -558,6 +558,22 @@ export interface StrapStatusWrite {
   worn: boolean | null
 }
 
+/** #2462. The Health Connect movement kinds stored per interval: a step count or active kilocalories
+ *  over [startAt, endAt], or a cadence sample in steps/min at startAt (= endAt). */
+export type HealthConnectIntervalKind = 'steps' | 'active_kcal' | 'cadence_spm'
+
+/** #2462. One row of `health_connect_intervals`. `recordId` is Health Connect's own record id;
+ *  `dataOrigin` the writing app's package, `deviceType` the plugin's TYPE_* string. */
+export interface HealthConnectIntervalRow {
+  kind: HealthConnectIntervalKind
+  recordId: string
+  startAt: Date
+  endAt: Date
+  value: number
+  dataOrigin: string | null
+  deviceType: string | null
+}
+
 /** #2469. `OuraRingService.status()`'s link counters, cumulative since `serviceStartedAt` (they
  *  reset with the service). The one device-supplied instant is `serviceStartedAt`, computed on the
  *  device as now − uptime; it identifies the service instance so a reader can see a reset. */
@@ -1319,6 +1335,12 @@ export interface WorkoutRepository {
    *  a device row at the same timestamp; device rows win at read time (#2168). `tz` dates the
    *  zone-minutes cache invalidation. */
   upsertAggregatorHeartrate(userId: string, rows: { timestamp: Date; bpm: number }[], source: HealthSource, tz: string): Promise<void>
+  /** #2462. Health Connect steps / active kcal per record and cadence per sample, upserted by
+   *  `(kind, recordId, startAt)` so a re-read window is idempotent. Returns rows written after the
+   *  in-batch collapse. Overlap between apps is kept and resolved by the reader. */
+  upsertHealthConnectIntervals(userId: string, rows: readonly HealthConnectIntervalRow[]): Promise<number>
+  /** #2462. One kind's rows starting in [from, to), oldest first, overlap NOT resolved. */
+  getHealthConnectIntervals(userId: string, kind: HealthConnectIntervalKind, from: Date, to: Date): Promise<HealthConnectIntervalRow[]>
   getHrForWindow(userId: string, from: Date, to: Date): Promise<{ timestamp: Date; bpm: number; source: string | null }[]>
   /** The corroboration-gated observed HR profile for a window, aggregated in the database — the
    *  same answer as `computeObservedHr` over `getHrForWindow`'s rows, without materialising them
