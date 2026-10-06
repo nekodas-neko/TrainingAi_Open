@@ -1,12 +1,13 @@
 'use client'
 
 import { useRef, useState } from 'react'
-import { Camera, ImagePlus, Loader2, Trash2, Utensils } from 'lucide-react'
+import { Camera, ImagePlus, Loader2, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@trainingai/shared/utils'
 import { dataUrlToBlob, downscaleToThumbDataUrl, THUMB_MAX_DIM } from '@/lib/media/downscale-image'
 import { mealImageBytes, rejectMealImage, mealImageRejectionMessage } from '@trainingai/shared/nutrition/meal-image'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { MealPlaceholderGlyph } from './meal-thumb'
 
 /**
  * `@capacitor/camera` reports a cancelled picker by throwing, with no code to test — only a message.
@@ -252,7 +253,7 @@ export function MealPhotoTile({ value, onChange, disabled, variant = 'tile', lab
           >
             {busy
               ? <Loader2 className="h-6 w-6 animate-spin text-white/70" />
-              : <Utensils className="h-8 w-8 text-white/45" strokeWidth={1.6} />}
+              : <MealPlaceholderGlyph size={32} />}
             <span className="text-xs font-semibold text-white/70">{busy ? 'Reading…' : 'Add a photo'}</span>
           </div>
         )}
