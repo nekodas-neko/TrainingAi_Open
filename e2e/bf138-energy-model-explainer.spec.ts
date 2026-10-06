@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 import { ensureEnergyBalanceProfile, STORAGE_STATE, tapInView, tolerateTestEnd } from './fixtures'
 
 /**
@@ -36,6 +37,8 @@ test.beforeAll(async () => { await ensureEnergyBalanceProfile() })
 /** Satisfies all three guards: a resting rate below the base, a stale saved goal, a long window. */
 const SPEAKS = {
   restingRateKcal: 1325,
+  restingRateSource: 'measured' as const,
+  restingRateMeasuredOn: shiftDateStr(todayInTz('Australia/Brisbane'), -40),
   restingBaseKcal: 1453,
   expenditureKcal: 1470,
   currentKcal: 1660,
@@ -46,6 +49,8 @@ const SPEAKS = {
 /** Fails all three: no measured rate, a goal that agrees, too short a window. */
 const SILENT = {
   restingRateKcal: null,
+  restingRateSource: undefined,
+  restingRateMeasuredOn: null,
   restingBaseKcal: 1453,
   expenditureKcal: 1650,
   currentKcal: 1660,
@@ -53,7 +58,17 @@ const SILENT = {
   weightRateKgPerWeek: null,
 }
 
-async function overlay(page: import('@playwright/test').Page, v: typeof SPEAKS | typeof SILENT) {
+type Overlay = {
+  restingRateKcal: number | null
+  restingRateSource?: 'measured' | 'formula'
+  restingRateMeasuredOn?: string | null
+  restingBaseKcal: number
+  expenditureKcal: number
+  currentKcal: number
+  daysLogged: number
+  weightRateKgPerWeek: number | null
+}
+async function overlay(page: import('@playwright/test').Page, v: Overlay) {
   await page.route(u => new URL(u).pathname === '/api/nutrition/energy-balance', tolerateTestEnd(async r => {
     const real = await r.fetch()
     const body = await real.json().catch(() => ({}))
@@ -66,6 +81,8 @@ async function overlay(page: import('@playwright/test').Page, v: typeof SPEAKS |
         balance: {
           ...body.balance,
           restingRateKcal: v.restingRateKcal,
+          restingRateSource: v.restingRateSource,
+          restingRateMeasuredOn: v.restingRateMeasuredOn,
           restingBaseKcal: v.restingBaseKcal,
           expenditureKcal: v.expenditureKcal,
         },
@@ -106,7 +123,7 @@ async function openInfoPanel(page: import('@playwright/test').Page): Promise<voi
   }).toPass({ timeout: 60_000 })
 }
 
-const CHAIN = /measured resting rate of/
+const CHAIN = /your resting rate of/
 const TWO_NUMBERS = /Why two numbers/
 const MEASURED = /What is actually measured/
 
@@ -120,6 +137,8 @@ test('with the numbers to say it, the panel states the chain, both models, and w
   await expect(page.getByText(CHAIN).first()).toBeVisible({ timeout: 30_000 })
   await expect(page.getByText(/1,325 kcal/).first()).toBeVisible()
   await expect(page.getByText(/1,453 kcal/).first()).toBeVisible()
+  // #2413: a measured rate says it is carried forward from the test, not that it is the test
+  await expect(page.getByText(/carried forward from your .* test/).first()).toBeVisible()
 
   // ② the two models, named beside each other
   await expect(page.getByText(TWO_NUMBERS).first()).toBeVisible()
@@ -143,4 +162,15 @@ test('⛔ and says none of them when the numbers behind them are not there', asy
   for (const absent of [CHAIN, TWO_NUMBERS, MEASURED]) {
     await expect(page.getByText(absent)).toHaveCount(0)
   }
+})
+
+test('#2413: a formula rate is called an estimate, never measured', async ({ page }) => {
+  await overlay(page, { ...SPEAKS, restingRateSource: 'formula', restingRateMeasuredOn: null })
+  await page.goto('/nutrition', { waitUntil: 'networkidle' })
+
+  await openInfoPanel(page)
+
+  await expect(page.getByText(/your estimated resting rate of/).first()).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/your measured resting rate/)).toHaveCount(0)
+  await expect(page.getByText(/carried forward from your/)).toHaveCount(0)
 })
