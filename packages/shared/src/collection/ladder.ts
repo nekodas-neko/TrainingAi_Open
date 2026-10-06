@@ -358,8 +358,9 @@ export interface BankReplayInput {
  * both, which the collection's third PR warned against.
  *
  * **The drain comes off what was carried into the day, never off the day's own gain** (#2085).
- * Whenever the carried balance covers the drain, the two orders give the same sum, so the owner's
- * 4,000-a-day profit holds. They differ only near empty: draining after the gain, a lone cardio
+ * Whenever the carried balance covers the drain, a day moves the bank by the same amount in either
+ * order, so the owner's 4,000-a-day profit holds, and the balance never sits more than one day's
+ * drain above the old order's. They differ only near empty: draining after the gain, a lone cardio
  * session banked 4 of the 5 fifths a cat costs, so "1 session = 1 T1" paid nothing for a first
  * run. The same was true of 5,000 steps and of a fully logged health day, which the plan also
  * counts as one T1 each.

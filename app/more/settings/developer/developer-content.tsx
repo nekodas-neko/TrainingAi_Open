@@ -35,7 +35,7 @@ export function DeveloperContent() {
       {/* #2250 — the owner's keep/hide call per card (2026-10-05), from the inventory in
           `docs/admin-control-inventory.md` §A. Everything stays visible except the unit fix, which
           is folded rather than deleted: a repair that is gone cannot be used when it is needed. */}
-      <ConsoleSection title="Checks" when="Read what the app is doing. Model assets is the only sign that production is loading its models from storage rather than the repo copy.">
+      <ConsoleSection title="Checks" when="Look at what the app is doing. Model assets is the only check that object storage holds every model the server needs.">
         <ModelAssetsCard />
         <TimeAuditCard />
         <ProgramExportCard />
