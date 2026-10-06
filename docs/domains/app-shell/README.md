@@ -281,7 +281,8 @@ Live at the time of writing (2026-07-30):
   `components/home/cat-sprite.tsx`, with the glyph as fallback. **Owner's look at 56 px owed.**
   The v2 rules are planned in
   [`2026-09-26-cat-collection-rules-v2.md`](../../superpowers/plans/2026-09-26-cat-collection-rules-v2.md)
-  (PS-48 owner questions, PS-49 engine, PS-50 Android widget).
+  (PS-48 owner questions, answered 2026-10-05; PS-49 engine, with the Rogue added by #2085; the
+  surface switch to v2 is #2187; PS-50 Android widget).
 - ⚠️ **The three exercise roles are named once** (BF-124/BF-125, 2026-09-07, v1.436.40) —
   `components/workout/exercise-role-labels.ts`, as Main / Secondary / Accessory. The editor's role
   row wraps and marks the chosen option in `bg-brand`; the near-white `bg-primary` selected slab is

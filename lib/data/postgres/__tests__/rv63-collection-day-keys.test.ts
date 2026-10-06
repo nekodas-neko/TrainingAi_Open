@@ -31,12 +31,14 @@ describe.skipIf(!canRun)('RV-63 — collection day keys', () => {
   })
 
   afterAll(async () => {
+    await pool.query(`DELETE FROM activity_logs WHERE user_id = $1`, [USER])
     await pool.query(`DELETE FROM body_metrics WHERE user_id = $1`, [USER])
     await pool.query(`DELETE FROM sleep_sessions WHERE user_id = $1`, [USER])
     await pool.query(`DELETE FROM users WHERE id = $1`, [USER])
   })
 
   beforeEach(async () => {
+    await pool.query(`DELETE FROM activity_logs WHERE user_id = $1`, [USER])
     await pool.query(`DELETE FROM body_metrics WHERE user_id = $1`, [USER])
     await pool.query(`DELETE FROM sleep_sessions WHERE user_id = $1`, [USER])
   })
@@ -109,5 +111,50 @@ describe.skipIf(!canRun)('RV-63 — collection day keys', () => {
     await steps('2026-09-10', 5_000)
 
     expect(await repo.listStepDayKeys('00000000-0000-4000-8000-0000000006ff', ...ALL)).toEqual([])
+  })
+
+  /**
+   * #2085 — the Rogue's faucet: live cardio sessions, counted per day in SQL. The type list is the
+   * engine's, passed in, so a mobility session and a tombstoned run both stay out.
+   */
+  describe('listCardioSessionCounts', () => {
+    const logged = (date: string, type: string, deleted = false) =>
+      pool.query(
+        `INSERT INTO activity_logs (user_id, date, activity_type, title, deleted_at) VALUES ($1,$2,$3,$4,$5)`,
+        [USER, date, type, type, deleted ? new Date() : null])
+    const CARDIO = ['walk', 'run'] as const
+
+    it('counts sessions per day, two on one day included', async () => {
+      await logged('2026-09-10', 'run')
+      await logged('2026-09-10', 'walk')
+      await logged('2026-09-12', 'walk')
+
+      expect(await repo.listCardioSessionCounts(USER, ...ALL, CARDIO))
+        .toEqual([{ date: '2026-09-10', sessions: 2 }, { date: '2026-09-12', sessions: 1 }])
+    })
+
+    it('leaves out types the engine does not count, and deleted sessions', async () => {
+      await logged('2026-09-10', 'yoga')
+      await logged('2026-09-11', 'run', true)
+      await logged('2026-09-12', 'run')
+
+      expect(await repo.listCardioSessionCounts(USER, ...ALL, CARDIO))
+        .toEqual([{ date: '2026-09-12', sessions: 1 }])
+    })
+
+    it('honours the bounds and the user', async () => {
+      await logged('2026-09-01', 'run')
+      await logged('2026-09-10', 'run')
+
+      expect(await repo.listCardioSessionCounts(USER, '2026-09-05', '2026-09-30', CARDIO))
+        .toEqual([{ date: '2026-09-10', sessions: 1 }])
+      expect(await repo.listCardioSessionCounts('00000000-0000-4000-8000-0000000006ff', ...ALL, CARDIO)).toEqual([])
+    })
+
+    it('returns nothing for an empty type list rather than every session', async () => {
+      await logged('2026-09-10', 'run')
+
+      expect(await repo.listCardioSessionCounts(USER, ...ALL, [])).toEqual([])
+    })
   })
 })

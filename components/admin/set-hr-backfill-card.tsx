@@ -2,9 +2,9 @@
 
 import { HrBackfillCard } from './hr-backfill-card'
 
-// One-off admin utility: materialise per-set HR snapshots (set_hr_stats, migration 139) for existing
-// completed sessions still inside the 180d oura_heartrate retention window, so the "Heart & Recovery"
-// exercise trends have back-data immediately instead of only filling in going forward.
+// A standing remedy, not a one-off (see `docs/admin-control-inventory.md`): materialise per-set HR
+// snapshots (set_hr_stats, migration 139) for completed sessions still inside the 180d
+// oura_heartrate retention window, so the "Heart & Recovery" exercise trends have their data.
 //
 // "New workouts populate automatically" is only true if the recap is opened — attribution runs from
 // `GET /api/oura/hr-data`, which is the recap fetch, and there is no other trigger. Four recent

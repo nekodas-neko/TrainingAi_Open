@@ -103,14 +103,11 @@ export default function ExerciseUnitFix() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <p className="text-sm font-medium mb-1">Fix lbs logged as kg</p>
-        <p className="text-xs text-muted-foreground">
-          Select the exercise(s) that were logged in lbs but recorded as kg, and the date
-          before which this applies. Set weights, estimated 1RM, target 80%, volume and the
-          personal record will be recalculated for affected sessions.
-        </p>
-      </div>
+      <p className="text-xs text-muted-foreground">
+        Select the exercise(s) that were logged in lbs but recorded as kg, and the date
+        before which this applies. Set weights, estimated 1RM, target 80%, volume and the
+        personal record will be recalculated for affected sessions.
+      </p>
 
       <div className="flex flex-wrap gap-1.5">
         {exerciseNames.map(name => {

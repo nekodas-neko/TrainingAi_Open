@@ -6,6 +6,12 @@ section to only use what we actually need as well."*
 This is the inventory OR-115 requires **before** anything is hidden or deleted. It is the list, grouped
 by what each control is *for*, with a recommendation per row. The keep/hide/delete call is the owner's.
 
+**Decided 2026-10-05 and built in #2379 (#2250):** the owner accepted the three strong recommendations
+and kept both open ones visible. Settings → Developer now groups section A under three headings —
+**Checks** (model assets first, then time audit and program export), **Heart-rate backfills** (both),
+and **One-off repairs**, where the exercise unit fix sits collapsed. Nothing was deleted. The
+set-HR backfill's code header no longer calls it a one-off.
+
 ---
 
 ## Finding 1 — "the admin section" is TWO screens, and that is most of the problem
@@ -71,7 +77,7 @@ accretion OR-115 describes: each was added when something needed a trigger, and 
 |---|---|---|---|
 | **Time audit** (`time-audit-card`) | Diagnostic + calibration input | Transition/set timing over 30–365 d against the current model; also writes `timing-baseline` | **Keep, grouped** under a timing/calibration heading |
 | **Program export** (`program-export-card`) | Diagnostic (read-only) | Dumps the active program as text to copy | **Keep, grouped**; collapsed by default |
-| **Model assets** (`model-assets-card`) | Diagnostic — *the only way to know* | Q-49 A1 gate: are the eight ONNX models really in object storage, or is the repo-tree fallback quietly carrying production? `getSession` **falls back silently** | **Keep, never hide deeply.** Silent fallback means this is the only signal; this is an "once a year, and the only way out of a real failure" control |
+| **Model assets** (`model-assets-card`) | Diagnostic — *the only way to know* | Q-49 A1 gate: are the eight ONNX models really in object storage? ⚠ *Since Q-49 A4b deleted the repo-tree copies there is no fallback at all*, so storage is the only source and this card is the only place a gap shows | **Keep, never hide deeply.** This is an "once a year, and the only way out of a real failure" control |
 | **Backfill per-set HR stats** (`set-hr-backfill-card`) | **Remedy, recurring** | Materialises `set_hr_stats` for sessions whose recap was never opened — attribution only runs from the recap fetch | **Keep reachable.** Not one-off; fix the header that says it is |
 | **Backfill per-workout HR summary** (`workout-hr-backfill-card`) | Remedy, mostly historical | Snapshots `workout_hr_stats`; the table sat at 0 rows for every session until the float/integer write bug was fixed | **Keep**, may collapse — the recap keeps it current once seeded |
 | **Exercise unit fix** (`exercise-unit-fix`) | **One-off correction** | Rewrites stored weights and estimated 1RMs for unit-confused logs | **Hide** behind a disclosure — the clearest hide candidate on either screen |
@@ -102,12 +108,11 @@ opened."* A tidy-up must not fold them into a later section.
 
 ---
 
-## What is owed from the owner
+## What was owed from the owner — answered 2026-10-05
 
-One pass over section A, six rows, with a keep / hide / delete each. Three of them carry a
-recommendation strong enough that a silent yes is reasonable (model assets: keep, never hide deeply;
-set-HR backfill: keep reachable; exercise unit fix: hide). The genuinely open ones are **program
-export** and **workout-HR backfill** — both defensible either way, and neither costly to reverse.
+One pass over section A, six rows, with a keep / hide / delete each. **Answered (#2250):** model
+assets keep, visible; set-HR backfill keep reachable; exercise unit fix hide behind a disclosure;
+program export and workout-HR backfill **keep visible**. Time audit was not asked and stays visible.
 
 **Hide beats delete throughout.** A destructive admin control that is gone cannot be used when it is
 needed; one behind a disclosure is out of the way and still there.

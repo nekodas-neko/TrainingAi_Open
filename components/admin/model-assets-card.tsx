@@ -18,9 +18,8 @@ const VERDICT_COLOR: Record<ModelBucketReport['verdict'], string> = {
   unreachable: 'var(--accent-amber)',
 }
 
-// The Q-49 A1 gate: are the eight ONNX models really in object storage, or is the repo-tree
-// fallback quietly carrying production? `getSession` prefers the bucket and falls back silently,
-// so nothing user-visible changes either way — which is exactly why it needs asking out loud.
+// The Q-49 A1 gate, kept after A4b deleted the repo-tree copies: object storage is now the only
+// source of the models, so this is where to ask whether it holds all of them.
 export default function ModelAssetsCard() {
   const [running, setRunning] = useState(false)
   const [report, setReport] = useState<Report | null>(null)
@@ -47,9 +46,9 @@ export default function ModelAssetsCard() {
         <span className="text-sm font-medium">Model asset delivery</span>
       </div>
       <p className="text-xs text-muted-foreground">
-        Checks object storage for every ONNX model the server loads. A &ldquo;complete&rdquo; verdict is
-        what clears the last step of the public-repo migration — until then the repo-tree copies
-        must stay.
+        Checks object storage for every ONNX model the server loads. Storage is the only copy since
+        the repo-tree files were deleted, so anything short of &ldquo;complete&rdquo; means those
+        models cannot run.
       </p>
       <Button size="sm" variant="outline" disabled={running} onClick={() => void run()}>
         {running ? 'Checking…' : 'Check model assets'}
