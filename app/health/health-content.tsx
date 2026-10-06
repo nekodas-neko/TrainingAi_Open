@@ -46,7 +46,7 @@ type Tab = "body" | "training" | "progress";
 // heart data across 4 positions and left sleep far from its correlation card.
 type BodyGroup = { header: string; cards: string[] };
 const BODY_GROUPS: BodyGroup[] = [
-  { header: "Body",              cards: ["bodyWeight", "bodyFat", "leanMass", "bodyComposition", "caloriesBurned", "weightTrend"] },
+  { header: "Body",              cards: ["bodyWeight", "weightTrend", "bodyFat", "leanMass", "bodyComposition", "caloriesBurned"] },
   { header: "Sleep",             cards: ["sleep"] },
   { header: "Heart & recovery",  cards: ["rhr", "measureHr", "hrDay", "hrvBaseline", "trainingLoad", "timeInZone", "sleepVsPerformance", "hrRecoveryProfile"] },
   { header: "Activity & intake", cards: ["energyBudget", "steps", "waterIntake", "nutritionActivityTrends"] },
@@ -55,7 +55,7 @@ const BODY_GROUPS: BodyGroup[] = [
   // at the top of the Body panel as the tab's main attraction (see the pinned hero below).
 ];
 const TRAINING_ORDER = ["calendar","weekInReview","weeklyStats","aiPeriodization","muscleSets","movementBalance","activityHistory","workoutDensity"];
-const PROGRESS_ORDER = ["strengthTrend","trends","strengthProgress","goalsProgress","weightTrendProgress"];
+const PROGRESS_ORDER = ["strengthTrend","trends","strengthProgress","goalsProgress"];
 
 interface SleepRow {
   date: string;
@@ -590,7 +590,6 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   const { bmi, bmiUsesBf, bmiLabel } = useBmiClassification(latestWeight, heightCm, latestBf, sexProp);
   const weightTrendKgPerWeek = useWeightTrend(metaRecent);
   const energyBalance = useEnergyBalanceToday({ onError: () => setEnergyBalanceFailed(true) });
-  const energyBalanceKcal = energyBalance?.balance?.netKcal ?? null;
 
 
   const { isSectionVisible, renderBodySection, renderTrainingSection, renderProgressSection } = getHealthSections({
@@ -598,7 +597,7 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
     latestDistanceKm, targetWeightKg, targetBfPct, openInfo, toggleInfo, openLog,
     setMetricSheet, setWaterLogOpen, recentSleep, lastSleep, readiness,
     todayWaterMl, waterGoalMl, activeEnergyKcalToday, bmi, bmiLabel, bmiUsesBf, latestBfIsCorrected,
-    weightTrendKgPerWeek, energyBalanceKcal, energyBalance, trainingLoad, sleepCorr, injuries,
+    weightTrendKgPerWeek, energyBalance, trainingLoad, sleepCorr, injuries,
     setInjuries, userId, recoveryMuscles, handleDayClick, weeklyStats, weeklyStatsError,
     metaFailed: metaFailed && metaToday == null && metaRecent.length === 0,
     energyBalanceFailed: energyBalanceFailed && energyBalance == null,
