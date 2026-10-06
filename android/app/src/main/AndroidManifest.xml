@@ -32,12 +32,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Deep link for Capacitor Browser OAuth callback -->
+            <!-- Deep link for Capacitor Browser OAuth callback. `trainingai` in the real app; the
+                 Dev app gets a scheme of its own (android/app/build.gradle) so it never answers
+                 the real app's sign-in. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="trainingai" android:host="auth-complete" />
+                <data android:scheme="${oauthScheme}" android:host="auth-complete" />
             </intent-filter>
 
             <!-- Health Connect permission rationale — Android 13 and below -->

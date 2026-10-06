@@ -67,6 +67,10 @@ android {
         }
     }
     buildTypes {
+        // Applies to every flavour's debug build, so the real app and the Dev app carry the same
+        // certificate. Never set a signingConfig on a flavour: it would take the prod APK off this
+        // key, and a differently signed APK cannot install over the owner's app without an
+        // uninstall, which destroys the Oura ring's BLE key.
         debug {
             if (debugKeystoreFile.exists()) {
                 signingConfig signingConfigs.debugStable
@@ -77,8 +81,171 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
     }
+    buildFeatures {
+        buildConfig true
+    }
+    // Two apps from one source tree (#2367).
+    //
+    // `prod` is the real app and sets nothing of its own: its applicationId, name, server URL and
+    // signing are exactly what they were before flavours existed. `dev` is "TrainingAi Dev", which
+    // installs beside it, loads the laptop's dev server over `adb reverse`, and can never talk to
+    // the ring, the scale or the strap. What it removes is in src/dev/AndroidManifest.xml, and
+    // verify<Variant>Flavour below fails the build if any of it comes back.
+    flavorDimensions = ["environment"]
+    productFlavors {
+        prod {
+            dimension "environment"
+            buildConfigField "boolean", "DEVICE_BLE_ENABLED", "true"
+            manifestPlaceholders = [oauthScheme: "trainingai"]
+        }
+        dev {
+            dimension "environment"
+            applicationIdSuffix ".dev"
+            buildConfigField "boolean", "DEVICE_BLE_ENABLED", "false"
+            // The real app's Google sign-in returns on trainingai://auth-complete. A second app
+            // claiming it would put a chooser in front of the owner's sign-in, so Dev answers to a
+            // scheme nothing sends. Dev signs in with the seeded credentials instead.
+            manifestPlaceholders = [oauthScheme: "trainingai-dev"]
+        }
+    }
     kotlinOptions {
         jvmTarget = '21'
+    }
+}
+
+// The Dev app's server. `adb reverse tcp:3000 tcp:<port>` carries it to the laptop's `pnpm dev`.
+def devServerUrl = "http://localhost:3000"
+// Capacitor registers every plugin listed in capacitor.plugins.json. The Dev app leaves out the two
+// that reach the owner's hardware or health data: the in-WebView BLE plugin (the JS fallback the
+// strap pairing uses when PolarBle is absent) and Health Connect (whose permission request fires on
+// every launch). The ring, strap and scale plugins are registered by MainActivity instead, behind
+// BuildConfig.DEVICE_BLE_ENABLED.
+def devDroppedPlugins = ["@capacitor-community/bluetooth-le", "@devmaxime/capacitor-health-connect"]
+def mainCapacitorAssets = file("src/main/assets")
+
+/**
+ * Writes the Dev app's capacitor.config.json and capacitor.plugins.json from the copies
+ * `npx cap sync android` writes into src/main/assets, changing only the server and the plugin list.
+ * Generating them keeps every other setting in step with the real app, and a sync only ever writes
+ * src/main, so it can never overwrite the override or point the real app anywhere new.
+ */
+abstract class GenerateDevCapacitorAssets extends DefaultTask {
+    @InputFile @PathSensitive(PathSensitivity.NONE) abstract RegularFileProperty getMainConfig()
+    @InputFile @PathSensitive(PathSensitivity.NONE) abstract RegularFileProperty getMainPlugins()
+    @Input abstract Property<String> getServerUrl()
+    @Input abstract ListProperty<String> getDroppedPlugins()
+    @OutputDirectory abstract DirectoryProperty getOutputDir()
+
+    @TaskAction
+    void generate() {
+        def slurper = new groovy.json.JsonSlurper()
+        def config = slurper.parse(mainConfig.get().asFile)
+        config.server = (config.server ?: [:]) + [url: serverUrl.get(), cleartext: true]
+        def plugins = slurper.parse(mainPlugins.get().asFile).findAll { !droppedPlugins.get().contains(it.pkg) }
+        def out = outputDir.get().asFile
+        out.mkdirs()
+        new File(out, "capacitor.config.json").text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(config))
+        new File(out, "capacitor.plugins.json").text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(plugins))
+    }
+}
+
+/**
+ * Reads what a variant will actually package — the merged manifest and the merged assets — and
+ * fails the build if a flavour has drifted from what it promises.
+ *
+ * dev: no ring/strap/scale component, no connectedDevice service, no Bluetooth or Health Connect
+ * permission, no claim on the real app's sign-in scheme, a localhost server, and none of the
+ * dropped plugins. The ring's history only moves forward, so a Dev app that drained it would land
+ * those nights on the laptop's database and lose them from production.
+ *
+ * prod: still com.trainingai.app, and its Capacitor config and plugin list are byte-for-byte the
+ * ones `npx cap sync` wrote, so nothing of the Dev app's can leak into the real one.
+ */
+abstract class VerifyFlavour extends DefaultTask {
+    @Input abstract Property<String> getFlavour()
+    @InputFile @PathSensitive(PathSensitivity.NONE) abstract RegularFileProperty getMergedManifest()
+    @InputDirectory @PathSensitive(PathSensitivity.RELATIVE) abstract DirectoryProperty getMergedAssets()
+    @InputDirectory @PathSensitive(PathSensitivity.RELATIVE) abstract DirectoryProperty getMainAssets()
+    @Input abstract ListProperty<String> getDroppedPlugins()
+    @OutputFile abstract RegularFileProperty getReport()
+
+    @TaskAction
+    void verify() {
+        def manifest = new groovy.xml.XmlSlurper(false, false).parse(mergedManifest.get().asFile)
+        def config = new File(mergedAssets.get().asFile, "capacitor.config.json")
+        def plugins = new File(mergedAssets.get().asFile, "capacitor.plugins.json")
+        def failures = []
+        def pkg = manifest.@package.text()
+
+        if (flavour.get() == "dev") {
+            if (pkg != "com.trainingai.app.dev") failures << "package is '${pkg}', expected com.trainingai.app.dev"
+            def app = manifest.application
+            ["service", "receiver", "activity", "provider"].each { kind ->
+                app."${kind}".each { c ->
+                    def name = c.@'android:name'.text()
+                    if (name ==~ /com\.trainingai\.app\.(oura|polar|scale)\..*/) failures << "${kind} ${name} is in the Dev app"
+                    if (kind == "service" && c.@'android:foregroundServiceType'.text().contains("connectedDevice")) {
+                        failures << "service ${name} is a connectedDevice foreground service"
+                    }
+                }
+            }
+            manifest.'uses-permission'.each { p ->
+                def name = p.@'android:name'.text()
+                if (name ==~ /android\.permission\.(BLUETOOTH.*|health\..*|FOREGROUND_SERVICE_CONNECTED_DEVICE)/) {
+                    failures << "permission ${name} is in the Dev app"
+                }
+            }
+            manifest.'**'.findAll { it.name() == "data" && it.@'android:scheme'.text() == "trainingai" }.each {
+                failures << "the Dev app claims the real app's trainingai:// sign-in scheme"
+            }
+            if (!app.@'android:networkSecurityConfig'.text()) failures << "no network security config, so localhost cleartext is blocked"
+            def server = config.exists() ? new groovy.json.JsonSlurper().parse(config).server : null
+            def url = server?.url ? new URI(server.url as String) : null
+            if (url?.scheme != "http" || !(url?.host in ["localhost", "127.0.0.1"])) failures << "server.url is '${server?.url}', expected a localhost URL"
+            def pkgs = plugins.exists() ? new groovy.json.JsonSlurper().parse(plugins)*.pkg : []
+            droppedPlugins.get().findAll { it in pkgs }.each { failures << "plugin ${it} is registered in the Dev app" }
+        } else {
+            if (pkg != "com.trainingai.app") failures << "package is '${pkg}', expected com.trainingai.app"
+            ["capacitor.config.json", "capacitor.plugins.json"].each { f ->
+                def packaged = new File(mergedAssets.get().asFile, f)
+                def synced = new File(mainAssets.get().asFile, f)
+                if (!packaged.exists() || !synced.exists() || packaged.bytes != synced.bytes) {
+                    failures << "${f} differs from the one npx cap sync wrote into src/main/assets"
+                }
+            }
+            def url = config.exists() ? new groovy.json.JsonSlurper().parse(config).server?.url : null
+            if (!(url as String)?.startsWith("https://")) failures << "server.url is '${url}', expected https"
+        }
+
+        report.get().asFile.text = failures ? failures.join("\n") : "ok"
+        if (failures) {
+            throw new GradleException("The ${flavour.get()} flavour broke its promise:\n  - " + failures.join("\n  - "))
+        }
+    }
+}
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        def variantName = variant.name.capitalize()
+        if (variant.flavorName == "dev") {
+            def generate = project.tasks.register("generate${variantName}CapacitorAssets", GenerateDevCapacitorAssets) {
+                mainConfig.set(new File(mainCapacitorAssets, "capacitor.config.json"))
+                mainPlugins.set(new File(mainCapacitorAssets, "capacitor.plugins.json"))
+                serverUrl.set(devServerUrl)
+                droppedPlugins.set(devDroppedPlugins)
+                outputDir.set(project.layout.buildDirectory.dir("generated/devCapacitorAssets/${variant.name}"))
+            }
+            variant.sources.assets.addGeneratedSourceDirectory(generate, { it.outputDir } as kotlin.jvm.functions.Function1)
+        }
+        def verify = project.tasks.register("verify${variantName}Flavour", VerifyFlavour) {
+            flavour.set(variant.flavorName)
+            mergedManifest.set(variant.artifacts.get(com.android.build.api.artifact.SingleArtifact.MERGED_MANIFEST.INSTANCE))
+            mergedAssets.set(variant.artifacts.get(com.android.build.api.artifact.SingleArtifact.ASSETS.INSTANCE))
+            mainAssets.set(mainCapacitorAssets)
+            droppedPlugins.set(devDroppedPlugins)
+            report.set(project.layout.buildDirectory.file("reports/flavour/${variant.name}.txt"))
+        }
+        project.tasks.named { it == "assemble${variantName}" }.configureEach { dependsOn(verify) }
     }
 }
 

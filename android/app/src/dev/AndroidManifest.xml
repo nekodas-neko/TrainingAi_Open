@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!--
+  TrainingAi Dev (#2367): merged over src/main/AndroidManifest.xml for the `dev` flavour only.
+
+  The Dev app must never talk to the Oura ring, the Polar strap or the Renpho scale. The ring's
+  history cursor only moves forward, so a Dev app that drained it would land those nights on the
+  laptop's database and lose them from production; the strap and scale hold one connection, which
+  the real app needs. So every component that reaches them is removed here, and so are the
+  Bluetooth permissions, which leaves Android itself refusing any scan or connection. Health
+  Connect permissions go too: the Dev app reads none of the owner's health data.
+
+  verify<Variant>Flavour in android/app/build.gradle fails the build if any of this comes back.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Cleartext to localhost only, for the laptop's dev server over `adb reverse`. -->
+    <application android:networkSecurityConfig="@xml/network_security_config">
+        <service android:name="com.trainingai.app.oura.OuraRingService" tools:node="remove" />
+        <service android:name="com.trainingai.app.polar.PolarStrapService" tools:node="remove" />
+        <service android:name="com.trainingai.app.scale.ScaleBleService" tools:node="remove" />
+        <receiver android:name="com.trainingai.app.oura.OuraBootReceiver" tools:node="remove" />
+        <receiver android:name="com.trainingai.app.scale.ScaleScanReceiver" tools:node="remove" />
+        <receiver android:name="com.trainingai.app.scale.ScaleBootReceiver" tools:node="remove" />
+    </application>
+
+    <!-- Bluetooth: from this app and from the in-WebView BLE plugin's own manifest. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" tools:node="remove" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" tools:node="remove" />
+    <uses-permission android:name="android.permission.BLUETOOTH" tools:node="remove" />
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" tools:node="remove" />
+
+    <!-- Health Connect -->
+    <uses-permission android:name="android.permission.health.READ_STEPS" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_DISTANCE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_FLOORS_CLIMBED" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_EXERCISE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_ACTIVITY_INTENSITY" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_SPEED" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_POWER" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_VO2_MAX" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE_VARIABILITY" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_OXYGEN_SATURATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_RESPIRATORY_RATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_SKIN_TEMPERATURE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_SLEEP" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_WEIGHT" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_HEIGHT" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_BODY_FAT" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_BASAL_METABOLIC_RATE" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_NUTRITION" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_HYDRATION" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" tools:node="remove" />
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY" tools:node="remove" />
+</manifest>

@@ -517,9 +517,14 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        registerPlugin(com.trainingai.app.oura.OuraBlePlugin.class);
-        registerPlugin(com.trainingai.app.polar.PolarBlePlugin.class);
-        registerPlugin(com.trainingai.app.scale.ScaleBlePlugin.class);
+        // #2367. The Dev app never registers the ring, strap or scale plugins, so the web layer
+        // sees them as unavailable (lib/oura-ble/plugin.ts and its siblings check
+        // isPluginAvailable) and never starts a scan or a sync.
+        if (BuildConfig.DEVICE_BLE_ENABLED) {
+            registerPlugin(com.trainingai.app.oura.OuraBlePlugin.class);
+            registerPlugin(com.trainingai.app.polar.PolarBlePlugin.class);
+            registerPlugin(com.trainingai.app.scale.ScaleBlePlugin.class);
+        }
         registerPlugin(com.trainingai.app.media.MediaSavePlugin.class);
         super.onCreate(savedInstanceState);
         // Q-250. Debug builds only, and gated on the manifest's own debuggable flag rather than a
@@ -580,7 +585,9 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onResume() {
         super.onResume();
-        com.trainingai.app.scale.ScaleForegroundScanner.INSTANCE.setAppResumed(this, true);
+        if (BuildConfig.DEVICE_BLE_ENABLED) {
+            com.trainingai.app.scale.ScaleForegroundScanner.INSTANCE.setAppResumed(this, true);
+        }
         relayoutWebViewAfterResume();
     }
 
@@ -607,7 +614,9 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onPause() {
-        com.trainingai.app.scale.ScaleForegroundScanner.INSTANCE.setAppResumed(this, false);
+        if (BuildConfig.DEVICE_BLE_ENABLED) {
+            com.trainingai.app.scale.ScaleForegroundScanner.INSTANCE.setAppResumed(this, false);
+        }
         super.onPause();
     }
 
