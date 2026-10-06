@@ -361,6 +361,19 @@ export function displayOneRm(
 }
 
 /**
+ * The share of a kilogram 1RM that a loaded bar actually is, to one decimal — `27.5 / 36.5` →
+ * `75.3`. #2378: a prescribed 70.5 % rounds UP to the plate grid, so printing the prescription
+ * beside the rounded bar told the lifter the set was 5 points lighter than it was. Returns `null`
+ * when there is no load or no usable 1RM. **Kilogram 1RMs only** — a bodyweight `estimated1rm` is a
+ * `BW_REF` index, and a share of it is meaningless.
+ */
+export function barShareOfOneRm(weightKg: number | null | undefined, oneRm: number | null | undefined): number | null {
+  if (weightKg == null || oneRm == null) return null
+  if (!Number.isFinite(weightKg) || !Number.isFinite(oneRm) || weightKg <= 0 || oneRm <= 0) return null
+  return Math.round((weightKg / oneRm) * 1000) / 10
+}
+
+/**
  * Signed change between two stored 1RMs, in display units. For bodyweight this is a whole number
  * of reps, so a change smaller than one rep reports 0 rather than a fractional kg figure that has
  * no meaning — which is the point of the whole rep basis.
