@@ -81,7 +81,7 @@ export function buildWholeSessionDeloadPrescription(
   // same plan the rules prescriber builds. An exercise with no base style gets none, and stays
   // deloaded under `Full`, which is also what the per-exercise path does without a record.
   const fullById = new Map(
-    (buildRulesPrescription(signals, reasoning)?.exercises ?? [])
+    (buildProgramAsWrittenPrescription(signals, reasoning)?.exercises ?? [])
       .map(e => [e.sessionExerciseId, { sets: e.sets, reps: e.reps, pct: e.pct, restSec: e.restSec }]),
   )
   const pct = DELOAD_LOWER_PCT[goal] ?? 50
@@ -173,6 +173,35 @@ export function buildWholeSessionDeloadPrescription(
  * invented number. A prescription that quietly fabricates a load is worse than a shorter one.
  */
 export function buildRulesPrescription(
+  signals: PrescriptionSignals,
+  reasoning: string,
+): AiPrescription | null {
+  const asWritten = buildProgramAsWrittenPrescription(signals, reasoning)
+  // #2402. The phase is already a deload (accepted earlier), and the bar deloads every exercise in
+  // it and logs every set as one. The program as written would put numbers and an Intensity toggle
+  // ("Full · As prescribed") on the card for a session that never runs. This is the OPPOSITE of the
+  // trap above: an outage still never CREATES a deload, but where the phase already is one the
+  // fallback has to say so. Nothing to build from stays null, so the caller's error path is kept.
+  if (asWritten && signals.phase === 'deload') {
+    return {
+      ...buildWholeSessionDeloadPrescription(signals, reasoning),
+      // The phase is already a deload, so there is nothing to recommend: `deload_recommended` on a
+      // stored prescription is what the accept route flips the phase on.
+      phaseAction: 'stay',
+      confidence: asWritten.confidence,
+      confidenceReasons: ['Your deload week as the program runs it \u2014 the AI coach could not be reached.'],
+      source: 'rules',
+    }
+  }
+  return asWritten
+}
+
+/**
+ * The program's own numbers for every phase, fitted to today's time budget. `buildRulesPrescription`
+ * wraps this and swaps in the deload where the phase already is one; the whole-session deload
+ * builder reads THIS for what `Full` reverts to, so the two cannot call each other forever.
+ */
+export function buildProgramAsWrittenPrescription(
   signals: PrescriptionSignals,
   reasoning: string,
 ): AiPrescription | null {
@@ -491,7 +520,11 @@ async function runPrescriptionGeneration(
     // expiry, so the short TTL costs nothing on the read side.
     const rules = buildRulesPrescription(
       signals,
-      'Your AI coach could not be reached, so this is your program as written.',
+      // #2402: in a deload phase the plan IS the deload, and "your program as written" would
+      // contradict its own numbers.
+      state.phase === 'deload'
+        ? 'Your AI coach could not be reached, so this is your deload week as the program runs it.'
+        : 'Your AI coach could not be reached, so this is your program as written.',
     )
     if (rules) {
       await repo.storePrescription(
