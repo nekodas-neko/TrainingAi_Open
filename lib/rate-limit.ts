@@ -115,6 +115,16 @@ export function rateLimit(key: string, limit: number, windowMs: number): boolean
   return true
 }
 
+/**
+ * Resolves once every increment scheduled before the call has reached `rate_limits`. A snapshot,
+ * not a drain: flushes started afterwards are not waited for, so a busy server cannot hold the
+ * caller. Account deletion (#2120) awaits it so its own request's key lands before the purge that
+ * removes the user's keys, rather than after it.
+ */
+export async function settleRateLimitFlushes(): Promise<void> {
+  await Promise.all([...inFlightFlushes])
+}
+
 // ── Test hooks ────────────────────────────────────────────────────────────
 export async function _awaitRateLimitFlushes(): Promise<void> {
   while (inFlightFlushes.size > 0) await Promise.all([...inFlightFlushes])

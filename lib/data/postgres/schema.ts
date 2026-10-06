@@ -138,6 +138,9 @@ export const programSessions = pgTable('program_sessions', {
     .where(sql`deleted_at IS NULL`),
 ])
 
+// #2120: every FK on this table, workout_sessions and meal_plan_meals is DEFERRABLE INITIALLY
+// IMMEDIATE in the database (Drizzle cannot declare it). Each has two or more SET NULL keys the
+// account-deletion cascade fires; account-deletion.test.ts fails if one is recreated without it.
 export const programPhases = pgTable('program_phases', {
   id:               uuid('id').primaryKey().defaultRandom(),
   phaseSetId:       uuid('phase_set_id').references(() => phaseSets.id, { onDelete: 'cascade' }),
@@ -196,6 +199,8 @@ export const scheduleDays = pgTable('schedule_days', {
 //
 // It has already cost a session: a repro fixture populated `program_session_id`, the periodization
 // block took its `null` branch, and the honest reading of that run was "the race does not exist".
+//
+// #2120: every FK here is DEFERRABLE in the database — see the note above `programPhases`.
 export const workoutSessions = pgTable('workout_sessions', {
   id:                uuid('id').primaryKey().defaultRandom(),
   userId:            uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -318,7 +323,8 @@ export const exerciseLibrary = pgTable('exercise_library', {
   muscles:      jsonb('muscles').notNull().default([]),
   equipment:    text('equipment').array().notNull().default([]),
   instructions: text('instructions'),
-  createdBy:    uuid('created_by').references(() => users.id),
+  // #2120: SET NULL, so deleting an account keeps the exercises it added to the shared catalogue.
+  createdBy:    uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
   exerciseType: text('exercise_type').notNull().default('weighted'),
   // Nullable, set only for a catalogue entry a data migration merged into another (migration 165).
   // The picker filters these out; historical exercise_id FKs stay valid since the row is kept.
@@ -745,8 +751,9 @@ export const mealTypes = pgTable('meal_types', {
   remindersEnabled: boolean('reminders_enabled').notNull().default(true),
   required:      boolean('required').notNull().default(true),
   createdAt:     timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  // Meal types soft-delete (Q-179). `food_logs.meal_type_id` is ON DELETE RESTRICT, so a hard
-  // DELETE fails the moment any log — including a soft-deleted one — still points here.
+  // Meal types soft-delete (Q-179). `food_logs.meal_type_id` refuses the delete (NO ACTION since
+  // #2120, RESTRICT before), so a hard DELETE fails the moment any log — including a soft-deleted
+  // one — still points here.
   deletedAt:     timestamp('deleted_at', { withTimezone: true }),
 })
 
@@ -777,8 +784,11 @@ export const foodLogs = pgTable('food_logs', {
   id:                 uuid('id').primaryKey().defaultRandom(),
   userId:             uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   date:               text('date').notNull(),
-  mealTypeId:         uuid('meal_type_id').notNull().references(() => mealTypes.id, { onDelete: 'restrict' }),
-  foodItemId:         uuid('food_item_id').notNull().references(() => foodItems.id, { onDelete: 'restrict' }),
+  // #2120: these two and saved_meal_items.food_item_id are NO ACTION DEFERRABLE in the database
+  // (Drizzle cannot declare DEFERRABLE). A lone delete of a referenced row is still refused; only
+  // account deletion defers the check to COMMIT so its own cascade can finish first.
+  mealTypeId:         uuid('meal_type_id').notNull().references(() => mealTypes.id, { onDelete: 'no action' }),
+  foodItemId:         uuid('food_item_id').notNull().references(() => foodItems.id, { onDelete: 'no action' }),
   // BF-39 (migration 238). `savedMealId` is WHAT was eaten; `mealGroupId` is WHICH TIME. Two
   // servings of the same meal on one day share the first and must not share the second, so the
   // diary groups on the group and names the group from the meal. `ON DELETE SET NULL` on the FK:
@@ -824,7 +834,7 @@ export const savedMealMealTypes = pgTable('saved_meal_meal_types', {
 export const savedMealItems = pgTable('saved_meal_items', {
   id:                 uuid('id').primaryKey().defaultRandom(),
   savedMealId:        uuid('saved_meal_id').notNull().references(() => savedMeals.id, { onDelete: 'cascade' }),
-  foodItemId:         uuid('food_item_id').notNull().references(() => foodItems.id, { onDelete: 'restrict' }),
+  foodItemId:         uuid('food_item_id').notNull().references(() => foodItems.id, { onDelete: 'no action' }),
   quantityMultiplier: doublePrecision('quantity_multiplier').notNull().default(1.0),
 })
 
@@ -864,6 +874,7 @@ export const mealPlanVariants = pgTable('meal_plan_variants', {
   targetFatG:      doublePrecision('target_fat_g').notNull(),
 })
 
+// #2120: every FK here is DEFERRABLE in the database — see the note above `programPhases`.
 export const mealPlanMeals = pgTable('meal_plan_meals', {
   id:              uuid('id').primaryKey().defaultRandom(),
   variantId:       uuid('variant_id').notNull().references(() => mealPlanVariants.id, { onDelete: 'cascade' }),

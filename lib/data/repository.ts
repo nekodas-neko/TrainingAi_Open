@@ -18,6 +18,7 @@ import type {
   CreateMealPlanInput, UpdateMealPlanInput, UpdateMealInput, ReplaceStructureInput, PlanMealAnswer, EstimateToStore,
 } from './postgres/slices/meal-plans'
 import type { Friendship, Season } from '@trainingai/shared/types/friends'
+import type { AccountDeletionResult } from './postgres/slices/account-deletion'
 import type {
   SessionPeriodization, PeriodizationPhase, AiPrescription,
   Baseline1rmEntry, PendingTransition, PrescriptionStatus, ProgramVolumeTarget,
@@ -571,8 +572,9 @@ export interface WorkoutRepository {
   activateUser(userId: string): Promise<boolean>
   deactivateUser(userId: string): Promise<boolean>
   getUserById(userId: string): Promise<User | null>
-  /** True when a user row was removed. */
-  deleteUser(userId: string): Promise<boolean>
+  /** #2120. Deletes the account and everything that cascades from it, in one transaction; the
+   *  one path for both self-service and admin deletion. `deleted: false` means no row matched. */
+  deleteAccount(userId: string): Promise<AccountDeletionResult>
   getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null>
   updateUserProfile(userId: string, profile: Partial<Pick<User, 'displayName' | 'heightCm' | 'dateOfBirth' | 'weightGoalKg' | 'timezone' | 'sex' | 'activityLevel' | 'fitnessGoal'>>): Promise<User>
   touchLastGoalReviewAt(userId: string): Promise<void>

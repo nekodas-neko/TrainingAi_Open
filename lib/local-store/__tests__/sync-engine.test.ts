@@ -356,6 +356,23 @@ describe('pushMutations', () => {
     expect(res).toEqual({ pushed: 1 })
   })
 
+  // #2120. A device still holding an outbox for an account deleted elsewhere: `auth()` re-reads the
+  // users row, so every push is a 401. It must take the poison-pill path — counted, dead-lettered —
+  // and never be confirmed (that would delete rows as "synced") or back the queue off as an outage.
+  it('quarantines a late push for a deleted account (401) without confirming or backing off', async () => {
+    const queued = [mut('d-0', 'mood_logs', '2026-09-20'), mut('d-1', 'body_metrics', '2026-09-20')]
+    fakeStore.getPendingMutations.mockResolvedValue(queued)
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 401 }))
+
+    const res = await pushMutations('u1')
+    expect(res).toBeNull()
+    expect(fakeStore.recordMutationFailures).toHaveBeenCalledWith(
+      queued.map(m => ({ id: m.id, error: 'push rejected: HTTP 401' })),
+    )
+    expect(fakeStore.deleteMutations).not.toHaveBeenCalled()
+    expect(isSyncBackedOff()).toBe(false)
+  })
+
   // F4: the three Oura push domains flip sync_status on confirm, same as every other
   // domain. Currently inert in production (nothing queues these mutations until D2's
   // on-device rollup writer lands) but the wiring must be correct now so D2 doesn't

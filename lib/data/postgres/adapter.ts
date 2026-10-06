@@ -95,6 +95,8 @@ import { nodeModelRuntime } from '@/lib/oura-models/inference/runtime-node'
 import { ensureServerOuraConstants } from '@/lib/oura-models/constants-inject'
 import { packOuraRawBuckets, countPackableBuckets, claimAutoPackSlot, AUTOPACK_MAX_BUCKETS } from './slices/oura-raw-pack'
 import * as bodyBattery from './slices/body-battery'
+import * as accountDeletion from './slices/account-deletion'
+import type { AccountDeletionResult } from './slices/account-deletion'
 import * as colmi from './slices/colmi'
 import { mergeSet, initialSourceMap, HEALTH_SOURCES, sourceRank, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
 import type {
@@ -700,9 +702,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return r ? this.rowToUser(r) : null
   }
 
-  async deleteUser(userId: string): Promise<boolean> {
-    const rows = await this.db.delete(s.users).where(eq(s.users.id, userId)).returning({ id: s.users.id })
-    return rows.length > 0
+  async deleteAccount(userId: string): Promise<AccountDeletionResult> {
+    return accountDeletion.deleteAccount(this.db, userId)
   }
 
   async getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null> {
