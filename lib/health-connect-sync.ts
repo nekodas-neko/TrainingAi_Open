@@ -29,10 +29,17 @@ const SYNC_DAYS_HOT  = 7;   // days on subsequent opens
 
 // Canonical read-type lists. Both requestPermissions and canRead.has() checks
 // must draw from these — any drift is caught by the parity test.
+//
+// #2462 added `ActiveCaloriesBurned` (READ_ACTIVE_CALORIES_BURNED — declared in the manifest since
+// before this, but never requested, so it is a NEW runtime grant). Step cadence is deliberately NOT
+// listed: `StepsCadenceSeries` reads under READ_STEPS (connect-client 1.1.0-alpha11's
+// `HealthPermission` maps `StepsCadenceRecord` to it), and the plugin's `reversePermission` returns
+// the first record name for a permission, which is `Steps` — so `StepsCadenceSeries` could never
+// appear in the granted list. Cadence is read when `Steps` is granted.
 export const HC_SYNC_READ_TYPES = [
   'Steps', 'Weight', 'ActivitySession', 'SleepSession', 'BodyFat',
   'Nutrition', 'RestingHeartRate', 'OxygenSaturation', 'HeartRateSeries',
-  'TotalCaloriesBurned', 'HeartRateVariabilityRmssd',
+  'TotalCaloriesBurned', 'HeartRateVariabilityRmssd', 'ActiveCaloriesBurned',
 ] as const;
 
 export const HC_ENRICH_READ_TYPES = ['Steps', 'HeartRateSeries'] as const;
@@ -143,36 +150,129 @@ export function flattenHeartRateRecords(records: unknown[]): HeartRateSample[] {
   return out.sort((a, b) => b.at - a.at)
 }
 
-/** Split samples into request-sized chunks, keeping at most `maxChunks` of them. */
-export function chunkHeartRateSamples(
-  samples: HeartRateSample[], size: number = HR_UPLOAD_CHUNK, maxChunks: number = HR_UPLOAD_MAX_CHUNKS,
-): HeartRateSample[][] {
-  const chunks: HeartRateSample[][] = []
-  for (let i = 0; i < samples.length && chunks.length < maxChunks; i += size) {
-    chunks.push(samples.slice(i, i + size))
+/** Split an already newest-first list into request-sized chunks, keeping at most `maxChunks`. */
+function chunkNewestFirst<T>(items: readonly T[], size: number, maxChunks: number): T[][] {
+  const chunks: T[][] = []
+  for (let i = 0; i < items.length && chunks.length < maxChunks; i += size) {
+    chunks.push(items.slice(i, i + size))
   }
   return chunks
 }
 
-/** Post the heart-rate series in chunks; stops at the first failure. The window is re-read on every
- *  sync, so anything not sent this time goes next time while it is still inside the window. */
-async function uploadHeartRate(samples: HeartRateSample[]): Promise<{ sent: number; note?: string }> {
+/** Split samples into request-sized chunks, keeping at most `maxChunks` of them. */
+export function chunkHeartRateSamples(
+  samples: HeartRateSample[], size: number = HR_UPLOAD_CHUNK, maxChunks: number = HR_UPLOAD_MAX_CHUNKS,
+): HeartRateSample[][] {
+  return chunkNewestFirst(samples, size, maxChunks)
+}
+
+/** Post a newest-first series to `/api/sync-health` under `field`, in chunks; stops at the first
+ *  failure. The window is re-read on every sync, so anything not sent this time goes next time while
+ *  it is still inside the window. `label` and `unit` word the note. */
+async function uploadSeries<T>(
+  field: 'heartRateSamples' | 'activityIntervals', items: readonly T[], size: number, maxChunks: number,
+  label: string, unit: string,
+): Promise<{ sent: number; note?: string }> {
   let sent = 0
-  for (const chunk of chunkHeartRateSamples(samples)) {
+  for (const chunk of chunkNewestFirst(items, size, maxChunks)) {
     try {
       const res = await fetch('/api/sync-health', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ heartRateSamples: chunk }),
+        body: JSON.stringify({ [field]: chunk }),
       })
-      if (!res.ok) return { sent, note: `heart rate stopped at sync-health ${res.status}` }
+      if (!res.ok) return { sent, note: `${label} stopped at sync-health ${res.status}` }
     } catch (err) {
-      return { sent, note: `heart rate stopped: ${err instanceof Error ? err.message : String(err)}` }
+      return { sent, note: `${label} stopped: ${err instanceof Error ? err.message : String(err)}` }
     }
     sent += chunk.length
   }
-  const left = samples.length - sent
-  return left > 0 ? { sent, note: `heart rate: ${left} older samples over the per-sync cap` } : { sent }
+  const left = items.length - sent
+  return left > 0 ? { sent, note: `${label}: ${left} older ${unit} over the per-sync cap` } : { sent }
+}
+
+// ── Per-interval movement (#2462) ────────────────────────────────────────────
+
+/** What `health_connect_intervals.kind` holds: a step count or active kcal over [startMs, endMs],
+ *  or a cadence sample in steps/min at startMs (= endMs). */
+export type ActivityIntervalKind = 'steps' | 'active_kcal' | 'cadence_spm'
+
+/** One row for `/api/sync-health`'s `activityIntervals`. `recordId` is Health Connect's own record
+ *  id (`metadata.id`), which the server keys on so a re-read window is idempotent. */
+export interface ActivityInterval {
+  kind: ActivityIntervalKind
+  startMs: number
+  endMs: number
+  value: number
+  recordId: string
+  /** The writing app's package (`metadata.dataOrigin`). */
+  origin?: string
+  /** `metadata.device.type` as the plugin spells it, e.g. TYPE_WATCH. */
+  device?: string
+}
+
+/** One request's share of the interval rows. ~170 bytes a row as JSON, so a chunk is ~700 KB, under
+ *  the route's 1 MB body cap. `/api/sync-health` imports it as its own array cap. */
+export const INTERVAL_UPLOAD_CHUNK = 4_000
+/** Interval requests per sync. With the heart-rate cap (20) and the daily post this stays under the
+ *  route's 60 a minute; newest rows go first, so a cap drops the oldest. */
+export const INTERVAL_UPLOAD_MAX_CHUNKS = 20
+
+function metadataOf(r: unknown): { recordId?: string; origin?: string; device?: string } {
+  const m = (r as { metadata?: unknown } | null)?.metadata as
+    { id?: unknown; dataOrigin?: unknown; device?: { type?: unknown } | null } | null | undefined
+  const str = (v: unknown) => (typeof v === 'string' && v.trim() !== '' ? v : undefined)
+  return { recordId: str(m?.id), origin: str(m?.dataOrigin), device: str(m?.device?.type) }
+}
+
+/**
+ * `Steps` or `ActiveCaloriesBurned` records as interval rows, newest first.
+ *
+ * Field names are the plugin converter's (`patches/@devmaxime__capacitor-health-connect.patch`):
+ * `StepsRecord` → `{ startTime, endTime, count }` (the unpatched plugin's own branch) and
+ * `ActiveCaloriesBurnedRecord` → `{ startTime, endTime, kilocalories }` (#2462, from
+ * `getEnergy().getKilocalories()` in the pinned connect-client 1.1.0-alpha11). Both carry
+ * `metadata.{ id, dataOrigin, device.type }`. A record without an id, a parseable span or a finite
+ * number is dropped here, never sent; plausibility is the server's (`/api/sync-health`).
+ */
+export function flattenIntervalRecords(kind: 'steps' | 'active_kcal', records: unknown[]): ActivityInterval[] {
+  const valueKey = kind === 'steps' ? 'count' : 'kilocalories'
+  const out: ActivityInterval[] = []
+  for (const r of records) {
+    const rec = r as { startTime?: unknown; endTime?: unknown; [k: string]: unknown } | null
+    if (!rec || typeof rec !== 'object') continue
+    const startMs = typeof rec.startTime === 'string' ? Date.parse(rec.startTime) : NaN
+    const endMs = typeof rec.endTime === 'string' ? Date.parse(rec.endTime) : NaN
+    const value = rec[valueKey]
+    const { recordId, origin, device } = metadataOf(rec)
+    if (!recordId || !Number.isFinite(startMs) || !Number.isFinite(endMs)) continue
+    if (typeof value !== 'number' || !Number.isFinite(value)) continue
+    out.push({ kind, startMs, endMs, value, recordId, ...(origin ? { origin } : {}), ...(device ? { device } : {}) })
+  }
+  return out.sort((a, b) => b.startMs - a.startMs)
+}
+
+/**
+ * The samples inside `StepsCadenceSeries` records as `cadence_spm` rows (startMs = endMs), newest
+ * first. The converter emits `samples[]` of `{ time, rate }` (#2462, `StepsCadenceRecord.Sample`'s
+ * `getTime(): Instant` and `getRate(): double`). Every sample keeps its record's id; the server keys
+ * on id + instant.
+ */
+export function flattenCadenceRecords(records: unknown[]): ActivityInterval[] {
+  const out: ActivityInterval[] = []
+  for (const r of records) {
+    const samples = (r as { samples?: unknown } | null)?.samples
+    if (!Array.isArray(samples)) continue
+    const { recordId, origin, device } = metadataOf(r)
+    if (!recordId) continue
+    for (const s of samples as Array<{ time?: unknown; rate?: unknown }>) {
+      const at = typeof s?.time === 'string' ? Date.parse(s.time) : NaN
+      const rate = s?.rate
+      if (!Number.isFinite(at) || typeof rate !== 'number' || !Number.isFinite(rate)) continue
+      out.push({ kind: 'cadence_spm', startMs: at, endMs: at, value: rate, recordId, ...(origin ? { origin } : {}), ...(device ? { device } : {}) })
+    }
+  }
+  return out.sort((a, b) => b.startMs - a.startMs)
 }
 
 /**
@@ -292,14 +392,14 @@ export async function enrichActivityLogs(candidates: EnrichmentCandidate[], tz: 
   }
 }
 
-export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metrics: number; sessions: number; sleep: number; heartRate: number; note?: string } | null> {
+export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metrics: number; sessions: number; sleep: number; heartRate: number; intervals: number; note?: string } | null> {
   const { Capacitor } = await import('@capacitor/core');
   if (!Capacitor.isNativePlatform()) return null;
 
   const { HealthConnect } = await import('@devmaxime/capacitor-health-connect');
 
   const { availability } = await HealthConnect.checkAvailability();
-  if (availability !== 'Available') return { metrics: 0, sessions: 0, sleep: 0, heartRate: 0, note: `HC ${availability}` };
+  if (availability !== 'Available') return { metrics: 0, sessions: 0, sleep: 0, heartRate: 0, intervals: 0, note: `HC ${availability}` };
 
   const perms = await HealthConnect.requestPermissions({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -526,11 +626,33 @@ export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metr
     }
   }
 
+  // ── Per-interval steps, active calories and cadence (#2462) ──────────────
+  // The daily aggregates above stay: Health Connect's aggregate de-duplicates across apps, which
+  // these raw records do not (the server keeps every app's rows and the reader de-duplicates). Like
+  // the HR read, a failure with the permission granted is worth a log line, not a silent catch.
+  const activityIntervals: ActivityInterval[] = [];
+  const readIntervals = async (type: 'Steps' | 'ActiveCaloriesBurned' | 'StepsCadenceSeries') => {
+    try {
+      const { records } = await HealthConnect.readRecords({ start: startIso, end: endIso, type });
+      activityIntervals.push(...(type === 'StepsCadenceSeries'
+        ? flattenCadenceRecords(records)
+        : flattenIntervalRecords(type === 'Steps' ? 'steps' : 'active_kcal', records)));
+    } catch (err) {
+      console.warn(`[health-connect] ${type} read failed:`, err);
+    }
+  };
+  if (canRead.has('Steps')) {
+    await readIntervals('Steps');
+    await readIntervals('StepsCadenceSeries');  // READ_STEPS — see HC_SYNC_READ_TYPES
+  }
+  if (canRead.has('ActiveCaloriesBurned')) await readIntervals('ActiveCaloriesBurned');
+  activityIntervals.sort((a, b) => b.startMs - a.startMs);
+
   const dailyMetrics = Object.values(dayBuckets);
   const hasDaily = dailyMetrics.length > 0 || exerciseSessions.length > 0 || sleepRecords.length > 0;
-  if (!hasDaily && !heartRateSamples.length) {
+  if (!hasDaily && !heartRateSamples.length && !activityIntervals.length) {
     localStorage.setItem(LAST_SYNC_KEY, end.toISOString());
-    return { metrics: 0, sessions: 0, sleep: 0, heartRate: 0, note: 'no data from HC' };
+    return { metrics: 0, sessions: 0, sleep: 0, heartRate: 0, intervals: 0, note: 'no data from HC' };
   }
 
   let enrichmentCandidates: EnrichmentCandidate[] | undefined;
@@ -547,7 +669,9 @@ export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metr
 
   localStorage.setItem(LAST_SYNC_KEY, end.toISOString());
 
-  const heartRate = await uploadHeartRate(heartRateSamples);
+  const heartRate = await uploadSeries('heartRateSamples', heartRateSamples, HR_UPLOAD_CHUNK, HR_UPLOAD_MAX_CHUNKS, 'heart rate', 'samples');
+  const intervals = await uploadSeries('activityIntervals', activityIntervals, INTERVAL_UPLOAD_CHUNK, INTERVAL_UPLOAD_MAX_CHUNKS, 'intervals', 'rows');
+  const note = [heartRate.note, intervals.note].filter(Boolean).join('; ');
 
   if (enrichmentCandidates?.length) {
     // `tz`, not the default — this call is INSIDE `syncHealthConnect`, so the timezone the caller
@@ -558,6 +682,6 @@ export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metr
 
   return {
     metrics: dailyMetrics.length, sessions: exerciseSessions.length, sleep: sleepRecords.length,
-    heartRate: heartRate.sent, ...(heartRate.note ? { note: heartRate.note } : {}),
+    heartRate: heartRate.sent, intervals: intervals.sent, ...(note ? { note } : {}),
   };
 }

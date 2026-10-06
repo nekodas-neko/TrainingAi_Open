@@ -23,9 +23,16 @@ const RECORD_CLASS: Record<string, string> = {
   BodyFat: 'BodyFatRecord', Nutrition: 'NutritionRecord',
   HeartRateVariabilityRmssd: 'HeartRateVariabilityRmssdRecord',
   OxygenSaturation: 'OxygenSaturationRecord', HeartRateSeries: 'HeartRateRecord',
+  // #2462, same map read with javap from the pinned aar: the cadence series keeps the `Series` name.
+  ActiveCaloriesBurned: 'ActiveCaloriesBurnedRecord', StepsCadenceSeries: 'StepsCadenceRecord',
 }
 
-const readTypes = [...sync.matchAll(/readRecords\(\{[^}]*type: '(\w+)'/g)].map(m => m[1])
+// Direct `readRecords({ … type: 'X' })` calls, plus the #2462 interval reads, which go through one
+// `readIntervals('X')` helper.
+const readTypes = [
+  ...[...sync.matchAll(/readRecords\(\{[^}]*type: '(\w+)'/g)].map(m => m[1]),
+  ...[...sync.matchAll(/readIntervals\('(\w+)'\)/g)].map(m => m[1]),
+]
 
 /** The body of one `is XRecord -> { … }` branch. */
 function branch(cls: string): string {
@@ -38,6 +45,7 @@ function branch(cls: string): string {
 describe('Health Connect record conversion (LA-115)', () => {
   it('finds the readRecords calls it is guarding', () => {
     expect(readTypes).toEqual(expect.arrayContaining(['HeartRateSeries', 'HeartRateVariabilityRmssd', 'OxygenSaturation']))
+    expect(readTypes).toEqual(expect.arrayContaining(['Steps', 'ActiveCaloriesBurned', 'StepsCadenceSeries']))
   })
 
   it('every type read has a converter branch, so nothing falls to record.toString()', () => {
@@ -50,6 +58,12 @@ describe('Health Connect record conversion (LA-115)', () => {
     // Percentage is a wrapper class; the sync averages numbers, so the branch must unwrap it.
     expect(branch('OxygenSaturationRecord')).toMatch(/put\("percentage", record\.percentage\.value\)/)
     expect(branch('HeartRateRecord')).toMatch(/put\("beatsPerMinute", sample\.beatsPerMinute\)[\s\S]*put\("samples", samplesArray\)/)
+    // #2462. `flattenIntervalRecords` reads `count` / `kilocalories`, `flattenCadenceRecords` reads
+    // `samples[].{time, rate}`, and both key rows on `metadata.id`.
+    expect(branch('StepsRecord')).toMatch(/put\("startTime",[\s\S]*put\("endTime",[\s\S]*put\("count", record\.count\)[\s\S]*put\("metadata", convertMetadataToJson/)
+    expect(branch('ActiveCaloriesBurnedRecord')).toMatch(/put\("startTime",[\s\S]*put\("endTime",[\s\S]*put\("kilocalories", record\.energy\.inKilocalories\)[\s\S]*put\("metadata", convertMetadataToJson/)
+    expect(branch('StepsCadenceRecord')).toMatch(/put\("time", sample\.time\.toString\(\)\)[\s\S]*put\("rate", sample\.rate\)[\s\S]*put\("samples", samplesArray\)[\s\S]*put\("metadata", convertMetadataToJson/)
+    expect(converter).toMatch(/fun convertMetadataToJson[\s\S]*json\.put\("id", metadata\.id\)[\s\S]*json\.put\("dataOrigin", metadata\.dataOrigin\.packageName\)/)
   })
 
   it('no readRecords call needs an `as any` to get past the type union any more', () => {

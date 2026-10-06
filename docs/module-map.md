@@ -528,6 +528,10 @@ files, all local. Do not re-add a Cloud call; it can only 401, and the guard tha
 Health Connect (Tasker ingest) sibling integration: `lib/health-connect-sync.ts`,
 `app/api/health-connect/ingest`.
 
+| Concern | Where |
+|---|---|
+| **Health Connect per-interval steps, active kcal, cadence (#2462)** — feeds `steps/min` and the `MET/min` cascade (#2115) for watch and phone users | `lib/health-connect-sync.ts` → `flattenIntervalRecords('steps' \| 'active_kcal', records)` and `flattenCadenceRecords(records)` (pure; a record with no `metadata.id`, unparseable span or non-finite value is dropped, never sent) read the plugin's `Steps` / `ActiveCaloriesBurned` / `StepsCadenceSeries` records inside `syncHealthConnect`, posted newest first in chunks (`INTERVAL_UPLOAD_CHUNK`, `INTERVAL_UPLOAD_MAX_CHUNKS`) as `activityIntervals` to `POST /api/sync-health`, which judges each row with the helper that already owns it (`isPlausibleStepWindow`, `activityImplausibleReason`'s kcal/min, `isPlausibleCadence`) → `repo.upsertHealthConnectIntervals` → `health_connect_intervals` (`claude_ro.health_connect_intervals`; keyed `(user_id, kind, record_id, start_at)`, so a re-read window is idempotent). **Every app's overlapping rows are kept** — de-duplicate on read through `stepCandidates` (`dedupeOverlappingWindows`), never at ingest. Read with `repo.getHealthConnectIntervals(userId, kind, from, to)`. Server-only by design (Health Connect is the device copy). Cadence reads under READ_STEPS, so it is gated on the `Steps` grant; the plugin converters live in `patches/@devmaxime__capacitor-health-connect.patch` (APK-gated) |
+
 ---
 
 ## 9. Notifications & push
