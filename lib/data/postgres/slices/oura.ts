@@ -1,4 +1,4 @@
-import { eq, and, or, gte, lte, lt, asc, desc, isNotNull, isNull, inArray, sql } from 'drizzle-orm'
+import { eq, and, or, gte, lte, lt, asc, desc, isNotNull, isNull, inArray, sql, type SQL } from 'drizzle-orm'
 import type { getDb } from '../client'
 import { getPool } from '../client'
 import * as s from '../schema'
@@ -44,7 +44,7 @@ const OURA_SLEEP_SOURCE_COLS: SourceColumn[] = [
   { prop: 'sleepScore', col: 'sleep_score' }, { prop: 'respiratoryRate', col: 'respiratory_rate' },
   { prop: 'sleepPhase5Min', col: 'sleep_phase_5_min' }, { prop: 'timeInBedHours', col: 'time_in_bed_hours' },
 ]
-import { preferStrapBuckets } from '@trainingai/shared/health/hr-window-merge'
+import { mergeHrSources, isAggregatorHrSource, AGGREGATOR_HR_SOURCES, AGGREGATOR_COVER_MS } from '@trainingai/shared/health/hr-window-merge'
 import { computeHrZones } from '@trainingai/shared/health/hr-zones'
 import { accumulateZoneSeconds, type HrReading } from '@trainingai/shared/health/zone-minutes'
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
@@ -554,10 +554,50 @@ let lastHeartrateStorePrune = 0
 const HR_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
 
 export async function upsertOuraHeartrate(db: Db, userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]) {
+  // B1 (Phase-2 durability): DO UPDATE, not DO NOTHING — a re-decoded/corrected bpm at an
+  // existing (user, timestamp) must reach the backup, else the Track-B sync never sees the
+  // fix (review R1/B1-a). Bump `updated_at` ONLY when bpm/source actually changed (setWhere),
+  // so an idempotent re-roll of unchanged points does not churn the timeseries sync.
+  await writeHeartrateRows(db, userId, rows, sql`${s.ouraHeartrate.bpm} IS DISTINCT FROM excluded.bpm OR ${s.ouraHeartrate.source} IS DISTINCT FROM excluded.source`)
+}
+
+/**
+ * Health Connect's (or Apple Health's) intraday heart-rate series into the shared HR table (#2168).
+ *
+ * The rows are kept whatever else covers the same minutes — which source a score reads is decided
+ * at read time by `mergeHrSources`, so a ring or strap user's scores do not move, and the losing
+ * rows are still there if the ranking changes (ingest architecture D2).
+ *
+ * The one place a row cannot be kept is an exact timestamp collision, because `(user_id,
+ * timestamp)` is unique. There the device row stays: this write may replace an aggregator row and
+ * never a device one. The device writers keep their plain overwrite, so a ring or strap row
+ * arriving later takes the slot back — the same answer from either order.
+ *
+ * Also drops the cached zone-minute days from the earliest sample on, because a past day cached
+ * before this data arrived would otherwise keep the old split for good (the rollup does the same
+ * after rewriting its window).
+ */
+export async function upsertAggregatorHeartrate(
+  db: Db, userId: string, rows: { timestamp: Date; bpm: number }[], source: HealthSource, tz: string,
+): Promise<void> {
+  if (!isAggregatorHrSource(source)) throw new Error(`upsertAggregatorHeartrate: '${source}' is not an aggregator source`)
+  if (rows.length === 0) return
+  const aggregators = sql.join(AGGREGATOR_HR_SOURCES.map(a => sql`${a}`), sql`, `)
+  await writeHeartrateRows(
+    db, userId, rows.map(r => ({ ...r, source })),
+    sql`${s.ouraHeartrate.source} IN (${aggregators}) AND (${s.ouraHeartrate.bpm} IS DISTINCT FROM excluded.bpm OR ${s.ouraHeartrate.source} IS DISTINCT FROM excluded.source)`,
+  )
+  const earliest = rows.reduce((min, r) => Math.min(min, r.timestamp.getTime()), Infinity)
+  await deleteZoneMinutesFrom(db, userId, formatInTimeZone(new Date(earliest), tz, 'yyyy-MM-dd'))
+}
+
+async function writeHeartrateRows(
+  db: Db, userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[], setWhere: SQL,
+): Promise<void> {
   if (rows.length === 0) return
   // Collapse repeats on the conflict target BEFORE the insert — one duplicated timestamp otherwise
   // discards an entire 5,000-point CHUNK, which is what Q-214 was (see `collapse-conflicts.ts`).
-  // Last value wins, matching this arm's bare excluded.* semantics.
+  // Last value wins, matching the arms' bare excluded.* semantics.
   const values = collapseOnConflict(
     rows.map(r => ({ userId, timestamp: r.timestamp, bpm: r.bpm, source: r.source })),
     r => r.timestamp.getTime(),
@@ -568,15 +608,11 @@ export async function upsertOuraHeartrate(db: Db, userId: string, rows: { timest
   for (let i = 0; i < values.length; i += CHUNK) {
     await db.insert(s.ouraHeartrate)
       .values(values.slice(i, i + CHUNK))
-      // B1 (Phase-2 durability): DO UPDATE, not DO NOTHING — a re-decoded/corrected bpm at an
-      // existing (user, timestamp) must reach the backup, else the Track-B sync never sees the
-      // fix (review R1/B1-a). Bump `updated_at` ONLY when bpm/source actually changed (setWhere),
-      // so an idempotent re-roll of unchanged points does not churn the timeseries sync. The
-      // conflict target is (user_id, timestamp), so the matched row is already user-scoped.
+      // The conflict target is (user_id, timestamp), so the matched row is already user-scoped.
       .onConflictDoUpdate({
         target: [s.ouraHeartrate.userId, s.ouraHeartrate.timestamp],
         set: { bpm: sql`excluded.bpm`, source: sql`excluded.source`, updatedAt: sql`now()` },
-        setWhere: sql`${s.ouraHeartrate.bpm} IS DISTINCT FROM excluded.bpm OR ${s.ouraHeartrate.source} IS DISTINCT FROM excluded.source`,
+        setWhere,
       })
   }
 
@@ -829,7 +865,7 @@ export async function getHrForWindow(db: Db, userId: string, from: Date, to: Dat
       lte(s.ouraHeartrate.timestamp, to),
     ))
     .orderBy(asc(s.ouraHeartrate.timestamp))
-  return preferStrapBuckets(rows)
+  return mergeHrSources(rows)
 }
 
 /**
@@ -843,9 +879,10 @@ export async function getHrForWindow(db: Db, userId: string, from: Date, to: Dat
  *
  * **Every rule `computeObservedHr` applies is reproduced here, and the equivalence is tested rather
  * than asserted** (`observed-hr-sql-equivalence.test.ts` runs both paths over the same rows):
- * `preferStrapBuckets` first (a ring row is dropped when a chest-strap row shares its 10-second
- * bucket — and the bucket set is built from rows *inside the window*, which is why the subquery
- * carries the same bounds as the outer one); then the plausible band; then `min`/`max` as k-th
+ * `mergeHrSources` first — an aggregator row (Health Connect) is dropped when a device row lies
+ * within `AGGREGATOR_COVER_MS` of it, and a ring row is dropped when a chest-strap row shares its
+ * 10-second bucket; both coverage sets are built from rows *inside the window*, which is why each
+ * subquery carries the same bounds as the outer one; then the plausible band; then `min`/`max` as k-th
  * order statistics **with multiplicity**, which `ORDER BY … OFFSET k-1 LIMIT 1` gives exactly and
  * `percentile_disc` does not. The mean comes back unrounded and TypeScript rounds it, so the
  * rounding rule stays in one language.
@@ -913,6 +950,8 @@ export async function getObservedHrProfile(
   db: Db, userId: string, from: Date, to: Date,
 ): Promise<ObservedHrProfile> {
   const k = CORROBORATION
+  const aggregators = sql.join(AGGREGATOR_HR_SOURCES.map(a => sql`${a}`), sql`, `)
+  const coverSec = AGGREGATOR_COVER_MS / 1000
   const rows = await db.execute<{
     merged_count: number; sample_count: number
     avg_bpm: string | null; highest: number | null; kth_max: number | null; kth_min: number | null
@@ -922,6 +961,14 @@ export async function getObservedHrProfile(
       FROM oura_heartrate h
       WHERE h.user_id = ${userId}
         AND h.timestamp >= ${from} AND h.timestamp <= ${to}
+        AND (COALESCE(h.source, '') NOT IN (${aggregators}) OR NOT EXISTS (
+          SELECT 1 FROM oura_heartrate dv
+          WHERE dv.user_id = ${userId}
+            AND COALESCE(dv.source, '') NOT IN (${aggregators})
+            AND dv.timestamp >= ${from} AND dv.timestamp <= ${to}
+            AND dv.timestamp >= h.timestamp - make_interval(secs => ${coverSec}::float8)
+            AND dv.timestamp <= h.timestamp + make_interval(secs => ${coverSec}::float8)
+        ))
         AND (h.source = 'chest_strap' OR NOT EXISTS (
           SELECT 1 FROM oura_heartrate st
           WHERE st.user_id = ${userId}

@@ -104,22 +104,32 @@ provenance bug before it was made required).
 ### 3a. Heart rate — **time-series list**, never a scalar
 
 ```ts
-{ timestamp: string /* ISO */, bpm: number, source: 'ble' | 'chest_strap' }[]
+{ timestamp: string /* ISO */, bpm: number, source: 'ble' | 'chest_strap' | 'health_connect' | 'apple_health' }[]
 ```
 
 - **Table:** `oura_heartrate` — one row per `(userId, timestamp)`, shared by every HR source (ring
-  rollup writes `source: 'ble'`, Polar strap writes `source: 'chest_strap'` via `POST /api/hr-ingest`).
-- **Not per-field ranked merge** — HR/RR have no `source_map`. Read-time bucket precedence instead:
-  `getHrForWindow` prefers `chest_strap` over `ble` per bucket, because the strap is electrical
-  ground truth and the ring is optical (see `docs/multi-device-comparison.md`).
-- **⚠ This is the one table where a real generic source (Health Connect) exists but is not
-  normalized in.** Health Connect's `HeartRateSeries` record type carries the same intraday shape
-  as this table — but today it is read only to backfill per-session avg/max HR onto individual
-  `activity_logs` (`enrichActivityLogs`, `lib/health-connect-sync.ts:186-230`). It is **never
-  written into `oura_heartrate`**. §4 shows the concrete cost of this gap: Activity Score's
-  zone-minutes/move-hours contributors go missing for a Health-Connect-only user even though the
-  data exists — it just never reaches the table those contributors read.
-  `docs/implementation-backlog.md` files this as **PS-41**.
+  rollup writes `source: 'ble'`, Polar strap writes `source: 'chest_strap'` via `POST /api/hr-ingest`,
+  Health Connect writes `source: 'health_connect'` via `POST /api/sync-health`'s `heartRateSamples`).
+- **Not per-field ranked merge** — HR/RR have no `source_map`. Every source's rows are **stored**,
+  and which ones a score reads is decided at read time by `mergeHrSources`
+  (`packages/shared/src/health/hr-window-merge.ts`), in `getHrForWindow` and its SQL mirror
+  `getObservedHrProfile` (ingest architecture D2: rank picks the winner per interval, the loser is
+  kept). Two rules, in order:
+  1. **An aggregator row yields to any device row within five minutes.** The aggregator tier is
+     derived from `SOURCE_RANK` (the sources ranked at or below `health_connect`), so this table and
+     the per-field merge cannot disagree about who it is. Five minutes is the ring's native bin. A
+     NULL source counts as a device row (pre-provenance ring data).
+  2. **The strap wins a 10-second bucket over the ring**, because the strap is electrical ground
+     truth and the ring is optical (see `docs/multi-device-comparison.md`).
+- **The one place a loser cannot be kept is an exact timestamp collision** (`(user_id, timestamp)`
+  is unique). There the device row keeps the slot: `upsertAggregatorHeartrate` may replace only an
+  aggregator row, and a device write arriving later takes the slot back.
+- **Health Connect's series (#2168, was PS-41).** `lib/health-connect-sync.ts` reads
+  `HeartRateSeries` over the sync window and posts it in chunks of `HR_UPLOAD_CHUNK` samples, at its
+  own resolution — nothing is resampled (D1). A ring or strap user's scores read the same rows as
+  before; a user without one gains Activity Score's zone-minutes and move-hours (22% of it).
+  **No per-sample resolution is stored yet** (D1 asks for one; it would need a column), and **no
+  completeness floor** is applied to a sparse series — both open.
 - **Derived from HR, not stored separately:** `daily_zone_minutes` (per-day time-in-zone) is a
   server-computed cache over `oura_heartrate`.
 - **This bpm value is the one metric in §5.6's classification that's a trivial, universally
@@ -224,7 +234,7 @@ table it reads.
 | **Illness radar** | `packages/shared/src/health/illness-radar.ts` | — | temperature (0.40), breathing (0.25), RHR (0.20), HRV-balance (0.15) — each optional, formula renormalizes over what's present | **not a formula limitation — a wiring gap.** The formula itself degrades gracefully, but its only caller (`readiness-payload.ts`) computes it *only if* an `oura_daily_summary` row exists — a Health-Connect-only user gets no illness computation at all, degraded or otherwise. Filed as PS-42 below |
 | **Training load / ACWR** | `packages/shared/src/ai-periodization/acwr.ts` (`computeVolumeAcwr`) | logged workout volume (`AcwrSession[]`, user-entered tonnage) | — | none — entirely source-agnostic, doesn't touch wearable data at all |
 | **OTS training stress score** | `packages/shared/src/health/training-stress.ts` + `lib/oura-models/inference/ots.ts` | — | — | full-day 1-min MET grid from raw ring events, persisted non-provisional `oura_daily_derived.readiness_score`, derived VO2max — **hard Oura-only, distinct from ACWR above** which is the source-agnostic training-load signal |
-| **Activity Score** | `packages/shared/src/health/activity-score.ts` | — | steps (18%) and activeCalories (15%) from `body_metrics` — **Health-Connect-writable**; strength-frequency/volume (45% combined) from logged workouts — source-agnostic | **zoneMinutes (10%) and moveHours (12%)** — both derived from intraday `oura_heartrate`, which (see §3a) Health Connect's equivalent series never reaches. Renormalizes rather than hard-failing, but a HC-only user is missing 22% of the formula's weight for a fixable reason, not a fundamental one |
+| **Activity Score** | `packages/shared/src/health/activity-score.ts` | — | steps (18%) and activeCalories (15%) from `body_metrics` — **Health-Connect-writable**; strength-frequency/volume (45% combined) from logged workouts — source-agnostic | **zoneMinutes (10%) and moveHours (12%)** — both derived from intraday `oura_heartrate`. Health Connect's series reaches it since #2168 (§3a), ranked below any ring or strap row covering the same minutes, so a HC-only user now has them. Not device-verified, and a sparse series is not floored (§3a) |
 
 **Reading this table:** `device-agnostic-source-architecture.md` §5's claim — that sleep staging
 beyond totals, daytime-HRV→stress→resilience, readiness's temperature term, illness detection,
@@ -349,10 +359,13 @@ load-bearing:**
 source-neutral, or genuinely Oura-only, in which case §4's table should mark which pillars degrade
 without a ring. That is TN-37 step 3, and it needs its own plan.
 
-**The nearest concrete instance is still §5.5's** discarded Health Connect `HeartRateSeries` (PS-41) —
-but it is **not** the only one, which is how §5.5 used to describe it.
+**§5.5's** discarded Health Connect `HeartRateSeries` (PS-41) was the nearest concrete instance and
+is closed (#2168) — but it was **not** the only one, which is how §5.5 used to describe it.
 
-### 5.5 Where the pattern is currently violated — the HR-series gap
+### 5.5 Where the pattern was violated — the HR-series gap (closed by #2168)
+
+**Closed 2026-10-06 (#2168):** the series is now written into `oura_heartrate` and ranked at read
+time — §3a has the rule. The account below is kept because §5.4 and the LA-115 note still refer to it.
 
 Named already in §3a and §4's Activity Score row: Health Connect's `HeartRateSeries` record type
 carries intraday HR — the same shape `oura_heartrate` stores — but `lib/health-connect-sync.ts`
@@ -675,7 +688,7 @@ ring-specific, but because no other source has been wired to fill this shape yet
 | 3 | Daily active calories | §3c | Activity Score, energy balance | derived from our HR/MET-based estimate | vendor's own estimate |
 | 4 | Resting heart rate | §3c | Readiness | our lowest-5-min-bin aggregation over ring-computed bpm (§5.6) | vendor's own RHR figure |
 | 5 | HRV (nightly) | §3c | Readiness | the ring's own computed rMSSD, quality-selected not recomputed (§5.6) | vendor's own HRV figure |
-| 6 | Intraday heart-rate series | §3a | Activity Score (zone/move time), recovery-index | ring-computed bpm from IBI, trivial conversion (§5.6) | vendor's HR series, if exposed (Health Connect's is currently **not** normalized in — §5.5, PS-41) |
+| 6 | Intraday heart-rate series | §3a | Activity Score (zone/move time), recovery-index | ring-computed bpm from IBI, trivial conversion (§5.6) | vendor's HR series, if exposed (Health Connect's is normalized in since #2168, ranked below a ring or strap — §3a) |
 | 7 | Body weight / composition | §3c | `body` pillar | — (ring doesn't measure this) | scale, or Health Connect |
 | 8 | Logged strength workouts | §3d-adjacent | ACWR, Activity Score's strength lane | always user-entered, no device involved either way | same |
 

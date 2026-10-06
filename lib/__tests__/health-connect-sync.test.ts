@@ -47,7 +47,7 @@ describe('HC_READ_TYPES parity', () => {
     // If a type is added here without being added to HC_SYNC_READ_TYPES, this test fails.
     const checkedTypes = ['Steps', 'Weight', 'BodyFat', 'Nutrition',
       'RestingHeartRate', 'OxygenSaturation', 'ActivitySession', 'SleepSession',
-      'TotalCaloriesBurned', 'HeartRateVariabilityRmssd']
+      'TotalCaloriesBurned', 'HeartRateVariabilityRmssd', 'HeartRateSeries']
     for (const t of checkedTypes) {
       expect(syncSet.has(t), `canRead.has('${t}') but it's not in HC_SYNC_READ_TYPES — add it or remove the check`).toBe(true)
     }

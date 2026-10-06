@@ -65,9 +65,10 @@ jobs:
     name: Android (Kotlin tests + debug APK)
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Needed by the "Publish APK" step below to create/replace the rolling release.
+    # #2408. Read-only: this job runs on every native PR, so it never holds a token that can write
+    # releases. Publishing is the `publish` job below, which runs only on push and release calls.
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v5
         with:
@@ -198,6 +199,29 @@ jobs:
           name: app-dev-debug-apk
           path: app-dev-debug.apk
           retention-days: 14
+
+  # #2408. The only job with a write token, and it never runs on a pull request. It publishes the
+  # APKs the `android` job built and already checked against the installed app's certificate, so
+  # nothing here builds or signs anything.
+  publish:
+    name: Publish APK
+    needs: android
+    if: github.event_name == 'push' || inputs.release_tag != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      # The notes read the version from package.json, at the same ref the build used.
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.release_tag }}
+      - uses: actions/download-artifact@v6
+        with:
+          name: app-debug-apk
+      - uses: actions/download-artifact@v6
+        with:
+          name: app-dev-debug-apk
 
       # On merge to main only (not PRs): publish the freshly-built APK to a single
       # rolling "apk-latest" release so there's always one stable, non-expiring
