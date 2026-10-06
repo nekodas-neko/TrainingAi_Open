@@ -6,6 +6,7 @@ const mockRepo = vi.hoisted(() => ({
   activityTypes: [] as { id: string }[],
   saveActivityLog: vi.fn(),
   upsertBodyMetrics: vi.fn(),
+  upsertAggregatorHeartrate: vi.fn(),
 }))
 
 vi.mock('@/auth', () => ({
@@ -14,6 +15,7 @@ vi.mock('@/auth', () => ({
 vi.mock('@/lib/data', () => ({
   getRepositoryAsync: vi.fn(async () => ({
     upsertBodyMetrics: mockRepo.upsertBodyMetrics,
+    upsertAggregatorHeartrate: mockRepo.upsertAggregatorHeartrate,
     saveActivityLog: mockRepo.saveActivityLog,
     saveSleepSession: vi.fn(),
     listActivityLogs: vi.fn(async () => []),
@@ -161,5 +163,81 @@ describe('POST /api/sync-health — activeCalories reaches an integer column', (
     await post({ dailyMetrics: [{ date: '2026-07-01', steps: 100 }] })
     const [, rows] = mockRepo.upsertBodyMetrics.mock.calls[0]
     expect(rows[0].activeCalories).toBeUndefined()
+  })
+})
+
+// #2168 — Health Connect's intraday heart rate. The write itself (and why a ring user's scores do
+// not move) is DB-tested in `aggregator-heartrate.test.ts`; this pins the route's half: structure
+// is validated as a batch, values and clocks per sample, and the write is stamped with the
+// payload's source and the session's timezone.
+describe('POST /api/sync-health — heartRateSamples', () => {
+  const MIN = 60_000
+
+  beforeEach(() => { mockRepo.upsertAggregatorHeartrate.mockClear() })
+
+  it('writes in-range samples as the payload source, in the session timezone', async () => {
+    const now = Date.now()
+    const res = await post({ heartRateSamples: [{ at: now - 2 * MIN, bpm: 71 }, { at: now - MIN, bpm: 128.6 }] })
+    expect(res.status).toBe(200)
+    expect((await res.json()).heartRateStored).toBe(2)
+
+    expect(mockRepo.upsertAggregatorHeartrate).toHaveBeenCalledTimes(1)
+    const [userId, rows, source, tz] = mockRepo.upsertAggregatorHeartrate.mock.calls[0]
+    expect(userId).toBe('u1')
+    expect(source).toBe('health_connect')
+    expect(tz).toBe('Australia/Brisbane')
+    expect(rows).toEqual([
+      { timestamp: new Date(now - 2 * MIN), bpm: 71 },
+      { timestamp: new Date(now - MIN), bpm: 129 },
+    ])
+  })
+
+  it('stamps Apple Health when the payload says so', async () => {
+    await post({ source: 'apple_health', heartRateSamples: [{ at: Date.now() - MIN, bpm: 70 }] })
+    expect(mockRepo.upsertAggregatorHeartrate.mock.calls[0][2]).toBe('apple_health')
+  })
+
+  it('drops an implausible bpm or a broken clock per sample, never the batch', async () => {
+    const now = Date.now()
+    const res = await post({
+      heartRateSamples: [
+        { at: now - MIN, bpm: 0 },                       // strap-on acquisition zero
+        { at: now - MIN + 1, bpm: 400 },                 // decode fault
+        { at: now - 40 * 24 * 60 * MIN, bpm: 70 },       // older than the cold-sync window
+        { at: now + 10 * MIN, bpm: 70 },                 // ahead of clock skew
+        { at: now - 3 * MIN, bpm: 66 },                  // the one good sample
+      ],
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.heartRateStored).toBe(1)
+    expect(body.rejected).toEqual([expect.stringContaining('heart rate: 4 sample(s)')])
+    expect(mockRepo.upsertAggregatorHeartrate.mock.calls[0][1]).toEqual([{ timestamp: new Date(now - 3 * MIN), bpm: 66 }])
+  })
+
+  it('does not write at all when every sample is dropped', async () => {
+    const res = await post({ heartRateSamples: [{ at: Date.now(), bpm: 5 }] })
+    expect(res.status).toBe(200)
+    expect(mockRepo.upsertAggregatorHeartrate).not.toHaveBeenCalled()
+  })
+
+  it('400s on a structurally broken sample (fail closed)', async () => {
+    for (const bad of [
+      [{ at: '2026-07-01T00:00:00Z', bpm: 70 }],         // a string where epoch ms belongs
+      [{ at: 1.5, bpm: 70 }],                            // not an integer instant
+      [{ at: 9e15, bpm: 70 }],                           // past the Date range
+      [{ at: Date.now(), bpm: 70, source: 'ble' }],      // a sample cannot name its own source
+      [{ at: Date.now() }],
+    ]) {
+      expect((await post({ heartRateSamples: bad })).status, JSON.stringify(bad)).toBe(400)
+    }
+    expect(mockRepo.upsertAggregatorHeartrate).not.toHaveBeenCalled()
+  })
+
+  it('400s past the per-request cap, which is the client chunk size', async () => {
+    const { HR_UPLOAD_CHUNK } = await import('@/lib/health-connect-sync')
+    const at = Date.now() - MIN
+    const res = await post({ heartRateSamples: Array.from({ length: HR_UPLOAD_CHUNK + 1 }, (_, i) => ({ at: at - i, bpm: 70 })) })
+    expect(res.status).toBe(400)
   })
 })

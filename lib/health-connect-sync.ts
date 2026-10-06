@@ -24,7 +24,7 @@ const HC_STAGE_TO_SLEEP_STAGE: Record<string, SleepStage> = {
 };
 
 export const LAST_SYNC_KEY  = 'ta_hc_last_sync';
-const SYNC_DAYS_COLD = 30;  // days on first install
+export const SYNC_DAYS_COLD = 30;  // days on first install
 const SYNC_DAYS_HOT  = 7;   // days on subsequent opens
 
 // Canonical read-type lists. Both requestPermissions and canRead.has() checks
@@ -112,7 +112,7 @@ export interface SyncPayload {
 /** One intraday heart-rate reading, at the source's own resolution. `at` is epoch ms. */
 export interface HeartRateSample { at: number; bpm: number }
 
-/** One request's share of the heart-rate series. Must not exceed the route's `MAX_HR_SAMPLES`. */
+/** One request's share of the heart-rate series. `/api/sync-health` imports it as its own cap. */
 export const HR_UPLOAD_CHUNK = 10_000
 /** Heart-rate requests per sync. The route allows 60 a minute, so a dense 30-day cold sync is
  *  bounded rather than run into a 429 halfway; newest samples go first, so a cap drops the oldest. */

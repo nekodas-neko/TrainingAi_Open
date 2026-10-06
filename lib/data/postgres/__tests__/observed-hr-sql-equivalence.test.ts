@@ -214,4 +214,57 @@ describe.skipIf(!canRun)('getObservedHrProfile — SQL matches computeObservedHr
     expect(p.isReliable).toBe(true)
     expect(p.outOfBandRejected).toBe(2)
   })
+
+  // #2168 — Health Connect rows share this table and yield to any device row within five minutes.
+  // The rows under test sit well clear of the plateau (which ends at 4,140 s), so the plateau
+  // covers none of them.
+  const hc = (n: number, bpm: number): Row => ({ at: at(n), bpm, source: 'health_connect' })
+
+  it('agrees when a Health Connect row yields to a device row within five minutes, edges inclusive', async () => {
+    await seed([
+      ...flat(150, 70), ring(10000, 80),
+      hc(9699, 202), hc(9700, 201), hc(10100, 205), hc(10300, 203), hc(10301, 204),
+    ])
+    const p = await bothAgree()
+    // 300 s either side is covered; 301 s is not.
+    expect(p.sampleCount).toBe(70 + 1 + 2)
+    expect(p.highestPlausible).toBe(204)
+  })
+
+  it('agrees that a Health Connect series with no device row near it is read whole', async () => {
+    await seed(Array.from({ length: 70 }, (_, i) => hc(i * 60, 140 + (i % 3))))
+    expect((await bothAgree()).sampleCount).toBe(70)
+  })
+
+  it('agrees that a NULL-source row covers Health Connect, and that Apple Health yields the same way', async () => {
+    await seed([
+      ...flat(150, 70),
+      { at: at(10000), bpm: 80, source: null }, hc(10010, 201), { at: at(10020), bpm: 202, source: 'apple_health' },
+      hc(20000, 160),
+    ])
+    expect((await bothAgree()).sampleCount).toBe(70 + 1 + 1)
+  })
+
+  it('agrees that a device row OUTSIDE the window does not hide a Health Connect row inside it', async () => {
+    // The device-coverage subquery carries the window bounds, like the strap one. The window ends at
+    // 600 s and the ring row at 700 s is outside it but within five minutes of the last three
+    // Health Connect rows — only a bounded subquery keeps them.
+    const from = at(0)
+    const to = at(600)
+    await seed([...Array.from({ length: 9 }, (_, i) => hc(i * 60, 150)), hc(600, 151), ring(700, 70)])
+    const viaRows = computeObservedHr((await oura.getHrForWindow(db, USER, from, to)).map(r => r.bpm))
+    const viaSql = await oura.getObservedHrProfile(db, USER, from, to)
+    expect(viaSql).toEqual(viaRows)
+    expect(viaSql.sampleCount, 'a Health Connect row near the out-of-window ring row was dropped').toBe(10)
+  })
+
+  it('agrees with Health Connect, ring and strap rows all in one window', async () => {
+    await seed([
+      ...flat(150, 60),
+      strap(30000.2, 175), ring(30000.4, 90), hc(30005, 199), hc(30400, 120),
+      hc(40000, 130), hc(40060, 131), ring(40200, 70),
+    ])
+    // Plateau 60 + the strap row + the one Health Connect row nothing covers + the lone ring row.
+    expect((await bothAgree()).sampleCount).toBe(63)
+  })
 })

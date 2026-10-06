@@ -7,19 +7,20 @@ import { z } from "zod";
 import { activityImplausibleReason, sleepImplausibleReason, MIN_PLAUSIBLE_BPM, MAX_PLAUSIBLE_BPM } from "@trainingai/shared/validation/plausibility";
 import { ingestDayRejection, INGEST_FUTURE_TOLERANCE_MS } from "@trainingai/shared/validation/ingest-clock";
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { HR_UPLOAD_CHUNK, SYNC_DAYS_COLD } from '@/lib/health-connect-sync'
 
 // Three arrays of at most MAX_ITEMS (400) rows of bounded numbers — about 300 KB at the schema's
 // own limit — plus MAX_HR_SAMPLES heart-rate points of ~30 bytes each, another ~300 KB. 1 MB is
 // still generous past both.
 const MAX_BODY_BYTES = 1024 * 1024
 
-// One request's share of a heart-rate series; the client splits a longer one across requests
-// (`HR_UPLOAD_CHUNK` in lib/health-connect-sync.ts, which must not exceed this).
-const MAX_HR_SAMPLES = 10_000
-// The client reads 30 days on a cold sync (`SYNC_DAYS_COLD`). A sample further back than that, or
-// ahead of ordinary clock skew, is a broken clock or a crafted call — dropped per sample, never a
-// 400 for the batch (the poison-pill rule).
-const HR_PAST_TOLERANCE_MS = 31 * 24 * 60 * 60_000
+// One request's share of a heart-rate series. The client's own chunk size, imported rather than
+// repeated, so the two cannot drift into every chunk being a 400.
+const MAX_HR_SAMPLES = HR_UPLOAD_CHUNK
+// The client reads `SYNC_DAYS_COLD` days on a cold sync. A sample further back than that (plus a
+// day of slack), or ahead of ordinary clock skew, is a broken clock or a crafted call — dropped per
+// sample, never a 400 for the batch (the poison-pill rule).
+const HR_PAST_TOLERANCE_MS = (SYNC_DAYS_COLD + 1) * 24 * 60 * 60_000
 
 // Receives aggregate health data. Legacy Android callers default to Health Connect.
 // The JS layer pre-aggregates data into daily buckets and sends individual
