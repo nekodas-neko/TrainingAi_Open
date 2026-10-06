@@ -24,7 +24,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 type Row = Record<string, unknown>
 
-const getUserById = vi.fn(async (_id: string) => ({ isAdmin: true }) as Row | null)
+const getUserById = vi.fn(async (_id: string) => ({ isActive: true, isAdmin: true }) as Row | null)
 const rateLimit = vi.fn((..._a: unknown[]) => true)
 
 let selectRows: Row[] = []
@@ -115,7 +115,7 @@ describe('BF-147 — recording a verdict on a generated GIF', () => {
 
   it('is admin-gated', async () => {
     sessionUser = { id: 'u-2', isAdmin: false }
-    getUserById.mockResolvedValueOnce({ isAdmin: false })
+    getUserById.mockResolvedValueOnce({ isActive: true, isAdmin: false })
     expect((await patch({ exerciseName: 'Barbell Shrug', status: 'ok' })).status).toBe(403)
   })
 

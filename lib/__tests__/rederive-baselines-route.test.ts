@@ -35,7 +35,7 @@ import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composi
 import { TEMP_DEV_FEVER_LIMIT_C } from '@trainingai/shared/health/chronic-stress-assembly'
 import type { OuraDailySummaryRow } from '@/lib/data/repository'
 
-const getUserById = vi.fn(async (_id: string) => ({ isAdmin: true }) as Record<string, unknown> | null)
+const getUserById = vi.fn(async (_id: string) => ({ isActive: true, isAdmin: true }) as Record<string, unknown> | null)
 const rateLimit = vi.fn((..._a: unknown[]) => true)
 const getOuraDailySummary = vi.fn(async (..._a: unknown[]) => [] as OuraDailySummaryRow[])
 const upsertOuraDailySummary = vi.fn(async (..._a: unknown[]) => undefined)
@@ -126,7 +126,7 @@ const body = async (r: Response) => await r.json() as {
 beforeEach(() => {
   for (const m of [getUserById, rateLimit, getOuraDailySummary, upsertOuraDailySummary]) m.mockClear()
   rateLimit.mockReturnValue(true)
-  getUserById.mockResolvedValue({ isAdmin: true })
+  getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
   getOuraDailySummary.mockResolvedValue(storedHistory(TEMPS))
   sessionUser = { id: 'u-1', isAdmin: true, timezone: 'Australia/Brisbane' }
 })
@@ -139,7 +139,7 @@ describe('the gate', () => {
 
   it('403s for a non-admin, by the DB flag rather than the JWT claim', async () => {
     sessionUser = { id: 'u-1', isAdmin: true }
-    getUserById.mockResolvedValue({ isAdmin: false })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     expect((await call()).status).toBe(403)
   })
 
