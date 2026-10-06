@@ -1,5 +1,10 @@
 import type { ProgramPhaseType } from './program'
 
+/** #2450: where a set's RPE came from — `rated` when the lifter set it on the picker, `expected`
+ *  when it is the picker's untouched pre-fill (owner rule on #2253: untouched means "as
+ *  predicted"). Stored as `set_logs.rpe_source`; NULL on a set with no RPE and on older rows. */
+export type RpeSource = 'expected' | 'rated'
+
 export interface SetLog {
   id: string
   exerciseLogId: string
@@ -18,6 +23,8 @@ export interface SetLog {
   plannedRestSec?: number
   /** #2445: the bar prescribed for this set after plate rounding (`set_logs.planned_weight_kg`). */
   plannedWeightKg?: number
+  /** #2450: whether `rpe` was tapped or left at the pre-fill (`set_logs.rpe_source`). */
+  rpeSource?: RpeSource
 }
 
 export interface ExerciseLog {
