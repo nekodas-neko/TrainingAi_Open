@@ -1,9 +1,11 @@
 "use client"
 
-import { Gauge, ScrollText, Sparkles } from 'lucide-react'
+import { Gauge, ScrollText, Sparkles, Wrench } from 'lucide-react'
 import { useTransitionRouter } from '@/lib/view-transition'
 import { MoreSubScreen } from '@/components/more/sub-screen'
 import { MoreRow, MoreRowGroup } from '@/components/more/more-row'
+import { ConsoleSection } from '@/components/admin/console-section'
+import { CollapsibleSection } from '@/components/ui/collapsible-section'
 import TimeAuditCard from '@/components/admin/time-audit-card'
 import ProgramExportCard from '@/components/admin/program-export-card'
 import ExerciseUnitFix from '@/components/admin/exercise-unit-fix'
@@ -30,12 +32,25 @@ export function DeveloperContent() {
         <MoreRow icon={Gauge} label="Day review" onClick={() => router.push('/more/settings/developer/day-review')} />
       </MoreRowGroup>
 
-      <TimeAuditCard />
-      <ProgramExportCard />
-      <ExerciseUnitFix />
-      <SetHrBackfillCard />
-      <WorkoutHrBackfillCard />
-      <ModelAssetsCard />
+      {/* #2250 — the owner's keep/hide call per card (2026-10-05), from the inventory in
+          `docs/admin-control-inventory.md` §A. Everything stays visible except the unit fix, which
+          is folded rather than deleted: a repair that is gone cannot be used when it is needed. */}
+      <ConsoleSection title="Checks" when="Read what the app is doing. Model assets is the only sign that production is loading its models from storage rather than the repo copy.">
+        <ModelAssetsCard />
+        <TimeAuditCard />
+        <ProgramExportCard />
+      </ConsoleSection>
+
+      <ConsoleSection title="Heart-rate backfills" when="When a workout ended without its recap being opened, which is the only thing that fills these. Safe to re-run.">
+        <SetHrBackfillCard />
+        <WorkoutHrBackfillCard />
+      </ConsoleSection>
+
+      <ConsoleSection title="One-off repairs" when="Corrections applied once to old logs, kept folded away in case one is needed again.">
+        <CollapsibleSection title="Fix lbs logged as kg" icon={<Wrench className="h-4 w-4" />}>
+          <ExerciseUnitFix />
+        </CollapsibleSection>
+      </ConsoleSection>
     </MoreSubScreen>
   )
 }

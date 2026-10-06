@@ -8,8 +8,9 @@
  *  `when` is the one-line answer to "why would I be on this section", because a console's own title
  *  says what it reads and never says when to read it. */
 export function ConsoleSection({ step, title, when, children }: {
-  /** The runbook position. Numbering the sections is what makes the page an order rather than a list. */
-  step: number
+  /** The runbook position. Numbering the sections is what makes the page an order rather than a list.
+   *  Omit it where the sections are groups with no order between them (Settings → Developer). */
+  step?: number
   title: string
   when: string
   children: React.ReactNode
@@ -18,7 +19,7 @@ export function ConsoleSection({ step, title, when, children }: {
     <section className="mt-6 first:mt-0">
       <div className="mb-2">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
-          {step}. {title}
+          {step != null && `${step}. `}{title}
         </h2>
         <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground/80">{when}</p>
       </div>
