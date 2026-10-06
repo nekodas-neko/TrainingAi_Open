@@ -70,8 +70,8 @@ export interface AiPrescription {
    * fell back to the base program anyway, so the lifter waited ~30 s to arrive where this
    * arrives immediately.
    *
-   * **Nothing in the UI reads this yet** — labelling the source is RV-202 item 3, Lane B's.
-   * Until then the numbers are unlabelled, exactly as the offline fallback already is.
+   * `workout-data` passes it on as `prescriptionSource` while the plan drives load, and the
+   * pre-workout heading labels a rules plan "From your program" (#2110).
    */
   source?: 'model' | 'rules'
   // Set only when the engine APPLIED a phase transition automatically (auto-apply on, the
