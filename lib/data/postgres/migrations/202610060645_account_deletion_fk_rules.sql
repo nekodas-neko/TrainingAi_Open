@@ -21,9 +21,23 @@
 --      account-deletion transaction runs `SET CONSTRAINTS ALL DEFERRED`, which moves the check to its
 --      COMMIT, after the whole cascade. A reference that survives to COMMIT (another account's row
 --      pointing at this one's) still fails the deletion and rolls it back, rather than deleting it.
+--   3. Every FK on workout_sessions, program_phases and meal_plan_meals → DEFERRABLE INITIALLY
+--      IMMEDIATE, keeping its delete rule. Found by a fixture with one row in EVERY user table, each
+--      linked to the user's own parents: the users delete then failed on
+--      meal_plan_meals_variant_id_fkey ("variant_id is not present in meal_plan_variants"). These
+--      three tables are the ones holding two or more SET NULL keys whose parents the cascade also
+--      deletes (3, 2 and 2), so one row can be UPDATEd twice inside the cascade. Postgres skips the
+--      FK re-check on an update whose keys did not change, EXCEPT when the old row version was
+--      written by the current transaction — which the second update's is. So the second SET NULL
+--      re-checks every other FK on the row, including its cascade parent, which may already be gone
+--      while the row's own cascade delete is still queued. Whether it fails depends on trigger order.
+--      Deferred to COMMIT, the check finds the row deleted and skips it. Outside a transaction that
+--      asks for deferral nothing changes: INITIALLY IMMEDIATE checks at the end of each statement,
+--      as before. `ALTER CONSTRAINT` changes only the deferral flags, so no table is scanned.
 --
 -- Each FK is found by its column, not its name, so a production constraint created under another
--- name is replaced too. Replay-safe: the second run drops and re-adds the same four constraints.
+-- name is replaced too. Replay-safe: the second run drops and re-adds the same four constraints, and
+-- step 3 only touches constraints that are not deferrable yet.
 
 DO $$
 DECLARE r record;
@@ -58,3 +72,19 @@ ALTER TABLE food_logs ADD CONSTRAINT food_logs_food_item_id_fkey
 
 ALTER TABLE food_logs ADD CONSTRAINT food_logs_meal_type_id_fkey
   FOREIGN KEY (meal_type_id) REFERENCES meal_types(id) ON DELETE NO ACTION DEFERRABLE INITIALLY IMMEDIATE;
+
+DO $$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT con.conname, cl.relname
+    FROM pg_constraint con
+    JOIN pg_class cl ON cl.oid = con.conrelid
+    WHERE con.contype = 'f'
+      AND NOT con.condeferrable
+      AND cl.relnamespace = 'public'::regnamespace
+      AND cl.relname IN ('workout_sessions', 'program_phases', 'meal_plan_meals')
+  LOOP
+    EXECUTE format('ALTER TABLE public.%I ALTER CONSTRAINT %I DEFERRABLE INITIALLY IMMEDIATE', r.relname, r.conname);
+  END LOOP;
+END $$;

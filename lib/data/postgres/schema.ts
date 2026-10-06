@@ -138,6 +138,9 @@ export const programSessions = pgTable('program_sessions', {
     .where(sql`deleted_at IS NULL`),
 ])
 
+// #2120: every FK on this table, workout_sessions and meal_plan_meals is DEFERRABLE INITIALLY
+// IMMEDIATE in the database (Drizzle cannot declare it). Each has two or more SET NULL keys the
+// account-deletion cascade fires; account-deletion.test.ts fails if one is recreated without it.
 export const programPhases = pgTable('program_phases', {
   id:               uuid('id').primaryKey().defaultRandom(),
   phaseSetId:       uuid('phase_set_id').references(() => phaseSets.id, { onDelete: 'cascade' }),
@@ -196,6 +199,8 @@ export const scheduleDays = pgTable('schedule_days', {
 //
 // It has already cost a session: a repro fixture populated `program_session_id`, the periodization
 // block took its `null` branch, and the honest reading of that run was "the race does not exist".
+//
+// #2120: every FK here is DEFERRABLE in the database — see the note above `programPhases`.
 export const workoutSessions = pgTable('workout_sessions', {
   id:                uuid('id').primaryKey().defaultRandom(),
   userId:            uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -869,6 +874,7 @@ export const mealPlanVariants = pgTable('meal_plan_variants', {
   targetFatG:      doublePrecision('target_fat_g').notNull(),
 })
 
+// #2120: every FK here is DEFERRABLE in the database — see the note above `programPhases`.
 export const mealPlanMeals = pgTable('meal_plan_meals', {
   id:              uuid('id').primaryKey().defaultRandom(),
   variantId:       uuid('variant_id').notNull().references(() => mealPlanVariants.id, { onDelete: 'cascade' }),
