@@ -5,6 +5,15 @@ export interface WeeklyZoneStack {
   seconds: [number, number, number, number, number]
 }
 
+/**
+ * #2337 — eight all-zero weeks from a user nothing can record are absence, not eight idle weeks.
+ * True only for a KNOWN `hasHrSource === false` with nothing in any stack: an older payload without
+ * the flag, a failed read (`null`), and real history from a source since removed all still draw.
+ */
+export function zoneStacksUnmeasured(stacks: readonly WeeklyZoneStack[], hasHrSource: boolean | null | undefined): boolean {
+  return hasHrSource === false && stacks.every((w) => w.seconds.every((s) => s === 0))
+}
+
 /** Buckets daily per-zone seconds (from `getZoneMinutesRange`) into Mon-Sun week totals. */
 export function bucketZoneMinutesByWeek(
   days: { day: string; seconds: [number, number, number, number, number] }[],

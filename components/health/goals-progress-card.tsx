@@ -73,6 +73,9 @@ export const GoalsProgressCard = memo(function GoalsProgressCard({ metaToday, we
   }
 
   if (userGoals?.sleepGoalHours != null) {
+    // #2337: `thisWeekHours` is null when no night this week recorded sleep, as `lastNightHours`
+    // already was. A null value drops the row in `visibleRows` below rather than drawing "0 h"
+    // against the goal; a payload cached before the change still carries its number.
     rows.push({
       key: 'Sleep', icon: Moon, color: '#a78bfa', weekly: view === 'week',
       value: view === 'today' ? progressSummary?.sleep.lastNightHours ?? null : progressSummary?.sleep.thisWeekHours ?? null,
