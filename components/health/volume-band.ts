@@ -32,10 +32,10 @@ export interface VolumeVerdict {
 }
 
 const BANDS: Record<VolumeBand, { label: string; color: string }> = {
-  under: { label: 'below MEV', color: '#ef4444' },
-  in:    { label: 'in range',  color: '#22c55e' },
-  high:  { label: 'above MAV', color: '#f59e0b' },
-  over:  { label: 'above MRV', color: '#ef4444' },
+  under: { label: 'below MEV', color: 'var(--destructive)' },
+  in:    { label: 'in range',  color: 'var(--accent-green)' },
+  high:  { label: 'above MAV', color: 'var(--accent-amber)' },
+  over:  { label: 'above MRV', color: 'var(--destructive)' },
 }
 
 export function volumeVerdict(trainingGoal: string, muscle: string, sets: number): VolumeVerdict {

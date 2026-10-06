@@ -149,9 +149,9 @@ function StreakCardComponent({
         <div
           className="rounded-lg px-3 py-1.5 text-xs font-medium text-center"
           style={{
-            background: streakBroken ? 'rgba(239,68,68,0.12)' : streakWarning ? 'rgba(251,191,36,0.12)' : 'rgba(148,163,184,0.12)',
-            color: streakBroken ? '#ef4444' : streakWarning ? '#fbbf24' : '#94a3b8',
-            border: `1px solid ${streakBroken ? 'rgba(239,68,68,0.25)' : streakWarning ? 'rgba(251,191,36,0.25)' : 'rgba(148,163,184,0.20)'}`,
+            background: streakBroken ? 'color-mix(in oklch, var(--destructive) 12%, transparent)' : streakWarning ? 'rgba(251,191,36,0.12)' : 'rgba(148,163,184,0.12)',
+            color: streakBroken ? 'var(--destructive)' : streakWarning ? '#fbbf24' : '#94a3b8',
+            border: `1px solid ${streakBroken ? 'color-mix(in oklch, var(--destructive) 25%, transparent)' : streakWarning ? 'rgba(251,191,36,0.25)' : 'rgba(148,163,184,0.20)'}`,
           }}
         >
           {streakBroken
