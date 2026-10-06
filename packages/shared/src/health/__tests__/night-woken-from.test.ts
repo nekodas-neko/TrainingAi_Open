@@ -54,16 +54,18 @@ describe('opensFollowingNight', () => {
 describe('nightWokenFrom', () => {
   it('returns nothing for a date whose only night is an evening window', () => {
     const nights = nightSessions([EVENING_ONSET], TZ)
-    // The pick that anchored the day at 22:30.
-    expect(canonicalNightForDate(nights, D)?.sleepEnd).toEqual(EVENING_ONSET.sleepEnd)
     expect(nightWokenFrom(nights, D, TZ)).toBeNull()
   })
 
   it('takes the morning night even when the evening window is longer', () => {
     const shortMorning = sleepWindow(D, 3, D, 5, 2)
-    const longEvening = sleepWindow(D, 20.5, D, 23.5, 3)
+    const shortEvening = sleepWindow(D, 20.5, D, 23.5, 3)
+    expect(nightWokenFrom(nightSessions([shortMorning, shortEvening], TZ), D, TZ)?.durationHours).toBe(2)
+    // Even one long enough for the scoring pick to grade it as the date's main sleep (#2456): an
+    // evening that ended that night never started the date's waking day.
+    const longEvening = sleepWindow(D, 18.5, D, 23.5, 5)
     const nights = nightSessions([shortMorning, longEvening], TZ)
-    expect(canonicalNightForDate(nights, D)?.durationHours).toBe(3)
+    expect(canonicalNightForDate(nights, D, TZ)?.durationHours).toBe(5)
     expect(nightWokenFrom(nights, D, TZ)?.durationHours).toBe(2)
   })
 
@@ -71,7 +73,7 @@ describe('nightWokenFrom', () => {
     const daytime = sleepWindow(D, 10.7, D, 17.42, 6.17)
     for (const sessions of [[OVERNIGHT], [OVERNIGHT, EVENING_ONSET], [OVERNIGHT, daytime], [daytime]]) {
       const nights = nightSessions(sessions, TZ)
-      expect(nightWokenFrom(nights, D, TZ)).toEqual(canonicalNightForDate(nights, D))
+      expect(nightWokenFrom(nights, D, TZ)).toEqual(canonicalNightForDate(nights, D, TZ))
     }
   })
 

@@ -71,11 +71,11 @@ describe('the aggregated-array helpers agree with it', () => {
   const nights = nightSessions(SESSIONS, TZ)
 
   it('canonicalNightForDate takes the longer of the two', () => {
-    expect(canonicalNightForDate(nights, '2026-09-23')?.durationHours).toBe(7.92)
+    expect(canonicalNightForDate(nights, '2026-09-23', TZ)?.durationHours).toBe(7.92)
   })
 
   it('canonicalLatestNight takes the same one', () => {
-    expect(canonicalLatestNight(nights)?.durationHours).toBe(7.92)
+    expect(canonicalLatestNight(nights, TZ)?.durationHours).toBe(7.92)
   })
 
   it('and the naive picks every consumer used would have taken the daytime rest', () => {
@@ -90,13 +90,13 @@ describe('the aggregated-array helpers agree with it', () => {
 
   it('a date with one night is unaffected, whichever helper asks', () => {
     const single = nightSessions([OVERNIGHT], TZ)
-    expect(canonicalNightForDate(single, '2026-09-23')?.durationHours).toBe(7.92)
-    expect(canonicalLatestNight(single)?.durationHours).toBe(7.92)
+    expect(canonicalNightForDate(single, '2026-09-23', TZ)?.durationHours).toBe(7.92)
+    expect(canonicalLatestNight(single, TZ)?.durationHours).toBe(7.92)
   })
 
   it('an empty history is null rather than a throw', () => {
-    expect(canonicalLatestNight([])).toBeNull()
-    expect(canonicalNightForDate([], '2026-09-23')).toBeNull()
+    expect(canonicalLatestNight([], TZ)).toBeNull()
+    expect(canonicalNightForDate([], '2026-09-23', TZ)).toBeNull()
   })
 
   it('canonicalLatestNight resolves the DATE first, so an older long night never wins', () => {
@@ -113,7 +113,7 @@ describe('the aggregated-array helpers agree with it', () => {
       efficiency: 95,
     }
     const nights2 = nightSessions([lastWeek, OVERNIGHT, DAYTIME], TZ)
-    expect(canonicalLatestNight(nights2)?.date).toBe('2026-09-23')
-    expect(canonicalLatestNight(nights2)?.durationHours).toBe(7.92)
+    expect(canonicalLatestNight(nights2, TZ)?.date).toBe('2026-09-23')
+    expect(canonicalLatestNight(nights2, TZ)?.durationHours).toBe(7.92)
   })
 })

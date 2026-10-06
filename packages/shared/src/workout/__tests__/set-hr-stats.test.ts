@@ -12,7 +12,7 @@ const baseline: HrBaseline = { maxHr: 190, restingHr: 60 }
 // One 30s set (start 10s, end 40s) peaking at 170, then a 60s rest that decays to 80.
 const SET1: RichSetMarker = {
   setLogId: 'set-1', exerciseLogId: 'ex-1', exerciseId: 'exid-1', exerciseName: 'Bench Press',
-  setNumber: 1, phaseType: 'peak', intensityPct: 90, plannedPct: 90,
+  setNumber: 1, phaseType: 'peak', intensityPct: 90, plannedPct: 90, plannedReps: null,
   restTakenSec: 60, plannedRestSec: 60, setStartMs: 10_000, setEndMs: 40_000, loggedAt: new Date(40_000),
 }
 
@@ -57,7 +57,38 @@ describe('computeSetHrStats — fully-worked single set', () => {
     expect(row.readingsCount).toBe(12)
     expect(row.intensityPct).toBe(90)
     expect(row.phaseType).toBe('peak')
-    expect(row.restAdequate).toBe(true) // hrr1 85 ≥ 15
+    // #2457: R1 samples every 5–10 s in the rest, so the dense rule (no gap over 5 s) cannot measure
+    // HRR60 here — no measurement, no verdict, even though the drop curve above still reads 85.
+    expect(row.hrr1Bpm).toBeNull()
+    expect(row.restAdequate).toBeNull()
+  })
+})
+
+describe('computeSetHrStats — HRR60 from dense HR (#2457)', () => {
+  // 1 Hz from the set end (40 s) to +60 s (100 s), falling 1 bpm a second: 165 → 105.
+  const dense = readings([
+    [12, 120], [30, 160],
+    ...Array.from({ length: 61 }, (_, k) => [40 + k, 165 - k] as [number, number]),
+  ])
+
+  it('stores the measured drop and judges the verdict on it', () => {
+    const [row] = computeSetHrStats(dense, [SET1], baseline)
+    expect(row.hrr1Bpm).toBe(60)
+    expect(row.restAdequate).toBe(true)
+  })
+
+  it('a small measured drop is a cross, not a pass', () => {
+    const flat = readings(Array.from({ length: 61 }, (_, k) => [40 + k, 120 - Math.floor(k / 10)] as [number, number]))
+    const [row] = computeSetHrStats(flat, [SET1], baseline)
+    expect(row.hrr1Bpm).toBe(6)
+    expect(row.restAdequate).toBe(false)
+  })
+
+  it('a 6 s hole in the minute leaves both null', () => {
+    const holed = dense.filter(r => { const t = r.timestamp.getTime() / 1000; return t < 70 || t > 75 })
+    const [row] = computeSetHrStats(holed, [SET1], baseline)
+    expect(row.hrr1Bpm).toBeNull()
+    expect(row.restAdequate).toBeNull()
   })
 })
 

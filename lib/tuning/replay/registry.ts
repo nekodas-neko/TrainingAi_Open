@@ -133,7 +133,7 @@ const nightlyTemperature: ReplayFunction<NightInputs> = {
 
       // Prefer the stored window where it is the night: it is the rollup's own trimmed window.
       for (const date of dates) {
-        const night = canonicalNightForDate(sessions, date)
+        const night = canonicalNightForDate(sessions, date, timezone)
         if (!night) continue
         const a = resolveMsToDs(new Date(night.sleepStart).getTime(), anchors)
         const b = resolveMsToDs(new Date(night.sleepEnd).getTime(), anchors)

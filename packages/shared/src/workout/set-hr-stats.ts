@@ -2,15 +2,16 @@
 // that follows, and how long HR takes to return toward baseline under three "recovered" definitions.
 // Persisted to set_hr_stats (migration 139) so per-set / per-exercise HR trends survive the 180d
 // oura_heartrate prune. One Formula, One Place: the nearest-reading helper, the proxy-peak fallback,
-// bpmAtLog, and the rest-adequacy heuristic come from analyseHrRecovery (lib/workout/hr-analysis.ts) —
-// not re-implemented here. This module ADDS the rest-bounded drop curve (30/60/90/120s), the trough,
-// the three time-to-recover models, and %HRR. NOTE: the persisted drop60s is REST-BOUNDED (null if the
+// and bpmAtLog come from analyseHrRecovery (lib/workout/hr-analysis.ts); the measured HRR60 and the
+// rest verdict built on it come from hrr60.ts (#2457) — not re-implemented here. This module ADDS
+// the rest-bounded drop curve (30/60/90/120s), the trough, the three time-to-recover models, and %HRR. NOTE: the persisted drop60s is REST-BOUNDED (null if the
 // next set began first), which differs from the session summary's classic unbounded HRR1 (hrr1Best) —
 // they coincide whenever the rest lasted ≥ 60s.
 //
 // IMPORTANT framing: the rest-adequacy signal is CARDIOVASCULAR recovery only. It says nothing about
 // CNS / neuromuscular readiness — every surface that shows it must label it as such.
 import { analyseHrRecovery, nearestBpm, type HrReading, type SetMarker } from './hr-analysis'
+import { deriveHrr60, restAdequateFromHrr60 } from './hrr60'
 
 /** A logged set with the identity + prescription dimensions needed to snapshot and later trend it. */
 export interface RichSetMarker {
@@ -64,6 +65,11 @@ export interface SetHrRow {
   recoveredResting: boolean | null
   pctHrrAtRestEnd: number | null
   secToHrr50: number | null
+  /** HRR60 measured from dense HR (`deriveHrr60`): null when the series could not see the minute
+   *  after the set — a ring-only set, a gap, or no readings. The input the rest verdict reads (#2457). */
+  hrr1Bpm: number | null
+  /** `restAdequateFromHrr60(hrr1Bpm)` — null when `hrr1Bpm` is. Written unconditionally on upsert so a
+   *  stale verdict from the older nearest-reading rule clears (#2457). */
   restAdequate: boolean | null
   readingsCount: number
   coverageOk: boolean
@@ -180,6 +186,10 @@ export function computeSetHrStats(
 
     const bpmAtEnd = leg.bpmAtLog
     const nextStart = nextStartByIndex.get(i) ?? null
+    // HRR60 from dense HR only (#2457 / #2299 v2). The persisted verdict reads this, not the legacy
+    // nearest-reading hrr1, so a ring-only set gets no verdict instead of a noisy one. The live recap
+    // (`analyseHrRecovery`) still uses the legacy rule until #2299 step 2 moves it.
+    const hrr1Bpm = deriveHrr60(readings, endMs)?.bpm ?? null
 
     // Empty defaults for a set we can't anchor a rest window on.
     const base = {
@@ -193,7 +203,8 @@ export function computeSetHrStats(
       secToPreset: null as number | null, recoveredPreset: null as boolean | null,
       secToResting: null as number | null, recoveredResting: null as boolean | null,
       pctHrrAtRestEnd: null as number | null, secToHrr50: null as number | null,
-      restAdequate: leg.adequate,
+      hrr1Bpm,
+      restAdequate: restAdequateFromHrr60(hrr1Bpm),
       readingsCount: 0, coverageOk: false,
       source: sourceOf(readings, startMs, endMs),
     }

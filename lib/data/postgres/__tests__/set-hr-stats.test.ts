@@ -29,8 +29,8 @@ function mkRow(over: Partial<SetHrRow> & { setLogId: string }): SetHrRow {
     loggedAt: new Date('2026-07-10T02:00:00Z'),
     peakBpm: 170, avgBpm: 150, bpmAtEnd: 165, drop30s: 20, drop60s: 30, drop90s: 40, drop120s: 45,
     troughBpm: 120, secToPreset: 50, recoveredPreset: true, secToResting: null, recoveredResting: false,
-    pctHrrAtRestEnd: 60, secToHrr50: 25, restAdequate: true, readingsCount: 40, coverageOk: true,
-    source: 'chest_strap',
+    pctHrrAtRestEnd: 60, secToHrr50: 25, hrr1Bpm: 30, restAdequate: true, readingsCount: 40, coverageOk: true,
+    plannedReps: 3, source: 'chest_strap',
     ...over,
   }
 }
@@ -189,6 +189,26 @@ describe.skipIf(!canRun)('set_hr_stats round-trip', () => {
     await repo.upsertSetHrStats(U, WS, [mkRow({ setLogId: SL1, source: null, readingsCount: 120 })])
     const rows = await repo.getSetHrStatsForSession(U, WS)
     expect(rows.find(r => r.setLogId === SL1)!.source).toBe('chest_strap')
+  })
+
+  // #2457: a stale verdict must be able to clear. Under the old COALESCE arm a fuller compute that
+  // found no measurable HRR60 kept the stored `true` forever.
+  it('hrr1_bpm and rest_adequate are written as computed, so null clears a stored verdict', async () => {
+    await repo.upsertSetHrStats(U, WS, [mkRow({ setLogId: SL2, setNumber: 2, hrr1Bpm: 22, restAdequate: true, readingsCount: 130 })])
+    let row = (await repo.getSetHrStatsForSession(U, WS)).find(r => r.setLogId === SL2)!
+    expect(row).toMatchObject({ hrr1Bpm: 22, restAdequate: true })
+
+    await repo.upsertSetHrStats(U, WS, [mkRow({ setLogId: SL2, setNumber: 2, hrr1Bpm: null, restAdequate: null, readingsCount: 130 })])
+    row = (await repo.getSetHrStatsForSession(U, WS)).find(r => r.setLogId === SL2)!
+    expect(row).toMatchObject({ hrr1Bpm: null, restAdequate: null })
+    expect(row.peakBpm).not.toBeNull() // the COALESCE columns still keep theirs
+  })
+
+  it('a sparser recompute still cannot touch hrr1_bpm or rest_adequate', async () => {
+    await repo.upsertSetHrStats(U, WS, [mkRow({ setLogId: SL2, setNumber: 2, hrr1Bpm: 18, restAdequate: true, readingsCount: 140 })])
+    await repo.upsertSetHrStats(U, WS, [mkRow({ setLogId: SL2, setNumber: 2, hrr1Bpm: null, restAdequate: null, readingsCount: 3 })])
+    const row = (await repo.getSetHrStatsForSession(U, WS)).find(r => r.setLogId === SL2)!
+    expect(row).toMatchObject({ hrr1Bpm: 18, restAdequate: true })
   })
 })
 

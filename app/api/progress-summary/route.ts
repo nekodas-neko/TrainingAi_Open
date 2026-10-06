@@ -54,7 +54,7 @@ export async function GET() {
   // last night. Naps drop out of the weekly total too — the card says "sleep", and a nights-only
   // total is the number that lines up with the nightly figure above it.
   const nights = nightSessions(sleepSessions, tz);
-  const lastNightHours = canonicalLatestNight(nights)?.durationHours ?? null;
+  const lastNightHours = canonicalLatestNight(nights, tz)?.durationHours ?? null;
   const thisWeekHours = nights
     .filter(ss => ss.date >= weekStartStr)
     .reduce((sum, ss) => sum + (ss.durationHours ?? 0), 0);

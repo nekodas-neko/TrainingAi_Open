@@ -7706,6 +7706,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getSetHrStatsForExercise(userId: string, opts: { exerciseId?: string | null; exerciseName?: string; since: Date }) { return oura.getSetHrStatsForExercise(this.db, userId, opts) }
   async getSetHrStatsSince(userId: string, since: Date, limit?: number) { return oura.getSetHrStatsSince(this.db, userId, since, limit) }
   async listSessionsMissingSetHrStats(userId: string, since: Date, limit: number) { return oura.listSessionsMissingSetHrStats(this.db, userId, since, limit) }
+  async listSetHrStatsForHrr1Backfill(userId: string) { return oura.listSetHrStatsForHrr1Backfill(this.db, userId) }
+  async writeSetHrr1(userId: string, updates: readonly { setLogId: string; hrr1Bpm: number | null; restAdequate: boolean | null }[]) { return oura.writeSetHrr1(this.db, userId, updates) }
   async getOuraWorkouts(userId: string, opts: { unreviewed?: boolean; from?: string; to?: string; timezone?: string }) { return oura.getOuraWorkouts(this.db, userId, opts) }
   async markOuraWorkoutReviewed(userId: string, id: string) { return oura.markOuraWorkoutReviewed(this.db, userId, id) }
   async getSetTimestampsForSession(userId: string, workoutSessionId: string) { return oura.getSetTimestampsForSession(this.db, userId, workoutSessionId) }
