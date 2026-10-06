@@ -558,6 +558,20 @@ export interface StrapStatusWrite {
   worn: boolean | null
 }
 
+/** #2469. `OuraRingService.status()`'s link counters, cumulative since `serviceStartedAt` (they
+ *  reset with the service). The one device-supplied instant is `serviceStartedAt`, computed on the
+ *  device as now − uptime; it identifies the service instance so a reader can see a reset. */
+export interface OuraLinkStatsWrite {
+  serviceStartedAt: Date
+  serviceUptimeMs: number
+  state: string
+  connectCount: number
+  dropCount: number
+  totalConnectedMs: number
+  lastTimeToConnectMs: number | null
+  consecutiveFailures: number | null
+}
+
 export interface StrapStatusRow extends StrapStatusWrite {
   id: number
   recordedAt: Date
@@ -1109,6 +1123,9 @@ export interface WorkoutRepository {
    *  captured only while the app holds the BLE link. measured_at is server-stamped. */
   insertOuraBatteryPoll(userId: string, percent: number, charging: boolean | null): Promise<void>
   getOuraBatteryPolls(userId: string, from: Date, to: Date): Promise<Array<{ tsMs: number; percent: number; charging: boolean | null }>>
+  /** #2469. One row of the ring link's connect/drop/connected-time counters. `recorded_at` is
+   *  server-stamped. Read through `claude_ro.oura_ble_link_stats`; nothing in the app reads it. */
+  insertOuraLinkStats(userId: string, stats: OuraLinkStatsWrite): Promise<void>
   /** TN-54. One row per chest-strap connection attempt or state change (migration 278). The
    *  service knew all of this already and kept it in memory, so a strap that died was
    *  indistinguishable from one that was not worn. `recordedAt` is server-stamped. */
