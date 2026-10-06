@@ -14,6 +14,18 @@ notifications.
 that shipped without a device run, each with the screen, the action, and what a pass looks like.
 This file is the generic pass; that one is what a given device session should actually work through.
 
+## 0. Which app
+
+- **Unreleased code runs in TrainingAi Dev** (amber icon, `com.trainingai.app.dev`), never the real
+  app: `pnpm dev`, then `adb reverse tcp:3000 tcp:<port>`, then sign in as the seeded test user.
+  Setup and limits: [`canonical-runtime-android.md`](canonical-runtime-android.md#trainingai-dev--unreleased-code-on-the-phone-2367).
+- **Phone Chrome over the same `adb reverse` is the fallback.** It gets width and fonts right but has
+  no local store, no Capacitor plugins and no edge-to-edge insets, so §1–§3 there prove little.
+- **§7 and any Health Connect check need the real app, after release** — the Dev app has no
+  Bluetooth or Health Connect access by design.
+- **In the Dev app, airplane mode is not offline** (`adb reverse` rides the USB cable): for §2 and
+  §2b stop `pnpm dev` or run `adb reverse --remove tcp:3000` instead.
+
 ## 1. Safe-area
 
 - Open every new/changed screen. Confirm content clears the status bar at the top
@@ -84,6 +96,8 @@ This file is the generic pass; that one is what a given device session should ac
   with the correct title/body.
 
 ## 7. Oura direct-BLE (only if the BLE pipeline changed; APK rebuild first if Kotlin changed)
+
+Real app only, after release: TrainingAi Dev cannot reach the ring.
 
 - Open the app → the "TrainingAI · Oura Ring" foreground notification appears without
   touching `/admin/oura-ble` (auto-start), and lands on "Connected · auth OK" (ring must

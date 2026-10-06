@@ -390,8 +390,12 @@ and the checks start.
 - An APK that "won't install over the existing one" means it was signed with the wrong key. **Stop
   there** and tell the Orchestrator — do not uninstall to get past it.
 - **Never point the real app at a local server.** Its unsynced data would be pushed to the laptop's
-  database and lost. Testing unreleased code on the phone uses the separate *TrainingAi Dev* app,
-  once it exists.
+  database and lost. Testing unreleased code on the phone uses the separate *TrainingAi Dev* app.
+- **TrainingAi Dev** is the one with the amber icon. It sits beside the real app and can never
+  replace it, shows the laptop's test data rather than yours, and never talks to the ring, the
+  scale or the strap. The Implementer installs it once, with your OK; **uninstalling it is
+  harmless**, unlike the real app. Details:
+  [`canonical-runtime-android.md`](canonical-runtime-android.md#trainingai-dev--unreleased-code-on-the-phone-2367).
 
 ### A secret has leaked
 

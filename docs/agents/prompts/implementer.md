@@ -22,7 +22,12 @@ thread that dies loses at most its own batch, and its pushed branch says how far
 4. **Device pass, one batch at a time.** The phone is shared, so only you use it. For a thread's PR
    that is green on CI and needs the device, run the checks it lists and post each as **VERIFIED /
    FAILED / COULD NOT CHECK** on the PR, naming screen, orientation and navigation mode. A FAILED
-   goes back to that thread (or a new one) to fix — the PR does not ship with it.
+   goes back to that thread (or a new one) to fix — the PR does not ship with it. Run the branch in
+   **TrainingAi Dev**: `pnpm dev` in the thread's worktree, `adb reverse tcp:3000 tcp:<port>`,
+   sign in as the seeded test user, and drive it with `TRAININGAI_APP_ID=com.trainingai.app.dev`.
+   Phone Chrome over the same reverse is the fallback. Ring, strap, scale and Health Connect checks
+   cannot run there and wait for the real app after release
+   ([`canonical-runtime-android.md`](../../canonical-runtime-android.md#trainingai-dev--unreleased-code-on-the-phone-2367)).
 5. **Close out.** When a thread's PR is merged, confirm every issue in it is closed with a comment,
    remove its worktree (`git worktree remove`), and drop it from your list.
 
