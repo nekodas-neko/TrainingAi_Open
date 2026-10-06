@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import type { ExerciseHistoryEntry, ExerciseHistoryResponse } from "@/app/api/exercise-history/route";
 import { displayOneRmSeries, oneRmLabel, oneRmUnit } from "@trainingai/shared/1rm";
 import type { MuscleAssignment } from "@trainingai/shared/types/program";
+import { MUSCLE_ROLE_LABEL } from "@trainingai/shared/workout/role-labels";
 import { MuscleHeatmap } from "@/components/muscle-heatmap";
 import { ExerciseHrTrendCard } from "@/components/workout/exercise-hr-trend-card";
 import { cachedFetch } from "@/lib/sqlite/cache";
@@ -243,7 +244,7 @@ export function ExerciseHistorySheet({ exerciseName, muscles = [], userId, onClo
           {/* ── Muscle Map ── */}
           {muscleActivations.length > 0 && (
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Primary Muscles</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2">Muscles</p>
               <div className="rounded-xl bg-muted/40 border border-border p-3 flex items-center gap-4">
                 <MuscleHeatmap assignments={muscleActivations} className="w-16 flex-none" />
                 <div>
@@ -264,9 +265,19 @@ export function ExerciseHistorySheet({ exerciseName, muscles = [], userId, onClo
                       </span>
                     ))}
                   </div>
-                  {mainMuscles.length > 0 && (
-                    <p className="text-[10px] text-muted-foreground mt-2">
-                      Compound · {mainMuscles[0]?.muscle} pattern
+                  {/* A key for the two chip styles, in the shared muscle-role words (#2240). This line
+                      used to call every exercise with a target muscle a compound "pattern" of its first one
+                      — a role word now retired, and wrong for an isolation lift. */}
+                  {mainMuscles.length > 0 && secondaryMuscles.length > 0 && (
+                    <p className="flex items-center gap-3 text-[10px] text-muted-foreground mt-2">
+                      <span className="flex items-center gap-1">
+                        <span aria-hidden="true" className="inline-block w-2 h-2 rounded-sm" style={{ background: "var(--color-brand)" }} />
+                        {MUSCLE_ROLE_LABEL.main}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <span aria-hidden="true" className="inline-block w-2 h-2 rounded-sm border border-border bg-muted" />
+                        {MUSCLE_ROLE_LABEL.secondary}
+                      </span>
                     </p>
                   )}
                 </div>

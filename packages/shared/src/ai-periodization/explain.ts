@@ -1,4 +1,5 @@
 import { isBodyweightType } from '@trainingai/shared/1rm'
+import { knownExerciseRoleLabel } from '@trainingai/shared/workout/role-labels'
 // Plain-English rationale for why an exercise got its prescribed sets/reps/load.
 // The exact numbers come from the AI within the goal's phase zone; these are the factors
 // that shaped them — surfaced so a prescription isn't a black box.
@@ -26,10 +27,15 @@ export function explainExerciseChoice(i: ExerciseChoiceInput): string[] {
   const phaseLabel = i.phase.charAt(0).toUpperCase() + i.phase.slice(1)
   out.push(`${phaseLabel} phase — ${PHASE_INTENT[i.phase] ?? 'progressing load'} (sets the rep/intensity range)`)
 
+  // Named with the shared role words (#2240) — this used to call both primary and secondary a
+  // compound lift, a word retired for roles because an accessory can be a compound too.
+  const roleWord = knownExerciseRoleLabel(i.role)
   out.push(
     i.role === 'accessory'
       ? 'Accessory — supporting volume, fewer sets'
-      : 'Compound lift — prioritised for sets and load',
+      : roleWord
+        ? `${roleWord} lift — prioritised for sets and load`
+        : 'Prioritised for sets and load',
   )
 
   // A bodyweight "1RM change in kg" is a change in an internal index, not in weight lifted, so the

@@ -6,6 +6,8 @@
 // the goal/role-configured RANGE the AI can move within. Kept separate on purpose: this one needs
 // no program context (just a %), so it can annotate any exercise row that shows a %.
 
+import { knownExerciseRoleLabel } from '@trainingai/shared/workout/role-labels'
+
 export interface IntensityZone {
   label: string
   // Inclusive-exclusive %1RM band this zone spans, for the "measured against" line.
@@ -26,22 +28,14 @@ export function intensityZoneForPct(pct: number): IntensityZone {
   return ZONES.find(z => pct >= z.min)!.zone
 }
 
-// Engine role → human category shown on the workout pills.
+// Engine role → human category shown on the workout pills. The words are the shared ones (#2240),
+// so a pill reads exactly what the program editor and builder review call the same role.
 export function roleLabel(role: string | undefined | null): string | null {
-  switch (role) {
-    case 'primary':
-      return 'Main'
-    case 'secondary':
-      return 'Secondary'
-    case 'accessory':
-      return 'Accessory'
-    default:
-      return null
-  }
+  return knownExerciseRoleLabel(role)
 }
 
 // Distinct colour per role so the category reads at a glance without parsing the label:
-// Main = emerald (the heavy anchor), Secondary = sky, Accessory = violet. These are the deeper
+// Primary = emerald (the heavy anchor), Secondary = sky, Accessory = violet. These are the deeper
 // (-600) shades so the chip can be a SOLID fill with white text at readable contrast.
 export function roleColor(role: string | undefined | null): string | null {
   switch (role) {

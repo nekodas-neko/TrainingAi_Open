@@ -11,6 +11,7 @@ import { invalidateExerciseLibrary } from '@/lib/cache-groups'
 import { TTL_LONG } from '@trainingai/shared/cache-ttl'
 import type { ExerciseLibraryEntry, MuscleAssignment, ExerciseType } from '@trainingai/shared/types/program'
 import { fuzzyScore } from '@trainingai/shared/exercise-utils'
+import { MUSCLE_ROLE_LABEL } from '@trainingai/shared/workout/role-labels'
 
 export { fuzzyScore }
 
@@ -329,7 +330,7 @@ export function AddExerciseSheet({ open, onOpenChange, initialName = '', onAdded
                           onClick={() => toggleMuscle(m, 'main')}
                           className={`px-2 py-1 transition-colors ${assignment?.role === 'main' ? 'bg-brand text-brand-foreground font-semibold' : 'text-muted-foreground hover:text-foreground'}`}
                           style={assignment?.role === 'main' ? { background: 'var(--color-brand)' } : undefined}
-                          title="Primary"
+                          title={MUSCLE_ROLE_LABEL.main}
                         >
                           {m}
                         </button>
@@ -337,7 +338,8 @@ export function AddExerciseSheet({ open, onOpenChange, initialName = '', onAdded
                           type="button"
                           onClick={() => toggleMuscle(m, 'secondary')}
                           className={`px-1.5 py-1 border-l border-border transition-colors ${assignment?.role === 'secondary' ? 'bg-amber-500/20 text-amber-400' : 'text-muted-foreground hover:text-foreground'}`}
-                          title="Secondary"
+                          title={MUSCLE_ROLE_LABEL.secondary}
+                          aria-label={`${m}: ${MUSCLE_ROLE_LABEL.secondary}`}
                         >
                           2°
                         </button>
@@ -345,7 +347,7 @@ export function AddExerciseSheet({ open, onOpenChange, initialName = '', onAdded
                     )
                   })}
                 </div>
-                <p className="text-[10px] text-muted-foreground mt-1">Tap name = primary · 2° = secondary · tap again to remove</p>
+                <p className="text-[10px] text-muted-foreground mt-1">Tap name = {MUSCLE_ROLE_LABEL.main} · 2° = {MUSCLE_ROLE_LABEL.secondary} · tap again to remove</p>
               </div>
 
               <Button className="w-full" onClick={handleSave} disabled={saving || !reviewName.trim()}>
