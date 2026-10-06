@@ -6,8 +6,6 @@ import Link from "next/link";
 import { cn } from "@trainingai/shared/utils";
 import { useWorkoutStore, isWorkoutActive } from "@/lib/stores/workout-store";
 import { LeaveWorkoutDialog } from "@/components/workout/leave-workout-dialog";
-import { useGuidedWalkStore, isGuidedWalkActive, walkElapsedSec, MIN_WALK_SEC } from "@/lib/stores/guided-walk-store";
-import { LeaveWalkDialog } from "@/components/guided-walk/leave-walk-dialog";
 import { useActivityStore, isActivityActive } from "@/lib/stores/activity-store";
 import { LeaveActivityDialog } from "@/components/activity/leave-activity-dialog";
 import { cachedFetch } from "@/lib/sqlite/cache";
@@ -28,15 +26,9 @@ export function BottomNav({
   const workoutStartMs = useWorkoutStore(s => s.workoutStartMs);
   const workoutEndMs = useWorkoutStore(s => s.workoutEndMs);
   const resetSession = useWorkoutStore(s => s.resetSession);
-  const walkMode = useGuidedWalkStore(s => s.mode);
-  const resetWalk = useGuidedWalkStore(s => s.reset);
-  const requestWalkFinish = useGuidedWalkStore(s => s.requestFinish);
   const activityMode = useActivityStore(s => s.mode);
   const resetActivity = useActivityStore(s => s.resetSession);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
-  // The elapsed seconds are SNAPSHOT at the tap, not recomputed per render: the dialog quotes them
-  // back and decides whether a save is offered at all, and both must be one reading.
-  const [pendingWalk, setPendingWalk] = useState<{ href: string; elapsedSec: number } | null>(null);
   const [pendingActivityHref, setPendingActivityHref] = useState<string | null>(null);
   const [adminBadge, setAdminBadge] = useState(0);
   // K3: a dead-lettered outbox write drives a persistent dot on the More tab (the
@@ -57,15 +49,7 @@ export function BottomNav({
   }, [isAdmin]);
 
   const workoutActive = isWorkoutActive({ workoutStartMs, workoutEndMs, mode });
-  const walkActive = isGuidedWalkActive({ mode: walkMode });
   const activityActive = isActivityActive({ mode: activityMode });
-
-  const leaveWalkDiscarding = () => {
-    const href = pendingWalk!.href;
-    setPendingWalk(null);
-    resetWalk();
-    navigateWithTransition(router, pathname, href);
-  };
 
   const handleNavClick = (key: TabKey, href: string, e: React.MouseEvent) => {
     hapticLight();
@@ -73,13 +57,6 @@ export function BottomNav({
       e.preventDefault();
       if (!href.startsWith("/workout")) setPendingHref(href);
       // else: already mid-workout — swallow the FAB tap instead of remounting the picker.
-      return;
-    }
-    if (walkActive && pathname.startsWith("/activity/guided-walk")) {
-      e.preventDefault();
-      if (!href.startsWith("/activity/guided-walk")) {
-        setPendingWalk({ href, elapsedSec: walkElapsedSec(useGuidedWalkStore.getState().startedAtMs) });
-      }
       return;
     }
     if (activityActive && pathname === "/activity") {
@@ -167,34 +144,6 @@ export function BottomNav({
           navigateWithTransition(router, pathname, href);
         }}
       />
-
-      {/* LB-141: this used to call reset() with no prompt, so tapping another tab threw away a
-          39-minute walk. The owner chose a prompt over a silent save. Two elements rather than one
-          with spread props, so `outcome=` stays literal at this call site — BF-191's guard reads the
-          source, and a caller that cannot be seen to name its outcome is the regression it catches. */}
-      {pendingWalk && pendingWalk.elapsedSec >= MIN_WALK_SEC ? (
-        <LeaveWalkDialog
-          open
-          outcome="choose"
-          elapsedSec={pendingWalk.elapsedSec}
-          // Deliberately does NOT navigate to the tapped tab. The walk is written by WalkSummary's
-          // mount, so leaving the screen here would save nothing — the summary is both the write and
-          // the confirmation that it happened.
-          onSave={() => { setPendingWalk(null); requestWalkFinish(); }}
-          onStay={() => setPendingWalk(null)}
-          onLeave={leaveWalkDiscarding}
-        />
-      ) : (
-        /* Under the floor this stays the plain discard confirm the End button shows, rather than
-           offering to save a walk too short to record (BF-191). */
-        <LeaveWalkDialog
-          open={!!pendingWalk}
-          outcome="discard"
-          elapsedSec={pendingWalk?.elapsedSec}
-          onStay={() => setPendingWalk(null)}
-          onLeave={leaveWalkDiscarding}
-        />
-      )}
 
       <LeaveActivityDialog
         open={!!pendingActivityHref}

@@ -58,7 +58,7 @@ describe('BF-190 — the elapsed time reaches the summary', () => {
   })
 })
 
-const EXIT_PATHS = ['components/mobile-auth-handler.tsx', 'components/shell/bottom-nav.tsx']
+const EXIT_PATHS = ['components/mobile-auth-handler.tsx']
 
 describe('BF-191 — a sub-minute walk is offered as a discard, in ONE dialog', () => {
   const ACTIVE = 'components/guided-walk/walk-active.tsx'
@@ -89,8 +89,9 @@ describe('BF-191 — a sub-minute walk is offered as a discard, in ONE dialog', 
       .split('\n').filter(Boolean)
       .filter(f => f.endsWith('.tsx') && !f.includes('__tests__'))
       .filter(f => f !== DIALOG && src(f).includes('<LeaveWalkDialog'))
-    // Three today: the End-walk button, the back gesture, the tab bar.
-    expect(callers.length).toBeGreaterThanOrEqual(3)
+    // Two today: the End-walk button and the back gesture. The tab bar was the third until #2134 —
+    // the walk route renders no tab bar, so its dialog could never open.
+    expect(callers.length).toBeGreaterThanOrEqual(2)
     for (const f of callers) {
       const tag = src(f).slice(src(f).indexOf('<LeaveWalkDialog'))
       expect(tag.slice(0, tag.indexOf('/>')), `${f} must name its outcome`).toMatch(/outcome=/)
