@@ -14,7 +14,13 @@ export type NumbersSource =
   /** A cached payload stamped with an earlier day — offline, or a seed painted before its fetch lands. */
   | { kind: "cached"; date: string }
   /** The on-device program mirror: the program's own per-set style, with no prescription applied. */
-  | { kind: "base" };
+  | { kind: "base" }
+  /**
+   * Today's payload, but its prescription is a rules plan (#2110): the model could not be reached,
+   * so the numbers are the program's own sets fitted to today's time budget. Unlabelled, they sat
+   * under "Recommended workout" looking exactly like a coached plan.
+   */
+  | { kind: "rules" };
 
 /**
  * The one place the label's wording lives. `null` means say nothing — which is the right answer
@@ -24,14 +30,23 @@ export type NumbersSource =
  */
 export function numbersSourceLabel(source: NumbersSource | null | undefined): string | null {
   if (!source) return null;
-  return source.kind === "base" ? "Base program" : `From ${formatDayShort(source.date)}`;
+  switch (source.kind) {
+    case "base": return "Base program";
+    case "rules": return "From your program";
+    case "cached": return `From ${formatDayShort(source.date)}`;
+  }
 }
 
-/** A cached/seeded payload's source, or `null` when it is today's and needs no label. */
-export function cachedNumbersSource(
-  data: { dataDate?: string } | null | undefined,
+/**
+ * A payload's source, or `null` when it is today's coached plan and needs no label.
+ *
+ * An earlier day wins over a rules plan: "these are not today's numbers" is the fact that can
+ * mislead more, and a stale payload's rules plan may already have been replaced by a model one.
+ */
+export function payloadNumbersSource(
+  data: { dataDate?: string; prescriptionSource?: string } | null | undefined,
   isToday: boolean,
 ): NumbersSource | null {
-  if (isToday || !data?.dataDate) return null;
-  return { kind: "cached", date: data.dataDate };
+  if (!isToday) return data?.dataDate ? { kind: "cached", date: data.dataDate } : null;
+  return data?.prescriptionSource === "rules" ? { kind: "rules" } : null;
 }
