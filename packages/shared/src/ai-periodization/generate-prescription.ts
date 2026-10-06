@@ -27,7 +27,7 @@ import { capLoadToAnchor } from '@trainingai/shared/ai-periodization/role-plausi
 import { resolveMeasuredRestSec } from '@trainingai/shared/workout/time-profile'
 import { budgetForPreset, requestedBudgetMin, fitBudgetMin, type DurationPreset } from '@trainingai/shared/workout/duration-model'
 import { applyAutoregulation, clampPrescribedPct } from '@trainingai/shared/ai-periodization/autoregulation'
-import { shouldTriggerEmergencyDeload } from '@trainingai/shared/ai-periodization/emergency-deload'
+import { shouldTriggerEmergencyDeload, emergencyDeloadTrigger } from '@trainingai/shared/ai-periodization/emergency-deload'
 import { computePerExerciseDeload } from '@trainingai/shared/ai-periodization/per-exercise-deload'
 import { buildTransitionRationale } from '@trainingai/shared/ai-periodization/transition-rationale'
 import { DELOAD_LOWER_PCT, DELOAD_REPS, DELOAD_SETS, DELOAD_REST } from '@trainingai/shared/ai-periodization/deload-constants'
@@ -72,6 +72,9 @@ const prescriptionDedup = createDedupCache<GeneratePrescriptionResult>(JUST_GENE
 export function buildWholeSessionDeloadPrescription(
   signals: PrescriptionSignals,
   reasoning: string,
+  // #2405: what fired the deload, stamped on every row so the sheet can say it. Absent, the row
+  // carries no note rather than an invented one.
+  deloadNote?: string,
 ): AiPrescription {
   const goal = signals.trainingGoal
   // BF-198: what `Full` reverts to. The per-exercise deload records the numbers it replaced as
@@ -115,6 +118,7 @@ export function buildWholeSessionDeloadPrescription(
     // server's shouldCountTowardPr gate — treated these sets as genuine max-effort work.
     // Stamping it here gives every consumer one consistent signal instead of two (Q-115).
     deloaded: true,
+    ...(deloadNote ? { deloadNote } : {}),
     preDeload: fullById.get(ex.sessionExerciseId),
   }))
 
@@ -419,9 +423,12 @@ async function runPrescriptionGeneration(
   const isEmergencyDeload = shouldTriggerEmergencyDeload(signals, state)
 
   if (isEmergencyDeload) {
+    // #2405: said what it was. The reasoning used to read "overtraining signals" for a sick check-in.
+    const trigger = emergencyDeloadTrigger(signals)
     const prescription = buildWholeSessionDeloadPrescription(
       signals,
-      'Emergency deload triggered due to overtraining signals.',
+      trigger ? `Emergency deload: ${trigger.reason}.` : 'Emergency deload triggered.',
+      trigger?.note,
     )
     // Offered, not imposed: only stores the prescription. Persisted phase state and
     // sessions_in_phase stay untouched until the user accepts it (respond route).
@@ -455,6 +462,7 @@ async function runPrescriptionGeneration(
     const prescription = buildWholeSessionDeloadPrescription(
       signals,
       `Most of this session's muscles are still sore (${muscles}) — a lighter full-session deload will serve recovery better than training through it.`,
+      `Deload — most of this session's muscles are still sore (${muscles})`,
     )
     // Soreness is a per-day signal — expire tomorrow so a clean check-in
     // gets a fresh decision (the emergency offer keeps its 7-day window).
