@@ -1,0 +1,309 @@
+<title>Readiness Hub</title>
+<style>
+/* Layout: one column of decision sections; each holds side-by-side 384 px phone panes that scroll inside their own row. */
+:root{
+  color-scheme: dark;
+  --page-bg:#0c1110; --page-panel:#131a18; --page-line:#22302c;
+  --page-fg:#e8efec; --page-dim:#93a49e; --page-accent:#00e07a; --page-warn:#ff8f6b;
+  --background: oklch(0.145 0.020 149);
+  --card: oklch(0.185 0.028 149);
+  --muted: oklch(0.225 0.034 149);
+  --foreground: oklch(0.985 0 0);
+  --muted-foreground: oklch(0.75 0 0);
+  --border: oklch(1 0 0 / 7%);
+  --brand: oklch(0.723 0.219 149.579);
+  --brand-card-bg: rgba(0,255,135,.07);
+  --accent-green: oklch(0.84 0.22 145);
+  --accent-amber: oklch(0.79 0.18 85);
+  --accent-cyan: oklch(0.84 0.15 210);
+  --destructive: oklch(0.704 0.191 22.216);
+  /* identity colours from components/oura-score-chip-row.tsx; Body is new and takes accent-cyan */
+  --c-ready:#60a5fa; --c-heart:#f87171; --c-sleep:#a78bfa; --c-act:#f97316; --c-body: var(--accent-cyan);
+  --font-page:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,monospace;
+  --font-app:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--page-bg);color:var(--page-fg);font-family:var(--font-page);line-height:1.55;padding-block:28px;padding-inline:16px}
+.wrap{max-width:1240px;margin:0 auto}
+h1{font-size:26px;line-height:1.2;margin:0 0 6px;font-weight:700;text-wrap:balance}
+.sub{color:var(--page-dim);margin:0 0 6px;max-width:66ch}
+.meta{font-family:var(--font-mono);font-size:11px;color:var(--page-dim);text-transform:uppercase;letter-spacing:.09em;margin:0 0 22px}
+section{border-top:1px solid var(--page-line);padding-block:24px 8px}
+h2{font-size:18px;margin:0 0 8px;font-weight:600;text-wrap:balance}
+.ask{margin:0 0 16px;max-width:66ch;color:var(--page-fg)}
+.pair{display:flex;gap:18px;overflow-x:auto;padding-bottom:12px}
+.pane{flex:0 0 auto;display:flex;flex-direction:column;gap:8px}
+.cap{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.chip{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:999px;font-weight:600}
+.chip.now{background:rgba(255,143,107,.14);color:var(--page-warn);border:1px solid rgba(255,143,107,.3)}
+.chip.rec{background:rgba(0,224,122,.13);color:var(--page-accent);border:1px solid rgba(0,224,122,.32)}
+.chip.alt{background:rgba(255,255,255,.07);color:var(--page-fg);border:1px solid var(--page-line)}
+.cap .w{font-family:var(--font-mono);font-size:10px;color:var(--page-dim)}
+.phone{width:384px;background:var(--background);border:1px solid var(--page-line);border-radius:22px;overflow:hidden;font-family:var(--font-app);color:var(--foreground);padding:0 0 14px}
+.why{max-width:384px;font-size:13px;color:var(--page-dim);margin:0}
+.why b{color:var(--page-fg);font-weight:600}
+
+/* status bar + screen header */
+.sb{display:flex;align-items:center;justify-content:space-between;padding:10px 22px 6px;font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums}
+.sb .r{display:flex;gap:6px;align-items:center;color:var(--muted-foreground);font-size:11px}
+.sb .bat{width:20px;height:10px;border:1.5px solid var(--muted-foreground);border-radius:3px;position:relative}
+.sb .bat i{position:absolute;left:1px;top:1px;bottom:1px;width:70%;background:var(--muted-foreground);border-radius:1px}
+.scr{padding:6px 12px 0}
+.hello{display:flex;align-items:baseline;justify-content:space-between;margin:2px 4px 12px}
+.hello h3{margin:0;font-size:20px;font-weight:700}
+.hello span{font-size:12px;color:var(--muted-foreground)}
+
+/* "Today": the oura-score-chip-row circle cells (default style), shrunk to fit four across */
+.chiprow{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:12px}
+.cell{display:flex;flex-direction:column;align-items:center;gap:4px}
+.ring{position:relative;width:80px;height:80px}
+.ring svg{position:absolute;inset:0}
+.ring .in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring .ic{font-size:13px;line-height:1;margin-bottom:2px}
+.ring .v{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1}
+.cell .l{font-size:10.5px;color:var(--muted-foreground)}
+.bb{border-radius:12px;border:1px solid var(--border);background:var(--brand-card-bg);padding:10px 12px;margin-bottom:12px}
+.bb .top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.bb .lab{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-foreground)}
+.bb .st{font-size:14px;font-weight:600;color:var(--accent-green)}
+.bb .tr{font-size:10px;font-weight:600;color:#ef4444}
+.bb .n{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--accent-green)}
+.bb .sp{flex:1}
+.bb .chev{color:var(--muted-foreground);font-size:12px}
+.bb p{margin:0 0 8px;font-size:10px;line-height:1.35;color:var(--muted-foreground)}
+.track{height:8px;border-radius:999px;background:color-mix(in oklch,var(--muted) 60%,transparent);display:flex;justify-content:flex-end;overflow:hidden}
+.track i{display:block;height:100%;border-radius:999px;background:var(--accent-green)}
+.ghost{border-radius:12px;border:1px dashed var(--border);padding:12px;font-size:11.5px;color:var(--muted-foreground);text-align:center}
+
+/* Proposed hub card */
+.hub{border-radius:16px;border:1px solid var(--border);background:var(--card);padding:14px}
+.hh{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.hh .t{font-size:16px;font-weight:700}
+.band{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:999px;background:color-mix(in oklch,var(--accent-green) 15%,transparent);color:var(--accent-green)}
+.hh .when{margin-left:auto;font-size:11px;color:var(--muted-foreground)}
+.gauge{position:relative;width:180px;height:180px;margin:4px auto 0}
+.gauge svg{position:absolute;inset:0}
+.gauge .in{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.gauge .big{font-size:46px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.gauge .k{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-foreground)}
+.gauge .s{font-size:11.5px;color:var(--muted-foreground);font-variant-numeric:tabular-nums}
+.capline{margin:8px 0 2px;text-align:center;font-size:13px;font-variant-numeric:tabular-nums;color:var(--muted-foreground)}
+.capline b{color:var(--foreground);font-weight:600}
+.legend{display:flex;justify-content:center;gap:14px;font-size:10.5px;color:var(--muted-foreground);margin:2px 0 4px}
+.legend span{display:flex;align-items:center;gap:5px}
+.legend i{display:inline-block;width:12px;height:6px;border-radius:3px}
+.spark{margin:8px 2px 2px}
+.spark .ax{display:flex;justify-content:space-between;font-size:9.5px;color:var(--muted-foreground);font-variant-numeric:tabular-nums;margin-top:2px}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.tile{position:relative;border-radius:12px;border:1px solid var(--border);background:color-mix(in oklch,var(--muted) 60%,transparent);padding:10px 22px 10px 10px;min-height:96px}
+.tile .nm{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600}
+.tile .dot{width:8px;height:8px;border-radius:50%;flex:none}
+.tile .sc{display:flex;align-items:baseline;gap:6px;margin-top:4px}
+.tile .sc b{font-size:24px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.tile .sc small{font-size:10.5px;color:var(--muted-foreground);font-variant-numeric:tabular-nums}
+.tile .bar{height:3px;border-radius:999px;background:oklch(1 0 0 / 8%);margin:6px 0 6px;overflow:hidden}
+.tile .bar i{display:block;height:100%;border-radius:999px}
+.tile .y{font-size:11px;line-height:1.3;color:var(--muted-foreground)}
+.tile .cv{position:absolute;right:8px;top:50%;transform:translateY(-50%);color:var(--muted-foreground);font-size:16px}
+.sum{margin-top:10px;padding-top:10px;border-top:1px solid color-mix(in oklch,var(--border) 60%,transparent);font-size:11px;color:var(--muted-foreground);font-variant-numeric:tabular-nums;line-height:1.5}
+.sum b{color:var(--foreground)}
+.below{margin-top:12px}
+
+/* notes */
+.verdict{margin-top:6px;padding:14px 16px;background:var(--page-panel);border:1px solid var(--page-line);border-left:3px solid var(--page-accent);border-radius:0 8px 8px 0;max-width:72ch}
+.verdict p{margin:0}
+.verdict p+p{margin-top:8px}
+.pillars{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;max-width:1000px}
+.pl{background:var(--page-panel);border:1px solid var(--page-line);border-radius:8px;padding:12px 14px}
+.pl h3{margin:0 0 6px;font-size:14px;display:flex;align-items:center;gap:8px}
+.pl h3 i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.pl ul{margin:0;padding-left:18px;font-size:13px;color:var(--page-dim)}
+.pl .new{font-family:var(--font-mono);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--page-accent);border:1px solid rgba(0,224,122,.32);border-radius:999px;padding:1px 6px}
+table.math{border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums;margin:4px 0 12px}
+table.math td,table.math th{padding:4px 14px 4px 0;text-align:left;border-bottom:1px solid var(--page-line)}
+table.math th{font-family:var(--font-mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--page-dim);font-weight:600}
+table.math tr.tot td{font-weight:700;border-bottom:none}
+@media (prefers-reduced-motion:no-preference){.phone{transition:border-color .2s}.phone:hover{border-color:var(--page-dim)}}
+</style>
+
+<div class="wrap">
+  <h1>Readiness as the master pillar</h1>
+  <p class="sub">Readiness becomes one hub built from four pillars: <b>Sleep, Heart, Activity, Body</b>. It also absorbs Body Battery. The ring's morning mark is today's readiness, and the filled arc is the energy you have left, which drains and recharges through the day. Each pillar tile shows its score, its share of the blend and one line saying why.</p>
+  <p class="meta">Issue #2356 · owner decisions 2026-10-06 · drawn at 384 px, dark · 2026-10-06</p>
+
+  <section>
+    <h2>The same Tuesday in every pane</h2>
+    <p class="ask">Pillar scores this morning: <b>Sleep 82, Heart 70, Activity 65, Body 74</b>. With example weights 30 / 30 / 20 / 20 they blend to <b>73.4, shown as 73</b>. A gym session at 9 am and a busy afternoon have drawn Body Battery down to <b>52</b> by 3 pm.</p>
+    <div class="pair">
+
+      <!-- ───────── 1. Today ───────── -->
+      <div class="pane">
+        <div class="cap"><span class="chip now">Today</span><span class="w">score row + separate Body Battery card</span></div>
+        <div class="phone">
+          <div class="sb"><span>15:00</span><span class="r">5G <span class="bat"><i></i></span></span></div>
+          <div class="scr">
+            <div class="hello"><h3>Home</h3><span>Tue 6 Oct</span></div>
+            <div class="chiprow">
+              <div class="cell"><div class="ring">
+                <svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="35" fill="none" stroke="#60a5fa" stroke-opacity=".22" stroke-width="4"/></svg>
+                <div class="in"><span class="ic" style="color:var(--c-ready)">⚡</span><span class="v">73</span></div></div><span class="l">Readiness</span></div>
+              <div class="cell"><div class="ring">
+                <svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="35" fill="none" stroke="#f87171" stroke-opacity=".22" stroke-width="4"/></svg>
+                <div class="in"><span class="ic" style="color:var(--c-heart)">♥</span><span class="v">54</span></div></div><span class="l">Resting HR</span></div>
+              <div class="cell"><div class="ring">
+                <svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="35" fill="none" stroke="#a78bfa" stroke-opacity=".22" stroke-width="4"/></svg>
+                <div class="in"><span class="ic" style="color:var(--c-sleep)">☾</span><span class="v">82</span></div></div><span class="l">Sleep</span></div>
+              <div class="cell"><div class="ring">
+                <svg viewBox="0 0 80 80"><circle cx="40" cy="40" r="35" fill="none" stroke="#f97316" stroke-opacity=".22" stroke-width="4"/></svg>
+                <div class="in"><span class="ic" style="color:var(--c-act)">🔥</span><span class="v">65</span></div></div><span class="l">Activity</span></div>
+            </div>
+            <div class="bb">
+              <div class="top">
+                <span style="color:var(--accent-green);font-size:13px">▮▮▯</span>
+                <span class="lab">Body Battery</span><span class="st">Good</span>
+                <span class="sp"></span><span class="tr">↓ Draining</span><span class="n">52</span><span class="chev">⌄</span>
+              </div>
+              <p>Energy left right now — opens at your readiness and drains as you use it.</p>
+              <div class="track"><i style="width:52%"></i></div>
+            </div>
+            <div class="ghost">Today's session card, banners, timeline…</div>
+          </div>
+        </div>
+        <p class="why"><b>The problem.</b> Readiness and Body Battery sit as two unrelated numbers, though one opens at the other. Readiness 73 says nothing about <i>why</i>: its inputs live on four separate screens, and temperature, SpO₂, weight and fuel feed nothing at all.</p>
+      </div>
+
+      <!-- ───────── 2. Proposed — morning ───────── -->
+      <div class="pane">
+        <div class="cap"><span class="chip rec">Proposed — morning</span><span class="w">06:52 · ring full, drained 0</span></div>
+        <div class="phone">
+          <div class="sb"><span>06:52</span><span class="r">5G <span class="bat"><i></i></span></span></div>
+          <div class="scr">
+            <div class="hello"><h3>Home</h3><span>Tue 6 Oct</span></div>
+            <div class="hub">
+              <div class="hh"><span class="t" style="color:var(--c-ready)">Readiness</span><span class="band">High</span><span class="when">updated 06:41</span></div>
+              <div class="gauge">
+                <svg viewBox="0 0 180 180" aria-hidden="true">
+                  <circle cx="90" cy="90" r="70" fill="none" stroke="oklch(0.75 0 0 / .14)" stroke-width="12"/>
+                  <circle cx="90" cy="90" r="70" fill="none" stroke="oklch(0.84 0.22 145)" stroke-width="12" stroke-linecap="round" stroke-dasharray="321.07 439.82" transform="rotate(-90 90 90)"/>
+                  <!-- morning-readiness marker at 73 -->
+                  <line x1="30.47" y1="97.52" x2="10.63" y2="100.03" stroke="#60a5fa" stroke-width="3" stroke-linecap="round"/>
+                  <circle cx="10.63" cy="100.03" r="3.2" fill="#60a5fa"/>
+                </svg>
+                <div class="in"><span class="k">Ready</span><span class="big">73</span><span class="s">battery full</span></div>
+              </div>
+              <p class="capline"><b>Ready 73</b> · now 73 · drained 0</p>
+              <div class="legend"><span><i style="background:oklch(0.84 0.22 145)"></i>energy left</span><span><i style="background:#60a5fa;height:3px"></i>morning readiness</span></div>
+              <div class="tiles">
+                <div class="tile"><div class="nm"><span class="dot" style="background:var(--c-sleep)"></span>Sleep</div>
+                  <div class="sc"><b>82</b><small>30% · +24.6</small></div><div class="bar"><i style="width:82%;background:var(--c-sleep)"></i></div>
+                  <div class="y">7 h 42 m · sleep balance on track</div><span class="cv">›</span></div>
+                <div class="tile"><div class="nm"><span class="dot" style="background:var(--c-heart)"></span>Heart</div>
+                  <div class="sc"><b>70</b><small>30% · +21.0</small></div><div class="bar"><i style="width:70%;background:var(--c-heart)"></i></div>
+                  <div class="y">HRV 38 ms, below your norm of 46</div><span class="cv">›</span></div>
+                <div class="tile"><div class="nm"><span class="dot" style="background:var(--c-act)"></span>Activity</div>
+                  <div class="sc"><b>65</b><small>20% · +13.0</small></div><div class="bar"><i style="width:65%;background:var(--c-act)"></i></div>
+                  <div class="y">Load 1.34 (7:28) · heavy week</div><span class="cv">›</span></div>
+                <div class="tile"><div class="nm"><span class="dot" style="background:var(--c-body)"></span>Body</div>
+                  <div class="sc"><b>74</b><small>20% · +14.8</small></div><div class="bar"><i style="width:74%;background:var(--c-body)"></i></div>
+                  <div class="y">Temp +0.3 °C · protein short yesterday</div><span class="cv">›</span></div>
+              </div>
+              <div class="sum">24.6 + 21.0 + 13.0 + 14.8 = <b>73.4 → 73</b> · weights are a proposal</div>
+            </div>
+            <div class="ghost below">Today's session card, banners, timeline…</div>
+          </div>
+        </div>
+        <p class="why"><b>Why.</b> One number in the morning, and you can see what built it: Heart is the drag today, at 30% of the blend. The separate Body Battery card is gone; its job is now the ring's fill.</p>
+      </div>
+
+      <!-- ───────── 3. Proposed — afternoon ───────── -->
+      <div class="pane">
+        <div class="cap"><span class="chip rec">Proposed — afternoon</span><span class="w">15:00 · drained 21</span></div>
+        <div class="phone">
+          <div class="sb"><span>15:00</span><span class="r">5G <span class="bat"><i></i></span></span></div>
+          <div class="scr">
+            <div class="hello"><h3>Home</h3><span>Tue 6 Oct</span></div>
+            <div class="hub">
+              <div class="hh"><span class="t" style="color:var(--c-ready)">Readiness</span><span class="band">High</span><span class="when" style="color:#ef4444">↓ Draining</span></div>
+              <div class="gauge">
+                <svg viewBox="0 0 180 180" aria-hidden="true">
+                  <defs><pattern id="drain" width="4" height="4" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2" height="4" fill="oklch(0.84 0.22 145 / .45)"/></pattern></defs>
+                  <circle cx="90" cy="90" r="70" fill="none" stroke="oklch(0.75 0 0 / .14)" stroke-width="12"/>
+                  <!-- drained part: from 52 up to the morning mark at 73 -->
+                  <circle cx="90" cy="90" r="70" fill="none" stroke="url(#drain)" stroke-width="12" stroke-dasharray="92.36 439.82" stroke-dashoffset="-228.71" transform="rotate(-90 90 90)"/>
+                  <circle cx="90" cy="90" r="70" fill="none" stroke="oklch(0.84 0.22 145)" stroke-width="12" stroke-linecap="round" stroke-dasharray="228.71 439.82" transform="rotate(-90 90 90)"/>
+                  <line x1="30.47" y1="97.52" x2="10.63" y2="100.03" stroke="#60a5fa" stroke-width="3" stroke-linecap="round"/>
+                  <circle cx="10.63" cy="100.03" r="3.2" fill="#60a5fa"/>
+                </svg>
+                <div class="in"><span class="k">Now</span><span class="big">52</span><span class="s">of 73 this morning</span></div>
+              </div>
+              <p class="capline"><b>Ready 73</b> · now 52 · drained 21</p>
+              <div class="legend"><span><i style="background:oklch(0.84 0.22 145)"></i>energy left</span><span><i style="background:repeating-linear-gradient(45deg,oklch(0.84 0.22 145 / .6) 0 2px,transparent 2px 4px)"></i>drained</span><span><i style="background:#60a5fa;height:3px"></i>morning</span></div>
+              <div class="spark">
+                <svg viewBox="0 0 300 60" width="100%" height="56" preserveAspectRatio="none" aria-hidden="true">
+                  <defs><linearGradient id="sf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="oklch(0.84 0.22 145)" stop-opacity=".28"/><stop offset="1" stop-color="oklch(0.84 0.22 145)" stop-opacity="0"/></linearGradient></defs>
+                  <line x1="0" y1="13.1" x2="300" y2="13.1" stroke="#60a5fa" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
+                  <rect x="48.4" y="0" width="19.3" height="60" fill="oklch(1 0 0 / .05)"/>
+                  <polygon points="0,60 0,13.1 19.4,15.7 48.4,22.2 67.7,32.6 87.1,30 116.1,33.9 135.5,36.5 145.2,35.2 164.5,40.4 164.5,60" fill="url(#sf)"/>
+                  <polyline points="0,13.1 19.4,15.7 48.4,22.2 67.7,32.6 87.1,30 116.1,33.9 135.5,36.5 145.2,35.2 164.5,40.4" fill="none" stroke="oklch(0.84 0.22 145)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+                  <line x1="164.5" y1="0" x2="164.5" y2="60" stroke="oklch(0.75 0 0 / .35)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                </svg>
+                <div class="ax"><span>06:30 · 73</span><span>gym 09:00</span><span>now 15:00 · 52</span><span>22:00</span></div>
+              </div>
+              <div class="tiles">
+                <div class="tile"><div class="nm"><span class="dot" style="background:var(--c-sleep)"></span>Sleep</div>
+                  <div class="sc"><b>82</b><small>30% · +24.6</small></div><div class="bar"><i style="width:82%;background:var(--c-sleep)"></i></div>
+                  <div class="y">7 h 42 m · sleep balance on track</div><span class="cv">›</span></div>
+                <div class="tile"><div class="nm"><span class="dot" style="background:var(--c-heart)"></span>Heart</div>
+                  <div class="sc"><b>70</b><small>30% · +21.0</small></div><div class="bar"><i style="width:70%;background:var(--c-heart)"></i></div>
+                  <div class="y">HRV 38 ms, below your norm of 46</div><span class="cv">›</span></div>
+                <div class="tile"><div class="nm"><span class="dot" style="background:var(--c-act)"></span>Activity</div>
+                  <div class="sc"><b>65</b><small>20% · +13.0</small></div><div class="bar"><i style="width:65%;background:var(--c-act)"></i></div>
+                  <div class="y">Load 1.34 (7:28) · heavy week</div><span class="cv">›</span></div>
+                <div class="tile"><div class="nm"><span class="dot" style="background:var(--c-body)"></span>Body</div>
+                  <div class="sc"><b>74</b><small>20% · +14.8</small></div><div class="bar"><i style="width:74%;background:var(--c-body)"></i></div>
+                  <div class="y">Stress high since 13:00 · 1.2 L water</div><span class="cv">›</span></div>
+              </div>
+              <div class="sum">Readiness stays <b>73</b> all day; only the fill moves. Pillar scores are this morning's; Body's "why" line follows live inputs.</div>
+            </div>
+          </div>
+        </div>
+        <p class="why"><b>Why.</b> "Drained 21" reads straight off the ring: the hatched arc is what the day has used since the morning mark. The sparkline shows where it went (gym, then a stressful afternoon).</p>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>What sits under each pillar</h2>
+    <p class="ask">Temperature moves out of Heart and into the new Body pillar. Tapping a tile opens that pillar's own screen, which lists these inputs.</p>
+    <div class="pillars">
+      <div class="pl"><h3><i style="background:var(--c-sleep)"></i>Sleep · 82</h3><ul><li>Last night</li><li>Sleep balance</li><li>Consistency</li></ul></div>
+      <div class="pl"><h3><i style="background:var(--c-heart)"></i>Heart · 70</h3><ul><li>Resting HR</li><li>HRV</li><li>Overnight recovery</li></ul></div>
+      <div class="pl"><h3><i style="background:var(--c-act)"></i>Activity · 65</h3><ul><li>Yesterday's movement</li><li>Activity balance</li><li>Training load: ACWR 7:28, plus the 28:90 block trend</li></ul></div>
+      <div class="pl"><h3><i style="background:var(--c-body)"></i>Body · 74 <span class="new">new</span></h3><ul><li>Temperature deviation</li><li>Respiratory rate</li><li>SpO₂</li><li>Weight and body-composition trend</li><li>Daytime stress</li><li>Fuel: energy balance vs budget, protein, hydration</li></ul></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>How the number is made</h2>
+    <p class="ask">Readiness is a weighted blend of the four pillar scores. Each tile prints its weight and its contribution, so the sum can be checked on screen.</p>
+    <table class="math">
+      <tr><th>Pillar</th><th>Score</th><th>Weight</th><th>Adds</th></tr>
+      <tr><td>Sleep</td><td>82</td><td>30%</td><td>24.6</td></tr>
+      <tr><td>Heart</td><td>70</td><td>30%</td><td>21.0</td></tr>
+      <tr><td>Activity</td><td>65</td><td>20%</td><td>13.0</td></tr>
+      <tr><td>Body</td><td>74</td><td>20%</td><td>14.8</td></tr>
+      <tr class="tot"><td>Readiness</td><td></td><td>100%</td><td>73.4 → 73</td></tr>
+    </table>
+    <div class="verdict">
+      <p><b>The weights are a tuning decision and need your sign-off.</b> 30 / 30 / 20 / 20 is only an example. They will ship as a <code>type: tuning</code> proposal that says how many past days move and by how much.</p>
+      <p><b>History would be re-scored.</b> Past readiness is recomputed from stored pillar inputs under the new blend, so trends compare like with like. Days missing a pillar (for example, no SpO₂ before the ring supported it) blend over the pillars they have, and the tile says so.</p>
+      <p><b>Body Battery keeps its engine.</b> It still opens at readiness and drains with HR load and stress. Only the presentation merges, so the morning mark and the fill can never disagree.</p>
+      <p>Reversal cost is low for the layout: the hub replaces one card and one chip. Re-scoring history is the costly part, so the weights should be settled before it runs.</p>
+    </div>
+  </section>
+</div>
