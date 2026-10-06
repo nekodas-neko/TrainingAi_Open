@@ -95,6 +95,8 @@ export interface AcwrBand {
 // activity-score, `EARLY_DELOAD_ACWR_MIN = 1.2` in readiness-payload), so nothing expressed that
 // two of them were the same boundary and the third deliberately was not.
 //
+//   veryLowMax  0.6  well under the Undertraining floor — the legacy blended readiness score's −5
+//                    detraining penalty. Lived inline in readiness-payload (#2375).
 //   lowMax      0.8  band floor — below is Undertraining
 //   optimalMax  1.3  band ceiling — above is amber. The running recovery gate holds back here.
 //   elevatedMin 1.2  the ONE deliberate exception, and it is inside the optimal band: the
@@ -103,7 +105,7 @@ export interface AcwrBand {
 //                    Aligning it to optimalMax would change who sees the card.
 //   highMax     1.5  where the two HARD actions fire — the emergency-deload trigger and the
 //                    Activity-score over-exertion taper. Both were 1.5 by coincidence of typing.
-export const ACWR_THRESHOLDS = { lowMax: 0.8, optimalMax: 1.3, elevatedMin: 1.2, highMax: 1.5 } as const
+export const ACWR_THRESHOLDS = { veryLowMax: 0.6, lowMax: 0.8, optimalMax: 1.3, elevatedMin: 1.2, highMax: 1.5 } as const
 
 // Single agreed ACWR band, consumed everywhere a band/label/color is displayed —
 // never re-derive from the raw acwr number at the call site (four divergent

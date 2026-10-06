@@ -1,4 +1,4 @@
-import { hrMaxFromAge } from '@trainingai/shared/health/hr-zones'
+import { hrMaxFromAge, DEFAULT_RESTING_HR } from '@trainingai/shared/health/hr-zones'
 import type { FitnessSnapshot } from './types'
 
 export interface BaselineResult {
@@ -15,7 +15,6 @@ export interface FitnessSnapshotInputs {
   baseline: BaselineResult | null
 }
 
-const DEFAULT_RESTING_HR = 60
 const BASE_MINUTES_FLOOR = 60
 
 export function resolveFitnessSnapshot(i: FitnessSnapshotInputs): FitnessSnapshot {

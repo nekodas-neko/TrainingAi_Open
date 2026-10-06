@@ -1,6 +1,6 @@
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { todayInTz, todayMidnightUtc, toAestDay, ageFromDob } from '@trainingai/shared/date-utils'
-import { hrMaxFromAge } from '@trainingai/shared/health/hr-zones'
+import { hrMaxFromAge, DEFAULT_RESTING_HR } from '@trainingai/shared/health/hr-zones'
 import { resolveMaxHr, EMPTY_OBSERVED_HR, type ObservedHrProfile } from '@trainingai/shared/health/observed-hr'
 
 /** Trailing window the observed max/min is corroborated over. */
@@ -45,7 +45,6 @@ export interface HrProfile {
 }
 
 const RESTING_HR_WINDOW_DAYS = 28
-const RESTING_HR_DEFAULT = 60
 
 
 /**
@@ -104,7 +103,7 @@ export async function resolveHrProfile(repo: WorkoutRepository, userId: string, 
   const rhrRows = (bodyMetrics ?? []).filter(m => m.restingHeartRate != null && m.restingHeartRate > 0)
   const restingHr = rhrRows.length
     ? Math.round(rhrRows.reduce((sum, m) => sum + m.restingHeartRate!, 0) / rhrRows.length)
-    : RESTING_HR_DEFAULT
+    : DEFAULT_RESTING_HR
 
   const estimatedMax = hrMaxFromAge(ageFromDob(user?.dateOfBirth, new Date()))
   const resolved = resolveMaxHr(observed, estimatedMax)

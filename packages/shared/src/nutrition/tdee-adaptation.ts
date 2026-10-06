@@ -10,6 +10,9 @@ export const GOAL_RATE_KG_PER_WEEK: Record<FitnessGoal, number> = {
 };
 
 export const KCAL_PER_KG = 7700;
+/** The lowest daily calorie target the app will ever recommend, whatever the goal — below it a
+ *  target is unsafe regardless of what the maths says. Read by every path that sets a target. */
+export const CALORIE_FLOOR_KCAL = 1200;
 const DEADBAND_KG_PER_WEEK = 0.1;
 const MAX_ADJUST_KCAL = 200;
 

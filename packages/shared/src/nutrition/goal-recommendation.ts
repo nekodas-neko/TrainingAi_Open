@@ -2,6 +2,7 @@ import { KCAL_PER_G } from './atwater'
 import { ACTIVITY_LEVELS, type ActivityLevel, type FitnessGoal } from '../types/user'
 import { bodyComposition, cunninghamBmr, personalRmr, type MeasuredRmr } from '../health/body-composition'
 import { SEDENTARY_MULTIPLIER } from '../health/energy-baseline'
+import { CALORIE_FLOOR_KCAL } from './tdee-adaptation'
 
 // Q-401: `ACTIVITY_MULTIPLIERS` used to live here — sedentary 1.2 through extra_active 1.9 — and
 // `calculateBaseline` folded the user's *self-reported* level into the calorie target. That made
@@ -277,7 +278,7 @@ export function clampRecommendation(
 ): ClampedRecommendation {
   const notes: string[] = []
 
-  const calorieMin = Math.max(1200, baseline.bmr)
+  const calorieMin = Math.max(CALORIE_FLOOR_KCAL, baseline.bmr)
   const calorieMax = Math.round(baseline.calories * 1.2)
   let calories = ai.recommendedCalories
   if (calories < calorieMin) {

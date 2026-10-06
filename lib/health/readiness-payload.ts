@@ -287,7 +287,7 @@ export function computeBlendedScore(
     if (acwr >= ACWR_THRESHOLDS.lowMax && acwr <= ACWR_THRESHOLDS.optimalMax) modifier += 3
     else if (acwr > ACWR_THRESHOLDS.optimalMax && acwr <= ACWR_THRESHOLDS.highMax) modifier -= Math.round(6 * (acwr - ACWR_THRESHOLDS.optimalMax) / 0.2)
     else if (acwr > ACWR_THRESHOLDS.highMax) modifier -= 15
-    else if (acwr < 0.6) modifier -= 5
+    else if (acwr < ACWR_THRESHOLDS.veryLowMax) modifier -= 5
   }
 
   const raw    = ouraScore + modifier
