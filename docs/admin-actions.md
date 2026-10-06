@@ -6,8 +6,8 @@ Read-only research against `main` in `/home/user/TrainingAi_Open`, 2026-10-06. T
 down to each **button**: what it calls, its scope, whether it is safe to repeat, and how dangerous
 it is. The inventory's findings still hold. There are two admin surfaces, `/admin` (with
 `/admin/oura-ble`, `/admin/cadence` and `/admin/data-capture` under it) and
-`/more/settings/developer`. Nothing is unreachable. The "one-off" header on the set-HR backfill is
-wrong.
+`/more/settings/developer`. Nothing is unreachable. The "one-off" header on the set-HR backfill was
+wrong, and #2379 fixed it.
 
 **Auth legend.** *admin session* means the route calls `requireAdmin` on the NextAuth session, and
 the page itself is `isAdminUser`-gated. *native* means a Capacitor `OuraBle` plugin method, which
@@ -128,6 +128,11 @@ One exception:
 | Admin > activities > **Add** / **Save** / **pencil** / **trash icon** | `components/admin/activity-type-manager.tsx:164` / `:86` / `:204` / `:212` | `POST`, `PATCH` or `DELETE /api/admin/activity-types` | Manages activity types. Delete is refused while the type is in use (409) and for `other`. | one | yes | admin session | delete: low (guarded), **no confirm, no aria-label** | |
 
 ## 8. `/more/settings/developer` (the six bare cards and the diagnostics rows)
+
+**Since #2379 (#2250) the six cards sit in three groups:** *Checks* (model assets, time audit,
+program export), *Heart-rate backfills* (both), and *One-off repairs*, where **Fix lbs logged as kg
+is folded behind a disclosure** and loads nothing until it is opened. The buttons below are
+unchanged.
 
 | Button | File:line | Calls | What it does | Scope | Repeat? | Auth | Danger | When |
 |---|---|---|---|---|---|---|---|---|
