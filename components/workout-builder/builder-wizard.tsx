@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { navigateToTab } from '@/lib/shell-nav'
+import { InjuryAvoidanceNotice } from './injury-avoidance-notice'
 import { TTL_LONG } from '@trainingai/shared/cache-ttl'
 import type { Program } from '@trainingai/shared/types'
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
@@ -94,7 +97,8 @@ function toggle<T>(arr: T[], val: T): T[] {
 }
 
 
-export default function BuilderWizard({ onClose, onSaved, registerCloseGuard }: { onClose: () => void; onSaved: () => void; registerCloseGuard?: (guard: () => void) => void }) {
+export default function BuilderWizard({ onClose, onSaved, registerCloseGuard, userId }: { onClose: () => void; onSaved: () => void; registerCloseGuard?: (guard: () => void) => void; userId?: string }) {
+  const router = useRouter()
   const [step, setStep] = useState(1)
   const [inputs, setInputs] = useState<BuilderInputs>(INITIAL_INPUTS)
   const [generating, setGenerating] = useState(false)
@@ -412,6 +416,10 @@ export default function BuilderWizard({ onClose, onSaved, registerCloseGuard }: 
                 </button>
               ))}
             </div>
+            <InjuryAvoidanceNotice
+              userId={userId}
+              onOpenHealth={() => { onClose(); navigateToTab(router, '/health?tab=body') }}
+            />
           </div>
         )}
 

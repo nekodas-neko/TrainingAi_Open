@@ -984,6 +984,7 @@ export default function ConfigScreen({ userId, openNewProgram }: { userId?: stri
       <Sheet open={builderOpen} onOpenChange={(open) => { open ? setBuilderOpen(true) : builderCloseGuardRef.current(); }}>
         <SheetContent side="bottom" className="h-[92dvh] p-0 flex flex-col">
           <BuilderWizard
+            userId={userId}
             onClose={() => setBuilderOpen(false)}
             registerCloseGuard={(fn) => { builderCloseGuardRef.current = fn; }}
             onSaved={() => {
