@@ -57,6 +57,15 @@ export function deloadStyleForGoal(trainingGoal: string): { pct: number; reps: n
   }))
 }
 
+// ── Readiness grading of a deload ────────────────────────────────────────────
+// How `computeDeloadStrength` grades a deload owed to consecutive training days: readiness at or
+// above SOFT_MIN keeps it a soft nudge, at or above RECOMMENDED_MIN it is recommended, below that
+// strong. The session-select "Why this recommendation?" list names readiness as a reason from the
+// same SOFT_MIN, so the explanation and the decision cannot drift (#2375). Not the < 60 used by
+// rest-day guidance and session weighting — those ask a different question.
+export const DELOAD_READINESS_SOFT_MIN = 70
+export const DELOAD_READINESS_RECOMMENDED_MIN = 50
+
 // ── Temperature thresholds ───────────────────────────────────────────────────
 //
 // These live here, not in `ai-dynamic.ts`, because they are read by client components.
