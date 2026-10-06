@@ -264,7 +264,7 @@ export function opensFollowingNight(
  *
  * Deliberately not applied inside `canonicalNightForDate`: the scoring consumers (readiness,
  * the sleep score, the day audit) read that, and moving which night they grade is a separate,
- * score-moving change.
+ * score-moving change (#2456).
  */
 export function nightWokenFrom<T extends { date: string; sleepStart: Date; sleepEnd: Date; durationHours?: number | null }>(
   nights: T[],

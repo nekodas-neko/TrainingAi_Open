@@ -168,7 +168,7 @@ Device pairing **Forget** buttons (`components/settings/{chest-strap,scale,colmi
 
 ## 11. Admin routes with NO button (scripts or curl only)
 
-`POST /api/admin/rederive-baselines` (re-folds the stored personal baselines), `POST /api/admin/rederive-body-battery` (recomputes past `body_battery_daily` under the current model), `POST /api/admin/backfill-derived-scores` (persists Sleep and Readiness scores across history). All three are admin session only, rate-limited, and full history. They are idempotent re-derives, **but each one moves past scores**, which is `type: tuning` territory. Read-only routes: `GET device-comparison`, `GET app-load-report`, and the bearer routes `db-query`, `replay`, `day-review`, `db-snapshot` (`scripts/local-db/snapshot.js`).
+`POST /api/admin/rederive-baselines` (re-folds the stored personal baselines), `POST /api/admin/rederive-body-battery` (recomputes past `body_battery_daily` under the current model; a day the TN-20 write guard refuses, because the recompute recorded no movement over a day that did, is reported `kept` and stays out of `written` and the deltas, in a dry run too), `POST /api/admin/backfill-derived-scores` (persists Sleep and Readiness scores across history). All three are admin session only, rate-limited, and full history. They are idempotent re-derives, **but each one moves past scores**, which is `type: tuning` territory. Read-only routes: `GET device-comparison`, `GET app-load-report`, and the bearer routes `db-query`, `replay`, `day-review`, `db-snapshot` (`scripts/local-db/snapshot.js`).
 
 ---
 
