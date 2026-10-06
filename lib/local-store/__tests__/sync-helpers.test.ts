@@ -214,6 +214,25 @@ describe('buildWorkoutLogPayload', () => {
       { pct: 82.5, reps: 5, restSec: 120, useFor1rm: true },
     ])
   })
+
+  // #2445: a stranded replay must re-send the bar it was given, or the server would store NULL.
+  it('#2445: replays the prescribed bar per set, keeping a null for a set that had none', () => {
+    const withBar = {
+      ...exerciseLog,
+      sets: [
+        { ...exerciseLog.sets[0], plannedWeightKg: 27.5 },
+        { ...exerciseLog.sets[1], plannedWeightKg: null },
+      ],
+    }
+    const { payload } = buildWorkoutLogPayload(session, withBar)
+    // Same set order as `weights` (sorted by set number), so index i is still set i.
+    expect(payload.plannedWeights).toEqual([null, 27.5])
+  })
+
+  it('#2445: omits plannedWeights when no set carries one (every row from before the column)', () => {
+    const { payload } = buildWorkoutLogPayload(session, exerciseLog)
+    expect(payload.plannedWeights).toBeUndefined()
+  })
 })
 
 describe('omitNullFields', () => {
