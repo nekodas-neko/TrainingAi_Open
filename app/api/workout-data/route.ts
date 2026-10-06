@@ -191,6 +191,7 @@ async function handleWorkoutData(req: NextRequest) {
       phaseStatus: PhaseStatus | null
       dataDate: string
       aiPrescriptionPending: boolean
+      prescriptionSource?: AiPrescription['source']
     }> = {}
 
     for (const programSession of program.sessions) {
@@ -305,6 +306,7 @@ async function handleWorkoutData(req: NextRequest) {
         phaseStatus: sessionPhaseStatus,
         dataDate: todayStr,
         aiPrescriptionPending,
+        prescriptionSource: aiDrivesLoad ? aiPrescription!.source : undefined,
       }
     }
 
@@ -601,5 +603,10 @@ async function handleWorkoutData(req: NextRequest) {
     trainingGoal: program.trainingGoal,
   });
 
-  return NextResponse.json({ exercises, program, session: programSession, phaseStatus: sessionPhaseStatus, dataDate: todayStr, aiPrescriptionPending }, { headers: cacheHeaders });
+  // #2110: which engine built the numbers the bar carries, so the screen can say when they are the
+  // program's own (`'rules'`, the model could not be reached) rather than a coached plan. Only
+  // while the prescription drives load — one that does not is not what `exercises` shows.
+  const prescriptionSource = aiDrivesLoad ? aiPrescription!.source : undefined
+
+  return NextResponse.json({ exercises, program, session: programSession, phaseStatus: sessionPhaseStatus, dataDate: todayStr, aiPrescriptionPending, prescriptionSource }, { headers: cacheHeaders });
 }

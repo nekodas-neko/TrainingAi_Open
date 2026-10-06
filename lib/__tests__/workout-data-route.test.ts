@@ -487,3 +487,38 @@ describe('GET /api/workout-data — the consumption-day re-evaluation', () => {
     expect(updatePrescriptionExercisesCache).not.toHaveBeenCalled()
   })
 })
+
+// #2110. A failed model call stores a rules plan — the program's own sets — and the screen used to
+// paint it under "Recommended workout" with nothing saying so. The route passes the plan's source on
+// so the client can label it, but only while that plan is what the bar carries.
+describe('GET /api/workout-data — which engine built the numbers (#2110)', () => {
+  beforeEach(() => {
+    getActiveProgram.mockResolvedValue(program({ phaseMode: 'ai_dynamic' }))
+  })
+
+  it('says a driving plan is a rules plan, on the single tab and the batch alike', async () => {
+    getSessionPeriodization.mockResolvedValue(periodization({
+      prescription: prescription({ source: 'rules' }), prescriptionStatus: 'pending',
+    }))
+    expect((await (await get('?tab=' + SESSION_ID)).json()).prescriptionSource).toBe('rules')
+    expect((await (await get('?tab=all')).json()).perSession[SESSION_ID].prescriptionSource).toBe('rules')
+  })
+
+  it('passes a model plan through as a model plan, and an unmarked one as nothing', async () => {
+    getSessionPeriodization.mockResolvedValue(periodization({ prescription: prescription({ source: 'model' }) }))
+    expect((await (await get('?tab=' + SESSION_ID)).json()).prescriptionSource).toBe('model')
+
+    getSessionPeriodization.mockResolvedValue(periodization())
+    expect((await (await get('?tab=' + SESSION_ID)).json()).prescriptionSource).toBeUndefined()
+  })
+
+  // A dismissed plan does not drive load, so the bar carries the program's base style and the
+  // rules plan is not what is on screen — naming it would describe numbers nobody sees.
+  it('says nothing about a rules plan that is not driving the bar', async () => {
+    getSessionPeriodization.mockResolvedValue(periodization({
+      prescription: prescription({ source: 'rules' }), prescriptionStatus: 'dismissed',
+    }))
+    expect((await (await get('?tab=' + SESSION_ID)).json()).prescriptionSource).toBeUndefined()
+    expect((await (await get('?tab=all')).json()).perSession[SESSION_ID].prescriptionSource).toBeUndefined()
+  })
+})

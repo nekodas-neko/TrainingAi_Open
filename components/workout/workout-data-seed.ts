@@ -1,6 +1,6 @@
 import { isWorkoutDataToday } from "@/lib/sqlite/cache";
 import type { WorkoutExercise, PhaseStatus } from "@/app/api/workout-data/route";
-import { cachedNumbersSource, type NumbersSource } from "./numbers-source";
+import { payloadNumbersSource, type NumbersSource } from "./numbers-source";
 
 /**
  * The `/api/workout-data` payload as the workout screen consumes it — the same shape whether it
@@ -13,6 +13,8 @@ export type WorkoutDataSeed = {
   phaseStatus?: PhaseStatus;
   program?: { phaseMode?: string };
   aiPrescriptionPending?: boolean;
+  /** Which engine built the prescription driving these numbers, when one does (#2110). */
+  prescriptionSource?: "model" | "rules";
   sessionNotFound?: boolean;
 };
 
@@ -30,11 +32,12 @@ export function freshExercises(data: WorkoutDataSeed, tz?: string): WorkoutExerc
 }
 
 /**
- * The same payload's provenance label (RV-202 ③) — `null` when it is today's and needs none.
+ * The same payload's provenance label (RV-202 ③) — `null` when it is today's coached plan and
+ * needs none; `rules` when today's plan was built from the program because the model failed (#2110).
  * Paired with `freshExercises` on purpose: both ask "is this payload today's", and a caller that
  * strips the flag without labelling the numbers leaves the screen quietly presenting a previous
  * day's sets as "Recommended".
  */
 export function seedNumbersSource(data: WorkoutDataSeed, tz?: string): NumbersSource | null {
-  return cachedNumbersSource(data, isWorkoutDataToday(data, tz));
+  return payloadNumbersSource(data, isWorkoutDataToday(data, tz));
 }
