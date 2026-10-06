@@ -1,7 +1,7 @@
 import { roleLabel, roleColor } from "@trainingai/shared/workout/intensity-zone";
 
 /**
- * Colour-coded exercise-category chip (Main / Secondary / Accessory). Each role has its own
+ * Colour-coded exercise-category chip (Primary / Secondary / Accessory). Each role has its own
  * colour so the category reads at a glance. Renders nothing when the role is unknown.
  */
 export function RoleChip({ role, className }: { role: string | undefined | null; className?: string }) {

@@ -15,6 +15,7 @@ import { GifReviewSweep, type ReviewCandidate } from "@/components/admin/gif-rev
 import { invalidateExerciseLibrary } from "@/lib/cache-groups";
 import type { MuscleAssignment, ExerciseType } from "@trainingai/shared/types/program";
 import { mustBypassImageOptimizer } from '@trainingai/shared/media/private-media'
+import { MUSCLE_ROLE_LABEL } from '@trainingai/shared/workout/role-labels'
 
 interface ExerciseRow {
   id: string;
@@ -113,18 +114,19 @@ function MuscleChips({ muscles, onChange }: { muscles: MuscleAssignment[]; onCha
           const a = muscles.find(x => x.muscle === m);
           return (
             <div key={m} className="flex rounded-lg overflow-hidden border border-border text-xs">
-              <button type="button" onClick={() => toggle(m, "main")}
+              <button type="button" onClick={() => toggle(m, "main")} title={MUSCLE_ROLE_LABEL.main}
                 className={`px-2 py-1 transition-colors ${a?.role === "main" ? "bg-brand text-brand-foreground font-semibold" : "text-muted-foreground hover:text-foreground"}`}
                 style={a?.role === "main" ? { background: "var(--color-brand)" } : undefined}
               >{m}</button>
               <button type="button" onClick={() => toggle(m, "secondary")}
+                title={MUSCLE_ROLE_LABEL.secondary} aria-label={`${m}: ${MUSCLE_ROLE_LABEL.secondary}`}
                 className={`px-1.5 py-1 border-l border-border transition-colors ${a?.role === "secondary" ? "bg-amber-500/20 text-amber-400" : "text-muted-foreground hover:text-foreground"}`}
               >2°</button>
             </div>
           );
         })}
       </div>
-      <p className="text-[10px] text-muted-foreground mt-1">Tap name = primary · 2° = secondary · tap again to remove</p>
+      <p className="text-[10px] text-muted-foreground mt-1">Tap name = {MUSCLE_ROLE_LABEL.main} · 2° = {MUSCLE_ROLE_LABEL.secondary} · tap again to remove</p>
     </div>
   );
 }

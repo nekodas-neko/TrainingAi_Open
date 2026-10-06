@@ -8,11 +8,15 @@ describe('explainExerciseChoice', () => {
     expect(out[0]).toContain('higher volume')
   })
 
-  it('distinguishes compound vs accessory set priority', () => {
+  it('distinguishes primary/secondary vs accessory set priority, in the shared role words (#2240)', () => {
     const primary = explainExerciseChoice({ phase: 'accumulation', role: 'primary', rm1Trend: 'flat', rm1ChangeKg: 0 })
+    const secondary = explainExerciseChoice({ phase: 'accumulation', role: 'secondary', rm1Trend: 'flat', rm1ChangeKg: 0 })
     const accessory = explainExerciseChoice({ phase: 'accumulation', role: 'accessory', rm1Trend: 'flat', rm1ChangeKg: 0 })
-    expect(primary.some(s => s.includes('Compound'))).toBe(true)
+    expect(primary).toContain('Primary lift — prioritised for sets and load')
+    expect(secondary).toContain('Secondary lift — prioritised for sets and load')
     expect(accessory.some(s => s.includes('Accessory'))).toBe(true)
+    // "Compound" is retired as a role word: an accessory can be a compound too.
+    for (const out of [primary, secondary, accessory]) expect(out.join(' ')).not.toContain('Compound')
   })
 
   it('explains load direction from the 1RM trend', () => {
