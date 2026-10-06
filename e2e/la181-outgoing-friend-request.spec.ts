@@ -46,7 +46,7 @@ test('the sender sees "Request sent" with a Cancel, not Accept/Decline', async (
   await page.getByPlaceholder(/friend code|email/i).fill(ZERO_DATA_EMAIL)
   await page.getByRole('button', { name: 'Add' }).click()
 
-  await expect(page.getByText('Request sent')).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByText('Request sent', { exact: true })).toBeVisible({ timeout: 20_000 })
   await expect(page.getByRole('button', { name: 'Cancel request' })).toBeVisible()
   // The bug in one assertion: the row used to say "Unknown" and offer an Accept that always failed.
   await expect(page.getByText('Unknown')).toHaveCount(0)
@@ -62,7 +62,7 @@ test('the addressee sees the sender by name, with Accept and Decline', async ({ 
     // RV-195 reveals the requester to the addressee on purpose — they need it to decide.
     await expect(page.getByRole('button', { name: /^Accept Test User/ })).toBeVisible()
     await expect(page.getByRole('button', { name: /^Decline Test User/ })).toBeVisible()
-    await expect(page.getByText('Request sent')).toHaveCount(0)
+    await expect(page.getByText('Request sent', { exact: true })).toHaveCount(0)
   } finally {
     await context.close()
   }

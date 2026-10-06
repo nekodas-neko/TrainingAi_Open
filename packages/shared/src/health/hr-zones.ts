@@ -10,6 +10,9 @@ export function hrMaxFromAge(age: number | null | undefined): number {
   return age != null ? 220 - age : 190
 }
 
+/** The resting heart rate assumed when none has been measured — every resolver falls back to this one. */
+export const DEFAULT_RESTING_HR = 60
+
 /** Heart-rate reserve (max − rest), floored at 30 so a bad/low resting value can't
  *  collapse the reserve and make every reading read as max effort. */
 export function hrReserve(maxHr: number, restingHr: number): number {

@@ -5,7 +5,7 @@ import { ChevronDownIcon, ThermometerIcon, HeartPulseIcon, MoonIcon, FlameIcon, 
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { cn } from "@trainingai/shared/utils";
 import type { NextSessionRecommendation } from "@trainingai/shared/types/program";
-import { TEMP_BASELINE_MIN_DAYS } from "@trainingai/shared/ai-periodization/deload-constants";
+import { TEMP_BASELINE_MIN_DAYS, DELOAD_READINESS_SOFT_MIN } from "@trainingai/shared/ai-periodization/deload-constants";
 import { temperatureBaselineProgress } from "./temperature-baseline-progress";
 
 interface Signal {
@@ -28,10 +28,10 @@ function buildSignals(rec: NextSessionRecommendation): Signal[] {
       : "Body temperature is above your baseline — often an early sign of illness, incomplete recovery, or heat/alcohol stress.";
     out.push({ icon: <ThermometerIcon className="h-3.5 w-3.5" />, text });
   }
-  if (s?.ouraReadiness != null && s.ouraReadiness < 70) {
+  if (s?.ouraReadiness != null && s.ouraReadiness < DELOAD_READINESS_SOFT_MIN) {
     out.push({
       icon: <ActivityIcon className="h-3.5 w-3.5" />,
-      text: `Readiness ${Math.round(s.ouraReadiness)} — below the 70+ range where hard training is well tolerated.`,
+      text: `Readiness ${Math.round(s.ouraReadiness)} — below the ${DELOAD_READINESS_SOFT_MIN}+ range where hard training is well tolerated.`,
     });
   }
   if (rec.hrvWarning || (s?.hrvTrend != null && s.hrvTrend < 0.85)) {

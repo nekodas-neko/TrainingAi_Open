@@ -1,0 +1,29 @@
+# Line endings (#2363). Text is stored and checked out with LF on every platform, so a commit made
+# on Windows cannot turn a one-line change into a whole-file CRLF rewrite (PR #2344 did that to ~15
+# files, burying its real diff and `git blame`).
+* text=auto eol=lf
+
+# Windows batch files are run by cmd.exe, which needs CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# pnpm patches are applied byte-for-byte against the package's own files, whatever endings those
+# have; normalising one can stop it applying.
+*.patch -text
+
+# Binary — never diffed or converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.jar binary
+*.bin binary
+*.npz binary
+*.onnx binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.pdf binary
+*.zip binary

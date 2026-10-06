@@ -18,6 +18,7 @@ import { LiveStepTest } from './live-step-test'
 import { BatterySoakTest } from './battery-soak-test'
 import { ContinuousCaptureCard } from './continuous-capture-card'
 import { runRedecodeJob } from './redecode-job'
+import { RingKeyDangerZone } from './ring-key-danger-zone'
 
 type Availability = 'checking' | 'unavailable' | 'ready'
 
@@ -236,6 +237,15 @@ export function OuraBleDebug() {
         ? 'reveal key: no key stored on this device'
         : `reveal key: unavailable (${msg}) — this needs an APK built after 2026-08-23`])
     }
+  }), [withPlugin])
+
+  // Reached only through RingKeyDangerZone's typed confirm. A rejection (the native Cancel) leaves
+  // the key and this screen exactly as they were.
+  const deleteKey = useCallback(() => withPlugin(async (p) => {
+    await p.clearKey()
+    setHasKey(false)
+    setRevealedKey(null)
+    setLines((prev) => [...prev, 'ring key deleted from this device'])
   }), [withPlugin])
 
   const copyKey = useCallback(async () => {
@@ -609,11 +619,6 @@ export function OuraBleDebug() {
               <Button size="sm" variant="outline" onClick={fullResync}><History className="mr-1 h-4 w-4" /> Full re-sync</Button>
               <Button size="sm" variant="outline" onClick={redecode}>Redecode</Button>
             </BtnGroup>
-            {hasKey && (
-              <BtnGroup label="Danger zone">
-                <Button size="sm" variant="ghost" onClick={() => withPlugin(async (p) => { await p.clearKey(); setHasKey(false) })}>Clear key</Button>
-              </BtnGroup>
-            )}
           </div>
         </div>
       </CollapsibleSection>
@@ -754,6 +759,9 @@ export function OuraBleDebug() {
           <LogConsole lines={lines} onClear={clearLines} />
         </div>
       </CollapsibleSection>
+
+      {/* Last on the page, away from the everyday levers (#2382) */}
+      {hasKey && <RingKeyDangerZone onDelete={deleteKey} />}
     </div>
   )
 }

@@ -29,7 +29,7 @@ describe('ACWR thresholds come from one place (Q-306)', () => {
     // The consolidation is deliberately behaviour-preserving. Changing any of these moves who gets
     // an emergency deload, an Activity-score taper, or the early-deload card — a scoring change,
     // which per CLAUDE.md is the owner's call and not a tidy-up's side effect.
-    expect(ACWR_THRESHOLDS).toEqual({ lowMax: 0.8, optimalMax: 1.3, elevatedMin: 1.2, highMax: 1.5 })
+    expect(ACWR_THRESHOLDS).toEqual({ veryLowMax: 0.6, lowMax: 0.8, optimalMax: 1.3, elevatedMin: 1.2, highMax: 1.5 })
   })
 
   it('the elevated bound sits inside the optimal band, on purpose', () => {
