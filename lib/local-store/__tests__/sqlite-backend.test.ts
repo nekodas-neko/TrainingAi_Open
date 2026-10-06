@@ -854,11 +854,44 @@ describe('set_logs.planned_weight_kg (#2445)', () => {
       id: 'sl-1', exerciseLogId: 'el-1', setNumber: 1, weightKg: 27.5, reps: 10,
       setTimeSec: null, restTimeSec: null, intensityPct: null, useFor1rm: true,
       setStartMs: null, setEndMs: null, rpe: null, plannedPct: 70.5, plannedReps: 10,
-      plannedRestSec: 90, plannedWeightKg: 27.5,
+      plannedRestSec: 90, plannedWeightKg: 27.5, rpeSource: null,
       updatedAt: '2026-10-06T09:00:00.000Z', deletedAt: null, syncStatus: 'synced',
     }] })
     expect(boundSetLogValue('planned_weight_kg')).toBe(27.5)
     expect(runSQL.mock.calls.map(c => String(c[0])).find(s => /INTO set_logs/.test(s)))
       .toContain('planned_weight_kg=excluded.planned_weight_kg')
+  })
+
+  // #2450: whether each RPE was tapped, on the same two write paths.
+  it('logWorkoutLocally writes rpe_source per set, and none beside a missing RPE', async () => {
+    await store.logWorkoutLocally({
+      sessionName: 'S', exercise: 'Bench', weights: [80, 80, 80], sets: 3, reps: [5, 5, 5],
+      workoutSessionId: '00000000-0000-4000-8000-000000000001',
+      rpeValues: [8, 9], rpeSources: ['expected', 'rated', 'rated'],
+    }, 'pending')
+    expect(boundSetLogValue('rpe_source', 0)).toBe('expected')
+    expect(boundSetLogValue('rpe_source', 1)).toBe('rated')
+    expect(boundSetLogValue('rpe_source', 2)).toBeNull()
+  })
+
+  it('logWorkoutLocally writes null when the payload carries no rpeSources', async () => {
+    await store.logWorkoutLocally({
+      sessionName: 'S', exercise: 'Curl', weights: [20], sets: 1, reps: [12], rpeValues: [8],
+      workoutSessionId: '00000000-0000-4000-8000-000000000001',
+    }, 'pending')
+    expect(boundSetLogValue('rpe_source')).toBeNull()
+  })
+
+  it('applyDelta carries the pulled rpe_source into the local row', async () => {
+    await store.applyDelta({ setLogs: [{
+      id: 'sl-2', exerciseLogId: 'el-1', setNumber: 1, weightKg: 80, reps: 5,
+      setTimeSec: null, restTimeSec: null, intensityPct: null, useFor1rm: true,
+      setStartMs: null, setEndMs: null, rpe: 9, plannedPct: 80, plannedReps: 5,
+      plannedRestSec: 180, plannedWeightKg: 80, rpeSource: 'rated',
+      updatedAt: '2026-10-07T09:00:00.000Z', deletedAt: null, syncStatus: 'synced',
+    }] })
+    expect(boundSetLogValue('rpe_source')).toBe('rated')
+    expect(runSQL.mock.calls.map(c => String(c[0])).find(s => /INTO set_logs/.test(s)))
+      .toContain('rpe_source=excluded.rpe_source')
   })
 })

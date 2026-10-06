@@ -3,6 +3,7 @@ import { reconcileDeadLetters } from './dead-letter-signal';
 import { resolveFailedOutboxIds, serverBackoffMs, buildWorkoutLogPayload } from './sync-helpers';
 import type { SyncDelta } from '@/lib/data/repository';
 import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role';
+import { asRpeSource } from '@trainingai/shared/workout/rpe-source';
 import type {
   LocalBodyMetric, LocalMoodLog, LocalSleepSession,
   LocalWorkoutSession, LocalActivityLog, LocalFitnessTest, LocalPrescribedRun, LocalProgram, LocalProgressionStyle,
@@ -223,6 +224,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     plannedReps:   (r.plannedReps as number) ?? null,
     plannedRestSec: (r.plannedRestSec as number) ?? null,
     plannedWeightKg: (r.plannedWeightKg as number) ?? null,
+    rpeSource:     asRpeSource(r.rpeSource),
     updatedAt:     toIso(r.updatedAt),
     deletedAt:     r.deletedAt ? toIso(r.deletedAt) : null,
     syncStatus:    'synced' as const,

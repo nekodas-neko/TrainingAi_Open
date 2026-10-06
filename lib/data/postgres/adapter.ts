@@ -1064,6 +1064,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           plannedReps: set.plannedReps ?? null,
           plannedRestSec: set.plannedRestSec ?? null,
           plannedWeightKg: set.plannedWeightKg ?? null,
+          rpeSource: set.rpeSource ?? null,
         })))
         .onConflictDoUpdate({
           target: s.setLogs.id,
@@ -1083,6 +1084,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             plannedReps: sql`EXCLUDED.planned_reps`,
             plannedRestSec: sql`EXCLUDED.planned_rest_sec`,
             plannedWeightKg: sql`EXCLUDED.planned_weight_kg`,
+            rpeSource: sql`EXCLUDED.rpe_source`,
           },
         })
         .returning()
@@ -1280,7 +1282,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
               weightKg: ss.weightKg, reps: ss.reps,
               setTimeSec: ss.setTimeSec ?? undefined, restTimeSec: ss.restTimeSec ?? undefined,
               intensityPct: ss.intensityPct ?? undefined, useFor1rm: ss.useFor1rm,
-              rpe: ss.rpe ?? undefined, plannedRestSec: ss.plannedRestSec ?? undefined,
+              rpe: ss.rpe ?? undefined, rpeSource: ss.rpeSource ?? undefined,
+              plannedRestSec: ss.plannedRestSec ?? undefined,
             })),
         })),
     }))
@@ -4632,6 +4635,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         plannedReps:   s.setLogs.plannedReps,
         plannedRestSec: s.setLogs.plannedRestSec,
         plannedWeightKg: s.setLogs.plannedWeightKg,
+        rpeSource:     s.setLogs.rpeSource,
         updatedAt:     s.setLogs.updatedAt,
         deletedAt:     s.setLogs.deletedAt,
       }).from(s.setLogs)

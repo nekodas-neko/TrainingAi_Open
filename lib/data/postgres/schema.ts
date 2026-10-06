@@ -267,6 +267,9 @@ export const setLogs = pgTable('set_logs', {
   // `planned_pct` implies. NULL where no style percentage set the bar (bodyweight, freeform, extra
   // sets) and on every row logged before the column existed.
   plannedWeightKg: doublePrecision('planned_weight_kg'),
+  // #2450: 'rated' (tapped on the picker) | 'expected' (the untouched pre-fill). CHECK-constrained
+  // in migration 202610061516. NULL on a set with no RPE and on every row logged before it existed.
+  rpeSource:     text('rpe_source').$type<import('@trainingai/shared/workout/rpe-source').RpeSource>(),
   updatedAt:     timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt:     timestamp('deleted_at', { withTimezone: true }),
 }, t => [unique().on(t.exerciseLogId, t.setNumber)])

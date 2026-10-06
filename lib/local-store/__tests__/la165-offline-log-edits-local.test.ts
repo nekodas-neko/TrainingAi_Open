@@ -30,7 +30,7 @@ beforeEach(() => {
       id TEXT PRIMARY KEY, exercise_log_id TEXT NOT NULL, set_number INTEGER NOT NULL,
       weight_kg REAL NOT NULL, reps INTEGER NOT NULL, set_time_sec INTEGER, rest_time_sec INTEGER,
       intensity_pct REAL, use_for_1rm INTEGER NOT NULL DEFAULT 0, set_start_ms INTEGER, set_end_ms INTEGER,
-      rpe REAL, planned_pct REAL, planned_reps INTEGER, planned_rest_sec INTEGER, planned_weight_kg REAL,
+      rpe REAL, planned_pct REAL, planned_reps INTEGER, planned_rest_sec INTEGER, planned_weight_kg REAL, rpe_source TEXT,
       updated_at TEXT, synced INTEGER NOT NULL DEFAULT 0, sync_status TEXT, deleted_at TEXT);
     INSERT INTO workout_sessions VALUES ('ws-1', 'synced', '2026-09-20T00:00:00Z', NULL);
     INSERT INTO exercise_logs VALUES ('el-1', 'ws-1', 'synced', '2026-09-20T00:00:00Z', NULL);
@@ -58,6 +58,18 @@ describe('pending mode (①)', () => {
     expect(all(`SELECT sync_status, deleted_at IS NOT NULL AS gone FROM exercise_logs WHERE id='el-1'`)[0]).toEqual({ sync_status: 'pending', gone: 1 })
     await store().deleteWorkoutSessionLocally('ws-1', { pending: true })
     expect(all(`SELECT sync_status FROM workout_sessions WHERE id='ws-1'`)[0].sync_status).toBe('pending')
+  })
+})
+
+// #2450: an edit corrects weight and reps; it must not touch whether the set's RPE was rated.
+describe('an edit keeps rpe and rpe_source', () => {
+  it('leaves both on an edited set, in pending and synced mode', async () => {
+    db.current!.exec(`UPDATE set_logs SET rpe = 9, rpe_source = 'rated' WHERE id = 's-1';
+                      UPDATE set_logs SET rpe = 7, rpe_source = 'expected' WHERE id = 's-2';`)
+    await store().updateExerciseLogLocally('el-1', [{ setNumber: 1, weightKg: 45, reps: 6 }, { setNumber: 2, weightKg: 45, reps: 6, intensityPct: 70 }], { pending: true })
+    await store().updateExerciseLogLocally('el-1', [{ setNumber: 1, weightKg: 47.5, reps: 5 }, { setNumber: 2, weightKg: 45, reps: 6 }])
+    expect(all(`SELECT rpe, rpe_source FROM set_logs WHERE exercise_log_id='el-1' ORDER BY set_number`))
+      .toEqual([{ rpe: 9, rpe_source: 'rated' }, { rpe: 7, rpe_source: 'expected' }])
   })
 })
 

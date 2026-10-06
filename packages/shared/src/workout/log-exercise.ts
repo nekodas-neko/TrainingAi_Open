@@ -8,6 +8,7 @@ import { computeSetAggregates, computeIntensityPct } from '@trainingai/shared/wo
 import { bodyweightSetLoadKg } from '@trainingai/shared/workout/bodyweight-load';
 import { defaultUseFor1rm } from '@trainingai/shared/workout/default-use-for-1rm';
 import type { ProgramPhaseType } from '@trainingai/shared/types/program';
+import { RPE_SOURCES } from '@trainingai/shared/workout/rpe-source';
 
 export const LogExercisePayloadSchema = z.object({
   sessionName:          z.string().min(1).max(200),
@@ -45,6 +46,9 @@ export const LogExercisePayloadSchema = z.object({
   workoutStartedAt:     z.number().optional(),
   warmupEndedAtMs:      z.number().optional(),
   rpeValues:            z.array(z.number().int().min(5).max(10)).optional(),
+  // #2450: per set, whether `rpeValues[i]` was tapped (`rated`) or left at the picker's pre-fill
+  // (`expected`); `null` where unknown. Stored as set_logs.rpe_source, only beside a stored RPE.
+  rpeSources:           z.array(z.enum(RPE_SOURCES).nullable()).max(20).optional(),
   intensityMode:        z.enum(['full', 'deload']).optional(),
   wasOverride:          z.boolean().optional(),
   exerciseDeloaded:     z.boolean().optional(),
@@ -91,7 +95,7 @@ export async function logExerciseFromPayload(
     localDate, timeToCompleteSet, setTimes, restTimes,
     setStartTimes, setEndTimes, interExerciseRestSec, prepTimeSec,
     progressionStyle, plannedWeights, styleName, styleId, muscleGroups, workoutStartedAt, warmupEndedAtMs,
-    rpeValues, intensityMode, wasOverride, exerciseDeloaded,
+    rpeValues, rpeSources, intensityMode, wasOverride, exerciseDeloaded,
   } = payload;
 
   // Lazy import: `@/lib/data` compiles as a Turbopack async module (it pulls in pg /
@@ -267,6 +271,8 @@ export async function logExerciseFromPayload(
       setStartMs: setStartTimes?.[i],
       setEndMs: setEndTimes?.[i],
       rpe: rpeValues?.[i],
+      // #2450: a source with no RPE beside it would describe nothing, so it is dropped.
+      rpeSource: rpeValues?.[i] != null ? (rpeSources?.[i] ?? undefined) : undefined,
       // Q-14: a bodyweight movement is never prescribed a %1RM — resolveBodyweightStyle turns the
       // style's pct into a rep target instead. Storing that pct here put it alongside a
       // BW_REF-relative intensity_pct on a different basis, so every bodyweight set recorded a
