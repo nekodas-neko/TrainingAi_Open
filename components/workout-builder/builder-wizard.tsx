@@ -1,6 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { navigateToTab } from '@/lib/shell-nav'
+import { releaseTopSurfaceEntry } from '@/lib/hooks/sheet-back-stack'
+import { InjuryAvoidanceNotice } from './injury-avoidance-notice'
 import { TTL_LONG } from '@trainingai/shared/cache-ttl'
 import type { Program } from '@trainingai/shared/types'
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
@@ -94,7 +98,8 @@ function toggle<T>(arr: T[], val: T): T[] {
 }
 
 
-export default function BuilderWizard({ onClose, onSaved, registerCloseGuard }: { onClose: () => void; onSaved: () => void; registerCloseGuard?: (guard: () => void) => void }) {
+export default function BuilderWizard({ onClose, onSaved, registerCloseGuard, userId }: { onClose: () => void; onSaved: () => void; registerCloseGuard?: (guard: () => void) => void; userId?: string }) {
+  const router = useRouter()
   const [step, setStep] = useState(1)
   const [inputs, setInputs] = useState<BuilderInputs>(INITIAL_INPUTS)
   const [generating, setGenerating] = useState(false)
@@ -214,6 +219,17 @@ export default function BuilderWizard({ onClose, onSaved, registerCloseGuard }: 
     if (next === 8 && (inputs.progressionMode === 'linear' || inputs.progressionMode === 'ai')) next = 9
     if (next === 9 && inputs.progressionMode === 'ai') next = 10
     setStep(next)
+  }
+
+  // #2415 — close-then-navigate from inside a sheet, the BF-165 shape: the sheet pops its own history
+  // entry on close, which lands on the entry the navigation just pushed and undoes it (verified here:
+  // `push /health?tab=body` then `replace /program`, screen unchanged). Release the entry first and
+  // `replace` over it — see `releaseTopSurfaceEntry`.
+  function openHealth() {
+    const tookSheetEntry = releaseTopSurfaceEntry()
+    onClose()
+    if (tookSheetEntry) router.replace('/health?tab=body')
+    else navigateToTab(router, '/health?tab=body')
   }
 
   function handleBack() {
@@ -412,6 +428,10 @@ export default function BuilderWizard({ onClose, onSaved, registerCloseGuard }: 
                 </button>
               ))}
             </div>
+            <InjuryAvoidanceNotice
+              userId={userId}
+              onOpenHealth={openHealth}
+            />
           </div>
         )}
 
