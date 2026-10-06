@@ -2119,6 +2119,27 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return rows.map(r => r.date)
   }
 
+  /** #2085 — sessions per day for the Rogue's bank. Counted in SQL, so the read stays a date and a
+   *  number however wide `activity_logs` grows (RV-63). Which types count is the engine's call
+   *  (`CARDIO_ACTIVITY_TYPES`), passed in rather than restated here. */
+  async listCardioSessionCounts(
+    userId: string, from: string, to: string, activityTypes: readonly string[],
+  ): Promise<{ date: string; sessions: number }[]> {
+    if (activityTypes.length === 0) return []
+    const rows = await this.db.select({ date: s.activityLogs.date, sessions: sql<number>`count(*)::int` })
+      .from(s.activityLogs)
+      .where(and(
+        eq(s.activityLogs.userId, userId),
+        gte(s.activityLogs.date, from),
+        lte(s.activityLogs.date, to),
+        inArray(s.activityLogs.activityType, [...activityTypes]),
+        isNull(s.activityLogs.deletedAt),
+      ))
+      .groupBy(s.activityLogs.date)
+      .orderBy(asc(s.activityLogs.date))
+    return rows.map(r => ({ date: String(r.date), sessions: Number(r.sessions) }))
+  }
+
   async listBodyMetrics(userId: string, from: string, to: string): Promise<BodyMetrics[]> {
     const rows = await this.db.select().from(s.bodyMetrics)
       .where(and(

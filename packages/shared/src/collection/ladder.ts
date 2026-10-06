@@ -14,6 +14,11 @@ import { spawnName, blendName, nameHash } from './names'
  *      decay window retroactively rewrites history — a Tank earned last month silently un-merges.
  *      If a threshold is ever exposed, it must be versioned with an effective-from date and each
  *      span replayed under the rule that was live then.
+ *
+ * **For v2 the rewrite is accepted, by the owner (2026-10-05, #2085):** *"happy for past scores to be
+ * re-scored — we are still in trial mode."* v2 replays all history from scratch, with no per-span
+ * versioning, and the provisional constants below may be retuned on the same terms. Exposing a
+ * threshold to the USER would still need the versioning above.
  */
 
 /** One rung. The bottom tier is what a faucet day spawns; each higher one costs `mergeCost` below. */
@@ -278,7 +283,8 @@ export const COLLECTION_RULES_VERSION = 1
 // ── Collection rules v2 (PS-49) ─────────────────────────────────────────────────────────────────
 // Plan: docs/superpowers/plans/2026-09-26-cat-collection-rules-v2.md. Shipped ALONGSIDE v1, not in
 // place of it: the route returns v2 in its own block, so nothing the owner sees changes until the
-// surface switches to it. That switch is the re-score of history PS-48 ④ asks him about.
+// surface switches to it (#2187). That switch re-scores his whole history, which he accepted on
+// 2026-10-05 (#2085 ④).
 
 const tiersOf = (label: string, costs: number[]) =>
   [{ name: `${label} I`, mergeCost: 0 }, ...costs.map((c, i) => ({ name: `${label} ${['II', 'III', 'IV', 'V', 'VI'][i]}`, mergeCost: c }))]
@@ -289,15 +295,16 @@ const tiersOf = (label: string, costs: number[]) =>
  *   "100 days will make a big tier", then the yearly one, then "much later". It keeps v1's
  *   rest-allowance decay (`replayCollection`), because a constant drain would punish a
  *   three-a-week lifter on the days their plan tells them to rest.
- * - **Ranger (steps) and Health cat: 3 → 1 at every tier** (owner: "at 3 they merge"), fed by a
- *   bank that drains daily (`replayBankCollection`).
+ * - **Ranger (steps), Rogue (cardio) and Health cat: 3 → 1 at every tier** (owner: "at 3 they
+ *   merge"), fed by a bank that drains daily (`replayBankCollection`).
  */
 /** v2's own faucet set, kept apart from v1's so the v1 surface's typed maps are untouched. */
-export interface V2Ladder { faucet: 'workout' | 'steps' | 'health'; tiers: Tier[] }
+export interface V2Ladder { faucet: 'workout' | 'steps' | 'cardio' | 'health'; tiers: Tier[] }
 
 export const V2_LADDERS: Record<V2Ladder['faucet'], V2Ladder> = {
   workout: { faucet: 'workout', tiers: tiersOf('Tank', [5, 4, 5, 3, 3]) },
   steps: { faucet: 'steps', tiers: tiersOf('Ranger', [3, 3, 3, 3, 3]) },
+  cardio: { faucet: 'cardio', tiers: tiersOf('Rogue', [3, 3, 3, 3, 3]) },
   health: { faucet: 'health', tiers: tiersOf('Health cat', [3, 3, 3, 3, 3]) },
 }
 
@@ -312,6 +319,24 @@ export const STEPS_DRAIN_PER_DAY = 1_000
 export const HEALTH_POINTS_PER_T1 = 3
 export const HEALTH_DRAIN_PER_DAY = 1
 
+/**
+ * The Rogue's bank: **1 cardio session = 1 T1, draining ⅕ of a session a day.** The owner's answer
+ * (2026-10-05, #2085), marked provisional by him and left to Tuning to revisit once there is data —
+ * the alternative he was shown, one T1 per 20 minutes, is fairer to long runs but pays nothing for a
+ * short walk. The bank counts fifths of a session, so the drain is a whole number.
+ */
+export const CARDIO_UNITS_PER_SESSION = 5
+export const CARDIO_UNITS_PER_T1 = 5
+export const CARDIO_DRAIN_PER_DAY = 1
+
+/**
+ * Which logged activities are a cardio session for the Rogue: the seeded types that are sustained
+ * movement. Yoga and stretching are mobility, not cardio. `other`, and any type an admin adds later,
+ * stays out until it is listed here — a session that earns nothing is noticed and fixed, while one
+ * that earns wrongly quietly devalues every cat on the row.
+ */
+export const CARDIO_ACTIVITY_TYPES: readonly string[] = ['walk', 'run', 'treadmill', 'hike', 'cycle', 'swim', 'hiit']
+
 export interface BankReplayInput {
   /** Units gained on each day (steps, points). Days absent gained nothing. */
   gains: Map<string, number>
@@ -325,12 +350,20 @@ export interface BankReplayInput {
 /**
  * Replay a draining bank into the same named-cat collection v1 uses.
  *
- * Each day: `bank = max(0, bank + gained − drain)`, and the T1s held are `floor(bank / unitsPerT1)`
+ * Each day: `bank = max(0, bank − drain) + gained`, and the T1s held are `floor(bank / unitsPerT1)`
  * (owner: "if I make 5000 steps in the day its an effective 4000 profit"). A rise spawns that many
  * T1 cats and merges; a fall decays that many, smallest first, breaking a bigger cat back into its
  * parts. With 3 → 1 merges that is exactly the base-3 conversion the plan describes, done by the
  * fold v1 already trusts, so every cat keeps its name and lineage. A replacement fold would lose
  * both, which the collection's third PR warned against.
+ *
+ * **The drain comes off what was carried into the day, never off the day's own gain** (#2085).
+ * Whenever the carried balance covers the drain, a day moves the bank by the same amount in either
+ * order, so the owner's 4,000-a-day profit holds, and the balance never sits more than one day's
+ * drain above the old order's. They differ only near empty: draining after the gain, a lone cardio
+ * session banked 4 of the 5 fifths a cat costs, so "1 session = 1 T1" paid nothing for a first
+ * run. The same was true of 5,000 steps and of a fully logged health day, which the plan also
+ * counts as one T1 each.
  *
  * Integer units only (whole steps, whole points), so no float can floor a T1 away.
  */
@@ -345,7 +378,7 @@ export function replayBankCollection(input: BankReplayInput): CollectionState {
 
   if (dates.length > 0) {
     for (let day = dates[0]; day <= today; day = addDays(day, 1)) {
-      bank = Math.max(0, bank + (input.gains.get(day) ?? 0) - drainPerDay)
+      bank = Math.max(0, bank - drainPerDay) + (input.gains.get(day) ?? 0)
       const target = Math.floor(bank / unitsPerT1)
       for (let k = t1; k < target; k++) {
         const id = `${ladder.faucet}-${day}-${k}`
@@ -364,7 +397,8 @@ export function replayBankCollection(input: BankReplayInput): CollectionState {
   const cats: CatSummary[] = [...held].reverse().flat().map(c => ({
     id: c.id, tier: c.tier, name: c.name, born: c.born, from: c.parts.map(p => p.name),
   }))
-  // A day with no gain tomorrow would drain below the current T1 count.
+  // A day with no gain tomorrow would drain below the current T1 count. Tomorrow's drain comes off
+  // today's closing balance, the same order as the loop above.
   const restless = t1 > 0 && Math.floor(Math.max(0, bank - drainPerDay) / unitsPerT1) < t1
   return { stock, duplicateDays: 0, decayEvents, cats, restless, lastLost, bank, unitsPerT1 }
 }

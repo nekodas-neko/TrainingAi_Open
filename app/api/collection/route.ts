@@ -9,6 +9,7 @@ import {
   replayCollection, LADDERS, STEPS_MAX_REST_GAP, SLEEP_MAX_REST_GAP, COLLECTION_RULES_VERSION,
   replayBankCollection, V2_LADDERS, COLLECTION_RULES_VERSION_V2,
   STEPS_UNITS_PER_T1, STEPS_DRAIN_PER_DAY, HEALTH_POINTS_PER_T1, HEALTH_DRAIN_PER_DAY,
+  CARDIO_ACTIVITY_TYPES, CARDIO_UNITS_PER_SESSION, CARDIO_UNITS_PER_T1, CARDIO_DRAIN_PER_DAY,
   type CollectionState,
 } from '@trainingai/shared/collection/ladder'
 
@@ -56,7 +57,7 @@ export async function GET() {
   const today = todayInTz(tz)
   const repo = await getRepository()
 
-  const [trainedDays, restDays, program, stepDays, sleepDays, stepTotals, foodDays, weightDays] = await Promise.all([
+  const [trainedDays, restDays, program, stepDays, sleepDays, stepTotals, foodDays, weightDays, cardioCounts] = await Promise.all([
     repo.listTrainedDayKeys(userId, tz),
     repo.listRestDays(userId, HISTORY_START, today),
     repo.getActiveProgram(userId),
@@ -69,6 +70,7 @@ export async function GET() {
     repo.listStepTotals(userId, HISTORY_START, today),
     repo.listFoodLogDayKeys(userId, HISTORY_START, today),
     repo.listWeightDayKeys(userId, HISTORY_START, today),
+    repo.listCardioSessionCounts(userId, HISTORY_START, today, CARDIO_ACTIVITY_TYPES),
   ])
 
   // `pausedDays` is compliance the app itself asked for, so that following its instructions never
@@ -111,8 +113,8 @@ export async function GET() {
   }
 
   // PS-49 — collection rules v2, BESIDE v1 rather than instead of it: the current surface reads
-  // `collections`, so nothing the owner sees changes until the surface switches to `v2`. That
-  // switch re-scores his history, which PS-48 ④ asks him about first.
+  // `collections`, so nothing the owner sees changes until the surface switches to `v2` (#2187).
+  // That switch re-scores his whole history, which he accepted on 2026-10-05 (#2085 ④).
   const healthPoints = new Map<string, number>()
   for (const day of [...sleepDays, ...foodDays, ...weightDays]) healthPoints.set(day, (healthPoints.get(day) ?? 0) + 1)
   const v2 = {
@@ -129,8 +131,11 @@ export async function GET() {
         gains: healthPoints, ladder: V2_LADDERS.health,
         unitsPerT1: HEALTH_POINTS_PER_T1, drainPerDay: HEALTH_DRAIN_PER_DAY, today,
       }),
-      // The Rogue's unit and drain are the owner's open question (PS-48 ②).
-      cardio: null,
+      // The Rogue: 1 session = 1 T1, draining ⅕ a session a day — provisional (#2085 ②).
+      cardio: replayBankCollection({
+        gains: new Map(cardioCounts.map(r => [r.date, r.sessions * CARDIO_UNITS_PER_SESSION])), ladder: V2_LADDERS.cardio,
+        unitsPerT1: CARDIO_UNITS_PER_T1, drainPerDay: CARDIO_DRAIN_PER_DAY, today,
+      }),
     },
   }
 

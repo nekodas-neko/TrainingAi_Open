@@ -1,7 +1,9 @@
 # Cat collection rules v2: four classes, merge-3, a drain that movement counteracts
 
-**Status:** planned, not built. Engine half is PS-49 (Lane A). Owner questions still open are PS-48
-(Lane O). Art shipped with BF-126 (2026-09-26); the Android home-screen widget is PS-50.
+**Status:** engine built beside v1 (PS-49, 2026-09-28; the Rogue and the drain order, #2085,
+2026-10-06). The owner answered every PS-48 question by 2026-10-05: re-score history from scratch,
+and the Rogue at 1 session = 1 T1 draining ⅕ a day, provisional. **The surface switch is #2187.**
+Art shipped with BF-126 (2026-09-26); the Android home-screen widget is PS-50.
 **Source:** the owner's brief in the BF-126 art session, 2026-09-26, quoted where it decides
 something.
 
@@ -34,7 +36,10 @@ is a running balance in that unit, and the number of T1 cats held is `floor(bank
 **Drain is constant, every day, and movement counteracts it** (owner: *"it should always drain; and
 it just gets counteracted by movement … if I make 5000 steps in the day its an effective 4000
 profit"*). This deliberately reverses v1's rule that only gap days decay. Each day:
-`bank = max(0, bank + gained(day) − drainPerDay)`.
+`bank = max(0, bank − drainPerDay) + gained(day)`. **The drain comes off what was carried in**
+(#2085): draining after the gain took it out of a first day's own gain, so one session, 5,000 steps
+or a fully logged day showed no cat. Whenever the carried balance covers the drain the two orders
+are the same sum.
 
 **Merges are 3 → 1 at every tier** (owner: *"the next amount creates 2 mini sprites; and then at 3
 they merge into a large sprite (t2), and this will repeat"*). Held cats are therefore the base-3
@@ -51,7 +56,7 @@ test"*):
 |---|---|---|---|
 | Ranger | 5,000 steps | 1,000 steps | owner, 2026-09-26 |
 | Tank | 1 workout | **none, and only the gap past the rest allowance decays** (see below) | owner, second answer, 2026-09-26 |
-| Rogue | **open (PS-48)** | **open** | proposal: 1 session = 1 T1, drain ⅕/day |
+| Rogue | 1 session (5 fifths) | ⅕ session (1 fifth) | owner, 2026-10-05, **provisional — Tuning revisits** (#2085). A session is a live `activity_logs` row of a type in `CARDIO_ACTIVITY_TYPES` |
 | Health cat | 3 points | 1 point | owner set the faucet 2026-09-26; the numbers are this plan's proposal |
 
 **The Health cat's points** (owner: *"it should give points for either sleep/nutrition/weight
@@ -123,7 +128,7 @@ Tank earned last month silently un-merges"*. v2 is that rewrite, deliberately, a
 request. Because nothing is stored, **there is nothing to migrate**: bump
 `COLLECTION_RULES_VERSION` to 2 and every read replays full history under v2. No per-span
 versioning (the "effective-from date" the docblock describes) is needed, unless the owner wants
-v1-era cats preserved. PS-48 asks him, with the recommendation to re-score from scratch, because
+v1-era cats preserved. **Answered 2026-10-05: re-score from scratch** (*"happy for past scores to be re-scored — we are still in trial mode"*). PS-48 asked him, with that recommendation, because
 v1 has been live for about two weeks.
 
 ## Build order (PS-49)
@@ -133,7 +138,7 @@ v1 has been live for about two weeks.
    switched, then delete it (one formula, one place).
 2. Faucet reads: steps need **per-day totals** (`listStepDayKeys` returns dates only; add a
    `listStepTotals` that is still one column wide, per RV-63). Workouts reuse `listTrainedDayKeys`.
-   Cardio and tracking wait on PS-48.
+   Cardio reads `listCardioSessionCounts` (#2085); the Health cat reads sleep, food and weight day keys.
 3. `app/api/collection/route.ts`: return all four classes (cardio and tracking as `null` until
    their faucets exist) plus `rulesVersion: 2`.
 4. Surface (Lane B): `collection-summary.ts` sentence builders, the card, the collection screen and

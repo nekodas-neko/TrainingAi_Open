@@ -889,6 +889,8 @@ export interface WorkoutRepository {
   listStepTotals(userId: string, from: string, to: string): Promise<{ date: string; steps: number }[]>
   listFoodLogDayKeys(userId: string, from: string, to: string): Promise<string[]>
   listWeightDayKeys(userId: string, from: string, to: string): Promise<string[]>
+  /** #2085 — live activity logs of the given types, counted per day, for the Rogue's bank. */
+  listCardioSessionCounts(userId: string, from: string, to: string, activityTypes: readonly string[]): Promise<{ date: string; sessions: number }[]>
   /** The chosen rest days in `[from, to]`, ascending — dates only, `YYYY-MM-DD`. */
   listRestDays(userId: string, from: string, to: string): Promise<string[]>
 
