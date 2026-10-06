@@ -392,12 +392,18 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // a Sleep Score of 5 against a 7.86 h night. `nightSessions` classifies by circadian position and
   // reassembles fragmented nights, so a wake-up in the middle no longer splits one night into two.
   const nights = nightSessions(sleepSessions, tz)
-  const lastSleep  = canonicalLatestNight(nights)
+  const lastSleep  = canonicalLatestNight(nights, tz)
   const sleepHours = lastSleep?.durationHours ?? null
   // Personal baselines for the Sleep Score's opt-in contributors (overnight HRV, overnight HR, and
   // habitual bed/wake times), derived from the *prior* nights only so the night being scored never
   // contributes to the bar it is judged against. One shared derivation — see sleepScoreBaselines.
-  const sleepBaselines = sleepScoreBaselines(nights.slice(0, -1), tz)
+  // "Prior" is by the scored night's end, the day audit's rule, not `slice(0, -1)`: the scored
+  // night is not always the last element (a later window on its date, or a short evening window
+  // it passed over, #2456), and then `slice` left the scored night inside its own baseline.
+  const sleepBaselines = sleepScoreBaselines(
+    lastSleep ? nights.filter(n => n.sleepEnd.getTime() < lastSleep.sleepEnd.getTime()) : nights,
+    tz,
+  )
   // Our own 0–100 Sleep Score (recovered open_health weights + contributor curves). Feeds both
   // the standalone Sleep chip (0–100) and the readiness composite's internal 0–40 sleep term.
   // Falls back to the crude duration-only estimate when there's no session to score at all.

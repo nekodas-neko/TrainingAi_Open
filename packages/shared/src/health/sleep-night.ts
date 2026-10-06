@@ -222,17 +222,40 @@ export function latestNight<T extends SleepWindow>(
  * Deliberately NOT fixed inside `nightSessions`: eighteen call sites read it, most of them summing
  * weekly and trend totals, and collapsing a date there would also decide whether a long daytime
  * rest counts as sleep at all. That is a different question and nobody asked it.
+ *
+ * **A short evening window is never a date's night (#2456).** A window that began and ended on the
+ * evening of its own date ({@link opensFollowingNight}) and is shorter than
+ * {@link ALWAYS_NIGHT_MIN_HOURS} is a broken onset or an evening nap the band calls night. On a date
+ * with no other night it used to be returned here, so the sleep score, the day audit and the
+ * derived-score backfill graded a one-hour evening bout as the date's night (2026-08-31's derived
+ * row: sleep 56 → 15, readiness 55 → 25). It is skipped, and such a date has no graded night, the
+ * same as a date with no ring overnight. An evening sleep of four hours or more still counts: that
+ * is a main sleep on any clock (readiness-tree edge case 13, the night-shift sleeper), and it is the
+ * same bar the classifier uses to call a window night wherever it sat.
  */
-export function canonicalNightForDate<T extends { date: string; durationHours?: number | null }>(
+export function canonicalNightForDate<T extends DatedNight>(
   nights: T[],
   date: string,
+  tz: string,
 ): T | null {
   let best: T | null = null
   for (const n of nights) {
-    if (n.date !== date) continue
+    if (n.date !== date || !isDatesNight(n, tz)) continue
     if (!best || (n.durationHours ?? 0) > (best.durationHours ?? 0)) best = n
   }
   return best
+}
+
+/** The fields the per-date pickers read from an aggregated night. */
+type DatedNight = { date: string; sleepStart: Date; sleepEnd: Date; durationHours?: number | null }
+
+/**
+ * True when a night can be graded as its date's night: anything except a window shorter than
+ * {@link ALWAYS_NIGHT_MIN_HOURS} on the evening side of its own date. See
+ * {@link canonicalNightForDate} (#2456).
+ */
+export function isDatesNight(night: DatedNight, tz: string): boolean {
+  return (night.durationHours ?? 0) >= ALWAYS_NIGHT_MIN_HOURS || !opensFollowingNight(night, tz)
 }
 
 /**
@@ -262,25 +285,32 @@ export function opensFollowingNight(
  * samples, and because they still moved the battery the write guard let them replace a measured
  * day. That is TN-20's flattened-day shape, reached a different way.
  *
- * Deliberately not applied inside `canonicalNightForDate`: the scoring consumers (readiness,
- * the sleep score, the day audit) read that, and moving which night they grade is a separate,
- * score-moving change (#2456).
+ * Stricter than `canonicalNightForDate`, which keeps an evening sleep of four hours or more as
+ * the date's graded night (#2456, edge case 13): a sleep that ended that evening still did not
+ * start the date's waking day, so it never anchors the wake, however long it was.
  */
-export function nightWokenFrom<T extends { date: string; sleepStart: Date; sleepEnd: Date; durationHours?: number | null }>(
+export function nightWokenFrom<T extends DatedNight>(
   nights: T[],
   date: string,
   tz: string = DEFAULT_TZ,
 ): T | null {
-  return canonicalNightForDate(nights.filter(n => !opensFollowingNight(n, tz)), date)
+  return canonicalNightForDate(nights.filter(n => !opensFollowingNight(n, tz)), date, tz)
 }
 
-/** The canonical night of the most recent night date — see {@link canonicalNightForDate}. */
-export function canonicalLatestNight<T extends { date: string; durationHours?: number | null }>(
+/**
+ * The canonical night of the most recent date that HAS one — see {@link canonicalNightForDate}.
+ * A latest date carrying only a short evening window is passed over for the date before it, which
+ * is what "last night" read before that window was recorded (#2456).
+ */
+export function canonicalLatestNight<T extends DatedNight>(
   nights: T[],
+  tz: string,
 ): T | null {
   let latestDate: string | null = null
-  for (const n of nights) if (!latestDate || n.date > latestDate) latestDate = n.date
-  return latestDate ? canonicalNightForDate(nights, latestDate) : null
+  for (const n of nights) {
+    if (isDatesNight(n, tz) && (!latestDate || n.date > latestDate)) latestDate = n.date
+  }
+  return latestDate ? canonicalNightForDate(nights, latestDate, tz) : null
 }
 
 // ── Aggregating a fragmented night into one scoreable session ────────────────
