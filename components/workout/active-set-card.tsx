@@ -3,12 +3,16 @@
 import { memo } from "react";
 import { useWorkoutStore } from "@/lib/stores/workout-store";
 import { SetCard } from "./set-card";
+import { barShareOfOneRm } from "@trainingai/shared/1rm";
 import type { ExerciseType } from "@trainingai/shared/types/program";
 
 interface ActiveSetCardProps {
   currentSet: number;
   workoutPhase: "rest" | "set";
+  /** The prescribed % of 1RM. Only decides whether the chip shows; the chip prints the bar's real share. */
   intensityPct?: number;
+  /** Kilogram 1RM the share is taken against. Ignored for bodyweight, whose 1RM is an index. */
+  oneRm?: number | null;
   isBaseline?: boolean;
   lastSetMode?: string;
   exerciseType?: ExerciseType;
@@ -30,6 +34,7 @@ export const ActiveSetCard = memo(function ActiveSetCard({
   currentSet,
   workoutPhase,
   intensityPct,
+  oneRm,
   isBaseline,
   lastSetMode,
   exerciseType,
@@ -47,6 +52,11 @@ export const ActiveSetCard = memo(function ActiveSetCard({
   const rpeValue = useWorkoutStore((s) => s.rpeValues?.[currentSet]);
   const setCount = useWorkoutStore((s) => s.reps.length);
   const isAmrap = (isBaseline ?? false) || (lastSetMode === "amrap" && currentSet === setCount - 1);
+  // #2378: the dialled weight is rounded up to the plate grid (and may be changed by hand), so the
+  // prescribed % understates the set. Show what this weight actually is of the 1RM.
+  const shownPct = intensityPct == null || isBodyweight
+    ? intensityPct
+    : barShareOfOneRm(weight, oneRm) ?? intensityPct;
 
   return (
     <SetCard
@@ -57,7 +67,7 @@ export const ActiveSetCard = memo(function ActiveSetCard({
       weight={weight}
       lapTime={lapTime}
       restTime={restTime}
-      intensityPct={intensityPct}
+      intensityPct={shownPct}
       onRepChange={onRepChange}
       onWeightChange={onWeightChange}
       isAmrap={isAmrap}

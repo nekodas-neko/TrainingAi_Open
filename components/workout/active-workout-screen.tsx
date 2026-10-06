@@ -16,7 +16,7 @@ import { wouldDiscardWork } from "./leave-guard";
 import { OneRmCalculatorDialog } from "./one-rm-calculator-dialog";
 import { MuscleHeatmap, type MuscleActivation } from "@/components/muscle-heatmap";
 import { cachedFetch } from "@/lib/sqlite/cache";
-import { displayOneRm, displayOneRmSeries } from "@trainingai/shared/1rm";
+import { barShareOfOneRm, displayOneRm, displayOneRmSeries } from "@trainingai/shared/1rm";
 import { EXERCISE_HISTORY_TTL } from '@trainingai/shared/cache-ttl';
 import { getLocalStore } from "@/lib/local-store";
 import { todayInTz, shiftDateStr } from "@trainingai/shared/date-utils";
@@ -360,7 +360,10 @@ export function ActiveWorkoutScreen({
                   {workingWeight} kg
                 </p>
                 {exercise?.progressionStyle?.[0]?.pct && (
-                  <p className="text-xs text-muted-foreground mt-1.5">{exercise.progressionStyle[0].pct}% of 1RM · {exercise.progressionStyle[0].reps} reps per set</p>
+                  <p className="text-xs text-muted-foreground mt-1.5">
+                    {/* #2378: the bar's real share — the prescription rounds up to the plate grid. */}
+                    {barShareOfOneRm(workingWeight, exercise.estimated1rm) ?? exercise.progressionStyle[0].pct}% of 1RM · {exercise.progressionStyle[0].reps} reps per set
+                  </p>
                 )}
                 {(() => {
                   const plates = plateBreakdown(workingWeight);
@@ -419,7 +422,7 @@ export function ActiveWorkoutScreen({
                     const w = exercise.estimated1rm ? mroundStepUp(exercise.estimated1rm * s.pct / 100, weightStep) : null;
                     return (
                       <div key={i} className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Set {i + 1} ({s.pct}%)</span>
+                        <span className="text-muted-foreground">Set {i + 1} ({barShareOfOneRm(w, exercise.estimated1rm) ?? s.pct}%)</span>
                         <span className="font-semibold text-brand tabular-nums">
                           {w != null ? `${w} kg` : "—"} × {s.reps} reps
                         </span>
@@ -582,6 +585,7 @@ export function ActiveWorkoutScreen({
                   currentSet={currentSet}
                   workoutPhase={workoutPhase}
                   intensityPct={exercise?.progressionStyle?.[currentSet]?.pct}
+                  oneRm={exercise?.estimated1rm}
                   onRepChange={onRepChange}
                   onWeightChange={onWeightChange}
                   isBaseline={isBaseline}
