@@ -133,8 +133,8 @@ describe('#2360 — the card rows show the numbers the bar will load', () => {
   })
 
   it('a row with no recorded full numbers stays the deload it still is', () => {
-    const { preDeload: _omit, ...noRecord } = row
-    expect(prescriptionRowAsTrained(noRecord, true)).toEqual(noRecord)
+    const noRecord = { ...row, preDeload: undefined }
+    expect(prescriptionRowAsTrained(noRecord, true)).toBe(noRecord)
   })
 
   it('without a working override the row is the prescription, untouched', () => {
