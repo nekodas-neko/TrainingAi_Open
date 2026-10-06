@@ -439,11 +439,13 @@ async function cachedFetchCore<T>(
 
   // Create the fetch promise and store it
   const firstSeq = invalidationSeq;
-  let self: Promise<void> | undefined;
+  // A holder rather than a `let`: the IIFE below reads it after it has been assigned, which no
+  // `const` initialiser can express, and a lone late assignment trips `prefer-const`.
+  const self: { promise?: Promise<void> } = {};
   const fetchPromise = (async () => {
    for (let attempt = 1; ; attempt++) {
     const startSeq = attempt === 1 ? firstSeq : invalidationSeq;
-    if (attempt > 1 && inFlightRequests.get(key) === self) inFlightStartSeq.set(key, startSeq);
+    if (attempt > 1 && inFlightRequests.get(key) === self.promise) inFlightStartSeq.set(key, startSeq);
     let retry = false;
     try {
       // `cache: 'no-store'` because the browser's HTTP cache is a SECOND cache layer under this
@@ -539,13 +541,13 @@ async function cachedFetchCore<T>(
     } finally {
       // Not while retrying, and not for a request a newer one has replaced: the waiters it would
       // clear are queued for the newer request's answer.
-      if (!retry && inFlightRequests.get(key) === self) pendingWaiters.delete(key);
+      if (!retry && inFlightRequests.get(key) === self.promise) pendingWaiters.delete(key);
     }
     if (!retry) return;
    }
   })();
 
-  self = fetchPromise;
+  self.promise = fetchPromise;
   inFlightRequests.set(key, fetchPromise);
   inFlightStartSeq.set(key, firstSeq);
   try {
