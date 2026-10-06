@@ -35,7 +35,7 @@ describe('the ring key cannot be deleted in one tap — #2382', () => {
 
   it('runs that handler only from a dialog that requires a typed phrase', () => {
     expect(zone.match(/\bonDelete\(/g)).toHaveLength(1)
-    expect(zone).toMatch(/<ConfirmDialog[^>]*confirmPhrase="DELETE"[^>]*onConfirm=\{\(\) => \{[^}]*onDelete\(\)/s)
+    expect(zone).toMatch(/<ConfirmDialog[^>]*confirmPhrase="DELETE"[^>]*onConfirm=\{\(\) => \{[^}]*onDelete\(\)/)
   })
 
   it('places the control after the log, not beside the Redecode levers', () => {
