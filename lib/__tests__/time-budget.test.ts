@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest'
 import {
   setWorkSec, estimateExerciseDurationSec, estimateSessionDurationSec,
   estimateSessionDurationMin, fitToBudget, expandToBudget, dropToBudget, SECONDS_PER_REP, SET_SETUP_SEC,
-  applyRoleSetPlausibility,
+  applyRoleSetPlausibility, shortSessionRestSec, MIN_KEPT_EXERCISES,
+  SHORT_SESSION_REST_FLOOR_SEC,
   type TimedExercise, type MuscleVolumeState,
 } from '@trainingai/shared/ai-periodization/time-budget'
 import { TRANSITION_SEC_BARBELL, TRANSITION_SEC_STANDARD } from '@trainingai/shared/workout/duration-model'
@@ -13,24 +14,24 @@ describe('duration model', () => {
     expect(setWorkSec(12)).toBeGreaterThan(setWorkSec(3))
   })
 
-  it('exercise duration = sets*setWork + sets*rest + transition', () => {
+  it('exercise duration = sets*setWork + (sets-1)*rest + transition', () => {
     const ex = { sets: 3, reps: 5, restSec: 120, transitionSec: TRANSITION_SEC_BARBELL }
-    const expected = 3 * setWorkSec(5) + 3 * 120 + TRANSITION_SEC_BARBELL
+    const expected = 3 * setWorkSec(5) + 2 * 120 + TRANSITION_SEC_BARBELL
     expect(estimateExerciseDurationSec(ex)).toBe(expected)
   })
 
-  it('every set is charged its rest, including the last one', () => {
+  it('no rest is charged after the last set', () => {
     expect(estimateExerciseDurationSec({ sets: 1, reps: 5, restSec: 180, transitionSec: TRANSITION_SEC_STANDARD }))
-      .toBe(setWorkSec(5) + 180 + TRANSITION_SEC_STANDARD)
+      .toBe(setWorkSec(5) + TRANSITION_SEC_STANDARD)
   })
 
-  it('session duration sums exercises', () => {
+  it('session duration sums exercises, less the gap before the first', () => {
     const exs = [
       { sets: 2, reps: 6, restSec: 90, transitionSec: TRANSITION_SEC_BARBELL },
       { sets: 3, reps: 8, restSec: 60, transitionSec: TRANSITION_SEC_STANDARD },
     ]
     expect(estimateSessionDurationSec(exs))
-      .toBe(estimateExerciseDurationSec(exs[0]) + estimateExerciseDurationSec(exs[1]))
+      .toBe(estimateExerciseDurationSec(exs[0]) + estimateExerciseDurationSec(exs[1]) - TRANSITION_SEC_BARBELL)
   })
 })
 
@@ -55,7 +56,7 @@ describe('fitToBudget', () => {
       mk('main', 'primary', 5, 5, 180),
       mk('acc', 'accessory', 5, 12, 90),
     ]
-    const out = fitToBudget(exs, 32)
+    const out = fitToBudget(exs, 24)
     const acc = out.find(e => e.sessionExerciseId === 'acc')!
     const main = out.find(e => e.sessionExerciseId === 'main')!
     expect(acc.sets).toBeLessThan(5)
@@ -63,7 +64,7 @@ describe('fitToBudget', () => {
   })
 
   it('a barbell-heavy session trims more sets than a machine session for the same budget', () => {
-    const budget = 30
+    const budget = 26
     const machine = fitToBudget([
       mk('a', 'primary', 5, 5, 150, TRANSITION_SEC_STANDARD),
       mk('b', 'accessory', 5, 12, 90, TRANSITION_SEC_STANDARD),
@@ -150,7 +151,7 @@ describe('fitToBudget', () => {
       ['chest', { loggedBeforeSession: 12, mav: 16 }],
       ['biceps', { loggedBeforeSession: 9, mav: 14 }],
     ])
-    const out = fitToBudget(exs, 22, new Set(), muscleVolume)
+    const out = fitToBudget(exs, 18, new Set(), muscleVolume)
     expect(out.find(e => e.sessionExerciseId === 'biceps')!.sets)
       .toBeLessThan(out.find(e => e.sessionExerciseId === 'chest')!.sets)
   })
@@ -166,7 +167,7 @@ describe('fitToBudget', () => {
       ['chest', { loggedBeforeSession: 13, mav: 16 }], // projects to 17 of 16 — over MAV
       ['biceps', { loggedBeforeSession: 0, mav: 14 }], // projects to 4 of 14 — badly under
     ])
-    const out = fitToBudget(exs, 21, new Set(), muscleVolume)
+    const out = fitToBudget(exs, 18, new Set(), muscleVolume)
     expect(out.find(e => e.sessionExerciseId === 'chest')!.sets)
       .toBeLessThan(out.find(e => e.sessionExerciseId === 'biceps')!.sets)
   })
@@ -178,9 +179,9 @@ describe('fitToBudget with measured time profiles', () => {
       sessionExerciseId: 'a', role: 'accessory', sets: 4, reps: 10,
       restSec: 60, transitionSec: 120,
     }
-    // Constants: 4×50 + 3×60 + 120 = 500s — fits a 10-min budget untouched.
+    // Constants: 4×50 + 3×60 = 380s (a lone exercise has no gap before it) — fits 10 min untouched.
     expect(fitToBudget([ex], 10)[0].sets).toBe(4)
-    // Measured reality: 300s actual rest → 4×50 + 3×300 + 120 = 1220s > 600s.
+    // Measured reality: 300s actual rest → 4×50 + 3×300 = 1100s > 600s.
     // Trimming must see the measured values, not the optimistic constants.
     const measured = { ...ex, measuredRestSec: 300 }
     expect(fitToBudget([measured], 10)[0].sets).toBeLessThan(4)
@@ -191,7 +192,7 @@ describe('fitToBudget with measured time profiles', () => {
       sessionExerciseId: 'a', role: 'accessory', sets: 4, reps: 10,
       restSec: 60, transitionSec: 120, measuredSecPerRep: 12, // slow tempo: 130s sets
     }
-    // 4×130 + 3×60 + 120 = 820s > 600s → must trim.
+    // 4×130 + 3×60 = 700s > 600s → must trim.
     expect(fitToBudget([ex], 10)[0].sets).toBeLessThan(4)
   })
 })
@@ -232,7 +233,7 @@ describe('expandToBudget', () => {
       ['biceps', { loggedBeforeSession: 13, mav: 14 }], // nearly at target
       ['calves', { loggedBeforeSession: 1, mav: 14 }],  // badly behind
     ])
-    const out = expandToBudget(exs, 22, muscleVolume)
+    const out = expandToBudget(exs, 12, muscleVolume)
     expect(out.find(e => e.sessionExerciseId === 'behind')!.sets)
       .toBeGreaterThan(out.find(e => e.sessionExerciseId === 'ahead')!.sets)
   })
@@ -266,17 +267,53 @@ describe('dropToBudget', () => {
   it('drops accessories before compounds', () => {
     const exs = [
       mk('main', 'primary', 4, 5, 180),
-      mk('acc', 'accessory', 4, 12, 90),
+      mk('acc1', 'accessory', 4, 12, 90),
+      mk('acc2', 'accessory', 4, 12, 90),
     ]
-    const { droppedIds } = dropToBudget(exs, 12)
-    expect(droppedIds).toContain('acc')
-    expect(droppedIds).not.toContain('main')
+    const { droppedIds } = dropToBudget(exs, 8)
+    expect(droppedIds).toHaveLength(1)
+    expect(droppedIds[0]).toMatch(/^acc/)
   })
 
-  it('always keeps at least one exercise, however impossible the budget', () => {
-    const exs = [mk('a', 'primary', 4, 5, 240), mk('b', 'accessory', 4, 12, 120)]
-    const { exercises } = dropToBudget(exs, 1)
-    expect(exercises.length).toBe(1)
+  // #2078: one movement repeated is not a session.
+  it('never goes below two exercises, however impossible the budget', () => {
+    expect(MIN_KEPT_EXERCISES).toBe(2)
+    const exs = [mk('a', 'primary', 4, 5, 240), mk('b', 'accessory', 4, 12, 120), mk('c', 'accessory', 4, 12, 120)]
+    const { exercises, droppedIds } = dropToBudget(exs, 1)
+    expect(exercises).toHaveLength(2)
+    expect(droppedIds).toHaveLength(1)
+    // A two-exercise session is never dropped from at all — the overrun note covers it.
+    expect(dropToBudget(exs.slice(0, 2), 1).droppedIds).toEqual([])
+  })
+
+  // #2078, the shape the owner met: value order drops the cheap accessory and arrives at the two
+  // most expensive lifts, which overrun together. The last drop takes the secondary instead, so the
+  // pair that remains fits — and the primary is never the one traded away.
+  it('makes the last drop leave a pair that fits, without trading away the primary', () => {
+    const exs = [
+      mk('row', 'primary', 4, 5, 180, 240),
+      mk('pulldown', 'secondary', 4, 8, 180, 240),
+      mk('curl', 'accessory', 4, 12, 60),
+    ]
+    // At floor sets: row + pulldown = 744 s, row + curl = 536 s, all three = 1040 s.
+    const { exercises, droppedIds } = dropToBudget(exs, 10)
+    expect(droppedIds).toEqual(['pulldown'])
+    expect(exercises.map(e => e.sessionExerciseId)).toEqual(['row', 'curl'])
+    expect(estimateSessionDurationSec(exercises)).toBeLessThanOrEqual(600)
+  })
+
+  it('keeps plain value order on earlier drops — fewer exercises, with their sets given back', () => {
+    const exs = [
+      mk('row', 'primary', 4, 5, 180, 240),
+      mk('pulldown', 'secondary', 4, 8, 180, 240),
+      mk('curl', 'accessory', 4, 12, 60),
+      mk('raise', 'accessory', 4, 12, 60),
+    ]
+    // 15 min: three with the secondary (1040 s at floor) do not fit, so the accessories go in value
+    // order and the row and pulldown remain — rather than the pulldown going to save an accessory.
+    const { exercises, droppedIds } = dropToBudget(exs, 15)
+    expect(droppedIds.sort()).toEqual(['curl', 'raise'])
+    expect(exercises.map(e => e.sessionExerciseId)).toEqual(['row', 'pulldown'])
   })
 
   it('is a no-op when trimming alone already fits', () => {
@@ -289,16 +326,40 @@ describe('dropToBudget', () => {
   it('gives sets back to the survivors after a drop frees time', () => {
     const exs = [
       mk('main', 'primary', 5, 5, 120),
+      mk('sec', 'secondary', 5, 8, 120),
       mk('acc', 'accessory', 5, 12, 90),
     ]
-    // 12 min is below what both exercises cost even at the 2-set floor (~14 min), so a
-    // drop is forced; the survivor is then re-fitted against the full budget.
+    // 12 min is below what all three cost even at the 2-set floor (~13.8 min), so a drop is
+    // forced; the survivors are then re-fitted against the full budget.
     const { exercises, droppedIds } = dropToBudget(exs, 12)
-    expect(droppedIds).toContain('acc')
+    expect(droppedIds).toEqual(['acc'])
     // main is re-fitted against the whole budget, not left at the count it was cut to
     // while competing with the dropped accessory.
     const main = exercises.find(e => e.sessionExerciseId === 'main')!
     expect(main.sets).toBeGreaterThan(2)
+  })
+})
+
+describe('shortSessionRestSec (#2284)', () => {
+  it('cuts accessory and secondary rest by a quarter on a shorter day, in 5 s steps', () => {
+    expect(shortSessionRestSec(120, 'accessory', -1)).toBe(90)
+    expect(shortSessionRestSec(127, 'secondary', -1)).toBe(95)
+    expect(shortSessionRestSec(75, 'accessory', -1)).toBe(55)
+  })
+
+  it('never cuts below 45 s, and never raises a rest already under it', () => {
+    expect(SHORT_SESSION_REST_FLOOR_SEC).toBe(45)
+    expect(shortSessionRestSec(60, 'accessory', -1)).toBe(45)
+    expect(shortSessionRestSec(50, 'accessory', -1)).toBe(45)
+    expect(shortSessionRestSec(30, 'accessory', -1)).toBe(30)
+  })
+
+  it('leaves the main compound alone, and every role alone on a normal or longer day', () => {
+    expect(shortSessionRestSec(180, 'primary', -1)).toBe(180)
+    for (const role of ['primary', 'secondary', 'accessory']) {
+      expect(shortSessionRestSec(120, role, 0)).toBe(120)
+      expect(shortSessionRestSec(120, role, 1)).toBe(120)
+    }
   })
 })
 

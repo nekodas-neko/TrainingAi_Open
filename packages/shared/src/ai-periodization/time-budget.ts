@@ -301,8 +301,22 @@ export function expandToBudget<T extends TimedExercise>(
 // Only for an explicit short-session request. Drops in trim-priority order (the muscle
 // furthest over its weekly MAV first, accessories before compounds — the same ordering that
 // governs set trimming), re-trimming after each drop so it stops as soon as the remainder
-// fits. Always keeps at least one exercise. Dropped ids flow into the prescription's existing
-// `droppedExerciseIds`, which every render path already honours.
+// fits. Dropped ids flow into the prescription's existing `droppedExerciseIds`, which every
+// render path already honours.
+//
+// #2078: the loop only ever asked "does it fit", so `Quick · 30 min` on Pull came back as ONE
+// exercise. Two changes, both local to this loop:
+//  - **It never goes below MIN_KEPT_EXERCISES.** One movement repeated is not a session; when two
+//    still overrun, the overrun note says so instead.
+//  - **The last drop picks a pair that fits.** Value order drops the cheap accessories first, so the
+//    pair it arrives at can be the two most expensive lifts in the session, which together overrun
+//    while the main lift plus a cheaper exercise would not. On that final drop only, when the
+//    value-order victim leaves a pair that overruns, the least valuable exercise whose drop leaves a
+//    pair that FITS goes instead — never the primary, which is not traded for accessories. Earlier
+//    drops keep plain value order on purpose: fewer exercises with their sets given back is the
+//    point of dropping at all.
+export const MIN_KEPT_EXERCISES = 2
+
 export function dropToBudget<T extends TimedExercise>(
   exercises: T[],
   budgetMin: number,
@@ -312,24 +326,59 @@ export function dropToBudget<T extends TimedExercise>(
   const budgetSec = Math.max(0, budgetMin) * 60
   let kept = fitToBudget(exercises, budgetMin, protectedIds, muscleVolume)
   const droppedIds: string[] = []
-
-  while (kept.length > 1 && estimateSessionDurationSec(kept) > budgetSec) {
-    // Highest trim priority = least valuable to keep. Without muscle data trimPriority
-    // degrades to the role bias, so accessories go first — the same order as set trimming.
-    const victim = kept.reduce((worst, e) =>
-      trimPriority(e, kept, muscleVolume ?? new Map()) > trimPriority(worst, kept, muscleVolume ?? new Map())
-        ? e : worst)
-    droppedIds.push(victim.sessionExerciseId)
-    // Re-trim from the ORIGINAL set counts of the survivors: dropping an exercise frees
-    // time, so sets cut to fit the old, more crowded session should be given back.
+  // Re-trim from the ORIGINAL set counts of the survivors: dropping an exercise frees time, so
+  // sets cut to fit the old, more crowded session should be given back.
+  const refitWithout = (victim: T): T[] => {
     const survivorIds = new Set(kept.filter(e => e !== victim).map(e => e.sessionExerciseId))
-    kept = fitToBudget(
+    return fitToBudget(
       exercises.filter(e => survivorIds.has(e.sessionExerciseId)),
       budgetMin, protectedIds, muscleVolume,
     )
   }
 
+  while (kept.length > MIN_KEPT_EXERCISES && estimateSessionDurationSec(kept) > budgetSec) {
+    // Highest trim priority = least valuable to keep. Without muscle data trimPriority
+    // degrades to the role bias, so accessories go first — the same order as set trimming.
+    const mv = muscleVolume ?? new Map<string, MuscleVolumeState>()
+    const byValue = [...kept].sort((a, b) => trimPriority(b, kept, mv) - trimPriority(a, kept, mv))
+    let victim = byValue[0]
+    let next = refitWithout(victim)
+    if (next.length === MIN_KEPT_EXERCISES && estimateSessionDurationSec(next) > budgetSec) {
+      for (const candidate of byValue.slice(1)) {
+        if (candidate.role === 'primary') continue
+        const without = refitWithout(candidate)
+        if (estimateSessionDurationSec(without) <= budgetSec) {
+          victim = candidate
+          next = without
+          break
+        }
+      }
+    }
+    droppedIds.push(victim.sessionExerciseId)
+    kept = next
+  }
+
   return { exercises: kept, droppedIds }
+}
+
+// Rest at a shorter-than-usual session (#2284, owner 2026-08-23, option (a) with a 45 s floor):
+// accessory and secondary rest is shortened by a quarter; the main compound keeps its full rest,
+// the same protect-the-primary order as SET_FLOOR, ROLE_TRIM_BIAS and TRIM_ORDER. The authored
+// rest is SCALED, never replaced by a function of %1RM — the catalogue's rest is already
+// monotonic in intensity and hand-tuned per style, which is the "keep PCT in mind" he asked for.
+// "A bit shorter" is a quarter; −33% was the other option measured and is one constant away.
+export const SHORT_SESSION_REST_SCALE = 0.75
+export const SHORT_SESSION_REST_FLOOR_SEC = 45
+const REST_COMPRESSIBLE_ROLES = new Set(['accessory', 'secondary'])
+
+/** The rest to prescribe for `role` when today is shorter than the session (`direction < 0`).
+ *  Unchanged otherwise, for a primary, and for a rest already at or under the floor. */
+export function shortSessionRestSec(restSec: number, role: string, direction: -1 | 0 | 1): number {
+  if (direction >= 0 || !REST_COMPRESSIBLE_ROLES.has(role) || restSec <= SHORT_SESSION_REST_FLOOR_SEC) {
+    return restSec
+  }
+  const scaled = Math.round((restSec * SHORT_SESSION_REST_SCALE) / 5) * 5
+  return Math.max(SHORT_SESSION_REST_FLOOR_SEC, scaled)
 }
 
 // Trim sets until the estimated duration fits the budget, or no set can be removed

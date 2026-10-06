@@ -6,7 +6,7 @@
 // adjustments to legal ranges, and recomputes the projected duration and weekly-volume
 // impact itself — the model never gets to assert a number the math doesn't support.
 
-import { estimateExerciseDurationSec } from '@trainingai/shared/workout/duration-model'
+import { estimateSessionDurationSec, type DurationExercise } from '@trainingai/shared/workout/duration-model'
 import { resolveMeasuredRestSec, type ExerciseTimeProfile } from '@trainingai/shared/workout/time-profile'
 import { normalizePctFraction } from '@trainingai/shared/ai-periodization/reconcile-prescription'
 
@@ -85,15 +85,15 @@ function mainMuscles(ex: ReviewSignalExercise): string[] {
   return ex.muscleContributions.filter(m => m.weight >= 1).map(m => m.muscle)
 }
 
-function durationSecFor(ex: ReviewSignalExercise, shape: SetShape): number {
-  return estimateExerciseDurationSec({
+function durationInputFor(ex: ReviewSignalExercise, shape: SetShape): DurationExercise {
+  return {
     sets: shape.sets,
     reps: shape.reps,
     restSec: shape.restSec,
     transitionSec: ex.transitionSec,
     measuredSecPerRep: ex.timeProfile?.secPerRep ?? null,
     measuredRestSec: ex.timeProfile ? resolveMeasuredRestSec(ex.timeProfile, shape.pct) : null,
-  })
+  }
 }
 
 // Reconcile the model's per-exercise actions into a safe, self-consistent proposal.
@@ -207,15 +207,16 @@ export function reconcileReview(params: {
     })
   }
 
-  // Projected duration over the surviving exercises, using each exercise's after shape.
+  // Projected duration over the surviving exercises, using each exercise's after shape, in session
+  // order — the session estimate charges no gap before the first one (#2132).
   const byId = new Map(ordered.map(e => [e.sessionExerciseId, e]))
-  let durationSec = 0
+  const surviving: DurationExercise[] = []
   for (const p of out) {
     if (p.action === 'drop' || !p.after) continue
     const sig = byId.get(p.sessionExerciseId)
-    if (sig) durationSec += durationSecFor(sig, p.after)
+    if (sig) surviving.push(durationInputFor(sig, p.after))
   }
-  const projectedDurationMin = Math.round(durationSec / 60)
+  const projectedDurationMin = Math.round(estimateSessionDurationSec(surviving) / 60)
 
   // Weekly-volume impact: net weighted set change per muscle (drops subtract, adjusts delta).
   const weeklyImpact: Record<string, number> = {}

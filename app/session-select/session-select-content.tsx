@@ -7,6 +7,7 @@ import { calendarMonthInTz, previousCalendarMonth } from "@/lib/calendar-month";
 import { useDayRolloverRefresh, useLocalDay } from '@/components/shell/local-day-provider';
 import { getGreeting } from './greeting';
 import { isMorningCheckinPromptDone, markMorningCheckinPromptDone } from '@/app/session-select/morning-checkin-marker';
+import { warmPrescription } from '@/app/session-select/warm-prescription';
 import { useTransitionRouter } from "@/lib/view-transition";
 import type { ProgramSession, Program, NextSessionRecommendation } from "@trainingai/shared/types/program";
 import { getScheduledSessionsPerWeek } from "@trainingai/shared/schedule-utils";
@@ -430,6 +431,13 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     if (!recommendedSessionId) return;
     router.prefetch(`/workout?session=${encodeURIComponent(recommendedSessionId)}`);
   }, [router, recommendedSessionId]);
+  // #2155: and warm today's AI prescription for it, so the workout tab opens on the plan rather than
+  // on "Preparing your AI workout…". The server generates only when the tab would have, and not once
+  // today's workout is done.
+  useEffect(() => {
+    if (!recommendedSessionId || !isAiDynamic) return;
+    warmPrescription(recommendedSessionId, localDay);
+  }, [recommendedSessionId, isAiDynamic, localDay]);
 
   const handleNavigateStats = useCallback(() => navigateToTab(router, "/health?tab=training"), [router]);
   const handleNavigateHealthBody = useCallback(() => navigateToTab(router, "/health?tab=body"), [router]);

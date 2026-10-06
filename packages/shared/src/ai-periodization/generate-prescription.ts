@@ -25,7 +25,7 @@ import { fitToBudget, estimateSessionDurationMin } from '@trainingai/shared/ai-p
 import { applyBudgetStage } from '@trainingai/shared/ai-periodization/budget-stage'
 import { capLoadToAnchor } from '@trainingai/shared/ai-periodization/role-plausibility'
 import { resolveMeasuredRestSec } from '@trainingai/shared/workout/time-profile'
-import { budgetForPreset, requestedBudgetMin, type DurationPreset } from '@trainingai/shared/workout/duration-model'
+import { budgetForPreset, requestedBudgetMin, fitBudgetMin, type DurationPreset } from '@trainingai/shared/workout/duration-model'
 import { applyAutoregulation, clampPrescribedPct } from '@trainingai/shared/ai-periodization/autoregulation'
 import { shouldTriggerEmergencyDeload } from '@trainingai/shared/ai-periodization/emergency-deload'
 import { computePerExerciseDeload } from '@trainingai/shared/ai-periodization/per-exercise-deload'
@@ -99,7 +99,7 @@ export function buildWholeSessionDeloadPrescription(
         measuredSecPerRep: ex.timeProfile?.secPerRep ?? null,
         measuredRestSec: ex.timeProfile ? resolveMeasuredRestSec(ex.timeProfile, pct) : null,
       })),
-      signals.effectiveTimeBudgetMin,
+      fitBudgetMin(signals),
     ).map(f => [f.sessionExerciseId, f.sets]),
   )
 
@@ -203,7 +203,7 @@ export function buildRulesPrescription(
         measuredSecPerRep: p.ex.timeProfile?.secPerRep ?? null,
         measuredRestSec: p.ex.timeProfile ? resolveMeasuredRestSec(p.ex.timeProfile, p.pct) : null,
       })),
-      signals.effectiveTimeBudgetMin,
+      fitBudgetMin(signals),
     ).map(f => [f.sessionExerciseId, f.sets]),
   )
 
@@ -659,7 +659,7 @@ async function runPrescriptionGeneration(
   // REMOVES sets, and a return to the session's own length runs neither drop nor expand, so
   // re-fitting a trimmed plan could never give the sets back (short → standard would keep the
   // 2-set short plan and label it standard).
-  const refitBaseline = {
+  const refitBaseline: NonNullable<AiPrescription['refitBaseline']> = {
     sets: Object.fromEntries(parsed.exercises.map(ex => [ex.session_exercise_id, ex.sets])),
     reasoning: parsed.reasoning,
     ...(autoreg.earnedSetIds.size > 0 && { earnedSetIds: [...autoreg.earnedSetIds] }),
@@ -681,6 +681,13 @@ async function runPrescriptionGeneration(
   )
   for (const ex of parsed.exercises) {
     ex.sets = budget.sets.get(ex.session_exercise_id) ?? ex.sets
+    const rest = budget.restSec.get(ex.session_exercise_id) ?? ex.rest_sec
+    // A shortened rest (#2284) is kept on the baseline at its full length, so re-fitting this plan
+    // back to the session's own length gives the rest back as well as the sets.
+    if (rest !== ex.rest_sec) {
+      refitBaseline.restSec = { ...refitBaseline.restSec, [ex.session_exercise_id]: ex.rest_sec }
+    }
+    ex.rest_sec = rest
   }
   const droppedIdSet = budget.droppedIds
   const estimatedSessionDurationMin = budget.estimatedSessionDurationMin

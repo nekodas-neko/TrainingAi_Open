@@ -1,7 +1,7 @@
 import type { PrescriptionSignals } from './signals'
 import type { SessionPeriodization } from '@trainingai/shared/types/ai-periodization'
 import { volumeLandmarks } from './volume-targets'
-import { SECONDS_PER_REP, SET_SETUP_SEC } from '@trainingai/shared/workout/duration-model'
+import { SECONDS_PER_REP, SET_SETUP_SEC, fitBudgetMin } from '@trainingai/shared/workout/duration-model'
 import { PCT_BANDS } from '@trainingai/shared/workout/time-profile'
 import { displayOneRm, displayOneRmDelta } from '@trainingai/shared/1rm'
 import { FEVER_TEMP_Z } from '@trainingai/shared/health/illness-radar'
@@ -141,11 +141,11 @@ Do NOT compare current_1rm against baseline_1rm as a strength metric — baselin
 the starting weight anchor from the AMRAP week and will be exceeded quickly.
 
 Time constraint: total session duration must fit within effective_time_budget_min.
-Duration formula: for each exercise, time = sets × (${SET_SETUP_SEC} + reps × sec_per_rep) + sets × rest + transition_sec.
+Duration formula: for each exercise, time = sets × (${SET_SETUP_SEC} + reps × sec_per_rep) + (sets − 1) × rest + transition_sec. No rest follows the last set: the walk to the next exercise is its transition_sec.
 sec_per_rep is the exercise's measured_sec_per_rep when given in the exercise list, else ${SECONDS_PER_REP}.
 rest is the exercise's measured rest for the band your prescribed pct falls in (light <70%, moderate 70-80%, heavy 80-90%, max ≥90%) when measured_rest_by_band lists that band, else your prescribed rest_sec. Measured values are this user's real logged times — trust them over the defaults.
 transition_sec is given per exercise in the exercise list (equipment-dependent: barbell setups cost more than machines).
-Total = sum across all exercises, converted to minutes.
+Total = sum across all exercises, less the FIRST exercise's transition_sec (its setup happens during the warm-up), converted to minutes.
 If over budget: cut sets on accessory exercises first. Never cut compound exercises entirely.
 Heavier phases use longer rest, so fewer sets fit the same budget — prefer fewer, harder
 sets over many sets that overrun the time. (A deterministic guard also trims to fit, but
@@ -296,7 +296,7 @@ export function buildUserPrompt(
 
   return `Current date: ${today}
 Program goal: ${signals.trainingGoal}
-Time budget: ${signals.effectiveTimeBudgetMin} min
+Time budget: ${Math.floor(fitBudgetMin(signals))} min
 
 Phase: ${signals.phase} (${signals.sessionsInPhase} sessions in this phase)
 

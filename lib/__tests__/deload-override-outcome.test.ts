@@ -82,7 +82,7 @@ describe('the card says the honest thing', () => {
    * survives the feature being disabled read as coverage and was not.
    */
   const HONEST_BRANCH =
-    /\{overrideOutcome === 'nothing-to-revert'\s*\?\s*"This prescription lowered the whole session[^"]*"\s*:\s*overrideBlockedNames\.length === 0\s*\?\s*"Every exercise is back to its pre-deload weights/
+    /\{overrideOutcome === 'nothing-to-revert'\s*\?\s*"This prescription has no full numbers recorded[^"]*"\s*:\s*overrideBlockedNames\.length === 0\s*\?\s*"Every exercise is back to its pre-deload weights/
 
   it('guards the honest sentence on the outcome, and reaches it before the blocked check', () => {
     // One pattern, so it cannot be satisfied by the condition and the sentence existing separately:
@@ -93,8 +93,12 @@ describe('the card says the honest thing', () => {
   })
 
   it('makes no revert or 1RM claim in that branch', () => {
-    const sentence = card().match(/"This prescription lowered the whole session[^"]*"/)![0]
-    expect(sentence).toContain('does not change')
+    const sentence = card().match(/"This prescription has no full numbers recorded[^"]*"/)![0]
+    expect(sentence).toContain('stay as they are')
+    // #2131: it used to send him to "a new prescription", which nothing on screen can request. The
+    // remedy it names must be one that exists.
+    expect(sentence).not.toMatch(/new prescription for that/)
+    expect(sentence).toContain('program editor')
     // The specific false sentence, not the phrase "back to" — the honest copy legitimately says
     // there is nothing to *go back to*, and a blunter matcher fails on the fix itself.
     expect(sentence, 'the false claim must not be what this branch renders')

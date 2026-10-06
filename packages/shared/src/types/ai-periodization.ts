@@ -103,9 +103,13 @@ export interface AiPrescription {
   // whole-session deloads (which are returned unchanged while they are pending) — both fall
   // back to a full generation.
   refitBaseline?: {
-    /** Set count per sessionExerciseId BEFORE the budget stage. The only lossy field: the
-     *  stage never touches reps/pct/restSec, so those are read off the exercise itself. */
+    /** Set count per sessionExerciseId BEFORE the budget stage. reps/pct are never touched by the
+     *  stage, so those are read off the exercise itself. */
     sets: Record<string, number>
+    /** Rest per sessionExerciseId BEFORE the budget stage, present only when the stage shortened
+     *  one (#2284, a shorter-than-usual session). Without it a re-fit back to the session's own
+     *  length would start from the shortened rest and keep it. */
+    restSec?: Record<string, number>
     /** The reasoning before the stage appended its dropped/overrun note, so a re-fit replaces
      *  that note rather than stacking a second one on top of it. */
     reasoning: string

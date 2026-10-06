@@ -12,7 +12,7 @@ import { sessionsRemainingThisWeek } from '@trainingai/shared/schedule-utils'
 import { volumeLandmarks } from '@trainingai/shared/ai-periodization/volume-targets'
 import { projectRm } from '@trainingai/shared/health/strength-projection'
 import { oneRmTrendStatus } from '@trainingai/shared/1rm'
-import { workingBudgetMin } from '@trainingai/shared/workout/duration-model'
+import { workingBudgetMin, planningBudgetMin } from '@trainingai/shared/workout/duration-model'
 import { buildTimeProfiles, type ExerciseTimeProfile } from '@trainingai/shared/workout/time-profile'
 import { robustAvgSetDurationsByExercise, buildMeasuredTimeBudget, resolveTransitionSec } from '@trainingai/shared/workout/time-audit'
 import { excludeLowWearDays, toOuraByDate } from '@trainingai/shared/health/wear-confidence'
@@ -22,6 +22,10 @@ export interface PrescriptionSignals {
   trainingGoal: string
   autoApplyPrescriptions: boolean
   effectiveTimeBudgetMin: number
+  /** What a plan is FITTED against: the working budget less the lifter's p75 finish-early margin
+   *  (#2132). Optional so a hand-built signal still fits against the working budget — read it
+   *  through `fitBudgetMin`. Shown to nobody; `effectiveTimeBudgetMin` is the number he sees. */
+  planningBudgetMin?: number
   exercises: Array<{
     sessionExerciseId: string
     name: string
@@ -531,6 +535,12 @@ export async function aggregateSignals(
   const { confidence, tier: confidenceTier } = computeConfidence(confidenceInputs)
   const confidenceReasons = confidenceFactors(confidenceInputs)
 
+  const workingMin = workingBudgetMin(
+    budgetOverrideMin ?? programSession.timeBudgetMinutes,
+    measuredTimeBudget.warmupSec != null ? measuredTimeBudget.warmupSec / 60 : null,
+    programSession.timeBudgetMinutes,
+  )
+
   const exercisesWithAutoreg = exercises.map(ex => ({
     ...ex,
     rpeDelta: perExRpeDelta.get(ex.name) ?? null,
@@ -540,11 +550,8 @@ export async function aggregateSignals(
   return {
     trainingGoal: program.trainingGoal,
     autoApplyPrescriptions: program.autoApplyPrescriptions,
-    effectiveTimeBudgetMin: workingBudgetMin(
-      budgetOverrideMin ?? programSession.timeBudgetMinutes,
-      measuredTimeBudget.warmupSec != null ? measuredTimeBudget.warmupSec / 60 : null,
-      programSession.timeBudgetMinutes,
-    ),
+    effectiveTimeBudgetMin: workingMin,
+    planningBudgetMin: planningBudgetMin(workingMin, measuredTimeBudget.planningMarginFactor),
     exercises: exercisesWithAutoreg,
     phase: state.phase,
     sessionsInPhase: state.sessionsInPhase,

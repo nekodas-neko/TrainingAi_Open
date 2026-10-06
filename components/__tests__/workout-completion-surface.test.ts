@@ -111,15 +111,15 @@ describe('BF-167 — the deload toggle reads the exercises, not the phase flag',
   })
 })
 
-describe('LA-177 — the completion-time prescribe call excludes the session that just finished', () => {
+describe('#2155 — no prescription is generated at completion', () => {
   const src = code('components/workout-screen.tsx')
 
-  it('routes the completion call through the helper, which owns the body shape', () => {
-    // The shape itself is tested by CALLING it, in components/workout/__tests__/prescribe-request.test.ts.
-    // What only this file can check is that the completion call actually uses it.
-    expect(src).toContain('fetch(`/api/ai-periodization/session/${psid}/prescribe`, prescribeRequestInit(wsId))')
-    expect(src, 'the bodyless literal it replaced must be gone')
-      .not.toContain('fetch(`/api/ai-periodization/session/${psid}/prescribe`, { method: "POST" })')
+  it('fires no prescribe call when a workout completes', () => {
+    // The next prescription is warmed from Home on the day it is wanted. Generating at completion
+    // built it on that day's readiness and left it sitting — the owner rejected that twice. LA-177's
+    // `excludeSessionId` helper existed only for this call and went with it.
+    expect(src).not.toContain('prescribeRequestInit')
+    expect(src).not.toContain('fetch(`/api/ai-periodization/session/${psid}/prescribe`')
   })
 
   it('leaves the OPEN-time prescribe call bodyless, which is correct there', () => {
