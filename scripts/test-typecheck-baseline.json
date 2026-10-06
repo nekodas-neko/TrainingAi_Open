@@ -27,7 +27,7 @@
   "lib/__tests__/prompt-recovery-signals.test.ts": 1,
   "lib/__tests__/reevaluate.test.ts": 1,
   "lib/__tests__/training-stress-warmed.test.ts": 1,
-  "lib/ai-chat/__tests__/tools-hr-recovery-profile.test.ts": 3,
+  "lib/ai-chat/__tests__/tools-hr-recovery-profile.test.ts": 2,
   "lib/ai-chat/__tests__/tools-hr-trend.test.ts": 8,
   "lib/ai-chat/__tests__/tools-recovery.test.ts": 1,
   "lib/ai/__tests__/instrument.test.ts": 6,
@@ -50,7 +50,6 @@
   "lib/data/postgres/__tests__/oura-ble-clock-epochs.test.ts": 11,
   "lib/data/postgres/__tests__/oura-clock-anchor-scoping.test.ts": 3,
   "lib/data/postgres/__tests__/saved-meal-last-used.test.ts": 2,
-  "lib/data/postgres/__tests__/set-hr-stats.test.ts": 1,
   "lib/data/postgres/__tests__/supplement-dose-on-log.test.ts": 1,
   "lib/data/postgres/__tests__/sync-delta-connection-demand.test.ts": 1,
   "lib/data/postgres/__tests__/sync-delta-window.test.ts": 3,
@@ -64,7 +63,7 @@
   "lib/walk/__tests__/segment-stats.test.ts": 1,
   "packages/shared/src/__tests__/schedule-utils.test.ts": 2,
   "packages/shared/src/ai-periodization/__tests__/illness-prompt.test.ts": 1,
-  "packages/shared/src/health/__tests__/compute-hr-recovery-profile.test.ts": 2,
+  "packages/shared/src/health/__tests__/compute-hr-recovery-profile.test.ts": 1,
   "packages/shared/src/health/__tests__/sleep-staging.test.ts": 4,
   "packages/shared/src/health/__tests__/strength-progress.test.ts": 1,
   "packages/shared/src/nutrition/__tests__/label-payload.test.ts": 1,
@@ -80,8 +79,6 @@
   "packages/shared/src/running/__tests__/prescription.test.ts": 1,
   "packages/shared/src/session-explain/__tests__/build-explain-data.test.ts": 1,
   "packages/shared/src/workout/__tests__/complete-workout.test.ts": 4,
-  "packages/shared/src/workout/__tests__/exercise-hr-trend.test.ts": 1,
   "packages/shared/src/workout/__tests__/log-exercise.test.ts": 25,
-  "packages/shared/src/workout/__tests__/session-data-manual-deload.test.ts": 7,
-  "packages/shared/src/workout/__tests__/set-hr-stats.test.ts": 1
+  "packages/shared/src/workout/__tests__/session-data-manual-deload.test.ts": 7
 }
