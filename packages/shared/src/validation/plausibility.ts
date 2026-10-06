@@ -62,6 +62,11 @@ export const MAX_PACE_SEC_PER_KM = 3600
 export const MIN_PLAUSIBLE_BPM = 20
 export const MAX_PLAUSIBLE_BPM = 250
 
+/** Metabolic equivalent for one minute. The Compendium of Physical Activities tops out near 23 MET
+ *  (all-out running and cycling); 25 clears it. Below 0.5 is below a sleeping metabolic rate. */
+export const MIN_PLAUSIBLE_MET = 0.5
+export const MAX_PLAUSIBLE_MET = 25
+
 /** Beat-to-beat interval band. 200 ms is 300 bpm, 4,000 ms is 15 bpm. */
 export const MIN_PLAUSIBLE_RR_MS = 200
 export const MAX_PLAUSIBLE_RR_MS = 4000
