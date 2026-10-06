@@ -8,6 +8,7 @@ import { reportServerError } from '@/lib/observability'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { rateLimit } from '@/lib/rate-limit'
 import { googleRefreshTokenFrom } from '@/lib/auth/session-token'
+import { isCalendarScopeMissing, googleErrorStatus } from '@/lib/calendar/google-error'
 import { z } from 'zod'
 
 // One calendar event.
@@ -105,17 +106,11 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ success: true, eventId: event.data.id });
   } catch (err: unknown) {
-    const errStr = String(err);
-    const errMsg = err instanceof Error ? err.message : errStr;
-    const errCode = (err instanceof Object && "code" in err) ? (err as { code?: string }).code : undefined;
-    console.error("[log-calendar-event] error:", { message: errMsg.slice(0, 200), code: errCode });
-    if (
-      errStr.includes("403") ||
-      errMsg.toLowerCase().includes("forbidden") ||
-      errMsg.toLowerCase().includes("insufficientpermissions") ||
-      errMsg.toLowerCase().includes("calendar") ||
-      errCode === "ERR_HTTP_403"
-    ) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    console.error("[log-calendar-event] error:", { message: errMsg.slice(0, 200), status: googleErrorStatus(err) });
+    // #2426: classified on Google's status and reason, never on the message text. A message that
+    // merely names the calendar is a fault, and must reach `error_events`.
+    if (isCalendarScopeMissing(err)) {
       return NextResponse.json({ code: "CALENDAR_SCOPE_MISSING" }, { status: 403 });
     }
     // Past the scope branch only — a missing calendar grant is the user's consent state, not a

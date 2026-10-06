@@ -15,7 +15,7 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { PROSE_GUARDS, PROSE_FIELD_GUARDS, METRIC_UNITS_RULE, NO_SUPERLATIVE_RULE, QUOTE_NUMBERS_RULE } from '../prompt-guards'
+import { PROSE_GUARDS, PROSE_FIELD_GUARDS, METRIC_UNITS_RULE, NO_SUPERLATIVE_RULE, NO_DIAGNOSIS_RULE, QUOTE_NUMBERS_RULE } from '../prompt-guards'
 import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const root = join(__dirname, '..', '..', '..')
@@ -83,11 +83,42 @@ describe('the guards say the two things that actually went wrong', () => {
   })
 })
 
+// #2421. The 2026-07-19 insight that inferred illness from skin temperature is the class the units
+// and superlative rules do not touch. Because every route reaches one of the two constants, the
+// rule reaching both is what makes it reach every route — the lists above pin that.
+describe('the guards forbid quasi-medical inference (#2421)', () => {
+  it('names the conditions the model must not reach for', () => {
+    expect(NO_DIAGNOSIS_RULE).toMatch(/never diagnose/)
+    for (const word of ['medical condition', 'illness', 'infection', 'sick']) {
+      expect(NO_DIAGNOSIS_RULE).toContain(word)
+    }
+  })
+
+  it('names the signals it was observed on, so it is not read as only about temperature', () => {
+    for (const signal of ['temperature', 'resting heart rate', 'HRV']) {
+      expect(NO_DIAGNOSIS_RULE).toContain(signal)
+    }
+  })
+
+  it('still lets the model say how far a reading is from the usual', () => {
+    // A rule that forbade describing the deviation would blank every insight about a body signal.
+    expect(NO_DIAGNOSIS_RULE).toMatch(/above or below the usual/)
+  })
+
+  it('is spliced into the prompt of every route that carries a guard set', () => {
+    for (const path of [...PROSE_ROUTES, ...PROSE_FIELD_ROUTES, 'app/api/coach/route.ts']) {
+      const src = read(path)
+      expect(src.includes('${PROSE_GUARDS}') || src.includes('${PROSE_FIELD_GUARDS}'), path).toBe(true)
+    }
+  })
+})
+
 describe('the two guard sets differ only where they have to', () => {
-  it('both carry the units and superlative rules', () => {
+  it('both carry the units, superlative and no-diagnosis rules', () => {
     for (const guards of [PROSE_GUARDS, PROSE_FIELD_GUARDS]) {
       expect(guards).toContain(METRIC_UNITS_RULE)
       expect(guards).toContain(NO_SUPERLATIVE_RULE)
+      expect(guards).toContain(NO_DIAGNOSIS_RULE)
     }
   })
 
