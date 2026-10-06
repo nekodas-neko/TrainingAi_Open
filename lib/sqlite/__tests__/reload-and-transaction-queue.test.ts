@@ -111,7 +111,7 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks() })
 
 const tookUpgradeFallback = () =>
-  errorSpy.mock.calls.some(c => String(c[0]).includes('version upgrade failed'))
+  errorSpy.mock.calls.some((c: unknown[]) => String(c[0]).includes('version upgrade failed'))
 
 describe('initSQLite after a page reload (#2386)', () => {
   it('reopens at the real schema version without the upgrade-failure fallback', async () => {
