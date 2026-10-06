@@ -24,20 +24,23 @@ export const READINESS_VERDICT_BASELINE_DAYS = 28
 /**
  * How far outside the interquartile range a score must sit to be called unusual, in IQRs.
  *
- * **1.00, copied from the sleep verdict's `VERDICT_IQR_MULTIPLIER` and NOT yet calibrated for
- * readiness.** Sleep's 1.00 was swept over the owner's real nights to hit 4–6 prompts a month;
- * readiness has its own spread, so the same multiplier gives an unknown rate here. The rate is the
- * target and this number is only how it is reached — calibrating it on the owner's real scores is
- * #2430, and any change moves `READINESS_VERDICT_MODEL_VERSION` with it.
+ * **0.65, calibrated on the owner's real readiness scores (#2430, signed off 2026-10-06) to about
+ * five prompts a month.** It was 1.00, copied from the sleep verdict's `VERDICT_IQR_MULTIPLIER`:
+ * sleep's 1.00 was swept over his nights to give 4–6 a month, and readiness has its own spread, so
+ * the copy gave an unknown rate. The rate is the target and this number is only how it is reached.
+ * **Confidence is low** (the sweep judged 55 days, so a handful of prompts decides it): the owner's
+ * instruction is to re-check after 30 more days of scores, and a change then moves
+ * `READINESS_VERDICT_MODEL_VERSION` with it.
  *
  * A separate constant rather than an import on purpose: a later sleep recalibration must not
  * silently move the readiness rule without bumping this file's version.
  */
-export const READINESS_VERDICT_IQR_MULTIPLIER = 1.0
+export const READINESS_VERDICT_IQR_MULTIPLIER = 0.65
 
 /** Bumped whenever the verdict rule changes, so a stored snapshot says which rule produced it.
- *  v1: trailing 28 scored days, median ± 1.00 × IQR, strict inequality at the band edges. */
-export const READINESS_VERDICT_MODEL_VERSION = 1
+ *  v1: trailing 28 scored days, median ± 1.00 × IQR, strict inequality at the band edges.
+ *  v2: the same, with the multiplier calibrated to 0.65 (#2430). */
+export const READINESS_VERDICT_MODEL_VERSION = 2
 
 export type ReadinessVerdict = 'normal' | 'poor' | 'good'
 
