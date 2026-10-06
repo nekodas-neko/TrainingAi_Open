@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
 import { formatInTimeZone, toZonedTime, fromZonedTime } from "date-fns-tz";
-import { DEFAULT_TZ, startOfWeekInTz, ageFromDob } from "@trainingai/shared/date-utils";
+import { DEFAULT_TZ, startOfWeekInTz, ageFromDob, shiftDateStr } from "@trainingai/shared/date-utils";
 import { BodyMetadataPostSchema } from "@trainingai/shared/validation/body-metrics";
 import { ingestDayRejection } from "@trainingai/shared/validation/ingest-clock";
 import { type Sex } from "@trainingai/shared/health/workout-energy";
 import { computeActiveEnergy } from "@trainingai/shared/health/daily-energy";
+import { weightTrendWindowStart } from "@trainingai/shared/health/long-term-goal-progress";
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { correctBodyFatPct, type BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
 import { invalidBodyResponse } from '@/lib/api/route-errors'
@@ -74,6 +75,16 @@ export interface BodyMetaRow {
 // Calendar week-to-date sums (Monday in the user's timezone through today).
 // Add a new field here + the corresponding `body_metrics` column to extend
 // to other weekly-tracked metrics.
+/**
+ * One weigh-in inside the Weight Trend window (`WEIGHT_TREND_WINDOW_DAYS`, local days, today
+ * included). Its own field rather than a wider `recent`: `recent` feeds the sparkline, the
+ * composition cards and six metric sheets, all of which stay on 7 days (#2480).
+ */
+export interface WeightTrendPoint {
+  date: string;
+  weightKg: number;
+}
+
 export interface WeekToDate {
   steps: number;
   calories: number;
@@ -125,10 +136,13 @@ export async function GET() {
   const tz = session.user.timezone ?? DEFAULT_TZ;
   const now = new Date();
   const today = formatInTimeZone(now, tz, "yyyy-MM-dd");
-  const from = formatInTimeZone(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000), tz, "yyyy-MM-dd");
+  // Calendar arithmetic on the local date, never `now − N × 86,400,000`: across a DST change the
+  // millisecond form lands on the wrong local day for the hour either side of midnight.
+  const from = shiftDateStr(today, -7);
   // Wider window purely to recover the LAST-KNOWN weight when nothing was logged in the last
   // 7 days — the card used to show "—" (7-day window) even though an older reading exists.
-  const from180 = formatInTimeZone(new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000), tz, "yyyy-MM-dd");
+  // The same read supplies the Weight Trend slope's 30 days (#2480) — a subset, so no extra query.
+  const from180 = shiftDateStr(today, -180);
 
   // Start of today in the user's timezone (UTC instant) — for today's completed workouts.
   const todayStartZoned = toZonedTime(now, tz);
@@ -137,12 +151,13 @@ export async function GET() {
 
   const repo = await getRepository();
   const weekStartForFetch = startOfWeekInTz(tz);
+  let weightHistoryFailed = false;
   const [metrics, foodLogs, activityLogs, weekFoodSummary, weightHistory, todayWorkouts, bodyFatCalibration] = await Promise.all([
     repo.listBodyMetrics(userId, from, today),
     repo.listFoodLogs(userId, today).catch(() => []),
     repo.listActivityLogs(userId, weekStartForFetch, today).catch(() => []),
     repo.listFoodLogsSummary(userId, weekStartForFetch, today).catch(() => []),
-    repo.listBodyMetrics(userId, from180, today).catch(() => []),
+    repo.listBodyMetrics(userId, from180, today).catch(() => { weightHistoryFailed = true; return []; }),
     repo.getWorkoutSessionsFrom(userId, todayStartUtc).catch(() => []),
     repo.getBodyFatCalibration(userId).catch(() => null),
   ]);
@@ -153,6 +168,13 @@ export async function GET() {
     .sort((a, b) => (a.date < b.date ? 1 : -1))[0];
   const latestWeightKg = latestWeightRow?.weightKg ?? null;
   const latestWeightDate = latestWeightRow?.date ?? null;
+
+  // Null, not [], when the read failed: an empty array says "no weigh-ins this month" and the card
+  // would print "Need more data" over a history that exists. Null tells the client to fall back.
+  const trendFrom = weightTrendWindowStart(today);
+  const weightTrend: WeightTrendPoint[] | null = weightHistoryFailed ? null : weightHistory
+    .filter((m): m is typeof m & { weightKg: number } => m.weightKg != null && m.date >= trendFrom)
+    .map(m => ({ date: m.date, weightKg: m.weightKg }));
 
   // Profile inputs for the active-energy estimator (below, after today's activity logs are in scope).
   const bodyWeightForEnergy = latestWeightKg ?? metrics.find(m => m.weightKg != null)?.weightKg ?? null;
@@ -255,7 +277,7 @@ export async function GET() {
   return NextResponse.json(
     {
       today: todayRow, recent, weekToDate, calsBurnedToday, activeEnergyKcalToday,
-      latestWeightKg, latestWeightDate,
+      latestWeightKg, latestWeightDate, weightTrend,
       // The owner asked to be shown the offset, not just its effect. `pairCount` is what says how
       // much to trust it: at one pair an offset and a ratio are the same number, so the UI must not
       // present it as a settled calibration.
