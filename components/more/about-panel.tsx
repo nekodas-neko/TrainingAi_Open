@@ -4,10 +4,13 @@ import { ChevronRight, Download } from 'lucide-react'
 import { CHANGELOG, CURRENT_VERSION } from '@trainingai/shared/changelog'
 import { UpdateCheckCard } from '@/components/more/update-check-card'
 import { ServiceWorkerStatusRow } from '@/components/more/sw-status-row'
+import { useIsDevApp } from '@/lib/hooks/use-is-dev-app'
 
 /** Version · update check · service-worker status · APK download · what's new.
  *  Sync/Restore/Export used to share this block; they are DataSyncPanel now (Q-232). */
 export function AboutPanel() {
+  // #2390: Download Android App serves the REAL app's APK; the Dev app must not offer it.
+  const isDevApp = useIsDevApp()
   return (
     <div className="rounded-2xl bg-muted/40 border border-border overflow-hidden divide-y divide-border">
       <div className="px-4 py-3 flex items-center justify-between">
@@ -27,21 +30,23 @@ export function AboutPanel() {
       </div>
       <UpdateCheckCard />
       <ServiceWorkerStatusRow />
-      <a
-        href="/api/download-apk"
-        className="flex items-center justify-between px-4 py-3 hover:bg-muted/60 transition"
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'color-mix(in oklab, var(--color-brand) 15%, var(--color-muted))' }}>
-            <Download className="h-4 w-4" style={{ color: 'var(--color-brand)' }} />
+      {!isDevApp && (
+        <a
+          href="/api/download-apk"
+          className="flex items-center justify-between px-4 py-3 hover:bg-muted/60 transition"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'color-mix(in oklab, var(--color-brand) 15%, var(--color-muted))' }}>
+              <Download className="h-4 w-4" style={{ color: 'var(--color-brand)' }} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Download Android App</p>
+              <p className="text-[10px] text-muted-foreground">Latest APK from GitHub releases</p>
+            </div>
           </div>
-          <div>
-            <p className="text-sm font-semibold">Download Android App</p>
-            <p className="text-[10px] text-muted-foreground">Latest APK from GitHub releases</p>
-          </div>
-        </div>
-        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-      </a>
+          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+        </a>
+      )}
       <div className="px-4 py-3">
         <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
           What&apos;s new in v{CHANGELOG[0].version}

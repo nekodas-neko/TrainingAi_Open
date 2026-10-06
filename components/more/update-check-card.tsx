@@ -6,6 +6,7 @@ import { resolveUpdateState } from "@trainingai/shared/version-check"
 import { useTabVisibility } from "@/components/shell/tab-visibility"
 import { useUserTimezone } from "@/components/shell/user-timezone-provider"
 import { formatBuildDate } from "@/components/more/build-label"
+import { isDevAppId } from "@/lib/platform/app-flavour"
 
 // Native-only: web/PWA already gets updates via the service worker (sw.js).
 // A capacitor-guarded dynamic import keeps @capacitor/app out of the web bundle.
@@ -42,10 +43,11 @@ export function UpdateCheckCard() {
       if (!Capacitor.isNativePlatform()) return
 
       const { App } = await import("@capacitor/app")
-      const [info, res] = await Promise.all([
-        App.getInfo(),
-        fetch("/api/version").then(r => r.json()).catch(() => null),
-      ])
+      const info = await App.getInfo()
+      // #2390: `/api/version` reports the REAL app's rolling APK, so inside the Dev app this card
+      // would offer it as the Dev app's "update". Show nothing, and do not even fetch.
+      if (isDevAppId(info.id)) return
+      const res = await fetch("/api/version").then(r => r.json()).catch(() => null)
       if (cancelled) return
 
       const nativeVersion: string | null = res?.nativeVersion ?? null
