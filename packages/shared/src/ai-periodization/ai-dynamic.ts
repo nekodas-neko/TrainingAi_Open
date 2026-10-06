@@ -215,7 +215,7 @@ export function countConsecutiveRestDays(history: SessionHistory[], now: Date, t
 // Defined in `deload-constants.ts` (import-free) and re-exported here so every existing importer
 // is unchanged. Client components must import them from there instead: this module transitively
 // pulls the ONNX runtime, so a client import of even a bare number fails the build.
-import { TEMP_BASELINE_MIN_DAYS, TEMP_ALERT_THRESHOLD_C } from './deload-constants'
+import { TEMP_BASELINE_MIN_DAYS, TEMP_ALERT_THRESHOLD_C, DELOAD_READINESS_SOFT_MIN, DELOAD_READINESS_RECOMMENDED_MIN } from './deload-constants'
 export { TEMP_BASELINE_MIN_DAYS, TEMP_ALERT_THRESHOLD_C }
 
 function computeDeloadStrength(
@@ -278,9 +278,9 @@ function computeDeloadStrength(
     return { recommended: false, strength: 'soft', temperatureAlert: false }
   }
 
-  const r = readinessScore ?? 70
-  if (r >= 70) return { recommended: true, strength: 'soft', temperatureAlert: false }
-  if (r >= 50) return { recommended: true, strength: 'recommended', temperatureAlert: false }
+  const r = readinessScore ?? DELOAD_READINESS_SOFT_MIN
+  if (r >= DELOAD_READINESS_SOFT_MIN) return { recommended: true, strength: 'soft', temperatureAlert: false }
+  if (r >= DELOAD_READINESS_RECOMMENDED_MIN) return { recommended: true, strength: 'recommended', temperatureAlert: false }
   return { recommended: true, strength: 'strong', temperatureAlert: false }
 }
 

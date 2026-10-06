@@ -14,13 +14,14 @@
 // work for loss, gain, recomp and maintenance without branching.
 
 import { KCAL_PER_G } from './atwater'
+import { KCAL_PER_KG, CALORIE_FLOOR_KCAL } from './tdee-adaptation'
 
 /** Intentional daily calorie offset per goal. Re-exported from the goal recommender so the
  *  deficit the bar bands against is the same one the target was built from. */
 export { CALORIE_ADJUSTMENT_BY_GOAL as GOAL_DAILY_DELTA } from './goal-recommendation'
 
 /** kcal per kg of body mass — the standard 7700 used across the app (see tdee-adaptation). */
-export { KCAL_PER_KG } from './tdee-adaptation'
+export { KCAL_PER_KG, CALORIE_FLOOR_KCAL }
 
 export type BalanceZone = 'far_under' | 'under' | 'on_target' | 'over' | 'far_over'
 
@@ -100,8 +101,6 @@ export interface CalorieBalanceResult {
   zoneColor: string
 }
 
-const KCAL_PER_KG_LOCAL = 7700
-
 export function computeCalorieBalance(input: CalorieBalanceInput): CalorieBalanceResult {
   const expenditureKcal = Math.round(input.restingBaseKcal + input.activeKcal)
   const netKcal = Math.round(input.intakeKcal - expenditureKcal)
@@ -138,7 +137,7 @@ export function computeCalorieBalance(input: CalorieBalanceInput): CalorieBalanc
     restingRateKcal: input.restingRateKcal ?? null,
     // `-0` is a legal result of negating 0 and leaks into equality checks; normalise it away.
     remainingKcal: deviationKcal === 0 ? 0 : -deviationKcal,
-    projectedWeeklyKg: Math.round((netKcal * 7 / KCAL_PER_KG_LOCAL) * 100) / 100,
+    projectedWeeklyKg: Math.round((netKcal * 7 / KCAL_PER_KG) * 100) / 100,
     zone,
     zoneLabel: label,
     zoneColor: color,
@@ -270,7 +269,7 @@ export function barProgress(
 /** The daily calorie target implied by a maintenance estimate and the goal's offset. */
 export function targetFromMaintenance(maintenanceKcal: number, goalDelta: number): number {
   // Never recommend below a floor that would be unsafe regardless of goal.
-  return Math.max(1200, Math.round(maintenanceKcal + goalDelta))
+  return Math.max(CALORIE_FLOOR_KCAL, Math.round(maintenanceKcal + goalDelta))
 }
 
 /**

@@ -61,7 +61,7 @@ physiological plausibility bounds.
 | Active minutes | vigorous floor = zone 3 packages/shared/src/health/zone-minutes.ts:96 | 0.70 HRR | Minutes counted ×2 | CONSTANT | **Inconsistency, not personalisation.** ACSM puts vigorous at ≥60% HRR, which is the zone 2 floor. Minutes between 60% and 70% HRR are counted once when the guideline would count them twice. |
 | Rest / move | `HR_REST_THRESHOLD` hr-zones.ts:23 | 0.05 of HRR | Body Battery charge-or-drain line, and the Activity score's "moved this hour" | LEARNED | **GAP (big).** Awake seated HR sits at a different reserve fraction per person (0.05–0.10 for the owner, according to the code comment). Someone whose seated HR is 8% of reserve never charges and is always "moving". It should be a percentile of the person's own waking seated HR. This is TN-2's open question. |
 | Walk target | `WALK_FAST_BAND_PCT_OF_MAX` hr-zones.ts:137 | 60–70% of HRmax | Guided-walk fast block band | GUARDED | It was moved from 0.70 HRR because the owner hit it on 0 of 44 blocks. Whether a target is reachable depends on fitness and age, so it should be personal inside the 60–70% range. |
-| Resting HR | `RESTING_HR_DEFAULT` packages/shared/src/health/hr-profile.ts:48 and `DEFAULT_RESTING_HR` packages/shared/src/running/fitness-snapshot.ts:18 | 60 bpm | Fallback resting HR | MODEL | Fallback only, but **defined twice**. |
+| Resting HR | `DEFAULT_RESTING_HR` packages/shared/src/health/hr-zones.ts | 60 bpm | Fallback resting HR | MODEL | Fallback only. Was defined twice (hr-profile, fitness-snapshot); one home since #2375. |
 | Resting HR | `RESTING_HR_WINDOW_DAYS` / `OBSERVED_WINDOW_DAYS` hr-profile.ts:7,47 | 28 / 90 days | Baseline windows | MODEL | Window lengths. |
 | Resting HR | `CORROBORATION`, `MIN_RELIABLE_SAMPLES` packages/shared/src/health/observed-hr.ts:45-47 | 5 readings, 60 samples | When an observed max or peak is trusted | MODEL | Statistics gate. |
 | Resting HR cue | packages/shared/src/health/resting-hr-cue.ts:37-40 | Δ ≤ −2 / ≤ +2 / ≤ +5 / > +5 bpm vs usual | Colour of the "vs usual" RHR chip | LEARNED | **GAP.** These are absolute bpm, but day-to-day RHR SD ranges from about 1 to 4 bpm between people. It should be σ of the person's own RHR, as readiness already does. |
@@ -91,7 +91,7 @@ physiological plausibility bounds.
 | Zone minutes | `DEFAULT_MAX_GAP_SEC` zone-minutes.ts:16 and ×2 vigorous weighting zone-minutes.ts:105 | 120 s gap cap; vigorous ×2 | Integrating HR into minutes | MODEL / CONSTANT | The gap cap is a modelling choice. The ×2 weighting is the WHO rule. |
 | ACWR | `ACWR_THRESHOLDS` packages/shared/src/ai-periodization/acwr.ts:106 | lowMax 0.8, optimalMax 1.3, elevatedMin 1.2, highMax 1.5 | ACWR band and label, emergency deload, activity taper, early-deload card, running gate | GUARDED | Gabbett's 0.8–1.3 / >1.5 are population ranges. Individual tolerance varies with training age. These could be personal within 0.8–1.5, for example by widening optimalMax for someone who has repeatedly tolerated 1.4 without readiness falling. |
 | ACWR | `ACWR_BASELINE_DAYS`; `minSpanDays` / `minSessions` / `minChronicWeeklyLoadKg` acwr.ts:59 and acwr.ts:19 | 28 d; 21 d / 6 sessions / 100 kg | When ACWR is trusted | MODEL | Maturity gates. The acute 7-day and chronic 28-day windows are the standard definition. |
-| Readiness (legacy) | ACWR modifier lib/health/readiness-payload.ts:287-290 | +3 inside 0.8–1.3; −6 per 0.2 above 1.3; −15 above 1.5; **−5 below 0.6** | Legacy blended score | MODEL | `0.6` is a fourth ACWR boundary hard-coded outside `ACWR_THRESHOLDS` (the Q-306 pattern). |
+| Readiness (legacy) | ACWR modifier lib/health/readiness-payload.ts:287-290 | +3 inside 0.8–1.3; −6 per 0.2 above 1.3; −15 above 1.5; **−5 below 0.6** | Legacy blended score | MODEL | `0.6` was a fourth ACWR boundary hard-coded outside the table (the Q-306 pattern); it is `ACWR_THRESHOLDS.veryLowMax` since #2375. |
 | Readiness (legacy) | load points readiness-payload.ts:533-536 | 10 inside the band, falling linearly outside it | Legacy custom score load component | MODEL | Fallback. |
 | Training stress | OTS gate packages/shared/src/health/training-stress.ts:81-87; high threshold ×0.9 when readiness < 60 lib/oura-models/inference/ots.ts:166 | ≥720 min of MET grid, ≥360 valid minutes; vendor `highOtsThreshold` | Whether OTS is computed and when it reads "high" | MODEL | Vendor model port. |
 | Energy | `SEDENTARY_MULTIPLIER` packages/shared/src/health/energy-baseline.ts:31 | 1.2 × BMR | Resting budget base on the formula path | GUARDED | A population NEAT factor. It is already superseded by the calibrated maintenance from adaptive TDEE once there is enough data, which is effectively LEARNED. |
@@ -110,12 +110,12 @@ physiological plausibility bounds.
 | Area | Constant (file:line) | Value | What it decides | Category | Why |
 |---|---|---|---|---|---|
 | BMR | `mifflinStJeorBmr`, `SEX_OFFSET` packages/shared/src/nutrition/goal-recommendation.ts:182,89 | 10W + 6.25H − 5A + {+5, −161, −78} | BMR | CONSTANT | Published equation. A measured lean mass (Katch-McArdle) is already preferred when present. |
-| Energy | `KCAL_PER_KG` packages/shared/src/nutrition/tdee-adaptation.ts:12 and `KCAL_PER_KG_LOCAL` packages/shared/src/nutrition/calorie-balance.ts:103 | 7,700 | Weight change ↔ energy | CONSTANT | **Defined twice**, which breaks the "one formula, one place" rule. |
+| Energy | `KCAL_PER_KG` packages/shared/src/nutrition/tdee-adaptation.ts:12 | 7,700 | Weight change ↔ energy | CONSTANT | Was defined twice (`KCAL_PER_KG_LOCAL` in calorie-balance); one home since #2375. |
 | Macros | `KCAL_PER_G` packages/shared/src/nutrition/atwater.ts:15 | 4 / 4 / 9 | Macro kcal | CONSTANT | Atwater factors. |
 | Calories | `CALORIE_ADJUSTMENT_BY_GOAL` goal-recommendation.ts:47 | lose −500, maintain 0, build +300, recomp −200 kcal | Calorie target offset | GUARDED | **GAP.** These are absolute kcal. A −500 deficit is 33% of a 1,500 kcal TDEE but 15% of 3,300. It should be a % of TDEE or a %-bodyweight-per-week rate, clamped. |
 | Calories | `GOAL_RATE_KG_PER_WEEK` tdee-adaptation.ts:5 | −0.45 / 0 / +0.27 / −0.18 kg/wk | Target rate for adaptive calorie adjustment | GUARDED | **GAP.** These are absolute kg. Evidence-based loss is about 0.5–1% of bodyweight per week, which is 0.25 kg/wk for a 50 kg person and 0.6 kg/wk for 120 kg. |
 | Calories | `DEADBAND_KG_PER_WEEK` / `MAX_ADJUST_KCAL` tdee-adaptation.ts:13-14 | 0.1 kg/wk / 200 kcal, rounded to 50 | When and how far adaptation moves the target | MODEL | Controller tuning. |
-| Calories | calorie floor packages/shared/src/nutrition/calorie-balance.ts:273 and goal-recommendation.ts:280; ceiling goal-recommendation.ts:281 | max(1,200, BMR); 1.2 × baseline | Bounds on a recommended calorie target | GUARDED | 1,200 is the conventional female floor (about 1,500 for men). The floor is **written twice**. |
+| Calories | `CALORIE_FLOOR_KCAL` packages/shared/src/nutrition/tdee-adaptation.ts, read by calorie-balance.ts and goal-recommendation.ts; ceiling goal-recommendation.ts:281 | max(1,200, BMR); 1.2 × baseline | Bounds on a recommended calorie target | GUARDED | 1,200 is the conventional female floor (about 1,500 for men). Was written twice; one constant since #2375. |
 | Calories | `ON_TARGET_KCAL` / `OUTER_KCAL` calorie-balance.ts:35-36 | ±150 / ±400 kcal | "On target / under / well under" band | GUARDED | **GAP.** These are absolute kcal. ±150 is 10% of a 1,500 budget and 5% of 3,000. It should be a % of the budget. |
 | Protein | `PROTEIN_G_PER_KG_BY_GOAL` goal-recommendation.ts:85; bounds :291-292 | 1.8 / 1.6 / 2.0 / 2.2 g/kg; clamp 1.0–2.5 | Protein target | GUARDED | Already per kg and inside the research range (Morton 2018, 1.6–2.2). **Gap (minor):** it uses total bodyweight even when lean mass is known, which overshoots for high body-fat users. |
 | Protein | `PROTEIN_G_PER_KG_PER_MEAL` packages/shared/src/nutrition/meal-split.ts:41 | 0.4 g/kg/meal | Per-meal protein | CONSTANT | Schoenfeld & Aragon 2018. |
@@ -198,7 +198,7 @@ physiological plausibility bounds.
 | Duration model | `SECONDS_PER_REP`, `SET_SETUP_SEC`, `WARMUP_FRACTION`, `TRANSITION_SEC_*` packages/shared/src/workout/duration-model.ts:13-221 | 4 s, 10 s, 15%, 240/120/60 s | Session time budget | LEARNED | Already learned from measured per-exercise times once there are `MIN_TRUSTED_SAMPLES` (5) / `WARMUP_LEARN_MIN_SESSIONS` (8) samples. These are fallbacks. |
 | Plateau | `PLATEAU_MIN_POINTS`, `PLATEAU_MIN_SPAN_DAYS`, `PLATEAU_PCT_PER_WEEK` packages/shared/src/health/strength-projection.ts:27-29 | 4 points, 21 d, 0.2%/wk | 1RM plateau flag | MODEL | Statistics. The expected rate of progress depends on training age, so this could become GUARDED later. |
 | Bodyweight | `BODYWEIGHT_LOAD_DEFAULT` packages/shared/src/workout/bodyweight-load.ts:76 | 0.65 × BW | Bodyweight exercise tonnage | CONSTANT | Biomechanical fraction. |
-| UI gate | `ouraReadiness < 70` app/session-select/components/deload-explanation.tsx:31 | 70 | Deload explanation copy | MODEL | **Note:** a threshold living in a component (logic in the surface), and 70 here does not match the < 60 / < 50 used elsewhere. |
+| Deload grading | `DELOAD_READINESS_SOFT_MIN` / `DELOAD_READINESS_RECOMMENDED_MIN` packages/shared/src/ai-periodization/deload-constants.ts | 70 / 50 | How `computeDeloadStrength` grades a deload (soft / recommended / strong), and when the session-select explanation names readiness as a reason | MODEL | #2375: the explanation hardcoded 70. It was right — 70 is the decision's soft/recommended edge — and now reads the same constant. The < 60 in rest-day guidance and session weighting asks a different question. |
 
 ---
 
@@ -271,12 +271,11 @@ duration model) or are guard ranges working as intended.
 
 ## Inconsistencies found along the way (not tuning, but worth issues)
 
-- `KCAL_PER_KG` is defined twice: `tdee-adaptation.ts:12` and `calorie-balance.ts:103`
-  (`KCAL_PER_KG_LOCAL`).
-- The 1,200 kcal floor is written twice: `calorie-balance.ts:273` and `goal-recommendation.ts:280`.
-- The resting-HR fallback of 60 is defined twice: `hr-profile.ts:48` and `fitness-snapshot.ts:18`.
+- ~~`KCAL_PER_KG` is defined twice~~ — fixed in #2375.
+- ~~The 1,200 kcal floor is written twice~~ — fixed in #2375 (`CALORIE_FLOOR_KCAL`).
+- ~~The resting-HR fallback of 60 is defined twice~~ — fixed in #2375 (`DEFAULT_RESTING_HR`).
 - The main-sleep minimum is 4 h in `sleep-score.ts:210` but 3 h in `lib/sleep/primary-sleep.ts:5`.
-- `readiness-payload.ts:290` has an ACWR `< 0.6` boundary outside `ACWR_THRESHOLDS`.
+- ~~`readiness-payload.ts:290` has an ACWR `< 0.6` boundary outside `ACWR_THRESHOLDS`~~ — fixed in #2375 (`veryLowMax`).
 - The vigorous-minute floor is the zone 3 edge (70% HRR, `zone-minutes.ts:96`), while ACSM's
   vigorous starts at 60% HRR.
-- `deload-explanation.tsx:31` holds a readiness `< 70` threshold in a UI component.
+- ~~`deload-explanation.tsx:31` holds a readiness `< 70` threshold in a UI component~~ — fixed in #2375; the 70 was the deload decision's own edge.
