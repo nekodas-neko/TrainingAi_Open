@@ -17,6 +17,8 @@ import {
   DEFAULT_REPS,
   mroundStep,
   mroundStepUp,
+  prescribedBarWeights,
+  plannedWeightsPayload,
   weightStepFor,
   defaultRpeFromPct,
   applyDeloadReverts,
@@ -66,23 +68,6 @@ const DoneScreen = dynamic(() => import("@/components/workout/done-screen").then
 // falls back to the base-program numbers instead of blocking the workout forever.
 const PRESCRIPTION_POLL_INTERVAL_MS = 3000;
 const PRESCRIPTION_POLL_MAX = 10;
-
-// The bar the style prescribes for each set, after plate rounding — `null` where no style
-// percentage sets it (bodyweight, no 1RM yet, a set past the style's length). This is what
-// `set_logs.planned_weight_kg` stores (#2445), and computeInitialWeights opens on the same
-// number, so the stored prescription is the bar the lifter was shown.
-function prescribedBarWeights(ex: WorkoutExercise | undefined, sets: number): (number | null)[] {
-  if (ex?.exerciseType === "bodyweight" || !ex?.progressionStyle || !ex.estimated1rm) {
-    return Array.from({ length: sets }, () => null);
-  }
-  const step = weightStepFor(ex.equipment);
-  const style = ex.progressionStyle;
-  const basis = ex.estimated1rm;
-  return Array.from({ length: sets }, (_, i) => {
-    const sc = style[i];
-    return sc ? mroundStepUp(basis * sc.pct / 100, step) : null;
-  });
-}
 
 // Shared per-set weight derivation — used at init (launchExercise, the per-set-weights
 // effect) and after an injury swap, so all three paths agree on how a set's target
@@ -1277,14 +1262,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       // has no clean meaning (same reason interExerciseRestSec is gated above).
       prepTimeSec: ex.supersetGroup == null ? (prepSecRef.current ?? undefined) : undefined,
       progressionStyle: ex.progressionStyle ?? undefined,
-      // #2445: only sent when at least one set had a prescribed bar, so a freeform log stays bare.
-      // A value outside the schema's 0-500 bound is sent as null: a rejected payload is a
-      // quarantined mutation, and the whole logged exercise is not worth losing over metadata.
-      ...(() => {
-        const plannedWeights = prescribedBarWeights(ex, snapWeights.length)
-          .map((w) => (w != null && w >= 0 && w <= 500 ? w : null));
-        return plannedWeights.some((w) => w != null) ? { plannedWeights } : {};
-      })(),
+      plannedWeights: plannedWeightsPayload(ex, snapWeights.length), // #2445
       styleName: ex.styleName ?? undefined,
       styleId: ex.styleId,
       muscleGroups: ex.muscleGroups?.length ? ex.muscleGroups : undefined,
