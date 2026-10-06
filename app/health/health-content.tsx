@@ -40,6 +40,7 @@ import type { ReadinessScoreResponse } from '@/app/api/readiness-score/route'
 import { useBmiClassification, useWeightTrend, useEnergyBalanceToday } from "@/app/health/hooks/use-health-calcs";
 import { useInvalidationRefetch } from "@/lib/hooks/use-invalidation-refetch";
 import { DEFAULT_WATER_GOAL_ML } from '@trainingai/shared/nutrition/goal-recommendation';
+import { recentBodyRows } from '@trainingai/shared/health/body-recent-window';
 
 type Tab = "body" | "training" | "progress";
 
@@ -286,9 +287,13 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
         // this the corrected value flickers back to the scale's number whenever the local seed
         // arrives after the network. Carry the correction forward per date; a local row genuinely
         // newer than the server's is still the one that supplies the raw value and everything else.
+        // #2505: the SAME window the route calls `recent` — newest first, last 7 days — not the
+        // store's oldest-first month. Every reader of `metaRecent` (the latest-weight tile, the
+        // sparklines) assumes the network shape. The 30-day `filtered` below still feeds the weight
+        // trend and today's tile, which have their own windows.
         setMetaRecent(prev => {
           const corrected = new Map(prev.map(r => [r.date, r]));
-          return filtered.map(m => {
+          return recentBodyRows(filtered, todayInTz(tz)).map(m => {
             const row = toRow(m);
             const had = corrected.get(row.date);
             if (had?.bodyFatCorrected != null && had.bodyFat === row.bodyFat) {
