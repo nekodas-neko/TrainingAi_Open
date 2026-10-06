@@ -27,6 +27,7 @@ layer**) through §16. Read it before building any shared helper.
 
 ## Reference docs
 
+- [`docs/admin-actions.md`](../../admin-actions.md) — **2026-10-06: every admin, maintenance and debug button**: what it calls, its scope, whether it is safe to repeat, its auth and danger, and which ones an agent may run (#2381). Found the one-tap ring-key delete (#2382) and six misbehaving actions (#2383).
 - [`docs/architecture/adaptive-scoring.md`](../../architecture/adaptive-scoring.md) — **2026-10-05: scores that learn the person** — any new signal declared once, baselines at hour/week/month/season scale, scores as per-person configuration, and an insights engine ("how does X affect you") with accuracy guards. Epic #2321.
 
 - [`docs/owner-manual.md`](../../owner-manual.md) — **2026-10-05: the owner's manual for the release train.** The switch-over steps in order, renaming the repository (including the local clone), bringing in a second contributor, the weekly routine, rollback / hotfix / broken-CI procedures, and who does what across the three remaining agents.
