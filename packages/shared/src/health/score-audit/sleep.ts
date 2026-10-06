@@ -42,7 +42,7 @@ function splitNights(sessions: SleepSession[], date: string, tz: string) {
   // Nights, not sessions — a post-waking nap must never be picked as "the night" (F-1/Q-1), and a
   // night broken by a wake-up must come back as one. Shared derivation: lib/health/sleep-night.ts.
   const nights = nightSessions(sessions, tz)
-  const night = canonicalNightForDate(nights, date)
+  const night = canonicalNightForDate(nights, date, tz)
   const prior = night
     ? nights.filter(s => s.sleepEnd.getTime() < night.sleepEnd.getTime())
     : nights.filter(s => s.date < date)

@@ -140,7 +140,7 @@ export async function POST(req: Request) {
     // so an evening nap could be handed to the model as last night's sleep — and the fallback to the
     // last row has the same exposure.
     const nights = nightSessions(sleepRows, tz)
-    const todaySleep = canonicalNightForDate(nights, date) ?? canonicalLatestNight(nights)
+    const todaySleep = canonicalNightForDate(nights, date, tz) ?? canonicalLatestNight(nights, tz)
     if (todayOura?.sleepScore != null) {
       headline = { label: 'Sleep score', value: `${todayOura.sleepScore}/100`, band: bandLabel(todayOura.sleepScore) }
     } else if (todaySleep?.durationHours != null) {
