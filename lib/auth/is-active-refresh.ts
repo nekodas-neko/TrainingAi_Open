@@ -14,7 +14,12 @@ export async function refreshIsActiveClaim<T extends IsActiveClaim>(
     return token
   }
 
-  const user = await lookup(token.userId)
+  let user: Awaited<ReturnType<typeof lookup>>
+  try {
+    user = await lookup(token.userId)
+  } catch {
+    return token
+  }
   token.isActive = user?.isActive ?? false
   token.isAdmin = user?.isAdmin ?? false
   if (user) {

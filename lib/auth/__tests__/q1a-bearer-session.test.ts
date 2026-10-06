@@ -134,19 +134,28 @@ describe('auth() — the bearer fallback sits behind the cookie, not beside it',
     expect(await auth()).toBe(cookieSession)
   })
 
-  it('propagates a database outage without treating the cookie as invalid', async () => {
-    baseAuth.mockResolvedValue({ user: { id: 'cookie-user' }, isActive: true })
+  it.each([true, false])('preserves a cookie with isActive=%s during a database outage', async isActive => {
+    const cookieSession = { user: { id: 'cookie-user', isAdmin: true }, isActive }
+    baseAuth.mockResolvedValue(cookieSession)
     getUserById.mockRejectedValue(new Error('db down'))
     const { auth } = await import('@/auth')
-    await expect(auth()).rejects.toThrow('db down')
+    await expect(auth()).resolves.toBe(isActive ? cookieSession : null)
+    expect(cookieSession.user.isAdmin).toBe(true)
   })
 
-  it('propagates a database outage without treating the bearer as invalid', async () => {
+  it.each([true, false])('preserves a bearer with isActive=%s during a database outage', async isActive => {
     baseAuth.mockResolvedValue(null)
-    requestHeaders = bearer(await mint({ userId: 'bearer-user', isActive: true }))
+    requestHeaders = bearer(await mint({ userId: 'bearer-user', isActive, isAdmin: true }))
     getUserById.mockRejectedValue(new Error('db down'))
     const { auth } = await import('@/auth')
-    await expect(auth()).rejects.toThrow('db down')
+    const session = await auth()
+    if (isActive) {
+      expect(session?.user.id).toBe('bearer-user')
+      expect(session?.isActive).toBe(true)
+      expect(session?.user.isAdmin).toBe(true)
+    } else {
+      expect(session).toBeNull()
+    }
   })
 
   it('resolves the bearer when the cookie path yields nothing', async () => {

@@ -33,19 +33,25 @@ describe('refreshIsActiveClaim', () => {
     expect(token.isActive).toBe(true)
   })
 
-  it('propagates an outage so it cannot be confused with an invalid login', async () => {
-    const token = { userId: 'u1', isActive: true, isActiveCheckedAt: 0 }
+  it.each([true, false, undefined])('keeps isActive=%s and retries after a database outage', async isActive => {
+    const token = { userId: 'u1', isActive, isAdmin: true, isActiveCheckedAt: 0 }
+    const original = { ...token }
+    const lookup = vi.fn().mockRejectedValueOnce(new Error('db down'))
+      .mockResolvedValue({ isActive: false, isAdmin: false })
     await expect(
-      refreshIsActiveClaim(token, async () => { throw new Error('db down') }, NOW),
-    ).rejects.toThrow('db down')
-    expect(token.isActive).toBe(true)
-    expect(token.isActiveCheckedAt).toBe(0)
+      refreshIsActiveClaim(token, lookup, NOW),
+    ).resolves.toBe(token)
+    expect(token).toEqual(original)
+    await refreshIsActiveClaim(token, lookup, NOW + 1)
+    expect(lookup).toHaveBeenCalledTimes(2)
+    expect(token).toEqual({ userId: 'u1', isActive: false, isAdmin: false, isActiveCheckedAt: NOW + 1 })
   })
 
   it('treats a DELETED user row as deactivation (RV-195 ②)', async () => {
-    const token = { userId: 'u1', isActive: true, isActiveCheckedAt: 0 }
+    const token = { userId: 'u1', isActive: true, isAdmin: true, isActiveCheckedAt: 0 }
     await refreshIsActiveClaim(token, async () => null, NOW)
     expect(token.isActive).toBe(false)
+    expect(token.isAdmin).toBe(false)
     expect(token.isActiveCheckedAt).toBe(0) // nothing to re-check; a restored row takes effect at once
   })
 
