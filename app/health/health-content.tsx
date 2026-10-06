@@ -10,11 +10,12 @@ import { useTransitionRouter } from "@/lib/view-transition";
 import { useTabVisibility } from "@/components/shell/tab-visibility";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { ScreenHeader } from "@/components/shell/screen-header";
-import { todayInTz, todayMidnightUtc, toAestDay, shiftDateStr } from "@trainingai/shared/date-utils";
+import { todayInTz, shiftDateStr } from "@trainingai/shared/date-utils";
+import { weightTrendWindowStart } from "@trainingai/shared/health/long-term-goal-progress";
 import { getLocalStore } from "@/lib/local-store";
 import { pushMutations, pullDelta } from "@/lib/local-store/sync-engine";
 import { PullToSync } from "@/components/pull-to-sync";
-import type { BodyMetaRow, WeekToDate } from "@/app/api/body-metadata/route";
+import type { BodyMetaRow, WeekToDate, WeightTrendPoint } from "@/app/api/body-metadata/route";
 import { latestDisplayedBodyFat, type BodyFatCalibrationMeta } from "@/components/health/body-fat-display";
 import { cachedFetch, readCacheSync, setCached, cachedFetchToday, readTodayCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
 import { useDayRolloverRefresh } from '@/components/shell/local-day-provider';
@@ -107,6 +108,9 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   }, [searchParams]);
   const [metaToday, setMetaToday] = useState<BodyMetaRow | null>(null);
   const [metaRecent, setMetaRecent] = useState<BodyMetaRow[]>([]);
+  // The Weight Trend slope's 30 days (#2480). Null until a source supplies them; the slope then
+  // falls back to `metaRecent` rather than reading "Need more data" over a week of weigh-ins.
+  const [weightTrend, setWeightTrend] = useState<WeightTrendPoint[] | null>(null);
   const [metaLoading, setMetaLoading] = useState(true);
   // LA-45: the DEXA offset itself, so the body-fat card can show WHY its number differs from the
   // scale's. `pairCount` is what says how much to trust it — at one pair an offset and a ratio are
@@ -179,9 +183,12 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   // Paint the non-today-specific parts of a body-metadata payload (trend arrays, week-to-date)
   // immediately, even from a stale (not-today) cache entry — only `metaToday`/`activeEnergyKcalToday`
   // (today's tiles, which already render "—" for null) wait for a freshness-confirmed payload.
-  const setMetaFromPayload = useCallback((data: { today: BodyMetaRow | null; recent: BodyMetaRow[]; weekToDate?: WeekToDate | null; activeEnergyKcalToday?: number | null; latestWeightKg?: number | null; latestWeightDate?: string | null; bodyFatCalibration?: BodyFatCalibrationMeta | null } | null | undefined) => {
+  const setMetaFromPayload = useCallback((data: { today: BodyMetaRow | null; recent: BodyMetaRow[]; weekToDate?: WeekToDate | null; activeEnergyKcalToday?: number | null; latestWeightKg?: number | null; latestWeightDate?: string | null; bodyFatCalibration?: BodyFatCalibrationMeta | null; weightTrend?: WeightTrendPoint[] | null } | null | undefined) => {
     if (!data) return;
     setMetaRecent(data.recent ?? []);
+    // Absent on a payload cached before #2480, null when the server's read failed: either way keep
+    // what the local seed supplied instead of blanking it.
+    if (Array.isArray(data.weightTrend)) setWeightTrend(data.weightTrend);
     if (data.bodyFatCalibration !== undefined) setBodyFatCalibration(data.bodyFatCalibration ?? null);
     setWeekToDate(data.weekToDate ?? null);
     setMetaLoading(false);
@@ -235,8 +242,8 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
       if (!userId) return;
       const store = getLocalStore(userId);
       if (!store) return;
-      const cutoff = new Date(todayMidnightUtc(tz).getTime() - 30 * 24 * 60 * 60 * 1000);
-      const cutoffStr = toAestDay(cutoff, tz);
+      // Calendar days on the local date, never `midnight − N × 86,400,000` (wrong day across DST).
+      const cutoffStr = shiftDateStr(todayInTz(tz), -30);
       const [localMetrics, localSleep] = await Promise.all([
         store.getBodyMetrics(cutoffStr),
         store.getSleepSessions(cutoffStr),
@@ -291,6 +298,10 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
             return row;
           });
         });
+        const trendFrom = weightTrendWindowStart(todayInTz(tz));
+        setWeightTrend(filtered
+          .filter((m): m is typeof m & { weightKg: number } => m.weightKg != null && m.date >= trendFrom)
+          .map(m => ({ date: m.date, weightKg: m.weightKg })));
         // SYNC-R2: the local seed previously never set today's tile, so an offline fresh
         // app-open on Health left steps/weight blank until the network fetch landed —
         // mirrors session-select-content.tsx's Home fetchMeta pattern (SYNC-R1).
@@ -588,7 +599,7 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   const heightCm = heightCmProp ?? null;
 
   const { bmi, bmiUsesBf, bmiLabel } = useBmiClassification(latestWeight, heightCm, latestBf, sexProp);
-  const weightTrendKgPerWeek = useWeightTrend(metaRecent);
+  const weightTrendKgPerWeek = useWeightTrend(weightTrend ?? metaRecent);
   const energyBalance = useEnergyBalanceToday({ onError: () => setEnergyBalanceFailed(true) });
 
 

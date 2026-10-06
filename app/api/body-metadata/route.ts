@@ -173,8 +173,7 @@ export async function GET() {
   // would print "Need more data" over a history that exists. Null tells the client to fall back.
   const trendFrom = weightTrendWindowStart(today);
   const weightTrend: WeightTrendPoint[] | null = weightHistoryFailed ? null : weightHistory
-    .filter((m): m is typeof m & { weightKg: number } => m.weightKg != null && m.date >= trendFrom)
-    .map(m => ({ date: m.date, weightKg: m.weightKg }));
+    .flatMap(m => (m.weightKg != null && m.date >= trendFrom ? [{ date: m.date, weightKg: m.weightKg }] : []));
 
   // Profile inputs for the active-energy estimator (below, after today's activity logs are in scope).
   const bodyWeightForEnergy = latestWeightKg ?? metrics.find(m => m.weightKg != null)?.weightKg ?? null;
