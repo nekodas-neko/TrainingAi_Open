@@ -1,8 +1,27 @@
 'use client'
 
 import { memo } from 'react'
-import { Utensils } from 'lucide-react'
+import { Soup } from 'lucide-react'
 import { cn } from '@trainingai/shared/utils'
+
+/**
+ * The no-photo glyph, shared by this tile and the meal sheet's hero (`meal-photo-tile.tsx`), which
+ * is the same tile at scale.
+ *
+ * A bowl in the muted token, not a fork and knife in white (#2075). Review sweep 63 read a generic
+ * fork-and-knife on a dark square as a failed image, and the owner chose to keep the tile and its
+ * alignment and change only the glyph. Do not swap it back to `Utensils`.
+ */
+export function MealPlaceholderGlyph({ size }: { size: number }) {
+  return (
+    <Soup
+      aria-hidden
+      style={{ width: size, height: size }}
+      strokeWidth={1.6}
+      className="text-muted-foreground"
+    />
+  )
+}
 
 interface Props {
   /** A stored `data:` URI, or null/undefined for the placeholder. */
@@ -49,11 +68,7 @@ export const MealThumb = memo(function MealThumb({ src, size = 40, className }: 
         // eslint-disable-next-line @next/next/no-img-element -- data: URI, fixed 128px source
         <img src={src} alt="" width={size} height={size} className="h-full w-full object-cover" />
       ) : (
-        <Utensils
-          style={{ width: Math.round(size * 0.425), height: Math.round(size * 0.425) }}
-          strokeWidth={1.6}
-          className="text-white/45"
-        />
+        <MealPlaceholderGlyph size={Math.round(size * 0.425)} />
       )}
     </span>
   )
