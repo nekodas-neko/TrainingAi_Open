@@ -29,6 +29,7 @@ import {
   sessionContextLabel,
 } from "@/components/workout/utils";
 import { estimateOneRm, isDeloadedForEstimate } from "@trainingai/shared/1rm";
+import { rpeSourcesPayload } from "@trainingai/shared/workout/rpe-source";
 import type { ExerciseSummaryData, SessionLogEntry } from "@/components/workout/types";
 import { buildSetSequence, nextStep } from "@trainingai/shared/workout/superset-order";
 import { exerciseLibraryRowsFrom } from '@/lib/local-store/program-assembler';
@@ -1187,7 +1188,8 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
     const snapExerciseStartMs = store.exerciseStartMs;
     const snapLastExerciseEndMs = store.lastExerciseEndMs;
     // Not in this component's reactive subscription — see the perSetWeights note above.
-    const snapRpeValues = [...useWorkoutStore.getState().rpeValues];
+    const { rpeValues: liveRpe, rpeRated: snapRpeRated } = useWorkoutStore.getState();
+    const snapRpeValues = [...liveRpe];
 
     store.clearSetWeights();
 
@@ -1269,6 +1271,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       workoutStartedAt: useWorkoutStore.getState().workoutStartMs ?? undefined,
       warmupEndedAtMs: store.warmupEndedMs ?? undefined,
       rpeValues: snapRpeValues.length > 0 ? snapRpeValues : undefined,
+      rpeSources: rpeSourcesPayload(snapRpeValues.slice(0, snapWeights.length), snapRpeRated), // #2450
       estimated1rm: newEst1rm,
       target80,
       ...(deload ? { intensityMode: 'deload' as const } : {}),

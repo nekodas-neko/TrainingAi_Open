@@ -18,6 +18,8 @@ interface ExerciseBuffer {
   setEndMsArray: number[]
   restTimes: number[]
   rpeValues: number[]
+  // Optional: a buffer persisted before #2450 has none, and restores as "nothing tapped".
+  rpeRated?: boolean[]
   accumulatedRestMs: number
   exerciseStartMs: number | null
   timerStarted: boolean
@@ -45,6 +47,9 @@ interface WorkoutState {
   setEndMsArray: number[]    // epoch ms when each "Log Set" was pressed
   workoutPhase: 'rest' | 'set'
   rpeValues: number[]
+  // #2450: true at set i once the lifter sets that set's RPE on the picker. rpeValues opens on the
+  // pre-fill, so this is the only record of which values are ratings (set_logs.rpe_source).
+  rpeRated: boolean[]
   accumulatedRestMs: number
   restTimes: number[]        // rest seconds taken *after* each set (index i -> rest
                               // following set i+1's row server-side)
@@ -161,6 +166,7 @@ const INITIAL_STATE: WorkoutState = {
   setEndMsArray: [],
   workoutPhase: 'rest',
   rpeValues: [],
+  rpeRated: [],
   accumulatedRestMs: 0,
   restTimes: [],
   timerStarted: false,
@@ -252,6 +258,7 @@ export function applyRehydrateFixups(
     state.lapTimes = []
     state.restTimes = []
     state.rpeValues = []
+    state.rpeRated = []
     state.accumulatedRestMs = 0
     state.timerStarted = false
     state.exerciseStartMs = null
@@ -304,6 +311,7 @@ export const useWorkoutStore = create<WorkoutStore>()(
         setEndMsArray: [],
         workoutPhase: 'rest',
         rpeValues: [],
+        rpeRated: [],
         accumulatedRestMs: 0,
         restTimes: [],
         timerStarted: false,
@@ -344,11 +352,14 @@ export const useWorkoutStore = create<WorkoutStore>()(
         next[idx] = value
         return { perSetWeights: next }
       }),
-      initRpeValues: (values) => set({ rpeValues: values }),
+      // A fresh pre-fill is untouched by definition, so it clears the tapped flags with it.
+      initRpeValues: (values) => set({ rpeValues: values, rpeRated: [] }),
       setRpeValue: (setIdx, value) => set((s) => {
         const next = [...s.rpeValues]
         next[setIdx] = value
-        return { rpeValues: next }
+        const rated = [...s.rpeRated]
+        rated[setIdx] = true
+        return { rpeValues: next, rpeRated: rated }
       }),
       setSoloMode: (soloMode) => set({ soloMode }),
       setTimerStarted: (timerStarted) => set({ timerStarted }),
@@ -381,7 +392,7 @@ export const useWorkoutStore = create<WorkoutStore>()(
             sets: s.sets, reps: s.reps, perSetWeights: s.perSetWeights,
             setWeights: s.setWeights, currentSet: s.currentSet, lapTimes: s.lapTimes,
             setStartMsArray: s.setStartMsArray, setEndMsArray: s.setEndMsArray,
-            restTimes: s.restTimes, rpeValues: s.rpeValues,
+            restTimes: s.restTimes, rpeValues: s.rpeValues, rpeRated: s.rpeRated,
             accumulatedRestMs: s.accumulatedRestMs, exerciseStartMs: s.exerciseStartMs,
             timerStarted: s.timerStarted, restStartMs: s.restStartMs,
           },
@@ -398,7 +409,7 @@ export const useWorkoutStore = create<WorkoutStore>()(
             sets: buf.sets, reps: buf.reps, perSetWeights: buf.perSetWeights,
             setWeights: buf.setWeights, currentSet: buf.currentSet, lapTimes: buf.lapTimes,
             setStartMsArray: buf.setStartMsArray, setEndMsArray: buf.setEndMsArray,
-            restTimes: buf.restTimes, rpeValues: buf.rpeValues,
+            restTimes: buf.restTimes, rpeValues: buf.rpeValues, rpeRated: buf.rpeRated ?? [],
             accumulatedRestMs: buf.accumulatedRestMs, exerciseStartMs: buf.exerciseStartMs,
             timerStarted: buf.timerStarted,
             restStartMs: buf.restStartMs, lapStartMs: null, workoutPhase: 'rest',

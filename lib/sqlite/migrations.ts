@@ -285,6 +285,8 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'set_logs',         column: 'planned_rest_sec',        ddl: `ALTER TABLE set_logs ADD COLUMN planned_rest_sec INTEGER` },
   // #2445 (v48).
   { table: 'set_logs',         column: 'planned_weight_kg',       ddl: `ALTER TABLE set_logs ADD COLUMN planned_weight_kg REAL` },
+  // #2450 (v49).
+  { table: 'set_logs',         column: 'rpe_source',              ddl: `ALTER TABLE set_logs ADD COLUMN rpe_source TEXT` },
   // Program-mirror columns added to the v4 local_programs stub in v9.
   { table: 'local_programs',   column: 'phase_mode',               ddl: `ALTER TABLE local_programs ADD COLUMN phase_mode TEXT NOT NULL DEFAULT 'manual'` },
   { table: 'local_programs',   column: 'training_goal',            ddl: `ALTER TABLE local_programs ADD COLUMN training_goal TEXT NOT NULL DEFAULT 'strength'` },
@@ -1691,6 +1693,17 @@ export const MIGRATIONS: UpgradeStatement[] = [
     toVersion: 48,
     statements: [
       `ALTER TABLE set_logs ADD COLUMN planned_weight_kg REAL`,
+    ],
+  },
+  {
+    // #2450, mirroring Postgres migration 202610061516. Whether a set's RPE was tapped ('rated') or
+    // left at the picker's pre-fill ('expected'). Same shape as v48: the ALTER reaches fresh installs
+    // and upgraded devices alike, RECONCILE_COLUMNS covers a half-applied upgrade. No CHECK here —
+    // the writers pass only the two values, and the server's constraint is the authority. No
+    // backfill: old rows stay NULL (unknown).
+    toVersion: 49,
+    statements: [
+      `ALTER TABLE set_logs ADD COLUMN rpe_source TEXT`,
     ],
   },
 ];

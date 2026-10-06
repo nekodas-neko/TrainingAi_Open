@@ -1,9 +1,7 @@
 import type { ProgramPhaseType } from './program'
 
-/** #2450: where a set's RPE came from — `rated` when the lifter set it on the picker, `expected`
- *  when it is the picker's untouched pre-fill (owner rule on #2253: untouched means "as
- *  predicted"). Stored as `set_logs.rpe_source`; NULL on a set with no RPE and on older rows. */
-export type RpeSource = 'expected' | 'rated'
+import type { RpeSource } from '../workout/rpe-source'
+export type { RpeSource }
 
 export interface SetLog {
   id: string

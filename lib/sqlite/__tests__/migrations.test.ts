@@ -5,7 +5,14 @@ describe('local schema', () => {
   // The describe and the title used to say v25 while the assertion said 27 — a stale label on a
   // guard whose whole job is to be the authority on the number. Named after what it checks now.
   it('tops out at the current version', () => {
-    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(48)
+    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(49)
+  })
+
+  // #2450. Whether an RPE was tapped has to reach an upgraded device, and survive a half-applied upgrade.
+  it('v49 adds set_logs.rpe_source by ALTER and reconciles it', () => {
+    const v49 = MIGRATIONS.find(m => m.toVersion === 49)!
+    expect(v49.statements.join('\n')).toContain('ALTER TABLE set_logs ADD COLUMN rpe_source')
+    expect(RECONCILE_COLUMNS.some(c => c.table === 'set_logs' && c.column === 'rpe_source')).toBe(true)
   })
 
   // #2445. The prescribed bar has to reach an upgraded device too, and survive a half-applied upgrade.

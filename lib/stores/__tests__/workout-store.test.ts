@@ -39,6 +39,50 @@ describe('ExerciseBuffer carries restStartMs through stash/restore (superset alt
   })
 })
 
+// #2450: rpeValues opens on the pre-fill, so the tapped flags are the only record of a rating.
+describe('rpeRated (which RPEs the lifter set)', () => {
+  beforeEach(() => { useWorkoutStore.getState().resetSession() })
+
+  it('a pre-fill is untouched; a tap marks only its own set, even at the pre-filled value', () => {
+    const store = useWorkoutStore.getState()
+    store.initRpeValues([8, 8, 8])
+    expect(useWorkoutStore.getState().rpeRated).toEqual([])
+    store.setRpeValue(1, 8)
+    expect(useWorkoutStore.getState().rpeValues).toEqual([8, 8, 8])
+    expect(useWorkoutStore.getState().rpeRated).toEqual([undefined, true])
+  })
+
+  it('a fresh pre-fill for the next exercise clears the flags', () => {
+    const store = useWorkoutStore.getState()
+    store.initRpeValues([7, 7])
+    store.setRpeValue(0, 9)
+    store.initRpeValues([6, 6])
+    expect(useWorkoutStore.getState().rpeRated).toEqual([])
+  })
+
+  it('survives superset stash/restore', () => {
+    const store = useWorkoutStore.getState()
+    store.initRpeValues([7, 7])
+    store.setRpeValue(0, 9)
+    store.stashExercise(0)
+    store.initRpeValues([6, 6])
+    store.restoreExercise(0)
+    expect(useWorkoutStore.getState().rpeRated).toEqual([true])
+  })
+
+  it('a buffer persisted before the field existed restores as untouched', () => {
+    const store = useWorkoutStore.getState()
+    store.initRpeValues([7, 7])
+    store.setRpeValue(0, 9)
+    store.stashExercise(2)
+    const legacy = { ...useWorkoutStore.getState().exerciseBuffers[2] }
+    delete legacy.rpeRated
+    useWorkoutStore.setState({ exerciseBuffers: { 2: legacy } })
+    store.restoreExercise(2)
+    expect(useWorkoutStore.getState().rpeRated).toEqual([])
+  })
+})
+
 describe('readyElapsedBaselineSec', () => {
   beforeEach(() => {
     localStorage.clear()

@@ -114,6 +114,9 @@ export function buildWorkoutLogPayload(
       // #2445: per-set and nullable, so it is re-sent whenever ANY set carries one — unlike the
       // all-or-nothing arrays above, a null here is a real value (no bar prescribed for that set).
       ...(sets.some(s => s.plannedWeightKg != null) ? { plannedWeights: sets.map(s => s.plannedWeightKg ?? null) } : {}),
+      // #2450: index-aligned with rpeValues, so only beside it; nullable per set like the bar above.
+      // A row from before the column carries null, and the server stores null for it as before.
+      ...(everySetHasRpe && sets.some(s => s.rpeSource != null) ? { rpeSources: sets.map(s => s.rpeSource ?? null) } : {}),
       ...(el.styleId ? { styleId: el.styleId } : {}),
       ...(el.styleName ? { styleName: el.styleName } : {}),
       ...(el.muscleGroups.length ? { muscleGroups: el.muscleGroups } : {}),
