@@ -87,7 +87,7 @@ describe('buildWorkoutLogPayload', () => {
   const session = {
     id: 'ws-9', sessionName: 'Session B', startedAt: '2026-06-30T08:30:00.000Z',
     completedAt: null, updatedAt: '2026-06-30T09:10:00.000Z', deletedAt: null,
-    syncStatus: 'pending' as const,
+    syncStatus: 'pending' as const, sessionRpe: null,
   }
   const exerciseLog = {
     id: 'el-9', workoutSessionId: 'ws-9', exerciseName: 'Squat',
@@ -99,10 +99,12 @@ describe('buildWorkoutLogPayload', () => {
       { id: 's-2', exerciseLogId: 'el-9', setNumber: 2, weightKg: 120, reps: 5,
         setTimeSec: 40, restTimeSec: 120, intensityPct: null, useFor1rm: true,
         setStartMs: null, setEndMs: null, rpe: 8, updatedAt: '2026-06-30T08:45:00.000Z',
+        plannedPct: null, plannedReps: null, plannedRestSec: null, plannedWeightKg: null,
         deletedAt: null, syncStatus: 'pending' as const },
       { id: 's-1', exerciseLogId: 'el-9', setNumber: 1, weightKg: 100, reps: 5,
         setTimeSec: 35, restTimeSec: 90, intensityPct: null, useFor1rm: false,
         setStartMs: null, setEndMs: null, rpe: null, updatedAt: '2026-06-30T08:45:00.000Z',
+        plannedPct: null, plannedReps: null, plannedRestSec: null, plannedWeightKg: null,
         deletedAt: null, syncStatus: 'pending' as const },
     ],
   }
