@@ -235,6 +235,45 @@ export function canonicalNightForDate<T extends { date: string; durationHours?: 
   return best
 }
 
+/**
+ * True when a night sits on the EVENING side of the band on its own wake date: its midpoint falls
+ * on that same local date, at or after {@link NIGHT_BAND_START_HOUR}. Such a night began and ended
+ * that evening, after the day's waking hours. It is the start of the following night (a broken
+ * onset, or an evening nap the classifier calls night), never the sleep that date woke from.
+ *
+ * A normal night's midpoint sits in the small hours of its wake date, or late on the date before,
+ * so this is never true of one.
+ */
+export function opensFollowingNight(
+  night: { date: string; sleepStart: Date; sleepEnd: Date },
+  tz: string = DEFAULT_TZ,
+): boolean {
+  const mid = new Date((night.sleepStart.getTime() + night.sleepEnd.getTime()) / 2)
+  return formatInTimeZone(mid, tz, 'yyyy-MM-dd') === night.date && localHour(mid, tz) >= NIGHT_BAND_START_HOUR
+}
+
+/**
+ * The night a date WOKE FROM: {@link canonicalNightForDate}, skipping any night that
+ * {@link opensFollowingNight}. Body Battery anchors the day's wake on it.
+ *
+ * #2230. Without the skip, on a date with no longer night, an evening window (21:30–22:30, say)
+ * was the only night for the date and became the wake anchor. Every reading before 22:30 fell
+ * outside the day. A read late that evening, or a re-derive any time after, walked a handful of
+ * samples, and because they still moved the battery the write guard let them replace a measured
+ * day. That is TN-20's flattened-day shape, reached a different way.
+ *
+ * Deliberately not applied inside `canonicalNightForDate`: the scoring consumers (readiness,
+ * the sleep score, the day audit) read that, and moving which night they grade is a separate,
+ * score-moving change (#2456).
+ */
+export function nightWokenFrom<T extends { date: string; sleepStart: Date; sleepEnd: Date; durationHours?: number | null }>(
+  nights: T[],
+  date: string,
+  tz: string = DEFAULT_TZ,
+): T | null {
+  return canonicalNightForDate(nights.filter(n => !opensFollowingNight(n, tz)), date)
+}
+
 /** The canonical night of the most recent night date — see {@link canonicalNightForDate}. */
 export function canonicalLatestNight<T extends { date: string; durationHours?: number | null }>(
   nights: T[],

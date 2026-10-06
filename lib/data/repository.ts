@@ -1293,7 +1293,8 @@ export interface WorkoutRepository {
   getColmiSleepSegments(userId: string, fromDate: string, toDate: string): Promise<{ localDate: string; startedAt: Date; endedAt: Date; stage: number; minutes: number }[]>
   getColmiLatestReadingAt(userId: string): Promise<Date | null>
 
-  upsertBodyBatteryDaily(userId: string, row: BodyBatteryDailyRow): Promise<void>
+  /** `false` when the TN-20 guard kept the stored day instead. */
+  upsertBodyBatteryDaily(userId: string, row: BodyBatteryDailyRow): Promise<boolean>
   getBodyBatteryHistory(userId: string, startDate: string, endDate: string): Promise<BodyBatteryDailyRow[]>
   upsertOuraSleep(userId: string, sessions: OuraSleepUpsertRow[], source: HealthSource): Promise<void>
   upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]): Promise<void>

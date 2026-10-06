@@ -30,8 +30,11 @@ type Db = ReturnType<typeof getDb>
 // It also repairs rather than only protecting: a later read of the same day that DOES see samples
 // passes the guard and overwrites the empty row, so a day flattened in the morning heals itself by
 // evening. That is this entry's pass test, met by the write path instead of by a backfill.
-export async function upsertBodyBatteryDaily(db: Db, userId: string, row: BodyBatteryDailyRow): Promise<void> {
-  await db.insert(s.bodyBatteryDaily)
+//
+// Returns whether the row was written. `false` means the guard kept the stored day. The re-derive
+// reports that rather than counting the day as moved (#2230).
+export async function upsertBodyBatteryDaily(db: Db, userId: string, row: BodyBatteryDailyRow): Promise<boolean> {
+  const written = await db.insert(s.bodyBatteryDaily)
     .values({
       userId,
       date:          row.date,
@@ -89,6 +92,18 @@ export async function upsertBodyBatteryDaily(db: Db, userId: string, row: BodyBa
         OR (${s.bodyBatteryDaily.totalCharged} = 0 AND ${s.bodyBatteryDaily.totalDrained} = 0)
       `,
     })
+    .returning({ date: s.bodyBatteryDaily.date })
+  return written.length > 0
+}
+
+/**
+ * The guard's "this day recorded movement" test, in TypeScript, so a dry run can say which days
+ * the write would keep. The SQL `setWhere` above is the rule; this restates it as
+ * `measured(incoming) || !measured(stored)`. `tn20-empty-snapshot-guard.test.ts` runs both over the
+ * same rows, so the two cannot drift apart silently.
+ */
+export function isMeasuredBatteryDay(row: Pick<BodyBatteryDailyRow, 'hrSampleCount' | 'totalCharged' | 'totalDrained'>): boolean {
+  return row.hrSampleCount > 0 && (row.totalCharged > 0 || row.totalDrained > 0)
 }
 
 export async function getBodyBatteryHistory(
