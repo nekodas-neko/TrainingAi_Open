@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import dynamic from "next/dynamic";
 import SessionSelectContent from "@/app/session-select/session-select-content";
 import { BottomNav } from "@/components/shell/bottom-nav";
+import { createPreloadedTab } from "./preloaded-tab";
 import { TabVisibilityProvider } from "./tab-visibility";
 import { hrefForTab, tabKeyForHref, type TabKey } from "./tabs";
 import { TAB_NAV_EVENT } from "@/lib/shell-nav";
@@ -12,8 +12,8 @@ import type { ActivityLevel } from "@trainingai/shared/types/user";
 import { useColmiAutoSync } from "@/lib/hooks/use-colmi-auto-sync";
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 
-// Shown only on a tab's FIRST activation while its chunk loads (SW-cached →
-// near-instant when warm). Never shown again for the life of the shell.
+// Shown only when a tab is activated before its chunk has been fetched (the idle
+// warm-up below normally has by then). Never shown again once the chunk is in.
 function TabChunkPulse() {
   return (
     <div className="flex flex-col bg-page min-h-screen pt-safe-or-4 px-4 gap-4" aria-busy="true">
@@ -25,19 +25,17 @@ function TabChunkPulse() {
 }
 
 // Home is the entry screen — static import so first paint never waits on a
-// second chunk. The other four load on first activation (code-split per tab).
-const HealthContent = dynamic(() => import("@/app/health/health-content"), {
-  ssr: false, loading: () => <TabChunkPulse />,
-});
-const WorkoutSelectContent = dynamic(() => import("@/app/workout-select/workout-select-content"), {
-  ssr: false, loading: () => <TabChunkPulse />,
-});
-const NutritionContent = dynamic(() => import("@/app/nutrition/nutrition-content"), {
-  ssr: false, loading: () => <TabChunkPulse />,
-});
-const MoreContent = dynamic(() => import("@/app/more/more-content"), {
-  ssr: false, loading: () => <TabChunkPulse />,
-});
+// second chunk. The other four are code-split per tab. Each is created with the
+// SAME loader the idle warm-up below calls, so a tapped tab whose chunk has
+// landed renders its screen directly instead of a pulse (#2442).
+const Health = createPreloadedTab(() => import("@/app/health/health-content"), () => <TabChunkPulse />);
+const Workout = createPreloadedTab(() => import("@/app/workout-select/workout-select-content"), () => <TabChunkPulse />);
+const Nutrition = createPreloadedTab(() => import("@/app/nutrition/nutrition-content"), () => <TabChunkPulse />);
+const More = createPreloadedTab(() => import("@/app/more/more-content"), () => <TabChunkPulse />);
+const HealthContent = Health.Tab;
+const WorkoutSelectContent = Workout.Tab;
+const NutritionContent = Nutrition.Tab;
+const MoreContent = More.Tab;
 
 export interface TabShellSession {
   userId: string;
@@ -121,10 +119,10 @@ export function TabShell({ initialTab, session }: { initialTab: TabKey; session:
       if (cancelled) return
       // Re-importing a module webpack has already resolved is a no-op, so this is safe regardless
       // of which tab the shell opened on.
-      void import("@/app/health/health-content")
-      void import("@/app/workout-select/workout-select-content")
-      void import("@/app/nutrition/nutrition-content")
-      void import("@/app/more/more-content")
+      void Health.preload()
+      void Workout.preload()
+      void Nutrition.preload()
+      void More.preload()
     }
     const ric = (window as Window & typeof globalThis & {
       requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number
