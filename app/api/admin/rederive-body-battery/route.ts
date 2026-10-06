@@ -5,6 +5,7 @@ import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz, normalizeDateParamIso, shiftDateStr, daysBetweenDateStrs, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { computeBodyBatteryDay, BODY_BATTERY_MODEL_VERSION } from '@/lib/health/body-battery-day'
+import { isMeasuredBatteryDay } from '@/lib/data/postgres/slices/body-battery'
 
 /**
  * Re-derive stored Body Battery days under the current model (TN-72, owner-approved 2026-09-27).
@@ -20,13 +21,17 @@ import { computeBodyBatteryDay, BODY_BATTERY_MODEL_VERSION } from '@/lib/health/
  *
  * Admin-only, POST because it writes, `dryRun` unless `dryRun=false`, and sequential: each day is
  * ~10 queries against a `max: 10` pool (session 165).
+ *
+ * **`kept` is a day the write guard refuses** (TN-20): the recompute recorded no movement and the
+ * stored day did, so the stored day stays. Before #2230 such a day was reported `written`, with its
+ * end-value delta in the summary, although nothing changed in the table.
  */
 
 const MAX_RANGE_DAYS = 31
 
 interface DayOutcome {
   date: string
-  action: 'written' | 'unchanged' | 'no-row' | 'today'
+  action: 'written' | 'kept' | 'unchanged' | 'no-row' | 'today'
   stored?: { endValue: number; modelVersion: string | null }
   recomputed?: { endValue: number; charged: number; drained: number; hrSampleCount: number }
   error?: string
@@ -85,17 +90,23 @@ export async function POST(req: NextRequest) {
       })
       const same = stored.modelVersion === snapshot.modelVersion && stored.endValue === snapshot.endValue
         && stored.totalCharged === snapshot.totalCharged && stored.totalDrained === snapshot.totalDrained
-      const outcome: DayOutcome = {
+      let action: DayOutcome['action'] = 'unchanged'
+      if (!same) {
+        // A real run takes the database's answer; a dry run predicts it from the same rule.
+        const written = dryRun
+          ? isMeasuredBatteryDay(snapshot) || !isMeasuredBatteryDay(stored)
+          : await repo.upsertBodyBatteryDaily(userId, snapshot)
+        action = written ? 'written' : 'kept'
+      }
+      days.push({
         date: d,
-        action: same ? 'unchanged' : 'written',
+        action,
         stored: { endValue: stored.endValue, modelVersion: stored.modelVersion },
         recomputed: {
           endValue: snapshot.endValue, charged: snapshot.totalCharged,
           drained: snapshot.totalDrained, hrSampleCount: snapshot.hrSampleCount,
         },
-      }
-      if (!dryRun && !same) await repo.upsertBodyBatteryDaily(userId, snapshot)
-      days.push(outcome)
+      })
     } catch (err) {
       // One day that cannot be computed must never abort the range.
       console.error(`[rederive-body-battery] ${d} failed:`, err)
@@ -115,6 +126,7 @@ export async function POST(req: NextRequest) {
     summary: {
       daysExamined: days.length,
       written: moved.length,
+      kept: days.filter(x => x.action === 'kept').length,
       unchanged: days.filter(x => x.action === 'unchanged').length,
       noRow: days.filter(x => x.action === 'no-row' && !x.error).length,
       failed: days.filter(x => x.error).length,
