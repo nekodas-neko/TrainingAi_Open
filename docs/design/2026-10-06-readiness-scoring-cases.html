@@ -1,0 +1,108 @@
+<title>Readiness Scoring Cases</title>
+<style>
+:root{color-scheme:dark;--bg:#0c1110;--panel:#131a18;--line:#22302c;--fg:#e8efec;--dim:#93a49e;--accent:#00e07a;--warn:#ff8f6b;--blue:#60a5fa;
+--font:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,sans-serif;--mono:"IBM Plex Mono",ui-monospace,monospace}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);line-height:1.55;padding-block:28px;padding-inline:16px}
+.wrap{max-width:1000px;margin:0 auto}
+h1{font-size:26px;line-height:1.2;margin:0 0 6px;text-wrap:balance}
+h2{font-size:19px;margin:0 0 8px;text-wrap:balance}
+h3{font-size:15px;margin:18px 0 6px}
+p{max-width:70ch;margin:0 0 10px}
+.dim{color:var(--dim)}
+.meta{font-family:var(--mono);font-size:11px;color:var(--dim);text-transform:uppercase;letter-spacing:.09em;margin:0 0 22px}
+section{border-top:1px solid var(--line);padding-block:22px 6px}
+.tbl{overflow-x:auto;margin:6px 0 14px}
+table{border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums;min-width:640px}
+th,td{padding:6px 12px 6px 0;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);font-weight:600}
+td.n{text-align:right;padding-right:16px}
+td.big{font-weight:700;font-size:15px}
+.ok{color:var(--accent)} .bad{color:var(--warn)}
+.callout{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--warn);border-radius:0 8px 8px 0;padding:12px 16px;margin:10px 0 14px;max-width:76ch}
+.callout.good{border-left-color:var(--accent)}
+.callout p:last-child{margin:0}
+code{font-family:var(--mono);font-size:12px;background:var(--panel);padding:1px 5px;border-radius:4px}
+.wins{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:8px 0 14px}
+.win{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.win b{font-family:var(--mono);font-size:13px}
+.win .r{font-size:11px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--dim)}
+.win.key{border-color:var(--accent)}
+.win p{font-size:13px;color:var(--dim);margin:6px 0 0}
+</style>
+<div class="wrap">
+<h1>How readiness reaches 100, and which baselines it uses</h1>
+<p class="dim">Companion to the Readiness hub mockup (#2356). Part 1 runs the <b>shipped</b> readiness function (<code>computeReadinessComposite</code>, model v5, 2026-10-06) on test days. Part 2 is the proposed pillar model. Part 3 covers baselines today and the proposed 1d → 7d → 30d → 90d windows.</p>
+<p class="meta">Issue #2356 · computed 2026-10-06 against main</p>
+
+<section>
+<h2>1 · Today's model: it cannot reach 100</h2>
+<p>Each signal is scored against your personal baseline: 50 means "at your normal". It climbs linearly to 80 at +0.9σ, then flattens so extreme days keep their order (TN-60). These rows are the real function's output:</p>
+<div class="tbl"><table>
+<tr><th>Test day</th><th>RHR</th><th>HRV</th><th>Temp</th><th>Sleep bal.</th><th>Last night</th><th>Prev. activity</th><th>Recovery idx</th><th>Act. balance</th><th>Readiness</th></tr>
+<tr><td>Typical day: everything at your normal</td><td class="n">50</td><td class="n">50</td><td class="n">90</td><td class="n">50</td><td class="n">75</td><td class="n">70</td><td class="n">100</td><td class="n">70</td><td class="n big">67</td></tr>
+<tr><td>Good day: +1σ better everywhere</td><td class="n">83</td><td class="n">83</td><td class="n">90</td><td class="n">83</td><td class="n">88</td><td class="n">85</td><td class="n">100</td><td class="n">85</td><td class="n big">87</td></tr>
+<tr><td>Great day: +1.5σ, sub-scores 95</td><td class="n">90</td><td class="n">90</td><td class="n">90</td><td class="n">90</td><td class="n">95</td><td class="n">95</td><td class="n">100</td><td class="n">95</td><td class="n big">93</td></tr>
+<tr><td>Best plausible: +3σ, sub-scores 100</td><td class="n">96</td><td class="n">96</td><td class="n">90</td><td class="n">96</td><td class="n">100</td><td class="n">100</td><td class="n">100</td><td class="n">100</td><td class="n big">97</td></tr>
+<tr><td>Impossible: +10σ everywhere</td><td class="n">99</td><td class="n">99</td><td class="n">90</td><td class="n">99</td><td class="n">100</td><td class="n">100</td><td class="n">100</td><td class="n">100</td><td class="n big">98</td></tr>
+<tr><td>Bad day: −1.5σ, poor night, warm</td><td class="n">10</td><td class="n">10</td><td class="n">33</td><td class="n">17</td><td class="n">55</td><td class="n">60</td><td class="n">100</td><td class="n">60</td><td class="n big">39</td></tr>
+</table></div>
+<div class="callout">
+<p><b>Two things stop it reaching 100.</b></p>
+<p>① <b>Temperature tops out at 90.</b> A perfectly normal temperature should be its best score. The tail compression meant for extreme days also squashes it, so it costs 1.1 readiness points every day. That's a defect, not a choice: a fix candidate in its own right.</p>
+<p>② <b>The tails approach 100 but never reach it.</b> By design, an integer 100 needs roughly 23σ. So <b>98 is the practical ceiling</b>, and even a +3σ day shows 97.</p>
+</div>
+<p class="dim">A "typical" day reads 67, not 50, because last night, activity and recovery are already-good absolute scores rather than "vs normal".</p>
+</section>
+
+<section>
+<h2>2 · Proposed pillar model: 100 is rare, but reachable</h2>
+<p>Readiness = Σ (pillar × weight). Each pillar = Σ (component × weight). Every component uses one curve, scored against your <b>30-day normal</b>. The numbers are a proposal for your sign-off:</p>
+<div class="tbl"><table>
+<tr><th>Where you are vs your 30-day normal</th><th>Component score</th><th>Reads as</th></tr>
+<tr><td>−1.5σ or worse</td><td class="n">0–25</td><td>well below your normal</td></tr>
+<tr><td>−0.5σ</td><td class="n">60</td><td>a little off</td></tr>
+<tr><td><b>at your normal (0σ)</b></td><td class="n"><b>70</b></td><td>a normal day reads 70, not 50</td></tr>
+<tr><td>+1σ</td><td class="n">90</td><td>clearly better than usual</td></tr>
+<tr><td><b>+1.5σ or better</b></td><td class="n"><b>100</b></td><td>as good as you get, and it does reach 100</td></tr>
+</table></div>
+<p>The curve is <code>70 + 20·z</code> through the middle, reaching an integer 100 at +1.5σ. Below 25 it flattens, so the worst days keep their order (the reason TN-60 exists). <b>Temperature</b> is scored "closer is better", so 100 at your normal. Fuel and other targets use their research ranges (<code>docs/architecture/component-references.md</code>).</p>
+<div class="tbl"><table>
+<tr><th>Test day</th><th>Sleep</th><th>Heart</th><th>Activity</th><th>Body</th><th>Readiness (30/30/20/20)</th></tr>
+<tr><td>Typical day, all at your normal</td><td class="n">70</td><td class="n">70</td><td class="n">70</td><td class="n">78</td><td class="n big">72</td></tr>
+<tr><td>Good day, +1σ</td><td class="n">90</td><td class="n">90</td><td class="n">90</td><td class="n">92</td><td class="n big">90</td></tr>
+<tr><td><b>Perfect day, +1.5σ on every component</b></td><td class="n">100</td><td class="n">100</td><td class="n">100</td><td class="n">100</td><td class="n big ok">100</td></tr>
+<tr><td>Great sleep, run-down body (warm, stressed)</td><td class="n">95</td><td class="n">72</td><td class="n">70</td><td class="n">45</td><td class="n big">73</td></tr>
+<tr><td>Bad day, −1.5σ</td><td class="n">25</td><td class="n">25</td><td class="n">40</td><td class="n">35</td><td class="n big bad">30</td></tr>
+</table></div>
+<div class="callout good"><p><b>How to hit 100:</b> every component at least 1.5σ better than your 30-day normal on the same morning. Expect a handful of days a year. A 100 means something, but it isn't impossible.</p></div>
+<p class="dim">Body reads 78 on a typical day because temperature is 100 at your normal and fuel scores against fixed targets. Test-case numbers are illustrative until the weights proposal is run on your real history.</p>
+</section>
+
+<section>
+<h2>3 · Baselines: what "your normal" means</h2>
+<h3>Today</h3>
+<p>There is effectively <b>one</b> baseline per signal: an exponential moving average ported from the ring firmware (<code>personal-baseline.ts</code>). It moves fast for the first 14 nights, then settles to a 1/32 step, a memory of about a month, with each night weighing less the older it is. Nothing scores until <b>14 nights</b> exist (<code>BASELINE_MIN_NIGHTS</code>). A few signals also use fixed windows: a 28-day average for the HRV and resting-HR displays, and 7-vs-28-day for training load. None of them show you a <i>trend</i> across windows.</p>
+<h3>Proposed: four windows per signal, one of them scores</h3>
+<div class="wins">
+<div class="win"><span class="r">1 day</span><br><b>vs yesterday</b><p>The arrow on each row: did it move overnight? Context only, never scored. One night is noise.</p></div>
+<div class="win"><span class="r">7 days</span><br><b>this week</b><p>Flags a run: HRV 1σ under your 30-day normal for 7 days raises "you're run down" before one bad night would.</p></div>
+<div class="win key"><span class="r">30 days · scores</span><br><b>your normal</b><p>The reference every component is scored against. Long enough to be stable, short enough to follow real fitness change.</p></div>
+<div class="win"><span class="r">90 days</span><br><b>your season</b><p>Drift: is your normal itself rising or falling? It catches slow detraining, the way the 28:90 load ratio did (#2340).</p></div>
+</div>
+<p>Each component row shows them as one line, for example <code>HRV 38 ms · vs 1d ↑2 · 7d ↓4 · <b>30d ↓8</b> · 90d ↓3</code>. A <b>365-day</b> window joins once a year of history exists (season-over-season).</p>
+<h3>Rules that keep it honest</h3>
+<p>· <b>Only 30d scores.</b> The others inform the arrows, alerts and insights, so the number you see has one meaning.<br>
+· <b>Learning period:</b> until a signal has 14 nights it shows "learning · day N of 14", never a fake 50. Until 30 nights exist, scoring uses what there is, flagged as provisional.<br>
+· <b>Low-wear nights and nap-fragments are excluded</b> from every window, so one missing night can't drag your normal (the nap bug, #2192).<br>
+· <b>Per-person refits</b> (the #2341 pattern) tune the curve's width per component and are shadow-tested before they go live.</p>
+</section>
+
+<section>
+<h2>What needs your yes</h2>
+<p>① The curve: <b>70 at your normal, 100 at +1.5σ</b>. ② <b>30 days</b> as the scoring window, with 1d/7d/90d as context. ③ Then the pillar and component weights, as a tuning proposal with the number of past days that move. The temperature-caps-at-90 defect gets fixed regardless.</p>
+</section>
+</div>
