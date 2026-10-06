@@ -1,6 +1,8 @@
 'use client'
 
 import type { EnergyBalanceResponse } from '@/app/api/nutrition/energy-balance/route'
+import { restingRateWording } from '@trainingai/shared/nutrition/resting-rate-source'
+import { formatDayShort } from '@trainingai/shared/date-utils'
 
 /**
  * The ⓘ panel's explanation of the energy numbers, rendered by both surfaces that show them.
@@ -20,6 +22,7 @@ export function EnergyExplainer({ data }: { data: EnergyBalanceResponse }) {
   // BF-138. The two figures the owner was reconciling by hand: the goal stored once, and the budget
   // today's movement has grown. Named together only when they actually differ — a reconciliation
   // shown on a day they agree is noise on a panel that already has five paragraphs.
+  const rate = restingRateWording(b.restingRateSource, b.restingRateMeasuredOn, formatDayShort)
   const showsTwoModels = storedGoal != null && Math.abs(storedGoal - b.expenditureKcal) >= 100
   return (
     <div className="space-y-2 rounded-xl bg-muted/50 p-3">
@@ -36,8 +39,9 @@ export function EnergyExplainer({ data }: { data: EnergyBalanceResponse }) {
           implementation of a calculation this entry forbids touching. */}
       {b.restingRateKcal != null && b.restingRateKcal !== b.restingBaseKcal && (
         <p className="text-[10px] leading-relaxed text-muted-foreground">
-          That resting burn starts from your measured resting rate of{' '}
-          <span className="font-semibold text-foreground">{b.restingRateKcal.toLocaleString()} kcal</span>,
+          That resting burn starts from {rate.label} of{' '}
+          <span className="font-semibold text-foreground">{b.restingRateKcal.toLocaleString()} kcal</span>
+          {rate.note ? ` (${rate.note})` : ''},
           scaled up for simply being awake and about, then reduced again by the everyday walking that
           scaling already assumed — which is what leaves{' '}
           <span className="font-semibold text-foreground">{b.restingBaseKcal.toLocaleString()} kcal</span>{' '}

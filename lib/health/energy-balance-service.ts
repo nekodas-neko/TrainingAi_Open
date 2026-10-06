@@ -17,6 +17,7 @@ import {
   resolveMaintenance, maintenanceGapMessage, MAX_WINDOW_DAYS, type MaintenanceDay,
 } from '@trainingai/shared/nutrition/adaptive-tdee'
 import type { FitnessGoal } from '@trainingai/shared/types/user'
+import type { RestingRateSource } from '@trainingai/shared/nutrition/resting-rate-source'
 import type { WorkoutRepository } from '@/lib/data/repository'
 
 export interface EnergyBalanceResult {
@@ -34,6 +35,12 @@ export interface EnergyBalanceResult {
     /** BF-152. The resting rate that anchors the budget — the measured RMR re-scaled onto today's
      *  fat-free mass when there is one, a prediction otherwise. Null when no profile supports one. */
     restingRateKcal: number | null
+    /** #2413. Which branch produced `restingRateKcal`. Optional so a payload cached before this
+     *  existed still types; a reader that finds it absent must not claim either. */
+    restingRateSource?: RestingRateSource
+    /** The test date, when `restingRateSource` is 'measured'. The rate is that test re-scaled onto
+     *  today's fat-free mass, so word it "carried forward from", never as the test's own figure. */
+    restingRateMeasuredOn?: string | null
     zone: string
     zoneLabel: string
     zoneColor: string
@@ -350,7 +357,11 @@ export async function computeEnergyBalance(
 
   return {
     date,
-    balance: { ...balance, intakeKcal, restingBaseKcal, activeKcal: activeEnergy.total },
+    balance: {
+      ...balance, intakeKcal, restingBaseKcal, activeKcal: activeEnergy.total,
+      restingRateSource: measuredBmr != null ? 'measured' : 'formula',
+      restingRateMeasuredOn: measuredBmr != null ? measuredRmr?.measuredOn ?? null : null,
+    },
     maintenance: {
       kcal: maintenanceKcal,
       source,
