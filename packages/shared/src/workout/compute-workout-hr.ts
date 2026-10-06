@@ -51,7 +51,9 @@ export async function computeWorkoutHr(
       const t = r.at.getTime()
       return t >= w.from && t <= w.to
     }))
-    .map(r => r.rrMs)
+    // With their times (#2488): beats either side of a set are not successive, and the adjacency
+    // check is what stops a pair being formed across one.
+    .map(r => ({ atMs: r.at.getTime(), rrMs: r.rrMs }))
   const workoutHrvMs = rmssdFromRr(restRr)
 
   return { readings, stats, setHrRows, workoutHrvMs, summary: summariseWorkoutHr(readings, stats, workoutHrvMs) }
