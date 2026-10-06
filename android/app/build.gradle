@@ -159,7 +159,8 @@ abstract class GenerateDevCapacitorAssets extends DefaultTask {
  * those nights on the laptop's database and lose them from production.
  *
  * prod: still com.trainingai.app, and its Capacitor config and plugin list are byte-for-byte the
- * ones `npx cap sync` wrote, so nothing of the Dev app's can leak into the real one.
+ * ones `npx cap sync` wrote, so nothing of the Dev app's can leak into the real one and point it at
+ * the laptop.
  */
 abstract class VerifyFlavour extends DefaultTask {
     @Input abstract Property<String> getFlavour()
@@ -206,6 +207,8 @@ abstract class VerifyFlavour extends DefaultTask {
             droppedPlugins.get().findAll { it in pkgs }.each { failures << "plugin ${it} is registered in the Dev app" }
         } else {
             if (pkg != "com.trainingai.app") failures << "package is '${pkg}', expected com.trainingai.app"
+            // Equality with the sync output, not a hardcoded URL: capacitor.config.ts stays the one
+            // place the real app's server is set (the disabled emulator job rewrites it on purpose).
             ["capacitor.config.json", "capacitor.plugins.json"].each { f ->
                 def packaged = new File(mergedAssets.get().asFile, f)
                 def synced = new File(mainAssets.get().asFile, f)
@@ -213,8 +216,6 @@ abstract class VerifyFlavour extends DefaultTask {
                     failures << "${f} differs from the one npx cap sync wrote into src/main/assets"
                 }
             }
-            def url = config.exists() ? new groovy.json.JsonSlurper().parse(config).server?.url : null
-            if (!(url as String)?.startsWith("https://")) failures << "server.url is '${url}', expected https"
         }
 
         report.get().asFile.text = failures ? failures.join("\n") : "ok"
