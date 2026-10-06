@@ -1,6 +1,6 @@
 import { InfoIcon } from "lucide-react";
 import { Sparkline } from "@/components/ui/sparkline";
-import { goalProgressPct } from "@trainingai/shared/health/long-term-goal-progress";
+import { goalProgressPct, WEIGHT_TREND_WINDOW_DAYS } from "@trainingai/shared/health/long-term-goal-progress";
 import type { BodyMetaRow } from "@/app/api/body-metadata/route";
 
 interface Props {
@@ -22,7 +22,8 @@ interface Props {
    * already carries this value for the Dist tile.
    */
   bodyFatBarColor: string;
-  /** The regression slope from `useWeightTrend` — the card renders it, never re-fits it. */
+  /** The regression slope from `useWeightTrend`, fitted over `WEIGHT_TREND_WINDOW_DAYS` — the card
+   *  renders it, never re-fits it. `metaRecent` (7 days) is the sparkline's input, not the slope's. */
   kgPerWeek: number | null;
   /** The body-metadata read has not landed yet (drives the headline's skeleton, not the sparkline). */
   loading: boolean;
@@ -56,7 +57,7 @@ export function WeightTrendCard({
     ) : kgPerWeek != null ? (
       <p className="text-2xl font-bold tabular-nums leading-tight" style={{ color: "var(--accent-green)" }}>
         {kgPerWeek >= 0 ? '+' : ''}{kgPerWeek}
-        <span className="text-xs font-normal ml-1 text-muted-foreground">kg/wk · last 7 days</span>
+        <span className="text-xs font-normal ml-1 text-muted-foreground">kg/wk · last {WEIGHT_TREND_WINDOW_DAYS} days</span>
       </p>
     ) : (
       <p className="text-xs text-muted-foreground">Need more data</p>
@@ -64,7 +65,7 @@ export function WeightTrendCard({
     {infoOpen && (
       <div className="mt-3 rounded-xl bg-muted/50 p-2.5">
         <p className="text-[10px] text-muted-foreground leading-relaxed">
-          Linear regression slope across your recent weight readings. Positive = gaining, negative = losing. Needs at least 3 readings to calculate.
+          Linear regression slope across your weight readings from the last {WEIGHT_TREND_WINDOW_DAYS} days. Positive = gaining, negative = losing. Needs at least 3 readings to calculate.
         </p>
       </div>
     )}

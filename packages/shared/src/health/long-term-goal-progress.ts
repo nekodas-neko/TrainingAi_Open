@@ -1,4 +1,5 @@
 import { linearFit } from './strength-projection'
+import { shiftDateStr } from '../date-utils'
 
 export function goalProgressPct(starting: number, current: number, target: number): number {
   if (starting === target) return 100
@@ -94,6 +95,25 @@ export function computeWeightRateKgPerWeek(points: WeightPoint[]): number | null
   const fit = computeWeightRateFit(points)
   if (!fit || fit.weighIns < 3) return null
   return Math.round(fit.rateKgPerWeek * 10) / 10
+}
+
+/**
+ * How many local days the Health → Body "Weight Trend" slope is fitted over, today included.
+ *
+ * 30, per the approved Home/Health IA mockup (#2480). It was 7 only because the slope rode the
+ * body-metadata `recent` rows, and a week of three-in-four weigh-ins is five points — enough for
+ * day-to-day water swings to read as a trend. The sparkline and every other `recent` consumer keep
+ * their 7 days; only the slope's input widens.
+ */
+export const WEIGHT_TREND_WINDOW_DAYS = 30
+
+/**
+ * First date (inclusive) of the Weight Trend window ending on `today`, the user's local date.
+ * Calendar arithmetic on the date string, never `now − N × 86,400,000`, so the window starts at a
+ * local midnight on both sides of a DST change.
+ */
+export function weightTrendWindowStart(today: string): string {
+  return shiftDateStr(today, -(WEIGHT_TREND_WINDOW_DAYS - 1))
 }
 
 export type GoalBandStatus = 'at_goal' | 'on_track' | 'too_slow' | 'too_fast' | 'wrong_direction'

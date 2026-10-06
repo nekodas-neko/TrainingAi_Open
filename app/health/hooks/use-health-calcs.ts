@@ -2,8 +2,7 @@
 
 import { useMemo } from "react";
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
-import type { BodyMetaRow } from "@/app/api/body-metadata/route";
-import { computeWeightRateKgPerWeek } from "@trainingai/shared/health/long-term-goal-progress";
+import { computeWeightRateKgPerWeek, type WeightPoint } from "@trainingai/shared/health/long-term-goal-progress";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { todayInTz } from "@trainingai/shared/date-utils";
 import { ENERGY_BALANCE_TTL } from "@trainingai/shared/cache-ttl";
@@ -29,12 +28,13 @@ export function useBmiClassification(
   }, [latestWeight, heightCm, latestBf, sexProp]);
 }
 
-export function useWeightTrend(metaRecent: BodyMetaRow[]) {
+/** Points are the body-metadata `weightTrend` (30 local days, #2480), or `recent` as a fallback. */
+export function useWeightTrend(points: WeightPoint[]) {
   // Dated points, not bare numbers (LB-67). Rows exist only on days carrying a metric, so fitting
   // the array position reported a slope per READING as though it were per day — which pushed an
   // ordinary −0.7 kg/wk past the 1.0 band and rendered "Faster than ideal pace". The shared fit
   // sorts and drops nulls itself, so the reverse here is no longer needed.
-  return useMemo(() => computeWeightRateKgPerWeek(metaRecent), [metaRecent]);
+  return useMemo(() => computeWeightRateKgPerWeek(points), [points]);
 }
 
 /**
