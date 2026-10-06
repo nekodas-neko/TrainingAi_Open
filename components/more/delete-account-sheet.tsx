@@ -102,7 +102,13 @@ export function DeleteAccountSheet() {
               Want a copy first? Use <span className="font-medium text-foreground">Export my data</span> in
               More → Data &amp; Sync before you delete.
             </p>
+          </div>
 
+          {/* Pinned with the button rather than at the end of the list: the soft keyboard shrinks the
+              scrolling area, and the field and the control it unlocks must stay on screen together. */}
+          <div className="px-4 shrink-0 space-y-3">
+            {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+            {state === "deleted" && <p role="status" className="text-sm">Your account has been deleted. Signing you out…</p>}
             <div className="space-y-1.5">
               <Label htmlFor="delete-account-phrase" className="text-xs font-semibold text-muted-foreground">
                 Type {ACCOUNT_DELETION_PHRASE} to confirm
@@ -120,12 +126,6 @@ export function DeleteAccountSheet() {
                 className="h-11 font-mono"
               />
             </div>
-
-            {error && <p role="alert" className="text-destructive">{error}</p>}
-            {state === "deleted" && <p role="status">Your account has been deleted. Signing you out…</p>}
-          </div>
-
-          <div className="px-4 shrink-0">
             <Button
               variant="destructive"
               className="w-full h-11"
