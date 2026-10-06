@@ -6,6 +6,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.488.0",
+    date: "2026-10-06",
+    changes: [
+      "Quick sessions keep at least two exercises, and on a shorter day only your accessory rests get shorter \u2014 the main lift keeps its full rest.",
+      "The session-length estimate no longer counts a rest after your last set or a changeover after your last exercise, which were about 14 minutes that never happened. It now plans with a margin taken from your own pace, so sessions fit more sets in the same time.",
+      "Swapping an exercise keeps the slot's role, so the swap no longer quietly changes your prescribed sets and percentages. \"Full\" can now override a whole-session deload.",
+      "A daytime nap can no longer replace the real night in your sleep data. Nights already lost this way come back once the history is re-decoded after this release.",
+      "Readiness no longer changes when you log the morning check-in, so the score you see on waking is the score for the day.",
+      "Home's date has its own line under the header chips, so a sunny day's weather chip no longer cuts it off.",
+    ],
+  },
+  {
     version: "1.487.0",
     date: "2026-10-05",
     changes: [
