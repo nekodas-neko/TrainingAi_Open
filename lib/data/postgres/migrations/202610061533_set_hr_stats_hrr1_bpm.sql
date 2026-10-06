@@ -1,0 +1,14 @@
+-- #2457 (step 1 of #2299): the one-minute heart-rate recovery each set actually measured.
+--
+-- HRR60 is the input the owner-signed "adequate rest" rule (#2299 v2) reads: HR at the set's end
+-- minus HR 60 s later, from a series dense enough to see the drop (a reading within 3 s of each
+-- end, no gap over 5 s between them). The chest strap at 1 Hz qualifies; the ring's sparse points
+-- do not, and a set measured only by the ring has no value rather than a noisy one.
+--
+-- The existing `drop_60s` cannot carry it: it is null whenever the next set began inside 60 s, and
+-- its 30 s tolerance accepts the ring's points. So the input gets its own column.
+--
+-- Additive and nullable, no default, NO backfill here. Filling historical rows also rewrites
+-- `rest_adequate` (old ring verdicts must clear), which is a data rewrite and runs separately,
+-- after a verified snapshot: `POST /api/admin/backfill-set-hrr1` (dry run by default).
+ALTER TABLE set_hr_stats ADD COLUMN IF NOT EXISTS hrr1_bpm integer;
