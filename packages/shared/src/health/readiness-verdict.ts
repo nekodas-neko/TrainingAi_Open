@@ -28,7 +28,7 @@ export const READINESS_VERDICT_BASELINE_DAYS = 28
  * readiness.** Sleep's 1.00 was swept over the owner's real nights to hit 4–6 prompts a month;
  * readiness has its own spread, so the same multiplier gives an unknown rate here. The rate is the
  * target and this number is only how it is reached — calibrating it on the owner's real scores is
- * its own `type: tuning` issue, and any change moves `READINESS_VERDICT_MODEL_VERSION` with it.
+ * #2430, and any change moves `READINESS_VERDICT_MODEL_VERSION` with it.
  *
  * A separate constant rather than an import on purpose: a later sleep recalibration must not
  * silently move the readiness rule without bumping this file's version.

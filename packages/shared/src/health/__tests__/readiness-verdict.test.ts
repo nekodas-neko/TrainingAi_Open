@@ -42,8 +42,8 @@ const day = (over: Partial<ReadinessVerdictDay> = {}): ReadinessVerdictDay => ({
 describe('the copied calibration', () => {
   it('starts at the sleep multiplier, as #2105 says, under its own version', () => {
     // Copied rather than imported so a later sleep recalibration cannot move this rule silently.
-    // Tuning it on the owner's real readiness scores is a separate `type: tuning` issue, and a
-    // change there moves READINESS_VERDICT_MODEL_VERSION with it.
+    // Tuning it on the owner's real readiness scores is #2430, and a change there moves
+    // READINESS_VERDICT_MODEL_VERSION with it — the rate test over his distribution lands with it.
     expect(READINESS_VERDICT_IQR_MULTIPLIER).toBe(VERDICT_IQR_MULTIPLIER)
     expect(READINESS_VERDICT_IQR_MULTIPLIER).toBe(1.0)
     expect(READINESS_VERDICT_MODEL_VERSION).toBe(1)
