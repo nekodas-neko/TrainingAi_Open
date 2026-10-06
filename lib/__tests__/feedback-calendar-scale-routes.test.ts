@@ -204,17 +204,28 @@ describe('POST /api/log-calendar-event', () => {
     expect(desc).not.toContain('Ex 50')
   })
 
+  // The shapes below are what `GaxiosError` builds, read from the pinned source (#2426): `.status` is
+  // the response's numeric status, `.code` the body's numeric `error.code`, and Google's `reason`
+  // sits on `response.data.error.errors[]` and on `cause.errors[]`.
+  const googleError = (message: string, status: number, reason?: string) => {
+    const errors = reason ? [{ message, domain: 'global', reason }] : undefined
+    return Object.assign(new Error(message), {
+      status, code: status,
+      response: { status, data: { error: { code: status, message, ...(errors ? { errors } : {}) } } },
+      cause: { message, code: status, ...(errors ? { errors } : {}) },
+    })
+  }
+
   it('answers 403 for a missing calendar grant and does NOT record it as a fault', async () => {
     // **The half that matters is the absence.** `error_events` is the table read at the start of
     // every session; a consent state the user simply has not given would be the most common row in
     // it and would bury the faults that need reading.
-    //
-    // Each of the four recognised shapes, so no single one carries the case.
     for (const err of [
-      new Error('Request failed with status code 403'),
-      new Error('Forbidden'),
-      new Error('insufficientPermissions on this resource'),
-      Object.assign(new Error('write failed'), { code: 'ERR_HTTP_403' }),
+      googleError('Insufficient Permission', 403, 'insufficientPermissions'),
+      // A 403 whose reason cannot be read keeps the answer it always had, rather than newly reporting.
+      googleError('Forbidden', 403),
+      // Only the response carries it, as when the client does not populate `status`.
+      Object.assign(new Error('Request failed with status code 403'), { response: { status: 403, data: { error: { errors: [{ reason: 'insufficientPermissions' }] } } } }),
     ]) {
       reportServerError.mockClear()
       eventsInsert.mockRejectedValue(err)
@@ -225,20 +236,49 @@ describe('POST /api/log-calendar-event', () => {
     }
   })
 
-  it("does NOT recognise the shape Google's own client actually throws — pinned, filed as LA-85", async () => {
-    // **Recorded because it is a gap, not because it is desired.** Read from the pinned `gaxios`
-    // source rather than guessed: `GaxiosError` sets `.code` only from an underlying `cause.code`
-    // or from the JSON body's `error.code`, which for Google is the **number** 403 — so
-    // `errCode === 'ERR_HTTP_403'`, a strict compare against a string, cannot match it. The status
-    // lives on `.status`, which this route never reads. And the message for a scope failure is
-    // "Insufficient Permission" (the `reason` field is not joined into it), which contains none of
-    // "403", "forbidden", "insufficientpermissions" or "calendar".
-    //
-    // So the shape below plausibly falls through to the 500 branch and IS reported as a fault —
-    // the opposite of what this route decided. I have not observed a live Google 403 from here, so
-    // this pins the behaviour and LA-85 carries what must be proven against a real one before
-    // anything is narrowed or widened.
-    eventsInsert.mockRejectedValue(Object.assign(new Error('Insufficient Permission'), { code: 403, status: 403 }))
+  // #2426 inverted the two cases this file used to pin as current behaviour.
+  it("recognises the shape Google's own client actually throws (was pinned as a gap, LA-85)", async () => {
+    eventsInsert.mockRejectedValue(googleError('Insufficient Permission', 403, 'insufficientPermissions'))
+    const res = await calendar(VALID_EVENT)
+    expect(res.status).toBe(403)
+    expect(reportServerError).not.toHaveBeenCalled()
+  })
+
+  it('treats a 403 that is not a missing grant as a fault', async () => {
+    // A rate limit and a quota are 403s too. Answering them "grant calendar access" sends the user
+    // to fix something that is not wrong, and keeps a real Google fault out of `error_events`.
+    for (const reason of ['rateLimitExceeded', 'userRateLimitExceeded', 'quotaExceeded']) {
+      reportServerError.mockClear()
+      eventsInsert.mockRejectedValue(googleError('Rate Limit Exceeded', 403, reason))
+      const res = await calendar(VALID_EVENT)
+      expect(res.status, reason).toBe(500)
+      expect(reportServerError, reason).toHaveBeenCalled()
+    }
+  })
+
+  it('does NOT classify on the message text any more', async () => {
+    // The old test matched "403", "forbidden", "insufficientpermissions" and "calendar" in the text.
+    // A plain Error carrying them has no status, so it is not a Google answer at all.
+    for (const text of ['Request failed with status code 403', 'Forbidden', 'insufficientPermissions on this resource']) {
+      reportServerError.mockClear()
+      eventsInsert.mockRejectedValue(new Error(text))
+      const res = await calendar(VALID_EVENT)
+      expect(res.status, text).toBe(500)
+      expect(reportServerError, text).toHaveBeenCalled()
+    }
+  })
+
+  it('records a failure whose message merely mentions the calendar (was pinned, #2426)', async () => {
+    // Nearly every Google failure names the API. Answered as a scope problem it was both told to
+    // the user as "grant permission" and kept out of `error_events`: invisible in both directions.
+    eventsInsert.mockRejectedValue(new Error('The calendar service is temporarily unavailable'))
+    const res = await calendar(VALID_EVENT)
+    expect(res.status).toBe(500)
+    expect(reportServerError).toHaveBeenCalled()
+  })
+
+  it('records a Google 5xx whose body names the calendar', async () => {
+    eventsInsert.mockRejectedValue(googleError('Calendar backend error', 503, 'backendError'))
     const res = await calendar(VALID_EVENT)
     expect(res.status).toBe(500)
     expect(reportServerError).toHaveBeenCalled()
@@ -251,18 +291,6 @@ describe('POST /api/log-calendar-event', () => {
     expect(await res.json()).toEqual({ error: 'Calendar write failed' })
     expect(reportServerError).toHaveBeenCalled()
     expect(await (await calendar(VALID_EVENT)).text()).not.toContain('10.0.0.4')
-  })
-
-  it('classifies any error MENTIONING a calendar as a scope problem — pinned, not endorsed', async () => {
-    // Current behaviour, recorded as LA-85 alongside the gap above. The scope test includes a bare
-    // `message.includes('calendar')`, so a genuine outage whose text names the API is answered as
-    // "you need to grant permission" AND is kept out of `error_events` — a fault that is invisible
-    // in both directions at once. Narrowing it is a judgement about Google's error shapes, which
-    // wants evidence from real failures rather than a guess in a test PR.
-    eventsInsert.mockRejectedValue(new Error('The calendar service is temporarily unavailable'))
-    const res = await calendar(VALID_EVENT)
-    expect(res.status).toBe(403)
-    expect(reportServerError).not.toHaveBeenCalled()
   })
 
   it('refuses without a refresh token — the session alone is not enough here', async () => {

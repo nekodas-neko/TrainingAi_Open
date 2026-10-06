@@ -264,3 +264,15 @@ export function maintenanceGapMessage(e: MaintenanceEstimate): string {
       return 'Using the formula estimate'
   }
 }
+
+/**
+ * LB-50 — the activity factor: a day's total expenditure as a multiple of resting burn.
+ *
+ * On the calibrated path `maintenanceKcal / bmr` IS the factor; on the measured-movement path
+ * `(restingBase + average movement) / bmr` is its measured equivalent. Two decimals, which is what
+ * a picker shows ("1.38×"). Null for a BMR that is not a positive number, rather than an Infinity.
+ */
+export function activityFactor(totalKcal: number, bmrKcal: number): number | null {
+  if (!(bmrKcal > 0) || !Number.isFinite(totalKcal)) return null
+  return Math.round((totalKcal / bmrKcal) * 100) / 100
+}

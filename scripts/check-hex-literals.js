@@ -44,7 +44,7 @@ const BASELINE = {
   // net -5 because the extraction folded five repeats of the card's rose into one BF_COLOR const.
   // The per-card health palette is literals throughout this file and tokenising one card while its
   // siblings keep theirs would be worse than either; that is a palette job, not this entry's.
-  'app/health/health-sections.tsx': 39,
+  'app/health/health-sections.tsx': 33,
   'components/health/body-fat-card.tsx': 1,
   'app/health/heart-rate/page.tsx': 6,
   'app/health/readiness/readiness-content.tsx': 1,

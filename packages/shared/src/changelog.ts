@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.489.0",
+    date: "2026-10-06",
+    changes: [
+      "Health → Body now has one Weight Trend card, with the weekly change, the chart and your weight and body-fat goal bars together. It replaces the separate Trend tile and the Weight Trend card that sat on Progress, which is now four cards.",
+      "The Balance tile on Body is gone. Its number is the Net figure on the Energy Balance card further down, so that card is now the only place today's energy answer appears.",
+    ],
+  },
+  {
     version: "1.488.0",
     date: "2026-10-06",
     changes: [

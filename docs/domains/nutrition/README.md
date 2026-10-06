@@ -45,6 +45,12 @@ See [`the journal entry`](../../overview/entries/2026-09-30-fix-rv208-date-and-b
 
 ## Reference docs
 
+- [`2026-10-06-feat-nutrition-activity-factor-and-day-types`](../../overview/entries/2026-10-06-feat-nutrition-activity-factor-and-day-types.md)
+  — **the activity factor is on the energy-balance response (#2208).** `maintenance.activityFactor`:
+  a calibrated figure that is null with a reason until calibration clears, and a measured-movement
+  figure. Nothing renders it yet. **#2121 was left out:** the plan card renders only for today, so a
+  past-day variant has no surface without an owner-approved screen change.
+
 - [`docs/reviews/2026-10-06-perceived-latency-sweep.md`](../../reviews/2026-10-06-perceived-latency-sweep.md)
   — **the perceived-latency sweep (#2101).** Opening Nutrition and adding a food are clean on screen.
   On the device, the Log Food sheet closes only after a serial chain of local-store awaits, which is

@@ -48,7 +48,9 @@ Add the **`in progress`** label to every issue in the batch. If you abandon it, 
 > needs the owner's yes on a mockup first — stop and report if so. Open a **draft PR** with a
 > `Closes #N` per issue as soon as you start, and push as you go. Test: `pnpm check:rules`,
 > `pnpm test`, `pnpm dev` through every changed route and flow. Then mark it ready, turn on
-> auto-merge, and list the **device checks** it needs and what you did **not** exercise. Comment on
+> auto-merge — **except** when the PR touches auth, sessions, secrets, money, any data deletion, or a
+> migration that drops, rewrites or re-keys existing data (an additive migration — a new table or a
+> nullable column — merges on green like anything else): then leave auto-merge off and say on the PR that it waits for the owner's yes — and list the **device checks** it needs and what you did **not** exercise. Comment on
 > each issue what was done. Report back the PR number and the device-check list. Never merge by
 > hand, release, touch production data, or edit files outside this worktree.
 

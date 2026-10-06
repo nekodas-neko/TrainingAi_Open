@@ -19,8 +19,8 @@ const DATE = '2026-09-13'
 // 1,660 kcal. All read from production 2026-09-13.
 let storedCalories: number | null = 1660
 let bodyFatPct: number | null = 25.5
-let measuredRmr: { rmrKcal: number; ffmKgAtTest: number | null } | null =
-  { rmrKcal: 1325, ffmKgAtTest: 51.5 }
+let measuredRmr: { rmrKcal: number; ffmKgAtTest: number | null; measuredOn: string } | null =
+  { rmrKcal: 1325, ffmKgAtTest: 51.5, measuredOn: '2026-08-27' }
 
 const repo = {
   listBodyMetrics: async () => [{ date: DATE, weightKg: 70.2, bodyFatPct }],
@@ -41,7 +41,7 @@ const repo = {
 beforeEach(() => {
   storedCalories = 1660
   bodyFatPct = 25.5
-  measuredRmr = { rmrKcal: 1325, ffmKgAtTest: 51.5 }
+  measuredRmr = { rmrKcal: 1325, ffmKgAtTest: 51.5, measuredOn: '2026-08-27' }
 })
 
 describe('the budget anchors to the measured resting rate', () => {
@@ -92,5 +92,37 @@ describe('the budget anchors to the measured resting rate', () => {
   it('still reports the stored target as the target', async () => {
     const r = await computeEnergyBalance(repo, 'u-1', TZ, DATE)
     expect(r.target.currentKcal).toBe(1660)
+  })
+
+  // #2413. The explainer called the rate "measured" whenever one was set, but it is
+  // `measuredBmr ?? formula`, and the payload did not say which.
+  it('says the rate is measured, and from which test, when a measurement produced it', async () => {
+    const b = (await computeEnergyBalance(repo, 'u-1', TZ, DATE)).balance!
+    expect(b.restingRateSource).toBe('measured')
+    expect(b.restingRateMeasuredOn).toBe('2026-08-27')
+  })
+
+  it('says the rate is a formula, with no test date, when nothing was measured', async () => {
+    measuredRmr = null
+    const b = (await computeEnergyBalance(repo, 'u-1', TZ, DATE)).balance!
+    expect(b.restingRateSource).toBe('formula')
+    expect(b.restingRateMeasuredOn).toBeNull()
+  })
+
+  // `personalRmr` declines a measurement it cannot use (a non-positive rate). The rate is then the
+  // formula, and calling it measured because a row exists is the exact mislabel this fixes.
+  it('says formula when a measurement exists but could not be used', async () => {
+    measuredRmr = { rmrKcal: 0, ffmKgAtTest: 51.5, measuredOn: '2026-08-27' }
+    const b = (await computeEnergyBalance(repo, 'u-1', TZ, DATE)).balance!
+    expect(b.restingRateSource).toBe('formula')
+    expect(b.restingRateMeasuredOn).toBeNull()
+  })
+
+  // Without a fat-free mass at the test it is carried as measured, unscaled — still the test.
+  it('still says measured when the test has no fat-free mass to re-scale from', async () => {
+    measuredRmr = { rmrKcal: 1325, ffmKgAtTest: null, measuredOn: '2026-08-27' }
+    const b = (await computeEnergyBalance(repo, 'u-1', TZ, DATE)).balance!
+    expect(b.restingRateKcal).toBe(1325)
+    expect(b.restingRateSource).toBe('measured')
   })
 })

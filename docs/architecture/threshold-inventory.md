@@ -110,11 +110,9 @@ physiological plausibility bounds.
 | Area | Constant (file:line) | Value | What it decides | Category | Why |
 |---|---|---|---|---|---|
 | BMR | `mifflinStJeorBmr`, `SEX_OFFSET` packages/shared/src/nutrition/goal-recommendation.ts:182,89 | 10W + 6.25H − 5A + {+5, −161, −78} | BMR | CONSTANT | Published equation. A measured lean mass (Katch-McArdle) is already preferred when present. |
-| Energy | `KCAL_PER_KG` packages/shared/src/nutrition/tdee-adaptation.ts:12 | 7,700 | Weight change ↔ energy | CONSTANT | Was defined twice (`KCAL_PER_KG_LOCAL` in calorie-balance); one home since #2375. |
+| Energy | `KCAL_PER_KG` packages/shared/src/nutrition/tdee-adaptation.ts:1 | 7,700 | Weight change ↔ energy | CONSTANT | Was defined twice (`KCAL_PER_KG_LOCAL` in calorie-balance); one home since #2375. |
 | Macros | `KCAL_PER_G` packages/shared/src/nutrition/atwater.ts:15 | 4 / 4 / 9 | Macro kcal | CONSTANT | Atwater factors. |
 | Calories | `CALORIE_ADJUSTMENT_BY_GOAL` goal-recommendation.ts:47 | lose −500, maintain 0, build +300, recomp −200 kcal | Calorie target offset | GUARDED | **GAP.** These are absolute kcal. A −500 deficit is 33% of a 1,500 kcal TDEE but 15% of 3,300. It should be a % of TDEE or a %-bodyweight-per-week rate, clamped. |
-| Calories | `GOAL_RATE_KG_PER_WEEK` tdee-adaptation.ts:5 | −0.45 / 0 / +0.27 / −0.18 kg/wk | Target rate for adaptive calorie adjustment | GUARDED | **GAP.** These are absolute kg. Evidence-based loss is about 0.5–1% of bodyweight per week, which is 0.25 kg/wk for a 50 kg person and 0.6 kg/wk for 120 kg. |
-| Calories | `DEADBAND_KG_PER_WEEK` / `MAX_ADJUST_KCAL` tdee-adaptation.ts:13-14 | 0.1 kg/wk / 200 kcal, rounded to 50 | When and how far adaptation moves the target | MODEL | Controller tuning. |
 | Calories | `CALORIE_FLOOR_KCAL` packages/shared/src/nutrition/tdee-adaptation.ts, read by calorie-balance.ts and goal-recommendation.ts; ceiling goal-recommendation.ts:281 | max(1,200, BMR); 1.2 × baseline | Bounds on a recommended calorie target | GUARDED | 1,200 is the conventional female floor (about 1,500 for men). Was written twice; one constant since #2375. |
 | Calories | `ON_TARGET_KCAL` / `OUTER_KCAL` calorie-balance.ts:35-36 | ±150 / ±400 kcal | "On target / under / well under" band | GUARDED | **GAP.** These are absolute kcal. ±150 is 10% of a 1,500 budget and 5% of 3,000. It should be a % of the budget. |
 | Protein | `PROTEIN_G_PER_KG_BY_GOAL` goal-recommendation.ts:85; bounds :291-292 | 1.8 / 1.6 / 2.0 / 2.2 g/kg; clamp 1.0–2.5 | Protein target | GUARDED | Already per kg and inside the research range (Morton 2018, 1.6–2.2). **Gap (minor):** it uses total bodyweight even when lean mass is known, which overshoots for high body-fat users. |
@@ -257,7 +255,7 @@ duration model) or are guard ranges working as intended.
     the 0.3/0.5/1.0 °C ladder at `readiness-payload.ts:302-309`). Nightly temperature SD differs
     about 4× between people. They should be z-scores, as the illness radar already uses.
 11. **Absolute energy and weight-rate numbers**: −500 / +300 kcal (`goal-recommendation.ts:47`),
-    −0.45 kg/wk (`tdee-adaptation.ts:5`), the 0.25–1.0 kg/wk healthy band
+    the 0.25–1.0 kg/wk healthy band
     (`long-term-goal-progress.ts:108`), and the ±150/400 kcal on-target band
     (`calorie-balance.ts:35`). They should be % of TDEE or % of bodyweight, GUARDED.
 12. **Other absolute-unit gates that should be self-relative**: `HEAVY_LEG_VOLUME_KG = 3000`

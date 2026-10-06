@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  estimateMaintenance, resolveMaintenance, maintenanceGapMessage, MAX_MEASURED_MOVEMENT_RATIO,
+  estimateMaintenance, resolveMaintenance, maintenanceGapMessage, MAX_MEASURED_MOVEMENT_RATIO, activityFactor,
   MIN_LOGGED_DAYS, MIN_WEIGH_INS, DEFAULT_WINDOW_DAYS, MAX_WINDOW_DAYS, MIN_PLAUSIBLE_MAINTENANCE,
   type MaintenanceDay,
 } from '../adaptive-tdee'
@@ -365,5 +365,16 @@ describe('the measured-movement ceiling (TN-29)', () => {
     for (const m of [null, undefined, 0]) {
       expect(estimateMaintenance(w, 14, 1345, m).maintenanceKcal).not.toBeNull()
     }
+  })
+})
+
+describe('activityFactor (LB-50)', () => {
+  it('is total over BMR at two decimals', () => {
+    expect(activityFactor(2245, 1600)).toBe(1.4)
+    expect(activityFactor(1895, 1342)).toBe(1.41)
+  })
+  it('is null rather than Infinity for a BMR that is not positive', () => {
+    expect(activityFactor(2000, 0)).toBeNull()
+    expect(activityFactor(NaN, 1500)).toBeNull()
   })
 })

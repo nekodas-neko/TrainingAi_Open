@@ -23,6 +23,17 @@ export const NO_SUPERLATIVE_RULE =
   '- Never apply a superlative to a value — not "perfect", "record", "your best", "all-time", "flawless". You are shown one snapshot and cannot see the history that would justify any of them. If a value came with a band label, use that label and nothing stronger.'
 
 /**
+ * Q-292 / #2421: describe a deviation, never diagnose it. The 2026-07-19 insight that inferred
+ * illness from a skin-temperature reading is the class: a model shown a number that sits off the
+ * user's usual will reach for a cause, and the nearest one is medical. The app has no way to know
+ * it, the user reads it as fact, and TN-46 already sets the same line for the dose overlay — never
+ * imply infection. Same reach as the units and superlative rules, so it applies to prose and to
+ * a text field inside an object alike.
+ */
+export const NO_DIAGNOSIS_RULE =
+  '- Describe a change, never diagnose it. Say a reading is above or below the usual and by how much, but never name a medical condition, illness or infection, never say or suggest the user may be sick, and never offer a medical cause for a body signal such as temperature, resting heart rate or HRV.'
+
+/**
  * Quote, never recompute. **This one does NOT generalise**, which is why PS-32 found the guard on
  * only half the prose routes and why a blanket import would have been a regression: four of the
  * remaining routes exist to PRODUCE numbers — `nutrition-goals/recommend` returns the calorie and
@@ -32,12 +43,13 @@ export const NO_SUPERLATIVE_RULE =
 export const QUOTE_NUMBERS_RULE =
   '- Quote the numbers you were given, exactly. Never recompute one, never estimate one, and never state a number that is not above.'
 
-/** For a route whose whole output is prose. Byte-identical to the string that shipped in Q-292. */
+/** For a route whose whole output is prose. */
 export const PROSE_GUARDS = [
   'Rules you must follow:',
   METRIC_UNITS_RULE,
   QUOTE_NUMBERS_RULE,
   NO_SUPERLATIVE_RULE,
+  NO_DIAGNOSIS_RULE,
 ].join('\n')
 
 /**
@@ -48,4 +60,5 @@ export const PROSE_FIELD_GUARDS = [
   'Rules you must follow in any explanation you write:',
   METRIC_UNITS_RULE,
   NO_SUPERLATIVE_RULE,
+  NO_DIAGNOSIS_RULE,
 ].join('\n')
