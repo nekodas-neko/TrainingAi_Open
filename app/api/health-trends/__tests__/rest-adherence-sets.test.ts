@@ -7,10 +7,10 @@
 //
 // Two properties are worth pinning, and they are the ones a refactor would quietly break:
 //
-//   · **The pairs are the LOGGED columns, not today's style.** The buckets in the same response are
-//     built from the CURRENT progression style, which answers a different question. If these two
-//     ever come from one source, a style edit silently rewrites what "prescribed" meant for every
-//     past set — which is the whole reason the card reads the snapshot.
+//   · **The pairs are the LOGGED columns, never today's style.** A style edit must not rewrite what
+//     "prescribed" meant for a past set — which is the whole reason the card reads the snapshot.
+//     Since #2181 the bars in the same response read that snapshot too, but fall back to the live
+//     style for sets without one; the pairs take no such fallback.
 //   · **Only sets carrying both are emitted.** `restByPrescription` discards the others (a
 //     prescription of 0 is "no rest planned", not a target), so shipping them is payload for
 //     nothing — and a null slipping into the list would reach that helper as a real pair.
@@ -49,15 +49,21 @@ describe.skipIf(!canRun)('health-trends rest-adherence per-set pairs (LB-98)', (
   afterAll(async () => {
     if (!canRun) return
     await pool.query(`DELETE FROM workout_sessions WHERE user_id = $1`, [TEST_USER_ID])
+    await pool.query(`DELETE FROM progression_styles WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM users WHERE id = $1`, [TEST_USER_ID])
   })
 
   beforeEach(async () => {
     await pool.query(`DELETE FROM workout_sessions WHERE user_id = $1`, [TEST_USER_ID])
+    await pool.query(`DELETE FROM progression_styles WHERE user_id = $1`, [TEST_USER_ID])
   })
 
   /** One session `daysAgo`, carrying the given (planned, actual) rest pairs as logged sets. */
-  async function session(daysAgo: number, pairs: [number | null, number | null][]) {
+  async function session(
+    daysAgo: number,
+    pairs: [number | null, number | null][],
+    opts: { styleId?: string; estimated1rm?: number } = {},
+  ) {
     const startedAt = new Date(mid.getTime() - daysAgo * 86_400_000 + 10 * 3_600_000)
     const { rows } = await pool.query<{ id: string }>(
       `INSERT INTO workout_sessions (user_id, session_name, started_at, completed_at)
@@ -65,9 +71,9 @@ describe.skipIf(!canRun)('health-trends rest-adherence per-set pairs (LB-98)', (
       [TEST_USER_ID, startedAt, new Date(startedAt.getTime() + 3_600_000)],
     )
     const ex = await pool.query<{ id: string }>(
-      `INSERT INTO exercise_logs (workout_session_id, exercise_name, logged_at, volume)
-       VALUES ($1, 'Bench Press', $2, 1000) RETURNING id`,
-      [rows[0].id, startedAt],
+      `INSERT INTO exercise_logs (workout_session_id, exercise_name, logged_at, volume, style_id, estimated_1rm)
+       VALUES ($1, 'Bench Press', $2, 1000, $3, $4) RETURNING id`,
+      [rows[0].id, startedAt, opts.styleId ?? null, opts.estimated1rm ?? null],
     )
     let n = 0
     for (const [planned, actual] of pairs) {
@@ -138,5 +144,54 @@ describe.skipIf(!canRun)('health-trends rest-adherence per-set pairs (LB-98)', (
     const data = await get()
 
     expect(data.restSets).toEqual([{ plannedRestSec: 90, restTimeSec: 105 }])
+  })
+
+  // #2181 — the bars. Three sessions of one lift at the same estimated 1RM put every session at 0%
+  // vs baseline, so the only thing that can move is which adherence bucket they land in.
+  describe('the rest-discipline bars', () => {
+    /** A progression style whose set 1 asks `restSec` — the style as it is TODAY. */
+    async function style(restSec: number) {
+      const { rows } = await pool.query<{ id: string }>(
+        `INSERT INTO progression_styles (user_id, name) VALUES ($1, 'Today') RETURNING id`,
+        [TEST_USER_ID],
+      )
+      await pool.query(
+        `INSERT INTO style_sets (style_id, set_number, pct, reps, rest_sec) VALUES ($1, 1, 0.8, 5, $2)`,
+        [rows[0].id, restSec],
+      )
+      return rows[0].id
+    }
+
+    it('grades a past session against the rest it was logged with, not a style edited since', async () => {
+      // Logged asking 90 s and rested 90 s. Today's style asks 180 s, which would read as 50%.
+      const styleId = await style(180)
+      for (const d of [3, 4, 5]) await session(d, [[90, 90]], { styleId, estimated1rm: 100 })
+
+      const data = await get()
+
+      expect(data.buckets).toEqual([{ label: '90–115%', avg: 0, count: 3 }])
+    })
+
+    // Only about half of production's sets carry the snapshot, so without the fallback most of the
+    // window would drop out of the chart.
+    it('falls back to the live style for a set logged without a snapshot', async () => {
+      const styleId = await style(180)
+      for (const d of [3, 4, 5]) await session(d, [[null, 90]], { styleId, estimated1rm: 100 })
+
+      const data = await get()
+
+      expect(data.buckets).toEqual([{ label: '<70%', avg: 0, count: 3 }])
+    })
+
+    // "No rest planned" was the plan that day. Grading the set against today's style instead would
+    // give it a target it never had.
+    it('does not fall back past a logged zero', async () => {
+      const styleId = await style(90)
+      for (const d of [3, 4, 5]) await session(d, [[0, 90]], { styleId, estimated1rm: 100 })
+
+      const data = await get()
+
+      expect(data.buckets).toEqual([])
+    })
   })
 })

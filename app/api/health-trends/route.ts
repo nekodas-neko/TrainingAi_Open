@@ -5,7 +5,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { formatInTimeZone } from 'date-fns-tz'
 import { DEFAULT_TZ, toAestDay, todayInTz, todayMidnightUtc } from '@trainingai/shared/date-utils'
 import { bucketize, correlationInsight, buildExercise1rmBaseline, sessionMean1RmPct, type BucketDef, type CorrelationBucket, type CorrelationStats, type WithheldReason } from '@trainingai/shared/health/correlation'
-import { restAdherencePct } from '@trainingai/shared/workout/rest-adherence'
+import { restAdherencePct, restAdherenceSets } from '@trainingai/shared/workout/rest-adherence'
 import { energyBalanceByDay } from '@trainingai/shared/health/energy-balance'
 import { median as medianOfValues } from '@trainingai/shared/stats'
 import { sorenessVsVolumePoints } from '@trainingai/shared/health/soreness-volume'
@@ -31,8 +31,8 @@ export interface TrendsResponse {
    * local store is absent (a browser, and therefore CI). Shaped as `RestSet` so the card's fallback
    * is a swap into the same `restByPrescription`, not a second aggregate that could disagree.
    *
-   * NOT the numbers `buckets` is built from: those use the CURRENT progression style, which answers
-   * a different question. See the comment at the emit site.
+   * Snapshot-only, while `buckets` also falls back to the live style for sets with no snapshot. See
+   * the comment at the emit site.
    */
   restSets?: { plannedRestSec: number; restTimeSec: number }[]
 }
@@ -198,11 +198,9 @@ export async function GET(req: Request) {
     const points: { x: number; y: number }[] = []
     const control: number[] = []
     for (const ws of workoutSessions) {
-      const restSets = ws.exercises.flatMap(ex => ex.sets.map(set => ({
-        actualRestSec: set.restTimeSec ?? null,
-        prescribedRestSec: ex.styleId ? restSecByStyleSet.get(`${ex.styleId}:${set.setNumber}`) ?? null : null,
-      })))
-      const adherence = restAdherencePct(restSets)
+      // #2181: each set against the plan of its own day — the logged snapshot, the live style only
+      // where a set has none. Owner-decided 2026-10-05; it re-buckets past sessions on purpose.
+      const adherence = restAdherencePct(restAdherenceSets(ws.exercises, restSecByStyleSet))
       const meanPct = sessionMean1RmPct(ws, baseline)
       if (adherence == null || meanPct == null) continue
       points.push({ x: adherence, y: meanPct })
@@ -220,12 +218,12 @@ export async function GET(req: Request) {
     // Local-only data cannot be exercised in CI — the card renders its empty state in a browser and
     // ships owing a device check — and this is the swap that closes it.
     //
-    // **These are the LOGGED columns, deliberately, and they are NOT the numbers the buckets above
-    // are built from.** `prescribedRestSec` in the correlation comes from the CURRENT progression
-    // style, which answers "does resting to plan go with lifting better?" against today's plan. The
-    // card asks a different question — what the plan asked AT THE TIME versus what was taken — and a
-    // later style edit would silently rewrite the first half of that for every past set. Emitting
-    // the live-style value here would look consistent and answer the wrong question.
+    // **These are the LOGGED columns only.** A later style edit would silently rewrite what
+    // "prescribed" meant for every past set, so the card never reads the live style. The buckets
+    // above read the same snapshot (#2181) but fall back to the live style where a set has none,
+    // because only about half the window's sets carry one (measured below). The card needs no such
+    // fallback: on the device it reads the snapshot from the local store, and these pairs have to
+    // match that read.
     //
     // Only sets carrying both are emitted: `restByPrescription` discards the rest anyway (a
     // prescription of 0 is "no rest planned", not a target), so sending them would be payload for

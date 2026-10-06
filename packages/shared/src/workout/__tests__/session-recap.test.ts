@@ -120,6 +120,18 @@ describe('buildRecapFacts', () => {
     expect(withoutStyle.restAdherencePct).toBeNull()
   })
 
+  // #2181: the recap of a past session grades it against the rest that session's plan asked for,
+  // not against a style edited since.
+  it('grades rest against the logged snapshot before the live style', () => {
+    const facts = buildRecapFacts({
+      session: makeSession({
+        exercises: [makeExercise({ styleId: 'style-1', sets: [makeSet({ setNumber: 1, restTimeSec: 90, plannedRestSec: 90 })] })],
+      }),
+      recentDurationsMin: [], restSecByStyleSet: new Map([['style-1:1', 180]]), prCount: 0,
+    })
+    expect(facts.restAdherencePct).toBe(100)
+  })
+
   it('carries through sessionRpe, defaulting to null when absent', () => {
     const withRpe = buildRecapFacts({ session: makeSession({ sessionRpe: 7 }), recentDurationsMin: [], restSecByStyleSet: new Map(), prCount: 0 })
     expect(withRpe.sessionRpe).toBe(7)

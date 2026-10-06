@@ -1,5 +1,5 @@
 import type { WorkoutSession } from '@trainingai/shared/types/log'
-import { restAdherencePct, type RestAdherenceSet } from './rest-adherence'
+import { restAdherencePct, restAdherenceSets } from './rest-adherence'
 import { median } from './time-audit'
 
 export interface RecapFacts {
@@ -16,7 +16,8 @@ export interface BuildRecapFactsInput {
   session: WorkoutSession
   // Completed durations (minutes) of recent same-type sessions, excluding this one.
   recentDurationsMin: number[]
-  // `${styleId}:${setNumber}` -> prescribed rest seconds.
+  // `${styleId}:${setNumber}` -> the live style's rest seconds; only a fallback for sets logged
+  // without a `plannedRestSec` snapshot (see `restAdherenceSets`).
   restSecByStyleSet: Map<string, number>
   prCount: number
 }
@@ -53,20 +54,13 @@ export function buildRecapFacts({ session, recentDurationsMin, restSecByStyleSet
     ? Math.round((rpeDeltas.reduce((a, d) => a + d, 0) / rpeDeltas.length) * 10) / 10
     : null
 
-  const restSets: RestAdherenceSet[] = session.exercises.flatMap(ex =>
-    ex.sets.map(set => ({
-      actualRestSec: set.restTimeSec ?? null,
-      prescribedRestSec: ex.styleId ? restSecByStyleSet.get(`${ex.styleId}:${set.setNumber}`) ?? null : null,
-    })),
-  )
-
   return {
     durationMin,
     durationVsMedianPct,
     totalVolumeKg,
     prCount,
     rpeDrift,
-    restAdherencePct: restAdherencePct(restSets),
+    restAdherencePct: restAdherencePct(restAdherenceSets(session.exercises, restSecByStyleSet)),
     sessionRpe: session.sessionRpe ?? null,
   }
 }
