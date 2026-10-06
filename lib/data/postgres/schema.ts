@@ -500,6 +500,35 @@ export const sleepVerdicts = pgTable('sleep_verdicts', {
   unique('sleep_verdicts_user_date_key').on(t.userId, t.date),
 ]))
 
+/**
+ * #2105 — whether a day's readiness score was unusual, with the score, band and contributors
+ * frozen beside the verdict. `oura_daily_derived.readiness_*` is rewritten on every readiness read
+ * and re-scored by every model change, so a rating paired with the live row would drift away from
+ * the number it answered.
+ *
+ * Server-side only, like `sleep_verdicts`: the band needs 28 days of stored scores.
+ */
+export const readinessVerdicts = pgTable('readiness_verdicts', {
+  id:                       uuid('id').primaryKey().defaultRandom(),
+  userId:                   uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  date:                     date('date', { mode: 'string' }).notNull(),   // readiness day
+  verdict:                  text('verdict').notNull(),                    // normal | poor | good
+  score:                    integer('score').notNull(),
+  bandMedian:               doublePrecision('band_median').notNull(),
+  bandLow:                  doublePrecision('band_low').notNull(),
+  bandHigh:                 doublePrecision('band_high').notNull(),
+  baselineDays:             integer('baseline_days').notNull(),
+  baselineSameVersionDays:  integer('baseline_same_version_days').notNull(),
+  contributors:             jsonb('contributors').notNull(),
+  readinessModelVersion:    text('readiness_model_version').notNull(),
+  modelVersion:             integer('model_version').notNull(),
+  responseState:            text('response_state').notNull().default('none'), // none | rated | dismissed
+  createdAt:                timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt:                timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ([
+  unique('readiness_verdicts_user_date_key').on(t.userId, t.date),
+]))
+
 export const sleepSessions = pgTable('sleep_sessions', {
   id:               uuid('id').primaryKey().defaultRandom(),
   userId:           uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),

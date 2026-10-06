@@ -71,7 +71,7 @@ import type {
   User, Program, ProgramSession, SessionExercise, Schedule, ScheduleDay,
   ProgressionStyle, StyleSet,
   WorkoutSession, ExerciseLog, SetLog, ExerciseHistoryLogRow,
-  BodyMetrics, ActivityLog, ActivityType, SleepSession, SleepVerdictRecord, NextSessionRecommendation,
+  BodyMetrics, ActivityLog, ActivityType, SleepSession, SleepVerdictRecord, ReadinessVerdictRecord, NextSessionRecommendation,
   ActivityLevel, FitnessGoal, MoodLog, GoalRecommendation,
 } from '@trainingai/shared/types'
 import type { ExerciseLibraryEntry, MuscleAssignment, ProgramPhase, ProgramPhaseType, PhaseSetWithPhases, ExerciseType } from '@trainingai/shared/types/program'
@@ -2945,6 +2945,81 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .set({ responseState: state, updatedAt: new Date() })
       .where(and(eq(s.sleepVerdicts.userId, userId), eq(s.sleepVerdicts.date, date)))
       .returning({ id: s.sleepVerdicts.id })
+    return updated.length > 0
+  }
+
+  // ── #2105: the readiness verdict ──────────────────────────────────────────────────────
+  // Score and band are columns so a rating can be correlated against them in SQL; contributors are
+  // JSONB because the contributor set changes between readiness model versions.
+
+  async getReadinessVerdict(userId: string, date: string): Promise<ReadinessVerdictRecord | null> {
+    const [r] = await this.db.select().from(s.readinessVerdicts)
+      .where(and(eq(s.readinessVerdicts.userId, userId), eq(s.readinessVerdicts.date, date)))
+      .limit(1)
+    if (!r) return null
+    return {
+      date: r.date,
+      verdict: r.verdict as ReadinessVerdictRecord['verdict'],
+      score: r.score,
+      band: { median: r.bandMedian, low: r.bandLow, high: r.bandHigh },
+      baselineDays: r.baselineDays,
+      baselineSameVersionDays: r.baselineSameVersionDays,
+      contributors: r.contributors as Record<string, unknown>,
+      readinessModelVersion: r.readinessModelVersion,
+      modelVersion: r.modelVersion,
+      responseState: r.responseState as ReadinessVerdictRecord['responseState'],
+    }
+  }
+
+  async upsertReadinessVerdict(
+    userId: string,
+    record: Omit<ReadinessVerdictRecord, 'responseState'>,
+  ): Promise<void> {
+    await this.db.insert(s.readinessVerdicts)
+      .values({
+        userId,
+        date: record.date,
+        verdict: record.verdict,
+        score: record.score,
+        bandMedian: record.band.median,
+        bandLow: record.band.low,
+        bandHigh: record.band.high,
+        baselineDays: record.baselineDays,
+        baselineSameVersionDays: record.baselineSameVersionDays,
+        contributors: record.contributors,
+        readinessModelVersion: record.readinessModelVersion,
+        modelVersion: record.modelVersion,
+      })
+      .onConflictDoUpdate({
+        target: [s.readinessVerdicts.userId, s.readinessVerdicts.date],
+        set: {
+          verdict: sql`EXCLUDED.verdict`,
+          score: sql`EXCLUDED.score`,
+          bandMedian: sql`EXCLUDED.band_median`,
+          bandLow: sql`EXCLUDED.band_low`,
+          bandHigh: sql`EXCLUDED.band_high`,
+          baselineDays: sql`EXCLUDED.baseline_days`,
+          baselineSameVersionDays: sql`EXCLUDED.baseline_same_version_days`,
+          contributors: sql`EXCLUDED.contributors`,
+          readinessModelVersion: sql`EXCLUDED.readiness_model_version`,
+          modelVersion: sql`EXCLUDED.model_version`,
+          updatedAt: sql`now()`,
+          // `response_state` is deliberately ABSENT, as on the sleep verdict: re-judging a day must
+          // never turn an answer back into silence.
+        },
+      })
+  }
+
+  /** Returns false when there is no verdict for that day to respond to. */
+  async setReadinessVerdictResponse(
+    userId: string,
+    date: string,
+    state: 'rated' | 'dismissed',
+  ): Promise<boolean> {
+    const updated = await this.db.update(s.readinessVerdicts)
+      .set({ responseState: state, updatedAt: new Date() })
+      .where(and(eq(s.readinessVerdicts.userId, userId), eq(s.readinessVerdicts.date, date)))
+      .returning({ id: s.readinessVerdicts.id })
     return updated.length > 0
   }
 

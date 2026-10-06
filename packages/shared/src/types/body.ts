@@ -119,6 +119,33 @@ export interface SleepVerdictRecord {
   responseState: 'none' | 'acknowledged' | 'corrected'
 }
 
+/**
+ * #2105 — the app's verdict on whether a day's readiness score was unusual, with the evidence
+ * frozen beside it.
+ *
+ * `score`, `band` and `contributors` are a snapshot: `oura_daily_derived.readiness_*` is rewritten
+ * on every readiness read and re-scored by every model change, so a rating stored against the live
+ * row would end up answering a number that was never shown.
+ */
+export interface ReadinessVerdictRecord {
+  /** The readiness day, `YYYY-MM-DD` — the same key as `oura_daily_derived.day`. */
+  date: string
+  verdict: 'normal' | 'poor' | 'good'
+  score: number
+  band: { median: number; low: number; high: number }
+  baselineDays: number
+  /** How many of `baselineDays` were scored by the same readiness model as `score`. */
+  baselineSameVersionDays: number
+  /** `oura_daily_derived.readiness_contributors` as it stood when the verdict was made. */
+  contributors: Record<string, unknown>
+  /** `model_versions.readiness` that produced `score`. */
+  readinessModelVersion: string
+  /** Version of the outlier rule (`READINESS_VERDICT_MODEL_VERSION`). */
+  modelVersion: number
+  /** `none` until he rates the day or dismisses the prompt. Silence is never promoted to an answer. */
+  responseState: 'none' | 'rated' | 'dismissed'
+}
+
 export interface SleepSession {
   id: string
   userId: string

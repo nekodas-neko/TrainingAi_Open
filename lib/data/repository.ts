@@ -3,7 +3,7 @@ import type { UserPreferences } from '@trainingai/shared/user/preferences'
 import type {
   User, Program, ProgressionStyle,
   WorkoutSession, ExerciseLog, SetLog, ExerciseHistoryLogRow,
-  BodyMetrics, ActivityLog, ActivityType, SleepSession, SleepVerdictRecord, MoodLog,
+  BodyMetrics, ActivityLog, ActivityType, SleepSession, SleepVerdictRecord, ReadinessVerdictRecord, MoodLog,
   NextSessionRecommendation, GoalRecommendation,
 } from '@trainingai/shared/types'
 import type { ExerciseLibraryEntry, MuscleAssignment, ProgramPhase, ProgramPhaseType, PhaseSetWithPhases, ExerciseType } from '@trainingai/shared/types/program'
@@ -719,6 +719,13 @@ export interface WorkoutRepository {
   getSleepVerdict(userId: string, date: string): Promise<SleepVerdictRecord | null>
   upsertSleepVerdict(userId: string, record: Omit<SleepVerdictRecord, 'responseState'>): Promise<void>
   setSleepVerdictResponse(userId: string, date: string, state: 'acknowledged' | 'corrected'): Promise<boolean>
+
+  // #2105 — whether a day's readiness score was unusual. Same contract as the sleep verdict:
+  // `upsertReadinessVerdict` is idempotent per (user, date) and never touches `response_state`.
+  getReadinessVerdict(userId: string, date: string): Promise<ReadinessVerdictRecord | null>
+  upsertReadinessVerdict(userId: string, record: Omit<ReadinessVerdictRecord, 'responseState'>): Promise<void>
+  /** Returns false when no verdict was made for that day, so there is nothing to answer. */
+  setReadinessVerdictResponse(userId: string, date: string, state: 'rated' | 'dismissed'): Promise<boolean>
   /** Q-519 — set (or clear, with `null`) the remembered bedtime on an existing night. Returns false
    *  when no session for that date exists; this never creates one. Read only by the bedtime
    *  estimate — see `docs/reviews/2026-08-26-manual-bedtime-write-audit.md` for why it is its own

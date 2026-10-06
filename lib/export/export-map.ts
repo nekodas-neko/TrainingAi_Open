@@ -100,6 +100,7 @@ export const EXPORTED: Record<string, ExportScope> = {
   programs: { kind: 'user_id' },
   blood_panels: { kind: 'user_id' },
   progression_styles: { kind: 'user_id' },
+  readiness_verdicts: { kind: 'user_id' },
   rest_days: { kind: 'user_id' },
   running_plans: { kind: 'user_id' },
   saved_meals: { kind: 'user_id' },
