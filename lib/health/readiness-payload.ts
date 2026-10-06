@@ -573,7 +573,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // composite above never ran and every readiness surface rendered blank. Health Connect and
   // manual logs do supply HRV, resting HR and sleep duration in the generic tables — enough for
   // the SAME composite, with the contributors it has no input for falling back to the composite's
-  // own neutral. Baselines are folded from the 28-day window with the same updateBaseline the
+  // own neutral. Baselines are folded from the 28-day window with the same seedOrUpdateBaseline the
   // ring's rollup uses, so the two paths score on one scale. Temperature and the recovery index
   // have no generic source and stay null rather than being approximated.
   const asc = <T extends { date: string }>(rows: T[]) => [...rows].sort((a, b) => a.date.localeCompare(b.date))

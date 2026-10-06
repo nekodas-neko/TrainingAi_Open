@@ -57,11 +57,12 @@ export function scoreAvailability(present: Partial<Record<ReadinessInputKey, boo
  * same scale as a ring user's. Uses `seedOrUpdateBaseline`/`baselineZ` rather than a second baseline
  * implementation (One Formula, One Place).
  *
- * `minPriorSamples` is not optional discipline. A cold baseline is wildly overconfident — two
- * samples of a steady 50 bpm produce z = 8, which the composite would read as a perfect resting-HR
- * day. The default matches the composite's own maturity gate, so a metric with sparse history
- * returns null (→ neutral) instead of a fabricated extreme, even when the user's overall history
- * is long enough for the composite to score.
+ * `minPriorSamples` is not optional discipline. A young baseline's spread is estimated from a
+ * handful of nights — at four samples it lands anywhere from half to one and a half times the true
+ * spread — so its z can be a fabricated extreme. (It used to be worse: before the seed and the dev
+ * warm-up, two samples of a steady 50 bpm produced z = 8.) The default matches the composite's own
+ * maturity gate, so a metric with sparse history returns null (→ neutral) instead, even when the
+ * user's overall history is long enough for the composite to score.
  */
 export function trailingBaselineZ(
   series: readonly number[],

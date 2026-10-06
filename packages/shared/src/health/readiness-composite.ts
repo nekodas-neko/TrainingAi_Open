@@ -192,8 +192,10 @@ function plainScore(v: number | null): ReadinessContributor {
 
 /** Stamped onto `oura_daily_derived.model_versions.readiness` so a score can be attributed to the
  *  model that produced it. Bump whenever the weights, curves or z-slope change — Q-273.
- *  Rows written before 2026-08-18 carry no stamp at all. */
-export const READINESS_MODEL_VERSION = 'v5:no-checkin:2026-10-06'
+ *  Rows written before 2026-08-18 carry no stamp at all.
+ *  v6: a baseline under 64 nights old warms its deviation up instead of climbing from zero (#2159),
+ *  which changes every z built from a young baseline. A mature ring baseline scores identically. */
+export const READINESS_MODEL_VERSION = 'v6:dev-warmup:2026-10-06'
 
 /** Recovery Index hours at which this contributor scores 100. `hoursToSettle` is measured from the
  *  overnight HR minimum to wake, so MORE hours = the heart settled earlier = better.
