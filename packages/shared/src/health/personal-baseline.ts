@@ -52,6 +52,10 @@ export function updateBaseline(baseline: Baseline | null, sample: number, ageDay
   return { meanX8, devX8 }
 }
 
+/** The vendor's mature dev gain is 1/64 (`shift 6`). From this age a running mean would weight a new
+ *  night no more than the vendor update does, so `seedOrUpdateBaseline`'s dev warm-up hands over here. */
+export const DEV_WARMUP_NIGHTS = 64
+
 /**
  * `updateBaseline`, but the metric's FIRST-EVER sample seeds the baseline instead of annealing
  * toward it from zero. **This is what our folds should call. `updateBaseline` is the vendor port
@@ -71,13 +75,36 @@ export function updateBaseline(baseline: Baseline | null, sample: number, ageDay
  * never exposes one this young. Our folds cold-start from an arbitrary point in the history, so the
  * young-baseline case is ours, not the vendor's — which is why the fix belongs here.
  *
- * `devX8: 0` because one sample has no spread. The dev term grows from the second sample on, which
- * is the first point at which spread means anything — and `baselineZ` already returns null while
- * `devX8` is 0, so a one-sample baseline reports no z rather than an overconfident one.
+ * `devX8: 0` because one sample has no spread, and `baselineZ` returns null while it is 0.
+ *
+ * **The deviation is warmed up too (#2159), because seeding only the mean left the same defect in
+ * the denominator.** Handed to the vendor update at 0, the dev climbs toward the spread under the
+ * same collapsing gain (1/64 after night 14), so it reads 0.45σ at night 14 — where scoring starts
+ * using z — 0.54σ at 30 and 0.64σ at 67, against the 0.78σ it settles at after ~200 nights.
+ * Every young baseline's z ran 1.3–2× hot: the next night's mean |z| was 2.07 at night 14 where a
+ * settled baseline gives ~1.0. That is the generic (no-ring) readiness path on every day, since its
+ * 28-night fold is always young, and any cold replay of stored history.
+ *
+ * So for the first `DEV_WARMUP_NIGHTS`, the dev is the running mean of each night's spread from the
+ * mean it is judged against — the pre-update mean, which is what `baselineZ` divides into on the
+ * next read. The first spread observed replaces the zero outright, so a metric that joins later than
+ * the shared age counter (breathing did) is not anchored to zero by a large `ageDays`. From
+ * `DEV_WARMUP_NIGHTS` on, the vendor update runs untouched. The mean is the vendor's throughout.
+ * Measured on synthetic nightly series at each metric's real spread, the next night's mean |z| is
+ * ~1.0 from night 8. MET, whose ×10 sample unit is ~0.9σ, lands a little under 1 instead of at 2.
  */
 export function seedOrUpdateBaseline(baseline: Baseline | null, sample: number, ageDays: number): Baseline {
   if (baseline == null) return { meanX8: sample << 3, devX8: 0 }
-  return updateBaseline(baseline, sample, ageDays)
+  const next = updateBaseline(baseline, sample, ageDays)
+  if (ageDays >= DEV_WARMUP_NIGHTS) return next
+  const spreadX8 = Math.abs((sample << 3) - baseline.meanX8)
+  const devX8 = baseline.devX8 === 0
+    ? spreadX8
+    : baseline.devX8 + (spreadX8 - baseline.devX8) / Math.max(ageDays, 1)
+  // Integer, like the vendor state and the `*_dev_x8` columns: a fractional in-memory dev would
+  // differ from the persisted checkpoint, and a windowed fold resumed from it would stop matching a
+  // full replay.
+  return { meanX8: next.meanX8, devX8: Math.round(devX8) }
 }
 
 /** Mean in real units. */
