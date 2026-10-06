@@ -1676,14 +1676,33 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * 34 exercises, every one of them flagged deload.
    *
    * So `latest` here is the most recent estimate that *is* one — not the most recent row.
+   *
+   * **A baseline estimate is never one half of the pair (#2297).** A baseline session — the first
+   * run of each session after a program is built, `phase_type = 'baseline'` since TN-75 — logs one
+   * unprescribed set, so its estimate goes through the AMRAP scaling, while every prescribed set is
+   * divided back up by its own %1RM. The two are different measurements, and comparing across them
+   * read as a decline straight after a rebuild and as the same amount "gained" one session later:
+   * the owner's 09-07 → 09-12 window, where every compound "declined" at once.
+   *
+   * It stays the `latest` value — after a rebuild it is the newest measurement there is, and for a
+   * new lifter the only one. What changes is the comparison: a baseline `latest` reports no
+   * `previous`, and a prescribed `latest` is compared with the last prescribed estimate before it,
+   * reaching past any baseline in between. Those two are like for like by construction, because
+   * dividing by the prescription is what makes an estimate phase-independent. No stored value moves.
    */
   async listRecent1rm(userId: string): Promise<Map<string, { latest: number; previous?: number }>> {
-    type Row = { exercise_name: string; estimated_1rm: number; rn: number }
+    type Row = { exercise_name: string; estimated_1rm: number; is_baseline: boolean; rn: number; rn_kind: number }
     const result = await this.db.execute<Row>(sql`
-      SELECT exercise_name, estimated_1rm, rn
+      SELECT exercise_name, estimated_1rm, is_baseline, rn, rn_kind
       FROM (
-        SELECT el.exercise_name, el.estimated_1rm,
-          ROW_NUMBER() OVER (PARTITION BY el.exercise_name ORDER BY el.logged_at DESC) AS rn
+        SELECT el.exercise_name, el.estimated_1rm, ws.phase_type IS NOT DISTINCT FROM 'baseline' AS is_baseline,
+          -- The same total order in both windows (id breaks a logged_at tie), so the newest
+          -- prescribed row is rn=1 and rn_kind=1 at once and can never be paired with itself.
+          ROW_NUMBER() OVER (PARTITION BY el.exercise_name ORDER BY el.logged_at DESC, el.id DESC) AS rn,
+          ROW_NUMBER() OVER (
+            PARTITION BY el.exercise_name, ws.phase_type IS NOT DISTINCT FROM 'baseline'
+            ORDER BY el.logged_at DESC, el.id DESC
+          ) AS rn_kind
         FROM exercise_logs el
         JOIN workout_sessions ws ON ws.id = el.workout_session_id
         WHERE ws.user_id = ${userId} AND el.estimated_1rm > 0
@@ -1693,17 +1712,22 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           AND el.exercise_deloaded = false
           AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
       ) ranked
-      WHERE rn <= 2
+      WHERE rn = 1 OR (NOT is_baseline AND rn_kind = 2)
     `)
-    const out = new Map<string, { latest: number; previous?: number }>()
+    const latest = new Map<string, { value: number; isBaseline: boolean }>()
+    const previousPrescribed = new Map<string, number>()
     for (const r of result.rows) {
-      const entry = out.get(r.exercise_name) ?? { latest: 0 }
-      if (Number(r.rn) === 1) entry.latest = r.estimated_1rm
-      else entry.previous = r.estimated_1rm
-      out.set(r.exercise_name, entry)
+      if (Number(r.rn) === 1) latest.set(r.exercise_name, { value: r.estimated_1rm, isBaseline: r.is_baseline })
+      else previousPrescribed.set(r.exercise_name, r.estimated_1rm)
     }
-    // An exercise with only an rn=2 row cannot exist — ranks are dense from 1 — so `latest` is
-    // always filled by the time the loop ends.
+    // Every exercise with a row has an rn=1 row — ranks are dense from 1 — so iterating `latest`
+    // covers them all. A non-baseline rn=1 row is also rn_kind=1, so the rn_kind=2 row is the one
+    // before it among the prescribed estimates.
+    const out = new Map<string, { latest: number; previous?: number }>()
+    for (const [name, l] of latest) {
+      const previous = l.isBaseline ? undefined : previousPrescribed.get(name)
+      out.set(name, previous == null ? { latest: l.value } : { latest: l.value, previous })
+    }
     return out
   }
 
