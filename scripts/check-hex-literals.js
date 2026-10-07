@@ -152,7 +152,10 @@ for (const top of ['app', 'components']) walk(path.join(root, top));
 // runs the SAME matcher over the base content — never a second regex, which would disagree with
 // the working-tree count for reasons nobody could see. Read after the walk, for every file at once:
 // one git process per run, not one per file (#2081).
-const atBase = countsAtBase(baseRef, judged.map((j) => j.rel), countHex);
+// The SAME counting as the working tree above — comments stripped first (#2557). Counting the base's
+// comments too (a `(#919)` PR reference reads as a hex literal) inflates the base, and `count <= atBase`
+// would then pass a branch's real addition as inherited.
+const atBase = countsAtBase(baseRef, judged.map((j) => j.rel), (c) => countHex(stripComments(c)));
 for (const { rel, count, allowed } of judged) {
   const v = verdict({ count, limit: allowed, atBase: atBase.get(rel) });
   if (v === 'inherited') {

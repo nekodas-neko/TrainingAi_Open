@@ -225,7 +225,9 @@ const baseRef = resolveBaseRef();
 const failures = [];
 const inherited = [];
 // One read of the base for every file, not one git process per file (#2081).
-const baseCounts = countsAtBase(baseRef, Object.keys(found), countNonStrict);
+// Comments stripped first, as the working-tree scan does (#2557): a base count that kept them could
+// read higher than the branch's and pass a real addition as inherited.
+const baseCounts = countsAtBase(baseRef, Object.keys(found), (c) => countNonStrict(stripComments(c)));
 for (const [file, n] of Object.entries(found)) {
   const limit = BASELINE[file];
   // LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over. `countNonStrict` is
