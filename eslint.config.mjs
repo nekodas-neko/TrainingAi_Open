@@ -30,6 +30,10 @@ const eslintConfig = [
       // Build/tooling scripts, not shipped product code — the timezone no-restricted-syntax
       // rule below does not cover this directory by design.
       "scripts/**",
+      // Reporter output from a local `pnpm e2e` run. Gitignored but not eslint-ignored, so the next
+      // `pnpm lint` read the HTML reporter's bundled JavaScript and reported 256 errors (LA-63).
+      "playwright-report/**",
+      "test-results/**",
     ],
   },
   {
@@ -56,6 +60,15 @@ const eslintConfig = [
       "jsx-a11y/role-supports-aria-props": "error",
       "no-console": ["error", { allow: ["warn", "error", "info"] }],
       "@typescript-eslint/no-explicit-any": "warn",
+      // #2197. A leading underscore is how this repo marks a parameter or binding that is unused ON
+      // PURPOSE, most of all the typed parameters of a mocked `vi.fn<(…) => …>` so an assertion can read
+      // `mock.calls[0][1]`. They were 60% of the warning list and can never be fixed, which buried the
+      // real dead code. Ignoring `^_` is the standard convention and turns the list back into signal.
+      "@typescript-eslint/no-unused-vars": ["warn", {
+        argsIgnorePattern: "^_",
+        varsIgnorePattern: "^_",
+        caughtErrorsIgnorePattern: "^_",
+      }],
       "no-restricted-syntax": [
         "error",
         {
