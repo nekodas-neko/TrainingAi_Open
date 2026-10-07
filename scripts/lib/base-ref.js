@@ -219,7 +219,54 @@ function warnUnreadable(baseRef, relPath, reason) {
  * a shallow clone with no remote, a detached tree, an export. Callers degrade to baseline-only
  * behaviour rather than failing: a missing base is not a violation.
  */
-const DEFAULT_BASE_REFS = ['origin/main', 'FETCH_HEAD', 'main'];
+//
+// #2559: `FETCH_HEAD` used to sit between these two, and in CI it was the one that answered. It
+// means "whatever was fetched last", and in the Custom Rules job that was `actions/checkout`'s own
+// fetch of the PR's MERGE commit — HEAD itself — because the step that fetches `origin/main` ran
+// after most of the ratchets. Every base read then returned the branch's own content, `atBase`
+// equalled `count` for every file, and growth past a baseline passed as "inherited". It is not a
+// name for the base on any path we run, so it is gone; `isHeadItself` below refuses it anyway.
+const DEFAULT_BASE_REFS = ['origin/main', 'main'];
+
+function treeOf(ref) {
+  try {
+    return git(['rev-parse', '--verify', '--quiet', `${ref}^{tree}`]).trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * #2559, the second guard: a candidate that is HEAD under another name is not a base.
+ *
+ * The test is the TREE, not the commit — CI's merge commit and a candidate pointing at it share a
+ * tree whatever their commit ids — and it holds for every candidate that is not a branch. So a
+ * `FETCH_HEAD`, `ORIG_HEAD`, tag or raw sha whose tree is HEAD's is refused, which closes #2559
+ * even if `FETCH_HEAD` ever comes back to the list.
+ *
+ * **A branch ref (`refs/heads/*`, `refs/remotes/*`) whose tree equals HEAD's is still accepted, and
+ * that is deliberate.** It is the base genuinely having the same content as HEAD, which happens on
+ * the paths we must not change:
+ *   - `main` (or a fresh branch with no commits yet) checked out locally, where `origin/main` is
+ *     HEAD — `pnpm check:rules` there reports an over-baseline file `main` already carries as
+ *     inherited, as it always has, rather than as the developer's own violation;
+ *   - a PR whose merge result is identical to `main`, which grew nothing and has nothing to fail.
+ * CI never runs Custom Rules on a push to `main` (there is no `push` trigger, and the nightly
+ * `schedule` skips that job); the nightly test run checks out `main`, where `origin/main` is HEAD
+ * and is accepted by this same rule.
+ * Refusing those would put them in strict no-base mode and fail them on `main`'s overages, which is
+ * the order-dependence Q-424 removed. A branch ref cannot be the PR's merge commit: checkout writes
+ * that to `refs/remotes/pull/<n>/merge`, which no default candidate names.
+ */
+function isHeadItself(ref) {
+  let fullName = '';
+  try {
+    fullName = git(['rev-parse', '--symbolic-full-name', ref]).trim();
+  } catch { /* a raw sha or an unknown name: not a branch */ }
+  if (fullName.startsWith('refs/heads/') || fullName.startsWith('refs/remotes/')) return false;
+  const head = treeOf('HEAD');
+  return head !== null && treeOf(ref) === head;
+}
 
 /** `refs` is injectable so the no-base path can be tested; callers pass nothing. */
 function resolveBaseRef(refs = DEFAULT_BASE_REFS) {
@@ -231,6 +278,7 @@ function resolveBaseRef(refs = DEFAULT_BASE_REFS) {
       // time and read as a violation each time. Probe once here instead, so a base we cannot see
       // degrades to no base at all — which is the honest, and stricter, fallback.
       git(['cat-file', '-e', `${ref}^{tree}`]);
+      if (isHeadItself(ref)) continue;
       return ref;
     } catch { /* try the next one */ }
   }
