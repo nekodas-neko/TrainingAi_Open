@@ -332,6 +332,44 @@
       }
     },
     {
+      "name": "a hand-entered night is written locally as pending, pushed, and marked synced",
+      "kind": "domain", "covers": "manual_sleep",
+      "guarantee": "upsertManualSleepLocally writes a manual_entry=1 pending row with its window and no measured fields; the queued manual_sleep mutation reaches the push with its id and window, and once accepted the row is synced and the outbox is empty.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "steps": [
+        { "op": "local", "action": "upsertManualSleepLocally", "args": [{ "id": "6f1c2a4e-0b7d-4c1e-9a55-2338aa000001", "date": "2026-10-01", "sleepStart": "2026-09-30T12:30:00.000Z", "sleepEnd": "2026-09-30T20:30:00.000Z", "durationHours": 8, "timeInBedHours": 8 }] },
+        { "op": "local", "action": "queueMutation", "args": [{ "domain": "manual_sleep", "date": "2026-10-01", "payload": { "id": "6f1c2a4e-0b7d-4c1e-9a55-2338aa000001", "sleepStart": "2026-09-30T12:30:00.000Z", "sleepEnd": "2026-09-30T20:30:00.000Z" } }] },
+        { "op": "push", "responses": [{}] }
+      ],
+      "expect": {
+        "tables": [{ "table": "sleep_sessions", "columns": ["id", "date", "sleep_start", "sleep_end", "duration_hours", "awake_hours", "efficiency", "manual_entry", "sync_status"],
+          "rows": [{ "id": "6f1c2a4e-0b7d-4c1e-9a55-2338aa000001", "date": "2026-10-01", "sleep_start": "2026-09-30T12:30:00.000Z", "sleep_end": "2026-09-30T20:30:00.000Z", "duration_hours": 8, "awake_hours": null, "efficiency": null, "manual_entry": 1, "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "manual_sleep", "date": "2026-10-01", "payload": { "id": "6f1c2a4e-0b7d-4c1e-9a55-2338aa000001", "sleepStart": "2026-09-30T12:30:00.000Z", "sleepEnd": "2026-09-30T20:30:00.000Z" } }]
+      }
+    },
+    {
+      "name": "a second entry for the same night edits the first and keeps its id",
+      "kind": "domain", "covers": "manual_sleep",
+      "guarantee": "One manual night per date on the device, as on the server: a second upsertManualSleepLocally for the date updates the existing manual row in place (its id kept, still pending) and leaves the device night on that date alone.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "sleep_sessions": [{ "id": "ring-1", "date": "2026-10-01", "sleep_start": "2026-09-30T13:00:00.000Z", "sleep_end": "2026-09-30T20:00:00.000Z", "duration_hours": 6.5, "oura_id": "ble:1", "updated_at": "2026-09-30T21:00:00.000Z", "sync_status": "synced" }]
+      },
+      "steps": [
+        { "op": "local", "action": "upsertManualSleepLocally", "args": [{ "id": "6f1c2a4e-0b7d-4c1e-9a55-2338aa000002", "date": "2026-10-01", "sleepStart": "2026-09-30T12:30:00.000Z", "sleepEnd": "2026-09-30T20:30:00.000Z", "durationHours": 8, "timeInBedHours": 8 }] },
+        { "op": "local", "action": "upsertManualSleepLocally", "args": [{ "id": "6f1c2a4e-0b7d-4c1e-9a55-2338aa000003", "date": "2026-10-01", "sleepStart": "2026-09-30T13:30:00.000Z", "sleepEnd": "2026-09-30T20:30:00.000Z", "durationHours": 7, "timeInBedHours": 7 }] }
+      ],
+      "expect": {
+        "tables": [{ "table": "sleep_sessions", "columns": ["id", "sleep_start", "duration_hours", "oura_id", "manual_entry", "sync_status"],
+          "rows": [
+            { "id": "6f1c2a4e-0b7d-4c1e-9a55-2338aa000002", "sleep_start": "2026-09-30T13:30:00.000Z", "duration_hours": 7, "oura_id": null, "manual_entry": 1, "sync_status": "pending" },
+            { "id": "ring-1", "sleep_start": "2026-09-30T13:00:00.000Z", "duration_hours": 6.5, "oura_id": "ble:1", "manual_entry": 0, "sync_status": "synced" }
+          ] }],
+        "outbox": []
+      }
+    },
+    {
       "name": "a queued rest day is pushed as queued and leaves the outbox",
       "kind": "domain", "covers": "rest_days",
       "guarantee": "A rest_days mutation, which has no local table, reaches the push with its date and flag and is removed once accepted.",
