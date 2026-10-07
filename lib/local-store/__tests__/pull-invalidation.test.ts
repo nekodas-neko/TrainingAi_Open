@@ -5,6 +5,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
+// Comments name `pullDelta(` in prose; only code counts. Line numbers survive the strip.
+import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const invalidated: string[] = []
 
@@ -156,11 +158,6 @@ describe('every pullDelta caller routes its flags to the cache (#2550)', () => {
     }
     return out
   }
-
-  // Comments name `pullDelta(` in prose; only code counts. A `//` after `:` is a URL, not a comment.
-  const stripComments = (src: string) =>
-    src.replace(/\/\*[\s\S]*?\*\//g, m => m.replace(/[^\n]/g, ' '))
-      .replace(/(^|[^:])\/\/.*$/gm, '$1')
 
   /** The 1-based lines of each `pullDelta(` call with no `invalidatePulledDomains(` close below it. */
   function unrouted(src: string): number[] {

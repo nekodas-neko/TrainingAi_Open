@@ -510,9 +510,7 @@ export default function ConfigScreen({ userId, openNewProgram }: { userId?: stri
       // the mirror keeps its pre-edit session ids indefinitely — the delta cursor won't
       // re-fetch an unchanged-since program later — and the workout screen seeds a stale
       // session id into the AI request, which 404s ("couldn't generate the AI prescription").
-      const pulled = userId ? await pullDelta(userId, true).catch(() => null) : null;
-      // The pull carries whatever else changed since the cursor, not only this program (#2550).
-      if (pulled) await invalidatePulledDomains(pulled.domains).catch(() => {});
+      if (userId) await pullDelta(userId, true).then(res => { if (res) return invalidatePulledDomains(res.domains); }).catch(() => {});
       setProgramSheetOpen(false);
       load(); // background refresh — don't block the spinner on 4 network calls
     } catch (e) {

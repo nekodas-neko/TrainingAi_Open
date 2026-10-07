@@ -705,8 +705,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     let pullRes: Awaited<ReturnType<typeof pullDelta>> | undefined;
     if (userId) pushRes = await pushMutations(userId).catch(() => null);
     if (userId) pullRes = await pullDelta(userId, true).catch(() => null);
-    // What the pull wrote, beside the fixed list below: a supplement or meal plan changed on another
-    // device is not in that list, and the cursor has moved past it for every later pull (#2550).
+    // What the pull wrote too, beside the fixed list below — e.g. a supplement changed elsewhere (#2550).
     if (pullRes) await invalidatePulledDomains(pullRes.domains).catch(() => {});
     const online = typeof navigator !== 'undefined' ? navigator.onLine : true;
     if (online && userId && getLocalStore(userId) && (pushRes === null || pullRes === null)) {
@@ -717,11 +716,8 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     // Targeted invalidations: preserve slow-changing config caches (program structure,
     // styles, exercise-library) while clearing everything that could change from a sync.
     // (invalidateOuraSync() already covers 'sleep-performance-correlation' — no separate call needed.)
-    await Promise.all([
-      invalidateWorkoutSummaries(),
-      invalidateReadinessInputs(),
-      invalidateOuraSync(),
-    ]).catch(() => {});
+    await Promise.all([invalidateWorkoutSummaries(), invalidateReadinessInputs(), invalidateOuraSync()])
+      .catch(() => {});
     refetchAll().catch(() => {});
   }, [userId, refetchAll]);
 
