@@ -103,8 +103,8 @@ android {
             applicationIdSuffix ".dev"
             buildConfigField "boolean", "DEVICE_BLE_ENABLED", "false"
             // The real app's Google sign-in returns on trainingai://auth-complete. A second app
-            // claiming it would put a chooser in front of the owner's sign-in, so Dev answers to a
-            // scheme nothing sends. Dev signs in with the seeded credentials instead.
+            // claiming it would put a chooser in front of the owner's sign-in, so Dev answers to its
+            // own scheme, which only the laptop's `pnpm dev` sends (lib/auth/mobile/return-scheme.ts).
             manifestPlaceholders = [oauthScheme: "trainingai-dev"]
         }
     }
