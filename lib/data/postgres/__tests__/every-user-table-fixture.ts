@@ -134,10 +134,18 @@ async function insertRow(pool: Pool, table: string, values: Row): Promise<Row> {
   }
 }
 
-/** A row in a table the fixture does not own (a catalogue), created only when none exists yet. */
+/**
+ * A row in a table the fixture does not own (a catalogue), created for THIS seed and handed back in
+ * `createdCatalogue` for the caller to remove.
+ *
+ * It used to reuse whatever row `SELECT … LIMIT 1` found, which is a row another test file owns. When
+ * `repository-ownership-scoping.test.ts` ran beside `account-deletion.test.ts` the row found was its
+ * `B TEST SEASON`, and that file's `afterAll` deleted it; `season_results → seasons` cascades, so the
+ * seeded user lost a row before the export count was read (#2571). `exercise_library` and
+ * `dietary_restrictions` had the same shape (SET NULL and CASCADE). A row nobody else holds cannot be
+ * deleted from under the seed.
+ */
 async function catalogueRow(pool: Pool, g: SchemaGraph, table: string, created: Row[]): Promise<Row> {
-  const { rows: [existing] } = await pool.query(`SELECT * FROM public."${table}" LIMIT 1`)
-  if (existing) return existing
   const values: Row = {}
   for (const col of g.columns.get(table) ?? []) {
     if (col.notNull && !col.hasDefault) values[col.name] = genericValue(table, col, g)
