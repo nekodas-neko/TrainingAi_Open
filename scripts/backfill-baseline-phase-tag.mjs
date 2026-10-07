@@ -179,6 +179,11 @@ function describe(row) {
     `id ${row.workout_session_id}  user ${row.user_id}`
 }
 
+/**
+ * @param {string[]} argv
+ * @param {Record<string, string | undefined>} env
+ * @param {(line: string) => void} log
+ */
 export async function run(argv, env = process.env, log = console.log) {
   const opts = parseArgs(argv)
   assertLocalDatabaseUrl(env.DATABASE_URL, env.LOCAL_DB_PORT || '5433')
