@@ -6783,7 +6783,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     if (rows.length === 0) return // genuinely no ring data in the window — nothing to say
     const toIso = todayInTz(timezone)
     const fromIso = toAestDay(new Date(Date.now() - REFIT_LOOKBACK_DAYS * 86_400_000), timezone)
-    const sleepSessions = await this.listSleepSessions(userId, fromIso, toIso)
+    // Measured windows only (#2338). A typed-in night reaches this list only when the ring recorded
+    // no sleep for it, and labelling the ring's samples inside a remembered window as "nightly" is
+    // the Q-519 hazard: awake hours in the training set (docs/reviews/2026-08-26-manual-bedtime-write-audit.md).
+    const sleepSessions = (await this.listSleepSessions(userId, fromIso, toIso)).filter(r => !r.manualEntry)
     const samples = extractNightlyTrainingSamples(rows, sleepSessions)
 
     // Both bails below used to be a bare `return`, which is why this went unnoticed for the life of

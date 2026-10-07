@@ -20,14 +20,14 @@ vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => limiter.allow }))
 
 describe.skipIf(!canRun)('manual sleep entry (#2338)', () => {
   let pool: import('pg').Pool
-  let repo: import('@/lib/data/repository').Repository
+  let repo: import('@/lib/data/repository').WorkoutRepository
   let POST: typeof import('@/app/api/sleep-sessions/manual/route').POST
 
   const post = (body: unknown) =>
     POST(new Request('http://localhost/api/sleep-sessions/manual', {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
     }))
-  const rows = async (userId = USER) => (await pool.query(
+  const rows = async (userId = USER): Promise<Record<string, unknown>[]> => (await pool.query(
     `SELECT id, user_id, date::text AS date, sleep_start, sleep_end, duration_hours, time_in_bed_hours,
             awake_hours, efficiency, oura_id, manual_entry, source_map
        FROM sleep_sessions WHERE user_id = $1 ORDER BY sleep_start`, [userId])).rows
@@ -177,7 +177,7 @@ describe.skipIf(!canRun)('manual sleep entry (#2338)', () => {
     })
 
     it('a replayed mutation is still one row', async () => {
-      const m = { id: 'm1', domain: 'manual_sleep', date: DATE, payload: { id: '6f1c2a4e-0b7d-4c1e-9a55-2338aa0000a2', sleepStart: BED, sleepEnd: WAKE } }
+      const m = { id: 'm1', domain: 'manual_sleep' as const, date: DATE, payload: { id: '6f1c2a4e-0b7d-4c1e-9a55-2338aa0000a2', sleepStart: BED, sleepEnd: WAKE } }
       await repo.pushMutations(USER, [m])
       const again = await repo.pushMutations(USER, [{ ...m, id: 'm2' }])
       expect(again.errors).toEqual([])
@@ -198,7 +198,7 @@ describe.skipIf(!canRun)('manual sleep entry (#2338)', () => {
         { id: 'bad2', domain: 'manual_sleep', date: DATE, payload: { sleepStart: 'late', sleepEnd: WAKE } },
         { id: 'good', domain: 'manual_sleep', date: DATE, payload: { id: '6f1c2a4e-0b7d-4c1e-9a55-2338aa0000a5', sleepStart: BED, sleepEnd: WAKE } },
       ])
-      expect(out.errors.map(e => e.id)).toEqual(['bad1', 'bad2'])
+      expect(out.errors.map((e: { id?: string }) => e.id)).toEqual(['bad1', 'bad2'])
       expect(out.processed).toBe(1)
       expect(await rows()).toHaveLength(1)
     })

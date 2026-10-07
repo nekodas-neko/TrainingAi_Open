@@ -56,7 +56,7 @@ describe('the local-store seed has the same shape as the route (#2264)', () => {
     sleepStart: '2026-10-05T14:00:00.000Z', sleepEnd: '2026-10-05T21:00:00.000Z', awakHours: 0.5,
     ouraId: 'o1', efficiency: 90, onsetLatencySec: 600, averageHrvMs: 50, avgHeartRate: 55, lowestHeartRate: 48,
     restlessPeriods: 3, sleepScore: 80, respiratoryRate: 14, sleepPhase5Min: null, timeInBedHours: 7.5,
-    manualSleepStart: BEDTIME, syncStatus: 'synced', updatedAt: '2026-10-06T00:00:00.000Z',
+    manualSleepStart: BEDTIME, manualEntry: false, syncStatus: 'synced', updatedAt: '2026-10-06T00:00:00.000Z',
     ...over,
   })
 

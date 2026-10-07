@@ -33,7 +33,7 @@ const sleepSession = {
   remSleepHours: 1.8, lightSleepHours: 4.5, ouraId: 'oura-abc', efficiency: 91,
   onsetLatencySec: 600, averageHrvMs: 62, avgHeartRate: 54, lowestHeartRate: 48,
   restlessPeriods: 12, sleepScore: 84, respiratoryRate: 14.2, sleepPhase5Min: '1,2,3',
-  timeInBedHours: 8.1, manualSleepStart: '2026-06-30T13:00:00.000Z',
+  timeInBedHours: 8.1, manualSleepStart: '2026-06-30T13:00:00.000Z', manualEntry: false,
   sleepStart: '2026-06-30T12:20:00.000Z', sleepEnd: '2026-06-30T20:25:00.000Z', awakHours: 0.6,
   syncStatus: 'synced' as const, updatedAt: '2026-07-01T09:00:00.000Z',
 }
