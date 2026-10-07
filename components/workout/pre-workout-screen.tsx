@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@trainingai/shared/utils";
 import type { WorkoutExercise } from "@/app/api/workout-data/route";
 import type { SessionLogEntry } from "./types";
-import { formatSheetDate, modalWeight, avgReps, type DeloadOverrideOutcome } from "./utils";
+import { formatSheetDate, modalWeight, avgReps, overrideRunsFull, prescriptionFiguresAsTrained, type DeloadOverrideOutcome } from "./utils";
 import { baselineHint } from "@/components/workout/baseline-hints";
 import { displayOneRm } from "@trainingai/shared/1rm";
 import { RoleChip } from "./role-chip";
@@ -287,7 +287,11 @@ export function PreWorkoutScreen({
                 <SessionDurationPicker
                   value={periodization.state.prescription.durationPreset ?? 'standard'}
                   standardMin={sessionBudgetMin ?? 60}
-                  estimatedMin={periodization.state.prescription.estimatedSessionDurationMin}
+                  // #2403: the same figure the card header prints — the full session's under Full.
+                  estimatedMin={prescriptionFiguresAsTrained(
+                    periodization.state.prescription,
+                    overrideFull && overrideRunsFull(overrideOutcome),
+                  ).estimatedSessionDurationMin}
                   disabled={prescriptionPending}
                   onChange={onDurationPresetChange}
                 />

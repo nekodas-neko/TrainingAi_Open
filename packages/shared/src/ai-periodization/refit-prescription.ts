@@ -87,12 +87,16 @@ export async function refitPrescriptionToBudget(
     validSession.timeBudgetMinutes,
     durationPreset,
     new Set(baseline.earnedSetIds ?? []),
+    // #2403: re-cost the session Full trains too, or the re-fit leaves it describing the old budget.
+    new Map(stored.exercises.flatMap(ex =>
+      ex.deloaded && ex.preDeload ? [[ex.sessionExerciseId, ex.preDeload] as const] : [])),
   )
 
   // The previous fit's drops are stripped rather than merged: an exercise dropped for a
   // 30-minute ask must come back when the lifter asks for 90.
   const carried = { ...stored }
   delete carried.droppedExerciseIds
+  delete carried.fullSession
   const fullRest = Object.fromEntries(
     stored.exercises.map(ex => [ex.sessionExerciseId, baseline.restSec?.[ex.sessionExerciseId] ?? ex.restSec]),
   )
@@ -111,6 +115,7 @@ export async function refitPrescriptionToBudget(
     },
     estimatedSessionDurationMin: budget.estimatedSessionDurationMin,
     weeklyVolumeContribution: budget.weeklyVolumeContribution,
+    ...(budget.fullSession && { fullSession: budget.fullSession }),
     reasoning: `${baseline.reasoning}${budget.budgetNote}`,
     durationPreset,
     ...(budget.droppedIds.size > 0 && { droppedExerciseIds: [...budget.droppedIds] }),

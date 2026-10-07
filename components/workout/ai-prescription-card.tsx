@@ -12,7 +12,7 @@ import type { AiPrescription, PrescriptionStatus, PeriodizationPhase } from "@tr
 import { LOW_CONFIDENCE_THRESHOLD } from "@trainingai/shared/ai-periodization/confidence";
 import { explainExerciseChoice } from "@trainingai/shared/ai-periodization/explain";
 import { prescriptionDrivesLoad } from "@trainingai/shared/ai-periodization/apply-prescription";
-import { mroundStepUp, weightStepFor, overrideRunsFull, overrideLogsAsDeloadWeek, prescriptionRowAsTrained, type DeloadOverrideOutcome } from "@/components/workout/utils";
+import { mroundStepUp, weightStepFor, overrideRunsFull, overrideLogsAsDeloadWeek, prescriptionRowAsTrained, prescriptionFiguresAsTrained, type DeloadOverrideOutcome } from "@/components/workout/utils";
 import { intensityZoneForPct } from "@trainingai/shared/workout/intensity-zone";
 import { isBodyweightType } from "@trainingai/shared/1rm";
 import { RoleChip } from "./role-chip";
@@ -132,6 +132,8 @@ export function AiPrescriptionCard({
   const runsFull = overrideFull && overrideRunsFull(overrideOutcome);
   // #2404: Full put the weights back, but a deload week still logs every set as a deload.
   const loggedAsDeload = overrideFull && overrideLogsAsDeloadWeek(overrideOutcome);
+  // #2403: the minutes and the weekly-volume pills follow the rows — under Full, the full session.
+  const figures = prescriptionFiguresAsTrained(prescription, runsFull);
 
   // Exercises dropped for this cycle are not part of today's session — workout-data filters
   // them out of what actually loads, so the card must not advertise them either (the
@@ -227,7 +229,7 @@ export function AiPrescriptionCard({
                   The wording matches SessionDurationPicker, which renders the SAME number directly
                   above this card and already named it. Two phrasings for one quantity, six lines
                   apart in pre-workout-screen, is the divergence worth more than the nicer phrase. */}
-              {prescription.estimatedSessionDurationMin > 0 && ` · ~${prescription.estimatedSessionDurationMin} min of work`}
+              {figures.estimatedSessionDurationMin > 0 && ` · ~${figures.estimatedSessionDurationMin} min of work`}
               {/* Once a transition has been APPLIED (auto or accepted) the action is history —
                   still calling it "suggested" would invite a tap on a decision already made. */}
               {isTransitionRecommended && (isPending
@@ -402,9 +404,9 @@ export function AiPrescriptionCard({
 
           {/* Per-muscle weekly volume this prescription contributes (sets/week), mirroring the
               workout-review sheet's weekly-impact pills — highest-volume muscles first. */}
-          {Object.keys(prescription.weeklyVolumeContribution ?? {}).length > 0 && (
+          {Object.keys(figures.weeklyVolumeContribution ?? {}).length > 0 && (
             <div className="flex flex-wrap gap-1.5 border-t border-brand/10 pt-1.5">
-              {Object.entries(prescription.weeklyVolumeContribution)
+              {Object.entries(figures.weeklyVolumeContribution)
                 .sort((a, b) => b[1] - a[1])
                 .map(([muscle, sets]) => (
                   <span key={muscle} className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-500">
