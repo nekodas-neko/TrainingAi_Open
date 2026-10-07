@@ -61,6 +61,12 @@ describe('callsUnderArity', () => {
     expect(callsUnderArity(`f(g(b, c))`, 'f', 2)).toEqual(['f(g(b, c))'])
   })
 
+  it('does not count the commas inside an array or object argument', () => {
+    expect(callsUnderArity(`f(a, [1, 2, 3], c)`, 'f', 4)).toEqual(['f(a, [1, 2, 3], c)'])
+    expect(callsUnderArity(`f(a, [1, 2, 3], c)`, 'f', 3)).toEqual([])
+    expect(callsUnderArity(`f({ a: 1, b: 2 })`, 'f', 2)).toEqual(['f({ a: 1, b: 2 })'])
+  })
+
   it('reads an empty argument list as zero arguments', () => {
     expect(callsUnderArity(`f()`, 'f', 1)).toEqual(['f()'])
     expect(callsUnderArity(`f( )`, 'f', 1)).toEqual(['f( )'])

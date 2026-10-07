@@ -5,7 +5,9 @@
 // Arity is per function and that is the whole reason this exists: the tz is `todayMidnightUtc`'s
 // FIRST argument but `toAestDay`'s SECOND, so one rule cannot cover both. Nor can a regex:
 // `toAestDay\([^,)]+\)` matches the corrected `toAestDay(new Date(x), tz)` by stopping at the inner
-// `)`. So this balances the parentheses and counts the commas that sit at the call's own depth.
+// `)`. So this balances the brackets — `()`, `[]` and `{}`, because an array or object argument has
+// commas of its own (`f(a, [1, 2], c)` is three arguments, not four) — and counts the commas that
+// sit at the call's own depth.
 //
 // Moved here from `lib/__tests__/rv176-timezone-escapes.test.ts` (RV-179), where it was the engine of
 // a vitest scan that only the full suite ran; Custom Rules now runs it on every PR.
@@ -26,8 +28,8 @@ function callsUnderArity(src, name, minArgs) {
     let i = m.index + m[0].length;
     for (; i < src.length && depth > 0; i++) {
       const c = src[i];
-      if (c === '(') depth++;
-      else if (c === ')') { depth--; if (depth === 0) break; }
+      if (c === '(' || c === '[' || c === '{') depth++;
+      else if (c === ')' || c === ']' || c === '}') { depth--; if (depth === 0) break; }
       else if (c === ',' && depth === 1) commas++;
       body += c;
     }

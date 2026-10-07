@@ -43,6 +43,32 @@ export interface RawFrameQuery {
   tags?: readonly number[]
   startDs?: number | null
   endDs?: number | null
+  /**
+   * Who is asking, named in the slow-read log below. Every caller passes one (a test holds that), so
+   * a read that shows up as `untagged` is a caller nobody has named yet.
+   */
+  caller?: string
+}
+
+/**
+ * A read at least this slow is logged with its caller (#2247).
+ *
+ * Production measured one raw read at ~2 s, ~1.5 times a minute, with no way to say who was making
+ * it: the hot-tier query's shape (`user_id`, a tag list, `ring_timestamp_ds >= cutoff`) fits the
+ * rollup and `getOuraRawSamplesForTags` equally. **This is application-side and not a SQL comment on
+ * purpose.** `pg_stat_statements` identifies a statement by a hash of its parse tree, which ignores
+ * comments, so a tag in a comment would leave every caller sharing one entry whose stored text shows
+ * only the first caller's. A log line is the thing that can tell them apart.
+ */
+export const SLOW_RAW_READ_MS = 750
+
+/** Logs one line for a slow read; silent otherwise. Exported so the threshold and the wording are testable. */
+export function reportRawFrameRead(ms: number, frames: number, q: RawFrameQuery): void {
+  if (ms < SLOW_RAW_READ_MS) return
+  console.info(
+    `[raw-frames] slow read: ${Math.round(ms)} ms, ${frames} frames, caller=${q.caller ?? 'untagged'}, ` +
+    `tags=${q.tags ? q.tags.length : 'all'}, startDs=${q.startDs ?? 'none'}, endDs=${q.endDs ?? 'none'}`,
+  )
 }
 
 function inRange(ds: number, startDs: number | null | undefined, endDs: number | null | undefined): boolean {
@@ -98,6 +124,13 @@ async function readColdFrames(
  * runs inside the rollup worker and is exactly where memory is not free.
  */
 export async function readRawFrames(db: Db, userId: string, q: RawFrameQuery = {}): Promise<RawFrameRow[]> {
+  const startedAt = performance.now()
+  const frames = await readFramesBothTiers(db, userId, q)
+  reportRawFrameRead(performance.now() - startedAt, frames.length, q)
+  return frames
+}
+
+async function readFramesBothTiers(db: Db, userId: string, q: RawFrameQuery): Promise<RawFrameRow[]> {
   const hotConds = [eq(s.ouraRawSamples.userId, userId)]
   if (q.tags) hotConds.push(inArray(s.ouraRawSamples.tag, [...q.tags]))
   if (q.startDs != null) hotConds.push(gte(s.ouraRawSamples.ringTimestampDs, q.startDs))
