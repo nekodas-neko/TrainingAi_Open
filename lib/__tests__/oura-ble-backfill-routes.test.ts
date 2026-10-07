@@ -47,8 +47,9 @@ const runRedecodeOffLoop = vi.fn(async (..._a: unknown[]) => ({
 
 const reapStaleRedecodeJobs = vi.fn(async (_u: string) => 0)
 const startRedecodeJob = vi.fn(async (..._a: unknown[]) => ({
-  job: { id: 77, startedAt: new Date('2026-09-09T04:00:00Z') },
+  job: { id: 77, startedAt: new Date('2026-09-09T04:00:00Z'), opts: {} as Row },
   alreadyRunning: false,
+  refused: false,
 }))
 const finishRedecodeJob = vi.fn(async (..._a: unknown[]) => undefined)
 const getRedecodeJob = vi.fn(async (..._a: unknown[]) => null as Row | null)
@@ -120,8 +121,9 @@ beforeEach(() => {
     aggregateError: null,
   })
   startRedecodeJob.mockResolvedValue({
-    job: { id: 77, startedAt: new Date('2026-09-09T04:00:00Z') },
+    job: { id: 77, startedAt: new Date('2026-09-09T04:00:00Z'), opts: {} },
     alreadyRunning: false,
+    refused: false,
   })
   getRedecodeJob.mockResolvedValue(null)
   getLatestRedecodeJob.mockResolvedValue(null)
@@ -182,22 +184,35 @@ describe('the admin gate on all three levers', () => {
 })
 
 describe('POST /api/oura-ble/samples/redecode', () => {
-  it('runs the full-history pass by default and merges both phases into one answer', async () => {
-    const body = await (await redecodeReq()).json()
-    expect(runRedecodeOffLoop).toHaveBeenCalledWith(
-      'u-1', 'Australia/Brisbane',
-      { debugDate: undefined, fullHistory: true, allowStepsDecrease: false },
-      true,
-    )
-    expect(body).toMatchObject({ scanned: 10, updated: 3, restamped: 2, redecodeError: null })
-    expect(body.aggregated).toMatchObject({ days: 4 })
+  it('refuses a full-history request that is not a job, so it can never run outside the slot', async () => {
+    // The slot (`oura_redecode_jobs`) is what keeps two full-history passes from running at once.
+    // The synchronous path never touched it. Nothing may start, no job row may be written, and the
+    // answer says how to ask properly.
+    const res = await redecodeReq()
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/\?async=1/)
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store')
+    expect(runRedecodeOffLoop).not.toHaveBeenCalled()
+    expect(startRedecodeJob).not.toHaveBeenCalled()
+    expect(reapStaleRedecodeJobs).not.toHaveBeenCalled()
   })
 
-  it('uses the CALLER’s timezone, not the default', async () => {
-    // A fixture whose timezone IS `DEFAULT_TZ` proves nothing about which one the route read.
-    sessionUser = { id: 'u-1', isAdmin: true, timezone: 'Europe/Berlin' }
-    await redecodeReq()
-    expect(runRedecodeOffLoop.mock.calls[0][1]).toBe('Europe/Berlin')
+  it('refuses the step-backfill flag on that path too, rather than honouring it', async () => {
+    const res = await redecodeReq('?allowStepsDecrease=1&date=2026-03-01')
+    expect(res.status).toBe(400)
+    expect(runRedecodeOffLoop).not.toHaveBeenCalled()
+    expect(startRedecodeJob).not.toHaveBeenCalled()
+  })
+
+  it('treats any value other than 1 as off, for all three flags', async () => {
+    // `?dump=true` is NOT the dump, so it is a bare full-history request and is refused; `?async=yes`
+    // likewise. Only the literal 1 opens a mode.
+    expect((await redecodeReq('?dump=true')).status).toBe(400)
+    expect((await redecodeReq('?async=yes')).status).toBe(400)
+    expect(runRedecodeOffLoop).not.toHaveBeenCalled()
+    await redecodeReq('?async=1&allowStepsDecrease=yes')
+    expect(startRedecodeJob).toHaveBeenCalledWith('u-1', expect.objectContaining({ allowStepsDecrease: false }))
+    await settle()
   })
 
   it('?dump=1 writes nothing and does NOT ask for the full-history pass', async () => {
@@ -211,52 +226,21 @@ describe('POST /api/oura-ble/samples/redecode', () => {
     expect(body).toMatchObject({ scanned: 0, updated: 0, redecodeError: null })
   })
 
+  it('uses the CALLER’s timezone, not the default', async () => {
+    // A fixture whose timezone IS `DEFAULT_TZ` proves nothing about which one the route read.
+    sessionUser = { id: 'u-1', isAdmin: true, timezone: 'Europe/Berlin' }
+    await redecodeReq('?async=1')
+    await settle()
+    expect(runRedecodeOffLoop.mock.calls[0][1]).toBe('Europe/Berlin')
+  })
+
   it('passes ?date and ?allowStepsDecrease through to the full pass', async () => {
     // Two independent params: a request setting only one could not tell which the route forwarded.
-    await redecodeReq('?date=2026-03-01&allowStepsDecrease=1')
+    await redecodeReq('?async=1&date=2026-03-01&allowStepsDecrease=1')
+    await settle()
     expect(runRedecodeOffLoop.mock.calls[0][2]).toEqual({
       debugDate: '2026-03-01', fullHistory: true, allowStepsDecrease: true,
     })
-  })
-
-  it('treats any value other than 1 as off, for both flags', async () => {
-    await redecodeReq('?dump=true&allowStepsDecrease=yes')
-    expect(runRedecodeOffLoop.mock.calls[0][2]).toMatchObject({ fullHistory: true, allowStepsDecrease: false })
-  })
-
-  it('reports a redecode failure as JSON and still runs the re-aggregate', async () => {
-    // Both phases are re-runnable over the archival hex, so a failure in one must not cancel the
-    // other — and a raw 500 would read as "redecode failed" while hiding which phase and why.
-    runRedecodeOffLoop.mockResolvedValue({
-      redecoded: null,
-      redecodeError: 'decoder threw on tag 0x14',
-      aggregated: { days: 4, stepErrors: [] },
-      aggregateError: null,
-    })
-    const res = await redecodeReq()
-    expect(res.status).toBe(200)
-    const body = await res.json()
-    expect(body.redecodeError).toBe('decoder threw on tag 0x14')
-    expect(body.aggregated).toMatchObject({ days: 4 })
-    // With no redecode result the counters fall back to zeros rather than vanishing from the shape.
-    expect(body).toMatchObject({ scanned: 0, updated: 0, restamped: 0 })
-  })
-
-  it('files the aggregate’s per-step errors, which do not throw and so reach no catch', async () => {
-    // A step that failed did not throw, so it appears in neither `aggregateError` nor any rejection.
-    // Reporting it is the only thing that puts it somewhere queryable — and on this path the caller
-    // may never receive the JSON at all, because the request can outlive the gateway timeout.
-    runRedecodeOffLoop.mockResolvedValue({
-      redecoded: { scanned: 1, updated: 0, restamped: 0 },
-      redecodeError: null,
-      aggregated: { days: 1, stepErrors: [{ step: 'steps', error: 'boom' }] },
-      aggregateError: null,
-    })
-    await redecodeReq()
-    expect(reportRollupStepErrors).toHaveBeenCalledWith(
-      [{ step: 'steps', error: 'boom' }],
-      { userId: 'u-1', url: '/api/oura-ble/samples/redecode' },
-    )
   })
 })
 
@@ -278,12 +262,48 @@ describe('POST /api/oura-ble/samples/redecode?async=1', () => {
     // sample — the operation whose own comment names it as the event-loop starvation that took
     // production down. The response still carries the running job's id so the caller can poll it.
     startRedecodeJob.mockResolvedValue({
-      job: { id: 77, startedAt: new Date('2026-09-09T04:00:00Z') },
+      job: { id: 77, startedAt: new Date('2026-09-09T04:00:00Z'), opts: { allowStepsDecrease: true } },
       alreadyRunning: true,
+      refused: false,
     })
     const body = await (await redecodeReq('?async=1')).json()
-    expect(body).toMatchObject({ jobId: 77, status: 'running', alreadyRunning: true })
+    // The joiner is told what it is following: here a step backfill, which a plain press may follow.
+    expect(body).toMatchObject({ jobId: 77, status: 'running', alreadyRunning: true, kind: 'step-backfill' })
     expect(runRedecodeOffLoop).not.toHaveBeenCalled()
+  })
+
+  // Issue 2383. A step backfill used to follow a running plain redecode, so the correction never ran
+  // and the console said "Backfill applied". It is refused now: 409, nothing started, nothing to poll.
+  it('refuses a step backfill with 409 while a plain redecode holds the slot', async () => {
+    startRedecodeJob.mockResolvedValue({
+      job: { id: 41, startedAt: new Date('2026-09-09T04:00:00Z'), opts: { allowStepsDecrease: false } },
+      alreadyRunning: true,
+      refused: true,
+    })
+    const res = await redecodeReq('?async=1&allowStepsDecrease=1')
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body).toMatchObject({
+      refused: true, runningJobId: 41, runningKind: 'redecode', requestedKind: 'step-backfill',
+    })
+    expect(body.error).toMatch(/already running.*wait for it to finish, then run the backfill/i)
+    // No job id: the caller must not poll the plain run as though it were its own.
+    expect(body.jobId).toBeUndefined()
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store')
+    expect(runRedecodeOffLoop).not.toHaveBeenCalled()
+    expect(finishRedecodeJob).not.toHaveBeenCalled()
+  })
+
+  it('reports the kind of a job it starts', async () => {
+    startRedecodeJob.mockResolvedValue({
+      job: { id: 78, startedAt: new Date('2026-09-09T04:00:00Z'), opts: { allowStepsDecrease: true } },
+      alreadyRunning: false,
+      refused: false,
+    })
+    const body = await (await redecodeReq('?async=1&allowStepsDecrease=1')).json()
+    expect(body).toMatchObject({ jobId: 78, alreadyRunning: false, kind: 'step-backfill' })
+    expect(startRedecodeJob).toHaveBeenCalledWith('u-1', expect.objectContaining({ allowStepsDecrease: true }))
+    await settle()
   })
 
   it('stores the options on the job row, with an absent date as null', async () => {
@@ -385,6 +405,18 @@ describe('GET /api/oura-ble/samples/redecode — polling', () => {
       getLatestRedecodeJob.mockResolvedValue(job)
       expect((await (await pollReq()).json()).job.status, name).toBe('failed')
     }
+  })
+
+  it('reports the kind from the job row, so the backfill screen can tell whose run finished', async () => {
+    // Issue 2383. The step-backfill screen says "Backfill applied" only for a 'step-backfill' kind.
+    const finishedAt = new Date('2026-09-09T04:05:00Z')
+    getLatestRedecodeJob.mockResolvedValue({ ...JOB, finishedAt, opts: { fullHistory: true, allowStepsDecrease: false }, result: {} })
+    expect((await (await pollReq()).json()).job.kind).toBe('redecode')
+    getLatestRedecodeJob.mockResolvedValue({ ...JOB, finishedAt, opts: { fullHistory: true, allowStepsDecrease: true }, result: {} })
+    expect((await (await pollReq()).json()).job.kind).toBe('step-backfill')
+    // A result payload cannot shadow it.
+    getLatestRedecodeJob.mockResolvedValue({ ...JOB, finishedAt, opts: { fullHistory: true }, result: { kind: 'step-backfill' } })
+    expect((await (await pollReq()).json()).job.kind).toBe('redecode')
   })
 
   it('reaps stale jobs on the poll too, so a dead run cannot hold the slot forever', async () => {

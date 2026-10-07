@@ -8,13 +8,17 @@ import { bodyBatteryColor, type BodyBatteryLabel } from '@trainingai/shared/heal
 interface Props {
   totals: { calories: number; proteinG: number; carbsG: number; fatG: number }
   targets: NutritionTargets | null
+  /** #2071. The day's calorie budget, or null. `targets.calories` is the typed goal and is never
+   *  printed as the day's budget. */
+  dayBudgetKcal: number | null
   battery: { current: number; label: BodyBatteryLabel; trend: string; drained: number } | null
 }
 
-export function DaySummaryCard({ totals, targets, battery }: Props) {
+export function DaySummaryCard({ totals, targets, dayBudgetKcal, battery }: Props) {
   // Null rather than a stand-in (BF-175): a denominator nobody set is not the day's budget, and
-  // `2000` printed as one read exactly like a target the user had chosen.
-  const calTarget = targets?.calories ?? null
+  // `2000` printed as one read exactly like a target the user had chosen. #2071 took the typed goal
+  // out for the same reason: it is a number the user set once, not the day's budget.
+  const calTarget = dayBudgetKcal
   const remaining = calTarget != null ? Math.max(0, calTarget - totals.calories) : null
   const calPct = calTarget != null ? Math.min(100, Math.round((totals.calories / calTarget) * 100)) : 0
 

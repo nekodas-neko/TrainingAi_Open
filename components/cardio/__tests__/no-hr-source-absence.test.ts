@@ -32,10 +32,11 @@ describe('ZoneQuotaCard', () => {
   it('renders the Time in Zone card\'s empty state through that predicate', () => {
     const quotaCard = src('components/cardio/zone-quota-card.tsx')
     const timeInZone = src('components/health/time-in-zone-card.tsx')
-    // Time in Zone says "in this window"; the quota has no window picker, so it drops those words.
-    const empty = 'wear the ring or strap during a workout.'
-    expect(timeInZone).toContain(empty)
-    expect(quotaCard).toContain(empty)
+    // #2338 — the sentence comes from the one copy function (it names whatever the user can
+    // connect, not a ring they may not own). Time in Zone passes its 'window' wording; the quota
+    // has no window picker, so it uses the plain one.
+    expect(timeInZone).toContain('noHrDataCopy(data?.hasHrSource, "window")')
+    expect(quotaCard).toContain("noHrDataCopy(false, 'workout')")
     expect(quotaCard).toMatch(/quotaHasNoHrSource\(weekQuota\)/)
   })
 

@@ -4,6 +4,7 @@ import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { rateLimit } from '@/lib/rate-limit'
 import { reportServerError } from '@/lib/observability'
 import { buildReadinessPayload } from '@/lib/health/readiness-payload'
+import { scheduleDailyShadowReadiness } from '@/lib/health/shadow-readiness-service'
 
 // The payload type is re-exported because ten call sites already import it from this route path.
 // It is defined in the shared module alongside the builder. Deliberately not enumerated here — the
@@ -20,7 +21,11 @@ export async function GET() {
   }
 
   try {
-    const payload = await buildReadinessPayload(userId, session.user?.timezone ?? DEFAULT_TZ)
+    const tz = session.user?.timezone ?? DEFAULT_TZ
+    const payload = await buildReadinessPayload(userId, tz)
+    // #2377: the shadow readiness model, scored beside the live one and shown nowhere. Detached and
+    // throttled: it cannot fail, slow or change this response, and it writes only its own table.
+    scheduleDailyShadowReadiness(userId, tz)
     return NextResponse.json(payload, {
       headers: { "Cache-Control": "private, no-store" },
     })

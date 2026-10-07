@@ -547,6 +547,40 @@ export const readinessVerdicts = pgTable('readiness_verdicts', {
   unique('readiness_verdicts_user_date_key').on(t.userId, t.date),
 ]))
 
+/**
+ * #2377 (migration 202610071507). The #2356 pillar readiness model, computed beside the live score
+ * and shown nowhere. One row per (user, date, model_version): a new version is stored beside the
+ * old rows, a recompute of the same version replaces its own row. Pillars are typed columns so
+ * `claude_ro` can aggregate them; units are JSONB keyed by stable unit id. Null = not scored, never
+ * 0. `inputsThrough` (last daytime day any unit read) must be before `date`. Server-only.
+ */
+export const shadowReadiness = pgTable('shadow_readiness', {
+  id:               uuid('id').primaryKey().defaultRandom(),
+  userId:           uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  date:             date('date', { mode: 'string' }).notNull(),   // readiness day
+  modelVersion:     integer('model_version').notNull(),
+  shadowReadiness:  doublePrecision('shadow_readiness'),
+  sleepPillar:      doublePrecision('sleep_pillar'),
+  heartPillar:      doublePrecision('heart_pillar'),
+  activityPillar:   doublePrecision('activity_pillar'),
+  bodyPillar:       doublePrecision('body_pillar'),
+  pillarDetail:     jsonb('pillar_detail').notNull().default(sql`'{}'::jsonb`),
+  units:            jsonb('units').notNull().default(sql`'{}'::jsonb`),
+  maturityStage:    text('maturity_stage').notNull(),             // learning | provisional | settled
+  inputsThrough:    date('inputs_through', { mode: 'string' }),
+  liveReadiness:    doublePrecision('live_readiness'),
+  liveModelVersion: text('live_model_version'),
+  computedBy:       text('computed_by').notNull(),                // daily | replay
+  computedAt:       timestamp('computed_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ([
+  unique('shadow_readiness_user_date_version_key').on(t.userId, t.date, t.modelVersion),
+  index('shadow_readiness_user_date_idx').on(t.userId, t.date),
+  check('shadow_readiness_model_version_check', sql`${t.modelVersion} > 0`),
+  check('shadow_readiness_stage_check', sql`${t.maturityStage} IN ('learning', 'provisional', 'settled')`),
+  check('shadow_readiness_computed_by_check', sql`${t.computedBy} IN ('daily', 'replay')`),
+  check('shadow_readiness_settled_inputs_check', sql`${t.inputsThrough} IS NULL OR ${t.inputsThrough} < ${t.date}`),
+]))
+
 export const sleepSessions = pgTable('sleep_sessions', {
   id:               uuid('id').primaryKey().defaultRandom(),
   userId:           uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -585,13 +619,18 @@ export const sleepSessions = pgTable('sleep_sessions', {
   // packages/shared/src/health/sleep-night.ts drops it on every read, and a device write landing
   // on its `sleep_start` takes the row over (`upsertOuraSleep` resets this to false).
   manualEntry:      boolean('manual_entry').notNull().default(false),
+  // Issue 2606 (migration 202610072213) — a manual night the user REMOVED. Only a manual_entry row
+  // is ever tombstoned (`deleteManualSleepNight`); every reader skips a tombstoned row, and the
+  // delta pull carries it so the device hides it too. A device night is never removed this way.
+  deletedAt:        timestamp('deleted_at', { withTimezone: true }),
   sourceMap:        jsonb('source_map').$type<Record<string, string>>(),   // per-field provenance (migration 120)
   createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:        timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [
   unique().on(t.userId, t.sleepStart),
-  // One manual night per (user, wake date): a second entry is an edit, never a second row.
-  uniqueIndex('sleep_sessions_manual_night_key').on(t.userId, t.date).where(sql`manual_entry`),
+  // One LIVE manual night per (user, wake date): a second entry is an edit, never a second row. A
+  // removed night (deleted_at set) does not hold the date (issue 2606).
+  uniqueIndex('sleep_sessions_manual_night_key').on(t.userId, t.date).where(sql`manual_entry AND deleted_at IS NULL`),
 ])
 
 export const moodLogs = pgTable('mood_logs', {
@@ -1186,6 +1225,33 @@ export const aiCallLog = pgTable('ai_call_log', {
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
+/**
+ * #2381 (migration 202610071523). One row per maintenance action an agent (or the owner) ran.
+ * **Append-only**: inserted `running`, finished once, never deleted or rewritten; a trigger in the
+ * migration enforces that, so it is not visible here. `targetUserId` is the account the job ran on
+ * (NULL = global) and is SET NULL on account deletion, so the record survives unlinked.
+ * `parameters` is redacted by the repository and never holds a secret or personal data.
+ */
+export const agentActionLog = pgTable('agent_action_log', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  job:          text('job').notNull(),                 // stable id from docs/admin-actions.md
+  parameters:   jsonb('parameters').notNull().default(sql`'{}'::jsonb`),
+  actor:        text('actor').notNull(),               // agent name, or 'owner'
+  approvalRef:  text('approval_ref'),
+  targetUserId: uuid('target_user_id').references(() => users.id, { onDelete: 'set null' }),
+  startedAt:    timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  finishedAt:   timestamp('finished_at', { withTimezone: true }),
+  outcome:      text('outcome').notNull().default('running'), // running | succeeded | failed | refused
+  affectedRows: bigint('affected_rows', { mode: 'number' }),
+  daysMoved:    integer('days_moved'),
+  error:        text('error'),
+}, (t) => ([
+  index('agent_action_log_started_idx').on(t.startedAt),
+  index('agent_action_log_job_started_idx').on(t.job, t.startedAt),
+  check('agent_action_log_outcome_check', sql`${t.outcome} IN ('running', 'succeeded', 'failed', 'refused')`),
+  check('agent_action_log_finished_check', sql`(${t.outcome} = 'running') = (${t.finishedAt} IS NULL)`),
+]))
+
 export const feedbackSubmissions = pgTable('feedback_submissions', {
   id:             uuid('id').primaryKey().defaultRandom(),
   userId:         uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -1370,6 +1436,44 @@ export const programVolumeTargets = pgTable('program_volume_targets', {
   targetSetsPerWeek:  integer('target_sets_per_week').notNull(),
 }, t => [unique().on(t.programId, t.muscleGroup)])
 
+// ── Native app sign-in ────────────────────────────────────────────────────────
+
+/**
+ * #2076 (migration 202610071636). Refresh tokens for the native app's own short-lived sign-in
+ * token, one `familyId` per sign-in on one device. **Only the SHA-256 of each token is stored**
+ * (`tokenHash`, 64 lowercase hex): the token is shown to the app once and never kept. Rotated on
+ * every use (`rotatedAt` + `replacedBy`); a rotated token presented again revokes its family.
+ * Server-only, not exported, `tokenHash` withheld from claude_ro. Read and written only through
+ * `slices/native-refresh-tokens.ts`.
+ */
+export const nativeRefreshTokens = pgTable('native_refresh_tokens', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  userId:        uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tokenHash:     text('token_hash').notNull(),
+  familyId:      uuid('family_id').notNull(),
+  deviceLabel:   text('device_label').notNull(),
+  deviceId:      text('device_id'),
+  createdAt:     timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  lastUsedAt:    timestamp('last_used_at', { withTimezone: true }),
+  expiresAt:     timestamp('expires_at', { withTimezone: true }).notNull(),
+  rotatedAt:     timestamp('rotated_at', { withTimezone: true }),
+  replacedBy:    uuid('replaced_by').references((): AnyPgColumn => nativeRefreshTokens.id, { onDelete: 'set null' }),
+  revokedAt:     timestamp('revoked_at', { withTimezone: true }),
+  revokedReason: text('revoked_reason'),
+}, (t) => ([
+  unique('native_refresh_tokens_token_hash_key').on(t.tokenHash),
+  index('native_refresh_tokens_user_idx').on(t.userId),
+  index('native_refresh_tokens_family_idx').on(t.familyId),
+  index('native_refresh_tokens_active_idx').on(t.userId, t.expiresAt).where(sql`revoked_at IS NULL AND rotated_at IS NULL`),
+  check('native_refresh_tokens_token_hash_check', sql`${t.tokenHash} ~ '^[0-9a-f]{64}$'`),
+  check('native_refresh_tokens_device_label_check', sql`char_length(${t.deviceLabel}) BETWEEN 1 AND 80 AND btrim(${t.deviceLabel}) <> ''`),
+  check('native_refresh_tokens_device_id_check', sql`${t.deviceId} IS NULL OR ${t.deviceId} ~ '^[A-Za-z0-9_-]{8,64}$'`),
+  check('native_refresh_tokens_expiry_check', sql`${t.expiresAt} > ${t.createdAt} AND ${t.expiresAt} <= ${t.createdAt} + interval '90 days'`),
+  check('native_refresh_tokens_revoked_check', sql`(${t.revokedAt} IS NULL) = (${t.revokedReason} IS NULL)`),
+  check('native_refresh_tokens_revoked_reason_check', sql`${t.revokedReason} IN ('user', 'sign_out', 'rotation_reuse', 'password_change', 'admin', 'account_deactivated')`),
+  check('native_refresh_tokens_replaced_check', sql`${t.replacedBy} IS NULL OR (${t.rotatedAt} IS NOT NULL AND ${t.replacedBy} <> ${t.id})`),
+]))
+
 // ── Oura Ring ─────────────────────────────────────────────────────────────────
 
 export const ouraTokens = pgTable('oura_tokens', {
@@ -1447,15 +1551,18 @@ export const ouraDaily = pgTable('oura_daily', {
   syncedAt: timestamp('synced_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [unique().on(t.userId, t.date)])
 
+// #2079 (migration 202610071656): keyed on (user_id, timestamp), the index every read and upsert
+// uses. `id` is kept and still emitted by the full export, but has no index: nothing looks a row up
+// by it, and the surrogate key it used to carry was never scanned once.
 export const ouraHeartrate = pgTable('oura_heartrate', {
-  id:        uuid('id').primaryKey().defaultRandom(),
+  id:        uuid('id').notNull().defaultRandom(),
   userId:    uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   timestamp: timestamp('timestamp', { withTimezone: true }).notNull(),
   bpm:       integer('bpm').notNull(),
   source:    text('source'),
   // migration 130 (Phase-2 B1) — cursor for the dedicated Track-B timeseries backup sync.
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, t => [unique().on(t.userId, t.timestamp)])
+}, t => [primaryKey({ name: 'oura_heartrate_pkey', columns: [t.userId, t.timestamp] })])
 
 // Server mirror of the on-device `oura_bucket` coarse-tier RRD trend ladder (migration 137,
 // Phase-2 B1). Durable backup destination for Track-B — device-computed, never server-computed.

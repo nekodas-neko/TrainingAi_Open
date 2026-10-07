@@ -17,7 +17,7 @@ import { movementSummary } from '@/components/nutrition/movement-breakdown'
  * switch where an object literal would defeat it silently.
  */
 export const CalorieZoneBar = memo(function CalorieZoneBar({
-  intakeKcal, restingBaseKcal, activeKcal, targetNetKcal, restingRateKcal,
+  intakeKcal, restingBaseKcal, activeKcal, targetNetKcal, restingRateKcal, deficitKcal, stepCreditKcal,
   workoutKcal, activityKcal, stepsKcal, compact,
 }: {
   intakeKcal: number
@@ -27,6 +27,11 @@ export const CalorieZoneBar = memo(function CalorieZoneBar({
   /** BF-152. The user's resting rate, which anchors the budget when it is known. Null/absent falls
    *  back to the old resting-base-plus-goal-delta budget — see `budgetProvenance`. */
   restingRateKcal?: number | null
+  /** #2071. The goal's deficit the budget was built with (payload `deficitKcal`). Absent on a payload
+   *  cached before it existed, which `budgetProvenance` then reads on its old terms. */
+  deficitKcal?: number | null
+  /** #2071. The first 3,000 steps' energy, which the budget takes out of the 20% (payload field). */
+  stepCreditKcal?: number | null
   /** The three addends of `activeKcal`, from the service's `activeBreakdown` (BF-87). Scalars, not
    *  the object — `memo` compares shallowly and an object literal at a call site defeats it. */
   workoutKcal: number
@@ -35,8 +40,11 @@ export const CalorieZoneBar = memo(function CalorieZoneBar({
   /** Home's card is dense — tighten the bar. */
   compact?: boolean
 }) {
-  const { base, earned, total, anchoredToRestingRate } =
-    budgetProvenance({ restingBaseKcal, activeKcal, targetNetKcal, restingRateKcal })
+  const { base, earned, total, anchoredToRestingRate, chain } =
+    budgetProvenance({ restingBaseKcal, activeKcal, targetNetKcal, restingRateKcal, deficitKcal, stepCreditKcal })
+  // #2071. With a floored still day `earned` is only what movement added ABOVE the floor; the chain
+  // prints the whole movement, because the chain's own arithmetic is what lifted the day past it.
+  const shownEarned = chain != null && chain.floored && !chain.totalFloored ? chain.movement : earned
   const parts = movementSummary({ workoutKcal, activityKcal, stepsKcal })
   // BF-99. On the UNANCHORED path `budgetProvenance().base` is `restingBaseKcal + targetNetKcal` —
   // the resting base with the GOAL DELTA already folded in — and this line called it "base". On a
@@ -69,7 +77,26 @@ export const CalorieZoneBar = memo(function CalorieZoneBar({
           sentence explained cannot arise while any steps exist. What is left is the honest
           remaining case — a day with no movement recorded at all. */}
       <p className={`${compact ? 'mt-1' : 'mt-2'} text-[10px] leading-snug text-muted-foreground tabular-nums`}>
-        {anchoredToRestingRate
+        {/* #2071. The owner's own chain — RMR − the goal's deficit + daily living + movement — so
+            every term of the number is on screen. Only when the floor set the WHOLE day's number does
+            the chain not reach it, and then the line names the floor instead. A still day that is
+            floored but lifted clear of it by movement still prints the chain, which is what the total
+            is made of (each term rounded, so it can read 1 kcal off the total). */}
+        {chain != null
+          ? chain.totalFloored
+            ? <>{total.toLocaleString()} minimum budget — never below your resting rate</>
+            : <>
+                {chain.rmr.toLocaleString()} resting rate
+                {chain.deficit !== 0 && (
+                  <> <span className="text-muted-foreground/70">{chain.deficit > 0 ? '−' : '+'}</span>{' '}
+                    {Math.abs(chain.deficit).toLocaleString()} for your goal</>
+                )}
+                {/* "Daily living" is the 20% LESS the first 3,000 steps (owner, 2026-10-07): movement
+                    below counts every step, so those steps are only counted there. */}
+                {' '}<span className="text-muted-foreground/70">{chain.dailyLiving < 0 ? '−' : '+'}</span>{' '}
+                {Math.abs(chain.dailyLiving).toLocaleString()} daily living
+              </>
+          : anchoredToRestingRate
           ? <>{base.toLocaleString()} resting rate</>
           : <>
               {restingBase.toLocaleString()} base
@@ -81,9 +108,11 @@ export const CalorieZoneBar = memo(function CalorieZoneBar({
                   {Math.abs(goalDelta).toLocaleString()} for your goal</>
               )}
             </>}
-        {earned > 0
+        {chain?.totalFloored
+          ? null
+          : shownEarned > 0
           ? <>
-              {' '}<span className="text-muted-foreground/70">+</span> {earned.toLocaleString()} earned from movement
+              {' '}<span className="text-muted-foreground/70">+</span> {shownEarned.toLocaleString()} earned from movement
               {parts && <span className="text-muted-foreground/70"> ({parts})</span>}
             </>
           : <> — no movement recorded yet today</>}

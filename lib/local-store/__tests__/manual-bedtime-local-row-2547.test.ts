@@ -36,7 +36,7 @@ beforeEach(() => {
       light_sleep_hours REAL, oura_id TEXT, efficiency REAL, onset_latency_sec REAL, average_hrv_ms REAL,
       avg_heart_rate REAL, lowest_heart_rate REAL, restless_periods REAL, sleep_score REAL,
       respiratory_rate REAL, sleep_phase_5_min TEXT, time_in_bed_hours REAL, manual_sleep_start TEXT,
-      sleep_start TEXT, sleep_end TEXT, awake_hours REAL, manual_entry INTEGER NOT NULL DEFAULT 0,
+      sleep_start TEXT, sleep_end TEXT, awake_hours REAL, manual_entry INTEGER NOT NULL DEFAULT 0, deleted_at TEXT,
       updated_at TEXT, sync_status TEXT);
     INSERT INTO sleep_sessions (id, date, duration_hours, sleep_start, updated_at, sync_status)
       VALUES ('sl-1', '${NIGHT}', 7.5, '2026-10-05T14:00:00.000Z', '${MEASURED_AT}', 'synced');

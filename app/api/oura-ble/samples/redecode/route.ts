@@ -6,6 +6,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { reportRollupStepErrors } from '@/lib/oura-ble/report-step-errors'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { getRepositoryAsync } from '@/lib/data'
+import { redecodeJobKind, REDECODE_BUSY_FOR_BACKFILL_MESSAGE } from '@/lib/oura-ble/redecode-job-kind'
 
 // Re-stamp measured_at / event_name over stored rows, then re-aggregate into the
 // product tables. Under Lever 1 the decoders run during the re-aggregate (from the
@@ -31,15 +32,12 @@ export async function POST(req: Request) {
   // (see aggregateOuraRawSamples's steps step / upsertBodyMetrics sourceMap merge). Requires the
   // full-history redecode path (below) — irrelevant to dumpOnly, which writes nothing.
   const allowStepsDecrease = params.get('allowStepsDecrease') === '1'
-  // ?async=1 → return a job id immediately instead of holding the request open (Q-535).
-  //
-  // **Opt-in, not the default, and that is a lane seam rather than timidity.** Both existing callers
-  // read the synchronous shape and report completion from it: `oura-ble-debug.tsx` falls back to
-  // "redecode ran … data refreshed", and `step-backfill-console.tsx` says "Done. Backfill applied".
-  // Flipping the default without their poller would make both of them state that finished work had
-  // finished when it had only started — a quieter and more misleading failure than the 502 this
-  // replaces. `components/**` belongs to the other implementation lane, so the poller and the
-  // default flip are Q-318.
+  // ?async=1 → start a job and return its id (Q-535). The full-history pass REQUIRES it: it runs
+  // inside the one-at-a-time job slot (`oura_redecode_jobs`, migration 196), because two full-history
+  // passes at once are the event-loop starvation that took production down on 2026-08-13. A request
+  // that held the connection open instead never touched the slot, so it could run alongside a job
+  // that held it, and a second one alongside that. Every caller already sends `?async=1`
+  // (`runRedecodeJob` in components/oura-ble/redecode-job.ts), so nothing used that path.
   const asyncJob = params.get('async') === '1'
 
   try {
@@ -64,35 +62,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ scanned: 0, updated: 0, redecodeError: null, aggregated, aggregateError })
   }
 
-  // Both phases are re-runnable over the archival body_hex, so neither should ever
-  // 500 the request (a raw 500 shows as a scary "redecode failed" in the tester and
-  // hides the cause). They run independently and report per-phase errors as JSON —
-  // a redecode failure must not prevent the re-aggregate, and vice versa.
+  // The job's two phases are re-runnable over the archival body_hex, so neither 500s the request
+  // (a raw 500 shows as a scary "redecode failed" and hides the cause): they run independently and
+  // report per-phase errors into the job row. Both run in the rollup worker (Q-213). `fullHistory` is
+  // required: a new/fixed decoder backfills every stored day, so this must bypass the incremental
+  // read window and rebuild the full daily-summary table.
   //
-  // Both run in the rollup worker (Q-213). `fullHistory` is required: a new/fixed decoder backfills
-  // every stored day, so this must bypass the incremental read window and rebuild the full
-  // daily-summary table.
-  //
-  // Q-535: the request no longer WAITS for it. It used to, and on real data that exceeded the
-  // gateway timeout — so Railway returned 502 and the tester printed "redecode failed" for work
-  // that had completed (measured: `scanned=1098158`, every `sleep_sessions` row stamped after the
-  // 502 landed). That is not cosmetic: a false failure invites a retry, and a retry is another
-  // full-history pass of the operation whose own comment names it as the event-loop starvation that
-  // took production down on 2026-08-13. The UI was encouraging the thing most likely to hurt.
+  // Q-535: the request does not WAIT for it. It used to, and on real data that exceeded the gateway
+  // timeout — Railway returned 502 and the tester printed "redecode failed" for work that had
+  // completed (measured: `scanned=1098158`, every `sleep_sessions` row stamped after the 502
+  // landed). A false failure invites a retry, and a retry is another full-history pass. So a request
+  // for the full-history pass that does not say `?async=1` is refused, with nothing started.
   if (!asyncJob) {
-    // The original synchronous path, unchanged. Still 502s on real data — that is what `?async=1`
-    // exists to fix, and what Q-318 will switch the callers to.
-    const { redecoded, redecodeError, aggregated, aggregateError } = await runRedecodeOffLoop(
-      userId, tz, { debugDate, fullHistory: true, allowStepsDecrease }, true,
+    return NextResponse.json(
+      { error: 'The full-history redecode runs as a job. Call with ?async=1 and poll GET ?jobId=…' },
+      { status: 400, headers: { 'Cache-Control': 'private, no-store' } },
     )
-    if (redecodeError) console.error('[oura-ble] redecode failed:', redecodeError)
-    if (aggregateError) console.error('[oura-ble] re-aggregate failed:', aggregateError)
-    // The MOST blind of the three paths, not the least: this one holds the request open past the
-    // gateway timeout, so the 502 means the caller never receives the JSON that carries
-    // `stepErrors` at all. Q-535 is the record of that — work completing behind a response nobody
-    // sees. Reported before the return so it lands whether or not the response does.
-    reportRollupStepErrors(aggregated?.stepErrors, { userId, url: '/api/oura-ble/samples/redecode' })
-    return NextResponse.json({ ...(redecoded ?? { scanned: 0, updated: 0, restamped: 0 }), redecodeError, aggregated, aggregateError })
   }
 
   const opts = { debugDate: debugDate ?? null, fullHistory: true, allowStepsDecrease }
@@ -101,11 +86,27 @@ export async function POST(req: Request) {
   // here rather than by a sweeper — there is no cron layer in this app, and the only reader that
   // matters is the one asking whether it may start another.
   await repo.reapStaleRedecodeJobs(userId)
-  const { job, alreadyRunning } = await repo.startRedecodeJob(userId, opts)
+  const { job, alreadyRunning, refused } = await repo.startRedecodeJob(userId, opts)
+  // Issue 2383: a step backfill must never follow a run that will not apply the step correction.
+  // Refused rather than queued — no hidden queue, and the owner presses again once it finishes.
+  // Nothing was started and no row was written, so the caller has nothing to poll.
+  if (refused) {
+    return NextResponse.json(
+      {
+        error: REDECODE_BUSY_FOR_BACKFILL_MESSAGE,
+        refused: true,
+        runningJobId: job.id,
+        runningKind: redecodeJobKind(job.opts),
+        requestedKind: redecodeJobKind(opts),
+      },
+      { status: 409, headers: { 'Cache-Control': 'private, no-store' } },
+    )
+  }
   if (alreadyRunning) {
     return NextResponse.json(
       {
         jobId: job.id, status: 'running', startedAt: job.startedAt.toISOString(), alreadyRunning: true,
+        kind: redecodeJobKind(job.opts),
         note: 'A redecode is already running; this did not start a second. Poll this job id.',
       },
       { headers: { 'Cache-Control': 'private, no-store' } },
@@ -135,6 +136,7 @@ export async function POST(req: Request) {
   return NextResponse.json(
     {
       jobId: job.id, status: 'running', startedAt: job.startedAt.toISOString(), alreadyRunning: false,
+      kind: redecodeJobKind(job.opts),
       note: 'Started. Poll GET ?jobId=… — this can take minutes, and the response arriving before it finishes is the point.',
     },
     { headers: { 'Cache-Control': 'private, no-store' } },
@@ -191,6 +193,10 @@ export async function GET(req: Request) {
         opts: job.opts,
         error: job.error,
         ...(job.result ?? {}),
+        // Issue 2383: what this run was asked to write, read from the row rather than from the
+        // request that is polling it. The step-backfill screen only says "Backfill applied" when
+        // this is 'step-backfill'. Placed after the spread so a result payload cannot shadow it.
+        kind: redecodeJobKind(job.opts),
       },
     },
     { headers: { 'Cache-Control': 'private, no-store' } },

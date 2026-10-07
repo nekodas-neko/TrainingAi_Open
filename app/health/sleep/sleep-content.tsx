@@ -7,6 +7,7 @@ import { ProvisionalBadge } from "@/components/health/provisional-badge";
 import { sleepCoverageNote } from "@/components/health/body-cards/sleep-coverage-note";
 import { Hypnogram } from "@/components/health/hypnogram";
 import { TrendSparkline } from "@/components/health/trend-sparkline-lazy";
+import { TREND_EMPTY } from "@/components/health/trend-empty-copy";
 import { SleepTrendToggleCard } from "@/components/health/sleep-trend-toggle-card-lazy";
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
@@ -146,7 +147,7 @@ export function SleepContent({ userId }: { userId?: string }) {
                 />
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  No sleep-stage data for last night yet — this shows up once your ring syncs.
+                  No sleep-stage data for last night yet — stages come from a ring or Health Connect.
                 </p>
               )}
             </div>
@@ -170,7 +171,7 @@ export function SleepContent({ userId }: { userId?: string }) {
 
           {last14Nights.length > 0 && <SleepTrendToggleCard nights={last14Nights} />}
 
-          {trends && <TrendSparkline trends={trends} field="temperatureDeviation" label="Skin Temperature" color="#f97316" unit="°C" />}
+          {trends && <TrendSparkline trends={trends} field="temperatureDeviation" label="Skin Temperature" color="#f97316" unit="°C" emptyText={TREND_EMPTY.temperatureDeviation} />}
         </>
       )}
     />

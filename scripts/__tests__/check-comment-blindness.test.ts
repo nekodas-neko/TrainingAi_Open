@@ -48,6 +48,7 @@ const CASES: Array<{ check: string; file: string; fixture: string }> = [
   { check: 'check-date-param-regex', file: apiRoute('app/api/user/goals'), fixture: 'date: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/)' },
   { check: 'check-api-no-store', file: apiRoute('app/api/user/goals'), fixture: "headers: { 'Cache-Control': 'private, max-age=60' }" },
   { check: 'check-strict-request-schemas', file: apiRoute('app/api/user/goals'), fixture: 'const S = z.object({ a: z.string() })' },
+  { check: 'check-llm-json-parse', file: apiRoute('app/api/daily-digest'), fixture: 'const o = JSON.parse(text)' },
 ]
 
 /** The check's whole output, exit code included — a check may signal by either. */

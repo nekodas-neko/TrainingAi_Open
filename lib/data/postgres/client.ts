@@ -73,6 +73,34 @@ export function isIdempotentMigrationError(err: unknown): boolean {
   return code !== undefined && IDEMPOTENT_SQLSTATES.has(code)
 }
 
+/**
+ * Run one migration file and log what it said (issue 2603).
+ *
+ * node-postgres delivers a `RAISE NOTICE` as a `notice` event on the CLIENT, and a pool-level
+ * `query()` checks a client out for one statement and hands it straight back with no listener on it,
+ * so every notice a migration wrote reached no log. The migrations that rely on them are the ones
+ * that matter on release day: how many rows 296 normalised, how many it skipped on a collision,
+ * whether each unique index was built.
+ *
+ * **One client per file, not one per statement.** A multi-statement string sent as a simple query is
+ * one implicit transaction, and that only holds if it is one `query()` call; the client is held for
+ * that call and released after, with the listener removed first so a pooled connection does not
+ * carry a stale one into its next job. `scripts/local-db/migrate.js` mirrors this.
+ */
+export async function runMigrationFile(
+  pool: Pool, file: string, sqlText: string, tag = 'ensureSchema',
+): Promise<void> {
+  const client = await pool.connect()
+  const onNotice = (n: { message?: string }) => console.info(`[${tag}] ${file} NOTICE: ${n.message ?? ''}`)
+  client.on('notice', onNotice)
+  try {
+    await client.query(sqlText)
+  } finally {
+    client.removeListener('notice', onNotice)
+    client.release()
+  }
+}
+
 export async function ensureSchema(): Promise<void> {
   if (schemaApplied) return
   const pool = getPool()
@@ -101,7 +129,7 @@ export async function ensureSchema(): Promise<void> {
     if (applied.has(file)) continue
     const sqlText = readFileSync(join(migrationsDir, file), 'utf-8')
     try {
-      await pool.query(sqlText)
+      await runMigrationFile(pool, file, sqlText)
       await pool.query('INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING', [file])
       ran++
     } catch (err) {

@@ -8,6 +8,8 @@
  * rendered before.
  */
 
+import type { RedecodeJobKind } from '@/lib/oura-ble/redecode-job-kind'
+
 export interface RedecodePhases {
   scanned?: number
   updated?: number
@@ -21,20 +23,36 @@ export interface RedecodePhases {
   }
 }
 
+/**
+ * `done.jobKind` is what the run that finished was asked to write, as the server read it from the
+ * job row. A caller that reports a specific effect (the step backfill) must check it rather than
+ * assume the run it followed was its own (issue 2383).
+ *
+ * `refused` means the server started nothing because a different kind of run holds the slot.
+ * It is not `failed`: nothing went wrong and nothing was written.
+ */
 export type RedecodeOutcome =
-  | { kind: 'done'; jobId: number; phases: RedecodePhases }
+  | { kind: 'done'; jobId: number; jobKind: RedecodeJobKind | null; phases: RedecodePhases }
+  | { kind: 'refused'; message: string }
   | { kind: 'failed'; message: string }
 
 interface StartResponse {
   jobId?: number
   alreadyRunning?: boolean
+  kind?: RedecodeJobKind
+  refused?: boolean
   note?: string
   error?: string
 }
 
 interface PollResponse {
   job:
-    | (RedecodePhases & { jobId: number; status: 'running' | 'done' | 'failed'; error?: string | null })
+    | (RedecodePhases & {
+        jobId: number
+        status: 'running' | 'done' | 'failed'
+        kind?: RedecodeJobKind
+        error?: string | null
+      })
     | null
   error?: string
 }
@@ -60,6 +78,9 @@ export async function runRedecodeJob(
   try {
     const res = await fetch(url, { method: 'POST' })
     start = await res.json().catch(() => ({}) as StartResponse)
+    if (res.status === 409 && start.refused) {
+      return { kind: 'refused', message: start.error ?? 'a redecode is already running' }
+    }
     if (!res.ok) return { kind: 'failed', message: start.error ?? `HTTP ${res.status}` }
   } catch (err) {
     return { kind: 'failed', message: err instanceof Error ? err.message : String(err) }
@@ -69,7 +90,7 @@ export async function runRedecodeJob(
 
   onNote?.(
     start.alreadyRunning
-      ? `a redecode (job ${start.jobId}) was already running — this started nothing; following that run`
+      ? `a ${start.kind === 'step-backfill' ? 'step backfill' : 'redecode'} (job ${start.jobId}) was already running — this started nothing; following that run`
       : `redecode job ${start.jobId} started — this can take minutes`,
   )
 
@@ -88,13 +109,13 @@ export async function runRedecodeJob(
     if (!job) return { kind: 'failed', message: `job ${start.jobId} not found` }
     if (job.status === 'running') continue
 
-    const { jobId, status, error, ...phases } = job
+    const { jobId, status, error, kind: jobKind, ...phases } = job
     if (status === 'failed') {
       return {
         kind: 'failed',
         message: error ?? phases.aggregateError ?? phases.redecodeError ?? 'unknown error',
       }
     }
-    return { kind: 'done', jobId, phases }
+    return { kind: 'done', jobId, jobKind: jobKind ?? null, phases }
   }
 }

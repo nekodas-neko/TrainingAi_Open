@@ -137,7 +137,7 @@ export function HrRecoveryChart({ readings, sets, sessionStartedAt }: Props) {
   if (readings.length === 0) {
     return (
       <div className="h-32 flex items-center justify-center text-xs text-muted-foreground">
-        No heart-rate data — will appear once your ring syncs
+        No heart-rate data for this workout yet
       </div>
     )
   }

@@ -455,19 +455,11 @@ jobs:
             exit 1
           fi
 
-      - name: No JSON.parse of free-text LLM output in AI routes
-        run: |
-          AI_ROUTES=$(grep -rl "@ai-sdk" app/api --include='*.ts' 2>/dev/null || true)
-          FOUND=""
-          for f in $AI_ROUTES; do
-            HIT=$(grep -n "JSON.parse" "$f" | grep -vE '^[0-9]+:[[:space:]]*(//|\*|/\*)' || true)
-            if [ -n "$HIT" ]; then FOUND="$FOUND\n$f: $HIT"; fi
-          done
-          if [ -n "$FOUND" ]; then
-            echo "Bare JSON.parse of LLM output detected — use generateObject/a response schema instead:"
-            echo -e "$FOUND"
-            exit 1
-          fi
+      # RV-179: this was a grep over `app/api` files importing `@ai-sdk`, which is two files; the other
+      # AI routes call the model through `lib/ai/*` and `lib/` itself was never scanned. The script
+      # decides what a model-calling file is, strips comments, and has a test.
+      - name: No JSON.parse of free-text LLM output in files that call a model
+        run: node scripts/check-llm-json-parse.js
 
       - name: No hand-rolled invalidateCache outside lib/cache-groups.ts
         run: |
@@ -751,6 +743,13 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
         run: node scripts/local-db/migrate.js
 
+      # Issue 2629: describe the fresh schema now, so the replay below can be compared with it. A
+      # replay that throws is caught by the next step; one that quietly CHANGES the schema is not.
+      - name: Describe the freshly built schema
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
+        run: node scripts/check-schema-replay-diff.js snapshot "$RUNNER_TEMP/schema-fresh.txt"
+
       # LA-13: the step above runs against a FRESH database, which is the one case where a
       # non-idempotent migration cannot fail — PS-3's four hid for months for exactly that reason.
       # Replaying every file against the schema it just built is what catches them. The truncate is
@@ -763,6 +762,16 @@ jobs:
         run: |
           psql -h localhost -U postgres -d trainingai_ci -c 'TRUNCATE schema_migrations'
           node scripts/local-db/migrate.js --replay
+
+      # Issue 2629. The replay above reports 0 failed for a migration that succeeds the second time
+      # and changes the schema: 280 re-added `day_checkins.vs_yesterday` after a later migration
+      # renamed it, and nothing noticed. The replayed schema must equal the fresh one.
+      - name: A replayed schema equals a fresh build
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
+        run: |
+          node scripts/check-schema-replay-diff.js snapshot "$RUNNER_TEMP/schema-replayed.txt"
+          node scripts/check-schema-replay-diff.js compare "$RUNNER_TEMP/schema-fresh.txt" "$RUNNER_TEMP/schema-replayed.txt"
 
       # BF-129: runs HERE rather than in Tests because it needs a database where only the
       # migrations have run. Tests shares one database across the suite and
@@ -879,6 +888,9 @@ jobs:
       # contributors — and because a hidden value would leave the same reader wondering whether CI
       # depends on a real credential. It does not.
       AUTH_SECRET: e2e-ci-secret-not-used-outside-this-job
+      # Issue 2166: the headless shell crashes on this runner (SIGSEGV 0x1b0); full Chromium did not in
+      # a measured three-arm probe. `playwright.config.ts` reads it. Remove this line to go back.
+      E2E_CHROMIUM_CHANNEL: chromium
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5

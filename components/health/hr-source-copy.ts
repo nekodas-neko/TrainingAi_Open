@@ -12,6 +12,52 @@ import type { HrProfile } from '@trainingai/shared/health/hr-profile'
  * the same provenance two ways.
  */
 
+/**
+ * #2338 — empty-state copy that does not assume the reader owns a ring.
+ *
+ * Every empty heart-rate state used to say "wear your ring", which a user with only a strap, or
+ * only Health Connect, or nothing yet, cannot act on. Where a surface KNOWS there is no heart-rate
+ * source at all (`hasHrSource === false`, from `health/hr-profile.ts` — the one definition) it names
+ * the three things the user can connect. Where there is a source, or it is unknown, it says what is
+ * missing without naming a device. Wording lives here so the surfaces cannot drift apart.
+ */
+export const HR_SOURCES = 'a ring, a chest strap or Health Connect'
+
+/** What resting heart rate is built from: a night of readings, which a strap does not record. */
+const RESTING_HR_NEEDS = 'it becomes yours once a ring or Health Connect records a night of heart rate.'
+
+export type NoHrDataContext = 'workout' | 'window' | 'range' | 'day'
+
+/**
+ * The line for a heart-rate empty state. `hasHrSource` is `false` only when nothing has recorded
+ * this person's heart rate; `true`/`null`/`undefined` all take the neutral wording, because "a
+ * source exists but nothing landed here" and "we could not tell" are not the same as "connect one".
+ */
+export function noHrDataCopy(hasHrSource: boolean | null | undefined, context: NoHrDataContext): string {
+  if (hasHrSource === false) {
+    switch (context) {
+      case 'range':
+        return `No heart-rate data yet — connect ${HR_SOURCES} to build your range.`
+      case 'day':
+        return `No heart rate yet — connect ${HR_SOURCES} to record it through the day.`
+      case 'window':
+        return `No heart-rate data in this window yet — connect ${HR_SOURCES}, then record a workout.`
+      default:
+        return `No heart-rate data yet — connect ${HR_SOURCES}, then record a workout.`
+    }
+  }
+  switch (context) {
+    case 'range':
+      return 'Still learning your range — it sharpens with a few more days of heart-rate data.'
+    case 'day':
+      return 'No heart rate recorded yet today.'
+    case 'window':
+      return 'No heart-rate data in this window yet — it fills in when a workout is recorded with a heart-rate sensor.'
+    default:
+      return 'No heart-rate data yet — it fills in when a workout is recorded with a heart-rate sensor.'
+  }
+}
+
 export interface SourceNote {
   /** Short parenthetical for beside the number. */
   label: string
@@ -52,7 +98,7 @@ export function restingHrSourceNote(source: HrProfile['restingHrSource'] | undef
       return {
         label: 'assumed',
         standIn: true,
-        detail: 'No resting readings yet, so 60 is assumed — wear your ring overnight and this becomes yours.',
+        detail: `No resting readings yet, so 60 is assumed — ${RESTING_HR_NEEDS}`,
       }
     default:
       return null

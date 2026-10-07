@@ -7,6 +7,7 @@ import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { useInvalidationRefetch } from '@/lib/hooks/use-invalidation-refetch'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { HrDayChart } from './hr-day-chart'
+import { noHrDataCopy } from './hr-source-copy'
 import { useStressDay } from '@/lib/hooks/use-stress-day'
 import type { HrSleepWindow } from '@trainingai/shared/health/hr-sleep-band'
 
@@ -83,7 +84,7 @@ export function HrDayCard() {
         <p className="text-xs text-muted-foreground">
           {failed
             ? "Couldn't load today's heart rate."
-            : 'No HR captured yet today — the ring records periodically while worn.'}
+            : noHrDataCopy(null, 'day')}
         </p>
       )}
     </div>

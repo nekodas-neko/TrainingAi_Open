@@ -141,6 +141,15 @@ export interface LocalStore {
    * this row stay one row. Never touches a device row.
    */
   upsertManualSleepLocally(night: LocalManualSleepNight): Promise<string>;
+  /**
+   * Issue 2606. Remove a night the user entered: the local row gets `deleted_at` and goes `pending`
+   * in the same turn as its queued `manual_sleep` `{ id, deleted: true }` mutation, so it disappears
+   * from `getSleepSessions` at once, offline, and a pull landing before the push cannot bring it
+   * back. Only a `manual_entry = 1` row is touched. **Returns the night's wake date** (the outbox
+   * entry's date), or null — changing nothing — for a device night or an id the store does not hold,
+   * so the caller queues nothing.
+   */
+  removeManualSleepLocally(id: string): Promise<string | null>;
   /** Confirm a queued `manual_sleep` mutation: the row goes back to `synced` unless another edit of
    *  the same night is still queued behind it. `confirmingIds` is the batch being confirmed. */
   markManualSleepSynced(id: string, confirmingIds?: string[]): Promise<void>;

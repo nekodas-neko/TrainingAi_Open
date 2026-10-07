@@ -91,6 +91,9 @@ export interface LocalSleepSession {
   /** #2338 (v51) — a night the user entered by hand, not one a device measured. `getSleepSessions`
    *  never returns one that a device night covers (`preferDeviceNights`). */
   manualEntry:     boolean;
+  /** Issue 2606 (v52) — set on a manual night the user removed. Carried by the pull (the tombstone
+   *  channel); `getSleepSessions` never returns a removed row, so a reader always sees null/absent. */
+  deletedAt?:      string | null;
   syncStatus:      'pending' | 'synced';
   updatedAt:       string;
 }

@@ -105,8 +105,8 @@ export function ManualBedtimeCard({ date, measuredStart, userId }: Props) {
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
           {measuredStart
-            ? `Your ring started recording at ${formatTimeOfDay(measuredStart, tz)}. If you were asleep before that, tell it when — the recorded night is left exactly as it was, and only your bedtime average uses this.`
-            : 'If the ring missed the start of this night, tell it when you went to bed. Only your bedtime average uses this.'}
+            ? `This night's recording started at ${formatTimeOfDay(measuredStart, tz)}. If you were asleep before that, tell it when — the recorded night is left exactly as it was, and only your bedtime average uses this.`
+            : 'If the start of this night was not recorded, tell it when you went to bed. Only your bedtime average uses this.'}
         </p>
       </div>
 

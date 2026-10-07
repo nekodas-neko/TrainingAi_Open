@@ -3,7 +3,25 @@ import { useState } from 'react'
 import { Footprints, Play, AlertTriangle, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { runRedecodeJob } from './redecode-job'
+import { runRedecodeJob, type RedecodeOutcome } from './redecode-job'
+
+/**
+ * What the screen says after a backfill press. Issue 2383: every full-history redecode shares one
+ * job slot, and the backfill used to follow a plain redecode that was already running — the step
+ * correction never ran and this said "Backfill applied" anyway. The server now refuses that case
+ * (409), and "applied" is claimed only when the job that finished is itself a step backfill, as
+ * the status route read it from the job row. Exported for the test.
+ */
+export function backfillResultText(outcome: RedecodeOutcome): string {
+  if (outcome.kind === 'refused') return `Not started: ${outcome.message} Nothing was changed.`
+  if (outcome.kind === 'failed') return `ERROR: ${outcome.message}`
+  const phaseError = outcome.phases.aggregateError ?? outcome.phases.redecodeError
+  if (phaseError) return `Error: ${phaseError}`
+  if (outcome.jobKind !== 'step-backfill') {
+    return `Not applied: the run that finished (job ${outcome.jobId}) was a plain redecode, so the step correction did not run. Run the backfill again.`
+  }
+  return 'Done. Backfill applied — re-run preview to confirm 0 days remain.'
+}
 
 /**
  * D0 historical step backfill — owner-gated, two-step (preview then fire). The rollup's steps step
@@ -50,14 +68,10 @@ export function StepBackfillConsole() {
     // applied" the moment the request returned — which on real data is a gateway timeout, long
     // before the re-aggregate has written anything.
     const outcome = await runRedecodeJob('allowStepsDecrease=1', setRunResult)
-    if (outcome.kind === 'failed') {
-      setRunResult(`ERROR: ${outcome.message}`)
-    } else if (outcome.phases.aggregateError ?? outcome.phases.redecodeError) {
-      setRunResult(`Error: ${outcome.phases.aggregateError ?? outcome.phases.redecodeError}`)
-    } else {
-      setRunResult('Done. Backfill applied — re-run preview to confirm 0 days remain.')
-      setPreview(null)
-    }
+    setRunResult(backfillResultText(outcome))
+    // The preview is stale only once the correction really ran.
+    if (outcome.kind === 'done' && outcome.jobKind === 'step-backfill'
+      && !(outcome.phases.aggregateError ?? outcome.phases.redecodeError)) setPreview(null)
     setRunning(false)
   }
 

@@ -61,7 +61,7 @@ import {
 } from '@trainingai/shared/validation/body-metrics'
 import { sleepImplausibleReason } from '@trainingai/shared/validation/plausibility'
 import { preferDeviceNights } from '@trainingai/shared/health/sleep-night'
-import { parseManualNight } from '@trainingai/shared/health/manual-sleep'
+import { parseManualNight, isManualSleepRemoval, ManualSleepRemovePayloadSchema } from '@trainingai/shared/health/manual-sleep'
 import { ActivityLogBody, deriveEndTime } from '@trainingai/shared/validation/activity-log'
 import { describeZodFailure } from './push-error-detail'
 import type { WorkoutRepository, UserGoals, EnsuredWorkoutSession, SessionLoad, YearReviewTotals, YearReviewTopExercise, UnitFixResult, SyncDelta, IncomingMutation, PushResult, OuraRawSampleInput, OuraRawSampleSummary, OuraRawSampleLatest, OuraRawSampleRow, FitnessTest, RunningPlan, PrescribedRun, PrescribedRunUpdate, AiCallLogInput, AiCallUsageSummary, ScaleRawSampleInput, ScalePendingSample, LastRealOneRm, BloodPanel, BloodPanelInput, BloodAnalyte, StrapStatusWrite, StrapStatusRow, OuraLinkStatsWrite, DetectionEventWrite } from '../repository'
@@ -108,10 +108,13 @@ import { nodeModelRuntime } from '@/lib/oura-models/inference/runtime-node'
 import { ensureServerOuraConstants } from '@/lib/oura-models/constants-inject'
 import { packOuraRawBuckets, countPackableBuckets, claimAutoPackSlot, AUTOPACK_MAX_BUCKETS } from './slices/oura-raw-pack'
 import * as bodyBattery from './slices/body-battery'
+import * as agentActions from './slices/agent-actions'
 import * as accountDeletion from './slices/account-deletion'
 import type { AccountDeletionResult } from './slices/account-deletion'
 import * as colmi from './slices/colmi'
 import * as hcIntervals from './slices/health-connect-intervals'
+import * as shadowReadinessSlice from './slices/shadow-readiness'
+import * as nativeRefreshTokens from './slices/native-refresh-tokens'
 import { mergeSet, initialSourceMap, HEALTH_SOURCES, sourceRank, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
 import type {
   PeriodizationPhase,
@@ -722,6 +725,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async deleteAccount(userId: string): Promise<AccountDeletionResult> {
     return accountDeletion.deleteAccount(this.db, userId)
   }
+
+  // #2076 — native app refresh tokens. Only a hash is stored and no method returns one.
+  async createNativeRefreshToken(input: nativeRefreshTokens.CreateNativeRefreshTokenInput) { return nativeRefreshTokens.createNativeRefreshToken(this.db, input) }
+  async findNativeRefreshTokenByHash(tokenHash: import('@/lib/auth/refresh-token-hash').RefreshTokenHash) { return nativeRefreshTokens.findNativeRefreshTokenByHash(this.db, tokenHash) }
+  async rotateNativeRefreshToken(input: nativeRefreshTokens.RotateNativeRefreshTokenInput) { return nativeRefreshTokens.rotateNativeRefreshToken(this.db, input) }
+  async revokeNativeRefreshToken(userId: string, id: string, reason: nativeRefreshTokens.NativeRefreshTokenRevokedReason) { return nativeRefreshTokens.revokeNativeRefreshToken(this.db, userId, id, reason) }
+  async revokeNativeRefreshTokenFamily(userId: string, familyId: string, reason: nativeRefreshTokens.NativeRefreshTokenRevokedReason) { return nativeRefreshTokens.revokeNativeRefreshTokenFamily(this.db, userId, familyId, reason) }
+  async listActiveNativeRefreshTokens(userId: string) { return nativeRefreshTokens.listActiveNativeRefreshTokens(this.db, userId) }
 
   async getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null> {
     // lower(), not eq: it matches a row stored before LA-61's backfill (or one a collision kept it
@@ -1491,8 +1502,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const programFilter = programId
       ? sql`AND ws.session_id IN (SELECT id FROM program_sessions WHERE program_id = ${programId})`
       : sql``
-    const result = await this.db.execute<{ exercise_name: string; estimated_1rm: number; target_80: number | null; avg_reps: number | null }>(sql`
-      SELECT DISTINCT ON (el.exercise_name) el.exercise_name, el.estimated_1rm, el.target_80, el.avg_reps
+    const result = await this.db.execute<{ exercise_name: string; estimated_1rm: number; target_80: number | null; avg_reps: number | null; is_baseline: boolean }>(sql`
+      SELECT DISTINCT ON (el.exercise_name) el.exercise_name, el.estimated_1rm, el.target_80, el.avg_reps,
+             ${period.wsIsBaselineSession} AS is_baseline
       FROM exercise_logs el
       JOIN workout_sessions ws ON ws.id = el.workout_session_id
       WHERE ws.user_id = ${userId}
@@ -1532,6 +1544,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           // recent log and can be a different session — a deload one — so pairing that log's reps
           // with this 1RM would describe two sessions as though they were one.
           avgReps: r.avg_reps != null ? Number(r.avg_reps) : null,
+          // Labels the row; it does not choose it. The ORDER BY above is unchanged, so the bar still
+          // loads from a baseline estimate as the owner decided (#2649, "leave it as is").
+          fromBaseline: r.is_baseline === true,
         })
       }
     }
@@ -1717,12 +1732,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const result = await this.db.execute<Row>(sql`
       SELECT exercise_name, estimated_1rm, is_baseline, rn, rn_kind
       FROM (
-        SELECT el.exercise_name, el.estimated_1rm, ws.phase_type IS NOT DISTINCT FROM 'baseline' AS is_baseline,
+        SELECT el.exercise_name, el.estimated_1rm, ${period.wsIsBaselineSession} AS is_baseline,
           -- The same total order in both windows (id breaks a logged_at tie), so the newest
           -- prescribed row is rn=1 and rn_kind=1 at once and can never be paired with itself.
           ROW_NUMBER() OVER (PARTITION BY el.exercise_name ORDER BY el.logged_at DESC, el.id DESC) AS rn,
           ROW_NUMBER() OVER (
-            PARTITION BY el.exercise_name, ws.phase_type IS NOT DISTINCT FROM 'baseline'
+            PARTITION BY el.exercise_name, ${period.wsIsBaselineSession}
             ORDER BY el.logged_at DESC, el.id DESC
           ) AS rn_kind
         FROM exercise_logs el
@@ -2122,6 +2137,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         gte(s.sleepSessions.date, from),
         lte(s.sleepSessions.date, to),
         gt(s.sleepSessions.durationHours, 0),
+        isNull(s.sleepSessions.deletedAt),   // issue 2606: a removed night is not a night
       ))
       .orderBy(desc(s.sleepSessions.date))
     return rows.map(r => r.date)
@@ -3092,6 +3108,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * one read every server consumer shares, so no scorer, list or chart has to know manual nights
    * exist. The read is widened a day each side only so a device row whose stored date disagrees with
    * its window can still shadow a manual night it overlaps; rows outside [from, to] are not returned.
+   *
+   * Issue 2606: a night the user REMOVED (`deleted_at` set) is skipped here, before the ranking, so
+   * it neither shows nor shadows anything. For a user who never removed a night the predicate
+   * filters nothing, and every consumer's input is exactly what it was.
    */
   async listSleepSessions(userId: string, from: string, to: string): Promise<SleepSession[]> {
     const rows = await this.db.select().from(s.sleepSessions)
@@ -3099,6 +3119,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         eq(s.sleepSessions.userId, userId),
         gte(s.sleepSessions.date, shiftDateStr(from, -1)),
         lte(s.sleepSessions.date, shiftDateStr(to, 1)),
+        isNull(s.sleepSessions.deletedAt),
       ))
       .orderBy(desc(s.sleepSessions.date))
     return preferDeviceNights(rows).filter(r => r.date >= from && r.date <= to).map(r => ({
@@ -3138,6 +3159,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    *
    * The update skips itself when a device row already starts at the new `sleep_start`, for the same
    * reason and so it can never raise the `(user_id, sleep_start)` unique violation.
+   *
+   * Issue 2606: with no live manual night for the date, a REMOVED one is revived (deleted_at cleared,
+   * id kept) before anything is inserted: the payload's own id first, then the date, then the same
+   * start instant. Reviving rather than inserting is forced as much as chosen: a removed row still
+   * holds its `(user_id, sleep_start)`, so re-entering identical times could never insert. A replay
+   * cannot undo a removal, because the outbox is FIFO: a save queued before a removal is always sent
+   * before it.
    */
   async saveManualSleepNight(
     userId: string,
@@ -3155,11 +3183,32 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         eq(s.sleepSessions.userId, userId),
         eq(s.sleepSessions.date, night.date),
         eq(s.sleepSessions.manualEntry, true),
+        isNull(s.sleepSessions.deletedAt),
       ))
+      .limit(1))[0]?.id ?? null
+    const startIso = night.sleepStart.toISOString()
+    const findRemoved = async () => (await this.db.select({ id: s.sleepSessions.id }).from(s.sleepSessions)
+      .where(and(
+        eq(s.sleepSessions.userId, userId),
+        eq(s.sleepSessions.manualEntry, true),
+        isNotNull(s.sleepSessions.deletedAt),
+        or(
+          eq(s.sleepSessions.date, night.date),
+          sql`${s.sleepSessions.sleepStart} = ${startIso}::timestamptz`,
+          ...(night.id ? [eq(s.sleepSessions.id, night.id)] : []),
+        ),
+      ))
+      .orderBy(
+        ...(night.id ? [desc(sql`${s.sleepSessions.id} = ${night.id}::uuid`)] : []),
+        desc(sql`${s.sleepSessions.date} = ${night.date}::date`),
+        desc(s.sleepSessions.deletedAt),
+        asc(s.sleepSessions.id),
+      )
       .limit(1))[0]?.id ?? null
     const updateManual = async (id: string) => {
       await this.db.update(s.sleepSessions)
-        .set(fields)
+        // `date` and `deletedAt` matter only for a revived row: a live one already has this date.
+        .set({ ...fields, date: night.date, deletedAt: null })
         .where(and(
           eq(s.sleepSessions.id, id),
           eq(s.sleepSessions.userId, userId),
@@ -3170,7 +3219,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       return id
     }
 
-    let id = await findManual()
+    let id = (await findManual()) ?? (await findRemoved())
     if (id) {
       await updateManual(id)
     } else {
@@ -3180,7 +3229,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         .returning({ id: s.sleepSessions.id })
       id = inserted[0]?.id ?? null
       if (!id) {
-        id = await findManual()
+        id = (await findManual()) ?? (await findRemoved())
         if (id) {
           await updateManual(id)
         } else if (night.id) {
@@ -3212,9 +3261,40 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const updated = await this.db
       .update(s.sleepSessions)
       .set({ manualSleepStart: at, updatedAt: new Date() })
-      .where(and(eq(s.sleepSessions.userId, userId), eq(s.sleepSessions.date, date)))
+      // Issue 2606: a removed night is not a night to put a bedtime on, and a date whose only row is
+      // removed must answer "nothing matched" rather than report a save no reader will ever show.
+      .where(and(eq(s.sleepSessions.userId, userId), eq(s.sleepSessions.date, date), isNull(s.sleepSessions.deletedAt)))
       .returning({ id: s.sleepSessions.id })
     return updated.length > 0
+  }
+
+  /**
+   * Issue 2606 — see the interface. One UPDATE whose predicate carries the whole rule (the caller's
+   * row, a manual night, not yet removed), so an affected-row count of 1 is the answer. Only a 0 is
+   * read back, to tell a replay from a device night from an id that is not the caller's — and that
+   * read is scoped to the caller too, so another user's id is `not_found`, never `not_manual`.
+   * `updated_at` moves so the delta pull carries the tombstone to every device.
+   */
+  async deleteManualSleepNight(userId: string, id: string): Promise<'removed' | 'already_removed' | 'not_manual' | 'not_found'> {
+    const now = new Date()
+    const removed = await this.db.update(s.sleepSessions)
+      .set({ deletedAt: now, updatedAt: now })
+      .where(and(
+        eq(s.sleepSessions.id, id),
+        eq(s.sleepSessions.userId, userId),
+        eq(s.sleepSessions.manualEntry, true),
+        isNull(s.sleepSessions.deletedAt),
+      ))
+      .returning({ id: s.sleepSessions.id })
+    if (removed.length === 1) return 'removed'
+    const [row] = await this.db
+      .select({ manualEntry: s.sleepSessions.manualEntry, deletedAt: s.sleepSessions.deletedAt })
+      .from(s.sleepSessions)
+      .where(and(eq(s.sleepSessions.id, id), eq(s.sleepSessions.userId, userId)))
+      .limit(1)
+    if (!row) return 'not_found'
+    if (!row.manualEntry) return 'not_manual'
+    return 'already_removed'
   }
 
   async getExerciseMuscleAssignments(names: string[]): Promise<Record<string, MuscleAssignment[]>> {
@@ -4625,6 +4705,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       this.db.select().from(s.bodyMetrics)
         .where(and(eq(s.bodyMetrics.userId, userId), gt(s.bodyMetrics.updatedAt, effectiveSince)))
         .orderBy(asc(s.bodyMetrics.updatedAt)).limit(pageLimit),
+      // Not filtered on `deleted_at` (issue 2606): this is the tombstone channel for a removed manual
+      // night, as for mood_logs and food_logs below.
       this.db.select().from(s.sleepSessions)
         .where(and(eq(s.sleepSessions.userId, userId), gt(s.sleepSessions.updatedAt, effectiveSince)))
         .orderBy(asc(s.sleepSessions.updatedAt)).limit(pageLimit),
@@ -5870,6 +5952,26 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           // An implausible or malformed night is a permanent 4xx — a retry cannot make it plausible —
           // so it quarantines rather than wedging the queue. A replay of an applied mutation edits the
           // same row to the same values: (user, wake date) is a unique key for manual nights.
+          //
+          // Issue 2606: `{ id, deleted: true }` on the same domain is a removal, calling the same
+          // `deleteManualSleepNight` as `DELETE /api/sleep-sessions/manual`. Already removed is a
+          // replay and counts as processed. So does an id with no row for this user: the end state
+          // the device asked for (no such night) already holds, and another user's id changes
+          // nothing. A device night is a permanent refusal, quarantined: it can never be removed.
+          if (isManualSleepRemoval(clean)) {
+            const removal = ManualSleepRemovePayloadSchema.safeParse(clean)
+            if (!removal.success) {
+              errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: `Invalid manual_sleep removal — ${describeZodFailure(removal.error)}` })
+              continue
+            }
+            const outcome = await this.deleteManualSleepNight(userId, removal.data.id)
+            if (outcome === 'not_manual') {
+              errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'manual_sleep removal: a night a device measured cannot be removed' })
+              continue
+            }
+            processed++
+            continue
+          }
           const parsedNight = parseManualNight(clean, userTz, new Date())
           if (!parsedNight.ok) {
             errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: `Invalid manual_sleep payload — ${parsedNight.issues ? describeZodFailure(parsedNight.issues) : parsedNight.reason}` })
@@ -6329,7 +6431,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     if (probeFromDs != null && probeToDs != null) {
       const startDs = Math.floor(probeFromDs)
       const endDs = Math.ceil(probeToDs)
-      const rows = await readRawFrames(this.db, userId, { startDs, endDs })
+      const rows = await readRawFrames(this.db, userId, { startDs, endDs, caller: 'workout-sensor-probe' })
       const counts = new Map<number, number>()
       for (const r of rows) counts.set(r.tag, (counts.get(r.tag) ?? 0) + 1)
       rawByTag = [...counts.entries()]
@@ -6398,7 +6500,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const endDs = Math.ceil(toDs)
     const tagsOfInterest = Object.keys(TAG_LABELS).map(Number)
 
-    const rows = await readRawFrames(this.db, userId, { tags: tagsOfInterest, startDs, endDs })
+    const rows = await readRawFrames(this.db, userId, { tags: tagsOfInterest, startDs, endDs, caller: 'daytime-tag-coverage' })
 
     const perTag = new Map<number, number[]>() // tag → 24-bucket hour histogram
     for (const r of rows) {
@@ -6468,7 +6570,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     if (fromDs == null || toDs == null) return { temp: [], met: [] }
     const startDs = Math.floor(fromDs)
     const endDs = Math.ceil(toDs)
-    const rows = await readRawFrames(this.db, userId, { tags: [0x46, 0x69, 0x50], startDs, endDs })
+    const rows = await readRawFrames(this.db, userId, { tags: [0x46, 0x69, 0x50], startDs, endDs, caller: 'oura-daytime-signals' })
     const temp: { tsMs: number; valueC: number }[] = []
     const met: { tsMs: number; value: number }[] = []
     for (const r of rows) {
@@ -6500,7 +6602,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     if (fromDs == null || toDs == null) return []
     const startDs = Math.floor(fromDs)
     const endDs = Math.ceil(toDs)
-    const rows = await readRawFrames(this.db, userId, { tags: [0x61], startDs, endDs })
+    const rows = await readRawFrames(this.db, userId, { tags: [0x61], startDs, endDs, caller: 'oura-battery-events' })
     const out: Array<{ tsMs: number; kind: 'battery_level_changed' | 'charging_time'; batteryPct: number | null; voltageMv: number | null; chargingTimeSec: number | null }> = []
     for (const r of rows) {
       const decoded = (r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null)) as Record<string, unknown> | null
@@ -6788,7 +6890,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     if (lastAttempt != null && Date.now() - lastAttempt < REFIT_THROTTLE_MS) return
     PostgresWorkoutRepository.lastHrvRefitAttemptMs.set(userId, Date.now())
 
-    const rows = await this.getOuraRawSamplesForTags(userId, [0x5d, 0x46, 0x69], REFIT_LOOKBACK_DAYS)
+    const rows = await this.getOuraRawSamplesForTags(userId, [0x5d, 0x46, 0x69], REFIT_LOOKBACK_DAYS, 'daytime-hrv-refit')
     if (rows.length === 0) return // genuinely no ring data in the window — nothing to say
     const toIso = todayInTz(timezone)
     const fromIso = toAestDay(new Date(Date.now() - REFIT_LOOKBACK_DAYS * 86_400_000), timezone)
@@ -6832,6 +6934,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       getBodyFatCalibration: id => this.getBodyFatCalibration(id),
       refitDaytimeHrvModel: (id, tz) => this.maybeRefitDaytimeHrvModel(id, tz),
       listSleepSessions: (id, from, to) => this.listSleepSessions(id, from, to),
+      caller: opts?.fullHistory ? 'rollup:full-history' : 'rollup',
     }), nodeModelRuntime, timezone, opts)
   }
 
@@ -6844,8 +6947,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const anchors = await this.getOuraClockAnchors(userId)
     if (anchors.length === 0) return []
     const [stepFrameRows, motionFrameRows, liveWindowRows] = await Promise.all([
-      readRawFrames(this.db, userId, { tags: [...STEP_FEATURE_TAGS] }),
-      readRawFrames(this.db, userId, { tags: [STEP_MOTION_TAG] }),
+      readRawFrames(this.db, userId, { tags: [...STEP_FEATURE_TAGS], caller: 'steps-backfill-preview' }),
+      readRawFrames(this.db, userId, { tags: [STEP_MOTION_TAG], caller: 'steps-backfill-preview' }),
       this.db
         .select({ startDs: s.stepLiveWindows.startDs, endDs: s.stepLiveWindows.endDs, steps: s.stepLiveWindows.steps })
         .from(s.stepLiveWindows)
@@ -7176,10 +7279,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * Decodes from `body_hex` now, preferring the stored column if it is ever populated.
    */
   async readOuraRawFrames(userId: string, q: import('./slices/oura-raw-frames').RawFrameQuery) {
-    return readRawFrames(this.db, userId, q)
+    return readRawFrames(this.db, userId, { caller: 'read-oura-raw-frames', ...q })
   }
 
-  async getOuraRawSamplesForTags(userId: string, tags: number[], days: number): Promise<OuraRawSampleRow[]> {
+  async getOuraRawSamplesForTags(userId: string, tags: number[], days: number, caller = 'raw-samples-for-tags'): Promise<OuraRawSampleRow[]> {
     if (tags.length === 0) return []
     const windowDays = Math.min(Math.max(Math.floor(days), 1), MAX_RAW_SAMPLE_WINDOW_DAYS)
 
@@ -7198,7 +7301,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const startDs = resolveMsToDs(Date.now() - windowDays * 86_400_000, anchors)
     if (startDs == null) return []
 
-    const rows = await readRawFrames(this.db, userId, { tags, startDs: Math.floor(startDs) })
+    const rows = await readRawFrames(this.db, userId, { tags, startDs: Math.floor(startDs), caller })
     return rows.map((r): OuraRawSampleRow => ({
       ringTimestampDs: Number(r.ds),
       tag: r.tag,
@@ -7753,6 +7856,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getLatestRedecodeJob(userId: string) { return oura.getLatestRedecodeJob(this.db, userId) }
   async finishRedecodeJob(id: number, result: Record<string, unknown> | null, error: string | null) { return oura.finishRedecodeJob(this.db, id, result, error) }
   async reapStaleRedecodeJobs(userId: string) { return oura.reapStaleRedecodeJobs(this.db, userId) }
+  async startAgentAction(input: agentActions.StartAgentActionInput) { return agentActions.startAgentAction(this.db, input) }
+  async finishAgentAction(id: string, result: agentActions.FinishAgentActionInput) { return agentActions.finishAgentAction(this.db, id, result) }
+  async getAgentAction(id: string) { return agentActions.getAgentAction(this.db, id) }
+  async listAgentActions(filter?: agentActions.ListAgentActionsFilter) { return agentActions.listAgentActions(this.db, filter) }
   async listOuraTags(userId: string, startDay: string, endDay: string) { return oura.listOuraTags(this.db, userId, startDay, endDay) }
   // Colmi R09, learning mode (PS-8). Reads/writes only the colmi_* tables.
   async insertColmiReadings(userId: string, rows: import('./slices/colmi').ColmiReadingInput[]) { return colmi.insertColmiReadings(this.db, userId, rows) }
@@ -7770,6 +7877,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async dropZoneMinutesFrom(userId: string, fromDay: string) { return oura.deleteZoneMinutesFrom(this.db, userId, fromDay) }
   async upsertHealthConnectIntervals(userId: string, rows: readonly import('../repository').HealthConnectIntervalRow[]) { return hcIntervals.upsertHealthConnectIntervals(this.db, userId, rows) }
   async getHealthConnectIntervals(userId: string, kind: import('../repository').HealthConnectIntervalKind, from: Date, to: Date) { return hcIntervals.getHealthConnectIntervals(this.db, userId, kind, from, to) }
+  async upsertShadowReadiness(userId: string, record: import('@trainingai/shared/types').ShadowReadinessRecord) { return shadowReadinessSlice.upsertShadowReadiness(this.db, userId, record) }
+  async getShadowReadiness(userId: string, from: string, to: string, modelVersion?: number) { return shadowReadinessSlice.getShadowReadiness(this.db, userId, from, to, modelVersion) }
   async getHrForWindow(userId: string, from: Date, to: Date) { return oura.getHrForWindow(this.db, userId, from, to) }
   async getObservedHrProfile(userId: string, from: Date, to: Date) { return oura.getObservedHrProfile(this.db, userId, from, to) }
   async getZoneMinutesRange(userId: string, fromDay: string, toDay: string, tz: string, profile: { maxHr: number; restingHr: number }) { return oura.getZoneMinutesRange(this.db, userId, fromDay, toDay, tz, profile) }

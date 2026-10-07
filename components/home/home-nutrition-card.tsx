@@ -14,7 +14,6 @@ interface Props {
   color: string
   onColorChange: (key: string, hex: string) => void
   metaLoading: boolean
-  calorieGoal: number | null
   calorieType: 'daily' | 'weekly'
   weekToDate: { steps: number; calories: number; waterMl: number } | null
   nutrCalories: number | null
@@ -40,16 +39,17 @@ interface Props {
  */
 export function HomeNutritionCard({
   sectionEditMode, color, onColorChange, metaLoading,
-  calorieGoal, calorieType, weekToDate,
+  calorieType, weekToDate,
   nutrCalories, nutrProtein, nutrCarbs, nutrFat,
 }: Props) {
   const router = useRouter()
   const pathname = usePathname()
   const balance = useEnergyBalanceToday()?.balance ?? null
 
-  // Falls back to the stored goal alone, never to a self-composed sum: without the payload there
-  // is no measured movement to add, and inventing one is how the third budget appeared.
-  const dailyBudget = balance ? budgetProvenance(balance).total : calorieGoal
+  // #2071: no fallback to the typed `calorie_goal`. It used to stand in when the payload was missing,
+  // which put a number the user typed once on screen as the day's budget — #2160's mismatch. Without
+  // the payload the ring shows "…" and no denominator, as it already did while loading.
+  const dailyBudget = balance ? budgetProvenance(balance).total : null
   const isWeekly = calorieType === 'weekly'
   const goalDisplay = isWeekly && dailyBudget ? dailyBudget * 7 : dailyBudget
   const consumedDisplay = isWeekly ? (weekToDate?.calories ?? 0) : nutrCalories
