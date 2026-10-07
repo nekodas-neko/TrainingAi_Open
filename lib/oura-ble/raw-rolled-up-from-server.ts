@@ -26,7 +26,7 @@ import type { OuraBlePlugin, OuraRawRow } from '@/lib/oura-ble/plugin'
  * `rolled_up = 1 AND synced = 1 AND measured_at < ?` (`OuraRawDb.pruneRaw`): such a row is never
  * deleted while the server lacks it. The flag on it is the one dishonest bit, and the device-writer
  * switch must reset `rolled_up` where `synced = 0` before it trusts the column (plan §7).
- * Enforcing `synced = 1` at marking time needs a native change — filed as a follow-up.
+ * Enforcing `synced = 1` at marking time needs a native change and an APK — #2583.
  *
  * Nothing here touches the ring key, the BLE link, the history cursor, the server, or any row the
  * server holds: the only writes are `markRolledUp` (device flag) and, when the flag is on,
