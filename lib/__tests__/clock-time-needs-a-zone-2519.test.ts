@@ -11,7 +11,10 @@ import { join, relative } from 'node:path'
 import { stripComments } from '../../scripts/lib/strip-comments.js'
 
 const root = join(__dirname, '..', '..')
-const SKIP_DIR = new Set(['node_modules', '.next', '__tests__', 'e2e', 'test-results', '.git', 'docs', 'android', 'coverage'])
+// `__check_fixture__` is where other suites park a scanner's COPY of a real source file while they run
+// (LB-194, `scripts/vitest-source-write-guard.ts`). Suites run in parallel, so walking into it reads a
+// copy that is half-written or about to vanish, and counts a file that is not app code.
+const SKIP_DIR = new Set(['node_modules', '.next', '__tests__', '__check_fixture__', 'e2e', 'test-results', '.git', 'docs', 'android', 'coverage'])
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
