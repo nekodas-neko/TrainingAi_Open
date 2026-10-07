@@ -111,7 +111,7 @@ One exception:
 
 | Screen > section > button | File:line | Calls | What it does | Scope | Repeat? | Auth | Danger | When |
 |---|---|---|---|---|---|---|---|---|
-| Admin > users > **activate / deactivate icon** (UserCheck / UserX, no text) | `app/admin/admin-content.tsx:407` | `PATCH /api/admin/users {userId, action}` | Turns a user's `isActive` on or off. | one user | yes | admin session | ⚠ **No self-guard and no confirm.** The owner's own row shows a deactivate icon. DELETE refuses "yourself" but PATCH deactivate does not (`app/api/admin/users/route.ts`). Deactivating yourself probably locks the owner out of auth (not exercised). | Approving invitees. |
+| Admin > users > **activate / deactivate icon** (UserCheck / UserX, no visible text; `aria-label` Activate / Deactivate) | `app/admin/admin-content.tsx` (`UserRow`) | `PATCH /api/admin/users {userId, action}` | Turns a user's `isActive` on or off. Deactivate opens a confirm naming the user; activate is one tap. | one user | yes | admin session | Fixed (#2383 item 3): the route refuses to deactivate the signed-in admin (`400 Cannot deactivate yourself`, the same shared check DELETE uses, before any write), and the admin's own row shows no deactivate icon. A deactivated user is sent to `/pending` (`auth.ts`) until an admin activates them. | Approving invitees. |
 | … > **delete icon** (Trash, pending users only) | `:395` | `DELETE /api/admin/users` | **Hard-deletes** a pending user. | one user | no | admin session | **destructive**, no confirm | Rejecting a signup. |
 | Admin > invites > **+** / **trash icon** | `:214` / `:222` | `POST` / `DELETE /api/admin/invites` | Adds or removes an invite email. | one email | yes | admin session | low | |
 | Admin > feedback > **Delete** → **Confirm delete** | `:340` → `:326` | `DELETE /api/admin/feedback/[id]` | Deletes a feedback report. The response is not checked: the row is removed from the UI even if the call failed. | one row | n/a | admin session | **destructive**: BugFix reads this inbox | After the report is triaged into an issue. |
@@ -183,7 +183,7 @@ Device pairing **Forget** buttons (`components/settings/{chest-strap,scale,colmi
 ## Findings worth an issue
 
 - **F1. Clear key has no confirm** (`oura-ble-debug.tsx:614`). It is the one action that can permanently cut the owner off from the ring, and it is a single tap on a ghost button. Every other destructive control on the page has a `ConfirmDialog`.
-- **F2. Users > deactivate has no self-guard and no confirm** (`admin-content.tsx:407`, `api/admin/users` PATCH). DELETE guards against "yourself" and PATCH does not.
+- **F2. Users > deactivate has no self-guard and no confirm** (`admin-content.tsx:407`, `api/admin/users` PATCH). DELETE guards against "yourself" and PATCH does not. **Fixed in #2383 item 3:** PATCH deactivate refuses self, the own row has no deactivate icon, and deactivating anyone else asks first.
 - **F3. Fix lbs logged as kg > Apply is not idempotent.** A second apply over the same exercises and date converts twice.
 - **F4. The `dumpOnly` path is described as "writes nothing"** (route comment, `run.ts:1270`) and the SleepNet card says it "does not change the staging stored". Per the code, it runs the windowed rollup steps including writes, and skips only the watermark. That is harmless in practice because it is deterministic, but the description is wrong. Related: `dumpOnly` leaves `fullHistory` false, so the read window is narrowed by the rollup watermark (`run.ts:97–112`), to roughly the last few days rather than the 35 days the comment promises. A dump for an older night may answer "no BLE night" for that reason (suspected, not reproduced).
 - **F5. Feedback "Confirm delete" ignores the response.** The row disappears from the UI even when the DELETE failed.
@@ -232,7 +232,7 @@ are read-only by design.
 | Cadence **Stop** | Also drains the ring. |
 | **Null historical decoded (Lever 1b)**, **Pack sealed frames (Lever 5)**, **VACUUM FULL (Lever 1c)** | They lean on internal "Lever N" names. The confirm dialogs explain; the buttons do not. |
 | **AI all** | One paid AI generation per uncovered exercise, with no count or cost before the press. |
-| Icon-only controls: user activate/deactivate (UserCheck/UserX), user delete, invite remove, exercise row icons, activity **trash** (no aria-label) | No text label. The activity delete has no accessible name at all. |
+| Icon-only controls: user activate/deactivate (UserCheck/UserX; `aria-label` since #2383), user delete, invite remove, exercise row icons, activity **trash** (no aria-label) | No text label. The activity delete has no accessible name at all. |
 | **Sync now** (More > Data & Sync) | A server-to-device pull. It shares its name with the Oura BLE ring drain. |
 | **Export my data** | Fine, but it downloads PII without a warning. |
 
