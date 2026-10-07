@@ -91,7 +91,7 @@ import { useBodyBattery } from "@/lib/hooks/use-body-battery";
 // needs, plus `provisional`, which the local-store seed below cannot supply and which the Home
 // score chip reads. A `Pick` keeps the seed's narrow object literal assignable.
 type HomeSleepRow = Pick<SleepRow,
-  'date' | 'durationHours' | 'deepSleepHours' | 'remSleepHours' | 'lightSleepHours' | 'awakHours' | 'provisional'>;
+  'date' | 'durationHours' | 'deepSleepHours' | 'remSleepHours' | 'lightSleepHours' | 'awakHours' | 'sleepStart' | 'sleepEnd' | 'provisional'>;
 
 
 export default function SessionSelectContent({ userId, isAdmin }: { userId?: string; isAdmin?: boolean }) {
@@ -771,7 +771,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
               deepSleepHours: s.deepSleepHours,
               remSleepHours: s.remSleepHours,
               lightSleepHours: s.lightSleepHours,
-              awakHours: s.awakHours, // null on a row pulled before SQLite v50 — render handles it
+              awakHours: s.awakHours, sleepStart: s.sleepStart, sleepEnd: s.sleepEnd, // awakHours is null on a row pulled before SQLite v50 — render handles it
             })));
           }
         }).catch(() => { /* store unavailable — network path below still runs */ });
