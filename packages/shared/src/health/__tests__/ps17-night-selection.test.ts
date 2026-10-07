@@ -17,6 +17,8 @@ import {
   ALWAYS_NIGHT_MIN_HOURS,
 } from '../sleep-night'
 
+const TZ = 'Australia/Brisbane'
+
 const realNight = {
   sleepStart: new Date('2026-08-26T13:02:00Z'),
   sleepEnd: new Date('2026-08-26T20:37:00Z'),
@@ -60,21 +62,21 @@ describe('PS-17: the 2026-08-27 phantom', () => {
   // loop, which would have passed even with the rollup still on last-wins.
   it('loses to the real night under nightPeriodsByDate, in either arrival order', () => {
     for (const order of [[realNight, phantom], [phantom, realNight]]) {
-      const picked = nightPeriodsByDate(groupSleepPeriods(order).nights).get('2026-08-27')
+      const picked = nightPeriodsByDate(groupSleepPeriods(order, TZ).nights, TZ).get('2026-08-27')
       expect(totalSleepHours(picked!)).toBe(7.42)
     }
   })
 
   // One period per date, so the phantom cannot also survive as a second entry.
   it('collapses the date to exactly one night', () => {
-    const byDate = nightPeriodsByDate(groupSleepPeriods([realNight, phantom]).nights)
+    const byDate = nightPeriodsByDate(groupSleepPeriods([realNight, phantom], TZ).nights, TZ)
     expect(byDate.size).toBe(1)
   })
 
   // The rule already lived here. If this ever disagrees with the loop above, the rollup has drifted
   // from the module again — which is the whole shape of this bug.
   it('agrees with nightForDate, which had the rule all along', () => {
-    const picked = nightForDate([realNight, phantom], '2026-08-27')
+    const picked = nightForDate([realNight, phantom], '2026-08-27', TZ)
     expect(picked?.windows[0].durationHours).toBe(7.42)
   })
 })
