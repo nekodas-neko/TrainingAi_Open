@@ -30,8 +30,8 @@ describe('RV-101 — the volume ramp is readable, and says what it means', () =>
     expect(stops).not.toContain('#166534')
   })
 
-  it('the key renders in compact mode, which is the only mode the volume callers use', () => {
-    // Both volume callers pass `compact` (body-muscle-card, weekly-muscle-sets-card), so a key
+  it('the key renders in compact mode, which is the only mode the volume caller uses', () => {
+    // The volume caller passes `compact` (weekly-muscle-sets-card), so a key
     // gated on `!compact` — as the injured swatch above it is — would be hidden exactly where it
     // is needed. That was the trap the 2026-09-24 re-read of the entry caught.
     const key = /\{hasActivity && usingVolumes && \(([\s\S]*?)\n {6}\)\}/.exec(SRC)?.[1]
@@ -41,9 +41,9 @@ describe('RV-101 — the volume ramp is readable, and says what it means', () =>
     expect(key).toMatch(/At target/)
   })
 
-  it('both volume call sites really do pass compact, which is what makes that gate matter', () => {
+  it('the volume call site really does pass compact, which is what makes that gate matter', () => {
     // If a caller stopped passing it the assertion above would still pass while guarding nothing.
-    for (const f of ['components/health/body-muscle-card.tsx', 'components/health/weekly-muscle-sets-card.tsx']) {
+    for (const f of ['components/health/weekly-muscle-sets-card.tsx']) {
       const call = /<MuscleHeatmap[^>]*volumes=[^>]*>/.exec(readFileSync(path.join(ROOT, f), 'utf8'))?.[0]
       expect(call, `${f} no longer has a volumes call site`).toBeTruthy()
       expect(call, `${f} stopped passing compact`).toMatch(/\bcompact\b/)
