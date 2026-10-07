@@ -175,7 +175,7 @@ export async function POST(req: Request) {
           '- Include a protein source, a carbohydrate source and a fat source (oil, butter, nuts, seeds, avocado, cheese, or a fattier cut of protein), unless the target for that macro is near zero. A meal missing one can never reach that target however the portions are resized.',
           '- Keep it realistic and repeatable: everyday supermarket ingredients, minimal prep.',
           '',
-          PROSE_FIELD_GUARDS,
+          `${PROSE_FIELD_GUARDS}`,
         ].filter(Boolean).join('\n'),
       }))
     meal = result.object

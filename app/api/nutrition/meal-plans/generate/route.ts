@@ -290,7 +290,7 @@ export async function POST(req: Request) {
             ? '- In "restDayAdjustment", say in one line what to change on a rest day (typically slightly fewer carbs).'
             : '- Return "" for "restDayAdjustment".',
           '',
-          PROSE_FIELD_GUARDS,
+          `${PROSE_FIELD_GUARDS}`,
         ].filter(Boolean).join('\n'),
       }))
     return result.object
