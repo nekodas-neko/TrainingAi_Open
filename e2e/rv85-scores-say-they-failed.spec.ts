@@ -36,7 +36,9 @@ test('a readiness fetch that never succeeds says so, instead of leaving a gap', 
 
   // Partway through the ladder: it has failed at least once and is still trying, so the row stays
   // quiet. A message here would sit under a request that might be about to succeed.
-  expect(calls).toBeGreaterThan(0)
+  // Polled, not read once: `settleRouteBoundary` returning does not mean Home has issued its first
+  // request yet, and a single read of the counter failed 4 runs in 6 on a clean main (issue 2615).
+  await expect.poll(() => calls, { timeout: 15_000 }).toBeGreaterThan(0)
   await expect(page.getByText(FAILED)).toHaveCount(0)
 
   // Once the attempts are spent, the slot says what happened. Generous timeout: the ladder itself
