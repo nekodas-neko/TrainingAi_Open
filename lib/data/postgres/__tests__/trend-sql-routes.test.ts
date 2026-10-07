@@ -9,7 +9,9 @@
 // LA-96 moved strength-trend's half of that SQL into the repository (`getExercise1rmHistory`),
 // which the route had been carrying a byte-identical copy of. These cases did not change and were
 // not touched — they are what established the delegation preserved the route's behaviour.
-// `muscle-tonnage-trend` still builds its query in the route.
+// #2420 did the same for `muscle-tonnage-trend`, which now reads the shared attribution query
+// (`getMuscleTonnageByWeek`); `muscle-tonnage-trend-characterization.test.ts` pins its answer to
+// the old route's, byte for byte.
 //
 // So the cases below are the ones a mock is structurally blind to:
 //
