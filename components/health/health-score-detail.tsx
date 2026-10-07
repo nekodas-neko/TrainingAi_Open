@@ -276,6 +276,7 @@ export function HealthScoreDetail({
             confidence={data.ownResilienceConfidence}
             asOf={data.ownResilienceAsOf}
             unavailable={data.ownResilienceUnavailable}
+            gapText={scoreGapText(data.availability, "resilience")}
           />
         )}
         {breakdown && data && breakdown(data)}
