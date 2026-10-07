@@ -1493,7 +1493,7 @@ export class SQLiteLocalStore implements LocalStore {
       // clobber-guarded so a future device-authored (pending) night isn't reverted by a
       // stale pull. updated_at must advance for the update to apply — with one exception (#2414):
       // a row pulled before v50 has no window, and when the server re-sends it unchanged (a full
-      // resync, or More → Restore) its updated_at is EQUAL, so the advance rule alone would keep
+      // resync, or More → Data → Restore from cloud) its updated_at is EQUAL, so the advance rule alone would keep
       // that gap forever. A synced row missing its window takes the server's; there is no local
       // edit to lose, and every other field it carries is the server's already.
       await runSQL(
