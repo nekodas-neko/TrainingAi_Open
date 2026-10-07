@@ -8,6 +8,15 @@
 // This finds them: every `memo(...)` component in the tree, then every JSX call site of one, then
 // any prop whose value is an inline `{{…}}`, `{[…]}`, or `{… => …}`.
 //
+// RV-179 widened it to the same defeat spelled with a NAME: `onToggle={toggleSoreMuscle}` where
+// `toggleSoreMuscle` is a plain function declared in the component body, so it is a new function on
+// every render and the memo does nothing while the code reads as optimised (RV-178 found two live;
+// the widening found a third, `MealBuilderFooter onSave={handleSave}`). A name counts when the same
+// file declares it indented (inside a component) as `const f = (...) =>`, `const f = function` or
+// `function f(` — a `useCallback(...)`/`useMemo(...)` RHS is exactly what does not match. It cannot
+// tell two same-named functions in different components of one file apart; a false positive is
+// fixed by renaming or, if it is truly stable, a baseline row with the reason.
+//
 // Shrink-only per-file baseline, same shape as check-hex-literals.js. A file not listed must have
 // zero; a listed file may only shrink; a file that reaches zero must have its row deleted. Fixing a
 // site means hoisting with useCallback/useMemo — or, when the site is inside a `.map` where a hook
@@ -63,6 +72,25 @@ function keptAtBase(rel) {
  * as `<Name` is not searched for. That skip cannot hide a site: the tag regex below matches only
  * text that starts with exactly those characters.
  */
+// A function declared inside a component body: indented, and not the result of a hook. Module-level
+// declarations sit at column 0 and are one identity for the life of the page, so they are not these.
+const RENDER_BODY_FN = [
+  /^[ \t]{2,}const\s+(\w+)\s*(?::[^=]+)?=\s*(?:async\s*)?(?:<[^>]*>\s*)?(?:\([^)]*\)|\w+)\s*(?::[^=]+)?=>/,
+  /^[ \t]{2,}const\s+(\w+)\s*=\s*(?:async\s*)?function\b/,
+  /^[ \t]{2,}(?:async\s+)?function\s+(\w+)\s*[(<]/,
+];
+
+function renderBodyFunctionNames(src) {
+  const names = new Set();
+  for (const line of src.split('\n')) {
+    for (const re of RENDER_BODY_FN) {
+      const m = line.match(re);
+      if (m) names.add(m[1]);
+    }
+  }
+  return names;
+}
+
 function scan(sources) {
   const stripped = sources.map(({ rel, content }) => ({ rel, src: stripComments(content) }));
 
@@ -77,6 +105,7 @@ function scan(sources) {
   const detail = [];
 
   for (const { rel, src } of stripped) {
+    const bodyFns = renderBodyFunctionNames(src);
     for (const name of memoised) {
     if (!src.includes('<' + name)) continue;
     const re = new RegExp('<' + name + '(?=[\\s/>])', 'g');
@@ -94,11 +123,14 @@ function scan(sources) {
       const inlineObject = /=\{\s*\{/.test(tag);
       const inlineArray = /=\{\s*\[/.test(tag);
       const inlineArrow = /=\{\s*(?:\([^)]*\)|\w+)\s*=>/.test(tag);
-      if (inlineObject || inlineArray || inlineArrow) {
+      // `prop={fn}` with `fn` declared in a component body in this file.
+      const byName = [...tag.matchAll(/\b(\w+)=\{\s*(\w+)\s*\}/g)].filter(pm => bodyFns.has(pm[2]));
+      if (inlineObject || inlineArray || inlineArrow || byName.length > 0) {
         perFile.set(rel, (perFile.get(rel) ?? 0) + 1);
         const line = src.slice(0, m.index).split('\n').length;
-        const kinds = [inlineObject && 'object', inlineArray && 'array', inlineArrow && 'arrow'].filter(Boolean);
-        detail.push(`${rel}:${line}  <${name}> — inline ${kinds.join(' + ')} in a prop`);
+        const kinds = [inlineObject && 'inline object', inlineArray && 'inline array', inlineArrow && 'inline arrow',
+          byName.length > 0 && `render-body function passed by name (${byName.map(pm => `${pm[1]}={${pm[2]}}`).join(', ')})`].filter(Boolean);
+        detail.push(`${rel}:${line}  <${name}> — ${kinds.join(' + ')} in a prop`);
         }
       }
     }
@@ -106,7 +138,9 @@ function scan(sources) {
   return { perFile, detail, memoised };
 }
 
-runMain(async () => {
+module.exports = { scan };
+
+if (require.main === module) runMain(async () => {
   const files = DIRS.flatMap(d => walk(path.join(root, d), []));
   const contents = await readFilesUtf8(files);
   const { perFile, detail, memoised } = scan(files.map((abs, k) => ({
@@ -156,9 +190,9 @@ runMain(async () => {
     console.error('\n  Sites found:');
     for (const d of detail) console.error(`    ${d}`);
     console.error(`
-  memo() compares props shallowly, so one inline object/array/arrow defeats it entirely and the
-  component re-renders on every parent render while still looking optimised. Hoist the value with
-  useCallback/useMemo at the call site. If the call site is inside a .map() — where a hook is not
+  memo() compares props shallowly, so one inline object/array/arrow — or a function declared in the
+  render body and passed by name — defeats it entirely and the component re-renders on every parent
+  render while still looking optimised. Hoist the value with useCallback/useMemo at the call site. If the call site is inside a .map() — where a hook is not
   allowed — pass scalars instead, or move the identity into the child.`);
     process.exit(1);
   }

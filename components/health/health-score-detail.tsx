@@ -12,6 +12,7 @@ import { scoreGapText } from "@/components/health/score-gap-copy";
 import type { HealthTrendsResponse, HealthTrendDay } from "@/app/api/health/trends/route";
 import { DetailHero, usePageGradient, useHeroColorScheme, type ColorScheme } from "@/components/health/detail-hero";
 import { TrendSparkline } from "@/components/health/trend-sparkline-lazy";
+import { scoreTrendEmpty } from "@/components/health/trend-empty-copy";
 import { scoreBand } from "@trainingai/shared/health/score-band";
 import { useCountUp } from "@/lib/hooks/use-count-up";
 import { Activity } from "lucide-react";
@@ -290,7 +291,7 @@ export function HealthScoreDetail({
         {data && extraCards?.(data, color, trends?.trends)}
 
         {trends?.trends && (
-          <TrendSparkline trends={trends.trends} field={trendField} label={`${title} Score`} color={sparklineColor} unit="" />
+          <TrendSparkline trends={trends.trends} field={trendField} label={`${title} Score`} color={sparklineColor} unit="" emptyText={scoreTrendEmpty(title)} />
         )}
 
         {/* No score for this section means nothing measured today, and the model turns that into

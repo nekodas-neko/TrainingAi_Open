@@ -1,5 +1,6 @@
 import * as Sentry from '@sentry/nextjs'
 import { scrubEvent } from '@/lib/observability/sentry-scrub'
+import { sentryRelease } from '@/lib/observability/sentry-release'
 
 // Browser/WebView runtime. Next 15's client instrumentation hook.
 //
@@ -20,6 +21,8 @@ Sentry.init({
   // `sendDefaultPii: false` is the SDK-level switch; `beforeSend` is the app-level one. Both, because
   // the first is a default that a future SDK version could change and the second is ours (Q-404).
   sendDefaultPii: false,
+  // Which deploy produced the fault: `trainingai@<package version>+<build sha>`. Absent in `pnpm dev`.
+  release: sentryRelease(process.env.NEXT_PUBLIC_APP_VERSION, process.env.NEXT_PUBLIC_BUILD_ID),
   beforeSend: scrubEvent,
   // RV-194. The SDK-level cap, paired with `scrubEvent`'s own truncation the same way
   // `sendDefaultPii: false` is paired with `beforeSend` — one is a default a future SDK version

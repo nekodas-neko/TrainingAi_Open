@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 import { buildCsp } from "./lib/security/csp";
 import { readBuildSha } from "./lib/build-sha";
+import { readAppVersion } from "./lib/observability/app-version";
+import { sentryRelease } from "./lib/observability/sentry-release";
 
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -50,6 +52,8 @@ const nextConfig: NextConfig = {
   // the APK's anyway.
   env: {
     NEXT_PUBLIC_BUILD_ID: readBuildSha()?.slice(0, 12) ?? '',
+    // The version half of the Sentry release (`lib/observability/sentry-release.ts`).
+    NEXT_PUBLIC_APP_VERSION: readAppVersion() ?? '',
   },
   // onnxruntime-node is a native addon (Oura neural-model inference, server-side rollup only) —
   // keep it external so Next never tries to bundle its .node binaries.
@@ -120,6 +124,13 @@ export default withSentryConfig(nextConfig, {
   // Our build data is not Sentry's to have. Consistent with `sendDefaultPii: false` and no replay —
   // the reason this vendor was accepted at all was alerting.
   telemetry: false,
+  // The SAME name the SDK is initialised with, so uploaded source maps belong to the release the
+  // events carry. Created on Sentry only when there is a token to create it with; without one the
+  // plugin has nothing to do and the SDK still tags events from its own `release` option.
+  release: {
+    name: sentryRelease(readAppVersion() ?? undefined, readBuildSha()?.slice(0, 12)),
+    create: !!process.env.SENTRY_AUTH_TOKEN,
+  },
   // Uploading needs `SENTRY_AUTH_TOKEN`, which CI does not have and should not. Without this the
   // plugin warns on every build about work it cannot do, and a warning nobody can action is noise
   // that hides the ones that matter. `deleteSourcemapsAfterUpload` keeps the maps off the public

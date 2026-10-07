@@ -306,6 +306,7 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     // verdicts, sleep, check-ins, panels, rest days
     ['getSleepVerdict', r => r.getSleepVerdict(USER_A, D)],
     ['getReadinessVerdict', r => r.getReadinessVerdict(USER_A, D)],
+    ['getShadowReadiness', r => r.getShadowReadiness(USER_A, FROM, TO)],
     ['listBloodPanels', r => r.listBloodPanels(USER_A)],
     ['isRestDayChosen', r => r.isRestDayChosen(USER_A, D)],
     ['listRestDays', r => r.listRestDays(USER_A, FROM, TO)],
@@ -452,6 +453,15 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['dismissScaleSample', r => r.dismissScaleSample(USER_A, bNum('scale_raw_samples'))],
     ['setSleepVerdictResponse', r => r.setSleepVerdictResponse(USER_A, D, 'acknowledged')],
     ['setReadinessVerdictResponse', r => r.setReadinessVerdictResponse(USER_A, D, 'rated')],
+    // #2377. No predicate for the sweep to neutralise: the conflict key (user_id, date,
+    // model_version) is the guard. Aimed at B's own day and version; checked by hand to fail when the
+    // upsert writes any user_id but the caller's.
+    ['upsertShadowReadiness', r => r.upsertShadowReadiness(USER_A, {
+      date: D, modelVersion: Number(bRow('shadow_readiness').model_version),
+      shadowReadiness: 1, pillars: { sleep: 1, heart: 1, activity: 1, body: 1 }, pillarDetail: {}, units: {},
+      maturityStage: 'settled', inputsThrough: null, liveReadiness: 1, liveModelVersion: 'OVERWRITTEN BY A',
+      computedBy: 'replay',
+    })],
     ['setManualSleepStart', r => r.setManualSleepStart(USER_A, D, AT)],
     ['deleteBloodPanel', r => r.deleteBloodPanel(USER_A, bId('blood_panels'))],
     ['setRestDay (clear)', r => r.setRestDay(USER_A, D, false)],

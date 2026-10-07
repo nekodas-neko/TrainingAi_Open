@@ -23,6 +23,7 @@ import { macrosForDayType } from '@trainingai/shared/nutrition/rest-day-macros'
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { invalidBodyResponse } from '@/lib/api/route-errors'
+import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
 
 // The schema's own caps total well under 100 KB (200 excluded foods x 80 chars is the largest
 // array). 256 KB is generous past that.
@@ -288,6 +289,8 @@ export async function POST(req: Request) {
           input.splitTrainingRest
             ? '- In "restDayAdjustment", say in one line what to change on a rest day (typically slightly fewer carbs).'
             : '- Return "" for "restDayAdjustment".',
+          '',
+          `${PROSE_FIELD_GUARDS}`,
         ].filter(Boolean).join('\n'),
       }))
     return result.object

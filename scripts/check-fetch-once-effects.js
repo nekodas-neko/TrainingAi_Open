@@ -66,15 +66,24 @@ const BASELINE = {
   // 'sleep-sessions'; it moved to `useInvalidationRefetch`, which subscribes to the invalidation
   // rather than to one event, and so covers `invalidateBiometrics` as well.
   //
+  // **Re-verified 2026-10-07 against the RV-105-widened population** (RV-179): walking static and
+  // dynamic imports from the five tab screens named in `components/shell/tabs.ts`, only
+  // `my-meals-picker` and `recent-foods-panel` of the baselined files below are reachable at all.
+  // Both are inside sheets that unmount on close, and `recent-foods-panel`'s key sits under the
+  // `nutrition-recent-for-meal:` prefix that every food write already evicts. Every other row is a
+  // route-level screen or the sync provider's warm pass. Re-run that walk if this list grows.
+  //
   // **Keep this group here even at zero** — it is where a new entry has to be justified, and the
   // rule for judging one has been got wrong three times: judge a site by where it is MOUNTED, by
   // grepping for the component name and checking its renderer against `components/shell/tabs.ts`.
   // Not by the directory the file sits in, and not by whether it is called a sheet — the tab
   // screens mount their sheets unconditionally with a null prop, so sheets do not unmount here.
 
-  // ── Unmount on navigate or on a conditional render, so their next mount refetches. **11 sites
-  // across 9 files** — count them off the map below rather than trusting this line, which said
-  // "13 across 11" for a day after a conversion removed a file and left the prose behind. That is
+  // ── Unmount on navigate or on a conditional render, so their next mount refetches. Count them
+  // off the map below rather than trusting any number written in prose here, which said
+  // "13 across 11" for a day after a conversion removed a file and left the prose behind, and was
+  // then left at "11 across 9" in this block and in docs/rules/cache-invalidation.md after RV-105
+  // widened the scan to the stable-dep sites below (the real total was 23 across 18). That is
   // the same class of error as the over-counting scanner above, in the same file, and it is why the
   // run line prints the computed totals.
   //
