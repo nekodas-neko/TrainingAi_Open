@@ -1622,7 +1622,11 @@ export const scaleRawSamples = pgTable('scale_raw_samples', {
   decoded:    jsonb('decoded'),
   status:     text('status').notNull().default('confirmed'), // 'confirmed' | 'pending' | 'dismissed'
   createdAt:  timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
+}, t => [
+  // LA-71 (migration 202610071236): one archived frame per (user, instant, raw bytes) — a re-send
+  // conflicts here and `insertScaleRawSample` returns the existing id.
+  uniqueIndex('scale_raw_samples_user_measured_raw_uq').on(t.userId, t.measuredAt, t.rawHex),
+])
 
 // Live keepalive battery poll (migration 133) — the 5-min reqBattery() reading persisted
 // so active-use drain rate is captured. measured_at is server-stamped (the poll is live).
