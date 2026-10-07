@@ -10,12 +10,16 @@ import { SEED_EMAIL, settleRouteBoundary } from './fixtures'
  * change is the logging. `isAnyDeload` includes the phase, so every set of a deload week is logged
  * as a deload and earns no 1RM. Both halves are on the card now, not one false one.
  *
- * Fixture: a deload-PHASE session whose stored prescription carries `preDeload` for each exercise,
- * which is what BF-198 records and what makes the revert possible.
+ * Fixture: an ai_dynamic program in a confirmed early-deload WEEK (the server then reports
+ * `phaseStatus.isDeloadActive`, which is what makes the card's `deloadWeek` true), with a session
+ * whose stored prescription carries `preDeload` for each exercise — what BF-198 records and what
+ * makes the revert possible. The week starts today in the user's own zone, computed in SQL so the
+ * app is never handed a literal date.
  */
 const SESSION_NAME = 'Push'
 let programSessionId = ''
 let previousPhaseMode = 'manual'
+let previousEarlyDeloadStart: string | null = null
 
 async function withDb<T>(fn: (db: Client) => Promise<T>): Promise<T> {
   const connectionString = process.env.DATABASE_URL
@@ -31,8 +35,8 @@ test.beforeAll(async () => {
     const userId = users[0]?.id
     expect(userId, `${SEED_EMAIL} is not seeded — run pnpm db:local`).toBeTruthy()
 
-    const { rows: sessions } = await db.query<{ id: string; program_id: string; phase_mode: string }>(
-      `SELECT ps.id, p.id AS program_id, p.phase_mode
+    const { rows: sessions } = await db.query<{ id: string; program_id: string; phase_mode: string; early: string | null }>(
+      `SELECT ps.id, p.id AS program_id, p.phase_mode, p.early_deload_week_start::text AS early
          FROM program_sessions ps JOIN programs p ON p.id = ps.program_id
         WHERE p.user_id = $1 AND ps.name = $2 LIMIT 1`,
       [userId, SESSION_NAME],
@@ -40,7 +44,13 @@ test.beforeAll(async () => {
     expect(sessions[0], `the seeded program has no ${SESSION_NAME} session`).toBeTruthy()
     programSessionId = sessions[0].id
     previousPhaseMode = sessions[0].phase_mode
-    await db.query('UPDATE programs SET phase_mode = $1 WHERE id = $2', ['ai_dynamic', sessions[0].program_id])
+    previousEarlyDeloadStart = sessions[0].early
+    await db.query(
+      `UPDATE programs SET phase_mode = $1,
+              early_deload_week_start = (now() AT TIME ZONE (SELECT timezone FROM users WHERE id = $3))::date
+        WHERE id = $2`,
+      ['ai_dynamic', sessions[0].program_id, userId],
+    )
 
     const { rows: exs } = await db.query<{ id: string; exercise_name: string }>(
       'SELECT id, exercise_name FROM session_exercises WHERE session_id = $1 AND deleted_at IS NULL ORDER BY position',
@@ -75,8 +85,9 @@ test.afterAll(async () => {
   await withDb(async db => {
     await db.query('DELETE FROM session_periodization WHERE program_session_id = $1', [programSessionId])
     await db.query(
-      'UPDATE programs SET phase_mode = $1 WHERE id = (SELECT program_id FROM program_sessions WHERE id = $2)',
-      [previousPhaseMode, programSessionId],
+      `UPDATE programs SET phase_mode = $1, early_deload_week_start = $3
+        WHERE id = (SELECT program_id FROM program_sessions WHERE id = $2)`,
+      [previousPhaseMode, programSessionId, previousEarlyDeloadStart],
     )
   })
 })
@@ -87,6 +98,10 @@ test('Full in a deload phase says the weights come back and the sets still log a
 
   const group = page.getByRole('radiogroup', { name: 'Intensity for today' })
   await expect(group).toBeVisible({ timeout: 30_000 })
+  // Wait for the prescription to be adopted first. Full reads as selected until it arrives, so a
+  // tap before that is a tap on the option already chosen: it records no choice and the deload is
+  // then adopted over it.
+  await expect(group.getByRole('radio', { name: /Deload/ })).toHaveAttribute('aria-checked', 'true', { timeout: 30_000 })
   await group.getByRole('radio', { name: /Full/ }).click()
   await expect(group.getByRole('radio', { name: /Full/ })).toHaveAttribute('aria-checked', 'true')
 

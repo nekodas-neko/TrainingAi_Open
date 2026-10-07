@@ -266,7 +266,7 @@ export function AiPrescriptionCard({
                   /* #2404. Its own paragraph rather than more branches in the chain below: that chain
                      is guarded as "nothing to revert, else the blocked check" and says "these sets
                      count toward your 1RM", which a deload week must not. */
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  <p className="text-2xs text-muted-foreground leading-relaxed">
                     {overrideOutcome === 'all-in-deload-week'
                       ? "Every exercise is back to its pre-deload weights and sets. This is your deload week, so these sets are still logged as a deload and do not count toward your 1RM."
                       : `Most exercises are back to their pre-deload weights and sets. ${
