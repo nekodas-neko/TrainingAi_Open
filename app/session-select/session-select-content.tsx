@@ -41,7 +41,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { cachedFetch, readCacheSync, setCached, cachedFetchToday, readTodayCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { useInvalidationRefetch } from "@/lib/hooks/use-invalidation-refetch";
-import { invalidateWorkoutSummaries, invalidateReadinessInputs, invalidateOuraSync, invalidateWorkoutMetaRefresh, invalidatePrescriptionChanged, invalidateUserProfile } from "@/lib/cache-groups";
+import { invalidateWorkoutSummaries, invalidateReadinessInputs, invalidateOuraSync, invalidateWorkoutMetaRefresh, invalidatePrescriptionChanged, invalidateUserProfile, invalidatePulledDomains } from "@/lib/cache-groups";
 import { mergeCalendarOverlay, readLocalCalendarOverlay } from "@/lib/calendar/local-overlay";
 import { syncOuraRing } from "@/lib/oura-ble/sync";
 import { getLocalStore } from "@/lib/local-store";
@@ -705,6 +705,8 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     let pullRes: Awaited<ReturnType<typeof pullDelta>> | undefined;
     if (userId) pushRes = await pushMutations(userId).catch(() => null);
     if (userId) pullRes = await pullDelta(userId, true).catch(() => null);
+    // What the pull wrote too, beside the fixed list below — e.g. a supplement changed elsewhere (#2550).
+    if (pullRes) await invalidatePulledDomains(pullRes.domains).catch(() => {});
     const online = typeof navigator !== 'undefined' ? navigator.onLine : true;
     if (online && userId && getLocalStore(userId) && (pushRes === null || pullRes === null)) {
       toast.error(wasBackedOff
@@ -714,11 +716,8 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     // Targeted invalidations: preserve slow-changing config caches (program structure,
     // styles, exercise-library) while clearing everything that could change from a sync.
     // (invalidateOuraSync() already covers 'sleep-performance-correlation' — no separate call needed.)
-    await Promise.all([
-      invalidateWorkoutSummaries(),
-      invalidateReadinessInputs(),
-      invalidateOuraSync(),
-    ]).catch(() => {});
+    await Promise.all([invalidateWorkoutSummaries(), invalidateReadinessInputs(), invalidateOuraSync()])
+      .catch(() => {});
     refetchAll().catch(() => {});
   }, [userId, refetchAll]);
 
@@ -1098,7 +1097,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
                 fetchWorkoutData();
                 fetchMeta();
                 void syncOuraRing();                              // BLE drain — replaces the dead Cloud sync
-                if (userId) pullDelta(userId, true).catch(() => {});
+                if (userId) pullDelta(userId, true).then(res => { if (res) return invalidatePulledDomains(res.domains); }).catch(() => {});
               }}
               disabled={refreshing}
               className="rounded-xl p-2 min-h-11 min-w-11 flex items-center justify-center text-muted-foreground hover:bg-muted transition"

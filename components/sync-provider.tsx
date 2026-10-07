@@ -198,9 +198,13 @@ export function SyncProvider({ userId }: SyncProviderProps) {
 
     import('@capacitor/network').then(({ Network }) => {
       Network.addListener('networkStatusChange', (status) => {
-        if (status.connected) {
-          if (userId) pushMutations(userId).catch(() => {});
-          if (userId) pullDelta(userId).catch(() => {});
+        if (status.connected && userId) {
+          // Pull once the push has settled, as the mount pass does, and hand the pull's flags to
+          // the cache: the cursor moves past these rows, so nothing else will ever see them (#2550).
+          pushMutations(userId).then(() => {}, () => {})
+            .then(() => pullDelta(userId))
+            .then(res => { if (res) return invalidatePulledDomains(res.domains); })
+            .catch(() => {});
         }
       }).then((h) => { handle = h; });
     });

@@ -62,6 +62,22 @@ export type SyncedDomains = {
   mealPlans:   boolean
 }
 
+function noSyncedDomains(): SyncedDomains {
+  return {
+    biometrics: false, programs: false, workouts: false, nutrition: false,
+    supplements: false, activity: false, fitnessTests: false, running: false, injuries: false, ouraDaily: false, dayCheckins: false,
+    mealPlans: false,
+  };
+}
+
+// Every flag, not a line per flag: the per-flag list had none for `mealPlans`, so a pulled plan
+// never reached the outer result and its cache was never invalidated (#2543).
+function mergeSyncedDomains(into: SyncedDomains, from: SyncedDomains): void {
+  for (const flag of Object.keys(into) as (keyof SyncedDomains)[]) {
+    into[flag] ||= from[flag];
+  }
+}
+
 // `fullResync` re-pulls from epoch (since=0) instead of the incremental cursor. The delta
 // cursor is monotonic, so once `lastSyncAt` passes a change it is never re-carried — which
 // leaves the on-device program mirror holding stale session ids after an edit that a later
@@ -732,11 +748,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
   // Surfaced on the outer return so a restore driver (restoreFromCloud) can keep pulling
   // past the 20-page-per-call cap until the server reports the delta is fully drained.
   let hasMore = false;
-  const domains: SyncedDomains = {
-    biometrics: false, programs: false, workouts: false, nutrition: false,
-    supplements: false, activity: false, fitnessTests: false, running: false, injuries: false, ouraDaily: false, dayCheckins: false,
-    mealPlans: false,
-  };
+  const domains = noSyncedDomains();
   for (let pageN = 0; pageN < 20; pageN++) {
     const pageResult = await pullPage(sinceIso);
     if (!pageResult) {
@@ -753,11 +765,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
       return { synced: total, domains, hasMore: true };
     }
     total += pageResult.count;
-    // Every flag, not a line per flag: the per-flag list had none for `mealPlans`, so a pulled plan
-    // never reached the outer result and its cache was never invalidated (#2543).
-    for (const flag of Object.keys(domains) as (keyof SyncedDomains)[]) {
-      domains[flag] ||= pageResult.domains[flag];
-    }
+    mergeSyncedDomains(domains, pageResult.domains);
     sinceIso = pageResult.syncedAt;
     hasMore = pageResult.hasMore;
     if (!pageResult.hasMore) break;
@@ -788,9 +796,13 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
 export async function restoreFromCloud(
   userId: string,
   onProgress?: (syncedSoFar: number) => void,
-): Promise<{ synced: number; failed: boolean } | null> {
+): Promise<{ synced: number; failed: boolean; domains: SyncedDomains } | null> {
   const store = getLocalStore(userId);
   if (!store) return null;
+  // Every page's flags, ORed, so the caller can invalidate what the restore wrote (#2550). Each
+  // pull here advances the cursor, so no later pull will ever carry these flags again — and a
+  // failed restore still returns the flags of the pages it did apply, because those rows landed.
+  const domains = noSyncedDomains();
   // A deliberate user action — clear any pull backoff so a recent transient failure
   // doesn't silently no-op the restore.
   _resetSyncBackoff();
@@ -804,12 +816,13 @@ export async function restoreFromCloud(
     // A dead pull attempt (network/auth/rate-limit) must not be reported as a completed
     // restore of zero records — the cursor is already persisted up to the last successful
     // page, so this is resumable, but the caller needs to know to retry, not treat it as done.
-    if (!res) return { synced: total, failed: true };
+    if (!res) return { synced: total, failed: true, domains };
     total += res.synced;
+    mergeSyncedDomains(domains, res.domains);
     onProgress?.(total);
     if (!res.hasMore) break;
   }
-  return { synced: total, failed: false };
+  return { synced: total, failed: false, domains };
 }
 
 /**

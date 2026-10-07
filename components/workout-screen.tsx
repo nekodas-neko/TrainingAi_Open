@@ -49,7 +49,7 @@ import { useDeloadChoice } from "@/components/workout/use-deload-choice";
 import { useDurationPreset } from "@/components/workout/use-duration-preset";
 import { WorkoutLoadError } from "@/components/workout/workout-load-error";
 import { TTL_SHORT, TTL_MEDIUM, TTL_LONG } from '@trainingai/shared/cache-ttl';
-import { invalidateWorkoutSummaries, invalidateExerciseLogged, invalidatePrescriptionChanged, invalidateWorkoutDataImmediate } from "@/lib/cache-groups";
+import { invalidateWorkoutSummaries, invalidateExerciseLogged, invalidatePrescriptionChanged, invalidateWorkoutDataImmediate, invalidatePulledDomains } from "@/lib/cache-groups";
 import type { DurationPreset } from "@trainingai/shared/workout/duration-model";
 import { hapticLight, hapticSuccess } from "@/lib/haptics";
 import { scheduleRestCompleteNotification, cancelRestCompleteNotification, computeRestNotificationAction } from "@/lib/notifications";
@@ -411,7 +411,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
           if (data.sessionNotFound) {
             setSessionStale(true);
             setLoading(false);
-            if (userId) pullDelta(userId, true, true).catch(() => {});
+            if (userId) pullDelta(userId, true, true).then(res => { if (res) return invalidatePulledDomains(res.domains); }).catch(() => {});
             return;
           }
           setSessionStale(false);
@@ -498,7 +498,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
           // current program — and every session id it navigates with — becomes correct again.
           // Guarded so each dead id triggers at most one re-sync (no loop).
           staleSessionIdRecoveredRef.current = programSessionId;
-          if (userId) pullDelta(userId, true, true).catch(() => {});
+          if (userId) pullDelta(userId, true, true).then(res => { if (res) return invalidatePulledDomains(res.domains); }).catch(() => {});
         }
       })
       .catch(() => {})
