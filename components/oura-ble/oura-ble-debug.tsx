@@ -297,6 +297,10 @@ export function OuraBleDebug() {
     const next: string[] = []
     if (outcome.kind === 'failed') {
       next.push(`redecode failed: ${outcome.message}`)
+    } else if (outcome.kind === 'refused') {
+      // A plain redecode follows any running run, so the server does not refuse this today; kept
+      // so a future refusal reads as "not started" rather than as a finished run.
+      next.push(`redecode not started: ${outcome.message}`)
     } else {
       const j = outcome.phases
       next.push(`redecode: scanned=${j.scanned ?? 0} updated=${j.updated ?? 0} · sleep=${j.aggregated?.sleepSessions ?? 0} days=${j.aggregated?.bodyMetricDays ?? 0}`)

@@ -1354,8 +1354,9 @@ export interface WorkoutRepository {
   cancelPendingRekeyDeclaration(userId: string): Promise<boolean>
 
   /** Q-535 — a redecode runs off the request. One in-flight job per user; `startRedecodeJob`
-   *  returns the running one rather than starting a second. */
-  startRedecodeJob(userId: string, opts: Record<string, unknown>): Promise<{ job: import('./postgres/slices/oura').RedecodeJob; alreadyRunning: boolean }>
+   *  returns the running one rather than starting a second, with `refused: true` when that run
+   *  would not write what `opts` asks for (issue 2383: a step backfill never follows a plain run). */
+  startRedecodeJob(userId: string, opts: Record<string, unknown>): Promise<{ job: import('./postgres/slices/oura').RedecodeJob; alreadyRunning: boolean; refused: boolean }>
   getRedecodeJob(userId: string, id: number): Promise<import('./postgres/slices/oura').RedecodeJob | null>
   getLatestRedecodeJob(userId: string): Promise<import('./postgres/slices/oura').RedecodeJob | null>
   finishRedecodeJob(id: number, result: Record<string, unknown> | null, error: string | null): Promise<void>
