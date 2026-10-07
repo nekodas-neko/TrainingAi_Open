@@ -187,6 +187,9 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     // #2338 — a night the user entered. Carried so the device ranks it below a device night, as the
     // server does; absent from an older server's reply, which had no manual nights to send.
     manualEntry:     r.manualEntry === true,
+    // Issue 2606 — the tombstone of a manual night the user removed. The delta is unfiltered on it
+    // (the tombstone channel); absent from an older server's reply, which had no removals to send.
+    deletedAt:       r.deletedAt ? toIso(r.deletedAt) : null,
     syncStatus:      'synced' as const,
     updatedAt:       toIso(r.updatedAt),
   } satisfies LocalSleepSession));

@@ -83,6 +83,9 @@ ids. The local mirror is keyed on the server id and the delta carries only live 
 re-roll leaves the device holding the old row next to the new one, and a night the server drops for
 good (#2486's short evening window) stays on the device. The device reads it first, before the
 server response replaces it.
+A typed night the user removes (issue 2606) is the one tombstoned case: `deleted_at` is set, every read
+skips it, and the delta pull carries it. Only `manual_entry` rows can be removed that way; the BLE
+re-roll above is unchanged.
 
 **`manual_bedtime` wrote the outbox but not the local row the card reads. Fixed (#2547).**
 `components/health/sleep/manual-bedtime-card.tsx` reads `manual_sleep_start` from the local
@@ -228,7 +231,7 @@ the code. Do not edit between the markers; CI compares this block with a fresh r
 | `set_hr_stats` | SERVER-ONLY | — | — | exported | cascade | derived (server rollup); writer: oura.ts |
 | `set_logs` | DEVICE-FIRST | `set_logs` | yes | exported | cascade | local write + outbox push + delta pull |
 | `shadow_readiness` | SERVER-ONLY | — | — | exported | cascade | derived (#2377 shadow readiness model, shown nowhere); nothing on the device reads it; read through claude_ro; writer: slices/shadow-readiness.ts |
-| `sleep_sessions` | SERVER-FIRST MIRROR | `sleep_sessions` | — | exported | cascade | server writes (BLE rollup deletes and reinserts a re-rolled night; Health Connect sync); delta pull fills the mirror, read local-first for first paint. The sleep_session push branch has no device producer (#2292); manual_bedtime edits one column through the outbox; manual_sleep (#2338) is a user-entered night (manual_entry=true) written locally + pushed, losing to any device night on read. Server hard delete, no tombstone: see Findings |
+| `sleep_sessions` | SERVER-FIRST MIRROR | `sleep_sessions` | yes | exported | cascade | server writes (BLE rollup deletes and reinserts a re-rolled night; Health Connect sync); delta pull fills the mirror, read local-first for first paint. The sleep_session push branch has no device producer (#2292); manual_bedtime edits one column through the outbox; manual_sleep (#2338) is a user-entered night (manual_entry=true) written locally + pushed, losing to any device night on read; removing one (issue 2606) is a deleted_at tombstone the delta pull carries, and every read skips it. The BLE re-roll is still a server hard delete of ble rows, no tombstone: see Findings |
 | `sleep_verdicts` | SERVER-ONLY | — | — | exported | cascade | derived (model verdict); writer: adapter.ts |
 | `step_live_windows` | SERVER-ONLY | — | — | exported | cascade | sensor ingest -> server; writer: adapter.ts |
 | `strap_status` | SERVER-ONLY | — | — | excluded (ops) | cascade | sensor ingest -> server; writer: adapter.ts |

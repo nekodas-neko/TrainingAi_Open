@@ -1,7 +1,7 @@
 import { getLocalStore } from '@/lib/local-store'
 import { pushMutations } from '@/lib/local-store/sync-engine'
 import { invalidateManualSleepWrite } from '@/lib/cache-groups'
-import { parseManualNight } from '@trainingai/shared/health/manual-sleep'
+import { parseManualNight, ManualSleepRemoveSchema } from '@trainingai/shared/health/manual-sleep'
 
 export type SaveManualNightResult =
   | {
@@ -71,4 +71,47 @@ export async function saveManualNight(args: {
 
   await invalidateManualSleepWrite()
   return { ok: true, date: night.date, shadowed }
+}
+
+export type RemoveManualNightResult = { ok: true } | { ok: false; reason: string }
+
+/**
+ * Issue 2606 — the ONE client write that removes a night the user entered by hand ("Remove night" on
+ * the approved card). `id` is the night's row id, as the sleep read returns it (`manualEntry: true`).
+ *
+ * Offline-first, as `saveManualNight`: on the device it marks the local row removed (`deleted_at`,
+ * pending) and queues `manual_sleep` `{ id, deleted: true }` in the same turn, so the night is gone
+ * from every local read at once and the removal survives being offline; the outbox pushes it to the
+ * same repository call the web route makes. Without a local store it calls
+ * `DELETE /api/sleep-sessions/manual`. Either way it invalidates through `invalidateManualSleepWrite`.
+ *
+ * Refused, with nothing queued, for a night a device measured or an id the store does not hold. To
+ * bring a removed night back, enter it again with `saveManualNight`: the removed row is revived.
+ */
+export async function removeManualNight(args: { userId: string; id: string }): Promise<RemoveManualNightResult> {
+  const valid = ManualSleepRemoveSchema.safeParse({ id: args.id })
+  if (!valid.success) return { ok: false, reason: 'invalid night id' }
+
+  const store = getLocalStore(args.userId)
+  if (store) {
+    // The store answers with the night's wake date, so the outbox entry is filed under the night it
+    // removes; null means a device night or an unknown id, and nothing is queued.
+    const date = await store.removeManualSleepLocally(args.id)
+    if (!date) return { ok: false, reason: 'Only a night you entered can be removed' }
+    await store.queueMutation({ userId: args.userId, domain: 'manual_sleep', date, payload: { id: args.id, deleted: true } })
+    pushMutations(args.userId).catch(() => {})
+  } else {
+    const res = await fetch('/api/sleep-sessions/manual', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: args.id }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => null) as { error?: string } | null
+      return { ok: false, reason: body?.error ?? `HTTP ${res.status}` }
+    }
+  }
+
+  await invalidateManualSleepWrite()
+  return { ok: true }
 }

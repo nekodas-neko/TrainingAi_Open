@@ -619,13 +619,18 @@ export const sleepSessions = pgTable('sleep_sessions', {
   // packages/shared/src/health/sleep-night.ts drops it on every read, and a device write landing
   // on its `sleep_start` takes the row over (`upsertOuraSleep` resets this to false).
   manualEntry:      boolean('manual_entry').notNull().default(false),
+  // Issue 2606 (migration 202610072213) — a manual night the user REMOVED. Only a manual_entry row
+  // is ever tombstoned (`deleteManualSleepNight`); every reader skips a tombstoned row, and the
+  // delta pull carries it so the device hides it too. A device night is never removed this way.
+  deletedAt:        timestamp('deleted_at', { withTimezone: true }),
   sourceMap:        jsonb('source_map').$type<Record<string, string>>(),   // per-field provenance (migration 120)
   createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:        timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [
   unique().on(t.userId, t.sleepStart),
-  // One manual night per (user, wake date): a second entry is an edit, never a second row.
-  uniqueIndex('sleep_sessions_manual_night_key').on(t.userId, t.date).where(sql`manual_entry`),
+  // One LIVE manual night per (user, wake date): a second entry is an edit, never a second row. A
+  // removed night (deleted_at set) does not hold the date (issue 2606).
+  uniqueIndex('sleep_sessions_manual_night_key').on(t.userId, t.date).where(sql`manual_entry AND deleted_at IS NULL`),
 ])
 
 export const moodLogs = pgTable('mood_logs', {

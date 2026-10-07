@@ -161,7 +161,9 @@ export async function computeAchievements(userId: string, tz: string): Promise<A
       ORDER BY day DESC
     `),
     db.execute(sql`
-      SELECT date, duration_hours FROM sleep_sessions WHERE user_id = ${userId}::uuid ORDER BY date DESC
+      SELECT date, duration_hours FROM sleep_sessions
+      WHERE user_id = ${userId}::uuid AND deleted_at IS NULL  -- issue 2606: a removed night earns nothing
+      ORDER BY date DESC
     `),
     db.execute(sql`
       SELECT COUNT(DISTINCT date)::int AS count

@@ -821,8 +821,24 @@ export interface WorkoutRepository {
    * uses the device night (`preferDeviceNights`). `id` is null only when a device row starts at the
    * very same instant: that row IS the night, measured, so nothing is stored. Throws on an id that
    * already belongs to another row.
+   *
+   * Issue 2606: entering a night again after it was REMOVED revives the removed row (its id kept,
+   * `deleted_at` cleared) rather than adding a second one — matched by the payload's id, then by
+   * wake date, then by start instant. A removed night is a state of (user, wake date), not a new
+   * night, and the `(user_id, sleep_start)` unique key would refuse a fresh row at the same start.
    */
   saveManualSleepNight(userId: string, night: import('@trainingai/shared/health/manual-sleep').ManualSleepNight): Promise<{ id: string | null; shadowed: boolean }>
+  /**
+   * Issue 2606 — remove a night the user entered by hand: a SOFT delete (`deleted_at = now()`), so
+   * the delta pull carries it to a device that has not synced. Only a row that is the caller's and
+   * `manual_entry = true` can be removed; a night a device measured never can.
+   *
+   * - `removed`: this call tombstoned it.
+   * - `already_removed`: it was already tombstoned (a replay, a double tap); nothing changed.
+   * - `not_manual`: the caller's row, but a device night. Nothing changed.
+   * - `not_found`: no such row for this user (another user's id reads the same).
+   */
+  deleteManualSleepNight(userId: string, id: string): Promise<'removed' | 'already_removed' | 'not_manual' | 'not_found'>
   listMoodLogs(userId: string, from: string, to: string): Promise<MoodLog[]>
   incrementWaterLog(userId: string, date: string, ml: number): Promise<void>
   /** Q-481 — the same increment, applied at most once per outbox mutation id. Returns false when

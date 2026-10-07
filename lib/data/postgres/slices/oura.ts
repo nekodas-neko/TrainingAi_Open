@@ -563,6 +563,11 @@ export async function upsertOuraSleep(db: Db, userId: string, sessions: OuraSlee
         sleepEnd:       sql.raw(`CASE WHEN sleep_sessions.manual_entry THEN EXCLUDED.sleep_end ELSE sleep_sessions.sleep_end END`),
         timeInBedHours: sql`CASE WHEN sleep_sessions.manual_entry THEN EXCLUDED.time_in_bed_hours ELSE ${merged.timeInBedHours} END`,
         manualEntry:    sql`false`,
+        // Issue 2606. A typed night the user REMOVED that a device then measures at the same start
+        // becomes that device night, visible: the user removed their guess, not the measurement, and
+        // a device night always wins. Only manual rows are ever tombstoned, so a device row keeps
+        // its value (NULL).
+        deletedAt:      sql.raw(`CASE WHEN sleep_sessions.manual_entry THEN NULL ELSE sleep_sessions.deleted_at END`),
         updatedAt: sql`NOW()`,
       },
     })
