@@ -7,6 +7,8 @@ command instead of a session.
 > **No cross-user hole was found.** Every survivor was read in context. The 31 left at the end are
 > either redundant by construction (19) or need state this pass did not build (12, filed as
 > #2570, §4). No production code changed.
+>
+> **Addendum (#2570):** 20 of 353 survive now, all redundant by construction. See §8.
 
 **Headline: 308 of 353 predicates survived before (87%); 31 of 353 survive now (9%).**
 
@@ -211,16 +213,18 @@ re-running rather than while writing.
 
 ## 4. Survivors left, and why
 
-**Redundant by construction: 19.** No single-predicate mutation can change behaviour, so no test can
-kill these. They are kept as cheap insurance, as the code comments on several of them already say.
+**Redundant by construction: 19, now 20.** No single-predicate mutation can change behaviour, so no
+test can kill these. They are kept as cheap insurance, as the code comments on several of them
+already say. The twentieth, `oura-raw-pack.ts` L210, was found while building #2570 (last row).
 
 | predicate | why it cannot be the deciding check |
 |---|---|
 | `upsertPrescribedRun` L2793, `setRestDay` L3725, `upsertStepLiveWindow` L6771, `replaceDaytimeStressBuckets` L2288, `savePlanMealAnswer` L650 | `setWhere` on a conflict target that already includes `user_id`: one user's insert cannot conflict with another's row |
 | `saveBloodPanel` L3641, `logSupplement` L7310 and L7375, `setMealPlanActive` L338, `replaceMealPlanStructure` L469, `savePlanMealAnswer` L632, `reassignAndDeleteMealType` L204, `reorderMealTypes` L253, `recordBaselineAnchors` L152, `revertAutoAdoptedBaseline` L762 | behind a covered predicate that already restricts the id to the caller's own (`ownedPlan`, `ownedVariantPlanId`, the supplement ownership check, the scoped row list, the live-ids check, the scoped `current` read) |
 | `saveBloodPanel` L3631, `revertAutoAdoptedBaseline` L741, `updateProgramPhaseSettings` L673, `autoRecalibrateCycleAnchor` L762 | an unscoped read here only feeds a write that is itself user-scoped, which hits 0 rows (`saveBloodPanel` then throws on `row.id` and rolls back). The read cannot reach the caller. |
+| `packOuraRawBuckets` L210 (`oura-raw-pack.ts`) | the delete is `user_id = … AND id IN (…)`, and the ids are the primary keys the scoped select at L139 just read. Without `user_id` it deletes exactly the same rows. L139 is covered. |
 
-**Needs state this pass did not build: 12.** These are real coverage gaps, not proven safe. Each
+**Needs state this pass did not build: 12, now covered (#2570, §8).** These were real coverage gaps, not proven safe. Each
 needs A to own something specific (ring history with anchors and packable buckets, a body-fat
 reading on the same source as a scan, an active program with a schedule) before the predicate
 decides anything:
@@ -234,7 +238,8 @@ decides anything:
 | `oura-raw-pack.ts` L91, L118, L139, L189, L210 | a packable hot bucket older than the seal line |
 | `countAllSessionsSinceStart` L721 | sessions named like B's program sessions (see §5) |
 
-Filed as #2570 so the next pass can build them.
+Filed as #2570. Eleven are now killed by a case in the "with rows of A's own" block; L210 turned out
+to be redundant (first table). See §8.
 
 ## 5. Id-taking repository methods that do not take a `userId`
 
@@ -288,3 +293,40 @@ After a data-layer change, run `node scripts/ownership-mutation-sweep/index.mjs 
 the slice you touched. Add a row to the sweep test for anything new that survives, and check it by
 running the sweep again. Reading the test and believing it is not a check. Finish with a full run
 before quoting a number (§2).
+
+## 8. Addendum: the twelve that needed A's own data (#2570)
+
+Six cases were added to the "with rows of A's own" block of the sweep test, placed before
+`deleteAccount` because that case deletes A. Each one seeds what A must own for the predicate to
+matter, then adds B rows built to change A's answer if the predicate is gone. Every row it adds
+creates its own data and removes it in a `finally`, so no shared catalogue row is involved (#2571).
+
+| case | A owns | B's look-alike | predicates it kills |
+|---|---|---|---|
+| `getNextSession` | an active program with two sessions | a session today, with a logged exercise, named after A's second session. Unscoped, A is told "Already trained". | L1789 |
+| `getBodyFatCalibration` | a scan on 08-10, `scale_ble` readings on 08-11 (offset +2) and 08-20 | a scan on 08-20, which pairs with A's spare reading, and a same-day `scale_ble` reading on 08-10, which displaces A's | L4289, L4302 |
+| `previewStepsBackfill` | a clock anchor and one 600-step live window on 08-25, no stored day | a live window one ring-day earlier (adds a row) and a `manual` 08-25 day (removes A's row) | L6723, L6744 |
+| `getOuraRawSampleSummary` | one hot frame, so `measuredAt` has an anchor | a packed bucket far older. Unscoped, it becomes the start of A's history. | L6949 |
+| `packOuraRawBuckets` | a newest frame, one sealed bucket and one frame still inside the hot window | a newer newest frame (seals A's warm bucket), a frame in A's sealed bucket (packed with A's), a B-only sealed bucket (left in `remaining`), and a junk blob at A's bucket key (refuses A's bucket on read-back) | L91, L118, L139, L189 |
+| `countAllSessionsSinceStart` | two sessions before B's program started, named after B's program session | B's program `started_at` after both. Unscoped, it filters A's count to 0. | L721 |
+
+**L210 is redundant.** The packer's delete is `user_id = … AND id IN (…)`, with ids from the scoped
+select at L139. It is in the first table of §4.
+
+**L189 depends on row order.** Unscoped, the read-back matches A's blob and B's at the same
+`(epoch, tag, ds_bucket)` and takes the first. On a small, unanalysed table Postgres 16 runs that as a
+sequential scan, so it returns B's row, which was inserted first, and the case fails as intended. If
+a future planner picks the primary key index (`user_id` leads, and A's id sorts first), this mutant
+could survive again. The full re-run is what would show it.
+
+**Counts, full run** (`--jobs 4`, not `--survivors-of`):
+
+| run | burn-down tests | survivors |
+|---|---|---:|
+| final full run in §2 | 57 + 251 | 31 of 353 |
+| **#2570 full run** | **57 + 257** | **20 of 353** |
+
+All 20 are in §4's first table; 333 killed. None of the 322 earlier kills turned back into a survivor, and each
+of the eleven new kills failed on its own #2570 case, not on another test. Errors: 0. Wall time 33.4 min
+with 4 jobs, about twice §1's figure, on a machine shared with another session's test runs.
+No production code changed, and no cross-user hole was found.
