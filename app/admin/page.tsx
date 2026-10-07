@@ -15,7 +15,7 @@ export default async function AdminPage() {
 
   return (
     <>
-      <AdminContent />
+      <AdminContent currentUserId={session.user.id} />
       <BottomNav isAdmin />
     </>
   )

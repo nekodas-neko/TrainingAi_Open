@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { toast } from 'sonner'
 import { UserCheck, UserX, Trash2, Plus, Loader2, ArrowLeft, Bluetooth, Footprints, ClipboardList } from 'lucide-react'
 import { cn } from '@trainingai/shared/utils'
@@ -17,7 +18,8 @@ import { initialsOf } from '@/lib/initials';
 
 type Tab = 'users' | 'invites' | 'exercises' | 'activities' | 'feedback' | 'devices'
 
-export default function AdminContent() {
+/** `currentUserId` is the signed-in admin, so their own row offers no deactivate (issue 2383 item 3). */
+export default function AdminContent({ currentUserId }: { currentUserId: string }) {
   const router = useTransitionRouter()
   const [tab, setTab] = useState<Tab>('users')
   const [users, setUsers] = useState<User[]>([])
@@ -35,6 +37,8 @@ export default function AdminContent() {
   const [feedbackLoading, setFeedbackLoading] = useState(false)
   const [expandedFeedback, setExpandedFeedback] = useState<string | null>(null)
   const [confirmDeleteFeedback, setConfirmDeleteFeedback] = useState<string | null>(null)
+  // issue 2383 item 3: deactivating signs that user out to `/pending`, so it asks first. Activation does not.
+  const [confirmDeactivate, setConfirmDeactivate] = useState<User | null>(null)
 
   async function loadAll() {
     setLoading(true)
@@ -71,12 +75,15 @@ export default function AdminContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, action }),
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        const data = await res.json().catch(() => null) as { error?: unknown } | null
+        throw new Error(typeof data?.error === 'string' ? data.error : 'Action failed')
+      }
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, isActive: action === 'activate' } : u))
       invalidateAdminPendingCount().catch(() => {})
       toast.success(action === 'activate' ? 'User activated' : 'User deactivated')
-    } catch {
-      toast.error('Action failed')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Action failed')
     } finally {
       setActionLoading(null)
     }
@@ -194,10 +201,32 @@ export default function AdminContent() {
             {active.length > 0 && (
               <div className="space-y-2">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Active</p>
-                {active.map(u => <UserRow key={u.id} user={u} onToggle={toggleUser} loadingId={actionLoading} />)}
+                {active.map(u => (
+                  <UserRow
+                    key={u.id}
+                    user={u}
+                    isSelf={u.id === currentUserId}
+                    onToggle={(id, action) => action === 'deactivate' ? setConfirmDeactivate(u) : toggleUser(id, action)}
+                    loadingId={actionLoading}
+                  />
+                ))}
               </div>
             )}
             {users.length === 0 && <p className="text-center text-muted-foreground py-8">No users yet.</p>}
+            <ConfirmDialog
+              open={!!confirmDeactivate}
+              onOpenChange={o => { if (!o) setConfirmDeactivate(null) }}
+              title="Deactivate user?"
+              message={confirmDeactivate
+                ? `${confirmDeactivate.displayName || confirmDeactivate.name || confirmDeactivate.email} will be signed out to the pending screen until you activate them again.`
+                : ''}
+              confirmLabel="Deactivate"
+              onConfirm={() => {
+                const u = confirmDeactivate
+                setConfirmDeactivate(null)
+                if (u) toggleUser(u.id, 'deactivate')
+              }}
+            />
           </div>
         )}
 
@@ -358,11 +387,14 @@ export default function AdminContent() {
 
 function UserRow({
   user,
+  isSelf = false,
   onToggle,
   onDelete,
   loadingId,
 }: {
   user: User
+  /** The signed-in admin's own row: no deactivate. The server refuses it too; this only hides it. */
+  isSelf?: boolean
   onToggle: (id: string, action: 'activate' | 'deactivate') => void
   onDelete?: (id: string) => void
   loadingId: string | null
@@ -404,19 +436,22 @@ function UserRow({
             : <Trash2 className="h-4 w-4 text-destructive" />}
         </Button>
       )}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => onToggle(user.id, user.isActive ? 'deactivate' : 'activate')}
-        disabled={isToggleLoading}
-        title={user.isActive ? 'Deactivate' : 'Activate'}
-      >
-        {isToggleLoading
-          ? <Loader2 className="h-4 w-4 animate-spin" />
-          : user.isActive
-            ? <UserX className="h-4 w-4 text-destructive" />
-            : <UserCheck className="h-4 w-4 text-green-500" />}
-      </Button>
+      {!(isSelf && user.isActive) && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onToggle(user.id, user.isActive ? 'deactivate' : 'activate')}
+          disabled={isToggleLoading}
+          title={user.isActive ? 'Deactivate' : 'Activate'}
+          aria-label={user.isActive ? 'Deactivate' : 'Activate'}
+        >
+          {isToggleLoading
+            ? <Loader2 className="h-4 w-4 animate-spin" />
+            : user.isActive
+              ? <UserX className="h-4 w-4 text-destructive" />
+              : <UserCheck className="h-4 w-4 text-green-500" />}
+        </Button>
+      )}
     </div>
   )
 }

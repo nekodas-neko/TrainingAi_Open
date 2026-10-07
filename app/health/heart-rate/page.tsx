@@ -14,6 +14,7 @@ import { DetailHero, usePageGradient, useHeroColorScheme } from "@/components/he
 import { TrendSparkline } from "@/components/health/trend-sparkline-lazy";
 import { ObservedHrCard } from "@/components/health/observed-hr-card";
 import { noHrDataCopy } from "@/components/health/hr-source-copy";
+import { TREND_EMPTY } from "@/components/health/trend-empty-copy";
 import { HrFactorsCard } from "@/components/health/hr-factors-card";
 import { gradeHeartRate, type HrProfileInput } from "@/components/health/hr-grade";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
@@ -174,11 +175,11 @@ export default function HeartRateDetailPage() {
 
         {trends?.trends && (
           <>
-            <TrendSparkline trends={trends.trends} field="rhrBpm" label="Resting Heart Rate" color="#f87171" unit="bpm" />
-            <TrendSparkline trends={trends.trends} field="hrvMs" label="HRV (overnight)" color="#a78bfa" unit="ms" />
+            <TrendSparkline trends={trends.trends} field="rhrBpm" label="Resting Heart Rate" color="#f87171" unit="bpm" emptyText={TREND_EMPTY.rhrBpm} />
+            <TrendSparkline trends={trends.trends} field="hrvMs" label="HRV (overnight)" color="#a78bfa" unit="ms" emptyText={TREND_EMPTY.hrvMs} />
             <TrendSparkline
               trends={trends.trends} field="hrr1Bpm" label="HR Recovery (60s drop)" color="#34d399" unit="bpm/min"
-              emptyText="No chest-strap workouts in the last 14 days. Recovery is measured from the strap."
+              emptyText={TREND_EMPTY.hrr1Bpm}
             />
           </>
         )}

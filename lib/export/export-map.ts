@@ -185,6 +185,7 @@ export const WITHHELD_COLUMNS: Record<string, string[]> = {
 export const EXCLUDED: Record<string, Exclusion> = {
   // ── Credentials. Exporting these hands the reader a working key. ────────────
   oura_tokens: { category: 'credentials', reason: 'OAuth/PAT credentials and the webhook signing key' },
+  native_refresh_tokens: { category: 'credentials', reason: 'credential material: refresh-token hashes for the native app sign-in (#2076)' },
 
   // ── Shared catalogue. Seed data the app ships, not anything the user created. ─
   activity_types: { category: 'catalogue', reason: 'shipped catalogue of activity types' },

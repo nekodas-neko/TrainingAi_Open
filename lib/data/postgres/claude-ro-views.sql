@@ -782,6 +782,24 @@ SELECT
 FROM public.mood_logs t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
+-- native_refresh_tokens: withholding "token_hash"
+CREATE VIEW claude_ro.native_refresh_tokens AS
+SELECT
+  t.id,
+  t.user_id,
+  t.family_id,
+  t.device_label,
+  t.device_id,
+  t.created_at,
+  t.last_used_at,
+  t.expires_at,
+  t.rotated_at,
+  t.replaced_by,
+  t.revoked_at,
+  t.revoked_reason
+FROM public.native_refresh_tokens t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.nutrition_targets AS
 SELECT
   t.id,
@@ -1819,6 +1837,7 @@ SELECT * FROM (VALUES
   ('oura_tokens', 'access_token'),
   ('oura_tokens', 'refresh_token'),
   ('oura_tokens', 'webhook_signing_key'),
+  ('native_refresh_tokens', 'token_hash'),
   ('feedback_submissions', 'screenshot_data'),
   ('saved_meals', 'image_data_uri'),
   ('food_items', 'image_data_uri')

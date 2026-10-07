@@ -47,8 +47,9 @@ const runRedecodeOffLoop = vi.fn(async (..._a: unknown[]) => ({
 
 const reapStaleRedecodeJobs = vi.fn(async (_u: string) => 0)
 const startRedecodeJob = vi.fn(async (..._a: unknown[]) => ({
-  job: { id: 77, startedAt: new Date('2026-09-09T04:00:00Z') },
+  job: { id: 77, startedAt: new Date('2026-09-09T04:00:00Z'), opts: {} as Row },
   alreadyRunning: false,
+  refused: false,
 }))
 const finishRedecodeJob = vi.fn(async (..._a: unknown[]) => undefined)
 const getRedecodeJob = vi.fn(async (..._a: unknown[]) => null as Row | null)
@@ -120,8 +121,9 @@ beforeEach(() => {
     aggregateError: null,
   })
   startRedecodeJob.mockResolvedValue({
-    job: { id: 77, startedAt: new Date('2026-09-09T04:00:00Z') },
+    job: { id: 77, startedAt: new Date('2026-09-09T04:00:00Z'), opts: {} },
     alreadyRunning: false,
+    refused: false,
   })
   getRedecodeJob.mockResolvedValue(null)
   getLatestRedecodeJob.mockResolvedValue(null)
@@ -278,12 +280,48 @@ describe('POST /api/oura-ble/samples/redecode?async=1', () => {
     // sample — the operation whose own comment names it as the event-loop starvation that took
     // production down. The response still carries the running job's id so the caller can poll it.
     startRedecodeJob.mockResolvedValue({
-      job: { id: 77, startedAt: new Date('2026-09-09T04:00:00Z') },
+      job: { id: 77, startedAt: new Date('2026-09-09T04:00:00Z'), opts: { allowStepsDecrease: true } },
       alreadyRunning: true,
+      refused: false,
     })
     const body = await (await redecodeReq('?async=1')).json()
-    expect(body).toMatchObject({ jobId: 77, status: 'running', alreadyRunning: true })
+    // The joiner is told what it is following: here a step backfill, which a plain press may follow.
+    expect(body).toMatchObject({ jobId: 77, status: 'running', alreadyRunning: true, kind: 'step-backfill' })
     expect(runRedecodeOffLoop).not.toHaveBeenCalled()
+  })
+
+  // Issue 2383. A step backfill used to follow a running plain redecode, so the correction never ran
+  // and the console said "Backfill applied". It is refused now: 409, nothing started, nothing to poll.
+  it('refuses a step backfill with 409 while a plain redecode holds the slot', async () => {
+    startRedecodeJob.mockResolvedValue({
+      job: { id: 41, startedAt: new Date('2026-09-09T04:00:00Z'), opts: { allowStepsDecrease: false } },
+      alreadyRunning: true,
+      refused: true,
+    })
+    const res = await redecodeReq('?async=1&allowStepsDecrease=1')
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body).toMatchObject({
+      refused: true, runningJobId: 41, runningKind: 'redecode', requestedKind: 'step-backfill',
+    })
+    expect(body.error).toMatch(/already running.*wait for it to finish, then run the backfill/i)
+    // No job id: the caller must not poll the plain run as though it were its own.
+    expect(body.jobId).toBeUndefined()
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store')
+    expect(runRedecodeOffLoop).not.toHaveBeenCalled()
+    expect(finishRedecodeJob).not.toHaveBeenCalled()
+  })
+
+  it('reports the kind of a job it starts', async () => {
+    startRedecodeJob.mockResolvedValue({
+      job: { id: 78, startedAt: new Date('2026-09-09T04:00:00Z'), opts: { allowStepsDecrease: true } },
+      alreadyRunning: false,
+      refused: false,
+    })
+    const body = await (await redecodeReq('?async=1&allowStepsDecrease=1')).json()
+    expect(body).toMatchObject({ jobId: 78, alreadyRunning: false, kind: 'step-backfill' })
+    expect(startRedecodeJob).toHaveBeenCalledWith('u-1', expect.objectContaining({ allowStepsDecrease: true }))
+    await settle()
   })
 
   it('stores the options on the job row, with an absent date as null', async () => {
@@ -385,6 +423,18 @@ describe('GET /api/oura-ble/samples/redecode — polling', () => {
       getLatestRedecodeJob.mockResolvedValue(job)
       expect((await (await pollReq()).json()).job.status, name).toBe('failed')
     }
+  })
+
+  it('reports the kind from the job row, so the backfill screen can tell whose run finished', async () => {
+    // Issue 2383. The step-backfill screen says "Backfill applied" only for a 'step-backfill' kind.
+    const finishedAt = new Date('2026-09-09T04:05:00Z')
+    getLatestRedecodeJob.mockResolvedValue({ ...JOB, finishedAt, opts: { fullHistory: true, allowStepsDecrease: false }, result: {} })
+    expect((await (await pollReq()).json()).job.kind).toBe('redecode')
+    getLatestRedecodeJob.mockResolvedValue({ ...JOB, finishedAt, opts: { fullHistory: true, allowStepsDecrease: true }, result: {} })
+    expect((await (await pollReq()).json()).job.kind).toBe('step-backfill')
+    // A result payload cannot shadow it.
+    getLatestRedecodeJob.mockResolvedValue({ ...JOB, finishedAt, opts: { fullHistory: true }, result: { kind: 'step-backfill' } })
+    expect((await (await pollReq()).json()).job.kind).toBe('redecode')
   })
 
   it('reaps stale jobs on the poll too, so a dead run cannot hold the slot forever', async () => {

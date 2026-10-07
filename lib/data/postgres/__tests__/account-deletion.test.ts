@@ -7,6 +7,7 @@
 // user's data can live in, cross-linked to the user's own rows — and the export map is read back as
 // the oracle, as the issue asked: every EXPORTED scope must come back empty for the deleted id.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { randomBytes } from 'node:crypto'
 import {
   readSchemaGraph, cascadeClosure, setNullToUsers, seedEveryUserTable, rowExists,
   type SchemaGraph, type SeededUser,
@@ -29,6 +30,14 @@ const LIVE_OVERRIDES = {
     start_at: new Date('2026-09-15T00:00:00Z'), end_at: new Date('2026-09-15T00:01:00Z'),
     source_bundle_id: 'com.example', quantity_value: 1, quantity_unit: 'count',
   },
+  native_refresh_tokens: refreshTokenRow(),
+}
+
+// #2076. Every account's row needs one, soft-deleted or not: the hash CHECK refuses the fixture's
+// generic text and the expiry CHECK wants a time after created_at. The hash is UNIQUE across the
+// database other files share, so it is random.
+function refreshTokenRow() {
+  return { token_hash: randomBytes(32).toString('hex'), expires_at: new Date(Date.now() + 30 * 86_400_000) }
 }
 
 type Pool = import('pg').Pool
@@ -154,7 +163,7 @@ describe.skipIf(!canRun)('account deletion (#2120)', () => {
     await makeUser(pool, B)
     // A's rows are soft-deleted wherever a table has `deleted_at`, so every one of them is a row
     // an export would skip.
-    a = await seedEveryUserTable(pool, g, A, { softDelete: true })
+    a = await seedEveryUserTable(pool, g, A, { softDelete: true, overrides: { native_refresh_tokens: refreshTokenRow() } })
     // B's rows name A's custom exercise: the shared catalogue entry must outlive its author for them.
     b = await seedEveryUserTable(pool, g, B, {
       overrides: LIVE_OVERRIDES,
@@ -226,7 +235,7 @@ describe.skipIf(!canRun)('account deletion (#2120)', () => {
     expect(survivors).toEqual([])
     // Spot-check the excluded-but-theirs tables by name, so a change to the closure cannot quietly
     // drop them from the loop above.
-    for (const t of ['oura_raw_samples', 'oura_raw_packed', 'applied_mutations', 'feedback_submissions', 'oura_tokens', 'friendships']) {
+    for (const t of ['oura_raw_samples', 'oura_raw_packed', 'applied_mutations', 'feedback_submissions', 'oura_tokens', 'native_refresh_tokens', 'friendships']) {
       expect(cascadeClosure(g).has(t), t).toBe(true)
     }
   })

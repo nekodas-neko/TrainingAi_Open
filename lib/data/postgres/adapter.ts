@@ -114,6 +114,7 @@ import type { AccountDeletionResult } from './slices/account-deletion'
 import * as colmi from './slices/colmi'
 import * as hcIntervals from './slices/health-connect-intervals'
 import * as shadowReadinessSlice from './slices/shadow-readiness'
+import * as nativeRefreshTokens from './slices/native-refresh-tokens'
 import { mergeSet, initialSourceMap, HEALTH_SOURCES, sourceRank, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
 import type {
   PeriodizationPhase,
@@ -724,6 +725,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async deleteAccount(userId: string): Promise<AccountDeletionResult> {
     return accountDeletion.deleteAccount(this.db, userId)
   }
+
+  // #2076 — native app refresh tokens. Only a hash is stored and no method returns one.
+  async createNativeRefreshToken(input: nativeRefreshTokens.CreateNativeRefreshTokenInput) { return nativeRefreshTokens.createNativeRefreshToken(this.db, input) }
+  async findNativeRefreshTokenByHash(tokenHash: import('@/lib/auth/refresh-token-hash').RefreshTokenHash) { return nativeRefreshTokens.findNativeRefreshTokenByHash(this.db, tokenHash) }
+  async rotateNativeRefreshToken(input: nativeRefreshTokens.RotateNativeRefreshTokenInput) { return nativeRefreshTokens.rotateNativeRefreshToken(this.db, input) }
+  async revokeNativeRefreshToken(userId: string, id: string, reason: nativeRefreshTokens.NativeRefreshTokenRevokedReason) { return nativeRefreshTokens.revokeNativeRefreshToken(this.db, userId, id, reason) }
+  async revokeNativeRefreshTokenFamily(userId: string, familyId: string, reason: nativeRefreshTokens.NativeRefreshTokenRevokedReason) { return nativeRefreshTokens.revokeNativeRefreshTokenFamily(this.db, userId, familyId, reason) }
+  async listActiveNativeRefreshTokens(userId: string) { return nativeRefreshTokens.listActiveNativeRefreshTokens(this.db, userId) }
 
   async getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null> {
     // lower(), not eq: it matches a row stored before LA-61's backfill (or one a collision kept it
@@ -1719,12 +1728,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const result = await this.db.execute<Row>(sql`
       SELECT exercise_name, estimated_1rm, is_baseline, rn, rn_kind
       FROM (
-        SELECT el.exercise_name, el.estimated_1rm, ws.phase_type IS NOT DISTINCT FROM 'baseline' AS is_baseline,
+        SELECT el.exercise_name, el.estimated_1rm, ${period.wsIsBaselineSession} AS is_baseline,
           -- The same total order in both windows (id breaks a logged_at tie), so the newest
           -- prescribed row is rn=1 and rn_kind=1 at once and can never be paired with itself.
           ROW_NUMBER() OVER (PARTITION BY el.exercise_name ORDER BY el.logged_at DESC, el.id DESC) AS rn,
           ROW_NUMBER() OVER (
-            PARTITION BY el.exercise_name, ws.phase_type IS NOT DISTINCT FROM 'baseline'
+            PARTITION BY el.exercise_name, ${period.wsIsBaselineSession}
             ORDER BY el.logged_at DESC, el.id DESC
           ) AS rn_kind
         FROM exercise_logs el
@@ -6331,7 +6340,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     if (probeFromDs != null && probeToDs != null) {
       const startDs = Math.floor(probeFromDs)
       const endDs = Math.ceil(probeToDs)
-      const rows = await readRawFrames(this.db, userId, { startDs, endDs })
+      const rows = await readRawFrames(this.db, userId, { startDs, endDs, caller: 'workout-sensor-probe' })
       const counts = new Map<number, number>()
       for (const r of rows) counts.set(r.tag, (counts.get(r.tag) ?? 0) + 1)
       rawByTag = [...counts.entries()]
@@ -6400,7 +6409,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const endDs = Math.ceil(toDs)
     const tagsOfInterest = Object.keys(TAG_LABELS).map(Number)
 
-    const rows = await readRawFrames(this.db, userId, { tags: tagsOfInterest, startDs, endDs })
+    const rows = await readRawFrames(this.db, userId, { tags: tagsOfInterest, startDs, endDs, caller: 'daytime-tag-coverage' })
 
     const perTag = new Map<number, number[]>() // tag → 24-bucket hour histogram
     for (const r of rows) {
@@ -6470,7 +6479,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     if (fromDs == null || toDs == null) return { temp: [], met: [] }
     const startDs = Math.floor(fromDs)
     const endDs = Math.ceil(toDs)
-    const rows = await readRawFrames(this.db, userId, { tags: [0x46, 0x69, 0x50], startDs, endDs })
+    const rows = await readRawFrames(this.db, userId, { tags: [0x46, 0x69, 0x50], startDs, endDs, caller: 'oura-daytime-signals' })
     const temp: { tsMs: number; valueC: number }[] = []
     const met: { tsMs: number; value: number }[] = []
     for (const r of rows) {
@@ -6502,7 +6511,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     if (fromDs == null || toDs == null) return []
     const startDs = Math.floor(fromDs)
     const endDs = Math.ceil(toDs)
-    const rows = await readRawFrames(this.db, userId, { tags: [0x61], startDs, endDs })
+    const rows = await readRawFrames(this.db, userId, { tags: [0x61], startDs, endDs, caller: 'oura-battery-events' })
     const out: Array<{ tsMs: number; kind: 'battery_level_changed' | 'charging_time'; batteryPct: number | null; voltageMv: number | null; chargingTimeSec: number | null }> = []
     for (const r of rows) {
       const decoded = (r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null)) as Record<string, unknown> | null
@@ -6790,7 +6799,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     if (lastAttempt != null && Date.now() - lastAttempt < REFIT_THROTTLE_MS) return
     PostgresWorkoutRepository.lastHrvRefitAttemptMs.set(userId, Date.now())
 
-    const rows = await this.getOuraRawSamplesForTags(userId, [0x5d, 0x46, 0x69], REFIT_LOOKBACK_DAYS)
+    const rows = await this.getOuraRawSamplesForTags(userId, [0x5d, 0x46, 0x69], REFIT_LOOKBACK_DAYS, 'daytime-hrv-refit')
     if (rows.length === 0) return // genuinely no ring data in the window — nothing to say
     const toIso = todayInTz(timezone)
     const fromIso = toAestDay(new Date(Date.now() - REFIT_LOOKBACK_DAYS * 86_400_000), timezone)
@@ -6834,6 +6843,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       getBodyFatCalibration: id => this.getBodyFatCalibration(id),
       refitDaytimeHrvModel: (id, tz) => this.maybeRefitDaytimeHrvModel(id, tz),
       listSleepSessions: (id, from, to) => this.listSleepSessions(id, from, to),
+      caller: opts?.fullHistory ? 'rollup:full-history' : 'rollup',
     }), nodeModelRuntime, timezone, opts)
   }
 
@@ -6846,8 +6856,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const anchors = await this.getOuraClockAnchors(userId)
     if (anchors.length === 0) return []
     const [stepFrameRows, motionFrameRows, liveWindowRows] = await Promise.all([
-      readRawFrames(this.db, userId, { tags: [...STEP_FEATURE_TAGS] }),
-      readRawFrames(this.db, userId, { tags: [STEP_MOTION_TAG] }),
+      readRawFrames(this.db, userId, { tags: [...STEP_FEATURE_TAGS], caller: 'steps-backfill-preview' }),
+      readRawFrames(this.db, userId, { tags: [STEP_MOTION_TAG], caller: 'steps-backfill-preview' }),
       this.db
         .select({ startDs: s.stepLiveWindows.startDs, endDs: s.stepLiveWindows.endDs, steps: s.stepLiveWindows.steps })
         .from(s.stepLiveWindows)
@@ -7178,10 +7188,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * Decodes from `body_hex` now, preferring the stored column if it is ever populated.
    */
   async readOuraRawFrames(userId: string, q: import('./slices/oura-raw-frames').RawFrameQuery) {
-    return readRawFrames(this.db, userId, q)
+    return readRawFrames(this.db, userId, { caller: 'read-oura-raw-frames', ...q })
   }
 
-  async getOuraRawSamplesForTags(userId: string, tags: number[], days: number): Promise<OuraRawSampleRow[]> {
+  async getOuraRawSamplesForTags(userId: string, tags: number[], days: number, caller = 'raw-samples-for-tags'): Promise<OuraRawSampleRow[]> {
     if (tags.length === 0) return []
     const windowDays = Math.min(Math.max(Math.floor(days), 1), MAX_RAW_SAMPLE_WINDOW_DAYS)
 
@@ -7200,7 +7210,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const startDs = resolveMsToDs(Date.now() - windowDays * 86_400_000, anchors)
     if (startDs == null) return []
 
-    const rows = await readRawFrames(this.db, userId, { tags, startDs: Math.floor(startDs) })
+    const rows = await readRawFrames(this.db, userId, { tags, startDs: Math.floor(startDs), caller })
     return rows.map((r): OuraRawSampleRow => ({
       ringTimestampDs: Number(r.ds),
       tag: r.tag,

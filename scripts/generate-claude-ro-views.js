@@ -31,6 +31,11 @@ const { Client } = require('pg')
 const DENY = {
   users: ['password_hash'],
   oura_tokens: ['personal_access_token', 'access_token', 'refresh_token', 'webhook_signing_key'],
+  // #2076. A SHA-256 of a 256-bit random token cannot be turned back into the token, so this is
+  // defence in depth rather than a live secret; but nothing an audit asks needs it. The rest of the
+  // row (device, family, created/used/expires, rotated, revoked and why) is what answers "why was
+  // the app signed out", so the table gets a view rather than going to DENIED.
+  native_refresh_tokens: ['token_hash'],
   feedback_submissions: ['screenshot_data'],
   // Q-396. A base64 thumbnail has no audit value and every row carries one, so a SELECT * over this
   // view would return kilobytes per meal for nothing. The size stand-in below is strictly MORE

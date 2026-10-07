@@ -23,8 +23,20 @@
 -- No CHECK constraint, deliberately. The Zod schema in packages/shared/src/validation/day-checkin.ts
 -- is the one gate both the web route and pushMutations parse, so a constraint here would be a
 -- second place for the allowed set to live and drift from.
-ALTER TABLE day_checkins
-  ADD COLUMN IF NOT EXISTS vs_yesterday text;
+-- Guarded on `vs_normal` (issue 2629). `202609301320_vs_normal_with_question_version.sql` renames this
+-- column to `vs_normal`, so on a REPLAY of every migration (CI's idempotency step, which truncates
+-- `schema_migrations`) this file ran again, found no `vs_yesterday`, and added a fresh empty one: the
+-- replay reported 0 failed and left a column a fresh build does not have. Once the rename has happened
+-- there is nothing for this to add. A fresh database still runs it before the rename, as it always
+-- did; production tracks migrations by filename and never ran it twice.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = 'public' AND table_name = 'day_checkins' AND column_name = 'vs_normal') THEN
+    ALTER TABLE day_checkins
+      ADD COLUMN IF NOT EXISTS vs_yesterday text;
 
-COMMENT ON COLUMN day_checkins.vs_yesterday IS
-  'TN-58 comparative self-report: better | same | worse. NULL = not answered (no default, by design).';
+    COMMENT ON COLUMN day_checkins.vs_yesterday IS
+      'TN-58 comparative self-report: better | same | worse. NULL = not answered (no default, by design).';
+  END IF;
+END $$;

@@ -4,6 +4,11 @@
 `docs/design/2026-10-06-readiness-hub.html`; scoring test cases and baseline windows:
 `docs/design/2026-10-06-readiness-scoring-cases.html`.
 
+**Shadow engine (#2377):** built and scored daily beside the live readiness, shown nowhere
+(`shadow_readiness`). The model as data is `packages/shared/src/health/shadow-readiness/model.ts`;
+units it cannot build yet (`sleep.deep_rem_share`, `heart.daytime_rhr`, `activity.block_trend`) are
+marked `unavailable` there with what each one needs, and drop out with their pillar renormalised.
+
 Read with [`adaptive-scoring.md`](adaptive-scoring.md) (how bands and normals are learned per
 person) and [`component-references.md`](component-references.md) (the research default for each
 unit). Today's shipped model is described in [`scoring-structure.md`](scoring-structure.md). Every
