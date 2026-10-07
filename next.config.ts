@@ -2,7 +2,8 @@ import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 import { buildCsp } from "./lib/security/csp";
 import { readBuildSha } from "./lib/build-sha";
-import { readAppVersion, sentryRelease } from "./lib/observability/sentry-release";
+import { readAppVersion } from "./lib/observability/app-version";
+import { sentryRelease } from "./lib/observability/sentry-release";
 
 const isDev = process.env.NODE_ENV === 'development';
 

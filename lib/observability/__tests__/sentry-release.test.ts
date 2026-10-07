@@ -12,7 +12,8 @@ import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
 import { readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { sentryRelease, readAppVersion } from '../sentry-release'
+import { sentryRelease } from '../sentry-release'
+import { readAppVersion } from '../app-version'
 
 const root = join(__dirname, '..', '..', '..')
 const src = (p: string) => readFileSync(join(root, p), 'utf8')
@@ -54,6 +55,23 @@ describe('readAppVersion', () => {
       writeFileSync(join(dir, 'package.json'), '{"version": 3}')
       expect(readAppVersion(dir)).toBeNull()
     } finally { rmSync(dir, { recursive: true, force: true }) }
+  })
+})
+
+describe('the edge runtime can load the release helper', () => {
+  // The first build of this failed with `Can't resolve 'fs'` because `sentry.edge.config.ts` imports
+  // the helper and the helper imported Node. A source test is the cheapest thing that holds it: the
+  // build is what proves it, and it takes five minutes.
+  it('sentry-release.ts imports nothing from Node', () => {
+    const s = src('lib/observability/sentry-release.ts')
+    expect(s).not.toMatch(/from\s+["'](?:node:)?(?:fs|path|os|child_process|crypto)["']/)
+    expect(s).not.toMatch(/\brequire\(/)
+  })
+
+  it('and the Node-only reader is not imported by any Sentry init', () => {
+    for (const f of ['instrumentation-client.ts', 'sentry.server.config.ts', 'sentry.edge.config.ts']) {
+      expect(src(f), f).not.toContain('app-version')
+    }
   })
 })
 
