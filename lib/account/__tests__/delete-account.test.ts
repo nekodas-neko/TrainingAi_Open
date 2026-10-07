@@ -27,6 +27,9 @@ const serverSignOut = vi.fn(async () => { order.push('server-sign-out') })
 vi.mock('@/lib/local-store', () => ({ clearLocalStoreData: () => clearLocalStoreData() }))
 vi.mock('@/lib/sqlite/cache', () => ({ clearAllCache: () => clearAllCache(), disableCacheWrites: () => disableCacheWrites() }))
 vi.mock('@/app/actions', () => ({ signOut: () => serverSignOut() }))
+// #2453: browser storage — account keys cleared, device keys (no ring key lives there) kept.
+const clearAccountStorage = vi.fn(() => { order.push('clear-account-storage') })
+vi.mock('@/lib/sign-out-storage', () => ({ clearAccountStorage: () => clearAccountStorage() }))
 
 const replace = vi.fn()
 vi.stubGlobal('window', { location: { replace } })
@@ -57,7 +60,7 @@ describe('deleteAccountAndSignOut (#2120)', () => {
     expect(JSON.parse(String(fetchMock.mock.calls[0][1].body))).toEqual({ confirm: 'DELETE' })
     expect(order).toEqual([
       'fetch DELETE /api/account', 'on-deleted',
-      'disable-cache-writes', 'clear-local-store', 'clear-cache', 'server-sign-out',
+      'disable-cache-writes', 'clear-local-store', 'clear-cache', 'clear-account-storage', 'server-sign-out',
     ])
     expect(bridgeCalls).toEqual([])
   })

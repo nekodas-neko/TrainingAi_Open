@@ -489,6 +489,9 @@ jobs:
       - name: Sign-out wipes the device, not just the session
         run: node scripts/check-sign-out-clears-device.js
 
+      - name: Sign-out classifies every browser-storage key (#2453)
+        run: node scripts/check-sign-out-clears-storage.js
+
       - name: API responses stay out of the browser HTTP cache
         run: node scripts/check-api-no-store.js
 
