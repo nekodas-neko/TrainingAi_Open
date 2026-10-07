@@ -6,7 +6,7 @@ const root = path.resolve(__dirname, '../../../..')
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (['node_modules', '.next', '__tests__'].includes(e.name)) continue
+    if (['node_modules', '.next', '__tests__', '__check_fixture__'].includes(e.name)) continue
     const p = path.join(dir, e.name)
     if (e.isDirectory()) walk(p, out)
     else if (/\.tsx?$/.test(e.name)) out.push(p)

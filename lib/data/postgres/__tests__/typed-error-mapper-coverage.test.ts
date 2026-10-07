@@ -78,6 +78,7 @@ describe('every route calling a throwing repository method maps its error', () =
   // function` in the Tests job.
   function routeFiles(dir: string, found: string[] = []): string[] {
     for (const e of readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === '__check_fixture__') continue
       const full = join(dir, e.name)
       if (e.isDirectory()) routeFiles(full, found)
       else if (e.name === 'route.ts') found.push(full)

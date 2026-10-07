@@ -62,7 +62,7 @@ describe('client reads bypass the browser HTTP cache', () => {
     const walk = (dir: string) => {
       for (const entry of readdirSync(dir, { withFileTypes: true })) {
         const full = join(dir, entry.name)
-        if (entry.isDirectory()) { if (entry.name !== '__tests__') walk(full); continue }
+        if (entry.isDirectory()) { if (entry.name !== '__tests__' && entry.name !== '__check_fixture__') walk(full); continue }
         if (entry.name !== 'route.ts') continue
         if (full.endsWith(join('api', 'version', 'route.ts'))) continue  // public, deliberately cacheable
         for (const line of readFileSync(full, 'utf8').split('\n')) {
