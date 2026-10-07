@@ -7,7 +7,11 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { resolveBaseRef, lineCountsAtBase, verdict } = require('./lib/base-ref');
+const { resolveBaseRef, countsAtBase, verdict } = require('./lib/base-ref');
+
+// Match `wc -l` (newline count), so a baseline can be read straight off the shell. The one counter for
+// both the working tree and the base: two formulas is how the base came to read a line high (#2557).
+const wcLines = (src) => src.split('\n').length - (src.endsWith('\n') ? 1 : 0);
 
 const LIMIT = 800;
 
@@ -58,8 +62,7 @@ function walk(dir) {
     } else if (entry.name.endsWith('.tsx')) {
       const rel = path.relative(root, full).split(path.sep).join('/');
       const src = fs.readFileSync(full, 'utf8');
-      // Match `wc -l` (newline count), so a baseline can be read straight off the shell.
-      const lines = src.split('\n').length - (src.endsWith('\n') ? 1 : 0);
+      const lines = wcLines(src);
       judged.push({ rel, lines, allowed: BASELINE[rel] ?? LIMIT });
     }
   }
@@ -73,7 +76,10 @@ for (const top of ['app', 'components']) walk(path.join(root, top));
 // over its number on the base is not this branch's to fix, and failing it here reports someone
 // else's merge as this author's oversized change. Read after the walk, for every file at once:
 // one git process per run, not one per file (#2081).
-const atBase = lineCountsAtBase(baseRef, judged.map((j) => j.rel));
+// The working tree's own count over the base's copy (#2557). `lineCountsAtBase` is
+// `split('\n').length`, one more than `wcLines` for a file ending in a newline, so every base read one
+// line high and a file over its baseline could grow by exactly one line and read as inherited.
+const atBase = countsAtBase(baseRef, judged.map((j) => j.rel), wcLines);
 for (const { rel, lines, allowed } of judged) {
   const v = verdict({ count: lines, limit: allowed, atBase: atBase.get(rel) });
   if (v === 'inherited') {

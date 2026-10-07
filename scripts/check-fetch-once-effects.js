@@ -233,7 +233,8 @@ for (const abs of files) {
 const failures = [];
 const inherited = [];
 // One read of the base for every file, not one git process per file (#2081).
-const atBase = countsAtBase(baseRef, [...perFile.keys()], (c) => countFetchOnce(c).count);
+// Comments stripped first, as the working-tree scan above does (#2557).
+const atBase = countsAtBase(baseRef, [...perFile.keys()], (c) => countFetchOnce(stripComments(c)).count);
 for (const [rel, count] of perFile) {
   const allowed = BASELINE[rel] ?? 0;
   // LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over.
