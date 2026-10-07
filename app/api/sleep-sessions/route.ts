@@ -45,6 +45,11 @@ export async function GET() {
     sleepStart:      r.sleepStart.toISOString(),
     sleepEnd:        r.sleepEnd.toISOString(),
     sleepTimeRecommendation: sleepTimeRecommendationByDate.get(r.date) ?? null,
+    // #2264. The repository maps the column; this list dropped it, so a bedtime the user entered was
+    // invisible wherever the card reads this route instead of the local store (the web build, and
+    // any screen whose local rows the network reply overwrites). It is passed through as its own
+    // field and nothing here reads it: the measured window above stays measured.
+    manualSleepStart: r.manualSleepStart ? r.manualSleepStart.toISOString() : null,
   })));
 
   // A night the rollup has not yet derived past is still growing, and saying so is the whole of
