@@ -1,0 +1,80 @@
+<title>Goals Calorie Budget</title>
+<style>
+:root{color-scheme:dark;--page:#0b100e;--page-fg:#e9efec;--page-dim:#9aa8a2;--line:#22302b;
+--background:oklch(0.145 0.020 149);--foreground:oklch(0.985 0 0);--muted:oklch(0.225 0.034 149);--muted-foreground:oklch(0.75 0 0);--border:oklch(1 0 0 / 7%);
+--cal:#f97316;--green:#22c55e;--red:#ef4444;
+--font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--page-fg);font-family:var(--font);line-height:1.5;padding-block:28px;padding-inline:16px}
+.wrap{max-width:860px;margin:0 auto}
+h1{font-size:24px;line-height:1.2;margin:0 0 6px;text-wrap:balance}
+p{max-width:68ch;margin:0 0 10px}
+.dim{color:var(--page-dim)}
+.meta{font-family:var(--mono);font-size:11px;color:var(--page-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:20px}
+.pair{display:flex;flex-wrap:wrap;gap:20px;margin:16px 0}
+.col{flex:1 1 300px;min-width:0;max-width:384px}
+.tag{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--page-dim);margin-bottom:6px}
+.tag.after{color:var(--green)}
+.phone{background:var(--background);color:var(--foreground);border:1px solid var(--line);border-radius:22px;padding:6px 0;display:flex;flex-direction:column}
+.sec{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
+.sec:last-child{border-bottom:0}
+.lab{font-size:12px;color:var(--muted-foreground);font-weight:500}
+.input{border:1px solid var(--border);background:color-mix(in oklch,var(--muted) 60%,transparent);border-radius:8px;padding:8px 10px;font-size:14px;font-weight:500}
+.seg{display:inline-flex;gap:2px;background:var(--muted);border:1px solid var(--border);border-radius:12px;padding:2px;font-size:12px;font-weight:600;align-self:flex-start}
+.seg span{padding:5px 16px;border-radius:9px;color:var(--muted-foreground)}
+.seg span.on{background:var(--background);color:var(--foreground)}
+.rec{font-size:12px;color:var(--muted-foreground)}
+.rec b{color:var(--foreground)}
+.link{color:#38bdf8;font-weight:600}
+.bar{height:7px;border-radius:999px;background:var(--muted);position:relative}
+.bar i{display:block;height:100%;border-radius:999px;background:var(--cal)}
+.barlab{display:flex;justify-content:space-between;font-size:12px;color:var(--muted-foreground);font-variant-numeric:tabular-nums}
+.big{display:flex;align-items:baseline;gap:6px}
+.big b{font-size:24px;font-weight:700;font-variant-numeric:tabular-nums}
+.big span{font-size:12px;color:var(--muted-foreground)}
+.rows{display:grid;grid-template-columns:1fr auto;gap:3px 12px;font-size:13px;font-variant-numeric:tabular-nums}
+.rows span{color:var(--muted-foreground)}
+.rows b{font-weight:600;text-align:right}
+.rows .tot{border-top:1px solid var(--border);padding-top:4px;color:var(--foreground)}
+.card{border:1px dashed color-mix(in oklch,var(--cal) 50%,transparent);border-radius:10px;padding:10px;font-size:12px;color:var(--muted-foreground);opacity:.55}
+.strike{text-decoration:line-through}
+ul{max-width:70ch;padding-left:20px} li{margin:4px 0}
+</style>
+<div class="wrap">
+<h1>Goals: one calorie number</h1>
+<p class="dim">This is for #2622, which you approved. Since #2618, your calorie budget is worked out from your resting rate, your goal and how much you move. The typed Calorie Goal box no longer changes anything you see, so it becomes a read-only line that shows today's budget and where it comes from. To change the budget, change your goal or goal weight. The numbers below are from your example on #2618 and are only illustrative.</p>
+<p class="meta">#2622 · 2026-10-07 · Profile → Goals · 384 px dark</p>
+<div class="pair">
+<div class="col"><div class="tag">Before (main)</div>
+<div class="phone">
+<div class="sec"><div class="lab">Calorie Goal</div><div class="input">2400</div>
+<div class="seg"><span class="on">Daily</span><span>Weekly</span></div>
+<div class="rec">Recommended <b>1,660 kcal</b>: your resting rate on a rest day, adjusted for your fitness goal · <span class="link">Use</span></div>
+<div class="bar"><i style="width:38%"></i></div><div class="barlab"><span>Today 910 kcal</span><span>of 2,400</span></div></div>
+<div class="sec"><div class="lab">Nutrition → Calorie Nudge</div><div class="card">"Why two numbers? Your goal is 2,400 but your maintenance suggests 1,660. Update your goal?"</div></div>
+</div></div>
+<div class="col"><div class="tag after">After</div>
+<div class="phone">
+<div class="sec"><div class="lab">Calorie budget today</div>
+<div class="big"><b>1,570</b><span>kcal · worked out, not typed</span></div>
+<div class="rows">
+<span>Resting rate</span><b>1,304</b>
+<span>Recomp deficit (0.3% a week)</span><b>−232</b>
+<span>Everyday burn (20%)</span><b>+261</b>
+<span>Movement today</span><b>+237</b>
+<span class="tot">Budget</span><b class="tot">1,570</b>
+</div>
+<div class="rec">It changes with your goal and goal weight above, and with how much you move. Meal plans are sized to it.</div>
+<div class="bar"><i style="width:58%"></i></div><div class="barlab"><span>Today 910 kcal</span><span>of 1,570</span></div></div>
+<div class="sec"><div class="lab">Nutrition → Calorie Nudge</div><div class="card strike">Removed: there's only one number left to compare.</div></div>
+</div></div>
+</div>
+<ul>
+<li><b>Gone:</b> the number box, the Daily/Weekly switch, the "Recommended … Use" line and the Calorie Nudge card. Your old typed value stays in the database. Nothing is deleted.</li>
+<li><b>Kept:</b> the progress bar, now measured against the budget, which is the same number Nutrition, Home and the coach use.</li>
+<li><b>The breakdown</b> uses the single budget calculation, so the lines always add up to the figure on Nutrition.</li>
+</ul>
+</div>
