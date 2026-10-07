@@ -1519,6 +1519,28 @@ SELECT
 FROM public.set_logs t
 WHERE EXISTS (SELECT 1 FROM public.exercise_logs e JOIN public.workout_sessions p ON p.id = e.workout_session_id WHERE e.id = t.exercise_log_id AND p.user_id = current_setting('app.claude_ro_owner', true)::uuid);
 
+CREATE VIEW claude_ro.shadow_readiness AS
+SELECT
+  t.id,
+  t.user_id,
+  t.date,
+  t.model_version,
+  t.shadow_readiness,
+  t.sleep_pillar,
+  t.heart_pillar,
+  t.activity_pillar,
+  t.body_pillar,
+  t.pillar_detail,
+  t.units,
+  t.maturity_stage,
+  t.inputs_through,
+  t.live_readiness,
+  t.live_model_version,
+  t.computed_by,
+  t.computed_at
+FROM public.shadow_readiness t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.sleep_sessions AS
 SELECT
   t.id,
