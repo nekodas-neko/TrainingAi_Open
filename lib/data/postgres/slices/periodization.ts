@@ -480,9 +480,34 @@ export async function getSetTimingRows(db: Db, userId: string, exerciseNames: st
     .where(and(...conditions))
 }
 
-// 90-day estimated-1RM history per exercise, one point per session-day — feeds the
-// strength-projection plateau detector and, since LA-96, /api/strength-trend, which used to
-// carry a byte-identical copy of this query.
+/**
+ * The one test for "this workout was a baseline session" in SQL, written against the
+ * `workout_sessions ws` alias (#2297, #2460). A baseline session is the first run of each session
+ * after a program is built: one unprescribed set per exercise, so its estimate goes through the
+ * AMRAP scaling instead of being divided back up by a prescribed %1RM. TN-75 (#1957) has tagged it
+ * `phase_type = 'baseline'` since 2026-09-29.
+ *
+ * `IS NOT DISTINCT FROM`, so a NULL tag is NOT baseline. Every row before TN-75 is NULL, and an
+ * untagged row is unknown rather than known-baseline: it keeps being read as it always was until a
+ * backfill tags it (`scripts/backfill-baseline-phase-tag.mjs`).
+ */
+export const wsIsBaselineSession = sql`ws.phase_type IS NOT DISTINCT FROM 'baseline'`
+
+/**
+ * 90-day estimated-1RM history per exercise, one point per session-day. It feeds the
+ * strength-projection plateau detector (`signals.ts`) and, since LA-96, `/api/strength-trend`,
+ * which used to carry a byte-identical copy of this query.
+ *
+ * **Baseline sessions are left out (#2460, owner decision 2026-10-07).** A baseline estimate is
+ * AMRAP-scaled from one unprescribed set, while every other point is a prescribed set divided by
+ * its own %1RM. On the owner's bench the 09-07 → 09-12 baseline read 82.75 between prescribed
+ * 103.75 and 91.25: a dip that the % change, the 30-day projection, the 90-day low and the plateau
+ * check all took as real. A day whose only points are baseline has no point at all — a gap, never a
+ * zero. An untagged (NULL) session is still included; see `wsIsBaselineSession`.
+ *
+ * `getLastRealOneRmBatch` keeps reading baseline estimates on purpose: it is the working basis the
+ * bar loads from, and straight after a rebuild the baseline is the only basis there is.
+ */
 export async function getExercise1rmHistory(db: Db, userId: string, exerciseNames: string[], tz: string): Promise<Record<string, { date: string; rm: number }[]>> {
   if (exerciseNames.length === 0) return {}
   type RawRow = { exercise_name: string; session_date: string; rm: number }
@@ -501,6 +526,7 @@ export async function getExercise1rmHistory(db: Db, userId: string, exerciseName
       -- predicate alone trusts the write-time invariant that a deload always stores 0, and
       -- that invariant has been violated in production in both directions.
       AND el.exercise_deloaded = false
+      AND NOT (${wsIsBaselineSession})
       AND ws.started_at >= NOW() - INTERVAL '90 days'
       AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
     GROUP BY el.exercise_name, session_date
