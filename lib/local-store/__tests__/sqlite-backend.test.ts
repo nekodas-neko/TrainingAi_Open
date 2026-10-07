@@ -34,6 +34,7 @@ const sleepSession = {
   onsetLatencySec: 600, averageHrvMs: 62, avgHeartRate: 54, lowestHeartRate: 48,
   restlessPeriods: 12, sleepScore: 84, respiratoryRate: 14.2, sleepPhase5Min: '1,2,3',
   timeInBedHours: 8.1, manualSleepStart: '2026-06-30T13:00:00.000Z',
+  sleepStart: '2026-06-30T12:20:00.000Z', sleepEnd: '2026-06-30T20:25:00.000Z', awakHours: 0.6,
   syncStatus: 'synced' as const, updatedAt: '2026-07-01T09:00:00.000Z',
 }
 const ouraDailyRow = {
@@ -290,6 +291,54 @@ describe('applyDelta pull-clobber guards', () => {
     const [row] = await store.getSleepSessions('2026-07-01')
     expect(row.manualSleepStart).toBe('2026-06-30T13:00:00.000Z')
     expect(row.durationHours).toBe(7.5)   // and nothing else moved
+  })
+
+  // #2414. The hypnogram needs the night's window on the local row. The pull has always carried
+  // it; the statement has to write it, and a pre-v50 row (no window) has to be fillable by a
+  // re-send whose updated_at is EQUAL — or the gap is permanent.
+  it('sleep_sessions upsert writes the window and awake time, and lets a re-send fill a pre-v50 gap (#2414)', async () => {
+    await store.applyDelta({ sleepSessions: [sleepSession] })
+    const stmt = sqlCalls().find(s => s.includes('INTO sleep_sessions'))!
+    const params = runSQL.mock.calls.find(c => String(c[0]).includes('INTO sleep_sessions'))![1] as unknown[]
+    const cols = stmt.slice(stmt.indexOf('(') + 1, stmt.indexOf('VALUES')).replace(/\)\s*$/, '')
+      .split(',').map(c => c.trim()).filter(Boolean)
+    expect(params[cols.indexOf('sleep_start')]).toBe('2026-06-30T12:20:00.000Z')
+    expect(params[cols.indexOf('sleep_end')]).toBe('2026-06-30T20:25:00.000Z')
+    expect(params[cols.indexOf('awake_hours')]).toBe(0.6)
+    for (const col of ['sleep_start', 'sleep_end', 'awake_hours']) {
+      expect(stmt).toContain(`${col}=excluded.${col}`)
+    }
+    // Still guarded against a pending (device-authored) row, whatever the window says.
+    expect(stmt).toContain(`WHERE sleep_sessions.sync_status='synced'`)
+    expect(stmt).toContain('OR (sleep_sessions.sleep_start IS NULL AND excluded.sleep_start IS NOT NULL)')
+  })
+
+  it('sleep_sessions upsert binds null, not undefined, for a delta row without a window (#2414)', async () => {
+    await store.applyDelta({ sleepSessions: [{ ...sleepSession, sleepStart: null, sleepEnd: null, awakHours: null }] })
+    const stmt = sqlCalls().find(s => s.includes('INTO sleep_sessions'))!
+    const params = runSQL.mock.calls.find(c => String(c[0]).includes('INTO sleep_sessions'))![1] as unknown[]
+    const cols = stmt.slice(stmt.indexOf('(') + 1, stmt.indexOf('VALUES')).replace(/\)\s*$/, '')
+      .split(',').map(c => c.trim()).filter(Boolean)
+    for (const col of ['sleep_start', 'sleep_end', 'awake_hours']) expect(params[cols.indexOf(col)]).toBeNull()
+  })
+
+  it('getSleepSessions reads the window back, and null for a row from before v50 (#2414)', async () => {
+    const base = {
+      id: 'ss-1', date: '2026-07-01', duration_hours: 7.5, deep_sleep_hours: 1.2,
+      rem_sleep_hours: 1.8, light_sleep_hours: 4.5, oura_id: 'oura-abc', sleep_phase_5_min: '1,2,3',
+      sync_status: 'synced', updated_at: '2026-07-01T09:00:00.000Z',
+    }
+    querySQL.mockResolvedValueOnce([
+      { ...base, sleep_start: '2026-06-30T12:20:00.000Z', sleep_end: '2026-06-30T20:25:00.000Z', awake_hours: 0.6 },
+      { ...base, id: 'ss-0', date: '2026-06-30', sleep_start: null, sleep_end: null, awake_hours: null },
+    ])
+    const [timed, old] = await store.getSleepSessions('2026-06-30')
+    expect(timed.sleepStart).toBe('2026-06-30T12:20:00.000Z')
+    expect(timed.sleepEnd).toBe('2026-06-30T20:25:00.000Z')
+    expect(timed.awakHours).toBe(0.6)
+    expect(old.sleepStart).toBeNull()
+    expect(old.sleepEnd).toBeNull()
+    expect(old.awakHours).toBeNull()
   })
 
   it('oura_daily upsert is clobber-guarded, not INSERT OR REPLACE (D4)', async () => {

@@ -64,6 +64,14 @@ export interface LocalSleepSession {
   deepSleepHours:  number | null;
   remSleepHours:   number | null;
   lightSleepHours: number | null;
+  /** #2414 (v50): the session's own window and awake time, as the server stores them. Null on
+   *  every row pulled before v50 until the server re-sends it — and a reader must treat a null
+   *  window as "cannot place this row", never as a zero-length night. `awakHours` keeps the
+   *  server's spelling (`sleep_sessions.awake_hours` → Drizzle `awakHours`) so the row reads as
+   *  the API's `SleepRow` without renaming. */
+  sleepStart:      string | null;
+  sleepEnd:        string | null;
+  awakHours:       number | null;
   // Oura columns (v18, added via RECONCILE) — carried through pull/restore so a
   // wiped device gets HRV/stages back, not sleep stripped to stage hours (review R6).
   ouraId:          string | null;

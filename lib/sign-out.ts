@@ -3,6 +3,7 @@
 import { clearLocalStoreData } from '@/lib/local-store'
 import { clearAllCache, disableCacheWrites } from '@/lib/sqlite/cache'
 import { signOut as serverSignOut } from '@/app/actions'
+import { clearAccountStorage } from '@/lib/sign-out-storage'
 
 /**
  * The only way to sign out.
@@ -21,7 +22,12 @@ import { signOut as serverSignOut } from '@/app/actions'
  * clears — it posts straight to the server action — so a sign-out control has to be a button with
  * an `onClick`. `scripts/check-sign-out-clears-device.js` fails the build on either mistake.
  *
- * Both clears are best-effort: a failure to wipe must not strand someone signed in. The server
+ * **Unsynced local writes go with the account, and that is deliberate.** `clearLocalStoreData()`
+ * empties `sync_outbox` like every other table, so a change not yet pushed is discarded rather than
+ * pushed later under whoever signs in next. The in-progress workout in `ta_workout_state` follows
+ * the same rule (#2453); it was already swept by the old `ta_` prefix clear, so that is unchanged.
+ *
+ * All three clears are best-effort: a failure to wipe must not strand someone signed in. The server
  * sign-out still runs, and the next sign-in re-syncs.
  */
 export async function signOutAndClearDevice(): Promise<void> {
@@ -31,5 +37,9 @@ export async function signOutAndClearDevice(): Promise<void> {
   disableCacheWrites()
   await clearLocalStoreData().catch(() => {})
   await clearAllCache().catch(() => {})
+  // Browser storage: everything but the device settings in `DEVICE_STORAGE`, with the persisted
+  // stores reset in memory first so a mounted screen cannot write the old state back (#2453).
+  // After the cache clear, which empties the cache's own mirror keys; this then takes the rest.
+  clearAccountStorage()
   await serverSignOut()
 }

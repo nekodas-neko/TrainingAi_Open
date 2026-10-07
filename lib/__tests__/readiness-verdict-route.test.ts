@@ -109,13 +109,13 @@ describe('GET /api/readiness-verdict', () => {
       date: DAY,
       verdict: 'poor',
       score: 41,
-      band: { median: 63, low: 57, high: 69 },
+      band: { median: 63, low: 58.4, high: 67.6 },
       baselineDays: 28,
       // Today is v6 and every day before it v5 — the mix #2105 warned about, counted.
       baselineSameVersionDays: 0,
       contributors: CONTRIBUTORS,
       readinessModelVersion: V6,
-      modelVersion: 1,
+      modelVersion: 2,
     })
     expect(record).not.toHaveProperty('responseState')  // the upsert must never set it
   })

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveHrProfile } from '../hr-profile'
+import { resolveHrProfile, hasHrSource } from '../hr-profile'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { computeObservedHr } from '../observed-hr'
 
@@ -119,5 +119,37 @@ describe('resolveHrProfile — a failed read degrades, and says so (LA-82)', () 
   it('an empty resting-HR window is still an ordinary default', async () => {
     const p = await resolveHrProfile(repoWith({ bpms: flat(150, 10), rhr: [] }), 'u', 'Australia/Brisbane')
     expect(p.restingHrSource).toBe('default')
+  })
+})
+
+// #2337 — the one definition of "has an HR source".
+describe('hasHrSource', () => {
+  const TZ = 'Australia/Brisbane'
+
+  it('is true once any plausible reading landed in the window, reliable or not', async () => {
+    expect(hasHrSource(await resolveHrProfile(repoWith({ bpms: [72] }), 'u', TZ))).toBe(true)
+    expect(hasHrSource(await resolveHrProfile(repoWith({ bpms: flat(150, 200) }), 'u', TZ))).toBe(true)
+  })
+
+  it('is false when nothing recorded heart rate', async () => {
+    expect(hasHrSource(await resolveHrProfile(repoWith({ bpms: [] }), 'u', TZ))).toBe(false)
+  })
+
+  it('is false when every reading was a sensor fault — a fault is not a source', async () => {
+    expect(hasHrSource(await resolveHrProfile(repoWith({ bpms: [0, 300] }), 'u', TZ))).toBe(false)
+  })
+
+  // A database fault must not tell anyone they have no heart-rate source.
+  it('is null, not false, when the observed read failed', async () => {
+    const repo = repoWith({ bpms: [] }) as unknown as Record<string, unknown>
+    repo.getObservedHrProfile = async () => { throw new Error('db down') }
+    const p = await resolveHrProfile(repo as unknown as WorkoutRepository, 'u', TZ)
+    expect(p.observedUnread).toBe(true)
+    expect(hasHrSource(p)).toBeNull()
+  })
+
+  it('adds nothing to the profile when the read succeeded', async () => {
+    const p = await resolveHrProfile(repoWith({ bpms: flat(150, 200) }), 'u', TZ)
+    expect('observedUnread' in p).toBe(false)
   })
 })

@@ -169,6 +169,12 @@ export function reevaluatePrescriptionForToday(
       if (!notes[ex.sessionExerciseId]) notes[ex.sessionExerciseId] = `Deload — illness radar: ${signals.illnessFlag}`
     }
   }
+  // #2402. Only a row THIS function deloaded may be put back by it. A whole-session deload
+  // (BF-198) and a deload PHASE (the rules fallback, #2512) record `deloaded` + `preDeload` on every
+  // row too, but nothing here flags those rows, so "not flagged now" read as "soreness cleared" and
+  // the first read of the day turned a stored 2×6 @ 50% back into the program as written. The bar
+  // kept deloading while the card described the full session. `Full` is the way back for those.
+  const deloadIsPrescribed = prescription.deload === true || state.phase === 'deload'
   let changed = false
   const exercises: AiPrescriptionExercise[] = prescription.exercises.map(ex => {
     const wasDeloaded = ex.deloaded === true
@@ -187,7 +193,7 @@ export function reevaluatePrescriptionForToday(
         deloadNote: notes[ex.sessionExerciseId],
       }
     }
-    if (!isDeloaded && wasDeloaded && ex.preDeload) {
+    if (!isDeloaded && wasDeloaded && ex.preDeload && !deloadIsPrescribed) {
       changed = true
       return {
         ...ex,

@@ -162,7 +162,7 @@ unchanged.
 |---|---|---|---|---|---|---|---|
 | More > Data & Sync > **Sync now** | `components/more/data-sync-panel.tsx:73` | clears `LAST_SYNC_KEY`, then `pullDelta(userId, true)`. On web, `clearAllCache()`. | Forced delta pull into the local store. | delta | yes | user session | none |
 | … > **Restore from cloud** | `:92` | `restoreFromCloud()` (`?mode=restore`, no 90-day floor) | Rebuilds the local store with full history. | full history | yes (resumable) | user session | slow |
-| … > **Export my data** | `:110` | `GET /api/export` (link) | Downloads everything. | full | yes | user session (rate-limited) | none (but the file contains PII) |
+| … > **Export my data** | `:110` | `GET /api/export` (link) | Downloads everything as NDJSON: a `_manifest` line, one `{domain,row}` line per record, then a trailer — `{"_complete":true}` when whole, `{"_error":…}` when the server failed part-way; no trailer means the download was cut off (#2427). | full | yes | user session (rate-limited) | none (but the file contains PII) |
 
 Device pairing **Forget** buttons (`components/settings/{chest-strap,scale,colmi}-pairing.tsx`) are product settings and are out of scope. Only Colmi has a confirm.
 

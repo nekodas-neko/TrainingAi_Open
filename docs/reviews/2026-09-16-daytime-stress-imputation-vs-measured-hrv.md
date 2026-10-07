@@ -79,6 +79,22 @@ the imputation is about twice as sensitive to a heart-rate change as the strap s
 
 ## Finding 3 — a ~3.2× level gap, which is real but confounded ⚠ do not act on this
 
+> **Correction, 2026-10-06 (#2488). Confound 2 below was a defect in the measurement, not a property
+> of the strap, and it does not support "do not act on this".** `rmssdFromRr` took successive
+> differences between every neighbour in the array. In the strap's sparse mode (about 60% of
+> half-hours) the array holds short runs of beats with gaps between them, so it differenced across
+> the gaps and counted the drift of the heart rate as beat-to-beat variability. Counted only over
+> truly adjacent beats, daytime RMSSD is **25–32 ms**, not the **76–93 ms** quoted in point 2, and
+> the "physiologically surprising" direction that point read as an instrument problem goes away.
+> The function now pairs only beats whose timestamps are consecutive (`packages/shared/src/health/rmssd.ts`).
+>
+> What this changes: the ×0.30 level gap in the table was computed against the inflated values, so
+> **the table does not stand as measured** and should be recomputed on the corrected function before
+> anyone reads a level gap, or its absence, out of it. What it does not change: points 1 and 3 (two
+> instruments; a moving wearer) are independent of the defect and still apply, and LA-113 remains a
+> scoring proposal that needs the owner's sign-off. Figures stored before the fix (including
+> `workout_hr_stats.workout_hrv_ms`) were computed the old way.
+
 Predicted against measured, mean log-ratio:
 
 | bucket floor | n | days | model ÷ measured | sd of log-ratio |

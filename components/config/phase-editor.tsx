@@ -5,6 +5,7 @@ import { GripVertical, X, Plus } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { cn } from "@trainingai/shared/utils"
 import type { ProgramPhase } from "@trainingai/shared/types/program"
+import { EXERCISE_ROLE_LABEL } from "@trainingai/shared/workout/role-labels"
 
 export type EditablePhase = Omit<ProgramPhase, 'id' | 'phaseSetId'> & { localId: string }
 
@@ -201,14 +202,15 @@ export function PhaseEditor({
           {/* Deload — no style picker */}
           {phase.phaseType === 'deload' && (
             <p className="text-xs text-muted-foreground pl-[100px]">
-              Auto: reduced sets · 60% 1RM compounds · same weight accessories
+              Auto: reduced sets · 60% 1RM {EXERCISE_ROLE_LABEL.primary.toLowerCase()} &amp; {EXERCISE_ROLE_LABEL.secondary.toLowerCase()} lifts · same weight accessories
             </p>
           )}
 
-          {/* Main lifts — all non-deload phases */}
+          {/* Primary-role lifts — all non-deload phases. Named with the shared exercise-role words (#2240):
+              `resolveStyleForExercise` gives this style to `primary` exercises and the next one to `secondary`. */}
           {phase.phaseType !== 'deload' && (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground w-24 shrink-0">Main lifts</span>
+              <span className="text-xs text-muted-foreground w-24 shrink-0">{EXERCISE_ROLE_LABEL.primary} lifts</span>
               <select
                 value={phase.primaryStyleId ?? ''}
                 onChange={e => updateMain(idx, { primaryStyleId: e.target.value || undefined })}
@@ -223,14 +225,14 @@ export function PhaseEditor({
             </div>
           )}
 
-          {/* Supporting lifts — Normal phases only.
+          {/* Secondary-role lifts — Normal phases only.
               During Peak the engine automatically reads back from the
-              preceding normal phase's supporting style, so it only needs
+              preceding normal phase's secondary style, so it only needs
               to be set here. */}
           {phase.phaseType === 'normal' && (
             <div className="flex items-center gap-2">
               <div className="w-24 shrink-0">
-                <p className="text-xs text-muted-foreground leading-none">Supporting</p>
+                <p className="text-xs text-muted-foreground leading-none">{EXERCISE_ROLE_LABEL.secondary} lifts</p>
                 <p className="text-[9px] text-muted-foreground/70 mt-0.5 leading-none">holds during Peak</p>
               </div>
               <select
@@ -238,7 +240,7 @@ export function PhaseEditor({
                 onChange={e => updateMain(idx, { secondaryStyleId: e.target.value || undefined })}
                 className="text-xs border rounded px-2 py-1 bg-background flex-1"
               >
-                <option value="">— same as main —</option>
+                <option value="">— same as {EXERCISE_ROLE_LABEL.primary.toLowerCase()} —</option>
                 {styleOptions.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
@@ -247,7 +249,7 @@ export function PhaseEditor({
           {/* Peak hint */}
           {phase.phaseType === 'peak' && (
             <p className="text-xs text-muted-foreground pl-[100px]">
-              Supporting lifts hold at the preceding phase&apos;s intensity.
+              {EXERCISE_ROLE_LABEL.secondary} lifts hold at the preceding phase&apos;s intensity.
             </p>
           )}
         </div>

@@ -7606,6 +7606,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getExercise1rmHistory(userId: string, exerciseNames: string[], tz: string) { return period.getExercise1rmHistory(this.db, userId, exerciseNames, tz) }
   async getWeeklySetsByMuscleGroup(userId: string, programId: string, weekStart: string, weekEnd: string, tz: string) { return period.getWeeklySetsByMuscleGroup(this.db, userId, programId, weekStart, weekEnd, tz) }
   async getSetsByMuscleInWindow(userId: string, from: string, to: string, tz: string) { return period.getSetsByMuscleInWindow(this.db, userId, from, to, tz) }
+  async getMuscleTonnageByWeek(userId: string, from: string, to: string, tz: string) { return period.getMuscleTonnageByWeek(this.db, userId, from, to, tz) }
 
   // ── Oura Ring (delegated to slices/oura.ts) ───────────────────────────────
   async upsertOuraDaily(userId: string, rows: import('../repository').OuraDailyRow[], source: HealthSource) { return oura.upsertOuraDaily(this.db, userId, rows, source) }
@@ -7637,6 +7638,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async upsertOuraSleep(userId: string, sessions: import('../repository').OuraSleepUpsertRow[], source: HealthSource) { return oura.upsertOuraSleep(this.db, userId, sessions, source) }
   async upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]) { return oura.upsertOuraHeartrate(this.db, userId, rows) }
   async upsertAggregatorHeartrate(userId: string, rows: { timestamp: Date; bpm: number }[], source: HealthSource, tz: string) { return oura.upsertAggregatorHeartrate(this.db, userId, rows, source, tz) }
+  async dropZoneMinutesFrom(userId: string, fromDay: string) { return oura.deleteZoneMinutesFrom(this.db, userId, fromDay) }
   async upsertHealthConnectIntervals(userId: string, rows: readonly import('../repository').HealthConnectIntervalRow[]) { return hcIntervals.upsertHealthConnectIntervals(this.db, userId, rows) }
   async getHealthConnectIntervals(userId: string, kind: import('../repository').HealthConnectIntervalKind, from: Date, to: Date) { return hcIntervals.getHealthConnectIntervals(this.db, userId, kind, from, to) }
   async getHrForWindow(userId: string, from: Date, to: Date) { return oura.getHrForWindow(this.db, userId, from, to) }

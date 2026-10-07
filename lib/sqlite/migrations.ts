@@ -390,6 +390,12 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   // reason it is not `sleep_start` — see docs/reviews/2026-08-26-manual-bedtime-write-audit.md.
   { table: 'sleep_sessions', column: 'manual_sleep_start', ddl: `ALTER TABLE sleep_sessions ADD COLUMN manual_sleep_start TEXT` },
   { table: 'sleep_sessions', column: 'sync_status',       ddl: `ALTER TABLE sleep_sessions ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'synced'` },
+  // #2414 (v50). The night's own window and awake time, so a local row can render the hypnogram
+  // (which needs sleep_start/sleep_end) and be clustered like the server's /api/sleep-sessions does.
+  // Nullable: every row pulled before v50 stays NULL until the server re-sends it.
+  { table: 'sleep_sessions', column: 'sleep_start',       ddl: `ALTER TABLE sleep_sessions ADD COLUMN sleep_start TEXT` },
+  { table: 'sleep_sessions', column: 'sleep_end',         ddl: `ALTER TABLE sleep_sessions ADD COLUMN sleep_end TEXT` },
+  { table: 'sleep_sessions', column: 'awake_hours',       ddl: `ALTER TABLE sleep_sessions ADD COLUMN awake_hours REAL` },
   // oura_daily gains sync_status so the applyDelta pull can clobber-guard a device-authored
   // (BLE rollup) row against a stale server pull — the D4 finding. Default 'synced' (existing
   // rows are server-mirrored); the device-write path that sets 'pending' lands with D2.
@@ -1704,6 +1710,20 @@ export const MIGRATIONS: UpgradeStatement[] = [
     toVersion: 49,
     statements: [
       `ALTER TABLE set_logs ADD COLUMN rpe_source TEXT`,
+    ],
+  },
+  {
+    // #2414. The server's sleep_sessions.sleep_start / sleep_end / awake_hours, which the pull has
+    // always carried and the device dropped — so a cold-open sleep detail painted from the local
+    // store had no window to draw the hypnogram against. Same shape as v48: the ALTER reaches fresh
+    // installs and upgraded devices alike (CREATE_SLEEP_SESSIONS predates every Oura column),
+    // RECONCILE_COLUMNS covers a half-applied upgrade. No backfill here: old rows stay NULL and
+    // render exactly as before; applyDelta fills them when the server re-sends a row.
+    toVersion: 50,
+    statements: [
+      `ALTER TABLE sleep_sessions ADD COLUMN sleep_start TEXT`,
+      `ALTER TABLE sleep_sessions ADD COLUMN sleep_end TEXT`,
+      `ALTER TABLE sleep_sessions ADD COLUMN awake_hours REAL`,
     ],
   },
 ];

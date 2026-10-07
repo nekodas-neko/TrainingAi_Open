@@ -44,16 +44,18 @@ export function ringVsH10HrAdapter(repo: WorkoutRepository): ComparisonAdapter {
 /** Buckets beat-to-beat RR intervals into 5-minute groups and runs the app's one RR→rMSSD
  *  implementation (`rmssdFromRr`) per bucket — the D6 reference side for daytime-HRV. */
 export function bucketRrToRmssd(rows: { at: Date; rrMs: number }[]): { bucketStart: string; value: number }[] {
-  const buckets = new Map<string, number[]>()
+  // Beats keep their times into `rmssdFromRr`: successive differences are only between beats that
+  // are actually adjacent (#2488), which a bare list of intervals cannot say.
+  const buckets = new Map<string, { atMs: number; rrMs: number }[]>()
   for (const r of rows) {
     const bucketStart = new Date(Math.floor(r.at.getTime() / HRV_BUCKET_MS) * HRV_BUCKET_MS).toISOString()
     const arr = buckets.get(bucketStart) ?? []
     if (!buckets.has(bucketStart)) buckets.set(bucketStart, arr)
-    arr.push(r.rrMs)
+    arr.push({ atMs: r.at.getTime(), rrMs: r.rrMs })
   }
   const out: { bucketStart: string; value: number }[] = []
-  for (const [bucketStart, rr] of buckets) {
-    const rmssd = rmssdFromRr(rr)
+  for (const [bucketStart, beats] of buckets) {
+    const rmssd = rmssdFromRr(beats)
     if (rmssd != null) out.push({ bucketStart, value: rmssd })
   }
   return out.sort((a, b) => a.bucketStart.localeCompare(b.bucketStart))

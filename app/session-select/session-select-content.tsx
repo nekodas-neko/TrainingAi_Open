@@ -41,10 +41,11 @@ import { formatInTimeZone } from "date-fns-tz";
 import { cachedFetch, readCacheSync, setCached, cachedFetchToday, readTodayCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { useInvalidationRefetch } from "@/lib/hooks/use-invalidation-refetch";
-import { invalidateWorkoutSummaries, invalidateReadinessInputs, invalidateOuraSync, invalidateWorkoutMetaRefresh, invalidatePrescriptionChanged, invalidateUserProfile } from "@/lib/cache-groups";
+import { invalidateWorkoutSummaries, invalidateReadinessInputs, invalidateOuraSync, invalidateWorkoutMetaRefresh, invalidatePrescriptionChanged, invalidateUserProfile, invalidatePulledDomains } from "@/lib/cache-groups";
 import { mergeCalendarOverlay, readLocalCalendarOverlay } from "@/lib/calendar/local-overlay";
 import { syncOuraRing } from "@/lib/oura-ble/sync";
 import { getLocalStore } from "@/lib/local-store";
+import { localSleepRowsAsNights } from "@/lib/sleep/merge-sessions";
 import { pushMutations, pullDelta, isSyncBackedOff } from "@/lib/local-store/sync-engine";
 import { PullToSync } from "@/components/pull-to-sync";
 import { BODY_BATTERY_TTL, TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, NEXT_SESSION_TTL, MOOD_TTL } from '@trainingai/shared/cache-ttl';
@@ -168,6 +169,9 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const [isAiDynamic, setIsAiDynamic] = useState(false)
   const [phaseStatus, setPhaseStatus] = useState<import('@/app/api/workout-data/route').PhaseStatus | null>(null)
   const [perSessionPhaseStatus, setPerSessionPhaseStatus] = useState<import('@/app/api/workout-data/route').PerSessionPhaseStatus[]>([])
+  // Duration-model "~N min" per program session (#2362), for the card's already-trained-today
+  // session; today's pick reads the prescription-aware figure off `recommendation` instead.
+  const [estMinBySession, setEstMinBySession] = useState<Record<string, number>>({})
   const [earlyDeloadDismissed, setEarlyDeloadDismissed] = useState(false)
   const [adminBadge, setAdminBadge] = useState(0)
   const [goalsProfile, setGoalsProfile] = useState<{ activityLevel: string | null; fitnessGoal: string | null; lastGoalReviewAt: string | null } | null>(null);
@@ -296,11 +300,13 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         if (d?.program?.sessions?.length) setActiveSessions(d.program.sessions);
         if (d?.phaseStatus) setPhaseStatus(d.phaseStatus);
         if (d?.perSessionPhaseStatus) setPerSessionPhaseStatus(d.perSessionPhaseStatus);
+        if (d?.estimatedMinBySession) setEstMinBySession(d.estimatedMinBySession);
       } else {
-        const cachedMeta = readCacheSync<{ program?: { sessions?: ProgramSession[]; phaseMode?: string }; phaseStatus?: import('@/app/api/workout-data/route').PhaseStatus | null; perSessionPhaseStatus?: import('@/app/api/workout-data/route').PerSessionPhaseStatus[] }>('workout-data:meta');
+        const cachedMeta = readCacheSync<{ program?: { sessions?: ProgramSession[]; phaseMode?: string }; phaseStatus?: import('@/app/api/workout-data/route').PhaseStatus | null; perSessionPhaseStatus?: import('@/app/api/workout-data/route').PerSessionPhaseStatus[]; estimatedMinBySession?: Record<string, number> }>('workout-data:meta');
         if (cachedMeta?.program?.sessions?.length) setActiveSessions(cachedMeta.program.sessions);
         if (cachedMeta?.phaseStatus) setPhaseStatus(cachedMeta.phaseStatus);
         if (cachedMeta?.perSessionPhaseStatus) setPerSessionPhaseStatus(cachedMeta.perSessionPhaseStatus);
+        if (cachedMeta?.estimatedMinBySession) setEstMinBySession(cachedMeta.estimatedMinBySession);
       }
     } catch { /* ignore */ }
 
@@ -527,7 +533,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
       // Fire next-session and streak in parallel with the meta fetch —
       // none of them depend on the sessions list, so there's no reason to sequence them.
       await Promise.all([
-        cachedFetch<{ program?: { sessions?: ProgramSession[]; schedule?: { type?: string; restAfterN?: number; days?: unknown[] }; phaseMode?: string }; phaseStatus?: import('@/app/api/workout-data/route').PhaseStatus | null; perSessionPhaseStatus?: import('@/app/api/workout-data/route').PerSessionPhaseStatus[] }>(
+        cachedFetch<{ program?: { sessions?: ProgramSession[]; schedule?: { type?: string; restAfterN?: number; days?: unknown[] }; phaseMode?: string }; phaseStatus?: import('@/app/api/workout-data/route').PhaseStatus | null; perSessionPhaseStatus?: import('@/app/api/workout-data/route').PerSessionPhaseStatus[]; estimatedMinBySession?: Record<string, number> }>(
           'workout-data:meta', '/api/workout-data?tab=meta', TTL_LONG,
           (metaData) => {
             if (metaData?.program?.sessions?.length) {
@@ -536,6 +542,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
             }
             setPhaseStatus(metaData?.phaseStatus ?? null);
             setPerSessionPhaseStatus(metaData?.perSessionPhaseStatus ?? []);
+            setEstMinBySession(metaData?.estimatedMinBySession ?? {});
             const aiDynamic = metaData?.program?.phaseMode === 'ai_dynamic';
             setIsAiDynamic(aiDynamic);
             setStreakSchedule((metaData?.program?.schedule ?? null) as StreakSchedule);
@@ -698,6 +705,8 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     let pullRes: Awaited<ReturnType<typeof pullDelta>> | undefined;
     if (userId) pushRes = await pushMutations(userId).catch(() => null);
     if (userId) pullRes = await pullDelta(userId, true).catch(() => null);
+    // What the pull wrote too, beside the fixed list below — e.g. a supplement changed elsewhere (#2550).
+    if (pullRes) await invalidatePulledDomains(pullRes.domains).catch(() => {});
     const online = typeof navigator !== 'undefined' ? navigator.onLine : true;
     if (online && userId && getLocalStore(userId) && (pushRes === null || pullRes === null)) {
       toast.error(wasBackedOff
@@ -707,11 +716,8 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     // Targeted invalidations: preserve slow-changing config caches (program structure,
     // styles, exercise-library) while clearing everything that could change from a sync.
     // (invalidateOuraSync() already covers 'sleep-performance-correlation' — no separate call needed.)
-    await Promise.all([
-      invalidateWorkoutSummaries(),
-      invalidateReadinessInputs(),
-      invalidateOuraSync(),
-    ]).catch(() => {});
+    await Promise.all([invalidateWorkoutSummaries(), invalidateReadinessInputs(), invalidateOuraSync()])
+      .catch(() => {});
     refetchAll().catch(() => {});
   }, [userId, refetchAll]);
 
@@ -757,13 +763,15 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         const cutoff = toAestDay(new Date(todayMidnightUtc(tz).getTime() - 14 * 24 * 60 * 60 * 1000), tz);
         store.getSleepSessions(cutoff).then(local => {
           if (local.length > 0 && !cancelled) {
-            setSleepData(local.map(s => ({
+            // #2414: one row per night, newest first, as the route returns — so the card's
+            // find-by-date lands on the night, not on whichever nap the store listed first.
+            setSleepData(localSleepRowsAsNights(local).map(s => ({
               date: s.date,
               durationHours: s.durationHours,
               deepSleepHours: s.deepSleepHours,
               remSleepHours: s.remSleepHours,
               lightSleepHours: s.lightSleepHours,
-              awakHours: null, // LocalSleepSession has no awake column — render handles null
+              awakHours: s.awakHours, // null on a row pulled before SQLite v50 — render handles it
             })));
           }
         }).catch(() => { /* store unavailable — network path below still runs */ });
@@ -1089,7 +1097,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
                 fetchWorkoutData();
                 fetchMeta();
                 void syncOuraRing();                              // BLE drain — replaces the dead Cloud sync
-                if (userId) pullDelta(userId, true).catch(() => {});
+                if (userId) pullDelta(userId, true).then(res => { if (res) return invalidatePulledDomains(res.domains); }).catch(() => {});
               }}
               disabled={refreshing}
               className="rounded-xl p-2 min-h-11 min-w-11 flex items-center justify-center text-muted-foreground hover:bg-muted transition"
@@ -1250,6 +1258,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
                         moodLog={moodLog}
                         phaseStatus={phaseStatus}
                         perSessionPhaseStatus={perSessionPhaseStatus}
+                        estMinBySession={estMinBySession}
                         cardColors={cardColors}
                         sectionEditMode={sectionEditMode}
                         dayKey={dayKey}

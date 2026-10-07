@@ -7,10 +7,9 @@ const read = (p: string) => stripComments(readFileSync(path.join(process.cwd(), 
 
 describe('RV-214 ① — a session icon is a component, not text', () => {
   // The scanner in scripts/check-session-icon-render.js holds this at zero across the tree; these
-  // pin the three sites that were wrong, so a revert names the file rather than just the count.
+  // pin the sites that were wrong, so a revert names the file rather than just the count.
   it.each([
     ['app/workout-select/workout-select-content.tsx'],
-    ['components/stats/program-exercise-list.tsx'],
     ['components/workout-builder/builder-review.tsx'],
   ])('%s renders SessionGlyph', (file) => {
     expect(read(file)).toMatch(/<SessionGlyph\s/);

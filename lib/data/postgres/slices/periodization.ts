@@ -515,8 +515,11 @@ export async function getExercise1rmHistory(db: Db, userId: string, exerciseName
   return byExercise
 }
 
+/** One row of the shared attribution query: a canonical muscle, its week when bucketed, and the measure. */
+interface MuscleAttributionRow { muscle: string; weekStart: string | null; value: number }
+
 /**
- * LA-118 — the ONE weighted-sets-per-muscle query. Every set-counting caller goes through this.
+ * LA-118 — the ONE muscle-attribution query. Every per-muscle read of logged sets goes through this.
  *
  * It was written out four times before this existed and the copies disagreed. Not on the weighting:
  * the 1.0 main / 0.5 secondary split was identical everywhere and every copy's comment said so.
@@ -530,16 +533,38 @@ export async function getExercise1rmHistory(db: Db, userId: string, exerciseName
  * counts whole — the behaviour every copy already had, preserved deliberately rather than
  * normalised away.
  *
- * `muscle-tonnage-trend` is deliberately NOT a caller: it sums `weight_kg * reps` and buckets by
- * week, so it shares the attribution half and nothing else. Folding it in means returning rows for
- * the caller to aggregate, which is a bigger change than this one.
+ * #2420 folded in the fifth reader, `/api/muscle-tonnage-trend`, which shares the attribution and
+ * differs in two things — both parameters here rather than a second copy:
+ *
+ * - `measure`: `'sets'` counts a set (role-weighted), `'tonnage'` sums `weight_kg * reps` under the
+ *   same role weight. A zero-load (bodyweight) set still yields a row, at 0 kg, so its muscle stays
+ *   on the trend as a flat line rather than vanishing.
+ * - `weekAnchor`: groups by 7-day week in SQL, anchored on a LOCAL date, placing each set by the
+ *   local calendar date of its timestamp in `tz`.
+ *
+ * **The window is a local-calendar-day comparison, not an instant range**, and so is the bucket —
+ * one `localDay` expression for both. For the set counts the two forms select the same rows and
+ * the sums are exact (`1.0`/`0.5` numerics, `COUNT`), so their answer is unchanged. Tonnage is a
+ * `float8` SUM, whose last digit depends on the order the plan feeds it rows: with an instant range
+ * the trend's fixture came back `795.0999999999999` where the route had answered `795.1`. Keeping
+ * the route's own predicate, join order and in-SQL weekly grouping is what keeps its JSON
+ * byte-identical (#2420's characterization test). Summing per day and adding days in JS would
+ * re-round the same way.
+ *
+ * Rows come back library branch first, then free-text, each muscle already normalised. A caller
+ * that sums them in that order reproduces what the copies did.
  */
-async function weightedSetsByMuscle(db: Db, opts: {
+async function muscleAttributionRows(db: Db, opts: {
   userId: string
-  /** Inclusive lower bound, already resolved to an instant. */
-  from: Date
-  /** Exclusive upper bound. Every caller has one — the absence of one is the LA-118 defect. */
-  toExclusive: Date
+  /** First local calendar day of the span, `YYYY-MM-DD`, inclusive. */
+  from: string
+  /**
+   * Last local calendar day, INCLUSIVE. Every caller has an upper bound — the absence of one is the
+   * LA-118 defect.
+   */
+  to: string
+  /** The zone whose calendar days `from`, `to` and the week buckets are. */
+  tz: string
   /**
    * Which timestamp attributes a set to a day.
    *
@@ -550,57 +575,93 @@ async function weightedSetsByMuscle(db: Db, opts: {
   dateColumn: 'logged_at' | 'started_at'
   /** Scope to one programme's sessions. Omit to count across programme changes. */
   programId?: string
-}): Promise<Record<string, number>> {
+  measure: 'sets' | 'tonnage'
+  /** Group into 7-day weeks starting on this local date. Omit for one total per muscle. */
+  weekAnchor?: string
+}): Promise<MuscleAttributionRow[]> {
   const dateExpr = opts.dateColumn === 'logged_at' ? sql`el.logged_at` : sql`ws.started_at`
+  // The set's LOCAL calendar day. The window and the week bucket both read this one expression, so
+  // a row can never be inside the window yet outside every bucket.
+  const localDay = sql`to_char((${dateExpr} AT TIME ZONE ${opts.tz}), 'YYYY-MM-DD')`
   const programFilter = opts.programId
     ? sql`AND ws.session_id IN (SELECT id FROM program_sessions WHERE program_id = ${opts.programId})`
     : sql``
+  const anchor = opts.weekAnchor
+  const weekCol = anchor
+    ? sql`, to_char(${anchor}::date + ((${localDay}::date - ${anchor}::date) / 7) * 7, 'YYYY-MM-DD') AS week_start`
+    : sql``
+  const groupBy = anchor ? sql`GROUP BY 1, 2` : sql`GROUP BY 1`
+  const roleWeight = sql`CASE WHEN muscle_entry->>'role' = 'main' THEN 1.0 ELSE 0.5 END`
+  const libValue = opts.measure === 'tonnage'
+    ? sql`SUM((sl.weight_kg * sl.reps) * ${roleWeight})::float`
+    : sql`SUM(${roleWeight})`
+  const nonLibValue = opts.measure === 'tonnage'
+    ? sql`SUM(sl.weight_kg * sl.reps)::float`
+    : sql`COUNT(*)::float`
 
   const libRows = await db.execute(sql`
     SELECT
-      LOWER(muscle_entry->>'muscle') AS muscle_group,
-      SUM(CASE WHEN muscle_entry->>'role' = 'main' THEN 1.0 ELSE 0.5 END) AS weighted_sets
-    FROM set_logs sl
-    JOIN exercise_logs el ON sl.exercise_log_id = el.id
-    JOIN workout_sessions ws ON el.workout_session_id = ws.id
+      LOWER(muscle_entry->>'muscle') AS muscle_group
+      ${weekCol},
+      ${libValue} AS value
+    FROM exercise_logs el
+    JOIN workout_sessions ws ON ws.id = el.workout_session_id
+    JOIN set_logs sl ON sl.exercise_log_id = el.id
     CROSS JOIN LATERAL jsonb_array_elements(
       (SELECT muscles FROM exercise_library WHERE name = el.exercise_name)
     ) AS muscle_entry
     WHERE ws.user_id = ${opts.userId}
-      AND ${dateExpr} >= ${opts.from}
-      AND ${dateExpr} < ${opts.toExclusive}
+      AND ${localDay} >= ${opts.from}
+      AND ${localDay} < ${shiftDateStr(opts.to, 1)}
       ${programFilter}
       AND EXISTS (SELECT 1 FROM exercise_library WHERE name = el.exercise_name)
       AND sl.deleted_at IS NULL AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
-    GROUP BY LOWER(muscle_entry->>'muscle')
+    ${groupBy}
   `)
 
   const nonLibRows = await db.execute(sql`
     SELECT
-      LOWER(mg) AS muscle_group,
-      COUNT(*)::float AS weighted_sets
-    FROM set_logs sl
-    JOIN exercise_logs el ON sl.exercise_log_id = el.id
-    JOIN workout_sessions ws ON el.workout_session_id = ws.id
+      LOWER(mg) AS muscle_group
+      ${weekCol},
+      ${nonLibValue} AS value
+    FROM exercise_logs el
+    JOIN workout_sessions ws ON ws.id = el.workout_session_id
+    JOIN set_logs sl ON sl.exercise_log_id = el.id
     CROSS JOIN LATERAL UNNEST(el.muscle_groups) AS mg
     WHERE ws.user_id = ${opts.userId}
-      AND ${dateExpr} >= ${opts.from}
-      AND ${dateExpr} < ${opts.toExclusive}
+      AND ${localDay} >= ${opts.from}
+      AND ${localDay} < ${shiftDateStr(opts.to, 1)}
       ${programFilter}
       AND NOT EXISTS (SELECT 1 FROM exercise_library WHERE name = el.exercise_name)
       AND sl.deleted_at IS NULL AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
-    GROUP BY LOWER(mg)
+    ${groupBy}
   `)
 
   // Canonical keys, matching what computeDefaultVolumeTargets writes into program_volume_targets.
   // The exercise library ships both spellings of several muscles ("core" in 14 seeded rows,
   // "quadriceps", "pecs", …), so returning raw labels split one muscle across two keys and no
   // caller could line logged sets up against its own target.
-  const result: Record<string, number> = {}
-  for (const row of [...libRows.rows, ...nonLibRows.rows] as { muscle_group: string; weighted_sets: string | number }[]) {
+  type Raw = { muscle_group: string | null; week_start?: string; value: string | number }
+  const out: MuscleAttributionRow[] = []
+  for (const row of [...libRows.rows, ...nonLibRows.rows] as Raw[]) {
     if (!row.muscle_group) continue
-    const mg = normalizeMuscle(row.muscle_group)
-    result[mg] = (result[mg] ?? 0) + Number(row.weighted_sets)
+    out.push({ muscle: normalizeMuscle(row.muscle_group), weekStart: row.week_start ?? null, value: Number(row.value) })
+  }
+  return out
+}
+
+/** Weighted sets per canonical muscle: `muscleAttributionRows` summed over the whole span. */
+async function weightedSetsByMuscle(db: Db, opts: {
+  userId: string
+  from: string
+  to: string
+  tz: string
+  dateColumn: 'logged_at' | 'started_at'
+  programId?: string
+}): Promise<Record<string, number>> {
+  const result: Record<string, number> = {}
+  for (const row of await muscleAttributionRows(db, { ...opts, measure: 'sets' })) {
+    result[row.muscle] = (result[row.muscle] ?? 0) + row.value
   }
   return result
 }
@@ -616,16 +677,9 @@ async function weightedSetsByMuscle(db: Db, opts: {
  * refactor. For a span that should cross programme changes, use `getSetsByMuscleInWindow`.
  */
 export async function getWeeklySetsByMuscleGroup(db: Db, userId: string, programId: string, weekStart: string, weekEnd: string, tz: string): Promise<Record<string, number>> {
-  // User-local midnight boundaries (Date Arithmetic rule) — matches the dateStrMidnightInTz
-  // pattern already used at :302 in this file, instead of a bare ::date cast which compares
+  // User-local calendar days (Date Arithmetic rule), never a bare ::date cast, which compares
   // against UTC midnight and can straddle two user-local weeks.
-  return weightedSetsByMuscle(db, {
-    userId,
-    from: dateStrMidnightInTz(weekStart, tz),
-    toExclusive: dateStrMidnightInTz(shiftDateStr(weekEnd, 1), tz),
-    dateColumn: 'started_at',
-    programId,
-  })
+  return weightedSetsByMuscle(db, { userId, from: weekStart, to: weekEnd, tz, dateColumn: 'started_at', programId })
 }
 
 /**
@@ -642,12 +696,25 @@ export async function getWeeklySetsByMuscleGroup(db: Db, userId: string, program
 export async function getSetsByMuscleInWindow(
   db: Db, userId: string, from: string, to: string, tz: string,
 ): Promise<Record<string, number>> {
-  return weightedSetsByMuscle(db, {
-    userId,
-    from: dateStrMidnightInTz(from, tz),
-    toExclusive: dateStrMidnightInTz(shiftDateStr(to, 1), tz),
-    dateColumn: 'logged_at',
+  return weightedSetsByMuscle(db, { userId, from, to, tz, dateColumn: 'logged_at' })
+}
+
+/**
+ * #2420 — tonnage per canonical muscle per week, for `/api/muscle-tonnage-trend`.
+ *
+ * Rows, not totals: the caller lays them onto its own week axis, summing rows that share a muscle
+ * after normalisation. Weeks are 7-day buckets anchored on `from`, and a set lands in the bucket of
+ * its own LOCAL `logged_at` date in `tz` — the attribution `getSetsByMuscleInWindow` uses, so a
+ * session started at 22:00 Sunday whose sets were logged after midnight counts toward the new
+ * week. `to` is INCLUSIVE.
+ */
+export async function getMuscleTonnageByWeek(
+  db: Db, userId: string, from: string, to: string, tz: string,
+): Promise<{ muscle: string; weekStart: string; tonnageKg: number }[]> {
+  const rows = await muscleAttributionRows(db, {
+    userId, from, to, tz, dateColumn: 'logged_at', measure: 'tonnage', weekAnchor: from,
   })
+  return rows.map(r => ({ muscle: r.muscle, weekStart: r.weekStart as string, tonnageKg: r.value }))
 }
 
 /**

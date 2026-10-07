@@ -6,9 +6,13 @@ import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-
 import {
   EXERCISE_ROLES,
   EXERCISE_ROLE_LABEL,
+  MUSCLE_ROLES,
+  MUSCLE_ROLE_LABEL,
   exerciseRoleLabel,
   exerciseRoleBadge,
 } from '../exercise-role-labels'
+import { knownExerciseRoleLabel } from '@trainingai/shared/workout/role-labels'
+import { roleLabel } from '@trainingai/shared/workout/intensity-zone'
 
 /**
  * BF-125: the same three enum values carried two wordings — *Main / Compound / Accessory* on the
@@ -25,10 +29,42 @@ const CONSUMERS = [
   'components/config/program-editor-sheet.tsx',
 ]
 
+/** Every screen that shows a role word for either axis (#2240). Each reads the shared helper. */
+const ROLE_WORD_SCREENS = [
+  ...CONSUMERS,
+  'components/config/phase-editor.tsx',
+  'components/exercises/add-exercise-sheet.tsx',
+  'components/exercise-history-sheet.tsx',
+  'components/admin/exercise-manager.tsx',
+  'packages/shared/src/workout/intensity-zone.ts',
+  'packages/shared/src/ai-periodization/explain.ts',
+]
+
 describe('exercise role labels (BF-125)', () => {
   it('names all three roles, in display order', () => {
     expect([...EXERCISE_ROLES]).toEqual(['primary', 'secondary', 'accessory'])
-    expect(EXERCISE_ROLES.map(r => EXERCISE_ROLE_LABEL[r])).toEqual(['Main', 'Secondary', 'Accessory'])
+    expect(EXERCISE_ROLES.map(r => EXERCISE_ROLE_LABEL[r])).toEqual(['Primary', 'Secondary', 'Accessory'])
+  })
+
+  it('names the muscle axis with its own words, not the exercise axis\'s (#2240)', () => {
+    // The stored values stay `main` / `secondary` — the data rename was declined — so only the
+    // words differ. The editor used to call the muscle value `main` "Primary" while calling the
+    // exercise value `primary` "Main Compound": each axis wearing the other's word.
+    expect([...MUSCLE_ROLES]).toEqual(['main', 'secondary'])
+    expect(MUSCLE_ROLES.map(r => MUSCLE_ROLE_LABEL[r])).toEqual(['Target', 'Assisting'])
+    const exerciseWords = new Set(Object.values(EXERCISE_ROLE_LABEL))
+    for (const w of Object.values(MUSCLE_ROLE_LABEL)) expect(exerciseWords.has(w), w).toBe(false)
+    // The editor renders both axes a few lines apart; the muscle one reads the shared map too.
+    const editor = read('components/config/program-editor-sheet.tsx')
+    expect(editor).toContain('MUSCLE_ROLE_LABEL[role]')
+    expect(editor).not.toMatch(/"Primary"\s*:\s*"Secondary"/)
+  })
+
+  it('the workout pills read the same words as the editor (#2240)', () => {
+    for (const r of EXERCISE_ROLES) expect(roleLabel(r)).toBe(EXERCISE_ROLE_LABEL[r])
+    expect(roleLabel(null)).toBeNull()
+    expect(roleLabel('compound')).toBeNull()
+    expect(knownExerciseRoleLabel('main')).toBeNull()
   })
 
   it('reads a missing or unrecognised role as the unclassified one (BF-15)', () => {
@@ -51,14 +87,25 @@ describe('exercise role labels (BF-125)', () => {
     }
   })
 
+  it('no screen carries a retired role word as a literal (#2240)', () => {
+    for (const file of ROLE_WORD_SCREENS) {
+      const src = read(file)
+      expect(src, file).toContain('role-labels')
+      // Each retired word in the quoted or JSX-text positions a label would occupy.
+      expect(src, file).not.toMatch(/["'>]\s*(Main|Compound|Main lifts|Primary Muscles)\s*["'<]/)
+      expect(src, file).not.toMatch(/Compound (lift|·)/)
+      expect(src, file).not.toMatch(/title="(Primary|Secondary)"/)
+    }
+  })
+
   it('and no other component re-declares the mapping', () => {
     // Asserted by search rather than by listing files: a third screen showing roles is exactly the
     // case this guard exists for, and it would not be in any list written today.
     const hits = execSync(
-      "grep -rlE \"secondary: *'(Compound|Secondary Compound)'\" --include=*.tsx --include=*.ts app components lib || true",
+      "grep -rlE \"secondary: *'(Compound|Secondary Compound)'|primary: *'Main'|main: *'(Primary|Main)'\" --include=*.tsx --include=*.ts app components lib packages/shared/src || true",
       { cwd: root, encoding: 'utf8' },
     ).trim()
-    expect(hits, 'a role-label map outside components/workout/exercise-role-labels.ts').toBe('')
+    expect(hits, 'a role-label map outside packages/shared/src/workout/role-labels.ts').toBe('')
   })
 })
 

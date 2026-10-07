@@ -22,6 +22,7 @@ import {
 } from "@trainingai/shared/workout/session-data";
 import { reportServerError } from "@/lib/observability";
 import { rateLimit } from "@/lib/rate-limit";
+import { estimateProgramSessionMin } from "@trainingai/shared/workout/program-session-duration";
 import { generatePrescriptionForSession } from "@trainingai/shared/ai-periodization/generate-prescription";
 import { regeneratePrescriptionInBackground as regeneratePrescriptionSingleFlight } from "@trainingai/shared/ai-periodization/regenerate-in-background";
 
@@ -131,7 +132,19 @@ async function handleWorkoutData(req: NextRequest) {
         }
       }
     }
-    return NextResponse.json({ program, styles, phaseStatus, perSessionPhaseStatus }, { headers: cacheHeaders });
+    // The Workout tab card's "~N min" per session (#2362): the duration model over each
+    // exercise's assigned style, never exercises × a constant. Rides the meta response because
+    // styles and equipment are already in hand here; a session with no styled exercise is absent.
+    const estimatedMinBySession: Record<string, number> = {}
+    for (const sess of program.sessions) {
+      const min = estimateProgramSessionMin(
+        sess.exercises.slice().sort((a, b) => a.position - b.position),
+        styleById,
+        name => libByName.get(name.toLowerCase())?.equipment,
+      )
+      if (min !== null) estimatedMinBySession[sess.id] = min
+    }
+    return NextResponse.json({ program, styles, phaseStatus, perSessionPhaseStatus, estimatedMinBySession }, { headers: cacheHeaders });
   }
 
   // ── Batch variant (?tab=all): every session's full workout data in one response ──────

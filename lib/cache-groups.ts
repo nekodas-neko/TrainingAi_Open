@@ -1,4 +1,5 @@
 import { invalidateCache } from '@/lib/sqlite/cache'
+import type { SyncedDomains } from '@/lib/local-store/sync-engine'
 
 /** Legacy sessionStorage seeds read by session-select-content's first-paint effect.
  *  They live outside the TTL cache, so every group that invalidates workout-data:meta
@@ -667,4 +668,34 @@ export async function invalidateWorkoutMetaRefresh(): Promise<void> {
 export async function invalidateWorkoutDataImmediate(): Promise<void> {
   await invalidateCache('workout-data')
   clearLegacyHomeSeeds()
+}
+
+/** The group each pull flag invalidates. Typed as a total record, so a flag added to
+ *  `SyncedDomains` without a decision here fails to compile rather than going silently stale.
+ *  `dayCheckins` is null on purpose: that UI reads the local store / API directly and never goes
+ *  through the sqlite-cache layer, so there is nothing to clear. */
+const PULL_FLAG_GROUPS: Record<keyof SyncedDomains, (() => Promise<void>) | null> = {
+  biometrics:   invalidateBiometrics,
+  programs:     invalidateProgramStructure,
+  workouts:     invalidateWorkoutSummaries,
+  nutrition:    invalidateNutritionWrite,
+  supplements:  invalidateSupplements,
+  activity:     invalidateActivityWrites,
+  fitnessTests: invalidateFitnessTests,
+  running:      invalidateRunningPlan,
+  injuries:     invalidateInjuryWrites,
+  ouraDaily:    invalidateOuraSync,
+  dayCheckins:  null,
+  mealPlans:    invalidateMealPlans,
+}
+
+/** Caches a sync pull changed — call with `pullDelta`'s `domains` after every pull whose result
+ *  you have (#2543). Acts on the flags alone, never on `synced`: the sync provider and the More tab
+ *  each kept their own copy of this block, gated on `synced > 0`, and the copies drifted — neither
+ *  could see a supplement-only page (counted as zero) and More never had a meal-plan line. */
+export async function invalidatePulledDomains(domains: SyncedDomains): Promise<void> {
+  for (const flag of Object.keys(PULL_FLAG_GROUPS) as (keyof SyncedDomains)[]) {
+    const group = PULL_FLAG_GROUPS[flag]
+    if (domains[flag] && group) await group()
+  }
 }

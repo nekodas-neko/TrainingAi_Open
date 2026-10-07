@@ -1,7 +1,7 @@
 import { getPool } from "@/lib/data/postgres/client"
 import { getRepositoryAsync } from "@/lib/data"
 import { getPrimaryKeyColumns, quoteIdent } from "@/lib/export/db-snapshot"
-import { EXPORTED, EXCLUDED, SOFT_DELETED, WITHHELD_COLUMNS, type ExportScope } from "@/lib/export/export-map"
+import { DERIVED_DOMAINS, EXPORTED, EXCLUDED, SOFT_DELETED, WITHHELD_COLUMNS, type ExportScope } from "@/lib/export/export-map"
 
 /**
  * Full-data takeout: one NDJSON line per row, `{ domain, row }`.
@@ -89,7 +89,11 @@ export function buildManifest(): ExportLine {
         .map(([table, x]) => ({ table, category: x.category, reason: x.reason }))
         .sort((a, b) => a.table.localeCompare(b.table)),
       withheldColumns: WITHHELD_COLUMNS,
-      note: 'Rows soft-deleted in the app are omitted. Excluded tables are listed above with the reason for each.',
+      derivedDomains: Object.entries(DERIVED_DOMAINS)
+        .map(([domain, d]) => ({ domain, sourceTables: d.sourceTables, reason: d.reason }))
+        .sort((a, b) => a.domain.localeCompare(b.domain)),
+      note: 'Rows soft-deleted in the app are omitted. Excluded tables are listed above with the reason for each. '
+        + 'The last line of a complete file is {"_complete":true}; a last line of {"_error":…}, or any other last line, means the file is incomplete.',
     },
   }
 }
@@ -107,6 +111,7 @@ export async function* exportUserData(userId: string): AsyncGenerator<ExportLine
 
   // Not a table — a repository call that assembles the user's goals. Kept because it was in the
   // export before this change and removing it would be a silent regression in the other direction.
+  // Declared in DERIVED_DOMAINS, which `check-export-coverage.js` holds every `repo.` call here to.
   const repo = await getRepositoryAsync()
   yield { domain: "goals", row: await repo.getUserGoals(userId) }
 }

@@ -7,7 +7,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { resolveBaseRef, lineCountAtBase, verdict } = require('./lib/base-ref');
+const { resolveBaseRef, lineCountsAtBase, verdict } = require('./lib/base-ref');
 
 const LIMIT = 800;
 
@@ -47,6 +47,7 @@ const BASELINE = {
 const root = path.join(__dirname, '..');
 const failures = [];
 const inherited = [];
+const judged = [];
 
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -59,16 +60,7 @@ function walk(dir) {
       const src = fs.readFileSync(full, 'utf8');
       // Match `wc -l` (newline count), so a baseline can be read straight off the shell.
       const lines = src.split('\n').length - (src.endsWith('\n') ? 1 : 0);
-      const allowed = BASELINE[rel] ?? LIMIT;
-      // LA-16 / Q-424: ask whether THIS BRANCH grew the file, not whether it is over. A file already
-      // over its number on the base is not this branch's to fix, and failing it here reports someone
-      // else's merge as this author's oversized change.
-      const v = verdict({ count: lines, limit: allowed, atBase: lineCountAtBase(baseRef, rel) });
-      if (v === 'inherited') {
-        inherited.push(`${rel}: ${lines} lines against a ${allowed}-line baseline, but the base branch is already there. Not this branch's growth.`);
-      } else if (v === 'fail') {
-        failures.push({ rel, lines, allowed, grandfathered: rel in BASELINE });
-      }
+      judged.push({ rel, lines, allowed: BASELINE[rel] ?? LIMIT });
     }
   }
 }
@@ -76,6 +68,20 @@ function walk(dir) {
 const baseRef = resolveBaseRef();
 
 for (const top of ['app', 'components']) walk(path.join(root, top));
+
+// LA-16 / Q-424: ask whether THIS BRANCH grew the file, not whether it is over. A file already
+// over its number on the base is not this branch's to fix, and failing it here reports someone
+// else's merge as this author's oversized change. Read after the walk, for every file at once:
+// one git process per run, not one per file (#2081).
+const atBase = lineCountsAtBase(baseRef, judged.map((j) => j.rel));
+for (const { rel, lines, allowed } of judged) {
+  const v = verdict({ count: lines, limit: allowed, atBase: atBase.get(rel) });
+  if (v === 'inherited') {
+    inherited.push(`${rel}: ${lines} lines against a ${allowed}-line baseline, but the base branch is already there. Not this branch's growth.`);
+  } else if (v === 'fail') {
+    failures.push({ rel, lines, allowed, grandfathered: rel in BASELINE });
+  }
+}
 
 // Reported whether or not the run fails, and never as a failure (Q-424).
 if (inherited.length > 0) {

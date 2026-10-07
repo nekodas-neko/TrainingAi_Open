@@ -629,8 +629,14 @@ export async function runOuraRollup(
    * `ALWAYS_NIGHT_MIN_HOURS` short-circuits the circadian check, and the detector emitted a sleep
    * window over 468 logged steps to begin with. Both stay open on PS-17 — this makes the summary
    * pick the real night; it does not stop the phantom existing or being listed.
+   *
+   * #2487. `nightPeriodsByDate` also drops a period shorter than ALWAYS_NIGHT_MIN_HOURS that sat on
+   * the evening of its own wake date, so a date whose only night-band window is an evening bout gets
+   * no night here: no sleep fields, HRV, heart rate or BDI from that bout reach its summary row. The
+   * bout's own `sleep_sessions` row is still written above; only the date's night pick changes. Both
+   * calls take the user's timezone — they used to fall back to Brisbane.
    */
-  for (const period of nightPeriodsByDate(groupSleepPeriods(nightCandidates).nights).values()) {
+  for (const period of nightPeriodsByDate(groupSleepPeriods(nightCandidates, timezone).nights, timezone).values()) {
     const parts = period.windows
     const durs = parts.map(p => p.durationHours ?? 0)
     const totalSleep = durs.reduce((a, b) => a + b, 0)

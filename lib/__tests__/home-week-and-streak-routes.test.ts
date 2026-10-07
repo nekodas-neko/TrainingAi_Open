@@ -37,6 +37,9 @@ type Row = Record<string, unknown>
 const getNextSession = vi.fn(async (_u: string, _tz?: string) => ({ session: null, isRestDay: false }) as Row)
 const getSessionPeriodization = vi.fn(async (_u: string, _id: string) => null as Row | null)
 const getExerciseMuscleAssignments = vi.fn(async (_n: string[]) => ({}) as Row)
+// #2362 — the card's duration estimate reads the program's styles and the exercises' equipment.
+const listProgressionStyles = vi.fn(async (_u: string) => [] as Row[])
+const getExerciseEquipment = vi.fn(async (_n: string[]) => ({}) as Row)
 const getRecentTrainedDays = vi.fn(async (_u: string, _d: number, _tz?: string) => ({}) as Row)
 const getWorkoutSessionsFrom = vi.fn(async (_u: string, _from: Date) => [] as Row[])
 const getDayExerciseNames = vi.fn(async (_u: string, _d: string, _tz?: string) => [] as Row[])
@@ -51,7 +54,7 @@ vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser 
 vi.mock('@/lib/data', () => {
   // Built inside the factory: `vi.mock` is hoisted above the consts above.
   const repo = async () => ({
-    getNextSession, getSessionPeriodization, getExerciseMuscleAssignments, getRecentTrainedDays,
+    getNextSession, getSessionPeriodization, getExerciseMuscleAssignments, listProgressionStyles, getExerciseEquipment, getRecentTrainedDays,
     getWorkoutSessionsFrom, getDayExerciseNames, getBodyMetricsBaseline, listBodyMetrics,
     listSleepSessions, getActiveProgram,
   })
@@ -223,9 +226,21 @@ describe('/api/progress-summary', () => {
     expect(body.sleep.lastNightHours).toBe(8)
   })
 
-  it('answers null for last night when nothing was recorded', async () => {
+  // #2337: "0 h this week" against a sleep goal was a claim about a week nothing recorded.
+  it('answers null for last night and for the week when nothing was recorded', async () => {
     const body = await (await getProgress()).json()
-    expect(body.sleep).toEqual({ lastNightHours: null, thisWeekHours: 0 })
+    expect(body.sleep).toEqual({ lastNightHours: null, thisWeekHours: null })
+  })
+
+  it('answers null for the week when the only nights fall before this week', async () => {
+    await getProgress()
+    const weekStart = formatInTimeZone(mondayFromCall(), TZ, 'yyyy-MM-dd')
+    const before = shiftDateStr(weekStart, -1)
+    listSleepSessions.mockResolvedValue([
+      sleep({ date: before, sleepStart: bne(shiftDateStr(before, -1), '22:00'), sleepEnd: bne(before, '06:00'), durationHours: 6 }),
+    ])
+    const body = await (await getProgress()).json()
+    expect(body.sleep.thisWeekHours).toBeNull()
   })
 
   // Several rows for one session on one day is one workout, not several.

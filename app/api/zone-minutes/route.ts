@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { DEFAULT_TZ, todayInTz, normalizeDateParamIso, toAestDay, todayMidnightUtc } from '@trainingai/shared/date-utils'
 import { rateLimit } from '@/lib/rate-limit'
-import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
+import { resolveHrProfile, hasHrSource } from '@trainingai/shared/health/hr-profile'
 
 // Per-day time-in-HR-zone over a local-date range, reconcile-on-read cached (daily_zone_minutes).
 // The zone profile is the canonical /api/hr-profile derivation (fixed 28-day RHR window), so the
@@ -33,7 +33,8 @@ export async function GET(req: NextRequest) {
   const days = await repo.getZoneMinutesRange(userId, from, to, tz, profile)
 
   return NextResponse.json(
-    { from, to, profile, days },
+    // #2337: zero seconds per day mean "none recorded" only when something records HR at all.
+    { from, to, profile, days, hasHrSource: hasHrSource(profile) },
     { headers: { 'Cache-Control': 'private, no-store' } },
   )
 }

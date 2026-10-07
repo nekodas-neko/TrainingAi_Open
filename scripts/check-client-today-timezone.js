@@ -34,7 +34,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { resolveBaseRef, countAtBase, verdict } = require('./lib/base-ref');
+const { resolveBaseRef, countsAtBase, verdict } = require('./lib/base-ref');
 const { stripComments } = require('./lib/strip-comments');
 
 const root = path.join(__dirname, '..');
@@ -103,11 +103,13 @@ if (process.argv.includes('--print')) {
 const baseRef = resolveBaseRef();
 const offenders = [];
 const inherited = [];
+// One read of the base for every file, not one git process per file (#2081).
+const atBase = countsAtBase(baseRef, [...counts.keys()].filter((rel) => !EXEMPT.has(rel)), countBare);
 for (const [rel, n] of counts) {
   if (EXEMPT.has(rel)) continue;
   const allowed = BASELINE[rel] ?? 0;
   // LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over.
-  const v = verdict({ count: n, limit: allowed, atBase: countAtBase(baseRef, rel, countBare) });
+  const v = verdict({ count: n, limit: allowed, atBase: atBase.get(rel) });
   if (v === 'inherited') {
     inherited.push(`${rel}: ${n} bare call(s) against a baseline of ${allowed}, but the base branch is already there.`);
   } else if (v === 'fail') {

@@ -7,8 +7,8 @@
 
 import type { HealthConnectPlugin } from '@devmaxime/capacitor-health-connect';
 import { intervalsToPhase5Min, type SleepStage, type StageInterval } from '@trainingai/shared/health/hypnogram';
-import { msToHHMMInTz, toAestDay, DEFAULT_TZ } from '@trainingai/shared/date-utils';
-import { formatInTimeZone } from 'date-fns-tz';
+import { msToHHMMInTz, toAestDay, shiftDateStr, dateStrMidnightInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils';
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 
 // Verified against the pinned plugin source (RecordConverter.kt:390-400, v1.1.0) — those seven
 // strings are the complete set it can emit. SLEEPING and UNKNOWN are deliberately absent: they
@@ -347,12 +347,39 @@ export interface EnrichmentCandidate {
   endTime?: string;   // "HH:MM", local time
 }
 
-// Builds the UTC instant for a local date + "HH:MM" time. `dayOffset` shifts
-// the date forward, used when a session's end time crosses midnight.
-function localDateTimeToIso(date: string, time: string, dayOffset = 0): string {
-  const [y, m, d] = date.split('-').map(Number);
-  const [h, mi] = time.split(':').map(Number);
-  return new Date(y, m - 1, d + dayOffset, h, mi).toISOString();
+/**
+ * The UTC instant for a date + "HH:MM" wall time IN THE USER'S ZONE. `dayOffset` shifts the date
+ * forward, used when a session's end time crosses midnight.
+ *
+ * #2438. This was `new Date(y, m - 1, d + dayOffset, h, mi)`, which reads the DEVICE's zone. LB-113
+ * threaded the user's zone into `enrichActivityLogs` and this never took it, so on a phone set to
+ * another zone the HR, distance and calorie enrichment read the wrong hours. The date is shifted as
+ * a calendar string first, so the offset cannot be skewed by a DST change on the day.
+ */
+export function localDateTimeToIso(date: string, time: string, tz: string, dayOffset = 0): string {
+  return fromZonedTime(`${shiftDateStr(date, dayOffset)}T${time}:00`, tz).toISOString();
+}
+
+/**
+ * The sync window: the user's local midnight `daysBack - 1` days before today, to the user's local
+ * midnight AFTER today.
+ *
+ * #2438. These were device-local midnights, while every bucket is dated in the user's zone
+ * (`toLocalDate(…, tz)`). The old comment said device midnight is what keeps the plugin's 24-hour
+ * aggregate windows on one calendar day, and that holds only when the two zones agree. The windows
+ * must start at the midnight the BUCKETS are cut at, which is the user's.
+ */
+export function syncWindowIso(todayStr: string, daysBack: number, tz: string): { startIso: string; endIso: string } {
+  return {
+    startIso: dateStrMidnightInTz(shiftDateStr(todayStr, -(daysBack - 1)), tz).toISOString(),
+    endIso: dateStrMidnightInTz(shiftDateStr(todayStr, 1), tz).toISOString(),
+  };
+}
+
+/** A session's start and end as the user's wall clock, "HH:MM". Without a zone `msToHHMMInTz` falls
+ *  back to Brisbane, which stored every non-Brisbane user's sessions with the wrong clock (#2438). */
+export function sessionClockTimes(startIso: string, endIso: string, tz: string): { startTime: string; endTime: string } {
+  return { startTime: msToHHMMInTz(startIso, tz), endTime: msToHHMMInTz(endIso, tz) };
 }
 
 // Backfills HR/distance/calories on activity logs that were saved without
@@ -377,8 +404,8 @@ export async function enrichActivityLogs(candidates: EnrichmentCandidate[], tz: 
 
   for (const c of candidates) {
     if (!c.startTime || !c.endTime) continue;
-    const start = localDateTimeToIso(c.date, c.startTime);
-    const end = localDateTimeToIso(c.date, c.endTime, c.endTime <= c.startTime ? 1 : 0);
+    const start = localDateTimeToIso(c.date, c.startTime, tz);
+    const end = localDateTimeToIso(c.date, c.endTime, tz, c.endTime <= c.startTime ? 1 : 0);
     const metrics = await getSessionMetrics(HealthConnect, canRead, start, end);
     if (!Object.keys(metrics).length) continue;
 
@@ -411,17 +438,12 @@ export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metr
   const lastSync  = localStorage.getItem(LAST_SYNC_KEY);
   const daysBack  = lastSync ? SYNC_DAYS_HOT : SYNC_DAYS_COLD;
 
-  // Align query window to local calendar day boundaries. The plugin loops over
-  // 24h windows from `startInstant`, so if start isn't a local midnight the
-  // windows straddle two calendar days and aggregate steps from both into one
-  // bucket. Using new Date(y, m-1, d, 0, 0, 0) creates midnight in the device's
-  // own timezone, so every bucket maps to exactly one local calendar day.
-  const todayStr      = toLocalDate(new Date().toISOString(), tz);
-  const [ty, tm, td]  = todayStr.split('-').map(Number);
-  const start         = new Date(ty, tm - 1, td - (daysBack - 1), 0, 0, 0);
-  const end           = new Date(ty, tm - 1, td + 1, 0, 0, 0);
-  const startIso      = start.toISOString();
-  const endIso        = end.toISOString();
+  // Align the query window to the USER's calendar day boundaries. The plugin loops over 24h windows
+  // from `startInstant`, so if start isn't a local midnight the windows straddle two calendar days
+  // and aggregate steps from both into one bucket. Every bucket below is dated in `tz`, so the
+  // midnight has to be `tz`'s, not the device's (#2438).
+  const todayStr = toLocalDate(new Date().toISOString(), tz);
+  const { startIso, endIso } = syncWindowIso(todayStr, daysBack, tz);
 
   const dayBuckets: Record<string, DailyMetric> = {};
   function bucket(date: string): DailyMetric {
@@ -560,8 +582,7 @@ export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metr
           date:         toLocalDate(r.startTime, tz),
           title:        r.title || r.exerciseType || 'Workout',
           activityType: mapExerciseTypeToActivityType(r.exerciseType),
-          startTime:    msToHHMMInTz(r.startTime),
-          endTime:      msToHHMMInTz(r.endTime),
+          ...sessionClockTimes(r.startTime, r.endTime, tz),
           durationMin:  Math.round(durationMin * 10) / 10,
           ...metrics,
         });
@@ -651,7 +672,7 @@ export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metr
   const dailyMetrics = Object.values(dayBuckets);
   const hasDaily = dailyMetrics.length > 0 || exerciseSessions.length > 0 || sleepRecords.length > 0;
   if (!hasDaily && !heartRateSamples.length && !activityIntervals.length) {
-    localStorage.setItem(LAST_SYNC_KEY, end.toISOString());
+    localStorage.setItem(LAST_SYNC_KEY, endIso);
     return { metrics: 0, sessions: 0, sleep: 0, heartRate: 0, intervals: 0, note: 'no data from HC' };
   }
 
@@ -667,7 +688,7 @@ export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metr
     ({ enrichmentCandidates } = await res.json() as { enrichmentCandidates?: EnrichmentCandidate[] });
   }
 
-  localStorage.setItem(LAST_SYNC_KEY, end.toISOString());
+  localStorage.setItem(LAST_SYNC_KEY, endIso);
 
   const heartRate = await uploadSeries('heartRateSamples', heartRateSamples, HR_UPLOAD_CHUNK, HR_UPLOAD_MAX_CHUNKS, 'heart rate', 'samples');
   const intervals = await uploadSeries('activityIntervals', activityIntervals, INTERVAL_UPLOAD_CHUNK, INTERVAL_UPLOAD_MAX_CHUNKS, 'intervals', 'rows');

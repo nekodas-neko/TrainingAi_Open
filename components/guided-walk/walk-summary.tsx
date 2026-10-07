@@ -15,7 +15,7 @@ import { useActivityStore } from '@/lib/stores/activity-store'
 import { linkPrescribedRun } from '@/lib/activity/link-prescribed-run'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { omitNullFields } from '@/lib/local-store/sync-helpers'
-import { invalidateActivityWrites } from '@/lib/cache-groups'
+import { invalidateActivityWrites, invalidatePulledDomains } from '@/lib/cache-groups'
 import { todayInTz, msToHHMMInTz } from '@trainingai/shared/date-utils'
 import { buildIntervalPlan, type WalkConfig } from '@/lib/walk/interval-plan'
 import { ZoneBreakdown } from '@/components/health/zone-breakdown'
@@ -156,8 +156,8 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
 
   async function saveWalk() {
     const date = todayInTz(tz)
-    const startTime = msToHHMMInTz(startedAtMs)
-    const endTime = msToHHMMInTz(startedAtMs + actualSec * 1000)
+    const startTime = msToHHMMInTz(startedAtMs, tz)
+    const endTime = msToHHMMInTz(startedAtMs + actualSec * 1000, tz)
 
     // Treadmill walks save as the `treadmill` activity type (is_distance_based=false), so the
     // cardio aggregates that filter on a non-null distance/pace exclude them automatically —
@@ -239,7 +239,9 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
         // pushed — and because revalidating around a local write instead of after it is its own bug.
         pushThenRevalidate(userId!, async () => {
           await invalidateActivityWrites()
-          await pullDelta(userId!, true)
+          const pulled = await pullDelta(userId!, true)
+          // The pull carries whatever else changed since the cursor, not only this walk (#2550).
+          if (pulled) await invalidatePulledDomains(pulled.domains)
           const rows = await store.getActivityLogs(date)
           const mine = rows.find(r => r.id === logId)
           if (mine?.caloriesBurned != null) setKcal(mine.caloriesBurned)
