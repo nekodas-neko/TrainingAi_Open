@@ -1142,7 +1142,8 @@ export interface WorkoutRepository {
   /** Decoded raw samples for the given tags over the last `days`, ordered by measured_at ASC.
    *  Windowed on the ingest-stamped measured_at (no anchor math) — feeds the admin device-metrics
    *  compute-on-read route. Rows with a null decoded/measured_at are excluded. */
-  getOuraRawSamplesForTags(userId: string, tags: number[], days: number): Promise<OuraRawSampleRow[]>
+  /** `caller` is named in the slow raw-read log (#2247). */
+  getOuraRawSamplesForTags(userId: string, tags: number[], days: number, caller?: string): Promise<OuraRawSampleRow[]>
   /** TN-56: raw frames by tag and ring-clock range, across both tiers (hot and packed). Read-only,
    *  for the admin replay; the rollup reads through its own IO. */
   readOuraRawFrames(userId: string, q: import('./postgres/slices/oura-raw-frames').RawFrameQuery): Promise<import('./postgres/slices/oura-raw-frames').RawFrameRow[]>
