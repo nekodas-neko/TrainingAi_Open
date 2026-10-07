@@ -1502,8 +1502,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const programFilter = programId
       ? sql`AND ws.session_id IN (SELECT id FROM program_sessions WHERE program_id = ${programId})`
       : sql``
-    const result = await this.db.execute<{ exercise_name: string; estimated_1rm: number; target_80: number | null; avg_reps: number | null }>(sql`
-      SELECT DISTINCT ON (el.exercise_name) el.exercise_name, el.estimated_1rm, el.target_80, el.avg_reps
+    const result = await this.db.execute<{ exercise_name: string; estimated_1rm: number; target_80: number | null; avg_reps: number | null; is_baseline: boolean }>(sql`
+      SELECT DISTINCT ON (el.exercise_name) el.exercise_name, el.estimated_1rm, el.target_80, el.avg_reps,
+             ${period.wsIsBaselineSession} AS is_baseline
       FROM exercise_logs el
       JOIN workout_sessions ws ON ws.id = el.workout_session_id
       WHERE ws.user_id = ${userId}
@@ -1543,6 +1544,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           // recent log and can be a different session — a deload one — so pairing that log's reps
           // with this 1RM would describe two sessions as though they were one.
           avgReps: r.avg_reps != null ? Number(r.avg_reps) : null,
+          // Labels the row; it does not choose it. The ORDER BY above is unchanged, so the bar still
+          // loads from a baseline estimate as the owner decided (#2649, "leave it as is").
+          fromBaseline: r.is_baseline === true,
         })
       }
     }
