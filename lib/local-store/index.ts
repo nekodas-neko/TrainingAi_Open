@@ -121,6 +121,17 @@ export interface LocalStore {
   // on-device rollup writer); flipping the flag doesn't need one. Currently inert:
   // nothing queues these mutations until D2 lands, but the arm is cheap+correct now.
   markSleepSessionSynced(id: string): Promise<void>;
+  /**
+   * #2547. The bedtime the user remembers, written to the night's local row in the same turn as its
+   * queued `manual_bedtime` mutation, and marked `pending` so a pull landing before the push cannot
+   * revert it (`applyDelta`'s sleep upsert only overwrites a `synced` row). Touches
+   * `manual_sleep_start` and nothing else on the row. A date with no local row changes nothing; the
+   * mutation still goes to the server, which quarantines it when it has no night either.
+   */
+  setManualSleepStartLocally(date: string, at: string | null): Promise<void>;
+  /** Confirm a queued `manual_bedtime` mutation: the row goes back to `synced` unless another
+   *  bedtime for that night is still queued behind it. `confirmingIds` is the batch being confirmed. */
+  markManualBedtimeSynced(date: string, confirmingIds?: string[]): Promise<void>;
   markOuraDailySummarySynced(day: string): Promise<void>;
   markOuraDailyDerivedSynced(day: string): Promise<void>;
   // D2 prep (Phase-1 Task 1): reads let anything local-first read Oura's device-computed

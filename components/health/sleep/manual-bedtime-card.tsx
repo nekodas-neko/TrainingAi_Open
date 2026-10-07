@@ -65,6 +65,9 @@ export function ManualBedtimeCard({ date, measuredStart, userId }: Props) {
       if (store) {
         // Queued rather than posted directly, so a bedtime entered offline survives to the next
         // sync — the same shape every other offline-first write here uses.
+        // The local row first, in the same turn: the card reads its value from it, so a remount before
+        // the push lands (or any time offline) must find the new bedtime there (#2547).
+        await store.setManualSleepStartLocally(date, at)
         await store.queueMutation({ userId: userId!, domain: 'manual_bedtime', date, payload: { at } })
         pushMutations(userId!).catch(() => {})
       } else {

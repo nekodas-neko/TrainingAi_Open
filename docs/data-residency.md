@@ -84,10 +84,12 @@ re-roll leaves the device holding the old row next to the new one, and a night t
 good (#2486's short evening window) stays on the device. The device reads it first, before the
 server response replaces it.
 
-**`manual_bedtime` writes the outbox but not the local row the card reads.** Filed as #2547.
+**`manual_bedtime` wrote the outbox but not the local row the card reads. Fixed (#2547).**
 `components/health/sleep/manual-bedtime-card.tsx` reads `manual_sleep_start` from the local
-`sleep_sessions` row and saves through the outbox only. Until the push and the next pull, a remount
-shows the old bedtime.
+`sleep_sessions` row and saved through the outbox only, so until the push and the next pull a
+remount showed the old bedtime. The save now calls `setManualSleepStartLocally` first, which writes
+that one column and marks the row `pending` so a pull cannot revert it; the push confirm
+(`markManualBedtimeSynced`) flips it back unless a later bedtime for the night is still queued.
 
 **The native `oura_raw.db` is not cleared by sign-out or account deletion.** Filed as #2548 (a
 question for the owner). `signOutAndClearDevice` wipes every JS SQLite table, but `raw`,

@@ -611,6 +611,25 @@ export class SQLiteLocalStore implements LocalStore {
     await runSQL(`UPDATE sleep_sessions SET sync_status='synced' WHERE id=?`, [id]);
   }
 
+  async setManualSleepStartLocally(date: string, at: string | null): Promise<void> {
+    await runSQL(
+      `UPDATE sleep_sessions SET manual_sleep_start=?, sync_status='pending', updated_at=? WHERE date=?`,
+      [at, new Date().toISOString(), date],
+    );
+  }
+
+  async markManualBedtimeSynced(date: string, confirmingIds: string[] = []): Promise<void> {
+    // The payload is `{ at }`, so the night is the outbox row's own `date` column, which the
+    // payload-matching `otherQueuedMutations` cannot see.
+    const notMine = confirmingIds.length ? ` AND id NOT IN (${confirmingIds.map(() => '?').join(',')})` : ''
+    const [{ cnt }] = await querySQL<{ cnt: number }>(
+      `SELECT COUNT(*) AS cnt FROM mutations_outbox WHERE domain='manual_bedtime' AND date=?${notMine}`,
+      [date, ...confirmingIds],
+    );
+    if (Number(cnt) > 0) return;
+    await runSQL(`UPDATE sleep_sessions SET sync_status='synced' WHERE date=?`, [date]);
+  }
+
   async markOuraDailySummarySynced(day: string): Promise<void> {
     await runSQL(`UPDATE oura_daily_summary SET sync_status='synced' WHERE day=?`, [day]);
   }
