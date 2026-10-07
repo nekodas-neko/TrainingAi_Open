@@ -1170,6 +1170,10 @@ async function pushMutationsOnce(userId: string): Promise<PushResult> {
       // same convention as workout_log/activity_logs above.
       const id = m.payload.id as string | undefined;
       if (id) await store.markSleepSessionSynced(id);
+    } else if (m.domain === 'manual_bedtime') {
+      // #2547. The card wrote the bedtime to the night's local row as 'pending'; without this the
+      // row stayed pending and every later pull skipped it.
+      await store.markManualBedtimeSynced(m.date, batchIds);
     } else if (m.domain === 'oura_daily_summary') {
       await store.markOuraDailySummarySynced(m.date);
     } else if (m.domain === 'oura_daily_derived') {
