@@ -36,11 +36,17 @@ export function buildPrecacheList(staticDir: string): string[] {
 
 // Inject the build-stamped cache name and the precache manifest into the SW
 // template. Each token appears exactly once in public/sw-template.js.
+//
+// `staticCacheFirst` is false only under `next dev`, whose chunk URLs are not
+// content-addressed, so a cache-first worker would keep serving the first
+// version of a chunk it ever saw (#2608). Production chunks are hashed and stay
+// cache-first.
 export function renderServiceWorker(
   template: string,
-  opts: { cacheName: string; precacheUrls: string[] },
+  opts: { cacheName: string; precacheUrls: string[]; staticCacheFirst?: boolean },
 ): string {
   return template
     .replace('__CACHE_NAME__', opts.cacheName)
     .replace('__PRECACHE_URLS__', JSON.stringify(opts.precacheUrls))
+    .replace('__STATIC_CACHE_FIRST__', JSON.stringify(opts.staticCacheFirst ?? true))
 }
