@@ -18,7 +18,7 @@ import { initialsOf } from '@/lib/initials';
 
 type Tab = 'users' | 'invites' | 'exercises' | 'activities' | 'feedback' | 'devices'
 
-/** `currentUserId` is the signed-in admin, so their own row offers no deactivate (#2383 item 3). */
+/** `currentUserId` is the signed-in admin, so their own row offers no deactivate (issue 2383 item 3). */
 export default function AdminContent({ currentUserId }: { currentUserId: string }) {
   const router = useTransitionRouter()
   const [tab, setTab] = useState<Tab>('users')
@@ -37,7 +37,7 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
   const [feedbackLoading, setFeedbackLoading] = useState(false)
   const [expandedFeedback, setExpandedFeedback] = useState<string | null>(null)
   const [confirmDeleteFeedback, setConfirmDeleteFeedback] = useState<string | null>(null)
-  // #2383 item 3: deactivating signs that user out to `/pending`, so it asks first. Activation does not.
+  // issue 2383 item 3: deactivating signs that user out to `/pending`, so it asks first. Activation does not.
   const [confirmDeactivate, setConfirmDeactivate] = useState<User | null>(null)
 
   async function loadAll() {

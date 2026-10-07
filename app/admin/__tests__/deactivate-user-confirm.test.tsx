@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 /**
- * #2383 item 3 — the admin Users screen deactivated on a single tap of an unlabelled icon, and the
+ * issue 2383 item 3 — the admin Users screen deactivated on a single tap of an unlabelled icon, and the
  * signed-in admin's own row offered it too. Deactivation sends that user to `/pending` until an
  * admin activates them again, so for the admin's own row it was a lock-out.
  *
@@ -24,8 +24,8 @@ import AdminContent from '../admin-content'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-const ME = '00000000-0000-4000-8000-0000000000a1'
-const THEM = '00000000-0000-4000-8000-0000000000b2'
+const ME = 'admin-self'
+const THEM = 'throwaway-user'
 const USERS = [
   { id: ME, email: 'me@example.com', name: 'Owner', displayName: 'Owner', isActive: true, isAdmin: true },
   { id: THEM, email: 'them@example.com', name: null, displayName: 'Throwaway Tester', isActive: true, isAdmin: false },
@@ -85,7 +85,7 @@ afterEach(async () => {
   vi.unstubAllGlobals()
 })
 
-describe('deactivating a user from the admin Users screen (#2383 item 3)', () => {
+describe('deactivating a user from the admin Users screen (issue 2383 item 3)', () => {
   it('the signed-in admin\'s own row has no deactivate control; another user\'s row does', async () => {
     await mount()
     expect(buttonIn(rowOf('me@example.com'), 'Deactivate')).toBeUndefined()
