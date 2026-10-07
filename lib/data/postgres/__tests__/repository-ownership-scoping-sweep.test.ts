@@ -947,6 +947,163 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
       expect(err).toBeNull()
     })
 
+    // ---- #2570: predicates that decide nothing until A owns specific data ----
+
+    it('getNextSession does not count another user\'s session today as the caller\'s', async () => {
+      // A's active program has two sessions; B trained the second one's NAME today. Read unscoped,
+      // B's session is the newest with a logged exercise, so A is told it already trained.
+      const shared = 'SHARED NAME 2570'
+      await pool.query(`UPDATE programs SET is_active = false WHERE user_id = $1`, [USER_A])
+      const prog = (await pool.query(
+        `INSERT INTO programs (user_id, name, is_active, phase_mode) VALUES ($1, 'A NEXT PROGRAM 2570', true, 'manual') RETURNING id`,
+        [USER_A])).rows[0].id
+      await pool.query(
+        `INSERT INTO program_sessions (program_id, name, position) VALUES ($1, 'A FIRST 2570', 0), ($1, $2, 1)`, [prog, shared])
+      const ws = (await pool.query(
+        `INSERT INTO workout_sessions (user_id, session_name, started_at) VALUES ($1, $2, now()) RETURNING id`,
+        [USER_B, shared])).rows[0].id
+      await pool.query(
+        `INSERT INTO exercise_logs (workout_session_id, exercise_name, logged_at) VALUES ($1, 'B TODAY LIFT 2570', now())`, [ws])
+      try {
+        const next = await repo.getNextSession(USER_A, TZ)
+        expect(next.reason).not.toMatch(/Already trained/)
+        expect(next.session?.name).not.toBe(shared)
+      } finally {
+        await pool.query(`DELETE FROM workout_sessions WHERE id = $1`, [ws])
+        await pool.query(`DELETE FROM programs WHERE id = $1`, [prog])
+      }
+    })
+
+    it('getBodyFatCalibration pairs only the caller\'s own scans with the caller\'s own readings', async () => {
+      // A: a scan on 08-10 paired with a scale reading on 08-11 (offset +2), and a spare reading on
+      // 08-20 with no scan. B: a scan on 08-20 (pairs with A's spare reading if scans are read
+      // unscoped) and a same-day, same-source reading on 08-10 (displaces A's if readings are).
+      const bm = (user: string, date: string, pct: number) => pool.query(
+        `INSERT INTO body_metrics (user_id, date, body_fat_pct, source_map) VALUES ($1, $2, $3, $4) RETURNING id`,
+        [user, date, pct, JSON.stringify({ body_fat_pct: 'scale_ble' })]).then(r => r.rows[0].id as string)
+      const scan = (user: string, date: string, pct: number) => pool.query(
+        `INSERT INTO dexa_scans (user_id, scanned_on, pct_fat) VALUES ($1, $2, $3) RETURNING id`,
+        [user, date, pct]).then(r => r.rows[0].id as string)
+      const metrics: string[] = []
+      const scans: string[] = []
+      try {
+        scans.push(await scan(USER_A, '2026-08-10', 20))
+        metrics.push(await bm(USER_A, '2026-08-11', 18), await bm(USER_A, '2026-08-20', 25))
+        const alone = await repo.getBodyFatCalibration(USER_A)
+        expect(alone?.offsetPct).toBe(2)
+        expect(alone?.pairs).toHaveLength(1)
+        scans.push(await scan(USER_B, '2026-08-20', 40))
+        metrics.push(await bm(USER_B, '2026-08-10', 10))
+        expect(await repo.getBodyFatCalibration(USER_A)).toEqual(alone)
+      } finally {
+        await pool.query(`DELETE FROM body_metrics WHERE id = ANY($1::uuid[])`, [metrics])
+        await pool.query(`DELETE FROM dexa_scans WHERE id = ANY($1::uuid[])`, [scans])
+      }
+    })
+
+    it('previewStepsBackfill builds step days only from the caller\'s own windows and stored days', async () => {
+      // A: a clock anchor at noon 08-25 and a 600-step live window there, no stored day — one row
+      // to preview. B: a live window one ring-day earlier (a second row if windows are read
+      // unscoped) and a manual 08-25 day (outranks the ring, so the row vanishes if days are).
+      const anchorUtc = new Date('2026-08-25T02:00:00Z')
+      const ds = 1_000_000
+      const anchor = (await pool.query(
+        `INSERT INTO oura_ble_clock_anchors (user_id, anchor_ds, anchor_utc, epoch) VALUES ($1, $2, $3, 0) RETURNING id`,
+        [USER_A, ds, anchorUtc])).rows[0].id
+      const windows = (await pool.query(
+        `INSERT INTO step_live_windows (user_id, start_ds, end_ds, steps) VALUES ($1, $3, $4, 600), ($2, $5, $6, 600) RETURNING id`,
+        [USER_A, USER_B, ds, ds + 6000, ds - 864_000, ds - 864_000 + 6000])).rows.map(r => r.id)
+      const day = (await pool.query(
+        `INSERT INTO body_metrics (user_id, date, steps, source_map) VALUES ($1, '2026-08-25', 9000, $2) RETURNING id`,
+        [USER_B, JSON.stringify({ steps: 'manual' })])).rows[0].id
+      try {
+        expect(await repo.previewStepsBackfill(USER_A, TZ))
+          .toEqual([{ date: '2026-08-25', oldSteps: 0, oldSource: null, newSteps: 600 }])
+      } finally {
+        await pool.query(`DELETE FROM body_metrics WHERE id = $1`, [day])
+        await pool.query(`DELETE FROM step_live_windows WHERE id = ANY($1::bigint[])`, [windows])
+        await pool.query(`DELETE FROM oura_ble_clock_anchors WHERE id = $1`, [anchor])
+      }
+    })
+
+    it('getOuraRawSampleSummary dates the caller\'s history from the caller\'s own packed tier only', async () => {
+      // A has one hot frame, so the summary has an anchor to date ds with; B has a packed bucket
+      // far older. Read unscoped, B's span would become the start of A's history.
+      const hot = (await pool.query(
+        `INSERT INTO oura_raw_samples (user_id, ring_timestamp_ds, tag, event_name, body_hex) VALUES ($1, 2000000, 70, 'a-hot-2570', '0102') RETURNING id`,
+        [USER_A])).rows[0].id
+      await pool.query(
+        `INSERT INTO oura_raw_packed (user_id, epoch, tag, ds_bucket, frame_count, min_ds, max_ds, body_sha256, blob)
+         VALUES ($1, 0, 70, 0, 1, 1000, 1000, 'b-2570', '\\x00')`, [USER_B])
+      try {
+        const sum = await repo.getOuraRawSampleSummary(USER_A)
+        expect(sum.newestMeasuredAt).not.toBeNull()
+        expect(sum.oldestMeasuredAt).toBe(sum.newestMeasuredAt)
+      } finally {
+        await pool.query(`DELETE FROM oura_raw_packed WHERE user_id = $1 AND body_sha256 = 'b-2570'`, [USER_B])
+        await pool.query(`DELETE FROM oura_raw_samples WHERE id = $1`, [hot])
+      }
+    })
+
+    it('packOuraRawBuckets seals, packs, verifies and counts only the caller\'s own buckets', async () => {
+      // Ring ds: one bucket is 864,000 ds and the hot window 6,048,000. Old rows were received two
+      // days ago (past the quiet guard); the newest of each user just now (inside it).
+      //   A: newest in bucket 100; an old frame in bucket 50 (sealed: the one bucket to pack);
+      //      an old frame in bucket 95 (inside A's hot window, so it stays hot).
+      //   B: newest in bucket 200 (seals A's bucket 95 if "newest" is read unscoped); an old frame
+      //      in A's bucket 50 (packed with A's if the bucket's rows are); an old B-only bucket 10
+      //      (left "remaining" if eligibility is); a junk blob at A's bucket key (refuses A's
+      //      bucket if the read-back is).
+      const SPAN = 864_000
+      const old = new Date(Date.now() - 2 * 86_400_000)
+      const frame = (user: string, ds: number, at: Date | null) => pool.query(
+        `INSERT INTO oura_raw_samples (user_id, ring_timestamp_ds, tag, event_name, body_hex, recorded_at, epoch)
+         VALUES ($1, $2, 70, 'pack-2570', '0102', coalesce($3, now()), 0) RETURNING id`, [user, ds, at]).then(r => r.rows[0].id as string)
+      const aNewest = await frame(USER_A, 100 * SPAN + 10, null)
+      const aSealed = await frame(USER_A, 50 * SPAN + 5, old)
+      const aWarm = await frame(USER_A, 95 * SPAN + 5, old)
+      await frame(USER_B, 200 * SPAN, null)
+      await frame(USER_B, 50 * SPAN + 7, old)
+      await frame(USER_B, 10 * SPAN + 5, old)
+      await pool.query(
+        `INSERT INTO oura_raw_packed (user_id, epoch, tag, ds_bucket, frame_count, min_ds, max_ds, body_sha256, blob)
+         VALUES ($1, 0, 70, 50, 99, $2, $2, 'b-junk-2570', '\\x00')`, [USER_B, 50 * SPAN])
+      try {
+        const before = await snapshotB()
+        const res = await repo.packOuraRawBuckets(USER_A)
+        expect({ packed: res.packed, refused: res.refused, framesMoved: res.framesMoved, remaining: res.remaining })
+          .toEqual({ packed: 1, refused: 0, framesMoved: 1, remaining: 0 })
+        const { rows: hotLeft } = await pool.query(
+          `SELECT id::text FROM oura_raw_samples WHERE user_id = $1 AND event_name = 'pack-2570' ORDER BY id`, [USER_A])
+        expect(hotLeft.map(r => r.id)).toEqual([aNewest, aWarm].sort((x, y) => Number(x) - Number(y)))
+        expect(hotLeft.map(r => r.id)).not.toContain(aSealed)
+        expect(await snapshotB()).toBe(before)
+      } finally {
+        await pool.query(`DELETE FROM oura_raw_samples WHERE event_name = 'pack-2570' AND user_id = ANY($1::uuid[])`, [[USER_A, USER_B]])
+        await pool.query(`DELETE FROM oura_raw_packed WHERE tag = 70 AND user_id = ANY($1::uuid[])`, [[USER_A, USER_B]])
+      }
+    })
+
+    it('countAllSessionsSinceStart takes the start anchor only from the caller\'s own program', async () => {
+      // A trained twice, before B's program started, under the name of B's program session. Given
+      // B's program id, B's start date must not filter A's history; read unscoped, it drops to 0.
+      // (That the result is keyed by B's session ids at all is the §5 shape of the 2026-10-07
+      // review: no caller passes a foreign program id.)
+      const orig = bRow('programs')
+      await pool.query(`UPDATE programs SET started_at = '2026-09-20', cycle_anchor_at = NULL WHERE id = $1`, [bId('programs')])
+      const mine = (await pool.query(
+        `INSERT INTO workout_sessions (user_id, session_name, started_at) VALUES ($1, $2, $3), ($1, $2, $4) RETURNING id`,
+        [USER_A, bVal('program_sessions', 'name'), AT, new Date(AT.getTime() - 86_400_000)])).rows.map(r => r.id)
+      try {
+        const counts = await repo.countAllSessionsSinceStart(USER_A, bId('programs'))
+        expect([...counts.values()].reduce((x, y) => x + y, 0)).toBe(2)
+      } finally {
+        await pool.query(`DELETE FROM workout_sessions WHERE id = ANY($1::uuid[])`, [mine])
+        await pool.query(`UPDATE programs SET started_at = $1, cycle_anchor_at = $2 WHERE id = $3`,
+          [orig.started_at, orig.cycle_anchor_at, bId('programs')])
+      }
+    })
+
     // Last: it deletes A.
     it('deleteAccount counts and unlinks only the caller\'s own rows', async () => {
       const before = await snapshotB()
