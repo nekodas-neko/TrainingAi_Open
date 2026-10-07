@@ -398,6 +398,8 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'sleep_sessions', column: 'awake_hours',       ddl: `ALTER TABLE sleep_sessions ADD COLUMN awake_hours REAL` },
   // #2338 (v51). A night the user entered by hand; 0 on every existing row, which is what they are.
   { table: 'sleep_sessions', column: 'manual_entry',      ddl: `ALTER TABLE sleep_sessions ADD COLUMN manual_entry INTEGER NOT NULL DEFAULT 0` },
+  // issue 2606 (v52). A manual night the user removed; NULL on every existing row, which is live.
+  { table: 'sleep_sessions', column: 'deleted_at',        ddl: `ALTER TABLE sleep_sessions ADD COLUMN deleted_at TEXT` },
   // oura_daily gains sync_status so the applyDelta pull can clobber-guard a device-authored
   // (BLE rollup) row against a stale server pull — the D4 finding. Default 'synced' (existing
   // rows are server-mirrored); the device-write path that sets 'pending' lands with D2.
@@ -1738,6 +1740,16 @@ export const MIGRATIONS: UpgradeStatement[] = [
     toVersion: 51,
     statements: [
       `ALTER TABLE sleep_sessions ADD COLUMN manual_entry INTEGER NOT NULL DEFAULT 0`,
+    ],
+  },
+  {
+    // issue 2606, mirroring Postgres migration 202610072213. A manual night the user removed: the
+    // tombstone the delta pull carries, and the mark `removeManualSleepLocally` sets. Same shape as
+    // v51: the ALTER reaches fresh installs and upgraded devices alike, RECONCILE_COLUMNS covers a
+    // half-applied upgrade. No default and no backfill: every row already on the device is live.
+    toVersion: 52,
+    statements: [
+      `ALTER TABLE sleep_sessions ADD COLUMN deleted_at TEXT`,
     ],
   },
 ];
