@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useGuidedWalkStore } from '@/lib/stores/guided-walk-store'
 import { WalkConfig } from './walk-config'
@@ -23,6 +23,13 @@ export function GuidedWalkContent({ userId, profile }: { userId?: string; profil
   const [elapsedSec, setElapsedSec] = useState(0)
   const [mounted, setMounted] = useState(false)
   useEffect(() => { setMounted(true) }, []) // avoid persisted-store hydration mismatch
+  // issue 2595. The walk's samples, cadence and elapsed time live in THIS component, so a `'done'` walk
+  // this mount did not finish has nothing to show: leaving the route any way but Done (a tab tap
+  // rather than Back, say) leaves the store `'done'`, and the next visit would render a 0-minute
+  // summary. Such a walk was already saved — or never will be — so the screen offers a fresh one.
+  const finishedHere = useRef(false)
+  const staleDone = mode === 'done' && !finishedHere.current
+  useEffect(() => { if (mounted && staleDone) reset() }, [mounted, staleDone, reset])
 
   if (!mounted) return null
 
@@ -30,14 +37,14 @@ export function GuidedWalkContent({ userId, profile }: { userId?: string; profil
     return (
       <WalkActive
         userProfile={profile}
-        onFinish={(s, c, e) => { setSamples(s); setCadence(c); setElapsedSec(e); finish() }}
+        onFinish={(s, c, e) => { finishedHere.current = true; setSamples(s); setCadence(c); setElapsedSec(e); finish() }}
         // BF-191: a sub-minute walk the lifter chose to discard never reaches the summary, which
         // saves on mount — so reset is the only point at which it can be dropped without a row.
         onDiscard={() => { toast('Walk discarded'); reset() }}
       />
     )
   }
-  if (mode === 'done' && startedAtMs != null) {
+  if (mode === 'done' && startedAtMs != null && !staleDone) {
     return <WalkSummary config={config} samples={samples} cadence={cadence} elapsedSec={elapsedSec} startedAtMs={startedAtMs} userId={userId} onDone={reset} />
   }
   return <WalkConfig onStart={() => start(Date.now())} />

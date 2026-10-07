@@ -2,7 +2,7 @@
 import { HR_PROFILE_TTL } from '@trainingai/shared/cache-ttl'
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { cachedFetch } from '@/lib/sqlite/cache'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTransitionRouter } from "@/lib/view-transition";
 import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
@@ -20,6 +20,7 @@ import { todayInTz, msToHHMMInTz } from '@trainingai/shared/date-utils'
 import { buildIntervalPlan, type WalkConfig } from '@/lib/walk/interval-plan'
 import { ZoneBreakdown } from '@/components/health/zone-breakdown'
 import { useGuidedWalkStore } from '@/lib/stores/guided-walk-store'
+import { registerWalkExit } from '@/lib/walk/walk-exit'
 import {
   computeTotalDistanceKm, computeSplits, computeBestEfforts, computePaceSeries,
   computeElevationChange, computeElevationProfile, computeAvgPaceSecPerKm,
@@ -63,6 +64,12 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
   // on. `/cardio`, where the walk was launched from, is the other candidate and loses for that
   // reason: it is where you go to begin one, not where you see the one you did.
   useEffect(() => { router.prefetch('/health') }, [router])
+  const leave = useCallback(() => { onDone(); navigateToTab(router, '/health') }, [onDone, router])
+  // issue 2595. The Android back gesture off this screen is Done. It used to navigate away with the walk
+  // still `'done'` in the store, so the next "Guided walk" tap remounted a summary that had lost the
+  // samples and elapsed time and showed a 0-minute walk. `MobileAuthHandler` asks through the same
+  // registry the active screen uses for its Exit prompt.
+  useEffect(() => registerWalkExit(leave), [leave])
   const rawPoints = useGuidedWalkStore(s => s.rawPoints)
   const plan = buildIntervalPlan(config)
   // Never above the plan: a walk cannot run longer than it was told to, and the 1 Hz tick can land
@@ -355,7 +362,7 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
       <p className="text-[10px] text-muted-foreground">
         {saved ? 'Saved to your activity history.' : 'Saving…'}
       </p>
-      <Button className="h-12" onClick={() => { onDone(); navigateToTab(router, '/health') }}>Done</Button>
+      <Button className="h-12" onClick={leave}>Done</Button>
     </div>
   )
 }
