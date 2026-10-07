@@ -93,7 +93,9 @@ describe('the end-of-day summary prints no budget it was not given', () => {
   it('has no fallback denominator', () => {
     // It read `targets?.calories ?? 2000` — a number nobody chose, rendered exactly like one.
     expect(DAY_SUMMARY).not.toMatch(/\?\?\s*2000/)
-    expect(DAY_SUMMARY).toMatch(/targets\?\.calories\s*\?\?\s*null/)
+    // #2071: and not the typed goal either — the card prints the budget it is handed, or nothing.
+    expect(DAY_SUMMARY).toMatch(/const calTarget = dayBudgetKcal/)
+    expect(DAY_SUMMARY).not.toMatch(/targets\?\.calories/)
   })
 
   it('hides the ratio and the bar when no target is known', () => {

@@ -453,9 +453,11 @@ export default function NutritionContent({ userId }: { userId?: string }) {
    */
   const balanceForDate = energyBalance?.date === selectedDate ? energyBalance : null;
   const budget = balanceForDate?.balance ? budgetProvenance(balanceForDate.balance) : null;
-  // Falls back to the stored goal alone rather than composing one: with no payload there is no
-  // measured movement to add, and inventing an addend is what produced the third number.
-  const effectiveCalorieGoal = budget?.total ?? targets?.calories ?? null;
+  // #2071: no fallback. This used to fall back to the stored goal (`targets.calories`, the typed
+  // `calorie_goal`) when the payload was missing — which is #2160's mismatch in its last hiding place:
+  // a typed number shown as the day's budget. The budget is `calorieBudget`'s or nothing; null draws
+  // "kcal" with no denominator rather than a figure the owner typed once.
+  const effectiveCalorieGoal = budget?.total ?? null;
   const earnedForSelectedDate = budget?.earned ?? null;
   // Q-323's remaining half: `scaled` is already computed server-side by `scaleMacrosForEarnedKcal`
   // (carbs and fat absorb the earned kcal in their existing ratio; protein is dosed per kg of
@@ -466,6 +468,8 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   const effectiveTargets = targets != null
     ? {
         ...targets,
+        // The type needs a number; nothing reads `.calories` off this object for display — the budget
+        // travels as `effectiveCalorieGoal` (energy card, log-food sheet, end-of-day review).
         calories: effectiveCalorieGoal ?? targets.calories,
         ...(scaledMacros ?? {}),
       }
@@ -678,7 +682,9 @@ export default function NutritionContent({ userId }: { userId?: string }) {
           calibrated={balanceForDate?.maintenance?.source === 'calibrated'}
           tz={tz}
           weeklyData={weeklyData}
-          calorieTarget={targets?.calories ?? null}
+          // #2071: the day's budget, not the typed goal. One number for the reference line, as it
+          // was; it is now the same one every other surface prints.
+          calorieTarget={effectiveCalorieGoal}
           adherence={adherence}
           supplements={supplements}
           supplementsLoading={supplementsLoading}
@@ -752,6 +758,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
         // here for the same reason it was in the log-food sheet — `energy-card` above already
         // takes this value.
         targets={effectiveTargets}
+        dayBudgetKcal={effectiveCalorieGoal}
         onLogged={handleFoodLogged}
       />
     </div>

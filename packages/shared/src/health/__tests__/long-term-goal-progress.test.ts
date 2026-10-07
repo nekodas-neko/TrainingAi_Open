@@ -1,5 +1,28 @@
 import { describe, it, expect } from 'vitest'
-import { goalProgressPct, computeWeightRateKgPerWeek, computeWeightRateFit, evaluateWeightRateVsGoalBand, weightTrendWindowStart } from '../long-term-goal-progress'
+import { goalProgressPct, computeWeightRateKgPerWeek, computeWeightRateFit, evaluateWeightRateVsGoalBand, weightTrendWindowStart, computeTrendWeightKg } from '../long-term-goal-progress'
+
+describe('computeTrendWeightKg (#2071)', () => {
+  it("is the Weight Trend line's value at the latest weigh-in", () => {
+    // An exact line: 80 kg falling 0.1 kg a day, read on day 10.
+    const pts = [0, 2, 5, 10].map(d => ({ date: '2026-09-' + String(1 + d).padStart(2, '0'), weightKg: 80 - 0.1 * d }))
+    expect(computeTrendWeightKg(pts)).toBeCloseTo(79, 9)
+  })
+
+  it('smooths a one-day swing rather than following it', () => {
+    const pts = [
+      { date: '2026-09-01', weightKg: 80 }, { date: '2026-09-05', weightKg: 79.6 },
+      { date: '2026-09-09', weightKg: 79.2 }, { date: '2026-09-12', weightKg: 77.5 },
+    ]
+    const t = computeTrendWeightKg(pts)!
+    expect(t).toBeGreaterThan(77.5)
+    expect(t).toBeLessThan(79.2)
+  })
+
+  it('keeps the three-reading floor the Body screen keeps', () => {
+    expect(computeTrendWeightKg([{ date: '2026-09-01', weightKg: 80 }, { date: '2026-09-05', weightKg: 79 }])).toBeNull()
+    expect(computeTrendWeightKg([])).toBeNull()
+  })
+})
 
 describe('goalProgressPct', () => {
   it('returns 100 when starting equals target (already at goal)', () => {

@@ -76,7 +76,7 @@ import {
   type MetaKey, type CardWidgetKey, type WidgetDef, type SectionKey,
   WIDGET_DEFS, DEFAULT_WIDGETS, DEFAULT_CARD_WIDGETS,
   loadPillColors, loadCardColors,
-  loadWidgets, loadCardWidgets, loadCalorieGoal, loadCalorieType, loadWeightLookback,
+  loadWidgets, loadCardWidgets, loadCalorieType, loadWeightLookback,
   loadStepsGoal, loadStepsGoalType, loadSleepGoal, loadWaterGoal, loadWaterGoalType,
   loadHiddenSections, buildDefaultOrder, loadSectionOrder,
 } from "@/lib/home/home-prefs";
@@ -91,7 +91,7 @@ import { useBodyBattery } from "@/lib/hooks/use-body-battery";
 // needs, plus `provisional`, which the local-store seed below cannot supply and which the Home
 // score chip reads. A `Pick` keeps the seed's narrow object literal assignable.
 type HomeSleepRow = Pick<SleepRow,
-  'date' | 'durationHours' | 'deepSleepHours' | 'remSleepHours' | 'lightSleepHours' | 'awakHours' | 'provisional'>;
+  'date' | 'durationHours' | 'deepSleepHours' | 'remSleepHours' | 'lightSleepHours' | 'awakHours' | 'sleepStart' | 'sleepEnd' | 'provisional'>;
 
 
 export default function SessionSelectContent({ userId, isAdmin }: { userId?: string; isAdmin?: boolean }) {
@@ -110,7 +110,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   // body-battery, training-load, muscle-recovery, oura-hr-day) instead of refetchAll
   // duplicating their fetch logic inline — one fetch call site per key, not two.
   const [refreshTick, setRefreshTick] = useState(0);
-  const [calorieGoal, setCalorieGoal]       = useState<number | null>(null);
   const [calorieType, setCalorieType]       = useState<"daily" | "weekly">("daily");
   const [weightLookback, setWeightLookback] = useState<7 | 30>(7);
   const [logWidget, setLogWidget]           = useState<WidgetDef | null>(null);
@@ -194,7 +193,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     setActiveCardWidgets(cards);
     setSectionOrder(loadSectionOrder(cards));
     setHiddenSections(loadHiddenSections());
-    setCalorieGoal(loadCalorieGoal());
     setCalorieType(loadCalorieType());
     setWeightLookback(loadWeightLookback());
     setStepsGoal(loadStepsGoal());
@@ -232,7 +230,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         setActiveCardWidgets(refreshedCards);
         setSectionOrder(loadSectionOrder(refreshedCards));
         setHiddenSections(loadHiddenSections());
-        setCalorieGoal(loadCalorieGoal());
         setCalorieType(loadCalorieType());
         setWeightLookback(loadWeightLookback());
         setStepsGoal(loadStepsGoal());
@@ -771,7 +768,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
               deepSleepHours: s.deepSleepHours,
               remSleepHours: s.remSleepHours,
               lightSleepHours: s.lightSleepHours,
-              awakHours: s.awakHours, // null on a row pulled before SQLite v50 — render handles it
+              awakHours: s.awakHours, sleepStart: s.sleepStart, sleepEnd: s.sleepEnd, // awakHours is null on a row pulled before SQLite v50 — render handles it
             })));
           }
         }).catch(() => { /* store unavailable — network path below still runs */ });
@@ -945,7 +942,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
 
   function handleGoalsApplied(applied: { stepsGoal?: number; calorieGoal?: number; waterGoalMl?: number }) {
     if (applied.stepsGoal != null) setStepsGoal(applied.stepsGoal);
-    if (applied.calorieGoal != null) setCalorieGoal(applied.calorieGoal);
   }
 
   const handleHideSection = useCallback((id: string) => {
@@ -1207,7 +1203,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
                   metaRecent={metaRecent}
                   metaLoading={metaLoading}
                   weekToDate={weekToDate}
-                  calorieGoal={calorieGoal}
                   calorieType={calorieType}
                   weightLookback={weightLookback}
                   stepsGoal={stepsGoal}

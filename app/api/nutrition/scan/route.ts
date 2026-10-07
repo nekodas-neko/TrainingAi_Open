@@ -10,6 +10,7 @@ import { perServing, sumIngredients, sanitiseNutrition } from '@trainingai/share
 import { extractRecipeJsonLd, extractReadableText, sliceAroundIngredients } from '@trainingai/shared/nutrition/recipe-parse'
 import { fetchPublicUrl, type SafeFetchFailure } from '@/lib/net/safe-fetch'
 import { z } from 'zod'
+import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
 import { scanImageKind, scanImagePrompt } from '@trainingai/shared/nutrition/scan-prompt'
 
 const REGION_CONTEXT: Record<string, string> = {
@@ -154,7 +155,9 @@ Rules:
    - A single plated meal is ONE candidate however many components it has: a curry with rice and naan is one candidate with three ingredients, not three candidates. If you are unsure whether components belong to the same plate, they do — return one.
    - SEPARATE PORTIONS ARE SEPARATE CANDIDATES EVEN WHEN IDENTICAL. Five meal-prep containers of the same chicken-and-rice are FIVE candidates, not one; count the portions, do not merge repeats. If a number of portions is stated or countable, return exactly that many.
    - Distinct dishes eaten on distinct occasions are distinct candidates, and a page listing four recipes is four.
-   Keep them in the order they appear, and never exceed ${MAX_CANDIDATES}.`
+   Keep them in the order they appear, and never exceed ${MAX_CANDIDATES}.
+
+${PROSE_FIELD_GUARDS}`
 
   let recipeYield: number | null = null
   let recipeName: string | null = null

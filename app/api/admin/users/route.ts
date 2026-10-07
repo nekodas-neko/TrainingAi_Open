@@ -9,6 +9,18 @@ import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
 import { reportServerError } from '@/lib/observability'
 
+/**
+ * #2383 item 3 — the one self-check both mutating handlers share. Deleting or deactivating your own
+ * account ends your admin session (deactivation redirects every request to `/pending`), and only an
+ * admin can undo it, so the signed-in admin is refused before anything is written. Because the
+ * acting admin can never remove themselves, these two routes also cannot leave zero active admins.
+ */
+function refuseSelf(targetUserId: string, sessionUserId: string, verb: 'delete' | 'deactivate') {
+  return targetUserId === sessionUserId
+    ? NextResponse.json({ error: `Cannot ${verb} yourself` }, { status: 400 })
+    : null
+}
+
 export async function GET(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -53,6 +65,11 @@ export async function PATCH(req: NextRequest) {
   // with an empty body, filing the failing UPDATE statement into `error_events` as a server fault.
   const badId = invalidUuidResponse(userId)
   if (badId) return badId
+  // Activating yourself is a no-op (you are signed in, so already active); only deactivation locks out.
+  if (action === 'deactivate') {
+    const self = refuseSelf(userId, session.user.id, 'deactivate')
+    if (self) return self
+  }
 
   const repo = await getRepository()
   // RV-48: an id that matched no user answered `200 {"ok":true}`, the same response a real
@@ -84,7 +101,8 @@ export async function DELETE(req: NextRequest) {
   if (typeof userId !== 'string' || !userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
   const badId = invalidUuidResponse(userId)
   if (badId) return badId
-  if (userId === session.user.id) return NextResponse.json({ error: 'Cannot delete yourself' }, { status: 400 })
+  const self = refuseSelf(userId, session.user.id, 'delete')
+  if (self) return self
 
   // #2120: the same deletion the user's own `DELETE /api/account` runs. This used to be a bare
   // `DELETE FROM users`, which threw for any account with a custom exercise or a saved meal.

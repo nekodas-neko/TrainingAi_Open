@@ -72,16 +72,11 @@ const calls = (rel: string, re: RegExp) => re.test(stripComments(read(rel)))
 const proseRoutes = allRoutes.filter(f => calls(f, PROSE_CALL))
 const objectRoutes = allRoutes.filter(f => calls(f, OBJECT_CALL) && !calls(f, PROSE_CALL))
 
-// Object routes whose user-facing text fields (`notes`, `instructions`, a plan name) go out with no
-// guard in the prompt. Found by this discovery, not decided: the schema fields are real prose, and
-// adding the guard to each is a prompt change that wants a model run, so it is tracked on #2627
-// rather than waved through. SHRINK-ONLY: a route that gains the guard must leave this list (the
-// test below fails until it does), and a NEW unguarded object route fails outright.
-const KNOWN_UNGUARDED = new Set([
-  'app/api/exercises/generate/route.ts',                       // `instructions`
-  'app/api/nutrition/meal-plans/generate/meal/route.ts',       // meal `notes`
-  'app/api/nutrition/meal-plans/generate/route.ts',            // meal `notes`, `planName`, `restDayAdjustment`
-  'app/api/nutrition/scan/route.ts',                           // candidate `notes`
+// Object routes that are exempt from PROSE_FIELD_GUARDS because they return no prose of their own.
+// Empty since the four routes found by this discovery (exercise generator, meal, meal plan, scan)
+// took the guard. A route belongs here only with the reason beside it: a NEW object route with
+// user-facing text fields fails outright rather than being waved through.
+const KNOWN_UNGUARDED = new Set<string>([
 ])
 
 const guardedObjectRoutes = objectRoutes.filter(f => !KNOWN_UNGUARDED.has(f))

@@ -113,6 +113,7 @@ import type { AccountDeletionResult } from './slices/account-deletion'
 import * as colmi from './slices/colmi'
 import * as hcIntervals from './slices/health-connect-intervals'
 import * as shadowReadinessSlice from './slices/shadow-readiness'
+import * as nativeRefreshTokens from './slices/native-refresh-tokens'
 import { mergeSet, initialSourceMap, HEALTH_SOURCES, sourceRank, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
 import type {
   PeriodizationPhase,
@@ -723,6 +724,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async deleteAccount(userId: string): Promise<AccountDeletionResult> {
     return accountDeletion.deleteAccount(this.db, userId)
   }
+
+  // #2076 — native app refresh tokens. Only a hash is stored and no method returns one.
+  async createNativeRefreshToken(input: nativeRefreshTokens.CreateNativeRefreshTokenInput) { return nativeRefreshTokens.createNativeRefreshToken(this.db, input) }
+  async findNativeRefreshTokenByHash(tokenHash: import('@/lib/auth/refresh-token-hash').RefreshTokenHash) { return nativeRefreshTokens.findNativeRefreshTokenByHash(this.db, tokenHash) }
+  async rotateNativeRefreshToken(input: nativeRefreshTokens.RotateNativeRefreshTokenInput) { return nativeRefreshTokens.rotateNativeRefreshToken(this.db, input) }
+  async revokeNativeRefreshToken(userId: string, id: string, reason: nativeRefreshTokens.NativeRefreshTokenRevokedReason) { return nativeRefreshTokens.revokeNativeRefreshToken(this.db, userId, id, reason) }
+  async revokeNativeRefreshTokenFamily(userId: string, familyId: string, reason: nativeRefreshTokens.NativeRefreshTokenRevokedReason) { return nativeRefreshTokens.revokeNativeRefreshTokenFamily(this.db, userId, familyId, reason) }
+  async listActiveNativeRefreshTokens(userId: string) { return nativeRefreshTokens.listActiveNativeRefreshTokens(this.db, userId) }
 
   async getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null> {
     // lower(), not eq: it matches a row stored before LA-61's backfill (or one a collision kept it
@@ -1718,12 +1727,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const result = await this.db.execute<Row>(sql`
       SELECT exercise_name, estimated_1rm, is_baseline, rn, rn_kind
       FROM (
-        SELECT el.exercise_name, el.estimated_1rm, ws.phase_type IS NOT DISTINCT FROM 'baseline' AS is_baseline,
+        SELECT el.exercise_name, el.estimated_1rm, ${period.wsIsBaselineSession} AS is_baseline,
           -- The same total order in both windows (id breaks a logged_at tie), so the newest
           -- prescribed row is rn=1 and rn_kind=1 at once and can never be paired with itself.
           ROW_NUMBER() OVER (PARTITION BY el.exercise_name ORDER BY el.logged_at DESC, el.id DESC) AS rn,
           ROW_NUMBER() OVER (
-            PARTITION BY el.exercise_name, ws.phase_type IS NOT DISTINCT FROM 'baseline'
+            PARTITION BY el.exercise_name, ${period.wsIsBaselineSession}
             ORDER BY el.logged_at DESC, el.id DESC
           ) AS rn_kind
         FROM exercise_logs el

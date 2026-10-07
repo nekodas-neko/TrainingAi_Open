@@ -72,13 +72,15 @@ export function TdeeAdaptationCard({ energyBalance, onApplied }: Props) {
         <p className="text-sm leading-snug">
           Your daily goal is set to{" "}
           <span className="font-semibold tabular-nums">{current?.toLocaleString() ?? "—"} kcal</span>,
-          but today&apos;s budget works out to{" "}
+          but the recommended goal works out to{" "}
           <span className="font-semibold tabular-nums">{recommended.toLocaleString()} kcal</span>
           {gap != null && <> — a {gap.toLocaleString()} kcal gap</>}.
         </p>
         <p className="text-[11px] leading-snug text-muted-foreground">
-          The set goal assumes a typical activity level; the budget starts from your resting burn and
-          adds what you actually moved today. {maintenance!.gapMessage
+          {/* #2071: neither of these is today's budget any more — that is the one number on the bar
+              above. This card only reconciles the stored goal with the recommendation. */}
+          The set goal assumes a typical activity level; the recommendation comes from your estimated
+          maintenance. Neither is today&apos;s budget, which is the number on the bar above. {maintenance!.gapMessage
             ? <>{maintenance!.gapMessage} — until then neither is measured, so nothing is changed for you.</>
             : <>Neither is measured yet, so nothing is changed for you.</>}
         </p>
