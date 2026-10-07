@@ -25,7 +25,7 @@
 //                          every predicate in every file — the 2026-08-09 headline measurement
 //   --jobs <n>             parallel runs (default 3; each gets its own cloned DB)
 //   --test <path>          test file(s) to run, comma-separated
-//                          (default lib/data/postgres/__tests__/repository-ownership-scoping.test.ts)
+//                          (default: both repository-ownership-scoping*.test.ts files)
 //   --json <path>          write the full result list as JSON
 //
 // Source files are never written: the mutation is applied by a vitest transform plugin
@@ -47,7 +47,11 @@ const opt = (name, dflt) => {
   return i >= 0 && i + 1 < argv.length ? argv[i + 1] : dflt
 }
 
-const DEFAULT_TEST = 'lib/data/postgres/__tests__/repository-ownership-scoping.test.ts'
+// Both halves of the burn-down: the hand-built Q-155 file and the #2425 schema-seeded one.
+const DEFAULT_TEST = [
+  'lib/data/postgres/__tests__/repository-ownership-scoping.test.ts',
+  'lib/data/postgres/__tests__/repository-ownership-scoping-sweep.test.ts',
+].join(',')
 const tests = opt('--test', DEFAULT_TEST).split(',')
 const jobs = Math.max(1, Number(opt('--jobs', '3')))
 const fileFilter = opt('--file', null)

@@ -54,7 +54,5 @@ export default defineConfig({
     setupFiles: [path.join(REPO_ROOT, 'vitest.setup.ts')],
     testTimeout: 20_000,
     hookTimeout: 30_000,
-    // One file, one worker: the sweep's cost is process start-up, not test time.
-    fileParallelism: false,
   },
 })
