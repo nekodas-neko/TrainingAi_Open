@@ -285,17 +285,22 @@ if (opacityBad.length) {
   process.exit(1);
 }
 
-// ---- RV-101: the muscle heatmap's volume ramp ----
+// ---- RV-101: the muscle heatmap's volume colours ----
 //
-// WCAG 1.4.11 puts the floor for a graphical object at 3:1 against what sits next to it. For this
-// ramp the neighbour is NOT `--card`: it is the heatmap's own `defaultFill`, a grey composited over
-// the card, which is what an untouched muscle is painted with. Measured against `--card` the bottom
-// two stops read 2.04:1 and 2.60:1; against the fill they are worse, 1.65:1 and 2.11:1 — so a muscle
-// trained to a fifth of its target was indistinguishable from one never trained at all.
+// WCAG 1.4.11 puts the floor for a graphical object at 3:1 against what sits next to it. For the
+// body map the neighbour is NOT `--card`: it is the heatmap's own `defaultFill`, a grey composited
+// over the card, which is what an untouched muscle is painted with. (The old green ramp's bottom
+// two stops measured 1.65:1 and 2.11:1 against it, so a muscle trained to a fifth of its target
+// could not be told from one never trained.)
 //
-// Both operands are read out of the component rather than restated here, so editing either the ramp
-// or the fill is what re-runs this check.
+// Since #2554 the patches are the bars' own colours — the `--accent-green`, `--accent-amber` and
+// `--destructive` tokens, via `muscleVolumeColor` in `components/health/volume-band.ts` — and they
+// change with the theme, so each is scored in BOTH themes, at the card's worst brand hue.
+//
+// Both operands are read rather than restated: the fill from the component, the three colours from
+// the rule's own table in volume-band.ts, so editing either re-runs this check.
 const HEATMAP = path.join(__dirname, '..', 'components', 'muscle-heatmap.tsx');
+const VOLUME_BAND = path.join(__dirname, '..', 'components', 'health', 'volume-band.ts');
 const NON_TEXT_FLOOR = 3;
 
 function compositeLum(rgb255, a, bgOklch) {
@@ -305,41 +310,52 @@ function compositeLum(rgb255, a, bgOklch) {
 }
 
 const heatmapSrc = fs.readFileSync(HEATMAP, 'utf8');
-const rampSrc = /const VOLUME_TINT_STEPS = \[([^\]]*)\]/.exec(heatmapSrc);
+const bandSrc = fs.readFileSync(VOLUME_BAND, 'utf8');
 const fillSrc = /defaultFill="rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([0-9.]+)\s*\)"/.exec(heatmapSrc);
-const ramp = rampSrc ? [...rampSrc[1].matchAll(/"(#[0-9a-fA-F]{6})"/g)].map(m => m[1]) : [];
+const tableSrc = /const TARGET_BAND_COLOR[^=]*=\s*\{([^}]*)\}/.exec(bandSrc);
+// Every `var(--token)` the rule can return for a trained muscle. `untrained` is the grey the
+// fill itself is, so it is not a patch colour and is excluded by name.
+const bandTokens = tableSrc
+  ? [...tableSrc[1].matchAll(/^\s*(\w+):\s*'var\(--([a-z-]+)\)'/gm)].filter(m => m[1] !== 'untrained').map(m => m[2])
+  : [];
 
 // A regex that stops matching is the failure this whole file is written to avoid — it would report
-// a clean ramp while measuring nothing.
-if (!ramp.length || !fillSrc || !dark.card) {
-  console.error('check-contrast: could not read the volume ramp, the default fill, or --card from');
-  console.error(`  ${path.relative(path.join(__dirname, '..'), HEATMAP)} / app/globals.css.`);
-  console.error('  Refusing to report the ramp as passing when nothing was measured.');
+// a clean palette while measuring nothing.
+if (bandTokens.length !== 3 || !fillSrc || !dark.card || !light.card) {
+  console.error('check-contrast: could not read the volume-band colours, the default fill, or --card from');
+  console.error(`  ${path.relative(path.join(__dirname, '..'), VOLUME_BAND)} / ${path.relative(path.join(__dirname, '..'), HEATMAP)} / app/globals.css.`);
+  console.error(`  (found ${bandTokens.length} band tokens, expected 3.) Refusing to report them as passing when nothing was measured.`);
   process.exit(1);
 }
 
 const fillRgb = [Number(fillSrc[1]), Number(fillSrc[2]), Number(fillSrc[3])];
 const fillAlpha = Number(fillSrc[4]);
-// `--card` takes the user's brand hue, so score the ramp at its WORST hue rather than at the
-// `var()` fallback — the same rule the token pairs above are held to.
-const hues = dark.card.hueVaries ? Array.from({ length: 360 / HUE_STEP }, (_, i) => i * HUE_STEP) : [dark.card[2]];
-const rampBad = [];
-for (const tint of ramp) {
-  let worst = Infinity, at = null;
-  for (const h of hues) {
-    const r = ratioFromLum(hexLum(tint), compositeLum(fillRgb, fillAlpha, [dark.card[0], dark.card[1], h]));
-    if (r < worst) { worst = r; at = h; }
+const bandBad = [];
+for (const [themeName, T] of [['light', light], ['dark', dark]]) {
+  // `--card` takes the user's brand hue, so score at its WORST hue rather than at the `var()`
+  // fallback — the same rule the token pairs above are held to.
+  const hues = T.card.hueVaries ? Array.from({ length: 360 / HUE_STEP }, (_, i) => i * HUE_STEP) : [T.card[2]];
+  for (const name of bandTokens) {
+    const tok = T[name];
+    if (!tok) {
+      console.error(`check-contrast: --${name} (a volume-band colour) is not parsed from the ${themeName} theme.`);
+      process.exit(1);
+    }
+    let worst = Infinity, at = null;
+    for (const h of hues) {
+      const r = ratioFromLum(lum(tok), compositeLum(fillRgb, fillAlpha, [T.card[0], T.card[1], h]));
+      if (r < worst) { worst = r; at = h; }
+    }
+    if (worst < NON_TEXT_FLOOR) bandBad.push({ themeName, name, r: worst, hue: at });
   }
-  if (worst < NON_TEXT_FLOOR) rampBad.push({ tint, r: worst, hue: at });
 }
-if (rampBad.length) {
-  console.error(`Volume-ramp stops below the ${NON_TEXT_FLOOR}:1 non-text floor against an untouched muscle:`);
-  for (const b of rampBad) {
-    console.error(`  ${b.tint} — ${b.r.toFixed(2)}:1 at brand hue ${b.hue}`);
+if (bandBad.length) {
+  console.error(`Volume-band colours below the ${NON_TEXT_FLOOR}:1 non-text floor against an untouched muscle:`);
+  for (const b of bandBad) {
+    console.error(`  --${b.name} (${b.themeName}) — ${b.r.toFixed(2)}:1 at brand hue ${b.hue}`);
   }
-  console.error('A stop below the floor cannot be told from a muscle with no sets logged, which is the');
-  console.error('one distinction the heatmap exists to draw. Lift the ramp — note that lifting only the');
-  console.error('bottom stops does not work, there is not enough room beneath the next one.');
+  console.error('A colour below the floor cannot be told from a muscle with no sets logged, which is the');
+  console.error('one distinction the heatmap exists to draw.');
   process.exit(1);
 }
 
@@ -350,4 +366,4 @@ if (staleExempt.length) {
   process.exit(1);
 }
 
-console.log(`check-contrast: ${results.length} token pairs meet WCAG AA (${GRANDFATHERED.size} grandfathered below minimum); opacity-modified text is at or above /${OPACITY_FLOOR} (${OPACITY_EXEMPT.size} non-text sites exempt); all ${ramp.length} volume-ramp stops clear ${NON_TEXT_FLOOR}:1 against an untouched muscle.`);
+console.log(`check-contrast: ${results.length} token pairs meet WCAG AA (${GRANDFATHERED.size} grandfathered below minimum); opacity-modified text is at or above /${OPACITY_FLOOR} (${OPACITY_EXEMPT.size} non-text sites exempt); all ${bandTokens.length} volume-band colours clear ${NON_TEXT_FLOOR}:1 against an untouched muscle in both themes.`);
