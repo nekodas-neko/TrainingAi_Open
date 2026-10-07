@@ -579,10 +579,20 @@ export const sleepSessions = pgTable('sleep_sessions', {
   // docs/reviews/2026-08-26-manual-bedtime-write-audit.md — and it is not a stylistic preference,
   // it is why a 23:00 bedtime over a measured 04:23-08:03 night does not become 34% efficiency.
   manualSleepStart: timestamp('manual_sleep_start', { withTimezone: true }),
+  // #2338 (migration 202610071309) — a night the USER entered (bed time → wake time), not one a
+  // device measured. Distinct from `manualSleepStart` above, which corrects one field of a measured
+  // night. A manual night loses to any device night for the same date: `preferDeviceNights` in
+  // packages/shared/src/health/sleep-night.ts drops it on every read, and a device write landing
+  // on its `sleep_start` takes the row over (`upsertOuraSleep` resets this to false).
+  manualEntry:      boolean('manual_entry').notNull().default(false),
   sourceMap:        jsonb('source_map').$type<Record<string, string>>(),   // per-field provenance (migration 120)
   createdAt:        timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:        timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, t => [unique().on(t.userId, t.sleepStart)])
+}, t => [
+  unique().on(t.userId, t.sleepStart),
+  // One manual night per (user, wake date): a second entry is an edit, never a second row.
+  uniqueIndex('sleep_sessions_manual_night_key').on(t.userId, t.date).where(sql`manual_entry`),
+])
 
 export const moodLogs = pgTable('mood_logs', {
   id:           uuid('id').primaryKey().defaultRandom(),
