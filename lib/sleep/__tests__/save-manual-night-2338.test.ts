@@ -67,11 +67,11 @@ describe('saveManualNight', () => {
   })
 
   it('without a local store (web build): posts to the route and invalidates', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ok: true, id: 'x', date: '2026-10-07', shadowed: false }), { status: 200 }))
+    const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify({ ok: true, id: 'x', date: '2026-10-07', shadowed: false }), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
     const res = await saveManualNight({ userId: 'u', tz: TZ, sleepStart: BED, sleepEnd: WAKE })
     expect(res).toEqual({ ok: true, date: '2026-10-07', shadowed: false })
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe('/api/sleep-sessions/manual')
     expect(JSON.parse(String(init.body))).toMatchObject({ sleepStart: BED, sleepEnd: WAKE })
     expect(invalidate).toHaveBeenCalledOnce()
