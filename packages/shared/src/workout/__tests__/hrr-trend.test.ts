@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sessionHrr1Median, rollupDailyBestHrr } from '../hrr-trend'
+import { sessionHrr1Median, rollupDailyBestHrr, setHrr60Values } from '../hrr-trend'
 
 describe('sessionHrr1Median', () => {
   it('returns the median of non-null HRR1 values (odd count)', () => {
@@ -39,5 +39,45 @@ describe('rollupDailyBestHrr', () => {
       { day: '2026-07-15', hrr1Values: [null, null] },
     ])
     expect(map.has('2026-07-15')).toBe(false)
+  })
+})
+
+// #2234: the trend plotted 0-value points on ring-only days, because the nearest-reading hrr1 turned
+// two idle ring readings a minute apart into a "recovery" of exactly 0. The per-set value is HRR60.
+describe('setHrr60Values', () => {
+  const end = Date.UTC(2026, 8, 17, 2, 0, 0)
+  const at = (ms: number, bpm: number, source = 'ble') => ({ timestamp: new Date(end + ms), bpm, source })
+  const strapMinute = Array.from({ length: 61 }, (_, k) => at(k * 1000, 150 - Math.round(k / 3), 'chest_strap'))
+
+  it('measures a dense strap minute', () => {
+    expect(setHrr60Values(strapMinute, [{ setEndMs: end, loggedAt: new Date(end) }])).toEqual([20])
+  })
+
+  it('a flat ring pair 60 s apart is not measured — null, never 0', () => {
+    const ring = [at(0, 92), at(60_000, 92)]
+    expect(setHrr60Values(ring, [{ setEndMs: end, loggedAt: new Date(end) }])).toEqual([null])
+  })
+
+  it('a rising ring pair is not measured either — null, never negative', () => {
+    expect(setHrr60Values([at(0, 95), at(60_000, 98)], [{ setEndMs: end, loggedAt: new Date(end) }])).toEqual([null])
+  })
+
+  it('anchors on loggedAt when the set has no timed end, and a set with neither is null', () => {
+    expect(setHrr60Values(strapMinute, [{ loggedAt: new Date(end) }, { setEndMs: null, loggedAt: null }])).toEqual([20, null])
+  })
+
+  it('a genuine flat recovery from dense HR stays 0 — a measurement, not an absence', () => {
+    const flat = Array.from({ length: 61 }, (_, k) => at(k * 1000, 120, 'chest_strap'))
+    expect(setHrr60Values(flat, [{ setEndMs: end, loggedAt: new Date(end) }])).toEqual([0])
+  })
+
+  it('a ring-only day rolls up to no entry, so the trend draws a gap', () => {
+    const ring = [at(0, 92), at(60_000, 92)]
+    const map = rollupDailyBestHrr([
+      { day: '2026-09-17', hrr1Values: setHrr60Values(ring, [{ setEndMs: end, loggedAt: new Date(end) }]) },
+      { day: '2026-09-15', hrr1Values: setHrr60Values(strapMinute, [{ setEndMs: end, loggedAt: new Date(end) }]) },
+    ])
+    expect(map.has('2026-09-17')).toBe(false)
+    expect(map.get('2026-09-15')).toBe(20)
   })
 })
