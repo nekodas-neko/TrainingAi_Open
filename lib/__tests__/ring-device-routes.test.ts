@@ -30,7 +30,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 type Row = Record<string, unknown>
 
-const getUserById = vi.fn(async (_id: string) => ({ isAdmin: true }) as Row | null)
+const getUserById = vi.fn(async (_id: string) => ({ isActive: true, isAdmin: true }) as Row | null)
 const rateLimit = vi.fn((..._a: unknown[]) => true)
 
 const getPendingRekeyDeclaration = vi.fn(async (_u: string) => null as Row | null)
@@ -98,7 +98,7 @@ beforeEach(() => {
                    getColmiLatestReadingAt, daytimeHrvCurve, intradayTempCurve, intradaySpo2Curve,
                    completenessForDay]) m.mockClear()
   rateLimit.mockReturnValue(true)
-  getUserById.mockResolvedValue({ isAdmin: true })
+  getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
   getPendingRekeyDeclaration.mockResolvedValue(null)
   declareOuraRekey.mockResolvedValue({
     id: 'rk-1', declaredAt: new Date('2026-09-09T04:00:00Z'), alreadyPending: false,
@@ -126,7 +126,7 @@ describe('the gate — and where it deliberately differs', () => {
 
   it('refuses a non-admin on the three ring routes, whatever the token claims', async () => {
     sessionUser = { id: 'u-1', isAdmin: true }
-    getUserById.mockResolvedValue({ isAdmin: false })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     for (const [name, call] of ADMIN_ONLY) expect((await call()).status, name).toBe(403)
     expect(declareOuraRekey).not.toHaveBeenCalled()
     expect(cancelPendingRekeyDeclaration).not.toHaveBeenCalled()
@@ -136,7 +136,7 @@ describe('the gate — and where it deliberately differs', () => {
     // `colmi/status` is a signed-in user's own ring, not an admin diagnostic. Gating it would break
     // it for everyone but the owner, and its neighbours here being admin-only is what makes the
     // difference easy to erase by accident.
-    getUserById.mockResolvedValue({ isAdmin: false })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     expect((await colmiGet()).status).toBe(200)
     expect(getColmiLatestReadingAt).toHaveBeenCalledWith('u-1')
   })

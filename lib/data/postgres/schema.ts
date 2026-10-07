@@ -58,6 +58,27 @@ export const users = pgTable('users', {
   timingBaselineDate: date('timing_baseline_date', { mode: 'string' }),
 })
 
+export const authIdentities = pgTable('auth_identities', {
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  provider: text('provider').$type<import('@/lib/auth/identity').AuthProvider>().notNull(),
+  subject: text('subject').notNull(),
+  email: text('email'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, x => [
+  primaryKey({ columns: [x.provider, x.subject] }),
+  unique().on(x.userId, x.provider),
+  check('auth_identities_provider_check', sql`${x.provider} IN ('google', 'apple')`),
+  check('auth_identities_subject_check', sql`length(${x.subject}) BETWEEN 1 AND 255`),
+])
+
+export const appleAuthAttempts = pgTable('apple_auth_attempts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  nonceHash: text('nonce_hash').notNull().unique(),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+}, x => [index('apple_auth_attempts_expiry_idx').on(x.expiresAt)])
+
 export const invitedEmails = pgTable('invited_emails', {
   email:     text('email').primaryKey(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),

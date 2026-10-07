@@ -39,8 +39,8 @@ describe.skipIf(!canRun)('rederive-body-battery (TN-72)', () => {
     yesterday = du.shiftDateStr(today, -1)
     twoAgo = du.shiftDateStr(today, -2)
     await pool.query(
-      `INSERT INTO users (id, email, password_hash, timezone, is_admin) VALUES ($1, $2, 'x', $3, true)
-       ON CONFLICT (id) DO UPDATE SET is_admin = true`,
+      `INSERT INTO users (id, email, password_hash, timezone, is_admin, is_active) VALUES ($1, $2, 'x', $3, true, true)
+       ON CONFLICT (id) DO UPDATE SET is_admin = true, is_active = true`,
       [USER, `tn72-${USER}@example.com`, TZ],
     )
   })

@@ -32,8 +32,8 @@ describe.skipIf(!canRun)('backfill-derived-scores (F-2)', () => {
     mid = dateUtils.todayMidnightUtc(TZ)
     shiftDateStr = dateUtils.shiftDateStr
     await pool.query(
-      `INSERT INTO users (id, email, password_hash, timezone, is_admin) VALUES ($1, $2, 'x', $3, true)
-       ON CONFLICT (id) DO UPDATE SET is_admin = true`,
+      `INSERT INTO users (id, email, password_hash, timezone, is_admin, is_active) VALUES ($1, $2, 'x', $3, true, true)
+       ON CONFLICT (id) DO UPDATE SET is_admin = true, is_active = true`,
       [TEST_USER_ID, `f2-${TEST_USER_ID}@example.com`, TZ],
     )
   })

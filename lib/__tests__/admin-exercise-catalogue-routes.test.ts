@@ -23,7 +23,7 @@ import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 
 type Row = Record<string, unknown>
 
-const getUserById = vi.fn(async (_id: string) => ({ isAdmin: true }) as Row | null)
+const getUserById = vi.fn(async (_id: string) => ({ isActive: true, isAdmin: true }) as Row | null)
 const listExerciseLibrary = vi.fn(async () => [] as Row[])
 const upsertExercise = vi.fn(async (..._a: unknown[]) => ({ id: 'e-1', name: 'Squat' }) as Row)
 const adminUpdateExercise = vi.fn(async (..._a: unknown[]) => ({ id: 'e-1', name: 'Squat' }) as Row)
@@ -71,7 +71,7 @@ const del = (qs: string) => send(DELETE, 'DELETE', undefined, qs)
 beforeEach(() => {
   for (const m of [getUserById, listExerciseLibrary, upsertExercise, adminUpdateExercise, deleteExercise,
                    invalidateExerciseMuscleMap, reportServerError, insertValues, deleteWhere]) m.mockClear()
-  getUserById.mockResolvedValue({ isAdmin: true })
+  getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
   listExerciseLibrary.mockResolvedValue([])
   upsertExercise.mockResolvedValue({ id: ID, name: 'Squat' })
   adminUpdateExercise.mockResolvedValue({ id: ID, name: 'Squat' })
@@ -90,7 +90,7 @@ describe('the admin gate on every verb', () => {
 
   it('refuses a non-admin whatever the token claims', async () => {
     sessionUser = { id: 'u-1', isAdmin: true }
-    getUserById.mockResolvedValue({ isAdmin: false })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     for (const [name, call] of ALL) expect((await call()).status, name).toBe(403)
     expect(upsertExercise).not.toHaveBeenCalled()
     expect(deleteExercise).not.toHaveBeenCalled()

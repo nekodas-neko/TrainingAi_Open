@@ -62,3 +62,32 @@ Optional:
 - `APK_RELEASE_REPO` — which repo `lib/github-release.ts` reads releases from. Set to
   `nekodas-neko/TrainingAi_Open`. The code falls back to the pre-cut repo, which is archived, so
   leaving it unset means reading a release whose version never changes again.
+
+Laptop only — TrainingAi Dev's Google sign-in (#2540):
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` **of the separate "TrainingAI Dev" OAuth client**, in
+  the laptop's gitignored `.env.local` only (check with `git check-ignore .env.local`). Same names
+  the production client uses — `auth.config.ts` reads only these two — so `pnpm dev` signs in
+  against the dev client and nothing else changes. **Never commit them, never put them in an issue,
+  PR, log or test fixture, and never set them on Railway**: production keeps its own client, and
+  localhost is never added to the production client. Placeholders:
+  ```
+  GOOGLE_CLIENT_ID=<dev-client-id>.apps.googleusercontent.com
+  GOOGLE_CLIENT_SECRET=<dev-client-secret>
+  ```
+  `pnpm dev` also needs `AUTH_SECRET` (any local random value, e.g. `openssl rand -base64 32`) and
+  the local `DATABASE_URL`; a Google sign-in creates or uses an account in that **local** database only.
+  **Redirect URIs registered on the dev client in Google Cloud Console** (Credentials → TrainingAI
+  Dev → Authorised redirect URIs) — Auth.js builds the redirect from the request's host, and the
+  phone reaches the laptop as `localhost:3000` over `adb reverse`, whatever port `pnpm dev` really
+  listens on:
+  - `http://localhost:3000/api/auth/callback/google` — **required**, the Dev app's sign-in.
+  - `http://localhost:<port>/api/auth/callback/google` — only to sign in from a desktop browser on a
+    `pnpm dev` that is not on 3000. A `*.localhost` host name (e.g. `x.engine.localhost:3020`) needs
+    its own exact entry; Google accepts no wildcards.
+  No Authorised JavaScript origin is needed (Auth.js uses the server-side redirect flow).
+  **For the Dev app's Google sign-in run `pnpm dev -p 3000` with `adb reverse tcp:3000 tcp:3000`**:
+  the begin route's redirects and Auth.js's `redirect_uri` use the port the server itself listens on,
+  so a server on another port reverse-mapped to 3000 sends the phone to a port it cannot reach.
+  The Dev app comes back on `trainingai-dev://auth-complete`, chosen from an allow-list of exactly
+  `trainingai` and `trainingai-dev` (`lib/auth/mobile/return-scheme.ts`); a production server
+  ignores the Dev scheme, so the real app's sign-in is unchanged by any of this.

@@ -25,7 +25,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 type Row = Record<string, unknown>
 
-const getUserById = vi.fn(async (_id: string) => ({ isAdmin: true }) as Row | null)
+const getUserById = vi.fn(async (_id: string) => ({ isActive: true, isAdmin: true }) as Row | null)
 const rateLimit = vi.fn((..._a: unknown[]) => true)
 const getAppLoadReport = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getTimingBaselineDate = vi.fn(async (_u: string) => '2026-01-15' as string | null)
@@ -89,7 +89,7 @@ beforeEach(() => {
                    listSleepSessions, listDayCheckins, reportServerError, nightSessions,
                    computeSleepScoreSeries, buildSleepFeelCalibration]) m.mockClear()
   rateLimit.mockReturnValue(true)
-  getUserById.mockResolvedValue({ isAdmin: true })
+  getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
   getAppLoadReport.mockResolvedValue([])
   getTimingBaselineDate.mockResolvedValue('2026-01-15')
   listSleepSessions.mockResolvedValue([])
@@ -111,7 +111,7 @@ describe('the admin gate on all three reports', () => {
     // The claim is stamped at login and can be 30 days stale; `requireAdmin` reads the database. A
     // fixture agreeing with itself could not tell which one the route consulted.
     sessionUser = { id: 'u-1', isAdmin: true }
-    getUserById.mockResolvedValue({ isAdmin: false })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     for (const [name, call] of ALL) expect((await call()).status, name).toBe(403)
     expect(setTimingBaselineDate).not.toHaveBeenCalled()
     expect(getAppLoadReport).not.toHaveBeenCalled()
@@ -130,7 +130,7 @@ describe('the admin gate on all three reports', () => {
     // The opposite direction, and it is load-bearing: without it a route that always answered 403
     // would pass the stale-claim case above.
     sessionUser = { id: 'u-1' }
-    getUserById.mockResolvedValue({ isAdmin: true })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
     for (const [name, call] of ALL) expect((await call()).status, name).toBe(200)
   })
 

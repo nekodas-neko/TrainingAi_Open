@@ -30,8 +30,8 @@ describe.skipIf(!canRun)('a typed repository error becomes a status, not a 500 (
     const { getPool } = await import('@/lib/data/postgres/client')
     pool = getPool()
     await pool.query(
-      `INSERT INTO users (id, email, password_hash, timezone, is_admin)
-       VALUES ($1, $2, 'x', 'Australia/Brisbane', true) ON CONFLICT (id) DO NOTHING`,
+      `INSERT INTO users (id, email, password_hash, timezone, is_admin, is_active)
+       VALUES ($1, $2, 'x', 'Australia/Brisbane', true, true) ON CONFLICT (id) DO NOTHING`,
       [USER, `rv46-${USER}@example.com`])
   })
 

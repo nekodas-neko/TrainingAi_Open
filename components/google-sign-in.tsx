@@ -2,31 +2,13 @@
 
 import { Button } from "@/components/ui/button";
 import { signIn } from "next-auth/react";
-
-const RAILWAY_URL = "https://trainingai-production.up.railway.app";
-export const MOBILE_AUTH_VERIFIER_KEY = "ta-mobile-auth-verifier";
-
-function base64url(bytes: Uint8Array): string {
-  let s = "";
-  bytes.forEach((b) => { s += String.fromCharCode(b); });
-  return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
+import { beginAndroidSignIn } from '@/lib/auth/mobile/client';
 
 export function GoogleSignIn() {
   async function handleSignIn() {
     const { Capacitor } = await import("@capacitor/core");
     if (Capacitor.isNativePlatform()) {
-      const { Browser } = await import("@capacitor/browser");
-      // PKCE-style binding: the verifier never leaves this WebView's
-      // localStorage; only its SHA-256 challenge rides the OAuth flow, so an
-      // app intercepting the trainingai:// deep link can't redeem the token.
-      const verifier = base64url(crypto.getRandomValues(new Uint8Array(32)));
-      const digest = new Uint8Array(
-        await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier)),
-      );
-      const challenge = base64url(digest);
-      localStorage.setItem(MOBILE_AUTH_VERIFIER_KEY, verifier);
-      await Browser.open({ url: `${RAILWAY_URL}/mobile-signin/begin?challenge=${challenge}` });
+      await beginAndroidSignIn();
     } else {
       signIn("google", { callbackUrl: "/" });
     }

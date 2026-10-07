@@ -167,7 +167,12 @@ second Android product flavour, for device passes on PRs and release candidates.
   Uninstalling *it* loses nothing that matters.
 - **It loads `http://localhost:3000`**, which `adb reverse tcp:3000 tcp:<port>` carries to the
   laptop's `pnpm dev`. Cleartext is allowed for localhost only (`src/dev/res/xml/network_security_config.xml`).
-  Sign in with the seeded test user; Google sign-in returns to the real app, so it does not work here.
+  Sign in with the seeded test user, or with Google once `.env.local` holds the separate "TrainingAI
+  Dev" OAuth client (#2540, [`environment-variables.md`](environment-variables.md)): the Dev app
+  opens `http://localhost:3000/mobile-signin/begin?…&return=trainingai-dev`, and the laptop's server
+  sends the token back on `trainingai-dev://auth-complete`, never to the real app. The scheme comes
+  from an allow-list of exactly two (`lib/auth/mobile/return-scheme.ts`), and a production server
+  ignores the Dev one. The account it signs in to lives in the laptop's database only.
 - **The real app's `server.url` is untouched.** The Dev app's Capacitor config and plugin list are
   generated at build time from what `npx cap sync` wrote (`android/app/build.gradle`), so a sync
   can never overwrite them or move the real app.
