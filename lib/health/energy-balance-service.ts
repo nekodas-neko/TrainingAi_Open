@@ -19,6 +19,7 @@ import {
 import {
   doseChangesInWindow, doseChangeCaveat, DOSE_HISTORY_LOOKBACK_DAYS,
 } from '@trainingai/shared/health/dose-change-caveat'
+import { goalDeficitKcal } from '@trainingai/shared/nutrition/calorie-budget'
 import type { FitnessGoal } from '@trainingai/shared/types/user'
 import type { RestingRateSource } from '@trainingai/shared/nutrition/resting-rate-source'
 import type { WorkoutRepository } from '@/lib/data/repository'
@@ -44,6 +45,12 @@ export interface EnergyBalanceResult {
     /** The test date, when `restingRateSource` is 'measured'. The rate is that test re-scaled onto
      *  today's fat-free mass, so word it "carried forward from", never as the test's own figure. */
     restingRateMeasuredOn?: string | null
+    /** #2071. The goal's deficit (kcal/day, positive = below the burn) the budget was built with.
+     *  Optional so a payload cached before it existed still types — `budgetProvenance` then returns
+     *  the budget that payload's `remainingKcal` was computed against. */
+    deficitKcal?: number | null
+    /** #2071. THE day's budget, `budgetProvenance(balance).total`, for server readers to quote. */
+    budgetKcal?: number
     zone: string
     zoneLabel: string
     zoneColor: string
@@ -206,7 +213,16 @@ export async function computeEnergyBalance(
   }
 
   const intakeKcal = Math.round(intakeByDate.get(date) ?? 0)
+  // The RECOMMENDATION's offset (`target.recommendedKcal`, the TDEE nudge). Unchanged by #2071: it is
+  // what turns the maintenance estimate into a suggested stored goal, and the maintenance estimate is
+  // explicitly not this change's to move.
   const goalDeltaKcal = goal ? GOAL_DAILY_DELTA[goal] : 0
+  // #2071. The BUDGET's deficit, derived from the goal and today's weight — never typed. Rounded here
+  // so the figure on the wire is exactly the one the budget was built with (see `computeCalorieBalance`).
+  // The weight is the latest weigh-in: the same one the RMR below is computed from.
+  const deficitKcal = Math.round(goalDeficitKcal({
+    goal, currentWeightKg: latestWeightKg, targetWeightKg: userGoals?.targetWeightKg ?? null,
+  }))
 
   const missingProfileFields = [
     latestWeightKg == null ? 'weight' : null,
@@ -383,8 +399,10 @@ export async function computeEnergyBalance(
   // anchored to the stored target instead. `bmr` is the measured RMR re-scaled onto today's fat-free
   // mass when there is one and a prediction otherwise, so the anchor tracks the body without
   // tracking the estimator. The stored target goes back to being a target (`target.currentKcal`).
+  // #2071: the goal's net is the budget's deficit (`targetNetKcal = −deficit`), so the coach's
+  // "target net" and the budget are one decision rather than the recommender's −200 beside it.
   const balance = computeCalorieBalance({
-    restingBaseKcal, activeKcal: activeEnergy.total, intakeKcal, goalDeltaKcal,
+    restingBaseKcal, activeKcal: activeEnergy.total, intakeKcal, goalDeltaKcal: 0 - deficitKcal, deficitKcal,
     // Rounded here rather than only inside `budgetProvenance`: this number goes on the wire, and a
     // float labelled kcal invites a consumer to print 1815.2992 where the card says 1,815.
     restingRateKcal: Math.round(bmr),
@@ -445,6 +463,7 @@ export async function computeEnergyBalance(
     macroTargets: macroTargetsFor(activeEnergy.total, budgetProvenance({
       restingBaseKcal, activeKcal: activeEnergy.total,
       targetNetKcal: balance.targetNetKcal, restingRateKcal: Math.round(bmr),
+      deficitKcal: balance.deficitKcal,
     }).base),
     activeBreakdown,
     goal,
