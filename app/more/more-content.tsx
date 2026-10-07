@@ -9,11 +9,7 @@ import type { User } from "@trainingai/shared/types/user";
 import type { Season } from "@trainingai/shared/types/friends";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl';
-import {
-  invalidateBiometrics, invalidateProgramStructure, invalidateWorkoutSummaries,
-  invalidateNutritionWrite, invalidateSupplements, invalidateActivityWrites,
-  invalidateInjuryWrites, invalidateOuraSync, invalidateRunningPlan, invalidateFitnessTests,
-} from "@/lib/cache-groups";
+import { invalidatePulledDomains } from "@/lib/cache-groups";
 import { pushMutations, pullDelta } from "@/lib/local-store/sync-engine";
 import { PullToSync } from "@/components/pull-to-sync";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
@@ -162,24 +158,10 @@ export default function MoreContent({ friendCode }: MoreContentProps) {
       userId ? pullDelta(userId, true) : Promise.resolve(null),
     ]).then(r => r[0]);
 
-    // Invalidate only what the pull actually changed (mirrors sync-provider.tsx)
+    // Invalidate only what the pull actually changed — the same helper sync-provider.tsx uses
     // — never invalidateCache(''), which wipes every screen's instant-paint seed.
     const delta = deltaResult.status === 'fulfilled' ? deltaResult.value : null;
-    if (delta && delta.synced > 0) {
-      if (delta.domains.biometrics)  await invalidateBiometrics();
-      if (delta.domains.programs)    await invalidateProgramStructure();
-      if (delta.domains.workouts)    await invalidateWorkoutSummaries();
-      if (delta.domains.nutrition)   await invalidateNutritionWrite();
-      if (delta.domains.supplements) await invalidateSupplements();
-      if (delta.domains.activity)    await invalidateActivityWrites();
-      // B6: this block claimed to mirror sync-provider but dropped the running +
-      // fitnessTests domains, so a More-tab sync that reconciled a pushed run/test
-      // never cleared their caches.
-      if (delta.domains.running)     await invalidateRunningPlan();
-      if (delta.domains.fitnessTests) await invalidateFitnessTests();
-      if (delta.domains.injuries)    await invalidateInjuryWrites();
-      if (delta.domains.ouraDaily)   await invalidateOuraSync();
-    }
+    if (delta) await invalidatePulledDomains(delta.domains);
   }, [user?.id]);
 
   return (

@@ -663,23 +663,21 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     estBasis:    r.estBasis == null ? null : String(r.estBasis),
   } satisfies LocalPlanMealAnswer));
 
-  const count = bodyMetrics.length + moodLogs.length + sleepSessions.length +
-    workoutSessions.length + activityLogs.length + fitnessTests.length + prescribedRuns.length + programs.length + progressionStyles.length +
-    programSessions.length + sessionExercises.length + schedules.length + scheduleDays.length +
-    styleSets.length +
-    foodItems.length + foodLogs.length + supplementLogs.length + injuries.length +
-    exerciseLogs.length + setLogs.length + personalRecords.length + ouraDaily.length +
-    ouraDailySummary.length + ouraDailyDerived.length +
-    dayCheckins.length + mealPlans.length + planMealAnswers.length;
+  // Everything this page writes, named once. `count` is summed from the same object `applyDelta`
+  // is handed, so a table cannot be written without being counted (#2543): the hand-written sum
+  // this replaced left out `supplements`, and a page whose only change was a supplement definition
+  // reported `synced: 0` — which callers read as "nothing changed" and skipped invalidating.
+  const delta = { bodyMetrics, moodLogs, sleepSessions,
+    workoutSessions, activityLogs, fitnessTests, prescribedRuns, programs, programSessions, sessionExercises,
+    schedules, scheduleDays, progressionStyles, styleSets,
+    foodItems, foodLogs, supplements, supplementLogs, injuries,
+    exerciseLogs, setLogs, personalRecords, ouraDaily, ouraDailySummary, ouraDailyDerived, dayCheckins,
+    mealPlans, mealPlanVariants, mealPlanMeals, planMealAnswers };
+  const count = Object.values(delta).reduce((n, rows) => n + rows.length, 0);
 
   let prunedPrograms = 0;
   try {
-    await store!.applyDelta({ bodyMetrics, moodLogs, sleepSessions,
-      workoutSessions, activityLogs, fitnessTests, prescribedRuns, programs, programSessions, sessionExercises,
-      schedules, scheduleDays, progressionStyles, styleSets,
-      foodItems, foodLogs, supplements, supplementLogs, injuries,
-      exerciseLogs, setLogs, personalRecords, ouraDaily, ouraDailySummary, ouraDailyDerived, dayCheckins,
-      mealPlans, mealPlanVariants, mealPlanMeals, planMealAnswers });
+    await store!.applyDelta(delta);
     // RV-174: a deleted program or style leaves no row in any delta, so the mirror is pruned to the
     // server's roster. Only when the server sent one — an absent roster must never read as "none".
     const asIds = (v: unknown) => (Array.isArray(v) ? v.map(String) : undefined);
@@ -701,18 +699,26 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
       programs:    prunedPrograms > 0 || programs.length > 0 || progressionStyles.length > 0 ||
                    programSessions.length > 0 || sessionExercises.length > 0 ||
                    schedules.length > 0 || scheduleDays.length > 0 || styleSets.length > 0,
-      workouts:    workoutSessions.length > 0 || exerciseLogs.length > 0 || personalRecords.length > 0,
+      // set_logs are cursored on their own `updated_at`, so a set edited on its own arrives without
+      // its exercise log — and every workout summary is derived from sets.
+      workouts:    workoutSessions.length > 0 || exerciseLogs.length > 0 || setLogs.length > 0 ||
+                   personalRecords.length > 0,
       nutrition:   foodItems.length > 0 || foodLogs.length > 0,
       supplements: supplements.length > 0 || supplementLogs.length > 0,
       activity:    activityLogs.length > 0,
       fitnessTests: fitnessTests.length > 0,
       running:     prescribedRuns.length > 0,
       injuries:    injuries.length > 0,
+      // `ouraDailySummary` / `ouraDailyDerived` deliberately raise nothing: the phone is their only
+      // writer, so a pull carries them back only as the echo of its own backup push (or a restore),
+      // and invalidating every Oura-derived cache on each echo would blank first paint for no change.
       ouraDaily:   ouraDaily.length > 0,
       dayCheckins: dayCheckins.length > 0,
       // Rides the mealPlans flag rather than getting its own: the answers only mean anything
       // beside the plan they answer, and every consumer that reacts to one needs the other.
-      mealPlans:   mealPlans.length > 0 || planMealAnswers.length > 0,
+      // Variants and meals ride their plan's page today; listed so the flag still holds if they stop.
+      mealPlans:   mealPlans.length > 0 || mealPlanVariants.length > 0 || mealPlanMeals.length > 0 ||
+                   planMealAnswers.length > 0,
     },
     // Old servers omit hasMore entirely, which reads as false — one page, done:
     // fully backwards compatible.
@@ -747,17 +753,11 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
       return { synced: total, domains, hasMore: true };
     }
     total += pageResult.count;
-    domains.biometrics  ||= pageResult.domains.biometrics;
-    domains.programs    ||= pageResult.domains.programs;
-    domains.workouts    ||= pageResult.domains.workouts;
-    domains.nutrition   ||= pageResult.domains.nutrition;
-    domains.supplements ||= pageResult.domains.supplements;
-    domains.activity    ||= pageResult.domains.activity;
-    domains.fitnessTests ||= pageResult.domains.fitnessTests;
-    domains.running     ||= pageResult.domains.running;
-    domains.injuries    ||= pageResult.domains.injuries;
-    domains.ouraDaily   ||= pageResult.domains.ouraDaily;
-    domains.dayCheckins ||= pageResult.domains.dayCheckins;
+    // Every flag, not a line per flag: the per-flag list had none for `mealPlans`, so a pulled plan
+    // never reached the outer result and its cache was never invalidated (#2543).
+    for (const flag of Object.keys(domains) as (keyof SyncedDomains)[]) {
+      domains[flag] ||= pageResult.domains[flag];
+    }
     sinceIso = pageResult.syncedAt;
     hasMore = pageResult.hasMore;
     if (!pageResult.hasMore) break;
