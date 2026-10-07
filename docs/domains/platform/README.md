@@ -28,6 +28,7 @@ layer**) through §16. Read it before building any shared helper.
 
 ## Reference docs
 
+- [`docs/data-residency.md`](../../data-residency.md) — **2026-10-07: where every table lives.** All 107 Postgres, 42 JS SQLite and 3 native tables, each with its class (device-first, server-first mirror, server-only, and so on), writer and reader, tombstone, export and account-deletion status. CI fails a new table that has no entry (#2489). Read it before adding a table or a delete path.
 - [`docs/admin-actions.md`](../../admin-actions.md) — **2026-10-06: every admin, maintenance and debug button**: what it calls, its scope, whether it is safe to repeat, its auth and danger, and which ones an agent may run (#2381). Found the one-tap ring-key delete (#2382) and six misbehaving actions (#2383).
 - [`docs/architecture/adaptive-scoring.md`](../../architecture/adaptive-scoring.md) — **2026-10-05: scores that learn the person** — any new signal declared once, baselines at hour/week/month/season scale, scores as per-person configuration, and an insights engine ("how does X affect you") with accuracy guards. Epic #2321.
 

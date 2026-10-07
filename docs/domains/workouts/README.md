@@ -422,17 +422,19 @@ Live at the time of writing (2026-07-30):
   user base, bound it on **rows** and rename the field rather than reinstating a day window under a
   name that promises all-time.
   ([`2026-09-18-lane-a-la117-leaderboard-all-time-streak.md`](../../overview/history-2026-09-21-folded-1.md#2026-09-18-lane-a-la117-leaderboard-all-time-streak))
-- **One query counts sets per muscle — go through it (LA-118).** `weightedSetsByMuscle` in
-  `lib/data/postgres/slices/periodization.ts` takes `{ from, toExclusive, dateColumn, programId? }`,
-  and those last two are parameters because they are what four separate copies used to disagree
-  about while every one of their comments claimed they matched. **State both at the call site:**
-  `started_at` only when the unit being measured is a programme session (that is
+- **One query attributes sets to muscles — go through it (LA-118, #2420).** `muscleAttributionRows`
+  in `lib/data/postgres/slices/periodization.ts` takes local-date
+  `{ from, to (inclusive), tz, dateColumn, programId?, measure: 'sets' | 'tonnage', weekAnchor? }`.
+  `dateColumn` and `programId` are parameters because they are what four separate copies used to
+  disagree about while every one of their comments claimed they matched. **State both at the call
+  site:** `started_at` only when the unit being measured is a programme session (that is
   `getWeeklySetsByMuscleGroup`, whose callers grade a week against that programme's targets),
   `logged_at` for anything per-day; and a `programId` only when a previous programme's sets should
-  vanish. For a windowed per-muscle set count from a client, the route already exists:
-  `GET /api/muscle-sets?from=&to=`. **`muscle-tonnage-trend` is still a separate copy** — it sums
-  tonnage and buckets by a local-date string, so it shares the attribution half and nothing else;
-  LA-118 is queued for it.
+  vanish. `weightedSetsByMuscle` sums its `'sets'` rows per muscle. For a windowed per-muscle set
+  count from a client, the route already exists: `GET /api/muscle-sets?from=&to=`. The muscle-tonnage
+  trend is no longer a separate copy: since #2542 `/api/muscle-tonnage-trend` reads
+  `getMuscleTonnageByWeek`, which is the same query with `measure: 'tonnage'` and weeks anchored on
+  `from`.
   ([`2026-09-18-lane-a-lb111-muscle-sets-window.md`](../../overview/history-2026-09-21-folded-1.md#2026-09-18-lane-a-lb111-muscle-sets-window))
 - **Muscle names are matched through `muscles.ts`, never compared raw (BF-171).** `normalizeMuscle`
   folds synonyms (`core` → `abs`, `quadriceps` → `quads`) and `moodMuscleMatches` expands a broad

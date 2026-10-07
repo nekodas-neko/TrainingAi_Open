@@ -453,6 +453,9 @@ jobs:
       - name: Local columns reach upgraded devices
         run: node scripts/check-local-column-upgrade-path.js
 
+      - name: Every table has a residency entry (docs/data-residency.md)
+        run: node scripts/check-table-residency.js
+
       - name: No duplicate Postgres migration numbers
         run: node scripts/check-migration-numbers.js
 
