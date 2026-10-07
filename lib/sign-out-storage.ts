@@ -47,6 +47,8 @@ export const DEVICE_STORAGE: Readonly<Record<string, string>> = Object.freeze({
   ta_strap_battery_v1: 'last-seen battery of the paired chest strap — hardware, deliberately not a preference (Q-111)',
   'ta-oura-ble-soak-log': 'ring battery soak diagnostics — about the ring hardware, not anyone\'s data',
   'ta-oura-ble-continuous-diag': 'ring capture diagnostics — about the BLE link, not anyone\'s data',
+  'ta-oura-ble-raw-maint-diag': 'raw-store maintenance results, row counts and cutoffs only — about this phone\'s oura_raw.db, which a sign-out does not clear either (#2579)',
+  'ta-oura-ble-raw-marked-by-day': 'marked-row counts per day for this phone\'s oura_raw.db, the prune estimate — dropping it would undercount a store a sign-out leaves in place (#2579)',
   ta_nav_timing_v1: 'navigation timing samples for this WebView — performance diagnostics',
   'ta-history-entry-depth': 'sessionStorage: where this tab\'s history begins, so Back does not leave the app',
 })

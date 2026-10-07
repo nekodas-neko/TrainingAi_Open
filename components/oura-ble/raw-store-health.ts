@@ -43,7 +43,8 @@ export function rawStoreFindings(s: RawStoreStats): RawStoreFinding[] {
       level: 'warn',
       text:
         'Nothing is marked rolled up, so the 14-day prune matches no rows and cannot delete any. ' +
-        'This store has no upper bound until the rollup consumer sets `rolled_up` (Q-538).',
+        'Rows are marked once the server\'s rollup has folded them (#2579): run "Raw store ' +
+        'maintenance" below, and check the server has completed a rollup since the last drain.',
     })
   }
 
