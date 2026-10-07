@@ -114,18 +114,24 @@ export const ACCOUNT_STORAGE: Readonly<Record<string, string>> = Object.freeze({
  * store still mounted keeps its state, and the next `set()` — a timer tick, a GPS point — would write
  * the whole of it straight back. Resetting first means anything written afterwards is the empty state.
  */
-const ACCOUNT_STORES = [
+interface PersistedStore {
+  getInitialState(): object
+  setState(state: never, replace: true): void
+  persist: { clearStorage(): void }
+}
+
+const ACCOUNT_STORES: readonly PersistedStore[] = [
   useWorkoutStore,
   useActivityStore,
   useGuidedWalkStore,
   useFitnessTestStore,
   useAutoDetectionStore,
-] as const
+]
 
 export function resetAccountStores(): void {
   for (const store of ACCOUNT_STORES) {
     try {
-      store.setState(store.getInitialState(), true)
+      store.setState(store.getInitialState() as never, true)
       // Removes the key AND drops a debounced write still pending for it (debounced-storage.ts).
       store.persist.clearStorage()
     } catch { /* best-effort, like every other clear in the sign-out sequence */ }
