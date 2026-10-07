@@ -6,6 +6,8 @@ import { Footprints, Flame, Droplet, Moon, Dumbbell, type LucideIcon } from 'luc
 import { accentCardStyle } from '@trainingai/shared/utils'
 import { GoalProgressBar } from './goal-progress-bar'
 import { EmptyState } from '@/components/ui/empty-state'
+import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
+import { useEnergyBalanceToday } from '@/app/health/hooks/use-health-calcs'
 import type { UserGoals } from '@/lib/data/repository'
 import type { BodyMetaRow, WeekToDate } from '@/app/api/body-metadata/route'
 import type { ProgressSummaryResponse } from '@/app/api/progress-summary/route'
@@ -46,6 +48,13 @@ export const GoalsProgressCard = memo(function GoalsProgressCard({ metaToday, we
   // Mirrors state, so it must not PATCH on mount — this card renders inside Health's launch burst.
   usePersistedPreference('goalsProgressView', view)
 
+  // #2071. The Calories row measures eating against the day's BUDGET — the one number every other
+  // surface prints — not the typed `calorie_goal`, which is no longer shown as a budget anywhere.
+  // Same cache key as Home and Nutrition, so this adds no request. The week view is the budget × 7,
+  // as Home's nutrition card already does for a weekly user: there is no per-day budget history.
+  const balance = useEnergyBalanceToday()?.balance ?? null
+  const dayBudgetKcal = balance ? budgetProvenance(balance).total : null
+
   // Built per view, because the card has to know whether the OTHER view has anything (#2337 below).
   const rowsFor = (view: 'today' | 'week'): GoalRow[] => {
     const rows: GoalRow[] = []
@@ -58,11 +67,13 @@ export const GoalsProgressCard = memo(function GoalsProgressCard({ metaToday, we
       })
     }
 
-    if (userGoals?.calorieGoal != null) {
+    // Still shown only to a user who set a calorie goal, so which rows appear is unchanged; the
+    // typed figure decides whether the row exists, never what it is measured against.
+    if (userGoals?.calorieGoal != null && dayBudgetKcal != null) {
       rows.push({
         key: 'Calories', icon: Flame, color: '#f97316', weekly: view === 'week',
         value: view === 'today' ? metaToday?.calories ?? null : weekToDate?.calories ?? null,
-        goal: normalizeGoal(userGoals.calorieGoal, userGoals.calorieGoalType ?? 'daily', view),
+        goal: view === 'today' ? dayBudgetKcal : dayBudgetKcal * 7,
       })
     }
 

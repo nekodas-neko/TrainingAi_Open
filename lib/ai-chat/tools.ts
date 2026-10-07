@@ -14,6 +14,7 @@ import { isBodyweightType, bodyweightRepMax } from '@trainingai/shared/1rm'
 import { todayMidnightUtc, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { computeEnergyBalance } from '@/lib/health/energy-balance-service'
+import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 
 export function buildChatTools(repo: WorkoutRepository, userId: string, tz: string, todayIso: string) {
   // User-local midnight, shared by every lookback window below — never Date.now(), which
@@ -141,23 +142,37 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
     }),
 
     getNutritionDay: tool({
-      description: 'Food logs and daily macro targets for one date: per-item calories/protein/carbs/fat plus totals and remaining calories.',
+      description: 'Food logs and daily targets for one date: per-item calories/protein/carbs/fat plus totals. ' +
+        '`targets.calories` is the calorie BUDGET for the day — the same number every screen in the app shows — ' +
+        'and `remainingKcal` is that budget minus what was eaten. Quote these; never recompute them.',
       inputSchema: z.object({
         date: z.string().nullable().describe('YYYY-MM-DD; null = today'),
       }),
       execute: async ({ date }) => {
         const d = date ?? todayIso
-        const [logs, targets] = await Promise.all([
+        // #2071. The calorie figure is the day's budget from the energy-balance service, never the
+        // typed goal (`targets.calories`), which no screen shows as a budget any more. A failed
+        // balance costs the budget, not the food log.
+        const [logs, targets, energy] = await Promise.all([
           repo.listFoodLogs(userId, d),
           repo.getNutritionTargets(userId),
+          (async () => computeEnergyBalance(repo, userId, tz, d))().catch(() => null),
         ])
+        const budgetKcal = energy?.balance?.budgetKcal ?? null
+        // The grams the Nutrition tab shows: re-fitted to that budget (BF-154) and grown by movement.
+        const grams = energy?.macroTargets?.scaled ?? (targets
+          ? { proteinG: targets.proteinG ?? null, carbsG: targets.carbsG ?? null, fatG: targets.fatG ?? null }
+          : null)
         const totals = logs.reduce(
           (acc, l) => ({ calories: acc.calories + l.calories, proteinG: acc.proteinG + l.proteinG, carbsG: acc.carbsG + l.carbsG, fatG: acc.fatG + l.fatG }),
           { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 },
         )
         return {
           date: d,
-          targets: targets ? { calories: targets.calories ?? null, proteinG: targets.proteinG ?? null, carbsG: targets.carbsG ?? null, fatG: targets.fatG ?? null } : null,
+          targets: budgetKcal != null || grams != null
+            ? { calories: budgetKcal, proteinG: grams?.proteinG ?? null, carbsG: grams?.carbsG ?? null, fatG: grams?.fatG ?? null }
+            : null,
+          remainingKcal: energy?.balance?.remainingKcal ?? null,
           totals: { calories: Math.round(totals.calories), proteinG: Math.round(totals.proteinG), carbsG: Math.round(totals.carbsG), fatG: Math.round(totals.fatG) },
           items: logs.map(l => ({ name: l.foodItem.name, meal: l.mealTypeId, calories: Math.round(l.calories), proteinG: Math.round(l.proteinG) })),
         }
@@ -175,6 +190,10 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
         'When `maintenance.doseCaveat` is set, a logged supplement or medication started, stopped or ' +
         'changed dose inside the calibration window: quote it beside any maintenance figure or target ' +
         'you give, because weight moved by a dose change is not metabolism. ' +
+        '`dailyBudgetKcal` is the calorie budget for the day — resting rate, minus the deficit for the goal, plus ' +
+        'the 20% for daily living, plus measured movement (`budgetBreakdown`) — and is the ONE budget every ' +
+        'screen shows; `kcalLeftToHitTarget` is measured against it. `storedGoal` is the calorie goal the ' +
+        'user once typed and the maintenance-based recommendation for it: never present either as the budget for today. ' +
         'Quote these numbers; never recompute them.',
       inputSchema: z.object({
         date: z.string().nullable().describe('YYYY-MM-DD; null = today'),
@@ -196,11 +215,19 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
           movementBreakdown: r.activeBreakdown,
           netKcal: r.balance.netKcal,
           targetNetKcal: r.balance.targetNetKcal,
+          dailyBudgetKcal: r.balance.budgetKcal ?? null,
+          budgetBreakdown: (() => {
+            const p = budgetProvenance(r.balance)
+            return p.chain == null ? null : {
+              restingRateKcal: p.chain.rmr, goalDeficitKcal: p.chain.deficit,
+              dailyLivingKcal: p.chain.metabolicBurn, movementKcal: p.earned,
+            }
+          })(),
           kcalLeftToHitTarget: r.balance.remainingKcal,
           standing: r.balance.zoneLabel,
           projectedWeeklyKg: r.balance.projectedWeeklyKg,
           maintenance: r.maintenance,
-          calorieTarget: r.target,
+          storedGoal: r.target,
         }
       },
     }),

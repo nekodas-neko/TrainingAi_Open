@@ -113,6 +113,8 @@ export interface CalorieBudget {
   totalKcal: number
   /** True when the floor, not the arithmetic, set `totalKcal`. */
   floored: boolean
+  /** True when the floor set `stillDayKcal` — a deficit bigger than the 20% metabolic burn. */
+  stillDayFloored: boolean
 }
 
 /**
@@ -128,7 +130,8 @@ export function calorieBudget({ rmrKcal, deficitKcal, movementKcal }: CalorieBud
   const metabolicBurn = rmr * (SEDENTARY_MULTIPLIER - 1)
   const floor = Math.max(rmr, CALORIE_FLOOR_KCAL)
 
-  const stillDayKcal = Math.round(Math.max(floor, rmr - deficit + metabolicBurn))
+  const stillDayRaw = rmr - deficit + metabolicBurn
+  const stillDayKcal = Math.round(Math.max(floor, stillDayRaw))
   const raw = rmr - deficit + metabolicBurn + movement
   const totalKcal = Math.round(Math.max(floor, raw))
   return {
@@ -140,5 +143,6 @@ export function calorieBudget({ rmrKcal, deficitKcal, movementKcal }: CalorieBud
     stillDayKcal,
     totalKcal,
     floored: raw < floor,
+    stillDayFloored: stillDayRaw < floor,
   }
 }

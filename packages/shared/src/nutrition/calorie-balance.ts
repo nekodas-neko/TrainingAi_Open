@@ -317,7 +317,8 @@ export interface BudgetProvenance {
   /** A resting rate anchors the budget (true on every path the service produces today). */
   anchoredToRestingRate: boolean
   /**
-   * #2071. The terms of `base`, for the provenance line: RMR − deficit + metabolic burn. Null on the
+   * #2071. The terms of `base`, for the provenance line: RMR − deficit + metabolic burn. `floored`
+   * means the floor, not that chain, set `base` (so the chain does not sum to it). Null on the
    * two legacy paths below, which have no such chain to print.
    */
   chain: { rmr: number; deficit: number; metabolicBurn: number; floored: boolean } | null
@@ -379,7 +380,7 @@ export function budgetProvenance(
       earned: b.totalKcal - b.stillDayKcal,
       total: b.totalKcal,
       anchoredToRestingRate: true,
-      chain: { rmr: b.rmrKcal, deficit: b.deficitKcal, metabolicBurn: b.metabolicBurnKcal, floored: b.floored },
+      chain: { rmr: b.rmrKcal, deficit: b.deficitKcal, metabolicBurn: b.metabolicBurnKcal, floored: b.stillDayFloored },
     }
   }
 
