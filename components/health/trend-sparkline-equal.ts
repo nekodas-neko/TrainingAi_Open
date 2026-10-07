@@ -12,6 +12,7 @@ export interface TrendSparklineCompared {
   label: string;
   color: string;
   unit?: string;
+  emptyText?: string;
 }
 
 /**
@@ -26,7 +27,7 @@ export interface TrendSparklineCompared {
  * different metric, and a refetch that moves one must redraw one rather than five.
  */
 export function trendSparklinePropsEqual(a: TrendSparklineCompared, b: TrendSparklineCompared): boolean {
-  if (a.field !== b.field || a.label !== b.label || a.color !== b.color || a.unit !== b.unit) return false;
+  if (a.field !== b.field || a.label !== b.label || a.color !== b.color || a.unit !== b.unit || a.emptyText !== b.emptyText) return false;
   if (a.trends === b.trends) return true;
   if (a.trends.length !== b.trends.length) return false;
   return a.trends.every((day, i) => {

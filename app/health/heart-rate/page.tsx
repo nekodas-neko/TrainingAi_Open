@@ -175,7 +175,10 @@ export default function HeartRateDetailPage() {
           <>
             <TrendSparkline trends={trends.trends} field="rhrBpm" label="Resting Heart Rate" color="#f87171" unit="bpm" />
             <TrendSparkline trends={trends.trends} field="hrvMs" label="HRV (overnight)" color="#a78bfa" unit="ms" />
-            <TrendSparkline trends={trends.trends} field="hrr1Bpm" label="HR Recovery (60s drop)" color="#34d399" unit="bpm/min" />
+            <TrendSparkline
+              trends={trends.trends} field="hrr1Bpm" label="HR Recovery (60s drop)" color="#34d399" unit="bpm/min"
+              emptyText="No chest-strap workouts in the last 14 days. Recovery is measured from the strap."
+            />
           </>
         )}
 

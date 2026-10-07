@@ -12,6 +12,7 @@ import { useHeroColorScheme } from "./detail-hero";
 import { resolveColor } from "@trainingai/shared/chart-colors";
 import { gapDataset } from "./trend-sparkline-gaps";
 import { trendSparklinePropsEqual } from "./trend-sparkline-equal";
+import { EmptyState } from "@/components/ui/empty-state";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
@@ -24,6 +25,12 @@ interface TrendSparklineProps {
   label: string;
   color: string;
   unit?: string;
+  /**
+   * What the card says when the field has no value on any day. Without it the card renders nothing,
+   * which is right for a metric every user has and wrong for one that depends on a device the user
+   * may not have worn: the card vanishing reads as a layout fault, not as an absence (issue 2604).
+   */
+  emptyText?: string;
 }
 
 // Translucent fill for the area under the line. The `+"18"` hex-alpha shortcut
@@ -48,13 +55,21 @@ function deltaChip(trends: HealthTrendDay[], field: Field) {
   return { text: `${sign} ${Math.abs(diff)} vs last week`, colorClass };
 }
 
-function TrendSparklineBase({ trends, field, label, color, unit }: TrendSparklineProps) {
+function TrendSparklineBase({ trends, field, label, color, unit, emptyText }: TrendSparklineProps) {
   const isLight = useHeroColorScheme() === "light";
   if (trends.length === 0) return null;
 
   const allValues = trends.map(t => t[field] as number | null);
   const firstIdx = allValues.findIndex(v => v != null);
-  if (firstIdx === -1) return null;
+  if (firstIdx === -1) {
+    if (!emptyText) return null;
+    return (
+      <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label} — 14 days</p>
+        <EmptyState title={emptyText} className="py-2" />
+      </div>
+    );
+  }
 
   // Trim leading nulls so chart starts at the first real data point
   const trimmed = trends.slice(firstIdx);
