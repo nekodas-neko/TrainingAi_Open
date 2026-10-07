@@ -37,6 +37,7 @@ const query = vi.fn(async (..._a: unknown[]) => ({ rows: [] }))
 const getPool = vi.fn(() => ({ query }))
 const rateLimit = vi.fn((..._a: unknown[]) => true)
 const exportUserData = vi.fn()
+const reportServerError = vi.fn()
 
 // The real changelog changes on every release, so a fixture built from it would assert a moving
 // target — and, worse, its top version would coincide with whatever the release lookup returns only
@@ -53,6 +54,7 @@ vi.mock('@/lib/github-release', () => ({
 }))
 vi.mock('@/lib/data/postgres/client', () => ({ getPool: () => getPool() }))
 vi.mock('@/lib/export/full-export', () => ({ exportUserData: (...a: unknown[]) => exportUserData(...a) }))
+vi.mock('@/lib/observability', () => ({ reportServerError: (...a: unknown[]) => reportServerError(...a) }))
 vi.mock('@trainingai/shared/changelog', () => ({
   CHANGELOG: [{ version: '9.9.9', date: '2026-09-08', changes: ['x'] }],
 }))
@@ -69,7 +71,7 @@ const statusReq = (forwardedFor?: string) =>
   }))
 
 beforeEach(() => {
-  for (const m of [lookupLatestApkRelease, fetchLatestApkRelease, query, getPool, rateLimit, exportUserData]) m.mockClear()
+  for (const m of [lookupLatestApkRelease, fetchLatestApkRelease, query, getPool, rateLimit, exportUserData, reportServerError]) m.mockClear()
   rateLimit.mockReturnValue(true)
   query.mockResolvedValue({ rows: [] })
   getPool.mockReturnValue({ query })
@@ -244,7 +246,7 @@ describe('GET /api/download-apk', () => {
 describe('GET /api/export', () => {
   const readAll = async (res: Response) => await res.text()
 
-  it('streams NDJSON for the caller, one JSON line per record', async () => {
+  it('streams NDJSON for the caller, one JSON line per record, ending with the completion trailer', async () => {
     exportUserData.mockImplementation(async function* () {
       yield { _manifest: { excluded: ['sessions'] } }
       yield { domain: 'body_metrics', row: { id: 1 } }
@@ -252,11 +254,43 @@ describe('GET /api/export', () => {
     const res = await getExport()
     expect(exportUserData).toHaveBeenCalledWith('u-1')
     expect(res.headers.get('Content-Type')).toBe('application/x-ndjson')
+    expect(res.headers.get('Cache-Control')).toBe('private, no-store')
 
     const lines = (await readAll(res)).trim().split('\n')
-    expect(lines).toHaveLength(2)
+    expect(lines).toHaveLength(3)
     expect(JSON.parse(lines[0])).toEqual({ _manifest: { excluded: ['sessions'] } })
     expect(JSON.parse(lines[1])).toEqual({ domain: 'body_metrics', row: { id: 1 } })
+    // #2427: the ONLY sign a reader has that nothing is missing. Exact text, because the documented
+    // check (`tail -n 1`) compares the last line as a string.
+    expect(lines[2]).toBe('{"_complete":true}')
+    expect(reportServerError).not.toHaveBeenCalled()
+  })
+
+  it('ends an empty export with the trailer too, so "no rows" never reads as "cut off"', async () => {
+    exportUserData.mockImplementation(async function* () { /* nothing */ })
+    expect((await readAll(await getExport())).split('\n')).toEqual(['{"_complete":true}', ''])
+  })
+
+  it('pulls the generator only as the client reads — it does not drain the export into memory', async () => {
+    // The route used to drain the generator inside `start()`, which enqueues every row whatever the
+    // client is reading: a slow phone link meant the whole export buffered on the server, undoing
+    // the keyset pagination in full-export.ts. Pin the backpressure, not the exact high-water mark.
+    let produced = 0
+    const TOTAL = 100_000 // ~4 MB of lines, far past the route's 256 KB high-water mark
+    exportUserData.mockImplementation(async function* () {
+      for (let i = 0; i < TOTAL; i++) { produced++; yield { domain: 't', row: { id: i, pad: 'x'.repeat(20) } } }
+    })
+    const res = await getExport()
+    const reader = res.body!.getReader()
+    await reader.read()
+    await new Promise(r => setTimeout(r, 20))
+    expect(produced).toBeGreaterThan(0)
+    expect(produced).toBeLessThan(TOTAL / 4)
+    // Abandoning the download stops the reads instead of finishing the export for nobody.
+    await reader.cancel()
+    const atCancel = produced
+    await new Promise(r => setTimeout(r, 20))
+    expect(produced).toBe(atCancel)
   })
 
   it("names the file with the USER's date, not the server's", async () => {
@@ -275,26 +309,41 @@ describe('GET /api/export', () => {
       .toBe('attachment; filename="trainingai-export-2026-03-11.ndjson"')
   })
 
-  it('closes the stream on a mid-export failure — the file is TRUNCATED, not marked failed', async () => {
-    // Pinning what the route does today, not endorsing it. The headers are already sent by the time
-    // the generator throws, so the status cannot change; the route logs and closes, and the user
-    // gets a short file that looks complete. Recorded as LA-84 rather than fixed here, because the
-    // remedy is a terminal error line and that changes the file's contract for any consumer.
-    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+  it('ends a mid-export failure with an _error trailer, never the completion one (#2427)', async () => {
+    // This test used to pin the defect (LA-84): the headers are already sent by the time the
+    // generator throws, so the status cannot change, and the route closed the stream leaving a short
+    // file that looked complete. The status still cannot change — the trailer is where it is said.
     exportUserData.mockImplementation(async function* () {
       yield { domain: 'body_metrics', row: { id: 1 } }
-      throw new Error('pagination blew up halfway')
+      throw new Error('pagination blew up halfway at "oura_heartrate" for user u-1')
     })
     const res = await getExport()
     expect(res.status).toBe(200)
 
-    const lines = (await readAll(res)).trim().split('\n')
-    expect(lines).toHaveLength(1)
+    const text = await readAll(res)
+    const lines = text.trim().split('\n')
+    expect(lines).toHaveLength(2)
     expect(JSON.parse(lines[0])).toEqual({ domain: 'body_metrics', row: { id: 1 } })
-    // Nothing in the payload says it is incomplete — which is the finding.
-    expect(await readAll(new Response(lines.join('\n')))).not.toContain('error')
-    expect(err).toHaveBeenCalled()
-    err.mockRestore()
+    expect(JSON.parse(lines[1])).toEqual({
+      _error: {
+        code: 'export_failed',
+        message: 'The export stopped before it finished. This file is incomplete — try the export again.',
+      },
+    })
+    expect(text).not.toContain('_complete')
+    // The internal detail goes to the owner's error log, never into the user's file.
+    expect(text).not.toContain('pagination')
+    expect(text).not.toContain('oura_heartrate')
+    expect(text).not.toMatch(/at .*\.ts:\d+/)
+    expect(reportServerError).toHaveBeenCalledTimes(1)
+    expect(reportServerError).toHaveBeenCalledWith(expect.any(Error), { userId: 'u-1', url: '/api/export' })
+  })
+
+  it('a failure before the first row still ends in _error, not an empty-looking file', async () => {
+    exportUserData.mockImplementation(async function* () { throw new Error('pool exhausted') })
+    const lines = (await readAll(await getExport())).trim().split('\n')
+    expect(lines).toHaveLength(1)
+    expect(JSON.parse(lines[0])._error.code).toBe('export_failed')
   })
 
   it('refuses without a session, and over a rate limit that is two per HOUR', async () => {
