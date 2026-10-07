@@ -11,6 +11,7 @@ import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals'
 import type { NutritionIngredient } from '@trainingai/shared/types/nutrition'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { invalidBodyResponse } from '@/lib/api/route-errors'
+import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
 
 // Same shape as the plan route plus one meal's ingredients. 256 KB is generous.
 const MAX_BODY_BYTES = 256 * 1024
@@ -173,6 +174,8 @@ export async function POST(req: Request) {
           '- DO choose weights that get close to the targets. Portions are fine-tuned in code afterwards, but only within about half to double what you give, so a meal that starts far off stays off.',
           '- Include a protein source, a carbohydrate source and a fat source (oil, butter, nuts, seeds, avocado, cheese, or a fattier cut of protein), unless the target for that macro is near zero. A meal missing one can never reach that target however the portions are resized.',
           '- Keep it realistic and repeatable: everyday supermarket ingredients, minimal prep.',
+          '',
+          PROSE_FIELD_GUARDS,
         ].filter(Boolean).join('\n'),
       }))
     meal = result.object

@@ -78,7 +78,6 @@ const objectRoutes = allRoutes.filter(f => calls(f, OBJECT_CALL) && !calls(f, PR
 // rather than waved through. SHRINK-ONLY: a route that gains the guard must leave this list (the
 // test below fails until it does), and a NEW unguarded object route fails outright.
 const KNOWN_UNGUARDED = new Set([
-  'app/api/nutrition/meal-plans/generate/meal/route.ts',       // meal `notes`
   'app/api/nutrition/meal-plans/generate/route.ts',            // meal `notes`, `planName`, `restDayAdjustment`
   'app/api/nutrition/scan/route.ts',                           // candidate `notes`
 ])
