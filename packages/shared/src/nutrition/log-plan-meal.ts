@@ -1,5 +1,5 @@
 import type { FoodLogWithItem, MealType, NutritionIngredient } from '@trainingai/shared/types/nutrition'
-import { DEFAULT_TZ } from '../date-utils'
+import { DEFAULT_TZ, msToHHMMInTz } from '../date-utils'
 import { logFoodEntries, type NewFoodEntry } from '@trainingai/shared/nutrition/log-food'
 
 /**
@@ -79,7 +79,9 @@ export async function logPlanMeal(
   const suggestedHour = meal.suggestedTime
     ? Number.parseInt(meal.suggestedTime.split(':')[0] ?? '', 10)
     : Number.NaN
-  const hour = Number.isFinite(suggestedHour) ? suggestedHour : now.getHours()
+  // The hour in the caller's zone, not the device's: this takes `tz` for exactly this reason, and a
+  // phone set to another zone would otherwise file a 7 am log under dinner.
+  const hour = Number.isFinite(suggestedHour) ? suggestedHour : Number(msToHHMMInTz(now, tz).slice(0, 2))
 
   const mealTypeId = meal.mealTypeId ?? mealTypeForHour(mealTypes, hour)
   if (!mealTypeId) throw new Error('No meal type available')
