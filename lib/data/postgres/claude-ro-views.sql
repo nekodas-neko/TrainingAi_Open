@@ -50,6 +50,23 @@ SELECT
   t.created_at
 FROM public.activity_types t;
 
+CREATE VIEW claude_ro.agent_action_log AS
+SELECT
+  t.id,
+  t.job,
+  t.parameters,
+  t.actor,
+  t.approval_ref,
+  t.target_user_id,
+  t.started_at,
+  t.finished_at,
+  t.outcome,
+  t.affected_rows,
+  t.days_moved,
+  t.error
+FROM public.agent_action_log t
+WHERE t.target_user_id IS NULL OR t.target_user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.ai_call_log AS
 SELECT
   t.id,
