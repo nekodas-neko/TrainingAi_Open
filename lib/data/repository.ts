@@ -461,6 +461,12 @@ export interface LastRealOneRm {
    *  the rep max IS this number, and the card had been reconstructing it by inverting the estimate
    *  — lossily, and impossibly for the 5/6 collision where both store the same figure. */
   avgReps: number | null
+  /** The log this 1RM came from belongs to a baseline session. A baseline estimate is AMRAP-scaled
+   *  from one unprescribed set, so a prescribed run compared against it reads as a gain that did not
+   *  happen. This only LABELS the row: which row is the working basis is unchanged. A session with
+   *  no `phase_type` (logged before TN-75) is not baseline here, as everywhere else. Optional so a
+   *  hand-built map from before it existed still types. */
+  fromBaseline?: boolean
 }
 
 export interface MeasuredRmrInput {

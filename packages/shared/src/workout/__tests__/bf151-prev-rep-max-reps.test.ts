@@ -149,3 +149,30 @@ describe('bodyweightRepMax prefers the stored reps over the inverse', () => {
     expect(bodyweightRepMax({ storedReps: null, oneRm: bad as number })).toBeNull()
   })
 })
+
+// Issue 2649. The summary leaves out its "+/− kg" on the first run after a baseline, so the builder
+// has to say when the working basis came from one. Only a REAL log can be a baseline: a seed or an
+// all-time PR is never labelled, whatever the map says.
+describe('prevFromBaseline labels a baseline basis', () => {
+  const lastReal = (fromBaseline?: boolean) => new Map([
+    ['Hanging Leg Raise', { estimated1rm: 82.75, target80: 66, avgReps: 8, ...(fromBaseline === undefined ? {} : { fromBaseline }) }],
+  ])
+
+  it('is true when the last real log came from a baseline session', () => {
+    expect(build({ lastRealOneRm: lastReal(true) }).prevFromBaseline).toBe(true)
+  })
+
+  it('is false for an ordinary log, and when the flag is absent', () => {
+    expect(build({ lastRealOneRm: lastReal(false) }).prevFromBaseline).toBe(false)
+    expect(build({ lastRealOneRm: lastReal() }).prevFromBaseline).toBe(false)
+  })
+
+  it('does not change which estimate is the basis', () => {
+    expect(build({ lastRealOneRm: lastReal(true) }).estimated1rm).toBe(82.75)
+  })
+
+  it('is false when the basis is a seed, even if a baseline log exists for the exercise', () => {
+    const ex = build({ lastRealOneRm: new Map(), estimateMap: new Map([['Hanging Leg Raise', 70]]) })
+    expect(ex.prevFromBaseline).toBe(false)
+  })
+})

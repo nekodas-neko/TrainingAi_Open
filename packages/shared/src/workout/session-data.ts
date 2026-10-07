@@ -94,6 +94,10 @@ export interface WorkoutExercise {
   /** BF-151: reps performed on the log `estimated1rm` came from, null when that number is a seed
    *  or an all-time PR rather than a logged set. For a bodyweight exercise this IS the rep max. */
   prevRepMaxReps: number | null;
+  /** The working basis behind `estimated1rm` came from a baseline session. The exercise summary
+   *  leaves out its "+/− kg" on the first run after a baseline, because that comparison is an
+   *  AMRAP-scaled estimate against a prescribed one. False for a seed, an all-time PR, or a normal log. */
+  prevFromBaseline?: boolean;
   progressionStyle: StyleSet[] | null;
   styleName: string | null;
   styleId?: string;
@@ -129,6 +133,7 @@ export interface LastRealOneRmLike {
   estimated1rm: number
   target80: number | null
   avgReps?: number | null
+  fromBaseline?: boolean
 }
 
 // All resolved inputs the per-exercise mapping reads. Identical whether the single-tab
@@ -375,6 +380,8 @@ export function buildWorkoutExercises(
         prevRepMaxReps: workingBasis.source === 'last_real'
           ? (lastRealOneRm?.get(ex.exerciseName)?.avgReps ?? null)
           : null,
+        prevFromBaseline: workingBasis.source === 'last_real'
+          && lastRealOneRm?.get(ex.exerciseName)?.fromBaseline === true,
         allTimePr1rm: prMap.get(ex.exerciseName) ?? null,
         // From the last NON-DELOAD session, not the last log (Q-202). A deload row stores
         // target_80 = 0, and this field is both the displayed target and the value the weight
