@@ -128,7 +128,7 @@ export const SyncVectorSchema = z.object({
     /** The last pull step's result: flags are matched as a subset, the rest exactly. */
     pull: z.object({
       result: z.enum(['ok', 'failed']).default('ok'),
-      flags: z.record(z.enum(PULL_FLAGS), z.boolean()).optional(),
+      flags: z.partialRecord(z.enum(PULL_FLAGS), z.boolean()).optional(),
       synced: z.number().int().optional(),
       hasMore: z.boolean().optional(),
     }).optional(),

@@ -76,7 +76,7 @@
         "pull": { "flags": { "biometrics": false, "programs": false, "workouts": false, "nutrition": false, "supplements": true, "activity": false, "fitnessTests": false, "running": false, "injuries": false, "ouraDaily": false, "dayCheckins": false, "mealPlans": false }, "synced": 1 },
         "cursor": "2026-10-01T01:00:00.000Z"
       },
-      "knownFailing": { "issue": "TBD", "reason": "pullDelta's count leaves out supplements, so a page whose only change is a supplement definition returns synced: 0 and the sync provider, which acts only when synced > 0, never calls invalidateSupplements." }
+      "knownFailing": { "issue": "#2543", "reason": "pullDelta's count leaves out supplements, so a page whose only change is a supplement definition returns synced: 0 and the sync provider, which acts only when synced > 0, never calls invalidateSupplements." }
     },
     {
       "name": "a pulled activity lands synced and raises only activity",
@@ -182,7 +182,7 @@
         "pull": { "flags": { "biometrics": false, "programs": false, "workouts": false, "nutrition": false, "supplements": false, "activity": false, "fitnessTests": false, "running": false, "injuries": false, "ouraDaily": false, "dayCheckins": false, "mealPlans": true }, "synced": 1 },
         "cursor": "2026-10-01T01:00:00.000Z"
       },
-      "knownFailing": { "issue": "TBD", "reason": "pullDelta merges each page's flags into its result but has no line for mealPlans, so the outer result always reports mealPlans: false and the sync provider never calls invalidateMealPlans after a pull." }
+      "knownFailing": { "issue": "#2543", "reason": "pullDelta merges each page's flags into its result but has no line for mealPlans, so the outer result always reports mealPlans: false and the sync provider never calls invalidateMealPlans after a pull." }
     }
   ]
 }
