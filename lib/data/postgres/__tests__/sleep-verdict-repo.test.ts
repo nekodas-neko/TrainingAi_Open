@@ -71,7 +71,7 @@ describe.skipIf(!canRun)('sleep verdict repository', () => {
   })
 
   // #2094: the medians land in their own columns, not just in the returned object.
-  it('stores each band's median in its own column', async () => {
+  it("stores each band's median in its own column", async () => {
     await repo.upsertSleepVerdict(USER_A, record())
     const { rows } = await pool.query(
       `SELECT duration_median, onset_median, efficiency_median FROM sleep_verdicts
