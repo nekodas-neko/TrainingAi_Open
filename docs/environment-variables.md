@@ -85,6 +85,9 @@ Laptop only — TrainingAi Dev's Google sign-in (#2540):
     `pnpm dev` that is not on 3000. A `*.localhost` host name (e.g. `x.engine.localhost:3020`) needs
     its own exact entry; Google accepts no wildcards.
   No Authorised JavaScript origin is needed (Auth.js uses the server-side redirect flow).
+  **For the Dev app's Google sign-in run `pnpm dev -p 3000` with `adb reverse tcp:3000 tcp:3000`**:
+  the begin route's redirects and Auth.js's `redirect_uri` use the port the server itself listens on,
+  so a server on another port reverse-mapped to 3000 sends the phone to a port it cannot reach.
   The Dev app comes back on `trainingai-dev://auth-complete`, chosen from an allow-list of exactly
   `trainingai` and `trainingai-dev` (`lib/auth/mobile/return-scheme.ts`); a production server
   ignores the Dev scheme, so the real app's sign-in is unchanged by any of this.
