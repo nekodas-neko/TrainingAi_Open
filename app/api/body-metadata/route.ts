@@ -11,6 +11,7 @@ import { weightTrendWindowStart } from "@trainingai/shared/health/long-term-goal
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { correctBodyFatPct, type BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
 import { invalidBodyResponse } from '@/lib/api/route-errors'
+import { bodyRecentFromDay, BODY_RECENT_DAYS } from '@trainingai/shared/health/body-recent-window'
 
 // One day's body metadata.
 const MAX_BODY_BYTES = 16 * 1024
@@ -138,7 +139,7 @@ export async function GET() {
   const today = formatInTimeZone(now, tz, "yyyy-MM-dd");
   // Calendar arithmetic on the local date, never `now − N × 86,400,000`: across a DST change the
   // millisecond form lands on the wrong local day for the hour either side of midnight.
-  const from = shiftDateStr(today, -7);
+  const from = bodyRecentFromDay(today);
   // Wider window purely to recover the LAST-KNOWN weight when nothing was logged in the last
   // 7 days — the card used to show "—" (7-day window) even though an older reading exists.
   // The same read supplies the Weight Trend slope's 30 days (#2480) — a subset, so no extra query.
@@ -189,7 +190,9 @@ export async function GET() {
   const weekActivitySteps = activityLogs.reduce((sum, a) => sum + (a.steps ?? 0), 0);
 
   const todayMetric = metrics.find(m => m.date === today);
-  const recent = metrics.slice(0, 7).map(m => toRow(m, bodyFatCalibration));
+  // Newest first, at most BODY_RECENT_DAYS rows: `listBodyMetrics` is ordered by date descending, and
+  // the local-store seed in Health builds the same window from the same helper (#2505).
+  const recent = metrics.slice(0, BODY_RECENT_DAYS).map(m => toRow(m, bodyFatCalibration));
 
   // Total active energy to add to the energy budget's "burned" — strength workouts + logged
   // activities (walk/run/cycle/…) + passive steps above a sedentary baseline, all net-of-rest via
