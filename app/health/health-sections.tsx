@@ -668,7 +668,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
       case "weeklyStats":     return <WeeklyStatsHub key="weeklyStats" data={weeklyStats} loading={weeklyStats === null} error={weeklyStatsError} onRetry={retryWeeklyStats} sessions={activeSessions} />;
       case "timeInZone":      return <TimeInZoneCard key="timeInZone" />;
       case "aiPeriodization": return <AiPeriodizationStatusCard key="aiPeriodization" />;
-      case "muscleSets":      return <WeeklyMuscleSetsCard key="muscleSets" muscles={muscleSets ?? []} loading={muscleSets === null} title="Muscle Volume This Week" trainingGoal={trainingGoal} />;
+      case "muscleSets":      return <WeeklyMuscleSetsCard key="muscleSets" muscles={muscleSets ?? []} loading={muscleSets === null} title="Muscle Volume This Week" trainingGoal={trainingGoal} injuredMuscles={(injuries ?? []).filter(i => i.resolvedDate == null).map(i => i.muscleName)} />;
       case "movementBalance": return <MovementBalanceCard key="movementBalance" />;
       case "activityHistory": return <ActivityHistoryCard key="activityHistory" userId={userId} />;
       case "workoutDensity":  return <WorkoutDensityCard key="workoutDensity" trends={healthTrends} />;

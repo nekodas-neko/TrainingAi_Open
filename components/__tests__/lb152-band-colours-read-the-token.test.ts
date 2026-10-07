@@ -60,7 +60,9 @@ describe('LB-152 — band colours read the accent token', () => {
   })
 
   it('every migrated file still paints with the token, not merely stopped colouring', () => {
-    for (const f of FILES) expect(code(f), f).toMatch(TOKEN)
+    // The weekly-muscle-sets card no longer names a colour at all (#2554): its bars and the body map
+    // both take theirs from `muscleVolumeColor` in `volume-band.ts`, which is in this list and does.
+    for (const f of FILES.filter(f => f !== 'components/health/weekly-muscle-sets-card.tsx')) expect(code(f), f).toMatch(TOKEN)
   })
 
   it('the volume bands return the tokens, and the two reds stay one colour', () => {

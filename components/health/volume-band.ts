@@ -44,3 +44,51 @@ export function volumeVerdict(trainingGoal: string, muscle: string, sets: number
   const band: VolumeBand = sets > mrv ? 'over' : sets > mav ? 'high' : sets >= mev ? 'in' : 'under'
   return { band, ...BANDS[band], mev, mav, mrv }
 }
+
+// ---- Weekly sets against a target: the one colour rule (#2554) ----
+//
+// The bars under "Muscle volume this week" and the body map above them used to run two rules for
+// one number: the bars went green / amber / red by share of target, the map shaded every trained
+// muscle green from dark to light. A muscle at 4 of 13 sets read red below and green above.
+// Both now read this, so the map cannot disagree with the bars again.
+
+/** The generic band's target when nothing supplies one — its 10-set minimum. */
+export const GENERIC_TARGET = 10
+/** Sets at which the generic band (no target, no goal) turns blue — well past the minimum. */
+const GENERIC_HIGH = 15
+
+export type TargetBand = 'untrained' | 'under' | 'approaching' | 'at'
+
+/** Which side of its target a week's sets fall. Integer arithmetic (`sets * 5` vs `target * 3`) so
+ *  exactly 60% is not at the mercy of `13 * 0.6` landing on 7.800000000000001. */
+export function targetBand(sets: number, target: number): TargetBand {
+  if (!(sets > 0)) return 'untrained'
+  if (sets >= target) return 'at'
+  if (sets * 5 >= target * 3) return 'approaching'
+  return 'under'
+}
+
+const TARGET_BAND_COLOR: Record<TargetBand, string> = {
+  at: 'var(--accent-green)',
+  approaching: 'var(--accent-amber)',
+  under: 'var(--destructive)',
+  untrained: 'var(--muted-foreground)',
+}
+
+export function targetBandColor(sets: number, target: number): string {
+  return TARGET_BAND_COLOR[targetBand(sets, target)]
+}
+
+/** The colour of one muscle's bar and its patch on the body map. A program target wins; then the
+ *  goal-scaled landmark verdict; then the generic 10-set band. */
+export function muscleVolumeColor(
+  sets: number,
+  target: number | null | undefined,
+  verdict?: Pick<VolumeVerdict, 'color'> | null,
+): string {
+  if (!(sets > 0)) return TARGET_BAND_COLOR.untrained
+  if (target != null) return targetBandColor(sets, target)
+  if (verdict) return verdict.color
+  if (sets >= GENERIC_HIGH) return 'var(--color-brand)'
+  return targetBandColor(sets, GENERIC_TARGET)
+}
