@@ -328,7 +328,16 @@ export async function computeEnergyBalance(
   // them never. This is the second one: resting base plus the movement actually measured. It fails
   // in unrelated ways to the intake/weight calibration, which is exactly what makes it a usable
   // check on it. For the owner on 2026-09-09 it read 1,895 against a calibrated 2,245.
-  const measuredMovementMaintenance = Math.round(formulaBaseline + avgActiveOverWindow)
+  //
+  // **#2474: built on the CREDITED base, not `formulaBaseline`.** `formulaBaseline` still holds the
+  // energy of the first 3,000 steps, and since BF-88 the movement total counts steps from the first
+  // one, so the same walking was in both terms and this read about one credit (~100 kcal for the
+  // owner) high, which made the `above_measured_movement` ceiling that much looser. The credited
+  // base is what the measured activity factor below already uses. The 1.15 ratio is unchanged, and
+  // the owner signed it off on 2026-10-06 with 0 of 41 days moving.
+  const stepBaseCreditKcal = stepEnergyKcal(energyProfile, STEP_BASE_CREDIT)
+  const formulaRestingBaseKcal = Math.max(Math.round(bmr), formulaBaseline - stepBaseCreditKcal)
+  const measuredMovementMaintenance = Math.round(formulaRestingBaseKcal + avgActiveOverWindow)
 
   const { maintenanceKcal, source, estimate } =
     resolveMaintenance(windowDays, formulaBaseline, bmr, measuredMovementMaintenance)
@@ -355,7 +364,7 @@ export async function computeEnergyBalance(
   // the base is `maintenance − avgActiveKcal` where `maintenance` is MEASURED: lowering the step
   // floor raises `avgActiveKcal`, so the subtraction already happens there. Applying the credit to
   // both double-subtracts it.
-  const stepBaseCreditKcal = stepEnergyKcal(energyProfile, STEP_BASE_CREDIT)
+  // (`stepBaseCreditKcal` is computed above the ceiling, which needs the same credited base.)
 
   // Floored at BMR for the same reason the calibrated branch is: a resting burn below BMR is not a
   // number this model is allowed to report, whatever the credit arithmetic says. It only binds for
@@ -363,7 +372,7 @@ export async function computeEnergyBalance(
   // is not a guarantee, and this is the cheaper half of being wrong.
   const restingBaseKcal = source === 'calibrated'
     ? Math.max(Math.round(bmr), Math.round(maintenanceKcal - avgActiveKcal))
-    : Math.max(Math.round(bmr), formulaBaseline - stepBaseCreditKcal)
+    : formulaRestingBaseKcal
 
   const currentKcal = targets?.calories ?? userGoals?.calorieGoal ?? null
 
@@ -385,9 +394,9 @@ export async function computeEnergyBalance(
 
   // LB-50. The measured factor uses the FORMULA-path resting base on both paths, so it stays
   // independent of the calibration: on the calibrated path `restingBaseKcal` is derived from the
-  // maintenance itself and would just hand the calibrated factor back. It is also not
-  // `measuredMovementMaintenance`, which adds the movement to `formulaBaseline` — that still holds
-  // the BF-88 step credit the movement total now counts too, so it reads ~one credit high.
+  // maintenance itself and would just hand the calibrated factor back. Since #2474 it is the same
+  // base the ceiling (`measuredMovementMaintenance`) is built on, so the two cannot disagree about
+  // the step credit.
   const gapMessage = source === 'formula' ? maintenanceGapMessage(estimate) : null
   // #2184. Over the days the ACCEPTED estimate actually used — the long or the short window, both
   // ending yesterday — so a change only the 28-day window saw is not blamed on a 14-day figure.
@@ -399,7 +408,6 @@ export async function computeEnergyBalance(
         shiftDateStr(date, -estimate.daysInWindow), shiftDateStr(date, -1),
       ))
     : null
-  const formulaRestingBaseKcal = Math.max(Math.round(bmr), formulaBaseline - stepBaseCreditKcal)
   const calibratedFactor = source === 'calibrated' ? activityFactor(maintenanceKcal, bmr) : null
   const measuredFactor = windowDays.length > 0
     ? activityFactor(formulaRestingBaseKcal + avgActiveOverWindow, bmr)
