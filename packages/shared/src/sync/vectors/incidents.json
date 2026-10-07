@@ -1,0 +1,553 @@
+{
+  "formatVersion": 1,
+  "vectors": [
+    {
+      "name": "a confirmed food-log delete leaves a synced tombstone",
+      "kind": "incident", "covers": "DV-5",
+      "source": "lib/local-store/__tests__/sync-engine.test.ts (DV-5)",
+      "guarantee": "Deleting a food log offline and pushing it ends with the row still deleted and synced, not stuck pending with its outbox entry gone.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "food_logs": [{ "id": "fl-1", "date": "2026-09-30", "meal_type_id": "mt-1", "food_item_id": "fi-1", "quantity_multiplier": 1, "logged_at": "2026-09-30T07:00:00.000Z", "updated_at": "2026-09-30T07:00:00.000Z", "sync_status": "synced" }]
+      },
+      "steps": [
+        { "op": "local", "action": "deleteFoodLog", "args": ["fl-1"] },
+        { "op": "local", "action": "queueMutation", "args": [{ "domain": "food_logs", "date": "2026-09-30", "payload": { "id": "fl-1", "deleted": true } }] },
+        { "op": "push", "responses": [{}] }
+      ],
+      "expect": {
+        "tables": [{ "table": "food_logs", "columns": ["id", "deleted_at", "sync_status"], "rows": [{ "id": "fl-1", "deleted_at": "2026-10-01T02:00:00.000Z", "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "food_logs", "payload": { "id": "fl-1", "deleted": true } }]
+      }
+    },
+    {
+      "name": "a confirmed injury delete leaves a synced tombstone",
+      "kind": "incident", "covers": "DV-5 (injuries)",
+      "source": "lib/local-store/__tests__/sync-engine.test.ts (DV-5 siblings)",
+      "guarantee": "Deleting an injury offline and pushing it ends with the row still deleted and synced.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "injuries": [{ "id": "inj-1", "muscle_name": "Hamstrings", "severity": "mild", "started_date": "2026-09-28", "created_at": "2026-09-28T09:00:00.000Z", "updated_at": "2026-09-28T09:00:00.000Z", "sync_status": "synced" }]
+      },
+      "steps": [
+        { "op": "local", "action": "deleteInjury", "args": ["inj-1"] },
+        { "op": "local", "action": "queueMutation", "args": [{ "domain": "injuries", "date": "2026-09-28", "payload": { "id": "inj-1", "deleted": true } }] },
+        { "op": "push", "responses": [{}] }
+      ],
+      "expect": {
+        "tables": [{ "table": "injuries", "columns": ["id", "deleted_at", "sync_status"], "rows": [{ "id": "inj-1", "deleted_at": "2026-10-01T02:00:00.000Z", "sync_status": "synced" }] }],
+        "outbox": []
+      }
+    },
+    {
+      "name": "a confirmed supplement untick leaves a synced tombstone",
+      "kind": "incident", "covers": "DV-5 (supplement_logs)",
+      "source": "lib/local-store/__tests__/sync-engine.test.ts (DV-5 siblings)",
+      "guarantee": "Unticking a supplement offline and pushing it ends with the manual log still deleted and synced, keyed on (supplement, day).",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "supplement_logs": [{ "id": "sl-1", "supplement_id": "sup-1", "log_date": "2026-09-30", "amount": 5, "unit": "g", "source": "manual", "taken_at": "2026-09-30T07:15:00.000Z", "updated_at": "2026-09-30T07:15:00.000Z", "sync_status": "synced" }]
+      },
+      "steps": [
+        { "op": "local", "action": "deleteSupplementLog", "args": ["sup-1", "2026-09-30"] },
+        { "op": "local", "action": "queueMutation", "args": [{ "domain": "supplement_logs", "date": "2026-09-30", "payload": { "supplementId": "sup-1", "logDate": "2026-09-30", "deleted": true } }] },
+        { "op": "push", "responses": [{}] }
+      ],
+      "expect": {
+        "tables": [{ "table": "supplement_logs", "columns": ["id", "deleted_at", "sync_status"], "rows": [{ "id": "sl-1", "deleted_at": "2026-10-01T02:00:00.000Z", "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "supplement_logs", "payload": { "supplementId": "sup-1", "deleted": true } }]
+      }
+    },
+    {
+      "name": "a confirmed activity delete leaves a synced tombstone",
+      "kind": "incident", "covers": "Q-328",
+      "source": "lib/local-store/__tests__/sqlite-backend.test.ts (softDeleteActivityLogPending / markActivityLogSynced)",
+      "guarantee": "Deleting an activity offline marks it pending so a pull cannot undo it, and the confirmed push flips the tombstone to synced.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "activity_logs": [{ "id": "act-1", "date": "2026-09-30", "activity_type": "walk", "title": "Evening walk", "start_time": "18:00:00", "updated_at": "2026-09-30T09:00:00.000Z", "sync_status": "synced" }]
+      },
+      "steps": [
+        { "op": "local", "action": "softDeleteActivityLogPending", "args": ["act-1"] },
+        { "op": "local", "action": "queueMutation", "args": [{ "domain": "activity_logs", "date": "2026-09-30", "payload": { "id": "act-1", "deleted": true } }] },
+        { "op": "push", "responses": [{}] }
+      ],
+      "expect": {
+        "tables": [{ "table": "activity_logs", "columns": ["id", "deleted_at", "sync_status"], "rows": [{ "id": "act-1", "deleted_at": "2026-10-01T02:00:00.000Z", "sync_status": "synced" }] }],
+        "outbox": []
+      }
+    },
+    {
+      "name": "a confirmed plan-meal answer delete is marked synced",
+      "kind": "incident", "covers": "DV-5 (plan_meal_answers)",
+      "source": "lib/local-store/__tests__/sync-engine.test.ts (confirms a plan-meal answer on the delete arm)",
+      "guarantee": "A plan-meal answer withdrawn offline is flipped to synced once the server accepts the delete, keeping its tombstone.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "plan_meal_answers": [{ "id": "pma-1", "plan_meal_id": "meal-1", "log_date": "2026-09-30", "answer": "no", "updated_at": "2026-10-01T01:00:00.000Z", "deleted_at": "2026-10-01T01:00:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "plan_meal_answers", "date": "2026-09-30", "payload": { "planMealId": "meal-1", "deleted": true } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [{ "table": "plan_meal_answers", "columns": ["id", "deleted_at", "sync_status"], "rows": [{ "id": "pma-1", "deleted_at": "2026-10-01T01:00:00.000Z", "sync_status": "synced" }] }],
+        "outbox": []
+      }
+    },
+    {
+      "name": "a stranded food tombstone is re-pushed, never just marked synced",
+      "kind": "incident", "covers": "DV-8",
+      "source": "lib/local-store/__tests__/dv8-requeue-stranded-tombstones.test.ts",
+      "guarantee": "A food-log tombstone left pending with no outbox entry, older than the grace period, is re-queued as a delete, pushed, and only then marked synced.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "food_logs": [{ "id": "fl-1", "date": "2026-09-23", "meal_type_id": "mt-1", "food_item_id": "fi-1", "quantity_multiplier": 1, "logged_at": "2026-09-23T07:00:00.000Z", "updated_at": "2026-09-23T07:00:10.000Z", "deleted_at": "2026-09-23T07:00:10.000Z", "sync_status": "pending" }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [{ "table": "food_logs", "columns": ["id", "deleted_at", "sync_status"], "rows": [{ "id": "fl-1", "deleted_at": "2026-09-23T07:00:10.000Z", "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "food_logs", "date": "2026-09-23", "payload": { "id": "fl-1", "deleted": true } }]
+      }
+    },
+    {
+      "name": "a food tombstone inside the grace period is left for its own push",
+      "kind": "incident", "covers": "DV-8 (grace period)",
+      "source": "lib/local-store/__tests__/dv8-requeue-stranded-tombstones.test.ts",
+      "guarantee": "A pending food tombstone written under five minutes ago is not swept: its own push may still be in flight, and sweeping it would queue a duplicate.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "food_logs": [{ "id": "fl-1", "date": "2026-10-01", "meal_type_id": "mt-1", "food_item_id": "fi-1", "quantity_multiplier": 1, "logged_at": "2026-10-01T01:50:00.000Z", "updated_at": "2026-10-01T01:58:00.000Z", "deleted_at": "2026-10-01T01:58:00.000Z", "sync_status": "pending" }]
+      },
+      "steps": [{ "op": "push", "responses": [] }],
+      "expect": {
+        "tables": [{ "table": "food_logs", "columns": ["id", "sync_status"], "rows": [{ "id": "fl-1", "sync_status": "pending" }] }],
+        "outbox": [],
+        "pushed": []
+      }
+    },
+    {
+      "name": "deleting a supplement tombstones it and touches nothing else, and a pull cannot revive it",
+      "kind": "incident", "covers": "DV-10",
+      "source": "lib/local-store/__tests__/dv10-supplement-delete-tombstone.test.ts",
+      "guarantee": "deleteSupplement sets deleted_at, clears active and marks the row pending without blanking its dose or presence window, and a pull carrying the pre-delete row does not overwrite it (Q-124).",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "supplements": [{ "id": "sup-1", "name": "Creatine", "dose": "5 g", "default_amount": 5, "unit": "g", "started_on": "2026-09-01", "stopped_on": null, "dose_prompt": 1, "sort_order": 0, "active": 1, "updated_at": "2026-09-01T00:00:00.000Z", "sync_status": "synced" }]
+      },
+      "steps": [
+        { "op": "local", "action": "deleteSupplement", "args": ["sup-1"] },
+        { "op": "pull", "pages": [{ "body": {
+          "syncedAt": "2026-10-01T01:59:00.000Z",
+          "supplements": [{ "id": "sup-1", "name": "Creatine", "dose": "5 g", "defaultAmount": 5, "unit": "g", "startedOn": "2026-09-01", "stoppedOn": null, "dosePrompt": true, "reminderEnabled": false, "sortOrder": 0, "active": true, "updatedAt": "2026-09-01T00:00:00.000Z", "deletedAt": null }]
+        } }] }
+      ],
+      "expect": {
+        "tables": [{ "table": "supplements",
+          "columns": ["id", "deleted_at", "active", "sync_status", "default_amount", "unit", "started_on", "stopped_on", "dose_prompt", "dose"],
+          "rows": [{ "id": "sup-1", "deleted_at": "2026-10-01T02:00:00.000Z", "active": 0, "sync_status": "pending", "default_amount": 5, "unit": "g", "started_on": "2026-09-01", "stopped_on": null, "dose_prompt": 1, "dose": "5 g" }] }]
+      }
+    },
+    {
+      "name": "a stale pull does not resurrect a synced food tombstone",
+      "kind": "incident", "covers": "DV-15",
+      "source": "lib/local-store/__tests__/dv15-stale-pull-cannot-resurrect.test.ts",
+      "guarantee": "A pull carrying the pre-delete copy of a food log, fetched before the server saw the delete, leaves the synced tombstone deleted and its timestamp unrolled.",
+      "now": "2026-09-23T10:31:30.000Z",
+      "seed": {
+        "food_logs": [{ "id": "ff8f28c6", "date": "2026-09-23", "meal_type_id": "lunch", "food_item_id": "cocoa", "quantity_multiplier": 1, "logged_at": "2026-09-23T10:30:45.000Z", "updated_at": "2026-09-23T10:30:55.419Z", "deleted_at": "2026-09-23T10:30:55.419Z", "sync_status": "synced" }]
+      },
+      "steps": [{ "op": "pull", "pages": [{ "body": {
+        "syncedAt": "2026-09-23T10:31:00.000Z",
+        "foodLogs": [{ "id": "ff8f28c6", "date": "2026-09-23", "mealTypeId": "lunch", "foodItemId": "cocoa", "savedMealId": null, "mealGroupId": null, "mealGroupName": null, "quantityMultiplier": 1, "loggedAt": "2026-09-23T10:30:45.000Z", "updatedAt": "2026-09-23T10:30:45.000Z", "deletedAt": null }]
+      } }] }],
+      "expect": {
+        "tables": [{ "table": "food_logs", "columns": ["id", "deleted_at", "updated_at", "sync_status"], "rows": [{ "id": "ff8f28c6", "deleted_at": "2026-09-23T10:30:55.419Z", "updated_at": "2026-09-23T10:30:55.419Z", "sync_status": "synced" }] }],
+        "cursor": "2026-09-23T10:31:00.000Z"
+      }
+    },
+    {
+      "name": "a pull still updates a live synced food log",
+      "kind": "incident", "covers": "DV-15 (control)",
+      "source": "lib/local-store/__tests__/dv15-stale-pull-cannot-resurrect.test.ts",
+      "guarantee": "The tombstone guard does not stop the ordinary case: a pull overwrites a live synced food log with the server's meal and quantity.",
+      "now": "2026-09-23T10:31:30.000Z",
+      "seed": {
+        "food_logs": [{ "id": "ff8f28c6", "date": "2026-09-23", "meal_type_id": "lunch", "food_item_id": "cocoa", "quantity_multiplier": 1, "logged_at": "2026-09-23T10:30:45.000Z", "updated_at": "2026-09-23T10:30:45.000Z", "sync_status": "synced" }]
+      },
+      "steps": [{ "op": "pull", "pages": [{ "body": {
+        "syncedAt": "2026-09-23T10:31:00.000Z",
+        "foodLogs": [{ "id": "ff8f28c6", "date": "2026-09-23", "mealTypeId": "dinner", "foodItemId": "cocoa", "quantityMultiplier": 2, "loggedAt": "2026-09-23T10:30:45.000Z", "updatedAt": "2026-09-23T10:30:55.419Z", "deletedAt": null }]
+      } }] }],
+      "expect": {
+        "tables": [{ "table": "food_logs", "columns": ["id", "meal_type_id", "quantity_multiplier", "updated_at"], "rows": [{ "id": "ff8f28c6", "meal_type_id": "dinner", "quantity_multiplier": 2, "updated_at": "2026-09-23T10:30:55.419Z" }] }]
+      }
+    },
+    {
+      "name": "a pull does not clobber a pending food-log edit",
+      "kind": "incident", "covers": "DV-15 (pending guard)",
+      "source": "lib/local-store/__tests__/dv15-stale-pull-cannot-resurrect.test.ts",
+      "guarantee": "A food log edited locally and not yet pushed keeps the local quantity when a pull carries the server's older copy.",
+      "now": "2026-09-23T10:31:30.000Z",
+      "seed": {
+        "food_logs": [{ "id": "ff8f28c6", "date": "2026-09-23", "meal_type_id": "lunch", "food_item_id": "cocoa", "quantity_multiplier": 9, "logged_at": "2026-09-23T10:30:45.000Z", "updated_at": "2026-09-23T10:30:55.419Z", "sync_status": "pending" }]
+      },
+      "steps": [{ "op": "pull", "pages": [{ "body": {
+        "syncedAt": "2026-09-23T10:31:00.000Z",
+        "foodLogs": [{ "id": "ff8f28c6", "date": "2026-09-23", "mealTypeId": "lunch", "foodItemId": "cocoa", "quantityMultiplier": 1, "loggedAt": "2026-09-23T10:30:45.000Z", "updatedAt": "2026-09-23T10:30:45.000Z", "deletedAt": null }]
+      } }] }],
+      "expect": {
+        "tables": [{ "table": "food_logs", "columns": ["id", "quantity_multiplier", "sync_status"], "rows": [{ "id": "ff8f28c6", "quantity_multiplier": 9, "sync_status": "pending" }] }]
+      }
+    },
+    {
+      "name": "the server's row for a merged activity retires the device's orphan",
+      "kind": "incident", "covers": "DV-19",
+      "source": "lib/local-store/__tests__/dv19-activity-merge-orphan.test.ts",
+      "guarantee": "When the server merged a pushed activity into an existing one at the same (date, minute), applying the server row deletes the device's synced orphan and keeps an activity at another minute.",
+      "now": "2026-09-25T00:00:00.000Z",
+      "seed": {
+        "activity_logs": [
+          { "id": "device-own", "date": "2026-09-24", "activity_type": "treadmill", "title": "Treadmill interval walk", "start_time": "09:18", "updated_at": "2026-09-24T23:00:00.000Z", "sync_status": "synced" },
+          { "id": "other-walk", "date": "2026-09-24", "activity_type": "walk", "title": "Walk", "start_time": "09:19", "updated_at": "2026-09-24T23:00:00.000Z", "sync_status": "synced" }
+        ]
+      },
+      "steps": [{ "op": "pull", "pages": [{ "body": {
+        "syncedAt": "2026-09-24T23:30:00.000Z",
+        "activityLogs": [{ "id": "server-row", "date": "2026-09-24", "activityType": "treadmill", "title": "Treadmill interval walk", "durationMin": 40, "caloriesBurned": 133, "startTime": "09:18:00", "endTime": "09:58:00", "updatedAt": "2026-09-24T23:19:13.245Z", "deletedAt": null }]
+      } }] }],
+      "expect": {
+        "tables": [{ "table": "activity_logs", "columns": ["id"], "rows": [{ "id": "other-walk" }, { "id": "server-row" }] }]
+      }
+    },
+    {
+      "name": "a pending activity at the merged minute is not an orphan yet",
+      "kind": "incident", "covers": "DV-19 (pending)",
+      "source": "lib/local-store/__tests__/dv19-activity-merge-orphan.test.ts",
+      "guarantee": "A device activity still pending at the same minute as an incoming server row is kept: its push has not happened, so it was not merged away.",
+      "now": "2026-09-25T00:00:00.000Z",
+      "seed": {
+        "activity_logs": [
+          { "id": "device-own", "date": "2026-09-24", "activity_type": "treadmill", "title": "Treadmill interval walk", "start_time": "09:18", "updated_at": "2026-09-24T23:00:00.000Z", "sync_status": "pending" }
+        ]
+      },
+      "steps": [{ "op": "pull", "pages": [{ "body": {
+        "syncedAt": "2026-09-24T23:30:00.000Z",
+        "activityLogs": [{ "id": "server-row", "date": "2026-09-24", "activityType": "treadmill", "title": "Treadmill interval walk", "startTime": "09:18:00", "updatedAt": "2026-09-24T23:19:13.245Z", "deletedAt": null }]
+      } }] }],
+      "expect": {
+        "tables": [{ "table": "activity_logs", "columns": ["id", "sync_status"], "rows": [{ "id": "device-own", "sync_status": "pending" }, { "id": "server-row", "sync_status": "synced" }] }]
+      }
+    },
+    {
+      "name": "an offline exercise-log edit survives a pull that lands before its push",
+      "kind": "incident", "covers": "LA-165 (pending edit)",
+      "source": "lib/local-store/__tests__/la165-offline-log-edits-local.test.ts",
+      "guarantee": "An exercise-log edit made offline leaves the log and its sets pending, so a pull carrying the server's older sets does not revert it.",
+      "now": "2026-09-28T02:00:00.000Z",
+      "seed": {
+        "workout_sessions": [{ "id": "ws-1", "session_name": "Upper A", "started_at": "2026-09-20T08:00:00.000Z", "updated_at": "2026-09-20T09:00:00.000Z", "sync_status": "synced" }],
+        "exercise_logs": [{ "id": "el-1", "workout_session_id": "ws-1", "exercise_name": "Bench Press", "logged_at": "2026-09-20T08:10:00.000Z", "updated_at": "2026-09-20T09:00:00.000Z", "sync_status": "synced" }],
+        "set_logs": [
+          { "id": "s-1", "exercise_log_id": "el-1", "set_number": 1, "weight_kg": 40, "reps": 8, "updated_at": "2026-09-20T09:00:00.000Z", "sync_status": "synced" },
+          { "id": "s-2", "exercise_log_id": "el-1", "set_number": 2, "weight_kg": 40, "reps": 8, "updated_at": "2026-09-20T09:00:00.000Z", "sync_status": "synced" }
+        ]
+      },
+      "steps": [
+        { "op": "local", "action": "updateExerciseLogLocally", "args": ["el-1", [{ "setNumber": 1, "weightKg": 45, "reps": 6 }, { "setNumber": 2, "weightKg": 45, "reps": 6 }], { "pending": true }] },
+        { "op": "pull", "pages": [{ "body": {
+          "syncedAt": "2026-09-28T01:00:00.000Z",
+          "setLogs": [
+            { "id": "s-1", "exerciseLogId": "el-1", "setNumber": 1, "weightKg": 40, "reps": 8, "useFor1rm": false, "updatedAt": "2026-09-20T09:00:00.000Z", "deletedAt": null },
+            { "id": "s-2", "exerciseLogId": "el-1", "setNumber": 2, "weightKg": 40, "reps": 8, "useFor1rm": false, "updatedAt": "2026-09-20T09:00:00.000Z", "deletedAt": null }
+          ]
+        } }] }
+      ],
+      "expect": {
+        "tables": [
+          { "table": "exercise_logs", "columns": ["id", "sync_status"], "rows": [{ "id": "el-1", "sync_status": "pending" }] },
+          { "table": "set_logs", "columns": ["id", "weight_kg", "reps", "sync_status"], "rows": [{ "id": "s-1", "weight_kg": 45, "reps": 6, "sync_status": "pending" }, { "id": "s-2", "weight_kg": 45, "reps": 6, "sync_status": "pending" }] }
+        ]
+      }
+    },
+    {
+      "name": "a confirmed edit does not unguard a later edit still queued for the same log",
+      "kind": "incident", "covers": "LA-165 (queued sibling)",
+      "source": "lib/local-store/__tests__/la165-offline-log-edits-local.test.ts",
+      "guarantee": "When the first of two queued edits to one exercise log is accepted and the second is rejected, the log stays pending and the second stays queued with one attempt counted.",
+      "now": "2026-09-28T02:00:00.000Z",
+      "seed": {
+        "workout_sessions": [{ "id": "ws-1", "session_name": "Upper A", "started_at": "2026-09-20T08:00:00.000Z", "updated_at": "2026-09-20T09:00:00.000Z", "sync_status": "synced" }],
+        "exercise_logs": [{ "id": "el-1", "workout_session_id": "ws-1", "exercise_name": "Bench Press", "logged_at": "2026-09-20T08:10:00.000Z", "updated_at": "2026-09-28T01:00:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [
+          { "id": "m-1", "domain": "exercise_log_edit", "date": "2026-09-20", "payload": { "exerciseLogId": "el-1", "sets": [{ "setNumber": 1, "weightKg": 45, "reps": 6 }] } },
+          { "id": "m-2", "domain": "exercise_log_edit", "date": "2026-09-20", "payload": { "exerciseLogId": "el-1", "sets": [{ "setNumber": 1, "weightKg": 47.5, "reps": 5 }] } }
+        ]
+      },
+      "steps": [{ "op": "push", "responses": [{ "errors": [{ "id": "m-2", "error": "validation failed" }] }] }],
+      "expect": {
+        "tables": [{ "table": "exercise_logs", "columns": ["id", "sync_status"], "rows": [{ "id": "el-1", "sync_status": "pending" }] }],
+        "outbox": [{ "domain": "exercise_log_edit", "status": "pending", "attempts": 1, "payload": { "exerciseLogId": "el-1" } }]
+      }
+    },
+    {
+      "name": "a pull replaces a synced local copy of an added set with the server's row",
+      "kind": "incident", "covers": "LA-165 (added set)",
+      "source": "lib/local-store/__tests__/la165-offline-log-edits-local.test.ts",
+      "guarantee": "A set added by an edit the server already confirmed is replaced by the server's row for that set number, not shown beside it.",
+      "now": "2026-09-28T02:00:00.000Z",
+      "seed": {
+        "workout_sessions": [{ "id": "ws-1", "session_name": "Upper A", "started_at": "2026-09-20T08:00:00.000Z", "updated_at": "2026-09-20T09:00:00.000Z", "sync_status": "synced" }],
+        "exercise_logs": [{ "id": "el-1", "workout_session_id": "ws-1", "exercise_name": "Bench Press", "logged_at": "2026-09-20T08:10:00.000Z", "updated_at": "2026-09-20T09:00:00.000Z", "sync_status": "synced" }],
+        "set_logs": [
+          { "id": "s-1", "exercise_log_id": "el-1", "set_number": 1, "weight_kg": 40, "reps": 8, "updated_at": "2026-09-20T09:00:00.000Z", "sync_status": "synced" },
+          { "id": "s-2", "exercise_log_id": "el-1", "set_number": 2, "weight_kg": 40, "reps": 8, "updated_at": "2026-09-20T09:00:00.000Z", "sync_status": "synced" }
+        ]
+      },
+      "steps": [
+        { "op": "local", "action": "updateExerciseLogLocally", "args": ["el-1", [{ "setNumber": 1, "weightKg": 40, "reps": 8 }, { "setNumber": 2, "weightKg": 40, "reps": 8 }, { "setNumber": 3, "weightKg": 50, "reps": 3 }]] },
+        { "op": "pull", "pages": [{ "body": {
+          "syncedAt": "2026-09-28T01:00:00.000Z",
+          "setLogs": [{ "id": "server-3", "exerciseLogId": "el-1", "setNumber": 3, "weightKg": 50, "reps": 3, "useFor1rm": false, "updatedAt": "2026-09-28T00:00:00.000Z", "deletedAt": null }]
+        } }] }
+      ],
+      "expect": {
+        "tables": [{ "table": "set_logs", "columns": ["id", "set_number"], "where": { "exercise_log_id": "el-1", "set_number": 3 }, "rows": [{ "id": "server-3", "set_number": 3 }] }]
+      }
+    },
+    {
+      "name": "a session's RPE confirm waits while a sibling workout log is still queued",
+      "kind": "incident", "covers": "SYN-7",
+      "source": "lib/local-store/__tests__/sqlite-backend.test.ts (markSessionSynced skips the flip while a sibling mutation is still queued)",
+      "guarantee": "When session_rpe is accepted but a workout_log for the same session is rejected and stays queued, the session stays pending so a pull cannot revert the outstanding log.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "workout_sessions": [{ "id": "ws-1", "session_name": "Upper A", "started_at": "2026-10-01T01:00:00.000Z", "session_rpe": 8, "updated_at": "2026-10-01T01:59:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [
+          { "id": "m-1", "domain": "session_rpe", "date": "2026-10-01", "payload": { "workoutSessionId": "ws-1", "sessionRpe": 8 } },
+          { "id": "m-2", "domain": "workout_log", "date": "2026-10-01", "payload": { "workoutSessionId": "ws-1", "exerciseLogId": "el-1" } }
+        ]
+      },
+      "steps": [{ "op": "push", "responses": [{ "errors": [{ "id": "m-2", "error": "validation failed" }] }] }],
+      "expect": {
+        "tables": [{ "table": "workout_sessions", "columns": ["id", "sync_status"], "rows": [{ "id": "ws-1", "sync_status": "pending" }] }],
+        "outbox": [{ "domain": "workout_log", "attempts": 1 }]
+      }
+    },
+    {
+      "name": "a deleted program and its children leave the mirror when the roster drops it",
+      "kind": "incident", "covers": "RV-174",
+      "source": "lib/local-store/__tests__/rv174-prune-program-structure.test.ts",
+      "guarantee": "A pull whose program roster omits a program removes it and its sessions, exercises, schedules and schedule days, leaving one active program, and reports programs changed.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "local_programs": [{ "id": "prog-A", "name": "A", "is_active": 1, "updated_at": "2026-09-01T00:00:00.000Z" }, { "id": "prog-B", "name": "B", "is_active": 1, "updated_at": "2026-09-01T00:00:00.000Z" }],
+        "program_sessions": [{ "id": "sess-A", "program_id": "prog-A", "name": "A1", "position": 0 }, { "id": "sess-B", "program_id": "prog-B", "name": "B1", "position": 0 }],
+        "session_exercises": [{ "id": "ex-A", "session_id": "sess-A", "exercise_name": "Squat", "position": 0 }, { "id": "ex-B", "session_id": "sess-B", "exercise_name": "Bench", "position": 0 }],
+        "schedules": [{ "id": "sch-A", "program_id": "prog-A", "type": "weekly" }, { "id": "sch-B", "program_id": "prog-B", "type": "weekly" }],
+        "schedule_days": [{ "schedule_id": "sch-A", "day_of_week": 1, "session_id": "sess-A" }, { "schedule_id": "sch-B", "day_of_week": 1, "session_id": "sess-B" }]
+      },
+      "steps": [{ "op": "pull", "pages": [{ "body": { "syncedAt": "2026-10-01T01:00:00.000Z", "programRoster": ["prog-B"] } }] }],
+      "expect": {
+        "tables": [
+          { "table": "local_programs", "columns": ["id", "is_active"], "rows": [{ "id": "prog-B", "is_active": 1 }] },
+          { "table": "program_sessions", "columns": ["id"], "rows": [{ "id": "sess-B" }] },
+          { "table": "session_exercises", "columns": ["id"], "rows": [{ "id": "ex-B" }] },
+          { "table": "schedules", "columns": ["id"], "rows": [{ "id": "sch-B" }] },
+          { "table": "schedule_days", "columns": ["schedule_id"], "rows": [{ "schedule_id": "sch-B" }] }
+        ],
+        "pull": { "flags": { "programs": true }, "synced": 1 }
+      }
+    },
+    {
+      "name": "a pull with no roster prunes nothing",
+      "kind": "incident", "covers": "RV-174 (absent roster)",
+      "source": "lib/local-store/__tests__/rv174-prune-program-structure.test.ts",
+      "guarantee": "An absent program roster means no information, not an empty account: every mirrored program stays and programs is not reported changed.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "local_programs": [{ "id": "prog-A", "name": "A", "is_active": 1, "updated_at": "2026-09-01T00:00:00.000Z" }, { "id": "prog-B", "name": "B", "is_active": 0, "updated_at": "2026-09-01T00:00:00.000Z" }]
+      },
+      "steps": [{ "op": "pull", "pages": [{ "body": { "syncedAt": "2026-10-01T01:00:00.000Z" } }] }],
+      "expect": {
+        "tables": [{ "table": "local_programs", "columns": ["id"], "rows": [{ "id": "prog-A" }, { "id": "prog-B" }] }],
+        "pull": { "flags": { "programs": false }, "synced": 0 }
+      }
+    },
+    {
+      "name": "re-ticking a supplement keeps the time it was first taken",
+      "kind": "incident", "covers": "BF-185",
+      "source": "lib/local-store/__tests__/bf185-local-retick-preserves-taken-at.test.ts",
+      "guarantee": "Ticking a supplement again after unticking it revives the row and takes the new dose, but keeps the original taken_at when the caller states no time.",
+      "now": "2026-09-20T11:21:13.000Z",
+      "seed": {
+        "supplement_logs": [{ "id": "log-1", "supplement_id": "sup-1", "log_date": "2026-09-20", "amount": 2, "unit": "mg", "source": "manual", "taken_at": "2026-09-20T10:46:33.000Z", "updated_at": "2026-09-20T11:00:00.000Z", "deleted_at": "2026-09-20T11:00:00.000Z", "sync_status": "pending" }]
+      },
+      "steps": [
+        { "op": "local", "action": "upsertSupplementLog", "args": [{ "id": "log-1", "supplementId": "sup-1", "logDate": "2026-09-20", "amount": 4, "unit": "mg", "doseText": "4 mg", "updatedAt": "2026-09-20T11:21:13.000Z", "deletedAt": null, "syncStatus": "pending" }] }
+      ],
+      "expect": {
+        "tables": [{ "table": "supplement_logs", "columns": ["id", "amount", "taken_at", "deleted_at"], "rows": [{ "id": "log-1", "amount": 4, "taken_at": "2026-09-20T10:46:33.000Z", "deleted_at": null }] }]
+      }
+    },
+    {
+      "name": "declining a planned meal replaces its estimate instead of sitting beside it",
+      "kind": "incident", "covers": "BF-203a",
+      "source": "lib/local-store/__tests__/bf203a-local-answers.test.ts",
+      "guarantee": "A decline recorded over a live estimate for the same (meal, day) updates that row to 'no' and clears its macros, leaving one live answer, pending.",
+      "now": "2026-09-30T04:00:00.000Z",
+      "steps": [
+        { "op": "local", "action": "upsertPlanMealAnswer", "args": [{ "id": "est-1", "planMealId": "meal-1", "logDate": "2026-09-30", "answer": "estimated", "answeredAt": "2026-09-30T03:00:00Z", "updatedAt": "2026-09-30T03:00:00Z", "deletedAt": null, "estCalories": 480, "estProteinG": 30, "estCarbsG": 40, "estFatG": 10, "estBiasKcal": 0, "estBasis": "planA" }] },
+        { "op": "local", "action": "upsertPlanMealAnswer", "args": [{ "id": "decline-1", "planMealId": "meal-1", "logDate": "2026-09-30", "answer": "no", "answeredAt": "2026-09-30T04:00:00Z", "updatedAt": "2026-09-30T04:00:00Z", "deletedAt": null }] }
+      ],
+      "expect": {
+        "tables": [{ "table": "plan_meal_answers", "columns": ["id", "answer", "est_calories", "sync_status"], "where": { "log_date": "2026-09-30", "deleted_at": null }, "rows": [{ "id": "est-1", "answer": "no", "est_calories": null, "sync_status": "pending" }] }]
+      }
+    },
+    {
+      "name": "a pull carries the vs-normal touched flag",
+      "kind": "incident", "covers": "LB-198",
+      "source": "lib/local-store/__tests__/lb198-local-touched.test.ts",
+      "guarantee": "A morning check-in pulled with vsNormalTouched true lands with vs_normal_touched 1 beside its answer.",
+      "now": "2026-10-05T02:00:00.000Z",
+      "steps": [{ "op": "pull", "pages": [{ "body": {
+        "syncedAt": "2026-10-05T01:30:00.000Z",
+        "dayCheckins": [{ "logDate": "2026-10-05", "phase": "morning", "vsNormal": "better", "vsQuestion": 2, "vsNormalTouched": true, "soreMuscles": [], "updatedAt": "2026-10-05T01:00:00Z", "deletedAt": null }]
+      } }] }],
+      "expect": {
+        "tables": [{ "table": "day_checkins", "columns": ["log_date", "phase", "vs_normal", "vs_normal_touched"], "rows": [{ "log_date": "2026-10-05", "phase": "morning", "vs_normal": "better", "vs_normal_touched": 1 }] }],
+        "pull": { "flags": { "dayCheckins": true } }
+      }
+    },
+    {
+      "name": "a pull keeps a supplement log's taken time and frozen vial",
+      "kind": "incident", "covers": "RV-172",
+      "source": "lib/local-store/__tests__/rv172-delta-carries-what-applydelta-writes.test.ts",
+      "guarantee": "A pulled supplement log carrying taken_at and the vial triple writes all four, rather than the pull mapper dropping them and applyDelta writing NULL over the frozen dose.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "supplement_logs": [{ "id": "sl-1", "supplement_id": "sup-1", "log_date": "2026-09-30", "amount": 250, "unit": "mcg", "source": "manual", "taken_at": "2026-09-30T07:15:00.000Z", "vial_strength_mg": 5, "vial_water_ml": 2, "vial_units_per_ml": 100, "updated_at": "2026-09-30T07:15:00.000Z", "sync_status": "synced" }]
+      },
+      "steps": [{ "op": "pull", "pages": [{ "body": {
+        "syncedAt": "2026-10-01T01:00:00.000Z",
+        "supplementLogs": [{ "id": "sl-1", "supplementId": "sup-1", "logDate": "2026-09-30", "amount": 250, "unit": "mcg", "doseText": null, "source": "manual", "sourceRef": null, "takenAt": "2026-09-30T07:15:00.000Z", "vialStrengthMg": 5, "vialWaterMl": 2, "vialUnitsPerMl": 100, "updatedAt": "2026-09-30T08:00:00.000Z", "deletedAt": null }]
+      } }] }],
+      "expect": {
+        "tables": [{ "table": "supplement_logs", "columns": ["id", "taken_at", "vial_strength_mg", "vial_water_ml", "vial_units_per_ml", "updated_at"], "rows": [{ "id": "sl-1", "taken_at": "2026-09-30T07:15:00.000Z", "vial_strength_mg": 5, "vial_water_ml": 2, "vial_units_per_ml": 100, "updated_at": "2026-09-30T08:00:00.000Z" }] }]
+      }
+    },
+    {
+      "name": "a pull carries a food-logging completion made on another device",
+      "kind": "incident", "covers": "LA-137",
+      "source": "lib/local-store/__tests__/la137-pull-drops-no-column.test.ts",
+      "guarantee": "A pulled evening check-in with foodLoggingCompletedAt writes it, instead of the mapper dropping the column the server selects.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "steps": [{ "op": "pull", "pages": [{ "body": {
+        "syncedAt": "2026-10-01T01:00:00.000Z",
+        "dayCheckins": [{ "logDate": "2026-09-30", "phase": "evening", "foodLoggingCompletedAt": "2026-09-30T11:30:00.000Z", "soreMuscles": [], "updatedAt": "2026-09-30T11:30:00.000Z", "deletedAt": null }]
+      } }] }],
+      "expect": {
+        "tables": [{ "table": "day_checkins", "columns": ["log_date", "food_logging_completed_at"], "rows": [{ "log_date": "2026-09-30", "food_logging_completed_at": "2026-09-30T11:30:00.000Z" }] }]
+      }
+    },
+    {
+      "name": "a pull carries the sleep window and awake time",
+      "kind": "incident", "covers": "#2414",
+      "source": "lib/local-store/__tests__/sleep-window-v50-upgrade.test.ts",
+      "guarantee": "A pulled sleep session writes sleep_start, sleep_end and awake_hours, so a cold open can draw the hypnogram against its window.",
+      "now": "2026-10-07T02:00:00.000Z",
+      "steps": [{ "op": "pull", "pages": [{ "body": {
+        "syncedAt": "2026-10-07T01:00:00.000Z",
+        "sleepSessions": [{ "id": "ss-1", "date": "2026-10-06", "durationHours": 7.67, "sleepStart": "2026-10-05T12:16:00.000Z", "sleepEnd": "2026-10-05T20:21:00.000Z", "awakHours": 0.4, "ouraId": "ble:1", "updatedAt": "2026-10-06T21:00:00.000Z" }]
+      } }] }],
+      "expect": {
+        "tables": [{ "table": "sleep_sessions", "columns": ["id", "sleep_start", "sleep_end", "awake_hours"], "rows": [{ "id": "ss-1", "sleep_start": "2026-10-05T12:16:00.000Z", "sleep_end": "2026-10-05T20:21:00.000Z", "awake_hours": 0.4 }] }],
+        "pull": { "flags": { "biometrics": true } }
+      }
+    },
+    {
+      "name": "a write the server could not perform stays queued without spending an attempt",
+      "kind": "incident", "covers": "Q-475",
+      "source": "lib/local-store/__tests__/sync-engine.test.ts (a per-item error the server marked retryable)",
+      "guarantee": "A per-item error the server marks retryable (its database was down) leaves the mutation queued with zero attempts and the local row pending, rather than walking it toward dead-letter.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "body_metrics": [{ "date": "2026-09-30", "weight_kg": 81, "updated_at": "2026-09-30T20:00:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "body_metrics", "date": "2026-09-30", "payload": { "weightKg": 81 } }]
+      },
+      "steps": [{ "op": "push", "responses": [{ "errors": [{ "id": "m-1", "error": "connection refused", "retryable": true }] }] }],
+      "expect": {
+        "tables": [{ "table": "body_metrics", "columns": ["date", "sync_status"], "rows": [{ "date": "2026-09-30", "sync_status": "pending" }] }],
+        "outbox": [{ "domain": "body_metrics", "status": "pending", "attempts": 0 }]
+      }
+    },
+    {
+      "name": "a rejected mutation spends one attempt and keeps the row pending",
+      "kind": "incident", "covers": "Q-475 (control)",
+      "source": "lib/local-store/__tests__/sync-engine.test.ts (deletes confirmed rows and records failures only for server-failed ids)",
+      "guarantee": "A per-item rejection the server does not mark retryable counts one attempt against the mutation and leaves its sibling confirmed.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "body_metrics": [
+          { "date": "2026-09-29", "weight_kg": 81.2, "updated_at": "2026-09-29T20:00:00.000Z", "sync_status": "pending" },
+          { "date": "2026-09-30", "weight_kg": 81, "updated_at": "2026-09-30T20:00:00.000Z", "sync_status": "pending" }
+        ],
+        "mutations_outbox": [
+          { "id": "m-1", "domain": "body_metrics", "date": "2026-09-29", "payload": { "weightKg": 81.2 } },
+          { "id": "m-2", "domain": "body_metrics", "date": "2026-09-30", "payload": { "weightKg": 81 } }
+        ]
+      },
+      "steps": [{ "op": "push", "responses": [{ "errors": [{ "id": "m-2", "error": "weight out of range" }] }] }],
+      "expect": {
+        "tables": [{ "table": "body_metrics", "columns": ["date", "sync_status"], "rows": [{ "date": "2026-09-29", "sync_status": "synced" }, { "date": "2026-09-30", "sync_status": "pending" }] }],
+        "outbox": [{ "domain": "body_metrics", "date": "2026-09-30", "status": "pending", "attempts": 1 }]
+      }
+    },
+    {
+      "name": "a server outage keeps the whole queue untouched",
+      "kind": "incident", "covers": "Q-475 (5xx)",
+      "source": "lib/local-store/__tests__/sync-engine.test.ts (records no per-item failure on a transport-level 5xx)",
+      "guarantee": "A 503 from the push route counts no attempt against any queued mutation and confirms nothing.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "body_metrics": [{ "date": "2026-09-30", "weight_kg": 81, "updated_at": "2026-09-30T20:00:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "body_metrics", "date": "2026-09-30", "payload": { "weightKg": 81 } }]
+      },
+      "steps": [{ "op": "push", "responses": [{ "status": 503 }] }],
+      "expect": {
+        "tables": [{ "table": "body_metrics", "columns": ["date", "sync_status"], "rows": [{ "date": "2026-09-30", "sync_status": "pending" }] }],
+        "outbox": [{ "domain": "body_metrics", "status": "pending", "attempts": 0 }]
+      }
+    },
+    {
+      "name": "a failed first pull page leaves the cursor where it was",
+      "kind": "incident", "covers": "pull cursor",
+      "source": "lib/local-store/__tests__/sync-engine.test.ts (backs off after a first-page pull failure)",
+      "guarantee": "A pull whose first page fails reports failure and does not advance the persisted cursor or write anything.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": { "sync_meta": [{ "key": "lastSyncAt", "value": "2026-09-30T00:00:00.000Z" }] },
+      "steps": [{ "op": "pull", "pages": [{ "status": 502 }] }],
+      "expect": {
+        "pull": { "result": "failed" },
+        "cursor": "2026-09-30T00:00:00.000Z"
+      }
+    },
+    {
+      "name": "a multi-page pull keeps paging until the server says it is drained",
+      "kind": "incident", "covers": "pull pagination",
+      "source": "lib/local-store/__tests__/sync-engine.test.ts (surfaces hasMore on the outer return)",
+      "guarantee": "A pull follows hasMore across pages, applies each, advances the cursor to the last page's syncedAt, and reports hasMore false once drained.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "steps": [{ "op": "pull", "pages": [
+        { "body": { "syncedAt": "2026-09-30T00:00:00.000Z", "hasMore": true, "bodyMetrics": [{ "date": "2026-09-29", "weightKg": 81.2, "updatedAt": "2026-09-29T20:00:00.000Z", "deletedAt": null }] } },
+        { "body": { "syncedAt": "2026-10-01T01:00:00.000Z", "hasMore": false, "bodyMetrics": [{ "date": "2026-09-30", "weightKg": 81, "updatedAt": "2026-09-30T20:00:00.000Z", "deletedAt": null }] } }
+      ] }],
+      "expect": {
+        "tables": [{ "table": "body_metrics", "columns": ["date", "weight_kg"], "rows": [{ "date": "2026-09-29", "weight_kg": 81.2 }, { "date": "2026-09-30", "weight_kg": 81 }] }],
+        "pull": { "synced": 2, "hasMore": false, "flags": { "biometrics": true } },
+        "cursor": "2026-10-01T01:00:00.000Z"
+      }
+    }
+  ]
+}
