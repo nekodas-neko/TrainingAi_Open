@@ -162,6 +162,17 @@ saving is realised here, not at Task 3.
 - **`markRolledUp` must only ever follow a durable local write of the finished forms.** Marking a frame
   consumed before its derived output is stored is a data-loss shape: the pruner would then be free to
   delete the raw, and nothing would hold the result.
+  - **Interim, #2579 (2026-10-07): `rolled_up` currently means "folded on the server".** Until Task 3
+    exists, `lib/oura-ble/raw-rolled-up-from-server.ts` marks device raw rows `rolled_up` once their
+    `measured_at` is 6 h behind the SERVER rollup's watermark (`GET /api/oura-ble/rollup-watermark`).
+    The finished forms it relies on are the server's, and every frame it lets the device forget is in
+    the server's never-pruned archive — that is what makes it consistent with the rule above. The
+    prune behind it stays off until the owner turns `ta_ring_raw_prune` on. **This interim is retired
+    at #2302 step 2, when the device becomes the writer**: from then on only the device rollup may set
+    the flag, and the switch must first stop this caller and reset `rolled_up = 0` on rows with
+    `synced = 0` — the bridge cannot see `synced`, so the interim can mark an old row whose backup
+    never landed, and a device rollup that trusted that flag would skip the row. #2248 stays open for
+    the full path.
 - **The server rollup stays live until Task 7**, and Task 7 is reversible only while server raw exists.
   D4 (dropping server raw) is **not** part of this plan and must not be pulled forward.
 
