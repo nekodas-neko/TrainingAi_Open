@@ -6,6 +6,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { reportRollupStepErrors } from '@/lib/oura-ble/report-step-errors'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { getRepositoryAsync } from '@/lib/data'
+import { redecodeJobKind, REDECODE_BUSY_FOR_BACKFILL_MESSAGE } from '@/lib/oura-ble/redecode-job-kind'
 
 // Re-stamp measured_at / event_name over stored rows, then re-aggregate into the
 // product tables. Under Lever 1 the decoders run during the re-aggregate (from the
@@ -101,11 +102,27 @@ export async function POST(req: Request) {
   // here rather than by a sweeper — there is no cron layer in this app, and the only reader that
   // matters is the one asking whether it may start another.
   await repo.reapStaleRedecodeJobs(userId)
-  const { job, alreadyRunning } = await repo.startRedecodeJob(userId, opts)
+  const { job, alreadyRunning, refused } = await repo.startRedecodeJob(userId, opts)
+  // Issue 2383: a step backfill must never follow a run that will not apply the step correction.
+  // Refused rather than queued — no hidden queue, and the owner presses again once it finishes.
+  // Nothing was started and no row was written, so the caller has nothing to poll.
+  if (refused) {
+    return NextResponse.json(
+      {
+        error: REDECODE_BUSY_FOR_BACKFILL_MESSAGE,
+        refused: true,
+        runningJobId: job.id,
+        runningKind: redecodeJobKind(job.opts),
+        requestedKind: redecodeJobKind(opts),
+      },
+      { status: 409, headers: { 'Cache-Control': 'private, no-store' } },
+    )
+  }
   if (alreadyRunning) {
     return NextResponse.json(
       {
         jobId: job.id, status: 'running', startedAt: job.startedAt.toISOString(), alreadyRunning: true,
+        kind: redecodeJobKind(job.opts),
         note: 'A redecode is already running; this did not start a second. Poll this job id.',
       },
       { headers: { 'Cache-Control': 'private, no-store' } },
@@ -135,6 +152,7 @@ export async function POST(req: Request) {
   return NextResponse.json(
     {
       jobId: job.id, status: 'running', startedAt: job.startedAt.toISOString(), alreadyRunning: false,
+      kind: redecodeJobKind(job.opts),
       note: 'Started. Poll GET ?jobId=… — this can take minutes, and the response arriving before it finishes is the point.',
     },
     { headers: { 'Cache-Control': 'private, no-store' } },
@@ -191,6 +209,10 @@ export async function GET(req: Request) {
         opts: job.opts,
         error: job.error,
         ...(job.result ?? {}),
+        // Issue 2383: what this run was asked to write, read from the row rather than from the
+        // request that is polling it. The step-backfill screen only says "Backfill applied" when
+        // this is 'step-backfill'. Placed after the spread so a result payload cannot shadow it.
+        kind: redecodeJobKind(job.opts),
       },
     },
     { headers: { 'Cache-Control': 'private, no-store' } },

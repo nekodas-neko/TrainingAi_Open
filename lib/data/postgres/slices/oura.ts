@@ -12,6 +12,7 @@ import { correctBodyFatPct, type BodyFatCalibration } from '@trainingai/shared/h
 import { mergeSet, initialSourceMap, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
 import { resolveDsToMs, LAG_PERCENTILE, type ClockAnchor, type ClockOffsets } from '@/lib/oura-ble/clock'
 import { CORROBORATION, MIN_RELIABLE_SAMPLES, PLAUSIBLE_MIN_BPM, PLAUSIBLE_MAX_BPM, type ObservedHrProfile } from '@trainingai/shared/health/observed-hr'
+import { redecodeJobKind, canFollowRunningRedecode } from '@/lib/oura-ble/redecode-job-kind'
 
 // Per-field provenance columns (migration 120) for the two multi-source Oura tables.
 const OURA_DAILY_SOURCE_COLS: SourceColumn[] = [
@@ -241,17 +242,40 @@ const asJob = (r: {
   reapedAt: r.reapedAt,
 })
 
-/** Returns the existing running job instead of starting a second — see the unique index. */
+/**
+ * Never starts a second run while one is in flight (see the unique index). When one is running:
+ *
+ * - it is returned with `alreadyRunning: true` if it writes everything `opts` asks for, so the
+ *   caller can follow it;
+ * - otherwise `refused: true` and nothing is inserted. Issue 2383: a step backfill used to follow a
+ *   plain redecode, the step correction never ran, and the screen said it had. The rule is
+ *   `canFollowRunningRedecode` in `lib/oura-ble/redecode-job-kind.ts`.
+ *
+ * Two requests racing past the read both try the insert; the index lets one through and the other
+ * gets no row back, then reads the winner and applies the same rule rather than surfacing a 500.
+ */
 export async function startRedecodeJob(
   db: Db, userId: string, opts: Record<string, unknown>,
-): Promise<{ job: RedecodeJob; alreadyRunning: boolean }> {
+): Promise<{ job: RedecodeJob; alreadyRunning: boolean; refused: boolean }> {
+  const requested = redecodeJobKind(opts)
+  const decide = (running: RedecodeJob) => canFollowRunningRedecode(requested, redecodeJobKind(running.opts))
+    ? { job: running, alreadyRunning: true, refused: false }
+    : { job: running, alreadyRunning: true, refused: true }
+
+  // Two attempts: the second covers a run that finished between our read and our insert.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const running = await getRunningRedecodeJob(db, userId)
+    if (running) return decide(running)
+    const [row] = await db
+      .insert(s.ouraRedecodeJobs)
+      .values({ userId, opts })
+      .onConflictDoNothing()
+      .returning(REDECODE_JOB_COLS)
+    if (row) return { job: asJob(row), alreadyRunning: false, refused: false }
+  }
   const running = await getRunningRedecodeJob(db, userId)
-  if (running) return { job: running, alreadyRunning: true }
-  const [row] = await db
-    .insert(s.ouraRedecodeJobs)
-    .values({ userId, opts })
-    .returning(REDECODE_JOB_COLS)
-  return { job: asJob(row), alreadyRunning: false }
+  if (running) return decide(running)
+  throw new Error('could not start or find a redecode job')
 }
 
 export async function getRunningRedecodeJob(db: Db, userId: string): Promise<RedecodeJob | null> {
