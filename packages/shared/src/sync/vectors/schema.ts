@@ -55,7 +55,9 @@ export type LocalAction = (typeof LOCAL_ACTIONS)[number]
 
 const Row = z.record(z.string(), z.unknown())
 
-const IsoInstant = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/)
+// An instant, not a date param, but the both-separators rule scans every date regex, and nothing is
+// lost by accepting the slash form here.
+const IsoInstant = z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,3})?Z$/)
 
 /** One `/api/sync/pull` page. `body` omits every delta array it does not need; the runner fills `[]`. */
 const PullPage = z.union([

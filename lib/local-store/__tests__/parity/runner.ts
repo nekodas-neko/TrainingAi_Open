@@ -170,7 +170,8 @@ export async function runVector(v: SyncVector): Promise<void> {
       const params = where.filter(([, val]) => val !== null).map(([, val]) => storable(val))
       const rows = db.prepare(
         `SELECT ${t.columns.join(', ')} FROM ${t.table}${clause} ORDER BY ${t.orderBy ?? t.columns[0]}`,
-      ).all(...(params as never[]))
+      ).all(...(params as never[])) as Record<string, unknown>[]
+      // node:sqlite rows have a null prototype; spread them so toEqual compares plain objects.
       expect(rows.map(r => ({ ...r })), `table ${t.table}`).toEqual(t.rows.map(r => {
         const out: Record<string, unknown> = {}
         for (const c of t.columns) out[c] = storable(r[c])
