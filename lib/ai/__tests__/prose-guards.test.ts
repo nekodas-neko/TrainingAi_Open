@@ -146,7 +146,7 @@ function routeFiles(dir: string): string[] {
   const out: string[] = []
   for (const e of readdirSync(join(root, dir), { withFileTypes: true })) {
     const rel = `${dir}/${e.name}`
-    if (e.isDirectory()) { if (e.name !== '__tests__') out.push(...routeFiles(rel)) }
+    if (e.isDirectory()) { if (e.name !== '__tests__' && e.name !== '__check_fixture__') out.push(...routeFiles(rel)) }
     else if (e.name === 'route.ts') out.push(rel)
   }
   return out

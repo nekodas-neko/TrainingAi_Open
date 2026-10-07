@@ -52,7 +52,16 @@ describe('sheet page surface', () => {
     // would also hit `sheet.tsx` itself, where it appears in the prop's own documentation, and this
     // test file — the same comment-versus-code trap that made a guard in the previous batch pass
     // against its own explanation.
-    const files = fs.readdirSync(path.join(root, 'components'), { recursive: true, encoding: 'utf8' })
+    //
+    // A walk of its own rather than `readdirSync({ recursive: true })`, because node's recursive
+    // listing cannot skip a directory: `check-comment-blindness` creates and deletes
+    // `components/workout/__check_fixture__/` while this runs, and descending into it as it goes
+    // throws ENOENT (#2560).
+    const tsx = (dir: string): string[] => fs.readdirSync(path.join(root, 'components', dir), { withFileTypes: true })
+      .flatMap(e => e.name === '__check_fixture__' ? []
+        : e.isDirectory() ? tsx(path.join(dir, e.name))
+        : [path.join(dir, e.name)])
+    const files = tsx('')
       .filter(f => f.endsWith('.tsx'))
       .filter(f => {
         const src = read(path.join('components', f))

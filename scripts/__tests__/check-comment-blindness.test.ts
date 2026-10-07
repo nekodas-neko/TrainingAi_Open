@@ -96,12 +96,15 @@ describe.each(CASES)('$check ignores its banned pattern inside a comment', ({ ch
     // "this check never looked at that file", which is the reading that makes the whole pass wrong.
     expect(asCode, `fixture for ${check} must trigger it in ${file}`).not.toEqual(clean)
     expect(asComment, `${check} counts its banned pattern inside a comment`).toEqual(clean)
-    // 120 s, not 30 (LA-163). The original reason is gone: `check-hex-literals` took 15 s per run on
-    // Windows, almost all of it one `git show` per file in `lib/base-ref.js`, and #2081 batched those
-    // reads. Its case now takes 4.0 s alone and 13.8 s under `pnpm test` load on the owner's
-    // machine. The limit stays because of checks that never touch base-ref. Measured in the same
-    // full run (2026-10-07): `check-tz-aware-cache-guards` 49.4 s, `check-timezone-rendering`
-    // 42.5 s, `check-memo-prop-stability` 35.2 s. Alone they take 11.9, 8.5 and 7.4 s. Under load
-    // that is over 30 s, so lowering the limit would make the suite flake.
-  }, 120_000)
+    // 30 s, back from 120 (LA-163, #2081, #2560). Two causes held it up. `check-hex-literals` ran one
+    // `git show` per file, which #2081 batched. Then `check-tz-aware-cache-guards`,
+    // `check-timezone-rendering` and `check-memo-prop-stability` took 49.4, 42.5 and 35.2 s a case
+    // under `pnpm test` on the owner's Windows machine. Most of each run was `readFileSync` on
+    // ~2,800 files, one at a time. #2560 reads them concurrently (`lib/read-sources.js`), as it does
+    // for `check-fetch-once-effects`, `check-client-today-timezone` and `check-date-param-regex`.
+    // The memo check also stopped extracting a `git archive` of the base. Measured in two full
+    // `pnpm test` runs on Windows after the change, with other test runs sharing the machine
+    // (2026-10-07): the three cases took 3.0/2.4, 5.4/5.8 and 3.6/6.6 s. The slowest of all eleven
+    // cases was 6.6 s. That leaves more than 4x headroom under 30 s.
+  }, 30_000)
 })

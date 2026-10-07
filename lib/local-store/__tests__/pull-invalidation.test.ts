@@ -151,7 +151,7 @@ describe('every pullDelta caller routes its flags to the cache (#2550)', () => {
   function sourceFiles(dir: string): string[] {
     const out: string[] = []
     for (const name of readdirSync(dir)) {
-      if (name === 'node_modules' || name === '__tests__' || name.startsWith('.')) continue
+      if (name === 'node_modules' || name === '__tests__' || name === '__check_fixture__' || name.startsWith('.')) continue
       const full = join(dir, name)
       if (statSync(full).isDirectory()) out.push(...sourceFiles(full))
       else if (/\.(ts|tsx)$/.test(name) && !/\.test\.tsx?$/.test(name)) out.push(full)

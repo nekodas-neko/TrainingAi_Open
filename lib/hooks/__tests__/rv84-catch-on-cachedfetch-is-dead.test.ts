@@ -8,7 +8,7 @@ function sourceFiles(): Array<{ rel: string; src: string }> {
   const out: string[] = []
   const walk = (d: string) => {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
-      if (['node_modules', '.next', '__tests__'].includes(e.name)) continue
+      if (['node_modules', '.next', '__tests__', '__check_fixture__'].includes(e.name)) continue
       const p = path.join(d, e.name)
       if (e.isDirectory()) walk(p)
       else if (/\.tsx?$/.test(e.name)) out.push(p)

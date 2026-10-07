@@ -16,7 +16,7 @@ const INVALIDATOR = 'invalidateGoalRecommendations'
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
-    if (name === 'node_modules' || name === '__tests__' || name.startsWith('.')) continue
+    if (name === 'node_modules' || name === '__tests__' || name === '__check_fixture__' || name.startsWith('.')) continue
     const full = join(dir, name)
     if (statSync(full).isDirectory()) walk(full, out)
     else if (/\.(ts|tsx)$/.test(full)) out.push(full)
