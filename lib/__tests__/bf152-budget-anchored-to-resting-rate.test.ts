@@ -10,6 +10,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 import { computeEnergyBalance } from '@/lib/health/energy-balance-service'
+import { stepEnergyKcal, STEP_BASE_CREDIT } from '@trainingai/shared/health/daily-energy'
+import { ageFromDob } from '@trainingai/shared/date-utils'
 
 const TZ = 'Australia/Brisbane'
 const DATE = '2026-09-13'
@@ -55,11 +57,21 @@ describe('the budget anchors to the measured resting rate', () => {
     expect(r.balance?.restingRateKcal).toBe(1342)
   })
 
-  it('makes the budget the resting rate plus earned movement, whatever the estimator says', async () => {
+  // #2071 kept the anchor and changed what is built on it: RMR − the goal's deficit + daily living
+  // (the 20% less the first 3,000 steps' energy) + movement. This fixture has no goal weight
+  // (`getUserGoals` → null), so the deficit is 0 and the still day is 1,342 × 1.2 − the credit.
+  it('builds the budget on the resting rate plus earned movement, whatever the estimator says', async () => {
     const r = await computeEnergyBalance(repo, 'u-1', TZ, DATE)
     const b = r.balance!
-    expect(budgetProvenance(b)).toMatchObject({ base: 1342, anchoredToRestingRate: true })
-    expect(budgetProvenance(b).total).toBe(1342 + Math.round(b.activeKcal))
+    const credit = stepEnergyKcal(
+      { ageYears: ageFromDob('1993-01-01', new Date()), weightKg: 70.2, sex: 'male' }, STEP_BASE_CREDIT,
+    )
+    expect(credit).toBeGreaterThan(0)
+    expect(b.deficitKcal).toBe(0)
+    expect(b.stepCreditKcal).toBe(credit)
+    expect(budgetProvenance(b)).toMatchObject({ base: Math.round(1342 * 1.2 - credit), anchoredToRestingRate: true })
+    expect(budgetProvenance(b).chain).toMatchObject({ rmr: 1342, deficit: 0, metabolicBurn: 268, stepCredit: credit })
+    expect(budgetProvenance(b).total).toBe(Math.round(1342 * 1.2 - credit + b.activeKcal))
   })
 
   // The anchor must NOT be `restingBaseKcal`. On a no-food fixture the two are far apart, and the
@@ -76,8 +88,10 @@ describe('the budget anchors to the measured resting rate', () => {
   it('falls back to the predicted BMR when no RMR has been measured', async () => {
     measuredRmr = null
     const b = (await computeEnergyBalance(repo, 'u-1', TZ, DATE)).balance!
-    // Cunningham on 52.3 kg of fat-free mass, with no residual to carry: 52.3 × 21.6 + 370.
-    expect(budgetProvenance(b).base).toBe(1500)
+    // Cunningham on 52.3 kg of fat-free mass, with no residual to carry: 52.3 × 21.6 + 370 = 1,500,
+    // and the still-day budget on it (#2071, no deficit here) 1,500 × 1.2 = 1,800 less the step credit.
+    expect(b.restingRateKcal).toBe(1500)
+    expect(budgetProvenance(b).base).toBe(Math.round(1800 - (b.stepCreditKcal ?? 0)))
     expect(budgetProvenance(b).anchoredToRestingRate).toBe(true)
   })
 

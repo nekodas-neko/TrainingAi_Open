@@ -90,6 +90,9 @@ describe('daily digest — nutrition coverage qualifier (Q-303)', () => {
     loggedDaysInWindow = 2
     const { POST } = await import('../route')
     await POST(new Request('http://localhost/api/daily-digest', { method: 'POST' }))
-    expect(captured).toContain('Nutrition today: 1800/2200 kcal, 90g/150g protein')
+    // #2071: the denominator is the day's budget, never the typed goal (2,200 here). This fixture has
+    // no weight on file, so there is no budget and the digest says so rather than quoting the goal.
+    expect(captured).toContain('Nutrition today: 1800/? kcal, 90g/150g protein')
+    expect(captured).not.toContain('/2200 kcal')
   })
 })

@@ -37,6 +37,9 @@ interface Props {
   date: string
   userId?: string
   targets: NutritionTargets | null
+  /** #2071. The day's calorie budget (`budgetProvenance(...).total`), or null when there is none. The
+   *  summary prints this, never `targets.calories`, which is the typed goal. */
+  dayBudgetKcal: number | null
   onLogged: (log?: FoodLogWithItem) => void
 }
 
@@ -48,7 +51,7 @@ const DEFAULT_SCALES: Record<EveningScaleKey, number> = {
   lateHeavyMeal: 3,
 }
 
-export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, targets, onLogged }: Props) {
+export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, targets, dayBudgetKcal, onLogged }: Props) {
   const tz = useUserTimezone()
   const pageGradient = usePageGradient('sleep')
   const isLight = useHeroColorScheme() === 'light'
@@ -241,7 +244,7 @@ export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, t
               {/* The narrative opener, above the numbers it is talking about (Q-112a), then the
                   day's totals, then the read-through those totals came out of (Q-112b). */}
               <DayDigestCard active={open} />
-              <DaySummaryCard totals={totals} targets={targets} battery={measured} />
+              <DaySummaryCard totals={totals} targets={targets} dayBudgetKcal={dayBudgetKcal} battery={measured} />
               <DayTrendsSection date={date} />
               <DayReadThroughSection date={date} tz={tz} logs={logs} />
             </>
