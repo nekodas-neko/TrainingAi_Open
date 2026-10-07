@@ -987,10 +987,7 @@ export default function ConfigScreen({ userId, openNewProgram }: { userId?: stri
             userId={userId}
             onClose={() => setBuilderOpen(false)}
             registerCloseGuard={(fn) => { builderCloseGuardRef.current = fn; }}
-            onSaved={() => {
-              setBuilderOpen(false);
-              refreshPrograms();
-            }}
+            onSaved={() => { setBuilderOpen(false); refreshPrograms(); }}
           />
         </SheetContent>
       </Sheet>
