@@ -8,6 +8,13 @@
 //   todayInTz()          falls back to DEFAULT_TZ, i.e. Brisbane        — wrong for anyone else
 //   localDateString()    the DEVICE's zone                              — a third answer entirely
 //
+// RV-179 widened what counts as the wrong answers, each measured at zero in client code when added
+// (so no baseline row): `todayInTz(DEFAULT_TZ)` and `todayInTz('Australia/Brisbane')`, which spell
+// the fallback out instead of leaving it implicit; `localDatetimeString()`, the device's clock and
+// date together; and the tz-less day-window helpers, `todayMidnightUtc()` with no argument and
+// `toAestDay(d)` with one — the tz is the first argument of the first and the SECOND of the second,
+// which is why the second is counted by balanced-paren arity (`lib/call-arity`) and not by regex.
+//
 // While a user is on `Australia/Brisbane` all three agree and nothing is broken, which is why this
 // has survived: the wrong call compiles, type-checks, lints clean, and is correct on the only device
 // anyone tests on. **Setting the timezone is what introduces the bug** — the server moves to the new
@@ -37,6 +44,7 @@ const path = require('path');
 const { resolveBaseRef, countsAtBase, verdict } = require('./lib/base-ref');
 const { readFilesUtf8, runMain } = require('./lib/read-sources');
 const { stripComments } = require('./lib/strip-comments');
+const { callsUnderArity } = require('./lib/call-arity');
 
 const root = path.join(__dirname, '..');
 
@@ -47,7 +55,9 @@ const SKIP_PREFIX = ['app/api/'];
 
 // A bare call — no argument at all. `todayInTz(tz)` and `todayInTz(user?.timezone)` are the
 // correct shape and are not counted.
-const BARE = /\b(todayInTz|localDateString)\s*\(\s*\)/g;
+const BARE = /\b(todayInTz|localDateString|localDatetimeString)\s*\(\s*\)/g;
+// The fallback spelled out. A call that PASSES a zone is right only if the zone is the user's.
+const DEFAULT_SPELLED = /\btodayInTz\s*\(\s*(?:DEFAULT_TZ|['"]Australia\/Brisbane['"])\s*\)/g;
 
 // Files allowed a bare call, each with the reason. Not a count — a claim that the file has no user
 // timezone available, which is a thing to defend rather than to baseline.
@@ -77,13 +87,19 @@ function walk(dir, out) {
 function countBare(raw) {
   const src = stripComments(raw);
   BARE.lastIndex = 0;
-  return [...src.matchAll(BARE)].length;
+  DEFAULT_SPELLED.lastIndex = 0;
+  return [...src.matchAll(BARE)].length
+    + [...src.matchAll(DEFAULT_SPELLED)].length
+    + callsUnderArity(src, 'todayMidnightUtc', 1).length
+    + callsUnderArity(src, 'toAestDay', 2).length;
 }
 
 const counts = new Map();
 let scanned = 0;
 
-runMain(async () => {
+module.exports = { countBare };
+
+if (require.main === module) runMain(async () => {
   const files = [];
   for (const dir of DIRS) {
     for (const full of walk(path.join(root, dir), [])) {
@@ -97,7 +113,7 @@ runMain(async () => {
   const contents = await readFilesUtf8(files.map(f => f.full));
   files.forEach(({ rel }, k) => {
     scanned++;
-    if (!contents[k].includes('todayInTz') && !contents[k].includes('localDateString')) return;
+    if (!/todayInTz|localDateString|localDatetimeString|todayMidnightUtc|toAestDay/.test(contents[k])) return;
     const n = countBare(contents[k]);
     if (n > 0) counts.set(rel, n);
   });
@@ -137,8 +153,9 @@ runMain(async () => {
 
   if (offenders.length > 0) {
     console.error('Client code computing "today" in the wrong timezone (Q-477).');
-    console.error('A bare `todayInTz()` falls back to DEFAULT_TZ (Brisbane) and a bare');
-    console.error('`localDateString()` reads the DEVICE\'s zone — neither follows the user\'s setting,');
+    console.error('A bare `todayInTz()` falls back to DEFAULT_TZ (Brisbane), `todayInTz(DEFAULT_TZ)` says so out loud,');
+    console.error('`localDateString()`/`localDatetimeString()` read the DEVICE\'s zone, and `todayMidnightUtc()` /');
+    console.error('`toAestDay(d)` with no zone fall back to Brisbane — none follows the user\'s setting,');
     console.error('which the server already honours. Pass the timezone from `useUserTimezone()`:');
     console.error('  const tz = useUserTimezone()   →   todayInTz(tz)');
     for (const o of offenders) {

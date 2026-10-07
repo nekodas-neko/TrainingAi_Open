@@ -51,36 +51,6 @@ describe('RV-176 — the calendar month comes from the user, not the phone', () 
 })
 
 
-/**
- * Calls to `name` that pass fewer than `minArgs` arguments — the shape that omits the timezone.
- *
- * Arity is per-function and that matters: the tz is `todayMidnightUtc`'s FIRST argument but
- * `toAestDay`'s SECOND, so one rule cannot cover both. Nor can a regex: `toAestDay\([^,)]+\)`
- * matches the corrected `toAestDay(new Date(x), tz)` by stopping at the inner `)`. Balance the
- * parens and count the commas that sit at the call's own depth.
- */
-function callsUnderArity(src: string, name: string, minArgs: number): string[] {
-  const hits: string[] = []
-  const re = new RegExp(`\\b${name}\\(`, 'g')
-  let m: RegExpExecArray | null
-  while ((m = re.exec(src)) !== null) {
-    let depth = 1
-    let commas = 0
-    let body = ''
-    let i = m.index + m[0].length
-    for (; i < src.length && depth > 0; i++) {
-      const c = src[i]
-      if (c === '(') depth++
-      else if (c === ')') { depth--; if (depth === 0) break }
-      else if (c === ',' && depth === 1) commas++
-      body += c
-    }
-    const args = body.trim() === '' ? 0 : commas + 1
-    if (args < minArgs) hits.push(src.slice(m.index, i + 1))
-  }
-  return hits
-}
-
 describe('RV-176 — no client surface keys a window or a bucket to the device clock', () => {
   it('no client file reads the device month or year for a calendar key', () => {
     const offenders = clientFiles().filter(f => /new Date\(\)\.get(Month|FullYear)\(\)/.test(code(f)))
@@ -92,19 +62,6 @@ describe('RV-176 — no client surface keys a window or a bucket to the device c
 
   it('no client file buckets by the device hour', () => {
     expect(clientFiles().filter(f => /new Date\(\)\.getHours\(\)/.test(code(f)))).toEqual([])
-  })
-
-  it('the tz-less day-window helpers have no client callers left', () => {
-    const offenders = clientFiles().filter(f =>
-      callsUnderArity(code(f), 'todayMidnightUtc', 1).length > 0 ||
-      callsUnderArity(code(f), 'toAestDay', 2).length > 0)
-    expect(offenders).toEqual([])
-  })
-
-  it('the readiness/activity detail screen no longer keys every user to Brisbane', () => {
-    const src = code('components/health/health-score-detail.tsx')
-    expect(src).not.toMatch(/todayInTz\(DEFAULT_TZ\)/)
-    expect(src).toMatch(/todayInTz\(tz\)/)
   })
 
   it('the meal bucket is chosen by the one shared formula, not a re-implementation', () => {
