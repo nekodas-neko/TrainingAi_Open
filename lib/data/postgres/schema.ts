@@ -547,6 +547,40 @@ export const readinessVerdicts = pgTable('readiness_verdicts', {
   unique('readiness_verdicts_user_date_key').on(t.userId, t.date),
 ]))
 
+/**
+ * #2377 (migration 202610071507). The #2356 pillar readiness model, computed beside the live score
+ * and shown nowhere. One row per (user, date, model_version): a new version is stored beside the
+ * old rows, a recompute of the same version replaces its own row. Pillars are typed columns so
+ * `claude_ro` can aggregate them; units are JSONB keyed by stable unit id. Null = not scored, never
+ * 0. `inputsThrough` (last daytime day any unit read) must be before `date`. Server-only.
+ */
+export const shadowReadiness = pgTable('shadow_readiness', {
+  id:               uuid('id').primaryKey().defaultRandom(),
+  userId:           uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  date:             date('date', { mode: 'string' }).notNull(),   // readiness day
+  modelVersion:     integer('model_version').notNull(),
+  shadowReadiness:  doublePrecision('shadow_readiness'),
+  sleepPillar:      doublePrecision('sleep_pillar'),
+  heartPillar:      doublePrecision('heart_pillar'),
+  activityPillar:   doublePrecision('activity_pillar'),
+  bodyPillar:       doublePrecision('body_pillar'),
+  pillarDetail:     jsonb('pillar_detail').notNull().default(sql`'{}'::jsonb`),
+  units:            jsonb('units').notNull().default(sql`'{}'::jsonb`),
+  maturityStage:    text('maturity_stage').notNull(),             // learning | provisional | settled
+  inputsThrough:    date('inputs_through', { mode: 'string' }),
+  liveReadiness:    doublePrecision('live_readiness'),
+  liveModelVersion: text('live_model_version'),
+  computedBy:       text('computed_by').notNull(),                // daily | replay
+  computedAt:       timestamp('computed_at', { withTimezone: true }).notNull().defaultNow(),
+}, (t) => ([
+  unique('shadow_readiness_user_date_version_key').on(t.userId, t.date, t.modelVersion),
+  index('shadow_readiness_user_date_idx').on(t.userId, t.date),
+  check('shadow_readiness_model_version_check', sql`${t.modelVersion} > 0`),
+  check('shadow_readiness_stage_check', sql`${t.maturityStage} IN ('learning', 'provisional', 'settled')`),
+  check('shadow_readiness_computed_by_check', sql`${t.computedBy} IN ('daily', 'replay')`),
+  check('shadow_readiness_settled_inputs_check', sql`${t.inputsThrough} IS NULL OR ${t.inputsThrough} < ${t.date}`),
+]))
+
 export const sleepSessions = pgTable('sleep_sessions', {
   id:               uuid('id').primaryKey().defaultRandom(),
   userId:           uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),

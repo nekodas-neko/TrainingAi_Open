@@ -3,7 +3,7 @@ import type { UserPreferences } from '@trainingai/shared/user/preferences'
 import type {
   User, Program, ProgressionStyle,
   WorkoutSession, ExerciseLog, SetLog, ExerciseHistoryLogRow,
-  BodyMetrics, ActivityLog, ActivityType, SleepSession, SleepVerdictRecord, ReadinessVerdictRecord, MoodLog,
+  BodyMetrics, ActivityLog, ActivityType, SleepSession, SleepVerdictRecord, ReadinessVerdictRecord, ShadowReadinessRecord, MoodLog,
   NextSessionRecommendation, GoalRecommendation,
 } from '@trainingai/shared/types'
 import type { ExerciseLibraryEntry, MuscleAssignment, ProgramPhase, ProgramPhaseType, PhaseSetWithPhases, ExerciseType } from '@trainingai/shared/types/program'
@@ -774,6 +774,16 @@ export interface WorkoutRepository {
   upsertReadinessVerdict(userId: string, record: Omit<ReadinessVerdictRecord, 'responseState'>): Promise<void>
   /** Returns false when no verdict was made for that day, so there is nothing to answer. */
   setReadinessVerdictResponse(userId: string, date: string, state: 'rated' | 'dismissed'): Promise<boolean>
+
+  // #2377 — the shadow readiness model (`shadow_readiness`), computed beside the live score and
+  // shown nowhere. Keyed (user, date, modelVersion): the upsert replaces only that version's own
+  // row, so a new model version lands beside the old rows and never over them.
+  upsertShadowReadiness(userId: string, record: ShadowReadinessRecord): Promise<void>
+  /** Rows with `from <= date <= to` (`YYYY-MM-DD`), oldest first, then by model version; only
+   *  `modelVersion` when given. Each carries `computedAt`. */
+  getShadowReadiness(
+    userId: string, from: string, to: string, modelVersion?: number,
+  ): Promise<Array<ShadowReadinessRecord & { computedAt: Date }>>
   /** Q-519 — set (or clear, with `null`) the remembered bedtime on an existing night. Returns false
    *  when no session for that date exists; this never creates one. Read only by the bedtime
    *  estimate — see `docs/reviews/2026-08-26-manual-bedtime-write-audit.md` for why it is its own
