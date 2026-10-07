@@ -12,8 +12,7 @@ describe('local schema', () => {
   // columns, and a half-applied upgrade has to heal.
   it('v50 adds sleep_sessions.sleep_start/sleep_end/awake_hours by ALTER and reconciles them', () => {
     const v50 = MIGRATIONS.find(m => m.toVersion === 50)!
-    const ddl = v50.statements.join('
-')
+    const ddl = v50.statements.join('\n')
     for (const column of ['sleep_start', 'sleep_end', 'awake_hours']) {
       expect(ddl).toContain(`ALTER TABLE sleep_sessions ADD COLUMN ${column}`)
       expect(

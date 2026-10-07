@@ -13,6 +13,7 @@ import { ScreenHeader } from "@/components/shell/screen-header";
 import { todayInTz, shiftDateStr } from "@trainingai/shared/date-utils";
 import { weightTrendWindowStart } from "@trainingai/shared/health/long-term-goal-progress";
 import { getLocalStore } from "@/lib/local-store";
+import { localSleepRowsAsNights } from "@/lib/sleep/merge-sessions";
 import { pushMutations, pullDelta } from "@/lib/local-store/sync-engine";
 import { PullToSync } from "@/components/pull-to-sync";
 import type { BodyMetaRow, WeekToDate, WeightTrendPoint } from "@/app/api/body-metadata/route";
@@ -322,7 +323,10 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
         });
         setMetaLoading(false);
       }
-      if (localSleep.length > 0) setSleepRows(localSleep as unknown as SleepRow[]);
+      // #2414: one row per night, newest first, as the route returns — not the raw per-session
+      // rows the store holds. Rows pulled before SQLite v50 carry no window and pass through
+      // unmerged; see `localSleepRowsAsNights` for why merging those would invent a night.
+      if (localSleep.length > 0) setSleepRows(localSleepRowsAsNights(localSleep));
     })();
     const networkPromise = Promise.all([
       cachedFetch<{ today: BodyMetaRow | null; recent: BodyMetaRow[]; weekToDate?: WeekToDate | null; activeEnergyKcalToday?: number | null; bodyFatCalibration?: BodyFatCalibrationMeta | null }>(

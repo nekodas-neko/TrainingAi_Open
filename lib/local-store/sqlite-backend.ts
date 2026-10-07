@@ -165,6 +165,9 @@ export class SQLiteLocalStore implements LocalStore {
       deepSleepHours:  (r.deep_sleep_hours as number) ?? null,
       remSleepHours:   (r.rem_sleep_hours as number) ?? null,
       lightSleepHours: (r.light_sleep_hours as number) ?? null,
+      sleepStart:      (r.sleep_start as string) ?? null,
+      sleepEnd:        (r.sleep_end as string) ?? null,
+      awakHours:       (r.awake_hours as number) ?? null,
       ouraId:          (r.oura_id as string) ?? null,
       efficiency:      (r.efficiency as number) ?? null,
       onsetLatencySec: (r.onset_latency_sec as number) ?? null,
@@ -1488,15 +1491,20 @@ export class SQLiteLocalStore implements LocalStore {
       // Carry the full Oura column set (HRV/RHR/stages) so restore isn't stripped to
       // stage hours (R6). Conflict on id (the server row id, stable for the mirror);
       // clobber-guarded so a future device-authored (pending) night isn't reverted by a
-      // stale pull. updated_at must advance for the update to apply.
+      // stale pull. updated_at must advance for the update to apply — with one exception (#2414):
+      // a row pulled before v50 has no window, and when the server re-sends it unchanged (a full
+      // resync, or More → Restore) its updated_at is EQUAL, so the advance rule alone would keep
+      // that gap forever. A synced row missing its window takes the server's; there is no local
+      // edit to lose, and every other field it carries is the server's already.
       await runSQL(
         `INSERT INTO sleep_sessions
            (id, date, duration_hours, deep_sleep_hours, rem_sleep_hours,
             light_sleep_hours, oura_id, efficiency, onset_latency_sec, average_hrv_ms,
             avg_heart_rate, lowest_heart_rate, restless_periods, sleep_score,
             respiratory_rate, sleep_phase_5_min, time_in_bed_hours, manual_sleep_start,
+            sleep_start, sleep_end, awake_hours,
             updated_at, sync_status)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
          ON CONFLICT(id) DO UPDATE SET
            date=excluded.date, duration_hours=excluded.duration_hours,
            deep_sleep_hours=excluded.deep_sleep_hours,
@@ -1509,13 +1517,17 @@ export class SQLiteLocalStore implements LocalStore {
            respiratory_rate=excluded.respiratory_rate, sleep_phase_5_min=excluded.sleep_phase_5_min,
            time_in_bed_hours=excluded.time_in_bed_hours,
            manual_sleep_start=excluded.manual_sleep_start,
+           sleep_start=excluded.sleep_start, sleep_end=excluded.sleep_end,
+           awake_hours=excluded.awake_hours,
            updated_at=excluded.updated_at, sync_status='synced'
          WHERE sleep_sessions.sync_status='synced'
-           AND excluded.updated_at > sleep_sessions.updated_at`,
+           AND (excluded.updated_at > sleep_sessions.updated_at
+                OR (sleep_sessions.sleep_start IS NULL AND excluded.sleep_start IS NOT NULL))`,
         [r.id, r.date, r.durationHours, r.deepSleepHours, r.remSleepHours, r.lightSleepHours,
          r.ouraId, r.efficiency, r.onsetLatencySec, r.averageHrvMs, r.avgHeartRate,
          r.lowestHeartRate, r.restlessPeriods, r.sleepScore, r.respiratoryRate,
-         r.sleepPhase5Min, r.timeInBedHours, r.manualSleepStart, r.updatedAt],
+         r.sleepPhase5Min, r.timeInBedHours, r.manualSleepStart,
+         r.sleepStart ?? null, r.sleepEnd ?? null, r.awakHours ?? null, r.updatedAt],
       );
     }
 
