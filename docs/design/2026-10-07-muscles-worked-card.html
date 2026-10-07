@@ -1,0 +1,100 @@
+<title>Muscles Worked Card</title>
+<style>
+:root{color-scheme:dark;--page:#0b100e;--page-fg:#e9efec;--page-dim:#9aa8a2;--line:#22302b;
+--background:oklch(0.145 0.020 149);--foreground:oklch(0.985 0 0);--muted:oklch(0.225 0.034 149);--muted-foreground:oklch(0.75 0 0);--border:oklch(1 0 0 / 7%);
+--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--body:oklch(0.32 0.02 149);
+--font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--page-fg);font-family:var(--font);line-height:1.5;padding-block:28px;padding-inline:16px}
+.wrap{max-width:860px;margin:0 auto}
+h1{font-size:24px;line-height:1.2;margin:0 0 6px;text-wrap:balance}
+h2{font-size:18px;margin:0 0 6px}
+p{max-width:68ch;margin:0 0 10px}
+.dim{color:var(--page-dim)}
+.meta{font-family:var(--mono);font-size:11px;color:var(--page-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:20px}
+section{border-top:1px solid var(--line);padding-block:22px 8px}
+.pair{display:flex;flex-wrap:wrap;gap:20px;margin:12px 0}
+.col{flex:1 1 300px;min-width:0;max-width:384px}
+.tag{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--page-dim);margin-bottom:6px}
+.tag.after{color:var(--green)}
+.phone{width:100%;max-width:384px;background:var(--background);color:var(--foreground);border:1px solid var(--line);border-radius:22px;padding:14px 12px 18px;display:flex;flex-direction:column;gap:12px;font-size:14px}
+.tabs{display:flex;gap:6px;font-size:12px;font-weight:600}
+.tabs span{padding:6px 10px;border-radius:999px;color:var(--muted-foreground)}
+.tabs span.on{background:var(--muted);color:var(--foreground)}
+.stub{height:44px;border-radius:16px;background:color-mix(in oklch,var(--muted) 35%,transparent);border:1px solid var(--border);display:flex;align-items:center;padding:0 14px;font-size:12px;color:var(--muted-foreground)}
+.card{border-radius:16px;padding:14px;border:1px solid var(--border);background:linear-gradient(135deg,color-mix(in oklch,var(--green) 12%,transparent),transparent 70%),color-mix(in oklch,var(--muted) 50%,transparent)}
+.new{outline:2px solid color-mix(in oklch,var(--green) 80%,transparent);outline-offset:2px}
+.hd{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:6px}
+.lbl{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-foreground)}
+.top{font-size:10px;color:var(--muted-foreground)} .top b{color:var(--foreground);font-weight:600}
+svg.map{display:block;margin:4px auto 0;width:100%;max-width:220px;height:auto}
+.legend{display:flex;justify-content:center;gap:12px;font-size:10px;color:var(--muted-foreground);margin-top:4px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.rec{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.chip{font-size:10px;padding:3px 8px;border-radius:999px;border:1px solid var(--border);color:var(--muted-foreground)}
+.chip b{color:var(--foreground);font-weight:600}
+.vol{border-radius:16px;padding:14px;border:1px solid var(--border);background:color-mix(in oklch,var(--muted) 50%,transparent)}
+.bar{display:flex;align-items:center;gap:8px;font-size:11px;margin-top:6px}
+.bar span{width:70px;color:var(--muted-foreground)} .bar i{height:6px;border-radius:999px;background:var(--green);display:block}
+ul{margin:4px 0 10px;padding-left:20px;max-width:68ch} li{margin:3px 0}
+code{font-family:var(--mono);font-size:12px;background:var(--line);padding:1px 5px;border-radius:4px}
+</style>
+<div class="wrap">
+<h1>Muscles Worked: back on the Training tab</h1>
+<p class="dim">For #2444. The owner chose to bring the card back (2026-10-07). It already exists as <code>BodyMuscleCard</code>, but no screen lists it. Below is the proposed placement on the real dark tokens at 384 px. The numbers are examples.</p>
+<p class="meta">#2444 · 2026-10-07</p>
+
+<section>
+<h2>Where it goes: Health → Training, directly under Muscle Volume</h2>
+<p>Volume tells you <i>how many sets</i>; the map shows <i>where</i> they landed and what is still recovering. Placing the two together answers one question: "what did I train this week, and what's ready again?"</p>
+<div class="pair">
+<div class="col"><div class="tag">Before (main)</div>
+<div class="phone">
+<div class="tabs"><span>Overview</span><span>Body</span><span class="on">Training</span><span>Progress</span></div>
+<div class="stub">Calendar</div><div class="stub">Week in review</div><div class="stub">Weekly stats · AI periodization</div>
+<div class="vol"><div class="lbl">Muscle Volume This Week</div>
+<div class="bar"><span>Chest</span><i style="width:70%"></i></div><div class="bar"><span>Back</span><i style="width:85%"></i></div><div class="bar"><span>Quads</span><i style="width:40%"></i></div><div class="bar"><span>Shoulders</span><i style="width:55%"></i></div></div>
+<div class="stub">Movement balance</div><div class="stub">Activity history · Workout density</div>
+</div></div>
+
+<div class="col"><div class="tag after">After</div>
+<div class="phone">
+<div class="tabs"><span>Overview</span><span>Body</span><span class="on">Training</span><span>Progress</span></div>
+<div class="stub">Calendar</div><div class="stub">Week in review</div><div class="stub">Weekly stats · AI periodization</div>
+<div class="vol"><div class="lbl">Muscle Volume This Week</div>
+<div class="bar"><span>Chest</span><i style="width:70%"></i></div><div class="bar"><span>Back</span><i style="width:85%"></i></div><div class="bar"><span>Quads</span><i style="width:40%"></i></div><div class="bar"><span>Shoulders</span><i style="width:55%"></i></div></div>
+<div class="card new">
+<div class="hd"><span class="lbl">Muscles Worked</span><span class="top">Top: <b>back, chest, shoulders</b></span></div>
+<svg class="map" viewBox="0 0 220 170" role="img" aria-label="Front and back body outline, back and chest shaded heavily, shoulders medium, quads light">
+<g fill="var(--body)">
+<circle cx="55" cy="18" r="11"/><rect x="38" y="31" width="34" height="56" rx="10"/><rect x="24" y="34" width="11" height="48" rx="5"/><rect x="75" y="34" width="11" height="48" rx="5"/><rect x="40" y="88" width="13" height="72" rx="6"/><rect x="57" y="88" width="13" height="72" rx="6"/>
+<circle cx="165" cy="18" r="11"/><rect x="148" y="31" width="34" height="56" rx="10"/><rect x="134" y="34" width="11" height="48" rx="5"/><rect x="185" y="34" width="11" height="48" rx="5"/><rect x="150" y="88" width="13" height="72" rx="6"/><rect x="167" y="88" width="13" height="72" rx="6"/>
+</g>
+<rect x="40" y="36" width="30" height="20" rx="6" fill="var(--green)" opacity=".75"/>
+<rect x="24" y="34" width="11" height="12" rx="5" fill="var(--green)" opacity=".5"/><rect x="75" y="34" width="11" height="12" rx="5" fill="var(--green)" opacity=".5"/>
+<rect x="40" y="92" width="13" height="30" rx="6" fill="var(--green)" opacity=".28"/><rect x="57" y="92" width="13" height="30" rx="6" fill="var(--green)" opacity=".28"/>
+<rect x="150" y="34" width="30" height="40" rx="8" fill="var(--green)" opacity=".9"/>
+<rect x="134" y="34" width="11" height="12" rx="5" fill="var(--green)" opacity=".5"/><rect x="185" y="34" width="11" height="12" rx="5" fill="var(--green)" opacity=".5"/>
+<text x="55" y="168" fill="var(--muted-foreground)" font-size="9" text-anchor="middle" font-family="Inter,sans-serif">Front</text>
+<text x="165" y="168" fill="var(--muted-foreground)" font-size="9" text-anchor="middle" font-family="Inter,sans-serif">Back</text>
+</svg>
+<div class="legend"><span><i style="background:color-mix(in oklch,var(--green) 28%,var(--body))"></i>light</span><span><i style="background:color-mix(in oklch,var(--green) 60%,var(--body))"></i>moderate</span><span><i style="background:var(--green)"></i>heavy</span></div>
+<div class="rec"><span class="chip">Back <b>recovering · 18 h</b></span><span class="chip">Chest <b>ready</b></span><span class="chip">Quads <b>ready</b></span></div>
+</div>
+<div class="stub">Movement balance</div><div class="stub">Activity history · Workout density</div>
+</div></div>
+</div>
+</section>
+
+<section>
+<h2>Notes</h2>
+<ul>
+<li><b>Code change:</b> add <code>"muscleMap"</code> to <code>TRAINING_ORDER</code> right after <code>"muscleSets"</code> (<code>app/health/health-content.tsx:57</code>), and migrate any saved section order. The card itself (<code>components/health/body-muscle-card.tsx</code>) is unchanged.</li>
+<li><b>Not a second copy:</b> Body's pinned <i>Muscle Status</i> map shows injuries and soreness. This card shows this week's training volume. If the two maps read as duplicates on the phone, the alternative is a "This week" toggle on Muscle Status instead of a separate card.</li>
+<li>The empty state stays as shipped: "No sets logged yet this week · Train a session to light up the map".</li>
+</ul>
+</section>
+</div>
