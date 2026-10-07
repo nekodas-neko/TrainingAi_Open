@@ -4,7 +4,7 @@ import { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { CalculatorIcon, ChevronLeftIcon, DumbbellIcon, ListIcon, SkipForwardIcon, ZapIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { WorkoutExercise, PhaseStatus } from "@/app/api/workout-data/route";
+import type { WorkoutExercise } from "@/app/api/workout-data/route";
 import { formatSheetDate, mroundStep, mroundStepUp, weightStepFor, plateBreakdown } from "./utils";
 import { ActiveSetCard } from "./active-set-card";
 import { SetsGrid } from "./sets-grid";
@@ -76,7 +76,7 @@ export function ActiveWorkoutScreen({
   sets,
   onWeightChange,
   currentSet,
-  lapStartMs,
+  lapStartMs: _lapStartMs,
   workoutPhase,
   restStartMs,
   currentRestSec,

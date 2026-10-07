@@ -515,7 +515,7 @@ async function cachedFetchCore<T>(
       // storing that under a long TTL would serve the fallback for as long as the real answer
       // would have lived — the recap's is 24h, on a card whose only retry is a refetch.
       if (!shouldCache || shouldCache(data)) await setCached(key, toStored(data), ttlSeconds);
-    } catch (err) {
+    } catch {
       // Network-level throw. Offline is not an error (queue + show saved data);
       // only report a genuine failure while online with nothing cached to show.
       //

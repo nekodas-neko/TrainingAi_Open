@@ -6,7 +6,6 @@ import { Clock, Dumbbell, Calendar, MessageCircle, Moon, BedDouble, TriangleAler
 import type { ProgramSession, NextSessionRecommendation } from "@trainingai/shared/types/program";
 import type { MoodLog } from "@trainingai/shared/types/mood";
 import type { PhaseStatus, PerSessionPhaseStatus } from "@/app/api/workout-data/route";
-import { getPaletteEntry } from "@trainingai/shared/session-palette";
 import { getSessionIcon } from "@/lib/session-icon";
 import { ColorSwatchPicker } from "@/components/ui/color-swatch-picker";
 import { CARD_DEFAULT_COLORS } from "../constants";

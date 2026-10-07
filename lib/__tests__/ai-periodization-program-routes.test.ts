@@ -18,8 +18,6 @@
  *     target row edited by hand can carry a synonym of one the defaults already wrote.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { startOfWeekInTz } from '@trainingai/shared/date-utils'
-
 type Row = Record<string, unknown>
 
 const getSessionPeriodization = vi.fn(async (_u: string, _s: string) => state() as Row | null)

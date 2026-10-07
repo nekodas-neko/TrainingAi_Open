@@ -30,7 +30,7 @@ import {
 } from "@/components/workout/utils";
 import { estimateOneRm, isDeloadedForEstimate } from "@trainingai/shared/1rm";
 import { rpeSourcesPayload } from "@trainingai/shared/workout/rpe-source";
-import type { ExerciseSummaryData, SessionLogEntry } from "@/components/workout/types";
+import type { SessionLogEntry } from "@/components/workout/types";
 import { buildSetSequence, nextStep } from "@trainingai/shared/workout/superset-order";
 import { exerciseLibraryRowsFrom } from '@/lib/local-store/program-assembler';
 import { getLocalStore } from "@/lib/local-store/index";
@@ -50,7 +50,6 @@ import { useDurationPreset } from "@/components/workout/use-duration-preset";
 import { WorkoutLoadError } from "@/components/workout/workout-load-error";
 import { TTL_SHORT, TTL_MEDIUM, TTL_LONG } from '@trainingai/shared/cache-ttl';
 import { invalidateWorkoutSummaries, invalidateExerciseLogged, invalidatePrescriptionChanged, invalidateWorkoutDataImmediate, invalidatePulledDomains } from "@/lib/cache-groups";
-import type { DurationPreset } from "@trainingai/shared/workout/duration-model";
 import { hapticLight, hapticSuccess } from "@/lib/haptics";
 import { scheduleRestCompleteNotification, cancelRestCompleteNotification, computeRestNotificationAction } from "@/lib/notifications";
 import { startRestChip, stopRestChip } from "@/lib/native/rest-timer-chip";
@@ -60,7 +59,7 @@ import { cancelWorkoutReminder } from "@/lib/workout-reminders";
 import type { Injury } from "@trainingai/shared/types/injury";
 import type { ExerciseLibraryEntry } from "@trainingai/shared/types/program";
 import { InjurySwapSheet } from "@/components/workout/injury-swap-sheet";
-import type { SessionPeriodization, AiPrescription, PrescriptionStatus } from "@trainingai/shared/types/ai-periodization";
+import type { SessionPeriodization } from "@trainingai/shared/types/ai-periodization";
 
 const DoneScreen = dynamic(() => import("@/components/workout/done-screen").then(m => m.DoneScreen), { ssr: false });
 
@@ -185,7 +184,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
   // behaviour when /api/workout-data 500s on a cold cache) is a bug. Only set when
   // nothing painted from cache or the local mirror; stale/seeded data beats an error.
   const [loadError, setLoadError] = useState(false);
-  const [loggedCount, setLoggedCount] = useState(0);
+  const [, setLoggedCount] = useState(0);
   const [calendarLoading, setCalendarLoading] = useState(false);
   const [calendarAdded, setCalendarAdded] = useState(false);
   const [phaseCompletionBanner, setPhaseCompletionBanner] = useState<{ from: string; to: string } | null>(null);
@@ -213,7 +212,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
     signals: { exercises: Array<{ sessionExerciseId: string; name: string; current1rm: number | null; role: string; rm1Trend: 'up' | 'flat' | 'down'; rm1ChangeKg: number }> };
   } | null>(null);
   const [periodizationLoading, setPeriodizationLoading] = useState(false);
-  const { deload, setDeload, recommended: deloadRecommended, prescribedDeload, overrideFull } = useDeloadChoice(!!aiDeload, periodization?.state);
+  const { deload, setDeload, recommended: deloadRecommended, overrideFull } = useDeloadChoice(!!aiDeload, periodization?.state);
   // Guards the stale-session-id self-heal (below) against a loop: records the id we've already
   // tried to re-resolve after an AI 404, so we re-resolve each dead id at most once.
   const staleSessionIdRecoveredRef = useRef<string | null>(null);

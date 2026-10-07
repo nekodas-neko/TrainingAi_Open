@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { ensureSchema } from '@/lib/data/postgres/client'
 import { getRepository } from '@/lib/data'
-import { formatInTimeZone } from 'date-fns-tz'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 
 export interface StrengthTrendEntry {

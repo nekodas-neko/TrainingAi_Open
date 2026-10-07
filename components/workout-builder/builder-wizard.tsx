@@ -19,8 +19,6 @@ import { WeightDial } from '@/components/ui/weight-dial'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { GoalSpectrum } from './goal-spectrum'
 
-const HOME_EQUIPMENT = ['dumbbell', 'barbell', 'cable', 'kettlebell']
-
 const EQUIPMENT_OPTIONS = [
   { id: 'dumbbell',   label: 'Dumbbells',  group: 'home' },
   { id: 'barbell',    label: 'Barbell',    group: 'home' },

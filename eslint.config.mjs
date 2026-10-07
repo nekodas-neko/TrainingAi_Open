@@ -64,7 +64,8 @@ const eslintConfig = [
       // PURPOSE, most of all the typed parameters of a mocked `vi.fn<(…) => …>` so an assertion can read
       // `mock.calls[0][1]`. They were 60% of the warning list and can never be fixed, which buried the
       // real dead code. Ignoring `^_` is the standard convention and turns the list back into signal.
-      "@typescript-eslint/no-unused-vars": ["warn", {
+      // #2589 deleted the dead code that was left, so the rule is an error: a new unused binding fails CI.
+      "@typescript-eslint/no-unused-vars": ["error", {
         argsIgnorePattern: "^_",
         varsIgnorePattern: "^_",
         caughtErrorsIgnorePattern: "^_",

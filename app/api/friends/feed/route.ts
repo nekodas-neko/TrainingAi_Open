@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
 import { getDb } from '@/lib/data/postgres/client'
 import * as s from '@/lib/data/postgres/schema'
-import { inArray, desc, gte, and, isNull } from 'drizzle-orm'
+import { inArray, desc, and, isNull } from 'drizzle-orm'
 import type { FeedEvent } from '@trainingai/shared/types/friends'
 
 export async function GET() {
@@ -16,7 +16,6 @@ export async function GET() {
   if (friendIds.length === 0) return NextResponse.json({ events: [] }, { headers: { 'Cache-Control': 'private, no-store' } })
 
   const db = getDb()
-  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
 
   const [prRows, sessionRows, friendRows] = await Promise.all([
     db.select({

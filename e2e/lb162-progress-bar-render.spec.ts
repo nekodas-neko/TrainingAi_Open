@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { shiftDateStr, startOfWeekInTz } from '@trainingai/shared/date-utils'
 import { STORAGE_STATE } from './fixtures'
 

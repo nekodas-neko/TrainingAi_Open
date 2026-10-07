@@ -16,7 +16,6 @@ import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { TabPanels } from "@/components/ui/tab-panels";
 import { ScreenHeader } from "@/components/shell/screen-header";
 import { useRefreshOnTabShow } from "@/components/shell/tab-visibility";
-import { toast } from "sonner";
 
 type Tab = "profile" | "friends";
 
