@@ -20,6 +20,10 @@ import type {
 import type { Friendship, Season } from '@trainingai/shared/types/friends'
 import type { AccountDeletionResult } from './postgres/slices/account-deletion'
 import type {
+  NativeRefreshToken, NativeRefreshTokenRevokedReason, CreateNativeRefreshTokenInput, RotateNativeRefreshTokenInput,
+} from './postgres/slices/native-refresh-tokens'
+import type { RefreshTokenHash } from '@/lib/auth/refresh-token-hash'
+import type {
   SessionPeriodization, PeriodizationPhase, AiPrescription,
   Baseline1rmEntry, PendingTransition, PrescriptionStatus, ProgramVolumeTarget,
 } from '@trainingai/shared/types/ai-periodization'
@@ -621,6 +625,24 @@ export interface WorkoutRepository {
   /** #2120. Deletes the account and everything that cascades from it, in one transaction; the
    *  one path for both self-service and admin deletion. `deleted: false` means no row matched. */
   deleteAccount(userId: string): Promise<AccountDeletionResult>
+
+  // ── Native app refresh tokens (#2076) ─────────────────────────────────────
+  // `native_refresh_tokens`. Only a hash is stored and no method returns one. Nothing calls these
+  // until the token flow (PR b). Every method but the hash lookup is scoped to `userId`.
+  /** A sign-in on a device: a new token in a new family. */
+  createNativeRefreshToken(input: CreateNativeRefreshTokenInput): Promise<NativeRefreshToken>
+  /** The row a presented token's hash names, in any state (rotated, revoked, expired). The one
+   *  unscoped lookup: a presented token is how the server learns which user is asking. */
+  findNativeRefreshTokenByHash(tokenHash: RefreshTokenHash): Promise<NativeRefreshToken | null>
+  /** Marks a live token rotated and inserts its successor in the same family, atomically. `null`
+   *  (nothing written) when it is not the caller's or is already rotated, revoked or expired. */
+  rotateNativeRefreshToken(input: RotateNativeRefreshTokenInput): Promise<NativeRefreshToken | null>
+  /** True when the caller's token was revoked now; false when not theirs or already revoked. */
+  revokeNativeRefreshToken(userId: string, id: string, reason: NativeRefreshTokenRevokedReason): Promise<boolean>
+  /** Revokes the caller's not-yet-revoked tokens in one family; returns how many. */
+  revokeNativeRefreshTokenFamily(userId: string, familyId: string, reason: NativeRefreshTokenRevokedReason): Promise<number>
+  /** The caller's live tokens (one per signed-in device), newest first. */
+  listActiveNativeRefreshTokens(userId: string): Promise<NativeRefreshToken[]>
   getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null>
   updateUserProfile(userId: string, profile: Partial<Pick<User, 'displayName' | 'heightCm' | 'dateOfBirth' | 'weightGoalKg' | 'timezone' | 'sex' | 'activityLevel' | 'fitnessGoal'>>): Promise<User>
   touchLastGoalReviewAt(userId: string): Promise<void>

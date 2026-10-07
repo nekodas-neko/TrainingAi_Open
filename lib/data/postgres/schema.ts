@@ -1404,6 +1404,44 @@ export const programVolumeTargets = pgTable('program_volume_targets', {
   targetSetsPerWeek:  integer('target_sets_per_week').notNull(),
 }, t => [unique().on(t.programId, t.muscleGroup)])
 
+// ── Native app sign-in ────────────────────────────────────────────────────────
+
+/**
+ * #2076 (migration 202610071636). Refresh tokens for the native app's own short-lived sign-in
+ * token, one `familyId` per sign-in on one device. **Only the SHA-256 of each token is stored**
+ * (`tokenHash`, 64 lowercase hex): the token is shown to the app once and never kept. Rotated on
+ * every use (`rotatedAt` + `replacedBy`); a rotated token presented again revokes its family.
+ * Server-only, not exported, `tokenHash` withheld from claude_ro. Read and written only through
+ * `slices/native-refresh-tokens.ts`.
+ */
+export const nativeRefreshTokens = pgTable('native_refresh_tokens', {
+  id:            uuid('id').primaryKey().defaultRandom(),
+  userId:        uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tokenHash:     text('token_hash').notNull(),
+  familyId:      uuid('family_id').notNull(),
+  deviceLabel:   text('device_label').notNull(),
+  deviceId:      text('device_id'),
+  createdAt:     timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  lastUsedAt:    timestamp('last_used_at', { withTimezone: true }),
+  expiresAt:     timestamp('expires_at', { withTimezone: true }).notNull(),
+  rotatedAt:     timestamp('rotated_at', { withTimezone: true }),
+  replacedBy:    uuid('replaced_by').references((): AnyPgColumn => nativeRefreshTokens.id, { onDelete: 'set null' }),
+  revokedAt:     timestamp('revoked_at', { withTimezone: true }),
+  revokedReason: text('revoked_reason'),
+}, (t) => ([
+  unique('native_refresh_tokens_token_hash_key').on(t.tokenHash),
+  index('native_refresh_tokens_user_idx').on(t.userId),
+  index('native_refresh_tokens_family_idx').on(t.familyId),
+  index('native_refresh_tokens_active_idx').on(t.userId, t.expiresAt).where(sql`revoked_at IS NULL AND rotated_at IS NULL`),
+  check('native_refresh_tokens_token_hash_check', sql`${t.tokenHash} ~ '^[0-9a-f]{64}$'`),
+  check('native_refresh_tokens_device_label_check', sql`char_length(${t.deviceLabel}) BETWEEN 1 AND 80 AND btrim(${t.deviceLabel}) <> ''`),
+  check('native_refresh_tokens_device_id_check', sql`${t.deviceId} IS NULL OR ${t.deviceId} ~ '^[A-Za-z0-9_-]{8,64}$'`),
+  check('native_refresh_tokens_expiry_check', sql`${t.expiresAt} > ${t.createdAt} AND ${t.expiresAt} <= ${t.createdAt} + interval '90 days'`),
+  check('native_refresh_tokens_revoked_check', sql`(${t.revokedAt} IS NULL) = (${t.revokedReason} IS NULL)`),
+  check('native_refresh_tokens_revoked_reason_check', sql`${t.revokedReason} IN ('user', 'sign_out', 'rotation_reuse', 'password_change', 'admin', 'account_deactivated')`),
+  check('native_refresh_tokens_replaced_check', sql`${t.replacedBy} IS NULL OR (${t.rotatedAt} IS NOT NULL AND ${t.replacedBy} <> ${t.id})`),
+]))
+
 // ── Oura Ring ─────────────────────────────────────────────────────────────────
 
 export const ouraTokens = pgTable('oura_tokens', {
