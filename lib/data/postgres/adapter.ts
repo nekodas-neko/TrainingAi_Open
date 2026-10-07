@@ -7606,6 +7606,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getExercise1rmHistory(userId: string, exerciseNames: string[], tz: string) { return period.getExercise1rmHistory(this.db, userId, exerciseNames, tz) }
   async getWeeklySetsByMuscleGroup(userId: string, programId: string, weekStart: string, weekEnd: string, tz: string) { return period.getWeeklySetsByMuscleGroup(this.db, userId, programId, weekStart, weekEnd, tz) }
   async getSetsByMuscleInWindow(userId: string, from: string, to: string, tz: string) { return period.getSetsByMuscleInWindow(this.db, userId, from, to, tz) }
+  async getMuscleTonnageByWeek(userId: string, from: string, to: string, tz: string) { return period.getMuscleTonnageByWeek(this.db, userId, from, to, tz) }
 
   // ── Oura Ring (delegated to slices/oura.ts) ───────────────────────────────
   async upsertOuraDaily(userId: string, rows: import('../repository').OuraDailyRow[], source: HealthSource) { return oura.upsertOuraDaily(this.db, userId, rows, source) }

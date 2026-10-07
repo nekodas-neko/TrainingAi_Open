@@ -1305,6 +1305,8 @@ export interface WorkoutRepository {
   getWeeklySetsByMuscleGroup(userId: string, programId: string, weekStart: string, weekEnd: string, tz: string): Promise<Record<string, number>>
   /** Weighted sets per muscle over an arbitrary span, across every programme (LB-111). `to` is inclusive. */
   getSetsByMuscleInWindow(userId: string, from: string, to: string, tz: string): Promise<Record<string, number>>
+  /** Tonnage per canonical muscle per 7-day week anchored on `from`, by local `logged_at` date (#2420). `to` is inclusive. */
+  getMuscleTonnageByWeek(userId: string, from: string, to: string, tz: string): Promise<{ muscle: string; weekStart: string; tonnageKg: number }[]>
   listSessionPeriodizationForProgram(userId: string, programId: string): Promise<SessionPeriodization[]>
   reconcileSessionsInPhase(userId: string, programId: string): Promise<void>
   reconcileUserStats(userId: string): Promise<void>
