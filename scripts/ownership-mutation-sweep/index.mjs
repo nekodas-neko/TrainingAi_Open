@@ -27,6 +27,7 @@
 //   --test <path>          test file(s) to run, comma-separated
 //                          (default: both repository-ownership-scoping*.test.ts files)
 //   --json <path>          write the full result list as JSON
+//   --survivors-of <path>  only re-run the predicates that survived in an earlier --json file
 //
 // Source files are never written: the mutation is applied by a vitest transform plugin
 // (vitest.config.mjs). A green run only counts as a survivor if the plugin confirms it applied the
@@ -57,6 +58,7 @@ const jobs = Math.max(1, Number(opt('--jobs', '3')))
 const fileFilter = opt('--file', null)
 const indexFilter = opt('--index', null)
 const jsonOut = opt('--json', null)
+const survivorsOf = opt('--survivors-of', null)
 const RUN_TIMEOUT_MS = 180_000
 
 const files = TARGET_FILES.filter((f) => !fileFilter || f.includes(fileFilter))
@@ -191,8 +193,16 @@ try {
       items.push({ file: '*', index: 'all', line: 0, method: `(every file, all ${n})`, text: '' })
     }
   } else {
+    // --survivors-of <json>: re-run only what survived a previous --json run — the quick loop while
+    // adding coverage. Matched by file + index + predicate text, so an edit that shifted the
+    // numbering re-runs the shifted predicate rather than silently skipping it.
+    const prior = survivorsOf
+      ? new Set(JSON.parse(fs.readFileSync(survivorsOf, 'utf8'))
+        .filter((r) => r.status === 'survived').map((r) => `${r.file}#${r.index}#${r.text}`))
+      : null
     items = inventory.flatMap(({ file, preds }) => preds
       .filter((p) => indexFilter === null || p.index === Number(indexFilter))
+      .filter((p) => !prior || prior.has(`${file}#${p.index}#${p.text}`))
       .map((p) => ({ file, index: p.index, line: p.line, method: p.method, text: p.text })))
   }
   console.log(`running ${items.length} mutation(s) with ${jobs} job(s)…`)

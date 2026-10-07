@@ -356,9 +356,13 @@ describe.skipIf(!canRun)('repository ownership scoping (Q-155)', () => {
 
   it('deleteMealType cannot delete another user\'s meal type', async () => {
     await repo.deleteMealType(bIds.emptyMealType, USER_A).catch(() => {})
+    // deleteMealType is a SOFT delete: it sets deleted_at and leaves the name alone. Asserting only
+    // on the name — as this did until #2425 — could never fail, and the 2026-10-07 sweep found the
+    // predicate surviving here. The seventh unfalsifiable assertion in this file.
     const { rows } = await pool.query(
-      `SELECT name FROM meal_types WHERE id = $1`, [bIds.emptyMealType])
+      `SELECT name, deleted_at FROM meal_types WHERE id = $1`, [bIds.emptyMealType])
     expect(rows).toHaveLength(1)
+    expect(rows[0].deleted_at).toBeNull()
     expect(rows[0].name).toBe('B SECRET SNACK')
   })
 
