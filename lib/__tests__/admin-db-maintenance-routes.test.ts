@@ -302,6 +302,52 @@ describe('GET /api/admin/db-snapshot — the export itself', () => {
     expect(reportServerError).toHaveBeenCalled()
   })
 
+  it('pulls the rows only as the client reads — it does not drain the snapshot into memory (#2537)', async () => {
+    // The loop used to run inside `start()`, which enqueues every row as fast as Postgres returns a
+    // page whatever the client is reading: on a slow link a `bulk=all` snapshot buffered on the server
+    // and undid the keyset pagination in `lib/export/db-snapshot.ts`. Pin the backpressure, not the
+    // exact high-water mark.
+    let produced = 0
+    const TOTAL = 100_000 // ~5 MB of lines, far past the route's 256 KB high-water mark
+    streamTableRows.mockImplementationOnce(async function* () {
+      for (let i = 0; i < TOTAL; i++) { produced++; yield { id: i, pad: 'x'.repeat(20) } }
+    })
+    const res = await snapshotReq()
+    const reader = res.body!.getReader()
+    await reader.read()
+    await new Promise(r => setTimeout(r, 20))
+    expect(produced).toBeGreaterThan(0)
+    expect(produced).toBeLessThan(TOTAL / 4)
+    // Abandoning the download stops the reads instead of finishing the snapshot for nobody.
+    await reader.cancel()
+    const atCancel = produced
+    await new Promise(r => setTimeout(r, 20))
+    expect(produced).toBe(atCancel)
+  })
+
+  it('still ends a complete snapshot with every table\'s completion line when read slowly', async () => {
+    // Backpressure must pause the stream, never drop or reorder a line: the consumer's row-count
+    // check against the manifest is what makes a cut-off snapshot unrestorable.
+    const rows = Array.from({ length: 5_000 }, (_, i) => ({ id: i, pad: 'y'.repeat(200) }))
+    streamTableRows.mockImplementationOnce(async function* () { for (const r of rows) yield r })
+    const res = await snapshotReq()
+    const reader = res.body!.getReader()
+    const decoder = new TextDecoder()
+    let text = ''
+    for (let reads = 1; ; reads++) {
+      const { done, value } = await reader.read()
+      if (done) break
+      text += decoder.decode(value, { stream: true })
+      // A reader slower than the producer, so the queue fills and the stream has to pause.
+      if (reads % 100 === 0) await new Promise(r => setTimeout(r, 0))
+    }
+    const lines = text.trim().split('\n').map(l => JSON.parse(l))
+    expect(lines[0]).toMatchObject({ manifest: true })
+    expect(lines.filter(l => 'row' in l)).toHaveLength(5_000)
+    expect(lines[lines.length - 1]).toEqual({ tableComplete: 'users', rowCount: 5_000 })
+    expect(lines.filter(l => 'error' in l)).toEqual([])
+  })
+
   it('writes an error LINE when it fails part-way, because the headers are already sent', async () => {
     // A 200 whose body simply stops is the failure mode this line exists to prevent — the consumer
     // has a file that looks complete. The status cannot be changed by then; the stream can say so.
@@ -340,7 +386,8 @@ describe('GET /api/admin/db-snapshot — the export itself', () => {
 
   it('passes the requested tables and bulk window through to the resolver', async () => {
     // Two different params: a fixture setting only one could not tell which the resolver received.
-    await snapshotReq('?tables=users,sleep_sessions&bulk=30')
+    // Read the body: the table loop runs as the stream is pulled, not when the response is returned.
+    await ndjson(await snapshotReq('?tables=users,sleep_sessions&bulk=30'))
     expect(resolveRequestedTables.mock.calls[0].slice(1)).toEqual(['users,sleep_sessions', '30'])
     expect(bulkWindowFor).toHaveBeenCalledWith('users', '30')
   })

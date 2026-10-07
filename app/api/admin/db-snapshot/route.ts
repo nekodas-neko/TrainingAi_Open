@@ -39,6 +39,9 @@ import {
 
 const CHUNK_SIZE = 5_000
 
+/** Bytes queued ahead of the client before the generator is paused. */
+const HIGH_WATER_BYTES = 256 * 1024
+
 type AuthOutcome =
   | { ok: true; via: 'session' | 'token' }
   | { ok: false; status: number; error: string }
@@ -104,7 +107,7 @@ export async function GET(req: NextRequest) {
   const tablesParam = q.get('tables')
   const pool = getReadonlyPool()
 
-  let cols
+  let cols: Awaited<ReturnType<typeof readTableColumns>>
   try {
     cols = await readTableColumns(pool)
     checkDrift(cols)
@@ -120,55 +123,89 @@ export async function GET(req: NextRequest) {
 
   const { toExport, omitted } = resolveRequestedTables(cols, tablesParam, bulk)
 
-  const encoder = new TextEncoder()
-  const stream = new ReadableStream({
-    async start(controller) {
-      const push = (obj: unknown) => controller.enqueue(encoder.encode(JSON.stringify(obj) + '\n'))
+  // The manifest, then each table's rows and completion line, as an async generator the stream
+  // PULLS from (#2537). It used to be drained inside `start()`, which has no backpressure: the loop
+  // enqueued every row as fast as Postgres returned a page, whatever the client was reading, so on a
+  // slow link with `bulk=all` (oura_raw_samples alone is ~58 MB of hex) most of the snapshot sat in
+  // server memory and undid the keyset pagination in `lib/export/db-snapshot.ts`. `/api/export` had
+  // the same shape and #2534 fixed it the same way. The bytes written are unchanged.
+  async function* snapshotLines(): AsyncGenerator<unknown> {
+    // Manifest first — snapshot time, view count, per-table row counts (from the request's own
+    // read, not a cached estimate), the resolved bulk window, and every omitted table with why.
+    // A consumer must never have to infer completeness from what happens to be in the file.
+    const rowCounts: Record<string, number | null> = {}
+    for (const table of toExport) {
       try {
-        // Manifest first — snapshot time, view count, per-table row counts (from the request's own
-        // read, not a cached estimate), the resolved bulk window, and every omitted table with why.
-        // A consumer must never have to infer completeness from what happens to be in the file.
-        const rowCounts: Record<string, number | null> = {}
-        for (const table of toExport) {
-          try {
-            // RV-190: same wrapper as db-query — the protections are per-query, not per-session.
-            const { rows } = await runScoped(pool, `SELECT count(*)::int AS n FROM claude_ro.${quoteIdent(table)}`)
-            rowCounts[table] = rows[0]?.n ?? null
-          } catch {
-            rowCounts[table] = null
-          }
-        }
-        push({
-          manifest: true,
-          snapshotAt: new Date().toISOString(),
-          viewCount: cols.views.size,
-          tables: toExport,
-          rowCounts,
-          bulk: bulk ?? '0',
-          omitted,
-        })
-
-        for (const table of toExport) {
-          const pk = await getPrimaryKeyColumns(pool, table)
-          const since = bulkWindowFor(table, bulk)
-          let n = 0
-          for await (const row of streamTableRows(pool, table, pk, CHUNK_SIZE, since ?? undefined)) {
-            push({ table, row })
-            n++
-          }
-          push({ tableComplete: table, rowCount: n })
-        }
-        await logSnapshot({ tables: toExport, bulk, ip, ok: true, error: null })
-        controller.close()
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err)
-        reportServerError(err, { url: '/api/admin/db-snapshot' })
-        await logSnapshot({ tables: toExport, bulk, ip, ok: false, error: message })
-        push({ error: 'Snapshot failed part-way through — see server logs' })
-        controller.close()
+        // RV-190: same wrapper as db-query — the protections are per-query, not per-session.
+        const { rows } = await runScoped(pool, `SELECT count(*)::int AS n FROM claude_ro.${quoteIdent(table)}`)
+        rowCounts[table] = rows[0]?.n ?? null
+      } catch {
+        rowCounts[table] = null
       }
+    }
+    yield {
+      manifest: true,
+      snapshotAt: new Date().toISOString(),
+      viewCount: cols.views.size,
+      tables: toExport,
+      rowCounts,
+      bulk: bulk ?? '0',
+      omitted,
+    }
+
+    for (const table of toExport) {
+      const pk = await getPrimaryKeyColumns(pool, table)
+      const since = bulkWindowFor(table, bulk)
+      let n = 0
+      for await (const row of streamTableRows(pool, table, pk, CHUNK_SIZE, since ?? undefined)) {
+        yield { table, row }
+        n++
+      }
+      yield { tableComplete: table, rowCount: n }
+    }
+  }
+
+  const encoder = new TextEncoder()
+  const encode = (obj: unknown) => encoder.encode(JSON.stringify(obj) + '\n')
+  const lines = snapshotLines()
+  let finished = false
+
+  const stream = new ReadableStream<Uint8Array>(
+    {
+      async pull(controller) {
+        if (finished) return
+        try {
+          // Fill to the high-water mark per pull rather than one line per pull: a row is ~100 bytes
+          // and a bulk snapshot is millions of them.
+          while ((controller.desiredSize ?? 0) > 0) {
+            const next = await lines.next()
+            if (next.done) {
+              finished = true
+              await logSnapshot({ tables: toExport, bulk, ip, ok: true, error: null })
+              controller.close()
+              return
+            }
+            controller.enqueue(encode(next.value))
+          }
+        } catch (err) {
+          // The status and headers are already sent, so an error line is the only place a failure
+          // can be said. `scripts/local-db/snapshot.js` rolls back on it.
+          finished = true
+          const message = err instanceof Error ? err.message : String(err)
+          reportServerError(err, { url: '/api/admin/db-snapshot' })
+          await logSnapshot({ tables: toExport, bulk, ip, ok: false, error: message })
+          controller.enqueue(encode({ error: 'Snapshot failed part-way through — see server logs' }))
+          controller.close()
+        }
+      },
+      async cancel() {
+        // The client went away. Stop reading tables for nobody; the generator's `finally` paths run.
+        finished = true
+        await lines.return?.(undefined)
+      },
     },
-  })
+    { highWaterMark: HIGH_WATER_BYTES, size: (chunk) => chunk.byteLength },
+  )
 
   return new NextResponse(stream, {
     headers: {
