@@ -13,6 +13,7 @@ vi.mock('@/auth', () => ({ auth: vi.fn(async () => ({ user: { id: USER, timezone
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => true }))
 vi.mock('@/lib/ai/instrument', () => ({
   aiModel: () => ({}),
+  bytesKey: () => 'k',
   loggedGenerateObject: async (_meta: unknown, run: () => Promise<unknown>) => run(),
 }))
 
