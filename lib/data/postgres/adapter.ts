@@ -2241,14 +2241,29 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async insertScaleRawSample(userId: string, sample: ScaleRawSampleInput): Promise<{ id: number }> {
-    // PS-33: a byte-identical re-send used to insert a second archive row. `oura_raw_samples`
-    // dedups on (user, timestamp, tag, body_hex); this table has only non-unique indexes, so the
-    // same three fields are matched here instead. Returning the existing id rather than skipping
-    // matters — the caller stages a pending reading and the client confirms it by that id.
+    // PS-33 / LA-71: one archive row per (user, timestamp, raw bytes), held by the unique index
+    // `scale_raw_samples_user_measured_raw_uq` (migration 202610071236). It replaced a
+    // select-then-insert pre-check, which two simultaneous posts of the same bytes could both pass.
     //
-    // A pre-check is not a constraint: two simultaneous posts of the same bytes can still both
-    // insert. The unique index that would close that is LA-71 — it needs a migration that first
-    // deletes any duplicate rows, which is a different kind of change from this one.
+    // A re-send returns the EXISTING id rather than skipping, and that matters: the caller stages a
+    // pending reading and the client confirms it by the id this returns. The existing row is left
+    // exactly as it is — its status included — as the pre-check left it.
+    //
+    // **The conflict target is deliberately omitted.** `ON CONFLICT (user_id, measured_at, raw_hex)`
+    // errors outright when no matching index exists, and the migration that builds it refuses to
+    // run (and is retried every boot) if it ever finds duplicates that disagree on status. A bare
+    // `ON CONFLICT DO NOTHING` degrades to "no dedup" there instead of failing every weigh-in.
+    const [row] = await this.db.insert(s.scaleRawSamples)
+      .values({
+        userId, measuredAt: sample.measuredAt, rawHex: sample.rawHex,
+        decoded: sample.decoded, status: sample.status,
+      })
+      .onConflictDoNothing()
+      .returning({ id: s.scaleRawSamples.id })
+    if (row) return { id: row.id }
+
+    // A conflict means the other row is committed (ON CONFLICT waits out an in-flight writer), and
+    // this is a new statement with a new snapshot under READ COMMITTED, so it sees that row.
     const [existing] = await this.db
       .select({ id: s.scaleRawSamples.id })
       .from(s.scaleRawSamples)
@@ -2257,16 +2272,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         eq(s.scaleRawSamples.measuredAt, sample.measuredAt),
         eq(s.scaleRawSamples.rawHex, sample.rawHex),
       ))
+      .orderBy(asc(s.scaleRawSamples.id))
       .limit(1)
-    if (existing) return { id: existing.id }
-
-    const [row] = await this.db.insert(s.scaleRawSamples)
-      .values({
-        userId, measuredAt: sample.measuredAt, rawHex: sample.rawHex,
-        decoded: sample.decoded, status: sample.status,
-      })
-      .returning({ id: s.scaleRawSamples.id })
-    return { id: row.id }
+    if (!existing) throw new Error('insertScaleRawSample: insert conflicted but no matching row was found')
+    return { id: existing.id }
   }
 
   async getConfirmedScaleTrendForDate(userId: string, date: string): Promise<{ weightKg: number } | null> {
