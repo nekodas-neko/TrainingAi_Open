@@ -88,8 +88,11 @@ describe.skipIf(!canRun)('weekly volume targets are derived, and take the phase 
     monday.setDate(monday.getDate() - ((nowZoned.getDay() + 6) % 7))
     // Midday, not midnight: a boundary is where an off-by-one stops being visible.
     monday.setHours(12, 0, 0, 0)
+    // `session_id`, the live link to the program session. This fixture wrote `program_session_id`, the
+    // dead column no real row has, which is what let the route read the same dead column and still
+    // pass (#2561).
     await pool.query(
-      `INSERT INTO workout_sessions (user_id, program_session_id, session_name, started_at, completed_at)
+      `INSERT INTO workout_sessions (user_id, session_id, session_name, started_at, completed_at)
        VALUES ($1, $2, 'BF-59 fixture session', $3, $3)`,
       [USER, programSessionId, fromZonedTime(monday, TZ).toISOString()],
     )
