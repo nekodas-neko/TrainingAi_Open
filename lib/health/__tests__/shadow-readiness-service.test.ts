@@ -119,11 +119,11 @@ describe.skipIf(!canRun)('shadow readiness service (#2377)', () => {
     __resetShadowThrottle()
     // A user that does not exist: the write fails on the foreign key, and that must stay inside.
     const ghost = '00000000-0000-4000-8000-000000237703'
-    const first = scheduleDailyShadowReadiness(ghost, TZ, 1_000_000)
+    const first = scheduleDailyShadowReadiness(ghost, TZ, 1_000_000, 0)
     expect(first).not.toBeNull()
     await expect(first).resolves.toBeUndefined()
     expect(scheduleDailyShadowReadiness(ghost, TZ, 1_000_000 + 59 * 60_000)).toBeNull()
-    const later = scheduleDailyShadowReadiness(ghost, TZ, 1_000_000 + 61 * 60_000)
+    const later = scheduleDailyShadowReadiness(ghost, TZ, 1_000_000 + 61 * 60_000, 0)
     expect(later).not.toBeNull()
     await later
     await pool.query(`DELETE FROM error_events WHERE user_id = $1`, [ghost]).catch(() => {})

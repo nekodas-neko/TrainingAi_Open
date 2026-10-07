@@ -54,7 +54,7 @@ describe.skipIf(!canRun)('readiness-score — live payload unchanged by the shad
 
     // With: the shadow step has run for today (and the route's own hook is then throttled, so
     // nothing else runs between the two reads).
-    await service.scheduleDailyShadowReadiness(TEST_USER_ID, TZ)
+    await service.scheduleDailyShadowReadiness(TEST_USER_ID, TZ, Date.now(), 0)
     const shadow = await pool.query(`SELECT computed_by FROM shadow_readiness WHERE user_id = $1 AND date = $2`, [TEST_USER_ID, today])
     expect(shadow.rows).toEqual([{ computed_by: 'daily' }])
     const withShadow = await (await GET()).text()

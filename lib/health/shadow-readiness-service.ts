@@ -97,7 +97,10 @@ async function loadHistory(repo: Repo, userId: string, tz: string, from: string,
 }> {
   const start = shiftDateStr(from, -LOOKBACK_DAYS)
   const today = todayInTz(tz)
-  const zoneFrom = [start, shiftDateStr(today, -ZONE_HR_RETENTION_DAYS)].sort()[1]
+  // Zone minutes are only needed for the weeks ending inside the scored range and the 30-day window
+  // under them. Reading the whole lookback would recompute up to four months of zone seconds
+  // whenever the HR profile moves, which it does most days.
+  const zoneFrom = [shiftDateStr(from, -(BASELINE_WINDOW_DAYS + 8)), shiftDateStr(today, -ZONE_HR_RETENTION_DAYS)].sort()[1]
   const zoneTo = shiftDateStr(to, -1)
 
   const [sleepSessions, bodyMetrics, summaries, wear, derived, workouts, setHr, moods, mornings, evenings, user, goals, food, profile] = await Promise.all([
@@ -285,11 +288,20 @@ export function __resetShadowThrottle(): void {
 }
 
 /**
+ * How long the daily run waits before starting. The readiness read is part of the app-open burst,
+ * and the pool is deliberately small (`lib/data/postgres/client.ts`); starting a few seconds later
+ * keeps the shadow's reads out of that burst rather than queueing beside it.
+ */
+const DAILY_START_DELAY_MS = 10_000
+
+/**
  * Fire-and-forget: start today's shadow run for this user and return immediately. Never throws,
  * never awaits, never touches the caller's response; a failure goes to the error reporter. Returns
  * the detached promise only so a test can wait for it.
  */
-export function scheduleDailyShadowReadiness(userId: string, tz: string, now: number = Date.now()): Promise<void> | null {
+export function scheduleDailyShadowReadiness(
+  userId: string, tz: string, now: number = Date.now(), delayMs: number = DAILY_START_DELAY_MS,
+): Promise<void> | null {
   try {
     const key = `${userId}:${todayInTz(tz)}`
     const prev = lastRun.get(key)
@@ -297,7 +309,8 @@ export function scheduleDailyShadowReadiness(userId: string, tz: string, now: nu
     // Keep the map to the current window: an entry older than the throttle can never block again.
     for (const [k, at] of lastRun) if (now - at >= DAILY_THROTTLE_MS) lastRun.delete(k)
     lastRun.set(key, now)
-    return runShadowReadinessForDate(userId, tz, todayInTz(tz), 'daily')
+    return new Promise<void>(resolve => setTimeout(resolve, delayMs))
+      .then(() => runShadowReadinessForDate(userId, tz, todayInTz(tz), 'daily'))
       .then(() => undefined)
       .catch(err => { reportServerError(err, { userId, url: 'shadow-readiness:daily' }) })
   } catch (err) {
