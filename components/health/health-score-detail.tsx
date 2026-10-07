@@ -108,6 +108,8 @@ export interface HealthScoreDetailProps {
   sparklineColor: string;
   contributorsTitle: string;
   extraCards?: (data: ReadinessScoreResponse, color: string, trends: HealthTrendDay[] | undefined) => ReactNode;
+  /** Issue 2338: a card that belongs directly under the score, above the contributor charts, and does not wait on the readiness payload (the Sleep screen's "log last night" card). */
+  leadCard?: ReactNode;
   // Optional richer detail (readiness screen): a "how the score is built" card rendered
   // above contributors, a graph-style contributor chart instead of the flat bars, and a
   // "vs your 14-day average" context chip under the score. Off by default so Sleep/Activity
@@ -135,7 +137,7 @@ function averageChip(trends: HealthTrendDay[] | undefined, field: HealthScoreDet
 }
 
 export function HealthScoreDetail({
-  userId, theme, title, subtitle, aiSection, scoreField, trendField, contributorsField, sparklineColor, contributorsTitle, extraCards,
+  userId, theme, title, subtitle, aiSection, scoreField, trendField, contributorsField, sparklineColor, contributorsTitle, extraCards, leadCard,
   breakdown, contributorChart, averageContext, hideContributors,
 }: HealthScoreDetailProps) {
   // Was `todayInTz(DEFAULT_TZ)`, which keyed every user's readiness and activity detail to
@@ -263,6 +265,7 @@ export function HealthScoreDetail({
             Computed by the app from your health and training data.
           </p>
         )}
+        {leadCard}
         {title === "Readiness" && data?.illnessAdvisory && (
           <div role="status" className="flex items-start gap-2.5 rounded-xl border border-border bg-muted/60 px-3 py-2.5">
             <Activity className="mt-0.5 h-4 w-4 shrink-0 text-foreground" aria-hidden />

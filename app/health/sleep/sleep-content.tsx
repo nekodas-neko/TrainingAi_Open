@@ -123,18 +123,17 @@ export function SleepContent({ userId }: { userId?: string }) {
       contributorChart
       sparklineColor="#818cf8"
       contributorsTitle="Sleep Contributors"
+      // Issue 2338: under the score, only when last night has no device night.
+      leadCard={loaded && userId && lastNight.kind !== "device" ? (
+        <ManualNightCard
+          userId={userId}
+          wakeDate={today}
+          night={lastNight.kind === "manual" ? lastNight.night : null}
+          onChanged={onNightChanged}
+        />
+      ) : null}
       extraCards={(data, _color, trends) => (
         <>
-          {/* Issue 2338: only when last night has no device night. */}
-          {loaded && userId && lastNight.kind !== "device" && (
-            <ManualNightCard
-              userId={userId}
-              wakeDate={today}
-              night={lastNight.kind === "manual" ? lastNight.night : null}
-              onChanged={onNightChanged}
-            />
-          )}
-
           {/* #2280 (OR-204): the Home chip marks a night scored on incomplete inputs with a glyph and
               leads here, so this is where it is said in words — the same note the Health screen's
               Sleep card shows, naming what is missing once a quarter of the model's weight is. */}
