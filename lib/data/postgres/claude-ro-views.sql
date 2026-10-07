@@ -1586,7 +1586,8 @@ SELECT
   t.time_in_bed_hours,
   t.source_map,
   t.manual_sleep_start,
-  t.manual_entry
+  t.manual_entry,
+  t.deleted_at
 FROM public.sleep_sessions t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
