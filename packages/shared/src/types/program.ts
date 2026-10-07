@@ -108,6 +108,9 @@ export interface NextSessionRecommendation {
   // escalation client-side (Q-115-followup) without re-deriving it from the flat
   // SessionExercise.muscleGroups list, which carries no role information.
   muscleAssignmentsByExercise?: Record<string, MuscleAssignment[]>
+  // Minutes of work for `session`, for the card's "~N min" (#2362): the prescription's own
+  // estimate when one drives the session, else `estimateProgramSessionMin`. null = nothing to price.
+  estimatedDurationMin?: number | null
   reason: string
   reminderEnabled?: boolean
   reminderTime?: string | null

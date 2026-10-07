@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { requireAdmin, adminErrorResponse } from '@/lib/admin'
-import { estimateSessionDurationSec, transitionSecForEquipment, type DurationExercise } from '@trainingai/shared/workout/duration-model'
+import { estimateProgramSessionSec } from '@trainingai/shared/workout/program-session-duration'
 import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
 import {
   formatProgramExport,
@@ -31,11 +31,11 @@ export async function GET(req: NextRequest) {
 
   const styles = await repo.listProgressionStyles(userId)
   const styleById = new Map(styles.map(st => [st.id, st]))
+  const styleSetsById = new Map(styles.map(st => [st.id, st.sets]))
   const allNames = [...new Set(program.sessions.flatMap(s => s.exercises.map(e => e.exerciseName)))]
   const equipmentMap = await repo.getExerciseEquipment(allNames)
 
   const sessions: ExportSession[] = program.sessions.map(s => {
-    const durationInputs: DurationExercise[] = []
     const exercises = s.exercises
       .slice()
       .sort((a, b) => a.position - b.position)
@@ -45,19 +45,6 @@ export async function GET(req: NextRequest) {
           .slice()
           .sort((a, b) => a.setNumber - b.setNumber)
         const sets: ExportSet[] = styleSets.map(ss => ({ reps: ss.reps, pct: ss.pct, restSec: ss.restSec }))
-
-        // Representative reps/rest (mean of the style's sets) for the duration estimate — matches
-        // how the app's own duration model treats an exercise as one reps/rest figure.
-        if (sets.length > 0) {
-          const meanReps = Math.round(sets.reduce((n, x) => n + x.reps, 0) / sets.length)
-          const meanRest = Math.round(sets.reduce((n, x) => n + x.restSec, 0) / sets.length)
-          durationInputs.push({
-            sets: sets.length,
-            reps: meanReps,
-            restSec: meanRest,
-            transitionSec: transitionSecForEquipment(equipmentMap[ex.exerciseName]),
-          })
-        }
 
         return {
           name: ex.exerciseName,
@@ -71,7 +58,12 @@ export async function GET(req: NextRequest) {
     return {
       name: s.name,
       budgetMin: s.timeBudgetMinutes,
-      estMin: Math.round(estimateSessionDurationSec(durationInputs) / 60),
+      // The same helper the session cards use (#2362): a representative reps/rest per exercise.
+      estMin: Math.round((estimateProgramSessionSec(
+        s.exercises.slice().sort((a, b) => a.position - b.position),
+        styleSetsById,
+        name => equipmentMap[name],
+      ) ?? 0) / 60),
       exercises,
     }
   })

@@ -168,6 +168,9 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const [isAiDynamic, setIsAiDynamic] = useState(false)
   const [phaseStatus, setPhaseStatus] = useState<import('@/app/api/workout-data/route').PhaseStatus | null>(null)
   const [perSessionPhaseStatus, setPerSessionPhaseStatus] = useState<import('@/app/api/workout-data/route').PerSessionPhaseStatus[]>([])
+  // Duration-model "~N min" per program session (#2362), for the card's already-trained-today
+  // session; today's pick reads the prescription-aware figure off `recommendation` instead.
+  const [estMinBySession, setEstMinBySession] = useState<Record<string, number>>({})
   const [earlyDeloadDismissed, setEarlyDeloadDismissed] = useState(false)
   const [adminBadge, setAdminBadge] = useState(0)
   const [goalsProfile, setGoalsProfile] = useState<{ activityLevel: string | null; fitnessGoal: string | null; lastGoalReviewAt: string | null } | null>(null);
@@ -296,11 +299,13 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         if (d?.program?.sessions?.length) setActiveSessions(d.program.sessions);
         if (d?.phaseStatus) setPhaseStatus(d.phaseStatus);
         if (d?.perSessionPhaseStatus) setPerSessionPhaseStatus(d.perSessionPhaseStatus);
+        if (d?.estimatedMinBySession) setEstMinBySession(d.estimatedMinBySession);
       } else {
-        const cachedMeta = readCacheSync<{ program?: { sessions?: ProgramSession[]; phaseMode?: string }; phaseStatus?: import('@/app/api/workout-data/route').PhaseStatus | null; perSessionPhaseStatus?: import('@/app/api/workout-data/route').PerSessionPhaseStatus[] }>('workout-data:meta');
+        const cachedMeta = readCacheSync<{ program?: { sessions?: ProgramSession[]; phaseMode?: string }; phaseStatus?: import('@/app/api/workout-data/route').PhaseStatus | null; perSessionPhaseStatus?: import('@/app/api/workout-data/route').PerSessionPhaseStatus[]; estimatedMinBySession?: Record<string, number> }>('workout-data:meta');
         if (cachedMeta?.program?.sessions?.length) setActiveSessions(cachedMeta.program.sessions);
         if (cachedMeta?.phaseStatus) setPhaseStatus(cachedMeta.phaseStatus);
         if (cachedMeta?.perSessionPhaseStatus) setPerSessionPhaseStatus(cachedMeta.perSessionPhaseStatus);
+        if (cachedMeta?.estimatedMinBySession) setEstMinBySession(cachedMeta.estimatedMinBySession);
       }
     } catch { /* ignore */ }
 
@@ -527,7 +532,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
       // Fire next-session and streak in parallel with the meta fetch —
       // none of them depend on the sessions list, so there's no reason to sequence them.
       await Promise.all([
-        cachedFetch<{ program?: { sessions?: ProgramSession[]; schedule?: { type?: string; restAfterN?: number; days?: unknown[] }; phaseMode?: string }; phaseStatus?: import('@/app/api/workout-data/route').PhaseStatus | null; perSessionPhaseStatus?: import('@/app/api/workout-data/route').PerSessionPhaseStatus[] }>(
+        cachedFetch<{ program?: { sessions?: ProgramSession[]; schedule?: { type?: string; restAfterN?: number; days?: unknown[] }; phaseMode?: string }; phaseStatus?: import('@/app/api/workout-data/route').PhaseStatus | null; perSessionPhaseStatus?: import('@/app/api/workout-data/route').PerSessionPhaseStatus[]; estimatedMinBySession?: Record<string, number> }>(
           'workout-data:meta', '/api/workout-data?tab=meta', TTL_LONG,
           (metaData) => {
             if (metaData?.program?.sessions?.length) {
@@ -536,6 +541,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
             }
             setPhaseStatus(metaData?.phaseStatus ?? null);
             setPerSessionPhaseStatus(metaData?.perSessionPhaseStatus ?? []);
+            setEstMinBySession(metaData?.estimatedMinBySession ?? {});
             const aiDynamic = metaData?.program?.phaseMode === 'ai_dynamic';
             setIsAiDynamic(aiDynamic);
             setStreakSchedule((metaData?.program?.schedule ?? null) as StreakSchedule);
@@ -1250,6 +1256,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
                         moodLog={moodLog}
                         phaseStatus={phaseStatus}
                         perSessionPhaseStatus={perSessionPhaseStatus}
+                        estMinBySession={estMinBySession}
                         cardColors={cardColors}
                         sectionEditMode={sectionEditMode}
                         dayKey={dayKey}

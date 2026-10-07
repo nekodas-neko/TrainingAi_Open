@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
 import { DEFAULT_TZ } from "@trainingai/shared/date-utils";
+import { estimateProgramSessionMin } from "@trainingai/shared/workout/program-session-duration";
 import { prescriptionDrivesLoad } from "@trainingai/shared/ai-periodization/apply-prescription";
 
 export async function GET() {
@@ -17,12 +18,16 @@ export async function GET() {
     // RV-78: the two reads are fetched together. Assignments are asked for the UNFILTERED list,
     // because the drop below depends on the prescription and would otherwise serialise them, and
     // then trimmed to what survives the drop, so the response is exactly what it was.
-    const [state, assignments] = await Promise.all([
+    const [state, assignments, styles, equipmentByName] = await Promise.all([
       repo.getSessionPeriodization(userId, recommendation.session.id),
       // Q-115-followup: lets the sore-muscle check-in predict the same whole-session escalation
       // computePerExerciseDeload applies server-side, instead of guessing from the flat
       // muscleGroups list (no main/secondary role information).
       repo.getExerciseMuscleAssignments(recommendation.session.exercises.map(e => e.exerciseName)),
+      // The card's "~N min" (#2362): the prescription's own estimate when one drives the session,
+      // else the duration model over the program's styles — never exercises × a constant.
+      repo.listProgressionStyles(userId),
+      repo.getExerciseEquipment(recommendation.session.exercises.map(e => e.exerciseName)),
     ]);
     // Reflect a Workout Review "drop this cycle" in the home card's exercise count / duration
     // estimate, matching what the workout screen will actually show.
@@ -34,6 +39,14 @@ export async function GET() {
         exercises: recommendation.session.exercises.filter(e => !dropped.has(e.id)),
       };
     }
+    const drives = !!p && !!state && prescriptionDrivesLoad(p.phaseAction, state.prescriptionStatus);
+    recommendation.estimatedDurationMin = drives && p.estimatedSessionDurationMin > 0
+      ? p.estimatedSessionDurationMin
+      : estimateProgramSessionMin(
+          recommendation.session.exercises,
+          new Map(styles.map(st => [st.id, st.sets])),
+          name => equipmentByName[name],
+        );
     const kept = new Set(recommendation.session.exercises.map(e => e.exerciseName));
     recommendation.muscleAssignmentsByExercise = Object.fromEntries(
       Object.entries(assignments).filter(([name]) => kept.has(name)),
