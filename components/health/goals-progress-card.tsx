@@ -46,56 +46,65 @@ export const GoalsProgressCard = memo(function GoalsProgressCard({ metaToday, we
   // Mirrors state, so it must not PATCH on mount — this card renders inside Health's launch burst.
   usePersistedPreference('goalsProgressView', view)
 
-  const rows: GoalRow[] = []
+  // Built per view, because the card has to know whether the OTHER view has anything (#2337 below).
+  const rowsFor = (view: 'today' | 'week'): GoalRow[] => {
+    const rows: GoalRow[] = []
 
-  if (userGoals?.stepsGoal != null) {
-    rows.push({
-      key: 'Steps', icon: Footprints, color: '#22c55e', weekly: view === 'week',
-      value: view === 'today' ? metaToday?.steps ?? null : weekToDate?.steps ?? null,
-      goal: normalizeGoal(userGoals.stepsGoal, userGoals.stepsGoalType ?? 'daily', view),
-    })
+    if (userGoals?.stepsGoal != null) {
+      rows.push({
+        key: 'Steps', icon: Footprints, color: '#22c55e', weekly: view === 'week',
+        value: view === 'today' ? metaToday?.steps ?? null : weekToDate?.steps ?? null,
+        goal: normalizeGoal(userGoals.stepsGoal, userGoals.stepsGoalType ?? 'daily', view),
+      })
+    }
+
+    if (userGoals?.calorieGoal != null) {
+      rows.push({
+        key: 'Calories', icon: Flame, color: '#f97316', weekly: view === 'week',
+        value: view === 'today' ? metaToday?.calories ?? null : weekToDate?.calories ?? null,
+        goal: normalizeGoal(userGoals.calorieGoal, userGoals.calorieGoalType ?? 'daily', view),
+      })
+    }
+
+    if (userGoals?.waterGoalMl != null) {
+      rows.push({
+        key: 'Water', icon: Droplet, color: '#38bdf8', weekly: view === 'week',
+        value: view === 'today' ? metaToday?.waterMl ?? null : weekToDate?.waterMl ?? null,
+        goal: normalizeGoal(userGoals.waterGoalMl, userGoals.waterGoalType ?? 'daily', view),
+      })
+    }
+
+    if (userGoals?.sleepGoalHours != null) {
+      // #2337: `thisWeekHours` is null when no night this week recorded sleep, as `lastNightHours`
+      // already was. A null value drops the row in `visibleRows` below rather than drawing "0 h"
+      // against the goal; a payload cached before the change still carries its number.
+      rows.push({
+        key: 'Sleep', icon: Moon, color: '#a78bfa', weekly: view === 'week',
+        value: view === 'today' ? progressSummary?.sleep.lastNightHours ?? null : progressSummary?.sleep.thisWeekHours ?? null,
+        goal: view === 'today' ? userGoals.sleepGoalHours : userGoals.sleepGoalHours * 7,
+      })
+    }
+
+    if (progressSummary?.workouts) {
+      rows.push({
+        key: 'Workouts', icon: Dumbbell, color: '#fbbf24', weekly: view === 'week',
+        value: view === 'today' ? (progressSummary.workouts.todayComplete ? 1 : 0) : progressSummary.workouts.completedThisWeek,
+        goal: view === 'today' ? 1 : progressSummary.workouts.scheduledThisWeek,
+      })
+    }
+
+    return rows.filter(r => r.value != null && r.goal != null && r.goal > 0)
   }
 
-  if (userGoals?.calorieGoal != null) {
-    rows.push({
-      key: 'Calories', icon: Flame, color: '#f97316', weekly: view === 'week',
-      value: view === 'today' ? metaToday?.calories ?? null : weekToDate?.calories ?? null,
-      goal: normalizeGoal(userGoals.calorieGoal, userGoals.calorieGoalType ?? 'daily', view),
-    })
-  }
-
-  if (userGoals?.waterGoalMl != null) {
-    rows.push({
-      key: 'Water', icon: Droplet, color: '#38bdf8', weekly: view === 'week',
-      value: view === 'today' ? metaToday?.waterMl ?? null : weekToDate?.waterMl ?? null,
-      goal: normalizeGoal(userGoals.waterGoalMl, userGoals.waterGoalType ?? 'daily', view),
-    })
-  }
-
-  if (userGoals?.sleepGoalHours != null) {
-    // #2337: `thisWeekHours` is null when no night this week recorded sleep, as `lastNightHours`
-    // already was. A null value drops the row in `visibleRows` below rather than drawing "0 h"
-    // against the goal; a payload cached before the change still carries its number.
-    rows.push({
-      key: 'Sleep', icon: Moon, color: '#a78bfa', weekly: view === 'week',
-      value: view === 'today' ? progressSummary?.sleep.lastNightHours ?? null : progressSummary?.sleep.thisWeekHours ?? null,
-      goal: view === 'today' ? userGoals.sleepGoalHours : userGoals.sleepGoalHours * 7,
-    })
-  }
-
-  if (progressSummary?.workouts) {
-    rows.push({
-      key: 'Workouts', icon: Dumbbell, color: '#fbbf24', weekly: view === 'week',
-      value: view === 'today' ? (progressSummary.workouts.todayComplete ? 1 : 0) : progressSummary.workouts.completedThisWeek,
-      goal: view === 'today' ? 1 : progressSummary.workouts.scheduledThisWeek,
-    })
-  }
-
-  const visibleRows = rows.filter(r => r.value != null && r.goal != null && r.goal > 0)
+  const visibleRows = rowsFor(view)
+  // #2337. A view can be empty while the other is not — a sleep goal with no night recorded this week
+  // used to draw "0 h" and now has no row. Vanishing then would take the toggle with it, and the view
+  // is persisted, so the card would stay gone. Keep the card and say the view is empty instead.
+  const otherViewHasRows = rowsFor(view === 'today' ? 'week' : 'today').length > 0
   // LB-176. `return null` is right for an account with no goals set and wrong for a read that failed —
   // the card simply left the screen. A vanish is the other half of the same rule as a false "No data"
   // (RV-150): say which happened.
-  if (visibleRows.length === 0) {
+  if (visibleRows.length === 0 && !otherViewHasRows) {
     return failed
       ? <EmptyState title="Couldn't load your goals" />
       : null
@@ -123,6 +132,11 @@ export const GoalsProgressCard = memo(function GoalsProgressCard({ metaToday, we
         </div>
       </div>
       <div className="space-y-3">
+        {visibleRows.length === 0 && (
+          <p className="text-xs text-muted-foreground">
+            Nothing recorded {view === 'today' ? 'today' : 'this week'} yet.
+          </p>
+        )}
         {visibleRows.map(row => {
           const Icon = row.icon
           return (
