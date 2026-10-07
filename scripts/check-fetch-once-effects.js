@@ -22,6 +22,7 @@
 const fs = require('fs');
 const path = require('path');
 const { resolveBaseRef, countsAtBase, verdict } = require('./lib/base-ref');
+const { readFilesUtf8, runMain } = require('./lib/read-sources');
 const { stripComments } = require('./lib/strip-comments');
 
 const root = path.join(__dirname, '..');
@@ -222,48 +223,54 @@ function countFetchOnce(src) {
 
 const baseRef = resolveBaseRef();
 
-for (const abs of files) {
-  const rel = path.relative(root, abs).replace(/\\/g, '/');
-  const { count, lines } = countFetchOnce(stripComments(fs.readFileSync(abs, 'utf8')));
-  if (count === 0) continue;
-  perFile.set(rel, count);
-  for (const ln of lines) detail.push(`${rel}:${ln}`);
-}
-
-const failures = [];
-const inherited = [];
-// One read of the base for every file, not one git process per file (#2081).
-// Comments stripped first, as the working-tree scan above does (#2557).
-const atBase = countsAtBase(baseRef, [...perFile.keys()], (c) => countFetchOnce(stripComments(c)).count);
-for (const [rel, count] of perFile) {
-  const allowed = BASELINE[rel] ?? 0;
-  // LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over.
-  const v = verdict({ count, limit: allowed, atBase: atBase.get(rel) });
-  if (v === 'inherited') {
-    inherited.push(`${rel}: ${count} fetch-once effect(s) against a baseline of ${allowed}, but the base branch is already there.`);
-  } else if (v === 'fail') {
-    failures.push(allowed === 0
-      ? `${rel}: ${count} fetch-once effect(s); this file is not in the baseline, so it must have zero.`
-      : `${rel}: ${count} fetch-once effect(s), over its baseline of ${allowed}.`);
+runMain(async () => {
+  // #2560: read together (lib/read-sources.js). A file with no `cachedFetch` anywhere counts zero
+  // without being stripped — `countFetchOnce` returns zero for it anyway, and stripping only ever
+  // turns characters into whitespace, so it cannot put one there.
+  const contents = await readFilesUtf8(files);
+  for (let k = 0; k < files.length; k++) {
+    if (!contents[k].includes('cachedFetch')) continue;
+    const rel = path.relative(root, files[k]).replace(/\\/g, '/');
+    const { count, lines } = countFetchOnce(stripComments(contents[k]));
+    if (count === 0) continue;
+    perFile.set(rel, count);
+    for (const ln of lines) detail.push(`${rel}:${ln}`);
   }
-}
 
-// Reported whether or not the run fails, and never as a failure (Q-424).
-if (inherited.length) {
-  console.log('check-fetch-once-effects: inherited from the base branch, not caused here:');
-  inherited.forEach((f) => console.log('  • ' + f));
-}
-for (const [rel, allowed] of Object.entries(BASELINE)) {
-  const count = perFile.get(rel) ?? 0;
-  if (count < allowed) {
-    failures.push(`${rel}: down to ${count} from a baseline of ${allowed} — ${count === 0 ? 'delete its row' : `lower it to ${count}`}, the baseline is shrink-only.`);
+  const failures = [];
+  const inherited = [];
+  // One read of the base for every file, not one git process per file (#2081).
+  // Comments stripped first, as the working-tree scan above does (#2557).
+  const atBase = countsAtBase(baseRef, [...perFile.keys()], (c) => countFetchOnce(stripComments(c)).count);
+  for (const [rel, count] of perFile) {
+    const allowed = BASELINE[rel] ?? 0;
+    // LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over.
+    const v = verdict({ count, limit: allowed, atBase: atBase.get(rel) });
+    if (v === 'inherited') {
+      inherited.push(`${rel}: ${count} fetch-once effect(s) against a baseline of ${allowed}, but the base branch is already there.`);
+    } else if (v === 'fail') {
+      failures.push(allowed === 0
+        ? `${rel}: ${count} fetch-once effect(s); this file is not in the baseline, so it must have zero.`
+        : `${rel}: ${count} fetch-once effect(s), over its baseline of ${allowed}.`);
+    }
   }
-}
 
-if (failures.length) {
-  console.error('Fetch-once effect check failed:\n');
-  for (const f of failures) console.error(`  • ${f}`);
-  console.error(`
+  // Reported whether or not the run fails, and never as a failure (Q-424).
+  if (inherited.length) {
+    console.log('check-fetch-once-effects: inherited from the base branch, not caused here:');
+    inherited.forEach((f) => console.log('  • ' + f));
+  }
+  for (const [rel, allowed] of Object.entries(BASELINE)) {
+    const count = perFile.get(rel) ?? 0;
+    if (count < allowed) {
+      failures.push(`${rel}: down to ${count} from a baseline of ${allowed} — ${count === 0 ? 'delete its row' : `lower it to ${count}`}, the baseline is shrink-only.`);
+    }
+  }
+
+  if (failures.length) {
+    console.error('Fetch-once effect check failed:\n');
+    for (const f of failures) console.error(`  • ${f}`);
+    console.error(`
   A useEffect(…, []) that calls cachedFetch runs once per mount and never again. In the persistent
   tab shell nothing unmounts, so the component holds its first payload until the app is killed —
   that is Q-402, reported as "requires a restart of the app".
@@ -271,8 +278,9 @@ if (failures.length) {
   Use useCachedValue(key, url, ttl) from lib/hooks/use-cached-value.ts, which refetches when the key
   is invalidated. If this site genuinely should fetch once — a sheet snapshotting at open, a warm
   pass with no reader — add it to the BASELINE here with the reason, so the choice is in the diff.`);
-  process.exit(1);
-}
+    process.exit(1);
+  }
 
-const total = [...perFile.values()].reduce((a, b) => a + b, 0);
-console.log(`check-fetch-once-effects: OK — ${total} known fetch-once effect(s) across ${perFile.size} file(s), none new`);
+  const total = [...perFile.values()].reduce((a, b) => a + b, 0);
+  console.log(`check-fetch-once-effects: OK — ${total} known fetch-once effect(s) across ${perFile.size} file(s), none new`);
+});
