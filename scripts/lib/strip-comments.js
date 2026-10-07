@@ -32,20 +32,25 @@
  * String literals are deliberately kept: a banned identifier inside a raw `sql` template is a real
  * hit, not prose, which is the point `check-learning-mode-isolation` makes in its own comment.
  */
+//
+// #2560: code and strings are copied as whole runs (`slice`) and joined once, rather than appended
+// a character at a time. The per-character `+=` built a chain of millions of tiny string pieces per
+// scan; `check-memo-prop-stability` holds every stripped file at once, and spent more time in the
+// garbage collector than in its own matching. The output is unchanged character for character —
+// compared over every .ts/.tsx/.js file in the repository when this was rewritten.
 function stripComments(src) {
-  let out = '';
+  const parts = [];
   let i = 0;
+  let copied = 0; // everything before this index is already in `parts`
   const n = src.length;
 
   while (i < n) {
     const c = src[i];
 
     if (c === '"' || c === "'" || c === '`') {
-      out += c;
       i += 1;
       while (i < n) {
-        if (src[i] === '\\' && i + 1 < n) { out += src.slice(i, i + 2); i += 2; continue; }
-        out += src[i];
+        if (src[i] === '\\' && i + 1 < n) { i += 2; continue; }
         const ch = src[i];
         i += 1;
         if (ch === c) break;
@@ -57,22 +62,28 @@ function stripComments(src) {
     }
 
     if (c === '/' && src[i + 1] === '/') {
-      while (i < n && src[i] !== '\n') { out += ' '; i += 1; }
+      parts.push(src.slice(copied, i));
+      const nl = src.indexOf('\n', i);
+      const stop = nl === -1 ? n : nl;
+      parts.push(' '.repeat(stop - i));
+      i = copied = stop;
       continue;
     }
 
     if (c === '/' && src[i + 1] === '*') {
+      parts.push(src.slice(copied, i));
       const end = src.indexOf('*/', i + 2);
       const stop = end === -1 ? n : end + 2;
-      for (; i < stop; i += 1) out += src[i] === '\n' ? '\n' : ' ';
+      parts.push(src.slice(i, stop).replace(/[^\n]/g, ' '));
+      i = copied = stop;
       continue;
     }
 
-    out += c;
     i += 1;
   }
 
-  return out;
+  parts.push(src.slice(copied));
+  return parts.join('');
 }
 
 module.exports = { stripComments };

@@ -12,6 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 const { stripComments } = require('./lib/strip-comments');
+const { readFilesUtf8, runMain } = require('./lib/read-sources');
 
 const EXEMPT_PREFIXES = [
   'components/admin/',
@@ -63,6 +64,8 @@ const root = path.join(__dirname, '..');
 const PATTERN = /\.toLocale(?:Date|Time)String\s*\(/;
 const offenders = new Map();
 
+const scanned = [];
+
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
@@ -74,41 +77,54 @@ function walk(dir) {
     if (!/\.tsx?$/.test(entry.name)) continue;
     const rel = path.relative(root, full).split(path.sep).join('/');
     if (EXEMPT_PREFIXES.some(p => rel.startsWith(p))) continue;
-
-    const lines = stripComments(fs.readFileSync(full, 'utf8')).split('\n');
-    lines.forEach((line, i) => {
-      if (!PATTERN.test(line)) return;
-      // The option object can span lines; scan a small window for an explicit timeZone.
-      const window = lines.slice(i, i + 6).join('\n');
-      if (/timeZone\s*:/.test(window)) return;
-      if (!offenders.has(rel)) offenders.set(rel, []);
-      offenders.get(rel).push(i + 1);
-    });
+    scanned.push({ full, rel });
   }
 }
 
-for (const top of ['app', 'components', 'lib', 'packages']) {
-  const dir = path.join(root, top);
-  if (fs.existsSync(dir)) walk(dir);
+function scan(rel, content) {
+  // #2560: a file with no `.toLocale` in it is not stripped or split. That cannot hide a hit —
+  // `stripComments` keeps every character's position and only turns characters into whitespace,
+  // so a `.toLocale…String` in the stripped text is the same characters in the raw text.
+  if (!content.includes('.toLocale')) return;
+  const lines = stripComments(content).split('\n');
+  lines.forEach((line, i) => {
+    if (!PATTERN.test(line)) return;
+    // The option object can span lines; scan a small window for an explicit timeZone.
+    const window = lines.slice(i, i + 6).join('\n');
+    if (/timeZone\s*:/.test(window)) return;
+    if (!offenders.has(rel)) offenders.set(rel, []);
+    offenders.get(rel).push(i + 1);
+  });
 }
 
-const newOffenders = [...offenders.keys()].filter(f => !GRANDFATHERED.has(f));
-const fixed = [...GRANDFATHERED].filter(f => !offenders.has(f));
+runMain(async () => {
+  for (const top of ['app', 'components', 'lib', 'packages']) {
+    const dir = path.join(root, top);
+    if (fs.existsSync(dir)) walk(dir);
+  }
 
-if (newOffenders.length > 0) {
-  console.error('toLocaleDateString/toLocaleTimeString without an explicit `timeZone` — this renders in the DEVICE timezone, not the user\'s (CLAUDE.md: Timezone).');
-  console.error('Use formatTimeOfDay/formatInTimeZone from @trainingai/shared/date-utils, or pass { timeZone }:');
-  for (const f of newOffenders) console.error(`  ${f}: line(s) ${offenders.get(f).join(', ')}`);
-  process.exit(1);
-}
+  // Read together, scanned in walk order, so offenders are reported in the order they always were.
+  const contents = await readFilesUtf8(scanned.map(f => f.full));
+  scanned.forEach((f, k) => scan(f.rel, contents[k]));
 
-if (fixed.length > 0) {
-  console.error('These files no longer call toLocale*String without a timeZone — remove them from GRANDFATHERED in this script so they stay fixed:');
-  for (const f of fixed) console.error(`  ${f}`);
-  process.exit(1);
-}
+  const newOffenders = [...offenders.keys()].filter(f => !GRANDFATHERED.has(f));
+  const fixed = [...GRANDFATHERED].filter(f => !offenders.has(f));
 
-console.log(
-  `check-timezone-rendering: no new device-local date/time rendering ` +
-  `(${REVIEWED_BENIGN.size} triaged benign, ${BLOCKED_ON_CLIENT_TZ.size} real but blocked on client-side timezone access — Q-148).`,
-);
+  if (newOffenders.length > 0) {
+    console.error('toLocaleDateString/toLocaleTimeString without an explicit `timeZone` — this renders in the DEVICE timezone, not the user\'s (CLAUDE.md: Timezone).');
+    console.error('Use formatTimeOfDay/formatInTimeZone from @trainingai/shared/date-utils, or pass { timeZone }:');
+    for (const f of newOffenders) console.error(`  ${f}: line(s) ${offenders.get(f).join(', ')}`);
+    process.exit(1);
+  }
+
+  if (fixed.length > 0) {
+    console.error('These files no longer call toLocale*String without a timeZone — remove them from GRANDFATHERED in this script so they stay fixed:');
+    for (const f of fixed) console.error(`  ${f}`);
+    process.exit(1);
+  }
+
+  console.log(
+    `check-timezone-rendering: no new device-local date/time rendering ` +
+    `(${REVIEWED_BENIGN.size} triaged benign, ${BLOCKED_ON_CLIENT_TZ.size} real but blocked on client-side timezone access — Q-148).`,
+  );
+});

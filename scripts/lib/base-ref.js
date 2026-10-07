@@ -411,7 +411,11 @@ function materialiseBaseTree(baseRef, paths) {
     const tar = execFileSync('git', ['archive', baseRef, ...paths], {
       cwd: root, maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'ignore'],
     });
-    execFileSync('tar', ['-x', '-C', dir], { input: tar, stdio: ['pipe', 'ignore', 'ignore'] });
+    // #2560: extract INTO `dir` as the working directory rather than naming it with `-C`. From Git
+    // Bash on Windows, `tar` is Git's GNU tar, which reads `C:\…` as a remote `host:path` and fails
+    // — so this returned `null` there on every run, and every caller silently ran with no base.
+    // `-f -` because GNU tar's default archive is not necessarily stdin; bsdtar accepts it too.
+    execFileSync('tar', ['-x', '-f', '-'], { cwd: dir, input: tar, stdio: ['pipe', 'ignore', 'ignore'] });
     return dir;
   } catch {
     cleanupBaseTree(dir);
@@ -421,6 +425,37 @@ function materialiseBaseTree(baseRef, paths) {
 
 function cleanupBaseTree(dir) {
   if (dir) fs.rmSync(dir, { recursive: true, force: true });
+}
+
+/**
+ * #2560. The base branch's files whose paths pass `keep`, as `path → content` in memory — or `null`
+ * when there is no base, or when any part of it could not be read.
+ *
+ * The same answer `materialiseBaseTree` gives a scan over the whole base, without writing it to
+ * disk: one `git ls-tree` and one `git cat-file --batch` (the #2081 reader) instead of `git archive`,
+ * `tar -x` into a temp directory, a walk and a read of every extracted file, and a recursive delete.
+ * On Windows each of those files is opened twice more and scanned on write, which is most of what
+ * that path cost `check-memo-prop-stability` on every run.
+ *
+ * `null` on ANY unreadable blob, not a partial map, because that is what the archive did: it either
+ * produced the whole tree or failed, and its caller then ran with no base at all, which is STRICT
+ * (see `showAtBase`). A partial map would instead read a missing file as "absent at the base" and
+ * quietly change verdicts. Content is the blob's bytes, as `git show` and the archive gave them for
+ * this repository's `eol=lf` text.
+ */
+function treeFilesAtBase(baseRef, keep) {
+  if (!baseRef) return null;
+  const tree = listTree(baseRef);
+  if (!tree.ok) return null;
+  const wanted = [...tree.entries].filter(([p, e]) => e.type === 'blob' && keep(p));
+  const blobs = readBlobs([...new Map(wanted.map(([, e]) => [e.oid, e.size]))].map(([oid, size]) => ({ oid, size })));
+  const out = new Map();
+  for (const [p, e] of wanted) {
+    const b = blobs.get(e.oid);
+    if (b.content === undefined) return null;
+    out.set(p, b.content);
+  }
+  return out;
 }
 
 /** Line count as the ratchets measure it — `split('\n').length`, i.e. `wc -l` + 1. */
@@ -492,5 +527,5 @@ function verdict({ count, limit, atBase }) {
 module.exports = {
   DEFAULT_BASE_REFS, resolveBaseRef, fileAtBase, filesAtBase, readAtBase, showAtBase,
   lineCountAtBase, lineCountsAtBase, countAtBase, countsAtBase, dirNamesAtBase,
-  materialiseBaseTree, cleanupBaseTree, verdict,
+  materialiseBaseTree, cleanupBaseTree, treeFilesAtBase, verdict,
 };
