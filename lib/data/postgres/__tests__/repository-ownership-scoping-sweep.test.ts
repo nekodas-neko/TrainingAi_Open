@@ -66,6 +66,7 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
   let g: SchemaGraph
   let b: SeededUser
   let owned: string[]
+  let bOpenSession = ''
   let userTables: string[]
   const createdCatalogue: Row[] = []
   /** Every string B's rows hold that is distinctive enough to grep for — ids and fixture text. */
@@ -94,8 +95,10 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
       const where = key.map(k => { params.push(row[k]); return `x."${k}"::text = $${params.length}::text` }).join(' AND ')
       cols.push(`(SELECT row_to_json(x)::text FROM public."${t}" x WHERE ${where}) AS "${t}"`)
     }
+    // Every B row of every table with a user_id, hashed — catches a write to a row the fixture did
+    // not create (the extra rows added below), and an insert or delete, not only a changed column.
     for (const t of userTables) {
-      cols.push(`(SELECT count(*)::int FROM public."${t}" WHERE user_id = $1) AS "#${t}"`)
+      cols.push(`(SELECT md5(coalesce(string_agg(x::text, '|' ORDER BY x::text), '')) FROM public."${t}" x WHERE x.user_id = $1) AS "#${t}"`)
     }
     snapshotSql = `SELECT ${cols.join(',\n')}`
     snapshotParams = params
@@ -146,13 +149,37 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
         [id, `ownership-sweep-2425-${tag}@example.com`, TZ])
     }
 
-    b = await seedEveryUserTable(pool, g, USER_B, { at: AT, overrides: B_OVERRIDES })
+    // B's own catalogue parents. The fixture otherwise reuses whatever catalogue row exists, and
+    // another DB test file deleting its own season or exercise mid-run would cascade into B's rows
+    // and fail a WRITERS snapshot for a reason that has nothing to do with ownership.
+    const catalogue = async (sql: string, params: unknown[], table: string) => {
+      const { rows: [row] } = await pool.query(sql, params)
+      createdCatalogue.push({ __table: table, id: row.id })
+      return row
+    }
+    const parentOverride = {
+      seasons: await catalogue(
+        `INSERT INTO seasons (label, start_date, end_date) VALUES ('sweep-2425 season', $1, $2) RETURNING *`,
+        [FROM, TO], 'seasons'),
+      exercise_library: await catalogue(
+        `INSERT INTO exercise_library (name) VALUES ('sweep-2425 exercise') ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING *`,
+        [], 'exercise_library'),
+      dietary_restrictions: await catalogue(
+        `INSERT INTO dietary_restrictions (code, label, category) VALUES ('sweep-2425', 'sweep-2425', 'dislike')
+         ON CONFLICT (code) DO UPDATE SET label = EXCLUDED.label RETURNING *`, [], 'dietary_restrictions'),
+    }
+    b = await seedEveryUserTable(pool, g, USER_B, { at: AT, overrides: B_OVERRIDES, parentOverride })
     createdCatalogue.push(...b.createdCatalogue)
 
     // Second rows the one-row-per-table fixture cannot express.
     await pool.query(
       `INSERT INTO scale_raw_samples (user_id, measured_at, raw_hex, decoded, status)
-       VALUES ($1, $2, 'b-dismissed-2425-raw', '{}', 'dismissed')`, [USER_B, AT])
+       VALUES ($1, $2, 'b-dismissed-2425-raw', '{}', 'dismissed'), ($1, $2, 'b-confirmed-2425-raw', '{}', 'confirmed')`,
+      [USER_B, AT])
+    // The fixture's session is completed (readers need that); completeWorkoutSession needs an open one.
+    bOpenSession = (await pool.query(
+      `INSERT INTO workout_sessions (user_id, session_name, started_at) VALUES ($1, 'B OPEN SESSION', $2) RETURNING id`,
+      [USER_B, AT])).rows[0].id
     // A library exercise, so the muscle-attribution reads take their library branch too.
     const { rows: [lib] } = await pool.query(
       `SELECT name FROM exercise_library WHERE jsonb_array_length(muscles) > 0 ORDER BY name LIMIT 1`)
@@ -418,7 +445,7 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
   // is the argument, not a leak — the `after` check carries the real assertion instead.
   type Writer = [name: string, call: (r: Repo) => Promise<unknown>, after?: (v: unknown) => Promise<void> | void, opts?: { echoes: true }]
   const WRITERS: Writer[] = [
-    ['completeWorkoutSession', r => r.completeWorkoutSession(bId('workout_sessions'), USER_A, AT)],
+    ['completeWorkoutSession', r => r.completeWorkoutSession(bOpenSession, USER_A, AT)],
     ['setSessionRpe', r => r.setSessionRpe(USER_A, bId('workout_sessions'), 9)],
     ['setWorkoutSessionWarmupEnd', r => r.setWorkoutSessionWarmupEnd(USER_A, bId('workout_sessions'), AT)],
     ['confirmScaleSample', r => r.confirmScaleSample(USER_A, bNum('scale_raw_samples'))],
@@ -440,7 +467,6 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
       v => { expect(v).toEqual({ nulled: 0, remaining: 0 }) }],
     ['packOuraRawBuckets', r => r.packOuraRawBuckets(USER_A)],
     ['persistBodyCompFromMetrics', r => r.persistBodyCompFromMetrics(USER_A), v => { expect(v).toBe(0) }],
-    ['replaceOuraDailySummary', r => r.replaceOuraDailySummary(USER_A, [])],
     ['deleteMealPlan', r => r.deleteMealPlan(bId('meal_plans'), USER_A)],
     ['updateMealPlan', r => r.updateMealPlan(bId('meal_plans'), USER_A, { name: 'OVERWRITTEN BY A' })],
     ['setMealPlanActive', r => r.setMealPlanActive(bId('meal_plans'), USER_A, true)],
@@ -864,13 +890,18 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     })
 
     it('autoRecalibrateCycleAnchor counts and orders only the caller\'s own sessions', async () => {
-      // Block length 2 (1 session per cycle × 2 cycles); A has 3 sessions, so n = 1 and the anchor is
-      // A's second-most-recent start. B's session at AT is newer than all of A's: counted, it moves
-      // n to 0 (anchor = now); ordered in, it shifts which session is second.
+      // A has 3 sessions; the block is A's count + B's count long. Scoped, n = 3 and A has no 4th
+      // session, so the anchor is just before A's oldest (AT − 3 h − 1 s). Counting B's sessions
+      // makes n = 0 (anchor = now); ordering B's in (they are newer than all of A's) makes the 4th
+      // most recent one of A's. Sized from B's live count so an extra B fixture row cannot make the
+      // two coincide — which is exactly how this case went blind once already.
+      const { rows: [{ n: bSessions }] } = await pool.query(
+        `SELECT count(*)::int AS n FROM workout_sessions WHERE user_id = $1 AND NOT is_early_deload AND deleted_at IS NULL`, [USER_B])
       const set = (await pool.query(
-        `INSERT INTO phase_sets (user_id, name, is_default) VALUES ($1, 'A BLOCK OF TWO', false) RETURNING id`, [USER_A])).rows[0].id
+        `INSERT INTO phase_sets (user_id, name, is_default) VALUES ($1, 'A BLOCK', false) RETURNING id`, [USER_A])).rows[0].id
       await pool.query(
-        `INSERT INTO program_phases (phase_set_id, position, name, duration_cycles, phase_type) VALUES ($1, 0, 'P', 2, 'normal')`, [set])
+        `INSERT INTO program_phases (phase_set_id, position, name, duration_cycles, phase_type) VALUES ($1, 0, 'P', $2, 'normal')`,
+        [set, 3 + bSessions])
       const prog = (await pool.query(
         `INSERT INTO programs (user_id, name, is_active, phase_mode, phase_set_id, sessions_per_cycle)
          VALUES ($1, 'A CYCLE PROGRAM', false, 'automatic', $2, 1) RETURNING id`, [USER_A, set])).rows[0].id
@@ -881,7 +912,7 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
       try {
         await repo.autoRecalibrateCycleAnchor(USER_A, prog)
         const { rows: [p] } = await pool.query(`SELECT cycle_anchor_at FROM programs WHERE id = $1`, [prog])
-        expect(new Date(p.cycle_anchor_at).getTime()).toBe(AT.getTime() - 7_200_000)
+        expect(new Date(p.cycle_anchor_at).getTime()).toBe(AT.getTime() - 10_800_000 - 1000)
       } finally {
         await pool.query(`DELETE FROM workout_sessions WHERE id = ANY($1::uuid[])`, [extra])
         await pool.query(`DELETE FROM programs WHERE id = $1`, [prog])

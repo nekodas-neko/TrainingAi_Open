@@ -27,7 +27,10 @@
 //   --test <path>          test file(s) to run, comma-separated
 //                          (default: both repository-ownership-scoping*.test.ts files)
 //   --json <path>          write the full result list as JSON
-//   --survivors-of <path>  only re-run the predicates that survived in an earlier --json file
+//   --survivors-of <path>  only re-run the predicates that survived in an earlier --json file.
+//                          Fast, and blind to regressions: a fixture change that makes an earlier
+//                          KILL survive is never re-run. It cost #2425 two predicates. Always finish
+//                          with a full run before quoting a number.
 //
 // Source files are never written: the mutation is applied by a vitest transform plugin
 // (vitest.config.mjs). A green run only counts as a survivor if the plugin confirms it applied the
