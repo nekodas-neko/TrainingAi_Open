@@ -42,6 +42,6 @@ describe("hrEmptyMessage", () => {
   });
 
   it("keeps the worn/synced message for a completed session with no readings", () => {
-    expect(hrEmptyMessage("none")).toBe("No HR data — ensure Oura was worn and synced");
+    expect(hrEmptyMessage("none")).toBe("No HR data for this workout yet");
   });
 });

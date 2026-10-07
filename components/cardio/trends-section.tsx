@@ -2,6 +2,7 @@
 
 import { memo, useState } from 'react'
 import dynamic from 'next/dynamic'
+import { noHrDataCopy } from '@/components/health/hr-source-copy'
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { CARDIO_TRENDS_TTL } from '@trainingai/shared/cache-ttl'
 import { zoneStacksUnmeasured, type WeeklyZoneStack, type EfficiencyPoint, type CadenceTrendPoint } from '@trainingai/shared/health/cardio-trends'
@@ -72,7 +73,7 @@ export const CardioTrendsSection = memo(function CardioTrendsSection() {
       ) : view === 'zones' ? (
         zoneStacksUnmeasured(data.weeklyZoneStacks, data.hasHrSource) ? (
           <p className="py-6 text-center text-xs text-muted-foreground">
-            No heart-rate data yet — wear the ring or strap during a workout.
+            {noHrDataCopy(data.hasHrSource, 'workout')}
           </p>
         ) : data.weeklyZoneStacks.length > 0 ? (
           <ZoneStackChart weeks={data.weeklyZoneStacks} />

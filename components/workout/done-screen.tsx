@@ -495,8 +495,8 @@ export function DoneScreen({
                 {hrLoading
                   ? 'Loading HR data…'
                   : hrAttempted
-                    ? 'No HR data for this session — wear the chest strap (or the ring) during the workout; ring data arrives via its background sync'
-                    : 'Tap Load to check for ring HR data from this workout'}
+                    ? 'No HR data for this session yet. A chest strap, a ring or Health Connect records it; ring data can arrive later through its background sync'
+                    : 'Tap Load to check for HR data from this workout'}
               </p>
             )}
           </div>

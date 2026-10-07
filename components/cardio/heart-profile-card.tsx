@@ -2,7 +2,7 @@
 
 import { memo } from 'react'
 import type { HrProfile } from '@trainingai/shared/health/hr-profile'
-import { maxHrSourceNote, restingHrSourceNote } from '@/components/health/hr-source-copy'
+import { maxHrSourceNote, noHrDataCopy, restingHrSourceNote } from '@/components/health/hr-source-copy'
 
 interface Props {
   restingHr: number
@@ -15,6 +15,8 @@ interface Props {
   /** LA-82 — `/api/cardio-week` sends both; absent on a payload cached before it did. */
   maxHrSource?: HrProfile['maxHrSource']
   restingHrSource?: HrProfile['restingHrSource']
+  /** #2338 — `false` only when nothing has recorded this person's heart rate (`hasHrSource`). */
+  hasHrSource?: boolean | null
 }
 
 function DeltaLabel({ deltaBpm }: { deltaBpm: number | null }) {
@@ -41,7 +43,7 @@ function Tile({ value, label, deltaBpm }: { value: string; label: string; deltaB
   )
 }
 
-function HeartProfileCardImpl({ restingHr, restingHrDeltaBpm, avgHr, avgHrDeltaBpm, maxHr, maxHrDeltaBpm, isReliable, maxHrSource, restingHrSource }: Props) {
+function HeartProfileCardImpl({ restingHr, restingHrDeltaBpm, avgHr, avgHrDeltaBpm, maxHr, maxHrDeltaBpm, isReliable, maxHrSource, restingHrSource, hasHrSource }: Props) {
   // LA-82. A zone quota measured against a stand-in max or resting HR has to say so — until now
   // both substitutions were silent, which is the quiet wrong answer the owner ruled out.
   const maxNote = maxHrSourceNote(maxHrSource)
@@ -71,7 +73,7 @@ function HeartProfileCardImpl({ restingHr, restingHrDeltaBpm, avgHr, avgHrDeltaB
           that is being built, and a value that could not be READ is a different thing to say. */}
       {!isReliable && standIns.length === 0 && (
         <p className="mt-2.5 text-[11px] leading-snug text-[color:var(--muted-foreground)]">
-          Still learning your range — wear your ring or strap for a few more days.
+          {noHrDataCopy(hasHrSource, 'range')}
         </p>
       )}
     </div>
