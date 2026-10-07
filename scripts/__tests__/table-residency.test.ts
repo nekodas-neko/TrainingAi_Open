@@ -9,7 +9,10 @@ const L = require('../lib/table-residency')
  * gone — and does not fail on the idioms the real migrations use.
  */
 
-const list = () => ({
+type Entry = { class: string; note?: string; mirrors?: string }
+type List = Record<'postgres' | 'local' | 'native', Record<string, Entry>>
+
+const list = (): List => ({
   postgres: {
     food_logs: { class: 'DEVICE-FIRST', note: 'n' },
     programs: { class: 'SERVER-FIRST MIRROR', note: 'n' },
@@ -77,7 +80,7 @@ describe('findProblems', () => {
 
   it('fails on a mirrored Postgres class that no local table mirrors', () => {
     const l = list()
-    delete (l.local as Record<string, unknown>).local_programs
+    delete l.local.local_programs
     const c = code()
     c.local = c.local.filter(t => t !== 'local_programs')
     expect(L.findProblems(c, l)).toEqual([
