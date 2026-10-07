@@ -49,7 +49,7 @@ export type PullFlag = (typeof PULL_FLAGS)[number]
 export const LOCAL_ACTIONS = [
   'deleteSupplement', 'upsertSupplementLog', 'upsertPlanMealAnswer', 'updateExerciseLogLocally',
   'deleteFoodLog', 'deleteInjury', 'deleteSupplementLog', 'softDeleteActivityLogPending',
-  'queueMutation',
+  'queueMutation', 'upsertManualSleepLocally',
 ] as const
 export type LocalAction = (typeof LOCAL_ACTIONS)[number]
 

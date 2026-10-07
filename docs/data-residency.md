@@ -225,7 +225,7 @@ the code. Do not edit between the markers; CI compares this block with a fresh r
 | `session_periodization` | SERVER-ONLY | — | — | exported | cascade | program structure (not mirrored); writer: periodization.ts, programs.ts |
 | `set_hr_stats` | SERVER-ONLY | — | — | exported | cascade | derived (server rollup); writer: oura.ts |
 | `set_logs` | DEVICE-FIRST | `set_logs` | yes | exported | cascade | local write + outbox push + delta pull |
-| `sleep_sessions` | SERVER-FIRST MIRROR | `sleep_sessions` | — | exported | cascade | server writes (BLE rollup deletes and reinserts a re-rolled night; Health Connect sync); delta pull fills the mirror, read local-first for first paint. The sleep_session push branch has no device producer (#2292); manual_bedtime edits one column through the outbox. Server hard delete, no tombstone: see Findings |
+| `sleep_sessions` | SERVER-FIRST MIRROR | `sleep_sessions` | — | exported | cascade | server writes (BLE rollup deletes and reinserts a re-rolled night; Health Connect sync); delta pull fills the mirror, read local-first for first paint. The sleep_session push branch has no device producer (#2292); manual_bedtime edits one column through the outbox; manual_sleep (#2338) is a user-entered night (manual_entry=true) written locally + pushed, losing to any device night on read. Server hard delete, no tombstone: see Findings |
 | `sleep_verdicts` | SERVER-ONLY | — | — | exported | cascade | derived (model verdict); writer: adapter.ts |
 | `step_live_windows` | SERVER-ONLY | — | — | exported | cascade | sensor ingest -> server; writer: adapter.ts |
 | `strap_status` | SERVER-ONLY | — | — | excluded (ops) | cascade | sensor ingest -> server; writer: adapter.ts |

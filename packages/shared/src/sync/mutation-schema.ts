@@ -27,6 +27,11 @@ export const SYNCED_MUTATION_DOMAINS = [
   // branch calls the same function its web route does (`lib/workout/exercise-log-edits.ts`,
   // `lib/workout/delete-session.ts`).
   'exercise_log_edit', 'exercise_log_delete', 'workout_session_delete',
+  // #2338. A whole night the user entered by hand (bed time → wake time), stored as its own row with
+  // `manual_entry = true`. Distinct from `manual_bedtime` (one field on a measured night) and from
+  // `sleep_session` (a night the ring measured). Payload is `{ id, sleepStart, sleepEnd }`; the server
+  // derives the wake date and calls the same write as `POST /api/sleep-sessions/manual`.
+  'manual_sleep',
 ] as const
 
 export type SyncedMutationDomain = (typeof SYNCED_MUTATION_DOMAINS)[number]

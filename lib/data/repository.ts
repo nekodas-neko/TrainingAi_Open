@@ -779,6 +779,18 @@ export interface WorkoutRepository {
    *  estimate — see `docs/reviews/2026-08-26-manual-bedtime-write-audit.md` for why it is its own
    *  column rather than a `manual`-ranked write to `sleep_start`. */
   setManualSleepStart(userId: string, date: string, at: Date | null): Promise<boolean>
+  /**
+   * #2338 — store a night the user entered by hand (`manual_entry = true`). The natural key is
+   * (user, wake date): a second entry for the same night EDITS the first, never adds a row, so a
+   * replayed outbox mutation or a double-tapped save is a no-op. The row id is `night.id` when the
+   * row is new (the device's local id, so the mirror stays one row) and the existing id otherwise.
+   *
+   * `shadowed` is true when a device night already covers it — the entry is kept, but every reader
+   * uses the device night (`preferDeviceNights`). `id` is null only when a device row starts at the
+   * very same instant: that row IS the night, measured, so nothing is stored. Throws on an id that
+   * already belongs to another row.
+   */
+  saveManualSleepNight(userId: string, night: import('@trainingai/shared/health/manual-sleep').ManualSleepNight): Promise<{ id: string | null; shadowed: boolean }>
   listMoodLogs(userId: string, from: string, to: string): Promise<MoodLog[]>
   incrementWaterLog(userId: string, date: string, ml: number): Promise<void>
   /** Q-481 — the same increment, applied at most once per outbox mutation id. Returns false when

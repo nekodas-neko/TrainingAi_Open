@@ -78,6 +78,76 @@ export function recordsSleep(durationHours: number | null | undefined): boolean 
   return durationHours != null && durationHours > 0
 }
 
+/** The fields {@link preferDeviceNights} reads. A server `SleepSession` (Date windows) and a local
+ *  store row (ISO-string windows, null before SQLite v50) both satisfy it. */
+export interface RankableSleepRow {
+  date: string
+  sleepStart: Date | string | null
+  sleepEnd: Date | string | null
+  durationHours?: number | null
+  /** #2338 — true on a night the user entered by hand. Absent or false is a device night. */
+  manualEntry?: boolean | null
+  updatedAt?: Date | string | null
+}
+
+const instantMs = (v: Date | string | null | undefined): number | null => {
+  if (v == null) return null
+  const ms = (v instanceof Date ? v : new Date(v)).getTime()
+  return Number.isFinite(ms) ? ms : null
+}
+
+/**
+ * **The ranked source merge for whole nights (#2338): a night the user typed in loses to any device
+ * night for the same sleep.** The owner's condition when he approved manual entry (2026-10-05).
+ *
+ * Every row-level reader goes through this before it groups, merges or scores — the server's
+ * `listSleepSessions` and the device's `getSleepSessions` both return its output — so a manual night
+ * reaches a consumer only when no device saw that night. It cannot be left to the night pickers
+ * downstream: `groupSleepPeriods` would treat a typed 23:00-07:00 and a measured 23:20-06:40 as two
+ * fragments of one night and SUM them into a 15-hour night, and `mergeByDate` adds same-source rows
+ * the same way (a manual row and a Health Connect row both have a null `ouraId`).
+ *
+ * A manual row is dropped when a device row that records sleep
+ * - **overlaps its window** — the device saw part of the very sleep the user describes. It wins even
+ *   when it saw only part of it: the owner's rule is "device data wins", and a remembered bedtime for
+ *   a night the ring caught late has its own field (`manualSleepStart`, Q-519);
+ * - **is on the same wake date and is a night on any clock** — at least
+ *   {@link ALWAYS_NIGHT_MIN_HOURS}, the classifier's own bar, so a short daytime nap on that date
+ *   does not erase the night the user entered; or
+ * - **is on the same wake date and has no window** — a local row pulled before SQLite v50 cannot be
+ *   placed, and a device row of unknown shape still outranks a typed one.
+ *
+ * Deliberately timezone-free, so the two repositories can apply it without loading the user. And it
+ * is not `SOURCE_RANK`: that ladder ranks `manual` HIGHEST, because it is about a user correcting one
+ * measured field — the opposite question.
+ *
+ * Two manual rows for one date (two devices that each entered the night before either synced; the
+ * server's unique index stops it there) keep only the newest by `updatedAt`. Order is preserved.
+ */
+export function preferDeviceNights<T extends RankableSleepRow>(rows: readonly T[]): T[] {
+  const devices = rows.filter(r => !r.manualEntry && recordsSleep(r.durationHours))
+  const newestManualByDate = new Map<string, T>()
+  for (const r of rows) {
+    if (!r.manualEntry) continue
+    const incumbent = newestManualByDate.get(r.date)
+    if (!incumbent || (instantMs(r.updatedAt) ?? 0) >= (instantMs(incumbent.updatedAt) ?? 0)) {
+      newestManualByDate.set(r.date, r)
+    }
+  }
+  const shadowed = (m: T): boolean => {
+    const ms = instantMs(m.sleepStart)
+    const me = instantMs(m.sleepEnd)
+    return devices.some(d => {
+      const ds = instantMs(d.sleepStart)
+      const de = instantMs(d.sleepEnd)
+      if (ds == null || de == null) return d.date === m.date
+      if (ms != null && me != null && ds < me && de > ms) return true
+      return d.date === m.date && (d.durationHours ?? 0) >= ALWAYS_NIGHT_MIN_HOURS
+    })
+  }
+  return rows.filter(r => !r.manualEntry || (newestManualByDate.get(r.date) === r && !shadowed(r)))
+}
+
 /** {@link recordsSleep} for a whole window. */
 function hasSleep(w: SleepWindow): boolean {
   return recordsSleep(w.durationHours)

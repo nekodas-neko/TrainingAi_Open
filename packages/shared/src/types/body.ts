@@ -191,4 +191,11 @@ export interface SleepSession {
    * is a different quantity, so it never enters that merge.
    */
   manualSleepStart?: Date | null     // migration 233
+  /**
+   * #2338 — a night the user ENTERED (bed time → wake time), not one a device measured. Distinct from
+   * `manualSleepStart`, which corrects one field of a measured night. `listSleepSessions` drops a
+   * manual night whenever a device recorded the same night (`preferDeviceNights`), so a consumer only
+   * ever sees one where nothing measured it.
+   */
+  manualEntry?: boolean
 }

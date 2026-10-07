@@ -31,6 +31,12 @@ export type SleepRow = {
    * reads it back from here. Optional so a payload from before it existed still parses (#2264).
    */
   manualSleepStart?: string | null;
+  /**
+   * #2338 — the night was entered by hand. Only ever true on a night no device recorded: both
+   * repositories drop a manual night a device night covers (`preferDeviceNights`) before this row is
+   * built. Optional so a payload from before it existed still parses. Lets a screen say whose night it is.
+   */
+  manualEntry?: boolean;
 };
 
 // Contiguity threshold for treating two same-date rows as one sleep period. Midnight-split
@@ -185,6 +191,7 @@ export function localSleepRowsAsNights(local: readonly LocalSleepSession[]): Sle
       sleepStart: l.sleepStart, sleepEnd: l.sleepEnd,
       sleepTimeRecommendation: null,
       manualSleepStart: l.manualSleepStart,
+      manualEntry: l.manualEntry,
     };
     const list = byDate.get(row.date) ?? [];
     list.push(row);

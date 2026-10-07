@@ -494,6 +494,7 @@ export async function upsertOuraSleep(db: Db, userId: string, sessions: OuraSlee
   // to "newer non-null wins": `keepLatestNonNull` is that arm, applied before `initialSourceMap`
   // reads the merged values.
   const collapsed = collapseOnConflict(sessions, r => r.sleepStart.getTime(), keepLatestNonNull)
+  const merged = mergeSet('sleep_sessions', OURA_SLEEP_SOURCE_COLS, source)
   await db
     .insert(s.sleepSessions)
     .values(collapsed.map(r => {
@@ -527,7 +528,17 @@ export async function upsertOuraSleep(db: Db, userId: string, sessions: OuraSlee
     .onConflictDoUpdate({
       target: [s.sleepSessions.userId, s.sleepSessions.sleepStart],
       set: {
-        ...mergeSet('sleep_sessions', OURA_SLEEP_SOURCE_COLS, source),
+        ...merged,
+        // #2338. A device night that starts at the very instant a typed-in night does IS that night,
+        // measured, and a device night always wins over a typed one. The manual row carries no
+        // `source_map`, so every field the device sends already wins the rank merge above; these
+        // take over the three a typed night set that the merge does not rank (its date, its end and
+        // its time in bed) and stop the row reading as manual. Device rows are unaffected: the CASE
+        // keeps their stored value.
+        date:           sql.raw(`CASE WHEN sleep_sessions.manual_entry THEN EXCLUDED.date ELSE sleep_sessions.date END`),
+        sleepEnd:       sql.raw(`CASE WHEN sleep_sessions.manual_entry THEN EXCLUDED.sleep_end ELSE sleep_sessions.sleep_end END`),
+        timeInBedHours: sql`CASE WHEN sleep_sessions.manual_entry THEN EXCLUDED.time_in_bed_hours ELSE ${merged.timeInBedHours} END`,
+        manualEntry:    sql`false`,
         updatedAt: sql`NOW()`,
       },
     })

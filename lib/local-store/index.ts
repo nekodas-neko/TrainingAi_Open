@@ -1,6 +1,6 @@
 import { isSQLiteAvailable, isLocalStoreDead, runSQL, querySQL } from '@/lib/sqlite/sqlite-service';
 import type {
-  LocalBodyMetric, LocalMoodLog, LocalSleepSession, LocalWorkoutSession,
+  LocalBodyMetric, LocalMoodLog, LocalSleepSession, LocalManualSleepNight, LocalWorkoutSession,
   LocalActivityLog, LocalFitnessTest, LocalPrescribedRun, LocalProgram, LocalProgressionStyle, PendingMutation,
   LocalFoodLog, LocalFoodItem, LocalDayCheckin, LocalSupplement, LocalSupplementLog, LocalSupplementVial, LocalInjury,
   LocalExerciseLog, LocalSetLog, LocalPersonalRecord, LocalOuraDaily,
@@ -132,6 +132,18 @@ export interface LocalStore {
   /** Confirm a queued `manual_bedtime` mutation: the row goes back to `synced` unless another
    *  bedtime for that night is still queued behind it. `confirmingIds` is the batch being confirmed. */
   markManualBedtimeSynced(date: string, confirmingIds?: string[]): Promise<void>;
+  /**
+   * #2338. A night the user entered by hand, written to the local `sleep_sessions` mirror as
+   * `manual_entry = 1` and `pending` in the same turn as its queued `manual_sleep` mutation, so it
+   * reads back at once, offline, and a pull landing before the push cannot revert it. One manual
+   * night per date, as on the server: when the date already has one, that row is edited and keeps its
+   * id. **Returns the id it wrote** — the caller queues the mutation with it, so the server row and
+   * this row stay one row. Never touches a device row.
+   */
+  upsertManualSleepLocally(night: LocalManualSleepNight): Promise<string>;
+  /** Confirm a queued `manual_sleep` mutation: the row goes back to `synced` unless another edit of
+   *  the same night is still queued behind it. `confirmingIds` is the batch being confirmed. */
+  markManualSleepSynced(id: string, confirmingIds?: string[]): Promise<void>;
   markOuraDailySummarySynced(day: string): Promise<void>;
   markOuraDailyDerivedSynced(day: string): Promise<void>;
   // D2 prep (Phase-1 Task 1): reads let anything local-first read Oura's device-computed

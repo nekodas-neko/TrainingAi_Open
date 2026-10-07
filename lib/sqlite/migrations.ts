@@ -396,6 +396,8 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'sleep_sessions', column: 'sleep_start',       ddl: `ALTER TABLE sleep_sessions ADD COLUMN sleep_start TEXT` },
   { table: 'sleep_sessions', column: 'sleep_end',         ddl: `ALTER TABLE sleep_sessions ADD COLUMN sleep_end TEXT` },
   { table: 'sleep_sessions', column: 'awake_hours',       ddl: `ALTER TABLE sleep_sessions ADD COLUMN awake_hours REAL` },
+  // #2338 (v51). A night the user entered by hand; 0 on every existing row, which is what they are.
+  { table: 'sleep_sessions', column: 'manual_entry',      ddl: `ALTER TABLE sleep_sessions ADD COLUMN manual_entry INTEGER NOT NULL DEFAULT 0` },
   // oura_daily gains sync_status so the applyDelta pull can clobber-guard a device-authored
   // (BLE rollup) row against a stale server pull — the D4 finding. Default 'synced' (existing
   // rows are server-mirrored); the device-write path that sets 'pending' lands with D2.
@@ -1724,6 +1726,18 @@ export const MIGRATIONS: UpgradeStatement[] = [
       `ALTER TABLE sleep_sessions ADD COLUMN sleep_start TEXT`,
       `ALTER TABLE sleep_sessions ADD COLUMN sleep_end TEXT`,
       `ALTER TABLE sleep_sessions ADD COLUMN awake_hours REAL`,
+    ],
+  },
+  {
+    // #2338, mirroring Postgres migration 202610071309. Whether a night was entered by hand, so the
+    // device can let a ring or Health Connect night win over it exactly as the server does
+    // (`preferDeviceNights`). Same shape as v50: the ALTER reaches fresh installs and upgraded
+    // devices alike, RECONCILE_COLUMNS covers a half-applied upgrade. NOT NULL DEFAULT 0, so every
+    // row already on the device reads as the device night it is. No unique index here: the server's
+    // partial key is the authority, and `upsertManualSleepLocally` edits the date's existing row.
+    toVersion: 51,
+    statements: [
+      `ALTER TABLE sleep_sessions ADD COLUMN manual_entry INTEGER NOT NULL DEFAULT 0`,
     ],
   },
 ];

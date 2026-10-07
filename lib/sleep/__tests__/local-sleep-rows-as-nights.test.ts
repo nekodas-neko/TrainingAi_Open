@@ -11,7 +11,7 @@ const local = (o: Partial<LocalSleepSession> & { id: string; date: string }): Lo
   sleepStart: null, sleepEnd: null, awakHours: null,
   ouraId: null, efficiency: null, onsetLatencySec: null, averageHrvMs: null, avgHeartRate: null,
   lowestHeartRate: null, restlessPeriods: null, sleepScore: null, respiratoryRate: null,
-  sleepPhase5Min: null, timeInBedHours: null, manualSleepStart: null,
+  sleepPhase5Min: null, timeInBedHours: null, manualSleepStart: null, manualEntry: false,
   syncStatus: 'synced', updatedAt: '2026-09-03T21:00:00.000Z',
   ...o,
 })

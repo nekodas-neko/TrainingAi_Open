@@ -42,7 +42,7 @@ const pulled: LocalSleepSession = {
   lightSleepHours: 4.3, sleepStart: '2026-10-05T12:16:00.000Z', sleepEnd: '2026-10-05T20:21:00.000Z',
   awakHours: 0.4, ouraId: 'ble:1', efficiency: 90, onsetLatencySec: 600, averageHrvMs: 50,
   avgHeartRate: 55, lowestHeartRate: 48, restlessPeriods: 10, sleepScore: 80, respiratoryRate: 14,
-  sleepPhase5Min: '1122334411', timeInBedHours: 8.1, manualSleepStart: null,
+  sleepPhase5Min: '1122334411', timeInBedHours: 8.1, manualSleepStart: null, manualEntry: false,
   syncStatus: 'synced', updatedAt: UPDATED,
 }
 
