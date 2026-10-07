@@ -1,7 +1,10 @@
-// PS-33: `scale_raw_samples` has no unique key — migration 157's two indexes are both non-unique —
+// PS-33: `scale_raw_samples` had no unique key — migration 157's two indexes are both non-unique —
 // so a byte-identical re-send inserted a second archive row, unlike `oura_raw_samples`, which
 // dedups on (user, timestamp, tag, body_hex). The trend survived it (lowest-wins picks the same
 // number twice) but the archive double-counted the weigh-in.
+//
+// LA-71 (#2196) replaced PS-33's select-then-insert with a unique index and ON CONFLICT DO NOTHING,
+// so the same re-send now dedups at the constraint — including two posts in flight at once.
 //
 // Runs only against a real local dev Postgres — skips cleanly in CI without DATABASE_URL.
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
@@ -61,6 +64,47 @@ describe.skipIf(!canRun)('scale_raw_samples — a re-sent reading does not doubl
     // client confirms it by the id this returns, so a skipped insert that returned a new or null
     // id would break confirm rather than dedup it.
     expect(second.id).toBe(first.id)
+  })
+
+  it('a post that races another in-flight post of the same bytes archives once and gets its id', async () => {
+    // The case the pre-check could not close, made deterministic rather than hoped for: the other
+    // post has inserted but not committed, so a select cannot see its row. The pre-check would
+    // insert anyway and, with the index in place, die on 23505; without it, archive twice.
+    const other = await pool.connect()
+    try {
+      await other.query('BEGIN')
+      const { rows: [theirs] } = await other.query<{ id: string }>(
+        `INSERT INTO scale_raw_samples (user_id, measured_at, raw_hex, decoded, status)
+         VALUES ($1, $2, $3, '{}', 'confirmed') RETURNING id`, [TEST_USER_ID, MEASURED_AT, RAW_HEX])
+
+      const mine = insert(TEST_USER_ID)
+      // Commit only once this call is actually waiting on the other row's lock.
+      for (let i = 0; i < 200; i++) {
+        const { rows } = await pool.query(
+          `SELECT 1 FROM pg_stat_activity
+            WHERE datname = current_database() AND wait_event_type = 'Lock'
+              AND query ILIKE 'insert into "scale_raw_samples"%'`)
+        if (rows.length > 0) break
+        await new Promise(r => setTimeout(r, 10))
+      }
+      await other.query('COMMIT')
+
+      expect((await mine).id).toBe(Number(theirs.id))
+      expect(await rowCount()).toBe(1)
+    } finally {
+      other.release()
+    }
+  })
+
+  it('a re-send leaves the archived row as it was, status included', async () => {
+    // A pending reading the user has not answered yet is re-sent as `confirmed` — the stored answer
+    // must not be overwritten by the re-send, as the pre-check never overwrote it either.
+    const first = await insert(TEST_USER_ID, { status: 'pending' })
+    const again = await insert(TEST_USER_ID, { status: 'confirmed' })
+
+    expect(again.id).toBe(first.id)
+    const { rows } = await pool.query(`SELECT status FROM scale_raw_samples WHERE id = $1`, [first.id])
+    expect(rows[0].status).toBe('pending')
   })
 
   it('a different instant or different bytes is a different reading', async () => {
