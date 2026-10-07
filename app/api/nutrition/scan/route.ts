@@ -2,7 +2,7 @@ import type { ScanOrigin } from '@trainingai/shared/types/nutrition'
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { generateObject } from 'ai'
-import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
+import { aiModel, loggedGenerateObject, bytesKey } from '@/lib/ai/instrument'
 import { rateLimit } from '@/lib/rate-limit'
 import { readJsonLimited, isAllowedImageMime } from '@trainingai/shared/http/request-guards'
 import { reportServerError } from '@/lib/observability'
@@ -185,7 +185,7 @@ Rules:
         // `imageBuffer.byteLength` is the DECODED image, not the base64 the client sent — the wire
         // cost is ~4/3 of it. The decoded size is the honest one to store: it is what the upload
         // actually represents, and the base64 inflation is a constant anyone can apply.
-        { section: 'nutrition-scan', userId: session.user.id, fingerprint: { mode: 'image', imageKind, note: userNote }, payloadBytes: imageBuffer.byteLength },
+        { section: 'nutrition-scan', userId: session.user.id, fingerprint: { mode: 'image', imageKind, note: userNote, image: bytesKey(imageBuffer) }, payloadBytes: imageBuffer.byteLength },
         signal => generateObject({
           model: aiModel(),
           schema: ScanSchema,
