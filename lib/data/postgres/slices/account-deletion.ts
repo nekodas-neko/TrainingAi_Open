@@ -32,6 +32,9 @@ export const OUTSIDE_THE_CASCADE: Record<string, { disposition: 'anonymised' | '
   // A custom exercise is already in the catalogue every account reads, and other accounts' programs
   // and logs may name it. SET NULL by its FK (migration 202610060645).
   exercise_library: { disposition: 'anonymised', how: 'created_by SET NULL; the exercise stays in the shared catalogue' },
+  // #2381. The record of what an agent did to their data must outlive them, and the table is
+  // append-only (its trigger lets the FK unlink a row and nothing else). Holds no personal data.
+  agent_action_log: { disposition: 'anonymised', how: 'target_user_id SET NULL by its FK; job, actor, approval link, times and counts stay' },
 
   // Owner, 2026-09-24: purged, because `sql_text` can carry the user's data and nulling a column
   // does not anonymise a payload. It has no user column, so "theirs" is defined below.

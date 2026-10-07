@@ -145,6 +145,12 @@ const VIA = {
   // only FK there is, so there is no second path to choose wrongly.
   blood_analytes:         t => `EXISTS (SELECT 1 FROM public.blood_panels bp WHERE bp.id = ${t}.panel_id AND bp.user_id = $OWNER)`,
   users:                  t => `${t}.id = $OWNER`,
+  // #2381. An ops log, not health data, but a run can target ONE account and its parameters name
+  // that account's dates and ids, so the rule that every view is row-scoped still holds: the
+  // owner's runs plus the global ones (VACUUM, target NULL), never a run on another account. A row
+  // whose account was deleted is unlinked (SET NULL) and shows as global; the migration keeps
+  // personal data out of `parameters` for exactly that reason.
+  agent_action_log:       t => `${t}.target_user_id IS NULL OR ${t}.target_user_id = $OWNER`,
   friendships:            t => `${t}.requester_id = $OWNER OR ${t}.addressee_id = $OWNER`,
 }
 

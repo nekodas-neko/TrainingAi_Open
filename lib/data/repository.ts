@@ -1385,6 +1385,18 @@ export interface WorkoutRepository {
   /** Closes a job whose process died mid-run — otherwise the one-at-a-time index blocks every
    *  future redecode forever. */
   reapStaleRedecodeJobs(userId: string): Promise<number>
+
+  // #2381 — the agent action log (`agent_action_log`). Append-only: a run is started, finished once,
+  // and read. There is no update or delete, and the table's trigger refuses both. Not user-scoped:
+  // `targetUserId` is the account a job ran on (null = global), set by admin-only routes.
+  /** Records a run as `running`. `parameters` is redacted (`redactActionParameters`) on the way in. */
+  startAgentAction(input: import('./postgres/slices/agent-actions').StartAgentActionInput): Promise<import('./postgres/slices/agent-actions').AgentActionRecord>
+  /** Finishes a running run. Null when no such row exists or it has already finished; a finished
+   *  row never changes again. */
+  finishAgentAction(id: string, result: import('./postgres/slices/agent-actions').FinishAgentActionInput): Promise<import('./postgres/slices/agent-actions').AgentActionRecord | null>
+  getAgentAction(id: string): Promise<import('./postgres/slices/agent-actions').AgentActionRecord | null>
+  /** Newest first; default 50 rows, at most 500. */
+  listAgentActions(filter?: import('./postgres/slices/agent-actions').ListAgentActionsFilter): Promise<import('./postgres/slices/agent-actions').AgentActionRecord[]>
   listOuraTags(userId: string, startDay: string, endDay: string): Promise<OuraTagRow[]>
 
   // ── Body Battery (daily snapshots for model tuning) ──────────────────────────

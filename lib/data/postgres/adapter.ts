@@ -108,6 +108,7 @@ import { nodeModelRuntime } from '@/lib/oura-models/inference/runtime-node'
 import { ensureServerOuraConstants } from '@/lib/oura-models/constants-inject'
 import { packOuraRawBuckets, countPackableBuckets, claimAutoPackSlot, AUTOPACK_MAX_BUCKETS } from './slices/oura-raw-pack'
 import * as bodyBattery from './slices/body-battery'
+import * as agentActions from './slices/agent-actions'
 import * as accountDeletion from './slices/account-deletion'
 import type { AccountDeletionResult } from './slices/account-deletion'
 import * as colmi from './slices/colmi'
@@ -7764,6 +7765,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getLatestRedecodeJob(userId: string) { return oura.getLatestRedecodeJob(this.db, userId) }
   async finishRedecodeJob(id: number, result: Record<string, unknown> | null, error: string | null) { return oura.finishRedecodeJob(this.db, id, result, error) }
   async reapStaleRedecodeJobs(userId: string) { return oura.reapStaleRedecodeJobs(this.db, userId) }
+  async startAgentAction(input: agentActions.StartAgentActionInput) { return agentActions.startAgentAction(this.db, input) }
+  async finishAgentAction(id: string, result: agentActions.FinishAgentActionInput) { return agentActions.finishAgentAction(this.db, id, result) }
+  async getAgentAction(id: string) { return agentActions.getAgentAction(this.db, id) }
+  async listAgentActions(filter?: agentActions.ListAgentActionsFilter) { return agentActions.listAgentActions(this.db, filter) }
   async listOuraTags(userId: string, startDay: string, endDay: string) { return oura.listOuraTags(this.db, userId, startDay, endDay) }
   // Colmi R09, learning mode (PS-8). Reads/writes only the colmi_* tables.
   async insertColmiReadings(userId: string, rows: import('./slices/colmi').ColmiReadingInput[]) { return colmi.insertColmiReadings(this.db, userId, rows) }
