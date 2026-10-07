@@ -491,7 +491,7 @@ describe('restoreFromCloud', () => {
     vi.stubGlobal('fetch', fetchMock)
 
     const res = await restoreFromCloud('u1')
-    expect(res).toEqual({ synced: 0, failed: false })
+    expect(res).toEqual({ synced: 0, failed: false, domains: expect.any(Object) })
     // Seeded epoch once at loop entry (the resumable-restore fix).
     expect(fakeStore.setLastSyncAt).toHaveBeenCalledWith(new Date(0).toISOString())
     // Every pull in the restore drain carried mode=restore (full-history unclamp).
@@ -505,7 +505,7 @@ describe('restoreFromCloud', () => {
     // A dead-network first page must be distinguishable from "genuinely nothing to restore" —
     // the caller (profile-tab) branches on `failed` to show an error instead of a false-positive
     // success toast. The cursor is still resumable (persisted up to the last successful page).
-    expect(res).toEqual({ synced: 0, failed: true })
+    expect(res).toEqual({ synced: 0, failed: true, domains: expect.any(Object) })
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

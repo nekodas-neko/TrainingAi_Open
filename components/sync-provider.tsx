@@ -200,7 +200,7 @@ export function SyncProvider({ userId }: SyncProviderProps) {
       Network.addListener('networkStatusChange', (status) => {
         if (status.connected) {
           if (userId) pushMutations(userId).catch(() => {});
-          if (userId) pullDelta(userId).catch(() => {});
+          if (userId) pullDelta(userId).then(res => { if (res) return invalidatePulledDomains(res.domains); }).catch(() => {});
         }
       }).then((h) => { handle = h; });
     });

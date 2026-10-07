@@ -22,7 +22,7 @@ import { cachedFetch, readCacheSync, setCached, cachedFetchToday, readTodayCache
 import { useDayRolloverRefresh } from '@/components/shell/local-day-provider';
 import { useUserTimezone } from '@/components/shell/user-timezone-provider';
 import { runWithConcurrency } from "@/lib/async/run-with-concurrency";
-import { invalidateReadinessInputs, invalidateOuraSync, invalidateBiometrics, invalidateHealthTrends, invalidateBodyMetricWrite } from "@/lib/cache-groups";
+import { invalidateReadinessInputs, invalidateOuraSync, invalidateBiometrics, invalidateHealthTrends, invalidateBodyMetricWrite, invalidatePulledDomains } from "@/lib/cache-groups";
 import { TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, HEALTH_TRENDS_SUMMARY_TTL } from '@trainingai/shared/cache-ttl';
 import type { HealthTrendsResponse } from "@/app/api/health/trends/route";
 import type { SleepDetailReading } from "@/components/health-metric-sheet";
@@ -554,7 +554,9 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
     // The Oura Cloud half of this pull is gone (owner, 2026-08-13): the ring has been on our own
     // BLE key since the re-key, so the Cloud had nothing to hand back. The ring itself is drained
     // by the BLE service; a manual pull reconciles the outbox and re-reads local data.
-    if (userId) await pullDelta(userId, true).catch(() => {});
+    const pulled = userId ? await pullDelta(userId, true).catch(() => null) : null;
+    // What the pull wrote, beyond this screen's own caches below (#2550).
+    if (pulled) await invalidatePulledDomains(pulled.domains).catch(() => {});
     Promise.all([invalidateOuraSync(), invalidateBiometrics(), invalidateHealthTrends()])
       .then(() => refreshVisibleHealthData())
       .catch(() => {});
