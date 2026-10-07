@@ -23,6 +23,11 @@
  * duplicate, and `rr_intervals_pkey` read 0 on 2026-08-30 and 5,034 a day later. The entry's own
  * first draft got this wrong and corrected itself; the correction is worth keeping.
  *
+ * **#2079 later moved the primary key itself, deliberately and with the owner's yes.** The surrogate
+ * `oura_heartrate_pkey (id)` had 0 scans for the table's whole life (stats never reset), so it was
+ * replaced by a primary key on `(user_id, timestamp)`: the same columns as the unique index that
+ * does the work, whose job that key's index now does. One index, still named `oura_heartrate_pkey`.
+ *
  * Runs only against a real local dev Postgres — skips cleanly in CI without DATABASE_URL.
  */
 import { describe, it, expect, beforeAll } from 'vitest'
@@ -50,12 +55,29 @@ describe.skipIf(!canRun)('oura_heartrate indexes after BF-55', () => {
 
   /**
    * The index that does the work stays. Dropping the wrong one is the failure this entry nearly
-   * shipped, so the survivor is asserted by name rather than by "some index remains".
+   * shipped, so the survivor is asserted by name and by columns rather than by "some index remains".
+   * Since #2079 that survivor is the primary key: the old unique index and the never-scanned `id`
+   * key were folded into one.
    */
-  it('the index the planner actually uses is untouched, and so is the primary key', async () => {
-    const names = await indexes()
-    expect(names).toContain('oura_heartrate_user_id_timestamp_key')
-    expect(names).toContain('oura_heartrate_pkey')
+  it('the (user_id, timestamp) index the planner uses is the primary key, and the only index', async () => {
+    const { rows } = await pool.query<{ indexname: string; indexdef: string }>(
+      `SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'oura_heartrate' ORDER BY indexname`
+    )
+    expect(rows.map(r => r.indexname)).toEqual(['oura_heartrate_pkey'])
+    expect(rows[0].indexdef).toMatch(/UNIQUE INDEX oura_heartrate_pkey .*\(user_id, "timestamp"\)/)
+    const { getPrimaryKeyColumns } = await import('@/lib/export/db-snapshot')
+    expect(await getPrimaryKeyColumns(pool, 'oura_heartrate')).toEqual(['user_id', 'timestamp'])
+  })
+
+  /** The column outlives its index: the full export still emits it, and the default still fills it. */
+  it('keeps the id column, NOT NULL with its default', async () => {
+    const { rows } = await pool.query<{ is_nullable: string; column_default: string | null }>(
+      `SELECT is_nullable, column_default FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'oura_heartrate' AND column_name = 'id'`
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0].is_nullable).toBe('NO')
+    expect(rows[0].column_default).toMatch(/gen_random_uuid\(\)/)
   })
 })
 
