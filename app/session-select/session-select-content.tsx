@@ -17,7 +17,7 @@ import { Meteors } from "@/components/ui/meteors";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScreenHeader } from "@/components/shell/screen-header";
 import { toast } from "sonner";
-import { RefreshCwIcon, LayoutGridIcon, Clock, Dumbbell, Calendar, Eye } from "lucide-react";
+import { RefreshCwIcon, LayoutGridIcon, Eye } from "lucide-react";
 import { HomeSortableSection } from "@/components/home-sortable-section";
 import { DragDropProvider, PointerSensor } from "@dnd-kit/react";
 import { useHomeSectionDrag } from "@/lib/hooks/use-home-section-drag";
@@ -48,7 +48,7 @@ import { getLocalStore } from "@/lib/local-store";
 import { localSleepRowsAsNights } from "@/lib/sleep/merge-sessions";
 import { pushMutations, pullDelta, isSyncBackedOff } from "@/lib/local-store/sync-engine";
 import { PullToSync } from "@/components/pull-to-sync";
-import { BODY_BATTERY_TTL, TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, NEXT_SESSION_TTL, MOOD_TTL } from '@trainingai/shared/cache-ttl';
+import { TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, NEXT_SESSION_TTL, MOOD_TTL } from '@trainingai/shared/cache-ttl';
 import { GoalRecommendationSheet, type GoalRecommendationData } from '@/components/profile/goal-recommendation-sheet'
 import type { User } from '@trainingai/shared/types'
 import { HomeCardWidget } from "@/components/home/home-card-widget";

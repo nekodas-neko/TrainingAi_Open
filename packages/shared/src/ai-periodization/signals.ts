@@ -1,5 +1,4 @@
 import type { WorkoutRepository } from '@/lib/data/repository'
-import type { SessionPeriodization } from '@trainingai/shared/types/ai-periodization'
 import { todayInTz, todayMidnightUtc, toAestDay, startOfWeekInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 import { confidenceFactors, computeConfidence } from '@trainingai/shared/ai-periodization/confidence'
 import { perExerciseRpeDelta, rpeTrendFromSets } from '@trainingai/shared/ai-periodization/expected-rpe'

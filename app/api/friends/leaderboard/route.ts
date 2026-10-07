@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
 import { getDb } from '@/lib/data/postgres/client'
 import * as s from '@/lib/data/postgres/schema'
-import { inArray, eq, and, gte, sum, count, isNull } from 'drizzle-orm'
+import { inArray, eq, and, gte, count, isNull } from 'drizzle-orm'
 import { sql } from 'drizzle-orm'
 import type { LeaderboardEntry } from '@trainingai/shared/types/friends'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
@@ -18,7 +18,7 @@ function getMondayUtc(tz: string): Date {
   return new Date(format(monday, "yyyy-MM-dd'T'00:00:00") + 'Z')
 }
 
-export async function GET(req: Request) {
+export async function GET(_req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

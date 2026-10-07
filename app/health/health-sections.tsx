@@ -4,7 +4,7 @@ import React from "react";
 import dynamic from "next/dynamic";
 import { InfoIcon } from "lucide-react";
 import { accentCardStyle } from "@trainingai/shared/utils";
-import { goalProgressPct, evaluateWeightRateVsGoalBand } from "@trainingai/shared/health/long-term-goal-progress";
+import { evaluateWeightRateVsGoalBand } from "@trainingai/shared/health/long-term-goal-progress";
 import { scoreBand } from "@trainingai/shared/health/score-band";
 import { bodyComposition } from "@trainingai/shared/health/body-composition";
 import { displayBodyFat, type BodyFatCalibrationMeta } from "@/components/health/body-fat-display";

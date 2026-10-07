@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
+
 import Link from "next/link";
 import { CalendarIcon, CheckIcon, SparklesIcon, ShareIcon, DumbbellIcon, TrophyIcon, NotebookTextIcon, FlameIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";

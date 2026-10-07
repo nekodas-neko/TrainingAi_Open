@@ -26,11 +26,9 @@ import { measuredAtMs, cadenceSecFromDs, decodeEventBody, hexToBytes, eventName 
  *  (812k rows). Exported so callers size their own lookback against it rather than asking for more
  *  and being silently clamped, which is what `maybeRefitDaytimeHrvModel` was doing at 60 days. */
 export const MAX_RAW_SAMPLE_WINDOW_DAYS = 31
-import { classifyClockRegression, currentEpoch, resolveDsToMs, resolveMsToDs, dsToMs, msToDs, type ClockAnchor, type ClockOffsets } from '@/lib/oura-ble/clock'
+import { classifyClockRegression, resolveDsToMs, resolveMsToDs, dsToMs, msToDs, type ClockAnchor, type ClockOffsets } from '@/lib/oura-ble/clock'
 import { spo2PctFromR } from '@/lib/oura-ble/spo2'
 import { STEP_FEATURE_TAGS, STEP_MOTION_TAG } from '@/lib/oura-ble/rollup-consumed-tags'
-import { mergeStepCounterWithLive, type StepCountWindow } from '@trainingai/shared/health/step-estimate'
-import { runStepCounterPipeline, type RawFrame } from '@/lib/oura-ble/step-counter-pipeline'
 import { computeStepsByDay } from '@/lib/oura-ble/step-day-buckets'
 import { numericField as numArr } from '@trainingai/shared/health/night-vitals'
 import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-radar'
@@ -68,11 +66,24 @@ import type { WorkoutRepository, UserGoals, EnsuredWorkoutSession, SessionLoad, 
 import { FitnessTestBody } from '@trainingai/shared/validation/fitness-test'
 import { PrescribedRunPatchBody } from '@trainingai/shared/validation/prescribed-run'
 import type {
-  User, Program, ProgramSession, SessionExercise, Schedule, ScheduleDay,
-  ProgressionStyle, StyleSet,
-  WorkoutSession, ExerciseLog, SetLog, ExerciseHistoryLogRow,
-  BodyMetrics, ActivityLog, ActivityType, SleepSession, SleepVerdictRecord, ReadinessVerdictRecord, NextSessionRecommendation,
-  ActivityLevel, FitnessGoal, MoodLog, GoalRecommendation,
+  User,
+  Program,
+  ProgressionStyle,
+  WorkoutSession,
+  ExerciseLog,
+  SetLog,
+  ExerciseHistoryLogRow,
+  BodyMetrics,
+  ActivityLog,
+  ActivityType,
+  SleepSession,
+  SleepVerdictRecord,
+  ReadinessVerdictRecord,
+  NextSessionRecommendation,
+  ActivityLevel,
+  FitnessGoal,
+  MoodLog,
+  GoalRecommendation,
 } from '@trainingai/shared/types'
 import type { ExerciseLibraryEntry, MuscleAssignment, ProgramPhase, ProgramPhaseType, PhaseSetWithPhases, ExerciseType } from '@trainingai/shared/types/program'
 import type {
@@ -101,8 +112,11 @@ import * as colmi from './slices/colmi'
 import * as hcIntervals from './slices/health-connect-intervals'
 import { mergeSet, initialSourceMap, HEALTH_SOURCES, sourceRank, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
 import type {
-  SessionPeriodization, PeriodizationPhase, AiPrescription,
-  Baseline1rmEntry, PendingTransition, PrescriptionStatus, ProgramVolumeTarget,
+  PeriodizationPhase,
+  AiPrescription,
+  Baseline1rmEntry,
+  PendingTransition,
+  PrescriptionStatus,
 } from '@trainingai/shared/types/ai-periodization'
 
 // Per-field provenance columns for body_metrics (migration 120). One place; shared with the merge.

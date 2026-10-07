@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest'
 import {
-  isNightWindow, groupSleepPeriods, nightForDate, nightSessions, aggregateNight,
+  isNightWindow,
+  groupSleepPeriods,
+  nightForDate,
+  nightSessions,
+  aggregateNight,
   MAX_INTRA_NIGHT_GAP_HOURS,
-  ALWAYS_NIGHT_MIN_HOURS,
 } from '@trainingai/shared/health/sleep-night'
 
 const TZ = 'Australia/Brisbane' // UTC+10, no DST

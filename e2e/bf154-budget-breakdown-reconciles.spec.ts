@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { Client } from 'pg'
 import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 import { ensureEnergyBalanceProfile, settleRouteBoundary } from './fixtures'

@@ -1,8 +1,23 @@
 import type { LucideIcon } from 'lucide-react'
 import {
-  Dumbbell, Footprints, Activity, Zap, Flame, Target, Award,
-  Brain, Bike, Waves, Users, Mountain, ChevronDown, ChevronUp,
-  Swords, Wind, Heart, Timer, TrendingUp, TrendingDown,
+  Dumbbell,
+  Footprints,
+  Activity,
+  Zap,
+  Flame,
+  Target,
+  Award,
+  Brain,
+  Bike,
+  Waves,
+  Users,
+  Mountain,
+  Swords,
+  Wind,
+  Heart,
+  Timer,
+  TrendingUp,
+  TrendingDown,
 } from 'lucide-react'
 
 // Maps emoji characters (stored in program_sessions.icon) to Lucide icon components

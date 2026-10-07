@@ -85,7 +85,7 @@ export default function WorkoutSelectContent() {
 
   // Current session index + swipe direction for AnimatePresence
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [hasSeeded, setHasSeeded] = useState(false);
+  const [, setHasSeeded] = useState(false);
   const [recommendedId, setRecommendedId] = useState<string | null>(null);
   const [direction, setDirection] = useState(0); // -1 = swiped up (next), 1 = swiped down (prev)
   const recovery = useCachedValue<{ muscles: MuscleRecoveryEntry[] }>(

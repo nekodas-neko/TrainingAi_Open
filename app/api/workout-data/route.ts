@@ -208,7 +208,6 @@ async function handleWorkoutData(req: NextRequest) {
     }> = {}
 
     for (const programSession of program.sessions) {
-      const exerciseNames = programSession.exercises.map(ex => ex.exerciseName)
       const aiPeriodizationState = periodizationBySession.get(programSession.id) ?? null
 
       const loggedTodayInThisSession = new Set(
