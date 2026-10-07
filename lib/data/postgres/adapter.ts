@@ -1718,12 +1718,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const result = await this.db.execute<Row>(sql`
       SELECT exercise_name, estimated_1rm, is_baseline, rn, rn_kind
       FROM (
-        SELECT el.exercise_name, el.estimated_1rm, ws.phase_type IS NOT DISTINCT FROM 'baseline' AS is_baseline,
+        SELECT el.exercise_name, el.estimated_1rm, ${period.wsIsBaselineSession} AS is_baseline,
           -- The same total order in both windows (id breaks a logged_at tie), so the newest
           -- prescribed row is rn=1 and rn_kind=1 at once and can never be paired with itself.
           ROW_NUMBER() OVER (PARTITION BY el.exercise_name ORDER BY el.logged_at DESC, el.id DESC) AS rn,
           ROW_NUMBER() OVER (
-            PARTITION BY el.exercise_name, ws.phase_type IS NOT DISTINCT FROM 'baseline'
+            PARTITION BY el.exercise_name, ${period.wsIsBaselineSession}
             ORDER BY el.logged_at DESC, el.id DESC
           ) AS rn_kind
         FROM exercise_logs el
