@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { cachedFetchToday, readTodayCacheSync } from "@/lib/sqlite/cache";
 import { HEALTH_TRENDS_SUMMARY_TTL, READINESS_SCORE_TTL } from '@trainingai/shared/cache-ttl';
 import { todayInTz } from "@trainingai/shared/date-utils";
+import { useInvalidationRefetch } from "@/lib/hooks/use-invalidation-refetch";
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { getLocalStore } from "@/lib/local-store";
 import type { ReadinessScoreResponse } from "@/app/api/readiness-score/route";
@@ -205,6 +206,14 @@ export function HealthScoreDetail({
       if (d) setTrends(d);
     });
   }, [today, userId, scoreField]);
+
+  // Issue 2338: a write on this screen (a night logged or removed by hand) clears the readiness
+  // cache; without this the score above stayed on the old figure until the screen was reopened.
+  useInvalidationRefetch("readiness-score", () => {
+    cachedFetchToday<ReadinessScoreResponse>("readiness-score", "/api/readiness-score", READINESS_SCORE_TTL, d => {
+      if (d) setData(d);
+    });
+  });
 
   const score = data?.[scoreField] ?? null;
   const contributors = data?.[contributorsField] ?? null;

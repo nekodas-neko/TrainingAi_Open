@@ -2,6 +2,8 @@ import { recordsSleep } from '@trainingai/shared/health/sleep-night';
 import type { LocalSleepSession } from '@/lib/local-store/types';
 
 export type SleepRow = {
+  /** The row id. `removeManualNight` needs it; optional so a payload sent before it existed still parses. */
+  id?: string;
   date: string;
   ouraId: string | null;
   durationHours: number | null;
@@ -181,7 +183,7 @@ export function localSleepRowsAsNights(local: readonly LocalSleepSession[]): Sle
   const byDate = new Map<string, SleepRow[]>();
   for (const l of local) {
     const row: SleepRow = {
-      date: l.date, ouraId: l.ouraId,
+      id: l.id, date: l.date, ouraId: l.ouraId,
       durationHours: l.durationHours, deepSleepHours: l.deepSleepHours,
       remSleepHours: l.remSleepHours, lightSleepHours: l.lightSleepHours, awakHours: l.awakHours,
       efficiency: l.efficiency, onsetLatencySec: l.onsetLatencySec, averageHrvMs: l.averageHrvMs,
