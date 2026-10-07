@@ -13,6 +13,15 @@ const SANDBOX_CHROMIUM = '/opt/pw-browsers/chromium'
 const executablePath = existsSync(SANDBOX_CHROMIUM) ? SANDBOX_CHROMIUM : undefined
 
 /**
+ * Issue 2166 probe levers. Unset (today's behaviour) = Playwright's default `chromium_headless_shell`
+ * with no extra flags. `E2E_CHROMIUM_CHANNEL=chromium` runs the full Chromium in new headless mode
+ * instead; `E2E_CHROMIUM_ARGS='--disable-gpu'` drops the software-GL path the crash faults in.
+ */
+const E2E_CHANNEL = process.env.E2E_CHROMIUM_CHANNEL || undefined
+const E2E_ARGS = (process.env.E2E_CHROMIUM_ARGS ?? '').split(' ').filter(Boolean)
+const launchOptions = { executablePath, args: E2E_ARGS }
+
+/**
  * Q-249 — the first harness in this repo that actually runs the app.
  *
  * Read `e2e/README.md` before adding a spec. The short version of what this can and cannot prove:
@@ -55,11 +64,11 @@ export default defineConfig({
   projects: [
     // Both setups run before the specs: the seeded user every spec uses by default, and the
     // zero-data account (Q-352) that specs opt into with `test.use({ storageState: … })`.
-    { name: 'setup', testMatch: /(auth|zero-data)\.setup\.ts/, use: { launchOptions: { executablePath } } },
+    { name: 'setup', testMatch: /(auth|zero-data)\.setup\.ts/, use: { channel: E2E_CHANNEL, launchOptions } },
     {
       name: 'mobile-chromium',
       dependencies: ['setup'],
-      use: { browserName: 'chromium', storageState: STORAGE_STATE, launchOptions: { executablePath } },
+      use: { browserName: 'chromium', channel: E2E_CHANNEL, storageState: STORAGE_STATE, launchOptions },
     },
   ],
   // `pnpm dev`, deliberately, not `pnpm start`. The pg pool turns SSL on whenever

@@ -1,0 +1,93 @@
+# THROWAWAY (issue 2166). Never merged: a draft PR carries this file so the probe runs on the same
+# runner image as the E2E shards, and it is deleted with the branch.
+#
+# The crash is `chrome-headless-shell` taking SIGSEGV 0x1b0 mid-suite, and it is spec-reproducible
+# (`diary-nested-meal` is the victim in 19 of 80 failed jobs). Three arms, same commit, same specs,
+# `--retries=0` so a crash is a failure rather than a retried non-event:
+#   A  today
+#   B  --disable-gpu
+#   C  channel 'chromium' (full Chromium, new headless) instead of the headless shell
+# The count that matters is "Received signal 11" and the `newContext ... has been closed` failures.
+name: probe-chromium-crash
+on:
+  pull_request:
+    paths: ['.github/workflows/probe-chromium-crash.yml']
+  workflow_dispatch:
+jobs:
+  probe:
+    name: arm ${{ matrix.arm }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arm: A, channel: '', args: '' }
+          - { arm: B, channel: '', args: '--disable-gpu' }
+          - { arm: C, channel: 'chromium', args: '' }
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: trainingai_ci
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
+      AUTH_SECRET: e2e-ci-secret-not-used-outside-this-job
+      E2E_CHROMIUM_CHANNEL: ${{ matrix.channel }}
+      E2E_CHROMIUM_ARGS: ${{ matrix.args }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: node scripts/local-db/migrate.js
+      - run: psql "$DATABASE_URL" -f scripts/local-db/seed.sql
+      - run: npx playwright install --with-deps chromium
+      - name: What the install placed (does it include the full chromium for arm C?)
+        run: |
+          ls ~/.cache/ms-playwright
+          npx playwright --version
+          uname -r
+          echo "arm ${{ matrix.arm }} channel='${E2E_CHROMIUM_CHANNEL}' args='${E2E_CHROMIUM_ARGS}'"
+      - name: Run the victim specs, 12 repeats, no retries
+        run: |
+          set +e
+          npx playwright test \
+            e2e/diary-nested-meal.spec.ts e2e/nutrition-day-navigation.spec.ts \
+            e2e/recent-all-buckets.spec.ts e2e/one-calorie-budget.spec.ts \
+            e2e/bf5-week-in-review-page.spec.ts e2e/forced-dark-theme.spec.ts \
+            --repeat-each=12 --retries=0 --reporter=list 2>&1 | tee probe.log
+          echo "playwright exit: ${PIPESTATUS[0]}"
+      - name: Count crashes for this arm
+        if: always()
+        run: |
+          SEGV=$(grep -c "Received signal 11" probe.log || true)
+          CLOSED=$(grep -c "Target page, context or browser has been closed" probe.log || true)
+          PASSED=$(grep -Eo "[0-9]+ passed" probe.log | tail -1 || true)
+          FAILED=$(grep -Eo "[0-9]+ failed" probe.log | tail -1 || true)
+          echo "::notice title=ARM ${{ matrix.arm }}::signal-11 lines=$SEGV  newContext-closed failures=$CLOSED  ${PASSED:-0 passed}  ${FAILED:-0 failed}"
+          {
+            echo "### arm ${{ matrix.arm }} (channel='${E2E_CHROMIUM_CHANNEL}', args='${E2E_CHROMIUM_ARGS}')"
+            echo "- \`Received signal 11\` lines: **$SEGV**"
+            echo "- \`browser.newContext ... has been closed\` failures: **$CLOSED**"
+            echo "- ${PASSED:-0 passed}, ${FAILED:-0 failed}"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: probe-log-${{ matrix.arm }}
+          path: probe.log
+          retention-days: 7
