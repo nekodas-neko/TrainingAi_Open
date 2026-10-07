@@ -13,6 +13,7 @@ import type { HealthTrendsResponse } from "@/app/api/health/trends/route";
 import { DetailHero, usePageGradient, useHeroColorScheme } from "@/components/health/detail-hero";
 import { TrendSparkline } from "@/components/health/trend-sparkline-lazy";
 import { ObservedHrCard } from "@/components/health/observed-hr-card";
+import { noHrDataCopy } from "@/components/health/hr-source-copy";
 import { HrFactorsCard } from "@/components/health/hr-factors-card";
 import { gradeHeartRate, type HrProfileInput } from "@/components/health/hr-grade";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
@@ -164,7 +165,7 @@ export default function HeartRateDetailPage() {
             <p className="text-xs text-muted-foreground">
               {hrFailed
                 ? "Couldn't load today's heart rate."
-                : 'No HR captured yet today — the ring records periodically while worn.'}
+                : noHrDataCopy(null, 'day')}
             </p>
           )}
         </div>

@@ -26,7 +26,8 @@ describe('LA-82 — a stand-in must not read like a real measurement', () => {
     const none = restingHrSourceNote('default')!
     const failed = restingHrSourceNote('unavailable')!
     expect(none.detail).not.toBe(failed.detail)
-    expect(none.detail).toMatch(/wear your ring/i)
+    expect(none.detail).toMatch(/ring or Health Connect records a night/i)
+    expect(none.detail).not.toMatch(/wear your ring/i)
     expect(failed.detail).toMatch(/couldn’t be read/i)
     expect([none.standIn, failed.standIn]).toEqual([true, true])
   })

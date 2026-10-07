@@ -2,6 +2,7 @@
 
 import { memo, useState } from 'react'
 import { HR_ZONE_META } from '@trainingai/shared/health/hr-zones'
+import { noHrDataCopy } from '@/components/health/hr-source-copy'
 import { quotaHasNoHrSource, type ZoneQuota, type ZoneQuotaRow } from '@trainingai/shared/health/zone-quota'
 
 interface Props {
@@ -78,7 +79,7 @@ function ZoneQuotaCardImpl({ dayQuota, weekQuota, goalLabel }: Props) {
     return (
       <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--card)] p-3.5">
         <p className="py-6 text-center text-xs text-muted-foreground">
-          No heart-rate data yet — wear the ring or strap during a workout.
+          {noHrDataCopy(false, 'workout')}
         </p>
       </div>
     )

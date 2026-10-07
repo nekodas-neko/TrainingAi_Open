@@ -146,7 +146,7 @@ export function SleepContent({ userId }: { userId?: string }) {
                 />
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  No sleep-stage data for last night yet — this shows up once your ring syncs.
+                  No sleep-stage data for last night yet — stages come from a ring or Health Connect.
                 </p>
               )}
             </div>

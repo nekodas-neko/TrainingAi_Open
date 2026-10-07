@@ -54,7 +54,7 @@ export function ContributorDetail({
           )}
           <p className="mt-1 text-muted-foreground">
             {provisional
-              ? 'Still learning your personal baseline — this factor stays neutral until enough nights of ring data accrue, then it scores against your own normal.'
+              ? 'Still learning your personal baseline — this factor stays neutral until enough nights of data accrue, then it scores against your own normal.'
               : meaning}
           </p>
         </div>
