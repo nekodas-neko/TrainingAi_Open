@@ -312,7 +312,7 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     // Oura / ring
     ['getOuraClockAnchor', r => r.getOuraClockAnchor(USER_A)],
     ['getOuraClockAnchors', r => r.getOuraClockAnchors(USER_A)],
-    ['getOuraClockOffsets', r => r.getOuraClockOffsets(USER_A), v => expect(leaked(v)).toEqual([])],
+    ['getOuraClockOffsets', r => r.getOuraClockOffsets(USER_A)],
     ['getOuraHeartrateBySource', r => r.getOuraHeartrateBySource(USER_A, bVal('oura_heartrate', 'source'), FROM_TS, TO_TS)],
     ['getOuraDaytimeStressBuckets', r => r.getOuraDaytimeStressBuckets(USER_A, FROM_TS, TO_TS)],
     ['getLatestStrapStatus', r => r.getLatestStrapStatus(USER_A)],
@@ -368,7 +368,8 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['getActiveMealPlan', r => r.getActiveMealPlan(USER_A)],
     ['listUserDietaryRestrictions', r => r.listUserDietaryRestrictions(USER_A)],
     ['listPlanMealAnswers', r => r.listPlanMealAnswers(USER_A, D)],
-    ['mealPlanNeedsReview', r => r.mealPlanNeedsReview(USER_A, 3650)],
+    // B's active plan was generated at AT, so a 1-day threshold makes it overdue.
+    ['mealPlanNeedsReview', r => r.mealPlanNeedsReview(USER_A, 1)],
     ['countLiveFoodLogsForMealType', r => r.countLiveFoodLogsForMealType(USER_A, bId('meal_types'))],
     ['foodLogRefsValid', r => r.foodLogRefsValid(USER_A, bId('meal_types'), bId('food_items'), bId('saved_meals'))],
     ['listLatestMealTimes', r => r.listLatestMealTimes(USER_A, FROM, TO)],
@@ -435,9 +436,10 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['markOuraWorkoutReviewed', r => r.markOuraWorkoutReviewed(USER_A, bId('oura_workouts'))],
     ['markHrSynced', r => r.markHrSynced(USER_A, bId('workout_sessions'))],
     ['writeSetHrr1', r => r.writeSetHrr1(USER_A, [{ setLogId: bId('set_logs'), hrr1Bpm: 99, restAdequate: true }])],
-    ['nullHistoricalDecoded', r => r.nullHistoricalDecoded(USER_A)],
+    ['nullHistoricalDecoded', r => r.nullHistoricalDecoded(USER_A),
+      v => { expect(v).toEqual({ nulled: 0, remaining: 0 }) }],
     ['packOuraRawBuckets', r => r.packOuraRawBuckets(USER_A)],
-    ['persistBodyCompFromMetrics', r => r.persistBodyCompFromMetrics(USER_A)],
+    ['persistBodyCompFromMetrics', r => r.persistBodyCompFromMetrics(USER_A), v => { expect(v).toBe(0) }],
     ['replaceOuraDailySummary', r => r.replaceOuraDailySummary(USER_A, [])],
     ['deleteMealPlan', r => r.deleteMealPlan(bId('meal_plans'), USER_A)],
     ['updateMealPlan', r => r.updateMealPlan(bId('meal_plans'), USER_A, { name: 'OVERWRITTEN BY A' })],
@@ -547,19 +549,24 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
       expect(rows).toEqual([])
     }],
     // ---- PR bookkeeping: B's 999 kg must not be read as A's best ----
+    // Before the upsert below, while A has no PR of its own for this name: the only right answer is none.
+    ['applyLbsToKgFix does not read another user\'s PR', r => r.applyLbsToKgFix(USER_A, [bVal('personal_records', 'exercise_name')], TO),
+      v => { expect((v as { exercises: { oldPersonalRecord?: number | null }[] }).exercises[0]?.oldPersonalRecord ?? null).toBeNull() },
+      { echoes: true }],
     ['upsertPersonalRecordIfBetter compares only against the caller\'s own PR', r => r.upsertPersonalRecordIfBetter(USER_A, bVal('personal_records', 'exercise_name'), 500),
       v => { expect(v).toBe(true) }],
-    ['applyLbsToKgFix does not read another user\'s PR', r => r.applyLbsToKgFix(USER_A, [bVal('personal_records', 'exercise_name')], TO),
-      // A holds its own 500 by now (row above); B's is 999.
-      v => { expect((v as { exercises: { oldPersonalRecord?: number | null }[] }).exercises[0]?.oldPersonalRecord ?? null).not.toBe(999) },
-      { echoes: true }],
+    // A has a profile (age, sex) but no weight; B has 80 kg. Only B's weight could yield an estimate.
+    ['saveActivityLog derives energy from the caller\'s own weight only', r => r.saveActivityLog(USER_A, {
+      date: '2026-09-22', activityType: 'walk', title: 'A WALK', durationMin: 60,
+    } as never), v => { expect((v as { caloriesBurned?: number }).caloriesBurned ?? null).toBeNull() }],
     // ---- periodization writes keyed by a client-supplied program-session id ----
     ['storePrescription', r => r.storePrescription(USER_A, bId('program_sessions'), { phase: 'deload' } as never, AT)],
     ['updatePrescriptionExercisesCache', r => r.updatePrescriptionExercisesCache(USER_A, bId('program_sessions'), { phase: 'deload' } as never)],
     // ---- maintenance sweeps scoped to the caller ----
     ['dropZoneMinutesFrom', r => r.dropZoneMinutesFrom(USER_A, FROM)],
     ['insertOuraAccelChunk (its retention prune)', async r => {
-      const v = await r.insertOuraAccelChunk(USER_A, { startedAt: AT, sampleRate: 1, magnitudes: [1], steps: 0 })
+      // FROM_TS, not AT: A's own session below spans AT and must see no chunk of A's either.
+      const v = await r.insertOuraAccelChunk(USER_A, { startedAt: FROM_TS, sampleRate: 1, magnitudes: [1], steps: 0 })
       // The prune is fire-and-forget; give it a moment to land before B's rows are compared.
       await new Promise(res => setTimeout(res, 500))
       return v
@@ -619,6 +626,46 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
          VALUES ($1, 0, 'A OWN PHASE', 4, 'normal', $2)`, [a.phaseSet, bId('progression_styles')])
       a.program = await ins(
         `INSERT INTO programs (user_id, name, is_active, phase_mode) VALUES ($1, 'A OWN PROGRAM', false, 'manual') RETURNING id`, [USER_A])
+    })
+
+    it('foodLogRefsValid rejects another user\'s meal type next to the caller\'s own food item', async () => {
+      expect(await repo.foodLogRefsValid(USER_A, bId('meal_types'), a.foodItem)).toBe(false)
+    })
+
+    it('getLatestOuraBleMeasuredAt does not date the caller\'s ring from another user\'s samples', async () => {
+      // A needs an anchor of its own, or there is nothing to convert B's ring clock with.
+      const anchor = bRow('oura_ble_clock_anchors')
+      const { rows: [mine] } = await pool.query(
+        `INSERT INTO oura_ble_clock_anchors (user_id, anchor_ds, anchor_utc, epoch) VALUES ($1, $2, $3, $4) RETURNING id`,
+        [USER_A, anchor.anchor_ds, anchor.anchor_utc, anchor.epoch])
+      try {
+        expect(await repo.getLatestOuraBleMeasuredAt(USER_A)).toBeNull()
+      } finally {
+        await pool.query(`DELETE FROM oura_ble_clock_anchors WHERE id = $1`, [mine.id])
+      }
+    })
+
+    it('listSessionsMissing{,Set}HrStats list none of another user\'s sessions', async () => {
+      // A has a heart-rate reading (so "after A's first reading" is satisfiable) and B has a
+      // completed session with no stats of either kind — the shape both lists exist to find.
+      const { rows: [hr] } = await pool.query(
+        `INSERT INTO oura_heartrate (user_id, timestamp, bpm, source) VALUES ($1, $2, 60, 'ble') RETURNING id`,
+        [USER_A, new Date(AT.getTime() - 86_400_000)])
+      const { rows: [ws] } = await pool.query(
+        `INSERT INTO workout_sessions (user_id, session_name, started_at, completed_at)
+         VALUES ($1, 'B BARE SESSION', $2, $3) RETURNING id`, [USER_B, AT, new Date(AT.getTime() + 3_600_000)])
+      const { rows: [el] } = await pool.query(
+        `INSERT INTO exercise_logs (workout_session_id, exercise_name, logged_at) VALUES ($1, 'B BARE LIFT', $2) RETURNING id`,
+        [ws.id, AT])
+      await pool.query(`INSERT INTO set_logs (exercise_log_id, set_number, weight_kg, reps) VALUES ($1, 1, 50, 5)`, [el.id])
+      try {
+        const missing = await repo.listSessionsMissingHrStats(USER_A, FROM_TS, 50)
+        const missingSet = await repo.listSessionsMissingSetHrStats(USER_A, FROM_TS, 50)
+        expect([...missing, ...missingSet].map(x => x.id)).not.toContain(ws.id)
+      } finally {
+        await pool.query(`DELETE FROM workout_sessions WHERE id = $1`, [ws.id])
+        await pool.query(`DELETE FROM oura_heartrate WHERE id = $1`, [hr.id])
+      }
     })
 
     it('foodLogRefsValid rejects another user\'s food item next to the caller\'s own meal type', async () => {
@@ -712,8 +759,7 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
       // A's session spans AT; B has an accel chunk and a heart-rate sample at AT.
       const probe = await repo.getWorkoutSensorProbe(USER_A, a.workoutSession)
       expect(probe).not.toBeNull()
-      const p = probe as unknown as Record<string, unknown>
-      expect({ accel: p.accelSamples ?? p.accel_samples ?? 0, hr: p.hrSamples ?? p.hr_samples ?? 0 }).toEqual({ accel: 0, hr: 0 })
+      expect({ chunks: probe!.accel.chunks, hr: probe!.hrSamples }).toEqual({ chunks: 0, hr: 0 })
     })
 
     it('listSessionsMissingHrStats does not date the caller\'s ring history from another user\'s', async () => {
@@ -770,6 +816,106 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
       }
     })
 
+    it('getLatestOuraBleMeasuredAt converts the caller\'s ring clock only with the caller\'s own anchors', async () => {
+      // A has a sample and no anchor: unconvertible, so null. B's anchor must not make it convertible.
+      const { rows: [mine] } = await pool.query(
+        `INSERT INTO oura_raw_samples (user_id, ring_timestamp_ds, tag, event_name, body_hex)
+         VALUES ($1, $2, $3, 'a-own', '00') RETURNING id`,
+        [USER_A, Number(bRow('oura_ble_clock_anchors').anchor_ds), Number(bRow('oura_raw_samples').tag)])
+      try {
+        expect(await repo.getLatestOuraBleMeasuredAt(USER_A)).toBeNull()
+      } finally {
+        await pool.query(`DELETE FROM oura_raw_samples WHERE id = $1`, [mine.id])
+      }
+    })
+
+    it('getObservedHrProfile drops the caller\'s samples only for the caller\'s own better sources', async () => {
+      // A has one aggregator sample and one ring sample. B has a device sample and a chest-strap
+      // sample at the same instants — read unscoped, they would displace both of A's.
+      const { AGGREGATOR_HR_SOURCES } = await import('@trainingai/shared/health/hr-window-merge')
+      const t1 = new Date(AT.getTime() + 600_000)
+      const t2 = new Date(AT.getTime() + 1_200_000)
+      const ids: string[] = []
+      const add = async (user: string, at: Date, bpm: number, source: string) => {
+        const { rows: [r] } = await pool.query(
+          `INSERT INTO oura_heartrate (user_id, timestamp, bpm, source) VALUES ($1, $2, $3, $4) RETURNING id`,
+          [user, at, bpm, source])
+        ids.push(r.id)
+      }
+      try {
+        await add(USER_A, t1, 90, AGGREGATOR_HR_SOURCES[0])
+        await add(USER_A, t2, 95, 'ble')
+        const alone = await repo.getObservedHrProfile(USER_A, FROM_TS, TO_TS)
+        await add(USER_B, t1, 150, 'ble')
+        await add(USER_B, t2, 155, 'chest_strap')
+        expect(await repo.getObservedHrProfile(USER_A, FROM_TS, TO_TS)).toEqual(alone)
+      } finally {
+        await pool.query(`DELETE FROM oura_heartrate WHERE id = ANY($1::uuid[])`, [ids])
+      }
+    })
+
+    it('countSessionsSinceStart reads the anchor only from the caller\'s own program', async () => {
+      // B's program starts 2026-09-20, after every session of A's. Read unscoped, A's count drops.
+      await pool.query(`UPDATE programs SET started_at = '2026-09-20' WHERE id = $1`, [bId('programs')])
+      const unknownProgram = '00000000-0000-4000-8000-0000000242ff'
+      expect(await repo.countSessionsSinceStart(USER_A, bId('programs')))
+        .toBe(await repo.countSessionsSinceStart(USER_A, unknownProgram))
+      expect(await repo.countSessionsSinceStart(USER_A, unknownProgram)).toBeGreaterThan(0)
+    })
+
+    it('autoRecalibrateCycleAnchor counts and orders only the caller\'s own sessions', async () => {
+      // Block length 2 (1 session per cycle × 2 cycles); A has 3 sessions, so n = 1 and the anchor is
+      // A's second-most-recent start. B's session at AT is newer than all of A's: counted, it moves
+      // n to 0 (anchor = now); ordered in, it shifts which session is second.
+      const set = (await pool.query(
+        `INSERT INTO phase_sets (user_id, name, is_default) VALUES ($1, 'A BLOCK OF TWO', false) RETURNING id`, [USER_A])).rows[0].id
+      await pool.query(
+        `INSERT INTO program_phases (phase_set_id, position, name, duration_cycles, phase_type) VALUES ($1, 0, 'P', 2, 'normal')`, [set])
+      const prog = (await pool.query(
+        `INSERT INTO programs (user_id, name, is_active, phase_mode, phase_set_id, sessions_per_cycle)
+         VALUES ($1, 'A CYCLE PROGRAM', false, 'automatic', $2, 1) RETURNING id`, [USER_A, set])).rows[0].id
+      const extra = (await pool.query(
+        `INSERT INTO workout_sessions (user_id, session_name, started_at) VALUES
+           ($1, 'A EXTRA 2', $2), ($1, 'A EXTRA 3', $3) RETURNING id`,
+        [USER_A, new Date(AT.getTime() - 7_200_000), new Date(AT.getTime() - 10_800_000)])).rows.map(r => r.id)
+      try {
+        await repo.autoRecalibrateCycleAnchor(USER_A, prog)
+        const { rows: [p] } = await pool.query(`SELECT cycle_anchor_at FROM programs WHERE id = $1`, [prog])
+        expect(new Date(p.cycle_anchor_at).getTime()).toBe(AT.getTime() - 7_200_000)
+      } finally {
+        await pool.query(`DELETE FROM workout_sessions WHERE id = ANY($1::uuid[])`, [extra])
+        await pool.query(`DELETE FROM programs WHERE id = $1`, [prog])
+        await pool.query(`DELETE FROM phase_sets WHERE id = $1`, [set])
+      }
+    })
+
+    it('saveProgram renames only the caller\'s own phase set when it renames the program', async () => {
+      // B's phase set names A's program as its owner — the FK proves the program exists, not whose.
+      const orig = bRow('phase_sets')
+      await pool.query(`UPDATE phase_sets SET owner_program_id = $1, template_base_name = 'B TEMPLATE' WHERE id = $2`,
+        [a.program, bId('phase_sets')])
+      try {
+        const before = await snapshotB()
+        await repo.saveProgram(USER_A, {
+          id: a.program, userId: USER_A, name: 'A OWN PROGRAM RENAMED', isActive: false,
+          sessions: [], createdAt: new Date(), updatedAt: new Date(),
+          phaseMode: 'manual', trainingGoal: 'strength', autoApplyPrescriptions: false,
+        } as never)
+        expect(await snapshotB()).toBe(before)
+      } finally {
+        await pool.query(`UPDATE phase_sets SET owner_program_id = $1, template_base_name = $2, name = $3 WHERE id = $4`,
+          [orig.owner_program_id, orig.template_base_name, orig.name, bId('phase_sets')])
+      }
+    })
+
+    it('deletePhaseSet is not blocked — or answered with a name — by another user\'s program', async () => {
+      const set = (await pool.query(
+        `INSERT INTO phase_sets (user_id, name, is_default) VALUES ($1, 'A SET B POINTS AT', false) RETURNING id`, [USER_A])).rows[0].id
+      await pool.query(`UPDATE programs SET phase_set_id = $1 WHERE id = $2`, [set, bId('programs')])
+      const err = await repo.deletePhaseSet(set, USER_A).then(() => null, (e: unknown) => String(e))
+      expect(err).toBeNull()
+    })
+
     // Last: it deletes A.
     it('deleteAccount counts and unlinks only the caller\'s own rows', async () => {
       const before = await snapshotB()
@@ -817,6 +963,12 @@ const B_OVERRIDES: Record<string, Row> = {
   meal_plans: { is_active: true, generated_at: AT },
   running_plans: { is_active: true },
   // B's session (started AT) must count as inside the phase, or there is no count to get wrong.
-  session_periodization: { phase_started_at: new Date(AT.getTime() - 86_400_000) },
+  // baseline_complete: recordBaselineAnchors returns an already-complete row as-is, so read unscoped
+  // it would hand B's periodization back to A.
+  session_periodization: { phase_started_at: new Date(AT.getTime() - 86_400_000), baseline_complete: true },
   daily_zone_minutes: { zone1_sec: 600, zone2_sec: 600, max_hr: 190, resting_hr: 50 },
+  // A text column holding a date, so the fixture's generic text would never match a day filter.
+  oura_daytime_stress_buckets: { day: '2026-09-15', bucket_mid: AT },
+  // A window the test instant (12:00 Brisbane) is outside of, so reading it would move the instant.
+  meal_types: { time_start_hour: 20, time_end_hour: 22 },
 }
