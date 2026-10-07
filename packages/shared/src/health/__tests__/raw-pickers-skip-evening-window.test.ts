@@ -36,7 +36,7 @@ const win = (startDay: string, startH: number, endDay: string, endH: number, dur
 const PREV_NIGHT = win('2026-08-29', 22, PREV, 6, 7.8)
 const NIGHT = win(PREV, 22.5, D, 6.5, 7.5)
 const EVENING_BOUT = win(D, 21.5, D, 22.5, 1)
-const byDate = (sessions: SleepWindow[]) => nightPeriodsByDate(groupSleepPeriods(sessions, TZ).nights, TZ)
+const byDate = <T extends SleepWindow>(sessions: T[]) => nightPeriodsByDate(groupSleepPeriods(sessions, TZ).nights, TZ)
 
 describe('nightPeriodsByDate', () => {
   it('gives a date whose only night-band window is a short evening bout no night', () => {
