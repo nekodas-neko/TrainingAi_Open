@@ -96,9 +96,12 @@ describe.each(CASES)('$check ignores its banned pattern inside a comment', ({ ch
     // "this check never looked at that file", which is the reading that makes the whole pass wrong.
     expect(asCode, `fixture for ${check} must trigger it in ${file}`).not.toEqual(clean)
     expect(asComment, `${check} counts its banned pattern inside a comment`).toEqual(clean)
-    // 120 s, not 30 (LA-163). `check-hex-literals` measured 15 s per run on Windows against ~6 s on
-    // Linux, and this runs it three times. Profiled: 98% of it is `spawnSync` — `lib/base-ref.js`
-    // starts one `git show` per file for the base comparison, and a process spawn costs far more on
-    // Windows. Batching those reads would speed every ratchet; until then this is the honest limit.
+    // 120 s, not 30 (LA-163). The original reason is gone: `check-hex-literals` took 15 s per run on
+    // Windows, almost all of it one `git show` per file in `lib/base-ref.js`, and #2081 batched those
+    // reads. Its case now takes 4.0 s alone and 13.8 s under `pnpm test` load on the owner's
+    // machine. The limit stays because of checks that never touch base-ref. Measured in the same
+    // full run (2026-10-07): `check-tz-aware-cache-guards` 49.4 s, `check-timezone-rendering`
+    // 42.5 s, `check-memo-prop-stability` 35.2 s. Alone they take 11.9, 8.5 and 7.4 s. Under load
+    // that is over 30 s, so lowering the limit would make the suite flake.
   }, 120_000)
 })
