@@ -871,6 +871,9 @@ jobs:
       # contributors — and because a hidden value would leave the same reader wondering whether CI
       # depends on a real credential. It does not.
       AUTH_SECRET: e2e-ci-secret-not-used-outside-this-job
+      # Issue 2166: the headless shell crashes on this runner (SIGSEGV 0x1b0); full Chromium did not in
+      # a measured three-arm probe. `playwright.config.ts` reads it. Remove this line to go back.
+      E2E_CHROMIUM_CHANNEL: chromium
     steps:
       - uses: actions/checkout@v5
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
