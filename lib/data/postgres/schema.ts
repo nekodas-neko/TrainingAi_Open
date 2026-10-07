@@ -1481,15 +1481,18 @@ export const ouraDaily = pgTable('oura_daily', {
   syncedAt: timestamp('synced_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [unique().on(t.userId, t.date)])
 
+// #2079 (migration 202610071656): keyed on (user_id, timestamp), the index every read and upsert
+// uses. `id` is kept and still emitted by the full export, but has no index: nothing looks a row up
+// by it, and the surrogate key it used to carry was never scanned once.
 export const ouraHeartrate = pgTable('oura_heartrate', {
-  id:        uuid('id').primaryKey().defaultRandom(),
+  id:        uuid('id').notNull().defaultRandom(),
   userId:    uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   timestamp: timestamp('timestamp', { withTimezone: true }).notNull(),
   bpm:       integer('bpm').notNull(),
   source:    text('source'),
   // migration 130 (Phase-2 B1) — cursor for the dedicated Track-B timeseries backup sync.
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-}, t => [unique().on(t.userId, t.timestamp)])
+}, t => [primaryKey({ name: 'oura_heartrate_pkey', columns: [t.userId, t.timestamp] })])
 
 // Server mirror of the on-device `oura_bucket` coarse-tier RRD trend ladder (migration 137,
 // Phase-2 B1). Durable backup destination for Track-B — device-computed, never server-computed.

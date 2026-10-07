@@ -153,4 +153,56 @@ describe.skipIf(!canRun)('db-snapshot — against a real read-only role', () => 
       await admin.end()
     }
   }, 20_000)
+
+  /**
+   * #2079 re-keyed `oura_heartrate` from the surrogate `id` onto `(user_id, timestamp)`, and this
+   * export pages every table by its primary key — so the heart-rate table now pages on a composite
+   * key whose second column is a timestamp. Another account holds readings at the SAME instants,
+   * which is the case a keyset cursor gets wrong if it compares the timestamp alone or loses the
+   * user column: the owner's stream must come back complete, once each, in time order, and without
+   * one of the other account's rows. 8 rows through a chunk size of 3 crosses two page boundaries.
+   */
+  it('pages oura_heartrate by (user_id, timestamp), exactly once each, beside another account at the same instants', async () => {
+    const owner = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeee79'
+    const other = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeee80'
+    const admin = new Client({ connectionString: ADMIN_URL! })
+    await admin.connect()
+    try {
+      for (const [id, email] of [[owner, 'snapshot-hr-owner@test.dev'], [other, 'snapshot-hr-other@test.dev']]) {
+        await admin.query(
+          `INSERT INTO users (id, email, is_active) VALUES ($1, $2, true) ON CONFLICT (id) DO NOTHING`,
+          [id, email],
+        )
+      }
+      await admin.query(`ALTER ROLE ${RO_ROLE} SET app.claude_ro_owner = '${owner}'`)
+      const base = Date.UTC(2026, 0, 15, 12, 0, 0)
+      const instants = Array.from({ length: 8 }, (_, i) => new Date(base + i * 5_000))
+      for (const [i, at] of instants.entries()) {
+        await admin.query(
+          `INSERT INTO oura_heartrate (user_id, timestamp, bpm, source) VALUES ($1, $3, $4, 'ble'), ($2, $3, 99, 'ble')`,
+          [owner, other, at, 60 + i],
+        )
+      }
+
+      const scopedPool = new Pool({ connectionString: roUrl(), max: 1 })
+      try {
+        const pk = await getPrimaryKeyColumns(scopedPool, 'oura_heartrate')
+        expect(pk).toEqual(['user_id', 'timestamp'])
+        const rows: Record<string, unknown>[] = []
+        for await (const row of streamTableRows(scopedPool, 'oura_heartrate', pk, 3)) rows.push(row)
+        expect(rows.map(r => (r.timestamp as Date).getTime())).toEqual(instants.map(d => d.getTime()))
+        expect(rows.every(r => r.user_id === owner)).toBe(true)
+        expect(rows.map(r => r.bpm)).toEqual(instants.map((_, i) => 60 + i))
+        // The surrogate column outlives its index and is still exported for every row.
+        expect(rows.every(r => typeof r.id === 'string' && (r.id as string).length === 36)).toBe(true)
+      } finally {
+        await scopedPool.end()
+      }
+    } finally {
+      await admin.query('DELETE FROM oura_heartrate WHERE user_id = ANY($1::uuid[])', [[owner, other]])
+      await admin.query('DELETE FROM users WHERE id = ANY($1::uuid[])', [[owner, other]])
+      await admin.query(`ALTER ROLE ${RO_ROLE} SET app.claude_ro_owner = 'fe481797-4114-4f59-824d-223e0281823e'`)
+      await admin.end()
+    }
+  }, 20_000)
 })
