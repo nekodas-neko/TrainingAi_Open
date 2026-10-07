@@ -68,6 +68,9 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
   let b: SeededUser
   let owned: string[]
   let bOpenSession = ''
+  /** Issue 2606: a typed night of B's (live) and a removed one, for the manual-night writers. */
+  let bManualNight = ''
+  let bRemovedNight = ''
   let userTables: string[]
   const createdCatalogue: Row[] = []
   /** Every string B's rows hold that is distinctive enough to grep for — ids and fixture text. */
@@ -180,6 +183,16 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     // The fixture's session is completed (readers need that); completeWorkoutSession needs an open one.
     bOpenSession = (await pool.query(
       `INSERT INTO workout_sessions (user_id, session_name, started_at) VALUES ($1, 'B OPEN SESSION', $2) RETURNING id`,
+      [USER_B, AT])).rows[0].id
+    // Issue 2606: the fixture's sleep row is a device night, which the manual-night writers refuse
+    // whoever calls them. A typed night and a removed typed night of B's give them something to hit.
+    bManualNight = (await pool.query(
+      `INSERT INTO sleep_sessions (user_id, date, sleep_start, sleep_end, duration_hours, manual_entry)
+       VALUES ($1, $2, '2026-09-14T12:30:00Z', '2026-09-14T20:30:00Z', 8, true) RETURNING id`,
+      [USER_B, D])).rows[0].id
+    bRemovedNight = (await pool.query(
+      `INSERT INTO sleep_sessions (user_id, date, sleep_start, sleep_end, duration_hours, manual_entry, deleted_at)
+       VALUES ($1, '2026-09-13', '2026-09-12T12:30:00Z', '2026-09-12T20:30:00Z', 8, true, $2) RETURNING id`,
       [USER_B, AT])).rows[0].id
     // A library exercise, so the muscle-attribution reads take their library branch too.
     const { rows: [lib] } = await pool.query(
@@ -476,6 +489,15 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
       computedBy: 'replay',
     })],
     ['setManualSleepStart', r => r.setManualSleepStart(USER_A, D, AT)],
+    // Issue 2606. Aimed at B's live typed night: A's removal must not tombstone it, and must answer
+    // as if the id did not exist (never 'not_manual' or 'already_removed', which would confirm it).
+    ['deleteManualSleepNight', r => r.deleteManualSleepNight(USER_A, bManualNight), v => { expect(v).toBe('not_found') }],
+    // Aimed at B's REMOVED typed night by id: A's entry must not revive B's row (the revive lookup
+    // is scoped), and stores A's own night instead.
+    ['saveManualSleepNight reviving another user\'s removed night', r => r.saveManualSleepNight(USER_A, {
+      id: bRemovedNight, date: '2026-09-13', sleepStart: new Date('2026-09-12T12:30:00Z'),
+      sleepEnd: new Date('2026-09-12T20:30:00Z'), durationHours: 8, timeInBedHours: 8,
+    }).catch((e: Error) => e.message), v => { expect(v).toBe('That id already belongs to another night') }],
     ['deleteBloodPanel', r => r.deleteBloodPanel(USER_A, bId('blood_panels'))],
     ['setRestDay (clear)', r => r.setRestDay(USER_A, D, false)],
     ['deleteAiHealthInsight', r => r.deleteAiHealthInsight(USER_A, bVal('ai_health_insights', 'section'))],
