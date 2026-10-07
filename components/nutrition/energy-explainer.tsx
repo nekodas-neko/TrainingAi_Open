@@ -70,10 +70,15 @@ export function EnergyExplainer({ data }: { data: EnergyBalanceResponse }) {
           rate ({budget.chain.rmr.toLocaleString()} kcal)
           {budget.chain.deficit > 0 && <>, less {budget.chain.deficit.toLocaleString()} kcal for your goal</>}
           {budget.chain.deficit < 0 && <>, plus {Math.abs(budget.chain.deficit).toLocaleString()} kcal for your goal</>}
-          , plus {budget.chain.metabolicBurn.toLocaleString()} kcal for daily living and digesting food,
-          plus your movement as it is measured — {budget.total.toLocaleString()} kcal so far. The goal
-          part comes from your goal weight and shrinks as you near it; the budget never drops below
-          your resting rate or 1,200 kcal, whichever is higher.
+          , plus {budget.chain.dailyLiving.toLocaleString()} kcal for daily living and digesting food
+          (a fifth of your resting rate, {budget.chain.metabolicBurn.toLocaleString()} kcal, less the{' '}
+          {budget.chain.stepCredit.toLocaleString()} kcal your first 3,000 steps are worth — your
+          movement counts every step, so those are counted there), plus your movement as it is
+          measured — {budget.total.toLocaleString()} kcal so far. The goal part comes from your
+          {b.deficitWeightSource === 'trend' ? ' 30-day trend weight' : ' latest weigh-in'}
+          {b.deficitWeightKg != null ? ` (${b.deficitWeightKg} kg)` : ''} and your goal weight, and
+          shrinks as you near it; the budget never drops below your resting rate or 1,200 kcal,
+          whichever is higher.
         </p>
       )}
 

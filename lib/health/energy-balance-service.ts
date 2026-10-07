@@ -20,6 +20,7 @@ import {
   doseChangesInWindow, doseChangeCaveat, DOSE_HISTORY_LOOKBACK_DAYS,
 } from '@trainingai/shared/health/dose-change-caveat'
 import { goalDeficitKcal } from '@trainingai/shared/nutrition/calorie-budget'
+import { computeTrendWeightKg, weightTrendWindowStart } from '@trainingai/shared/health/long-term-goal-progress'
 import type { FitnessGoal } from '@trainingai/shared/types/user'
 import type { RestingRateSource } from '@trainingai/shared/nutrition/resting-rate-source'
 import type { WorkoutRepository } from '@/lib/data/repository'
@@ -49,8 +50,14 @@ export interface EnergyBalanceResult {
      *  Optional so a payload cached before it existed still types — `budgetProvenance` then returns
      *  the budget that payload's `remainingKcal` was computed against. */
     deficitKcal?: number | null
+    /** #2071. The step credit taken out of the 20% (see `calorieBudget`). Optional for old payloads. */
+    stepCreditKcal?: number | null
     /** #2071. THE day's budget, `budgetProvenance(balance).total`, for server readers to quote. */
     budgetKcal?: number
+    /** #2071 (b). The weight the deficit was computed from, to 0.1 kg, and which one it was: the
+     *  smoothed 30-day trend, or the latest weigh-in when there is no trend yet. */
+    deficitWeightKg?: number | null
+    deficitWeightSource?: 'trend' | 'latest' | null
     zone: string
     zoneLabel: string
     zoneColor: string
@@ -130,11 +137,15 @@ export async function computeEnergyBalance(
   // MAX_WINDOW_DAYS of COMPLETED days ending yesterday — `date` is excluded from the calibration
   // (see windowDays below), so the window starts one day further back than the span it covers.
   const windowStart = shiftDateStr(date, -MAX_WINDOW_DAYS)
+  // #2071 (b). The deficit reads the Body screen's 30-day Weight Trend, whose window starts a day or
+  // two before the calibration window, so the weigh-ins are read from whichever starts first.
+  const trendStart = weightTrendWindowStart(date)
+  const metricsStart = trendStart < windowStart ? trendStart : windowStart
 
   // The whole window is fetched, not just the requested day: a calibrated maintenance needs the
   // window's average movement to separate resting burn from habitual movement (see below).
   const [metrics, foodSummary, activityLogs, workouts, targets, userGoals, profile, dayCheckins, bodyFatCalibration, measuredRmr] = await Promise.all([
-    repo.listBodyMetrics(userId, windowStart, date).catch(() => []),
+    repo.listBodyMetrics(userId, metricsStart, date).catch(() => []),
     repo.listFoodLogsSummary(userId, windowStart, date).catch(() => []),
     repo.listActivityLogs(userId, windowStart, date).catch(() => []),
     repo.getWorkoutSessionsFrom(userId, localMidnightUtc(windowStart, tz)).catch(() => []),
@@ -217,11 +228,19 @@ export async function computeEnergyBalance(
   // what turns the maintenance estimate into a suggested stored goal, and the maintenance estimate is
   // explicitly not this change's to move.
   const goalDeltaKcal = goal ? GOAL_DAILY_DELTA[goal] : 0
-  // #2071. The BUDGET's deficit, derived from the goal and today's weight — never typed. Rounded here
-  // so the figure on the wire is exactly the one the budget was built with (see `computeCalorieBalance`).
-  // The weight is the latest weigh-in: the same one the RMR below is computed from.
+  // #2071. The BUDGET's deficit, derived from the goal and the weight — never typed. Rounded here so
+  // the figure on the wire is exactly the one the budget was built with (see `computeCalorieBalance`).
+  //
+  // (b) The weight is the SMOOTHED 30-day trend — the Body screen's Weight Trend line read at its
+  // latest weigh-in (`computeTrendWeightKg`, the same fit as that card's rate, never a second
+  // smoothing). Fallback, stated: with fewer than three weigh-ins in the window there is no trend, and
+  // the latest weigh-in is used instead. The RMR keeps the latest weigh-in, as before.
+  const trendWeightKg = computeTrendWeightKg(metrics.filter(m => m.date >= trendStart && m.date <= date))
+  const deficitWeightKg = trendWeightKg ?? latestWeightKg
+  const deficitWeightSource: 'trend' | 'latest' | null =
+    trendWeightKg != null ? 'trend' : latestWeightKg != null ? 'latest' : null
   const deficitKcal = Math.round(goalDeficitKcal({
-    goal, currentWeightKg: latestWeightKg, targetWeightKg: userGoals?.targetWeightKg ?? null,
+    goal, currentWeightKg: deficitWeightKg, targetWeightKg: userGoals?.targetWeightKg ?? null,
   }))
 
   const missingProfileFields = [
@@ -403,6 +422,9 @@ export async function computeEnergyBalance(
   // "target net" and the budget are one decision rather than the recommender's −200 beside it.
   const balance = computeCalorieBalance({
     restingBaseKcal, activeKcal: activeEnergy.total, intakeKcal, goalDeltaKcal: 0 - deficitKcal, deficitKcal,
+    // (a) The first 3,000 steps' energy, out of the 20% — the same per-user credit the formula
+    // resting base above already takes, so the two halves of the energy model agree on it.
+    stepCreditKcal: stepBaseCreditKcal,
     // Rounded here rather than only inside `budgetProvenance`: this number goes on the wire, and a
     // float labelled kcal invites a consumer to print 1815.2992 where the card says 1,815.
     restingRateKcal: Math.round(bmr),
@@ -437,6 +459,8 @@ export async function computeEnergyBalance(
       ...balance, intakeKcal, restingBaseKcal, activeKcal: activeEnergy.total,
       restingRateSource: measuredBmr != null ? 'measured' : 'formula',
       restingRateMeasuredOn: measuredBmr != null ? measuredRmr?.measuredOn ?? null : null,
+      deficitWeightKg: deficitWeightKg == null ? null : Math.round(deficitWeightKg * 10) / 10,
+      deficitWeightSource,
     },
     maintenance: {
       kcal: maintenanceKcal,
@@ -463,7 +487,7 @@ export async function computeEnergyBalance(
     macroTargets: macroTargetsFor(activeEnergy.total, budgetProvenance({
       restingBaseKcal, activeKcal: activeEnergy.total,
       targetNetKcal: balance.targetNetKcal, restingRateKcal: Math.round(bmr),
-      deficitKcal: balance.deficitKcal,
+      deficitKcal: balance.deficitKcal, stepCreditKcal: balance.stepCreditKcal,
     }).base),
     activeBreakdown,
     goal,

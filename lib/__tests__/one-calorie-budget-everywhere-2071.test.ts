@@ -16,12 +16,16 @@ import { NextRequest } from 'next/server'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 import { calorieBudget, goalDeficitKcal } from '@trainingai/shared/nutrition/calorie-budget'
+import { computeTrendWeightKg } from '@trainingai/shared/health/long-term-goal-progress'
+import { shiftDateStr } from '@trainingai/shared/date-utils'
 
 const USER_ID = '00000000-0000-4000-8000-000000002071'
 const TZ = 'Australia/Brisbane'
 const TODAY = todayInTz(TZ)
 
 let weightKg = 70.3
+/** Extra weigh-ins before today, for the trend-weight tests. */
+let history: { date: string; weightKg: number }[] = []
 let storedCalories = 1660
 let targetWeightKg: number | null = 60
 let digestPrompt = ''
@@ -44,7 +48,7 @@ vi.mock('@/lib/ai/instrument', () => ({
 
 const repo = {
   // energy balance
-  listBodyMetrics: async () => [{ date: TODAY, weightKg, steps: 7000 }],
+  listBodyMetrics: async () => [...history, { date: TODAY, weightKg, steps: 7000 }],
   listFoodLogsSummary: async () => [{ date: TODAY, calories: 900, proteinG: 70, carbsG: 80, fatG: 30 }],
   listActivityLogs: async () => [],
   getWorkoutSessionsFrom: async () => [],
@@ -117,6 +121,7 @@ async function budgetsBySurface() {
 
 beforeEach(() => {
   weightKg = 70.3
+  history = []
   storedCalories = 1660
   targetWeightKg = 60
   vi.resetModules()
@@ -134,7 +139,10 @@ describe('#2071 — one calorie budget on every surface', () => {
     const b = payload.balance
     expect(budgets.clientSurfaces).toBe(calorieBudget({
       rmrKcal: b.restingRateKcal, deficitKcal: b.deficitKcal, movementKcal: b.activeKcal,
+      stepCreditKcal: b.stepCreditKcal,
     }).totalKcal)
+    // (a) the energy model's own step credit is in it, never zero for a complete profile.
+    expect(b.stepCreditKcal).toBeGreaterThan(0)
   })
 
   it("builds the deficit from the goal and today's weight", async () => {
@@ -152,6 +160,43 @@ describe('#2071 — one calorie budget on every surface', () => {
     vi.resetModules()
     const lighter = (await budgetsBySurface()).payload.balance.deficitKcal
     expect(lighter).toBeLessThan(heavy)
+  })
+
+  // Owner 2026-10-07 (b): the deficit reads the smoothed 30-day trend weight — the Body screen's
+  // Weight Trend line — and falls back to the latest weigh-in only when there is no trend.
+  it('builds the deficit from the 30-day trend weight, not a noisy last weigh-in', async () => {
+    // A steady fall from 72 kg, then a light reading today (a water swing).
+    history = [20, 15, 10, 5, 2].map((back, i) => ({ date: shiftDateStr(TODAY, -back), weightKg: 72 - i * 0.3 }))
+    weightKg = 69.0
+    const { payload, budgets } = await budgetsBySurface()
+    const trend = computeTrendWeightKg([...history, { date: TODAY, weightKg }])!
+    expect(trend).toBeGreaterThan(69.0)
+    expect(payload.balance.deficitWeightSource).toBe('trend')
+    expect(payload.balance.deficitWeightKg).toBe(Math.round(trend * 10) / 10)
+    expect(payload.balance.deficitKcal).toBe(Math.round(goalDeficitKcal({
+      goal: 'recomp', currentWeightKg: trend, targetWeightKg: 60,
+    })))
+    expect(payload.balance.deficitKcal).not.toBe(Math.round(goalDeficitKcal({
+      goal: 'recomp', currentWeightKg: 69.0, targetWeightKg: 60,
+    })))
+    expect(new Set(Object.values(budgets)).size).toBe(1)
+  })
+
+  it('ignores weigh-ins older than the 30-day trend window', async () => {
+    history = [
+      { date: shiftDateStr(TODAY, -40), weightKg: 90 },
+      { date: shiftDateStr(TODAY, -35), weightKg: 90 },
+      { date: shiftDateStr(TODAY, -31), weightKg: 90 },
+    ]
+    const { payload } = await budgetsBySurface()
+    expect(payload.balance.deficitWeightSource).toBe('latest')
+    expect(payload.balance.deficitKcal).toBe(232)
+  })
+
+  it('falls back to the latest weigh-in when there is no trend yet', async () => {
+    const { payload } = await budgetsBySurface()
+    expect(payload.balance.deficitWeightSource).toBe('latest')
+    expect(payload.balance.deficitWeightKg).toBe(70.3)
   })
 
   it('takes no deficit with no goal weight set', async () => {

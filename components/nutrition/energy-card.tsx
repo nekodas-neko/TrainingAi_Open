@@ -233,6 +233,7 @@ export const EnergyCard = memo(function EnergyCard({
             targetNetKcal={b.targetNetKcal}
         restingRateKcal={b.restingRateKcal}
         deficitKcal={b.deficitKcal}
+        stepCreditKcal={b.stepCreditKcal}
             workoutKcal={breakdown?.workoutKcal ?? 0}
             activityKcal={breakdown?.activityKcal ?? 0}
             stepsKcal={breakdown?.stepsKcal ?? 0}

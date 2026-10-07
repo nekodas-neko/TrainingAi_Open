@@ -191,7 +191,7 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
         'changed dose inside the calibration window: quote it beside any maintenance figure or target ' +
         'you give, because weight moved by a dose change is not metabolism. ' +
         '`dailyBudgetKcal` is the calorie budget for the day — resting rate, minus the deficit for the goal, plus ' +
-        'the 20% for daily living, plus measured movement (`budgetBreakdown`) — and is the ONE budget every ' +
+        'the 20% for daily living less the first 3,000 steps, plus measured movement (`budgetBreakdown`) — and is the ONE budget every ' +
         'screen shows; `kcalLeftToHitTarget` is measured against it. `storedGoal` is the calorie goal the ' +
         'user once typed and the maintenance-based recommendation for it: never present either as the budget for today. ' +
         'Quote these numbers; never recompute them.',
@@ -220,7 +220,11 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
             const p = budgetProvenance(r.balance)
             return p.chain == null ? null : {
               restingRateKcal: p.chain.rmr, goalDeficitKcal: p.chain.deficit,
-              dailyLivingKcal: p.chain.metabolicBurn, movementKcal: p.earned,
+              // The 20% less the first 3,000 steps' energy, which movement already counts.
+              dailyLivingKcal: p.chain.dailyLiving, movementKcal: p.chain.movement,
+              floorSetTheTotal: p.chain.totalFloored,
+              deficitFromWeightKg: r.balance.deficitWeightKg ?? null,
+              deficitWeightSource: r.balance.deficitWeightSource ?? null,
             }
           })(),
           kcalLeftToHitTarget: r.balance.remainingKcal,

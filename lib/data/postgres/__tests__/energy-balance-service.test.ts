@@ -294,9 +294,12 @@ describe.skipIf(!canRun)('energy balance — calibration window', () => {
     await pool.query(`UPDATE users SET target_weight_kg = 70 WHERE id = $1`, [TEST_USER_ID])
     try {
       const r0 = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
-      // lose_weight keeps the app's existing 500 kcal/day (a placeholder until the tuning issue).
-      expect(r0.balance!.deficitKcal).toBe(500)
-      expect(r0.balance!.targetNetKcal).toBe(-500)
+      // lose_weight is 0.5% of the 30-day TREND weight a week (#2621). The 28 seeded weigh-ins give a
+      // trend, so the deficit reads it: ~79 kg → 0.005 × 79 × 7,700 / 7 ≈ 435 kcal/day.
+      expect(r0.balance!.deficitWeightSource).toBe('trend')
+      const w = r0.balance!.deficitWeightKg!
+      expect(Math.abs(r0.balance!.deficitKcal! - (0.005 * w * 7700) / 7)).toBeLessThan(1)
+      expect(r0.balance!.targetNetKcal).toBe(-r0.balance!.deficitKcal!)
 
       // Eat exactly maintenance: net 0, which is well ABOVE the deficit budget.
       await logFood(TODAY, r0.balance!.expenditureKcal)

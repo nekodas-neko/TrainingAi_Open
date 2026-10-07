@@ -81,9 +81,12 @@ export interface CalorieBalanceInput {
   restingRateKcal?: number | null
   /**
    * #2071. The goal's deficit in kcal/day (`goalDeficitKcal`), positive to eat below the burn. With
-   * a resting rate it makes the budget `calorieBudget`'s RMR − deficit + metabolic burn + movement.
+   * a resting rate it makes the budget `calorieBudget`'s RMR − deficit + daily living + movement.
    */
   deficitKcal?: number | null
+  /** #2071. The first 3,000 steps' energy (`stepEnergyKcal(profile, STEP_BASE_CREDIT)`), which the
+   *  budget takes out of the 20% because movement counts those steps. */
+  stepCreditKcal?: number | null
 }
 
 export interface CalorieBalanceResult {
@@ -105,6 +108,8 @@ export interface CalorieBalanceResult {
   /** #2071. The goal's deficit the budget was built with, carried so a client re-reading the budget
    *  through `budgetProvenance` gets the same number. Null when the caller supplied none. */
   deficitKcal: number | null
+  /** #2071. The step credit the budget was built with, carried for the same reason. */
+  stepCreditKcal: number | null
   /** #2071. THE day's budget — `budgetProvenance(...).total`, on the wire so a server reader (the
    *  coach, the digest) quotes it rather than re-deriving it. */
   budgetKcal: number
@@ -138,12 +143,15 @@ export function computeCalorieBalance(input: CalorieBalanceInput): CalorieBalanc
   // the screen cannot land 1 kcal away from the server's `remainingKcal`.
   const deficitKcal = typeof input.deficitKcal === 'number' && Number.isFinite(input.deficitKcal)
     ? Math.round(input.deficitKcal) : null
+  const stepCreditKcal = typeof input.stepCreditKcal === 'number' && Number.isFinite(input.stepCreditKcal)
+    ? Math.round(input.stepCreditKcal) : null
   const budgetKcal = budgetProvenance({
     restingBaseKcal: input.restingBaseKcal,
     activeKcal: input.activeKcal,
     targetNetKcal,
     restingRateKcal: input.restingRateKcal,
     deficitKcal,
+    stepCreditKcal,
   }).total
   const deviationKcal = Math.round(input.intakeKcal) - budgetKcal
   const { zone, label, color } = balanceZone(deviationKcal)
@@ -154,6 +162,7 @@ export function computeCalorieBalance(input: CalorieBalanceInput): CalorieBalanc
     deviationKcal,
     restingRateKcal: input.restingRateKcal ?? null,
     deficitKcal,
+    stepCreditKcal,
     budgetKcal,
     // `-0` is a legal result of negating 0 and leaks into equality checks; normalise it away.
     remainingKcal: deviationKcal === 0 ? 0 : -deviationKcal,
@@ -317,11 +326,19 @@ export interface BudgetProvenance {
   /** A resting rate anchors the budget (true on every path the service produces today). */
   anchoredToRestingRate: boolean
   /**
-   * #2071. The terms of `base`, for the provenance line: RMR − deficit + metabolic burn. `floored`
+   * #2071. The terms of `base`, for the provenance line: RMR − deficit + daily living (the 20%
+   * metabolic burn less the first 3,000 steps' energy, `stepCredit`). `floored`
    * means the floor, not that chain, set `base` (so the chain does not sum to it). Null on the
    * two legacy paths below, which have no such chain to print.
    */
-  chain: { rmr: number; deficit: number; metabolicBurn: number; floored: boolean } | null
+  chain: {
+    rmr: number; deficit: number; metabolicBurn: number; stepCredit: number; dailyLiving: number
+    /** Today's movement, rounded — the last term of the chain. */
+    movement: number
+    floored: boolean
+    /** The floor set the whole day's total, not only the still day. */
+    totalFloored: boolean
+  } | null
 }
 
 /**
@@ -338,9 +355,9 @@ export interface BudgetProvenance {
  * why. `anchoredToRestingRate` says which branch ran, so a caller printing the provenance line names
  * the right thing instead of calling a resting rate a goal, or the reverse.
  *
- * **#2071 changed it again, to the owner's final spec:** `base` is RMR − the goal's deficit + the
- * 20% metabolic burn (`calorieBudget().stillDayKcal`), and `total` adds movement. `chain` carries the
- * three terms so the provenance line can print them.
+ * **#2071 changed it again, to the owner's final spec:** `base` is RMR − the goal's deficit + daily
+ * living (the 20% metabolic burn less the first 3,000 steps' energy) — `calorieBudget().stillDayKcal`
+ * — and `total` adds movement. `chain` carries the terms so the provenance line can print them.
  *
  * **Lives here, beside `computeCalorieBalance` whose output it reads.** It spent a day in
  * `components/nutrition/` only to avoid colliding with the Lane A half of Q-401 in this directory;
@@ -353,12 +370,14 @@ export interface BudgetProvenance {
  * Q-401: two budgets on one screen, 274 kcal apart, both labelled "left".
  */
 export function budgetProvenance(
-  { restingBaseKcal, activeKcal, targetNetKcal, restingRateKcal, deficitKcal }:
+  { restingBaseKcal, activeKcal, targetNetKcal, restingRateKcal, deficitKcal, stepCreditKcal }:
   {
     restingBaseKcal: number; activeKcal: number; targetNetKcal: number
     restingRateKcal?: number | null
     /** #2071. Absent on a payload cached before the goal deficit existed — see below. */
     deficitKcal?: number | null
+    /** #2071. The first 3,000 steps' energy, taken out of the 20%. */
+    stepCreditKcal?: number | null
   },
 ): BudgetProvenance {
   const anchoredToRestingRate =
@@ -374,13 +393,17 @@ export function budgetProvenance(
   // the new total against an old remainder would put two numbers on one card until the revalidation
   // lands, which is the exact defect this function exists to prevent.
   if (anchoredToRestingRate && typeof deficitKcal === 'number' && Number.isFinite(deficitKcal)) {
-    const b = calorieBudget({ rmrKcal: restingRateKcal as number, deficitKcal, movementKcal: activeKcal })
+    const b = calorieBudget({ rmrKcal: restingRateKcal as number, deficitKcal, movementKcal: activeKcal, stepCreditKcal })
     return {
       base: b.stillDayKcal,
       earned: b.totalKcal - b.stillDayKcal,
       total: b.totalKcal,
       anchoredToRestingRate: true,
-      chain: { rmr: b.rmrKcal, deficit: b.deficitKcal, metabolicBurn: b.metabolicBurnKcal, floored: b.stillDayFloored },
+      chain: {
+        rmr: b.rmrKcal, deficit: b.deficitKcal, metabolicBurn: b.metabolicBurnKcal,
+        stepCredit: b.stepCreditKcal, dailyLiving: b.dailyLivingKcal, movement: b.movementKcal,
+        floored: b.stillDayFloored, totalFloored: b.floored,
+      },
     }
   }
 
