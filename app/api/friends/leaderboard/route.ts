@@ -18,7 +18,7 @@ function getMondayUtc(tz: string): Date {
   return new Date(format(monday, "yyyy-MM-dd'T'00:00:00") + 'Z')
 }
 
-export async function GET() {
+export async function GET(_req: Request) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
