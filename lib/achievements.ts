@@ -157,7 +157,7 @@ export async function computeAchievements(userId: string, tz: string): Promise<A
     db.execute(sql`
       SELECT DISTINCT (fl.logged_at AT TIME ZONE ${tz})::date AS day
       FROM food_logs fl
-      WHERE fl.user_id = ${userId}::uuid
+      WHERE fl.user_id = ${userId}::uuid AND fl.deleted_at IS NULL
       ORDER BY day DESC
     `),
     db.execute(sql`
@@ -168,13 +168,13 @@ export async function computeAchievements(userId: string, tz: string): Promise<A
     db.execute(sql`
       SELECT COUNT(DISTINCT date)::int AS count
       FROM body_metrics
-      WHERE user_id = ${userId}::uuid AND weight_kg IS NOT NULL
+      WHERE user_id = ${userId}::uuid AND weight_kg IS NOT NULL AND deleted_at IS NULL
     `),
     db.execute(sql`
       SELECT (fl.logged_at AT TIME ZONE ${tz})::date AS day, SUM(fi.calories * fl.quantity_multiplier) AS total_cals
       FROM food_logs fl
       JOIN food_items fi ON fl.food_item_id = fi.id
-      WHERE fl.user_id = ${userId}::uuid
+      WHERE fl.user_id = ${userId}::uuid AND fl.deleted_at IS NULL
       GROUP BY day
       ORDER BY day DESC
     `),
@@ -184,12 +184,12 @@ export async function computeAchievements(userId: string, tz: string): Promise<A
     db.execute(sql`
       SELECT COALESCE(MAX(steps), 0)::int AS max_steps
       FROM body_metrics
-      WHERE user_id = ${userId}::uuid AND steps IS NOT NULL
+      WHERE user_id = ${userId}::uuid AND steps IS NOT NULL AND deleted_at IS NULL
     `),
     db.execute(sql`
       SELECT COALESCE(SUM(distance_km), 0)::float AS total
       FROM activity_logs
-      WHERE user_id = ${userId}::uuid
+      WHERE user_id = ${userId}::uuid AND deleted_at IS NULL
     `),
     // BF-122a — the active schedule, so the workout streak's rest-day allowance comes from what the
     // user actually signed up for rather than a literal 1. One row; the days are aggregated here so
@@ -209,7 +209,7 @@ export async function computeAchievements(userId: string, tz: string): Promise<A
       SELECT
         (SELECT target_weight_kg FROM users WHERE id = ${userId}::uuid) AS target_weight,
         (SELECT weight_kg FROM body_metrics
-          WHERE user_id = ${userId}::uuid AND weight_kg IS NOT NULL
+          WHERE user_id = ${userId}::uuid AND weight_kg IS NOT NULL AND deleted_at IS NULL
           ORDER BY date DESC LIMIT 1) AS current_weight
     `),
   ])
