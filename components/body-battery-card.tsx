@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'motion/react'
 import { fmtAest } from '@trainingai/shared/date-utils'
 import { bodyBatteryColor, type BodyBatteryLabel } from '@trainingai/shared/health/body-battery-band'
 import { StressStrip } from '@/components/body-battery/stress-strip'
+import { scoreGapText } from '@/components/health/score-gap-copy'
 import { StressDayChart } from '@/components/body-battery/stress-day-chart'
 import type { BodyBatteryResponse } from '@/app/api/body-battery/route'
 import { ProgressFill } from '@/components/ui/progress-fill'
@@ -102,6 +103,7 @@ export function BodyBatteryCard({ battery }: { battery: BodyBatteryResponse }) {
   // thing not passing it on. `sufficient` is false in both cases, which is what makes it the right
   // condition on its own.
   const lowData = conf != null && !conf.sufficient
+  const stressGap = scoreGapText(battery.availability, 'daytimeStress')
   // **No HR drove the arc at all, so there is no level to band.** RV-38 made the qualification
   // STRONGER as the data got worse, and this continues that rather than undoing it: a sparse day
   // keeps its number and gains the "Limited data" chip, and a day with nothing behind it stops
@@ -226,6 +228,11 @@ export function BodyBatteryCard({ battery }: { battery: BodyBatteryResponse }) {
                           which is the comparison the owner's pass test makes. */}
                       <StressDayChart />
                     </>
+                  )}
+                  {/* issue 2423. No strip means no daytime stress series, and the card said nothing about
+                      it. One line, with the copy the score screens use for the same absence. */}
+                  {!battery.stress && stressGap && (
+                    <p className="text-2xs text-muted-foreground">Daytime stress · {stressGap}</p>
                   )}
                 </>
               ) : (

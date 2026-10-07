@@ -12,6 +12,7 @@ import { walkBodyBattery } from '@trainingai/shared/health/body-battery-walk'
 import { buildDaytimeStressSeriesFromModel, summarizeStressDay, type StressPoint, type DhrvBaselines } from '@/lib/health/daytime-stress'
 import { resolveAnchor, type AnchorSource } from '@/lib/health/body-battery-anchor'
 import { buildReadinessPayload } from '@/lib/health/readiness-payload'
+import { metricAvailability, type MetricAvailability } from '@/lib/health/score-availability'
 
 /**
  * One day of Body Battery, computed from stored inputs. Extracted from `/api/body-battery` for TN-72
@@ -52,6 +53,13 @@ export interface BodyBatteryResponse {
     series: { t: number; level: number }[]  // 30-min bucket midpoints, level ∈ [−1,+1]
     highMinutes: number | null              // minutes at level ≤ STRESS_HIGH_LEVEL today
   } | null
+  /**
+   * Why `stress` is null, in the same shape the readiness payload reports its metrics in, so the
+   * strip's empty state reads `scoreGapText` rather than carrying a sentence of its own (issue 2423).
+   * Optional: a response seeded from the on-device cache predates it, and "no entry" means the
+   * surface says nothing rather than guessing.
+   */
+  availability?: MetricAvailability[]
 }
 
 // ── Tuning constants ─────────────────────────────────────────────────────────
@@ -416,6 +424,7 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
           highMinutes: stressSummary?.stressHighMinutes ?? null,
         }
       : null,
+    availability: [metricAvailability('daytimeStress', stressSeries.length > 0 ? stressSeries.length : null)],
   }
 
   return { response, snapshot, hadPersistedAnchor: daySnapshot != null }

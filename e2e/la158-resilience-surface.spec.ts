@@ -104,13 +104,34 @@ test('⭐ no level states what was observed instead of rendering nothing', async
 test('⛔ and a payload from before these fields existed still renders no tile', async ({ page }) => {
   // Absent data is not a state worth a sentence. This is the case that must NOT grow a tile, or
   // every reader on an old cached payload gets a line about nothing.
+  // `availability: []` too: the real response now reports a resilience entry (issue 2423), and an
+  // old cached payload has no such entry — that absence is what this case is about.
   await withResilience(page, {
     ownResilienceLevel: null, ownResilienceBand: null, ownResilienceConfidence: null,
-    ownResilienceAsOf: null, ownResilienceUnavailable: null,
+    ownResilienceAsOf: null, ownResilienceUnavailable: null, availability: [],
   })
 
   // The page itself is up — so a missing tile is a missing TILE, not a failed load.
   await expect(page.getByRole('heading', { name: /Readiness/i }).first())
     .toBeVisible({ timeout: 120_000 })
   await expect(page.getByText('Resilience')).toHaveCount(0)
+})
+
+test('no level, no coverage observation, but a reason: the tile says why (issue 2423)', async ({ page }) => {
+  await withResilience(page, {
+    ownResilienceLevel: null, ownResilienceBand: null, ownResilienceConfidence: null,
+    ownResilienceAsOf: null, ownResilienceUnavailable: null,
+    availability: [{ metric: 'resilience', state: 'absent', gap: 'no_input', degradedInputs: [] }],
+  })
+
+  await expect(page.getByText('Resilience').first()).toBeVisible({ timeout: 120_000 })
+  await expect(page.getByText(/Not published yet/)).toBeVisible()
+  const reason = page.getByText('Nothing recorded for today', { exact: true })
+  await expect(reason).toBeVisible()
+  // The score's own reason line (if any) is the readiness one; this is the tile's, inside its box.
+  const tile = page.locator('div.rounded-xl').filter({ hasText: 'Not published yet' }).last()
+  const t = (await tile.boundingBox())!
+  const r = (await reason.last().boundingBox())!
+  expect(r.x).toBeGreaterThanOrEqual(t.x)
+  expect(r.x + r.width).toBeLessThanOrEqual(t.x + t.width + 1)
 })
