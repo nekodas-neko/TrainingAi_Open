@@ -22,6 +22,8 @@ export async function GET() {
     const body = renderServiceWorker(template, {
       cacheName: `ta-${BUILD_ID.slice(0, 12)}`,
       precacheUrls: buildPrecacheList(STATIC_DIR),
+      // `next dev` chunk names are reused across edits, so dev must not be cache-first (#2608).
+      staticCacheFirst: process.env.NODE_ENV === "production",
     });
     _cached = { buildId: BUILD_ID, body };
   }

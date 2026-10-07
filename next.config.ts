@@ -82,7 +82,12 @@ const nextConfig: NextConfig = {
         source: '/(.*)',
         headers: securityHeaders,
       },
-      {
+      // Immutable only where it is true. A production chunk's name is a hash of its contents; a
+      // `next dev` chunk keeps its name while its contents change with every edit, branch switch
+      // and restart. Sent in dev, this told the Dev app's WebView to keep the first version of each
+      // chunk for a year, so a sitting ran a mixture of old and new code and no probe an agent added
+      // ever reached the screen (#2608). Dev keeps Next's own no-cache header.
+      ...(isDev ? [] : [{
         source: '/_next/static/(.*)',
         headers: [
           {
@@ -90,7 +95,7 @@ const nextConfig: NextConfig = {
             value: 'public, max-age=31536000, immutable',
           },
         ],
-      },
+      }]),
       {
         source: '/icons/(.*)',
         headers: [
