@@ -25,6 +25,12 @@ export type SleepRow = {
   phaseWindowStart?: string | null;
   phaseWindowEnd?: string | null;
   sleepTimeRecommendation: string | null;
+  /**
+   * The bedtime the user remembers for a night the ring missed the start of (Q-519). Its own field,
+   * never folded into `sleepStart`: the measured window stays measured, and the card that edits it
+   * reads it back from here. Optional so a payload from before it existed still parses (#2264).
+   */
+  manualSleepStart?: string | null;
 };
 
 // Contiguity threshold for treating two same-date rows as one sleep period. Midnight-split
@@ -178,6 +184,7 @@ export function localSleepRowsAsNights(local: readonly LocalSleepSession[]): Sle
       respiratoryRate: l.respiratoryRate, sleepPhase5Min: l.sleepPhase5Min,
       sleepStart: l.sleepStart, sleepEnd: l.sleepEnd,
       sleepTimeRecommendation: null,
+      manualSleepStart: l.manualSleepStart,
     };
     const list = byDate.get(row.date) ?? [];
     list.push(row);

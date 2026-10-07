@@ -31,10 +31,10 @@ interface Props {
  * *window*, one of which turned a 3-hour night into 9 hours at 34% efficiency and moved five awake
  * hours into a nightly training set. `docs/reviews/2026-08-26-manual-bedtime-write-audit.md`.
  *
- * **The current value is read from the local store, not from `/api/sleep-sessions`** — that route
- * does not return `manualSleepStart`, so on the web build this reads as unset even when it is set.
- * The APK is the canonical runtime and reads it correctly; adding the field to the route is Lane A's
- * and is filed on Q-519.
+ * **The current value is read from the local store.** `/api/sleep-sessions` returns
+ * `manualSleepStart` too since #2264, but this card has not been moved onto it: on the web build,
+ * which has no local store, it still reads as unset. The APK is the canonical runtime and reads it
+ * correctly.
  */
 export function ManualBedtimeCard({ date, measuredStart, userId }: Props) {
   const tz = useUserTimezone()
