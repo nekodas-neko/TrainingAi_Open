@@ -184,6 +184,9 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     // anywhere. It is a plain value here, not a merge input: nothing on the device derives a
     // window, duration or efficiency from it.
     manualSleepStart: r.manualSleepStart ? toIso(r.manualSleepStart) : null,
+    // #2338 — a night the user entered. Carried so the device ranks it below a device night, as the
+    // server does; absent from an older server's reply, which had no manual nights to send.
+    manualEntry:     r.manualEntry === true,
     syncStatus:      'synced' as const,
     updatedAt:       toIso(r.updatedAt),
   } satisfies LocalSleepSession));
@@ -1170,6 +1173,11 @@ async function pushMutationsOnce(userId: string): Promise<PushResult> {
       // same convention as workout_log/activity_logs above.
       const id = m.payload.id as string | undefined;
       if (id) await store.markSleepSessionSynced(id);
+    } else if (m.domain === 'manual_sleep') {
+      // #2338. `upsertManualSleepLocally` wrote the night as 'pending'; without this the row would
+      // stay pending and every later pull would skip it, so a server-side edit never arrived.
+      const id = m.payload.id as string | undefined;
+      if (id) await store.markManualSleepSynced(id, batchIds);
     } else if (m.domain === 'manual_bedtime') {
       // #2547. The card wrote the bedtime to the night's local row as 'pending'; without this the
       // row stayed pending and every later pull skipped it.

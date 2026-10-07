@@ -50,6 +50,8 @@ export async function GET() {
     // any screen whose local rows the network reply overwrites). It is passed through as its own
     // field and nothing here reads it: the measured window above stays measured.
     manualSleepStart: r.manualSleepStart ? r.manualSleepStart.toISOString() : null,
+    // #2338. Only true on a night no device recorded — `listSleepSessions` already dropped the rest.
+    manualEntry: r.manualEntry ?? false,
   })));
 
   // A night the rollup has not yet derived past is still growing, and saying so is the whole of

@@ -553,6 +553,22 @@ export async function invalidateRestDayChoice(): Promise<void> {
   clearLegacyHomeSeeds()
 }
 
+/** #2338 — a night the user entered by hand (`saveManualNight`). It is a sleep row like any other,
+ *  so everything a synced night moves moves here too: the sleep list, readiness and what derives from
+ *  it, the sleep streak, the collection's sleep ladder, and the day's read-through. */
+export async function invalidateManualSleepWrite(): Promise<void> {
+  await Promise.all([
+    invalidateBiometrics(),
+    invalidateReadinessInputs(),
+    // a night is a faucet day for the collection's sleep ladder (BF-122b)
+    invalidateCache('collection'),
+    invalidateCache('day-log:'),
+    invalidateCache('home-day-timeline'),
+    invalidateCache('day-review-week-window:'),
+    invalidateCache('weekly-review-month-window:'),
+  ])
+}
+
 /** Exercise library entry added/edited/deleted (user custom or admin catalogue). */
 export async function invalidateExerciseLibrary(): Promise<void> {
   await invalidateCache('exercise-library')

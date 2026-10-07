@@ -88,8 +88,22 @@ export interface LocalSleepSession {
   /** Q-519 — the bedtime the user remembers for a night the ring did not observe. Read only by the
    *  bedtime estimate; never by anything deriving a window, duration or efficiency. */
   manualSleepStart: string | null;
+  /** #2338 (v51) — a night the user entered by hand, not one a device measured. `getSleepSessions`
+   *  never returns one that a device night covers (`preferDeviceNights`). */
+  manualEntry:     boolean;
   syncStatus:      'pending' | 'synced';
   updatedAt:       string;
+}
+
+/** #2338 — what the device writes for a night the user entered: its window and what follows from
+ *  it (`manualNightFromWindow`). Nothing measured — no stages, efficiency, heart rate or awake time. */
+export interface LocalManualSleepNight {
+  id:             string;
+  date:           string;
+  sleepStart:     string;
+  sleepEnd:       string;
+  durationHours:  number;
+  timeInBedHours: number;
 }
 
 export interface LocalWorkoutSession {

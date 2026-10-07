@@ -60,6 +60,8 @@ import {
   validWaterMlDeltaOrNull,
 } from '@trainingai/shared/validation/body-metrics'
 import { sleepImplausibleReason } from '@trainingai/shared/validation/plausibility'
+import { preferDeviceNights } from '@trainingai/shared/health/sleep-night'
+import { parseManualNight } from '@trainingai/shared/health/manual-sleep'
 import { ActivityLogBody, deriveEndTime } from '@trainingai/shared/validation/activity-log'
 import { describeZodFailure } from './push-error-detail'
 import type { WorkoutRepository, UserGoals, EnsuredWorkoutSession, SessionLoad, YearReviewTotals, YearReviewTopExercise, UnitFixResult, SyncDelta, IncomingMutation, PushResult, OuraRawSampleInput, OuraRawSampleSummary, OuraRawSampleLatest, OuraRawSampleRow, FitnessTest, RunningPlan, PrescribedRun, PrescribedRunUpdate, AiCallLogInput, AiCallUsageSummary, ScaleRawSampleInput, ScalePendingSample, LastRealOneRm, BloodPanel, BloodPanelInput, BloodAnalyte, StrapStatusWrite, StrapStatusRow, OuraLinkStatsWrite, DetectionEventWrite } from '../repository'
@@ -3075,15 +3077,22 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return updated.length > 0
   }
 
+  /**
+   * Every night in [from, to] by wake date, newest date first — **with a typed-in night dropped
+   * wherever a device recorded the same night** (#2338, `preferDeviceNights`). Applied here, at the
+   * one read every server consumer shares, so no scorer, list or chart has to know manual nights
+   * exist. The read is widened a day each side only so a device row whose stored date disagrees with
+   * its window can still shadow a manual night it overlaps; rows outside [from, to] are not returned.
+   */
   async listSleepSessions(userId: string, from: string, to: string): Promise<SleepSession[]> {
     const rows = await this.db.select().from(s.sleepSessions)
       .where(and(
         eq(s.sleepSessions.userId, userId),
-        gte(s.sleepSessions.date, from),
-        lte(s.sleepSessions.date, to),
+        gte(s.sleepSessions.date, shiftDateStr(from, -1)),
+        lte(s.sleepSessions.date, shiftDateStr(to, 1)),
       ))
       .orderBy(desc(s.sleepSessions.date))
-    return rows.map(r => ({
+    return preferDeviceNights(rows).filter(r => r.date >= from && r.date <= to).map(r => ({
       id: r.id, userId: r.userId, date: r.date,
       sleepStart:      r.sleepStart,
       sleepEnd:        r.sleepEnd,
@@ -3105,7 +3114,76 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       sleepPhase5Min:  r.sleepPhase5Min  ?? undefined,
       timeInBedHours:  r.timeInBedHours  ?? undefined,
       manualSleepStart: r.manualSleepStart ?? null,
+      manualEntry:     r.manualEntry,
     }))
+  }
+
+  /**
+   * #2338 — see the interface. One implementation for the route and the `manual_sleep` push branch.
+   *
+   * Never touches a device row. An existing manual night for the date is updated in place (its id
+   * kept); otherwise a new one is inserted with `ON CONFLICT DO NOTHING`, and a conflict is read
+   * back rather than guessed at: the same night inserted concurrently (the partial unique key) is
+   * updated like an existing one; a device row starting at the very same instant IS this night,
+   * measured, so nothing is stored; an id that is already some other row's is refused.
+   *
+   * The update skips itself when a device row already starts at the new `sleep_start`, for the same
+   * reason and so it can never raise the `(user_id, sleep_start)` unique violation.
+   */
+  async saveManualSleepNight(
+    userId: string,
+    night: import('@trainingai/shared/health/manual-sleep').ManualSleepNight,
+  ): Promise<{ id: string | null; shadowed: boolean }> {
+    const fields = {
+      sleepStart:     night.sleepStart,
+      sleepEnd:       night.sleepEnd,
+      durationHours:  night.durationHours,
+      timeInBedHours: night.timeInBedHours,
+      updatedAt:      new Date(),
+    }
+    const findManual = async () => (await this.db.select({ id: s.sleepSessions.id }).from(s.sleepSessions)
+      .where(and(
+        eq(s.sleepSessions.userId, userId),
+        eq(s.sleepSessions.date, night.date),
+        eq(s.sleepSessions.manualEntry, true),
+      ))
+      .limit(1))[0]?.id ?? null
+    const updateManual = async (id: string) => {
+      await this.db.update(s.sleepSessions)
+        .set(fields)
+        .where(and(
+          eq(s.sleepSessions.id, id),
+          eq(s.sleepSessions.userId, userId),
+          eq(s.sleepSessions.manualEntry, true),
+          sql`NOT EXISTS (SELECT 1 FROM sleep_sessions d WHERE d.user_id = ${userId}
+                AND d.sleep_start = ${night.sleepStart.toISOString()}::timestamptz AND d.id <> ${id})`,
+        ))
+      return id
+    }
+
+    let id = await findManual()
+    if (id) {
+      await updateManual(id)
+    } else {
+      const inserted = await this.db.insert(s.sleepSessions)
+        .values({ ...(night.id ? { id: night.id } : {}), userId, date: night.date, ...fields, manualEntry: true })
+        .onConflictDoNothing()
+        .returning({ id: s.sleepSessions.id })
+      id = inserted[0]?.id ?? null
+      if (!id) {
+        id = await findManual()
+        if (id) {
+          await updateManual(id)
+        } else if (night.id) {
+          const [taken] = await this.db.select({ id: s.sleepSessions.id }).from(s.sleepSessions)
+            .where(eq(s.sleepSessions.id, night.id)).limit(1)
+          if (taken) throw new UserFacingError('That id already belongs to another night', 409)
+        }
+      }
+    }
+    if (!id) return { id: null, shadowed: true }
+    const visible = await this.listSleepSessions(userId, night.date, night.date)
+    return { id, shadowed: !visible.some(r => r.id === id) }
   }
 
   /**
@@ -4953,7 +5031,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // Non-fatal: a transient DB error here must not 500 the whole batch
     // before any mutation is even tried.
     let userTz: string = DEFAULT_TZ
-    if (mutations.some(m => m.domain === 'workout_log')) {
+    // `manual_sleep` needs it too: a typed night's date is its wake date in the user's timezone.
+    if (mutations.some(m => m.domain === 'workout_log' || m.domain === 'manual_sleep')) {
       try {
         const user = await this.getUserById(userId)
         userTz = user?.timezone ?? DEFAULT_TZ
@@ -5771,6 +5850,23 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           if (!saved) {
             throw new Error(`manual_bedtime: no sleep session for ${mut.date}`)
           }
+          processed++
+        } else if (mut.domain === 'manual_sleep') {
+          // #2338. The same parse and the same `saveManualSleepNight` the web route calls, so the two
+          // write paths cannot drift. The date is derived from the wake time in the user's timezone,
+          // exactly as the route derives it, and `mut.date` is not trusted for it: the row's key is
+          // (user, wake date), and a device whose clock zone differs from the profile must not file
+          // the night under another date than the web would.
+          //
+          // An implausible or malformed night is a permanent 4xx — a retry cannot make it plausible —
+          // so it quarantines rather than wedging the queue. A replay of an applied mutation edits the
+          // same row to the same values: (user, wake date) is a unique key for manual nights.
+          const parsedNight = parseManualNight(clean, userTz, new Date())
+          if (!parsedNight.ok) {
+            errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: `Invalid manual_sleep payload — ${parsedNight.issues ? describeZodFailure(parsedNight.issues) : parsedNight.reason}` })
+            continue
+          }
+          await this.saveManualSleepNight(userId, parsedNight.night)
           processed++
         } else if (mut.domain === 'plan_meal_answers') {
           // Q-187 phase 2. Calls the same `mp.savePlanMealAnswer` / `mp.deletePlanMealAnswer` the

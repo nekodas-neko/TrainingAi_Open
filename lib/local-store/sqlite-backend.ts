@@ -2,7 +2,7 @@ import { runSQL, querySQL, beginTransaction, commitTransaction, rollbackTransact
 import { MAX_MUTATION_ATTEMPTS, nextRetryDelayMs } from './sync-helpers';
 import type { LocalStore, LocalWorkoutHistory } from './index';
 import type {
-  LocalBodyMetric, LocalMoodLog, LocalSleepSession, LocalWorkoutSession,
+  LocalBodyMetric, LocalMoodLog, LocalSleepSession, LocalManualSleepNight, LocalWorkoutSession,
   LocalActivityLog, LocalFitnessTest, LocalPrescribedRun, LocalProgram, LocalProgressionStyle, PendingMutation,
   LocalFoodLog, LocalFoodItem, LocalDayCheckin, LocalSupplement, LocalSupplementLog, LocalInjury,
   LocalExerciseLog, LocalSetLog, LocalPersonalRecord, LocalOuraDaily,
@@ -16,6 +16,7 @@ import { defaultUseFor1rm } from '@trainingai/shared/workout/default-use-for-1rm
 import { asRpeSource } from '@trainingai/shared/workout/rpe-source';
 import { assembleLocalActiveProgram, type LocalActiveProgram } from './program-assembler';
 import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role';
+import { preferDeviceNights } from '@trainingai/shared/health/sleep-night';
 
 /**
  * The local `ingredients` column is a TEXT mirror of the server's JSONB. A row written by an older
@@ -153,12 +154,16 @@ export class SQLiteLocalStore implements LocalStore {
     }));
   }
 
+  // #2338: a night the user typed in is dropped wherever a device recorded the same night — the same
+  // `preferDeviceNights` the server's `listSleepSessions` applies, so a local-first screen and the
+  // network reply agree on which night it is. Applied here, at the store's one sleep read, so no
+  // screen has to know manual nights exist.
   async getSleepSessions(cutoffDate: string): Promise<LocalSleepSession[]> {
     const rows = await querySQL<Record<string, unknown>>(
       `SELECT * FROM sleep_sessions WHERE date >= ? ORDER BY date`,
       [cutoffDate],
     );
-    return rows.map(r => ({
+    return preferDeviceNights(rows.map(r => ({
       id:              String(r.id),
       date:            String(r.date),
       durationHours:   (r.duration_hours as number) ?? null,
@@ -180,9 +185,10 @@ export class SQLiteLocalStore implements LocalStore {
       sleepPhase5Min:  (r.sleep_phase_5_min as string) ?? null,
       timeInBedHours:  (r.time_in_bed_hours as number) ?? null,
       manualSleepStart: (r.manual_sleep_start as string) ?? null,
+      manualEntry:     Number(r.manual_entry ?? 0) === 1,
       syncStatus:      (r.sync_status as 'pending' | 'synced') ?? 'synced',
       updatedAt:       String(r.updated_at),
-    }));
+    })));
   }
 
   async getWorkoutSessions(cutoffDate: string): Promise<LocalWorkoutSession[]> {
@@ -616,6 +622,40 @@ export class SQLiteLocalStore implements LocalStore {
       `UPDATE sleep_sessions SET manual_sleep_start=?, sync_status='pending', updated_at=? WHERE date=?`,
       [at, new Date().toISOString(), date],
     );
+  }
+
+  async upsertManualSleepLocally(night: LocalManualSleepNight): Promise<string> {
+    // One manual night per date, as the server's partial unique key has it: an existing one for the
+    // date is edited and keeps its id, so a second save before the first has synced is still one
+    // row here and one row there.
+    const [existing] = await querySQL<{ id: string }>(
+      `SELECT id FROM sleep_sessions WHERE date=? AND manual_entry=1 LIMIT 1`, [night.date],
+    );
+    const id = existing?.id ?? night.id;
+    // Every measured column is written NULL rather than left alone: a manual night has none, and an
+    // edit must not inherit a value from anything that row ever held.
+    await runSQL(
+      `INSERT INTO sleep_sessions
+         (id, date, sleep_start, sleep_end, duration_hours, time_in_bed_hours,
+          deep_sleep_hours, rem_sleep_hours, light_sleep_hours, awake_hours, oura_id, efficiency,
+          onset_latency_sec, average_hrv_ms, avg_heart_rate, lowest_heart_rate, restless_periods,
+          sleep_score, respiratory_rate, sleep_phase_5_min, manual_sleep_start,
+          manual_entry, updated_at, sync_status)
+       VALUES (?,?,?,?,?,?,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,1,?,'pending')
+       ON CONFLICT(id) DO UPDATE SET
+         date=excluded.date, sleep_start=excluded.sleep_start, sleep_end=excluded.sleep_end,
+         duration_hours=excluded.duration_hours, time_in_bed_hours=excluded.time_in_bed_hours,
+         updated_at=excluded.updated_at, sync_status='pending'
+       WHERE sleep_sessions.manual_entry=1`,
+      [id, night.date, night.sleepStart, night.sleepEnd, night.durationHours, night.timeInBedHours,
+       new Date().toISOString()],
+    );
+    return id;
+  }
+
+  async markManualSleepSynced(id: string, confirmingIds: string[] = []): Promise<void> {
+    if (await otherQueuedMutations(['manual_sleep'], id, confirmingIds)) return;
+    await runSQL(`UPDATE sleep_sessions SET sync_status='synced' WHERE id=? AND manual_entry=1`, [id]);
   }
 
   async markManualBedtimeSynced(date: string, confirmingIds: string[] = []): Promise<void> {
@@ -1521,9 +1561,9 @@ export class SQLiteLocalStore implements LocalStore {
             light_sleep_hours, oura_id, efficiency, onset_latency_sec, average_hrv_ms,
             avg_heart_rate, lowest_heart_rate, restless_periods, sleep_score,
             respiratory_rate, sleep_phase_5_min, time_in_bed_hours, manual_sleep_start,
-            sleep_start, sleep_end, awake_hours,
+            sleep_start, sleep_end, awake_hours, manual_entry,
             updated_at, sync_status)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
          ON CONFLICT(id) DO UPDATE SET
            date=excluded.date, duration_hours=excluded.duration_hours,
            deep_sleep_hours=excluded.deep_sleep_hours,
@@ -1537,7 +1577,7 @@ export class SQLiteLocalStore implements LocalStore {
            time_in_bed_hours=excluded.time_in_bed_hours,
            manual_sleep_start=excluded.manual_sleep_start,
            sleep_start=excluded.sleep_start, sleep_end=excluded.sleep_end,
-           awake_hours=excluded.awake_hours,
+           awake_hours=excluded.awake_hours, manual_entry=excluded.manual_entry,
            updated_at=excluded.updated_at, sync_status='synced'
          WHERE sleep_sessions.sync_status='synced'
            AND (excluded.updated_at > sleep_sessions.updated_at
@@ -1546,7 +1586,7 @@ export class SQLiteLocalStore implements LocalStore {
          r.ouraId, r.efficiency, r.onsetLatencySec, r.averageHrvMs, r.avgHeartRate,
          r.lowestHeartRate, r.restlessPeriods, r.sleepScore, r.respiratoryRate,
          r.sleepPhase5Min, r.timeInBedHours, r.manualSleepStart,
-         r.sleepStart ?? null, r.sleepEnd ?? null, r.awakHours ?? null, r.updatedAt],
+         r.sleepStart ?? null, r.sleepEnd ?? null, r.awakHours ?? null, r.manualEntry ? 1 : 0, r.updatedAt],
       );
     }
 
