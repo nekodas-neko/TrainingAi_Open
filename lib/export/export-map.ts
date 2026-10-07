@@ -159,6 +159,23 @@ export const EXPORTED: Record<string, ExportScope> = {
   program_phases: { kind: 'via', predicate: 'EXISTS (SELECT 1 FROM public.phase_sets ps WHERE ps.id = t.phase_set_id AND ps.user_id = $1)' },
 }
 
+/**
+ * Lines that are NOT a table read: a repository call whose result is written as one more domain
+ * (#2427). `goals` was the only one, and it sat outside every list, so the coverage check could not
+ * see it — a new repo call added the same way would have been just as invisible, and could have read
+ * a table the map deliberately excludes.
+ *
+ * `scripts/check-export-coverage.js` now reads `full-export.ts` and fails when a `repo.<method>(`
+ * call or a literal `domain:` there is not declared here, when an entry here is no longer called,
+ * or when a `sourceTables` entry is not itself in `EXPORTED`. That last rule is the safety one: a
+ * derived line may only re-present data the export already carries, never reach around an
+ * exclusion. One entry per line — the check reads them with a line regex.
+ */
+export interface DerivedDomain { repoCall: string; sourceTables: string[]; reason: string }
+export const DERIVED_DOMAINS: Record<string, DerivedDomain> = {
+  goals: { repoCall: 'getUserGoals', sourceTables: ['users'], reason: 'the goal columns of the user\'s own row, named as the app names them; the same values are in the users line' },
+}
+
 /** Columns never written to a takeout, even from an exported table. */
 export const WITHHELD_COLUMNS: Record<string, string[]> = {
   users: ['password_hash'],

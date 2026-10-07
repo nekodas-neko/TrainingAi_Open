@@ -96,6 +96,27 @@ describe.skipIf(!canRun)('full export (Q-288)', () => {
     expect(new Set(hr).size).toBe(5001)
   })
 
+  it('the goals line re-presents the users row and nothing else (#2427)', async () => {
+    // `goals` is a repository call, not a table read, so it is declared in DERIVED_DOMAINS with
+    // `sourceTables: ['users']`. Prove the declaration: every goal value is already in the users
+    // line, and the manifest names the derived line so a reader knows it is not a table.
+    await pool.query(`UPDATE users SET steps_goal = 12345, target_weight_kg = 77.5 WHERE id = $1`, [A])
+    const lines = await collect(A)
+    const goals = lines.find(l => l.domain === 'goals')!.row as Record<string, unknown>
+    const me = lines.find(l => l.domain === 'users')!.row as Record<string, unknown>
+    const snake = (k: string) => k.replace(/[A-Z]/g, c => `_${c.toLowerCase()}`)
+    expect(goals.stepsGoal).toBe(12345)
+    for (const [k, v] of Object.entries(goals)) {
+      expect(me).toHaveProperty(snake(k))
+      // `numeric` columns come back from raw pg as strings ('77.50') and from the repo as numbers.
+      const raw = me[snake(k)]
+      expect(typeof v === 'number' && raw != null ? Number(raw) : raw).toEqual(v)
+    }
+    const m = lines[0].row as { derivedDomains: { domain: string; sourceTables: string[] }[]; note: string }
+    expect(m.derivedDomains).toEqual([expect.objectContaining({ domain: 'goals', sourceTables: ['users'] })])
+    expect(m.note).toContain('{"_complete":true}')
+  })
+
   it('strips the password hash from the exported profile row', async () => {
     const lines = await collect(A)
     const me = lines.filter(l => l.domain === 'users').map(l => l.row as Record<string, unknown>)
