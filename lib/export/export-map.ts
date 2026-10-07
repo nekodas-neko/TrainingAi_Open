@@ -195,6 +195,7 @@ export const EXCLUDED: Record<string, Exclusion> = {
 
   // ── App-internal bookkeeping. Not the user's content, and meaningless outside this database. ─
   ai_call_log: { category: 'ops', reason: 'token/latency accounting, no user content' },
+  agent_action_log: { category: 'ops', reason: 'audit trail of maintenance jobs agents ran (#2381); a job on the user's data is not content they created' },
   prescription_shadow: { category: 'ops', reason: 'BF-199 evidence: the given prescription beside what the rules prescriber would have said. Derived per model call, nothing the user wrote, and it duplicates the prescription the export already carries' },
   app_load_metrics: { category: 'ops', reason: 'page-load timing telemetry, pruned at 14 days' },
   applied_mutations: { category: 'ops', reason: 'sync idempotency ledger' },

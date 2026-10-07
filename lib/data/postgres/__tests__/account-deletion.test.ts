@@ -239,7 +239,10 @@ describe.skipIf(!canRun)('account deletion (#2120)', () => {
     }
     expect(naming).toEqual([])
 
-    expect([...setNullToUsers(g)].sort()).toEqual(['ai_call_log', 'error_events', 'exercise_library'])
+    expect([...setNullToUsers(g)].sort()).toEqual(['agent_action_log', 'ai_call_log', 'error_events', 'exercise_library'])
+    // #2381: the audit row survives, unlinked — and the append-only trigger let the FK do it.
+    const act = await rowExists(pool, g, 'agent_action_log', a.rows.get('agent_action_log')!)
+    expect(act?.target_user_id).toBeNull()
     const ai = await rowExists(pool, g, 'ai_call_log', a.rows.get('ai_call_log')!)
     const ee = await rowExists(pool, g, 'error_events', a.rows.get('error_events')!)
     const ex = await rowExists(pool, g, 'exercise_library', a.rows.get('exercise_library')!)

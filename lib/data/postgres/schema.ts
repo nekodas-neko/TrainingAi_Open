@@ -1186,6 +1186,33 @@ export const aiCallLog = pgTable('ai_call_log', {
   createdAt:    timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
+/**
+ * #2381 (migration 202610071523). One row per maintenance action an agent (or the owner) ran.
+ * **Append-only**: inserted `running`, finished once, never deleted or rewritten; a trigger in the
+ * migration enforces that, so it is not visible here. `targetUserId` is the account the job ran on
+ * (NULL = global) and is SET NULL on account deletion, so the record survives unlinked.
+ * `parameters` is redacted by the repository and never holds a secret or personal data.
+ */
+export const agentActionLog = pgTable('agent_action_log', {
+  id:           uuid('id').primaryKey().defaultRandom(),
+  job:          text('job').notNull(),                 // stable id from docs/admin-actions.md
+  parameters:   jsonb('parameters').notNull().default(sql`'{}'::jsonb`),
+  actor:        text('actor').notNull(),               // agent name, or 'owner'
+  approvalRef:  text('approval_ref'),
+  targetUserId: uuid('target_user_id').references(() => users.id, { onDelete: 'set null' }),
+  startedAt:    timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  finishedAt:   timestamp('finished_at', { withTimezone: true }),
+  outcome:      text('outcome').notNull().default('running'), // running | succeeded | failed | refused
+  affectedRows: bigint('affected_rows', { mode: 'number' }),
+  daysMoved:    integer('days_moved'),
+  error:        text('error'),
+}, (t) => ([
+  index('agent_action_log_started_idx').on(t.startedAt),
+  index('agent_action_log_job_started_idx').on(t.job, t.startedAt),
+  check('agent_action_log_outcome_check', sql`${t.outcome} IN ('running', 'succeeded', 'failed', 'refused')`),
+  check('agent_action_log_finished_check', sql`(${t.outcome} = 'running') = (${t.finishedAt} IS NULL)`),
+]))
+
 export const feedbackSubmissions = pgTable('feedback_submissions', {
   id:             uuid('id').primaryKey().defaultRandom(),
   userId:         uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
