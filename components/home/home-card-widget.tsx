@@ -31,6 +31,7 @@ const CollectionCard = dynamic(() => import('@/components/home/collection-card')
 import type { CardWidgetKey } from '@/lib/home/home-prefs'
 import { formatKg } from '@trainingai/shared/format/units'
 import { SleepVerdictNote } from '@/components/home/sleep-verdict-note'
+import { sleepWindowLabel } from '@/components/home/sleep-window-label'
 
 export type CardSectionKey = `card_${CardWidgetKey}`
 
@@ -41,6 +42,8 @@ interface SleepRow {
   remSleepHours: number | null
   lightSleepHours: number | null
   awakHours: number | null
+  sleepStart?: string | null
+  sleepEnd?: string | null
 }
 
 interface HrReading { timestamp: string; bpm: number; source: string | null }
@@ -152,6 +155,7 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
       // #1e3a70 measured ~1:1 on the S25. The hours inherit the foreground, as the sleep detail
       // sheet's identical legend already does.
       const stages = latest ? [{ label: "Deep", hours: latest.deepSleepHours, color: STAGE_COLOR.deep }, { label: "REM", hours: latest.remSleepHours, color: STAGE_COLOR.rem }, { label: "Light", hours: latest.lightSleepHours, color: STAGE_COLOR.light }, { label: "Awake", hours: latest.awakHours, color: STAGE_COLOR.awake }] : []
+      const windowLabel = latest ? sleepWindowLabel(latest.sleepStart, latest.sleepEnd, tz) : null
       const totalStageHrs = stages.reduce((s, st) => s + (st.hours ?? 0), 0)
       const _sColor = cardColors['sleepWidget'] ?? CARD_DEFAULT_COLORS.sleepWidget
       return (
@@ -166,6 +170,7 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--accent-purple)" }}>Sleep</p>
                 <p className="text-2xl font-bold tabular-nums leading-tight">{hrs != null ? `${hrs.toFixed(1)}h` : "—"}{hrs != null && <span className="text-sm font-normal text-muted-foreground ml-1">/ {sleepGoal}h goal</span>}</p>
+                {windowLabel && <p className="text-xs text-muted-foreground tabular-nums">{windowLabel}</p>}
               </div>
               <Moon className="h-6 w-6 flex-none" style={{ color: "var(--accent-purple)" }} />
             </div>
