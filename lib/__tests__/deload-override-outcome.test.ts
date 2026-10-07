@@ -112,9 +112,36 @@ describe('#2360 — the outcome follows the session that will actually run', () 
     expect(deloadOverrideOutcome([ex('Skull Crusher', true, false)], true, pendingEmergency)).toBe('nothing-to-revert')
   })
 
-  it('a deload week is never called full — every set of it is logged as a deload', () => {
-    expect(deloadOverrideOutcome(BF198, true, { ...DRIVES, deloadWeek: true })).toBe('nothing-to-revert')
+  // #2404. This used to read "a deload week is never called full" and answered `nothing-to-revert`,
+  // so the card said "Full is on, but these weights are unchanged". The weights DO change: Full
+  // reverts every deloaded exercise that recorded full numbers (`deloadRevertNames`), and the bar
+  // loads them. What does not change is the logging, which stays a deload because
+  // `isAnyDeload = deload || phaseStatus.isDeloadActive`. Both halves are said, not one.
+  it('a deload week under Full loads the full numbers and says every set is still logged as a deload', () => {
+    expect(deloadOverrideOutcome(BF198, true, { ...DRIVES, deloadWeek: true })).toBe('all-in-deload-week')
+  })
+
+  it('a deload week where some exercises cannot revert is partial, and still logged as a deload', () => {
+    expect(deloadOverrideOutcome([ex('Squat', true, true), ex('Bench', true, false)], true, { ...DRIVES, deloadWeek: true }))
+      .toBe('partial-in-deload-week')
+  })
+
+  it('a deload week with nothing recorded to revert still says the weights are unchanged', () => {
+    expect(deloadOverrideOutcome([ex('Skull Crusher', true, false)], true, { ...DRIVES, deloadWeek: true })).toBe('nothing-to-revert')
+  })
+
+  it('a deload week with no deloaded exercise makes no claim of a revert', () => {
+    // Nothing was cut, so nothing was put back. Not upgraded to a "full in deload week".
     expect(deloadOverrideOutcome(program, true, { ...pendingEmergency, deloadWeek: true })).toBe('nothing-to-revert')
+  })
+
+  it('every outcome that put the session back on full numbers runs full, in a deload week or not', () => {
+    for (const outcome of ['all', 'partial', 'all-in-deload-week', 'partial-in-deload-week'] as const) {
+      expect(overrideRunsFull(outcome), outcome).toBe(true)
+    }
+    for (const outcome of ['none', 'nothing-to-revert'] as const) {
+      expect(overrideRunsFull(outcome), outcome).toBe(false)
+    }
   })
 
   it('no prescription at all cannot be on the bar', () => {
