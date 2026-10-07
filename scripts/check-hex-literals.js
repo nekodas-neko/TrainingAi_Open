@@ -26,7 +26,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { resolveBaseRef, countAtBase, verdict } = require('./lib/base-ref');
+const { resolveBaseRef, countsAtBase, verdict } = require('./lib/base-ref');
 const { stripComments } = require('./lib/strip-comments');
 
 const HEX = /#[0-9a-fA-F]{3,8}\b/g;
@@ -124,6 +124,7 @@ const inherited = [];
 const stale = [];
 let total = 0;
 const seen = new Set();
+const judged = [];
 
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -138,16 +139,7 @@ function walk(dir) {
     const count = countHex(stripComments(fs.readFileSync(full, 'utf8')));
     total += count;
     seen.add(rel);
-    const allowed = BASELINE[rel] ?? 0;
-    // LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over. The base count
-    // runs the SAME matcher over the base content — never a second regex, which would disagree with
-    // the working-tree count for reasons nobody could see.
-    const v = verdict({ count, limit: allowed, atBase: countAtBase(baseRef, rel, countHex) });
-    if (v === 'inherited') {
-      inherited.push(`${rel}: ${count} against a baseline of ${allowed}, but the base branch already has ${count}. Not this branch's growth.`);
-    } else if (v === 'fail') {
-      failures.push({ rel, count, allowed });
-    }
+    judged.push({ rel, count, allowed: BASELINE[rel] ?? 0 });
     if (count === 0 && rel in BASELINE) stale.push(rel);
   }
 }
@@ -155,6 +147,20 @@ function walk(dir) {
 const baseRef = resolveBaseRef();
 
 for (const top of ['app', 'components']) walk(path.join(root, top));
+
+// LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over. The base count
+// runs the SAME matcher over the base content — never a second regex, which would disagree with
+// the working-tree count for reasons nobody could see. Read after the walk, for every file at once:
+// one git process per run, not one per file (#2081).
+const atBase = countsAtBase(baseRef, judged.map((j) => j.rel), countHex);
+for (const { rel, count, allowed } of judged) {
+  const v = verdict({ count, limit: allowed, atBase: atBase.get(rel) });
+  if (v === 'inherited') {
+    inherited.push(`${rel}: ${count} against a baseline of ${allowed}, but the base branch already has ${count}. Not this branch's growth.`);
+  } else if (v === 'fail') {
+    failures.push({ rel, count, allowed });
+  }
+}
 
 // A row for a file that is now clean (or gone) has to come out, or the list rots into an allowlist
 // that permits hex to come back to a file that had been fixed. Same rule the sibling checks use.

@@ -21,7 +21,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { resolveBaseRef, countAtBase, verdict } = require('./lib/base-ref');
+const { resolveBaseRef, countsAtBase, verdict } = require('./lib/base-ref');
 const { stripComments } = require('./lib/strip-comments');
 
 const root = path.join(__dirname, '..');
@@ -232,10 +232,12 @@ for (const abs of files) {
 
 const failures = [];
 const inherited = [];
+// One read of the base for every file, not one git process per file (#2081).
+const atBase = countsAtBase(baseRef, [...perFile.keys()], (c) => countFetchOnce(c).count);
 for (const [rel, count] of perFile) {
   const allowed = BASELINE[rel] ?? 0;
   // LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over.
-  const v = verdict({ count, limit: allowed, atBase: countAtBase(baseRef, rel, (c) => countFetchOnce(c).count) });
+  const v = verdict({ count, limit: allowed, atBase: atBase.get(rel) });
   if (v === 'inherited') {
     inherited.push(`${rel}: ${count} fetch-once effect(s) against a baseline of ${allowed}, but the base branch is already there.`);
   } else if (v === 'fail') {

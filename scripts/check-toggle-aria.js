@@ -30,7 +30,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { resolveBaseRef, countAtBase, verdict } = require('./lib/base-ref');
+const { resolveBaseRef, countsAtBase, verdict } = require('./lib/base-ref');
 
 /**
  * Blank comments and string bodies, keeping byte length so nothing else shifts.
@@ -112,6 +112,7 @@ const seen = new Set();
 const failures = [];
 const inherited = [];
 const stale = [];
+const judged = [];
 
 function walk(dir) {
   let entries;
@@ -128,13 +129,7 @@ function walk(dir) {
     const count = countUnlabelledToggles(fs.readFileSync(full, 'utf8'));
     if (count === 0 && !(rel in BASELINE)) continue;
     seen.add(rel);
-    const allowed = BASELINE[rel] ?? 0;
-    const v = verdict({ count, limit: allowed, atBase: countAtBase(baseRef, rel, countUnlabelledToggles) });
-    if (v === 'inherited') {
-      inherited.push(`${rel}: ${count} against a baseline of ${allowed}, but the base branch already has ${count}. Not this branch's growth.`);
-    } else if (v === 'fail') {
-      failures.push({ rel, count, allowed });
-    }
+    judged.push({ rel, count, allowed: BASELINE[rel] ?? 0 });
     if (count === 0 && rel in BASELINE) stale.push(rel);
   }
 }
@@ -142,6 +137,17 @@ function walk(dir) {
 const baseRef = resolveBaseRef();
 
 for (const top of ['app', 'components']) walk(path.join(root, top));
+
+// Read after the walk, for every file at once: one git process per run, not one per file (#2081).
+const atBase = countsAtBase(baseRef, judged.map((j) => j.rel), countUnlabelledToggles);
+for (const { rel, count, allowed } of judged) {
+  const v = verdict({ count, limit: allowed, atBase: atBase.get(rel) });
+  if (v === 'inherited') {
+    inherited.push(`${rel}: ${count} against a baseline of ${allowed}, but the base branch already has ${count}. Not this branch's growth.`);
+  } else if (v === 'fail') {
+    failures.push({ rel, count, allowed });
+  }
+}
 
 for (const rel of Object.keys(BASELINE)) if (!seen.has(rel)) stale.push(`${rel} (deleted)`);
 
