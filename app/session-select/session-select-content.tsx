@@ -45,6 +45,7 @@ import { invalidateWorkoutSummaries, invalidateReadinessInputs, invalidateOuraSy
 import { mergeCalendarOverlay, readLocalCalendarOverlay } from "@/lib/calendar/local-overlay";
 import { syncOuraRing } from "@/lib/oura-ble/sync";
 import { getLocalStore } from "@/lib/local-store";
+import { localSleepRowsAsNights } from "@/lib/sleep/merge-sessions";
 import { pushMutations, pullDelta, isSyncBackedOff } from "@/lib/local-store/sync-engine";
 import { PullToSync } from "@/components/pull-to-sync";
 import { BODY_BATTERY_TTL, TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, NEXT_SESSION_TTL, MOOD_TTL } from '@trainingai/shared/cache-ttl';
@@ -763,13 +764,15 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         const cutoff = toAestDay(new Date(todayMidnightUtc(tz).getTime() - 14 * 24 * 60 * 60 * 1000), tz);
         store.getSleepSessions(cutoff).then(local => {
           if (local.length > 0 && !cancelled) {
-            setSleepData(local.map(s => ({
+            // #2414: one row per night, newest first, as the route returns — so the card's
+            // find-by-date lands on the night, not on whichever nap the store listed first.
+            setSleepData(localSleepRowsAsNights(local).map(s => ({
               date: s.date,
               durationHours: s.durationHours,
               deepSleepHours: s.deepSleepHours,
               remSleepHours: s.remSleepHours,
               lightSleepHours: s.lightSleepHours,
-              awakHours: null, // LocalSleepSession has no awake column — render handles null
+              awakHours: s.awakHours, // null on a row pulled before SQLite v50 — render handles it
             })));
           }
         }).catch(() => { /* store unavailable — network path below still runs */ });

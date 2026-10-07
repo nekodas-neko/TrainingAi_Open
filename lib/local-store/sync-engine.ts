@@ -146,6 +146,11 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     deepSleepHours:  (r.deepSleepHours as number) ?? null,
     remSleepHours:   (r.remSleepHours as number) ?? null,
     lightSleepHours: (r.lightSleepHours as number) ?? null,
+    // #2414: the delta's select() has always carried these (Drizzle keys, so `awakHours`); the
+    // device dropped them, which left a cold-open hypnogram with no window to draw against.
+    sleepStart:      r.sleepStart ? toIso(r.sleepStart) : null,
+    sleepEnd:        r.sleepEnd ? toIso(r.sleepEnd) : null,
+    awakHours:       (r.awakHours as number) ?? null,
     // R6: carry the full Oura column set through pull/restore (HRV/RHR/stages), not just
     // stage hours. Server select() emits these camelCase keys; a pulled row is synced.
     ouraId:          (r.ouraId as string) ?? null,

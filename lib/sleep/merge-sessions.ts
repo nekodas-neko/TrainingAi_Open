@@ -1,4 +1,5 @@
 import { recordsSleep } from '@trainingai/shared/health/sleep-night';
+import type { LocalSleepSession } from '@/lib/local-store/types';
 
 export type SleepRow = {
   date: string;
@@ -147,4 +148,45 @@ export function mergeByDate(rows: SleepRow[]) {
     results.push(merged);
   }
   return results;
+}
+
+/**
+ * #2414 — the local store's sleep rows in the shape `/api/sleep-sessions` returns: one row per
+ * night, newest first. The cold-open seed for every screen that reads that route.
+ *
+ * **A date is merged only when every row on it carries its window.** `mergeByDate` is the route's
+ * own formula and is right for timed rows: `primaryCluster` drops naps and evening fragments, so
+ * only contiguous splits reach the additive merge. Untimed rows defeat that — clustering returns
+ * early and the additive merge SUMS a night and its naps into a fabricated 11.5 h night (BF-115's
+ * refutation). Rows pulled before SQLite v50 have no window, so a date holding any such row passes
+ * through raw, exactly as the seed always passed it.
+ *
+ * Newest first because the route is and every reader assumes it (`sleepRows[0]` is "last night");
+ * the store returns oldest first. `sleepTimeRecommendation` and `provisional` are not in the local
+ * table — null/absent, which every reader already treats as "cannot tell".
+ */
+export function localSleepRowsAsNights(local: readonly LocalSleepSession[]): SleepRow[] {
+  const byDate = new Map<string, SleepRow[]>();
+  for (const l of local) {
+    const row: SleepRow = {
+      date: l.date, ouraId: l.ouraId,
+      durationHours: l.durationHours, deepSleepHours: l.deepSleepHours,
+      remSleepHours: l.remSleepHours, lightSleepHours: l.lightSleepHours, awakHours: l.awakHours,
+      efficiency: l.efficiency, onsetLatencySec: l.onsetLatencySec, averageHrvMs: l.averageHrvMs,
+      avgHeartRate: l.avgHeartRate, lowestHeartRate: l.lowestHeartRate,
+      restlessPeriods: l.restlessPeriods, sleepScore: l.sleepScore,
+      respiratoryRate: l.respiratoryRate, sleepPhase5Min: l.sleepPhase5Min,
+      sleepStart: l.sleepStart, sleepEnd: l.sleepEnd,
+      sleepTimeRecommendation: null,
+    };
+    const list = byDate.get(row.date) ?? [];
+    list.push(row);
+    byDate.set(row.date, list);
+  }
+  const out: SleepRow[] = [];
+  for (const list of byDate.values()) {
+    out.push(...(list.every(r => r.sleepStart && r.sleepEnd) ? mergeByDate(list) : list));
+  }
+  // Array.prototype.sort is stable, so rows sharing an untimed date keep the store's order.
+  return out.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 }

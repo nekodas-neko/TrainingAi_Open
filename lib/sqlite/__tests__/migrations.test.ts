@@ -5,7 +5,23 @@ describe('local schema', () => {
   // The describe and the title used to say v25 while the assertion said 27 — a stale label on a
   // guard whose whole job is to be the authority on the number. Named after what it checks now.
   it('tops out at the current version', () => {
-    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(49)
+    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(50)
+  })
+
+  // #2414. The hypnogram needs the night's window on a local row; an upgraded device has to get the
+  // columns, and a half-applied upgrade has to heal.
+  it('v50 adds sleep_sessions.sleep_start/sleep_end/awake_hours by ALTER and reconciles them', () => {
+    const v50 = MIGRATIONS.find(m => m.toVersion === 50)!
+    const ddl = v50.statements.join('\n')
+    for (const column of ['sleep_start', 'sleep_end', 'awake_hours']) {
+      expect(ddl).toContain(`ALTER TABLE sleep_sessions ADD COLUMN ${column}`)
+      expect(
+        RECONCILE_COLUMNS.some(c => c.table === 'sleep_sessions' && c.column === column),
+        `sleep_sessions.${column} missing from RECONCILE_COLUMNS`,
+      ).toBe(true)
+    }
+    // Purely additive: no rewrite of existing rows, no NOT NULL a pre-v50 row could violate.
+    expect(ddl).not.toMatch(/UPDATE|DELETE|NOT NULL/)
   })
 
   // #2450. Whether an RPE was tapped has to reach an upgraded device, and survive a half-applied upgrade.

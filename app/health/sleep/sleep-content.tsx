@@ -13,6 +13,7 @@ import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
 import { TTL_MEDIUM } from "@trainingai/shared/cache-ttl";
 import { computeSleepStartConsistency } from "@trainingai/shared/health/sleep-consistency";
 import { getLocalStore } from "@/lib/local-store";
+import { localSleepRowsAsNights } from "@/lib/sleep/merge-sessions";
 import { todayMidnightUtc, toAestDay } from "@trainingai/shared/date-utils";
 import { useInvalidationRefetch } from "@/lib/hooks/use-invalidation-refetch";
 
@@ -40,17 +41,17 @@ export function SleepContent({ userId }: { userId?: string }) {
     const cached = readCacheSync<SleepSessionRow[]>("sleep-sessions");
     if (cached) setSleepRows(cached);
     // Local-first: read from the on-device store before the network reply lands, mirroring
-    // health-content.tsx's main-screen pattern (same sleep domain, sibling surface). The local
-    // sleep table doesn't yet carry hypnogram/phase-window fields, so a local-only row renders
-    // without the Hypnogram/consistency card until the network response (or a store schema
-    // extension) fills those in — still correct, since every field check here is a `!= null`
-    // guard that treats an absent field as "no data yet", not an error.
+    // health-content.tsx's main-screen pattern (same sleep domain, sibling surface). #2414: the
+    // local table carries the night's window since SQLite v50, so a row pulled since then draws
+    // the hypnogram offline. A row pulled before v50 has none and still renders without the
+    // Hypnogram/consistency card until the network fills it — every field check here is a
+    // `!= null` guard that reads an absent field as "no data yet", not an error.
     if (userId) {
       const store = getLocalStore(userId);
       if (store) {
         const cutoff = new Date(todayMidnightUtc(tz).getTime() - 30 * 24 * 60 * 60 * 1000);
         store.getSleepSessions(toAestDay(cutoff, tz)).then(localSleep => {
-          if (localSleep.length > 0) setSleepRows(prev => (prev.length > 0 ? prev : localSleep as unknown as SleepSessionRow[]));
+          if (localSleep.length > 0) setSleepRows(prev => (prev.length > 0 ? prev : localSleepRowsAsNights(localSleep)));
         });
       }
     }
