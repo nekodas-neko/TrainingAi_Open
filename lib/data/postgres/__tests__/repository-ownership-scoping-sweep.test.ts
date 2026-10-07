@@ -62,7 +62,7 @@ const rawFrames = () => import('@/lib/data/postgres/slices/oura-raw-frames')
 describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#2425)', () => {
   let pool: import('pg').Pool
   let repo: Repo
-  let db: import('@/lib/data/postgres/client').Db
+  let db: ReturnType<typeof import('@/lib/data/postgres/client').getDb>
   let g: SchemaGraph
   let b: SeededUser
   let owned: string[]

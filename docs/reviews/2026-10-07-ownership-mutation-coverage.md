@@ -5,8 +5,8 @@ two months on, closes most of what it finds, and leaves the tool behind so the n
 command instead of a session.
 
 > **No cross-user hole was found.** Every survivor was read in context. The 31 left at the end are
-> either redundant by construction (19) or need state this pass did not build (12, filed as a
-> follow-up, §4). No production code changed.
+> either redundant by construction (19) or need state this pass did not build (12, filed as
+> #2570, §4). No production code changed.
 
 **Headline: 308 of 353 predicates survived before (87%); 31 of 353 survive now (9%).**
 
@@ -45,7 +45,7 @@ command instead of a session.
   the wrong reason. That would under-count survivors, the dangerous direction. The driver refuses any
   non-local host. The scratch databases were dropped afterwards. Production was never touched.
 - **Cost.** About 5 s of test time per predicate. The full 353 took **14.2 min** against the
-  original file alone and **14.7 min** against both files at the end, with 4 parallel jobs.
+  original file alone and **15.6 min** against both files at the end, with 4 parallel jobs.
 
 ```
 DATABASE_URL=postgresql://postgres:postgres@localhost:5434/<scratch> DATABASE_SSL=false \
@@ -62,7 +62,7 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5434/<scratch> DATABASE_SS
 | pass 3: layered checks with rows of A's own (survivors only) | 57 + 246 | 40 |
 | pass 4 (survivors only) | 57 + 252 | 31 |
 | full re-run | 57 + 252 | 33 (**two regressions**, see below) |
-| **final full run** | **57 + 252** | **31 of 353** (9%) |
+| **final full run** (also the code in this PR) | **57 + 251** | **31 of 353** (9%) |
 
 **The survivors-only loop hid two regressions.** Pass 2 filled `workout_sessions.completed_at` and
 `scale_raw_samples.status` so readers had something to find. That made B's session already
@@ -107,7 +107,7 @@ a `day` stored as text), which a generic fixture does not fill.
 
 ## 3. What was added
 
-**`lib/data/postgres/__tests__/repository-ownership-scoping-sweep.test.ts`** (new, 251 tests; 252 at the final run, after which one row that could never fail was removed: a `replaceOuraDailySummary` call with an empty list, which returns before any query) is part
+**`lib/data/postgres/__tests__/repository-ownership-scoping-sweep.test.ts`** (new, 251 tests) is part
 2 of the burn-down. It is separate from the hand-built Q-155 file because it seeds differently, and
 the two would collide on fixed user ids running in parallel.
 
@@ -234,7 +234,7 @@ decides anything:
 | `oura-raw-pack.ts` L91, L118, L139, L189, L210 | a packable hot bucket older than the seal line |
 | `countAllSessionsSinceStart` L721 | sessions named like B's program sessions (see §5) |
 
-Filed as a follow-up so the next pass can build them.
+Filed as #2570 so the next pass can build them.
 
 ## 5. Id-taking repository methods that do not take a `userId`
 
