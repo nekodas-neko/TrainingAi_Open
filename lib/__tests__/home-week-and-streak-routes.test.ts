@@ -223,9 +223,21 @@ describe('/api/progress-summary', () => {
     expect(body.sleep.lastNightHours).toBe(8)
   })
 
-  it('answers null for last night when nothing was recorded', async () => {
+  // #2337: "0 h this week" against a sleep goal was a claim about a week nothing recorded.
+  it('answers null for last night and for the week when nothing was recorded', async () => {
     const body = await (await getProgress()).json()
-    expect(body.sleep).toEqual({ lastNightHours: null, thisWeekHours: 0 })
+    expect(body.sleep).toEqual({ lastNightHours: null, thisWeekHours: null })
+  })
+
+  it('answers null for the week when the only nights fall before this week', async () => {
+    await getProgress()
+    const weekStart = formatInTimeZone(mondayFromCall(), TZ, 'yyyy-MM-dd')
+    const before = shiftDateStr(weekStart, -1)
+    listSleepSessions.mockResolvedValue([
+      sleep({ date: before, sleepStart: bne(shiftDateStr(before, -1), '22:00'), sleepEnd: bne(before, '06:00'), durationHours: 6 }),
+    ])
+    const body = await (await getProgress()).json()
+    expect(body.sleep.thisWeekHours).toBeNull()
   })
 
   // Several rows for one session on one day is one workout, not several.

@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz, startOfWeekInTz, todayMidnightUtc, toAestDay, ageFromDob } from '@trainingai/shared/date-utils'
-import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
+import { resolveHrProfile, hasHrSource } from '@trainingai/shared/health/hr-profile'
 import { EMPTY_OBSERVED_HR } from '@trainingai/shared/health/observed-hr'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
 import { resolveFitnessSnapshot } from '@trainingai/shared/running/fitness-snapshot'
@@ -96,12 +96,15 @@ export async function GET() {
   const fitness = resolveFitnessSnapshot({ age: ageYears, restingHr, baseline: null })
 
   const targets = weeklyZoneTargets(plan?.frameworkKey ?? 'zone2-base', fitness.weeklyBaseMinutes)
-  const quota = computeZoneQuota(targets.perZone, days)
+  // #2337: a user with no ring, strap or Health Connect HR got "0 / 108 min" on every zone, read as
+  // a week not yet trained rather than a week nothing could measure. The quota says which it is.
+  const hrSource = hasHrSource(profile)
+  const quota = computeZoneQuota(targets.perZone, days, { hasHrSource: hrSource })
 
   // Daily quota alongside the weekly one — the weekly-only view otherwise can't answer
   // "did I clear today's floor" without doing the division in your head.
   const dailyTargets = targets.perZone.map((t) => ({ zoneId: t.zoneId, minutes: t.minutes / 7 }))
-  const dayQuota = computeZoneQuota(dailyTargets, days.filter((d) => d.day === today))
+  const dayQuota = computeZoneQuota(dailyTargets, days.filter((d) => d.day === today), { hasHrSource: hrSource })
 
   const restingHrNow = avgRestingHr(currentRestingMetrics)
   const restingHrPrior = avgRestingHr(priorRestingMetrics)

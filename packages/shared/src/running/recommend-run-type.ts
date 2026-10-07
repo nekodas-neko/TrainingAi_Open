@@ -1,4 +1,4 @@
-import type { ZoneQuota } from '@trainingai/shared/health/zone-quota'
+import { quotaHasNoHrSource, type ZoneQuota } from '@trainingai/shared/health/zone-quota'
 import type { HrZone } from '@trainingai/shared/health/hr-zones'
 import type { RunType } from './types'
 
@@ -26,6 +26,9 @@ export interface RunTypeRecommendation {
  *  ZoneQuota the Cardiovascular hub already shows. Returns null once every training zone
  *  is already complete or has no target (nothing left to recommend toward). */
 export function recommendRunType(quota: ZoneQuota): RunTypeRecommendation | null {
+  // #2337: no HR source means every zone reads fully open; "108 min of Zone 2 still open" would be a
+  // number nothing measured. Nothing to recommend toward is the honest answer.
+  if (quotaHasNoHrSource(quota)) return null
   const remainingByZone = new Map(
     quota.zones.filter((z) => z.zoneId !== 1 && z.status === 'open').map((z) => [z.zoneId, z.remainingMin]),
   )
