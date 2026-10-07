@@ -112,6 +112,12 @@ export interface SleepVerdictRecord {
     durationLow: number | null; durationHigh: number | null
     onsetLow: number | null; onsetHigh: number | null
     efficiencyLow: number | null; efficiencyHigh: number | null
+    /**
+     * #2094: each band's median, so a correction can be asked how far from centre the night sat,
+     * not only which edge it crossed. `null` on every verdict stored before the column existed:
+     * its trailing window has moved, so the middle it was judged against cannot be recovered.
+     */
+    durationMedian: number | null; onsetMedian: number | null; efficiencyMedian: number | null
   }
   baselineNights: number
   modelVersion: number

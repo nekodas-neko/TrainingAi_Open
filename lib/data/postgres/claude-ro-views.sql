@@ -1569,7 +1569,10 @@ SELECT
   t.model_version,
   t.response_state,
   t.created_at,
-  t.updated_at
+  t.updated_at,
+  t.duration_median,
+  t.onset_median,
+  t.efficiency_median
 FROM public.sleep_verdicts t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
