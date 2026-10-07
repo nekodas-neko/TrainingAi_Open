@@ -1,0 +1,188 @@
+{
+  "formatVersion": 1,
+  "vectors": [
+    {
+      "name": "a pulled body-metrics row lands synced and raises only biometrics",
+      "kind": "pull-flag", "covers": "biometrics",
+      "guarantee": "A page carrying a body_metrics row writes it as synced, advances the cursor, and reports biometrics and nothing else.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "steps": [{ "op": "pull", "pages": [{ "body": {
+        "syncedAt": "2026-10-01T01:00:00.000Z",
+        "bodyMetrics": [{ "date": "2026-09-30", "weightKg": 81.4, "updatedAt": "2026-09-30T20:00:00.000Z", "deletedAt": null }]
+      } }] }],
+      "expect": {
+        "tables": [{ "table": "body_metrics", "columns": ["date", "weight_kg", "sync_status", "updated_at"],
+          "rows": [{ "date": "2026-09-30", "weight_kg": 81.4, "sync_status": "synced", "updated_at": "2026-09-30T20:00:00.000Z" }] }],
+        "pull": { "flags": { "biometrics": true, "programs": false, "workouts": false, "nutrition": false, "supplements": false, "activity": false, "fitnessTests": false, "running": false, "injuries": false, "ouraDaily": false, "dayCheckins": false, "mealPlans": false }, "synced": 1, "hasMore": false },
+        "cursor": "2026-10-01T01:00:00.000Z"
+      }
+    },
+    {
+      "name": "a pulled program lands in the program mirror and raises only programs",
+      "kind": "pull-flag", "covers": "programs",
+      "guarantee": "A page carrying a program writes it to local_programs and reports programs and nothing else.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "steps": [{ "op": "pull", "pages": [{ "body": {
+        "syncedAt": "2026-10-01T01:00:00.000Z",
+        "programs": [{ "id": "prog-1", "name": "Strength block", "isActive": true, "phaseMode": "manual", "trainingGoal": "strength", "updatedAt": "2026-09-30T20:00:00.000Z" }]
+      } }] }],
+      "expect": {
+        "tables": [{ "table": "local_programs", "columns": ["id", "name", "is_active"], "rows": [{ "id": "prog-1", "name": "Strength block", "is_active": 1 }] }],
+        "pull": { "flags": { "biometrics": false, "programs": true, "workouts": false, "nutrition": false, "supplements": false, "activity": false, "fitnessTests": false, "running": false, "injuries": false, "ouraDaily": false, "dayCheckins": false, "mealPlans": false }, "synced": 1 },
+        "cursor": "2026-10-01T01:00:00.000Z"
+      }
+    },
+    {
+      "name": "a pulled workout session lands synced and raises only workouts",
+      "kind": "pull-flag", "covers": "workouts",
+      "guarantee": "A page carrying a workout session writes it as synced, with its program-session link, and reports workouts and nothing else.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "steps": [{ "op": "pull", "pages": [{ "body": {
+        "syncedAt": "2026-10-01T01:00:00.000Z",
+        "workoutSessions": [{ "id": "ws-1", "sessionName": "Upper A", "startedAt": "2026-09-30T08:00:00.000Z", "completedAt": null, "programSessionId": "ps-1", "updatedAt": "2026-09-30T09:00:00.000Z", "deletedAt": null }]
+      } }] }],
+      "expect": {
+        "tables": [{ "table": "workout_sessions", "columns": ["id", "session_name", "session_id", "sync_status"], "rows": [{ "id": "ws-1", "session_name": "Upper A", "session_id": "ps-1", "sync_status": "synced" }] }],
+        "pull": { "flags": { "biometrics": false, "programs": false, "workouts": true, "nutrition": false, "supplements": false, "activity": false, "fitnessTests": false, "running": false, "injuries": false, "ouraDaily": false, "dayCheckins": false, "mealPlans": false }, "synced": 1 },
+        "cursor": "2026-10-01T01:00:00.000Z"
+      }
+    },
+    {
+      "name": "a pulled food item lands ordered by its creation time and raises only nutrition",
+      "kind": "pull-flag", "covers": "nutrition",
+      "guarantee": "A page carrying a food item writes it with updated_at taken from createdAt (the server table has no updated_at, RV-172) and reports nutrition and nothing else.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "steps": [{ "op": "pull", "pages": [{ "body": {
+        "syncedAt": "2026-10-01T01:00:00.000Z",
+        "foodItems": [{ "id": "fi-1", "name": "Oats", "brand": null, "servingSizeG": 40, "calories": 150, "proteinG": 5, "carbsG": 27, "fatG": 3, "source": "manual", "createdAt": "2026-09-29T07:00:00.000Z" }]
+      } }] }],
+      "expect": {
+        "tables": [{ "table": "food_items", "columns": ["id", "name", "calories", "updated_at"], "rows": [{ "id": "fi-1", "name": "Oats", "calories": 150, "updated_at": "2026-09-29T07:00:00.000Z" }] }],
+        "pull": { "flags": { "biometrics": false, "programs": false, "workouts": false, "nutrition": true, "supplements": false, "activity": false, "fitnessTests": false, "running": false, "injuries": false, "ouraDaily": false, "dayCheckins": false, "mealPlans": false }, "synced": 1 },
+        "cursor": "2026-10-01T01:00:00.000Z"
+      }
+    },
+    {
+      "name": "a pulled supplement lands synced and raises only supplements",
+      "kind": "pull-flag", "covers": "supplements",
+      "guarantee": "A page carrying a supplement definition writes it as synced and reports supplements and nothing else.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "steps": [{ "op": "pull", "pages": [{ "body": {
+        "syncedAt": "2026-10-01T01:00:00.000Z",
+        "supplements": [{ "id": "sup-1", "name": "Creatine", "dose": "5 g", "defaultAmount": 5, "unit": "g", "sortOrder": 0, "active": true, "dosePrompt": false, "reminderEnabled": false, "updatedAt": "2026-09-30T20:00:00.000Z", "deletedAt": null }]
+      } }] }],
+      "expect": {
+        "tables": [{ "table": "supplements", "columns": ["id", "name", "default_amount", "unit", "active", "sync_status"], "rows": [{ "id": "sup-1", "name": "Creatine", "default_amount": 5, "unit": "g", "active": 1, "sync_status": "synced" }] }],
+        "pull": { "flags": { "biometrics": false, "programs": false, "workouts": false, "nutrition": false, "supplements": true, "activity": false, "fitnessTests": false, "running": false, "injuries": false, "ouraDaily": false, "dayCheckins": false, "mealPlans": false }, "synced": 1 },
+        "cursor": "2026-10-01T01:00:00.000Z"
+      },
+      "knownFailing": { "issue": "TBD", "reason": "pullDelta's count leaves out supplements, so a page whose only change is a supplement definition returns synced: 0 and the sync provider, which acts only when synced > 0, never calls invalidateSupplements." }
+    },
+    {
+      "name": "a pulled activity lands synced and raises only activity",
+      "kind": "pull-flag", "covers": "activity",
+      "guarantee": "A page carrying an activity log writes it as synced, with its start time and calories, and reports activity and nothing else.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "steps": [{ "op": "pull", "pages": [{ "body": {
+        "syncedAt": "2026-10-01T01:00:00.000Z",
+        "activityLogs": [{ "id": "act-1", "date": "2026-09-30", "activityType": "walk", "title": "Evening walk", "durationMin": 30, "caloriesBurned": 120, "startTime": "18:00:00", "updatedAt": "2026-09-30T09:00:00.000Z", "deletedAt": null }]
+      } }] }],
+      "expect": {
+        "tables": [{ "table": "activity_logs", "columns": ["id", "start_time", "calories_burned", "sync_status"], "rows": [{ "id": "act-1", "start_time": "18:00:00", "calories_burned": 120, "sync_status": "synced" }] }],
+        "pull": { "flags": { "biometrics": false, "programs": false, "workouts": false, "nutrition": false, "supplements": false, "activity": true, "fitnessTests": false, "running": false, "injuries": false, "ouraDaily": false, "dayCheckins": false, "mealPlans": false }, "synced": 1 },
+        "cursor": "2026-10-01T01:00:00.000Z"
+      }
+    },
+    {
+      "name": "a pulled fitness test lands synced and raises only fitnessTests",
+      "kind": "pull-flag", "covers": "fitnessTests",
+      "guarantee": "A page carrying a fitness test writes it as synced and reports fitnessTests and nothing else.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "steps": [{ "op": "pull", "pages": [{ "body": {
+        "syncedAt": "2026-10-01T01:00:00.000Z",
+        "fitnessTests": [{ "id": "ft-1", "testType": "cooper", "date": "2026-09-30", "distanceM": 2800, "vo2maxEst": 51.4, "updatedAt": "2026-09-30T09:00:00.000Z", "deletedAt": null }]
+      } }] }],
+      "expect": {
+        "tables": [{ "table": "fitness_tests", "columns": ["id", "distance_m", "vo2max_est", "sync_status"], "rows": [{ "id": "ft-1", "distance_m": 2800, "vo2max_est": 51.4, "sync_status": "synced" }] }],
+        "pull": { "flags": { "biometrics": false, "programs": false, "workouts": false, "nutrition": false, "supplements": false, "activity": false, "fitnessTests": true, "running": false, "injuries": false, "ouraDaily": false, "dayCheckins": false, "mealPlans": false }, "synced": 1 },
+        "cursor": "2026-10-01T01:00:00.000Z"
+      }
+    },
+    {
+      "name": "a pulled prescribed run lands synced and raises only running",
+      "kind": "pull-flag", "covers": "running",
+      "guarantee": "A page carrying a prescribed run writes it as synced and reports running and nothing else.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "steps": [{ "op": "pull", "pages": [{ "body": {
+        "syncedAt": "2026-10-01T01:00:00.000Z",
+        "prescribedRuns": [{ "id": "pr-1", "planId": "plan-1", "date": "2026-10-02", "runType": "easy", "durationMin": 40, "targetZoneIds": [2], "rationale": "base", "gateAction": "proceed", "status": "pending", "updatedAt": "2026-09-30T09:00:00.000Z", "deletedAt": null }]
+      } }] }],
+      "expect": {
+        "tables": [{ "table": "prescribed_runs", "columns": ["id", "run_type", "status", "sync_status"], "rows": [{ "id": "pr-1", "run_type": "easy", "status": "pending", "sync_status": "synced" }] }],
+        "pull": { "flags": { "biometrics": false, "programs": false, "workouts": false, "nutrition": false, "supplements": false, "activity": false, "fitnessTests": false, "running": true, "injuries": false, "ouraDaily": false, "dayCheckins": false, "mealPlans": false }, "synced": 1 },
+        "cursor": "2026-10-01T01:00:00.000Z"
+      }
+    },
+    {
+      "name": "a pulled injury lands synced and raises only injuries",
+      "kind": "pull-flag", "covers": "injuries",
+      "guarantee": "A page carrying an injury writes it as synced and reports injuries and nothing else.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "steps": [{ "op": "pull", "pages": [{ "body": {
+        "syncedAt": "2026-10-01T01:00:00.000Z",
+        "injuries": [{ "id": "inj-1", "muscleName": "Hamstrings", "notes": null, "severity": "mild", "startedDate": "2026-09-28", "resolvedDate": null, "createdAt": "2026-09-28T09:00:00.000Z", "updatedAt": "2026-09-28T09:00:00.000Z", "deletedAt": null }]
+      } }] }],
+      "expect": {
+        "tables": [{ "table": "injuries", "columns": ["id", "muscle_name", "severity", "sync_status"], "rows": [{ "id": "inj-1", "muscle_name": "Hamstrings", "severity": "mild", "sync_status": "synced" }] }],
+        "pull": { "flags": { "biometrics": false, "programs": false, "workouts": false, "nutrition": false, "supplements": false, "activity": false, "fitnessTests": false, "running": false, "injuries": true, "ouraDaily": false, "dayCheckins": false, "mealPlans": false }, "synced": 1 },
+        "cursor": "2026-10-01T01:00:00.000Z"
+      }
+    },
+    {
+      "name": "a pulled Oura daily row lands and raises only ouraDaily",
+      "kind": "pull-flag", "covers": "ouraDaily",
+      "guarantee": "A page carrying an oura_daily row writes it, contributors as JSON text, and reports ouraDaily and nothing else.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "steps": [{ "op": "pull", "pages": [{ "body": {
+        "syncedAt": "2026-10-01T01:00:00.000Z",
+        "ouraDaily": [{ "day": "2026-09-30", "readinessScore": 82, "sleepScore": 77, "activityScore": null, "temperatureDeviation": -0.1, "activeCalories": null, "contributors": { "hrv_balance": 80 }, "updatedAt": "2026-09-30T20:00:00.000Z" }]
+      } }] }],
+      "expect": {
+        "tables": [{ "table": "oura_daily", "columns": ["day", "readiness_score", "contributors"], "rows": [{ "day": "2026-09-30", "readiness_score": 82, "contributors": "{\"hrv_balance\":80}" }] }],
+        "pull": { "flags": { "biometrics": false, "programs": false, "workouts": false, "nutrition": false, "supplements": false, "activity": false, "fitnessTests": false, "running": false, "injuries": false, "ouraDaily": true, "dayCheckins": false, "mealPlans": false }, "synced": 1 },
+        "cursor": "2026-10-01T01:00:00.000Z"
+      }
+    },
+    {
+      "name": "a pulled day check-in lands synced and raises only dayCheckins",
+      "kind": "pull-flag", "covers": "dayCheckins",
+      "guarantee": "A page carrying a day check-in writes it as synced, keyed on (log_date, phase), and reports dayCheckins and nothing else.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "steps": [{ "op": "pull", "pages": [{ "body": {
+        "syncedAt": "2026-10-01T01:00:00.000Z",
+        "dayCheckins": [{ "logDate": "2026-09-30", "phase": "evening", "physicalTiredness": 3, "soreMuscles": ["quads"], "journal": null, "updatedAt": "2026-09-30T11:00:00.000Z", "deletedAt": null }]
+      } }] }],
+      "expect": {
+        "tables": [{ "table": "day_checkins", "columns": ["log_date", "phase", "physical_tiredness", "sore_muscles", "sync_status"], "rows": [{ "log_date": "2026-09-30", "phase": "evening", "physical_tiredness": 3, "sore_muscles": "[\"quads\"]", "sync_status": "synced" }] }],
+        "pull": { "flags": { "biometrics": false, "programs": false, "workouts": false, "nutrition": false, "supplements": false, "activity": false, "fitnessTests": false, "running": false, "injuries": false, "ouraDaily": false, "dayCheckins": true, "mealPlans": false }, "synced": 1 },
+        "cursor": "2026-10-01T01:00:00.000Z"
+      }
+    },
+    {
+      "name": "a pulled meal plan lands synced and raises only mealPlans",
+      "kind": "pull-flag", "covers": "mealPlans",
+      "guarantee": "A page carrying a meal plan writes it as synced and reports mealPlans and nothing else, so the sync provider invalidates the meal-plan cache.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "steps": [{ "op": "pull", "pages": [{ "body": {
+        "syncedAt": "2026-10-01T01:00:00.000Z",
+        "mealPlans": [{ "id": "mp-1", "name": "Cut", "isActive": true, "mealsPerDay": 4, "targetCalories": 2400, "targetProteinG": 180, "targetCarbsG": 250, "targetFatG": 70, "trainingTime": null, "generatedAt": "2026-09-29T00:00:00.000Z", "lastReviewedAt": null, "updatedAt": "2026-09-29T00:00:00.000Z", "deletedAt": null }]
+      } }] }],
+      "expect": {
+        "tables": [{ "table": "meal_plans", "columns": ["id", "name", "is_active", "sync_status"], "rows": [{ "id": "mp-1", "name": "Cut", "is_active": 1, "sync_status": "synced" }] }],
+        "pull": { "flags": { "biometrics": false, "programs": false, "workouts": false, "nutrition": false, "supplements": false, "activity": false, "fitnessTests": false, "running": false, "injuries": false, "ouraDaily": false, "dayCheckins": false, "mealPlans": true }, "synced": 1 },
+        "cursor": "2026-10-01T01:00:00.000Z"
+      },
+      "knownFailing": { "issue": "TBD", "reason": "pullDelta merges each page's flags into its result but has no line for mealPlans, so the outer result always reports mealPlans: false and the sync provider never calls invalidateMealPlans after a pull." }
+    }
+  ]
+}
