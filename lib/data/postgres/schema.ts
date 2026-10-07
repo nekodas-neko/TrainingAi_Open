@@ -504,6 +504,11 @@ export const sleepVerdicts = pgTable('sleep_verdicts', {
   onsetHigh:       doublePrecision('onset_high'),
   efficiencyLow:   doublePrecision('efficiency_low'),
   efficiencyHigh:  doublePrecision('efficiency_high'),
+  // #2094: each band's middle. NULL on every row written before the column existed — those
+  // windows have moved, so the median cannot be re-derived and is never back-filled.
+  durationMedian:   doublePrecision('duration_median'),
+  onsetMedian:      doublePrecision('onset_median'),
+  efficiencyMedian: doublePrecision('efficiency_median'),
   baselineNights:  integer('baseline_nights').notNull(),
   modelVersion:    integer('model_version').notNull(),
   responseState:   text('response_state').notNull().default('none'), // none | acknowledged | corrected

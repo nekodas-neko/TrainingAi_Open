@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import {
   deloadOverrideOutcome, deloadRevertNames, deloadOverrideBlocked, overrideRunsFull, prescriptionRowAsTrained,
+  prescriptionFiguresAsTrained,
 } from '@/components/workout/utils'
 import { stripComments } from '../../scripts/lib/strip-comments.js'
 
@@ -173,6 +174,37 @@ describe('#2360 — the card rows show the numbers the bar will load', () => {
     expect(overrideRunsFull('partial')).toBe(true)
     expect(overrideRunsFull('nothing-to-revert')).toBe(false)
     expect(overrideRunsFull('none')).toBe(false)
+  })
+})
+
+describe('#2403 — the minutes and the volume pills follow the rows', () => {
+  const stored = {
+    estimatedSessionDurationMin: 19,
+    weeklyVolumeContribution: { chest: 2 },
+    fullSession: { estimatedSessionDurationMin: 30, weeklyVolumeContribution: { chest: 4 } },
+  }
+
+  it('under a working override they are the full session the engine costed', () => {
+    expect(prescriptionFiguresAsTrained(stored, true)).toEqual(stored.fullSession)
+  })
+
+  it('without one they are the stored figures, exactly as before', () => {
+    expect(prescriptionFiguresAsTrained(stored, false)).toEqual({ estimatedSessionDurationMin: 19, weeklyVolumeContribution: { chest: 2 } })
+  })
+
+  it('a prescription stored before the block existed falls back to the stored figures', () => {
+    const old = { estimatedSessionDurationMin: 19, weeklyVolumeContribution: { chest: 2 } }
+    expect(prescriptionFiguresAsTrained(old, true)).toEqual(old)
+  })
+
+  it('the card and the picker above it both read it, with the same runsFull', () => {
+    const card = source('components/workout/ai-prescription-card.tsx')
+    expect(card).toMatch(/const figures = prescriptionFiguresAsTrained\(prescription, runsFull\)/)
+    expect(card).toMatch(/figures\.estimatedSessionDurationMin\} min of work/)
+    expect(card).toMatch(/Object\.entries\(figures\.weeklyVolumeContribution\)/)
+    expect(card).not.toMatch(/prescription\.estimatedSessionDurationMin|prescription\.weeklyVolumeContribution/)
+    const screen = source('components/workout/pre-workout-screen.tsx')
+    expect(screen).not.toMatch(/estimatedMin=\{periodization\.state\.prescription\.estimatedSessionDurationMin\}/)
   })
 })
 

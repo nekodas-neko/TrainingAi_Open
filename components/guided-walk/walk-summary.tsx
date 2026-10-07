@@ -2,7 +2,7 @@
 import { HR_PROFILE_TTL } from '@trainingai/shared/cache-ttl'
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { cachedFetch } from '@/lib/sqlite/cache'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTransitionRouter } from "@/lib/view-transition";
 import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
@@ -72,8 +72,11 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
   const bpms = samples.map(s => s.bpm)
   const avgHr = avg(bpms)
   const maxHr = bpms.length ? Math.max(...bpms) : null
-  const savedRef = useRef(false)
-  const [saved, setSaved] = useState(false)
+  // DV-19 ③. A remount of a walk already saved writes nothing and says so — see `claimWalkSave`.
+  const [saved, setSaved] = useState(() => {
+    const s = useGuidedWalkStore.getState()
+    return s.savedWalkId != null && s.savedWalkId === s.walkId
+  })
   /**
    * The server-derived calories (BF-107), which do not exist when this screen first paints.
    *
@@ -138,9 +141,13 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
   }, [])
 
   useEffect(() => {
-    if (savedRef.current) return
-    savedRef.current = true
-    void saveWalk()
+    // DV-19 ③. Once per WALK, not per mount: the claim lives in the persisted store, so a summary
+    // remounted on a walk still `'done'` (Back off this screen, then the walk route again) finds
+    // it taken. That mount has lost the samples and the elapsed time, and its write would have
+    // replaced the real walk with a 0-minute one.
+    const walkId = useGuidedWalkStore.getState().claimWalkSave()
+    if (!walkId) return
+    void saveWalk(walkId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -154,7 +161,7 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
     linkPrescribedRun(userId, prescribedRunId, activityLogId, tz, 'walk').catch(() => {})
   }
 
-  async function saveWalk() {
+  async function saveWalk(walkId: string) {
     const date = todayInTz(tz)
     const startTime = msToHHMMInTz(startedAtMs, tz)
     const endTime = msToHHMMInTz(startedAtMs + actualSec * 1000, tz)
@@ -202,7 +209,8 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
       if (store) {
         try {
         const now = new Date().toISOString()
-        const logId = crypto.randomUUID()
+        // The walk's own id, so a second write for this walk can only ever upsert its one row.
+        const logId = walkId
         await store.upsertActivityLog({
           id: logId, date, activityType, title,
           durationMin, distanceKm, steps: stepsEstimate,
@@ -285,6 +293,7 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
       // and the server write failed too. So there is nothing queued for the outbox to retry, and
       // claiming otherwise by setting `saved` told the lifter their walk was safe when it was gone
       // (Q-216). Leave it unsaved so the button stays live and the walk can be saved again.
+      useGuidedWalkStore.getState().releaseWalkSave(walkId)
       toast.error('Failed to save walk — try again')
     }
   }

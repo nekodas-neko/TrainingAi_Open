@@ -1,7 +1,8 @@
 import type { ExerciseType } from "@trainingai/shared/types/program";
 import type { PhaseStatus } from "@trainingai/shared/workout/session-data";
 import type { WorkoutExercise } from "@/app/api/workout-data/route";
-import type { AiPrescriptionExercise, SessionPeriodization } from "@trainingai/shared/types/ai-periodization";
+import type { AiPrescription, AiPrescriptionExercise, PrescriptionFigures, SessionPeriodization } from "@trainingai/shared/types/ai-periodization";
+import { rowUnderFull } from "@trainingai/shared/ai-periodization/prescription-figures";
 import { formatDateDisplay } from "@trainingai/shared/date-utils";
 import { categoricalColor } from "@trainingai/shared/chart-colors";
 import { prescriptionDrivesLoad } from "@trainingai/shared/ai-periodization/apply-prescription";
@@ -308,7 +309,22 @@ export function overrideRunsFull(outcome: DeloadOverrideOutcome): boolean {
  *  shows the full numbers it recorded (`preDeload`), which is what the revert loads. One with no
  *  record stays deloaded on the bar, so it keeps its deload numbers and its Deload tag. */
 export function prescriptionRowAsTrained(ex: AiPrescriptionExercise, runsFull: boolean): AiPrescriptionExercise {
-  return runsFull && ex.deloaded && ex.preDeload ? { ...ex, ...ex.preDeload, deloaded: false } : ex
+  return runsFull ? rowUnderFull(ex) : ex
+}
+
+/** The prescription's "~N min of work" and weekly-volume figures as the session will be trained
+ *  (#2403). Under a working override they are the stored `fullSession` block — the same rows
+ *  `prescriptionRowAsTrained` shows, costed by the engine. Everywhere else, and on a prescription
+ *  stored before that block existed, they are the stored figures exactly as before. */
+export function prescriptionFiguresAsTrained(
+  prescription: Pick<AiPrescription, 'estimatedSessionDurationMin' | 'weeklyVolumeContribution' | 'fullSession'>,
+  runsFull: boolean,
+): PrescriptionFigures {
+  if (runsFull && prescription.fullSession) return prescription.fullSession
+  return {
+    estimatedSessionDurationMin: prescription.estimatedSessionDurationMin,
+    weeklyVolumeContribution: prescription.weeklyVolumeContribution,
+  }
 }
 
 /** Deloaded exercises a session-level override could NOT revert, because the prescription carried
