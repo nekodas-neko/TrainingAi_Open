@@ -47,12 +47,29 @@ export interface PendingTransition {
   urgency: 'normal' | 'high'
 }
 
+/** A prescription's two whole-session figures (`prescriptionFigures` computes both). */
+export interface PrescriptionFigures {
+  estimatedSessionDurationMin: number
+  weeklyVolumeContribution: Record<string, number>
+}
+
 export interface AiPrescription {
   phase: PeriodizationPhase
   phaseAction: 'stay' | 'transition_recommended' | 'deload_recommended' | 'session_swap_recommended' | 'rest_day_recommended'
   exercises: AiPrescriptionExercise[]
   estimatedSessionDurationMin: number
   weeklyVolumeContribution: Record<string, number>
+  /**
+   * The same two figures for the session the `Full` override trains — every deloaded row put back
+   * on its `preDeload` numbers (#2403). The stored figures above describe the deload; under Full
+   * the card, its pills and the time picker read these instead. Written wherever `preDeload` is
+   * (the whole-session deload builder, the model path's per-exercise deload, the budget re-fit) and
+   * only when some row has one. Absent — every prescription stored before this, and any with
+   * nothing to revert — the surfaces fall back to the stored figures. Consumption-day re-evaluation
+   * never needs to touch it: moving a row between deloaded and full keeps `preDeload` equal to its
+   * full numbers, so the session Full trains is unchanged.
+   */
+  fullSession?: PrescriptionFigures
   deload: boolean
   reasoning: string
   confidence: number

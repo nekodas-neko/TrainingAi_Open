@@ -11,7 +11,6 @@ import {
   expandToBudget,
   dropToBudget,
   applyRoleSetPlausibility,
-  estimateSessionDurationMin,
   shortSessionRestSec,
   SHORT_SESSION_REST_FLOOR_SEC,
   type MuscleContribution,
@@ -23,6 +22,8 @@ import { volumeLandmarks } from '@trainingai/shared/ai-periodization/volume-targ
 import { durationDirection, fitBudgetMin, type DurationPreset } from '@trainingai/shared/workout/duration-model'
 import type { PrescriptionSignals } from '@trainingai/shared/ai-periodization/signals'
 import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
+import { prescriptionFigures } from '@trainingai/shared/ai-periodization/prescription-figures'
+import type { PrescriptionFigures } from '@trainingai/shared/types/ai-periodization'
 
 /** One exercise as the budget stage receives it — its PRE-budget shape. The stage changes `sets`,
  *  and `restSec` on a shorter-than-usual day (#2284); reps/pct are read-only inputs. */
@@ -49,6 +50,8 @@ export interface BudgetStageResult {
    *  dropped — kept as a separate return value so a RE-fit replaces the previous note
    *  instead of stacking a second one onto it. */
   budgetNote: string
+  /** The same two figures under the `Full` override — present only when `fullShapeById` named a row. */
+  fullSession?: PrescriptionFigures
 }
 
 /**
@@ -105,6 +108,9 @@ export function applyBudgetStage(
   /** Exercises that earned a set through RPE autoregulation — trimmed last, so an earned
    *  set funds itself from lower-value work rather than deleting itself. */
   earnedSetIds: Set<string>,
+  /** #2403: the full numbers (`preDeload`) of each row a deload cut, so the result can carry the
+   *  figures for the session the `Full` override trains. Omitted or empty: no `fullSession`. */
+  fullShapeById?: ReadonlyMap<string, { sets: number; reps: number; pct: number; restSec: number }>,
 ): BudgetStageResult {
   // Time-budget enforcement — the AI is asked to fit the budget, but trim deterministically
   // so the session is guaranteed to fit the allocated time. Sets are cut by muscle-overage
@@ -204,19 +210,16 @@ export function applyBudgetStage(
   // convention — droppedExerciseIds filters at render), so every derived total below must
   // exclude them explicitly or the session would be costed for work it won't do.
   const activeExercises = exercises.filter(ex => !droppedIds.has(ex.sessionExerciseId))
-  const estimatedSessionDurationMin = estimateSessionDurationMin(
-    activeExercises.map(ex => {
-      const t = timedById.get(ex.sessionExerciseId)
-      return {
-        sets: sets.get(ex.sessionExerciseId) ?? ex.sets,
-        reps: ex.reps,
-        restSec: restSec.get(ex.sessionExerciseId) ?? ex.restSec,
-        transitionSec: t?.transitionSec ?? 240,
-        measuredSecPerRep: t?.measuredSecPerRep ?? null,
-        measuredRestSec: t?.measuredRestSec ?? null,
-      }
-    }),
-  )
+  // As the stage leaves them — trimmed sets, today's rest, and the measured rest scaled with it.
+  const asStaged = activeExercises.map(ex => ({
+    sessionExerciseId: ex.sessionExerciseId,
+    sets: sets.get(ex.sessionExerciseId) ?? ex.sets,
+    reps: ex.reps,
+    pct: ex.pct,
+    restSec: restSec.get(ex.sessionExerciseId) ?? ex.restSec,
+    measuredRestSec: timedById.get(ex.sessionExerciseId)?.measuredRestSec ?? null,
+  }))
+  const { estimatedSessionDurationMin, weeklyVolumeContribution } = prescriptionFigures(asStaged, signals)
 
   const notes: string[] = []
   const shortened = activeExercises.filter(ex => (restSec.get(ex.sessionExerciseId) ?? ex.restSec) < ex.restSec)
@@ -235,19 +238,18 @@ export function applyBudgetStage(
   }
   const budgetNote = notes.map(n => ` ${n}`).join('')
 
-  const weeklyVolumeContribution: Record<string, number> = {}
-  for (const ex of activeExercises) {
-    const signal = sigById.get(ex.sessionExerciseId)
-    if (!signal) continue
-    for (const ma of signal.muscleAssignments) {
-      const weight = ma.role === 'main' ? 1.0 : 0.5
-      // Deliberately `.toLowerCase()` and not `normalizeMuscle` — this map is keyed the way
-      // every existing consumer of weeklyVolumeContribution reads it. The muscleGroups above
-      // normalise because trim priority joins them against `signals.weeklyTargets`.
-      const muscle = ma.muscle.toLowerCase()
-      weeklyVolumeContribution[muscle] = (weeklyVolumeContribution[muscle] ?? 0) + (sets.get(ex.sessionExerciseId) ?? ex.sets) * weight
-    }
-  }
+  // #2403: the session `Full` trains. A deloaded row goes back to its recorded full numbers — which
+  // the stage never touched, so neither are their rest or measured rest — and every other row runs
+  // as staged. Only when the caller has a row to put back; otherwise there is no second session.
+  const fullSession = fullShapeById && fullShapeById.size > 0
+    ? prescriptionFigures(asStaged.map(row => {
+        const full = fullShapeById.get(row.sessionExerciseId)
+        return full ? { sessionExerciseId: row.sessionExerciseId, ...full } : row
+      }), signals)
+    : undefined
 
-  return { sets, restSec, droppedIds, estimatedSessionDurationMin, weeklyVolumeContribution, budgetNote }
+  return {
+    sets, restSec, droppedIds, estimatedSessionDurationMin, weeklyVolumeContribution, budgetNote,
+    ...(fullSession && { fullSession }),
+  }
 }
