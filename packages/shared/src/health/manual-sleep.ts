@@ -31,6 +31,25 @@ export const ManualSleepNightSchema = z.object({
 
 export type ManualSleepNightInput = z.infer<typeof ManualSleepNightSchema>
 
+/**
+ * Issue 2606 — removing a night the user entered. The route body is `{ id }`; the outbox payload is
+ * `{ id, deleted: true }`, the delete shape every outbox domain uses (`pendingDeletedIds`), on the
+ * same `manual_sleep` domain as the save. Strict, so a stray field is refused rather than ignored.
+ */
+export const ManualSleepRemoveSchema = z.object({
+  id: z.string().uuid(),
+}).strict()
+
+export const ManualSleepRemovePayloadSchema = z.object({
+  id: z.string().uuid(),
+  deleted: z.literal(true),
+}).strict()
+
+/** True when an outbox `manual_sleep` payload is a removal rather than a save. */
+export function isManualSleepRemoval(payload: Record<string, unknown>): boolean {
+  return payload.deleted === true
+}
+
 /** A validated manual night, with everything the row stores derived from its two ends. */
 export interface ManualSleepNight {
   id?: string

@@ -157,10 +157,11 @@ export class SQLiteLocalStore implements LocalStore {
   // #2338: a night the user typed in is dropped wherever a device recorded the same night — the same
   // `preferDeviceNights` the server's `listSleepSessions` applies, so a local-first screen and the
   // network reply agree on which night it is. Applied here, at the store's one sleep read, so no
-  // screen has to know manual nights exist.
+  // screen has to know manual nights exist. Issue 2606: a night the user removed (`deleted_at`) is
+  // skipped before the ranking, as the server skips it, so it neither shows nor shadows anything.
   async getSleepSessions(cutoffDate: string): Promise<LocalSleepSession[]> {
     const rows = await querySQL<Record<string, unknown>>(
-      `SELECT * FROM sleep_sessions WHERE date >= ? ORDER BY date`,
+      `SELECT * FROM sleep_sessions WHERE date >= ? AND deleted_at IS NULL ORDER BY date`,
       [cutoffDate],
     );
     return preferDeviceNights(rows.map(r => ({
@@ -619,7 +620,8 @@ export class SQLiteLocalStore implements LocalStore {
 
   async setManualSleepStartLocally(date: string, at: string | null): Promise<void> {
     await runSQL(
-      `UPDATE sleep_sessions SET manual_sleep_start=?, sync_status='pending', updated_at=? WHERE date=?`,
+      // Issue 2606: never onto a removed night, as on the server.
+      `UPDATE sleep_sessions SET manual_sleep_start=?, sync_status='pending', updated_at=? WHERE date=? AND deleted_at IS NULL`,
       [at, new Date().toISOString(), date],
     );
   }
@@ -628,8 +630,17 @@ export class SQLiteLocalStore implements LocalStore {
     // One manual night per date, as the server's partial unique key has it: an existing one for the
     // date is edited and keeps its id, so a second save before the first has synced is still one
     // row here and one row there.
+    //
+    // Issue 2606: the revive order of `saveManualSleepNight` — the date's live manual night, else a
+    // REMOVED one for the date, else a removed one at the same start (the server's first rule, the
+    // payload's own id, cannot apply: a new entry's id is fresh) — so re-entering a removed night
+    // brings that row back (deleted_at cleared below) under the id the server holds.
     const [existing] = await querySQL<{ id: string }>(
-      `SELECT id FROM sleep_sessions WHERE date=? AND manual_entry=1 LIMIT 1`, [night.date],
+      `SELECT id FROM sleep_sessions
+        WHERE manual_entry=1 AND (date=? OR (deleted_at IS NOT NULL AND sleep_start=?))
+        ORDER BY (deleted_at IS NULL) DESC, (date=?) DESC, deleted_at DESC, id
+        LIMIT 1`,
+      [night.date, night.sleepStart, night.date],
     );
     const id = existing?.id ?? night.id;
     // Every measured column is written NULL rather than left alone: a manual night has none, and an
@@ -645,12 +656,30 @@ export class SQLiteLocalStore implements LocalStore {
        ON CONFLICT(id) DO UPDATE SET
          date=excluded.date, sleep_start=excluded.sleep_start, sleep_end=excluded.sleep_end,
          duration_hours=excluded.duration_hours, time_in_bed_hours=excluded.time_in_bed_hours,
-         updated_at=excluded.updated_at, sync_status='pending'
+         deleted_at=NULL, updated_at=excluded.updated_at, sync_status='pending'
        WHERE sleep_sessions.manual_entry=1`,
       [id, night.date, night.sleepStart, night.sleepEnd, night.durationHours, night.timeInBedHours,
        new Date().toISOString()],
     );
     return id;
+  }
+
+  async removeManualSleepLocally(id: string): Promise<string | null> {
+    // Read first: `runSQL` reports no row count, and the caller must not queue a removal for a device
+    // night or an id this store does not hold.
+    const [row] = await querySQL<{ manual_entry: number; date: string }>(
+      `SELECT manual_entry, date FROM sleep_sessions WHERE id=?`, [id],
+    );
+    if (!row || Number(row.manual_entry) !== 1) return null;
+    const now = new Date().toISOString();
+    // An already-removed row keeps its first removal time; re-marking it pending is harmless (the
+    // removal it queues again is idempotent on the server).
+    await runSQL(
+      `UPDATE sleep_sessions SET deleted_at=COALESCE(deleted_at, ?), updated_at=?, sync_status='pending'
+        WHERE id=? AND manual_entry=1`,
+      [now, now, id],
+    );
+    return String(row.date);
   }
 
   async markManualSleepSynced(id: string, confirmingIds: string[] = []): Promise<void> {
@@ -1555,15 +1584,21 @@ export class SQLiteLocalStore implements LocalStore {
       // resync, or More → Data → Restore from cloud) its updated_at is EQUAL, so the advance rule alone would keep
       // that gap forever. A synced row missing its window takes the server's; there is no local
       // edit to lose, and every other field it carries is the server's already.
+      //
+      // Issue 2606: `deleted_at` rides the same guard. A server tombstone lands like any newer row
+      // (and hides it from `getSleepSessions`); an older live copy cannot clear a local removal,
+      // because its updated_at does not advance and an unpushed removal is 'pending'. A NEWER live
+      // copy does clear it — the night was entered again, or a device measured it — so this is not
+      // the one-way `deleted_at IS NULL` guard mood_logs uses.
       await runSQL(
         `INSERT INTO sleep_sessions
            (id, date, duration_hours, deep_sleep_hours, rem_sleep_hours,
             light_sleep_hours, oura_id, efficiency, onset_latency_sec, average_hrv_ms,
             avg_heart_rate, lowest_heart_rate, restless_periods, sleep_score,
             respiratory_rate, sleep_phase_5_min, time_in_bed_hours, manual_sleep_start,
-            sleep_start, sleep_end, awake_hours, manual_entry,
+            sleep_start, sleep_end, awake_hours, manual_entry, deleted_at,
             updated_at, sync_status)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
          ON CONFLICT(id) DO UPDATE SET
            date=excluded.date, duration_hours=excluded.duration_hours,
            deep_sleep_hours=excluded.deep_sleep_hours,
@@ -1578,6 +1613,7 @@ export class SQLiteLocalStore implements LocalStore {
            manual_sleep_start=excluded.manual_sleep_start,
            sleep_start=excluded.sleep_start, sleep_end=excluded.sleep_end,
            awake_hours=excluded.awake_hours, manual_entry=excluded.manual_entry,
+           deleted_at=excluded.deleted_at,
            updated_at=excluded.updated_at, sync_status='synced'
          WHERE sleep_sessions.sync_status='synced'
            AND (excluded.updated_at > sleep_sessions.updated_at
@@ -1586,7 +1622,8 @@ export class SQLiteLocalStore implements LocalStore {
          r.ouraId, r.efficiency, r.onsetLatencySec, r.averageHrvMs, r.avgHeartRate,
          r.lowestHeartRate, r.restlessPeriods, r.sleepScore, r.respiratoryRate,
          r.sleepPhase5Min, r.timeInBedHours, r.manualSleepStart,
-         r.sleepStart ?? null, r.sleepEnd ?? null, r.awakHours ?? null, r.manualEntry ? 1 : 0, r.updatedAt],
+         r.sleepStart ?? null, r.sleepEnd ?? null, r.awakHours ?? null, r.manualEntry ? 1 : 0,
+         r.deletedAt ?? null, r.updatedAt],
       );
     }
 

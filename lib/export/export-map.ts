@@ -53,6 +53,8 @@ export const SOFT_DELETED: Record<string, string> = {
   session_exercises: 'deleted_at',
   rest_days: 'deleted_at',
   set_logs: 'deleted_at',
+  // issue 2606: only a manual night the user removed is ever tombstoned
+  sleep_sessions: 'deleted_at',
   supplement_logs: 'deleted_at',
   supplement_vials: 'deleted_at',
   supplements: 'deleted_at',

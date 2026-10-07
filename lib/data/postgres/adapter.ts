@@ -61,7 +61,7 @@ import {
 } from '@trainingai/shared/validation/body-metrics'
 import { sleepImplausibleReason } from '@trainingai/shared/validation/plausibility'
 import { preferDeviceNights } from '@trainingai/shared/health/sleep-night'
-import { parseManualNight } from '@trainingai/shared/health/manual-sleep'
+import { parseManualNight, isManualSleepRemoval, ManualSleepRemovePayloadSchema } from '@trainingai/shared/health/manual-sleep'
 import { ActivityLogBody, deriveEndTime } from '@trainingai/shared/validation/activity-log'
 import { describeZodFailure } from './push-error-detail'
 import type { WorkoutRepository, UserGoals, EnsuredWorkoutSession, SessionLoad, YearReviewTotals, YearReviewTopExercise, UnitFixResult, SyncDelta, IncomingMutation, PushResult, OuraRawSampleInput, OuraRawSampleSummary, OuraRawSampleLatest, OuraRawSampleRow, FitnessTest, RunningPlan, PrescribedRun, PrescribedRunUpdate, AiCallLogInput, AiCallUsageSummary, ScaleRawSampleInput, ScalePendingSample, LastRealOneRm, BloodPanel, BloodPanelInput, BloodAnalyte, StrapStatusWrite, StrapStatusRow, OuraLinkStatsWrite, DetectionEventWrite } from '../repository'
@@ -2132,6 +2132,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         gte(s.sleepSessions.date, from),
         lte(s.sleepSessions.date, to),
         gt(s.sleepSessions.durationHours, 0),
+        isNull(s.sleepSessions.deletedAt),   // issue 2606: a removed night is not a night
       ))
       .orderBy(desc(s.sleepSessions.date))
     return rows.map(r => r.date)
@@ -3102,6 +3103,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * one read every server consumer shares, so no scorer, list or chart has to know manual nights
    * exist. The read is widened a day each side only so a device row whose stored date disagrees with
    * its window can still shadow a manual night it overlaps; rows outside [from, to] are not returned.
+   *
+   * Issue 2606: a night the user REMOVED (`deleted_at` set) is skipped here, before the ranking, so
+   * it neither shows nor shadows anything. For a user who never removed a night the predicate
+   * filters nothing, and every consumer's input is exactly what it was.
    */
   async listSleepSessions(userId: string, from: string, to: string): Promise<SleepSession[]> {
     const rows = await this.db.select().from(s.sleepSessions)
@@ -3109,6 +3114,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         eq(s.sleepSessions.userId, userId),
         gte(s.sleepSessions.date, shiftDateStr(from, -1)),
         lte(s.sleepSessions.date, shiftDateStr(to, 1)),
+        isNull(s.sleepSessions.deletedAt),
       ))
       .orderBy(desc(s.sleepSessions.date))
     return preferDeviceNights(rows).filter(r => r.date >= from && r.date <= to).map(r => ({
@@ -3148,6 +3154,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    *
    * The update skips itself when a device row already starts at the new `sleep_start`, for the same
    * reason and so it can never raise the `(user_id, sleep_start)` unique violation.
+   *
+   * Issue 2606: with no live manual night for the date, a REMOVED one is revived (deleted_at cleared,
+   * id kept) before anything is inserted: the payload's own id first, then the date, then the same
+   * start instant. Reviving rather than inserting is forced as much as chosen: a removed row still
+   * holds its `(user_id, sleep_start)`, so re-entering identical times could never insert. A replay
+   * cannot undo a removal, because the outbox is FIFO: a save queued before a removal is always sent
+   * before it.
    */
   async saveManualSleepNight(
     userId: string,
@@ -3165,11 +3178,32 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         eq(s.sleepSessions.userId, userId),
         eq(s.sleepSessions.date, night.date),
         eq(s.sleepSessions.manualEntry, true),
+        isNull(s.sleepSessions.deletedAt),
       ))
+      .limit(1))[0]?.id ?? null
+    const startIso = night.sleepStart.toISOString()
+    const findRemoved = async () => (await this.db.select({ id: s.sleepSessions.id }).from(s.sleepSessions)
+      .where(and(
+        eq(s.sleepSessions.userId, userId),
+        eq(s.sleepSessions.manualEntry, true),
+        isNotNull(s.sleepSessions.deletedAt),
+        or(
+          eq(s.sleepSessions.date, night.date),
+          sql`${s.sleepSessions.sleepStart} = ${startIso}::timestamptz`,
+          ...(night.id ? [eq(s.sleepSessions.id, night.id)] : []),
+        ),
+      ))
+      .orderBy(
+        ...(night.id ? [desc(sql`${s.sleepSessions.id} = ${night.id}::uuid`)] : []),
+        desc(sql`${s.sleepSessions.date} = ${night.date}::date`),
+        desc(s.sleepSessions.deletedAt),
+        asc(s.sleepSessions.id),
+      )
       .limit(1))[0]?.id ?? null
     const updateManual = async (id: string) => {
       await this.db.update(s.sleepSessions)
-        .set(fields)
+        // `date` and `deletedAt` matter only for a revived row: a live one already has this date.
+        .set({ ...fields, date: night.date, deletedAt: null })
         .where(and(
           eq(s.sleepSessions.id, id),
           eq(s.sleepSessions.userId, userId),
@@ -3180,7 +3214,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       return id
     }
 
-    let id = await findManual()
+    let id = (await findManual()) ?? (await findRemoved())
     if (id) {
       await updateManual(id)
     } else {
@@ -3190,7 +3224,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         .returning({ id: s.sleepSessions.id })
       id = inserted[0]?.id ?? null
       if (!id) {
-        id = await findManual()
+        id = (await findManual()) ?? (await findRemoved())
         if (id) {
           await updateManual(id)
         } else if (night.id) {
@@ -3222,9 +3256,40 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const updated = await this.db
       .update(s.sleepSessions)
       .set({ manualSleepStart: at, updatedAt: new Date() })
-      .where(and(eq(s.sleepSessions.userId, userId), eq(s.sleepSessions.date, date)))
+      // Issue 2606: a removed night is not a night to put a bedtime on, and a date whose only row is
+      // removed must answer "nothing matched" rather than report a save no reader will ever show.
+      .where(and(eq(s.sleepSessions.userId, userId), eq(s.sleepSessions.date, date), isNull(s.sleepSessions.deletedAt)))
       .returning({ id: s.sleepSessions.id })
     return updated.length > 0
+  }
+
+  /**
+   * Issue 2606 — see the interface. One UPDATE whose predicate carries the whole rule (the caller's
+   * row, a manual night, not yet removed), so an affected-row count of 1 is the answer. Only a 0 is
+   * read back, to tell a replay from a device night from an id that is not the caller's — and that
+   * read is scoped to the caller too, so another user's id is `not_found`, never `not_manual`.
+   * `updated_at` moves so the delta pull carries the tombstone to every device.
+   */
+  async deleteManualSleepNight(userId: string, id: string): Promise<'removed' | 'already_removed' | 'not_manual' | 'not_found'> {
+    const now = new Date()
+    const removed = await this.db.update(s.sleepSessions)
+      .set({ deletedAt: now, updatedAt: now })
+      .where(and(
+        eq(s.sleepSessions.id, id),
+        eq(s.sleepSessions.userId, userId),
+        eq(s.sleepSessions.manualEntry, true),
+        isNull(s.sleepSessions.deletedAt),
+      ))
+      .returning({ id: s.sleepSessions.id })
+    if (removed.length === 1) return 'removed'
+    const [row] = await this.db
+      .select({ manualEntry: s.sleepSessions.manualEntry, deletedAt: s.sleepSessions.deletedAt })
+      .from(s.sleepSessions)
+      .where(and(eq(s.sleepSessions.id, id), eq(s.sleepSessions.userId, userId)))
+      .limit(1)
+    if (!row) return 'not_found'
+    if (!row.manualEntry) return 'not_manual'
+    return 'already_removed'
   }
 
   async getExerciseMuscleAssignments(names: string[]): Promise<Record<string, MuscleAssignment[]>> {
@@ -4635,6 +4700,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       this.db.select().from(s.bodyMetrics)
         .where(and(eq(s.bodyMetrics.userId, userId), gt(s.bodyMetrics.updatedAt, effectiveSince)))
         .orderBy(asc(s.bodyMetrics.updatedAt)).limit(pageLimit),
+      // Not filtered on `deleted_at` (issue 2606): this is the tombstone channel for a removed manual
+      // night, as for mood_logs and food_logs below.
       this.db.select().from(s.sleepSessions)
         .where(and(eq(s.sleepSessions.userId, userId), gt(s.sleepSessions.updatedAt, effectiveSince)))
         .orderBy(asc(s.sleepSessions.updatedAt)).limit(pageLimit),
@@ -5880,6 +5947,26 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           // An implausible or malformed night is a permanent 4xx — a retry cannot make it plausible —
           // so it quarantines rather than wedging the queue. A replay of an applied mutation edits the
           // same row to the same values: (user, wake date) is a unique key for manual nights.
+          //
+          // Issue 2606: `{ id, deleted: true }` on the same domain is a removal, calling the same
+          // `deleteManualSleepNight` as `DELETE /api/sleep-sessions/manual`. Already removed is a
+          // replay and counts as processed. So does an id with no row for this user: the end state
+          // the device asked for (no such night) already holds, and another user's id changes
+          // nothing. A device night is a permanent refusal, quarantined: it can never be removed.
+          if (isManualSleepRemoval(clean)) {
+            const removal = ManualSleepRemovePayloadSchema.safeParse(clean)
+            if (!removal.success) {
+              errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: `Invalid manual_sleep removal — ${describeZodFailure(removal.error)}` })
+              continue
+            }
+            const outcome = await this.deleteManualSleepNight(userId, removal.data.id)
+            if (outcome === 'not_manual') {
+              errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'manual_sleep removal: a night a device measured cannot be removed' })
+              continue
+            }
+            processed++
+            continue
+          }
           const parsedNight = parseManualNight(clean, userTz, new Date())
           if (!parsedNight.ok) {
             errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: `Invalid manual_sleep payload — ${parsedNight.issues ? describeZodFailure(parsedNight.issues) : parsedNight.reason}` })
