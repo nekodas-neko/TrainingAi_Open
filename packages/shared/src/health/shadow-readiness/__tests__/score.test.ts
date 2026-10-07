@@ -241,6 +241,19 @@ describe('shadow readiness — structural rules', () => {
     expect(r.inputsThrough).toBe(shiftDateStr(D, -1))
   })
 
+  it('training load follows the shared ACWR baselining rule: withheld in a program\'s first 28 days (OR-210)', () => {
+    const tz = 'Australia/Brisbane'
+    const raw = emptyRaw(tz)
+    // Three sessions a week for six weeks before the readiness day.
+    raw.workouts = Array.from({ length: 18 }, (_, i) => ({
+      startedAt: new Date(`${shiftDateStr(D, -(2 + Math.floor(i * 7 / 3)))}T08:00:00+10:00`), volumeKg: 4000,
+    }))
+    raw.program = { createdAt: new Date(`${shiftDateStr(D, -90)}T00:00:00+10:00`) }
+    expect(assembleShadowInputs(prepareShadowHistory(raw), D).units['activity.training_load']!.today).not.toBeNull()
+    raw.program = { createdAt: new Date(`${shiftDateStr(D, -5)}T00:00:00+10:00`) }
+    expect(assembleShadowInputs(prepareShadowHistory(raw), D).units['activity.training_load']!.today).toBeNull()
+  })
+
   it('drop-out + renormalise: a pillar renormalises over the units that scored and says which dropped', () => {
     const r = scoreShadowReadiness({
       date: D,
@@ -370,7 +383,7 @@ describe('shadow readiness — structural rules', () => {
 
 function emptyRaw(tz: string): ShadowRawHistory {
   return {
-    tz, ageYears: 40, sleepSessions: [], bodyMetrics: [], dailySummaries: [], wear: [], derived: [], workouts: [],
+    tz, ageYears: 40, sleepSessions: [], bodyMetrics: [], dailySummaries: [], wear: [], derived: [], workouts: [], program: null,
     setHr: [], zoneSeconds: null, unwellDates: new Set(), fuel: new Map(), weightVsPlan: new Map(),
   }
 }

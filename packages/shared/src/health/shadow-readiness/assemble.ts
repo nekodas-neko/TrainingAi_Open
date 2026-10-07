@@ -13,7 +13,7 @@
  */
 import { median } from '@trainingai/shared/stats'
 import { dateStrMidnightInTz, shiftDateStr, toAestDay } from '@trainingai/shared/date-utils'
-import { computeVolumeAcwr } from '@trainingai/shared/ai-periodization/acwr'
+import { acwrBaselineDaysRemaining, computeVolumeAcwr, type ProgramAgeInput } from '@trainingai/shared/ai-periodization/acwr'
 import { activeMinutesFromZoneSeconds } from '@trainingai/shared/health/zone-minutes'
 import { minutesFromNoon } from '@trainingai/shared/health/sleep-consistency'
 import { nightSessions, canonicalNightForDate, type AggregatableSleep } from '@trainingai/shared/health/sleep-night'
@@ -41,6 +41,8 @@ export interface ShadowRawHistory {
   derived: readonly { day: string; stressHighMinutes: number | null }[]
   /** Strength sessions with their total volume. */
   workouts: readonly { startedAt: Date; volumeKg: number }[]
+  /** The active program, for the ACWR baselining rule (OR-210). Null = no program to judge. */
+  program: ProgramAgeInput | null
   /** Per-set HR rows (`set_hr_stats`), for HRR60. */
   setHr: readonly { setLogId: string; drop60s: number | null; coverageOk: boolean; source: string | null; loggedAt: Date | null }[]
   /** Zone seconds per completed day, or null when nothing records this person's heart rate. */
@@ -129,6 +131,11 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
   const trainingLoad = compact([...loadDays].sort().map(d => {
     const end = dateStrMidnightInTz(shiftDateStr(d, 1), tz)
     const start = end.getTime() - 28 * DAY_MS
+    // OR-210: for the first 28 days of a program the chronic window still holds the previous
+    // routine, so the ratio is withheld — the same rule every ACWR consumer applies. The program is
+    // the one active now (no history of programs is stored), so a replayed day before it began is
+    // withheld too.
+    if (acwrBaselineDaysRemaining(raw.program, end) > 0) return null
     const window = sessions.filter(s => s.startedAt.getTime() >= start && s.startedAt.getTime() < end.getTime())
     return obs(d, computeVolumeAcwr(window, end).acwr, 'workout_sessions')
   }))
