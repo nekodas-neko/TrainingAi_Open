@@ -47,6 +47,7 @@
     "meal_types": {"class":"HYDRATED MIRROR","note":"local table exists, NOT in getSyncDelta; filled from API fetches; server authoritative"},
     "measured_rmr": {"class":"SERVER-ONLY","note":"user data, no local mirror; writer: adapter.ts"},
     "mood_logs": {"class":"DEVICE-FIRST","note":"local write + outbox push + delta pull"},
+    "native_refresh_tokens": {"class":"SERVER-ONLY","note":"credential material (#2076 native app refresh tokens, SHA-256 hashes only); nothing on the device reads it; token_hash withheld from claude_ro; writer: slices/native-refresh-tokens.ts"},
     "nutrition_targets": {"class":"SERVER-ONLY","note":"user data, no local mirror; writer: goals.ts, nutrition.ts"},
     "oura_accel_chunks": {"class":"SERVER-ONLY","note":"sensor ingest -> server; writer: adapter.ts"},
     "oura_ble_battery_poll": {"class":"SERVER-ONLY","note":"sensor ingest -> server; writer: adapter.ts"},

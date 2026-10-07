@@ -21,6 +21,7 @@
 //
 // Runs only against a real Postgres — skips cleanly when DATABASE_URL is absent.
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
+import { randomBytes } from 'node:crypto'
 import {
   readSchemaGraph, cascadeClosure, setNullToUsers, seedEveryUserTable,
   type SchemaGraph, type SeededUser, type Row,
@@ -310,6 +311,8 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['listBloodPanels', r => r.listBloodPanels(USER_A)],
     ['isRestDayChosen', r => r.isRestDayChosen(USER_A, D)],
     ['listRestDays', r => r.listRestDays(USER_A, FROM, TO)],
+    // #2076. B's token is live (not rotated, not revoked, expiring in a month).
+    ['listActiveNativeRefreshTokens', r => r.listActiveNativeRefreshTokens(USER_A)],
     // PRs and estimates
     ['getExerciseEstimates', r => r.getExerciseEstimates(USER_A)],
     ['listRecentPersonalRecords', r => r.listRecentPersonalRecords(USER_A, FROM_TS, TO_TS)],
@@ -453,6 +456,16 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['dismissScaleSample', r => r.dismissScaleSample(USER_A, bNum('scale_raw_samples'))],
     ['setSleepVerdictResponse', r => r.setSleepVerdictResponse(USER_A, D, 'acknowledged')],
     ['setReadinessVerdictResponse', r => r.setReadinessVerdictResponse(USER_A, D, 'rated')],
+    // #2076. Aimed at B's live token and B's family. `createNativeRefreshToken` has no predicate (it
+    // always starts a new family for the caller) and `findNativeRefreshTokenByHash` is the one lookup
+    // that is unscoped by design, so neither has a row here.
+    ['rotateNativeRefreshToken', r => r.rotateNativeRefreshToken({
+      userId: USER_A, id: bId('native_refresh_tokens'),
+      newTokenHash: randomBytes(32).toString('hex') as import('@/lib/auth/refresh-token-hash').RefreshTokenHash,
+      expiresAt: new Date(Date.now() + 86_400_000),
+    }), v => { expect(v).toBeNull() }],
+    ['revokeNativeRefreshToken', r => r.revokeNativeRefreshToken(USER_A, bId('native_refresh_tokens'), 'user')],
+    ['revokeNativeRefreshTokenFamily', r => r.revokeNativeRefreshTokenFamily(USER_A, bVal('native_refresh_tokens', 'family_id'), 'user')],
     // #2377. No predicate for the sweep to neutralise: the conflict key (user_id, date,
     // model_version) is the guard. Aimed at B's own day and version; checked by hand to fail when the
     // upsert writes any user_id but the caller's.
@@ -1132,6 +1145,10 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
  * nothing of B's whether or not it is scoped — every entry here was a survivor for that reason.
  */
 const B_OVERRIDES: Record<string, Row> = {
+  // The hash CHECK refuses the fixture's generic text, and the expiry CHECK wants a time after
+  // created_at (now()). Live for a month, so the reader above has something to leak. A random hash:
+  // other files seed this table in the same database, and the hash is UNIQUE.
+  native_refresh_tokens: { token_hash: randomBytes(32).toString('hex'), expires_at: new Date(Date.now() + 30 * 86_400_000), device_label: 'B PHONE 2076' },
   apple_health_samples: {
     start_at: new Date('2026-09-15T00:00:00Z'), end_at: new Date('2026-09-15T00:01:00Z'),
     source_bundle_id: 'com.example', quantity_value: 1, quantity_unit: 'count',
