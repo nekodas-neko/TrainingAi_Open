@@ -35,6 +35,7 @@ interface UnitFixExerciseSummary {
 interface UnitFixResult {
   logs: UnitFixLogChange[];
   exercises: UnitFixExerciseSummary[];
+  alreadyConverted?: number;
 }
 
 export default function ExerciseUnitFix() {
@@ -152,10 +153,17 @@ export default function ExerciseUnitFix() {
         <div className="space-y-3 rounded-lg border p-3">
           {result.logs.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No sessions found for the selected exercise(s) before {beforeDate}.
+              {result.alreadyConverted
+                ? `Nothing to convert: ${result.alreadyConverted} session(s) before ${beforeDate} were already converted and are left alone.`
+                : `No sessions found for the selected exercise(s) before ${beforeDate}.`}
             </p>
           ) : (
             <>
+              {!!result.alreadyConverted && (
+                <p className="text-xs text-muted-foreground">
+                  {result.alreadyConverted} more session(s) were already converted and are left alone.
+                </p>
+              )}
               <div className="space-y-1">
                 {result.exercises.map(ex => (
                   <p key={ex.exerciseName} className="text-xs">
