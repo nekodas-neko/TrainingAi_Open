@@ -155,7 +155,7 @@ follows the running job.
 | … > per-row **Sparkles / RefreshCw icon** (generate / regenerate) | `:698` | `generate-exercise-media` with `force` when one exists (confirm on overwrite) | One AI generation. | one exercise | Costs money each time. | admin session | money, overwrites | |
 | … > per-row **Trash icon** | `:716` (confirm) | `DELETE /api/admin/exercises?name=` | **Hard-deletes** a library row and its GIF cache. There is no `deleted_at` tombstone, which conflicts with the offline-first rule. | one exercise | no | admin session | **destructive** | Rarely. |
 | … > **Add** / form **Sparkles** / **Save** | `:609` / `:168` / `:211` | `POST /api/exercises/generate` (AI fills details) · `POST` or `PATCH /api/admin/exercises` | Creates or edits an exercise. A rename shows a warning (`:172`), because references are by name. | one | yes | admin session (generate: user session plus rate limit) | rename can orphan references by name | |
-| Admin > activities > **Add** / **Save** / **pencil** / **trash icon** | `components/admin/activity-type-manager.tsx:164` / `:86` / `:204` / `:212` | `POST`, `PATCH` or `DELETE /api/admin/activity-types` | Manages activity types. Delete is refused while the type is in use (409) and for `other`. | one | yes | admin session | delete: low (guarded), **no confirm, no aria-label** | |
+| Admin > activities > **Add** / **Save** / **pencil** / **trash icon** | `components/admin/activity-type-manager.tsx:164` / `:86` / `:204` / `:212` | `POST`, `PATCH` or `DELETE /api/admin/activity-types` | Manages activity types. Delete opens a confirm naming the type (since #2693); it hard-deletes the global row and is refused while any activity log uses the type (409) and for `other`. | one | yes | admin session | delete: low (guarded), confirm and `aria-label` since #2693 | |
 
 ## 8. `/more/settings/developer` (the six bare cards and the diagnostics rows)
 
@@ -262,7 +262,7 @@ are read-only by design.
 | Cadence **Stop** | Also drains the ring. |
 | **Null historical decoded (Lever 1b)**, **Pack sealed frames (Lever 5)**, **VACUUM FULL (Lever 1c)** | They lean on internal "Lever N" names. The confirm dialogs explain; the buttons do not. |
 | **AI all** | One paid AI generation per uncovered exercise, with no count or cost before the press. |
-| Icon-only controls: user activate/deactivate (UserCheck/UserX; `aria-label` since #2383), user delete, invite remove, exercise row icons, activity **trash** (no aria-label) | No text label. The activity delete has no accessible name at all. |
+| Icon-only controls: user activate/deactivate (UserCheck/UserX; `aria-label` since #2383), user delete, invite remove, exercise row icons, activity trash (`aria-label` since #2693) | No text label. |
 | **Sync now** (More > Data & Sync) | A server-to-device pull. It shares its name with the Oura BLE ring drain. |
 | **Export my data** | Fine, but it downloads PII without a warning. |
 
