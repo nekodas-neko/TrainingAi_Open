@@ -38,6 +38,12 @@ interface UnitFixResult {
   alreadyConverted?: number;
 }
 
+// The sync-first line is not decoration: the push path has no merge rule (issue 2716), so a phone with
+// an unsynced edit to one of these workouts would push the old weights back over the converted ones.
+export function applyConfirmMessage(sessions: number, exercises: string[], beforeDate: string): string {
+  return `Convert ${sessions} session(s) for ${exercises.join(", ")} logged before ${beforeDate} from lbs to kg? This cannot be undone automatically. Sync your phone first (More → Data → Sync now). An unsynced edit to one of these workouts would put the old weights back.`;
+}
+
 export default function ExerciseUnitFix() {
   const [exerciseNames, setExerciseNames] = useState<string[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
@@ -211,9 +217,7 @@ export default function ExerciseUnitFix() {
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
         title="Convert these weights to kg?"
-        message={result
-          ? `Convert ${result.logs.length} session(s) for ${selected.join(", ")} logged before ${beforeDate} from lbs to kg? This cannot be undone automatically.`
-          : ""}
+        message={result ? applyConfirmMessage(result.logs.length, selected, beforeDate) : ""}
         confirmLabel="Convert"
         onConfirm={applyFix}
       />

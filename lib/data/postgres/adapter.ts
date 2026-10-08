@@ -1022,7 +1022,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // would otherwise be overwritten (and reassigned into this user's session) by the
       // bare-id upsert below — a cross-user row theft. exercise_logs has no user_id, so
       // ownership is via the workout_sessions join (the assertOwnership pattern).
-      const [existing] = await tx.select({ ownerId: s.workoutSessions.userId, unitFixAppliedAt: s.exerciseLogs.unitFixAppliedAt })
+      const [existing] = await tx.select({ ownerId: s.workoutSessions.userId })
         .from(s.exerciseLogs)
         .innerJoin(s.workoutSessions, eq(s.workoutSessions.id, s.exerciseLogs.workoutSessionId))
         .where(eq(s.exerciseLogs.id, clientExerciseLogId))
@@ -1031,14 +1031,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         throw new Error('exercise log not owned by user')
       }
       const isReplay = !!existing
-      // Issue 2716: the push upsert below is last-write-wins by arrival, with no `updated_at`
-      // comparison. A device that still holds the pre-conversion copy of a log (an unsynced outbox
-      // entry) would write the lbs-as-kg weights back over the corrected ones. A log the admin fix has
-      // converted therefore ignores a replayed log push: nothing is written, and the device receives
-      // the corrected values on its next pull (applyDelta overwrites `synced` rows).
-      if (existing?.unitFixAppliedAt) {
-        return { exerciseLog: { ...log, id: clientExerciseLogId, sets: [] }, setLogs: [] }
-      }
 
       // Same guard for client-supplied set ids: reject any that already exist under
       // another user's exercise log.

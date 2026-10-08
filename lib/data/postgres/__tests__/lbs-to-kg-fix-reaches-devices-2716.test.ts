@@ -1,10 +1,8 @@
 // Issue 2716: the lbs-to-kg admin fix is a server write on a device-first table, so it has to travel
 // the normal sync road. Apply moves `updated_at` on every converted log and each of its sets (the delta
-// pull cursors both tables on their own `updated_at`), and a replayed push of the pre-conversion copy
-// must not put the lbs-as-kg weights back (the push upsert is last-write-wins by arrival, with no
-// `updated_at` comparison, so the converted log refuses the replay).
+// pull cursors both tables on their own `updated_at`).
 //
-// DB-backed because both defects are in SQL. Not exercised: a real device pulling the rows.
+// DB-backed because the defect is in SQL. Not exercised: a real device pulling the rows.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 
 const canRun = !!process.env.DATABASE_URL
@@ -86,44 +84,5 @@ describe.skipIf(!canRun)('lbs-to-kg Apply reaches devices (issue 2716)', () => {
     const delta = (await repo.getSyncDelta(USER, new Date(seededAt + 1))) as unknown as { exerciseLogs: { id: string }[]; setLogs: { id: string; weightKg: number }[] }
     expect(delta.exerciseLogs.map(l => l.id)).not.toContain(untouchedLog)
     expect(delta.setLogs.map(l => l.id)).not.toContain(untouchedSet)
-  })
-
-  it('an older pushed copy of a converted log does not put the lbs-as-kg weights back', async () => {
-    const res = await repo.logExerciseAndSets(
-      USER,
-      {
-        workoutSessionId: sessionId,
-        exerciseLogId: convertedLog,
-        exerciseName: LIFT,
-        estimated1rm: 150,
-        target80: 120,
-        volume: 500,
-        muscleGroups: ['chest'],
-        loggedAt: new Date('2026-01-10T00:00:00Z'),
-      } as never,
-      [{ id: convertedSet, setNumber: 1, weightKg: 100, reps: 5, useFor1rm: true }] as never,
-    )
-    expect(res.exerciseLog.id).toBe(convertedLog)
-    const w = await pool.query(`SELECT weight_kg FROM set_logs WHERE id = $1`, [convertedSet])
-    expect(Number(w.rows[0].weight_kg)).toBe(45.5)
-    const e = await pool.query(`SELECT estimated_1rm FROM exercise_logs WHERE id = $1`, [convertedLog])
-    expect(Number(e.rows[0].estimated_1rm)).toBeLessThan(100)
-  })
-
-  it('a replayed push still updates a log the fix never touched (the guard is only for converted logs)', async () => {
-    await repo.logExerciseAndSets(
-      USER,
-      {
-        workoutSessionId: sessionId,
-        exerciseLogId: untouchedLog,
-        exerciseName: OTHER_LIFT,
-        estimated1rm: 160,
-        muscleGroups: ['chest'],
-        loggedAt: new Date('2026-01-11T00:00:00Z'),
-      } as never,
-      [{ id: untouchedSet, setNumber: 1, weightKg: 102.5, reps: 5, useFor1rm: true }] as never,
-    )
-    const w = await pool.query(`SELECT weight_kg FROM set_logs WHERE id = $1`, [untouchedSet])
-    expect(Number(w.rows[0].weight_kg)).toBe(102.5)
   })
 })
