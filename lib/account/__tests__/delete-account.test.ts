@@ -29,7 +29,7 @@ vi.mock('@/lib/sqlite/cache', () => ({ clearAllCache: () => clearAllCache(), dis
 vi.mock('@/app/actions', () => ({ signOut: () => serverSignOut() }))
 // #2453: browser storage — account keys cleared, device keys (no ring key lives there) kept.
 const clearAccountStorage = vi.fn(() => { order.push('clear-account-storage') })
-vi.mock('@/lib/sign-out-storage', () => ({ clearAccountStorage: () => clearAccountStorage() }))
+vi.mock('@/lib/sign-out-storage', () => ({ clearAccountStorage: () => clearAccountStorage(), UPLOAD_QUEUE_STORAGE: {} }))
 
 const replace = vi.fn()
 vi.stubGlobal('window', { location: { replace } })

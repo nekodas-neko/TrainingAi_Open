@@ -6,6 +6,7 @@ import { pushMutations } from '@/lib/local-store/sync-engine'
 import { flushDetectionEvents } from '@/lib/activity/detection-events'
 import { requestsCompleting } from '@/lib/sqlite/cache'
 import { useWorkoutStore, isWorkoutActive } from '@/lib/stores/workout-store'
+import { UPLOAD_QUEUE_STORAGE } from '@/lib/sign-out-storage'
 
 /**
  * Issue 2532 — what a sign-out would throw away, and a sync to shrink that first (engine half).
@@ -23,14 +24,8 @@ import { useWorkoutStore, isWorkoutActive } from '@/lib/stores/workout-store'
  * between someone and signing out.
  */
 
-/** The localStorage upload queues (JSON arrays) that a sign-out clears. */
-export const UPLOAD_QUEUE_KEYS = [
-  'detection-events-outbox',
-  'ta-cadence-captures',
-  'ta-oura-ble-pending-live-steps',
-  'ta-oura-ble-pending-live-steps-auto',
-  'ta-oura-ble-pending-accel-chunks',
-] as const
+/** The localStorage upload queues (JSON arrays) that a sign-out clears: the one list in `sign-out-storage.ts`. */
+export const UPLOAD_QUEUE_KEYS: readonly string[] = Object.keys(UPLOAD_QUEUE_STORAGE)
 
 const PREFS_UNSYNCED_KEY = 'ta_prefs_unsynced'
 

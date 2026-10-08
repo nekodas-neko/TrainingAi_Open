@@ -50,7 +50,8 @@ const registrySrc = read(REGISTRY);
 const prefsSrc = read(PREFS);
 const device = new Set(objectKeys(registrySrc, 'DEVICE_STORAGE'));
 for (const k of objectKeys(prefsSrc, 'DEVICE_LOCAL_PREFERENCES')) device.add(k);
-const account = new Set(objectKeys(registrySrc, 'ACCOUNT_STORAGE'));
+// ACCOUNT_STORAGE spreads UPLOAD_QUEUE_STORAGE in, so its keys are read from their own literal.
+const account = new Set([...objectKeys(registrySrc, 'ACCOUNT_STORAGE'), ...objectKeys(registrySrc, 'UPLOAD_QUEUE_STORAGE')]);
 
 function classified(key) {
   for (const list of [device, account]) {
