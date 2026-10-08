@@ -1,6 +1,7 @@
 import type { FoodItem } from '@trainingai/shared/types/nutrition'
 import { sanitiseNutrition } from '@trainingai/shared/nutrition/scan-totals'
 import { findDuplicateFoodItem } from '@trainingai/shared/nutrition/food-item-identity'
+import { rejectMealImage, FOOD_ITEM_IMAGE_MAX_BYTES } from '@trainingai/shared/nutrition/meal-image'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
@@ -100,8 +101,46 @@ export async function createFoodItem(input: NewFoodItem, userId?: string): Promi
   // stored, and comparing pre-rounding values against stored ones is how a check like this misses.
   if (store) {
     const existing = findDuplicateFoodItem(item, await store.findFoodItemsByCalories(item.calories))
-    // No local write, no mutation, no invalidation — nothing changed, so nothing to tell anyone.
-    if (existing) return existing
+    if (existing) {
+      // Issue 2684. A pre-fix saved copy can lack the picture and barcode this scan just fetched;
+      // returning it untouched threw both away for good. Fill the gap, add-only: a value the saved
+      // copy already has is kept, whatever this scan offered (two products can share a name and
+      // macros, so a different non-null barcode means "leave it as it is", not "replace it").
+      // An over-cap picture is dropped for the picture only.
+      const offeredImage = item.imageDataUri && !rejectMealImage(item.imageDataUri, FOOD_ITEM_IMAGE_MAX_BYTES)
+        ? item.imageDataUri : null
+      const imageDataUri = existing.imageDataUri ?? offeredImage
+      const barcode = existing.barcode || item.barcode?.trim() || undefined
+      const gained = imageDataUri !== (existing.imageDataUri ?? null) || barcode !== existing.barcode
+      // Nothing to add: no local write, no mutation, no invalidation — nothing changed, so
+      // nothing to tell anyone.
+      if (!gained || !userId) return existing
+      const filled: FoodItem = { ...existing, imageDataUri, barcode }
+      await store.upsertFoodItem({
+        id: filled.id, name: filled.name, brand: filled.brand ?? null,
+        servingSizeG: filled.servingSizeG, calories: filled.calories,
+        proteinG: filled.proteinG, carbsG: filled.carbsG, fatG: filled.fatG,
+        fiberG: filled.fiberG ?? null, sugarG: filled.sugarG ?? null,
+        sodiumMg: filled.sodiumMg ?? null, satFatG: filled.satFatG ?? null,
+        source: filled.source, barcode: filled.barcode ?? null,
+        imageDataUri: filled.imageDataUri ?? null, updatedAt: new Date().toISOString(),
+      })
+      // The SAME id, so the server's insert is a no-op and its add-only fill-if-null update does
+      // the work (`createFoodItem` in the Postgres slice). Replays are harmless.
+      await store.queueMutation({
+        userId, domain: 'food_items', date: todayInTz(),
+        payload: {
+          id: filled.id, name: filled.name, brand: filled.brand,
+          servingSizeG: filled.servingSizeG, calories: filled.calories,
+          proteinG: filled.proteinG, carbsG: filled.carbsG, fatG: filled.fatG,
+          fiberG: filled.fiberG, sugarG: filled.sugarG, sodiumMg: filled.sodiumMg, satFatG: filled.satFatG,
+          source: filled.source, barcode: filled.barcode, imageDataUri: filled.imageDataUri ?? null,
+        },
+      })
+      await invalidateFoodItems()
+      pushThenRevalidate(userId, invalidateFoodItems)
+      return filled
+    }
   }
 
   const body = {
