@@ -46,6 +46,7 @@ import { mergeCalendarOverlay, readLocalCalendarOverlay } from "@/lib/calendar/l
 import { syncOuraRing } from "@/lib/oura-ble/sync";
 import { getLocalStore } from "@/lib/local-store";
 import { localSleepRowsAsNights } from "@/lib/sleep/merge-sessions";
+import { sleepReplyWithPending } from "@/lib/sleep/manual-night-view";
 import { pushMutations, pullDelta, isSyncBackedOff } from "@/lib/local-store/sync-engine";
 import { PullToSync } from "@/components/pull-to-sync";
 import { TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, NEXT_SESSION_TTL, MOOD_TTL } from '@trainingai/shared/cache-ttl';
@@ -138,6 +139,11 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [sleepData, setSleepData] = useState<HomeSleepRow[]>([]);
+  // Issue 2667: a server reply lags this device's own manual-night writes until the outbox pushes, so
+  // a night just removed on the Sleep screen would show here again. Every reply goes through this.
+  const applySleepReply = useCallback((d: HomeSleepRow[] | null) => {
+    void sleepReplyWithPending<HomeSleepRow>(d, userId, tz).then(setSleepData);
+  }, [userId, tz]);
   // RV-85. `readiness === null` covers two different situations — still loading, and gave up — and
   // the row rendered nothing for both. `/api/readiness-score` has no null-payload path (it answers
   // a payload or an error status), so once `fetchWithRetry` reports exhaustion, null is a failure.
@@ -660,12 +666,11 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     await Promise.allSettled([
       fetchMeta(),
       fetchWorkoutData(),
-      cachedFetch<HomeSleepRow[]>('sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM,
-        d => setSleepData(Array.isArray(d) ? d : [])),
+      cachedFetch<HomeSleepRow[]>('sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM, applySleepReply),
       loadTodayMood(),
     ]);
     setRefreshTick(t => t + 1);
-  }, [fetchMeta, fetchWorkoutData, loadTodayMood]);
+  }, [fetchMeta, fetchWorkoutData, loadTodayMood, applySleepReply]);
 
   // A check-in changes what this screen prescribes — the whole-session deload trigger is driven
   // entirely by the sore muscles it reports. Storing the log in local state was all this did, so a
@@ -729,7 +734,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
 
   // Was on the BLE event; the invalidation is wider (`invalidateBiometrics` clears this key too).
   useInvalidationRefetch('sleep-sessions', () => {
-    cachedFetch<HomeSleepRow[]>('sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM, d => setSleepData(Array.isArray(d) ? d : []));
+    cachedFetch<HomeSleepRow[]>('sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM, applySleepReply);
   });
 
   // Q-359: synced into state, not derived — `goalsProfile` also takes optimistic local writes that
@@ -773,7 +778,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     }
     fetchWithRetry<HomeSleepRow[]>(
       'sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM,
-      (data) => setSleepData(Array.isArray(data) ? data : []),
+      applySleepReply,
       () => cancelled,
     );
     return () => { cancelled = true; };
