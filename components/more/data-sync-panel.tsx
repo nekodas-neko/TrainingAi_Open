@@ -7,6 +7,7 @@ import { clearAllCache } from '@/lib/sqlite/cache'
 import { pullDelta, restoreFromCloud } from '@/lib/local-store/sync-engine'
 import { invalidatePulledDomains } from '@/lib/cache-groups'
 import { LAST_SYNC_KEY } from '@/lib/health-connect-sync'
+import { HistoryImportRow } from '@/components/more/history-import-row'
 
 /** Sync now · Restore from cloud · Export my data. These three used to sit under an "About"
  *  heading beside the version string (Q-232) — data operations filed under a version number. */
@@ -112,6 +113,7 @@ export function DataSyncPanel({ userId }: { userId?: string }) {
           </div>
         </div>
       </button>
+      <HistoryImportRow userId={userId} />
       <a
         href="/api/export"
         className="flex items-center justify-between px-4 py-3 hover:bg-muted/60 transition"

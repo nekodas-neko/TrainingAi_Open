@@ -213,6 +213,7 @@ export const EXCLUDED: Record<string, Exclusion> = {
   oura_bucket: { category: 'ops', reason: 'rollup working set' },
   oura_redecode_jobs: { category: 'ops', reason: 'decoder backfill job state' },
   oura_rollup_state: { category: 'ops', reason: 'rollup cursor' },
+  health_connect_history_import: { category: 'ops', reason: 'import-more-history progress cursor' },
   rate_limits: { category: 'ops', reason: 'request-timing keys that embed other users\' ids' },
   schema_migrations: { category: 'ops', reason: 'migration ledger' },
   // TN-54. Device-connection bookkeeping, the same category as its ring sibling
