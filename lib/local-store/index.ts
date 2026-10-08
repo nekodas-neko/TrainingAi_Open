@@ -237,6 +237,10 @@ export interface LocalStore {
    *  path that forgets it during the backoff window puts the row back on screen. */
   getQueuedMutationsForDomain(userId: string, domain: string): Promise<PendingMutation[]>;
   getFailedMutations(userId: string): Promise<PendingMutation[]>;
+  /** Issue 2532. How many mutations are queued per domain, **whatever their status or retry
+   *  backoff** — the sign-out warning counts everything not yet acknowledged, including rows
+   *  waiting out a backoff or dead-lettered, because all of them are lost by a sign-out. */
+  countQueuedMutationsByDomain(userId: string): Promise<Record<string, number>>;
   recordMutationFailures(failures: Array<{ id: string; error: string }>): Promise<void>;
   retryFailedMutation(id: string): Promise<void>;
   // One-shot heal for food logs stranded by the D-1 envelope bug: for each
