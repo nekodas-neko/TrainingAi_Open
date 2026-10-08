@@ -106,6 +106,36 @@ One exception:
 | Ring re-key > **Cancel declaration** | `:118` | `DELETE /api/oura-ble/rekey` | Withdraws a pending declaration that has not been consumed. | pending row | yes | admin session | none | Only if the declaration was a mistake and no drain has happened yet. |
 | D0 historical step backfill > **Preview backfill** | `step-backfill-console.tsx:75` | `GET /api/oura-ble/samples/step-backfill-preview` | Lists the days whose step count would drop. | full history | yes | admin session | none | |
 | … > **Run backfill now** | `step-backfill-console.tsx` (confirm) | `runRedecodeJob('allowStepsDecrease=1')`, a **full-history redecode** with the "steps only go up" guard lifted | Rewrites inflated historical step days **downward** to the step_counter total. Manual entries are untouched. If a plain Redecode is already running, the server **refuses with 409** and starts nothing ("A redecode is already running. Wait for it to finish, then run the backfill."), and the console says *Not started … Nothing was changed.* It says *Done. Backfill applied* only when the finished job's `kind` (read from the job row by the status poll) is `step-backfill` (issue 2383, F9). | full history | Idempotent once applied, but the old values are gone. A second press during a running backfill follows that backfill. | admin session | **destructive** (the old step values are not recoverable). slow. | One-off D0 correction. A third caller of the full-history redecode. Run it when no Redecode or Sync & Redecode is in flight. |
+| Daytime-stress bucket backfill > **Dry run** | `stress-backfill-console.tsx` | `runRedecodeJob('stressBackfill=1')`, i.e. `POST /api/oura-ble/samples/redecode?async=1&stressBackfill=1` (dry run is the default) | Computes, from stored data, which past days would gain `oura_daytime_stress_buckets` rows, and reports it. **Writes nothing.** Uses the rollup's own series builder (`lib/oura-ble/rollup/stress-series.ts`) over the raw frames (both tiers, read-only), the nightly summary baselines, the fitted daytime-HRV model and the recorded sleep windows. | full history | yes | admin session, `rateLimit` 4/min, strict query | slow (a full-history raw read, in the rollup worker, in the one job slot) | Before the write, always. Compare its numbers to the write's (see the entry below). |
+| … > **Add N buckets** | `stress-backfill-console.tsx` (confirm; offered only after a dry run found something to add) | `runRedecodeJob('stressBackfill=1&dryRun=false')` | **Adds** the missing buckets. **Add-only (issue 2236):** it never deletes a bucket and never changes one. A day that already has any bucket is skipped whole, and each insert is `ON CONFLICT DO NOTHING` on `(user_id, bucket_mid)`. Today is left to the forward writer. A day it cannot score (no raw data, no model, no HRV or resting-HR baseline, no temperature, no scorable bucket) is reported with the reason and gets nothing. One transaction that **rolls back** unless the rows written equal the rows planned. It is a separate job kind (`stress-backfill`), so a plain redecode, a step backfill or another full-history pass cannot join it or be joined by it: a request while another kind runs gets **409**, nothing started. The console says *Done … added* only when the finished job's `kind` is `stress-backfill` and its report says it was not a dry run. | full history | yes: a second run finds every day populated and adds 0 | admin session | additive only; no deletes, no overwrites. slow. **Production run: snapshot first** (policy below). | One-off, by the owner or the Orchestrator, after a verified snapshot and a dry run whose numbers were read. NOT behind the future agent key. |
+
+### 6a. Running the stress-bucket backfill in production (issue 2236)
+
+Policy (docs/rules/git-safety-and-packages.md): it only adds rows, but it is a production write, so
+the order is fixed. The owner or the Orchestrator runs it, never an agent on its own.
+
+1. **Snapshot first**: take a database snapshot and verify it restores (as for any production write).
+2. **Dry run** (the default): `POST /api/oura-ble/samples/redecode?async=1&stressBackfill=1`, then poll
+   `GET ?jobId=…`. The finished job carries `stressBackfill`, the report, and `kind:
+   "stress-backfill-dry-run"`. Nothing is written.
+3. **Read the report and compare**:
+   - `range` and `daysConsidered`: completed days that have a nightly summary row.
+   - `daysSkippedPopulated`: days that already have buckets. Expect the days the forward writer
+     covered (production history begins 2026-08-24, about 26 buckets a day).
+   - `daysToGain` and `bucketsToAdd`: expect roughly 20 to 26 buckets for each gaining day.
+   - `daysCannotCompute`, `cannotComputeByReason` and `cannotCompute`: each such day gets nothing, with
+     its reason (`no-raw-data`, `no-daytime-hrv-model`, `no-night-hrv-baseline`,
+     `no-resting-heart-rate`, `no-temperature-in-day`, `no-scorable-buckets`). Depth is bounded by the
+     packed raw tier (`oura_raw_packed`), so very old days will report `no-raw-data`.
+   - `depth`: first and last day that would gain buckets. This is the achieved back-fill depth.
+4. **Write**: the same request with `&dryRun=false`. The job's `kind` is `stress-backfill`, and its
+   report has `dryRun: false` and `bucketsWritten`, which must equal the dry run's `bucketsToAdd`
+   (the transaction rolls back and the job reports an error if they differ).
+5. **Confirm**: run the dry run again. Expect `daysToGain: 0`, `bucketsToAdd: 0`.
+
+If the job slot is held by a redecode, a step backfill or a run of the other stress kind, the request
+gets 409 and starts nothing; wait for the running job, then ask again. A second press of the same kind
+follows the running job.
 
 ## 7. `/admin` (tabs)
 

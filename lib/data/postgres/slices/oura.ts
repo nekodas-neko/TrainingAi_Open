@@ -2348,3 +2348,51 @@ export async function listDaytimeStressBuckets(
     .orderBy(asc(s.ouraDaytimeStressBuckets.bucketMid))
   return rows.map(r => ({ day: r.day, bucketMid: r.bucketMid, level: Number(r.level) }))
 }
+
+/** Every stored bucket's day and instant for one user: a key listing, no levels. Used by the
+ *  stress-bucket backfill (issue 2236) to know which days are already populated. */
+export async function listDaytimeStressBucketKeys(
+  db: Db, userId: string,
+): Promise<{ day: string; bucketMid: Date }[]> {
+  return db
+    .select({ day: s.ouraDaytimeStressBuckets.day, bucketMid: s.ouraDaytimeStressBuckets.bucketMid })
+    .from(s.ouraDaytimeStressBuckets)
+    .where(eq(s.ouraDaytimeStressBuckets.userId, userId))
+    .orderBy(asc(s.ouraDaytimeStressBuckets.bucketMid))
+}
+
+/** The backfill's plan and what the database accepted disagreed; the transaction rolled back. */
+export class StressBackfillCountMismatchError extends Error {
+  constructor(public readonly planned: number, public readonly written: number) {
+    super(`stress backfill rolled back: planned ${planned} bucket rows, the database accepted ${written}`)
+    this.name = 'StressBackfillCountMismatchError'
+  }
+}
+
+/**
+ * ADD missing stress buckets, and only add (issue 2236). `ON CONFLICT DO NOTHING` on the table's
+ * natural key `(user_id, bucket_mid)`: an existing row is never updated, and nothing is deleted.
+ * This is not `replaceDaytimeStressBuckets`, which replaces a whole day.
+ *
+ * One transaction. If the rows the database accepted differ from the rows planned (a concurrent
+ * forward write landed an instant in between, say), it throws and rolls back, so a half-applied
+ * plan is never left behind. Chunked inside the transaction to stay under the parameter limit.
+ */
+export async function addMissingDaytimeStressBuckets(
+  db: Db, userId: string, rows: { day: string; bucketMid: Date; level: number }[],
+): Promise<number> {
+  const CHUNK = 1000
+  return db.transaction(async tx => {
+    let written = 0
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const inserted = await tx
+        .insert(s.ouraDaytimeStressBuckets)
+        .values(rows.slice(i, i + CHUNK).map(r => ({ userId, day: r.day, bucketMid: r.bucketMid, level: r.level, updatedAt: new Date() })))
+        .onConflictDoNothing({ target: [s.ouraDaytimeStressBuckets.userId, s.ouraDaytimeStressBuckets.bucketMid] })
+        .returning({ bucketMid: s.ouraDaytimeStressBuckets.bucketMid })
+      written += inserted.length
+    }
+    if (written !== rows.length) throw new StressBackfillCountMismatchError(rows.length, written)
+    return written
+  })
+}

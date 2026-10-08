@@ -1,12 +1,23 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { requireAdmin, adminErrorResponse } from '@/lib/admin'
-import { runRedecodeOffLoop } from '@/lib/oura-ble/rollup-worker'
+import { z } from 'zod'
+import { runRedecodeOffLoop, runStressBackfillOffLoop } from '@/lib/oura-ble/rollup-worker'
 import { rateLimit } from '@/lib/rate-limit'
 import { reportRollupStepErrors } from '@/lib/oura-ble/report-step-errors'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { getRepositoryAsync } from '@/lib/data'
-import { redecodeJobKind, REDECODE_BUSY_FOR_BACKFILL_MESSAGE } from '@/lib/oura-ble/redecode-job-kind'
+import { redecodeJobKind, isStressBackfillKind, REDECODE_BUSY_FOR_BACKFILL_MESSAGE, REDECODE_BUSY_FOR_STRESS_MESSAGE } from '@/lib/oura-ble/redecode-job-kind'
+
+// Issue 2236: `?stressBackfill=1` adds the daytime-stress buckets history never got. Its own strict
+// schema: any other parameter (date, dump, allowStepsDecrease, a typo) is a 400 rather than ignored,
+// so a request that mixes this mode with a redecode lever never runs as something it did not say.
+// `dryRun` is the dry run unless it is exactly `false`.
+const StressBackfillQuery = z.object({
+  stressBackfill: z.literal('1'),
+  async: z.literal('1'),
+  dryRun: z.enum(['true', 'false']).optional(),
+}).strict()
 
 // Re-stamp measured_at / event_name over stored rows, then re-aggregate into the
 // product tables. Under Lever 1 the decoders run during the re-aggregate (from the
@@ -54,6 +65,19 @@ export async function POST(req: Request) {
   const tz = session.user.timezone ?? DEFAULT_TZ
   const repo = await getRepositoryAsync()
 
+  const stressRequested = params.has('stressBackfill')
+  let stressDryRun = true
+  if (stressRequested) {
+    const parsed = StressBackfillQuery.safeParse(Object.fromEntries(params))
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'stressBackfill takes only async=1 and an optional dryRun=true|false, and nothing else' },
+        { status: 400, headers: { 'Cache-Control': 'private, no-store' } },
+      )
+    }
+    stressDryRun = parsed.data.dryRun !== 'false'
+  }
+
   // Lightweight dump: no full re-decode, bounded (recent-window) aggregate — just enough to return
   // the requested night's per-epoch diagnostic without timing out.
   if (dumpOnly) {
@@ -80,7 +104,9 @@ export async function POST(req: Request) {
     )
   }
 
-  const opts = { debugDate: debugDate ?? null, fullHistory: true, allowStepsDecrease }
+  const opts: Record<string, unknown> = stressRequested
+    ? { fullHistory: true, stressBackfill: true, dryRun: stressDryRun }
+    : { debugDate: debugDate ?? null, fullHistory: true, allowStepsDecrease }
 
   // A job whose process died mid-run would otherwise hold the one-at-a-time slot forever. Reaped
   // here rather than by a sweeper — there is no cron layer in this app, and the only reader that
@@ -93,7 +119,7 @@ export async function POST(req: Request) {
   if (refused) {
     return NextResponse.json(
       {
-        error: REDECODE_BUSY_FOR_BACKFILL_MESSAGE,
+        error: isStressBackfillKind(redecodeJobKind(opts)) ? REDECODE_BUSY_FOR_STRESS_MESSAGE : REDECODE_BUSY_FOR_BACKFILL_MESSAGE,
         refused: true,
         runningJobId: job.id,
         runningKind: redecodeJobKind(job.opts),
@@ -108,6 +134,25 @@ export async function POST(req: Request) {
         jobId: job.id, status: 'running', startedAt: job.startedAt.toISOString(), alreadyRunning: true,
         kind: redecodeJobKind(job.opts),
         note: 'A redecode is already running; this did not start a second. Poll this job id.',
+      },
+      { headers: { 'Cache-Control': 'private, no-store' } },
+    )
+  }
+
+  if (stressRequested) {
+    // Reads stored data and adds rows; redecodes and re-aggregates nothing. Failure is reported into
+    // the job row (`aggregateError`) by the worker, and the `.catch` covers anything that is not.
+    void runStressBackfillOffLoop(userId, tz, stressDryRun)
+      .then(phases => repo.finishRedecodeJob(job.id, phases as unknown as Record<string, unknown>, null))
+      .catch(async err => {
+        console.error('[oura-ble] stress backfill job threw:', err instanceof Error ? err.message : String(err))
+        await repo.finishRedecodeJob(job.id, null, err instanceof Error ? err.message : String(err)).catch(() => {})
+      })
+    return NextResponse.json(
+      {
+        jobId: job.id, status: 'running', startedAt: job.startedAt.toISOString(), alreadyRunning: false,
+        kind: redecodeJobKind(job.opts),
+        note: 'Started. Poll GET ?jobId=… for the report.',
       },
       { headers: { 'Cache-Control': 'private, no-store' } },
     )

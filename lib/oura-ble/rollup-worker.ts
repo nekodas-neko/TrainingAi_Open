@@ -14,6 +14,7 @@ import path from 'path'
 import { existsSync } from 'fs'
 import { Worker } from 'node:worker_threads'
 import type { OuraRawAggregateResult } from '@/lib/data/repository'
+import type { StressBackfillReport } from '@/lib/oura-ble/stress-backfill'
 
 type RollupOpts = {
   sinceDs?: number
@@ -31,6 +32,8 @@ export type RedecodePhases = {
   redecodeError: string | null
   aggregated: OuraRawAggregateResult | null
   aggregateError: string | null
+  /** Issue 2236: present only for the stress-bucket backfill job. */
+  stressBackfill?: StressBackfillReport | null
 }
 
 const WORKER_BUNDLE = path.join(process.cwd(), '.rollup-worker', 'rollup-worker.cjs')
@@ -155,6 +158,37 @@ export async function runRedecodeOffLoop(
     pending.set(id, { resolve: resolve as (r: unknown) => void, reject })
     w.postMessage({ kind: 'redecode', id, userId, timezone, opts, redecodeFirst })
   })
+}
+
+/**
+ * Issue 2236: the stress-bucket backfill, off the request loop like the redecode. It redecodes and
+ * re-aggregates nothing; it reads stored data and, unless `dryRun`, adds missing bucket rows. Resolves
+ * with phases rather than rejecting, so a failure is reported into the job row.
+ */
+export async function runStressBackfillOffLoop(
+  userId: string,
+  timezone: string,
+  dryRun: boolean,
+): Promise<RedecodePhases> {
+  const w = getWorker()
+  if (!w) return runStressBackfillInProcess(userId, timezone, dryRun)
+
+  const id = nextJobId++
+  return new Promise<RedecodePhases>((resolve, reject) => {
+    pending.set(id, { resolve: resolve as (r: unknown) => void, reject })
+    w.postMessage({ kind: 'stress-backfill', id, userId, timezone, dryRun })
+  })
+}
+
+async function runStressBackfillInProcess(userId: string, timezone: string, dryRun: boolean): Promise<RedecodePhases> {
+  const { getRepositoryAsync } = await import('@/lib/data')
+  const repo = await getRepositoryAsync()
+  try {
+    const stressBackfill = await repo.backfillDaytimeStressBuckets(userId, timezone, { dryRun })
+    return { redecoded: null, redecodeError: null, aggregated: null, aggregateError: null, stressBackfill }
+  } catch (err) {
+    return { redecoded: null, redecodeError: null, aggregated: null, aggregateError: err instanceof Error ? err.message : String(err), stressBackfill: null }
+  }
 }
 
 async function runRedecodeInProcess(

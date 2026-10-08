@@ -45,6 +45,11 @@ const runRedecodeOffLoop = vi.fn(async (..._a: unknown[]) => ({
   aggregateError: null as string | null,
 }))
 
+const runStressBackfillOffLoop = vi.fn(async (..._a: unknown[]) => ({
+  redecoded: null, redecodeError: null, aggregated: null, aggregateError: null as string | null,
+  stressBackfill: { bucketsToAdd: 5 } as Row | null,
+}))
+
 const reapStaleRedecodeJobs = vi.fn(async (_u: string) => 0)
 const startRedecodeJob = vi.fn(async (..._a: unknown[]) => ({
   job: { id: 77, startedAt: new Date('2026-09-09T04:00:00Z'), opts: {} as Row },
@@ -70,6 +75,7 @@ vi.mock('@/lib/oura-ble/report-step-errors', () => ({
 }))
 vi.mock('@/lib/oura-ble/rollup-worker', () => ({
   runRedecodeOffLoop: (...a: unknown[]) => runRedecodeOffLoop(...a),
+  runStressBackfillOffLoop: (...a: unknown[]) => runStressBackfillOffLoop(...a),
 }))
 vi.mock('@trainingai/shared/workout/compute-workout-hr', () => ({
   computeWorkoutHr: (...a: unknown[]) => computeWorkoutHr(...a),
@@ -108,7 +114,7 @@ const hrReq = (body?: unknown) =>
 const settle = () => new Promise(r => setTimeout(r, 0))
 
 beforeEach(() => {
-  for (const m of [getUserById, rateLimit, reportServerError, reportRollupStepErrors, runRedecodeOffLoop,
+  for (const m of [getUserById, rateLimit, reportServerError, reportRollupStepErrors, runRedecodeOffLoop, runStressBackfillOffLoop,
                    reapStaleRedecodeJobs, startRedecodeJob, finishRedecodeJob, getRedecodeJob,
                    getLatestRedecodeJob, previewStepsBackfill, listSessionsMissingHrStats,
                    upsertWorkoutHrStats, computeWorkoutHr]) m.mockClear()
@@ -124,6 +130,10 @@ beforeEach(() => {
     job: { id: 77, startedAt: new Date('2026-09-09T04:00:00Z'), opts: {} },
     alreadyRunning: false,
     refused: false,
+  })
+  runStressBackfillOffLoop.mockResolvedValue({
+    redecoded: null, redecodeError: null, aggregated: null, aggregateError: null,
+    stressBackfill: { bucketsToAdd: 5 },
   })
   getRedecodeJob.mockResolvedValue(null)
   getLatestRedecodeJob.mockResolvedValue(null)
@@ -141,6 +151,7 @@ describe('the admin gate on all three levers', () => {
     ['redecode GET', () => pollReq()],
     ['step preview GET', () => previewGet()],
     ['hr backfill POST', () => hrReq()],
+    ['stress backfill POST', () => redecodeReq('?stressBackfill=1&async=1')],
   ]
 
   it('refuses a non-admin, whatever the token claims', async () => {
@@ -148,6 +159,8 @@ describe('the admin gate on all three levers', () => {
     getUserById.mockResolvedValue({ isAdmin: false })
     for (const [name, call] of ALL) expect((await call()).status, name).toBe(403)
     expect(runRedecodeOffLoop).not.toHaveBeenCalled()
+    expect(runStressBackfillOffLoop).not.toHaveBeenCalled()
+    expect(startRedecodeJob).not.toHaveBeenCalled()
     expect(upsertWorkoutHrStats).not.toHaveBeenCalled()
   })
 
@@ -554,5 +567,106 @@ describe('POST /api/oura-ble/backfill-hr-stats', () => {
 
     listSessionsMissingHrStats.mockResolvedValue(sessions(3))
     expect((await (await hrReq({ maxRows: 4 })).json()).remaining).toBe(false)
+  })
+})
+
+// Issue 2236: ?stressBackfill=1 adds the daytime-stress buckets history never got. Dry run is the
+// default; only a literal dryRun=false writes; the strict query refuses anything else.
+describe('POST /api/oura-ble/samples/redecode?stressBackfill=1', () => {
+  it('defaults to a dry run and starts the stress job, not a redecode', async () => {
+    startRedecodeJob.mockResolvedValue({
+      job: { id: 90, startedAt: new Date('2026-10-08T04:00:00Z'), opts: { fullHistory: true, stressBackfill: true, dryRun: true } },
+      alreadyRunning: false, refused: false,
+    })
+    const body = await (await redecodeReq('?stressBackfill=1&async=1')).json()
+    expect(startRedecodeJob).toHaveBeenCalledWith('u-1', { fullHistory: true, stressBackfill: true, dryRun: true })
+    expect(body).toMatchObject({ jobId: 90, alreadyRunning: false, kind: 'stress-backfill-dry-run' })
+    await settle()
+    expect(runStressBackfillOffLoop).toHaveBeenCalledWith('u-1', 'Australia/Brisbane', true)
+    expect(runRedecodeOffLoop).not.toHaveBeenCalled()
+    expect(finishRedecodeJob).toHaveBeenCalledWith(90, expect.objectContaining({ stressBackfill: { bucketsToAdd: 5 } }), null)
+  })
+
+  it('writes only for a literal dryRun=false', async () => {
+    startRedecodeJob.mockResolvedValue({
+      job: { id: 91, startedAt: new Date('2026-10-08T04:00:00Z'), opts: { fullHistory: true, stressBackfill: true, dryRun: false } },
+      alreadyRunning: false, refused: false,
+    })
+    const body = await (await redecodeReq('?stressBackfill=1&async=1&dryRun=false')).json()
+    expect(startRedecodeJob).toHaveBeenCalledWith('u-1', { fullHistory: true, stressBackfill: true, dryRun: false })
+    expect(body.kind).toBe('stress-backfill')
+    await settle()
+    expect(runStressBackfillOffLoop).toHaveBeenCalledWith('u-1', 'Australia/Brisbane', false)
+  })
+
+  it('refuses anything the strict query does not name, starting nothing', async () => {
+    for (const qs of [
+      '?stressBackfill=1&async=1&dryRun=yes',
+      '?stressBackfill=1&async=1&dryRun=0',
+      '?stressBackfill=1&async=1&allowStepsDecrease=1',
+      '?stressBackfill=1&async=1&date=2026-03-01',
+      '?stressBackfill=1&async=1&dump=1',
+      '?stressBackfill=1&async=1&bogus=1',
+      '?stressBackfill=1',
+      '?stressBackfill=true&async=1',
+    ]) {
+      const res = await redecodeReq(qs)
+      expect(res.status, qs).toBe(400)
+      expect(res.headers.get('Cache-Control')).toBe('private, no-store')
+    }
+    expect(startRedecodeJob).not.toHaveBeenCalled()
+    expect(runStressBackfillOffLoop).not.toHaveBeenCalled()
+    expect(runRedecodeOffLoop).not.toHaveBeenCalled()
+  })
+
+  it('is refused with 409 while a plain redecode holds the slot, naming both kinds', async () => {
+    startRedecodeJob.mockResolvedValue({
+      job: { id: 41, startedAt: new Date('2026-10-08T04:00:00Z'), opts: { fullHistory: true, allowStepsDecrease: false } },
+      alreadyRunning: true, refused: true,
+    })
+    const res = await redecodeReq('?stressBackfill=1&async=1&dryRun=false')
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body).toMatchObject({ refused: true, runningJobId: 41, runningKind: 'redecode', requestedKind: 'stress-backfill' })
+    expect(body.error).toMatch(/stress backfill/i)
+    expect(body.jobId).toBeUndefined()
+    expect(runStressBackfillOffLoop).not.toHaveBeenCalled()
+    expect(finishRedecodeJob).not.toHaveBeenCalled()
+  })
+
+  it('rate-limits at the same allowance as the other full-history levers', async () => {
+    rateLimit.mockReturnValue(false)
+    expect((await redecodeReq('?stressBackfill=1&async=1')).status).toBe(429)
+    expect(rateLimit.mock.calls[0].slice(1)).toEqual([4, 60_000])
+    expect(startRedecodeJob).not.toHaveBeenCalled()
+  })
+
+  it('finishes the job with an error when the run throws, rather than leaving it running', async () => {
+    startRedecodeJob.mockResolvedValue({
+      job: { id: 92, startedAt: new Date('2026-10-08T04:00:00Z'), opts: { fullHistory: true, stressBackfill: true, dryRun: true } },
+      alreadyRunning: false, refused: false,
+    })
+    runStressBackfillOffLoop.mockRejectedValue(new Error('worker exited'))
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    await redecodeReq('?stressBackfill=1&async=1')
+    await settle()
+    expect(finishRedecodeJob).toHaveBeenCalledWith(92, null, 'worker exited')
+  })
+
+  it('the poll reports the stress report and marks a phase error as failed', async () => {
+    getRedecodeJob.mockResolvedValue({
+      id: 90, startedAt: new Date('2026-10-08T04:00:00Z'), finishedAt: new Date('2026-10-08T04:01:00Z'),
+      opts: { fullHistory: true, stressBackfill: true, dryRun: true }, error: null,
+      result: { aggregateError: null, stressBackfill: { bucketsToAdd: 5 } },
+    })
+    const ok = await (await pollReq('?jobId=90')).json()
+    expect(ok.job).toMatchObject({ status: 'done', kind: 'stress-backfill-dry-run', stressBackfill: { bucketsToAdd: 5 } })
+    getRedecodeJob.mockResolvedValue({
+      id: 93, startedAt: new Date('2026-10-08T04:00:00Z'), finishedAt: new Date('2026-10-08T04:01:00Z'),
+      opts: { fullHistory: true, stressBackfill: true, dryRun: false }, error: null,
+      result: { aggregateError: 'stress backfill rolled back: planned 4, the database accepted 3', stressBackfill: null },
+    })
+    const bad = await (await pollReq('?jobId=93')).json()
+    expect(bad.job).toMatchObject({ status: 'failed', kind: 'stress-backfill' })
   })
 })

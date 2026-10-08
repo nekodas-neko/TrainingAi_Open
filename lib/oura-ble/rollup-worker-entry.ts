@@ -14,6 +14,7 @@
 import { parentPort, workerData } from 'node:worker_threads'
 import { PostgresWorkoutRepository } from '@/lib/data/postgres/adapter'
 import type { OuraRawAggregateResult } from '@/lib/data/repository'
+import type { StressBackfillReport } from '@/lib/oura-ble/stress-backfill'
 import { ensureServerOuraConstants } from '@/lib/oura-models/constants-inject'
 
 /** Everything `aggregateOuraRawSamples` accepts. The ingest path passes only `sinceDs`; the admin
@@ -38,6 +39,12 @@ export type WorkerJob =
    * versa, and that neither ever 500s the request.
    */
   | { kind: 'redecode'; id: number; userId: string; timezone: string; opts?: AggregateOpts; redecodeFirst: boolean }
+  /**
+   * Issue 2236: add the daytime-stress buckets history never got. Reads stored data and adds rows;
+   * redecodes and re-aggregates nothing. Reported in the same `phases` shape so the job row and its
+   * poller need no second format; a failure lands in `aggregateError`.
+   */
+  | { kind: 'stress-backfill'; id: number; userId: string; timezone: string; dryRun: boolean }
 
 export type WorkerReply =
   | { id: number; ok: true; result: OuraRawAggregateResult }
@@ -50,6 +57,7 @@ export type WorkerReply =
         redecodeError: string | null
         aggregated: OuraRawAggregateResult | null
         aggregateError: string | null
+        stressBackfill?: StressBackfillReport | null
       }
     }
 
@@ -93,6 +101,18 @@ async function handle(job: WorkerJob): Promise<WorkerReply> {
   // `OURA_CONSTANTS_DIR` it set in `process.env`, which a worker does copy at spawn. Idempotent, so
   // this is three boolean checks after the first job. Missing this call is how the port change
   // (Q-545) would have taken the rollup down here and nowhere else.
+  if (job.kind === 'stress-backfill') {
+    // Before `ensureServerOuraConstants`: this needs only the daytime-stress table, which the repo
+    // method injects itself, and must not fail on constants it never reads.
+    let stressBackfill: StressBackfillReport | null = null
+    let aggregateError: string | null = null
+    try {
+      stressBackfill = await repo.backfillDaytimeStressBuckets(job.userId, job.timezone, { dryRun: job.dryRun })
+    } catch (err) {
+      aggregateError = msg(err)
+    }
+    return { id: job.id, ok: true, phases: { redecoded: null, redecodeError: null, aggregated: null, aggregateError, stressBackfill } }
+  }
   ensureServerOuraConstants()
   if (job.kind === 'redecode') {
     let redecoded: RedecodeCounts | null = null

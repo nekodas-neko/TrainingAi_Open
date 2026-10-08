@@ -110,6 +110,62 @@ describe.skipIf(!canRun)('the redecode job row', () => {
       expect(backfill.job.opts).toEqual(BACKFILL)
     })
 
+    // Issue 2236: the stress-bucket backfill shares the slot but redecodes nothing.
+    describe('the stress-bucket backfill (issue 2236)', () => {
+      const STRESS_DRY = { fullHistory: true, stressBackfill: true, dryRun: true }
+      const STRESS_WRITE = { fullHistory: true, stressBackfill: true, dryRun: false }
+
+      it('is refused while a plain redecode runs, and writes no second row', async () => {
+        const plain = await repo.startRedecodeJob(TEST_USER_ID, PLAIN)
+        for (const stress of [STRESS_DRY, STRESS_WRITE]) {
+          const r = await repo.startRedecodeJob(TEST_USER_ID, stress)
+          expect(r.refused).toBe(true)
+          expect(r.job.id).toBe(plain.job.id)
+        }
+        expect(await countRows()).toBe(1)
+      })
+
+      it('is refused while a step backfill runs', async () => {
+        await repo.startRedecodeJob(TEST_USER_ID, BACKFILL)
+        expect((await repo.startRedecodeJob(TEST_USER_ID, STRESS_WRITE)).refused).toBe(true)
+        expect(await countRows()).toBe(1)
+      })
+
+      it('is not followed by a plain redecode or a step backfill: neither would get what it asked for', async () => {
+        const stress = await repo.startRedecodeJob(TEST_USER_ID, STRESS_WRITE)
+        for (const other of [PLAIN, BACKFILL]) {
+          const r = await repo.startRedecodeJob(TEST_USER_ID, other)
+          expect(r.refused).toBe(true)
+          expect(r.job.id).toBe(stress.job.id)
+        }
+        expect(await countRows()).toBe(1)
+      })
+
+      it('never lets a write follow a running dry run, or a dry run follow a write', async () => {
+        const dry = await repo.startRedecodeJob(TEST_USER_ID, STRESS_DRY)
+        const write = await repo.startRedecodeJob(TEST_USER_ID, STRESS_WRITE)
+        expect(write).toMatchObject({ refused: true })
+        expect(write.job.id).toBe(dry.job.id)
+        await repo.finishRedecodeJob(dry.job.id, {}, null)
+        const w = await repo.startRedecodeJob(TEST_USER_ID, STRESS_WRITE)
+        expect(w).toMatchObject({ alreadyRunning: false, refused: false })
+        expect((await repo.startRedecodeJob(TEST_USER_ID, STRESS_DRY)).refused).toBe(true)
+      })
+
+      it('lets a second request of its own kind follow the first', async () => {
+        const first = await repo.startRedecodeJob(TEST_USER_ID, STRESS_WRITE)
+        const second = await repo.startRedecodeJob(TEST_USER_ID, STRESS_WRITE)
+        expect(second).toMatchObject({ alreadyRunning: true, refused: false })
+        expect(second.job.id).toBe(first.job.id)
+      })
+
+      it('starts alone and stores the flags on its row', async () => {
+        const { job, alreadyRunning, refused } = await repo.startRedecodeJob(TEST_USER_ID, STRESS_DRY)
+        expect({ alreadyRunning, refused }).toEqual({ alreadyRunning: false, refused: false })
+        expect((await repo.getRedecodeJob(TEST_USER_ID, job.id))!.opts).toEqual(STRESS_DRY)
+      })
+    })
+
     it('does not let a dead plain run wedge the backfill: the reaper frees the slot', async () => {
       const plain = await repo.startRedecodeJob(TEST_USER_ID, PLAIN)
       await pool.query(

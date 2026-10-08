@@ -9,12 +9,15 @@
  */
 
 import type { RedecodeJobKind } from '@/lib/oura-ble/redecode-job-kind'
+import type { StressBackfillReport } from '@/lib/oura-ble/stress-backfill'
 
 export interface RedecodePhases {
   scanned?: number
   updated?: number
   redecodeError?: string | null
   aggregateError?: string | null
+  /** Issue 2236: present only on a finished stress-bucket backfill job. */
+  stressBackfill?: StressBackfillReport | null
   aggregated?: {
     sleepSessions?: number
     bodyMetricDays?: number
@@ -59,6 +62,13 @@ interface PollResponse {
 
 const POLL_INTERVAL_MS = 3_000
 
+function kindLabel(kind: RedecodeJobKind | undefined): string {
+  if (kind === 'step-backfill') return 'step backfill'
+  if (kind === 'stress-backfill') return 'stress-bucket backfill'
+  if (kind === 'stress-backfill-dry-run') return 'stress-bucket backfill dry run'
+  return 'redecode'
+}
+
 /**
  * Start a redecode and poll it to completion.
  *
@@ -90,8 +100,8 @@ export async function runRedecodeJob(
 
   onNote?.(
     start.alreadyRunning
-      ? `a ${start.kind === 'step-backfill' ? 'step backfill' : 'redecode'} (job ${start.jobId}) was already running — this started nothing; following that run`
-      : `redecode job ${start.jobId} started — this can take minutes`,
+      ? `a ${kindLabel(start.kind)} (job ${start.jobId}) was already running — this started nothing; following that run`
+      : `${kindLabel(start.kind)} job ${start.jobId} started — this can take minutes`,
   )
 
   for (;;) {

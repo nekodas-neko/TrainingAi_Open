@@ -23,7 +23,7 @@ import { computeChronicStress, chronicStressScoreToInt, chronicStressDiagnostics
 import { illnessFromSummaries, illnessZScores } from '@trainingai/shared/health/illness-radar'
 import { computeSleepScore, sleepScoreBaselines } from '@trainingai/shared/health/sleep-score'
 import { computeReadinessComposite } from '@trainingai/shared/health/readiness-composite'
-import { buildDaytimeStressSeriesFromModel, type DhrvBaselines } from '@/lib/health/daytime-stress'
+import { collectStressInputs, buildDayStressSeries, nightHrvMsOf } from './stress-series'
 import { computeResilienceForDay, type DailyIndices } from '@/lib/health/stress-resilience'
 import type { SleepSession } from '@trainingai/shared/types'
 import { sourceRank } from '@trainingai/shared/health/source-rank'
@@ -1044,20 +1044,9 @@ export async function runOuraRollup(
     await step('resilience', async () => {
       const dhrvModel = await io.readDaytimeHrvModel()
       const toMs = (ds: number) => toDate(ds).getTime()
-      const collect = <T>(rows: { ds: unknown; decoded: unknown }[], key: string, map: (v: number, tsMs: number) => T): T[] => {
-        const out: T[] = []
-        for (const r of rows) { const t = toMs(Number(r.ds)); for (const v of numArr(r.decoded, key)) out.push(map(v, t)) }
-        return out
-      }
-      const allTemp = [
-        ...collect(tempRows, 'temps_c', (valueC, tsMs) => ({ tsMs, valueC })),
-        ...collect(sleepSignal.filter(r => Number(r.tag) === 0x75), 'temps_c', (valueC, tsMs) => ({ tsMs, valueC })),
-      ].sort((a, b) => a.tsMs - b.tsMs)
-      const allMet = collect(metRows, 'met', (value, tsMs) => ({ tsMs, value })).sort((a, b) => a.tsMs - b.tsMs)
-      const allHr = [
-        ...collect(ibiRows, 'hr_bpm', (bpm, tsMs) => ({ tsMs, bpm })),
-        ...collect(aohrRows, 'bpm', (bpm, tsMs) => ({ tsMs, bpm })),
-      ].filter(h => h.bpm >= 35 && h.bpm <= 200).sort((a, b) => a.tsMs - b.tsMs)
+      // Issue 2236: the inputs and the per-day series are assembled in `stress-series.ts`, which the
+      // stress-bucket backfill calls too — one definition of the series, two callers.
+      const stressInputs = collectStressInputs(rollupRows, toMs)
 
       const sleepByDate = new Map(sleepRows.map(sr => [sr.date, sr]))
       const dayMinus = (dayStr: string, n: number): string => {
@@ -1101,9 +1090,7 @@ export async function runOuraRollup(
 
         // Night HRV baseline (ms): the smoothed personal baseline (×8 fixed-point), else the
         // night's own average as a cold-start proxy. Doubles as the daytime-stress scaling anchor.
-        const nightHrvMs = latest.hrvBaseline != null ? latest.hrvBaseline.meanX8 / 8 : latest.hrvAvgMs
-        const dayTemp = allTemp.filter(s => s.tsMs >= dayStartMs && s.tsMs < dayEndMs)
-        const tempBaseline = dayTemp.length ? dayTemp.reduce((s, t) => s + t.valueC, 0) / dayTemp.length : null
+        const nightHrvMs = nightHrvMsOf(latest)
 
         // D5: own-model daytime-HRV (dhrvModel) replaces the ONNX imputation in production. No
         // ONNX fallback when dhrvModel is null (cold start / not enough training data yet) —
@@ -1117,21 +1104,18 @@ export async function runOuraRollup(
         // which put two numbers behind one metric: measured in production, the sign disagreed on
         // **6 of 8** days and high-stress minutes by 4–8×.
         let stressSummary: ReturnType<typeof summarizeStressDay> = null
-        if (dhrvModel && nightHrvMs != null && nightHrvMs > 0 && latest.rhrLowBpm != null && latest.rhrLowBpm > 0 && tempBaseline != null && tempBaseline > 0) {
-          const baselines: DhrvBaselines = { dhrvBaseline: nightHrvMs, hrBaseline: latest.rhrLowBpm, tempBaseline }
-          const pts = buildDaytimeStressSeriesFromModel(
-            dayTemp,
-            allMet.filter(s => s.tsMs >= dayStartMs && s.tsMs < dayEndMs),
-            allHr.filter(s => s.tsMs >= dayStartMs && s.tsMs < dayEndMs),
-            dhrvModel, baselines, dayStartMs, dayEndMs,
-            // Both nights that can touch this day: the one that ENDED this morning and the one that
-            // STARTS tonight. Measured 2026-09-16, the owner's stored buckets ran densest in Brisbane
-            // 00:00–06:59 (289 of 672) and 22:00–23:59 — the evening tail is the second night, and
-            // filtering only on the wake-keyed row for `day` would leave it in.
-            sleepSpan.filter(w => w.sleepEnd.getTime() > dayStartMs && w.sleepStart.getTime() < dayEndMs),
-          )
-          series = pts.map(p => ({ tMs: p.t, level: p.stressLevel }))
-          stressSummary = summarizeStressDay(pts)
+        // Both nights that can touch this day (the one that ENDED this morning and the one that
+        // STARTS tonight) are dropped inside buildDayStressSeries. Measured 2026-09-16, the owner's
+        // stored buckets ran densest in Brisbane 00:00–06:59 (289 of 672) and 22:00–23:59 — the
+        // evening tail is the second night, and filtering only on the wake-keyed row for the day
+        // would leave it in.
+        const built = buildDayStressSeries({
+          dayStartMs, dayEndMs, inputs: stressInputs, model: dhrvModel,
+          nightHrvMs, rhrLowBpm: latest.rhrLowBpm, sleepWindows: sleepSpan,
+        })
+        if (built.skipped == null) {
+          series = built.points.map(p => ({ tMs: p.t, level: p.stressLevel }))
+          stressSummary = summarizeStressDay(built.points)
         }
 
         // TN-3a — persist the buckets. `summarizeStressDay` reduces this series to three daily
