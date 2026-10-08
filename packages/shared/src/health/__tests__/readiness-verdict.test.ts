@@ -60,6 +60,26 @@ describe('the calibrated multiplier (#2430)', () => {
     expect(readinessVerdictForDay(day({ score: 58 }), ordinaryDays())?.verdict).toBe('poor')
     expect(readinessVerdictForDay(day({ score: 68 }), ordinaryDays())?.verdict).toBe('good')
   })
+
+  it('gives the signed-off rate over the scores it was calibrated on: 55 judged, 9 poor, 1 good', () => {
+    // The owner's 83 scored days up to 2026-10-06, in order, as the sweep saw them (re-read from
+    // production on 2026-10-08 and checked against the proposal's counts). Bare scores only: this
+    // repository is public, so the days carry made-up consecutive dates and no contributors. The
+    // baseline is "the last 28 scored days", so only the order matters, not the real gaps.
+    const scores = [
+      48, 69, 63, 62, 48, 37, 70, 80, 84, 60, 29, 83, 74, 74, 87, 74, 63, 77, 83, 80, 79, 76, 76, 65,
+      70, 73, 68, 73, 62, 77, 73, 69, 58, 77, 50, 66, 76, 71, 62, 73, 52, 52, 33, 67, 74, 73, 25, 69,
+      58, 76, 74, 51, 66, 74, 50, 38, 46, 51, 38, 48, 55, 40, 31, 37, 36, 74, 52, 53, 57, 44, 59, 54,
+      56, 45, 48, 43, 51, 38, 42, 39, 33, 49, 63,
+    ]
+    const days: ReadinessVerdictDay[] = scores.map((score, i) => ({
+      date: shiftDateStr('2026-01-01', i), score, modelVersion: null,
+    }))
+    const verdicts = days.map(d => readinessVerdictForDay(d, days)).filter(r => r !== null)
+    expect(verdicts).toHaveLength(55)
+    expect(verdicts.filter(r => r.verdict === 'poor')).toHaveLength(9)
+    expect(verdicts.filter(r => r.verdict === 'good')).toHaveLength(1)
+  })
 })
 
 describe('readinessVerdictForDay', () => {
