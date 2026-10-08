@@ -25,6 +25,21 @@ export const HISTORY_MAX_DAYS = 3650
  *  second. One request per 1.2 s keeps a run at 50 a minute. */
 export const HISTORY_REQUEST_SPACING_MS = 1_200
 
+/** How far back an ordinary pull reaches (`getSyncDelta`'s default window). An import that stops
+ *  inside it is already on the device after the ordinary pull; one that goes past it needs the
+ *  restore pull (issue 2713). */
+export const PULL_FLOOR_DAYS = 90
+/** Slack under the run's start for a client clock behind the server's: the span is bounded by the
+ *  server's `updated_at`, and a row the run wrote must not fall just below the bound. Re-applying a
+ *  few extra rows is idempotent. */
+export const RESTORE_SPAN_SLACK_MS = 10 * 60_000
+
+/** True when an import reached past what the ordinary 90-day pull carries, so the imported span
+ *  needs the restore pull. */
+export function importNeedsRestore(oldest: string | null, today: string): boolean {
+  return oldest !== null && oldest < shiftDateStr(today, -PULL_FLOOR_DAYS)
+}
+
 /** The oldest day an ordinary cold sync covers, which is where an import starts when none has run. */
 export function coldSyncOldestDay(today: string): string {
   return shiftDateStr(today, -(SYNC_DAYS_COLD - 1))

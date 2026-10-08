@@ -498,6 +498,21 @@ describe('restoreFromCloud', () => {
     for (const call of fetchMock.mock.calls) expect(String(call[0])).toContain('mode=restore')
   })
 
+  it('issue 2713: a span restore seeds the cursor at the given instant, not epoch, and still unclamps', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(okJson(emptyDelta(false, '2026-07-03T00:00:00.000Z')))
+    vi.stubGlobal('fetch', fetchMock)
+    const since = '2026-07-01T00:00:00.000Z'
+    const res = await restoreFromCloud('u1', undefined, since)
+    expect(res?.failed).toBe(false)
+    expect(fakeStore.setLastSyncAt).toHaveBeenCalledWith(since)
+    expect(fakeStore.setLastSyncAt).not.toHaveBeenCalledWith(new Date(0).toISOString())
+    expect(String(fetchMock.mock.calls[0][0])).toContain(`since=${since}`)
+    expect(String(fetchMock.mock.calls[0][0])).toContain('mode=restore')
+    // Idempotent: running the same span again makes the same request.
+    await restoreFromCloud('u1', undefined, since)
+    expect(String(fetchMock.mock.calls[1][0])).toContain(`since=${since}`)
+  })
+
   it('reports failed:true (not a bare zero) when a pull fails, without looping forever', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 503 })
     vi.stubGlobal('fetch', fetchMock)
