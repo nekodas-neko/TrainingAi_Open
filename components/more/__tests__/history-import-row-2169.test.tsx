@@ -133,6 +133,23 @@ describe('HistoryImportRow', () => {
     expect(cache.invalidatePulledDomains).toHaveBeenCalled()
   })
 
+  it('a declined history permission says why on the row, with no toast, pull or restore, and the next press tries again', async () => {
+    eng.run.mockResolvedValueOnce({ oldest: null, windows: 0, end: 'permission-declined' })
+    await mount()
+    await click()
+    expect(text()).toContain('Older history needs the Health Connect permission to read past data')
+    expect(btn()!.textContent).toContain('Import more history')
+    expect(toast.error).not.toHaveBeenCalled()
+    expect(toast.success).not.toHaveBeenCalled()
+    expect(pullDelta).not.toHaveBeenCalled()
+    expect(restore).not.toHaveBeenCalled()
+
+    eng.run.mockResolvedValueOnce({ oldest: '2026-05-01', windows: 1, end: 'exhausted' })
+    await click()
+    expect(eng.run).toHaveBeenCalledTimes(2)
+    expect(text()).not.toContain('needs the Health Connect permission')
+  })
+
   it('does not touch caches or pull when nothing was imported', async () => {
     eng.run.mockResolvedValue({ oldest: null, windows: 0, end: 'exhausted' })
     await mount()

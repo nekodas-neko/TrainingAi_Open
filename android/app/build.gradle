@@ -192,7 +192,8 @@ abstract class VerifyFlavour extends DefaultTask {
             }
             manifest.'uses-permission'.each { p ->
                 def name = p.@'android:name'.text()
-                if (name ==~ /android\.permission\.(BLUETOOTH.*|health\..*|FOREGROUND_SERVICE_CONNECTED_DEVICE)/) {
+                // READ_HEALTH_DATA_HISTORY is the one health permission Dev keeps (issue 2712).
+                if (name != "android.permission.health.READ_HEALTH_DATA_HISTORY" && name ==~ /android\.permission\.(BLUETOOTH.*|health\..*|FOREGROUND_SERVICE_CONNECTED_DEVICE)/) {
                     failures << "permission ${name} is in the Dev app"
                 }
             }

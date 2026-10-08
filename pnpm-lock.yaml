@@ -34,7 +34,7 @@ overrides:
 
 patchedDependencies:
   '@devmaxime/capacitor-health-connect':
-    hash: 6ddd8cb9b0e4fa4934f0ebfd25e101c6d6215f99dd39d518b9fe4ad2944bee4f
+    hash: 56fc68e71f15d886c8237e4f7b52f9916bfc00c9627ab5ec719bd7f840b16ff6
     path: patches/@devmaxime__capacitor-health-connect.patch
 
 importers:
@@ -106,7 +106,7 @@ importers:
         version: 8.0.2(@capacitor/core@8.3.4)
       '@devmaxime/capacitor-health-connect':
         specifier: ^1.1.0
-        version: 1.1.0(patch_hash=6ddd8cb9b0e4fa4934f0ebfd25e101c6d6215f99dd39d518b9fe4ad2944bee4f)(@capacitor/core@8.3.4)
+        version: 1.1.0(patch_hash=56fc68e71f15d886c8237e4f7b52f9916bfc00c9627ab5ec719bd7f840b16ff6)(@capacitor/core@8.3.4)
       '@dnd-kit/dom':
         specifier: 0.4.0
         version: 0.4.0
@@ -7365,7 +7365,7 @@ snapshots:
 
   '@csstools/css-tokenizer@4.0.0': {}
 
-  '@devmaxime/capacitor-health-connect@1.1.0(patch_hash=6ddd8cb9b0e4fa4934f0ebfd25e101c6d6215f99dd39d518b9fe4ad2944bee4f)(@capacitor/core@8.3.4)':
+  '@devmaxime/capacitor-health-connect@1.1.0(patch_hash=56fc68e71f15d886c8237e4f7b52f9916bfc00c9627ab5ec719bd7f840b16ff6)(@capacitor/core@8.3.4)':
     dependencies:
       '@capacitor/core': 8.3.4
 

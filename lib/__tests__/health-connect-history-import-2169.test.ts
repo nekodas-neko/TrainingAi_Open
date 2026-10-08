@@ -9,13 +9,19 @@ const hc = vi.hoisted(() => ({
   /** A Weight record per local day, keyed by the window's start instant -> returns records inside it. */
   weights: [] as Array<{ time: string; value: number }>,
   readRecords: vi.fn(),
+  /** Whether READ_HEALTH_DATA_HISTORY is already granted, and what the Android sheet will answer. */
+  historyGranted: true,
+  userGrantsHistory: true,
+  getGrantedPermissions: vi.fn(),
+  requestPermissions: vi.fn(),
 }))
 
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => true } }))
 vi.mock('@devmaxime/capacitor-health-connect', () => ({
   HealthConnect: {
     checkAvailability: async () => ({ availability: 'Available' }),
-    requestPermissions: async () => ({ read: ['Weight'] }),
+    requestPermissions: hc.requestPermissions,
+    getGrantedPermissions: hc.getGrantedPermissions,
     aggregateRecords: async () => ({ aggregates: [] }),
     readRecords: hc.readRecords,
   },
@@ -241,6 +247,15 @@ beforeEach(() => {
   failNextSync = false
   seedWeights()
   hc.readRecords.mockReset()
+  hc.historyGranted = true
+  hc.userGrantsHistory = true
+  hc.getGrantedPermissions.mockReset()
+  hc.getGrantedPermissions.mockImplementation(async () => ({ read: hc.historyGranted ? ['Weight', 'HealthDataHistory'] : ['Weight'], write: [] }))
+  hc.requestPermissions.mockReset()
+  hc.requestPermissions.mockImplementation(async ({ read }: { read: string[] }) => {
+    if (read.includes('HealthDataHistory') && hc.userGrantsHistory) hc.historyGranted = true
+    return { read: hc.historyGranted ? ['Weight', 'HealthDataHistory'] : ['Weight'], write: [] }
+  })
   hc.readRecords.mockImplementation(async ({ start, end, type }: { start: string; end: string; type: string }) => ({
     records: type === 'Weight' ? hc.weights.filter(r => r.time >= start && r.time < end) : [],
   }))
@@ -316,6 +331,52 @@ describe('importMoreHistory - on the device', () => {
     const from = syncPostsFirstFrom()
     expect(first.start).toBe(dateStrMidnightInTz(from, TZ).toISOString())
     expect(first.end).toBe(dateStrMidnightInTz(shiftDateStr(coldSyncOldestDay(todayInTz(TZ)), 0), TZ).toISOString())
+  })
+})
+
+describe('importMoreHistory - the history permission (issue 2712)', () => {
+  const historyAsks = () => hc.requestPermissions.mock.calls.filter(c => (c[0] as { read: string[] }).read.includes('HealthDataHistory'))
+  const run = () => importMoreHistory({ tz: TZ, shouldStop: () => false, sleep: async () => {} })
+
+  it('asks once, before the first window read, when it is not granted, then imports', async () => {
+    hc.historyGranted = false
+    const out = await run()
+    expect(historyAsks()).toHaveLength(1)
+    expect(hc.requestPermissions).toHaveBeenLastCalledWith({ read: ['HealthDataHistory'], write: [] })
+    // the permission sheet resolved before any Health Connect data call or upload
+    const askedAt = hc.requestPermissions.mock.invocationCallOrder.at(-1)!
+    expect(askedAt).toBeLessThan(hc.readRecords.mock.invocationCallOrder[0])
+    expect(calls.find(c => c.url === '/api/sync-health')).toBeTruthy()
+    expect(out).toMatchObject({ end: 'exhausted' })
+  })
+
+  it('does not ask again when it is already granted', async () => {
+    hc.historyGranted = true
+    await run()
+    expect(historyAsks()).toHaveLength(0)
+  })
+
+  it('a decline ends the run before any read, upload or cursor save, with the plain end', async () => {
+    hc.historyGranted = false
+    hc.userGrantsHistory = false
+    const out = await run()
+    expect(out).toEqual({ oldest: null, windows: 0, end: 'permission-declined' })
+    expect(hc.readRecords).not.toHaveBeenCalled()
+    expect(calls).toHaveLength(0)
+    expect(importEndMessage(out!, TODAY)).toBe('Older history needs the Health Connect permission to read past data')
+  })
+
+  it('one prompt per press: a second press after a decline asks once more, not in a loop', async () => {
+    hc.historyGranted = false
+    hc.userGrantsHistory = false
+    await run()
+    await run()
+    expect(historyAsks()).toHaveLength(2)
+  })
+
+  it('ensureHistoryPermission is the only place that asks, and the live sync request never lists it', async () => {
+    const { HC_SYNC_READ_TYPES } = await import('../health-connect-sync')
+    expect(HC_SYNC_READ_TYPES as readonly string[]).not.toContain('HealthDataHistory')
   })
 })
 

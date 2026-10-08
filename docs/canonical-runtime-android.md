@@ -174,7 +174,8 @@ second Android product flavour, for device passes on PRs and release candidates.
 - **It can never talk to the ring, the strap or the scale, or read Health Connect.** The ring's
   history only moves forward, so a Dev app that drained it would lose those nights from production.
   `src/dev/AndroidManifest.xml` removes the three BLE services, their boot and scan receivers, and
-  every Bluetooth and Health Connect permission; `MainActivity` skips the three device plugins
+  every Bluetooth and Health Connect permission except `READ_HEALTH_DATA_HISTORY` (issue 2712: declared so
+  the permission prompt can exist, but with the plugin left out Dev still cannot read Health Connect); `MainActivity` skips the three device plugins
   (`BuildConfig.DEVICE_BLE_ENABLED`); the in-WebView BLE and Health Connect plugins are left out of
   its plugin list. BLE and Health Connect changes are therefore still checked on the real app.
 - **The build enforces it.** `verifyDevDebugFlavour` reads the merged manifest and assets and fails
