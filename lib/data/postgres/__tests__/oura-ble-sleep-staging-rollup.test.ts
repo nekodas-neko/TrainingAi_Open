@@ -293,3 +293,80 @@ describe.skipIf(!canRun)('aggregateOuraRawSamples — clamps the window to the d
     expect(r.sleep_phase_5_min.length).toBeLessThan(76)
   })
 })
+
+// Issue 2383 (item 4): Sleep epochs > Compute and SleepNet > Run dump are diagnostics. They must
+// write nothing, and a dump for a night older than the rollup watermark must still find it (the
+// route promises the 35-day window; the watermark used to narrow it to the last few days).
+describe.skipIf(!canRun)('aggregateOuraRawSamples — dumpOnly is a read over the full 35 days', () => {
+  const USER = '00000000-0000-4000-8000-00000000d17d'
+  const DS_PER_DAY = 24 * H
+  // The night sits 20 days before the newest clock anchor, so a watermark at the anchor excludes it.
+  const ANCHOR_DS = END_DS + 20 * DS_PER_DAY
+  const ANCHOR_UTC_LATE = new Date(new Date(ANCHOR_UTC).getTime() + 20 * 86_400_000).toISOString()
+  const TABLES = ['oura_raw_samples', 'oura_ble_clock_anchors', 'sleep_sessions', 'body_metrics', 'oura_rollup_state']
+  let pool: import('pg').Pool
+  let repo: import('@/lib/data/repository').WorkoutRepository
+
+  beforeAll(async () => {
+    const { getPool } = await import('@/lib/data/postgres/client')
+    const { getRepository } = await import('@/lib/data')
+    pool = getPool()
+    repo = await getRepository()
+    await pool.query(
+      `INSERT INTO users (id, email, password_hash, timezone) VALUES ($1, $2, 'x', 'Australia/Brisbane')
+       ON CONFLICT (id) DO NOTHING`,
+      [USER, `ble-dump-${USER}@example.com`],
+    )
+    for (const t of TABLES) await pool.query(`DELETE FROM ${t} WHERE user_id = $1`, [USER])
+    await pool.query(
+      `INSERT INTO oura_ble_clock_anchors (user_id, anchor_ds, anchor_utc) VALUES ($1, $2, $3)`,
+      [USER, ANCHOR_DS, ANCHOR_UTC_LATE],
+    )
+    const rows: string[] = []
+    const params: unknown[] = []
+    const add = (ds: number, tag: number, name: string, decoded: unknown) => {
+      const b = params.length
+      rows.push(`($1, $${b + 2}, $${b + 3}, $${b + 4}, 'aa', $${b + 5}::jsonb)`)
+      params.push(ds, tag, name, JSON.stringify(decoded))
+    }
+    for (let k = 0; k < 96; k++) {
+      const ds = START_DS + k * EPOCH_DS
+      add(ds, 0x72, 'sleep_acm_period', { acm_mad: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1] })
+      add(ds, 0x80, 'ibi_and_amplitude_event', { hr_bpm: [55, 55, 55, 55] })
+      add(ds, 0x5d, 'hrv_event', { hr_bpm: [55], rmssd_ms: [45], interval_min: 5 })
+      add(ds, 0x75, 'sleep_temp_event', { temps_c: [35] })
+    }
+    await pool.query(
+      `INSERT INTO oura_raw_samples (user_id, ring_timestamp_ds, tag, event_name, body_hex, decoded) VALUES ${rows.join(',')}`,
+      [USER, ...params],
+    )
+  })
+
+  afterAll(async () => {
+    if (!canRun) return
+    for (const t of TABLES) await pool.query(`DELETE FROM ${t} WHERE user_id = $1`, [USER])
+    await pool.query(`DELETE FROM users WHERE id = $1`, [USER])
+  })
+
+  it('finds a night older than the watermark and writes nothing', async () => {
+    // A normal rollup stamps the watermark at the anchor, which excludes the night for an ingest.
+    await repo.aggregateOuraRawSamples(USER, 'Australia/Brisbane')
+    const wm = await pool.query(`SELECT last_rolled_ds FROM oura_rollup_state WHERE user_id = $1`, [USER])
+    expect(Number(wm.rows[0].last_rolled_ds)).toBe(ANCHOR_DS)
+    // Clear everything the rollup wrote, so any write by the dump shows.
+    await pool.query(`DELETE FROM sleep_sessions WHERE user_id = $1`, [USER])
+    await pool.query(`DELETE FROM body_metrics WHERE user_id = $1`, [USER])
+    await pool.query(`UPDATE oura_rollup_state SET updated_at = '2000-01-01' WHERE user_id = $1`, [USER])
+
+    const res = await repo.aggregateOuraRawSamples(USER, 'Australia/Brisbane', { debugDate: '2026-07-09', dumpOnly: true })
+    expect(res.debugNight).not.toBeNull()
+    expect(res.debugNight!.epochs.length).toBeGreaterThan(80)
+
+    for (const t of ['sleep_sessions', 'body_metrics']) {
+      const n = await pool.query(`SELECT count(*)::int AS n FROM ${t} WHERE user_id = $1`, [USER])
+      expect(n.rows[0].n, `${t} written by a dump`).toBe(0)
+    }
+    const st = await pool.query(`SELECT updated_at FROM oura_rollup_state WHERE user_id = $1`, [USER])
+    expect(new Date(st.rows[0].updated_at).getUTCFullYear()).toBe(2000)
+  })
+})

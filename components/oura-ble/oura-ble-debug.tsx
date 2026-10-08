@@ -11,6 +11,7 @@ import { CollapsibleSection } from '@/components/ui/collapsible-section'
 import { getOuraBle, type OuraBlePlugin, type OuraBleStatus, type OuraFrameEvent } from '@/lib/oura-ble/plugin'
 import { invalidateOuraSync } from '@/lib/cache-groups'
 import { frameLabel, historyEventFromHex } from '@/lib/oura-ble/decode'
+import { waitForUploadToSettle } from '@/lib/oura-ble/upload-settle'
 import { LogConsole } from './log-console'
 import { SampleInspector, type LatestSample } from './sample-inspector'
 import { StepCalibration } from './step-calibration'
@@ -401,7 +402,11 @@ export function OuraBleDebug() {
   const syncAndRedecode = useCallback(async () => {
     setLines((prev) => [...prev, 'sync + redecode…'])
     await syncNow()
-    await new Promise((r) => setTimeout(r, 4000)) // let the drained frames POST + store
+    // Issue 2383: wait for the drained frames to finish uploading, not a fixed 4 s. Frames that land
+    // after the full-history pass starts are missed by it.
+    const p = pluginRef.current
+    const outcome = p && await waitForUploadToSettle({ getStatus: () => p.getStatus(), sleep: (ms) => new Promise<void>((r) => setTimeout(r, ms)) })
+    if (outcome === 'timeout') setLines((prev) => [...prev, 'upload still arriving after 90 s — redecoding what has landed. Run Redecode again once it finishes.'])
     await redecode()
   }, [syncNow, redecode])
 
