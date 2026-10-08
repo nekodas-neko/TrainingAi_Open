@@ -21,6 +21,7 @@
 const fs = require('fs');
 const path = require('path');
 const { stripComments } = require('./lib/strip-comments');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
 // Chroma-0 in both themes, so all of these trigger the bug.
 const ACHROMATIC = /^(?:var\(--color-muted\)|var\(--color-background\)|var\(--card\)|var\(--background\)|var\(--muted\)|var\(--popover\)|#000|#000000|#fff|#ffffff|white|black)$/;
@@ -51,6 +52,7 @@ function scan(file, rel) {
 
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory() && isSkippedFixtureDir(entry.name)) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       if (['node_modules', '.next', 'dist'].includes(entry.name)) continue;

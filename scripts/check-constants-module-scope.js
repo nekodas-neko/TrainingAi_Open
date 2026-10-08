@@ -26,6 +26,7 @@
 const fs = require('fs');
 const path = require('path');
 const ts = require('typescript');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
 const ROOT = path.resolve(__dirname, '..');
 const ROOTS = ['lib', 'app', 'packages/shared/src', 'components'];
@@ -39,6 +40,7 @@ function constantsGetters() {
 
 function walk(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (e.isDirectory() && isSkippedFixtureDir(e.name)) continue;
     if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
     const p = path.join(dir, e.name);
     if (e.isDirectory()) walk(p, out);

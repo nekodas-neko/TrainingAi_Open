@@ -35,6 +35,7 @@
  */
 const fs = require('node:fs')
 const path = require('node:path')
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs')
 
 const ROOT = process.cwd()
 const CONSTANTS_DIR = path.join(ROOT, 'lib', 'oura-models', 'constants')
@@ -52,6 +53,7 @@ function walk(dir, out = []) {
     return out
   }
   for (const e of entries) {
+    if (e.isDirectory() && isSkippedFixtureDir(e.name)) continue
     if (['node_modules', '.next', 'build'].includes(e.name)) continue
     const full = path.join(dir, e.name)
     if (e.isDirectory()) walk(full, out)

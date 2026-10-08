@@ -27,6 +27,7 @@
 const fs = require('fs');
 const path = require('path');
 const { stripComments } = require('./lib/strip-comments');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
 const root = path.join(__dirname, '..');
 const ROOTS = ['components', 'app'];
@@ -36,6 +37,7 @@ const VH = /\[(\d+(?:\.\d+)?)vh\]/g;
 
 function walk(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (e.isDirectory() && isSkippedFixtureDir(e.name)) continue;
     const full = path.join(dir, e.name);
     if (e.isDirectory()) { if (e.name !== 'node_modules') walk(full, out); continue; }
     if (e.name.endsWith('.tsx')) out.push(full);

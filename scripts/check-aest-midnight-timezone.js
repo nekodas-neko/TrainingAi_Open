@@ -24,6 +24,7 @@
 const fs = require('fs');
 const path = require('path');
 const { resolveBaseRef, countsAtBase, verdict } = require('./lib/base-ref');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
 /**
  * Blank out comments and string bodies, keeping the byte length so nothing else shifts.
@@ -118,6 +119,7 @@ function walk(dir) {
   let entries;
   try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
   for (const e of entries) {
+    if (e.isDirectory() && isSkippedFixtureDir(e.name)) continue;
     const full = path.join(dir, e.name);
     if (e.isDirectory()) {
       if (e.name === 'node_modules' || e.name === '__tests__' || e.name === '.next') continue;

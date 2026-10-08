@@ -25,6 +25,7 @@
 const fs = require('fs');
 const path = require('path');
 const L = require('./lib/table-residency');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
 const root = path.join(__dirname, '..');
 const read = p => fs.readFileSync(path.join(root, p), 'utf8');
@@ -36,6 +37,7 @@ const END = '<!-- residency:generated:end -->';
 function walk(dir, exts, out = []) {
   if (!fs.existsSync(dir)) return out;
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (e.isDirectory() && isSkippedFixtureDir(e.name)) continue;
     const p = path.join(dir, e.name);
     if (e.isDirectory()) walk(p, exts, out);
     else if (exts.some(x => e.name.endsWith(x))) out.push(p);
