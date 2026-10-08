@@ -877,6 +877,11 @@ export const savedMeals = pgTable('saved_meals', {
   // Not a URL: this row syncs to a phone and has to render offline. Not 5 MB like `users.avatar`:
   // that column never enters the sync delta and this one does.
   imageDataUri: text('image_data_uri'),
+  // Issue 2153. Server-only (never synced, never in the payload). False means the one-time
+  // history seed of `saved_meal_meal_types` has not looked at this meal; the migration flips every
+  // existing row to true and the column defaults to true, so no row created afterwards is ever
+  // seeded and the meal's tag set, including a deliberately EMPTY one, is entirely the user's.
+  mealTypesSeeded: boolean('meal_types_seeded').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
