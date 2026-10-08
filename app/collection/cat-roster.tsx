@@ -1,4 +1,4 @@
-import type { CatSummary, Ladder } from '@trainingai/shared/collection/ladder'
+import type { CatSummary, V2Ladder } from '@trainingai/shared/collection/ladder'
 import { CatSprite } from '@/components/home/cat-sprite'
 import type { FaucetKey } from '@/components/home/collection-summary'
 
@@ -17,7 +17,7 @@ function madeFrom(names: string[]): string {
  * Every cat on a ladder by name: its tier, the day it arrived, and the cats it was made from. The
  * names are the replay's own, so a cat here is the same cat wandering in the Home pen.
  */
-export function CatRoster({ faucet, ladder, cats }: { faucet: FaucetKey; ladder: Ladder; cats: CatSummary[] | undefined }) {
+export function CatRoster({ faucet, ladder, cats }: { faucet: FaucetKey; ladder: V2Ladder; cats: CatSummary[] | undefined }) {
   if (!cats?.length) return null
   return (
     <ul className="mt-3 space-y-1.5 border-t border-border pt-3">
