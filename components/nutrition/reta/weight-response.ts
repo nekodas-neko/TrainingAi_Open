@@ -418,3 +418,46 @@ export function recoveryResponse(input: RecoveryResponseInput): SubstanceRecover
   }
   return out.sort((a, b) => a.supplementName.localeCompare(b.supplementName) || a.supplementId.localeCompare(b.supplementId))
 }
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// Reading the recovery response (issue 2152, the "Heart after a dose" card).
+//
+// This is NOT a second estimator: `recoveryResponse` above produces every number. What lives here is
+// the one owner-specified gate on top of them, kept beside the model so every reader applies the
+// same rule.
+//
+// **"Clear pattern" = on some day, the middle half of the doses (p25 to p75) sits FULLY outside the
+// person's own normal, baseline median ± IQR/2.** Anything less, including a median that is outside
+// but a band that still overlaps, is "no clear pattern yet". It describes a pattern in the owner's
+// numbers and never names a cause: training, sleep and stress are uncontrolled.
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+
+export interface MetricPattern {
+  /** The gate above held on at least one day. */
+  clear: boolean
+  /** Days (offsets) on which the middle half sat fully outside the normal. */
+  clearOffsets: number[]
+  /** Of those days, the one whose median is furthest from the baseline (absolute value); null when not clear. */
+  peak: { offset: number; value: number; direction: 'up' | 'down' } | null
+  /** The last day with a centre: its absolute median, and whether that median is outside the normal. */
+  last: { offset: number; value: number; outside: boolean } | null
+}
+
+export function metricPattern(r: MetricRecoveryResponse): MetricPattern {
+  if (r.state !== 'ok') return { clear: false, clearOffsets: [], peak: null, last: null }
+  const half = r.baseline.iqr / 2
+  const clearOffsets: number[] = []
+  let peak: MetricPattern['peak'] = null
+  let last: MetricPattern['last'] = null
+  for (const o of r.offsets) {
+    if (o.median === null || o.p25 === null || o.p75 === null) continue
+    last = { offset: o.offset, value: r.baseline.median + o.median, outside: Math.abs(o.median) > half }
+    if (o.p25 > half || o.p75 < -half) {
+      clearOffsets.push(o.offset)
+      if (!peak || Math.abs(o.median) > Math.abs(peak.value - r.baseline.median)) {
+        peak = { offset: o.offset, value: r.baseline.median + o.median, direction: o.median >= 0 ? 'up' : 'down' }
+      }
+    }
+  }
+  return { clear: clearOffsets.length > 0, clearOffsets, peak, last }
+}
