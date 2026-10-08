@@ -96,14 +96,18 @@ export async function runOuraRollup(
   // pegged main thread on every deploy, measured in production. The persisted watermark says how
   // far the last successful run reached, so a cold start narrows from there like a warm one.
   // Null (no row, or a row from a previous clock epoch) still falls back to the full window.
-  const persistedSinceDs = fullHistory ? null
+  // Issue 2383 (item 4): a `dumpOnly` pass reads the whole promised 35 days. It must not inherit the
+  // watermark or the caller's span, which narrow an ingest's read to the last few days and made a
+  // dump for an older night answer "no BLE night".
+  const dumpOnly = opts?.dumpOnly === true
+  const persistedSinceDs = fullHistory || dumpOnly ? null
     : await io.readRollupWatermark(currentEpoch(anchors) ?? 0)
   // The run must cover BOTH: everything since the last successful rollup (the watermark) and
   // whatever this batch carried. Taking the caller's span alone was wrong — a batch ingested before
   // a restart, after the last rollup, sits older than the incoming batch's span and would never be
   // rolled up. Normally the watermark is the older of the two and wins; the caller's span wins only
   // when a batch back-fills data older than the watermark. Either way, the minimum is the safe floor.
-  const spans = [opts?.sinceDs, persistedSinceDs].filter((v): v is number => v != null)
+  const spans = [dumpOnly ? null : opts?.sinceDs, persistedSinceDs].filter((v): v is number => v != null)
   const effectiveSinceDs = spans.length > 0 ? Math.min(...spans) : null
   const incrementalFloorDs = effectiveSinceDs != null ? effectiveSinceDs - 3 * DS_PER_DAY : null
   const windowFloorDs = anchor.anchorDs - ROLLUP_WINDOW_DAYS * DS_PER_DAY
@@ -688,6 +692,12 @@ export async function runOuraRollup(
   // downstream metric (this is exactly how SpO₂ went missing in prod while HRV
   // wrote, 2026-07-08). Errors are collected and returned, never thrown.
   const stepErrors: string[] = []
+  // Issue 2383 (item 4): the debug dump is a read. Everything above only reads and every write is in
+  // the steps below, so stopping here is what makes Sleep epochs > Compute and SleepNet > Run dump
+  // write nothing (they used to re-run the whole recent-window rollup).
+  if (dumpOnly) {
+    return { sleepSessions: 0, bodyMetricDays: 0, daysWritten: [], hrSeriesPoints: 0, wearDays: 0, stepErrors, debugNight }
+  }
   const step = async (name: string, fn: () => Promise<void>) => {
     try { await fn() } catch (err) {
       const msg = `${name}: ${err instanceof Error ? err.message : String(err)}`
