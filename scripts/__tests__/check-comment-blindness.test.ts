@@ -22,8 +22,11 @@ import { describe, it, expect } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
+import { FIXTURE_DIR, fixtureChildDir } from '../lib/fixture-dirs'
 
 const root = path.join(__dirname, '..', '..')
+/** Issue 2707: this suite's own fixture folder and scan token, so no other suite's copy is scanned or removed. */
+const TAG = 'comment-blindness'
 
 /**
  * The API-route paths are joined rather than written whole, and that is not style.
@@ -54,7 +57,7 @@ const CASES: Array<{ check: string; file: string; fixture: string }> = [
 /**
  * The check's whole output, exit code included — a check may signal by either.
  *
- * #2578. The checks skip `__check_fixture__/` unless SCAN_CHECK_FIXTURES=1, so a real check run by
+ * #2578. The checks skip `__check_fixture__/` unless SCAN_CHECK_FIXTURES names its folder (issue 2707), so a real check run by
  * another suite in parallel (`strict-schema-inert`) never sees this file's copy. It is set on these
  * child processes only, never on the test process itself.
  */
@@ -63,7 +66,7 @@ const run = (check: string): string => {
     return execFileSync('node', [path.join(root, 'scripts', `${check}.js`)], {
       cwd: root,
       encoding: 'utf8',
-      env: { ...process.env, SCAN_CHECK_FIXTURES: '1' },
+      env: { ...process.env, SCAN_CHECK_FIXTURES: TAG },
     })
   } catch (err) {
     const e = err as { stdout?: string; stderr?: string; status?: number }
@@ -82,9 +85,8 @@ const run = (check: string): string => {
  * content so every check sees a realistic file. Each case compares runs made WITH the copy present,
  * so the copy's own pre-existing findings cancel out.
  */
-const FIXTURE_DIR = '__check_fixture__'
 const withCopy = (rel: string, line: string | null, fn: () => string): string => {
-  const dir = path.join(root, path.dirname(rel), FIXTURE_DIR)
+  const dir = path.join(root, path.dirname(rel), FIXTURE_DIR, fixtureChildDir(TAG))
   const copy = path.join(dir, path.basename(rel))
   const original = readFileSync(path.join(root, rel), 'utf8')
   try {

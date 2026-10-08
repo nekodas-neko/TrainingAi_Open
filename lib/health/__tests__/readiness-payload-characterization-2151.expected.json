@@ -1,0 +1,780 @@
+{
+  "buildReadinessPayload characterization (issue 2151) > nothing at all": {
+    "score": null,
+    "readinessDisplayScore": null,
+    "label": "Low",
+    "components": {
+      "sleep": 0,
+      "hrv": 0,
+      "rhr": 0,
+      "load": 5
+    },
+    "hasSufficientData": false,
+    "earlyDeloadRecommended": false,
+    "earlyDeload": null,
+    "source": "none",
+    "ouraScore": null,
+    "inputsAvailable": [],
+    "inputsMissing": [
+      "sleep",
+      "hrv",
+      "restingHeartRate",
+      "temperature",
+      "activity"
+    ],
+    "scoreConfidence": "minimal",
+    "limited": true,
+    "availability": [
+      {
+        "metric": "readiness",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "sleep",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "activity",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "daytimeStress",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "resilience",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      }
+    ]
+  },
+  "buildReadinessPayload characterization (issue 2151) > weight only: no recovery signal": {
+    "score": null,
+    "readinessDisplayScore": null,
+    "label": "Low",
+    "components": {
+      "sleep": 0,
+      "hrv": 0,
+      "rhr": 0,
+      "load": 5
+    },
+    "hasSufficientData": false,
+    "earlyDeloadRecommended": false,
+    "earlyDeload": null,
+    "source": "custom",
+    "ouraScore": null,
+    "inputsAvailable": [],
+    "inputsMissing": [
+      "sleep",
+      "hrv",
+      "restingHeartRate",
+      "temperature",
+      "activity"
+    ],
+    "scoreConfidence": "minimal",
+    "limited": true,
+    "availability": [
+      {
+        "metric": "readiness",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "sleep",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "activity",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "daytimeStress",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "resilience",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      }
+    ]
+  },
+  "buildReadinessPayload characterization (issue 2151) > sleep only": {
+    "score": 51,
+    "readinessDisplayScore": 51,
+    "label": "Moderate",
+    "components": {
+      "sleep": 21,
+      "hrv": 0,
+      "rhr": 0,
+      "load": 5
+    },
+    "hasSufficientData": true,
+    "earlyDeloadRecommended": false,
+    "earlyDeload": null,
+    "source": "custom",
+    "ouraScore": null,
+    "inputsAvailable": [
+      "sleep"
+    ],
+    "inputsMissing": [
+      "hrv",
+      "restingHeartRate",
+      "temperature",
+      "activity"
+    ],
+    "scoreConfidence": "minimal",
+    "limited": true,
+    "availability": [
+      {
+        "metric": "readiness",
+        "state": "present",
+        "gap": null,
+        "degradedInputs": [
+          {
+            "key": "restingHeartRate",
+            "gap": "no_input"
+          },
+          {
+            "key": "hrvBalance",
+            "gap": "no_input"
+          },
+          {
+            "key": "temperature",
+            "gap": "no_input"
+          },
+          {
+            "key": "sleepBalance",
+            "gap": "no_input"
+          },
+          {
+            "key": "prevDayActivity",
+            "gap": "no_input"
+          },
+          {
+            "key": "recoveryIndex",
+            "gap": "no_input"
+          },
+          {
+            "key": "activityBalance",
+            "gap": "no_input"
+          }
+        ]
+      },
+      {
+        "metric": "sleep",
+        "state": "present",
+        "gap": null,
+        "degradedInputs": []
+      },
+      {
+        "metric": "activity",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "daytimeStress",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "resilience",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      }
+    ]
+  },
+  "buildReadinessPayload characterization (issue 2151) > generic HRV and RHR with sleep": {
+    "score": 59,
+    "readinessDisplayScore": 59,
+    "label": "Moderate",
+    "components": {
+      "sleep": 21,
+      "hrv": 30,
+      "rhr": 20,
+      "load": 5
+    },
+    "hasSufficientData": true,
+    "earlyDeloadRecommended": false,
+    "earlyDeload": null,
+    "source": "custom",
+    "ouraScore": null,
+    "inputsAvailable": [
+      "sleep",
+      "hrv",
+      "restingHeartRate",
+      "activity"
+    ],
+    "inputsMissing": [
+      "temperature"
+    ],
+    "scoreConfidence": "partial",
+    "limited": true,
+    "availability": [
+      {
+        "metric": "readiness",
+        "state": "present",
+        "gap": null,
+        "degradedInputs": [
+          {
+            "key": "temperature",
+            "gap": "no_input"
+          },
+          {
+            "key": "sleepBalance",
+            "gap": "no_input"
+          },
+          {
+            "key": "recoveryIndex",
+            "gap": "no_input"
+          }
+        ]
+      },
+      {
+        "metric": "sleep",
+        "state": "present",
+        "gap": null,
+        "degradedInputs": []
+      },
+      {
+        "metric": "activity",
+        "state": "present",
+        "gap": null,
+        "degradedInputs": []
+      },
+      {
+        "metric": "daytimeStress",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "resilience",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      }
+    ]
+  },
+  "buildReadinessPayload characterization (issue 2151) > RHR baseline only, no sleep: recovery signal without sleep": {
+    "score": 65,
+    "readinessDisplayScore": 65,
+    "label": "Moderate",
+    "components": {
+      "sleep": 0,
+      "hrv": 0,
+      "rhr": 20,
+      "load": 5
+    },
+    "hasSufficientData": false,
+    "earlyDeloadRecommended": false,
+    "earlyDeload": null,
+    "source": "custom",
+    "ouraScore": null,
+    "inputsAvailable": [
+      "restingHeartRate",
+      "activity"
+    ],
+    "inputsMissing": [
+      "sleep",
+      "hrv",
+      "temperature"
+    ],
+    "scoreConfidence": "minimal",
+    "limited": true,
+    "availability": [
+      {
+        "metric": "readiness",
+        "state": "present",
+        "gap": null,
+        "degradedInputs": [
+          {
+            "key": "hrvBalance",
+            "gap": "no_input"
+          },
+          {
+            "key": "temperature",
+            "gap": "no_input"
+          },
+          {
+            "key": "sleepBalance",
+            "gap": "no_input"
+          },
+          {
+            "key": "previousNight",
+            "gap": "no_input"
+          },
+          {
+            "key": "recoveryIndex",
+            "gap": "no_input"
+          }
+        ]
+      },
+      {
+        "metric": "sleep",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "activity",
+        "state": "present",
+        "gap": null,
+        "degradedInputs": []
+      },
+      {
+        "metric": "daytimeStress",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "resilience",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      }
+    ]
+  },
+  "buildReadinessPayload characterization (issue 2151) > ring rollup composite": {
+    "score": 70,
+    "readinessDisplayScore": 70,
+    "label": "High",
+    "components": {
+      "sleep": 21,
+      "hrv": 30,
+      "rhr": 20,
+      "load": 5
+    },
+    "hasSufficientData": true,
+    "earlyDeloadRecommended": false,
+    "earlyDeload": null,
+    "source": "custom",
+    "ouraScore": null,
+    "inputsAvailable": [
+      "sleep",
+      "hrv",
+      "restingHeartRate",
+      "temperature",
+      "activity"
+    ],
+    "inputsMissing": [],
+    "scoreConfidence": "full",
+    "limited": false,
+    "availability": [
+      {
+        "metric": "readiness",
+        "state": "present",
+        "gap": null,
+        "degradedInputs": [
+          {
+            "key": "temperature",
+            "gap": "no_input"
+          }
+        ]
+      },
+      {
+        "metric": "sleep",
+        "state": "present",
+        "gap": null,
+        "degradedInputs": []
+      },
+      {
+        "metric": "activity",
+        "state": "present",
+        "gap": null,
+        "degradedInputs": []
+      },
+      {
+        "metric": "daytimeStress",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "resilience",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      }
+    ]
+  },
+  "buildReadinessPayload characterization (issue 2151) > ring day with a Cloud row whose frozen readiness score is null": {
+    "score": 59,
+    "readinessDisplayScore": 59,
+    "label": "Moderate",
+    "components": {
+      "sleep": 21,
+      "hrv": 30,
+      "rhr": 20,
+      "load": 5
+    },
+    "hasSufficientData": true,
+    "earlyDeloadRecommended": false,
+    "earlyDeload": null,
+    "source": "custom",
+    "ouraScore": null,
+    "inputsAvailable": [
+      "sleep",
+      "hrv",
+      "restingHeartRate",
+      "temperature",
+      "activity"
+    ],
+    "inputsMissing": [],
+    "scoreConfidence": "full",
+    "limited": false,
+    "availability": [
+      {
+        "metric": "readiness",
+        "state": "present",
+        "gap": null,
+        "degradedInputs": [
+          {
+            "key": "temperature",
+            "gap": "no_input"
+          },
+          {
+            "key": "sleepBalance",
+            "gap": "no_input"
+          },
+          {
+            "key": "recoveryIndex",
+            "gap": "no_input"
+          }
+        ]
+      },
+      {
+        "metric": "sleep",
+        "state": "present",
+        "gap": null,
+        "degradedInputs": []
+      },
+      {
+        "metric": "activity",
+        "state": "present",
+        "gap": null,
+        "degradedInputs": []
+      },
+      {
+        "metric": "daytimeStress",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "resilience",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      }
+    ]
+  },
+  "buildReadinessPayload characterization (issue 2151) > no HRV baseline, poor score, high load: the early-deload gate stays closed": {
+    "score": null,
+    "readinessDisplayScore": null,
+    "label": "Low",
+    "components": {
+      "sleep": 0,
+      "hrv": 0,
+      "rhr": 0,
+      "load": 0
+    },
+    "hasSufficientData": false,
+    "earlyDeloadRecommended": false,
+    "earlyDeload": null,
+    "source": "custom",
+    "ouraScore": null,
+    "inputsAvailable": [
+      "activity"
+    ],
+    "inputsMissing": [
+      "sleep",
+      "hrv",
+      "restingHeartRate",
+      "temperature"
+    ],
+    "scoreConfidence": "minimal",
+    "limited": true,
+    "availability": [
+      {
+        "metric": "readiness",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "sleep",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "activity",
+        "state": "present",
+        "gap": null,
+        "degradedInputs": []
+      },
+      {
+        "metric": "daytimeStress",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "resilience",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      }
+    ]
+  },
+  "buildReadinessPayload characterization (issue 2151) > HRV baseline, poor sleep, high load: early deload fires (ai_dynamic)": {
+    "score": 43,
+    "readinessDisplayScore": 43,
+    "label": "Low",
+    "components": {
+      "sleep": 0,
+      "hrv": 11,
+      "rhr": 15,
+      "load": 0
+    },
+    "hasSufficientData": false,
+    "earlyDeloadRecommended": true,
+    "earlyDeload": {
+      "score": 43,
+      "acwr": 3.9740259740259734,
+      "scoreThreshold": 45,
+      "acwrThreshold": 1.2
+    },
+    "source": "custom",
+    "ouraScore": null,
+    "inputsAvailable": [
+      "hrv",
+      "restingHeartRate",
+      "activity"
+    ],
+    "inputsMissing": [
+      "sleep",
+      "temperature"
+    ],
+    "scoreConfidence": "partial",
+    "limited": true,
+    "availability": [
+      {
+        "metric": "readiness",
+        "state": "present",
+        "gap": null,
+        "degradedInputs": [
+          {
+            "key": "temperature",
+            "gap": "no_input"
+          },
+          {
+            "key": "sleepBalance",
+            "gap": "no_input"
+          },
+          {
+            "key": "previousNight",
+            "gap": "no_input"
+          },
+          {
+            "key": "recoveryIndex",
+            "gap": "no_input"
+          }
+        ]
+      },
+      {
+        "metric": "sleep",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "activity",
+        "state": "present",
+        "gap": null,
+        "degradedInputs": []
+      },
+      {
+        "metric": "daytimeStress",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "resilience",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      }
+    ]
+  },
+  "buildReadinessPayload characterization (issue 2151) > HRV baseline and high load but a healthy score: gate open, no recommendation (automatic)": {
+    "score": 59,
+    "readinessDisplayScore": 59,
+    "label": "Moderate",
+    "components": {
+      "sleep": 21,
+      "hrv": 30,
+      "rhr": 20,
+      "load": 0
+    },
+    "hasSufficientData": true,
+    "earlyDeloadRecommended": false,
+    "earlyDeload": null,
+    "source": "custom",
+    "ouraScore": null,
+    "inputsAvailable": [
+      "sleep",
+      "hrv",
+      "restingHeartRate",
+      "activity"
+    ],
+    "inputsMissing": [
+      "temperature"
+    ],
+    "scoreConfidence": "partial",
+    "limited": true,
+    "availability": [
+      {
+        "metric": "readiness",
+        "state": "present",
+        "gap": null,
+        "degradedInputs": [
+          {
+            "key": "temperature",
+            "gap": "no_input"
+          },
+          {
+            "key": "sleepBalance",
+            "gap": "no_input"
+          },
+          {
+            "key": "recoveryIndex",
+            "gap": "no_input"
+          }
+        ]
+      },
+      {
+        "metric": "sleep",
+        "state": "present",
+        "gap": null,
+        "degradedInputs": []
+      },
+      {
+        "metric": "activity",
+        "state": "present",
+        "gap": null,
+        "degradedInputs": []
+      },
+      {
+        "metric": "daytimeStress",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "resilience",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      }
+    ]
+  },
+  "buildReadinessPayload characterization (issue 2151) > HRV baseline, poor sleep, high load, but manual mode: never recommended": {
+    "score": 43,
+    "readinessDisplayScore": 43,
+    "label": "Low",
+    "components": {
+      "sleep": 0,
+      "hrv": 11,
+      "rhr": 15,
+      "load": 0
+    },
+    "hasSufficientData": false,
+    "earlyDeloadRecommended": false,
+    "earlyDeload": null,
+    "source": "custom",
+    "ouraScore": null,
+    "inputsAvailable": [
+      "hrv",
+      "restingHeartRate",
+      "activity"
+    ],
+    "inputsMissing": [
+      "sleep",
+      "temperature"
+    ],
+    "scoreConfidence": "partial",
+    "limited": true,
+    "availability": [
+      {
+        "metric": "readiness",
+        "state": "present",
+        "gap": null,
+        "degradedInputs": [
+          {
+            "key": "temperature",
+            "gap": "no_input"
+          },
+          {
+            "key": "sleepBalance",
+            "gap": "no_input"
+          },
+          {
+            "key": "previousNight",
+            "gap": "no_input"
+          },
+          {
+            "key": "recoveryIndex",
+            "gap": "no_input"
+          }
+        ]
+      },
+      {
+        "metric": "sleep",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "activity",
+        "state": "present",
+        "gap": null,
+        "degradedInputs": []
+      },
+      {
+        "metric": "daytimeStress",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      },
+      {
+        "metric": "resilience",
+        "state": "absent",
+        "gap": "no_input",
+        "degradedInputs": []
+      }
+    ]
+  }
+}

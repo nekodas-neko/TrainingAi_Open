@@ -1,5 +1,5 @@
 /**
- * #2578 — a check skips `__check_fixture__/` unless SCAN_CHECK_FIXTURES=1.
+ * #2578 — a check skips `__check_fixture__/` unless SCAN_CHECK_FIXTURES names the suite's folder.
  *
  * `check-comment-blindness.test.ts` parks a copy of a real file, with a violation appended, in
  * `__check_fixture__/` while it runs. Another suite running the REAL check against the working tree
@@ -7,16 +7,19 @@
  * removed mid-walk. The checks now leave fixtures alone by default; only comment-blindness opts in,
  * and only for its own child processes. A user's `pnpm check:rules` and CI never set the variable.
  *
- * This file uses its OWN parent folders (not goals/ or components/workout/, which comment-blindness
- * uses) so the two suites cannot remove each other's copy.
+ * Issue 2707: this file parks its copy in its OWN child folder (`__check_fixture__/__fx_<tag>/`) and
+ * scans only that one, so it cannot collide with comment-blindness, which scans with another token.
  */
 import { describe, it, expect } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
+import { fixtureChildDir } from '../lib/fixture-dirs'
 
 const root = path.join(__dirname, '..', '..')
 const FIXTURE_DIR = '__check_fixture__'
+/** Issue 2707: own child folder and scan token; comment-blindness uses a different one. */
+const TAG = 'fixture-isolation'
 
 // The checks `check-comment-blindness.test.ts` exercises.
 const CHECKS = [
@@ -38,7 +41,7 @@ const exitOf = (check: string, env: Record<string, string>): number => {
 }
 
 const withFixture = <T>(rel: string, line: string, fn: () => T): T => {
-  const dir = path.join(root, path.dirname(rel), FIXTURE_DIR)
+  const dir = path.join(root, path.dirname(rel), FIXTURE_DIR, fixtureChildDir(TAG))
   try {
     mkdirSync(dir, { recursive: true })
     writeFileSync(path.join(dir, path.basename(rel)), `${readFileSync(path.join(root, rel), 'utf8')}\n${line}\n`)
@@ -54,14 +57,14 @@ describe('a fixture copy is invisible to a real check run (#2578)', () => {
     withFixture('app/api/achievements/route.ts', line, () => {
       // The overlap `strict-schema-inert` used to lose, made deterministic: the copy exists for the whole run.
       expect(exitOf('check-strict-request-schemas', {})).toBe(0)
-      expect(exitOf('check-strict-request-schemas', { SCAN_CHECK_FIXTURES: '1' })).not.toBe(0)
+      expect(exitOf('check-strict-request-schemas', { SCAN_CHECK_FIXTURES: TAG })).not.toBe(0)
     })
   }, 60_000)
 
   it('check-hex-literals: exit 0 beside a violating copy, non-zero when asked to scan fixtures', () => {
     withFixture('components/home/collection-card.tsx', 'const c = { color: "#ff0000" }', () => {
       expect(exitOf('check-hex-literals', {})).toBe(0)
-      expect(exitOf('check-hex-literals', { SCAN_CHECK_FIXTURES: '1' })).not.toBe(0)
+      expect(exitOf('check-hex-literals', { SCAN_CHECK_FIXTURES: TAG })).not.toBe(0)
     })
   }, 60_000)
 
@@ -79,7 +82,7 @@ describe('a fixture copy is invisible to a real check run (#2578)', () => {
   it('check-route-test-coverage: a parked copy of a route is not counted as an untested route (issue 2697)', () => {
     withFixture('app/api/achievements/route.ts', '// copy', () => {
       expect(exitOf('check-route-test-coverage', {})).toBe(0)
-      expect(exitOf('check-route-test-coverage', { SCAN_CHECK_FIXTURES: '1' })).not.toBe(0)
+      expect(exitOf('check-route-test-coverage', { SCAN_CHECK_FIXTURES: TAG })).not.toBe(0)
     })
   }, 60_000)
 
@@ -108,7 +111,7 @@ describe('a fixture copy is invisible to a real check run (#2578)', () => {
 
   it('comment-blindness sets the variable for its child processes, and only there', () => {
     const src = readFileSync(path.join(root, 'scripts', '__tests__', 'check-comment-blindness.test.ts'), 'utf8')
-    expect(src).toContain("SCAN_CHECK_FIXTURES: '1'")
+    expect(src).toContain('SCAN_CHECK_FIXTURES: TAG')
     expect(src).not.toMatch(/process\.env\.SCAN_CHECK_FIXTURES\s*=/)
     expect(process.env.SCAN_CHECK_FIXTURES).not.toBe('1')
   })
