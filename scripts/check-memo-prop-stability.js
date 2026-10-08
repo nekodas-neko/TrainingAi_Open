@@ -28,6 +28,7 @@ const path = require('path');
 const { resolveBaseRef, treeFilesAtBase, verdict } = require('./lib/base-ref');
 const { readFilesUtf8, runMain } = require('./lib/read-sources');
 const { stripComments } = require('./lib/strip-comments');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
 const root = path.join(__dirname, '..');
 const DIRS = ['app', 'components'];
@@ -44,7 +45,7 @@ const BASELINE = {};
 
 function walk(dir, out) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (['node_modules', '.next', '__tests__'].includes(e.name)) continue;
+    if (['node_modules', '.next', '__tests__'].includes(e.name) || isSkippedFixtureDir(e.name)) continue;
     const p = path.join(dir, e.name);
     if (e.isDirectory()) walk(p, out);
     else if (e.name.endsWith('.tsx')) out.push(p);

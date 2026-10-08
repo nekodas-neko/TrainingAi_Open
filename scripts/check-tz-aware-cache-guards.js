@@ -16,6 +16,7 @@
 const fs = require('fs');
 const path = require('path');
 const { stripComments } = require('./lib/strip-comments');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 const { readFilesUtf8, runMain } = require('./lib/read-sources');
 
 const root = path.join(__dirname, '..');
@@ -27,7 +28,7 @@ const EXEMPT = new Set(['lib/sqlite/cache.ts', 'lib/__tests__/cache-fetch.test.t
 
 function walk(dir, out) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (e.name === 'node_modules' || e.name === '.next') continue;
+    if (e.name === 'node_modules' || e.name === '.next' || isSkippedFixtureDir(e.name)) continue;
     const p = path.join(dir, e.name);
     if (e.isDirectory()) walk(p, out);
     else if (/\.tsx?$/.test(e.name)) out.push(p);

@@ -20,14 +20,17 @@
 //
 // Counting caveat, so the number stays comparable with the ones above: this is the same expression
 // CLAUDE.md and the 2026-08-14 review used, over .tsx under app/ + components/. It is a proxy — it
-// also matches a `#1279`-style PR reference in a comment. Kept identical anyway, because a baseline
-// whose number cannot be reproduced from a shell is a baseline nobody will trust:
+// also matches a `#1279`-style PR reference. Comments are stripped before counting (#2557), and an
+// all-digit reference of four or more digits outside a colour position (a test name, JSX text) is
+// left out (#2652; the rule is in scripts/lib/hex-literals.js). Otherwise identical, because a
+// baseline whose number cannot be reproduced from a shell is a baseline nobody will trust:
 //   grep -rhoE '#[0-9a-fA-F]{3,8}\b' app components --include=*.tsx | wc -l
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const { resolveBaseRef, countsAtBase, verdict } = require('./lib/base-ref');
 const { stripComments } = require('./lib/strip-comments');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
 const HEX = /#[0-9a-fA-F]{3,8}\b/g;
 
@@ -129,7 +132,7 @@ function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name === 'node_modules' || entry.name === '.next') continue;
+      if (entry.name === 'node_modules' || entry.name === '.next' || isSkippedFixtureDir(entry.name)) continue;
       walk(full);
       continue;
     }

@@ -111,6 +111,7 @@ const path = require('path');
 const { toPosix } = require('./lib/repo-path');
 const { resolveBaseRef, countsAtBase, verdict } = require('./lib/base-ref');
 const { stripComments } = require('./lib/strip-comments');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 const { countInertStrict } = require('./lib/inert-strict');
 
 const ROOTS = ['app/api', 'packages/shared/src/validation'];
@@ -196,6 +197,7 @@ function countNonStrict(src) {
 // means it cannot.
 function walk(dir, hit) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (isSkippedFixtureDir(e.name)) continue;
     const p = path.join(dir, e.name);
     if (e.isDirectory()) walk(p, hit);
     else if (p.endsWith('.ts') && !p.includes('__tests__')) {
