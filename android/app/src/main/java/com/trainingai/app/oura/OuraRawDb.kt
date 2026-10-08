@@ -312,6 +312,14 @@ class OuraRawDb private constructor(private val file: File, private val db: SQLi
 
     fun markRolledUp(ringTsList: List<Long>): Int = updateByRingTs("rolled_up", ringTsList)
 
+    /**
+     * issue 2583: as [markRolledUp], but only rows the server has acknowledged (`synced = 1`).
+     * A row whose backup POST failed keeps `rolled_up = 0` until it syncs, so the flag never
+     * claims "folded on the server" for a row the server does not hold. Narrower than
+     * [markRolledUp]; the device-side rollup keeps the unfiltered one.
+     */
+    fun markRolledUpIfSynced(ringTsList: List<Long>): Int = updateByRingTs("rolled_up", ringTsList, requireSynced = true)
+
     fun markSynced(ringTsList: List<Long>): Int = updateByRingTs("synced", ringTsList)
 
     /**
@@ -384,7 +392,7 @@ class OuraRawDb private constructor(private val file: File, private val db: SQLi
 
     /** One transaction for the whole list so a partial mark can't leave rows the caller
      *  believes it consumed. Chunked to stay under SQLite's bound-parameter ceiling. */
-    private fun updateByRingTs(column: String, ringTsList: List<Long>): Int {
+    private fun updateByRingTs(column: String, ringTsList: List<Long>, requireSynced: Boolean = false): Int {
         if (ringTsList.isEmpty()) return 0
         var updated = 0
         return try {
@@ -393,7 +401,9 @@ class OuraRawDb private constructor(private val file: File, private val db: SQLi
                 ringTsList.chunked(IN_CHUNK).forEach { chunk ->
                     val placeholders = chunk.joinToString(",") { "?" }
                     db.compileStatement(
-                        "UPDATE raw SET $column = 1 WHERE $column = 0 AND ring_ts IN ($placeholders)",
+                        "UPDATE raw SET $column = 1 WHERE $column = 0 " +
+                            (if (requireSynced) "AND synced = 1 " else "") +
+                            "AND ring_ts IN ($placeholders)",
                     ).use { stmt ->
                         chunk.forEachIndexed { i, ts -> stmt.bindLong(i + 1, ts) }
                         updated += stmt.executeUpdateDelete()

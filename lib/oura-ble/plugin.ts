@@ -97,6 +97,10 @@ export interface OuraBlePlugin {
   /** Marks every row at each listed `ringTs` as rolled up. `getUnrolledRaw` never splits a
    *  ringTs across calls, so marking by timestamp can't consume an unseen row. */
   markRolledUp(opts: { ringTsList: number[] }): Promise<{ updated: number }>
+  /** issue 2583: like `markRolledUp`, but only rows the server has acknowledged (`synced = 1`).
+   *  Absent on APKs older than this build (the bridge rejects as unimplemented) — callers fall
+   *  back to `markRolledUp`. */
+  markRolledUpIfSynced?(opts: { ringTsList: number[] }): Promise<{ updated: number }>
   markSynced(opts: { ringTsList: number[] }): Promise<{ updated: number }>
   /** Deletes rolled-up AND server-backed rows older than `olderThanMs`, stopping once free
    *  disk reaches `reserveBytes`. Nothing else is ever eligible — `bodyHex` is what a future

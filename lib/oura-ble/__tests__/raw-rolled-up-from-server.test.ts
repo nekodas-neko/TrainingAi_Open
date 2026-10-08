@@ -46,7 +46,7 @@ const readRow = (r: Record<string, unknown>): OuraRawRow => ({
 })
 
 /** The bridge, over the Kotlin's own SQL. `failMarkAfter` simulates the process dying mid-pass. */
-function nativePlugin(opts: { failMarkAfter?: number } = {}) {
+function nativePlugin(opts: { failMarkAfter?: number; legacy?: boolean; unimplementedIfSynced?: boolean } = {}) {
   let markCalls = 0
   const plugin: RawStorePlugin = {
     getUnrolledRaw: vi.fn(async ({ limit = 500 } = {}) => {
@@ -73,6 +73,19 @@ function nativePlugin(opts: { failMarkAfter?: number } = {}) {
       db.exec('COMMIT')
       return { updated }
     }),
+    // issue 2583: the Kotlin's `updateByRingTs(..., requireSynced = true)` SQL.
+    markRolledUpIfSynced: vi.fn(async ({ ringTsList }) => {
+      if (opts.unimplementedIfSynced) throw Object.assign(new Error('"markRolledUpIfSynced" is not implemented on android'), { code: 'UNIMPLEMENTED' })
+      if (opts.failMarkAfter != null && markCalls >= opts.failMarkAfter) throw new Error('process died')
+      markCalls++
+      db.exec('BEGIN')
+      let updated = 0
+      for (const ts of ringTsList) {
+        updated += Number(db.prepare('UPDATE raw SET rolled_up = 1 WHERE rolled_up = 0 AND synced = 1 AND ring_ts = ?').run(ts).changes)
+      }
+      db.exec('COMMIT')
+      return { updated }
+    }),
     pruneRaw: vi.fn(async ({ olderThanMs }) => {
       const n = db.prepare(
         'DELETE FROM raw WHERE rowid IN (SELECT rowid FROM raw WHERE rolled_up = 1 AND synced = 1 AND measured_at IS NOT NULL AND measured_at < ? ORDER BY measured_at)',
@@ -86,6 +99,7 @@ function nativePlugin(opts: { failMarkAfter?: number } = {}) {
       lowDisk: false,
     })),
   }
+  if (opts.legacy) delete plugin.markRolledUpIfSynced
   return plugin
 }
 
@@ -238,16 +252,73 @@ describe('marking from the server watermark', () => {
     expect(flags()).toEqual({ 1: 1, 2: 1, 3: 1, 4: 0 })
   })
 
-  // What the bridge cannot show: the synced flag. A row whose backup never reached the server is
-  // marked when it is old enough — that is the documented gap — but the native prune still refuses
-  // it, so it is never deleted while the server lacks it.
-  it('can mark an unsynced row, and the prune still never deletes it', async () => {
+  // issue 2583: the bridge cannot show the synced flag, so the native mark filters on it.
+  it('does not mark a row the server has not acknowledged, and marks the acknowledged one', async () => {
     insert({ ringTs: 1, measuredAt: NOW - 20 * DAY, synced: 0 })
     insert({ ringTs: 2, measuredAt: NOW - 20 * DAY, synced: 1 })
-    const r = await runRawRolledUpMaintenance(deps({ watermark: W, isPruneEnabled: () => true }))
+    const d = deps({ watermark: W })
+    const r = await runRawRolledUpMaintenance(d)
+    expect(r.marked).toBe(1)
+    expect(flags()).toEqual({ 1: 0, 2: 1 })
+    expect(d.plugin!.markRolledUp).not.toHaveBeenCalled()
+  })
+
+  it('marks the unsynced row once it is acknowledged, and is idempotent', async () => {
+    insert({ ringTs: 1, measuredAt: NOW - 20 * DAY, synced: 0 })
+    insert({ ringTs: 2, measuredAt: NOW - 20 * DAY, synced: 1 })
+    await runRawRolledUpMaintenance(deps({ watermark: W }))
+    db.exec('UPDATE raw SET synced = 1')
+    const again = await runRawRolledUpMaintenance(deps({ watermark: W }))
+    expect(again.marked).toBe(1)
+    expect(flags()).toEqual({ 1: 1, 2: 1 })
+    const third = await runRawRolledUpMaintenance(deps({ watermark: W }))
+    expect(third.marked).toBe(0)
+  })
+
+  it('stops (no spin) when every candidate row is unacknowledged, and prunes none of them', async () => {
+    insert({ ringTs: 1, measuredAt: NOW - 20 * DAY, synced: 0 })
+    const d = deps({ watermark: W, isPruneEnabled: () => true })
+    const r = await runRawRolledUpMaintenance(d)
+    expect(r.marked).toBe(0)
+    expect(d.plugin!.getUnrolledRaw).toHaveBeenCalledTimes(1)
+    expect(flags()).toEqual({ 1: 0 })
+    expect(count()).toBe(1)
+  })
+
+  it('never deletes or changes a row: the raw archive keeps every body', async () => {
+    insert({ ringTs: 1, measuredAt: NOW - 20 * DAY, synced: 0 })
+    insert({ ringTs: 2, measuredAt: NOW - 20 * DAY, synced: 1 })
+    const q = 'SELECT ring_ts, tag, body_hex, measured_at, synced FROM raw ORDER BY ring_ts'
+    const before = db.prepare(q).all()
+    await runRawRolledUpMaintenance(deps({ watermark: W }))
+    expect(db.prepare(q).all()).toEqual(before)
+  })
+
+  it('on an APK without the synced-only method, falls back to the unfiltered mark; the prune still spares the unsynced row', async () => {
+    insert({ ringTs: 1, measuredAt: NOW - 20 * DAY, synced: 0 })
+    insert({ ringTs: 2, measuredAt: NOW - 20 * DAY, synced: 1 })
+    const r = await runRawRolledUpMaintenance(deps({ watermark: W, isPruneEnabled: () => true, plugin: nativePlugin({ legacy: true }) }))
     expect(r.pruned).toBe(1)
     const left = db.prepare('SELECT ring_ts, synced FROM raw').all() as { ring_ts: number; synced: number }[]
     expect(left).toEqual([{ ring_ts: 1, synced: 0 }])
+  })
+
+  it('falls back when the bridge rejects the synced-only method as unimplemented', async () => {
+    insert({ ringTs: 1, measuredAt: NOW - 20 * DAY, synced: 1 })
+    const d = deps({ watermark: W, plugin: nativePlugin({ unimplementedIfSynced: true }) })
+    const r = await runRawRolledUpMaintenance(d)
+    expect(r.error).toBeNull()
+    expect(r.marked).toBe(1)
+    expect(d.plugin!.markRolledUp).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports any other synced-only failure instead of falling back', async () => {
+    insert({ ringTs: 1, measuredAt: NOW - 20 * DAY, synced: 1 })
+    const d = deps({ watermark: W, plugin: nativePlugin({ failMarkAfter: 0 }) })
+    const r = await runRawRolledUpMaintenance(d)
+    expect(r.error).toMatch(/process died/)
+    expect(d.plugin!.markRolledUp).not.toHaveBeenCalled()
+    expect(flags()).toEqual({ 1: 0 })
   })
 
   it('pages through a store larger than one page', async () => {
