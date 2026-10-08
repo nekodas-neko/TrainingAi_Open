@@ -12,7 +12,7 @@ const USER = '00000000-0000-4000-8000-0000000023c1'
 const OTHER = '00000000-0000-4000-8000-0000000023c2'
 const LIFT = 'Unit Fix Test Lift'
 const BEFORE = '2026-03-31'
-const LBS_TO_KG = 0.45359237
+import { LBS_TO_KG } from '@trainingai/shared/workout/units'
 
 describe.skipIf(!canRun)('applyLbsToKgFix is idempotent (issue 2383)', () => {
   let pool: import('pg').Pool
