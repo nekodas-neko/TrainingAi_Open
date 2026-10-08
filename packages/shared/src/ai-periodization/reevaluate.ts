@@ -2,6 +2,7 @@ import type { AiPrescription, AiPrescriptionExercise } from '@trainingai/shared/
 import { computePerExerciseDeload, type PerExerciseDeloadInput } from './per-exercise-deload'
 import { shouldTriggerEmergencyDeload, type EmergencySignals, type EmergencyState } from './emergency-deload'
 import type { IllnessFlag } from '@trainingai/shared/health/illness-radar'
+import { recostPrescription, rowNumbersMoved, type FigureSignals } from './prescription-figures'
 
 // Cheap fresh-signals subset for consumption-day re-evaluation — deliberately NOT the full
 // 30-signal aggregation (aggregateSignals), which is too expensive to run on every
@@ -100,6 +101,10 @@ export function reevaluatePrescriptionForToday(
   signals: ReevaluationSignals,
   state: EmergencyState,
   now = new Date(),
+  // Issue 2592: the inputs `prescriptionFigures` costs a row with. Present, a deload or revert that
+  // moves a row's numbers re-costs the two whole-session figures through that one function; absent
+  // (the cheap path), the output is exactly what it was.
+  figureSignals?: FigureSignals,
 ): ReevaluationResult {
   // The 7-day window in the comment above was documented intent and nothing enforced it (Q-229):
   // `prescriptionExpiresAt` was written at generation and then only ever read to suppress
@@ -217,8 +222,13 @@ export function reevaluatePrescriptionForToday(
     return ex
   })
 
+  const moved = changed ? { ...prescription, exercises } : prescription
+  const recosted = changed && figureSignals && rowNumbersMoved(prescription.exercises, exercises)
+    ? recostPrescription(moved, figureSignals)
+    : moved
+
   return {
-    prescription: changed ? { ...prescription, exercises } : prescription,
+    prescription: recosted,
     changed,
     needsRegenerate: false,
   }

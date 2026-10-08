@@ -65,8 +65,8 @@ export interface AiPrescription {
    * the card, its pills and the time picker read these instead. Written wherever `preDeload` is
    * (the whole-session deload builder, the model path's per-exercise deload, the budget re-fit) and
    * only when some row has one. Absent — every prescription stored before this, and any with
-   * nothing to revert — the surfaces fall back to the stored figures. Consumption-day re-evaluation
-   * never needs to touch it: moving a row between deloaded and full keeps `preDeload` equal to its
+   * nothing to revert — the surfaces fall back to the stored figures. Consumption-day re-evaluation (issue 2592) re-costs the stored figures when it moves rows, but its value
+   * is unchanged by that: moving a row between deloaded and full keeps `preDeload` equal to its
    * full numbers, so the session Full trains is unchanged.
    */
   fullSession?: PrescriptionFigures

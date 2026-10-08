@@ -8,8 +8,18 @@
 
 import { estimateSessionDurationMin } from '@trainingai/shared/workout/duration-model'
 import { resolveMeasuredRestSec } from '@trainingai/shared/workout/time-profile'
-import type { PrescriptionSignals } from '@trainingai/shared/ai-periodization/signals'
-import type { AiPrescriptionExercise, PrescriptionFigures } from '@trainingai/shared/types/ai-periodization'
+import type { ExerciseTimeProfile } from '@trainingai/shared/workout/time-profile'
+import type { AiPrescription, AiPrescriptionExercise, PrescriptionFigures } from '@trainingai/shared/types/ai-periodization'
+
+/** The three per-exercise inputs a row is costed with. A full `PrescriptionSignals` satisfies it,
+ *  so does the cheap set the re-cost paths load (`loadFigureSignals`). */
+export interface FigureSignalExercise {
+  sessionExerciseId: string
+  muscleAssignments: Array<{ muscle: string; role: 'main' | 'secondary' }>
+  timeProfile: ExerciseTimeProfile | null
+  transitionSec: number
+}
+export interface FigureSignals { exercises: ReadonlyArray<FigureSignalExercise> }
 
 /** One row to cost: the shape that will be trained for one session exercise. */
 export interface FigureRow {
@@ -32,7 +42,7 @@ export interface FigureRow {
  */
 export function prescriptionFigures(
   rows: readonly FigureRow[],
-  signals: Pick<PrescriptionSignals, 'exercises'>,
+  signals: FigureSignals,
 ): PrescriptionFigures {
   const sigById = new Map(signals.exercises.map(e => [e.sessionExerciseId, e]))
 
@@ -78,4 +88,64 @@ export function rowUnderFull<T extends Pick<AiPrescriptionExercise, 'deloaded' |
  *  storing. Without one the stored figures already describe what runs. */
 export function hasFullSessionRevert(exercises: ReadonlyArray<Pick<AiPrescriptionExercise, 'deloaded' | 'preDeload'>>): boolean {
   return exercises.some(ex => ex.deloaded === true && !!ex.preDeload)
+}
+
+const NUMBERS = ['sets', 'reps', 'pct', 'restSec'] as const
+
+/** True when a row's training numbers differ between two versions of the same prescription (a
+ *  deload applied or put back). A note refresh is not a move: it changes no figure. */
+export function rowNumbersMoved(
+  before: ReadonlyArray<AiPrescriptionExercise>,
+  after: ReadonlyArray<AiPrescriptionExercise>,
+): boolean {
+  const byId = new Map(before.map(ex => [ex.sessionExerciseId, ex]))
+  return after.some(ex => {
+    const prev = byId.get(ex.sessionExerciseId)
+    return !!prev && NUMBERS.some(k => prev[k] !== ex[k])
+  })
+}
+
+/**
+ * A prescription whose rows moved between deloaded and full, with both whole-session figures costed
+ * again over the new rows through `prescriptionFigures` — no second estimate. `fullSession` is
+ * re-derived from the same rows (a no-op when only deload state moved, since `preDeload` stays
+ * equal to the full numbers) and dropped when nothing is left to revert. Returns the input
+ * untouched when the result would not be a real number, so a bad input can never store a zero or
+ * NaN where a figure was.
+ */
+export function recostPrescription(prescription: AiPrescription, signals: FigureSignals): AiPrescription {
+  const rows = prescription.exercises
+  const figures = prescriptionFigures(rows, signals)
+  const full = hasFullSessionRevert(rows) ? prescriptionFigures(rows.map(rowUnderFull), signals) : null
+  const real = (f: PrescriptionFigures) => Number.isFinite(f.estimatedSessionDurationMin) && f.estimatedSessionDurationMin > 0
+  if (!real(figures) || (full && !real(full))) return prescription
+  const { fullSession: _stale, ...rest } = prescription
+  return { ...rest, ...figures, ...(full && { fullSession: full }) }
+}
+
+/**
+ * The `Full` figures for a prescription whose stored figures do NOT cover exactly `rows` — the
+ * Workout Review apply, whose blob holds only the rows it overlays while the stored minutes are the
+ * review's projection of the WHOLE session. Costing the blob alone would undercount, so the
+ * difference `Full` makes is costed over `rows` (through `prescriptionFigures`, as everywhere) and
+ * added to the stored figures. Null when no row has anything to revert, or the result is not a real
+ * number.
+ */
+export function fullSessionAlongside(
+  rows: ReadonlyArray<AiPrescriptionExercise>,
+  stored: PrescriptionFigures,
+  signals: FigureSignals,
+): PrescriptionFigures | null {
+  if (!hasFullSessionRevert(rows)) return null
+  const asIs = prescriptionFigures(rows, signals)
+  const full = prescriptionFigures(rows.map(rowUnderFull), signals)
+  const volume: Record<string, number> = { ...stored.weeklyVolumeContribution }
+  for (const muscle of new Set([...Object.keys(asIs.weeklyVolumeContribution), ...Object.keys(full.weeklyVolumeContribution)])) {
+    const delta = (full.weeklyVolumeContribution[muscle] ?? 0) - (asIs.weeklyVolumeContribution[muscle] ?? 0)
+    if (delta !== 0) volume[muscle] = Math.max(0, (volume[muscle] ?? 0) + delta)
+  }
+  const estimatedSessionDurationMin = Math.round(
+    stored.estimatedSessionDurationMin + full.estimatedSessionDurationMin - asIs.estimatedSessionDurationMin)
+  if (!Number.isFinite(estimatedSessionDurationMin) || estimatedSessionDurationMin <= 0) return null
+  return { estimatedSessionDurationMin, weeklyVolumeContribution: volume }
 }
