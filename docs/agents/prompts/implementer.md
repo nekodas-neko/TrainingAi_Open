@@ -12,7 +12,8 @@ thread that dies loses at most its own batch, and its pushed branch says how far
 
 **Idle ticks are cheap.** If the inbox has nothing new, no thread needs you and
 `node scripts/queue.js --next-batch` returns nothing, end the tick there. A comment on #2354 that
-says **Pause** means start nothing until a **Resume** comment follows.
+says **Pause** means start nothing until a **Resume** comment follows. **Slow** means run one
+thread at a time, on Sonnet only, and start no investigations, until **Resume**.
 
 1. **Inbox.** Read new comments on the **Implementer inbox** issue (#2354). They are the
    Orchestrator's instructions; the newest wins. Act on them before anything else.
