@@ -1259,6 +1259,10 @@ export interface WorkoutRepository {
    *  35-day window — the caller must do that at least once per process before it starts narrowing,
    *  or a batch ingested before this process started could never be rolled up (Q-213). */
   aggregateOuraRawSamples(userId: string, timezone: string, opts?: { debugDate?: string; disableNeuralStager?: boolean; fullHistory?: boolean; dumpOnly?: boolean; allowStepsDecrease?: boolean; sinceDs?: number }): Promise<OuraRawAggregateResult>
+  /** Issue 2236: add the daytime-stress buckets that history never got. Add-only (never deletes or
+   *  changes a bucket, skips days that already have buckets), one transaction that rolls back unless
+   *  rows written equal rows planned. `dryRun: true` computes and returns the plan, writing nothing. */
+  backfillDaytimeStressBuckets(userId: string, timezone: string, opts: { dryRun: boolean }): Promise<import('@/lib/oura-ble/stress-backfill').StressBackfillReport>
   // Read-only dry-run for the D0 historical step backfill — no write performed. Returns every day
   // whose stored steps would actually change if `allowStepsDecrease` ran, computed the same way
   // (same pipeline, same sourceMap rank protection), so the owner can review before firing it.

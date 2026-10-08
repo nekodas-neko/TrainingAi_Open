@@ -106,6 +106,9 @@ import { runOuraRollup } from '@/lib/oura-ble/rollup/run'
 import { createPostgresRollupIO } from './rollup-io'
 import { nodeModelRuntime } from '@/lib/oura-models/inference/runtime-node'
 import { ensureServerOuraConstants } from '@/lib/oura-models/constants-inject'
+import { getDaytimeStressConstants } from '@/lib/oura-models/constants'
+import { hasDaytimeStressConstants, setDaytimeStressConstants } from '@/lib/health/daytime-stress'
+import { runStressBackfill } from '@/lib/oura-ble/stress-backfill'
 import { packOuraRawBuckets, countPackableBuckets, claimAutoPackSlot, AUTOPACK_MAX_BUCKETS } from './slices/oura-raw-pack'
 import * as bodyBattery from './slices/body-battery'
 import * as agentActions from './slices/agent-actions'
@@ -6956,6 +6959,27 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       listSleepSessions: (id, from, to) => this.listSleepSessions(id, from, to),
       caller: opts?.fullHistory ? 'rollup:full-history' : 'rollup',
     }), nodeModelRuntime, timezone, opts)
+  }
+
+  /**
+   * Issue 2236: add the daytime-stress buckets history never got, from what is stored. Add-only,
+   * dry-run by default at every caller; see `lib/oura-ble/stress-backfill.ts` for the rules. Reads
+   * the raw archive through the two-tier reader and never writes it.
+   */
+  async backfillDaytimeStressBuckets(userId: string, timezone: string, opts: { dryRun: boolean }): Promise<import('@/lib/oura-ble/stress-backfill').StressBackfillReport> {
+    // Only the daytime-stress table is needed here; reading the others would fail this on a host
+    // that lacks the steps tables for no reason of the backfill's.
+    if (!hasDaytimeStressConstants()) setDaytimeStressConstants(getDaytimeStressConstants())
+    return runStressBackfill({
+      readClockAnchors: () => this.getOuraClockAnchors(userId),
+      readRawFrames: q => readRawFrames(this.db, userId, { ...q, caller: 'stress-backfill' }),
+      readDaytimeHrvModel: () => oura.getDaytimeHrvModel(this.db, userId),
+      readDailySummaries: () => oura.getOuraDailySummary(this.db, userId, '0001-01-01', '9999-12-31'),
+      readSleepWindows: async (from, to) => (await this.listSleepSessions(userId, from, to))
+        .map(r => ({ sleepStart: r.sleepStart, sleepEnd: r.sleepEnd })),
+      readStressBucketKeys: () => oura.listDaytimeStressBucketKeys(this.db, userId),
+      addStressBuckets: rows => oura.addMissingDaytimeStressBuckets(this.db, userId, rows),
+    }, timezone, opts)
   }
 
   // Read-only dry-run for the D0 historical step backfill (`allowStepsDecrease`). Mirrors the
