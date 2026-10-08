@@ -34,6 +34,10 @@ const EXEMPT = new Set([
   // index and draws one line, so it cannot express any of that — this is the same reason the three
   // time-axis entries above are exempt rather than converted.
   'components/health/energy-timeline-chart.tsx',
+  // Issue 2152. A chart with its own axes: a y-axis with ticks, day-after-dose labels, a middle-half
+  // band (p25-p75 polygon) and a grey strip for the person's normal. The primitive draws one
+  // unlabelled line and cannot express any of it.
+  'components/nutrition/reta/heart-response-card.tsx',
   // TN-3b. x = minute-of-day on a fixed 0–1440 axis with its own hour labels, and — the part the
   // primitive cannot express at all — MANY DISJOINT PATHS. The ring records about 13 of 24 hours, so
   // the series is split at every gap and each run drawn separately; one joined line is the single way
