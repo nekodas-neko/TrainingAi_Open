@@ -7,7 +7,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 
 const ROOT = join(__dirname, '..', '..')
-const SKIP = new Set(['node_modules', '.next', '.git', 'android', 'ios', 'out', 'dist', '.claude'])
+const SKIP = new Set(['node_modules', '.next', '.git', 'android', 'ios', 'out', 'dist', '.claude', '__check_fixture__'])
 const ALLOWED = new Set([
   'components/more/sign-out-flow.tsx',   // the flow: "Sign out anyway" and a clean sync
   'lib/sign-out.ts',                     // the definition
