@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, X, Check, Loader2 } from "lucide-react";
 import { getActivityIcon, ACTIVITY_ICON_OPTIONS } from "@trainingai/shared/constants/activity-icons";
@@ -104,6 +105,8 @@ export default function ActivityTypeManager() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  // issue 2693: the trash icon used to delete on one tap; it now opens a confirm first.
+  const [pendingDelete, setPendingDelete] = useState<ActivityType | null>(null);
 
   async function load() {
     setLoading(true);
@@ -207,9 +210,10 @@ export default function ActivityTypeManager() {
                       <Button
                         size="icon"
                         variant="ghost"
+                        aria-label={`Delete ${t.label}`}
                         className="h-8 w-8 text-destructive"
                         disabled={deleting === t.id || t.id === 'other'}
-                        onClick={() => handleDelete(t.id)}
+                        onClick={() => setPendingDelete(t)}
                       >
                         {deleting === t.id
                           ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -223,6 +227,22 @@ export default function ActivityTypeManager() {
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        onOpenChange={open => { if (!open) setPendingDelete(null); }}
+        title={pendingDelete ? `Delete ${pendingDelete.label}?` : "Delete activity type?"}
+        message={pendingDelete
+          ? `${pendingDelete.label} is removed from the activity type list for every user, and it cannot be undone. If any logged activity still uses it, the delete is refused and nothing changes.`
+          : ""}
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => {
+          const t = pendingDelete;
+          setPendingDelete(null);
+          if (t) void handleDelete(t.id);
+        }}
+      />
     </div>
   );
 }
