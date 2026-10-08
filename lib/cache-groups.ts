@@ -221,6 +221,8 @@ export async function invalidateOuraSync(): Promise<void> {
     invalidateCache('bedtime-estimate'),
     // TN-46 — the overlay's other input: each night's resting HR, HRV and stored baseline.
     invalidateCache('dose-vitals:'),
+    // Issue 2152 — the reta heart-response card reads the same nights.
+    invalidateCache('reta-heart:'),
     invalidateCache('body-metadata'),
     invalidateCache('sleep-sessions'),
     invalidateCache('readiness-score'),
@@ -403,6 +405,8 @@ export async function invalidateSupplements(): Promise<void> {
     // TN-46 — a vial-dosed log is one of the two inputs to the dose/vitals overlay, so logging a
     // dose has to reach the chart that annotates it.
     invalidateCache('dose-vitals:'),
+    // Issue 2152 — a logged dose is the other input of the reta heart-response card.
+    invalidateCache('reta-heart:'),
     // #2184 — the calibrated maintenance carries a caveat naming a dose that started, stopped or
     // changed inside its window, so a supplement write has to reach the card that prints it.
     invalidateCache('energy-balance:'),

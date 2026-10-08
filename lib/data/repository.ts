@@ -1335,7 +1335,8 @@ export interface WorkoutRepository {
   /** #2184: every live dose log of ANY supplement in [from, to] (null amounts kept), and the
    *  definitions whose `stoppedOn` falls in it — the inputs to the maintenance dose-change caveat. */
   listDoseHistory(userId: string, from: string, to: string): Promise<{
-    logs: import('@trainingai/shared/health/dose-change-caveat').DoseLogEntry[]
+    /** `takenAt` (issue 2152) is an ISO instant, or null for a dose logged before the column existed. */
+    logs: (import('@trainingai/shared/health/dose-change-caveat').DoseLogEntry & { takenAt: string | null })[]
     courses: import('@trainingai/shared/health/dose-change-caveat').SupplementCourse[]
   }>
 

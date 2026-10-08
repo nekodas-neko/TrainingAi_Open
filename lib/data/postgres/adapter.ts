@@ -7830,6 +7830,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         .select({
           supplementId: s.supplementLogs.supplementId, name: s.supplements.name, date: s.supplementLogs.logDate,
           amount: s.supplementLogs.amount, unit: s.supplementLogs.unit, doseText: s.supplementLogs.doseText,
+          // Issue 2152: the moment the dose was taken, for the reta heart-response card. NULL for
+          // doses logged before the column existed (the first Retatrutide row); never back-filled.
+          takenAt: s.supplementLogs.takenAt,
         })
         .from(s.supplementLogs)
         .innerJoin(s.supplements, eq(s.supplements.id, s.supplementLogs.supplementId))
@@ -7855,6 +7858,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       logs: logRows.map(r => ({
         supplementId: r.supplementId, supplementName: r.name, date: r.date,
         amount: r.amount == null ? null : Number(r.amount), unit: r.unit, doseText: r.doseText,
+        takenAt: r.takenAt ? r.takenAt.toISOString() : null,
       })),
       courses: courseRows.map(r => ({ supplementId: r.supplementId, supplementName: r.name, stoppedOn: r.stoppedOn })),
     }
