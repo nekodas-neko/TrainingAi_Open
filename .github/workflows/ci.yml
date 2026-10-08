@@ -339,6 +339,15 @@ jobs:
         # a depth-1 checkout, so the fetch still runs and nothing about the gate changes.
         run: git rev-parse --verify --quiet origin/main >/dev/null || git fetch --depth=1 origin main || true
 
+      - name: No AI attribution in commit messages
+        # issue 2700. Checkout is depth 1 of the merge commit, so the PR's own commits are not in
+        # the clone; the script fetches exactly PR_COMMITS of them behind the PR head. The env is
+        # empty under `pnpm check:rules`, where it falls back to origin/main..HEAD.
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_COMMITS: ${{ github.event.pull_request.commits }}
+        run: node scripts/check-commit-attribution.js
+
       - name: No unresolved conflict markers
         run: node scripts/check-conflict-markers.js
 
