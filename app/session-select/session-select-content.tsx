@@ -46,7 +46,7 @@ import { mergeCalendarOverlay, readLocalCalendarOverlay } from "@/lib/calendar/l
 import { syncOuraRing } from "@/lib/oura-ble/sync";
 import { getLocalStore } from "@/lib/local-store";
 import { localSleepRowsAsNights } from "@/lib/sleep/merge-sessions";
-import { sleepReplyWithPending } from "@/lib/sleep/manual-night-view";
+import { useSleepReply } from "@/lib/sleep/use-sleep-reply";
 import { pushMutations, pullDelta, isSyncBackedOff } from "@/lib/local-store/sync-engine";
 import { PullToSync } from "@/components/pull-to-sync";
 import { TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, NEXT_SESSION_TTL, MOOD_TTL } from '@trainingai/shared/cache-ttl';
@@ -94,7 +94,6 @@ import { useBodyBattery } from "@/lib/hooks/use-body-battery";
 type HomeSleepRow = Pick<SleepRow,
   'date' | 'durationHours' | 'deepSleepHours' | 'remSleepHours' | 'lightSleepHours' | 'awakHours' | 'sleepStart' | 'sleepEnd' | 'provisional'>;
 
-
 export default function SessionSelectContent({ userId, isAdmin }: { userId?: string; isAdmin?: boolean }) {
   const router = useTransitionRouter();
   // Q-112a: the weekly reminder deep-links straight to the recap instead of landing on bare Home.
@@ -139,11 +138,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [sleepData, setSleepData] = useState<HomeSleepRow[]>([]);
-  // Issue 2667: a server reply lags this device's own manual-night writes until the outbox pushes, so
-  // a night just removed on the Sleep screen would show here again. Every reply goes through this.
-  const applySleepReply = useCallback((d: HomeSleepRow[] | null) => {
-    void sleepReplyWithPending<HomeSleepRow>(d, userId, tz).then(setSleepData);
-  }, [userId, tz]);
+  const applySleepReply = useSleepReply<HomeSleepRow>(userId, tz, setSleepData); // issue 2667: apply pending manual-night writes
   // RV-85. `readiness === null` covers two different situations — still loading, and gave up — and
   // the row rendered nothing for both. `/api/readiness-score` has no null-payload path (it answers
   // a payload or an error status), so once `fetchWithRetry` reports exhaustion, null is a failure.
@@ -782,7 +777,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
       () => cancelled,
     );
     return () => { cancelled = true; };
-  }, [userId, tz]);
+  }, [userId, tz, applySleepReply]);
 
   useEffect(() => { loadTodayMood(); }, [loadTodayMood, localDay]);
 

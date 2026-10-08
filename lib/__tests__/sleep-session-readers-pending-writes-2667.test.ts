@@ -29,7 +29,7 @@ function walk(dir: string, out: string[] = []): string[] {
 
 /** The list route itself (not `/api/sleep-sessions/manual`), or its cache entry read synchronously. */
 const READS_ROUTE = /\/api\/sleep-sessions(?![\w/-])|readCacheSync<[^>]*>\(\s*['"]sleep-sessions['"]/
-const APPLIES_PENDING = /\b(?:withPendingManualWrites|sleepReplyWithPending)\b/
+const APPLIES_PENDING = /\b(?:withPendingManualWrites|sleepReplyWithPending|useSleepReply)\b/
 
 const ALLOWED: { file: string; reason: string }[] = [
   {
