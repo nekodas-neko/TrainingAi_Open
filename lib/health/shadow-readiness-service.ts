@@ -16,7 +16,8 @@
  * - the daily step (`computed_by = 'daily'`) for today, through the route hook;
  * - {@link replayShadowReadiness} (`computed_by = 'replay'`), which back-fills past days from stored
  *   history so the comparison starts with past days. Run it with `scripts/shadow-readiness-replay.mjs`
- *   against a local database; there is deliberately no HTTP route for it.
+ *   against a local database, or the admin route `POST /api/admin/backfill-shadow-readiness`
+ *   (issue 2636), the only way to write replay rows into production.
  */
 import { getRepository } from '@/lib/data'
 import type { WorkoutRepository } from '@/lib/data/repository'

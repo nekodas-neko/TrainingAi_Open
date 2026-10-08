@@ -6,7 +6,8 @@
 //
 // Dry run unless --write. The entry point is TypeScript and imports the repository through the `@/`
 // alias, so it is bundled first with esbuild, the same way `build-rollup-worker.mjs` does it. There
-// is deliberately no HTTP route for the replay; the production comparison is read-only SQL.
+// is an admin route for production (`POST /api/admin/backfill-shadow-readiness`, issue 2636); this
+// script stays local-only, and the production comparison is read-only SQL.
 import * as esbuild from 'esbuild'
 import { mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
