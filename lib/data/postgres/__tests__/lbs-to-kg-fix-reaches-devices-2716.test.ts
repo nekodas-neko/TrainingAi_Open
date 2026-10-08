@@ -18,7 +18,6 @@ describe.skipIf(!canRun)('lbs-to-kg Apply reaches devices (issue 2716)', () => {
   let convertedSet = ''
   let untouchedLog = ''
   let untouchedSet = ''
-  let sessionId = ''
   let untouchedStamps: number[] = []
   let seededAt = 0 // the newest updated_at any seeded row carries
 
@@ -45,7 +44,7 @@ describe.skipIf(!canRun)('lbs-to-kg Apply reaches devices (issue 2716)', () => {
       `INSERT INTO users (id, email, password_hash, timezone) VALUES ($1, $2, 'x', 'Australia/Brisbane') ON CONFLICT (id) DO NOTHING`,
       [USER, `unitfix-sync-${USER}@example.com`])
     const a = await seed(LIFT, '2026-01-10T00:00:00Z', 100)
-    convertedLog = a.log; convertedSet = a.set; sessionId = a.ws
+    convertedLog = a.log; convertedSet = a.set
     const b = await seed(OTHER_LIFT, '2026-01-11T00:00:00Z', 100)
     untouchedLog = b.log; untouchedSet = b.set
     seededAt = Math.max(...await Promise.all([
