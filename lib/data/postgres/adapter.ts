@@ -1022,7 +1022,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // would otherwise be overwritten (and reassigned into this user's session) by the
       // bare-id upsert below — a cross-user row theft. exercise_logs has no user_id, so
       // ownership is via the workout_sessions join (the assertOwnership pattern).
-      const [existing] = await tx.select({ ownerId: s.workoutSessions.userId })
+      const [existing] = await tx.select({ ownerId: s.workoutSessions.userId, unitFixAppliedAt: s.exerciseLogs.unitFixAppliedAt })
         .from(s.exerciseLogs)
         .innerJoin(s.workoutSessions, eq(s.workoutSessions.id, s.exerciseLogs.workoutSessionId))
         .where(eq(s.exerciseLogs.id, clientExerciseLogId))
@@ -1031,6 +1031,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         throw new Error('exercise log not owned by user')
       }
       const isReplay = !!existing
+      // Issue 2716: the push upsert below is last-write-wins by arrival, with no `updated_at`
+      // comparison. A device that still holds the pre-conversion copy of a log (an unsynced outbox
+      // entry) would write the lbs-as-kg weights back over the corrected ones. A log the admin fix has
+      // converted therefore ignores a replayed log push: nothing is written, and the device receives
+      // the corrected values on its next pull (applyDelta overwrites `synced` rows).
+      if (existing?.unitFixAppliedAt) {
+        return { exerciseLog: { ...log, id: clientExerciseLogId, sets: [] }, setLogs: [] }
+      }
 
       // Same guard for client-supplied set ids: reject any that already exist under
       // another user's exercise log.
@@ -4268,16 +4276,21 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // Issue 2383: claim each log first, in the statement that rewrites it, and only while its
       // marker is still unset. A concurrent Apply that got there first leaves zero rows here, so this
       // one skips that log's sets instead of converting them a second time.
+      // Issue 2716: `updated_at` moves on every row converted, on the log and on each of its sets,
+      // because the delta pull cursors exercise_logs and set_logs on their own `updated_at`. The
+      // `trg_set_updated_at` trigger (migration 069) does the same on any UPDATE; it is set here too so
+      // delivery does not depend on a trigger nobody reads when editing this function.
+      const now = new Date()
       const converted: LbsToKgFixLog[] = []
       for (const log of fix.logs) {
         const claimed = await tx.update(s.exerciseLogs)
-          .set({ estimated1rm: log.newEstimated1rm, target80: log.newTarget80, volume: log.newVolume, unitFixAppliedAt: new Date() })
+          .set({ estimated1rm: log.newEstimated1rm, target80: log.newTarget80, volume: log.newVolume, unitFixAppliedAt: now, updatedAt: now })
           .where(and(eq(s.exerciseLogs.id, log.exerciseLogId), isNull(s.exerciseLogs.unitFixAppliedAt)))
           .returning({ id: s.exerciseLogs.id })
         if (claimed.length === 0) continue
         for (const set of log.sets) {
           await tx.update(s.setLogs)
-            .set({ weightKg: set.newWeightKg, intensityPct: set.newIntensityPct })
+            .set({ weightKg: set.newWeightKg, intensityPct: set.newIntensityPct, updatedAt: now })
             .where(eq(s.setLogs.id, set.id))
         }
         converted.push(log)
