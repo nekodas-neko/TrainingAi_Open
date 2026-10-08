@@ -19,7 +19,7 @@ import { metExclusionWindows, rmssdSamples, hrvMsFromSamples, nightlyHeartRate, 
 import { clampToDenseSensing } from '@/lib/sleep/sensing-span'
 import { computeDailySummaries, type NightInput } from '@trainingai/shared/health/daily-summary'
 import { computeHrv5MinSeries } from '@trainingai/shared/health/hrv-5min'
-import { computeChronicStress, chronicStressScoreToInt, usableGranularNights, CHRONIC_STRESS_MIN_DAYS, type ChronicStressNightSignals } from '@trainingai/shared/health/chronic-stress-assembly'
+import { computeChronicStress, chronicStressScoreToInt, chronicStressDiagnostics, usableGranularNights, CHRONIC_STRESS_MIN_DAYS, type ChronicStressDiagnostics, type ChronicStressNightSignals } from '@trainingai/shared/health/chronic-stress-assembly'
 import { illnessFromSummaries, illnessZScores } from '@trainingai/shared/health/illness-radar'
 import { computeSleepScore, sleepScoreBaselines } from '@trainingai/shared/health/sleep-score'
 import { computeReadinessComposite } from '@trainingai/shared/health/readiness-composite'
@@ -695,6 +695,9 @@ export async function runOuraRollup(
       console.error('[oura-ble] aggregate step failed —', msg)
     }
   }
+  // Issue 2422: why chronic stress did or did not score on this pass. Returned with the result, so a
+  // Redecode's job row (`oura_redecode_jobs.result`) keeps it without a column of its own.
+  let chronicStress: ChronicStressDiagnostics | null = null
 
   if (sleepRows.length > 0) await step('sleep', async () => {
     // Own our derived rows: delete every BLE sleep row for the wake-days we're about to
@@ -1248,6 +1251,10 @@ export async function runOuraRollup(
       const granularNights = usableGranularNights(summaryRows, chronicStressSignalsByDate)
       const res = computeChronicStress(summaryRows, chronicStressSignalsByDate)
       const score = res ? chronicStressScoreToInt(res.chronicStressScore) : null
+      // Read from the model's own per-series counts; changes nothing the model returned. Logged as
+      // well as returned because the ingest path keeps no job row.
+      chronicStress = chronicStressDiagnostics(summaryRows, chronicStressSignalsByDate, res)
+      if (chronicStress.reason !== 'scored') console.info('[oura-ble] chronic stress not scored —', JSON.stringify(chronicStress))
       await io.upsertDailyDerived(summaryRows[summaryRows.length - 1].date, {
         chronicStressGranularNights: granularNights,
         ...(res != null && score != null ? {
@@ -1290,5 +1297,6 @@ export async function runOuraRollup(
     wearDays: wearRows.length,
     stepErrors,
     debugNight,
+    chronicStress,
   }
 }

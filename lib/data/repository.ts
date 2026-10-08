@@ -119,6 +119,9 @@ export interface OuraRawAggregateResult {
   stepErrors: string[]
   /** Per-epoch staging detail for the night matching the requested `debugDate`, if any. */
   debugNight?: SleepNightDebug | null
+  /** Issue 2422: why chronic stress did or did not score. Null when the pass did not reach the
+   *  model (fewer than 21 summary rows — every routine incremental pass). */
+  chronicStress?: import('@trainingai/shared/health/chronic-stress-assembly').ChronicStressDiagnostics | null
 }
 
 /** One day the D0 historical step backfill (`allowStepsDecrease`) would change — a dry-run row, no
