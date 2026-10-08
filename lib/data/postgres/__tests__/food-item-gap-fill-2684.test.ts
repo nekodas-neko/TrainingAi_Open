@@ -15,7 +15,7 @@ const PIC2 = 'data:image/webp;base64,BBBB'
 
 describe.skipIf(!canRun)('food_items gap fill on a duplicate (issue 2684)', () => {
   let pool: import('pg').Pool
-  let repo: import('@/lib/data/repository').Repository
+  let repo: Awaited<ReturnType<typeof import('@/lib/data').getRepositoryAsync>>
 
   beforeAll(async () => {
     const { getPool } = await import('@/lib/data/postgres/client')
