@@ -642,6 +642,9 @@ jobs:
       - name: CLAUDE.md names only paths that exist
         run: node scripts/check-claude-md-paths.js
 
+      - name: Docs point at the generated withheld-columns list
+        run: node scripts/check-withheld-columns-docs.js
+
       - name: No dormant vendored model files
         run: node scripts/check-oura-models-dormancy.js
 
