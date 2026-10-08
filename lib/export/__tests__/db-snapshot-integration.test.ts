@@ -21,7 +21,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { Client, Pool } from 'pg'
 import { migrationTestLock } from '@/lib/data/postgres/__tests__/migration-test-lock'
-import { readTableColumns, checkDrift, getPrimaryKeyColumns, streamTableRows } from '../db-snapshot'
+import { readTableColumns, checkDrift, getPrimaryKeyColumns, streamTableRows, subMillisecondIso } from '../db-snapshot'
 
 const ADMIN_URL = process.env.DATABASE_URL
 const isTcpUrl = (u: string) => { try { return !!new URL(u).hostname } catch { return false } }
@@ -205,4 +205,138 @@ describe.skipIf(!canRun)('db-snapshot — against a real read-only role', () => 
       await admin.end()
     }
   }, 20_000)
+
+  /**
+   * Issue 2645. A `timestamptz` key comes back from the driver as a JS `Date` (milliseconds) while
+   * Postgres keeps microseconds, so a cursor rebuilt from the `Date` sat BELOW the real last key and
+   * the next page returned that row a second time. Here two keys differ only below the millisecond
+   * (.123456 and .123789) and the chunk size puts a page boundary between them, for two accounts
+   * that share every instant. 8 rows through chunks of 3 cross two boundaries, one of them exactly
+   * on a sub-millisecond key.
+   */
+  it('pages a timestamptz key exactly once each when keys differ only in microseconds', async () => {
+    const owner = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeee2645'
+    const other = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeee2646'
+    const admin = new Client({ connectionString: ADMIN_URL! })
+    await admin.connect()
+    try {
+      for (const [id, email] of [[owner, 'snapshot-us-owner@test.dev'], [other, 'snapshot-us-other@test.dev']]) {
+        await admin.query(
+          `INSERT INTO users (id, email, is_active) VALUES ($1, $2, true) ON CONFLICT (id) DO NOTHING`,
+          [id, email],
+        )
+      }
+      await admin.query(`ALTER ROLE ${RO_ROLE} SET app.claude_ro_owner = '${owner}'`)
+      const stamps = [
+        '2026-01-15 12:00:00.123456+00', '2026-01-15 12:00:00.123789+00', '2026-01-15 12:00:00.124000+00',
+        '2026-01-15 12:00:00.999999+00', '2026-01-15 12:00:01.000000+00', '2026-01-15 12:00:01.000001+00',
+        '2026-01-15 12:00:02.500000+00', '2026-01-15 12:00:03.000000+00',
+      ]
+      for (const [i, at] of stamps.entries()) {
+        await admin.query(
+          `INSERT INTO oura_heartrate (user_id, timestamp, bpm, source) VALUES ($1, $3, $4, 'ble'), ($2, $3, 99, 'ble')`,
+          [owner, other, at, 60 + i],
+        )
+      }
+
+      const scopedPool = new Pool({ connectionString: roUrl(), max: 1 })
+      try {
+        const pk = await getPrimaryKeyColumns(scopedPool, 'oura_heartrate')
+        for (const chunk of [1, 2, 3, 4, 7, 8, 9]) {
+          const rows: Record<string, unknown>[] = []
+          for await (const row of streamTableRows(scopedPool, 'oura_heartrate', pk, chunk)) rows.push(row)
+          expect(rows.map(r => r.bpm), `chunk ${chunk}`).toEqual(stamps.map((_, i) => 60 + i))
+          expect(rows.every(r => r.user_id === owner), `chunk ${chunk}`).toBe(true)
+          // The helper cursor columns never leak into the emitted row.
+          expect(rows.every(r => Object.keys(r).every(k => !k.startsWith('__pk')))).toBe(true)
+        }
+
+        // What is emitted: a millisecond-precision key stays the Date it always was; a key with
+        // digits below the millisecond is an ISO string that keeps them, so a restore cannot
+        // collapse two such keys into one.
+        const emitted: Record<string, unknown>[] = []
+        for await (const row of streamTableRows(scopedPool, 'oura_heartrate', pk, 3)) emitted.push(row)
+        const ts = emitted.map(r => r.timestamp)
+        expect(ts[0]).toBe('2026-01-15T12:00:00.123456Z')
+        expect(ts[1]).toBe('2026-01-15T12:00:00.123789Z')
+        expect(ts[2]).toEqual(new Date('2026-01-15T12:00:00.124Z'))
+        expect(ts[3]).toBe('2026-01-15T12:00:00.999999Z')
+        expect(ts[4]).toEqual(new Date('2026-01-15T12:00:01.000Z'))
+        expect(ts[5]).toBe('2026-01-15T12:00:01.000001Z')
+        expect(ts[6]).toEqual(new Date('2026-01-15T12:00:02.500Z'))
+
+        // Round trip: load the NDJSON-shaped rows the way scripts/local-db/snapshot.js does (bound
+        // parameters, the value as it arrives from JSON) into a copy of the table. Every row lands
+        // and no key collides.
+        const wire = JSON.parse(JSON.stringify(emitted)) as Record<string, unknown>[]
+        await admin.query('CREATE TEMP TABLE hr_restore_2645 (LIKE oura_heartrate INCLUDING ALL)')
+        const columns = Object.keys(wire[0])
+        for (const row of wire) {
+          await admin.query(
+            `INSERT INTO hr_restore_2645 (${columns.map(c => `"${c}"`).join(', ')}) VALUES (${columns.map((_, i) => `$${i + 1}`).join(', ')})`,
+            columns.map(c => row[c]),
+          )
+        }
+        const back = await admin.query(
+          `SELECT to_char(timestamp AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS.US') AS t FROM hr_restore_2645 ORDER BY timestamp`,
+        )
+        expect(back.rows.map(r => r.t)).toEqual(stamps.map(x => x.replace('+00', '').replace(/^([^.]*)$/, '$1.').padEnd(26, '0')))
+      } finally {
+        await scopedPool.end()
+      }
+    } finally {
+      await admin.query('DELETE FROM oura_heartrate WHERE user_id = ANY($1::uuid[])', [[owner, other]])
+      await admin.query('DELETE FROM users WHERE id = ANY($1::uuid[])', [[owner, other]])
+      await admin.query(`ALTER ROLE ${RO_ROLE} SET app.claude_ro_owner = 'fe481797-4114-4f59-824d-223e0281823e'`)
+      await admin.end()
+    }
+  }, 30_000)
+
+  it('pages a single-column timestamptz key (oura_daytime_stress_buckets) with microsecond keys', async () => {
+    const owner = 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeee2647'
+    const admin = new Client({ connectionString: ADMIN_URL! })
+    await admin.connect()
+    try {
+      await admin.query(
+        `INSERT INTO users (id, email, is_active) VALUES ($1, 'snapshot-us-stress@test.dev', true) ON CONFLICT (id) DO NOTHING`,
+        [owner],
+      )
+      await admin.query(`ALTER ROLE ${RO_ROLE} SET app.claude_ro_owner = '${owner}'`)
+      const pkCols = (await admin.query(
+        `SELECT a.attname FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
+          WHERE i.indrelid = 'public.oura_daytime_stress_buckets'::regclass AND i.indisprimary`,
+      )).rows.map(r => r.attname)
+      expect(pkCols.sort()).toEqual(['bucket_mid', 'user_id'])
+      const stamps = ['2026-02-01 08:00:00.000123+00', '2026-02-01 08:00:00.000456+00', '2026-02-01 08:00:00.000999+00', '2026-02-01 08:05:00+00']
+      for (const at of stamps) {
+        await admin.query(`INSERT INTO oura_daytime_stress_buckets (user_id, day, bucket_mid, level) VALUES ($1, '2026-02-01', $2, 1)`, [owner, at])
+      }
+      const scopedPool = new Pool({ connectionString: roUrl(), max: 1 })
+      try {
+        const pk = await getPrimaryKeyColumns(scopedPool, 'oura_daytime_stress_buckets')
+        const rows: Record<string, unknown>[] = []
+        for await (const row of streamTableRows(scopedPool, 'oura_daytime_stress_buckets', pk, 1)) rows.push(row)
+        expect(rows.length).toBe(4)
+      } finally {
+        await scopedPool.end()
+      }
+    } finally {
+      await admin.query('DELETE FROM oura_daytime_stress_buckets WHERE user_id = $1', [owner])
+      await admin.query('DELETE FROM users WHERE id = $1', [owner])
+      await admin.query(`ALTER ROLE ${RO_ROLE} SET app.claude_ro_owner = 'fe481797-4114-4f59-824d-223e0281823e'`)
+      await admin.end()
+    }
+  }, 30_000)
+
+  it('subMillisecondIso keeps microseconds only when there are some', () => {
+    expect(subMillisecondIso('2026-01-15 12:00:00.123456+00')).toBe('2026-01-15T12:00:00.123456Z')
+    expect(subMillisecondIso('2026-01-15 12:00:00.000001+00')).toBe('2026-01-15T12:00:00.000001Z')
+    expect(subMillisecondIso('2026-01-15 12:00:00.999999+00')).toBe('2026-01-15T12:00:00.999999Z')
+    expect(subMillisecondIso('2026-01-15 12:00:00.123000+00')).toBeNull() // millisecond precision
+    expect(subMillisecondIso('2026-01-15 12:00:00.123+00')).toBeNull()
+    expect(subMillisecondIso('2026-01-15 12:00:00+00')).toBeNull()
+    expect(subMillisecondIso('2026-01-15 22:30:00.123456+10:30')).toBe('2026-01-15T12:00:00.123456Z')
+    expect(subMillisecondIso('infinity')).toBeNull()
+    expect(subMillisecondIso('2026-01-15')).toBeNull()
+  })
 })
