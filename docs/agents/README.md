@@ -110,6 +110,13 @@ of that, the **Orchestrator can send instructions straight to a running agent** 
    The Orchestrator closes a batch milestone once it has no open issues, and keeps the queue ahead
    of the Implementer: an idle Implementer with ready issues and no open batch is the
    Orchestrator's miss.
+   **Grooming, daily (owner, 2026-10-08; weekly once the backlog is under control).** The
+   Orchestrator reads the open backlog and acts on what it finds: it closes what is already done,
+   superseded, a duplicate or stale (with the evidence: a merged PR or `file:line`), folds a
+   long-range programme's entries under one tracker, parks a someday idea with **`later`** (kept,
+   never queued; remove the label to queue it), unblocks an issue whose blocker has closed, and
+   batches what is ready. Read-only helpers may propose; only the Orchestrator applies, and a bug or
+   an owner-signed decision is never parked.
 4. The **Implementer** takes the oldest open batch (`node scripts/queue.js --next-batch`) and builds
    it as one PR; **BugFix** takes single small fixes labelled `agent: bugfix`. Either opens a draft PR with `Closes #N` when they start (that is the claim), and turn on
    auto-merge when it is ready.
