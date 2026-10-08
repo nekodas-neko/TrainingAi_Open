@@ -56,13 +56,17 @@ function startContainer() {
 }
 
 function main() {
-  for (const step of ['lint', 'check:rules', 'typecheck', 'typecheck:tests']) {
-    const c = run('pnpm', [step])
-    if (c) return c
+  // `node scripts/ci-local.mjs --role-tests-only` runs just the container phase, for re-checking
+  // the role tests without paying for the whole suite.
+  if (!process.argv.includes('--role-tests-only')) {
+    for (const step of ['lint', 'check:rules', 'typecheck', 'typecheck:tests']) {
+      const c = run('pnpm', [step])
+      if (c) return c
+    }
+    const excludes = ROLE_TESTS.flatMap(f => ['--exclude', f])
+    const suite = run('pnpm', ['exec', 'vitest', 'run', ...excludes])
+    if (suite) return suite
   }
-  const excludes = ROLE_TESTS.flatMap(f => ['--exclude', f])
-  const suite = run('pnpm', ['exec', 'vitest', 'run', ...excludes])
-  if (suite) return suite
 
   console.log(`\n[ci:local] role tests: starting throwaway ${IMAGE} "${NAME}" on port ${PORT}`)
   startContainer()
@@ -73,7 +77,7 @@ function main() {
   }
   const migrated = run('node', ['scripts/local-db/migrate.js'], env)
   if (migrated) return migrated
-  return run('pnpm', ['exec', 'vitest', 'run', ...ROLE_TESTS], env)
+  return run('pnpm', ['exec', 'vitest', 'run', '--no-file-parallelism', ...ROLE_TESTS], env)
 }
 
 let code = 1
