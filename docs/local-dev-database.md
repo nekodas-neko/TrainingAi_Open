@@ -265,6 +265,17 @@ node scripts/generate-claude-ro-views.js > lib/data/postgres/claude-ro-views.sql
 place — since BF-214 it is not a migration and takes no number). The generator emits an explicit
 column list per view, so a new column is invisible to `/api/admin/db-query` until the views are
 rebuilt, and `claude-ro-views-file.test.ts` fails until they are.
+**`pnpm ci:local` runs the two role tests on their own Postgres (issue 2144).** `claude_readonly` is
+a cluster-global role, and the shared dev cluster holds grants to it in every sibling database, so
+`claude-ro-owner-bootstrap` and `claude-ro-readonly-role` cannot `DROP ROLE` there. `scripts/ci-local.mjs`
+runs everything else as before, then starts a throwaway `postgres:16` container on port 5439
+(`CI_LOCAL_PG_PORT` to change), migrates it, runs just those two files against it, and removes it
+even on failure. Docker must be running. It never touches the shared cluster.
+
+**A Windows checkout older than `.gitattributes` (issue 2363) has CRLF in tracked files**, and tests
+that search source for `'INSERT INTO <table>\n'` fail on it. Fix once, no test change:
+`git add --renormalize . && git checkout -- .` (or re-clone).
+
 **Third blind spot, and this one is self-inflicted: applying a BRANCH's migration to the shared
 local database poisons every later run in the session.** The database outlives the checkout. Apply a
 migration that exists only on one branch, switch to another, and the schema no longer matches any
