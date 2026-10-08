@@ -170,13 +170,7 @@ describe('GET /api/readiness-score — degradation for non-ring users', () => {
     expect(readinessWrite![2].readinessSource).toBe('ble-derived')
   })
 
-  it('reports full and unlimited when a cloud readiness score is present', async () => {
-    repo.ouraDaily = [{ date: today, readinessScore: 82, temperatureDeviation: 0.1, nonWearTimeSec: 3600 }]
-
-    const d = await call()
-    expect(d.ouraScore).toBe(82)
-    expect(d.limited).toBe(false)
-    expect(d.scoreConfidence).toBe('full')
-    expect(d.inputsMissing).toEqual([])
-  })
+  // issue 2151: a "cloud readiness score present" case lived here. `oura_daily.readiness_score` is
+  // NULL on every row that can match today (frozen at the 2026-07-07 re-key), so that arm was
+  // removed and with it this test; readiness-payload-characterization-2151 pins what does run.
 })
