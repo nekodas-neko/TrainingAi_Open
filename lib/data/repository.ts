@@ -1397,6 +1397,8 @@ export interface WorkoutRepository {
   /** Has the ring ever reported? Answers "is it connected" without needing a resolvable clock
    *  anchor — see the note on the implementation for why those are different questions. */
   hasOuraBleSamples(userId: string): Promise<boolean>
+  /** Issue 2613. Whether the user has strap or Health Connect data since `since`; one EXISTS each. */
+  getRecentSourceFacts(userId: string, since: Date): Promise<{ strapHeartRate: boolean; healthConnectHeartRate: boolean; healthConnectIntervals: boolean }>
   /** Q-314 — the owner declares a deliberate ring re-key; the next ingest batch opens the epoch.
    *  Idempotent: declaring twice returns the pending one rather than queueing a second. */
   declareOuraRekey(userId: string, note: string | null): Promise<{ id: number; declaredAt: Date; alreadyPending: boolean }>

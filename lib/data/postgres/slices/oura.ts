@@ -440,6 +440,25 @@ export async function hasOuraBleSamples(db: Db, userId: string): Promise<boolean
 }
 
 /**
+ * The recent-source facts behind `connectedSources` (issue 2613): three existence checks, each a
+ * `LIMIT 1` probe scoped by `user_id` and bounded by `since`. The ring fact is `hasOuraBleSamples`, so it is
+ * not repeated here. `oura_heartrate`'s primary key leads `(user_id, timestamp)`, so the window is a
+ * range scan on the user's own rows and each check stops at its first match.
+ */
+export async function getRecentSourceFacts(db: Db, userId: string, since: Date) {
+  const hr = s.ouraHeartrate
+  const hc = s.healthConnectIntervals
+  const hrRow = (source: string) => db.select({ one: sql<number>`1` }).from(hr)
+    .where(and(eq(hr.userId, userId), gte(hr.timestamp, since), eq(hr.source, source))).limit(1)
+  const [[strap], [hcHr], [hcInterval]] = await Promise.all([
+    hrRow('chest_strap'),
+    hrRow('health_connect'),
+    db.select({ one: sql<number>`1` }).from(hc).where(and(eq(hc.userId, userId), gte(hc.startAt, since))).limit(1),
+  ])
+  return { strapHeartRate: strap != null, healthConnectHeartRate: hcHr != null, healthConnectIntervals: hcInterval != null }
+}
+
+/**
  * When the ring last recorded anything, in wall clock.
  *
  * Q-541 Task 7 / Q-534: derived from `max(ring_timestamp_ds)` through the clock anchors, not read

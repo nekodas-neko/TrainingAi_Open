@@ -369,6 +369,7 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['getLatestRedecodeJob', r => r.getLatestRedecodeJob(USER_A)],
     ['getPendingRekeyDeclaration', r => r.getPendingRekeyDeclaration(USER_A)],
     ['hasOuraBleSamples', r => r.hasOuraBleSamples(USER_A)],
+    ['getRecentSourceFacts', r => r.getRecentSourceFacts(USER_A, FROM_TS)],
     ['getLatestOuraBleMeasuredAt', r => r.getLatestOuraBleMeasuredAt(USER_A)],
     ['listOuraTags', r => r.listOuraTags(USER_A, FROM, TO)],
     ['getHrForWindow', r => r.getHrForWindow(USER_A, FROM_TS, TO_TS)],
