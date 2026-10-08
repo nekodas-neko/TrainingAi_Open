@@ -4,6 +4,7 @@ import { computeTotalDistanceKm, computeAvgPaceSecPerKm } from '@/lib/activity/a
 import { samplesInWindow } from './segment-window'
 import { formatPace } from '@trainingai/shared/health/vdot'
 import { stepsFromCadenceSeries } from '@trainingai/shared/health/cadence'
+import { summarisePacerTally, type PacerBandCounts, type PacerSegmentTally, type PacerSignal } from '@trainingai/shared/health/pacer-adherence'
 
 export interface WalkSegmentStat {
   index: number
@@ -33,6 +34,15 @@ export interface WalkSegmentStat {
    * every consumer rounding it differently.
    */
   steps: number | null
+  /**
+   * Issue 2242 (LA-48): which signal paced this segment, how often the walker was shown the in-band
+   * reading, and the band counts behind it. Counted LIVE from what the pacer displayed, never
+   * reconstructed from the binned cadence series. Absent, not 0, on a segment the pacer never judged
+   * and on every walk saved before this existed.
+   */
+  pacerSignal?: PacerSignal | null
+  pacerAdherence?: number | null
+  pacerTicks?: PacerBandCounts | null
 }
 
 function avg(nums: number[]): number | null {
@@ -57,12 +67,15 @@ export function computeWalkSegmentStats({
   hrSamples,
   rawPoints,
   cadenceSeries,
+  pacerTallies,
 }: {
   plan: IntervalPlan
   startedAtMs: number
   hrSamples: { at: number; bpm: number }[]
   rawPoints: RoutePoint[]
   cadenceSeries: { tSec: number; spm: number }[] | null
+  /** The live pacer's per-segment tally, keyed by segment index (issue 2242). Omitted on a walk with none. */
+  pacerTallies?: Record<number, PacerSegmentTally> | null
 }): WalkSegmentStat[] {
   return plan.segments.map(seg => {
     const fromMs = startedAtMs + seg.startSec * 1000
@@ -81,6 +94,8 @@ export function computeWalkSegmentStats({
       ? samplesInWindow(cadenceSeries, c => startedAtMs + c.tSec * 1000, fromMs, toMs)
       : []
 
+    const pacer = summarisePacerTally(pacerTallies?.[seg.index])
+
     return {
       index: seg.index,
       setNumber: seg.setNumber,
@@ -94,6 +109,8 @@ export function computeWalkSegmentStats({
       distanceKm,
       avgCadenceSpm: avg(cadenceInWindow.map(c => c.spm)),
       steps: stepsFromCadenceSeries(cadenceInWindow),
+      // Spread, so a segment with no pacer reading has no key at all rather than three nulls.
+      ...(pacer ?? {}),
     }
   })
 }

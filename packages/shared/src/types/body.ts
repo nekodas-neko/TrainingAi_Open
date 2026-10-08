@@ -83,6 +83,12 @@ export interface ActivityLog {
     avgPaceSecPerKm: number | null; distanceKm: number | null; avgCadenceSpm: number | null
     // LA-48. Optional because pre-2026-09-14 walks have no `steps` key — see schema.ts.
     steps?: number | null
+    // Issue 2242 (LA-48). Optional, and ABSENT (never 0) on walks saved before this and on segments the
+    // pacer never judged. Counts are seconds the walker was shown each band; adherence is derived once
+    // in `packages/shared/src/health/pacer-adherence.ts`.
+    pacerSignal?: 'cadence' | 'speed' | 'hr' | null
+    pacerAdherence?: number | null
+    pacerTicks?: { green: number; amber: number; red: number; stopped: number } | null
   }[]
   createdAt: Date
 }
