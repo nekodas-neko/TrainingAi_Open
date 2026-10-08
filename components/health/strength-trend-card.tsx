@@ -4,7 +4,7 @@ import { memo, useState } from "react";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import type { StrengthTrendEntry } from "@/app/api/strength-trend/route";
 import { Sparkline } from "@/components/ui/sparkline";
-import { projectRm } from "@trainingai/shared/health/strength-projection";
+import { projectRm, isRmPlateau } from "@trainingai/shared/health/strength-projection";
 import { displayOneRm, displayOneRmSeries, oneRmUnit } from "@trainingai/shared/1rm";
 
 interface Props {
@@ -78,7 +78,7 @@ export const StrengthTrendCard = memo(function StrengthTrendCard({ exercises, lo
               <span className="text-[10px] text-muted-foreground">
                 → ~{displayOneRm(projection.projectedRm, ex.exerciseType).value}{unitSuffix} in 30d
               </span>
-              {projection.plateau && (
+              {isRmPlateau(ex.history) && (
                 <span className="text-[9px] font-semibold rounded-full px-1.5 py-0.5 bg-amber-500/15 text-amber-500">
                   Plateau
                 </span>

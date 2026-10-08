@@ -9,7 +9,7 @@ import { sleepDurationTrend, sleepScoreTrend } from '@trainingai/shared/health/s
 import { moodMuscleMatches, normalizeMuscle } from '@trainingai/shared/muscles'
 import { sessionsRemainingThisWeek } from '@trainingai/shared/schedule-utils'
 import { volumeLandmarks } from '@trainingai/shared/ai-periodization/volume-targets'
-import { projectRm } from '@trainingai/shared/health/strength-projection'
+import { isRmPlateau } from '@trainingai/shared/health/strength-projection'
 import { oneRmTrendStatus } from '@trainingai/shared/1rm'
 import { workingBudgetMin, planningBudgetMin } from '@trainingai/shared/workout/duration-model'
 import { buildTimeProfiles, type ExerciseTimeProfile } from '@trainingai/shared/workout/time-profile'
@@ -295,7 +295,7 @@ export async function aggregateSignals(
       : ex.muscleGroups.map(mg => ({ muscle: mg, role: 'main' as const }))
 
     const rm1History = rm1Histories[ex.exerciseName] ?? []
-    const plateau = rm1History.length >= 4 ? (projectRm(rm1History)?.plateau ?? false) : false
+    const plateau = isRmPlateau(rm1History)
 
     return {
       sessionExerciseId: card.sessionExerciseId,
