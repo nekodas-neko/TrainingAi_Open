@@ -59,7 +59,12 @@ The owner wants work to continue until 90%, so the two states are:
 
 - **Slow** (status `allowed_warning`): the Orchestrator posts **Slow** on #2354. The Implementer
   runs one thread at a time, on Sonnet only, and starts no investigations. BugFix carries on as
-  normal. The Orchestrator checks every 60 minutes and starts no helpers.
+  normal. The Orchestrator checks every 60 minutes and starts no helpers. `--next-batch` serves the
+  oldest batch with ready work, so while Slow lasts the Orchestrator labels every ready issue that
+  needs Opus (engine formulas, migrations, scoring changes) or is an investigation `blocked`, with a
+  comment saying it lasts only until the reset, and keeps at least two Sonnet-sized batches open.
+  It lifts those labels when it posts **Resume**. Without this, the Implementer is served a batch it
+  may not take, and it reports an empty queue (10-08).
 - **Pause** (90% on either limit): when the owner says a limit has reached 90%, or the status goes
   past warning, the Orchestrator interrupts the sessions, stops its own helpers, posts **Pause**
   on #2354 with the reset time, and schedules its next check for just after `resetsAt`.
@@ -102,6 +107,9 @@ of that, the **Orchestrator can send instructions straight to a running agent** 
    `next`, then bugs, then the rest oldest first** — and groups 1–10 related ones (same files, same
    area) into a **milestone titled `Batch: <what it is>`**. One batch becomes one PR. A migration is
    always its own batch. The **owner** steers with the `next` label; nothing else needs his say.
+   The Orchestrator closes a batch milestone once it has no open issues, and keeps the queue ahead
+   of the Implementer: an idle Implementer with ready issues and no open batch is the
+   Orchestrator's miss.
 4. The **Implementer** takes the oldest open batch (`node scripts/queue.js --next-batch`) and builds
    it as one PR; **BugFix** takes single small fixes labelled `agent: bugfix`. Either opens a draft PR with `Closes #N` when they start (that is the claim), and turn on
    auto-merge when it is ready.
