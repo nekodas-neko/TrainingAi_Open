@@ -63,7 +63,6 @@ interface HomeCardWidgetProps {
   metaLoading: boolean
   weekToDate: { steps: number; calories: number; waterMl: number } | null
   // goals
-  calorieType: 'daily' | 'weekly'
   weightLookback: 7 | 30
   stepsGoal: number
   stepsGoalType: 'daily' | 'weekly'
@@ -88,7 +87,7 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
   const {
     sectionKey, sectionEditMode, activeCardWidgets, cardColors, onColorChange,
     metaToday, metaRecent, metaLoading, weekToDate,
-    calorieType, weightLookback, stepsGoal, stepsGoalType,
+    weightLookback, stepsGoal, stepsGoalType,
     sleepGoal, moodLog, sleepData, acwrData, muscleData, hrData, setMoodSheetOpen,
     onCorrectSleepVerdict, userId,
   } = props
@@ -132,8 +131,6 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
           color={cardColors['nutritionDonut'] ?? CARD_DEFAULT_COLORS.nutritionDonut}
           onColorChange={onColorChange}
           metaLoading={metaLoading}
-          calorieType={calorieType}
-          weekToDate={weekToDate}
           nutrCalories={nutrCalories}
           nutrProtein={nutrProtein}
           nutrCarbs={nutrCarbs}

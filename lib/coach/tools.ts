@@ -4,6 +4,7 @@ import type { WorkoutRepository } from '@/lib/data/repository'
 import { ChoiceListSchema, ChangePreviewSchema, HandoffSchema, NumberDialSchema, ChartSchema, PlanCardSchema } from './widgets'
 import { CoachPatchSchema } from './patch'
 import { COACH_SCOPES, pickTools, type CoachScope } from './scopes'
+import { ownTargetFromGoals } from '@trainingai/shared/nutrition/calorie-budget'
 import { injurySafeAlternatives } from '@trainingai/shared/workout/injury-substitution'
 
 /**
@@ -115,7 +116,9 @@ export function buildWidgetTools(
           deloadRunning: program?.earlyDeloadWeekStart != null,
           goals: {
             stepsGoal: goals.stepsGoal,
-            calorieGoal: goals.calorieGoal,
+            // Issue 2622. The user's OWN calorie target, or null when the worked-out budget rules.
+            // The retired typed goal is never shown as a calorie goal.
+            calorieGoal: ownTargetFromGoals(goals),
             waterGoalMl: goals.waterGoalMl,
           },
           macroTargets: targets
@@ -280,7 +283,14 @@ export function buildWidgetTools(
         '  ("Barbell"). That creates the exercise and swaps to it in one confirmation. Those',
         '  muscles drive deload and recovery, so give the real ones and let the user check them.',
         '· "nutrition_targets" — fields "calories", "proteinG", "carbsG", "fatG". `targetId` is null.',
+        '  "calories" here is the rest-day figure the macro grams are fitted to; it does NOT change the',
+        '  calorie budget the app shows. To change that budget, use user_goals "calorieGoal".',
         '· "user_goals" — fields "stepsGoal", "calorieGoal", "waterGoalMl". `targetId` is null.',
+        '  "calorieGoal" is the user\'s OWN daily calorie target (800-10,000 kcal): while it is set it IS',
+        '  the calorie budget on every screen, in place of the worked-out one. `from` is the current own',
+        '  target from getGoalsAndInjuries, or null when none is set; `to` null clears it back to the',
+        '  worked-out budget. Propose it only when the user asks to set or change their own target.',
+        '  Never use it to "fix" the budget: that follows their goal, weight and movement.',
         '· "injury" — fields "muscleName", "severity" ("mild"/"moderate"/"severe"), "notes",',
         '  "resolved". `targetId` is null when logging a new one, and the injury id from',
         '  getGoalsAndInjuries when marking one recovered.',

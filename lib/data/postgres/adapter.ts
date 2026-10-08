@@ -3510,7 +3510,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       stepsGoalType:   (row?.stepsGoalType   as 'daily' | 'weekly' | null) ?? null,
       sleepGoalHours:  row?.sleepGoalHours   ?? null,
       calorieGoal:     row?.calorieGoal      ?? null,
-      calorieGoalType: (row?.calorieGoalType as 'daily' | 'weekly' | null) ?? null,
+      calorieGoalType: (row?.calorieGoalType as 'daily' | 'weekly' | 'own' | null) ?? null,
       waterGoalMl:     row?.waterGoalMl      ?? null,
       waterGoalType:   (row?.waterGoalType   as 'daily' | 'weekly' | null) ?? null,
       targetWeightKg:  row?.targetWeightKg   ?? null,

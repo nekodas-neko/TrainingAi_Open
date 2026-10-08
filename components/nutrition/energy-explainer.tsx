@@ -64,7 +64,17 @@ export function EnergyExplainer({ data }: { data: EnergyBalanceResponse }) {
           in the base at all", which was true of BF-152's bare-resting-rate budget. The owner's final
           spec puts them in — the existing 20% (`SEDENTARY_MULTIPLIER − 1`) — and takes the goal's
           deficit off, so this names the chain the provenance line under the bar prints. */}
-      {budget.chain != null && (
+      {/* Issue 2622. An own target IS the budget, so the chain below (which is what the worked-out budget
+          is made of) is not printed as its make-up; this says what the number is and what it replaces. */}
+      {budget.ownTarget && (
+        <p className="text-[10px] leading-relaxed text-muted-foreground">
+          <span className="font-semibold text-foreground">Today&apos;s budget</span> is your own target of{' '}
+          {budget.total.toLocaleString()} kcal, set in Profile, Goals. It replaces the worked-out budget
+          ({budget.workedOutTotal.toLocaleString()} kcal today) on every screen, and does not grow with movement.
+        </p>
+      )}
+
+      {!budget.ownTarget && budget.chain != null && (
         <p className="text-[10px] leading-relaxed text-muted-foreground">
           <span className="font-semibold text-foreground">Today&apos;s budget</span> is your resting
           rate ({budget.chain.rmr.toLocaleString()} kcal)

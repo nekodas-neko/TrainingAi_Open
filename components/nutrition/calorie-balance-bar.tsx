@@ -92,6 +92,7 @@ export const CalorieBalanceBar = memo(function CalorieBalanceBar({ data, isToday
         restingRateKcal={b.restingRateKcal}
         deficitKcal={b.deficitKcal}
         stepCreditKcal={b.stepCreditKcal}
+        ownTargetKcal={b.ownTargetKcal}
         workoutKcal={data.activeBreakdown.workoutKcal}
         activityKcal={data.activeBreakdown.activityKcal}
         stepsKcal={data.activeBreakdown.stepsKcal}

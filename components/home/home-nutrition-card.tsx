@@ -14,8 +14,6 @@ interface Props {
   color: string
   onColorChange: (key: string, hex: string) => void
   metaLoading: boolean
-  calorieType: 'daily' | 'weekly'
-  weekToDate: { steps: number; calories: number; waterMl: number } | null
   nutrCalories: number | null
   nutrProtein: number | null
   nutrCarbs: number | null
@@ -39,7 +37,6 @@ interface Props {
  */
 export function HomeNutritionCard({
   sectionEditMode, color, onColorChange, metaLoading,
-  calorieType, weekToDate,
   nutrCalories, nutrProtein, nutrCarbs, nutrFat,
 }: Props) {
   const router = useRouter()
@@ -50,11 +47,8 @@ export function HomeNutritionCard({
   // which put a number the user typed once on screen as the day's budget — #2160's mismatch. Without
   // the payload the ring shows "…" and no denominator, as it already did while loading.
   const dailyBudget = balance ? budgetProvenance(balance).total : null
-  const isWeekly = calorieType === 'weekly'
-  const goalDisplay = isWeekly && dailyBudget ? dailyBudget * 7 : dailyBudget
-  const consumedDisplay = isWeekly ? (weekToDate?.calories ?? 0) : nutrCalories
-  // The ring always reads TODAY, even when the header shows the weekly total — a weekly goal is a
-  // budget for seven days and sweeping it with one day's intake would read as barely started.
+  // Issue 2622. The Daily/Weekly switch is retired: the budget is a day's, so the header and the
+  // ring both read today.
   const overUnder = dailyBudget != null ? dailyBudget - (nutrCalories ?? 0) : null
   const eatenPct = dailyBudget != null && dailyBudget > 0
     ? Math.min(100, Math.round(((nutrCalories ?? 0) / dailyBudget) * 100))
@@ -109,8 +103,8 @@ export function HomeNutritionCard({
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline justify-between mb-1">
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Nutrition{isWeekly ? ' (week)' : ''}</p>
-            {goalDisplay && <p className="text-xs text-muted-foreground">{(consumedDisplay ?? 0).toLocaleString()} / {goalDisplay.toLocaleString()} kcal</p>}
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Nutrition</p>
+            {dailyBudget && <p className="text-xs text-muted-foreground">{(nutrCalories ?? 0).toLocaleString()} / {dailyBudget.toLocaleString()} kcal</p>}
           </div>
           {/* Q-401: the gradient progress fill that used to be here measured "how full is the
               tank" against a fixed target. The zone bar measures "am I on target" against a

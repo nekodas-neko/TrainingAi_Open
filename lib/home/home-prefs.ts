@@ -56,6 +56,15 @@ export const STEPS_GOAL_TYPE_KEY = "ta_steps_goal_type";
 export const SLEEP_GOAL_KEY      = "ta_sleep_goal_hours";
 export const CALORIE_GOAL_KEY    = "ta_calorie_goal_kcal";
 export const CALORIE_TYPE_KEY    = "ta_calorie_goal_type";
+/** Issue 2622. Drops the device copy of the calorie goal and its own-target flag after a write that did
+ *  not go through the Goals screen (Coach). The next read comes from the server payload, which
+ *  `hydrateGoalSeeds` re-seeds; a stale pair here would read as the wrong override on first paint. */
+export function clearCalorieGoalSeeds(): void {
+  try {
+    localStorage.removeItem(CALORIE_GOAL_KEY);
+    localStorage.removeItem(CALORIE_TYPE_KEY);
+  } catch { /* private mode */ }
+}
 export const WATER_GOAL_KEY      = "ta_water_goal_ml";
 export const WATER_GOAL_TYPE_KEY = "ta_water_goal_type";
 export const TARGET_WEIGHT_KEY   = "ta_target_weight_kg";
@@ -81,7 +90,7 @@ export interface GoalSeedValues {
   stepsGoalType: "daily" | "weekly" | null;
   sleepGoalHours: number | null;
   calorieGoal: number | null;
-  calorieGoalType: "daily" | "weekly" | null;
+  calorieGoalType: "daily" | "weekly" | "own" | null;
   waterGoalMl: number | null;
   waterGoalType: "daily" | "weekly" | null;
   targetWeightKg: number | null;
@@ -121,20 +130,6 @@ export function loadCardWidgets(): CardWidgetKey[] {
     const raw = typeof window !== "undefined" ? localStorage.getItem(CARD_WIDGETS_KEY) : null;
     return raw ? JSON.parse(raw) : DEFAULT_CARD_WIDGETS;
   } catch { return DEFAULT_CARD_WIDGETS; }
-}
-
-export function loadCalorieGoal(): number | null {
-  try {
-    const raw = typeof window !== "undefined" ? localStorage.getItem(CALORIE_GOAL_KEY) : null;
-    return raw ? Number(raw) : null;
-  } catch { return null; }
-}
-
-export function loadCalorieType(): "daily" | "weekly" {
-  try {
-    const raw = typeof window !== "undefined" ? localStorage.getItem(CALORIE_TYPE_KEY) : null;
-    return raw === "weekly" ? "weekly" : "daily";
-  } catch { return "daily"; }
 }
 
 export function loadWeightLookback(): 7 | 30 {
