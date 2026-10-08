@@ -45,7 +45,7 @@ async function budgetFromRoute(page: Page) {
   expect(res.ok(), 'energy-balance route must answer').toBeTruthy()
   const body = await res.json()
   expect(body.balance, 'the seeded profile must be complete enough to produce a balance').toBeTruthy()
-  const { restingBaseKcal, targetNetKcal, activeKcal, intakeKcal } = body.balance
+  const { activeKcal, intakeKcal } = body.balance
   const earned = Math.round(activeKcal)
 
   // LB-100. This used to re-derive the budget as `restingBase + targetNet + earned`. That was a
@@ -65,8 +65,14 @@ async function budgetFromRoute(page: Page) {
   // — what both surfaces printed before the budget was anchored — not the anchor itself, which is now
   // what the budget IS. Written the old way this asserted the fixture must differ from the correct
   // answer, so it would have started failing for being right.
-  expect(total, 'fixture must separate the real budget from the pre-anchor expression')
-    .not.toBe(Math.round(restingBaseKcal + targetNetKcal) + earned)
+  // Issue 2071: the old discriminator (`restingBase + targetNet + earned`) can no longer separate
+  // anything. The owner's budget is RMR − deficit + (20% of RMR − step credit) + movement, which is
+  // built from the same terms as `restingBase` (RMR scaled up, less the step credit) and `targetNet`
+  // (the deficit), so on an unfloored day the two coincide (both read 2,804 on this fixture).
+  // What a reverted `budgetProvenance` would print is the BF-152 budget — the bare resting rate
+  // plus movement — so that is what the fixture must be separated from.
+  expect(total, 'fixture must separate the real budget from the BF-152 one (resting rate + movement)')
+    .not.toBe(Math.round(body.balance.restingRateKcal) + earned)
 
   return { total, earned, intakeKcal: Math.round(intakeKcal), scaled: body.macroTargets.scaled }
 }
