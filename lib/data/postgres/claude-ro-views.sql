@@ -1389,6 +1389,7 @@ SELECT
   t.name,
   t.created_at,
   t.servings,
+  t.meal_types_seeded,
   octet_length(t.image_data_uri) AS image_bytes
 FROM public.saved_meals t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
