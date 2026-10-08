@@ -26,6 +26,8 @@ export async function GET() {
   );
 
   const merged = mergeByDate(rows.map(r => ({
+    // Issue 2338: the entry card removes a hand-entered night by this id.
+    id:              r.id,
     date:            r.date,
     ouraId:          r.ouraId          ?? null,
     durationHours:   r.durationHours   ?? null,

@@ -133,7 +133,6 @@ const BASELINE = {
 
   // Unmount on navigate — their next mount refetches, same category as the block above.
   'app/health/heart-rate/page.tsx': 1,                       // route
-  'app/health/sleep/sleep-content.tsx': 1,                   // route
   'app/year-review/year-review-content.tsx': 1,              // route
   'components/more/details/performance-overview-section.tsx': 1, // route
   'components/fitness-tests/latest-baseline-card.tsx': 1,    // inside /baselines
