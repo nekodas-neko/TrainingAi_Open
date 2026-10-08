@@ -3277,16 +3277,36 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    */
   async deleteManualSleepNight(userId: string, id: string): Promise<'removed' | 'already_removed' | 'not_manual' | 'not_found'> {
     const now = new Date()
-    const removed = await this.db.update(s.sleepSessions)
-      .set({ deletedAt: now, updatedAt: now })
-      .where(and(
-        eq(s.sleepSessions.id, id),
-        eq(s.sleepSessions.userId, userId),
-        eq(s.sleepSessions.manualEntry, true),
-        isNull(s.sleepSessions.deletedAt),
-      ))
-      .returning({ id: s.sleepSessions.id })
-    if (removed.length === 1) return 'removed'
+    // Issue 2660: the tombstone and the stored sleep score for its wake date go in ONE transaction,
+    // so a removed night never leaves a score behind (and a failed clear never leaves a half removal).
+    const removed = await this.db.transaction(async tx => {
+      const hit = await tx.update(s.sleepSessions)
+        .set({ deletedAt: now, updatedAt: now })
+        .where(and(
+          eq(s.sleepSessions.id, id),
+          eq(s.sleepSessions.userId, userId),
+          eq(s.sleepSessions.manualEntry, true),
+          isNull(s.sleepSessions.deletedAt),
+        ))
+        .returning({ id: s.sleepSessions.id, date: s.sleepSessions.date })
+      if (hit.length !== 1) return false
+      // Only when no other live night (a device night or another typed one) remains on that wake
+      // date: the score then belongs to that night and the next read recomputes it. Only the two
+      // sleep columns are cleared; readiness, the verdicts and every other derived column record
+      // what the app said or are not about this night. `updated_at` moves so the delta pull carries
+      // the null to the device (its apply writes every column as sent).
+      await tx.update(s.ouraDailyDerived)
+        .set({ sleepScore: null, sleepContributors: null, updatedAt: now })
+        .where(and(
+          eq(s.ouraDailyDerived.userId, userId),
+          eq(s.ouraDailyDerived.day, hit[0].date),
+          or(isNotNull(s.ouraDailyDerived.sleepScore), isNotNull(s.ouraDailyDerived.sleepContributors)),
+          sql`NOT EXISTS (SELECT 1 FROM sleep_sessions o WHERE o.user_id = ${userId}
+                AND o.date = ${hit[0].date} AND o.deleted_at IS NULL)`,
+        ))
+      return true
+    })
+    if (removed) return 'removed'
     const [row] = await this.db
       .select({ manualEntry: s.sleepSessions.manualEntry, deletedAt: s.sleepSessions.deletedAt })
       .from(s.sleepSessions)
