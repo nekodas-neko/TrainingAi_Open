@@ -103,6 +103,25 @@ describe.skipIf(!canRun)('food_items.image_data_uri (BF-35)', () => {
     expect(rows[0].image_data_uri).toBe(TINY_PNG)
   })
 
+  // Issue 2219. The payload shape `logFoodEntries` queues for a scan: a NON-NULL barcode and picture
+  // must land in the row, and then travel down the pull delta to the device.
+  it('a scan payload lands with a non-null barcode and image, and the delta returns both', async () => {
+    const id = crypto.randomUUID()
+    await repo.pushMutations(USER, [{
+      id: crypto.randomUUID(), domain: 'food_items', date: '2026-03-01',
+      payload: { ...base, id, barcode: '9300675024235', imageDataUri: TINY_PNG },
+    }] as never)
+    const { rows } = await pool.query(
+      `SELECT barcode, image_data_uri FROM food_items WHERE id = $1`, [id])
+    expect(rows[0].barcode).toBe('9300675024235')
+    expect(rows[0].image_data_uri).toBe(TINY_PNG)
+    const delta = await repo.getSyncDelta(USER, new Date(Date.now() - 60_000)) as
+      { foodItems?: { id: string; barcode?: string | null; imageDataUri?: string | null }[] }
+    const synced = delta.foodItems?.find(f => f.id === id)
+    expect(synced?.barcode).toBe('9300675024235')
+    expect(synced?.imageDataUri).toBe(TINY_PNG)
+  })
+
   // Zod `.optional()` alone rejects null, and the local mirror stores null for "no picture" — that
   // exact mismatch broke every food save in v1.42.4.
   it('the push branch accepts an explicit null image', async () => {
