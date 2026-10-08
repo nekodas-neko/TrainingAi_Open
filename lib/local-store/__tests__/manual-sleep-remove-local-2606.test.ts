@@ -170,3 +170,40 @@ describe('entering a removed night again', () => {
     expect(all(`SELECT deleted_at IS NOT NULL AS removed FROM sleep_sessions WHERE id=?`, NIGHT.id)).toEqual([{ removed: 1 }])
   })
 })
+
+// Issue 2660 — the stored sleep score for a removed night's wake date goes with it, offline too.
+describe('the stored sleep score and a removed night', () => {
+  const seedDerived = (day: string) => local.db!.exec(
+    `INSERT INTO oura_daily_derived (day, sleep_score, sleep_contributors, readiness_score, updated_at, sync_status)
+     VALUES ('${day}', 81, '{"x":1}', 77, '2026-10-07T00:00:00.000Z', 'synced')`)
+  const derived = (day: string) => all(`SELECT sleep_score, sleep_contributors, readiness_score FROM oura_daily_derived WHERE day=?`, day)
+
+  it('clears both sleep columns when no other night is left on the date, and nothing else', async () => {
+    await store().upsertManualSleepLocally(NIGHT)
+    seedDerived(DATE)
+    await store().removeManualSleepLocally(NIGHT.id)
+    expect(derived(DATE)).toEqual([{ sleep_score: null, sleep_contributors: null, readiness_score: 77 }])
+  })
+
+  it('clears nothing while a device night remains on the date', async () => {
+    seedDerived('2026-10-01') // old-ring (device) is on this date
+    local.db!.exec(`INSERT INTO sleep_sessions (id, date, duration_hours, manual_entry, updated_at, sync_status)
+      VALUES ('typed-same-day', '2026-10-01', 1, 1, '2026-10-01T22:00:00.000Z', 'synced')`)
+    await store().removeManualSleepLocally('typed-same-day')
+    expect(derived('2026-10-01')).toEqual([{ sleep_score: 81, sleep_contributors: '{"x":1}', readiness_score: 77 }])
+  })
+
+  it('a device night is refused and its date keeps the score', async () => {
+    seedDerived('2026-10-01')
+    expect(await store().removeManualSleepLocally('old-ring')).toBeNull()
+    expect(derived('2026-10-01')[0].sleep_score).toBe(81)
+  })
+
+  it('a pull carries the server null over a stale local score (applyDelta writes the columns as sent)', async () => {
+    seedDerived(DATE)
+    await store().applyDelta({ ouraDailyDerived: [{
+      day: DATE, sleepScore: null, sleepContributors: null, readinessScore: 77, updatedAt: '2026-10-08T00:00:00.000Z',
+    } as never] })
+    expect(derived(DATE)).toEqual([{ sleep_score: null, sleep_contributors: null, readiness_score: 77 }])
+  })
+})

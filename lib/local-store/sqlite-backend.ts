@@ -679,6 +679,16 @@ export class SQLiteLocalStore implements LocalStore {
         WHERE id=? AND manual_entry=1`,
       [now, now, id],
     );
+    // Issue 2660: the stored sleep score for that wake date belonged to the night, so with no other
+    // live night on the date it goes too (offline: Remove must not leave the stale score showing).
+    // Only the two sleep columns; `updated_at`/`sync_status` stay, so the server's cleared copy
+    // (newer) still applies on the next pull.
+    await runSQL(
+      `UPDATE oura_daily_derived SET sleep_score=NULL, sleep_contributors=NULL
+        WHERE day=? AND (sleep_score IS NOT NULL OR sleep_contributors IS NOT NULL)
+          AND NOT EXISTS (SELECT 1 FROM sleep_sessions WHERE date=? AND deleted_at IS NULL)`,
+      [String(row.date), String(row.date)],
+    );
     return String(row.date);
   }
 

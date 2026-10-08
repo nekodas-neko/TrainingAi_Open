@@ -91,15 +91,81 @@ describe.skipIf(!canRun)('readiness after a typed night is removed (issue 2606)'
     expect(await manual('DELETE', { id })).toMatchObject({ removed: true })
     const after = JSON.parse(await readiness())
     // Every field the readiness read computes is back where it was. The one difference is not a
-    // score: while the night existed the route PERSISTED its scores into oura_daily_derived for
-    // today, and `ownResilienceUnavailable.daysSeen` counts that stored row. Whether a removal should
-    // also clear the stored sleep score is an owner question (issue 2660); this pins today's state so
-    // a fix for it announces itself here.
+    // score: while the night existed the route PERSISTED today's row into oura_daily_derived, and
+    // `ownResilienceUnavailable.daysSeen` counts that stored row (readiness is deliberately kept:
+    // it records what the app said). The stored SLEEP score and contributors were the night's, and
+    // issue 2660 clears them in the same write as the removal.
     expect(after.ownResilienceUnavailable.daysSeen).toBe(before.ownResilienceUnavailable.daysSeen + 1)
     expect({ ...after, ownResilienceUnavailable: null }).toEqual({ ...before, ownResilienceUnavailable: null })
     const { rows: [stored] } = await pool.query(
+      `SELECT sleep_score, sleep_contributors, readiness_score FROM oura_daily_derived WHERE user_id = $1 AND day = $2`, [NO_DEVICE, TODAY])
+    expect(stored.sleep_score).toBeNull()
+    expect(stored.sleep_contributors).toBeNull()
+    expect(stored.readiness_score).not.toBeNull()
+
+    // A later read for a date that now has no night does not refill the score from the COALESCE
+    // merge, and the row still carries the readiness it recorded.
+    await readiness()
+    const { rows: [again] } = await pool.query(
+      `SELECT sleep_score, sleep_contributors, readiness_score FROM oura_daily_derived WHERE user_id = $1 AND day = $2`, [NO_DEVICE, TODAY])
+    expect(again).toEqual(stored)
+
+    // Entering the night again and reading recomputes the stored score.
+    await manual('POST', { sleepStart: BED, sleepEnd: WAKE })
+    const reentered = JSON.parse(await readiness())
+    expect(reentered.sleepScore).toBe(entered.sleepScore)
+    const { rows: [back] } = await pool.query(
       `SELECT sleep_score FROM oura_daily_derived WHERE user_id = $1 AND day = $2`, [NO_DEVICE, TODAY])
-    expect(stored?.sleep_score).toBe(entered.sleepScore)
+    expect(back.sleep_score).toBe(entered.sleepScore)
+  })
+
+  it('removal leaves the verdict row byte-equal and clears only the sleep columns', async () => {
+    const U = '00000000-0000-4000-8000-000000002661'
+    await pool.query('DELETE FROM users WHERE id = $1', [U])
+    await pool.query(`INSERT INTO users (id, email, password_hash, timezone) VALUES ($1,$2,'x',$3)`, [U, 'clear-2660@example.com', TZ])
+    try {
+      asUser(U)
+      const { id } = await manual('POST', { sleepStart: BED, sleepEnd: WAKE })
+      await pool.query(
+        `INSERT INTO oura_daily_derived (user_id, day, sleep_score, sleep_contributors, readiness_score, activity_score, source)
+         VALUES ($1,$2,81,'{"x":1}'::jsonb,77,66,'t')`, [U, TODAY])
+      await pool.query(
+        `INSERT INTO sleep_verdicts (user_id, date, verdict, baseline_nights, model_version, response_state)
+         VALUES ($1,$2,'good',20,1,'acknowledged')`, [U, TODAY])
+      const verdictSql = `SELECT to_jsonb(v) AS row FROM sleep_verdicts v WHERE user_id = $1`
+      const verdictBefore = (await pool.query(verdictSql, [U])).rows[0].row
+      expect(await manual('DELETE', { id })).toMatchObject({ removed: true })
+      const { rows: [d] } = await pool.query(
+        `SELECT sleep_score, sleep_contributors, readiness_score, activity_score, source FROM oura_daily_derived WHERE user_id = $1 AND day = $2`, [U, TODAY])
+      expect(d).toEqual({ sleep_score: null, sleep_contributors: null, readiness_score: 77, activity_score: 66, source: 't' })
+      expect((await pool.query(verdictSql, [U])).rows[0].row).toEqual(verdictBefore)
+      // A replay changes nothing: no second write, so updated_at does not move.
+      const stamp = async () => (await pool.query(`SELECT updated_at FROM oura_daily_derived WHERE user_id = $1 AND day = $2`, [U, TODAY])).rows[0].updated_at.getTime()
+      const t0 = await stamp()
+      expect(await manual('DELETE', { id })).toMatchObject({ alreadyRemoved: true })
+      expect(await stamp()).toBe(t0)
+    } finally {
+      await pool.query('DELETE FROM users WHERE id = $1', [U])
+    }
+  })
+
+  it('removal clears nothing for another user\'s row on the same date', async () => {
+    const A = '00000000-0000-4000-8000-000000002662'
+    const B = '00000000-0000-4000-8000-000000002663'
+    for (const u of [A, B]) {
+      await pool.query('DELETE FROM users WHERE id = $1', [u])
+      await pool.query(`INSERT INTO users (id, email, password_hash, timezone) VALUES ($1,$2,'x',$3)`, [u, `clear-2660-${u}@example.com`, TZ])
+      await pool.query(`INSERT INTO oura_daily_derived (user_id, day, sleep_score) VALUES ($1,$2,70)`, [u, TODAY])
+    }
+    try {
+      asUser(A)
+      const { id } = await manual('POST', { sleepStart: BED, sleepEnd: WAKE })
+      await manual('DELETE', { id })
+      const { rows } = await pool.query(`SELECT user_id, sleep_score FROM oura_daily_derived WHERE user_id = ANY($1) ORDER BY user_id`, [[A, B]])
+      expect(rows).toEqual([{ user_id: A, sleep_score: null }, { user_id: B, sleep_score: 70 }])
+    } finally {
+      await pool.query('DELETE FROM users WHERE id = ANY($1)', [[A, B]])
+    }
   })
 
   it('with a ring: entering and removing the shadowed typed night never moves the score', async () => {
@@ -113,7 +179,13 @@ describe.skipIf(!canRun)('readiness after a typed night is removed (issue 2606)'
     const { id, shadowed } = await manual('POST', { sleepStart: BED, sleepEnd: WAKE })
     expect(shadowed).toBe(true)
     expect(await readiness()).toBe(before)
+    const storedRow = async () => (await pool.query(
+      `SELECT sleep_score, sleep_contributors FROM oura_daily_derived WHERE user_id = $1 AND day = $2`, [WITH_RING, TODAY])).rows[0]
+    const kept = await storedRow()
+    expect(kept.sleep_score).not.toBeNull()
     await manual('DELETE', { id })
     expect(await readiness()).toBe(before)
+    // The ring's own night remains on the date, so the stored score is not cleared (issue 2660).
+    expect(await storedRow()).toEqual(kept)
   })
 })
