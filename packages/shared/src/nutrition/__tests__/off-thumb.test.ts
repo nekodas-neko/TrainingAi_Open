@@ -35,13 +35,13 @@ describe('OFF_FIELDS', () => {
 describe('fetchOffThumbDataUri', () => {
   it('returns a data URI carrying the response content type', async () => {
     mockFetch(ok(jpegBytes(64)))
-    const out = await fetchOffThumbDataUri('https://off/x.jpg', CAP)
+    const out = await fetchOffThumbDataUri('https://images.openfoodfacts.org/x.jpg', CAP)
     expect(out).toMatch(/^data:image\/jpeg;base64,/)
   })
 
   it('round-trips the bytes it was given', async () => {
     mockFetch(ok(new Uint8Array([1, 2, 3, 250])))
-    const out = await fetchOffThumbDataUri('https://off/x.jpg', CAP)
+    const out = await fetchOffThumbDataUri('https://images.openfoodfacts.org/x.jpg', CAP)
     const b64 = out!.split(',')[1]
     expect([...atob(b64)].map(c => c.charCodeAt(0))).toEqual([1, 2, 3, 250])
   })
@@ -55,36 +55,36 @@ describe('fetchOffThumbDataUri', () => {
 
   it('is null on a non-2xx', async () => {
     mockFetch({ ok: false, headers: new Headers(), arrayBuffer: async () => new ArrayBuffer(0) })
-    expect(await fetchOffThumbDataUri('https://off/x.jpg', CAP)).toBeNull()
+    expect(await fetchOffThumbDataUri('https://images.openfoodfacts.org/x.jpg', CAP)).toBeNull()
   })
 
   // OFF serving an HTML error page is the realistic version of this, and storing it as an image
   // would put a broken tile on the row forever.
   it('is null when the body is not an image', async () => {
     mockFetch(ok(jpegBytes(64), 'text/html'))
-    expect(await fetchOffThumbDataUri('https://off/x.jpg', CAP)).toBeNull()
+    expect(await fetchOffThumbDataUri('https://images.openfoodfacts.org/x.jpg', CAP)).toBeNull()
   })
 
   it('tolerates a charset on the content type', async () => {
     mockFetch(ok(jpegBytes(64), 'image/jpeg; charset=binary'))
-    expect(await fetchOffThumbDataUri('https://off/x.jpg', CAP)).not.toBeNull()
+    expect(await fetchOffThumbDataUri('https://images.openfoodfacts.org/x.jpg', CAP)).not.toBeNull()
   })
 
   it('is null over the cap, and fine at exactly the cap', async () => {
     mockFetch(ok(jpegBytes(CAP + 1)))
-    expect(await fetchOffThumbDataUri('https://off/x.jpg', CAP)).toBeNull()
+    expect(await fetchOffThumbDataUri('https://images.openfoodfacts.org/x.jpg', CAP)).toBeNull()
     mockFetch(ok(jpegBytes(CAP)))
-    expect(await fetchOffThumbDataUri('https://off/x.jpg', CAP)).not.toBeNull()
+    expect(await fetchOffThumbDataUri('https://images.openfoodfacts.org/x.jpg', CAP)).not.toBeNull()
   })
 
   it('is null on an empty body', async () => {
     mockFetch(ok(new Uint8Array(0)))
-    expect(await fetchOffThumbDataUri('https://off/x.jpg', CAP)).toBeNull()
+    expect(await fetchOffThumbDataUri('https://images.openfoodfacts.org/x.jpg', CAP)).toBeNull()
   })
 
   // The one that matters most: a thrown fetch must not propagate into the food save.
   it('swallows a thrown fetch rather than rejecting', async () => {
     mockFetch(new Error('ECONNRESET'))
-    await expect(fetchOffThumbDataUri('https://off/x.jpg', CAP)).resolves.toBeNull()
+    await expect(fetchOffThumbDataUri('https://images.openfoodfacts.org/x.jpg', CAP)).resolves.toBeNull()
   })
 })
