@@ -4268,16 +4268,21 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // Issue 2383: claim each log first, in the statement that rewrites it, and only while its
       // marker is still unset. A concurrent Apply that got there first leaves zero rows here, so this
       // one skips that log's sets instead of converting them a second time.
+      // Issue 2716: `updated_at` moves on every row converted, on the log and on each of its sets,
+      // because the delta pull cursors exercise_logs and set_logs on their own `updated_at`. The
+      // `trg_set_updated_at` trigger (migration 069) does the same on any UPDATE; it is set here too so
+      // delivery does not depend on a trigger nobody reads when editing this function.
+      const now = new Date()
       const converted: LbsToKgFixLog[] = []
       for (const log of fix.logs) {
         const claimed = await tx.update(s.exerciseLogs)
-          .set({ estimated1rm: log.newEstimated1rm, target80: log.newTarget80, volume: log.newVolume, unitFixAppliedAt: new Date() })
+          .set({ estimated1rm: log.newEstimated1rm, target80: log.newTarget80, volume: log.newVolume, unitFixAppliedAt: now, updatedAt: now })
           .where(and(eq(s.exerciseLogs.id, log.exerciseLogId), isNull(s.exerciseLogs.unitFixAppliedAt)))
           .returning({ id: s.exerciseLogs.id })
         if (claimed.length === 0) continue
         for (const set of log.sets) {
           await tx.update(s.setLogs)
-            .set({ weightKg: set.newWeightKg, intensityPct: set.newIntensityPct })
+            .set({ weightKg: set.newWeightKg, intensityPct: set.newIntensityPct, updatedAt: now })
             .where(eq(s.setLogs.id, set.id))
         }
         converted.push(log)
