@@ -26,6 +26,7 @@ import { WalkPacerBar } from './walk-pacer-bar'
 import { PhaseChangeFlash } from './phase-change-flash'
 import { shouldCuePhaseChange, phaseCueHaptic } from '@/lib/walk/walk-phase-cue'
 import { resolveCadenceTargets, speedTargetsFromHistory } from '@/lib/walk/walk-pacer'
+import type { PacerSignal, PacerBand as PaceBand } from '@trainingai/shared/health/pacer-adherence'
 
 const ActivityRouteMap = dynamic(
   () => import('@/components/activity/activity-route-map').then(m => m.ActivityRouteMap),
@@ -244,6 +245,12 @@ export function WalkActive({ userProfile, onFinish, onDiscard }: {
     cuedIndexRef.current = segmentIndex
   }, [segmentIndex, kind, phaseColor])
 
+  // Issue 2242: the pacer bar reports what it showed, once a second, into the persisted store.
+  // `getState()` rather than a selector: a tick must not re-render this screen.
+  const recordPacerShown = useCallback((idx: number, shown: { signal: PacerSignal; band: PaceBand }, atMs: number) => {
+    useGuidedWalkStore.getState().recordPacerTick(idx, shown.signal, shown.band, atMs)
+  }, [])
+
   return (
     <div className="relative flex h-full flex-col items-center justify-center gap-6 px-6 pt-safe pb-safe-action-lg text-center">
       <PhaseChangeFlash cueKey={cue?.index ?? null} color={cue?.color ?? phaseColor} />
@@ -315,6 +322,8 @@ export function WalkActive({ userProfile, onFinish, onDiscard }: {
           cadenceTargets={cadenceTargets}
           speedTargets={speedTargets}
           hrTargets={targets}
+          segmentIndex={segmentIndex ?? undefined}
+          onTick={recordPacerShown}
         />
       )}
 

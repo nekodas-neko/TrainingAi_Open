@@ -28,6 +28,10 @@ const CadencePointSchema = z.object({
   tSec: z.number().nonnegative().max(MAX_ACTIVITY_DURATION_MIN * 60),
   spm: z.number().nonnegative().max(MAX_PLAUSIBLE_SPM),
 })
+const PacerTickCount = z.number().int().nonnegative().max(MAX_ACTIVITY_DURATION_MIN * 60)
+const PacerTicksSchema = z.object({
+  green: PacerTickCount, amber: PacerTickCount, red: PacerTickCount, stopped: PacerTickCount,
+}).strict()
 const WalkSegmentStatSchema = z.object({
   index: z.number().int().nonnegative().max(1000),
   setNumber: z.number().int().nonnegative().max(1000),
@@ -52,6 +56,12 @@ const WalkSegmentStatSchema = z.object({
   // Ceiling is the fastest plausible cadence held for the longest plausible activity, which is
   // the most steps any single segment could contain — no new constant to drift from these two.
   steps: z.number().nonnegative().max(MAX_PLAUSIBLE_SPM * MAX_ACTIVITY_DURATION_MIN).nullable().optional(),
+  // Issue 2242 (LA-48). Same reason as `steps` above: left off this schema they would be stripped
+  // silently on both write paths. Optional so older clients' segments still validate. A tick is one
+  // second, so no count can exceed the longest plausible activity.
+  pacerSignal: z.enum(['cadence', 'speed', 'hr']).nullable().optional(),
+  pacerAdherence: z.number().min(0).max(1).nullable().optional(),
+  pacerTicks: PacerTicksSchema.nullable().optional(),
 })
 
 export const ActivityLogBody = z.object({

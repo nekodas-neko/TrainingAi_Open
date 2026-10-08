@@ -71,6 +71,7 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
   // registry the active screen uses for its Exit prompt.
   useEffect(() => registerWalkExit(leave), [leave])
   const rawPoints = useGuidedWalkStore(s => s.rawPoints)
+  const pacerTallies = useGuidedWalkStore(s => s.pacerTallies)
   const plan = buildIntervalPlan(config)
   // Never above the plan: a walk cannot run longer than it was told to, and the 1 Hz tick can land
   // a second past `totalSec` before the finish fires.
@@ -101,9 +102,9 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
   // ephemeral display that used to be thrown away on save).
   const segmentStats = useMemo(
     () => computeWalkSegmentStats({
-      plan, startedAtMs, hrSamples: samples, rawPoints, cadenceSeries: cadence?.series ?? null,
+      plan, startedAtMs, hrSamples: samples, rawPoints, cadenceSeries: cadence?.series ?? null, pacerTallies,
     }),
-    [plan, startedAtMs, samples, rawPoints, cadence],
+    [plan, startedAtMs, samples, rawPoints, cadence, pacerTallies],
   )
 
   // Time-in-zone + Session Load — same shared primitive the regular activity detail view uses

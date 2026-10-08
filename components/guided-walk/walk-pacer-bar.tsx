@@ -1,8 +1,9 @@
 'use client'
 
-import { memo, useEffect, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import type { CadenceTracker, CadenceTrackerSnapshot } from '@/lib/activity/cadence-tracker'
 import { readPacer, bandColor, type PacerInput, type TargetPair } from '@/lib/walk/walk-pacer'
+import { startPacerSampler, type PacerShown } from '@/lib/walk/pacer-sampler'
 import { ProgressFill } from "@/components/ui/progress-fill";
 
 /**
@@ -13,7 +14,7 @@ import { ProgressFill } from "@/components/ui/progress-fill";
  * countdown, the route map and the metric row on every reading.
  */
 export const WalkPacerBar = memo(function WalkPacerBar({
-  tracker, kind, speedKmh, bpm, cadenceTargets, speedTargets, hrTargets,
+  tracker, kind, speedKmh, bpm, cadenceTargets, speedTargets, hrTargets, segmentIndex, onTick,
 }: {
   tracker: CadenceTracker | null
   kind: PacerInput['kind']
@@ -22,6 +23,9 @@ export const WalkPacerBar = memo(function WalkPacerBar({
   cadenceTargets: TargetPair
   speedTargets: TargetPair | null
   hrTargets: TargetPair
+  /** The segment this bar is pacing, and a once-a-second report of what it is showing (issue 2242). */
+  segmentIndex?: number
+  onTick?: (segmentIndex: number, shown: PacerShown, atMs: number) => void
 }) {
   const [snap, setSnap] = useState<CadenceTrackerSnapshot | null>(null)
 
@@ -34,6 +38,20 @@ export const WalkPacerBar = memo(function WalkPacerBar({
   const reading = readPacer({
     kind, cadenceSpm: snap?.liveSpm ?? null, speedKmh, bpm, cadenceTargets, speedTargets, hrTargets,
   })
+
+  // What is on screen right now, for the sampler below. A ref, so counting never re-renders this.
+  const shownRef = useRef<PacerShown | null>(null)
+  shownRef.current = reading ? { signal: reading.signal, band: reading.band } : null
+  const onTickRef = useRef(onTick)
+  onTickRef.current = onTick
+  useEffect(() => {
+    if (segmentIndex == null) return
+    return startPacerSampler(
+      () => shownRef.current,
+      (shown, atMs) => onTickRef.current?.(segmentIndex, shown, atMs),
+    )
+  }, [segmentIndex])
+
   if (!reading) return null
 
   const color = bandColor(reading.band)
