@@ -633,7 +633,8 @@ export interface WorkoutRepository {
   getUserById(userId: string): Promise<User | null>
   /** #2120. Deletes the account and everything that cascades from it, in one transaction; the
    *  one path for both self-service and admin deletion. `deleted: false` means no row matched. */
-  deleteAccount(userId: string): Promise<AccountDeletionResult>
+  deleteAccount(userId: string, opts?: { onlyIfNoData?: boolean }): Promise<AccountDeletionResult>
+  usersWithData(userIds: readonly string[]): Promise<Set<string>>
 
   // ── Native app refresh tokens (#2076) ─────────────────────────────────────
   // `native_refresh_tokens`. Only a hash is stored and no method returns one. Nothing calls these

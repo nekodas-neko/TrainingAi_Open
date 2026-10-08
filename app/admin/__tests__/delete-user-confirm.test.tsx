@@ -28,7 +28,7 @@ const ME = 'admin-self'
 const THEM = 'pending-user'
 const USERS = [
   { id: ME, email: 'me@example.com', name: 'Owner', displayName: 'Owner', isActive: true, isAdmin: true },
-  { id: THEM, email: 'pending@example.com', name: null, displayName: 'Pending Tester', isActive: false, isAdmin: false },
+  { id: THEM, email: 'pending@example.com', name: null, displayName: 'Pending Tester', isActive: false, isAdmin: false, hasData: false },
 ]
 
 let container: HTMLDivElement
@@ -120,6 +120,43 @@ describe('deleting a pending user from the admin Users screen (issue 2651)', () 
     await mount()
     expect(buttonIn(rowOf('me@example.com'), 'Delete user')).toBeUndefined()
     expect(buttonIn(rowOf('pending@example.com'), 'Delete user')).toBeDefined()
+  })
+})
+
+describe('only a signup that never got in can be deleted (issue 2695)', () => {
+  const GONE = { id: 'deactivated-user', email: 'gone@example.com', name: null, displayName: 'Was In', isActive: false, isAdmin: false, hasData: true }
+
+  it('a deactivated user with data sits under Deactivated and has Activate but no delete', async () => {
+    users = [...USERS, GONE]
+    await mount()
+    const row = rowOf('gone@example.com')
+    expect(buttonIn(row, 'Delete user')).toBeUndefined()
+    expect(buttonIn(row, 'Activate')).toBeDefined()
+    expect(row.textContent).toContain('Deactivated')
+    const pendingRow = rowOf('pending@example.com')
+    expect(buttonIn(pendingRow, 'Delete user')).toBeDefined()
+    expect(pendingRow.textContent).toContain('Pending')
+  })
+
+  it('an inactive user whose hasData is unknown is treated as having data: no delete', async () => {
+    const unknown = { id: GONE.id, email: GONE.email, name: null, displayName: GONE.displayName, isActive: false, isAdmin: false }
+    users = [USERS[0], unknown as typeof GONE]
+    await mount()
+    expect(buttonIn(rowOf('gone@example.com'), 'Delete user')).toBeUndefined()
+  })
+
+  it('a 409 from the server keeps the row and shows its plain reason', async () => {
+    const { toast } = await import('sonner')
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === 'DELETE') return new Response(JSON.stringify({ error: 'has data' }), { status: 409 })
+      if (url === '/api/admin/users') return new Response(JSON.stringify({ users }), { status: 200 })
+      return new Response('[]', { status: 200 })
+    })
+    await mount()
+    await click(buttonIn(rowOf('pending@example.com'), 'Delete user')!)
+    await click(buttonIn(dialog()!, 'Delete')!)
+    expect(toast.error).toHaveBeenCalledWith('has data')
+    expect(rowOf('pending@example.com')).toBeDefined()
   })
 })
 

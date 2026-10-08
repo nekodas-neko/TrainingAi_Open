@@ -22,7 +22,7 @@ type Tab = 'users' | 'invites' | 'exercises' | 'activities' | 'feedback' | 'devi
 export default function AdminContent({ currentUserId }: { currentUserId: string }) {
   const router = useTransitionRouter()
   const [tab, setTab] = useState<Tab>('users')
-  const [users, setUsers] = useState<User[]>([])
+  const [users, setUsers] = useState<AdminUser[]>([])
   const [invites, setInvites] = useState<string[]>([])
   const [inviteInput, setInviteInput] = useState('')
   const [loading, setLoading] = useState(true)
@@ -122,6 +122,12 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId }),
       })
+      if (res.status === 409) {
+        // issue 2695: the account gained data after the list loaded. The server's refusal is the plain-words reason.
+        const body = await res.json().catch(() => null) as { error?: string } | null
+        toast.error(body?.error ?? 'This account has data under it, so it cannot be deleted.')
+        return
+      }
       if (!res.ok) throw new Error()
       setUsers(prev => prev.filter(u => u.id !== userId))
       toast.success('User deleted')
@@ -158,7 +164,12 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
     )
   }
 
-  const pending = users.filter(u => !u.isActive)
+  // issue 2695: an inactive user with no data under the account is a signup that never got in
+  // (Pending: Activate or Delete); one with data was in and was deactivated (Deactivated: Activate
+  // only). `hasData` missing is read as "has data", so an unknown never offers the trash.
+  const inactive = users.filter(u => !u.isActive)
+  const pending = inactive.filter(u => u.hasData === false)
+  const deactivated = inactive.filter(u => u.hasData !== false)
   const active = users.filter(u => u.isActive)
 
   return (
@@ -186,7 +197,7 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
               )}
             >
               {t === 'users'
-                ? `Users${pending.length > 0 ? ` (${pending.length})` : ''}`
+                ? `Users${inactive.length > 0 ? ` (${inactive.length})` : ''}`
                 : t === 'feedback' && feedbackSubmissions.length > 0
                     ? <><span>Feedback</span> <span className="ml-0.5 inline-flex items-center justify-center rounded-full bg-blue-500 text-white text-[9px] font-bold w-4 h-4">{feedbackSubmissions.length}</span></>
                     : t}
@@ -206,6 +217,20 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
                     isSelf={u.id === currentUserId}
                     onToggle={toggleUser}
                     onDelete={() => setConfirmDelete(u)}
+                    loadingId={actionLoading}
+                  />
+                ))}
+              </div>
+            )}
+            {deactivated.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Deactivated</p>
+                {deactivated.map(u => (
+                  <UserRow
+                    key={u.id}
+                    user={u}
+                    isSelf={u.id === currentUserId}
+                    onToggle={toggleUser}
                     loadingId={actionLoading}
                   />
                 ))}
@@ -432,6 +457,9 @@ function userLabel(u: User): string {
   return u.displayName || u.name || u.email
 }
 
+/** `hasData` is sent by `GET /api/admin/users` for inactive users (issue 2695). */
+type AdminUser = User & { hasData?: boolean }
+
 function UserRow({
   user,
   isSelf = false,
@@ -439,7 +467,7 @@ function UserRow({
   onDelete,
   loadingId,
 }: {
-  user: User
+  user: AdminUser
   /** The signed-in admin's own row: no deactivate, no delete. The server refuses both too; this only hides them. */
   isSelf?: boolean
   onToggle: (id: string, action: 'activate' | 'deactivate') => void
@@ -468,9 +496,9 @@ function UserRow({
         'shrink-0 rounded-full px-2 py-0.5 text-xs font-medium',
         user.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-muted text-muted-foreground'
       )}>
-        {user.isActive ? 'Active' : 'Pending'}
+        {user.isActive ? 'Active' : user.hasData === false ? 'Pending' : 'Deactivated'}
       </span>
-      {onDelete && !user.isActive && !isSelf && (
+      {onDelete && !user.isActive && user.hasData === false && !isSelf && (
         <Button
           variant="ghost"
           size="sm"
