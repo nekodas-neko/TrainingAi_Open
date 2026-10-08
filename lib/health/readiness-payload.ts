@@ -34,7 +34,6 @@ import { computeIllnessRadar, illnessAdvisory, illnessZScores, type IllnessFlag,
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { scoreAvailability, metricAvailability, trailingBaselineZ, type ReadinessInputKey, type ScoreAvailability, type MetricAvailability } from '@/lib/health/score-availability'
 import { connectedSources, CONNECTED_SOURCE_WINDOW_DAYS, type ConnectedSources } from '@trainingai/shared/health/connected-sources'
-import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperature-baseline-health'
 
 /**
  * Early-deload trigger: a low readiness score *and* an elevated acute:chronic load ratio.
@@ -290,7 +289,11 @@ export interface ReadinessScoreResponse {
   } | null
 }
 
-/** Exported for TN-6a's pass test: the ladder's contribution has to be measured, not read. */
+/**
+ * Exported for TN-6a's pass test: the ladder's contribution has to be measured, not read.
+ * issue 2151: no production path calls this any more (its only caller was the Oura-score arm, which
+ * never ran). It stays, with `temp-penalty-suspension.test.ts`, as the record of what the ladder did.
+ */
 export function computeBlendedScore(
   ouraScore: number,
   acwr: number | null,
@@ -580,11 +583,6 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // Temp deviation, BLE-first: the rollup already persists last night's deviation vs the
   // prior night's baseline (daily-summary.ts → oura_daily_summary.temp_dev_c). The Cloud
   // field froze at the re-key — it survives only as an explicitly-tagged fallback.
-  // TN-6a. The 28-day summary window is already loaded above, so the suspension condition costs
-  // one pass over it — no extra query, and it re-evaluates on every request, which is what lets it
-  // clear itself the moment a Redecode re-derivation centres the stored deviations.
-  const tempLadderTrusted = isTemperatureBaselineCentred(dailySummaries.map(d => d.tempDevC))
-
   const bleTempDevC = latestSummary?.tempDevC ?? null
   const cloudTempDevC = ouraToday?.temperatureDeviation ?? null
   const temperatureDeviation = bleTempDevC ?? cloudTempDevC
@@ -689,16 +687,10 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   let score: number
   let source: ReadinessScoreResponse['source']
 
-  if (ouraToday?.readinessScore != null) {
-    const blended = computeBlendedScore(
-      ouraToday.readinessScore,
-      acwr,
-      ouraToday.temperatureDeviation ?? null,
-      tempLadderTrusted,
-    )
-    score  = blended.score
-    source = blended.source
-  } else if (ownComposite) {
+  // issue 2151: there used to be a first arm here that blended Oura's own readiness score with ACWR
+  // and the temperature ladder. `oura_daily.readiness_score` has been NULL since the 2026-07-07
+  // re-key (the Cloud integration is gone), so it never ran; only these arms do.
+  if (ownComposite) {
     score  = ownComposite.score
     source = 'custom'
   } else {
@@ -714,16 +706,13 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
 
   const label: ReadinessScoreResponse['label'] = scoreBand(score).label
 
-  // Readiness for the chip/detail: Oura's when present, else our composite — but only when we
+  // Readiness for the chip/detail: our composite — but only when we
   // actually have a recovery signal (an HRV or RHR baseline, or the A4 daily_summary composite).
   // Without one the composite is just sleep+load and would mislead, so leave it null and let
   // the chip hide itself.
-  const readinessDisplayScore = ouraToday?.readinessScore != null
-    ? score
-    : (baselineHrv != null || baselineRhr != null || ownComposite != null) ? score : null
+  const readinessDisplayScore = (baselineHrv != null || baselineRhr != null || ownComposite != null) ? score : null
 
-  const hasSufficientData = ouraToday?.readinessScore != null ||
-    (sleepHours != null && (baselineHrv != null || baselineRhr != null || ownComposite != null))
+  const hasSufficientData = sleepHours != null && (baselineHrv != null || baselineRhr != null || ownComposite != null)
 
   // Early deload — the periodization modes the app drives, and not already in deload.
   //
@@ -771,7 +760,9 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
       const { phase } = getCurrentPhase(phaseList, program.sessionsPerCycle, sessionsCount)
       inDeloadPhase = phase.phaseType === 'deload'
     }
-    if (!inDeloadPhase && (baselineHrv != null || ouraToday?.readinessScore != null) && acwr != null) {
+    // issue 2151: early deload is gated on the HRV baseline alone. Oura's readiness score used to be
+    // a second way in, but it is permanently null, so it never opened this gate.
+    if (!inDeloadPhase && baselineHrv != null && acwr != null) {
       earlyDeloadRecommended = score < EARLY_DELOAD_SCORE_MAX && acwr > EARLY_DELOAD_ACWR_MIN
       if (earlyDeloadRecommended) {
         earlyDeload = {
@@ -921,17 +912,13 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     console.error('[readiness-score] derived persist merge refused (read still served):', err)
   }
 
-  // An Oura readiness score is a whole-picture number by construction, so it reports as full
-  // regardless of which of our own inputs happen to be present today.
-  const availability: ScoreAvailability = ouraToday?.readinessScore != null
-    ? { available: ['sleep', 'hrv', 'restingHeartRate', 'temperature', 'activity'], missing: [], confidence: 'full', limited: false }
-    : scoreAvailability({
-        sleep: sleepScore100 != null,
-        hrv: baselineHrv != null || hrvZ != null,
-        restingHeartRate: baselineRhr != null || rhrZ != null,
-        temperature: temperatureDeviation != null || tempZ != null,
-        activity: ownActivityScore != null,
-      })
+  const availability: ScoreAvailability = scoreAvailability({
+    sleep: sleepScore100 != null,
+    hrv: baselineHrv != null || hrvZ != null,
+    restingHeartRate: baselineRhr != null || rhrZ != null,
+    temperature: temperatureDeviation != null || tempZ != null,
+    activity: ownActivityScore != null,
+  })
 
   return {
     // `score` is what a reader shows and acts on, so it is the display score: null without a recovery
