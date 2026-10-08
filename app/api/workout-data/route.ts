@@ -6,8 +6,9 @@ import { todayInTz, shiftDateStr, DEFAULT_TZ } from "@trainingai/shared/date-uti
 import { buildAutomaticPhaseStatus, isEarlyDeloadWeek } from "@trainingai/shared/phase-engine";
 import { getScheduledSessionsPerWeek } from "@trainingai/shared/schedule-utils";
 import { prescriptionDrivesLoad } from "@trainingai/shared/ai-periodization/apply-prescription";
-import { reevaluatePrescriptionForToday, reevaluationKey } from "@trainingai/shared/ai-periodization/reevaluate";
-import { resolveSelfReportedSick } from "@trainingai/shared/ai-periodization/signals";
+import { reevaluatePrescriptionForToday, reevaluationKey, type ReevaluationSignals } from "@trainingai/shared/ai-periodization/reevaluate";
+import { rowNumbersMoved } from "@trainingai/shared/ai-periodization/prescription-figures";
+import { resolveSelfReportedSick, loadFigureSignals } from "@trainingai/shared/ai-periodization/signals";
 import { normalizeStoredPrescription } from "@trainingai/shared/ai-periodization/reconcile-prescription";
 import { latestIllnessFromDerived } from "@trainingai/shared/health/illness-radar";
 import { isAiPrescriptionPending } from "@trainingai/shared/ai-periodization/prescription-pending";
@@ -534,9 +535,7 @@ async function handleWorkoutData(req: NextRequest) {
         }
       }
 
-      const reevalResult = reevaluatePrescriptionForToday(
-        aiPrescription,
-        {
+      const reevalSignals: ReevaluationSignals = {
           soreMusclesInSession,
           hoursSinceLastSession,
           activeInjuredMusclesInSession,
@@ -553,14 +552,28 @@ async function handleWorkoutData(req: NextRequest) {
               ? muscleAssignmentsMap[ex.exerciseName]
               : ex.muscleGroups.map(mg => ({ muscle: mg, role: 'main' as const })),
           })),
-        },
-        {
-          phase: aiPeriodizationState.phase,
-          prescription: aiPeriodizationState.prescription,
-          prescriptionStatus: aiPeriodizationState.prescriptionStatus,
-          prescriptionExpiresAt: aiPeriodizationState.prescriptionExpiresAt,
-        },
-      )
+      }
+      const reevalState = {
+        phase: aiPeriodizationState.phase,
+        prescription: aiPeriodizationState.prescription,
+        prescriptionStatus: aiPeriodizationState.prescriptionStatus,
+        prescriptionExpiresAt: aiPeriodizationState.prescriptionExpiresAt,
+      }
+      let reevalResult = reevaluatePrescriptionForToday(aiPrescription, reevalSignals, reevalState)
+
+      // Issue 2592: a deload or revert moved rows, so the stored minutes and volume pills describe
+      // the old rows. Re-cost them through `prescriptionFigures` — the inputs it needs are loaded
+      // only now, when a row actually moved, and a failed load keeps the stored figures (the rows
+      // are still right; only the header would lag).
+      if (!reevalResult.needsRegenerate && reevalResult.changed
+        && rowNumbersMoved(aiPrescription.exercises, reevalResult.prescription.exercises)) {
+        try {
+          const figureSignals = await loadFigureSignals(repo, userId, programSession)
+          reevalResult = reevaluatePrescriptionForToday(aiPrescription, reevalSignals, reevalState, new Date(), figureSignals)
+        } catch (err) {
+          reportServerError(err, { userId, url: '/api/workout-data#recost' })
+        }
+      }
 
       if (reevalResult.needsRegenerate) {
         regeneratePrescriptionInBackground(userId, programSession.id, repo, tz)
