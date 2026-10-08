@@ -3,7 +3,7 @@ import type { UserPreferences } from '@trainingai/shared/user/preferences'
 import type {
   User, Program, ProgressionStyle,
   WorkoutSession, ExerciseLog, SetLog, ExerciseHistoryLogRow,
-  BodyMetrics, ActivityLog, ActivityType, SleepSession, SleepVerdictRecord, ReadinessVerdictRecord, MoodLog,
+  BodyMetrics, ActivityLog, ActivityType, SleepSession, SleepVerdictRecord, ReadinessVerdictRecord, ShadowReadinessRecord, MoodLog,
   NextSessionRecommendation, GoalRecommendation,
 } from '@trainingai/shared/types'
 import type { ExerciseLibraryEntry, MuscleAssignment, ProgramPhase, ProgramPhaseType, PhaseSetWithPhases, ExerciseType } from '@trainingai/shared/types/program'
@@ -19,6 +19,10 @@ import type {
 } from './postgres/slices/meal-plans'
 import type { Friendship, Season } from '@trainingai/shared/types/friends'
 import type { AccountDeletionResult } from './postgres/slices/account-deletion'
+import type {
+  NativeRefreshToken, NativeRefreshTokenRevokedReason, CreateNativeRefreshTokenInput, RotateNativeRefreshTokenInput,
+} from './postgres/slices/native-refresh-tokens'
+import type { RefreshTokenHash } from '@/lib/auth/refresh-token-hash'
 import type {
   SessionPeriodization, PeriodizationPhase, AiPrescription,
   Baseline1rmEntry, PendingTransition, PrescriptionStatus, ProgramVolumeTarget,
@@ -115,6 +119,9 @@ export interface OuraRawAggregateResult {
   stepErrors: string[]
   /** Per-epoch staging detail for the night matching the requested `debugDate`, if any. */
   debugNight?: SleepNightDebug | null
+  /** Issue 2422: why chronic stress did or did not score. Null when the pass did not reach the
+   *  model (fewer than 21 summary rows — every routine incremental pass). */
+  chronicStress?: import('@trainingai/shared/health/chronic-stress-assembly').ChronicStressDiagnostics | null
 }
 
 /** One day the D0 historical step backfill (`allowStepsDecrease`) would change — a dry-run row, no
@@ -395,7 +402,7 @@ export interface UserGoals {
   stepsGoalType: 'daily' | 'weekly' | null
   sleepGoalHours: number | null
   calorieGoal: number | null
-  calorieGoalType: 'daily' | 'weekly' | null
+  calorieGoalType: 'daily' | 'weekly' | 'own' | null
   waterGoalMl: number | null
   waterGoalType: 'daily' | 'weekly' | null
   targetWeightKg: number | null
@@ -457,6 +464,12 @@ export interface LastRealOneRm {
    *  the rep max IS this number, and the card had been reconstructing it by inverting the estimate
    *  — lossily, and impossibly for the 5/6 collision where both store the same figure. */
   avgReps: number | null
+  /** The log this 1RM came from belongs to a baseline session. A baseline estimate is AMRAP-scaled
+   *  from one unprescribed set, so a prescribed run compared against it reads as a gain that did not
+   *  happen. This only LABELS the row: which row is the working basis is unchanged. A session with
+   *  no `phase_type` (logged before TN-75) is not baseline here, as everywhere else. Optional so a
+   *  hand-built map from before it existed still types. */
+  fromBaseline?: boolean
 }
 
 export interface MeasuredRmrInput {
@@ -621,6 +634,24 @@ export interface WorkoutRepository {
   /** #2120. Deletes the account and everything that cascades from it, in one transaction; the
    *  one path for both self-service and admin deletion. `deleted: false` means no row matched. */
   deleteAccount(userId: string): Promise<AccountDeletionResult>
+
+  // ── Native app refresh tokens (#2076) ─────────────────────────────────────
+  // `native_refresh_tokens`. Only a hash is stored and no method returns one. Nothing calls these
+  // until the token flow (PR b). Every method but the hash lookup is scoped to `userId`.
+  /** A sign-in on a device: a new token in a new family. */
+  createNativeRefreshToken(input: CreateNativeRefreshTokenInput): Promise<NativeRefreshToken>
+  /** The row a presented token's hash names, in any state (rotated, revoked, expired). The one
+   *  unscoped lookup: a presented token is how the server learns which user is asking. */
+  findNativeRefreshTokenByHash(tokenHash: RefreshTokenHash): Promise<NativeRefreshToken | null>
+  /** Marks a live token rotated and inserts its successor in the same family, atomically. `null`
+   *  (nothing written) when it is not the caller's or is already rotated, revoked or expired. */
+  rotateNativeRefreshToken(input: RotateNativeRefreshTokenInput): Promise<NativeRefreshToken | null>
+  /** True when the caller's token was revoked now; false when not theirs or already revoked. */
+  revokeNativeRefreshToken(userId: string, id: string, reason: NativeRefreshTokenRevokedReason): Promise<boolean>
+  /** Revokes the caller's not-yet-revoked tokens in one family; returns how many. */
+  revokeNativeRefreshTokenFamily(userId: string, familyId: string, reason: NativeRefreshTokenRevokedReason): Promise<number>
+  /** The caller's live tokens (one per signed-in device), newest first. */
+  listActiveNativeRefreshTokens(userId: string): Promise<NativeRefreshToken[]>
   getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null>
   updateUserProfile(userId: string, profile: Partial<Pick<User, 'displayName' | 'heightCm' | 'dateOfBirth' | 'weightGoalKg' | 'timezone' | 'sex' | 'activityLevel' | 'fitnessGoal'>>): Promise<User>
   touchLastGoalReviewAt(userId: string): Promise<void>
@@ -774,11 +805,49 @@ export interface WorkoutRepository {
   upsertReadinessVerdict(userId: string, record: Omit<ReadinessVerdictRecord, 'responseState'>): Promise<void>
   /** Returns false when no verdict was made for that day, so there is nothing to answer. */
   setReadinessVerdictResponse(userId: string, date: string, state: 'rated' | 'dismissed'): Promise<boolean>
+
+  // #2377 — the shadow readiness model (`shadow_readiness`), computed beside the live score and
+  // shown nowhere. Keyed (user, date, modelVersion): the upsert replaces only that version's own
+  // row, so a new model version lands beside the old rows and never over them.
+  upsertShadowReadiness(userId: string, record: ShadowReadinessRecord): Promise<void>
+  /** Rows with `from <= date <= to` (`YYYY-MM-DD`), oldest first, then by model version; only
+   *  `modelVersion` when given. Each carries `computedAt`. */
+  getShadowReadiness(
+    userId: string, from: string, to: string, modelVersion?: number,
+  ): Promise<Array<ShadowReadinessRecord & { computedAt: Date }>>
   /** Q-519 — set (or clear, with `null`) the remembered bedtime on an existing night. Returns false
    *  when no session for that date exists; this never creates one. Read only by the bedtime
    *  estimate — see `docs/reviews/2026-08-26-manual-bedtime-write-audit.md` for why it is its own
    *  column rather than a `manual`-ranked write to `sleep_start`. */
   setManualSleepStart(userId: string, date: string, at: Date | null): Promise<boolean>
+  /**
+   * #2338 — store a night the user entered by hand (`manual_entry = true`). The natural key is
+   * (user, wake date): a second entry for the same night EDITS the first, never adds a row, so a
+   * replayed outbox mutation or a double-tapped save is a no-op. The row id is `night.id` when the
+   * row is new (the device's local id, so the mirror stays one row) and the existing id otherwise.
+   *
+   * `shadowed` is true when a device night already covers it — the entry is kept, but every reader
+   * uses the device night (`preferDeviceNights`). `id` is null only when a device row starts at the
+   * very same instant: that row IS the night, measured, so nothing is stored. Throws on an id that
+   * already belongs to another row.
+   *
+   * Issue 2606: entering a night again after it was REMOVED revives the removed row (its id kept,
+   * `deleted_at` cleared) rather than adding a second one — matched by the payload's id, then by
+   * wake date, then by start instant. A removed night is a state of (user, wake date), not a new
+   * night, and the `(user_id, sleep_start)` unique key would refuse a fresh row at the same start.
+   */
+  saveManualSleepNight(userId: string, night: import('@trainingai/shared/health/manual-sleep').ManualSleepNight): Promise<{ id: string | null; shadowed: boolean }>
+  /**
+   * Issue 2606 — remove a night the user entered by hand: a SOFT delete (`deleted_at = now()`), so
+   * the delta pull carries it to a device that has not synced. Only a row that is the caller's and
+   * `manual_entry = true` can be removed; a night a device measured never can.
+   *
+   * - `removed`: this call tombstoned it.
+   * - `already_removed`: it was already tombstoned (a replay, a double tap); nothing changed.
+   * - `not_manual`: the caller's row, but a device night. Nothing changed.
+   * - `not_found`: no such row for this user (another user's id reads the same).
+   */
+  deleteManualSleepNight(userId: string, id: string): Promise<'removed' | 'already_removed' | 'not_manual' | 'not_found'>
   listMoodLogs(userId: string, from: string, to: string): Promise<MoodLog[]>
   incrementWaterLog(userId: string, date: string, ml: number): Promise<void>
   /** Q-481 — the same increment, applied at most once per outbox mutation id. Returns false when
@@ -1120,7 +1189,8 @@ export interface WorkoutRepository {
   /** Decoded raw samples for the given tags over the last `days`, ordered by measured_at ASC.
    *  Windowed on the ingest-stamped measured_at (no anchor math) — feeds the admin device-metrics
    *  compute-on-read route. Rows with a null decoded/measured_at are excluded. */
-  getOuraRawSamplesForTags(userId: string, tags: number[], days: number): Promise<OuraRawSampleRow[]>
+  /** `caller` is named in the slow raw-read log (#2247). */
+  getOuraRawSamplesForTags(userId: string, tags: number[], days: number, caller?: string): Promise<OuraRawSampleRow[]>
   /** TN-56: raw frames by tag and ring-clock range, across both tiers (hot and packed). Read-only,
    *  for the admin replay; the rollup reads through its own IO. */
   readOuraRawFrames(userId: string, q: import('./postgres/slices/oura-raw-frames').RawFrameQuery): Promise<import('./postgres/slices/oura-raw-frames').RawFrameRow[]>
@@ -1189,6 +1259,10 @@ export interface WorkoutRepository {
    *  35-day window — the caller must do that at least once per process before it starts narrowing,
    *  or a batch ingested before this process started could never be rolled up (Q-213). */
   aggregateOuraRawSamples(userId: string, timezone: string, opts?: { debugDate?: string; disableNeuralStager?: boolean; fullHistory?: boolean; dumpOnly?: boolean; allowStepsDecrease?: boolean; sinceDs?: number }): Promise<OuraRawAggregateResult>
+  /** Issue 2236: add the daytime-stress buckets that history never got. Add-only (never deletes or
+   *  changes a bucket, skips days that already have buckets), one transaction that rolls back unless
+   *  rows written equal rows planned. `dryRun: true` computes and returns the plan, writing nothing. */
+  backfillDaytimeStressBuckets(userId: string, timezone: string, opts: { dryRun: boolean }): Promise<import('@/lib/oura-ble/stress-backfill').StressBackfillReport>
   // Read-only dry-run for the D0 historical step backfill — no write performed. Returns every day
   // whose stored steps would actually change if `allowStepsDecrease` ran, computed the same way
   // (same pipeline, same sourceMap rank protection), so the owner can review before firing it.
@@ -1301,10 +1375,12 @@ export interface WorkoutRepository {
     rpe: number | null; reps: number; intensityPct: number | null; setTimeSec: number | null
   }>>
   getSetTimingRows(userId: string, exerciseNames: string[]): Promise<import('@trainingai/shared/workout/time-profile').TimingRow[]>
-  getExercise1rmHistory(userId: string, exerciseNames: string[], tz: string): Promise<Record<string, { date: string; rm: number }[]>>
+  getExercise1rmHistory(userId: string, exerciseNames: string[], tz: string, windowDays?: number): Promise<Record<string, { date: string; rm: number }[]>>
   getWeeklySetsByMuscleGroup(userId: string, programId: string, weekStart: string, weekEnd: string, tz: string): Promise<Record<string, number>>
   /** Weighted sets per muscle over an arbitrary span, across every programme (LB-111). `to` is inclusive. */
   getSetsByMuscleInWindow(userId: string, from: string, to: string, tz: string): Promise<Record<string, number>>
+  /** Tonnage per canonical muscle per 7-day week anchored on `from`, by local `logged_at` date (#2420). `to` is inclusive. */
+  getMuscleTonnageByWeek(userId: string, from: string, to: string, tz: string): Promise<{ muscle: string; weekStart: string; tonnageKg: number }[]>
   listSessionPeriodizationForProgram(userId: string, programId: string): Promise<SessionPeriodization[]>
   reconcileSessionsInPhase(userId: string, programId: string): Promise<void>
   reconcileUserStats(userId: string): Promise<void>
@@ -1329,14 +1405,27 @@ export interface WorkoutRepository {
   cancelPendingRekeyDeclaration(userId: string): Promise<boolean>
 
   /** Q-535 — a redecode runs off the request. One in-flight job per user; `startRedecodeJob`
-   *  returns the running one rather than starting a second. */
-  startRedecodeJob(userId: string, opts: Record<string, unknown>): Promise<{ job: import('./postgres/slices/oura').RedecodeJob; alreadyRunning: boolean }>
+   *  returns the running one rather than starting a second, with `refused: true` when that run
+   *  would not write what `opts` asks for (issue 2383: a step backfill never follows a plain run). */
+  startRedecodeJob(userId: string, opts: Record<string, unknown>): Promise<{ job: import('./postgres/slices/oura').RedecodeJob; alreadyRunning: boolean; refused: boolean }>
   getRedecodeJob(userId: string, id: number): Promise<import('./postgres/slices/oura').RedecodeJob | null>
   getLatestRedecodeJob(userId: string): Promise<import('./postgres/slices/oura').RedecodeJob | null>
   finishRedecodeJob(id: number, result: Record<string, unknown> | null, error: string | null): Promise<void>
   /** Closes a job whose process died mid-run — otherwise the one-at-a-time index blocks every
    *  future redecode forever. */
   reapStaleRedecodeJobs(userId: string): Promise<number>
+
+  // #2381 — the agent action log (`agent_action_log`). Append-only: a run is started, finished once,
+  // and read. There is no update or delete, and the table's trigger refuses both. Not user-scoped:
+  // `targetUserId` is the account a job ran on (null = global), set by admin-only routes.
+  /** Records a run as `running`. `parameters` is redacted (`redactActionParameters`) on the way in. */
+  startAgentAction(input: import('./postgres/slices/agent-actions').StartAgentActionInput): Promise<import('./postgres/slices/agent-actions').AgentActionRecord>
+  /** Finishes a running run. Null when no such row exists or it has already finished; a finished
+   *  row never changes again. */
+  finishAgentAction(id: string, result: import('./postgres/slices/agent-actions').FinishAgentActionInput): Promise<import('./postgres/slices/agent-actions').AgentActionRecord | null>
+  getAgentAction(id: string): Promise<import('./postgres/slices/agent-actions').AgentActionRecord | null>
+  /** Newest first; default 50 rows, at most 500. */
+  listAgentActions(filter?: import('./postgres/slices/agent-actions').ListAgentActionsFilter): Promise<import('./postgres/slices/agent-actions').AgentActionRecord[]>
   listOuraTags(userId: string, startDay: string, endDay: string): Promise<OuraTagRow[]>
 
   // ── Body Battery (daily snapshots for model tuning) ──────────────────────────
@@ -1361,6 +1450,11 @@ export interface WorkoutRepository {
    *  a device row at the same timestamp; device rows win at read time (#2168). `tz` dates the
    *  zone-minutes cache invalidation. */
   upsertAggregatorHeartrate(userId: string, rows: { timestamp: Date; bpm: number }[], source: HealthSource, tz: string): Promise<void>
+  /** Drops the cached `daily_zone_minutes` rows on or after `fromDay` ('YYYY-MM-DD', the user's day),
+   *  so they are recomputed on the next read. A heart-rate writer that rewrites or adds rows for a
+   *  PAST day calls this, because a day cached before that data arrived keeps its old split for good
+   *  (#2439). The rollup and the aggregator upsert do it inline; the chest-strap route uses this. */
+  dropZoneMinutesFrom(userId: string, fromDay: string): Promise<void>
   /** #2462. Health Connect steps / active kcal per record and cadence per sample, upserted by
    *  `(kind, recordId, startAt)` so a re-read window is idempotent. Returns rows written after the
    *  in-batch collapse. Overlap between apps is kept and resolved by the reader. */

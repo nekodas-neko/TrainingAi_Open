@@ -75,6 +75,19 @@ export function contentKey(...parts: (string | number | null | undefined)[]): st
   return createHash('sha256').update(joined).digest('hex').slice(0, 8)
 }
 
+/**
+ * `contentKey` for bytes: the same 8-hex key, over a photo rather than a string (#2195).
+ *
+ * The image scan fingerprinted on `{mode, imageKind, note}`, so two DIFFERENT photos with the same
+ * (usually empty) note shared one fingerprint and the AI-usage double-trip metric read a second,
+ * deliberate scan as a redundant repeat. A hash of the bytes tells them apart without storing
+ * anything of the photo.
+ */
+export function bytesKey(bytes: Uint8Array): string {
+  if (bytes.byteLength === 0) return ''
+  return createHash('sha256').update(bytes).digest('hex').slice(0, 8)
+}
+
 // Deterministic hash of section + key inputs (16 hex chars). Object keys are
 // sorted so `{a,b}` and `{b,a}` fingerprint identically.
 export function aiFingerprint(section: string, input: unknown): string {

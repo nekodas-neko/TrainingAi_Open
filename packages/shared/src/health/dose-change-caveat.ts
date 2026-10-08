@@ -57,7 +57,7 @@ const normText = (t: string | null) => (t ?? '').trim().toLowerCase().replace(/\
 const sameAmount = (a: number, b: number) => Math.abs(a - b) < 1e-6
 
 /** Does `cur` record a different dose from `prev`? Amount wins; text only when neither has one. */
-function doseDiffers(prev: DoseLogEntry, cur: DoseLogEntry): boolean {
+export function doseDiffers(prev: DoseLogEntry, cur: DoseLogEntry): boolean {
   if (prev.amount != null && cur.amount != null) {
     return !sameAmount(prev.amount, cur.amount) || normUnit(prev.unit) !== normUnit(cur.unit)
   }

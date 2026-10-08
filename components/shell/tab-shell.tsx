@@ -28,10 +28,10 @@ function TabChunkPulse() {
 // second chunk. The other four are code-split per tab. Each is created with the
 // SAME loader the idle warm-up below calls, so a tapped tab whose chunk has
 // landed renders its screen directly instead of a pulse (#2442).
-const Health = createPreloadedTab(() => import("@/app/health/health-content"), () => <TabChunkPulse />);
-const Workout = createPreloadedTab(() => import("@/app/workout-select/workout-select-content"), () => <TabChunkPulse />);
-const Nutrition = createPreloadedTab(() => import("@/app/nutrition/nutrition-content"), () => <TabChunkPulse />);
-const More = createPreloadedTab(() => import("@/app/more/more-content"), () => <TabChunkPulse />);
+const Health = createPreloadedTab("Health", () => import("@/app/health/health-content"), () => <TabChunkPulse />);
+const Workout = createPreloadedTab("Workout", () => import("@/app/workout-select/workout-select-content"), () => <TabChunkPulse />);
+const Nutrition = createPreloadedTab("Nutrition", () => import("@/app/nutrition/nutrition-content"), () => <TabChunkPulse />);
+const More = createPreloadedTab("More", () => import("@/app/more/more-content"), () => <TabChunkPulse />);
 const HealthContent = Health.Tab;
 const WorkoutSelectContent = Workout.Tab;
 const NutritionContent = Nutrition.Tab;

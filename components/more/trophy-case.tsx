@@ -36,7 +36,7 @@ function BadgeSlot({ achievement, onUnpin }: { achievement?: AchievementResult; 
     );
   }
 
-  const { id, name, description, xpReward, category, unlocked } = achievement;
+  const { id, name, description, xpReward, category } = achievement;
   const Icon = ACHIEVEMENT_ICONS[id] ?? Dumbbell;
   const color = CATEGORY_COLORS[category] ?? 'var(--color-brand)';
 

@@ -68,6 +68,10 @@ export default defineConfig({
       },
       {
         resolve: { alias },
+        // tsconfig's `jsx: "preserve"` is Next's to compile, so without this a test cannot import a
+        // `.tsx` component at all — vite refuses the JSX. Component tests (DV-19, #2118) mount the
+        // real component under jsdom rather than a copy of its logic.
+        oxc: { jsx: { runtime: 'automatic' } },
         test: {
           name: 'unit',
           environment: 'node',

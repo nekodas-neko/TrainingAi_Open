@@ -151,10 +151,12 @@ describe('computeReadinessComposite', () => {
 
   // **TN-60 makes 100 unreachable, and that is the cost of the change rather than a bug.** A
   // saturating curve and a reachable ceiling are mutually exclusive: the ceiling IS the rail. A
-  // 1.5σ-on-everything day now reads ~94 rather than 100, because the z-driven contributors carry
+  // 1.5σ-on-everything day now reads ~96 rather than 100, because the z-driven contributors carry
   // about two thirds of the weight and each tops out at 90 there. Milder than the ~86 the 2026-07-22
   // note called a defect, and reversible with one constant (TAIL_BAND_POINTS). It read 95 while the
-  // check-in held 0.10 at 100; #2224 renormalised the other eight over that share.
+  // check-in held 0.10 at 100; #2224 renormalised the other eight over that share. It read 94 until
+  // #2359, which stopped the temperature contributor compressing its good end: a temperature at
+  // baseline is 100, so this day gains the two points that contributor had been losing.
   it('puts a genuinely perfect day just under the ceiling rather than on it', () => {
     const r = computeReadinessComposite({
       rhrZ: -1.5, hrvZ: 1.5, tempZ: 0, sleepBalanceZ: 1.5,
@@ -162,7 +164,7 @@ describe('computeReadinessComposite', () => {
       recoveryIndexHours: 6,
       nHistory: FULL_HISTORY,
     })
-    expect(r.score).toBe(94)
+    expect(r.score).toBe(96)
   })
 
   it('still rewards a day better than 1.5σ on every axis — the ceiling is approached, not hit', () => {
@@ -238,5 +240,68 @@ describe('computeReadinessComposite', () => {
       const good = computeReadinessComposite({ ...base, recoveryIndexHours: 6 })
       expect(good.score).toBeGreaterThan(50)
     })
+  })
+})
+
+// #2359 — "closer is better" means a temperature exactly at baseline is the best score, 100. The
+// TN-60 tail compression squashed every raw score above 80 toward 100 without reaching it, and the
+// closer-better curve puts "at baseline" at raw 100, so a perfectly normal temperature scored 90 and
+// cost readiness about a point on every normal day. The good end of a closer-better curve is a single
+// point that cannot be exceeded, so there is no rail there to compress; the bad end keeps the shape.
+describe('the temperature contributor scores 100 at baseline (#2359)', () => {
+  const temp = (tempZ: number | null) => computeReadinessComposite({
+    rhrZ: 0, hrvZ: 0, tempZ, sleepBalanceZ: 0,
+    previousNightScore: 80, prevDayActivityScore: 80, activityBalanceScore: 80,
+    recoveryIndexHours: 5,
+    nHistory: FULL_HISTORY,
+  }).contributors.temperature.score
+
+  it('a temperature exactly at baseline scores 100, not 90', () => {
+    expect(temp(0)).toBe(100)
+  })
+
+  it('is symmetric: warm and cool by the same amount score the same', () => {
+    for (const z of [0.1, 0.3, 0.9, 1.5, 2.5]) expect(temp(z), `z=${z}`).toBe(temp(-z))
+  })
+
+  it('falls as the deviation grows, from the top', () => {
+    const scores = [0, 0.05, 0.1, 0.2, 0.3].map(temp)
+    for (let i = 1; i < scores.length; i++) expect(scores[i], `step ${i}`).toBeLessThan(scores[i - 1])
+  })
+
+  it('is unchanged from 0.3σ out, where the old curve was already below its knee', () => {
+    // Raw 80 and under never touched the compression, so these are the numbers the model gave before.
+    expect([0.3, 0.6, 1].map(temp)).toEqual([80, 60, 33])
+  })
+
+  it('still compresses the BAD end, so extreme deviations keep their order instead of railing at 0', () => {
+    const far = [1.5, 2, 2.5, 3].map(temp)
+    expect(far[0]).toBe(10)
+    for (let i = 1; i < far.length; i++) expect(far[i]).toBeLessThanOrEqual(far[i - 1])
+    expect(far[0]).toBeGreaterThan(far[far.length - 1])
+    // Compressed, not clipped: well past 3σ a real score is still above zero.
+    expect(temp(3)).toBeGreaterThan(0)
+  })
+
+  it('leaves the other contributors\' curves alone: hrv at +1.5σ is still 90', () => {
+    const r = computeReadinessComposite({
+      rhrZ: 0, hrvZ: 1.5, tempZ: 0, sleepBalanceZ: 0,
+      previousNightScore: 80, prevDayActivityScore: 80, activityBalanceScore: 80,
+      recoveryIndexHours: 5,
+      nHistory: FULL_HISTORY,
+    })
+    expect(r.contributors.hrvBalance.score).toBe(90)
+  })
+
+  it('a normal temperature lifts readiness by about the weight it carries, about a point', () => {
+    const withTemp = (tempZ: number) => computeReadinessComposite({
+      rhrZ: 0, hrvZ: 0, tempZ, sleepBalanceZ: 0,
+      previousNightScore: 80, prevDayActivityScore: 80, activityBalanceScore: 80,
+      recoveryIndexHours: 5,
+      nHistory: FULL_HISTORY,
+    }).score
+    // 0.10 / 0.90 of the 10 points the contributor gained, rounded: one point, not zero and not ten.
+    expect(withTemp(0) - withTemp(0.3)).toBeGreaterThanOrEqual(2)
+    expect(withTemp(0) - withTemp(0.3)).toBeLessThanOrEqual(3)
   })
 })

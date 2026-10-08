@@ -16,7 +16,7 @@
 // already "branch merged into base" — exactly the state we want to measure. What we need alongside it
 // is the base's own content, which is what this resolves.
 'use strict';
-const { execFileSync } = require('child_process');
+const { execFileSync, spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -28,19 +28,148 @@ function git(args) {
 }
 
 /**
- * git's own stderr for "that path is not in that tree" — the ordinary answer for a file the branch
- * adds. Measured against git 2.x on 2026-09-23; both wordings are live, the second when the path
- * exists in the working tree but not at the ref.
+ * #2081. Every base read goes through ONE `git ls-tree` and ONE `git cat-file --batch`, however
+ * many paths are asked for.
+ *
+ * It used to be one `git show <base>:<path>` per scanned file. A CPU profile of
+ * `check-hex-literals.js` on the owner's Windows machine put 15,048 of 15,360 ms in `spawnSync`,
+ * and every ratchet built on this file paid the same per-file spawn, in sequence, inside
+ * `pnpm check:rules`. A process start is the expensive part; reading the bytes is not.
+ *
+ * **Why ls-tree first, and blobs by object id rather than `<ref>:<path>`.** `cat-file --batch`
+ * answers `missing` for both "that path is not in that tree" and "that object is not in this
+ * repository", and those are the two facts OR-130 exists to keep apart (see `showAtBase`). The tree
+ * listing answers the first one alone: a path absent from it is ABSENT. Every object then asked of
+ * `cat-file` is one the tree names, so a `missing` there can only mean *unreadable*. Feeding object
+ * ids also keeps paths off stdin entirely, so spaces, unicode and newline-bearing names never meet
+ * the line protocol, and `-z` keeps them unquoted in the listing.
+ *
+ * The listing is the WHOLE tree, filtered here, rather than pathspecs on the command line: Windows
+ * caps a command line at 32,767 characters, and Next.js route segments such as `[id]` are glob
+ * syntax to a pathspec.
+ *
+ * Content is byte-for-byte what `git show <ref>:<path>` printed for a blob — neither applies eol
+ * conversion or filters — decoded as UTF-8 one blob at a time, which is what `encoding: 'utf8'` did
+ * to the single blob `git show` returned.
  */
-const PATH_ABSENT_RE = /does not exist in|exists on disk, but not in/;
+function runGit(args, input, maxBuffer) {
+  const res = spawnSync('git', args, {
+    cwd: root, input, maxBuffer, stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true,
+  });
+  if (res.error) return { ok: false, reason: String(res.error.message || res.error) };
+  if (res.status !== 0) {
+    const stderr = String(res.stderr || '').trim();
+    return { ok: false, reason: (stderr || `git ${args[0]} exited ${res.status}`).split('\n')[0] };
+  }
+  return { ok: true, stdout: res.stdout };
+}
+
+/** `path → { type, oid, size }` for every entry at `baseRef`, from one `git ls-tree -r -l -z`. */
+function listTree(baseRef) {
+  const res = runGit(['ls-tree', '-r', '-l', '-z', '--full-tree', baseRef], undefined, 256 * 1024 * 1024);
+  if (!res.ok) return res;
+  const entries = new Map();
+  for (const record of res.stdout.toString('utf8').split('\0')) {
+    if (!record) continue;
+    // `<mode> SP <type> SP <oid> SP+ <size> TAB <path>`; size is `-` for a submodule.
+    const tab = record.indexOf('\t');
+    const [, type, oid, size] = record.slice(0, tab).trim().split(/ +/);
+    entries.set(record.slice(tab + 1), { type, oid, size: Number(size) || 0 });
+  }
+  return { ok: true, entries };
+}
 
 /**
- * `git show ref:path`, told apart from the failure that looks identical to it (OR-130).
+ * LA-132: the read's buffer has to fit the content, and node's default (1 MiB) did not —
+ * `docs/implementation-backlog.md` passed 2.11 MiB, the spawn failed with ENOBUFS, and the read was
+ * treated as absent. Here the sizes are known from the listing, so each `cat-file` gets a buffer
+ * sized to what it will print, and the objects are split across processes at ~64 MiB so no single
+ * buffer grows without bound. A repo-wide ratchet still fits in one.
+ */
+const CHUNK_BYTES = 64 * 1024 * 1024;
+
+/** `oid → { content }` or `oid → { reason }`, for objects listed with their sizes. */
+function readBlobs(objects) {
+  const out = new Map();
+  const chunks = [];
+  let chunk = [];
+  let bytes = 0;
+  for (const o of objects) {
+    if (chunk.length > 0 && bytes + o.size > CHUNK_BYTES) { chunks.push(chunk); chunk = []; bytes = 0; }
+    chunk.push(o);
+    bytes += o.size;
+  }
+  if (chunk.length > 0) chunks.push(chunk);
+
+  for (const objs of chunks) {
+    const size = objs.reduce((n, o) => n + o.size, 0);
+    // Per object: a header line (oid, type, size — under 100 bytes) and a trailing newline.
+    const res = runGit(['cat-file', '--batch'], objs.map((o) => o.oid).join('\n') + '\n', size + objs.length * 128 + 1024 * 1024);
+    if (!res.ok) {
+      for (const o of objs) out.set(o.oid, { reason: res.reason });
+      continue;
+    }
+    const buf = res.stdout;
+    let pos = 0;
+    for (const o of objs) {
+      const nl = buf.indexOf(0x0a, pos);
+      if (nl < 0) { out.set(o.oid, { reason: `git cat-file output ended before ${o.oid}` }); continue; }
+      const header = buf.toString('utf8', pos, nl);
+      pos = nl + 1;
+      const parts = header.split(' ');
+      if (parts.length !== 3 || parts[0] !== o.oid) {
+        // `<oid> missing` (or `ambiguous`): no content follows, so the stream stays in step.
+        out.set(o.oid, { reason: `git cat-file: ${header}` });
+        continue;
+      }
+      const len = Number(parts[2]);
+      out.set(o.oid, { content: buf.toString('utf8', pos, pos + len) });
+      pos += len + 1;
+    }
+  }
+  return out;
+}
+
+/**
+ * One read of many paths: `path → { content, unreadable, reason? }`, with the same three answers
+ * `showAtBase` gives for one.
+ */
+function readAtBase(baseRef, relPaths) {
+  const out = new Map();
+  const tree = listTree(baseRef);
+  if (!tree.ok) {
+    for (const p of relPaths) out.set(p, { content: null, unreadable: true, reason: tree.reason });
+    return out;
+  }
+  const wanted = new Map();
+  for (const p of relPaths) {
+    const e = tree.entries.get(p);
+    if (!e) out.set(p, { content: null, unreadable: false });
+    else if (e.type !== 'blob') out.set(p, { content: null, unreadable: true, reason: `${p} is a ${e.type} at ${baseRef}, not a file` });
+    else wanted.set(e.oid, e.size);
+  }
+  const blobs = readBlobs([...wanted].map(([oid, size]) => ({ oid, size })));
+  for (const p of relPaths) {
+    if (out.has(p)) continue;
+    const b = blobs.get(tree.entries.get(p).oid);
+    out.set(p, b.content !== undefined
+      ? { content: b.content, unreadable: false }
+      : { content: null, unreadable: true, reason: b.reason });
+  }
+  return out;
+}
+
+/**
+ * `git show ref:path`, told apart from the failure that looks identical to it (OR-130). Since #2081
+ * it is `readAtBase` for one path — one read path, not two.
  *
- * @returns {{ content: string|null, unreadable: boolean }}
+ * @returns {{ content: string|null, unreadable: boolean, reason?: string }}
  *   `content` is the file, or `null` when the path is genuinely not at that ref.
  *   `unreadable` is `true` when git failed for any OTHER reason — a bad ref, a missing object, a
- *   repack mid-run — which is *nothing known about the base*, not *absent from it*.
+ *   repack mid-run — which is *nothing known about the base*, not *absent from it*. `reason` is
+ *   git's own words, or node's when the spawn itself failed: the mechanism behind this failure has
+ *   never been reproduced (see the note on `fileAtBase`), so the next occurrence has to identify
+ *   itself.
  *
  * **Why the distinction is load-bearing.** `verdict` maps a `null` base count to `'fail'`, so a read
  * failure became an accusation: a file byte-identical to `main` reported as this branch's new
@@ -55,29 +184,7 @@ const PATH_ABSENT_RE = /does not exist in|exists on disk, but not in/;
  * blip. So an unreadable base keeps today's strict outcome and only stops lying about the reason.
  */
 function showAtBase(baseRef, relPath) {
-  try {
-    // Its own spawn rather than `git()`, which pipes stderr to `ignore` — and the whole of this
-    // function is reading that stderr. Capturing it there instead would change every other caller.
-    const content = execFileSync('git', ['show', `${baseRef}:${relPath}`], {
-      cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
-      // LA-132: node's default maxBuffer is 1 MB and `docs/implementation-backlog.md` passed
-      // 2.11 MB, so this spawn failed with ENOBUFS and the base read was treated as absent —
-      // STRICT, per the note below, which means the `inherited` escape hatch stopped working for
-      // the single file most likely to be grown by somebody else's merge. That is the mechanism
-      // the comment below says had never been reproduced; it is this, and it arrives silently the
-      // day a tracked file crosses a megabyte.
-      maxBuffer: 256 * 1024 * 1024,
-    });
-    return { content, unreadable: false };
-  } catch (err) {
-    const stderr = String((err && err.stderr) || '');
-    if (PATH_ABSENT_RE.test(stderr)) return { content: null, unreadable: false };
-    // `reason` is git's own words, or node's when the spawn itself failed. It is the whole point of
-    // the warning below: the mechanism behind this failure has never been reproduced (see the note
-    // on `fileAtBase`), so the next occurrence has to identify itself.
-    const reason = (stderr.trim() || String((err && err.message) || 'unknown')).split('\n')[0];
-    return { content: null, unreadable: true, reason };
-  }
+  return readAtBase(baseRef, [relPath]).get(relPath);
 }
 
 /**
@@ -112,7 +219,54 @@ function warnUnreadable(baseRef, relPath, reason) {
  * a shallow clone with no remote, a detached tree, an export. Callers degrade to baseline-only
  * behaviour rather than failing: a missing base is not a violation.
  */
-const DEFAULT_BASE_REFS = ['origin/main', 'FETCH_HEAD', 'main'];
+//
+// #2559: `FETCH_HEAD` used to sit between these two, and in CI it was the one that answered. It
+// means "whatever was fetched last", and in the Custom Rules job that was `actions/checkout`'s own
+// fetch of the PR's MERGE commit — HEAD itself — because the step that fetches `origin/main` ran
+// after most of the ratchets. Every base read then returned the branch's own content, `atBase`
+// equalled `count` for every file, and growth past a baseline passed as "inherited". It is not a
+// name for the base on any path we run, so it is gone; `isHeadItself` below refuses it anyway.
+const DEFAULT_BASE_REFS = ['origin/main', 'main'];
+
+function treeOf(ref) {
+  try {
+    return git(['rev-parse', '--verify', '--quiet', `${ref}^{tree}`]).trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * #2559, the second guard: a candidate that is HEAD under another name is not a base.
+ *
+ * The test is the TREE, not the commit — CI's merge commit and a candidate pointing at it share a
+ * tree whatever their commit ids — and it holds for every candidate that is not a branch. So a
+ * `FETCH_HEAD`, `ORIG_HEAD`, tag or raw sha whose tree is HEAD's is refused, which closes #2559
+ * even if `FETCH_HEAD` ever comes back to the list.
+ *
+ * **A branch ref (`refs/heads/*`, `refs/remotes/*`) whose tree equals HEAD's is still accepted, and
+ * that is deliberate.** It is the base genuinely having the same content as HEAD, which happens on
+ * the paths we must not change:
+ *   - `main` (or a fresh branch with no commits yet) checked out locally, where `origin/main` is
+ *     HEAD — `pnpm check:rules` there reports an over-baseline file `main` already carries as
+ *     inherited, as it always has, rather than as the developer's own violation;
+ *   - a PR whose merge result is identical to `main`, which grew nothing and has nothing to fail.
+ * CI never runs Custom Rules on a push to `main` (there is no `push` trigger, and the nightly
+ * `schedule` skips that job); the nightly test run checks out `main`, where `origin/main` is HEAD
+ * and is accepted by this same rule.
+ * Refusing those would put them in strict no-base mode and fail them on `main`'s overages, which is
+ * the order-dependence Q-424 removed. A branch ref cannot be the PR's merge commit: checkout writes
+ * that to `refs/remotes/pull/<n>/merge`, which no default candidate names.
+ */
+function isHeadItself(ref) {
+  let fullName = '';
+  try {
+    fullName = git(['rev-parse', '--symbolic-full-name', ref]).trim();
+  } catch { /* a raw sha or an unknown name: not a branch */ }
+  if (fullName.startsWith('refs/heads/') || fullName.startsWith('refs/remotes/')) return false;
+  const head = treeOf('HEAD');
+  return head !== null && treeOf(ref) === head;
+}
 
 /** `refs` is injectable so the no-base path can be tested; callers pass nothing. */
 function resolveBaseRef(refs = DEFAULT_BASE_REFS) {
@@ -124,6 +278,7 @@ function resolveBaseRef(refs = DEFAULT_BASE_REFS) {
       // time and read as a violation each time. Probe once here instead, so a base we cannot see
       // degrades to no base at all — which is the honest, and stricter, fallback.
       git(['cat-file', '-e', `${ref}^{tree}`]);
+      if (isHeadItself(ref)) continue;
       return ref;
     } catch { /* try the next one */ }
   }
@@ -175,16 +330,38 @@ function sleep(ms) {
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
-function fileAtBase(baseRef, relPath) {
-  if (!baseRef) return null;
-  let last = null;
-  for (let i = 0; i < ATTEMPTS; i++) {
-    if (i > 0) sleep(BACKOFF_MS[i - 1]);
-    last = showAtBase(baseRef, relPath);
-    if (!last.unreadable) return last.content;
+/**
+ * `path → content | null` for every path in `relPaths`, read in one batch (#2081). The retry covers
+ * only the paths still unreadable after the previous attempt, and each one that stays unreadable
+ * warns for itself, exactly as a lone `fileAtBase` did.
+ */
+function filesAtBase(baseRef, relPaths) {
+  const out = new Map();
+  let pending = [...new Set(relPaths)];
+  if (!baseRef) {
+    for (const p of pending) out.set(p, null);
+    return out;
   }
-  warnUnreadable(baseRef, relPath, last.reason);
-  return null;
+  const reasons = new Map();
+  for (let i = 0; i < ATTEMPTS && pending.length > 0; i++) {
+    if (i > 0) sleep(BACKOFF_MS[i - 1]);
+    const read = readAtBase(baseRef, pending);
+    const next = [];
+    for (const p of pending) {
+      const r = read.get(p);
+      if (r.unreadable) { next.push(p); reasons.set(p, r.reason); } else out.set(p, r.content);
+    }
+    pending = next;
+  }
+  for (const p of pending) {
+    warnUnreadable(baseRef, p, reasons.get(p));
+    out.set(p, null);
+  }
+  return out;
+}
+
+function fileAtBase(baseRef, relPath) {
+  return filesAtBase(baseRef, [relPath]).get(relPath);
 }
 
 /**
@@ -200,8 +377,17 @@ function fileAtBase(baseRef, relPath) {
  * adds and must NOT read as a count of zero.
  */
 function countAtBase(baseRef, relPath, countFn) {
-  const content = fileAtBase(baseRef, relPath);
-  return content === null ? null : countFn(content);
+  return countsAtBase(baseRef, [relPath], countFn).get(relPath);
+}
+
+/**
+ * `countAtBase` for many files in one read — what a ratchet scanning a directory should call
+ * (#2081): collect the files it judges, then ask once. Same `null` meaning, same `countFn`.
+ */
+function countsAtBase(baseRef, relPaths, countFn) {
+  const out = new Map();
+  for (const [p, content] of filesAtBase(baseRef, relPaths)) out.set(p, content === null ? null : countFn(content));
+  return out;
 }
 
 /**
@@ -225,7 +411,11 @@ function materialiseBaseTree(baseRef, paths) {
     const tar = execFileSync('git', ['archive', baseRef, ...paths], {
       cwd: root, maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'ignore'],
     });
-    execFileSync('tar', ['-x', '-C', dir], { input: tar, stdio: ['pipe', 'ignore', 'ignore'] });
+    // #2560: extract INTO `dir` as the working directory rather than naming it with `-C`. From Git
+    // Bash on Windows, `tar` is Git's GNU tar, which reads `C:\…` as a remote `host:path` and fails
+    // — so this returned `null` there on every run, and every caller silently ran with no base.
+    // `-f -` because GNU tar's default archive is not necessarily stdin; bsdtar accepts it too.
+    execFileSync('tar', ['-x', '-f', '-'], { cwd: dir, input: tar, stdio: ['pipe', 'ignore', 'ignore'] });
     return dir;
   } catch {
     cleanupBaseTree(dir);
@@ -237,10 +427,45 @@ function cleanupBaseTree(dir) {
   if (dir) fs.rmSync(dir, { recursive: true, force: true });
 }
 
+/**
+ * #2560. The base branch's files whose paths pass `keep`, as `path → content` in memory — or `null`
+ * when there is no base, or when any part of it could not be read.
+ *
+ * The same answer `materialiseBaseTree` gives a scan over the whole base, without writing it to
+ * disk: one `git ls-tree` and one `git cat-file --batch` (the #2081 reader) instead of `git archive`,
+ * `tar -x` into a temp directory, a walk and a read of every extracted file, and a recursive delete.
+ * On Windows each of those files is opened twice more and scanned on write, which is most of what
+ * that path cost `check-memo-prop-stability` on every run.
+ *
+ * `null` on ANY unreadable blob, not a partial map, because that is what the archive did: it either
+ * produced the whole tree or failed, and its caller then ran with no base at all, which is STRICT
+ * (see `showAtBase`). A partial map would instead read a missing file as "absent at the base" and
+ * quietly change verdicts. Content is the blob's bytes, as `git show` and the archive gave them for
+ * this repository's `eol=lf` text.
+ */
+function treeFilesAtBase(baseRef, keep) {
+  if (!baseRef) return null;
+  const tree = listTree(baseRef);
+  if (!tree.ok) return null;
+  const wanted = [...tree.entries].filter(([p, e]) => e.type === 'blob' && keep(p));
+  const blobs = readBlobs([...new Map(wanted.map(([, e]) => [e.oid, e.size]))].map(([oid, size]) => ({ oid, size })));
+  const out = new Map();
+  for (const [p, e] of wanted) {
+    const b = blobs.get(e.oid);
+    if (b.content === undefined) return null;
+    out.set(p, b.content);
+  }
+  return out;
+}
+
 /** Line count as the ratchets measure it — `split('\n').length`, i.e. `wc -l` + 1. */
 function lineCountAtBase(baseRef, relPath) {
-  const content = fileAtBase(baseRef, relPath);
-  return content === null ? null : content.split('\n').length;
+  return lineCountsAtBase(baseRef, [relPath]).get(relPath);
+}
+
+/** `lineCountAtBase` for many files in one read (#2081). */
+function lineCountsAtBase(baseRef, relPaths) {
+  return countsAtBase(baseRef, relPaths, (content) => content.split('\n').length);
 }
 
 /**
@@ -300,6 +525,7 @@ function verdict({ count, limit, atBase }) {
 }
 
 module.exports = {
-  DEFAULT_BASE_REFS, resolveBaseRef, fileAtBase, showAtBase, lineCountAtBase, countAtBase, dirNamesAtBase,
-  materialiseBaseTree, cleanupBaseTree, verdict,
+  DEFAULT_BASE_REFS, resolveBaseRef, fileAtBase, filesAtBase, readAtBase, showAtBase,
+  lineCountAtBase, lineCountsAtBase, countAtBase, countsAtBase, dirNamesAtBase,
+  materialiseBaseTree, cleanupBaseTree, treeFilesAtBase, verdict,
 };

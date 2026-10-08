@@ -2,7 +2,8 @@
 
 import { memo, useState } from 'react'
 import { HR_ZONE_META } from '@trainingai/shared/health/hr-zones'
-import type { ZoneQuota, ZoneQuotaRow } from '@trainingai/shared/health/zone-quota'
+import { noHrDataCopy } from '@/components/health/hr-source-copy'
+import { quotaHasNoHrSource, type ZoneQuota, type ZoneQuotaRow } from '@trainingai/shared/health/zone-quota'
 
 interface Props {
   dayQuota: ZoneQuota
@@ -70,6 +71,19 @@ function ZoneQuotaCardImpl({ dayQuota, weekQuota, goalLabel }: Props) {
   const training = quota.zones.filter((z) => z.zoneId !== PASSIVE_ZONE_ID)
   const passive = quota.zones.find((z) => z.zoneId === PASSIVE_ZONE_ID)
   const passiveMeta = HR_ZONE_META.find((m) => m.id === PASSIVE_ZONE_ID)
+
+  // #2337 — with nothing recording heart rate every row read "0 / 108 min", a deficit nothing could
+  // have measured. Say so instead, in the words the Time in Zone card already uses for the same case.
+  // The day toggle goes with the numbers: both views are equally empty.
+  if (quotaHasNoHrSource(weekQuota) || quotaHasNoHrSource(dayQuota)) {
+    return (
+      <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--card)] p-3.5">
+        <p className="py-6 text-center text-xs text-muted-foreground">
+          {noHrDataCopy(false, 'workout')}
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--card)] p-3.5">

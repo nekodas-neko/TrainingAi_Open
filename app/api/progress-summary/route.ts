@@ -4,10 +4,12 @@ import { getRepository } from "@/lib/data";
 import { DEFAULT_TZ, todayInTz, startOfWeekInTz, aestMidnight, toAestDay, shiftDateStr } from "@trainingai/shared/date-utils";
 import { getScheduledSessionsPerWeek } from "@trainingai/shared/schedule-utils";
 import { computeWeightRateKgPerWeek } from "@trainingai/shared/health/long-term-goal-progress";
-import { nightSessions, canonicalLatestNight } from "@trainingai/shared/health/sleep-night";
+import { nightSessions, canonicalLatestNight, recordsSleep } from "@trainingai/shared/health/sleep-night";
 
 export interface ProgressSummaryResponse {
-  sleep: { lastNightHours: number | null; thisWeekHours: number };
+  // #2337: `thisWeekHours` is null when no night this week has a duration — "0 h" against a sleep
+  // goal is a claim about a week nothing recorded. A payload cached before this is still a number.
+  sleep: { lastNightHours: number | null; thisWeekHours: number | null };
   workouts: { todayComplete: boolean; completedThisWeek: number; scheduledThisWeek: number };
   bodyBaseline: { weightKg: number | null; bodyFatPct: number | null };
   // kg/week linear-regression slope over the last 14 days of weight readings —
@@ -55,9 +57,14 @@ export async function GET() {
   // total is the number that lines up with the nightly figure above it.
   const nights = nightSessions(sleepSessions, tz);
   const lastNightHours = canonicalLatestNight(nights, tz)?.durationHours ?? null;
-  const thisWeekHours = nights
+  // Missing is not zero (#2337): a week with no measured night has no total, and summing nothing into
+  // 0 told a user with no sleep source they had slept 0 h. A night that recorded nothing
+  // (`recordsSleep`) is left out rather than counted as 0; it never moved a real week's total.
+  const weekNightHours = nights
     .filter(ss => ss.date >= weekStartStr)
-    .reduce((sum, ss) => sum + (ss.durationHours ?? 0), 0);
+    .map(ss => ss.durationHours)
+    .filter((h): h is number => recordsSleep(h));
+  const thisWeekHours = weekNightHours.length > 0 ? weekNightHours.reduce((sum, h) => sum + h, 0) : null;
 
   const trainedToday = dayExercises.length > 0;
   const todayComplete = trainedToday || nextSession.isRestDay;

@@ -22,11 +22,7 @@ import { reportClientError } from '@/lib/client-error';
 import { hydrateGoalSeeds, type GoalSeedValues } from '@/lib/home/home-prefs';
 import { hydrateUserPreferences } from '@/lib/user/preferences-sync';
 import type { UserPreferences } from '@trainingai/shared/user/preferences';
-import {
-  invalidateBiometrics, invalidateProgramStructure, invalidateWorkoutSummaries,
-  invalidateMealPlans,
-  invalidateNutritionWrite, invalidateSupplements, invalidateActivityWrites, invalidateInjuryWrites, invalidateOuraSync, invalidateRunningPlan, invalidateFitnessTests,
-} from '@/lib/cache-groups';
+import { invalidatePulledDomains } from '@/lib/cache-groups';
 import { BODY_BATTERY_TTL, TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, NEXT_SESSION_TTL, NUTRITION_FOOD_LOGS_TTL, TRAINING_STRESS_TTL } from '@trainingai/shared/cache-ttl';
 import { getStepOrchestrator } from '@/lib/oura-ble/step-orchestrator';
 import { getContinuousCapture, isContinuousCaptureEnabled } from '@/lib/oura-ble/continuous-capture';
@@ -170,22 +166,7 @@ export function SyncProvider({ userId }: SyncProviderProps) {
       if (userId) {
         try {
           const delta = await pullDelta(userId);
-          if (delta && delta.synced > 0) {
-            if (delta.domains.biometrics)  await invalidateBiometrics();
-            if (delta.domains.programs)    await invalidateProgramStructure();
-            if (delta.domains.workouts)    await invalidateWorkoutSummaries();
-            if (delta.domains.nutrition)   await invalidateNutritionWrite();
-            if (delta.domains.supplements) await invalidateSupplements();
-            if (delta.domains.activity)    await invalidateActivityWrites();
-            if (delta.domains.running)     await invalidateRunningPlan();
-            // B6: the delta sets a fitnessTests flag that no consumer acted on.
-            if (delta.domains.fitnessTests) await invalidateFitnessTests();
-            if (delta.domains.injuries)    await invalidateInjuryWrites();
-            if (delta.domains.ouraDaily)   await invalidateOuraSync();
-            if (delta.domains.mealPlans)   await invalidateMealPlans();
-            // dayCheckins: no cache-groups entry — that UI reads the local store/API
-            // directly, never through the sqlite-cache layer (see SyncedDomains).
-          }
+          if (delta) await invalidatePulledDomains(delta.domains);
         } catch { /* network unavailable */ }
         if (cancelled) return;
       }
@@ -217,9 +198,13 @@ export function SyncProvider({ userId }: SyncProviderProps) {
 
     import('@capacitor/network').then(({ Network }) => {
       Network.addListener('networkStatusChange', (status) => {
-        if (status.connected) {
-          if (userId) pushMutations(userId).catch(() => {});
-          if (userId) pullDelta(userId).catch(() => {});
+        if (status.connected && userId) {
+          // Pull once the push has settled, as the mount pass does, and hand the pull's flags to
+          // the cache: the cursor moves past these rows, so nothing else will ever see them (#2550).
+          pushMutations(userId).then(() => {}, () => {})
+            .then(() => pullDelta(userId))
+            .then(res => { if (res) return invalidatePulledDomains(res.domains); })
+            .catch(() => {});
         }
       }).then((h) => { handle = h; });
     });

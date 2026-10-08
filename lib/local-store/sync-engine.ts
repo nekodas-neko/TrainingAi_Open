@@ -62,6 +62,22 @@ export type SyncedDomains = {
   mealPlans:   boolean
 }
 
+function noSyncedDomains(): SyncedDomains {
+  return {
+    biometrics: false, programs: false, workouts: false, nutrition: false,
+    supplements: false, activity: false, fitnessTests: false, running: false, injuries: false, ouraDaily: false, dayCheckins: false,
+    mealPlans: false,
+  };
+}
+
+// Every flag, not a line per flag: the per-flag list had none for `mealPlans`, so a pulled plan
+// never reached the outer result and its cache was never invalidated (#2543).
+function mergeSyncedDomains(into: SyncedDomains, from: SyncedDomains): void {
+  for (const flag of Object.keys(into) as (keyof SyncedDomains)[]) {
+    into[flag] ||= from[flag];
+  }
+}
+
 // `fullResync` re-pulls from epoch (since=0) instead of the incremental cursor. The delta
 // cursor is monotonic, so once `lastSyncAt` passes a change it is never re-carried — which
 // leaves the on-device program mirror holding stale session ids after an edit that a later
@@ -146,6 +162,11 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     deepSleepHours:  (r.deepSleepHours as number) ?? null,
     remSleepHours:   (r.remSleepHours as number) ?? null,
     lightSleepHours: (r.lightSleepHours as number) ?? null,
+    // #2414: the delta's select() has always carried these (Drizzle keys, so `awakHours`); the
+    // device dropped them, which left a cold-open hypnogram with no window to draw against.
+    sleepStart:      r.sleepStart ? toIso(r.sleepStart) : null,
+    sleepEnd:        r.sleepEnd ? toIso(r.sleepEnd) : null,
+    awakHours:       (r.awakHours as number) ?? null,
     // R6: carry the full Oura column set through pull/restore (HRV/RHR/stages), not just
     // stage hours. Server select() emits these camelCase keys; a pulled row is synced.
     ouraId:          (r.ouraId as string) ?? null,
@@ -163,6 +184,12 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     // anywhere. It is a plain value here, not a merge input: nothing on the device derives a
     // window, duration or efficiency from it.
     manualSleepStart: r.manualSleepStart ? toIso(r.manualSleepStart) : null,
+    // #2338 — a night the user entered. Carried so the device ranks it below a device night, as the
+    // server does; absent from an older server's reply, which had no manual nights to send.
+    manualEntry:     r.manualEntry === true,
+    // Issue 2606 — the tombstone of a manual night the user removed. The delta is unfiltered on it
+    // (the tombstone channel); absent from an older server's reply, which had no removals to send.
+    deletedAt:       r.deletedAt ? toIso(r.deletedAt) : null,
     syncStatus:      'synced' as const,
     updatedAt:       toIso(r.updatedAt),
   } satisfies LocalSleepSession));
@@ -658,23 +685,21 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     estBasis:    r.estBasis == null ? null : String(r.estBasis),
   } satisfies LocalPlanMealAnswer));
 
-  const count = bodyMetrics.length + moodLogs.length + sleepSessions.length +
-    workoutSessions.length + activityLogs.length + fitnessTests.length + prescribedRuns.length + programs.length + progressionStyles.length +
-    programSessions.length + sessionExercises.length + schedules.length + scheduleDays.length +
-    styleSets.length +
-    foodItems.length + foodLogs.length + supplementLogs.length + injuries.length +
-    exerciseLogs.length + setLogs.length + personalRecords.length + ouraDaily.length +
-    ouraDailySummary.length + ouraDailyDerived.length +
-    dayCheckins.length + mealPlans.length + planMealAnswers.length;
+  // Everything this page writes, named once. `count` is summed from the same object `applyDelta`
+  // is handed, so a table cannot be written without being counted (#2543): the hand-written sum
+  // this replaced left out `supplements`, and a page whose only change was a supplement definition
+  // reported `synced: 0` — which callers read as "nothing changed" and skipped invalidating.
+  const delta = { bodyMetrics, moodLogs, sleepSessions,
+    workoutSessions, activityLogs, fitnessTests, prescribedRuns, programs, programSessions, sessionExercises,
+    schedules, scheduleDays, progressionStyles, styleSets,
+    foodItems, foodLogs, supplements, supplementLogs, injuries,
+    exerciseLogs, setLogs, personalRecords, ouraDaily, ouraDailySummary, ouraDailyDerived, dayCheckins,
+    mealPlans, mealPlanVariants, mealPlanMeals, planMealAnswers };
+  const count = Object.values(delta).reduce((n, rows) => n + rows.length, 0);
 
   let prunedPrograms = 0;
   try {
-    await store!.applyDelta({ bodyMetrics, moodLogs, sleepSessions,
-      workoutSessions, activityLogs, fitnessTests, prescribedRuns, programs, programSessions, sessionExercises,
-      schedules, scheduleDays, progressionStyles, styleSets,
-      foodItems, foodLogs, supplements, supplementLogs, injuries,
-      exerciseLogs, setLogs, personalRecords, ouraDaily, ouraDailySummary, ouraDailyDerived, dayCheckins,
-      mealPlans, mealPlanVariants, mealPlanMeals, planMealAnswers });
+    await store!.applyDelta(delta);
     // RV-174: a deleted program or style leaves no row in any delta, so the mirror is pruned to the
     // server's roster. Only when the server sent one — an absent roster must never read as "none".
     const asIds = (v: unknown) => (Array.isArray(v) ? v.map(String) : undefined);
@@ -696,18 +721,26 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
       programs:    prunedPrograms > 0 || programs.length > 0 || progressionStyles.length > 0 ||
                    programSessions.length > 0 || sessionExercises.length > 0 ||
                    schedules.length > 0 || scheduleDays.length > 0 || styleSets.length > 0,
-      workouts:    workoutSessions.length > 0 || exerciseLogs.length > 0 || personalRecords.length > 0,
+      // set_logs are cursored on their own `updated_at`, so a set edited on its own arrives without
+      // its exercise log — and every workout summary is derived from sets.
+      workouts:    workoutSessions.length > 0 || exerciseLogs.length > 0 || setLogs.length > 0 ||
+                   personalRecords.length > 0,
       nutrition:   foodItems.length > 0 || foodLogs.length > 0,
       supplements: supplements.length > 0 || supplementLogs.length > 0,
       activity:    activityLogs.length > 0,
       fitnessTests: fitnessTests.length > 0,
       running:     prescribedRuns.length > 0,
       injuries:    injuries.length > 0,
+      // `ouraDailySummary` / `ouraDailyDerived` deliberately raise nothing: the phone is their only
+      // writer, so a pull carries them back only as the echo of its own backup push (or a restore),
+      // and invalidating every Oura-derived cache on each echo would blank first paint for no change.
       ouraDaily:   ouraDaily.length > 0,
       dayCheckins: dayCheckins.length > 0,
       // Rides the mealPlans flag rather than getting its own: the answers only mean anything
       // beside the plan they answer, and every consumer that reacts to one needs the other.
-      mealPlans:   mealPlans.length > 0 || planMealAnswers.length > 0,
+      // Variants and meals ride their plan's page today; listed so the flag still holds if they stop.
+      mealPlans:   mealPlans.length > 0 || mealPlanVariants.length > 0 || mealPlanMeals.length > 0 ||
+                   planMealAnswers.length > 0,
     },
     // Old servers omit hasMore entirely, which reads as false — one page, done:
     // fully backwards compatible.
@@ -721,11 +754,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
   // Surfaced on the outer return so a restore driver (restoreFromCloud) can keep pulling
   // past the 20-page-per-call cap until the server reports the delta is fully drained.
   let hasMore = false;
-  const domains: SyncedDomains = {
-    biometrics: false, programs: false, workouts: false, nutrition: false,
-    supplements: false, activity: false, fitnessTests: false, running: false, injuries: false, ouraDaily: false, dayCheckins: false,
-    mealPlans: false,
-  };
+  const domains = noSyncedDomains();
   for (let pageN = 0; pageN < 20; pageN++) {
     const pageResult = await pullPage(sinceIso);
     if (!pageResult) {
@@ -742,17 +771,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
       return { synced: total, domains, hasMore: true };
     }
     total += pageResult.count;
-    domains.biometrics  ||= pageResult.domains.biometrics;
-    domains.programs    ||= pageResult.domains.programs;
-    domains.workouts    ||= pageResult.domains.workouts;
-    domains.nutrition   ||= pageResult.domains.nutrition;
-    domains.supplements ||= pageResult.domains.supplements;
-    domains.activity    ||= pageResult.domains.activity;
-    domains.fitnessTests ||= pageResult.domains.fitnessTests;
-    domains.running     ||= pageResult.domains.running;
-    domains.injuries    ||= pageResult.domains.injuries;
-    domains.ouraDaily   ||= pageResult.domains.ouraDaily;
-    domains.dayCheckins ||= pageResult.domains.dayCheckins;
+    mergeSyncedDomains(domains, pageResult.domains);
     sinceIso = pageResult.syncedAt;
     hasMore = pageResult.hasMore;
     if (!pageResult.hasMore) break;
@@ -783,9 +802,13 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
 export async function restoreFromCloud(
   userId: string,
   onProgress?: (syncedSoFar: number) => void,
-): Promise<{ synced: number; failed: boolean } | null> {
+): Promise<{ synced: number; failed: boolean; domains: SyncedDomains } | null> {
   const store = getLocalStore(userId);
   if (!store) return null;
+  // Every page's flags, ORed, so the caller can invalidate what the restore wrote (#2550). Each
+  // pull here advances the cursor, so no later pull will ever carry these flags again — and a
+  // failed restore still returns the flags of the pages it did apply, because those rows landed.
+  const domains = noSyncedDomains();
   // A deliberate user action — clear any pull backoff so a recent transient failure
   // doesn't silently no-op the restore.
   _resetSyncBackoff();
@@ -799,12 +822,13 @@ export async function restoreFromCloud(
     // A dead pull attempt (network/auth/rate-limit) must not be reported as a completed
     // restore of zero records — the cursor is already persisted up to the last successful
     // page, so this is resumable, but the caller needs to know to retry, not treat it as done.
-    if (!res) return { synced: total, failed: true };
+    if (!res) return { synced: total, failed: true, domains };
     total += res.synced;
+    mergeSyncedDomains(domains, res.domains);
     onProgress?.(total);
     if (!res.hasMore) break;
   }
-  return { synced: total, failed: false };
+  return { synced: total, failed: false, domains };
 }
 
 /**
@@ -1152,6 +1176,15 @@ async function pushMutationsOnce(userId: string): Promise<PushResult> {
       // same convention as workout_log/activity_logs above.
       const id = m.payload.id as string | undefined;
       if (id) await store.markSleepSessionSynced(id);
+    } else if (m.domain === 'manual_sleep') {
+      // #2338. `upsertManualSleepLocally` wrote the night as 'pending'; without this the row would
+      // stay pending and every later pull would skip it, so a server-side edit never arrived.
+      const id = m.payload.id as string | undefined;
+      if (id) await store.markManualSleepSynced(id, batchIds);
+    } else if (m.domain === 'manual_bedtime') {
+      // #2547. The card wrote the bedtime to the night's local row as 'pending'; without this the
+      // row stayed pending and every later pull skipped it.
+      await store.markManualBedtimeSynced(m.date, batchIds);
     } else if (m.domain === 'oura_daily_summary') {
       await store.markOuraDailySummarySynced(m.date);
     } else if (m.domain === 'oura_daily_derived') {

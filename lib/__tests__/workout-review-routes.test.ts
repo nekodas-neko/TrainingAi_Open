@@ -28,6 +28,9 @@ const removeSessionExercise = vi.fn(async (_u: string, _id: string) => true)
 const storePrescription = vi.fn(async (_u: string, _s: string, _p: Row, _e: Date) => undefined)
 const updatePrescriptionStatus = vi.fn(async (_u: string, _s: string, _st: string) => undefined)
 const aggregateSignals = vi.fn(async (..._a: unknown[]) => signals() as Row | null)
+const loadFigureSignals = vi.fn(async (..._a: unknown[]) => ({ exercises: [
+  { sessionExerciseId: '00000000-0000-4000-8000-000000000001', muscleAssignments: [{ muscle: 'Quads', role: 'main' }], timeProfile: null, transitionSec: 240 },
+] }) as Row)
 /** Loosely typed: a model returns arbitrary JSON and the schema narrows it, so a case handing back
  *  an invented id has to be expressible here. */
 const generateObject = vi.fn(async (_o: unknown) => ({ object: aiReview() as Record<string, unknown> }))
@@ -44,6 +47,7 @@ vi.mock('@/lib/data', () => {
 })
 vi.mock('@trainingai/shared/ai-periodization/signals', () => ({
   aggregateSignals: (...a: unknown[]) => aggregateSignals(...a),
+  loadFigureSignals: (...a: unknown[]) => loadFigureSignals(...a),
 }))
 vi.mock('ai', () => ({ generateObject: (o: unknown) => generateObject(o) }))
 vi.mock('@/lib/ai/instrument', () => ({
@@ -124,7 +128,7 @@ let seq = 0
 const freshUser = () => { sessionUser = { id: `u-${++seq}`, timezone: 'Australia/Brisbane' } }
 
 beforeEach(() => {
-  for (const m of [getSessionPeriodization, getActiveProgram, listProgressionStyles,
+  for (const m of [loadFigureSignals, getSessionPeriodization, getActiveProgram, listProgressionStyles,
     removeSessionExercise, storePrescription, updatePrescriptionStatus, aggregateSignals, generateObject]) m.mockClear()
   getSessionPeriodization.mockResolvedValue(state())
   getActiveProgram.mockResolvedValue(program())
@@ -358,6 +362,52 @@ describe('POST /api/workout-review/session/[sessionId]/apply', () => {
     }))
     expect(storedPrescription().confidence).toBe(1)
     expect(storedPrescription().confidenceReasons).toEqual([])
+  })
+
+  // Issue 2592: a kept deloaded row (with its `preDeload`) means Full trains something else, so the
+  // rebuilt blob carries a `fullSession` costed through the one figures function.
+  const deloadedSquat = {
+    sessionExerciseId: SQUAT, name: 'Squat', sets: 2, reps: 5, pct: 55, restSec: 120,
+    deloaded: true, preDeload: { sets: 4, reps: 5, pct: 80, restSec: 180 },
+  }
+  const existingWithDeload = () => state({
+    prescriptionStatus: 'accepted',
+    prescription: {
+      phase: 'accumulation', phaseAction: 'stay', exercises: [deloadedSquat], deload: false, reasoning: 'r',
+      confidence: 1, estimatedSessionDurationMin: 40, weeklyVolumeContribution: { quads: 2 },
+    },
+  })
+
+  it('carries fullSession for a kept deloaded row, costed over the stored figures', async () => {
+    getSessionPeriodization.mockResolvedValue(existingWithDeload())
+    await applyPost(validApply({
+      estimatedSessionDurationMin: 50,
+      adjustments: [{ sessionExerciseId: ROW, sets: 4, reps: 8, pct: 72, restSec: 120 }],
+    }))
+    const p = storedPrescription()
+    expect(p.estimatedSessionDurationMin).toBe(50)
+    const rows = p.exercises as Row[]
+    expect(rows.find(e => e.sessionExerciseId === SQUAT)).toMatchObject({ deloaded: true, preDeload: { sets: 4 } })
+    const full = p.fullSession as { estimatedSessionDurationMin: number; weeklyVolumeContribution: Record<string, number> }
+    expect(full.estimatedSessionDurationMin).toBeGreaterThan(50)
+    expect(full.weeklyVolumeContribution.quads).toBe(4) // stored 2 + (4 full sets - 2 deload sets)
+  })
+
+  it('stores no fullSession when no kept row has anything to revert', async () => {
+    await applyPost(validApply({ adjustments: [{ sessionExerciseId: ROW, sets: 4, reps: 8, pct: 72, restSec: 120 }] }))
+    expect(storedPrescription().fullSession).toBeUndefined()
+  })
+
+  it('still stores the apply, without a fullSession, when the figure inputs cannot be loaded', async () => {
+    getSessionPeriodization.mockResolvedValue(existingWithDeload())
+    loadFigureSignals.mockRejectedValueOnce(new Error('db down'))
+    const res = await applyPost(validApply({
+      estimatedSessionDurationMin: 50,
+      adjustments: [{ sessionExerciseId: ROW, sets: 4, reps: 8, pct: 72, restSec: 120 }],
+    }))
+    expect(res.status).toBe(200)
+    expect(storedPrescription().fullSession).toBeUndefined()
+    expect(storedPrescription().estimatedSessionDurationMin).toBe(50)
   })
 
   it('raises a set count below its role floor instead of writing it', async () => {

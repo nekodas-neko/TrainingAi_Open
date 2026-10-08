@@ -26,6 +26,20 @@ export interface ZoneQuota {
   trainingTargetMin: number
   trainingDoneMin: number
   trainingRemainingMin: number
+  /**
+   * #2337 — `false` means nothing has recorded this person's heart rate (`hasHrSource` in
+   * `health/hr-profile.ts`), so every `doneMin` above is 0 because nothing COULD fill it, not
+   * because nothing was done. A consumer shows absence and never reads the zeros as a deficit.
+   * `null` is unknown (the read failed). Optional because a payload cached before it existed has
+   * no such field — absent is treated exactly as before, as a measured week.
+   */
+  hasHrSource?: boolean | null
+}
+
+/** True only when the quota is KNOWN to have nothing behind it — absent and `null` both keep the
+ *  old behaviour, so an older cached payload and a failed read never hide a real week. */
+export function quotaHasNoHrSource(quota: Pick<ZoneQuota, 'hasHrSource'> | null | undefined): boolean {
+  return quota?.hasHrSource === false
 }
 
 /** The zone below which time accrues from ordinary daily movement rather than training. */
@@ -34,6 +48,7 @@ const PASSIVE_ZONE_ID = 1
 export function computeZoneQuota(
   targets: readonly ZoneTarget[],
   days: readonly { seconds: readonly [number, number, number, number, number] }[],
+  opts?: { hasHrSource?: boolean | null },
 ): ZoneQuota {
   const doneSec = [0, 0, 0, 0, 0]
   for (const d of days) {
@@ -56,6 +71,9 @@ export function computeZoneQuota(
     trainingTargetMin: training.reduce((s, z) => s + z.targetMin, 0),
     trainingDoneMin: training.reduce((s, z) => s + z.doneMin, 0),
     trainingRemainingMin: training.reduce((s, z) => s + z.remainingMin, 0),
+    // Carried only when the caller knows — no key at all otherwise, so a quota computed without it
+    // is byte-identical to one computed before #2337.
+    ...(opts?.hasHrSource !== undefined ? { hasHrSource: opts.hasHrSource } : {}),
   }
 }
 

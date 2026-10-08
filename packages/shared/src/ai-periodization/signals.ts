@@ -1,5 +1,4 @@
 import type { WorkoutRepository } from '@/lib/data/repository'
-import type { SessionPeriodization } from '@trainingai/shared/types/ai-periodization'
 import { todayInTz, todayMidnightUtc, toAestDay, startOfWeekInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 import { confidenceFactors, computeConfidence } from '@trainingai/shared/ai-periodization/confidence'
 import { perExerciseRpeDelta, rpeTrendFromSets } from '@trainingai/shared/ai-periodization/expected-rpe'
@@ -10,13 +9,14 @@ import { sleepDurationTrend, sleepScoreTrend } from '@trainingai/shared/health/s
 import { moodMuscleMatches, normalizeMuscle } from '@trainingai/shared/muscles'
 import { sessionsRemainingThisWeek } from '@trainingai/shared/schedule-utils'
 import { volumeLandmarks } from '@trainingai/shared/ai-periodization/volume-targets'
-import { projectRm } from '@trainingai/shared/health/strength-projection'
+import { isRmPlateau } from '@trainingai/shared/health/strength-projection'
 import { oneRmTrendStatus } from '@trainingai/shared/1rm'
 import { workingBudgetMin, planningBudgetMin } from '@trainingai/shared/workout/duration-model'
 import { buildTimeProfiles, type ExerciseTimeProfile } from '@trainingai/shared/workout/time-profile'
 import { robustAvgSetDurationsByExercise, buildMeasuredTimeBudget, resolveTransitionSec } from '@trainingai/shared/workout/time-audit'
 import { excludeLowWearDays, toOuraByDate } from '@trainingai/shared/health/wear-confidence'
 import { answeredMorningScales } from '@trainingai/shared/health/self-report'
+import type { FigureSignals, FigureSignalExercise } from '@trainingai/shared/ai-periodization/prescription-figures'
 
 export interface PrescriptionSignals {
   trainingGoal: string
@@ -124,6 +124,54 @@ export interface PrescriptionSignals {
   confidence: number
   // Plain-English factors limiting confidence (empty when the engine has full data).
   confidenceReasons: string[]
+}
+
+/** The three per-exercise inputs `prescriptionFigures` costs a row with: its muscle credit, its
+ *  measured time profile and its transition time. Derived HERE, once, for the generation path
+ *  (`aggregateSignals`) and the consumption-day re-cost (`loadFigureSignals`), so the two cannot
+ *  cost the same row differently. */
+export function figureInputsFor(
+  ex: { exerciseName: string; muscleGroups: string[] },
+  maps: {
+    muscleAssignmentsMap: Record<string, FigureSignalExercise['muscleAssignments']>
+    equipmentMap: Record<string, string[]>
+    timeProfiles: Record<string, ExerciseTimeProfile>
+    measuredTimeBudget: ReturnType<typeof buildMeasuredTimeBudget>
+  },
+): Omit<FigureSignalExercise, 'sessionExerciseId'> {
+  const libraryAssignments = maps.muscleAssignmentsMap[ex.exerciseName]
+  return {
+    muscleAssignments: libraryAssignments && libraryAssignments.length > 0
+      ? libraryAssignments
+      : ex.muscleGroups.map(mg => ({ muscle: mg, role: 'main' as const })),
+    timeProfile: maps.timeProfiles[ex.exerciseName] ?? null,
+    transitionSec: resolveTransitionSec(ex.exerciseName, maps.equipmentMap[ex.exerciseName], maps.measuredTimeBudget),
+  }
+}
+
+/** What `prescriptionFigures` needs and nothing more: the cheap loader for a path that must re-cost
+ *  a stored prescription without running the whole signal aggregation (consumption-day
+ *  re-evaluation, Workout Review apply). Four indexed reads, none of which call a model. */
+export async function loadFigureSignals(
+  repo: WorkoutRepository,
+  userId: string,
+  programSession: { exercises: Array<{ id: string; exerciseName: string; muscleGroups: string[] }> },
+): Promise<FigureSignals> {
+  const exerciseNames = programSession.exercises.map(e => e.exerciseName)
+  const [timingRows, muscleAssignmentsMap, equipmentMap, timingAudit] = await Promise.all([
+    repo.getSetTimingRows(userId, exerciseNames),
+    repo.getExerciseMuscleAssignments(exerciseNames),
+    repo.getExerciseEquipment(exerciseNames),
+    repo.getTimingAuditData(userId, 90),
+  ])
+  const timeProfiles = buildTimeProfiles(timingRows)
+  const measuredTimeBudget = buildMeasuredTimeBudget(timingAudit.sessions, timingAudit.sets, timingAudit.exercises)
+  return {
+    exercises: programSession.exercises.map(ex => ({
+      sessionExerciseId: ex.id,
+      ...figureInputsFor(ex, { muscleAssignmentsMap, equipmentMap, timeProfiles, measuredTimeBudget }),
+    })),
+  }
 }
 
 // The subset of per-exercise signal the AI-prescription CARD renders — identity, role, and the
@@ -290,13 +338,12 @@ export async function aggregateSignals(
     const card = cardSignalsById.get(ex.id)!
     const baseline = state.baseline1rm[ex.id]?.kg ?? null
 
-    const libraryAssignments = muscleAssignmentsMap[ex.exerciseName]
-    const muscleAssignments = libraryAssignments && libraryAssignments.length > 0
-      ? libraryAssignments
-      : ex.muscleGroups.map(mg => ({ muscle: mg, role: 'main' as const }))
+    const { muscleAssignments, timeProfile, transitionSec } = figureInputsFor(ex, {
+      muscleAssignmentsMap, equipmentMap, timeProfiles, measuredTimeBudget,
+    })
 
     const rm1History = rm1Histories[ex.exerciseName] ?? []
-    const plateau = rm1History.length >= 4 ? (projectRm(rm1History)?.plateau ?? false) : false
+    const plateau = isRmPlateau(rm1History)
 
     return {
       sessionExerciseId: card.sessionExerciseId,
@@ -309,10 +356,10 @@ export async function aggregateSignals(
       rm1Trend: card.rm1Trend,
       rm1ChangeKg: card.rm1ChangeKg,
       avgSetDurationSec: avgSetDurations[ex.exerciseName] ?? 45,
-      timeProfile: timeProfiles[ex.exerciseName] ?? null,
+      timeProfile,
       exerciseType: exerciseTypeMap[ex.exerciseName] ?? null,
       equipment: equipmentMap[ex.exerciseName] ?? [],
-      transitionSec: resolveTransitionSec(ex.exerciseName, equipmentMap[ex.exerciseName], measuredTimeBudget),
+      transitionSec,
       plateau,
       baseSets: (ex.styleId ? setsByStyleId.get(ex.styleId) : undefined) ?? [],
     }

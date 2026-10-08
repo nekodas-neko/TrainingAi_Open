@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { todayInTz } from '@trainingai/shared/date-utils'
 
 // Q-291 — on 2026-08-06 the morning readiness insight said "Keep your planned exercise intensity
 // low"; that evening the digest said "Keep that same energy tomorrow!". Neither surface could see
@@ -7,7 +6,6 @@ import { todayInTz } from '@trainingai/shared/date-utils'
 // show that the route wired the helper in — and cannot show it wired it in on the hashed side.
 
 const USER_ID = '00000000-0000-4000-8000-000000000291'
-const TODAY = todayInTz('Australia/Brisbane')
 
 let captured = ''
 let storedHash: string | undefined

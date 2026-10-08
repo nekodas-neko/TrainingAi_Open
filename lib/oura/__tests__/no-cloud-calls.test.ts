@@ -59,6 +59,7 @@ function codeOf(src: string): string {
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
+    if (name === '__check_fixture__') continue
     const full = join(dir, name)
     if (statSync(full).isDirectory()) walk(full, out)
     else if (/\.(ts|tsx)$/.test(name)) out.push(full)

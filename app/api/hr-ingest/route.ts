@@ -10,6 +10,7 @@ import {
   rrContradictsBpm,
 } from '@trainingai/shared/validation/plausibility'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { toAestDay, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 
 // 2,000 samples of `{at, bpm, rr[<=16]}` is ~240 KB of JSON at the schema's own limit. 512 KB
 // matches the `oura-ble/samples` sibling.
@@ -83,7 +84,18 @@ export async function POST(req: Request) {
   const hrSamples = samples
     .filter(s => s.bpm >= BPM_MIN && s.bpm <= BPM_MAX)
     .map(s => ({ timestamp: new Date(s.at), bpm: s.bpm, source: 'chest_strap' as const }))
-  if (hrSamples.length > 0) await repo.upsertOuraHeartrate(userId, hrSamples)
+  if (hrSamples.length > 0) {
+    await repo.upsertOuraHeartrate(userId, hrSamples)
+    // #2439. A day's time-in-zone is cached the first time it is read and trusted afterwards, and
+    // this route accepts samples up to seven days old: a strap backlog (phone offline overnight,
+    // then a flush) for a day that was already read would leave its split stale for good. The
+    // rollup and the Health Connect writer drop the cached days their data touches; a ring user
+    // never noticed because the rollup wipes the last 14 on every pass. After the write, never
+    // before, so a read in between cannot recompute from rows about to change. The day is the
+    // user's, because that is how the cache is keyed.
+    const earliest = hrSamples.reduce((min, r) => Math.min(min, r.timestamp.getTime()), Infinity)
+    await repo.dropZoneMinutesFrom(userId, toAestDay(new Date(earliest), session.user.timezone ?? DEFAULT_TZ))
+  }
 
   // Reconstruct per-beat wall-clock times by walking BACKWARDS from the packet
   // receive time: the last RR ended at `at`, the one before ended rr[last] earlier.

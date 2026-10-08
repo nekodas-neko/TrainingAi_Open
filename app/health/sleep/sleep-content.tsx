@@ -1,22 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { HealthScoreDetail } from "@/components/health/health-score-detail";
 import { ManualBedtimeCard } from "@/components/health/sleep/manual-bedtime-card";
+import { ManualNightCard } from "@/components/health/sleep/manual-night-card";
 import { ProvisionalBadge } from "@/components/health/provisional-badge";
 import { sleepCoverageNote } from "@/components/health/body-cards/sleep-coverage-note";
 import { Hypnogram } from "@/components/health/hypnogram";
 import { TrendSparkline } from "@/components/health/trend-sparkline-lazy";
+import { TREND_EMPTY } from "@/components/health/trend-empty-copy";
 import { SleepTrendToggleCard } from "@/components/health/sleep-trend-toggle-card-lazy";
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
 import { TTL_MEDIUM } from "@trainingai/shared/cache-ttl";
 import { computeSleepStartConsistency } from "@trainingai/shared/health/sleep-consistency";
 import { getLocalStore } from "@/lib/local-store";
-import { todayMidnightUtc, toAestDay } from "@trainingai/shared/date-utils";
+import { localSleepRowsAsNights } from "@/lib/sleep/merge-sessions";
+import { todayMidnightUtc, toAestDay, todayInTz } from "@trainingai/shared/date-utils";
+import { lastNightState, withPendingManualWrites } from "@/lib/sleep/manual-night-view";
 import { useInvalidationRefetch } from "@/lib/hooks/use-invalidation-refetch";
 
 interface SleepSessionRow {
+  id?: string;
+  /** Issue 2338: entered by hand. Only ever true on a night no device recorded. */
+  manualEntry?: boolean;
   date: string;
   sleepPhase5Min: string | null;
   sleepStart: string | null;
@@ -35,42 +42,67 @@ interface SleepSessionRow {
 export function SleepContent({ userId }: { userId?: string }) {
   const tz = useUserTimezone();
   const [sleepRows, setSleepRows] = useState<SleepSessionRow[]>([]);
+  // The entry card must not flash in before the rows are known: a user whose ring recorded last
+  // night would see "No night recorded" for a moment on a cold open.
+  const [loaded, setLoaded] = useState(false);
+  const rowsRef = useRef(sleepRows);
+  rowsRef.current = sleepRows;
+  const today = todayInTz(tz);
+  const cutoffDate = useCallback(
+    () => toAestDay(new Date(todayMidnightUtc(tz).getTime() - 30 * 24 * 60 * 60 * 1000), tz),
+    [tz],
+  );
+
+  // A server reply lags this device's own manual-night writes until the outbox pushes: it still holds
+  // a night just removed and lacks one just typed. Applied to every reply, not only the first.
+  const applyServerRows = useCallback((rows: SleepSessionRow[] | null) => {
+    if (!rows) return;
+    void withPendingManualWrites(rows, userId, cutoffDate()).then(r => { setSleepRows(r); setLoaded(true); });
+  }, [userId, cutoffDate]);
+
+  // After the card saves or removes a night, show it at once from the local store (no network wait
+  // on the device); the invalidation the writer fires then refetches the server copy.
+  const onNightChanged = useCallback(() => {
+    void withPendingManualWrites(rowsRef.current, userId, cutoffDate()).then(setSleepRows);
+  }, [userId, cutoffDate]);
 
   useEffect(() => {
     const cached = readCacheSync<SleepSessionRow[]>("sleep-sessions");
-    if (cached) setSleepRows(cached);
+    if (cached) { setSleepRows(cached); setLoaded(true); }
     // Local-first: read from the on-device store before the network reply lands, mirroring
-    // health-content.tsx's main-screen pattern (same sleep domain, sibling surface). The local
-    // sleep table doesn't yet carry hypnogram/phase-window fields, so a local-only row renders
-    // without the Hypnogram/consistency card until the network response (or a store schema
-    // extension) fills those in — still correct, since every field check here is a `!= null`
-    // guard that treats an absent field as "no data yet", not an error.
+    // health-content.tsx's main-screen pattern (same sleep domain, sibling surface). #2414: the
+    // local table carries the night's window since SQLite v50, so a row pulled since then draws
+    // the hypnogram offline. A row pulled before v50 has none and still renders without the
+    // Hypnogram/consistency card until the network fills it — every field check here is a
+    // `!= null` guard that reads an absent field as "no data yet", not an error.
     if (userId) {
       const store = getLocalStore(userId);
       if (store) {
         const cutoff = new Date(todayMidnightUtc(tz).getTime() - 30 * 24 * 60 * 60 * 1000);
         store.getSleepSessions(toAestDay(cutoff, tz)).then(localSleep => {
-          if (localSleep.length > 0) setSleepRows(prev => (prev.length > 0 ? prev : localSleep as unknown as SleepSessionRow[]));
-        });
+          if (localSleep.length > 0) setSleepRows(prev => (prev.length > 0 ? prev : localSleepRowsAsNights(localSleep)));
+          // The device is the source of truth: an empty local read is an answer, not "not loaded".
+          setLoaded(true);
+        }).catch(() => {});
       }
     }
-    cachedFetch<SleepSessionRow[]>("sleep-sessions", "/api/sleep-sessions", TTL_MEDIUM, rows => {
-      if (rows) setSleepRows(rows);
-    });
-  }, [userId, tz]);
+    cachedFetch<SleepSessionRow[]>("sleep-sessions", "/api/sleep-sessions", TTL_MEDIUM, applyServerRows);
+  }, [userId, tz, applyServerRows]);
 
   // Q-91: a BLE drain settling or an admin Redecode both invalidate the 'sleep-sessions'
   // cache entry (invalidateOuraSync) but this screen, once mounted, never learned to
   // refetch it — the hypnogram looked "stuck missing" until the next navigate-away/remount.
   // Mirrors session-select-content.tsx's existing listener for the same event.
   useInvalidationRefetch("sleep-sessions", () => {
-    cachedFetch<SleepSessionRow[]>("sleep-sessions", "/api/sleep-sessions", TTL_MEDIUM, rows => {
-      if (rows) setSleepRows(rows);
-    });
+    cachedFetch<SleepSessionRow[]>("sleep-sessions", "/api/sleep-sessions", TTL_MEDIUM, applyServerRows);
   });
 
   // Rows are ordered most-recent-first — the latest logged night.
   const latest = sleepRows[0];
+  const lastNight = lastNightState(sleepRows, today);
+  // A typed night has no stages and no measured start, so the stage card and the bedtime-adjust card
+  // (both about what a device observed) stay out of its way.
+  const latestIsTyped = latest?.manualEntry === true;
   const recentStarts = sleepRows.slice(0, 7).map(r => r.sleepStart).filter((s): s is string => s != null);
   // DV-9. Without a zone each bedtime lands in the DEVICE's clock, so the figure moves when the
   // phone travels. The server route already passes the session timezone; this screen did not.
@@ -91,6 +123,15 @@ export function SleepContent({ userId }: { userId?: string }) {
       contributorChart
       sparklineColor="#818cf8"
       contributorsTitle="Sleep Contributors"
+      // Issue 2338: under the score, only when last night has no device night.
+      leadCard={loaded && userId && lastNight.kind !== "device" ? (
+        <ManualNightCard
+          userId={userId}
+          wakeDate={today}
+          night={lastNight.kind === "manual" ? lastNight.night : null}
+          onChanged={onNightChanged}
+        />
+      ) : null}
       extraCards={(data, _color, trends) => (
         <>
           {/* #2280 (OR-204): the Home chip marks a night scored on incomplete inputs with a glyph and
@@ -133,7 +174,7 @@ export function SleepContent({ userId }: { userId?: string }) {
             </div>
           )}
 
-          {latest && (
+          {latest && !latestIsTyped && (
             <div className="rounded-xl border border-border bg-muted/20 p-4">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2">Sleep Stages</p>
               {latest.sleepPhase5Min && latest.sleepStart && latest.sleepEnd ? (
@@ -145,13 +186,13 @@ export function SleepContent({ userId }: { userId?: string }) {
                 />
               ) : (
                 <p className="text-xs text-muted-foreground">
-                  No sleep-stage data for last night yet — this shows up once your ring syncs.
+                  No sleep-stage data for last night yet — stages come from a ring or Health Connect.
                 </p>
               )}
             </div>
           )}
 
-          {latest && (
+          {latest && !latestIsTyped && (
             <ManualBedtimeCard date={latest.date} measuredStart={latest.sleepStart} userId={userId} />
           )}
 
@@ -169,7 +210,7 @@ export function SleepContent({ userId }: { userId?: string }) {
 
           {last14Nights.length > 0 && <SleepTrendToggleCard nights={last14Nights} />}
 
-          {trends && <TrendSparkline trends={trends} field="temperatureDeviation" label="Skin Temperature" color="#f97316" unit="°C" />}
+          {trends && <TrendSparkline trends={trends} field="temperatureDeviation" label="Skin Temperature" color="#f97316" unit="°C" emptyText={TREND_EMPTY.temperatureDeviation} />}
         </>
       )}
     />

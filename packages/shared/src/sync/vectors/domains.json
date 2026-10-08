@@ -1,0 +1,495 @@
+{
+  "formatVersion": 1,
+  "vectors": [
+    {
+      "name": "a confirmed body-metrics write is marked synced and leaves the outbox",
+      "kind": "domain", "covers": "body_metrics",
+      "guarantee": "A pending body_metrics row whose mutation the server accepts is flipped to synced, keeps its values, and its outbox entry is removed.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "body_metrics": [{ "date": "2026-09-30", "weight_kg": 81, "updated_at": "2026-09-30T20:00:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "body_metrics", "date": "2026-09-30", "payload": { "weightKg": 81 } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [{ "table": "body_metrics", "columns": ["date", "weight_kg", "sync_status"], "rows": [{ "date": "2026-09-30", "weight_kg": 81, "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "body_metrics", "date": "2026-09-30", "payload": { "weightKg": 81 } }]
+      }
+    },
+    {
+      "name": "a confirmed mood log is marked synced and leaves the outbox",
+      "kind": "domain", "covers": "mood_logs",
+      "guarantee": "A pending mood_logs row whose mutation the server accepts is flipped to synced and its outbox entry is removed.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "mood_logs": [{ "log_date": "2026-09-30", "energy_level": "high", "sleep_quality": "good", "updated_at": "2026-09-30T20:00:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "mood_logs", "date": "2026-09-30", "payload": { "energyLevel": "high", "sleepQuality": "good" } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [{ "table": "mood_logs", "columns": ["log_date", "energy_level", "sync_status"], "rows": [{ "log_date": "2026-09-30", "energy_level": "high", "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "mood_logs", "date": "2026-09-30" }]
+      }
+    },
+    {
+      "name": "a confirmed food log is marked synced and leaves the outbox",
+      "kind": "domain", "covers": "food_logs",
+      "guarantee": "A pending food log whose mutation the server accepts is flipped to synced by id and its outbox entry is removed.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "food_items": [{ "id": "fi-1", "name": "Oats", "serving_size_g": 40, "calories": 150, "protein_g": 5, "carbs_g": 27, "fat_g": 3, "updated_at": "2026-09-29T07:00:00.000Z" }],
+        "food_logs": [{ "id": "fl-1", "date": "2026-09-30", "meal_type_id": "mt-1", "food_item_id": "fi-1", "quantity_multiplier": 1, "logged_at": "2026-09-30T07:00:00.000Z", "updated_at": "2026-09-30T07:00:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "food_logs", "date": "2026-09-30", "payload": { "id": "fl-1", "foodItemId": "fi-1", "mealTypeId": "mt-1", "quantityMultiplier": 1 } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [{ "table": "food_logs", "columns": ["id", "deleted_at", "sync_status"], "rows": [{ "id": "fl-1", "deleted_at": null, "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "food_logs", "date": "2026-09-30", "payload": { "id": "fl-1" } }]
+      }
+    },
+    {
+      "name": "a confirmed food item leaves the outbox and the local item stays",
+      "kind": "domain", "covers": "food_items",
+      "guarantee": "A food_items mutation the server accepts is removed from the outbox; the local item, which carries no sync status, is untouched.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "food_items": [{ "id": "fi-1", "name": "Oats", "serving_size_g": 40, "calories": 150, "protein_g": 5, "carbs_g": 27, "fat_g": 3, "updated_at": "2026-09-29T07:00:00.000Z" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "food_items", "date": "2026-09-30", "payload": { "id": "fi-1", "name": "Oats", "calories": 150 } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [{ "table": "food_items", "columns": ["id", "name", "calories"], "rows": [{ "id": "fi-1", "name": "Oats", "calories": 150 }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "food_items", "date": "2026-09-30", "payload": { "id": "fi-1" } }]
+      }
+    },
+    {
+      "name": "a supplement tick pushes the dose and time it was taken at, then is marked synced",
+      "kind": "domain", "covers": "supplement_logs",
+      "guarantee": "The push enriches a supplement_logs mutation with the dose, taken_at and vial triple stamped on the local row (BF-3, LA-97), and the confirm flips the row to synced without moving taken_at.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "supplements": [{ "id": "sup-1", "name": "Creatine", "dose": "5 g", "default_amount": 5, "unit": "g", "sort_order": 0, "active": 1, "updated_at": "2026-09-01T00:00:00.000Z", "sync_status": "synced" }],
+        "supplement_logs": [{ "id": "sl-1", "supplement_id": "sup-1", "log_date": "2026-09-30", "amount": 5, "unit": "g", "dose_text": "5 g", "source": "manual", "taken_at": "2026-09-30T07:15:00.000Z", "updated_at": "2026-09-30T07:15:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "supplement_logs", "date": "2026-09-30", "payload": { "supplementId": "sup-1", "logDate": "2026-09-30" } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [{ "table": "supplement_logs", "columns": ["id", "amount", "taken_at", "sync_status"], "rows": [{ "id": "sl-1", "amount": 5, "taken_at": "2026-09-30T07:15:00.000Z", "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "supplement_logs", "date": "2026-09-30", "payload": { "supplementId": "sup-1", "amount": 5, "unit": "g", "doseText": "5 g", "takenAt": "2026-09-30T07:15:00.000Z", "vialStrengthMg": null, "vialWaterMl": null, "vialUnitsPerMl": null } }]
+      }
+    },
+    {
+      "name": "a confirmed injury is marked synced and leaves the outbox",
+      "kind": "domain", "covers": "injuries",
+      "guarantee": "A pending injury whose mutation the server accepts is flipped to synced and its outbox entry is removed.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "injuries": [{ "id": "inj-1", "muscle_name": "Hamstrings", "severity": "mild", "started_date": "2026-09-28", "created_at": "2026-09-28T09:00:00.000Z", "updated_at": "2026-09-28T09:00:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "injuries", "date": "2026-09-28", "payload": { "id": "inj-1", "muscleName": "Hamstrings" } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [{ "table": "injuries", "columns": ["id", "sync_status"], "rows": [{ "id": "inj-1", "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "injuries", "payload": { "id": "inj-1" } }]
+      }
+    },
+    {
+      "name": "a confirmed supplement definition is marked synced (Q-124)",
+      "kind": "domain", "covers": "supplements",
+      "guarantee": "A pending supplement whose mutation the server accepts is flipped to synced, so the next pull may update it again.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "supplements": [{ "id": "sup-1", "name": "Creatine", "sort_order": 0, "active": 1, "updated_at": "2026-09-30T00:00:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "supplements", "date": "2026-09-30", "payload": { "id": "sup-1", "name": "Creatine" } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [{ "table": "supplements", "columns": ["id", "sync_status"], "rows": [{ "id": "sup-1", "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "supplements", "payload": { "id": "sup-1" } }]
+      }
+    },
+    {
+      "name": "a confirmed activity is marked synced and leaves the outbox",
+      "kind": "domain", "covers": "activity_logs",
+      "guarantee": "A pending activity whose mutation the server accepts is flipped to synced and its outbox entry is removed.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "activity_logs": [{ "id": "act-1", "date": "2026-09-30", "activity_type": "walk", "title": "Evening walk", "start_time": "18:00:00", "updated_at": "2026-09-30T09:00:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "activity_logs", "date": "2026-09-30", "payload": { "id": "act-1", "activityType": "walk" } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [{ "table": "activity_logs", "columns": ["id", "start_time", "sync_status"], "rows": [{ "id": "act-1", "start_time": "18:00:00", "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "activity_logs", "payload": { "id": "act-1" } }]
+      }
+    },
+    {
+      "name": "a confirmed fitness test is marked synced and leaves the outbox",
+      "kind": "domain", "covers": "fitness_tests",
+      "guarantee": "A pending fitness test whose mutation the server accepts is flipped to synced and its outbox entry is removed.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "fitness_tests": [{ "id": "ft-1", "test_type": "cooper", "date": "2026-09-30", "distance_m": 2800, "updated_at": "2026-09-30T09:00:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "fitness_tests", "date": "2026-09-30", "payload": { "id": "ft-1", "testType": "cooper" } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [{ "table": "fitness_tests", "columns": ["id", "distance_m", "sync_status"], "rows": [{ "id": "ft-1", "distance_m": 2800, "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "fitness_tests", "payload": { "id": "ft-1" } }]
+      }
+    },
+    {
+      "name": "a confirmed prescribed-run change is marked synced and leaves the outbox",
+      "kind": "domain", "covers": "prescribed_run",
+      "guarantee": "A pending prescribed run whose mutation the server accepts is flipped to synced and its outbox entry is removed.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "prescribed_runs": [{ "id": "pr-1", "plan_id": "plan-1", "date": "2026-09-30", "run_type": "easy", "status": "completed", "activity_log_id": "act-1", "updated_at": "2026-09-30T09:00:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "prescribed_run", "date": "2026-09-30", "payload": { "id": "pr-1", "status": "completed", "activityLogId": "act-1" } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [{ "table": "prescribed_runs", "columns": ["id", "status", "sync_status"], "rows": [{ "id": "pr-1", "status": "completed", "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "prescribed_run", "payload": { "id": "pr-1" } }]
+      }
+    },
+    {
+      "name": "a confirmed workout log marks its session, log and sets synced",
+      "kind": "domain", "covers": "workout_log",
+      "guarantee": "A workout_log mutation the server accepts flips the session, that exercise log and its sets to synced, and leaves the outbox.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "workout_sessions": [{ "id": "ws-1", "session_name": "Upper A", "started_at": "2026-10-01T01:00:00.000Z", "updated_at": "2026-10-01T01:59:00.000Z", "sync_status": "pending" }],
+        "exercise_logs": [{ "id": "el-1", "workout_session_id": "ws-1", "exercise_name": "Bench Press", "logged_at": "2026-10-01T01:10:00.000Z", "updated_at": "2026-10-01T01:59:00.000Z", "sync_status": "pending" }],
+        "set_logs": [{ "id": "s-1", "exercise_log_id": "el-1", "set_number": 1, "weight_kg": 80, "reps": 5, "updated_at": "2026-10-01T01:59:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "workout_log", "date": "2026-10-01", "payload": { "workoutSessionId": "ws-1", "exerciseLogId": "el-1", "exerciseName": "Bench Press" } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [
+          { "table": "workout_sessions", "columns": ["id", "sync_status"], "rows": [{ "id": "ws-1", "sync_status": "synced" }] },
+          { "table": "exercise_logs", "columns": ["id", "sync_status"], "rows": [{ "id": "el-1", "sync_status": "synced" }] },
+          { "table": "set_logs", "columns": ["id", "sync_status"], "rows": [{ "id": "s-1", "sync_status": "synced" }] }
+        ],
+        "outbox": [],
+        "pushed": [{ "domain": "workout_log", "payload": { "workoutSessionId": "ws-1", "exerciseLogId": "el-1" } }]
+      }
+    },
+    {
+      "name": "a confirmed day check-in is marked synced and leaves the outbox",
+      "kind": "domain", "covers": "day_checkins",
+      "guarantee": "A pending day check-in whose mutation the server accepts is flipped to synced, keyed on its date and phase.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "day_checkins": [{ "log_date": "2026-09-30", "phase": "evening", "physical_tiredness": 3, "updated_at": "2026-09-30T11:00:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "day_checkins", "date": "2026-09-30", "payload": { "phase": "evening", "physicalTiredness": 3 } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [{ "table": "day_checkins", "columns": ["log_date", "phase", "physical_tiredness", "sync_status"], "rows": [{ "log_date": "2026-09-30", "phase": "evening", "physical_tiredness": 3, "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "day_checkins", "date": "2026-09-30", "payload": { "phase": "evening" } }]
+      }
+    },
+    {
+      "name": "a confirmed session RPE marks the session synced",
+      "kind": "domain", "covers": "session_rpe",
+      "guarantee": "A session_rpe mutation the server accepts flips its session to synced, because the confirm does not count the mutation it is confirming (LA-165).",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "workout_sessions": [{ "id": "ws-1", "session_name": "Upper A", "started_at": "2026-10-01T01:00:00.000Z", "session_rpe": 7, "updated_at": "2026-10-01T01:59:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "session_rpe", "date": "2026-10-01", "payload": { "workoutSessionId": "ws-1", "sessionRpe": 7 } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [{ "table": "workout_sessions", "columns": ["id", "session_rpe", "sync_status"], "rows": [{ "id": "ws-1", "session_rpe": 7, "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "session_rpe", "payload": { "workoutSessionId": "ws-1", "sessionRpe": 7 } }]
+      }
+    },
+    {
+      "name": "a confirmed workout completion marks the session synced",
+      "kind": "domain", "covers": "complete_workout",
+      "guarantee": "A complete_workout mutation the server accepts flips its session to synced and keeps completed_at.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "workout_sessions": [{ "id": "ws-1", "session_name": "Upper A", "started_at": "2026-10-01T01:00:00.000Z", "completed_at": "2026-10-01T01:58:00.000Z", "updated_at": "2026-10-01T01:59:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "complete_workout", "date": "2026-10-01", "payload": { "workoutSessionId": "ws-1", "completedAt": "2026-10-01T01:58:00.000Z" } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [{ "table": "workout_sessions", "columns": ["id", "completed_at", "sync_status"], "rows": [{ "id": "ws-1", "completed_at": "2026-10-01T01:58:00.000Z", "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "complete_workout", "payload": { "workoutSessionId": "ws-1" } }]
+      }
+    },
+    {
+      "name": "a confirmed saved meal is marked synced",
+      "kind": "domain", "covers": "saved_meals",
+      "guarantee": "A saved_meals mutation the server accepts flips the local saved meal to synced, so the next hydrate may prune it.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "saved_meals": [{ "id": "sm-1", "name": "Breakfast bowl", "servings": 1, "created_at": "2026-09-30T00:00:00.000Z", "updated_at": "2026-09-30T00:00:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "saved_meals", "date": "2026-09-30", "payload": { "id": "sm-1", "name": "Breakfast bowl" } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [{ "table": "saved_meals", "columns": ["id", "sync_status"], "rows": [{ "id": "sm-1", "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "saved_meals", "payload": { "id": "sm-1" } }]
+      }
+    },
+    {
+      "name": "a confirmed Oura daily summary is marked synced by day",
+      "kind": "domain", "covers": "oura_daily_summary",
+      "guarantee": "An oura_daily_summary mutation the server accepts flips that day's row to synced.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "oura_daily_summary": [{ "day": "2026-09-30", "hrv_avg_ms": 52, "updated_at": "2026-09-30T22:00:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "oura_daily_summary", "date": "2026-09-30", "payload": { "hrvAvgMs": 52 } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [{ "table": "oura_daily_summary", "columns": ["day", "hrv_avg_ms", "sync_status"], "rows": [{ "day": "2026-09-30", "hrv_avg_ms": 52, "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "oura_daily_summary", "date": "2026-09-30" }]
+      }
+    },
+    {
+      "name": "a confirmed Oura derived row is marked synced by day",
+      "kind": "domain", "covers": "oura_daily_derived",
+      "guarantee": "An oura_daily_derived mutation the server accepts flips that day's row to synced.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "oura_daily_derived": [{ "day": "2026-09-30", "readiness_score": 80, "updated_at": "2026-09-30T22:00:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "oura_daily_derived", "date": "2026-09-30", "payload": { "readinessScore": 80 } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [{ "table": "oura_daily_derived", "columns": ["day", "readiness_score", "sync_status"], "rows": [{ "day": "2026-09-30", "readiness_score": 80, "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "oura_daily_derived", "date": "2026-09-30" }]
+      }
+    },
+    {
+      "name": "a confirmed sleep session is marked synced by its local id",
+      "kind": "domain", "covers": "sleep_session",
+      "guarantee": "A sleep_session mutation the server accepts flips the row named by the payload's local id to synced.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "sleep_sessions": [{ "id": "ss-1", "date": "2026-09-30", "duration_hours": 7.5, "oura_id": "ble:1", "updated_at": "2026-09-30T21:00:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "sleep_session", "date": "2026-09-30", "payload": { "id": "ss-1", "ouraId": "ble:1", "durationHours": 7.5 } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [{ "table": "sleep_sessions", "columns": ["id", "duration_hours", "sync_status"], "rows": [{ "id": "ss-1", "duration_hours": 7.5, "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "sleep_session", "payload": { "id": "ss-1" } }]
+      }
+    },
+    {
+      "name": "a confirmed plan-meal answer is marked synced",
+      "kind": "domain", "covers": "plan_meal_answers",
+      "guarantee": "A plan_meal_answers mutation the server accepts flips the answer for that (meal, day) to synced.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "plan_meal_answers": [{ "id": "pma-1", "plan_meal_id": "meal-1", "log_date": "2026-09-30", "answer": "no", "answered_at": "2026-09-30T03:00:00.000Z", "updated_at": "2026-09-30T03:00:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "plan_meal_answers", "date": "2026-09-30", "payload": { "planMealId": "meal-1", "logDate": "2026-09-30", "answer": "no" } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [{ "table": "plan_meal_answers", "columns": ["id", "answer", "sync_status"], "rows": [{ "id": "pma-1", "answer": "no", "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "plan_meal_answers", "payload": { "planMealId": "meal-1" } }]
+      }
+    },
+    {
+      "name": "a queued manual bedtime is pushed as queued and leaves the outbox",
+      "kind": "domain", "covers": "manual_bedtime",
+      "guarantee": "A manual_bedtime mutation queued by the app reaches the push with its date and time and is removed once accepted; no local row is touched.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "sleep_sessions": [{ "id": "ss-1", "date": "2026-09-30", "updated_at": "2026-09-30T21:00:00.000Z", "sync_status": "synced" }]
+      },
+      "steps": [
+        { "op": "local", "action": "queueMutation", "args": [{ "domain": "manual_bedtime", "date": "2026-09-30", "payload": { "at": "2026-09-29T13:30:00.000Z" } }] },
+        { "op": "push", "responses": [{}] }
+      ],
+      "expect": {
+        "tables": [{ "table": "sleep_sessions", "columns": ["id", "manual_sleep_start", "sync_status"], "rows": [{ "id": "ss-1", "manual_sleep_start": null, "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "manual_bedtime", "date": "2026-09-30", "payload": { "at": "2026-09-29T13:30:00.000Z" } }]
+      }
+    },
+    {
+      "name": "a hand-entered night is written locally as pending, pushed, and marked synced",
+      "kind": "domain", "covers": "manual_sleep",
+      "guarantee": "upsertManualSleepLocally writes a manual_entry=1 pending row with its window and no measured fields; the queued manual_sleep mutation reaches the push with its id and window, and once accepted the row is synced and the outbox is empty.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "steps": [
+        { "op": "local", "action": "upsertManualSleepLocally", "args": [{ "id": "6f1c2a4e-0b7d-4c1e-9a55-2338aa000001", "date": "2026-10-01", "sleepStart": "2026-09-30T12:30:00.000Z", "sleepEnd": "2026-09-30T20:30:00.000Z", "durationHours": 8, "timeInBedHours": 8 }] },
+        { "op": "local", "action": "queueMutation", "args": [{ "domain": "manual_sleep", "date": "2026-10-01", "payload": { "id": "6f1c2a4e-0b7d-4c1e-9a55-2338aa000001", "sleepStart": "2026-09-30T12:30:00.000Z", "sleepEnd": "2026-09-30T20:30:00.000Z" } }] },
+        { "op": "push", "responses": [{}] }
+      ],
+      "expect": {
+        "tables": [{ "table": "sleep_sessions", "columns": ["id", "date", "sleep_start", "sleep_end", "duration_hours", "awake_hours", "efficiency", "manual_entry", "sync_status"],
+          "rows": [{ "id": "6f1c2a4e-0b7d-4c1e-9a55-2338aa000001", "date": "2026-10-01", "sleep_start": "2026-09-30T12:30:00.000Z", "sleep_end": "2026-09-30T20:30:00.000Z", "duration_hours": 8, "awake_hours": null, "efficiency": null, "manual_entry": 1, "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "manual_sleep", "date": "2026-10-01", "payload": { "id": "6f1c2a4e-0b7d-4c1e-9a55-2338aa000001", "sleepStart": "2026-09-30T12:30:00.000Z", "sleepEnd": "2026-09-30T20:30:00.000Z" } }]
+      }
+    },
+    {
+      "name": "a second entry for the same night edits the first and keeps its id",
+      "kind": "domain", "covers": "manual_sleep",
+      "guarantee": "One manual night per date on the device, as on the server: a second upsertManualSleepLocally for the date updates the existing manual row in place (its id kept, still pending) and leaves the device night on that date alone.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "sleep_sessions": [{ "id": "ring-1", "date": "2026-10-01", "sleep_start": "2026-09-30T13:00:00.000Z", "sleep_end": "2026-09-30T20:00:00.000Z", "duration_hours": 6.5, "oura_id": "ble:1", "updated_at": "2026-09-30T21:00:00.000Z", "sync_status": "synced" }]
+      },
+      "steps": [
+        { "op": "local", "action": "upsertManualSleepLocally", "args": [{ "id": "6f1c2a4e-0b7d-4c1e-9a55-2338aa000002", "date": "2026-10-01", "sleepStart": "2026-09-30T12:30:00.000Z", "sleepEnd": "2026-09-30T20:30:00.000Z", "durationHours": 8, "timeInBedHours": 8 }] },
+        { "op": "local", "action": "upsertManualSleepLocally", "args": [{ "id": "6f1c2a4e-0b7d-4c1e-9a55-2338aa000003", "date": "2026-10-01", "sleepStart": "2026-09-30T13:30:00.000Z", "sleepEnd": "2026-09-30T20:30:00.000Z", "durationHours": 7, "timeInBedHours": 7 }] }
+      ],
+      "expect": {
+        "tables": [{ "table": "sleep_sessions", "columns": ["id", "sleep_start", "duration_hours", "oura_id", "manual_entry", "sync_status"],
+          "rows": [
+            { "id": "6f1c2a4e-0b7d-4c1e-9a55-2338aa000002", "sleep_start": "2026-09-30T13:30:00.000Z", "duration_hours": 7, "oura_id": null, "manual_entry": 1, "sync_status": "pending" },
+            { "id": "ring-1", "sleep_start": "2026-09-30T13:00:00.000Z", "duration_hours": 6.5, "oura_id": "ble:1", "manual_entry": 0, "sync_status": "synced" }
+          ] }],
+        "outbox": []
+      }
+    },
+    {
+      "name": "a removed hand-entered night is tombstoned locally, pushed as a removal, and a stale pull cannot bring it back",
+      "kind": "domain", "covers": "manual_sleep",
+      "source": "issue 2606",
+      "guarantee": "removeManualSleepLocally sets deleted_at and marks the manual row pending; the queued manual_sleep { id, deleted: true } reaches the push and, once accepted, the row is synced and still removed; a later pull carrying the older live copy of the night does not clear the tombstone.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "sleep_sessions": [{ "id": "6f1c2a4e-0b7d-4c1e-9a55-2606aa000001", "date": "2026-10-01", "sleep_start": "2026-09-30T12:30:00.000Z", "sleep_end": "2026-09-30T20:30:00.000Z", "duration_hours": 8, "manual_entry": 1, "updated_at": "2026-09-30T21:00:00.000Z", "sync_status": "synced" }]
+      },
+      "steps": [
+        { "op": "local", "action": "removeManualSleepLocally", "args": ["6f1c2a4e-0b7d-4c1e-9a55-2606aa000001"] },
+        { "op": "local", "action": "queueMutation", "args": [{ "domain": "manual_sleep", "date": "2026-10-01", "payload": { "id": "6f1c2a4e-0b7d-4c1e-9a55-2606aa000001", "deleted": true } }] },
+        { "op": "push", "responses": [{}] },
+        { "op": "pull", "pages": [{ "body": { "syncedAt": "2026-10-01T01:30:00.000Z", "sleepSessions": [
+          { "id": "6f1c2a4e-0b7d-4c1e-9a55-2606aa000001", "date": "2026-10-01", "sleepStart": "2026-09-30T12:30:00.000Z", "sleepEnd": "2026-09-30T20:30:00.000Z", "durationHours": 8, "timeInBedHours": 8, "manualEntry": true, "deletedAt": null, "updatedAt": "2026-09-30T21:00:00.000Z" }
+        ] } }] }
+      ],
+      "expect": {
+        "tables": [{ "table": "sleep_sessions", "columns": ["id", "manual_entry", "deleted_at", "sync_status"],
+          "rows": [{ "id": "6f1c2a4e-0b7d-4c1e-9a55-2606aa000001", "manual_entry": 1, "deleted_at": "2026-10-01T02:00:00.000Z", "sync_status": "synced" }] }],
+        "outbox": [],
+        "pushed": [{ "domain": "manual_sleep", "date": "2026-10-01", "payload": { "id": "6f1c2a4e-0b7d-4c1e-9a55-2606aa000001", "deleted": true } }]
+      }
+    },
+    {
+      "name": "a pulled tombstone removes a hand-entered night the device holds as synced",
+      "kind": "domain", "covers": "manual_sleep",
+      "source": "issue 2606",
+      "guarantee": "A sleep_sessions row arriving with deletedAt and a newer updatedAt sets deleted_at on the synced local copy, so a night removed on another device or the web disappears here too; it reports biometrics.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "sleep_sessions": [{ "id": "6f1c2a4e-0b7d-4c1e-9a55-2606aa000002", "date": "2026-10-01", "sleep_start": "2026-09-30T12:30:00.000Z", "sleep_end": "2026-09-30T20:30:00.000Z", "duration_hours": 8, "manual_entry": 1, "updated_at": "2026-09-30T21:00:00.000Z", "sync_status": "synced" }]
+      },
+      "steps": [
+        { "op": "pull", "pages": [{ "body": { "syncedAt": "2026-10-01T01:30:00.000Z", "sleepSessions": [
+          { "id": "6f1c2a4e-0b7d-4c1e-9a55-2606aa000002", "date": "2026-10-01", "sleepStart": "2026-09-30T12:30:00.000Z", "sleepEnd": "2026-09-30T20:30:00.000Z", "durationHours": 8, "timeInBedHours": 8, "manualEntry": true, "deletedAt": "2026-10-01T01:00:00.000Z", "updatedAt": "2026-10-01T01:00:00.000Z" }
+        ] } }] }
+      ],
+      "expect": {
+        "tables": [{ "table": "sleep_sessions", "columns": ["id", "deleted_at", "sync_status"],
+          "rows": [{ "id": "6f1c2a4e-0b7d-4c1e-9a55-2606aa000002", "deleted_at": "2026-10-01T01:00:00.000Z", "sync_status": "synced" }] }],
+        "pull": { "flags": { "biometrics": true }, "synced": 1 }
+      }
+    },
+    {
+      "name": "a queued rest day is pushed as queued and leaves the outbox",
+      "kind": "domain", "covers": "rest_days",
+      "guarantee": "A rest_days mutation, which has no local table, reaches the push with its date and flag and is removed once accepted.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "steps": [
+        { "op": "local", "action": "queueMutation", "args": [{ "domain": "rest_days", "date": "2026-10-01", "payload": { "resting": true } }] },
+        { "op": "push", "responses": [{}] }
+      ],
+      "expect": {
+        "outbox": [],
+        "pushed": [{ "domain": "rest_days", "date": "2026-10-01", "payload": { "resting": true } }]
+      }
+    },
+    {
+      "name": "a confirmed exercise-log edit marks the log and its sets synced",
+      "kind": "domain", "covers": "exercise_log_edit",
+      "guarantee": "An exercise_log_edit mutation the server accepts flips the edited log and its sets to synced (LA-165).",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "workout_sessions": [{ "id": "ws-1", "session_name": "Upper A", "started_at": "2026-09-30T08:00:00.000Z", "updated_at": "2026-09-30T09:00:00.000Z", "sync_status": "synced" }],
+        "exercise_logs": [{ "id": "el-1", "workout_session_id": "ws-1", "exercise_name": "Bench Press", "logged_at": "2026-09-30T08:10:00.000Z", "updated_at": "2026-10-01T01:00:00.000Z", "sync_status": "pending" }],
+        "set_logs": [{ "id": "s-1", "exercise_log_id": "el-1", "set_number": 1, "weight_kg": 85, "reps": 5, "updated_at": "2026-10-01T01:00:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "exercise_log_edit", "date": "2026-09-30", "payload": { "exerciseLogId": "el-1", "sets": [{ "setNumber": 1, "weightKg": 85, "reps": 5 }] } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [
+          { "table": "exercise_logs", "columns": ["id", "sync_status"], "rows": [{ "id": "el-1", "sync_status": "synced" }] },
+          { "table": "set_logs", "columns": ["id", "weight_kg", "sync_status"], "rows": [{ "id": "s-1", "weight_kg": 85, "sync_status": "synced" }] }
+        ],
+        "outbox": [],
+        "pushed": [{ "domain": "exercise_log_edit", "payload": { "exerciseLogId": "el-1" } }]
+      }
+    },
+    {
+      "name": "a confirmed exercise-log delete marks the tombstone and its sets synced",
+      "kind": "domain", "covers": "exercise_log_delete",
+      "guarantee": "An exercise_log_delete mutation the server accepts flips the tombstoned log and sets to synced and keeps them deleted (LA-165).",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "workout_sessions": [{ "id": "ws-1", "session_name": "Upper A", "started_at": "2026-09-30T08:00:00.000Z", "updated_at": "2026-09-30T09:00:00.000Z", "sync_status": "synced" }],
+        "exercise_logs": [{ "id": "el-1", "workout_session_id": "ws-1", "exercise_name": "Bench Press", "logged_at": "2026-09-30T08:10:00.000Z", "updated_at": "2026-10-01T01:00:00.000Z", "deleted_at": "2026-10-01T01:00:00.000Z", "sync_status": "pending" }],
+        "set_logs": [{ "id": "s-1", "exercise_log_id": "el-1", "set_number": 1, "weight_kg": 80, "reps": 5, "updated_at": "2026-10-01T01:00:00.000Z", "deleted_at": "2026-10-01T01:00:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "exercise_log_delete", "date": "2026-09-30", "payload": { "exerciseLogId": "el-1" } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [
+          { "table": "exercise_logs", "columns": ["id", "deleted_at", "sync_status"], "rows": [{ "id": "el-1", "deleted_at": "2026-10-01T01:00:00.000Z", "sync_status": "synced" }] },
+          { "table": "set_logs", "columns": ["id", "deleted_at", "sync_status"], "rows": [{ "id": "s-1", "deleted_at": "2026-10-01T01:00:00.000Z", "sync_status": "synced" }] }
+        ],
+        "outbox": [],
+        "pushed": [{ "domain": "exercise_log_delete", "payload": { "exerciseLogId": "el-1" } }]
+      }
+    },
+    {
+      "name": "a confirmed session delete marks the whole tombstoned tree synced",
+      "kind": "domain", "covers": "workout_session_delete",
+      "guarantee": "A workout_session_delete mutation the server accepts flips the session, its logs and their sets to synced and keeps them deleted.",
+      "now": "2026-10-01T02:00:00.000Z",
+      "seed": {
+        "workout_sessions": [{ "id": "ws-1", "session_name": "Upper A", "started_at": "2026-09-30T08:00:00.000Z", "updated_at": "2026-10-01T01:00:00.000Z", "deleted_at": "2026-10-01T01:00:00.000Z", "sync_status": "pending" }],
+        "exercise_logs": [{ "id": "el-1", "workout_session_id": "ws-1", "exercise_name": "Bench Press", "logged_at": "2026-09-30T08:10:00.000Z", "updated_at": "2026-10-01T01:00:00.000Z", "deleted_at": "2026-10-01T01:00:00.000Z", "sync_status": "pending" }],
+        "set_logs": [{ "id": "s-1", "exercise_log_id": "el-1", "set_number": 1, "weight_kg": 80, "reps": 5, "updated_at": "2026-10-01T01:00:00.000Z", "deleted_at": "2026-10-01T01:00:00.000Z", "sync_status": "pending" }],
+        "mutations_outbox": [{ "id": "m-1", "domain": "workout_session_delete", "date": "2026-09-30", "payload": { "workoutSessionId": "ws-1" } }]
+      },
+      "steps": [{ "op": "push", "responses": [{}] }],
+      "expect": {
+        "tables": [
+          { "table": "workout_sessions", "columns": ["id", "deleted_at", "sync_status"], "rows": [{ "id": "ws-1", "deleted_at": "2026-10-01T01:00:00.000Z", "sync_status": "synced" }] },
+          { "table": "exercise_logs", "columns": ["id", "sync_status"], "rows": [{ "id": "el-1", "sync_status": "synced" }] },
+          { "table": "set_logs", "columns": ["id", "sync_status"], "rows": [{ "id": "s-1", "sync_status": "synced" }] }
+        ],
+        "outbox": [],
+        "pushed": [{ "domain": "workout_session_delete", "payload": { "workoutSessionId": "ws-1" } }]
+      }
+    }
+  ]
+}

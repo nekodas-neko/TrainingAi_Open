@@ -2,6 +2,7 @@ import type { AiPrescription, AiPrescriptionExercise } from '@trainingai/shared/
 import { computePerExerciseDeload, type PerExerciseDeloadInput } from './per-exercise-deload'
 import { shouldTriggerEmergencyDeload, type EmergencySignals, type EmergencyState } from './emergency-deload'
 import type { IllnessFlag } from '@trainingai/shared/health/illness-radar'
+import { recostPrescription, rowNumbersMoved, type FigureSignals } from './prescription-figures'
 
 // Cheap fresh-signals subset for consumption-day re-evaluation — deliberately NOT the full
 // 30-signal aggregation (aggregateSignals), which is too expensive to run on every
@@ -100,6 +101,10 @@ export function reevaluatePrescriptionForToday(
   signals: ReevaluationSignals,
   state: EmergencyState,
   now = new Date(),
+  // Issue 2592: the inputs `prescriptionFigures` costs a row with. Present, a deload or revert that
+  // moves a row's numbers re-costs the two whole-session figures through that one function; absent
+  // (the cheap path), the output is exactly what it was.
+  figureSignals?: FigureSignals,
 ): ReevaluationResult {
   // The 7-day window in the comment above was documented intent and nothing enforced it (Q-229):
   // `prescriptionExpiresAt` was written at generation and then only ever read to suppress
@@ -169,6 +174,12 @@ export function reevaluatePrescriptionForToday(
       if (!notes[ex.sessionExerciseId]) notes[ex.sessionExerciseId] = `Deload — illness radar: ${signals.illnessFlag}`
     }
   }
+  // #2402. Only a row THIS function deloaded may be put back by it. A whole-session deload
+  // (BF-198) and a deload PHASE (the rules fallback, #2512) record `deloaded` + `preDeload` on every
+  // row too, but nothing here flags those rows, so "not flagged now" read as "soreness cleared" and
+  // the first read of the day turned a stored 2×6 @ 50% back into the program as written. The bar
+  // kept deloading while the card described the full session. `Full` is the way back for those.
+  const deloadIsPrescribed = prescription.deload === true || state.phase === 'deload'
   let changed = false
   const exercises: AiPrescriptionExercise[] = prescription.exercises.map(ex => {
     const wasDeloaded = ex.deloaded === true
@@ -187,7 +198,7 @@ export function reevaluatePrescriptionForToday(
         deloadNote: notes[ex.sessionExerciseId],
       }
     }
-    if (!isDeloaded && wasDeloaded && ex.preDeload) {
+    if (!isDeloaded && wasDeloaded && ex.preDeload && !deloadIsPrescribed) {
       changed = true
       return {
         ...ex,
@@ -211,8 +222,13 @@ export function reevaluatePrescriptionForToday(
     return ex
   })
 
+  const moved = changed ? { ...prescription, exercises } : prescription
+  const recosted = changed && figureSignals && rowNumbersMoved(prescription.exercises, exercises)
+    ? recostPrescription(moved, figureSignals)
+    : moved
+
   return {
-    prescription: changed ? { ...prescription, exercises } : prescription,
+    prescription: recosted,
     changed,
     needsRegenerate: false,
   }

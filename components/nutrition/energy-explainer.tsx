@@ -3,6 +3,7 @@
 import type { EnergyBalanceResponse } from '@/app/api/nutrition/energy-balance/route'
 import { restingRateWording } from '@trainingai/shared/nutrition/resting-rate-source'
 import { formatDayShort } from '@trainingai/shared/date-utils'
+import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 
 /**
  * The ⓘ panel's explanation of the energy numbers, rendered by both surfaces that show them.
@@ -18,12 +19,9 @@ import { formatDayShort } from '@trainingai/shared/date-utils'
 export function EnergyExplainer({ data }: { data: EnergyBalanceResponse }) {
   const b = data.balance!
   const m = data.maintenance
-  const storedGoal = data.target.currentKcal
-  // BF-138. The two figures the owner was reconciling by hand: the goal stored once, and the budget
-  // today's movement has grown. Named together only when they actually differ — a reconciliation
-  // shown on a day they agree is noise on a panel that already has five paragraphs.
   const rate = restingRateWording(b.restingRateSource, b.restingRateMeasuredOn, formatDayShort)
-  const showsTwoModels = storedGoal != null && Math.abs(storedGoal - b.expenditureKcal) >= 100
+  // #2071. The same call every budget surface makes, so the chain printed here is the budget's own.
+  const budget = budgetProvenance(b)
   return (
     <div className="space-y-2 rounded-xl bg-muted/50 p-3">
       <p className="text-[10px] leading-relaxed text-muted-foreground">
@@ -62,44 +60,46 @@ export function EnergyExplainer({ data }: { data: EnergyBalanceResponse }) {
         second deduction for your goal.
       </p>
 
-      {/* LA-102. The owner, on the anchored budget: *"1350 doesnt count some basic metabolic
-          needs".* He is right, and BF-152 chose not to model either omission rather than
-          overlooking them — a multiplier ASSERTS the overhead happened where the step credit
-          OBSERVES it, and treating intake-linked digestion as an earned credit makes the budget
-          grow as you eat. So the fix is to say what the base leaves out, not to inflate it.
-
-          Deliberately a separate paragraph from the one above, which is about not double-counting
-          movement that IS eventually added. These two are never added by anything. */}
-      <p className="text-[10px] leading-relaxed text-muted-foreground">
-        Two things are <span className="font-semibold text-foreground">not in the base at all</span>:
-        the energy it takes to digest what you eat, and small everyday movement your phone cannot
-        count — standing, fidgeting, housework. Both are real and neither is estimated here, so on a
-        still day your true burn runs a little above what this shows. Movement is added only as it is
-        measured.
-      </p>
-
-      <p className="text-[10px] leading-relaxed text-muted-foreground">
-        <span className="font-semibold text-foreground">On target</span> means your net
-        ({b.netKcal >= 0 ? '+' : ''}{b.netKcal.toLocaleString()}) is within 150 kcal of the
-        {' '}{b.targetNetKcal >= 0 ? '+' : ''}{b.targetNetKcal.toLocaleString()} kcal/day your goal calls for.
-        Sustaining today&apos;s net works out to {b.projectedWeeklyKg >= 0 ? '+' : ''}{b.projectedWeeklyKg} kg/week.
-      </p>
-
-      {/* BF-138 ②. The question he actually asked — *"I thought it was eat to 1,350 + exercise
-          right? im getting confused"*. Both numbers are defensible and neither was ever named
-          beside the other, so four screens showing four figures read as four bugs. This states the
-          relationship rather than picking a winner: that is a calibration question (BF-137, TN-29)
-          and this entry is explicitly not allowed to answer it. */}
-      {showsTwoModels && (
+      {/* #2071 replaced LA-102's paragraph here. LA-102 said digestion and everyday living were "not
+          in the base at all", which was true of BF-152's bare-resting-rate budget. The owner's final
+          spec puts them in — the existing 20% (`SEDENTARY_MULTIPLIER − 1`) — and takes the goal's
+          deficit off, so this names the chain the provenance line under the bar prints. */}
+      {/* Issue 2622. An own target IS the budget, so the chain below (which is what the worked-out budget
+          is made of) is not printed as its make-up; this says what the number is and what it replaces. */}
+      {budget.ownTarget && (
         <p className="text-[10px] leading-relaxed text-muted-foreground">
-          <span className="font-semibold text-foreground">Why two numbers.</span> Your saved daily
-          goal ({storedGoal.toLocaleString()} kcal) assumes a typical day&apos;s movement is already
-          included; today&apos;s budget ({b.expenditureKcal.toLocaleString()} kcal) starts from rest
-          and climbs as you move. On an average day they should land close together — when they do
-          not, the saved goal is the one that has not caught up.
+          <span className="font-semibold text-foreground">Today&apos;s budget</span> is your own target of{' '}
+          {budget.total.toLocaleString()} kcal, set in Profile, Goals. It replaces the worked-out budget
+          ({budget.workedOutTotal.toLocaleString()} kcal today) on every screen, and does not grow with movement.
         </p>
       )}
 
+      {!budget.ownTarget && budget.chain != null && (
+        <p className="text-[10px] leading-relaxed text-muted-foreground">
+          <span className="font-semibold text-foreground">Today&apos;s budget</span> is your resting
+          rate ({budget.chain.rmr.toLocaleString()} kcal)
+          {budget.chain.deficit > 0 && <>, less {budget.chain.deficit.toLocaleString()} kcal for your goal</>}
+          {budget.chain.deficit < 0 && <>, plus {Math.abs(budget.chain.deficit).toLocaleString()} kcal for your goal</>}
+          , plus {budget.chain.dailyLiving.toLocaleString()} kcal for daily living and digesting food
+          (a fifth of your resting rate, {budget.chain.metabolicBurn.toLocaleString()} kcal, less the{' '}
+          {budget.chain.stepCredit.toLocaleString()} kcal your first 3,000 steps are worth — your
+          movement counts every step, so those are counted there), plus your movement as it is
+          measured — {budget.total.toLocaleString()} kcal so far. The goal part comes from your
+          {b.deficitWeightSource === 'trend' ? ' 30-day trend weight' : ' latest weigh-in'}
+          {b.deficitWeightKg != null ? ` (${b.deficitWeightKg} kg)` : ''} and your goal weight, and
+          shrinks as you near it; the budget never drops below your resting rate or 1,200 kcal,
+          whichever is higher.
+        </p>
+      )}
+
+      <p className="text-[10px] leading-relaxed text-muted-foreground">
+        <span className="font-semibold text-foreground">On target</span> means you ate within 150
+        kcal of today&apos;s budget. Your net against the calories out above is
+        {' '}{b.netKcal >= 0 ? '+' : ''}{b.netKcal.toLocaleString()} kcal, and sustaining today&apos;s net works out to {b.projectedWeeklyKg >= 0 ? '+' : ''}{b.projectedWeeklyKg} kg/week.
+      </p>
+
+      {/* BF-138 ② printed "Why two numbers" here: the saved goal beside today's budget. #2071 retired
+          the typed goal as a displayed budget, so there is one number and nothing to reconcile. */}
       {/* BF-138 ③. The most useful sentence available is not any estimate. A flat weight across a
           long logged window is measured; every figure above it is derived, and presenting them as
           equally solid is what made the derived ones look authoritative. */}

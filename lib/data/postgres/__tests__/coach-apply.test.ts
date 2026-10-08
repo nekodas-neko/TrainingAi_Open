@@ -68,7 +68,7 @@ describe.skipIf(!canRun)('AI Coach — apply path', () => {
       `UPDATE exercise_library SET merged_into = (SELECT id FROM exercise_library WHERE name = $1)
        WHERE name = $2`, [HAMSTRING, MERGED])
 
-    for (const [userId, progId, sessId, exId] of [
+    for (const [userId, progId, sessId] of [
       [OWNER, PROGRAM, SESSION, EXERCISE_ROW],
       [STRANGER, STRANGER_PROGRAM, STRANGER_SESSION, STRANGER_EXERCISE_ROW],
     ] as const) {

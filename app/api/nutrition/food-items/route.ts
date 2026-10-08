@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { z } from 'zod'
 import { FoodItemFieldsSchema } from '@trainingai/shared/validation/food-item'
 import { rejectMealImage, mealImageRejectionMessage, FOOD_ITEM_IMAGE_MAX_BYTES } from '@trainingai/shared/nutrition/meal-image'
 import { sanitiseNutrition } from '@trainingai/shared/nutrition/scan-totals'

@@ -2,7 +2,6 @@ import { eq, and, or, gte, lte, lt, asc, desc, isNotNull, isNull, inArray, sql, 
 import type { getDb } from '../client'
 import { getPool } from '../client'
 import * as s from '../schema'
-import type { OuraWorkout } from '@/lib/oura/types'
 import type { OuraDailyRow, OuraSleepUpsertRow, OuraTagRow, OuraDailySummaryRow, OuraDailyDerivedRow, OuraDailyDerivedPatch, WorkoutHrStatsInput, WorkoutHrStatsRow, SetHrStatsRow, DaytimeHrvModelRow } from '../../repository'
 import type { SetHrRow, RichSetMarker } from '@trainingai/shared/workout/set-hr-stats'
 import { aestMidnight, todayInTz, DEFAULT_TZ, shiftDateStr } from '@trainingai/shared/date-utils'
@@ -13,6 +12,7 @@ import { correctBodyFatPct, type BodyFatCalibration } from '@trainingai/shared/h
 import { mergeSet, initialSourceMap, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
 import { resolveDsToMs, LAG_PERCENTILE, type ClockAnchor, type ClockOffsets } from '@/lib/oura-ble/clock'
 import { CORROBORATION, MIN_RELIABLE_SAMPLES, PLAUSIBLE_MIN_BPM, PLAUSIBLE_MAX_BPM, type ObservedHrProfile } from '@trainingai/shared/health/observed-hr'
+import { redecodeJobKind, canFollowRunningRedecode } from '@/lib/oura-ble/redecode-job-kind'
 
 // Per-field provenance columns (migration 120) for the two multi-source Oura tables.
 const OURA_DAILY_SOURCE_COLS: SourceColumn[] = [
@@ -242,17 +242,40 @@ const asJob = (r: {
   reapedAt: r.reapedAt,
 })
 
-/** Returns the existing running job instead of starting a second — see the unique index. */
+/**
+ * Never starts a second run while one is in flight (see the unique index). When one is running:
+ *
+ * - it is returned with `alreadyRunning: true` if it writes everything `opts` asks for, so the
+ *   caller can follow it;
+ * - otherwise `refused: true` and nothing is inserted. Issue 2383: a step backfill used to follow a
+ *   plain redecode, the step correction never ran, and the screen said it had. The rule is
+ *   `canFollowRunningRedecode` in `lib/oura-ble/redecode-job-kind.ts`.
+ *
+ * Two requests racing past the read both try the insert; the index lets one through and the other
+ * gets no row back, then reads the winner and applies the same rule rather than surfacing a 500.
+ */
 export async function startRedecodeJob(
   db: Db, userId: string, opts: Record<string, unknown>,
-): Promise<{ job: RedecodeJob; alreadyRunning: boolean }> {
+): Promise<{ job: RedecodeJob; alreadyRunning: boolean; refused: boolean }> {
+  const requested = redecodeJobKind(opts)
+  const decide = (running: RedecodeJob) => canFollowRunningRedecode(requested, redecodeJobKind(running.opts))
+    ? { job: running, alreadyRunning: true, refused: false }
+    : { job: running, alreadyRunning: true, refused: true }
+
+  // Two attempts: the second covers a run that finished between our read and our insert.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const running = await getRunningRedecodeJob(db, userId)
+    if (running) return decide(running)
+    const [row] = await db
+      .insert(s.ouraRedecodeJobs)
+      .values({ userId, opts })
+      .onConflictDoNothing()
+      .returning(REDECODE_JOB_COLS)
+    if (row) return { job: asJob(row), alreadyRunning: false, refused: false }
+  }
   const running = await getRunningRedecodeJob(db, userId)
-  if (running) return { job: running, alreadyRunning: true }
-  const [row] = await db
-    .insert(s.ouraRedecodeJobs)
-    .values({ userId, opts })
-    .returning(REDECODE_JOB_COLS)
-  return { job: asJob(row), alreadyRunning: false }
+  if (running) return decide(running)
+  throw new Error('could not start or find a redecode job')
 }
 
 export async function getRunningRedecodeJob(db: Db, userId: string): Promise<RedecodeJob | null> {
@@ -495,6 +518,7 @@ export async function upsertOuraSleep(db: Db, userId: string, sessions: OuraSlee
   // to "newer non-null wins": `keepLatestNonNull` is that arm, applied before `initialSourceMap`
   // reads the merged values.
   const collapsed = collapseOnConflict(sessions, r => r.sleepStart.getTime(), keepLatestNonNull)
+  const merged = mergeSet('sleep_sessions', OURA_SLEEP_SOURCE_COLS, source)
   await db
     .insert(s.sleepSessions)
     .values(collapsed.map(r => {
@@ -528,7 +552,22 @@ export async function upsertOuraSleep(db: Db, userId: string, sessions: OuraSlee
     .onConflictDoUpdate({
       target: [s.sleepSessions.userId, s.sleepSessions.sleepStart],
       set: {
-        ...mergeSet('sleep_sessions', OURA_SLEEP_SOURCE_COLS, source),
+        ...merged,
+        // #2338. A device night that starts at the very instant a typed-in night does IS that night,
+        // measured, and a device night always wins over a typed one. The manual row carries no
+        // `source_map`, so every field the device sends already wins the rank merge above; these
+        // take over the three a typed night set that the merge does not rank (its date, its end and
+        // its time in bed) and stop the row reading as manual. Device rows are unaffected: the CASE
+        // keeps their stored value.
+        date:           sql.raw(`CASE WHEN sleep_sessions.manual_entry THEN EXCLUDED.date ELSE sleep_sessions.date END`),
+        sleepEnd:       sql.raw(`CASE WHEN sleep_sessions.manual_entry THEN EXCLUDED.sleep_end ELSE sleep_sessions.sleep_end END`),
+        timeInBedHours: sql`CASE WHEN sleep_sessions.manual_entry THEN EXCLUDED.time_in_bed_hours ELSE ${merged.timeInBedHours} END`,
+        manualEntry:    sql`false`,
+        // Issue 2606. A typed night the user REMOVED that a device then measures at the same start
+        // becomes that device night, visible: the user removed their guess, not the measurement, and
+        // a device night always wins. Only manual rows are ever tombstoned, so a device row keeps
+        // its value (NULL).
+        deletedAt:      sql.raw(`CASE WHEN sleep_sessions.manual_entry THEN NULL ELSE sleep_sessions.deleted_at END`),
         updatedAt: sql`NOW()`,
       },
     })
@@ -2308,4 +2347,52 @@ export async function listDaytimeStressBuckets(
     ))
     .orderBy(asc(s.ouraDaytimeStressBuckets.bucketMid))
   return rows.map(r => ({ day: r.day, bucketMid: r.bucketMid, level: Number(r.level) }))
+}
+
+/** Every stored bucket's day and instant for one user: a key listing, no levels. Used by the
+ *  stress-bucket backfill (issue 2236) to know which days are already populated. */
+export async function listDaytimeStressBucketKeys(
+  db: Db, userId: string,
+): Promise<{ day: string; bucketMid: Date }[]> {
+  return db
+    .select({ day: s.ouraDaytimeStressBuckets.day, bucketMid: s.ouraDaytimeStressBuckets.bucketMid })
+    .from(s.ouraDaytimeStressBuckets)
+    .where(eq(s.ouraDaytimeStressBuckets.userId, userId))
+    .orderBy(asc(s.ouraDaytimeStressBuckets.bucketMid))
+}
+
+/** The backfill's plan and what the database accepted disagreed; the transaction rolled back. */
+export class StressBackfillCountMismatchError extends Error {
+  constructor(public readonly planned: number, public readonly written: number) {
+    super(`stress backfill rolled back: planned ${planned} bucket rows, the database accepted ${written}`)
+    this.name = 'StressBackfillCountMismatchError'
+  }
+}
+
+/**
+ * ADD missing stress buckets, and only add (issue 2236). `ON CONFLICT DO NOTHING` on the table's
+ * natural key `(user_id, bucket_mid)`: an existing row is never updated, and nothing is deleted.
+ * This is not `replaceDaytimeStressBuckets`, which replaces a whole day.
+ *
+ * One transaction. If the rows the database accepted differ from the rows planned (a concurrent
+ * forward write landed an instant in between, say), it throws and rolls back, so a half-applied
+ * plan is never left behind. Chunked inside the transaction to stay under the parameter limit.
+ */
+export async function addMissingDaytimeStressBuckets(
+  db: Db, userId: string, rows: { day: string; bucketMid: Date; level: number }[],
+): Promise<number> {
+  const CHUNK = 1000
+  return db.transaction(async tx => {
+    let written = 0
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const inserted = await tx
+        .insert(s.ouraDaytimeStressBuckets)
+        .values(rows.slice(i, i + CHUNK).map(r => ({ userId, day: r.day, bucketMid: r.bucketMid, level: r.level, updatedAt: new Date() })))
+        .onConflictDoNothing({ target: [s.ouraDaytimeStressBuckets.userId, s.ouraDaytimeStressBuckets.bucketMid] })
+        .returning({ bucketMid: s.ouraDaytimeStressBuckets.bucketMid })
+      written += inserted.length
+    }
+    if (written !== rows.length) throw new StressBackfillCountMismatchError(rows.length, written)
+    return written
+  })
 }

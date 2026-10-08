@@ -1,4 +1,5 @@
 import { invalidateCache } from '@/lib/sqlite/cache'
+import type { SyncedDomains } from '@/lib/local-store/sync-engine'
 
 /** Legacy sessionStorage seeds read by session-select-content's first-paint effect.
  *  They live outside the TTL cache, so every group that invalidates workout-data:meta
@@ -196,13 +197,15 @@ export async function invalidateBiometrics(): Promise<void> {
  *  applying a goal recommendation or editing activity level/fitness goal in Profile. */
 export async function invalidateGoalRecommendations(): Promise<void> {
   await Promise.all([
-    // the fitness goal sets the target net the bar bands against
+    // the fitness goal sets the target net the bar bands against; and an own calorie target (issue
+    // 2622) IS the budget on Nutrition, Home, the log-food sheet and end of day, all of which read
+    // this key
     invalidateCache('energy-balance:'),
     invalidateCache('nutrition-targets'),
     invalidateCache('body-metadata'),
     invalidateCache('progress-summary'),
     invalidateCache('user-goals'),
-    // fitnessGoal feeds the nutrition screen's TDEE-adaptation-card check
+    // fitnessGoal is read from this key by the Goals screen
     invalidateCache('more-user-profile'),
     // LB-48. Recommended calories route through `personalRmr`, so a saved RMR test changes them.
     // The key belongs to this group rather than one of its own because saving an RMR is a goal
@@ -552,6 +555,22 @@ export async function invalidateRestDayChoice(): Promise<void> {
   clearLegacyHomeSeeds()
 }
 
+/** #2338 — a night the user entered by hand (`saveManualNight`). It is a sleep row like any other,
+ *  so everything a synced night moves moves here too: the sleep list, readiness and what derives from
+ *  it, the sleep streak, the collection's sleep ladder, and the day's read-through. */
+export async function invalidateManualSleepWrite(): Promise<void> {
+  await Promise.all([
+    invalidateBiometrics(),
+    invalidateReadinessInputs(),
+    // a night is a faucet day for the collection's sleep ladder (BF-122b)
+    invalidateCache('collection'),
+    invalidateCache('day-log:'),
+    invalidateCache('home-day-timeline'),
+    invalidateCache('day-review-week-window:'),
+    invalidateCache('weekly-review-month-window:'),
+  ])
+}
+
 /** Exercise library entry added/edited/deleted (user custom or admin catalogue). */
 export async function invalidateExerciseLibrary(): Promise<void> {
   await invalidateCache('exercise-library')
@@ -667,4 +686,34 @@ export async function invalidateWorkoutMetaRefresh(): Promise<void> {
 export async function invalidateWorkoutDataImmediate(): Promise<void> {
   await invalidateCache('workout-data')
   clearLegacyHomeSeeds()
+}
+
+/** The group each pull flag invalidates. Typed as a total record, so a flag added to
+ *  `SyncedDomains` without a decision here fails to compile rather than going silently stale.
+ *  `dayCheckins` is null on purpose: that UI reads the local store / API directly and never goes
+ *  through the sqlite-cache layer, so there is nothing to clear. */
+const PULL_FLAG_GROUPS: Record<keyof SyncedDomains, (() => Promise<void>) | null> = {
+  biometrics:   invalidateBiometrics,
+  programs:     invalidateProgramStructure,
+  workouts:     invalidateWorkoutSummaries,
+  nutrition:    invalidateNutritionWrite,
+  supplements:  invalidateSupplements,
+  activity:     invalidateActivityWrites,
+  fitnessTests: invalidateFitnessTests,
+  running:      invalidateRunningPlan,
+  injuries:     invalidateInjuryWrites,
+  ouraDaily:    invalidateOuraSync,
+  dayCheckins:  null,
+  mealPlans:    invalidateMealPlans,
+}
+
+/** Caches a sync pull changed — call with `pullDelta`'s `domains` after every pull whose result
+ *  you have (#2543). Acts on the flags alone, never on `synced`: the sync provider and the More tab
+ *  each kept their own copy of this block, gated on `synced > 0`, and the copies drifted — neither
+ *  could see a supplement-only page (counted as zero) and More never had a meal-plan line. */
+export async function invalidatePulledDomains(domains: SyncedDomains): Promise<void> {
+  for (const flag of Object.keys(PULL_FLAG_GROUPS) as (keyof SyncedDomains)[]) {
+    const group = PULL_FLAG_GROUPS[flag]
+    if (domains[flag] && group) await group()
+  }
 }

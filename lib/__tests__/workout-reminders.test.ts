@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz'
-import { computeWorkoutReminderAction, type WorkoutReminderAction } from '../workout-reminders'
+import { computeWorkoutReminderAction } from '../workout-reminders'
 
 const SESSION = 'Push'
 

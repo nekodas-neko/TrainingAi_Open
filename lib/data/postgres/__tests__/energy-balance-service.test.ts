@@ -91,7 +91,14 @@ describe.skipIf(!canRun)('energy balance — calibration window', () => {
     )
   }
 
-  /** 28 completed days ending yesterday: 2000 kcal/day, weight falling 1 kg linearly.
+  /** Weight lost across the seeded window. Half a kilo, not a kilo, on purpose (#2474): at zero steps
+   *  the calibrated burn from a kilo is about 2285 kcal, which is 1.3x this user's resting rate and
+   *  above what 1.15x of the formula's credited base plus measured movement supports, so the guard
+   *  correctly rejects it. This scenario is about the calibration window, not the guard, so it stays
+   *  inside the ceiling. */
+  const WEIGHT_LOSS_KG = 0.5
+
+  /** 28 completed days ending yesterday: 2000 kcal/day, weight falling half a kilo linearly.
    *
    *  Q-387: every day is also MARKED complete. Before that flag existed, "logged" meant any non-zero
    *  intake, so a day abandoned after lunch counted at its partial total and dragged the mean down
@@ -106,7 +113,7 @@ describe.skipIf(!canRun)('energy balance — calibration window', () => {
       await pool.query(
         `INSERT INTO body_metrics (user_id, date, weight_kg, steps) VALUES ($1, $2, $3, 0)
          ON CONFLICT (user_id, date) DO UPDATE SET weight_kg = EXCLUDED.weight_kg, steps = 0`,
-        [TEST_USER_ID, d, 80 - (1 * i) / 27],
+        [TEST_USER_ID, d, 80 - (WEIGHT_LOSS_KG * i) / 27],
       )
     }
   }
@@ -115,7 +122,7 @@ describe.skipIf(!canRun)('energy balance — calibration window', () => {
     await seedCalibratableHistory()
     const r = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
     expect(r.maintenance?.source).toBe('calibrated')
-    // Ate 2000/day while losing ~1 kg over the window — real burn exceeds intake.
+    // Ate 2000/day while losing a little weight over the window — real burn exceeds intake.
     expect(r.maintenance!.kcal).toBeGreaterThan(2000)
     expect(r.maintenance!.weightRateKgPerWeek).toBeLessThan(0)
   })
@@ -132,7 +139,7 @@ describe.skipIf(!canRun)('energy balance — calibration window', () => {
       await pool.query(
         `INSERT INTO body_metrics (user_id, date, weight_kg, steps) VALUES ($1, $2, $3, 0)
          ON CONFLICT (user_id, date) DO UPDATE SET weight_kg = EXCLUDED.weight_kg, steps = 0`,
-        [TEST_USER_ID, d, 80 - (1 * i) / 27],
+        [TEST_USER_ID, d, 80 - (WEIGHT_LOSS_KG * i) / 27],
       )
     }
 
@@ -282,15 +289,33 @@ describe.skipIf(!canRun)('energy balance — calibration window', () => {
 
   it('bands the day against the goal deficit, not against zero', async () => {
     await seedCalibratableHistory()
-    const r0 = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
-    // lose_weight asks for −500 kcal/day.
-    expect(r0.balance!.targetNetKcal).toBe(-500)
+    // #2071: the deficit is derived from the goal AND a goal weight. With none set it is 0 — the
+    // owner's "no goal weight set: deficit 0" — so this sets one well below the ~79 kg on file.
+    await pool.query(`UPDATE users SET target_weight_kg = 70 WHERE id = $1`, [TEST_USER_ID])
+    try {
+      const r0 = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
+      // lose_weight is 0.5% of the 30-day TREND weight a week (#2621). The 28 seeded weigh-ins give a
+      // trend, so the deficit reads it: ~79 kg → 0.005 × 79 × 7,700 / 7 ≈ 435 kcal/day.
+      expect(r0.balance!.deficitWeightSource).toBe('trend')
+      const w = r0.balance!.deficitWeightKg!
+      expect(Math.abs(r0.balance!.deficitKcal! - (0.005 * w * 7700) / 7)).toBeLessThan(1)
+      expect(r0.balance!.targetNetKcal).toBe(-r0.balance!.deficitKcal!)
 
-    // Eat exactly maintenance: net 0, which is 500 kcal ABOVE what the goal calls for.
-    await logFood(TODAY, r0.balance!.expenditureKcal)
-    const rMaint = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
-    expect(rMaint.balance!.netKcal).toBe(0)
-    expect(rMaint.balance!.zone).toBe('far_over')
+      // Eat exactly maintenance: net 0, which is well ABOVE the deficit budget.
+      await logFood(TODAY, r0.balance!.expenditureKcal)
+      const rMaint = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
+      expect(rMaint.balance!.netKcal).toBe(0)
+      expect(rMaint.balance!.zone).toBe('far_over')
+    } finally {
+      await pool.query(`UPDATE users SET target_weight_kg = NULL WHERE id = $1`, [TEST_USER_ID])
+    }
+  })
+
+  it('takes no deficit when no goal weight is set (#2071)', async () => {
+    await seedCalibratableHistory()
+    const r = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
+    expect(r.balance!.deficitKcal).toBe(0)
+    expect(r.balance!.targetNetKcal).toBe(0)
   })
 
   it('reports the goal-aware recommended target from calibrated maintenance', async () => {

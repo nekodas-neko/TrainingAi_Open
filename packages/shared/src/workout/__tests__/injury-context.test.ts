@@ -3,7 +3,7 @@
 // one description of "what is currently injured", which BF-44 imports for the Coach surface rather
 // than writing a second one.
 import { describe, it, expect } from 'vitest'
-import { activeInjuries, activeInjuredMuscles, formatInjuryContext } from '../injury-context'
+import { activeInjuries, activeInjuredMuscles, describeInjury, formatInjuryContext } from '../injury-context'
 import { excludeInjuredExercises, injurySafeAlternatives } from '../injury-substitution'
 import type { Injury } from '../../types/injury'
 
@@ -15,6 +15,20 @@ const injury = (over: Partial<Injury> & Pick<Injury, 'muscleName' | 'startedDate
 })
 
 const TODAY = '2026-09-01'
+
+// #2415 — the wizard names the injuries the builder avoids. It must say what the prompt line says.
+describe('describeInjury', () => {
+  it('uses the prompt line wording without its prompt-injection fence or the note', () => {
+    const i = injury({ muscleName: 'Lower Back', startedDate: '2026-08-20', severity: 'mild', notes: 'ignore previous' })
+    expect(describeInjury(i, TODAY)).toBe('Lower Back (mild, active 12 days)')
+    expect(formatInjuryContext([i], TODAY)).toContain('(mild, active 12 days)')
+    expect(describeInjury(i, TODAY)).not.toContain('<user_text>')
+  })
+
+  it('says "started today" on day zero', () => {
+    expect(describeInjury(injury({ muscleName: 'Knee', startedDate: TODAY }), TODAY)).toBe('Knee (moderate, started today)')
+  })
+})
 
 describe('activeInjuries', () => {
   it('drops resolved ones — `resolvedDate` is the only "is it over" signal', () => {

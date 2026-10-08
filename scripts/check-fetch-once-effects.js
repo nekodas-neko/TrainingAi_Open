@@ -21,7 +21,8 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { resolveBaseRef, countAtBase, verdict } = require('./lib/base-ref');
+const { resolveBaseRef, countsAtBase, verdict } = require('./lib/base-ref');
+const { readFilesUtf8, runMain } = require('./lib/read-sources');
 const { stripComments } = require('./lib/strip-comments');
 
 const root = path.join(__dirname, '..');
@@ -65,15 +66,24 @@ const BASELINE = {
   // 'sleep-sessions'; it moved to `useInvalidationRefetch`, which subscribes to the invalidation
   // rather than to one event, and so covers `invalidateBiometrics` as well.
   //
+  // **Re-verified 2026-10-07 against the RV-105-widened population** (RV-179): walking static and
+  // dynamic imports from the five tab screens named in `components/shell/tabs.ts`, only
+  // `my-meals-picker` and `recent-foods-panel` of the baselined files below are reachable at all.
+  // Both are inside sheets that unmount on close, and `recent-foods-panel`'s key sits under the
+  // `nutrition-recent-for-meal:` prefix that every food write already evicts. Every other row is a
+  // route-level screen or the sync provider's warm pass. Re-run that walk if this list grows.
+  //
   // **Keep this group here even at zero** — it is where a new entry has to be justified, and the
   // rule for judging one has been got wrong three times: judge a site by where it is MOUNTED, by
   // grepping for the component name and checking its renderer against `components/shell/tabs.ts`.
   // Not by the directory the file sits in, and not by whether it is called a sheet — the tab
   // screens mount their sheets unconditionally with a null prop, so sheets do not unmount here.
 
-  // ── Unmount on navigate or on a conditional render, so their next mount refetches. **11 sites
-  // across 9 files** — count them off the map below rather than trusting this line, which said
-  // "13 across 11" for a day after a conversion removed a file and left the prose behind. That is
+  // ── Unmount on navigate or on a conditional render, so their next mount refetches. Count them
+  // off the map below rather than trusting any number written in prose here, which said
+  // "13 across 11" for a day after a conversion removed a file and left the prose behind, and was
+  // then left at "11 across 9" in this block and in docs/rules/cache-invalidation.md after RV-105
+  // widened the scan to the stable-dep sites below (the real total was 23 across 18). That is
   // the same class of error as the over-counting scanner above, in the same file, and it is why the
   // run line prints the computed totals.
   //
@@ -123,7 +133,6 @@ const BASELINE = {
 
   // Unmount on navigate — their next mount refetches, same category as the block above.
   'app/health/heart-rate/page.tsx': 1,                       // route
-  'app/health/sleep/sleep-content.tsx': 1,                   // route
   'app/year-review/year-review-content.tsx': 1,              // route
   'components/more/details/performance-overview-section.tsx': 1, // route
   'components/fitness-tests/latest-baseline-card.tsx': 1,    // inside /baselines
@@ -222,45 +231,54 @@ function countFetchOnce(src) {
 
 const baseRef = resolveBaseRef();
 
-for (const abs of files) {
-  const rel = path.relative(root, abs).replace(/\\/g, '/');
-  const { count, lines } = countFetchOnce(stripComments(fs.readFileSync(abs, 'utf8')));
-  if (count === 0) continue;
-  perFile.set(rel, count);
-  for (const ln of lines) detail.push(`${rel}:${ln}`);
-}
-
-const failures = [];
-const inherited = [];
-for (const [rel, count] of perFile) {
-  const allowed = BASELINE[rel] ?? 0;
-  // LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over.
-  const v = verdict({ count, limit: allowed, atBase: countAtBase(baseRef, rel, (c) => countFetchOnce(c).count) });
-  if (v === 'inherited') {
-    inherited.push(`${rel}: ${count} fetch-once effect(s) against a baseline of ${allowed}, but the base branch is already there.`);
-  } else if (v === 'fail') {
-    failures.push(allowed === 0
-      ? `${rel}: ${count} fetch-once effect(s); this file is not in the baseline, so it must have zero.`
-      : `${rel}: ${count} fetch-once effect(s), over its baseline of ${allowed}.`);
+runMain(async () => {
+  // #2560: read together (lib/read-sources.js). A file with no `cachedFetch` anywhere counts zero
+  // without being stripped — `countFetchOnce` returns zero for it anyway, and stripping only ever
+  // turns characters into whitespace, so it cannot put one there.
+  const contents = await readFilesUtf8(files);
+  for (let k = 0; k < files.length; k++) {
+    if (!contents[k].includes('cachedFetch')) continue;
+    const rel = path.relative(root, files[k]).replace(/\\/g, '/');
+    const { count, lines } = countFetchOnce(stripComments(contents[k]));
+    if (count === 0) continue;
+    perFile.set(rel, count);
+    for (const ln of lines) detail.push(`${rel}:${ln}`);
   }
-}
 
-// Reported whether or not the run fails, and never as a failure (Q-424).
-if (inherited.length) {
-  console.log('check-fetch-once-effects: inherited from the base branch, not caused here:');
-  inherited.forEach((f) => console.log('  • ' + f));
-}
-for (const [rel, allowed] of Object.entries(BASELINE)) {
-  const count = perFile.get(rel) ?? 0;
-  if (count < allowed) {
-    failures.push(`${rel}: down to ${count} from a baseline of ${allowed} — ${count === 0 ? 'delete its row' : `lower it to ${count}`}, the baseline is shrink-only.`);
+  const failures = [];
+  const inherited = [];
+  // One read of the base for every file, not one git process per file (#2081).
+  // Comments stripped first, as the working-tree scan above does (#2557).
+  const atBase = countsAtBase(baseRef, [...perFile.keys()], (c) => countFetchOnce(stripComments(c)).count);
+  for (const [rel, count] of perFile) {
+    const allowed = BASELINE[rel] ?? 0;
+    // LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over.
+    const v = verdict({ count, limit: allowed, atBase: atBase.get(rel) });
+    if (v === 'inherited') {
+      inherited.push(`${rel}: ${count} fetch-once effect(s) against a baseline of ${allowed}, but the base branch is already there.`);
+    } else if (v === 'fail') {
+      failures.push(allowed === 0
+        ? `${rel}: ${count} fetch-once effect(s); this file is not in the baseline, so it must have zero.`
+        : `${rel}: ${count} fetch-once effect(s), over its baseline of ${allowed}.`);
+    }
   }
-}
 
-if (failures.length) {
-  console.error('Fetch-once effect check failed:\n');
-  for (const f of failures) console.error(`  • ${f}`);
-  console.error(`
+  // Reported whether or not the run fails, and never as a failure (Q-424).
+  if (inherited.length) {
+    console.log('check-fetch-once-effects: inherited from the base branch, not caused here:');
+    inherited.forEach((f) => console.log('  • ' + f));
+  }
+  for (const [rel, allowed] of Object.entries(BASELINE)) {
+    const count = perFile.get(rel) ?? 0;
+    if (count < allowed) {
+      failures.push(`${rel}: down to ${count} from a baseline of ${allowed} — ${count === 0 ? 'delete its row' : `lower it to ${count}`}, the baseline is shrink-only.`);
+    }
+  }
+
+  if (failures.length) {
+    console.error('Fetch-once effect check failed:\n');
+    for (const f of failures) console.error(`  • ${f}`);
+    console.error(`
   A useEffect(…, []) that calls cachedFetch runs once per mount and never again. In the persistent
   tab shell nothing unmounts, so the component holds its first payload until the app is killed —
   that is Q-402, reported as "requires a restart of the app".
@@ -268,8 +286,9 @@ if (failures.length) {
   Use useCachedValue(key, url, ttl) from lib/hooks/use-cached-value.ts, which refetches when the key
   is invalidated. If this site genuinely should fetch once — a sheet snapshotting at open, a warm
   pass with no reader — add it to the BASELINE here with the reason, so the choice is in the diff.`);
-  process.exit(1);
-}
+    process.exit(1);
+  }
 
-const total = [...perFile.values()].reduce((a, b) => a + b, 0);
-console.log(`check-fetch-once-effects: OK — ${total} known fetch-once effect(s) across ${perFile.size} file(s), none new`);
+  const total = [...perFile.values()].reduce((a, b) => a + b, 0);
+  console.log(`check-fetch-once-effects: OK — ${total} known fetch-once effect(s) across ${perFile.size} file(s), none new`);
+});

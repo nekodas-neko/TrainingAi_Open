@@ -5,6 +5,7 @@ import { CloudDownload, FileDown, Loader2, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { clearAllCache } from '@/lib/sqlite/cache'
 import { pullDelta, restoreFromCloud } from '@/lib/local-store/sync-engine'
+import { invalidatePulledDomains } from '@/lib/cache-groups'
 import { LAST_SYNC_KEY } from '@/lib/health-connect-sync'
 
 /** Sync now · Restore from cloud · Export my data. These three used to sit under an "About"
@@ -19,6 +20,9 @@ export function DataSyncPanel({ userId }: { userId?: string }) {
     try {
       localStorage.removeItem(LAST_SYNC_KEY)
       const result = await pullDelta(userId, true)
+      // The pull has advanced the cursor, so this is the only place these rows' flags will ever be
+      // seen: drop the caches they feed now or they serve the old rows until their TTL (#2550).
+      if (result) await invalidatePulledDomains(result.domains)
       if (result === null) {
         // On web (no native SQLite), fall back to clearing the API cache so the
         // next navigation picks up fresh data from the server.
@@ -45,6 +49,8 @@ export function DataSyncPanel({ userId }: { userId?: string }) {
       // Full-history restore: drains the ?mode=restore pull (no 90-day floor) until the
       // server reports nothing more, rebuilding the local store after a wipe / on a new device.
       const result = await restoreFromCloud(userId)
+      // Every page's flags, failed or not: a paused restore still wrote the pages before the break.
+      if (result) await invalidatePulledDomains(result.domains)
       if (result === null) {
         toast.error('Restore needs the app (native storage) — not available on web')
       } else if (result.failed) {

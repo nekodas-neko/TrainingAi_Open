@@ -8,6 +8,7 @@ import { WorkoutSensorProbeConsole } from '@/components/oura-ble/workout-sensor-
 import { DaytimeCoverageConsole } from '@/components/oura-ble/daytime-coverage-console'
 import { StepCounterExportConsole } from '@/components/oura-ble/step-counter-export-console'
 import { StepBackfillConsole } from '@/components/oura-ble/step-backfill-console'
+import { StressBackfillConsole } from '@/components/oura-ble/stress-backfill-console'
 import { RekeyDeclarationCard } from '@/components/oura-ble/rekey-declaration-card'
 import { DbFootprintCard } from '@/components/oura-ble/db-footprint-card'
 import { DeviceMetricsPanel } from '@/components/oura-ble/device-metrics-panel'
@@ -88,10 +89,11 @@ export default async function OuraBlePage() {
         <ConsoleSection
           step={6}
           title="Maintenance & corrections"
-          when="Both WRITE. A re-key declaration tells the server a restarted ring clock was deliberate rather than a history gap; the step backfill rewrites already-stored days downward."
+          when="All WRITE. A re-key declaration tells the server a restarted ring clock was deliberate rather than a history gap; the step backfill rewrites already-stored days downward; the stress-bucket backfill adds missing buckets (add-only)."
         >
           <RekeyDeclarationCard />
           <StepBackfillConsole />
+          <StressBackfillConsole />
         </ConsoleSection>
       </main>
       <BottomNav isAdmin />

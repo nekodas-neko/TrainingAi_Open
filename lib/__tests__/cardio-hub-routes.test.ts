@@ -314,6 +314,41 @@ describe('/api/cardio-week', () => {
     expect(await toFor('Etc/GMT+12')).toBe(todayInTz('Etc/GMT+12'))
     expect(todayInTz('Etc/GMT-14')).not.toBe(todayInTz('Etc/GMT+12'))
   })
+
+  // #2337 — "0 / 108 min" on every zone for a user nothing can record was read as an untrained week.
+  describe('says whether anything records heart rate', () => {
+    it('marks both quotas as having no HR source when nothing recorded any', async () => {
+      const body = await (await getWeek()).json()
+      expect(body.quota.hasHrSource).toBe(false)
+      expect(body.dayQuota.hasHrSource).toBe(false)
+    })
+
+    it('marks them as unknown, never as "no source", when the HR read failed', async () => {
+      getObservedHrProfile.mockRejectedValue(new Error('db down'))
+      const body = await (await getWeek()).json()
+      expect(body.quota.hasHrSource).toBeNull()
+      expect(body.dayQuota.hasHrSource).toBeNull()
+    })
+
+    // The pin: for a user WITH an HR source the flag is added and nothing else moves.
+    it('leaves every quota number unchanged for a user with an HR source', async () => {
+      const today = todayInTz(TZ)
+      getObservedHrProfile.mockResolvedValue(computeObservedHr(reliableBpms(120)))
+      const days: Day[] = [{ day: today, seconds: [1800, 2400, 300, 120, 0] }]
+      getZoneMinutesRange.mockResolvedValue(days)
+      const body = await (await getWeek()).json()
+      expect(body.quota.hasHrSource).toBe(true)
+      expect(body.dayQuota.hasHrSource).toBe(true)
+      const z2 = body.quota.zones.find((z: { zoneId: number }) => z.zoneId === 2)
+      expect(z2.doneMin).toBe(40)
+      const { hasHrSource: _w, ...week } = body.quota
+      const { hasHrSource: _d, ...day } = body.dayQuota
+      const { computeZoneQuota } = await import('@trainingai/shared/health/zone-quota')
+      const targets = body.quota.zones.map((z: { zoneId: 1 | 2 | 3 | 4 | 5; targetMin: number }) => ({ zoneId: z.zoneId, minutes: z.targetMin }))
+      expect(week).toEqual(computeZoneQuota(targets, days))
+      expect(day.zones.map((z: { doneMin: number }) => z.doneMin)).toEqual(week.zones.map((z: { doneMin: number }) => z.doneMin))
+    })
+  })
 })
 
 describe('/api/cardio-trends', () => {
@@ -352,8 +387,19 @@ describe('/api/cardio-trends', () => {
     listActivityLogs.mockRejectedValue(new Error('db down'))
     const res = await getTrends()
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ weeklyZoneStacks: [], efficiencyCurve: [], cadenceTrend: [] })
+    // `hasHrSource: false` here is the observed read (still answering) finding nothing — the
+    // zone-range read failing does not make it unknown.
+    expect(await res.json()).toEqual({ weeklyZoneStacks: [], efficiencyCurve: [], cadenceTrend: [], hasHrSource: false })
     expect(res.headers.get('Cache-Control')).toBe('private, no-store')
+  })
+
+  // #2337 — eight all-zero stacks from a user with nothing recording HR are absence.
+  it('says whether anything records heart rate, and unknown when the read failed', async () => {
+    expect((await (await getTrends()).json()).hasHrSource).toBe(false)
+    getObservedHrProfile.mockResolvedValue(computeObservedHr(reliableBpms(120)))
+    expect((await (await getTrends()).json()).hasHrSource).toBe(true)
+    getObservedHrProfile.mockRejectedValue(new Error('db down'))
+    expect((await (await getTrends()).json()).hasHrSource).toBeNull()
   })
 
   it('rate-limits the thirty-first read in the minute', async () => {

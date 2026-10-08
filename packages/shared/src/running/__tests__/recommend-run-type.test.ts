@@ -46,4 +46,18 @@ describe('recommendRunType', () => {
     const q = quota([row(1, 4), row(2, 0, 'complete'), row(3, 0, 'not-required'), row(4, 0, 'complete'), row(5, 0, 'not-required')])
     expect(recommendRunType(q)).toBeNull()
   })
+
+  // #2337 — "108 min of Zone 2 still open" is a number nothing measured when nothing records HR.
+  it('recommends nothing when there is no HR source to have filled any zone', () => {
+    const q = quota([row(1, 30), row(2, 108), row(3, 8)])
+    expect(recommendRunType({ ...q, hasHrSource: false })).toBeNull()
+  })
+
+  it('answers exactly as before for a user WITH a source, and for an older payload without the flag', () => {
+    const q = quota([row(1, 30), row(2, 108), row(3, 8)])
+    const before = recommendRunType(q)
+    expect(before).not.toBeNull()
+    expect(recommendRunType({ ...q, hasHrSource: true })).toEqual(before)
+    expect(recommendRunType({ ...q, hasHrSource: null })).toEqual(before)
+  })
 })

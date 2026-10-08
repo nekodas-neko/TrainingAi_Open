@@ -18,6 +18,14 @@ export interface StoredSleepVerdict {
     onsetHigh: number | null
     efficiencyLow: number | null
     efficiencyHigh: number | null
+    /**
+     * #2094: each band's median. Optional because a response cached on the device before the
+     * column existed lacks it, and `null` on every row stored before then. No copy reads it — the
+     * wording below is measured to the band edge on purpose.
+     */
+    durationMedian?: number | null
+    onsetMedian?: number | null
+    efficiencyMedian?: number | null
   }
   baselineNights: number
   modelVersion: number
@@ -48,12 +56,12 @@ export function formatClock(minutesFromMidnight: number): string {
  * arguable if its evidence is visible — "your sleep was bad" invites being ignored, "5h10, 1h20
  * short of your usual" invites either a nod or a correction. That is the plan's whole instrument.
  *
- * **The distance is measured from the BAND EDGE, not from a median, and that is a constraint
- * rather than a preference:** `sleep_verdicts` snapshots `*_low`/`*_high` and drops
- * `ComponentBand.median`, so "90 minutes later than usual" cannot be said from a stored row
- * without re-deriving a middle the verdict never saw. "Your usual" therefore means *your usual
- * range*, and the distance quoted is to the edge of it — the smallest true claim, and the one the
- * verdict actually acted on.
+ * **The distance is measured from the BAND EDGE, not from a median, and that is deliberate.**
+ * "65 min past the late end of your usual range" is a smaller, truer claim than "90 min later than
+ * usual", and it is the quantity the verdict actually acted on. Since #2094 the row also stores
+ * each band's median (as tuning evidence), but every verdict written before then has none, so a
+ * median-based clause would also go silent on old rows. "Your usual" therefore means *your usual
+ * range*, and the distance quoted is to the edge of it.
  *
  * Returns `null` rather than half a sentence when the snapshot has no value or no band for the
  * component: coverage differs per component, so a band can exist for duration and not efficiency.

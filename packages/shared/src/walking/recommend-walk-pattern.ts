@@ -1,4 +1,4 @@
-import type { ZoneQuota } from '@trainingai/shared/health/zone-quota'
+import { quotaHasNoHrSource, type ZoneQuota } from '@trainingai/shared/health/zone-quota'
 
 /**
  * TN-25 — which block structure today's guided walk should use.
@@ -73,6 +73,11 @@ export function recommendWalkPattern(
   quota: ZoneQuota,
   opts?: { hadHardDayYesterday?: boolean; shortOnTime?: boolean },
 ): WalkPatternRecommendation {
+  // #2337: nothing records heart rate, so the Zone-2 gap is unmeasured, not open. Degrade to step
+  // volume — the same refusal to prescribe intervals off no data that `noTarget` makes below.
+  if (quotaHasNoHrSource(quota)) {
+    return { pattern: WALK_PATTERNS.easy_steps, reason: 'No heart-rate source to measure Zone 2 — walking for steps' }
+  }
   const zone2 = quota.zones.find(z => z.zoneId === 2) ?? null
   // No Zone-2 target at all means nothing to aim the walk at; treat it as met rather than inventing
   // a gap, so the selector degrades to step volume instead of prescribing intervals off no data.

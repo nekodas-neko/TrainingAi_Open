@@ -73,6 +73,20 @@ function sortMigrationFiles(files) {
   return [...files].sort((a, b) => lead(a) - lead(b) || (a < b ? -1 : a > b ? 1 : 0))
 }
 
+// Mirrors `runMigrationFile` in lib/data/postgres/client.ts (read the reason there, issue 2603): one
+// client per file so its `RAISE NOTICE`s reach the log instead of being dropped with the checkout.
+async function runMigrationFile(pool, file, sqlText) {
+  const client = await pool.connect()
+  const onNotice = n => console.info(`[migrate] ${file} NOTICE: ${n.message ?? ''}`)
+  client.on('notice', onNotice)
+  try {
+    await client.query(sqlText)
+  } finally {
+    client.removeListener('notice', onNotice)
+    client.release()
+  }
+}
+
 async function main() {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
   const migrationsDir = join(__dirname, '../../lib/data/postgres/migrations')
@@ -100,7 +114,7 @@ async function main() {
     }
     const sqlText = readFileSync(join(migrationsDir, file), 'utf-8')
     try {
-      await pool.query(sqlText)
+      await runMigrationFile(pool, file, sqlText)
       await pool.query('INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING', [file])
       ran++
     } catch (err) {
@@ -191,4 +205,4 @@ if (require.main === module) {
   })
 }
 
-module.exports = { sortMigrationFiles }
+module.exports = { sortMigrationFiles, runMigrationFile }

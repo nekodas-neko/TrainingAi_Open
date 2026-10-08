@@ -24,7 +24,6 @@ import { SEED_EMAIL, settleRouteBoundary } from './fixtures'
  * pass on the new one. The database poll stays as an invariant, not as the guard.
  */
 
-const DAY_OFFSET_NOTE = 'today, in the user timezone — read back from the app, never composed here'
 const IMPLAUSIBLE_KG = '5000'
 const PLAUSIBLE_KG = '81.6'
 

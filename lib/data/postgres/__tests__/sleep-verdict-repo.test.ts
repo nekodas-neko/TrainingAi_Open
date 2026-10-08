@@ -24,6 +24,7 @@ const record = (over: Partial<Omit<SleepVerdictRecord, 'responseState'>> = {}): 
     durationLow: 6.9, durationHigh: 8.8,
     onsetLow: -95, onsetHigh: -15,
     efficiencyLow: 85.5, efficiencyHigh: 93.5,
+    durationMedian: 7.75, onsetMedian: -55, efficiencyMedian: 89.5,
   },
   baselineNights: 28,
   modelVersion: 1,
@@ -67,6 +68,33 @@ describe.skipIf(!canRun)('sleep verdict repository', () => {
     await repo.upsertSleepVerdict(USER_A, record())
     const got = await repo.getSleepVerdict(USER_A, DAY)
     expect(got).toEqual({ ...record(), responseState: 'none' })
+  })
+
+  // #2094: the medians land in their own columns, not just in the returned object.
+  it("stores each band's median in its own column", async () => {
+    await repo.upsertSleepVerdict(USER_A, record())
+    const { rows } = await pool.query(
+      `SELECT duration_median, onset_median, efficiency_median FROM sleep_verdicts
+        WHERE user_id = $1 AND date = $2`, [USER_A, DAY])
+    expect(rows[0]).toEqual({ duration_median: 7.75, onset_median: -55, efficiency_median: 89.5 })
+  })
+
+  // #2094: every verdict announced before the median columns existed has NULL there for good —
+  // its trailing window has moved, so nothing back-fills it. It must still read as a verdict.
+  it('reads a verdict stored before the medians existed, with null medians', async () => {
+    await pool.query(
+      `INSERT INTO sleep_verdicts (user_id, date, verdict, triggered, duration_hours, onset_minutes,
+         efficiency, duration_low, duration_high, onset_low, onset_high, efficiency_low,
+         efficiency_high, baseline_nights, model_version)
+       VALUES ($1, $2, 'poor', '{duration}', 5.2, 90, 88, 6.9, 8.8, -95, -15, 85.5, 93.5, 28, 2)`,
+      [USER_A, DAY])
+    const got = await repo.getSleepVerdict(USER_A, DAY)
+    expect(got?.verdict).toBe('poor')
+    expect(got?.bands).toEqual({
+      durationLow: 6.9, durationHigh: 8.8, onsetLow: -95, onsetHigh: -15,
+      efficiencyLow: 85.5, efficiencyHigh: 93.5,
+      durationMedian: null, onsetMedian: null, efficiencyMedian: null,
+    })
   })
 
   it('a re-announcement updates the evidence but NEVER erases the answer', async () => {

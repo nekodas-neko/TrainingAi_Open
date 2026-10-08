@@ -210,6 +210,7 @@ export function CardioContent({ userId }: { userId?: string }) {
             isReliable={data.heart.isReliable}
             maxHrSource={data.heart.maxHrSource}
             restingHrSource={data.heart.restingHrSource}
+            hasHrSource={data.quota.hasHrSource}
           />
           {/* BF-159. Moved off the Health tab's Training list, which is otherwise all lifting, and
               placed against the heart profile: that card is what the heart is doing lately, this is

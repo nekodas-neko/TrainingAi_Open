@@ -42,6 +42,9 @@ export interface HrProfile {
   maxHrSource: 'observed' | 'estimated' | 'estimated-age-unread'
   /** The full spike-rejection detail, for surfaces that want to show their working. */
   observed: ObservedHrProfile
+  /** The observed-HR read itself FAILED and `observed` is the empty profile standing in for it —
+   *  so `observed.sampleCount === 0` says nothing about whether this person has an HR source. */
+  observedUnread?: boolean
 }
 
 const RESTING_HR_WINDOW_DAYS = 28
@@ -88,8 +91,8 @@ export async function resolveHrProfile(repo: WorkoutRepository, userId: string, 
   // cardio hub among them — is built to degrade on missing data, and an unguarded read made a
   // transient fault in either of these two take the whole screen down instead. What a guard must
   // not do is make a failure look like data, so each failed read is named in its source field.
-  const unread = new Set<'user' | 'restingHr'>()
-  const failed = (what: 'user' | 'restingHr') => (err: unknown) => {
+  const unread = new Set<'user' | 'restingHr' | 'observed'>()
+  const failed = (what: 'user' | 'restingHr' | 'observed') => (err: unknown) => {
     console.error(`[hr-profile] ${what} read failed, continuing on a default:`, err)
     unread.add(what)
     return null
@@ -97,7 +100,10 @@ export async function resolveHrProfile(repo: WorkoutRepository, userId: string, 
   const [user, bodyMetrics, observed] = await Promise.all([
     repo.getUserById(userId).catch(failed('user')),
     repo.listBodyMetrics(userId, from28dIso, todayIso).catch(failed('restingHr')),
-    repo.getObservedHrProfile(userId, observedFrom, observedTo).catch(() => EMPTY_OBSERVED_HR),
+    repo.getObservedHrProfile(userId, observedFrom, observedTo).catch((err: unknown) => {
+      failed('observed')(err)
+      return EMPTY_OBSERVED_HR
+    }),
   ])
 
   const rhrRows = (bodyMetrics ?? []).filter(m => m.restingHeartRate != null && m.restingHeartRate > 0)
@@ -118,5 +124,24 @@ export async function resolveHrProfile(repo: WorkoutRepository, userId: string, 
     observedMax,
     maxHrSource: resolved.source === 'estimated' && unread.has('user') ? 'estimated-age-unread' : resolved.source,
     observed,
+    ...(unread.has('observed') ? { observedUnread: true } : {}),
   }
+}
+
+/**
+ * **Has anything recorded this person's heart rate?** — the one definition (#2337), so a screen
+ * can tell "no zone minutes" from "nothing that could have recorded zone minutes".
+ *
+ * True when any plausible reading landed in the profile's `OBSERVED_WINDOW_DAYS` window, from any
+ * source the window merges (ring, chest strap, Health Connect). It costs nothing extra: every route
+ * that reports zone minutes already resolves this profile to draw the zone boundaries.
+ *
+ * `null` when the read failed: unknown is neither "yes" nor "no", and a caller must not turn a
+ * database fault into "you have no heart-rate source". This is the house rule the input layer
+ * (`inputs/cascade.ts`) states for a slot — missing is never scored as 0 — applied one level up,
+ * to whether there is a source at all.
+ */
+export function hasHrSource(profile: Pick<HrProfile, 'observed' | 'observedUnread'>): boolean | null {
+  if (profile.observedUnread) return null
+  return profile.observed.sampleCount > 0
 }

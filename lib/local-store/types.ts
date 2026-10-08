@@ -64,6 +64,14 @@ export interface LocalSleepSession {
   deepSleepHours:  number | null;
   remSleepHours:   number | null;
   lightSleepHours: number | null;
+  /** #2414 (v50): the session's own window and awake time, as the server stores them. Null on
+   *  every row pulled before v50 until the server re-sends it — and a reader must treat a null
+   *  window as "cannot place this row", never as a zero-length night. `awakHours` keeps the
+   *  server's spelling (`sleep_sessions.awake_hours` → Drizzle `awakHours`) so the row reads as
+   *  the API's `SleepRow` without renaming. */
+  sleepStart:      string | null;
+  sleepEnd:        string | null;
+  awakHours:       number | null;
   // Oura columns (v18, added via RECONCILE) — carried through pull/restore so a
   // wiped device gets HRV/stages back, not sleep stripped to stage hours (review R6).
   ouraId:          string | null;
@@ -80,8 +88,25 @@ export interface LocalSleepSession {
   /** Q-519 — the bedtime the user remembers for a night the ring did not observe. Read only by the
    *  bedtime estimate; never by anything deriving a window, duration or efficiency. */
   manualSleepStart: string | null;
+  /** #2338 (v51) — a night the user entered by hand, not one a device measured. `getSleepSessions`
+   *  never returns one that a device night covers (`preferDeviceNights`). */
+  manualEntry:     boolean;
+  /** Issue 2606 (v52) — set on a manual night the user removed. Carried by the pull (the tombstone
+   *  channel); `getSleepSessions` never returns a removed row, so a reader always sees null/absent. */
+  deletedAt?:      string | null;
   syncStatus:      'pending' | 'synced';
   updatedAt:       string;
+}
+
+/** #2338 — what the device writes for a night the user entered: its window and what follows from
+ *  it (`manualNightFromWindow`). Nothing measured — no stages, efficiency, heart rate or awake time. */
+export interface LocalManualSleepNight {
+  id:             string;
+  date:           string;
+  sleepStart:     string;
+  sleepEnd:       string;
+  durationHours:  number;
+  timeInBedHours: number;
 }
 
 export interface LocalWorkoutSession {
@@ -308,6 +333,12 @@ export interface LocalActivityLog {
     avgPaceSecPerKm: number | null; distanceKm: number | null; avgCadenceSpm: number | null
     // LA-48. Optional because pre-2026-09-14 walks have no `steps` key — see schema.ts.
     steps?: number | null
+    // Issue 2242 (LA-48). Optional, and ABSENT (never 0) on walks saved before this and on segments the
+    // pacer never judged. Counts are seconds the walker was shown each band; adherence is derived once
+    // in `packages/shared/src/health/pacer-adherence.ts`.
+    pacerSignal?: 'cadence' | 'speed' | 'hr' | null
+    pacerAdherence?: number | null
+    pacerTicks?: { green: number; amber: number; red: number; stopped: number } | null
   }[] | null;
   updatedAt:      string;
   deletedAt:      string | null;

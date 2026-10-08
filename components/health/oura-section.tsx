@@ -9,6 +9,7 @@ import { TTL_MEDIUM, HEALTH_TRENDS_SUMMARY_TTL } from '@trainingai/shared/cache-
 import type { OuraStatsResponse } from '@/app/api/oura/stats/route'
 import type { HealthTrendsResponse } from '@/app/api/health/trends/route'
 import { TrendSparkline } from './trend-sparkline-lazy'
+import { TREND_EMPTY } from './trend-empty-copy'
 import { formatHoursMinutes } from '@trainingai/shared/format/units'
 
 function fmtMin(sec: number | null | undefined) {
@@ -157,7 +158,7 @@ export const OuraSection = memo(function OuraSection({ trends: trendsProp }: Pro
           )}
         </div>
         {trends.length > 0 && (
-          <TrendSparkline trends={trends} field="wornHours" label="Wear Time" color="var(--color-brand)" unit="h" />
+          <TrendSparkline trends={trends} field="wornHours" label="Wear Time" color="var(--color-brand)" unit="h" emptyText={TREND_EMPTY.wornHours} />
         )}
       </div>
 

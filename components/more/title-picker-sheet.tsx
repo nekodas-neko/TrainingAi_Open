@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { TITLES } from "@trainingai/shared/types/friends";
 import { invalidateUserProfile } from "@/lib/cache-groups";

@@ -24,7 +24,7 @@ import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/s
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { getDailyGoals, type DailyGoals } from '@trainingai/shared/health/daily-goals'
 import { hrMaxFromAge, computeHrZones, moderateIntensityBpm } from '@trainingai/shared/health/hr-zones'
-import { accumulateZoneSeconds, activeMinutesFromReadings } from '@trainingai/shared/health/zone-minutes'
+import { activeMinutesFromReadings } from '@trainingai/shared/health/zone-minutes'
 import { computeMovedHours, moveHoursGoal } from '@trainingai/shared/health/hourly-movement'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { baselineZ } from '@trainingai/shared/health/personal-baseline'
@@ -121,7 +121,16 @@ export interface ActivityBlendResult {
 }
 
 export interface ReadinessScoreResponse {
-  score: number
+  /**
+   * The readiness score, or `null` when there is no recovery signal to score from (#2336).
+   *
+   * It used to be a number always: with no sleep, RHR or HRV the recovery components are all 0 and
+   * only load contributed, so a user with no ring data got `5` and "Low", and the rest-day card told
+   * them to rest fully. `null` is the same condition `readinessDisplayScore` already encoded, now on
+   * the field the consumers actually read; the rest-day guidance and the check-in headers already
+   * have a branch for it.
+   */
+  score: number | null
   label: 'High' | 'Moderate' | 'Low'
   components: {
     sleep: number   // 0–40 (custom signal — kept for fallback + ACWR display)
@@ -905,7 +914,11 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
       })
 
   return {
-    score, label,
+    // `score` is what a reader shows and acts on, so it is the display score: null without a recovery
+    // signal. The local `score` above stays a number because the early-deload gate and the band label
+    // read it, and the gate is itself closed without a recovery baseline. The load component stays in
+    // `components` below, so the breakdown still shows what did contribute.
+    score: readinessDisplayScore, label,
     components: { sleep: sleepComponent, hrv: hrvScore, rhr: rhrScore, load: loadScore },
     hasSufficientData,
     earlyDeloadRecommended,
@@ -919,9 +932,17 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     // contributor breakdown of their own, so they can only report present/absent honestly — which is
     // still more than the surfaces had.
     availability: [
-      metricAvailability('readiness', score, ownComposite?.contributors ?? {}),
+      // Keyed on the DISPLAY score: derived from the raw one it read `present` for a score of 5 built
+      // from load alone, and the chip showed a dash with no reason (#2336).
+      metricAvailability('readiness', readinessDisplayScore, ownComposite?.contributors ?? {}),
       metricAvailability('sleep', sleepScore100),
       metricAvailability('activity', ownActivityScore),
+      // #2423. The two lowest-coverage pillars. Present/absent only, like sleep and activity: neither
+      // has contributors, and inventing some so they could say `awaiting_baseline` would be a claim
+      // nothing computes. Stress is present when today's high-stress minutes were derived (0 is a
+      // real reading); resilience when any recent day published a level.
+      metricAvailability('daytimeStress', derivedToday?.stressHighMinutes ?? null),
+      metricAvailability('resilience', latestResilience?.resilienceLevel ?? null),
     ],
     ouraScore:               ouraToday?.readinessScore             ?? null,
     temperatureDeviation,

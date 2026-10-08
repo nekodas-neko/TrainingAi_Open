@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import type { MuscleSetsEntry } from "@/app/api/weekly-muscle-sets/route";
 import type { MuscleTonnageTrendResponse } from "@/app/api/muscle-tonnage-trend/route";
 import { MuscleHeatmap } from "@/components/muscle-heatmap";
@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Sparkline } from "@/components/ui/sparkline";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
-import { volumeVerdict } from "@/components/health/volume-band";
+import { muscleVolumeColor, volumeVerdict } from "@/components/health/volume-band";
 import { TTL_LONG } from "@trainingai/shared/cache-ttl";
 import { ProgressFill } from '@/components/ui/progress-fill'
 
@@ -19,13 +19,6 @@ function capitalize(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function barColor(sets: number): string {
-  if (sets >= 15) return "var(--color-brand)";
-  if (sets >= MIN_TARGET) return "var(--accent-green)";
-  if (sets >= 6) return "var(--accent-amber)";
-  return "var(--destructive)";
-}
-
 interface Props {
   muscles: MuscleSetsEntry[];
   loading: boolean;
@@ -33,11 +26,30 @@ interface Props {
   /** The active program's training goal, which SCALES the landmark table (Q-305). Absent → the
    *  generic 10–20 band, which is what every muscle used to be measured against. */
   trainingGoal?: string;
+  /** Muscles with an active injury. The map outlines them so an injury is not mistaken for a red
+   *  "under target" patch. */
+  injuredMuscles?: string[];
 }
 
-export const WeeklyMuscleSetsCard = memo(function WeeklyMuscleSetsCard({ muscles, loading, title = "{title}", trainingGoal }: Props) {
+export const WeeklyMuscleSetsCard = memo(function WeeklyMuscleSetsCard({ muscles, loading, title = "{title}", trainingGoal, injuredMuscles }: Props) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [trend, setTrend] = useState<MuscleTonnageTrendResponse | null>(null);
+  // The same rule as the bars below (`muscleVolumeColor`), computed once and handed to the map so
+  // the two cannot disagree (#2554). Memoised: `MuscleHeatmap` is `memo`'d, and a fresh array on
+  // every expand-a-row re-render would repaint the whole SVG.
+  // The caller builds `injuredMuscles` inline, so its identity changes every render; key on the
+  // contents instead.
+  const injuredKey = injuredMuscles?.join("|") ?? "";
+  const injuredStable = useMemo(() => (injuredKey ? injuredKey.split("|") : undefined), [injuredKey]);
+  const mapVolumes = useMemo(() => {
+    const landmarks = !muscles.some(m => m.target != null) && trainingGoal != null;
+    return muscles.map(({ muscle, sets, target }) => ({
+      muscle,
+      sets,
+      target,
+      color: muscleVolumeColor(sets, target, landmarks ? volumeVerdict(trainingGoal, muscle, sets) : null),
+    }));
+  }, [muscles, trainingGoal]);
 
   function toggleExpanded(muscle: string) {
     const next = expanded === muscle ? null : muscle;
@@ -94,7 +106,13 @@ export const WeeklyMuscleSetsCard = memo(function WeeklyMuscleSetsCard({ muscles
         </p>
       </div>
 
-      <MuscleHeatmap volumes={muscles} compact className="mb-3" />
+      <MuscleHeatmap
+        volumes={mapVolumes}
+        injuredMuscles={injuredStable}
+        volumeKey={hasTargets ? "target" : "bars"}
+        compact
+        className="mb-3"
+      />
 
       <div className="space-y-2">
         {muscles.map(({ muscle, sets, target }) => {
@@ -103,9 +121,7 @@ export const WeeklyMuscleSetsCard = memo(function WeeklyMuscleSetsCard({ muscles
           const barPct = (sets / maxSets) * 100;
           const targetLinePct = (markSets / maxSets) * 100;
           const ceilingPct = verdict ? (verdict.mrv / maxSets) * 100 : null;
-          const color = target != null
-            ? (sets >= target ? "var(--accent-green)" : sets >= target * 0.6 ? "var(--accent-amber)" : "var(--destructive)")
-            : verdict?.color ?? barColor(sets);
+          const color = muscleVolumeColor(sets, target, verdict);
           const tonnageValues = trend?.muscles[muscle];
           return (
             <div key={muscle}>

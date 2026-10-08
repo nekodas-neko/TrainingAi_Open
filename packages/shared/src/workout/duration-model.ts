@@ -189,6 +189,33 @@ export function requestedBudgetMin(sessionBudgetMin: number, preset: DurationPre
   return sessionBudgetMin - DURATION_PRESET_DELTA_MIN
 }
 
+/** The lengths the picker offers around a session's own budget (owner 2026-08-23: "anchor to
+ *  session; dont need 15minutes"). */
+export const SESSION_LENGTH_LADDER_MIN = [30, 45, 60, 90] as const
+
+/**
+ * The four lengths to offer for a session configured at `anchorMin`. The fixed ladder when the
+ * anchor is on it; otherwise the anchor takes the place of the nearest rung (the lower one on a
+ * tie), so the control is always four choices and the default is always one of them: a 75-minute
+ * session reads 30/45/75/90, never a ladder that cannot express its own length.
+ */
+export function sessionLengthOptions(anchorMin: number): number[] {
+  const ladder: number[] = [...SESSION_LENGTH_LADDER_MIN]
+  if (!Number.isFinite(anchorMin) || ladder.includes(anchorMin)) return ladder
+  let nearest = 0
+  for (let i = 1; i < ladder.length; i++) {
+    if (Math.abs(ladder[i] - anchorMin) < Math.abs(ladder[nearest] - anchorMin)) nearest = i
+  }
+  ladder[nearest] = anchorMin
+  return ladder.sort((a, b) => a - b)
+}
+
+/** What to send for a picked length: the anchor stays `'standard'` (the same request the old
+ *  Normal button made), anything else is the absolute number of minutes. */
+export function presetForLength(anchorMin: number, lengthMin: number): DurationPreset {
+  return lengthMin === anchorMin ? 'standard' : lengthMin
+}
+
 /**
  * Is today shorter than, the same as, or longer than the session's configured length?
  *

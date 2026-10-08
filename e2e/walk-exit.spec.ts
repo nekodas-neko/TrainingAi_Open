@@ -129,10 +129,12 @@ test('under a minute the only choices are to discard or keep walking', async ({ 
   await expect(page.getByRole('button', { name: 'Save walk' })).toHaveCount(0)
 })
 
-test('the back gesture opens the same Exit prompt, and does nothing else', async ({ page }) => {
-  // A stub of Capacitor's native bridge: just enough for `App.addListener('backButton', …)` to
-  // register, and a handle to fire it. The platform flips back to web as soon as that listener is in
-  // so nothing else on the page believes it is on a device.
+/**
+ * A stub of Capacitor's native bridge: just enough for `App.addListener('backButton', …)` to
+ * register, and a handle to fire it. The platform flips back to web as soon as that listener is in
+ * so nothing else on the page believes it is on a device.
+ */
+async function stubBackButton(page: Page) {
   await page.addInitScript(() => {
     type Cb = (e: { canGoBack: boolean }) => void
     const w = window as unknown as Record<string, unknown>
@@ -163,6 +165,10 @@ test('the back gesture opens the same Exit prompt, and does nothing else', async
     w.__pressBack = () => (listeners.backButton ?? []).forEach(cb => cb({ canGoBack: true }))
     w.__backListeners = () => (listeners.backButton ?? []).length
   })
+}
+
+test('the back gesture opens the same Exit prompt, and does nothing else', async ({ page }) => {
+  await stubBackButton(page)
   await openWalk(page, 5 * 60)
   await expect.poll(
     () => page.evaluate(() => (window as unknown as { __backListeners: () => number }).__backListeners()),
@@ -184,4 +190,30 @@ test('the back gesture opens the same Exit prompt, and does nothing else', async
   await dialog.getByRole('button', { name: 'Keep walking' }).click()
   await expect(dialog).toBeHidden()
   expect(await storedMode(page), 'asking must not end the walk').toBe('active')
+})
+
+test('the back gesture off the saved summary is Done: the next walk starts fresh (issue 2595)', async ({ page }) => {
+  await page.route('**/api/activity-logs', route => {
+    if (route.request().method() !== 'POST') return route.continue()
+    return route.fulfill({
+      status: 200, contentType: 'application/json',
+      body: JSON.stringify({ activityLog: { id: 'e2e-walk-back', caloriesBurned: 120 } }),
+    })
+  })
+  await stubBackButton(page)
+  await openWalk(page, 5 * 60)
+  await expect.poll(
+    () => page.evaluate(() => (window as unknown as { __backListeners: () => number }).__backListeners()),
+    { timeout: 30_000 },
+  ).toBeGreaterThan(0)
+
+  await page.getByRole('button', { name: 'Exit walk' }).click()
+  await page.getByRole('dialog', { name: 'Exit this walk?' }).getByRole('button', { name: 'Save walk' }).click()
+  await expect(page.getByRole('heading', { name: 'Walk complete' })).toBeVisible({ timeout: 30_000 })
+
+  await page.evaluate(() => (window as unknown as { __pressBack: () => void }).__pressBack())
+
+  // Back is Done: off the walk, to Health, and nothing of the finished walk is left to reopen.
+  await expect(page).toHaveURL(/\/health/, { timeout: 30_000 })
+  await expect.poll(() => storedMode(page), { timeout: 10_000 }).toBe('config')
 })

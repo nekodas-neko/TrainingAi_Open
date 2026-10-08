@@ -291,7 +291,7 @@ export async function GET(req: Request) {
       buckets,
       (best, worst) => `You lift ${best.avg} t on days your overnight HRV is ${best.label} baseline, vs ${worst.avg} t at ${worst.label}.`,
       undefined,
-      { insufficient: 'Log workouts on days the ring recorded your sleep to unlock this.' },
+      { insufficient: 'Log workouts on days with recorded sleep to unlock this.' },
       { points, control },
     )
     result = { view, insight, buckets: toBucketResponse(buckets), hasSufficientData, stats, withheld }

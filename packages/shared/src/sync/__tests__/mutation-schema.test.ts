@@ -49,7 +49,7 @@ describe('queueMutation domain coverage', () => {
 
   function walk(dir: string, acc: string[]): string[] {
     for (const entry of readdirSync(dir)) {
-      if (entry === 'node_modules' || entry === '__tests__') continue
+      if (entry === 'node_modules' || entry === '__tests__' || entry === '__check_fixture__') continue
       const full = join(dir, entry)
       if (statSync(full).isDirectory()) walk(full, acc)
       else if ((full.endsWith('.ts') || full.endsWith('.tsx')) && !full.includes('.test.')) acc.push(full)

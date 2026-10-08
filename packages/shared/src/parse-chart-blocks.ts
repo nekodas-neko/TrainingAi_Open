@@ -20,7 +20,7 @@ const ChartDatasetSchema = z.object({
   tension: z.number().optional(),
 });
 
-const ChartPayloadSchema = z.object({
+export const ChartPayloadSchema = z.object({
   type: z.enum(["bar", "line", "pie"]),
   title: z.string().optional(),
   labels: z.array(z.string()),

@@ -2,7 +2,10 @@ import { test, expect, type Page } from '@playwright/test'
 import { Client } from 'pg'
 import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 import {
-  SEED_EMAIL, ensureEnergyBalanceProfile, settleRouteBoundary, suppressMorningCheckin, tapCentre,
+  ensureEnergyBalanceProfile,
+  settleRouteBoundary,
+  suppressMorningCheckin,
+  tapCentre,
 } from './fixtures'
 
 /**

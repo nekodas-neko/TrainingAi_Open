@@ -24,8 +24,9 @@ const CODE = /\.tsx?$/
 function walk(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
     // `__tests__` is skipped so this file's own failure messages, which name the pattern it
-    // looks for, are not read back as call sites.
-    if (name === 'node_modules' || name === 'dist' || name === '.next' || name === '__tests__') continue
+    // looks for, are not read back as call sites. `__check_fixture__` is another suite's temporary
+    // copy, deleted while this walk may be inside it — the ENOENT this test failed with (#2560).
+    if (name === 'node_modules' || name === 'dist' || name === '.next' || name === '__tests__' || name === '__check_fixture__') continue
     const full = join(dir, name)
     if (statSync(full).isDirectory()) walk(full, out)
     else if (CODE.test(name)) out.push(full)

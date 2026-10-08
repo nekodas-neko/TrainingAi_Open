@@ -33,6 +33,11 @@ export interface WeightRateFit {
   /** Days between the first and last weigh-in. Two readings a fortnight apart and two on
    *  consecutive days are very different evidence for the same slope. */
   spanDays: number
+  /** #2071. The fitted line's value on the LATEST weigh-in's day, in kg, unrounded — the smoothed
+   *  trend weight. It is the same line `rateKgPerWeek` is the slope of, so the weight and the rate
+   *  the Body screen shows can never come from two different smoothings. Evaluated at the last
+   *  weigh-in rather than at "today", so a gap since the last reading is never extrapolated. */
+  fittedLatestKg: number
 }
 
 /**
@@ -81,6 +86,7 @@ export function computeWeightRateFit(points: WeightPoint[]): WeightRateFit | nul
     stdErrKgPerWeek,
     weighIns: n,
     spanDays: xy[n - 1].x,
+    fittedLatestKg: fit.intercept + fit.slope * xy[n - 1].x,
   }
 }
 
@@ -95,6 +101,19 @@ export function computeWeightRateKgPerWeek(points: WeightPoint[]): number | null
   const fit = computeWeightRateFit(points)
   if (!fit || fit.weighIns < 3) return null
   return Math.round(fit.rateKgPerWeek * 10) / 10
+}
+
+/**
+ * The smoothed trend weight (#2071): the Body screen's 30-day Weight Trend line, read at its latest
+ * weigh-in. Null under the same three-reading floor `computeWeightRateKgPerWeek` keeps — a trend the
+ * Body screen would not show is not one the calorie budget may use. Callers pass the points of
+ * `weightTrendWindowStart(today)..today`, exactly as the Weight Trend card is fed, and fall back to
+ * the latest weigh-in themselves when this is null.
+ */
+export function computeTrendWeightKg(points: WeightPoint[]): number | null {
+  const fit = computeWeightRateFit(points)
+  if (!fit || fit.weighIns < 3) return null
+  return Number.isFinite(fit.fittedLatestKg) && fit.fittedLatestKg > 0 ? fit.fittedLatestKg : null
 }
 
 /**

@@ -41,8 +41,10 @@ handles it. Consequences and rules:
   **server** archive; protocol fixes ship as decoder changes + a redecode pass. (Until D4's
   owner-confirmed cutover moves that archive to the device, at which point this PR rewrites the
   rule.) **The device-local copy is MEANT to be transient — a 14-day rolling window, per the owner's
-  2026-08-02 retention decision — and ⚠ that window HAS NOT SHIPPED** (`projectOverview.md`):
-  `pruneRaw` has no caller, and its predicate needs `rolled_up = 1`, which only D2 Task 5 sets.
+  2026-08-02 retention decision — and ⚠ that window is NOT ON yet**: `pruneRaw`'s predicate needs
+  `rolled_up = 1`, which since #2579 is set from the SERVER rollup's watermark (meaning "folded on the
+  server" — an interim until the device rollup, retired at #2302 step 2), and its only caller runs the
+  prune behind the owner's `ta_ring_raw_prune` flag, OFF by default (ops-doc I30).
   Measured on-device 2026-08-18: **209,326 rows, 0 rolled up, 31.2 MB**, growing at ~3.4 MB/day, and
   past Android Auto Backup's 25 MB quota so none of it is backed up. **Do not cite the device as a
   surviving copy of anything until that lands.** Local pruning is local-only and must never reach a

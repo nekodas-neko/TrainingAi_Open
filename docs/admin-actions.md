@@ -47,7 +47,7 @@ Line numbers point at the `<Button>` or `onClick` line.
 
 | Button | File:line | Calls | What it does | Scope | Repeat? | Auth | Danger | When |
 |---|---|---|---|---|---|---|---|---|
-| **Sync & Redecode** | `:486` → `syncAndRedecode` `:387` | native `ensurePermissions` + `startService` (if stopped), native `drainHistory()`, a **fixed 4 s wait**, then `runRedecodeJob('')`, which does `POST /api/oura-ble/samples/redecode?async=1` and polls `GET ?jobId=` | Drains new ring events, then re-runs every server decoder and the **full-history** rollup. | ring: since cursor. Server: **full history**. | Yes, idempotent. The server allows one job at a time, and a second press attaches to the running job. Rate limit 4/min. | native + admin session | slow (a full-history re-aggregate, minutes; the cause of a 2026-08-13 outage before it moved off the request loop) | After a release that changes a decoder, the sleep stager or a rollup step. ⚠ The 4 s wait is not tied to the drain finishing. Frames that land later are rolled up by the normal incremental ingest, but **this** full-history pass misses them. |
+| **Sync & Redecode** | `:486` → `syncAndRedecode` `:387` | native `ensurePermissions` + `startService` (if stopped), native `drainHistory()`, a **fixed 4 s wait**, then `runRedecodeJob('')`, which does `POST /api/oura-ble/samples/redecode?async=1` and polls `GET ?jobId=` | Drains new ring events, then re-runs every server decoder and the **full-history** rollup. | ring: since cursor. Server: **full history**. | Yes, idempotent. The server allows one job at a time, and a second press follows the running job (a plain redecode or a step backfill; both do the full redecode). Rate limit 4/min. | native + admin session | slow (a full-history re-aggregate, minutes; the cause of a 2026-08-13 outage before it moved off the request loop) | After a release that changes a decoder, the sleep stager or a rollup step. ⚠ The 4 s wait is not tied to the drain finishing. Frames that land later are rolled up by the normal incremental ingest, but **this** full-history pass misses them. |
 | **Sync now** | `:489` → `syncNow` `:255` | native `startService` (if stopped) + `drainHistory()` | Pulls new ring history from the resume cursor. Native ingest POSTs `/api/oura-ble/samples` and triggers the incremental rollup. | since cursor | Yes, idempotent. The server dedups. | native | none | Any time data looks stale. |
 | **Start** / **Stop** | `:493` / `:498` | native `ensurePermissions` + `startService` / `stopService` | Starts or stops the background BLE service. | device | yes | native | Stop halts all background sync until the next Start. | Troubleshooting. |
 | **Allow** (battery exemption banner) | `:514` | native `requestBatteryExemption()` | Opens the Android dialog for battery-optimisation exemption. | device | yes | native | none | One-time setup. |
@@ -105,13 +105,43 @@ One exception:
 | Ring re-key > **Declare a re-key** (+ note) | `rekey-declaration-card.tsx:130` (confirm) | `POST /api/oura-ble/rekey` | Records a pending declaration. The **next drain** consumes it and opens a new clock epoch. | next drain onward | **No.** A second declaration after the first is consumed opens a second epoch. Rate limit 5/min. | admin session | **destructive / irreversible once consumed**: every timestamp in the epoch depends on it. A wrong declaration re-times history. | Only right after re-keying with `open_oura`. |
 | Ring re-key > **Cancel declaration** | `:118` | `DELETE /api/oura-ble/rekey` | Withdraws a pending declaration that has not been consumed. | pending row | yes | admin session | none | Only if the declaration was a mistake and no drain has happened yet. |
 | D0 historical step backfill > **Preview backfill** | `step-backfill-console.tsx:75` | `GET /api/oura-ble/samples/step-backfill-preview` | Lists the days whose step count would drop. | full history | yes | admin session | none | |
-| … > **Run backfill now** | `:97` (confirm) | `runRedecodeJob('allowStepsDecrease=1')`, a **full-history redecode** with the "steps only go up" guard lifted | Rewrites inflated historical step days **downward** to the step_counter total. Manual entries are untouched. | full history | Idempotent once applied, but the old values are gone. | admin session | **destructive** (the old step values are not recoverable). slow. | One-off D0 correction. A third caller of the full-history redecode. |
+| … > **Run backfill now** | `step-backfill-console.tsx` (confirm) | `runRedecodeJob('allowStepsDecrease=1')`, a **full-history redecode** with the "steps only go up" guard lifted | Rewrites inflated historical step days **downward** to the step_counter total. Manual entries are untouched. If a plain Redecode is already running, the server **refuses with 409** and starts nothing ("A redecode is already running. Wait for it to finish, then run the backfill."), and the console says *Not started … Nothing was changed.* It says *Done. Backfill applied* only when the finished job's `kind` (read from the job row by the status poll) is `step-backfill` (issue 2383, F9). | full history | Idempotent once applied, but the old values are gone. A second press during a running backfill follows that backfill. | admin session | **destructive** (the old step values are not recoverable). slow. | One-off D0 correction. A third caller of the full-history redecode. Run it when no Redecode or Sync & Redecode is in flight. |
+| Daytime-stress bucket backfill > **Dry run** | `stress-backfill-console.tsx` | `runRedecodeJob('stressBackfill=1')`, i.e. `POST /api/oura-ble/samples/redecode?async=1&stressBackfill=1` (dry run is the default) | Computes, from stored data, which past days would gain `oura_daytime_stress_buckets` rows, and reports it. **Writes nothing.** Uses the rollup's own series builder (`lib/oura-ble/rollup/stress-series.ts`) over the raw frames (both tiers, read-only), the nightly summary baselines, the fitted daytime-HRV model and the recorded sleep windows. | full history | yes | admin session, `rateLimit` 4/min, strict query | slow (a full-history raw read, in the rollup worker, in the one job slot) | Before the write, always. Compare its numbers to the write's (see the entry below). |
+| … > **Add N buckets** | `stress-backfill-console.tsx` (confirm; offered only after a dry run found something to add) | `runRedecodeJob('stressBackfill=1&dryRun=false')` | **Adds** the missing buckets. **Add-only (issue 2236):** it never deletes a bucket and never changes one. A day that already has any bucket is skipped whole, and each insert is `ON CONFLICT DO NOTHING` on `(user_id, bucket_mid)`. Today is left to the forward writer. A day it cannot score (no raw data, no model, no HRV or resting-HR baseline, no temperature, no scorable bucket) is reported with the reason and gets nothing. One transaction that **rolls back** unless the rows written equal the rows planned. It is a separate job kind (`stress-backfill`), so a plain redecode, a step backfill or another full-history pass cannot join it or be joined by it: a request while another kind runs gets **409**, nothing started. The console says *Done … added* only when the finished job's `kind` is `stress-backfill` and its report says it was not a dry run. | full history | yes: a second run finds every day populated and adds 0 | admin session | additive only; no deletes, no overwrites. slow. **Production run: snapshot first** (policy below). | One-off, by the owner or the Orchestrator, after a verified snapshot and a dry run whose numbers were read. NOT behind the future agent key. |
+
+### 6a. Running the stress-bucket backfill in production (issue 2236)
+
+Policy (docs/rules/git-safety-and-packages.md): it only adds rows, but it is a production write, so
+the order is fixed. The owner or the Orchestrator runs it, never an agent on its own.
+
+1. **Snapshot first**: take a database snapshot and verify it restores (as for any production write).
+2. **Dry run** (the default): `POST /api/oura-ble/samples/redecode?async=1&stressBackfill=1`, then poll
+   `GET ?jobId=…`. The finished job carries `stressBackfill`, the report, and `kind:
+   "stress-backfill-dry-run"`. Nothing is written.
+3. **Read the report and compare**:
+   - `range` and `daysConsidered`: completed days that have a nightly summary row.
+   - `daysSkippedPopulated`: days that already have buckets. Expect the days the forward writer
+     covered (production history begins 2026-08-24, about 26 buckets a day).
+   - `daysToGain` and `bucketsToAdd`: expect roughly 20 to 26 buckets for each gaining day.
+   - `daysCannotCompute`, `cannotComputeByReason` and `cannotCompute`: each such day gets nothing, with
+     its reason (`no-raw-data`, `no-daytime-hrv-model`, `no-night-hrv-baseline`,
+     `no-resting-heart-rate`, `no-temperature-in-day`, `no-scorable-buckets`). Depth is bounded by the
+     packed raw tier (`oura_raw_packed`), so very old days will report `no-raw-data`.
+   - `depth`: first and last day that would gain buckets. This is the achieved back-fill depth.
+4. **Write**: the same request with `&dryRun=false`. The job's `kind` is `stress-backfill`, and its
+   report has `dryRun: false` and `bucketsWritten`, which must equal the dry run's `bucketsToAdd`
+   (the transaction rolls back and the job reports an error if they differ).
+5. **Confirm**: run the dry run again. Expect `daysToGain: 0`, `bucketsToAdd: 0`.
+
+If the job slot is held by a redecode, a step backfill or a run of the other stress kind, the request
+gets 409 and starts nothing; wait for the running job, then ask again. A second press of the same kind
+follows the running job.
 
 ## 7. `/admin` (tabs)
 
 | Screen > section > button | File:line | Calls | What it does | Scope | Repeat? | Auth | Danger | When |
 |---|---|---|---|---|---|---|---|---|
-| Admin > users > **activate / deactivate icon** (UserCheck / UserX, no text) | `app/admin/admin-content.tsx:407` | `PATCH /api/admin/users {userId, action}` | Turns a user's `isActive` on or off. | one user | yes | admin session | ⚠ **No self-guard and no confirm.** The owner's own row shows a deactivate icon. DELETE refuses "yourself" but PATCH deactivate does not (`app/api/admin/users/route.ts`). Deactivating yourself probably locks the owner out of auth (not exercised). | Approving invitees. |
+| Admin > users > **activate / deactivate icon** (UserCheck / UserX, no visible text; `aria-label` Activate / Deactivate) | `app/admin/admin-content.tsx` (`UserRow`) | `PATCH /api/admin/users {userId, action}` | Turns a user's `isActive` on or off. Deactivate opens a confirm naming the user; activate is one tap. | one user | yes | admin session | Fixed (#2383 item 3): the route refuses to deactivate the signed-in admin (`400 Cannot deactivate yourself`, the same shared check DELETE uses, before any write), and the admin's own row shows no deactivate icon. A deactivated user is sent to `/pending` (`auth.ts`) until an admin activates them. | Approving invitees. |
 | … > **delete icon** (Trash, pending users only) | `:395` | `DELETE /api/admin/users` | **Hard-deletes** a pending user. | one user | no | admin session | **destructive**, no confirm | Rejecting a signup. |
 | Admin > invites > **+** / **trash icon** | `:214` / `:222` | `POST` / `DELETE /api/admin/invites` | Adds or removes an invite email. | one email | yes | admin session | low | |
 | Admin > feedback > **Delete** → **Confirm delete** | `:340` → `:326` | `DELETE /api/admin/feedback/[id]` | Deletes a feedback report. The response is not checked: the row is removed from the UI even if the call failed. | one row | n/a | admin session | **destructive**: BugFix reads this inbox | After the report is triaged into an issue. |
@@ -162,7 +192,7 @@ unchanged.
 |---|---|---|---|---|---|---|---|
 | More > Data & Sync > **Sync now** | `components/more/data-sync-panel.tsx:73` | clears `LAST_SYNC_KEY`, then `pullDelta(userId, true)`. On web, `clearAllCache()`. | Forced delta pull into the local store. | delta | yes | user session | none |
 | … > **Restore from cloud** | `:92` | `restoreFromCloud()` (`?mode=restore`, no 90-day floor) | Rebuilds the local store with full history. | full history | yes (resumable) | user session | slow |
-| … > **Export my data** | `:110` | `GET /api/export` (link) | Downloads everything. | full | yes | user session (rate-limited) | none (but the file contains PII) |
+| … > **Export my data** | `:110` | `GET /api/export` (link) | Downloads everything as NDJSON: a `_manifest` line, one `{domain,row}` line per record, then a trailer — `{"_complete":true}` when whole, `{"_error":…}` when the server failed part-way; no trailer means the download was cut off (#2427). | full | yes | user session (rate-limited) | none (but the file contains PII) |
 
 Device pairing **Forget** buttons (`components/settings/{chest-strap,scale,colmi}-pairing.tsx`) are product settings and are out of scope. Only Colmi has a confirm.
 
@@ -174,7 +204,7 @@ Device pairing **Forget** buttons (`components/settings/{chest-strap,scale,colmi
 
 ## Duplicates
 
-1. **Full-history redecode has three buttons:** *Sync & Redecode* (drains first, then a fixed 4 s wait), *History & sync > Redecode*, and *D0 step backfill > Run backfill now* (the same job with `allowStepsDecrease=1`). They share one single-flight job slot, and **`startRedecodeJob` does not compare the opts** (`lib/data/postgres/slices/oura.ts:246-256` returns any running job). So if a plain Redecode is already running, pressing *Run backfill now* attaches to that run. The decrease never happens, and the console still prints "Done. Backfill applied" (`step-backfill-console.tsx:61`). This was confirmed by reading the code, not reproduced. It is finding F9.
+1. **Full-history redecode has three buttons:** *Sync & Redecode* (drains first, then a fixed 4 s wait), *History & sync > Redecode*, and *D0 step backfill > Run backfill now* (the same job with `allowStepsDecrease=1`). They share one single-flight job slot. Until issue 2383, `startRedecodeJob` did not compare the opts, so a backfill pressed during a plain Redecode followed that run, the decrease never happened, and the console printed "Done. Backfill applied" (finding F9). **Fixed:** a request may follow a running job only if that job writes everything the request asked for (`canFollowRunningRedecode` in `lib/oura-ble/redecode-job-kind.ts`). A backfill during a plain run is refused with 409; a plain run during a backfill follows it; the poll reports each job's `kind`.
 2. **Drain from cursor has five buttons:** *Sync now*, *Drain history* (does not start the service), *Step calibration > Mark start*, *Cadence > Sync ring*, and *Cadence > Stop* (implicit).
 3. **One-night dump has two buttons:** *Sleep > Sleep epochs > Compute* and *SleepNet dump > Run dump*. Both call `redecode?date=&dump=1`.
 4. **Two buttons both labelled "Run backfill"** on the Developer screen (set-HR and workout-HR). Same component, different routes.
@@ -183,13 +213,13 @@ Device pairing **Forget** buttons (`components/settings/{chest-strap,scale,colmi
 ## Findings worth an issue
 
 - **F1. Clear key has no confirm** (`oura-ble-debug.tsx:614`). It is the one action that can permanently cut the owner off from the ring, and it is a single tap on a ghost button. Every other destructive control on the page has a `ConfirmDialog`.
-- **F2. Users > deactivate has no self-guard and no confirm** (`admin-content.tsx:407`, `api/admin/users` PATCH). DELETE guards against "yourself" and PATCH does not.
+- **F2. Users > deactivate has no self-guard and no confirm** (`admin-content.tsx:407`, `api/admin/users` PATCH). DELETE guards against "yourself" and PATCH does not. **Fixed in #2383 item 3:** PATCH deactivate refuses self, the own row has no deactivate icon, and deactivating anyone else asks first.
 - **F3. Fix lbs logged as kg > Apply is not idempotent.** A second apply over the same exercises and date converts twice.
 - **F4. The `dumpOnly` path is described as "writes nothing"** (route comment, `run.ts:1270`) and the SleepNet card says it "does not change the staging stored". Per the code, it runs the windowed rollup steps including writes, and skips only the watermark. That is harmless in practice because it is deterministic, but the description is wrong. Related: `dumpOnly` leaves `fullHistory` false, so the read window is narrowed by the rollup watermark (`run.ts:97–112`), to roughly the last few days rather than the 35 days the comment promises. A dump for an older night may answer "no BLE night" for that reason (suspected, not reproduced).
 - **F5. Feedback "Confirm delete" ignores the response.** The row disappears from the UI even when the DELETE failed.
 - **F6. HR backfill client loop against the 6/min rate limit.** A backlog of more than 3,000 sessions ends in "HTTP 429" partway through. It is re-runnable, so this is low severity.
 - **F7. Pack sealed frames versus the rule "never prune or mutate the server raw archive".** It is proof-gated and confirm-gated, but it is still a delete. The owner should consciously sign off that Lever 5 is an exception to the rule.
-- **F9. A step backfill can silently no-op.** *Run backfill now* reports success after attaching to an already-running plain redecode, because the job slot ignores `allowStepsDecrease`. It should refuse, or wait and then start its own run.
+- **F9. A step backfill can silently no-op.** *Run backfill now* reported success after attaching to an already-running plain redecode, because the job slot ignored `allowStepsDecrease`. **Fixed for issue 2383:** the backfill is refused with 409 while a plain redecode runs (never queued), and the console claims "Backfill applied" only for a finished job whose kind is `step-backfill`.
 - **F8. Hard deletes without a tombstone:** exercise library delete, pending-user delete, feedback delete. The offline-first rule asks for `deleted_at`. The exercise library is the case that matters for unsynced devices.
 
 ---
@@ -232,7 +262,7 @@ are read-only by design.
 | Cadence **Stop** | Also drains the ring. |
 | **Null historical decoded (Lever 1b)**, **Pack sealed frames (Lever 5)**, **VACUUM FULL (Lever 1c)** | They lean on internal "Lever N" names. The confirm dialogs explain; the buttons do not. |
 | **AI all** | One paid AI generation per uncovered exercise, with no count or cost before the press. |
-| Icon-only controls: user activate/deactivate (UserCheck/UserX), user delete, invite remove, exercise row icons, activity **trash** (no aria-label) | No text label. The activity delete has no accessible name at all. |
+| Icon-only controls: user activate/deactivate (UserCheck/UserX; `aria-label` since #2383), user delete, invite remove, exercise row icons, activity **trash** (no aria-label) | No text label. The activity delete has no accessible name at all. |
 | **Sync now** (More > Data & Sync) | A server-to-device pull. It shares its name with the Oura BLE ring drain. |
 | **Export my data** | Fine, but it downloads PII without a warning. |
 

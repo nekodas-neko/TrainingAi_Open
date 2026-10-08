@@ -5,7 +5,7 @@ import type { WorkoutRepository } from '@/lib/data/repository'
 import { pearsonCorrelation, averageByDayOfWeek, type TrendClassification } from './analytics'
 import { summarizePeriod } from './period-comparison'
 import { computeVolumeAcwr, trainingLoadBand, acwrBandByKey } from '@trainingai/shared/ai-periodization/acwr'
-import { projectRm } from '@trainingai/shared/health/strength-projection'
+import { projectRm, isRmPlateau } from '@trainingai/shared/health/strength-projection'
 import { aggregateExerciseHrTrend, summarizeHrByExercise } from '@trainingai/shared/workout/exercise-hr-trend'
 import { computeHrRecoveryProfile } from '@trainingai/shared/health/compute-hr-recovery-profile'
 import { liveReadinessByDay } from '@trainingai/shared/health/live-readiness'
@@ -14,6 +14,7 @@ import { isBodyweightType, bodyweightRepMax } from '@trainingai/shared/1rm'
 import { todayMidnightUtc, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { computeEnergyBalance } from '@/lib/health/energy-balance-service'
+import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 
 export function buildChatTools(repo: WorkoutRepository, userId: string, tz: string, todayIso: string) {
   // User-local midnight, shared by every lookback window below — never Date.now(), which
@@ -141,23 +142,37 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
     }),
 
     getNutritionDay: tool({
-      description: 'Food logs and daily macro targets for one date: per-item calories/protein/carbs/fat plus totals and remaining calories.',
+      description: 'Food logs and daily targets for one date: per-item calories/protein/carbs/fat plus totals. ' +
+        '`targets.calories` is the calorie BUDGET for the day — the same number every screen in the app shows — ' +
+        'and `remainingKcal` is that budget minus what was eaten. Quote these; never recompute them.',
       inputSchema: z.object({
         date: z.string().nullable().describe('YYYY-MM-DD; null = today'),
       }),
       execute: async ({ date }) => {
         const d = date ?? todayIso
-        const [logs, targets] = await Promise.all([
+        // #2071. The calorie figure is the day's budget from the energy-balance service, never the
+        // typed goal (`targets.calories`), which no screen shows as a budget any more. A failed
+        // balance costs the budget, not the food log.
+        const [logs, targets, energy] = await Promise.all([
           repo.listFoodLogs(userId, d),
           repo.getNutritionTargets(userId),
+          (async () => computeEnergyBalance(repo, userId, tz, d))().catch(() => null),
         ])
+        const budgetKcal = energy?.balance?.budgetKcal ?? null
+        // The grams the Nutrition tab shows: re-fitted to that budget (BF-154) and grown by movement.
+        const grams = energy?.macroTargets?.scaled ?? (targets
+          ? { proteinG: targets.proteinG ?? null, carbsG: targets.carbsG ?? null, fatG: targets.fatG ?? null }
+          : null)
         const totals = logs.reduce(
           (acc, l) => ({ calories: acc.calories + l.calories, proteinG: acc.proteinG + l.proteinG, carbsG: acc.carbsG + l.carbsG, fatG: acc.fatG + l.fatG }),
           { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 },
         )
         return {
           date: d,
-          targets: targets ? { calories: targets.calories ?? null, proteinG: targets.proteinG ?? null, carbsG: targets.carbsG ?? null, fatG: targets.fatG ?? null } : null,
+          targets: budgetKcal != null || grams != null
+            ? { calories: budgetKcal, proteinG: grams?.proteinG ?? null, carbsG: grams?.carbsG ?? null, fatG: grams?.fatG ?? null }
+            : null,
+          remainingKcal: energy?.balance?.remainingKcal ?? null,
           totals: { calories: Math.round(totals.calories), proteinG: Math.round(totals.proteinG), carbsG: Math.round(totals.carbsG), fatG: Math.round(totals.fatG) },
           items: logs.map(l => ({ name: l.foodItem.name, meal: l.mealTypeId, calories: Math.round(l.calories), proteinG: Math.round(l.proteinG) })),
         }
@@ -175,6 +190,11 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
         'When `maintenance.doseCaveat` is set, a logged supplement or medication started, stopped or ' +
         'changed dose inside the calibration window: quote it beside any maintenance figure or target ' +
         'you give, because weight moved by a dose change is not metabolism. ' +
+        '`dailyBudgetKcal` is the calorie budget for the day — resting rate, minus the deficit for the goal, plus ' +
+        'the 20% for daily living less the first 3,000 steps, plus measured movement (`budgetBreakdown`) — and is the ONE budget every ' +
+        'screen shows; `kcalLeftToHitTarget` is measured against it. `ownTargetKcal` is set when the user chose their ' +
+        'own daily target: it then IS `dailyBudgetKcal` (say "your own target"), and `workedOutBudgetKcal` is what the ' +
+        'budget would be without it. `recommendedMaintenanceKcal` is the maintenance-based suggestion: never present it as the budget for today. ' +
         'Quote these numbers; never recompute them.',
       inputSchema: z.object({
         date: z.string().nullable().describe('YYYY-MM-DD; null = today'),
@@ -196,11 +216,27 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
           movementBreakdown: r.activeBreakdown,
           netKcal: r.balance.netKcal,
           targetNetKcal: r.balance.targetNetKcal,
+          dailyBudgetKcal: r.balance.budgetKcal ?? null,
+          budgetBreakdown: (() => {
+            const p = budgetProvenance(r.balance)
+            // With an own target the chain is what the budget WOULD be, not what the number is made
+            // of, so it is not offered as a breakdown of it.
+            return p.chain == null || p.ownTarget ? null : {
+              restingRateKcal: p.chain.rmr, goalDeficitKcal: p.chain.deficit,
+              // The 20% less the first 3,000 steps' energy, which movement already counts.
+              dailyLivingKcal: p.chain.dailyLiving, movementKcal: p.chain.movement,
+              floorSetTheTotal: p.chain.totalFloored,
+              deficitFromWeightKg: r.balance.deficitWeightKg ?? null,
+              deficitWeightSource: r.balance.deficitWeightSource ?? null,
+            }
+          })(),
           kcalLeftToHitTarget: r.balance.remainingKcal,
           standing: r.balance.zoneLabel,
           projectedWeeklyKg: r.balance.projectedWeeklyKg,
           maintenance: r.maintenance,
-          calorieTarget: r.target,
+          ownTargetKcal: r.balance.ownTargetKcal ?? null,
+          workedOutBudgetKcal: budgetProvenance(r.balance).workedOutTotal,
+          recommendedMaintenanceKcal: r.target.recommendedKcal,
         }
       },
     }),
@@ -342,7 +378,7 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
     }),
 
     getPlateauReport: tool({
-      description: 'Per-exercise trend (improving/plateaued/declining) from estimated-1RM history, plus days since each exercise\'s last PR. Use for "what\'s stalled" type questions.',
+      description: 'Per-exercise trend (improving/plateaued/declining) from the same estimated-1RM series the Strength trend card uses (baseline-test and deload sessions left out, last 180 days), plus days since each exercise\'s last PR. Use for "what\'s stalled" type questions.',
       inputSchema: z.object({}),
       execute: async () => {
         const from180d = daysAgo(180)
@@ -351,33 +387,29 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
           repo.getWorkoutSessionsFrom(userId, from180d),
           repo.listRecentPersonalRecords(userId, from10y, new Date()),
         ])
-        const byExercise = new Map<string, { date: Date; orm: number }[]>()
-        for (const ws of sessions) {
-          for (const el of ws.exercises) {
-            if (el.estimated1rm == null || el.estimated1rm <= 0) continue
-            const arr = byExercise.get(el.exerciseName) ?? []
-            arr.push({ date: ws.startedAt, orm: el.estimated1rm })
-            byExercise.set(el.exerciseName, arr)
-          }
-        }
+        // The sessions only name the lifts. The points come from the SAME repository series the
+        // Strength trend card and the engine read (baseline sessions and deloads left out, one
+        // point per local day), over a 180-day window, so the verdicts cannot differ (issue 2648).
+        const names = [...new Set(sessions.flatMap(ws => ws.exercises.map(el => el.exerciseName)))]
+        const history = await repo.getExercise1rmHistory(userId, names, tz, 180)
+        // First-seen order, as before, so equal days-since-PR keep their order.
+        const byExercise = new Map(names.filter(n => history[n]).map(n => [n, history[n]] as const))
         const recordDates = new Map(recentPrs.map(r => [r.exerciseName, r.achievedAt]))
         const now = Date.now()
         const report = [...byExercise.entries()]
-          .filter(([, entries]) => entries.length >= 3)
-          .map(([name, entries]) => {
-            const sorted = entries.sort((a, b) => a.date.getTime() - b.date.getTime())
-            // Day-spaced plateau verdict (projectRm) — shares the single definition the
-            // Health screen's strength-projection card uses, instead of the index-spaced
-            // classifyTrend, so the AI chat and Health screen never disagree on "plateaued".
-            const proj = projectRm(sorted.map(e => ({ date: formatInTimeZone(e.date, tz, 'yyyy-MM-dd'), rm: e.orm })))
+          .filter(([, series]) => series.length >= 3)
+          .map(([name, series]) => {
+            // The plateau verdict is isRmPlateau, the same function the Health card badge and the
+            // engine call. Only the improving/declining split of a non-plateau is the coach's own.
+            const proj = projectRm(series)
             const trend: TrendClassification =
               !proj ? 'plateaued'
-              : proj.plateau ? 'plateaued'
+              : isRmPlateau(series) ? 'plateaued'
               : proj.slopePerWeek > 0 ? 'improving'
               : 'declining'
             const prDate = recordDates.get(name)
             const daysSincePr = prDate ? Math.round((now - prDate.getTime()) / 86_400_000) : null
-            return { exerciseName: name, trend, sessionsAnalyzed: sorted.length, daysSinceLastPr: daysSincePr }
+            return { exerciseName: name, trend, sessionsAnalyzed: series.length, daysSinceLastPr: daysSincePr }
           })
           .sort((a, b) => (b.daysSinceLastPr ?? 0) - (a.daysSinceLastPr ?? 0))
         return { exercises: report }

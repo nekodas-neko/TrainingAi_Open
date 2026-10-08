@@ -16,6 +16,7 @@ const root = process.cwd()
 
 function routeFiles(dir: string, out: string[] = []): string[] {
   for (const name of readdirSync(dir)) {
+    if (name === '__check_fixture__') continue
     const p = join(dir, name)
     if (statSync(p).isDirectory()) routeFiles(p, out)
     else if (name === 'route.ts') out.push(p)

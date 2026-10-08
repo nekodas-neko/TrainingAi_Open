@@ -51,15 +51,21 @@ A subagent does not inherit a sensible model: set `model` on every thread or hel
 
 **Cadence.** The Implementer loops every **~30 minutes**, not 15. When the inbox has nothing new, no
 thread needs it and `node scripts/queue.js --next-batch` returns nothing, it ends the tick at once
-without re-reading anything else. **Usage gate (automatic, owner 2026-10-06).** Every Orchestrator health check first reads
-`rate_limit_info` from the agents' session records (`get_session`). When its `status` turns
-`allowed_warning`, the Orchestrator:
-1. interrupts the sessions and stops its own helpers;
-2. posts **Pause** on #2354 with the reset time;
-3. schedules its next check for just after `resetsAt`.
+without re-reading anything else. **Usage gate (automatic, owner 2026-10-08).** Every Orchestrator health check first reads
+`rate_limit_info` from the agents' session records (`get_session`). The record shows the status,
+the limit type (`five_hour` or `seven_day`) and the reset time. It never shows a percentage.
+`allowed_warning` arrives well before the end: on the weekly limit it fired at about 75% (10-08).
+The owner wants work to continue until 90%, so the two states are:
 
-Once the status reads `allowed` again, it posts **Resume**. The record shows the status and reset
-time, not the percentage. The owner can still say "pause" at any time.
+- **Slow** (status `allowed_warning`): the Orchestrator posts **Slow** on #2354. The Implementer
+  runs one thread at a time, on Sonnet only, and starts no investigations. BugFix carries on as
+  normal. The Orchestrator checks every 60 minutes and starts no helpers.
+- **Pause** (90% on either limit): when the owner says a limit has reached 90%, or the status goes
+  past warning, the Orchestrator interrupts the sessions, stops its own helpers, posts **Pause**
+  on #2354 with the reset time, and schedules its next check for just after `resetsAt`.
+
+Once the status reads `allowed` again, it posts **Resume**. The owner can say "pause" or "resume"
+at any time.
 
 ## What the Orchestrator can do from the cloud
 

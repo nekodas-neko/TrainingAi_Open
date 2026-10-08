@@ -12,7 +12,7 @@ import type { ProgressionStyle, Program } from "@trainingai/shared/types";
 import type { PhaseSetWithPhases, ExerciseLibraryEntry } from "@trainingai/shared/types/program";
 import { type EditablePhase } from "@/components/config/phase-editor";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
-import { invalidateProgramStructure } from "@/lib/cache-groups";
+import { invalidateProgramStructure, invalidatePulledDomains } from "@/lib/cache-groups";
 import { pullDelta } from "@/lib/local-store/sync-engine";
 import { TTL_LONG } from '@trainingai/shared/cache-ttl';
 import { StyleEditorSheet } from "@/components/config/style-editor-sheet";
@@ -510,7 +510,7 @@ export default function ConfigScreen({ userId, openNewProgram }: { userId?: stri
       // the mirror keeps its pre-edit session ids indefinitely — the delta cursor won't
       // re-fetch an unchanged-since program later — and the workout screen seeds a stale
       // session id into the AI request, which 404s ("couldn't generate the AI prescription").
-      if (userId) await pullDelta(userId, true).catch(() => {});
+      if (userId) await pullDelta(userId, true).then(res => { if (res) return invalidatePulledDomains(res.domains); }).catch(() => {});
       setProgramSheetOpen(false);
       load(); // background refresh — don't block the spinner on 4 network calls
     } catch (e) {
@@ -984,12 +984,10 @@ export default function ConfigScreen({ userId, openNewProgram }: { userId?: stri
       <Sheet open={builderOpen} onOpenChange={(open) => { open ? setBuilderOpen(true) : builderCloseGuardRef.current(); }}>
         <SheetContent side="bottom" className="h-[92dvh] p-0 flex flex-col">
           <BuilderWizard
+            userId={userId}
             onClose={() => setBuilderOpen(false)}
             registerCloseGuard={(fn) => { builderCloseGuardRef.current = fn; }}
-            onSaved={() => {
-              setBuilderOpen(false);
-              refreshPrograms();
-            }}
+            onSaved={() => { setBuilderOpen(false); refreshPrograms(); }}
           />
         </SheetContent>
       </Sheet>

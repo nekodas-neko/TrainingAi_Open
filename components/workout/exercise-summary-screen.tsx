@@ -44,6 +44,7 @@ export function ExerciseSummaryScreen({ summaryData, workoutStartMs, onNext, use
     prevEst1rm,
     prevRepMaxReps,
     allTimePr1rm,
+    suppressRmChange,
     newEst1rm,
     exerciseType,
     nextExercise,
@@ -93,7 +94,7 @@ export function ExerciseSummaryScreen({ summaryData, workoutStartMs, onNext, use
   useEffect(() => {
     if (isNewPR) hapticSuccess();
   }, [exName, isNewPR]);
-  const rmDiff = prevEst1rm != null ? newEst1rm - prevEst1rm : null;
+  const rmDiff = prevEst1rm != null && !suppressRmChange ? newEst1rm - prevEst1rm : null;
   const RmArrowIcon = rmDiff == null ? null : rmDiff > 0.1 ? ArrowUpIcon : rmDiff < -0.1 ? ArrowDownIcon : ArrowRightIcon;
   const rmColor =
     rmDiff == null
@@ -118,7 +119,7 @@ export function ExerciseSummaryScreen({ summaryData, workoutStartMs, onNext, use
   const prevRepMax = bodyweightRepMax({ storedReps: prevRepMaxReps, oneRm: prevEst1rm });
   // This session's rep max is the best set just logged — already on the client, never inverted.
   const newRepMax = bodyweightRepMax({ storedReps: sr.length ? Math.max(...sr) : null, oneRm: newEst1rm }) ?? 0;
-  const repDiff = prevRepMax != null ? newRepMax - prevRepMax : null;
+  const repDiff = prevRepMax != null && !suppressRmChange ? newRepMax - prevRepMax : null;
 
 
   return (

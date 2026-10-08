@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeZoneQuota, weekWindow } from '../zone-quota'
+import { computeZoneQuota, weekWindow, quotaHasNoHrSource } from '../zone-quota'
 
 describe('computeZoneQuota', () => {
   const targets = [
@@ -70,5 +70,41 @@ describe('weekWindow', () => {
     const w = weekWindow('2026-07-19', '2026-07-20')
     expect(w.from).toBe('2026-07-19')
     expect(w.to).toBe('2026-07-19')
+  })
+})
+
+// #2337 — the flag says whether the zeros mean anything; it must never move a number.
+describe('computeZoneQuota — hasHrSource (#2337)', () => {
+  const targets = [
+    { zoneId: 1 as const, minutes: 30 },
+    { zoneId: 2 as const, minutes: 108 },
+    { zoneId: 3 as const, minutes: 8 },
+  ]
+  const days = [{ day: '2026-07-20', seconds: [1800, 2400, 180, 60, 0] as [number, number, number, number, number] }]
+
+  it('leaves every row and total exactly as before for a user WITH an HR source', () => {
+    const before = computeZoneQuota(targets, days)
+    const { hasHrSource, ...rest } = computeZoneQuota(targets, days, { hasHrSource: true })
+    expect(hasHrSource).toBe(true)
+    expect(rest).toEqual(before)
+  })
+
+  it('adds no key at all when the caller does not know, so an old shape is unchanged', () => {
+    expect('hasHrSource' in computeZoneQuota(targets, days)).toBe(false)
+  })
+
+  it('carries false and null through without touching the zeros', () => {
+    const none = computeZoneQuota(targets, [], { hasHrSource: false })
+    expect(none.hasHrSource).toBe(false)
+    expect(none.zones.map(z => z.doneMin)).toEqual([0, 0, 0])
+    expect(computeZoneQuota(targets, [], { hasHrSource: null }).hasHrSource).toBeNull()
+  })
+
+  it('treats only a KNOWN false as no source — absent and null keep the measured reading', () => {
+    expect(quotaHasNoHrSource({ hasHrSource: false })).toBe(true)
+    expect(quotaHasNoHrSource({ hasHrSource: true })).toBe(false)
+    expect(quotaHasNoHrSource({ hasHrSource: null })).toBe(false)
+    expect(quotaHasNoHrSource({})).toBe(false)
+    expect(quotaHasNoHrSource(null)).toBe(false)
   })
 })

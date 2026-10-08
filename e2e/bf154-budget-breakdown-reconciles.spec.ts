@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { Client } from 'pg'
 import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 import { ensureEnergyBalanceProfile, settleRouteBoundary } from './fixtures'
@@ -76,24 +76,29 @@ test.afterAll(async () => {
   })
 })
 
-/** Every integer in the sentence, in the order a reader meets them. */
-function numbersIn(text: string): number[] {
-  return [...text.matchAll(/\d[\d,]*/g)].map(m => Number(m[0].replace(/,/g, '')))
-}
-
 test('the budget the sentence names equals the terms it breaks it into', async ({ page }) => {
   const res = await page.request.get('/api/nutrition/energy-balance')
   expect(res.ok()).toBeTruthy()
   const b = (await res.json()).balance
   expect(b, 'the seeded profile must produce a balance').toBeTruthy()
-  const { total, base, earned, anchoredToRestingRate } = budgetProvenance(b)
+  const { total, base, earned, anchoredToRestingRate, chain } = budgetProvenance(b)
 
   // The discriminator. If the fixture's anchored budget happened to equal the retired expression,
   // this spec would pass against the defect itself — which is the trap `calorie-progress-bar.spec.ts`
   // documents for the same reason.
   expect(anchoredToRestingRate, 'fixture must exercise the anchored path — the branch that broke').toBe(true)
-  expect(total, 'fixture must separate the budget from the pre-anchor expression')
-    .not.toBe(Math.round(b.restingBaseKcal) + Math.round(b.targetNetKcal) + Math.round(b.activeKcal))
+  // Issue 2071: the old discriminator (`restingBase + targetNet + earned`) can no longer separate
+  // anything. The owner's budget is RMR − deficit + (20% of RMR − step credit) + movement, which is
+  // built from the same terms as `restingBase` (RMR scaled up, less the step credit) and `targetNet`
+  // (the deficit), so on an unfloored day the two coincide (both read 2,804 on this fixture).
+  // What a reverted `budgetProvenance` would print is the BF-152 budget — the bare resting rate
+  // plus movement — so that is what the fixture must be separated from.
+  expect(total, 'fixture must separate the budget from the BF-152 one (resting rate + movement)')
+    .not.toBe(Math.round(b.restingRateKcal) + Math.round(b.activeKcal))
+  // Issue 2071: the line is a chain of signed terms, which only exists on the live-payload path and
+  // only while the floor is not setting the whole day (then the line names the floor instead).
+  expect(chain, 'a live payload must carry the budget chain').toBeTruthy()
+  expect(chain!.totalFloored, 'fixture must not sit on the floor, or the line prints no terms').toBe(false)
 
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
@@ -109,20 +114,34 @@ test('the budget the sentence names equals the terms it breaks it into', async (
   // steps)" — which are terms of `earned`, not of the budget. Stripped, or they would be counted
   // twice.
   const clause = (await sentence.innerText()).replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ')
-  const terms = numbersIn(clause)
 
-  expect(terms[0], 'the sentence leads with the provenance base').toBe(base)
+  // Issue 2071: "1,304 resting rate − 232 for your goal + 161 daily living + 237 earned from
+  // movement". Each term is read WITH its sign, so the arithmetic below is the reader's own.
+  const num = (m: RegExpMatchArray | null) => (m ? Number(m[m.length - 1].replace(/,/g, '')) : null)
+  const signed = (m: RegExpMatchArray | null) => (m ? (m[1] === '−' || m[1] === '-' ? -1 : 1) * Number(m[2].replace(/,/g, '')) : 0)
+  const rmr = num(clause.match(/^\s*(\d[\d,]*) resting rate/))
+  const goal = signed(clause.match(/([−+-]) (\d[\d,]*) for your goal/))
+  const living = signed(clause.match(/([−+-]) (\d[\d,]*) daily living/))
+  const moved = earned > 0 ? num(clause.match(/\+ (\d[\d,]*) earned from movement/)) : 0
+
+  expect(rmr, `"${clause}" — the sentence leads with the resting rate`).toBe(chain!.rmr)
   // Not the estimator field it replaced on screen, which is the regression this spec exists for.
-  expect(terms[0]).not.toBe(Math.round(b.restingBaseKcal))
+  expect(rmr).not.toBe(Math.round(b.restingBaseKcal))
+  // The deficit is a subtraction on screen, whatever its sign in the payload.
+  expect(goal, `"${clause}" — the goal term`).toBe(0 - chain!.deficit)
+  expect(living, `"${clause}" — the daily living term`).toBe(chain!.dailyLiving)
 
   if (earned > 0) {
-    expect(terms, `"${clause}" — the earned term must be named`).toContain(earned)
-    expect(terms.reduce((a, n) => a + n, 0), `"${clause}" — the terms must add up to the budget`).toBe(total)
+    expect(moved, `"${clause}" — the earned term must be named`).toBe(earned)
+    // Each term is rounded on its own, so the printed sum can sit 1 kcal off the budget (the
+    // component's own comment says so); anything larger is the contradiction this spec exists for.
+    const sum = rmr! + goal + living + moved!
+    expect(Math.abs(sum - total), `"${clause}" — the terms must add up to the budget ${total}`).toBeLessThanOrEqual(1)
   } else {
-    // Nothing earned: the budget IS the base, and the sentence says so in words rather than
-    // repeating the figure.
+    // Nothing earned: the chain is the still-day budget, and the sentence says so in words.
     expect(base, 'a term-free sentence is only honest when the budget is the base').toBe(total)
     expect(clause).toMatch(/no movement recorded yet today/)
+    expect(Math.abs(rmr! + goal + living - total)).toBeLessThanOrEqual(1)
   }
 })
 

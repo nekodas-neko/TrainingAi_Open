@@ -87,6 +87,18 @@ export interface AchievementsResult {
   achievements: AchievementResult[]
 }
 
+/**
+ * `Promise.all` over an object, so each result keeps the name of the query that produced it. The
+ * batch below used to be a positional array destructured into a list of names, and two of those
+ * names ended up in the opposite order to their queries (issue 2663): the schedule was read as the
+ * weight goal and the weight goal as the schedule, for as long as the file existed. A name written
+ * beside its query cannot drift from it.
+ */
+async function allNamed<T extends Record<string, Promise<unknown>>>(queries: T): Promise<{ [K in keyof T]: Awaited<T[K]> }> {
+  const entries = await Promise.all(Object.entries(queries).map(async ([key, promise]) => [key, await promise] as const))
+  return Object.fromEntries(entries) as { [K in keyof T]: Awaited<T[K]> }
+}
+
 export async function computeAchievements(userId: string, tz: string): Promise<AchievementsResult> {
   const db = getDb()
 
@@ -94,7 +106,7 @@ export async function computeAchievements(userId: string, tz: string): Promise<A
   // it's only ever incremented, never decremented on delete.
   await reconcileUserStats(db, userId)
 
-  const [
+  const {
     userStatsRes,
     prCountRes,
     prValuesRes,
@@ -108,14 +120,14 @@ export async function computeAchievements(userId: string, tz: string): Promise<A
     calorieTargetRes,
     maxStepsRes,
     distanceRes,
-    goalDirRes,
     scheduleRes,
-  ] = await Promise.all([
-    db.execute(sql`
+    goalDirRes,
+  } = await allNamed({
+    userStatsRes: db.execute(sql`
       SELECT total_sessions, total_volume_kg, total_sets
       FROM user_stats WHERE user_id = ${userId}::uuid
     `),
-    db.execute(sql`
+    prCountRes: db.execute(sql`
       SELECT COUNT(*)::int AS count FROM personal_records WHERE user_id = ${userId}::uuid
     `),
     // Weighted lifts only. The kg milestones below ("Achieve 100kg squat 1RM") compare against a
@@ -123,14 +135,14 @@ export async function computeAchievements(userId: string, tz: string): Promise<A
     // on the bar. `prFor` matches by substring, so a bodyweight movement whose name contains
     // "squat" (a Pistol Squat, say) would unlock Century Squat the moment it was first logged.
     // Nothing in the library does today; this stops it becoming true later (finding Q-19).
-    db.execute(sql`
+    prValuesRes: db.execute(sql`
       SELECT pr.exercise_name, pr.estimated_1rm
       FROM personal_records pr
       LEFT JOIN exercise_library el ON el.name = pr.exercise_name
       WHERE pr.user_id = ${userId}::uuid
         AND COALESCE(el.exercise_type, 'weighted') <> 'bodyweight'
     `),
-    db.execute(sql`
+    earlyBirdRes: db.execute(sql`
       SELECT COUNT(*)::int AS count
       FROM workout_sessions ws
       JOIN exercise_logs el ON el.workout_session_id = ws.id
@@ -138,7 +150,7 @@ export async function computeAchievements(userId: string, tz: string): Promise<A
         AND EXTRACT(HOUR FROM ws.started_at AT TIME ZONE ${tz}) < 7
         AND ws.deleted_at IS NULL AND el.deleted_at IS NULL
     `),
-    db.execute(sql`
+    nightOwlRes: db.execute(sql`
       SELECT COUNT(*)::int AS count
       FROM workout_sessions ws
       JOIN exercise_logs el ON el.workout_session_id = ws.id
@@ -146,7 +158,7 @@ export async function computeAchievements(userId: string, tz: string): Promise<A
         AND EXTRACT(HOUR FROM ws.started_at AT TIME ZONE ${tz}) >= 21
         AND ws.deleted_at IS NULL AND el.deleted_at IS NULL
     `),
-    db.execute(sql`
+    workoutDatesRes: db.execute(sql`
       SELECT DISTINCT (ws.started_at AT TIME ZONE ${tz})::date AS day
       FROM workout_sessions ws
       JOIN exercise_logs el ON el.workout_session_id = ws.id
@@ -154,45 +166,47 @@ export async function computeAchievements(userId: string, tz: string): Promise<A
         AND ws.deleted_at IS NULL AND el.deleted_at IS NULL
       ORDER BY day DESC
     `),
-    db.execute(sql`
+    foodDatesRes: db.execute(sql`
       SELECT DISTINCT (fl.logged_at AT TIME ZONE ${tz})::date AS day
       FROM food_logs fl
-      WHERE fl.user_id = ${userId}::uuid
+      WHERE fl.user_id = ${userId}::uuid AND fl.deleted_at IS NULL
       ORDER BY day DESC
     `),
-    db.execute(sql`
-      SELECT date, duration_hours FROM sleep_sessions WHERE user_id = ${userId}::uuid ORDER BY date DESC
+    sleepRes: db.execute(sql`
+      SELECT date, duration_hours FROM sleep_sessions
+      WHERE user_id = ${userId}::uuid AND deleted_at IS NULL  -- issue 2606: a removed night earns nothing
+      ORDER BY date DESC
     `),
-    db.execute(sql`
+    weightCountRes: db.execute(sql`
       SELECT COUNT(DISTINCT date)::int AS count
       FROM body_metrics
-      WHERE user_id = ${userId}::uuid AND weight_kg IS NOT NULL
+      WHERE user_id = ${userId}::uuid AND weight_kg IS NOT NULL AND deleted_at IS NULL
     `),
-    db.execute(sql`
+    calorieDaysRes: db.execute(sql`
       SELECT (fl.logged_at AT TIME ZONE ${tz})::date AS day, SUM(fi.calories * fl.quantity_multiplier) AS total_cals
       FROM food_logs fl
       JOIN food_items fi ON fl.food_item_id = fi.id
-      WHERE fl.user_id = ${userId}::uuid
+      WHERE fl.user_id = ${userId}::uuid AND fl.deleted_at IS NULL
       GROUP BY day
       ORDER BY day DESC
     `),
-    db.execute(sql`
+    calorieTargetRes: db.execute(sql`
       SELECT calories AS daily_calories FROM nutrition_targets WHERE user_id = ${userId}::uuid LIMIT 1
     `),
-    db.execute(sql`
+    maxStepsRes: db.execute(sql`
       SELECT COALESCE(MAX(steps), 0)::int AS max_steps
       FROM body_metrics
-      WHERE user_id = ${userId}::uuid AND steps IS NOT NULL
+      WHERE user_id = ${userId}::uuid AND steps IS NOT NULL AND deleted_at IS NULL
     `),
-    db.execute(sql`
+    distanceRes: db.execute(sql`
       SELECT COALESCE(SUM(distance_km), 0)::float AS total
       FROM activity_logs
-      WHERE user_id = ${userId}::uuid
+      WHERE user_id = ${userId}::uuid AND deleted_at IS NULL
     `),
     // BF-122a — the active schedule, so the workout streak's rest-day allowance comes from what the
     // user actually signed up for rather than a literal 1. One row; the days are aggregated here so
     // this stays a single round trip inside the existing parallel batch.
-    db.execute(sql`
+    scheduleRes: db.execute(sql`
       SELECT sc.type, sc.rest_after_n,
              COALESCE(ARRAY_AGG(sd.day_of_week ORDER BY sd.day_of_week)
                       FILTER (WHERE sd.session_id IS NOT NULL), '{}') AS days
@@ -203,14 +217,14 @@ export async function computeAchievements(userId: string, tz: string): Promise<A
       GROUP BY sc.type, sc.rest_after_n
       LIMIT 1
     `),
-    db.execute(sql`
+    goalDirRes: db.execute(sql`
       SELECT
         (SELECT target_weight_kg FROM users WHERE id = ${userId}::uuid) AS target_weight,
         (SELECT weight_kg FROM body_metrics
-          WHERE user_id = ${userId}::uuid AND weight_kg IS NOT NULL
+          WHERE user_id = ${userId}::uuid AND weight_kg IS NOT NULL AND deleted_at IS NULL
           ORDER BY date DESC LIMIT 1) AS current_weight
     `),
-  ])
+  })
 
   const statsRow = userStatsRes.rows[0] as { total_sessions: number; total_volume_kg: number; total_sets: number } | undefined
   const totalSessions = Number(statsRow?.total_sessions ?? 0)

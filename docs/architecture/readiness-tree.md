@@ -4,6 +4,11 @@
 `docs/design/2026-10-06-readiness-hub.html`; scoring test cases and baseline windows:
 `docs/design/2026-10-06-readiness-scoring-cases.html`.
 
+**Shadow engine (#2377):** built and scored daily beside the live readiness, shown nowhere
+(`shadow_readiness`). The model as data is `packages/shared/src/health/shadow-readiness/model.ts`;
+units it cannot build yet (`heart.daytime_rhr`, `activity.block_trend`) are
+marked `unavailable` there with what each one needs, and drop out with their pillar renormalised.
+
 Read with [`adaptive-scoring.md`](adaptive-scoring.md) (how bands and normals are learned per
 person) and [`component-references.md`](component-references.md) (the research default for each
 unit). Today's shipped model is described in [`scoring-structure.md`](scoring-structure.md). Every
@@ -40,7 +45,7 @@ excluded from every window.
 |---|---|---|---|---|
 | **Sleep** | duration | sweet spot | guarded | default 7–9 h, refit per person |
 | | efficiency | directional ↑ | learned | |
-| | deep + REM share | sweet spot vs normal | constant | |
+| | deep + REM share | steady | learned | vs the person's own rolling 30-day normal, no fixed band and no Level. Decided 2026-10-07 (issue 2635): the research gives no consensus on stage amounts, so a fixed range would be invented. Shadow model version 2. A night with no staging has no value and drops out, never 0. |
 | | latency | sweet spot | constant | falling asleep instantly is a sign of debt, not health |
 | | timing / consistency | steady | learned | vs the person's usual bed and wake times |
 | | sleep balance (7-day debt) | sweet spot | guarded | |
@@ -69,7 +74,7 @@ Each unit's reference is one of three kinds (the *Reference* column above):
 | Kind | How it works |
 |---|---|
 | **learned** | The person's own distribution sets the scale: p10 ≈ 30, median = 70, p90 and above = 100 (mirrored for lower-is-better). Medians and percentiles, not means, so one bad week can't redefine "normal". |
-| **constant** | A research value that does not change per person — weekly zone minutes, SpO₂ ≥ 95 %, protein g/kg, hydration, training load 0.8–1.3, sleep-stage ratio ranges (`component-references.md`). |
+| **constant** | A research value that does not change per person — weekly zone minutes, SpO₂ ≥ 95 %, protein g/kg, hydration, training load 0.8–1.3. (Sleep-stage ratios are not here: deep + REM share is learned, issue 2635.) |
 | **guarded** | Learned, but only **inside** the research range: the person's own sweet spot, clamped to the guardrails (e.g. sleep duration learned within 7–9 h). |
 
 **Why guarded exists.** Pure self-relative scoring normalises a bad habit: a month of 5½-hour nights

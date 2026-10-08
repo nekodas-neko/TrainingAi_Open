@@ -21,13 +21,14 @@ import {
   applyDeloadFloor,
   canAutoApplyTransition,
 } from '@trainingai/shared/ai-periodization/phase-guards'
-import { fitToBudget, estimateSessionDurationMin } from '@trainingai/shared/ai-periodization/time-budget'
+import { fitToBudget } from '@trainingai/shared/ai-periodization/time-budget'
 import { applyBudgetStage } from '@trainingai/shared/ai-periodization/budget-stage'
+import { prescriptionFigures, rowUnderFull, hasFullSessionRevert } from '@trainingai/shared/ai-periodization/prescription-figures'
 import { capLoadToAnchor } from '@trainingai/shared/ai-periodization/role-plausibility'
 import { resolveMeasuredRestSec } from '@trainingai/shared/workout/time-profile'
 import { budgetForPreset, requestedBudgetMin, fitBudgetMin, type DurationPreset } from '@trainingai/shared/workout/duration-model'
 import { applyAutoregulation, clampPrescribedPct } from '@trainingai/shared/ai-periodization/autoregulation'
-import { shouldTriggerEmergencyDeload } from '@trainingai/shared/ai-periodization/emergency-deload'
+import { shouldTriggerEmergencyDeload, emergencyDeloadTrigger } from '@trainingai/shared/ai-periodization/emergency-deload'
 import { computePerExerciseDeload } from '@trainingai/shared/ai-periodization/per-exercise-deload'
 import { buildTransitionRationale } from '@trainingai/shared/ai-periodization/transition-rationale'
 import { DELOAD_LOWER_PCT, DELOAD_REPS, DELOAD_SETS, DELOAD_REST } from '@trainingai/shared/ai-periodization/deload-constants'
@@ -72,6 +73,9 @@ const prescriptionDedup = createDedupCache<GeneratePrescriptionResult>(JUST_GENE
 export function buildWholeSessionDeloadPrescription(
   signals: PrescriptionSignals,
   reasoning: string,
+  // #2405: what fired the deload, stamped on every row so the sheet can say it. Absent, the row
+  // carries no note rather than an invented one.
+  deloadNote?: string,
 ): AiPrescription {
   const goal = signals.trainingGoal
   // BF-198: what `Full` reverts to. The per-exercise deload records the numbers it replaced as
@@ -115,32 +119,11 @@ export function buildWholeSessionDeloadPrescription(
     // server's shouldCountTowardPr gate — treated these sets as genuine max-effort work.
     // Stamping it here gives every consumer one consistent signal instead of two (Q-115).
     deloaded: true,
+    ...(deloadNote ? { deloadNote } : {}),
     preDeload: fullById.get(ex.sessionExerciseId),
   }))
 
-  const sigById = new Map(signals.exercises.map(e => [e.sessionExerciseId, e]))
-  const estimatedSessionDurationMin = estimateSessionDurationMin(
-    exercises.map(ex => {
-      const sig = sigById.get(ex.sessionExerciseId)
-      return {
-        sets: ex.sets, reps: ex.reps, restSec: ex.restSec,
-        transitionSec: sig?.transitionSec ?? 240,
-        measuredSecPerRep: sig?.timeProfile?.secPerRep ?? null,
-        measuredRestSec: sig?.timeProfile ? resolveMeasuredRestSec(sig.timeProfile, pct) : null,
-      }
-    }),
-  )
-
-  const weeklyVolumeContribution: Record<string, number> = {}
-  for (const ex of exercises) {
-    const signal = signals.exercises.find(e => e.sessionExerciseId === ex.sessionExerciseId)
-    if (!signal) continue
-    for (const ma of signal.muscleAssignments) {
-      const weight = ma.role === 'main' ? 1.0 : 0.5
-      const muscle = ma.muscle.toLowerCase()
-      weeklyVolumeContribution[muscle] = (weeklyVolumeContribution[muscle] ?? 0) + ex.sets * weight
-    }
-  }
+  const { estimatedSessionDurationMin, weeklyVolumeContribution } = prescriptionFigures(exercises, signals)
 
   return {
     phase: 'deload',
@@ -148,6 +131,10 @@ export function buildWholeSessionDeloadPrescription(
     exercises,
     estimatedSessionDurationMin,
     weeklyVolumeContribution,
+    // #2403: what Full trains — the program's own numbers wherever one was recorded.
+    ...(hasFullSessionRevert(exercises) && {
+      fullSession: prescriptionFigures(exercises.map(rowUnderFull), signals),
+    }),
     deload: true,
     reasoning,
     confidence: 1.0,
@@ -245,29 +232,7 @@ export function buildProgramAsWrittenPrescription(
     restSec: p.restSec,
   }))
 
-  const plannedById = new Map(planned.map(p => [p.ex.sessionExerciseId, p]))
-  const estimatedSessionDurationMin = estimateSessionDurationMin(
-    exercises.map(ex => {
-      const p = plannedById.get(ex.sessionExerciseId)
-      return {
-        sets: ex.sets, reps: ex.reps, restSec: ex.restSec,
-        transitionSec: p?.ex.transitionSec ?? 240,
-        measuredSecPerRep: p?.ex.timeProfile?.secPerRep ?? null,
-        measuredRestSec: p?.ex.timeProfile ? resolveMeasuredRestSec(p.ex.timeProfile, ex.pct) : null,
-      }
-    }),
-  )
-
-  const weeklyVolumeContribution: Record<string, number> = {}
-  for (const ex of exercises) {
-    const p = plannedById.get(ex.sessionExerciseId)
-    if (!p) continue
-    for (const ma of p.ex.muscleAssignments) {
-      const weight = ma.role === 'main' ? 1.0 : 0.5
-      const muscle = ma.muscle.toLowerCase()
-      weeklyVolumeContribution[muscle] = (weeklyVolumeContribution[muscle] ?? 0) + ex.sets * weight
-    }
-  }
+  const { estimatedSessionDurationMin, weeklyVolumeContribution } = prescriptionFigures(exercises, signals)
 
   return {
     // The stored phase, unchanged: a rules plan never moves the lifter through periodization.
@@ -419,9 +384,12 @@ async function runPrescriptionGeneration(
   const isEmergencyDeload = shouldTriggerEmergencyDeload(signals, state)
 
   if (isEmergencyDeload) {
+    // #2405: said what it was. The reasoning used to read "overtraining signals" for a sick check-in.
+    const trigger = emergencyDeloadTrigger(signals)
     const prescription = buildWholeSessionDeloadPrescription(
       signals,
-      'Emergency deload triggered due to overtraining signals.',
+      trigger ? `Emergency deload: ${trigger.reason}.` : 'Emergency deload triggered.',
+      trigger?.note,
     )
     // Offered, not imposed: only stores the prescription. Persisted phase state and
     // sessions_in_phase stay untouched until the user accepts it (respond route).
@@ -455,6 +423,7 @@ async function runPrescriptionGeneration(
     const prescription = buildWholeSessionDeloadPrescription(
       signals,
       `Most of this session's muscles are still sore (${muscles}) — a lighter full-session deload will serve recovery better than training through it.`,
+      `Deload — most of this session's muscles are still sore (${muscles})`,
     )
     // Soreness is a per-day signal — expire tomorrow so a clean check-in
     // gets a fresh decision (the emergency offer keeps its 7-day window).
@@ -711,6 +680,9 @@ async function runPrescriptionGeneration(
     validSession.timeBudgetMinutes,
     durationPreset,
     autoreg.earnedSetIds,
+    // #2403: the same rows the prescription below records as `preDeload`, so the figures for the
+    // session Full trains come out of the one stage that costs this one.
+    new Map([...preDeloadById].filter(([id]) => deloadedIds.has(id))),
   )
   for (const ex of parsed.exercises) {
     ex.sets = budget.sets.get(ex.session_exercise_id) ?? ex.sets
@@ -746,6 +718,7 @@ async function runPrescriptionGeneration(
     })),
     estimatedSessionDurationMin,
     weeklyVolumeContribution,
+    ...(budget.fullSession && { fullSession: budget.fullSession }),
     deload: parsed.deload,
     reasoning: parsed.reasoning,
     // The LLM's self-reported confidence is input only — a hallucinated 0.85 must never

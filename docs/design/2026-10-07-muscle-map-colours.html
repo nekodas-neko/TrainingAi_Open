@@ -1,0 +1,76 @@
+<title>Muscle Map Colours</title>
+<style>
+:root{color-scheme:dark;--page:#0b100e;--page-fg:#e9efec;--page-dim:#9aa8a2;--line:#22302b;
+--background:oklch(0.145 0.020 149);--foreground:oklch(0.985 0 0);--muted:oklch(0.225 0.034 149);--muted-foreground:oklch(0.75 0 0);--border:oklch(1 0 0 / 7%);
+--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--body:#3a3f3d;--untrained:rgba(128,128,128,0.18);
+--font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--page-fg);font-family:var(--font);line-height:1.5;padding-block:28px;padding-inline:16px}
+.wrap{max-width:860px;margin:0 auto}
+h1{font-size:24px;line-height:1.2;margin:0 0 6px;text-wrap:balance}
+p{max-width:68ch;margin:0 0 10px}
+.dim{color:var(--page-dim)}
+.meta{font-family:var(--mono);font-size:11px;color:var(--page-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:20px}
+.pair{display:flex;flex-wrap:wrap;gap:20px;margin:16px 0}
+.col{flex:1 1 300px;min-width:0;max-width:384px}
+.tag{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--page-dim);margin-bottom:6px}
+.tag.after{color:var(--green)}
+.phone{background:var(--background);color:var(--foreground);border:1px solid var(--line);border-radius:22px;padding:16px 14px;display:flex;flex-direction:column;gap:10px}
+.hd{display:flex;justify-content:space-between;align-items:baseline;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-foreground)}
+.hd span:last-child{letter-spacing:0;text-transform:none;font-weight:400}
+.key{display:flex;justify-content:center;align-items:center;gap:6px;font-size:11px;color:var(--muted-foreground);flex-wrap:wrap}
+.key i{display:inline-block;width:11px;height:11px;border-radius:2px}
+svg{display:block;width:100%;height:auto}
+.row{font-size:13px}
+.row .t{display:flex;justify-content:space-between}
+.row .t b{font-variant-numeric:tabular-nums;font-weight:600}
+.track{height:7px;border-radius:999px;background:var(--muted);margin-top:4px;position:relative}
+.track i{display:block;height:100%;border-radius:999px}
+.track s{position:absolute;top:-3px;width:2px;height:13px;background:var(--muted-foreground);opacity:.6}
+ul{max-width:68ch;padding-left:20px} li{margin:3px 0}
+</style>
+<div class="wrap">
+<h1>Muscle Volume: one colour scale for the map and the bars</h1>
+<p class="dim">For #2554. Today the map shades every trained muscle green, from dark (under 20% of target) to light (at target). The bars below show the same muscles in red. Proposal: the map uses the bars' own rule. Green means at target, amber 60–99%, red under 60%, and grey means untrained. The example uses your week from the screenshot.</p>
+<p class="meta">#2554 · 2026-10-07</p>
+<div class="pair">
+<div class="col"><div class="tag">Before (main)</div>
+<div class="phone">
+<div class="hd"><span>Muscle volume this week</span><span>vs your program target</span></div>
+<div class="key">Under 20% <i style="background:#178a42"></i><i style="background:#16a34a"></i><i style="background:#22c55e"></i><i style="background:#4ade80"></i><i style="background:#86efac"></i> At target</div>
+<svg viewBox="0 0 220 150" role="img" aria-label="Body map with chest, shoulders, lats and abs all shaded green">
+<g fill="var(--body)"><circle cx="55" cy="16" r="10"/><rect x="38" y="28" width="34" height="52" rx="10"/><rect x="25" y="31" width="10" height="44" rx="5"/><rect x="75" y="31" width="10" height="44" rx="5"/><rect x="40" y="82" width="13" height="62" rx="6"/><rect x="57" y="82" width="13" height="62" rx="6"/>
+<circle cx="165" cy="16" r="10"/><rect x="148" y="28" width="34" height="52" rx="10"/><rect x="135" y="31" width="10" height="44" rx="5"/><rect x="185" y="31" width="10" height="44" rx="5"/><rect x="150" y="82" width="13" height="62" rx="6"/><rect x="167" y="82" width="13" height="62" rx="6"/></g>
+<rect x="40" y="31" width="30" height="16" rx="5" fill="#16a34a"/><rect x="45" y="50" width="20" height="26" rx="5" fill="#16a34a"/>
+<rect x="25" y="31" width="10" height="11" rx="5" fill="#16a34a"/><rect x="75" y="31" width="10" height="11" rx="5" fill="#16a34a"/>
+<rect x="150" y="34" width="30" height="34" rx="8" fill="#22c55e"/><rect x="135" y="31" width="10" height="11" rx="5" fill="#16a34a"/><rect x="185" y="31" width="10" height="11" rx="5" fill="#16a34a"/>
+<rect x="40" y="85" width="13" height="26" rx="6" fill="#178a42"/><rect x="57" y="85" width="13" height="26" rx="6" fill="#178a42"/>
+</svg>
+<div class="row"><div class="t"><span>Lats</span><b style="color:var(--red)">4 / 13 sets</b></div><div class="track"><i style="width:31%;background:var(--red)"></i><s style="left:100%"></s></div></div>
+<div class="row"><div class="t"><span>Chest</span><b style="color:var(--red)">3 / 13 sets</b></div><div class="track"><i style="width:23%;background:var(--red)"></i></div></div>
+</div></div>
+<div class="col"><div class="tag after">After</div>
+<div class="phone">
+<div class="hd"><span>Muscle volume this week</span><span>vs your program target</span></div>
+<div class="key"><i style="background:var(--red)"></i>Under 60% <i style="background:var(--amber)"></i>60–99% <i style="background:var(--green)"></i>At target <i style="background:var(--untrained);outline:1px solid var(--border)"></i>Not trained</div>
+<svg viewBox="0 0 220 150" role="img" aria-label="Body map with chest, shoulders, lats and abs in red, legs in grey">
+<g fill="var(--body)"><circle cx="55" cy="16" r="10"/><rect x="38" y="28" width="34" height="52" rx="10"/><rect x="25" y="31" width="10" height="44" rx="5"/><rect x="75" y="31" width="10" height="44" rx="5"/><rect x="40" y="82" width="13" height="62" rx="6"/><rect x="57" y="82" width="13" height="62" rx="6"/>
+<circle cx="165" cy="16" r="10"/><rect x="148" y="28" width="34" height="52" rx="10"/><rect x="135" y="31" width="10" height="44" rx="5"/><rect x="185" y="31" width="10" height="44" rx="5"/><rect x="150" y="82" width="13" height="62" rx="6"/><rect x="167" y="82" width="13" height="62" rx="6"/></g>
+<rect x="40" y="31" width="30" height="16" rx="5" fill="var(--red)"/><rect x="45" y="50" width="20" height="26" rx="5" fill="var(--red)"/>
+<rect x="25" y="31" width="10" height="11" rx="5" fill="var(--red)"/><rect x="75" y="31" width="10" height="11" rx="5" fill="var(--red)"/>
+<rect x="150" y="34" width="30" height="34" rx="8" fill="var(--red)"/><rect x="135" y="31" width="10" height="11" rx="5" fill="var(--red)"/><rect x="185" y="31" width="10" height="11" rx="5" fill="var(--red)"/>
+<rect x="40" y="85" width="13" height="26" rx="6" fill="var(--amber)"/><rect x="57" y="85" width="13" height="26" rx="6" fill="var(--amber)"/>
+</svg>
+<div class="row"><div class="t"><span>Lats</span><b style="color:var(--red)">4 / 13 sets</b></div><div class="track"><i style="width:31%;background:var(--red)"></i></div></div>
+<div class="row"><div class="t"><span>Chest</span><b style="color:var(--red)">3 / 13 sets</b></div><div class="track"><i style="width:23%;background:var(--red)"></i></div></div>
+</div></div>
+</div>
+<ul>
+<li>The map and the bars read from one function (<code>components/health/weekly-muscle-sets-card.tsx</code>'s colour rule moves to a shared helper that <code>MuscleHeatmap</code> also uses). Two rules for one number would be a bug.</li>
+<li>Red, amber and green are the app's tokens (<code>--destructive</code>, <code>--accent-amber</code>, <code>--accent-green</code>). Each must keep 3:1 contrast against the untrained grey, as the current test (RV-101) requires.</li>
+<li>Injured muscles keep their own red outline marker, so injury is not confused with "under target".</li>
+</ul>
+</div>

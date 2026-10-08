@@ -8,6 +8,15 @@
 // This finds them: every `memo(...)` component in the tree, then every JSX call site of one, then
 // any prop whose value is an inline `{{…}}`, `{[…]}`, or `{… => …}`.
 //
+// RV-179 widened it to the same defeat spelled with a NAME: `onToggle={toggleSoreMuscle}` where
+// `toggleSoreMuscle` is a plain function declared in the component body, so it is a new function on
+// every render and the memo does nothing while the code reads as optimised (RV-178 found two live;
+// the widening found a third, `MealBuilderFooter onSave={handleSave}`). A name counts when the same
+// file declares it indented (inside a component) as `const f = (...) =>`, `const f = function` or
+// `function f(` — a `useCallback(...)`/`useMemo(...)` RHS is exactly what does not match. It cannot
+// tell two same-named functions in different components of one file apart; a false positive is
+// fixed by renaming or, if it is truly stable, a baseline row with the reason.
+//
 // Shrink-only per-file baseline, same shape as check-hex-literals.js. A file not listed must have
 // zero; a listed file may only shrink; a file that reaches zero must have its row deleted. Fixing a
 // site means hoisting with useCallback/useMemo — or, when the site is inside a `.map` where a hook
@@ -16,7 +25,8 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { resolveBaseRef, materialiseBaseTree, cleanupBaseTree, verdict } = require('./lib/base-ref');
+const { resolveBaseRef, treeFilesAtBase, verdict } = require('./lib/base-ref');
+const { readFilesUtf8, runMain } = require('./lib/read-sources');
 const { stripComments } = require('./lib/strip-comments');
 
 const root = path.join(__dirname, '..');
@@ -43,18 +53,50 @@ function walk(dir, out) {
 }
 
 /**
- * The whole check, over one root. Run twice — the working tree, and the base branch materialised into
- * a temp directory — so the base is measured by its OWN memoised-component list rather than this
- * branch's (LA-16). A branch that newly memoises a component with existing inline call sites is
- * exactly the case a shared component list would mis-report, and mis-report as passing.
+ * The same file filter as `walk`, for a path the base tree listing names: a `.tsx` under one of
+ * `DIRS`, with no directory on the way named like one `walk` skips.
  */
-function scan(rootDir) {
-  const files = DIRS.flatMap(d => walk(path.join(rootDir, d), []));
+function keptAtBase(rel) {
+  const parts = rel.split('/');
+  return DIRS.includes(parts[0]) && rel.endsWith('.tsx') &&
+    !parts.some(p => ['node_modules', '.next', '__tests__'].includes(p));
+}
+
+/**
+ * The whole check, over one set of sources (`[{ rel, content }]`). Run twice — the working tree, and
+ * the base branch read from git — so the base is measured by its OWN memoised-component list rather
+ * than this branch's (LA-16). A branch that newly memoises a component with existing inline call
+ * sites is exactly the case a shared component list would mis-report, and mis-report as passing.
+ *
+ * #2560: each file is stripped once, not once per pass, and a memoised name the file never spells
+ * as `<Name` is not searched for. That skip cannot hide a site: the tag regex below matches only
+ * text that starts with exactly those characters.
+ */
+// A function declared inside a component body: indented, and not the result of a hook. Module-level
+// declarations sit at column 0 and are one identity for the life of the page, so they are not these.
+const RENDER_BODY_FN = [
+  /^[ \t]{2,}const\s+(\w+)\s*(?::[^=]+)?=\s*(?:async\s*)?(?:<[^>]*>\s*)?(?:\([^)]*\)|\w+)\s*(?::[^=]+)?=>/,
+  /^[ \t]{2,}const\s+(\w+)\s*=\s*(?:async\s*)?function\b/,
+  /^[ \t]{2,}(?:async\s+)?function\s+(\w+)\s*[(<]/,
+];
+
+function renderBodyFunctionNames(src) {
+  const names = new Set();
+  for (const line of src.split('\n')) {
+    for (const re of RENDER_BODY_FN) {
+      const m = line.match(re);
+      if (m) names.add(m[1]);
+    }
+  }
+  return names;
+}
+
+function scan(sources) {
+  const stripped = sources.map(({ rel, content }) => ({ rel, src: stripComments(content) }));
 
   // Every component wrapped in memo(...), by the name it is rendered under.
   const memoised = new Set();
-  for (const abs of files) {
-    const src = stripComments(fs.readFileSync(abs, 'utf8'));
+  for (const { src } of stripped) {
     for (const m of src.matchAll(/(?:const|let)\s+(\w+)\s*(?::[^=]+)?=\s*(?:React\.)?memo\s*\(/g)) memoised.add(m[1]);
     for (const m of src.matchAll(/(?:React\.)?memo\s*\(\s*function\s+(\w+)/g)) memoised.add(m[1]);
   }
@@ -62,10 +104,10 @@ function scan(rootDir) {
   const perFile = new Map();
   const detail = [];
 
-  for (const abs of files) {
-    const rel = path.relative(rootDir, abs).replace(/\\/g, '/');
-    const src = stripComments(fs.readFileSync(abs, 'utf8'));
+  for (const { rel, src } of stripped) {
+    const bodyFns = renderBodyFunctionNames(src);
     for (const name of memoised) {
+    if (!src.includes('<' + name)) continue;
     const re = new RegExp('<' + name + '(?=[\\s/>])', 'g');
     let m;
     while ((m = re.exec(src))) {
@@ -81,11 +123,14 @@ function scan(rootDir) {
       const inlineObject = /=\{\s*\{/.test(tag);
       const inlineArray = /=\{\s*\[/.test(tag);
       const inlineArrow = /=\{\s*(?:\([^)]*\)|\w+)\s*=>/.test(tag);
-      if (inlineObject || inlineArray || inlineArrow) {
+      // `prop={fn}` with `fn` declared in a component body in this file.
+      const byName = [...tag.matchAll(/\b(\w+)=\{\s*(\w+)\s*\}/g)].filter(pm => bodyFns.has(pm[2]));
+      if (inlineObject || inlineArray || inlineArrow || byName.length > 0) {
         perFile.set(rel, (perFile.get(rel) ?? 0) + 1);
         const line = src.slice(0, m.index).split('\n').length;
-        const kinds = [inlineObject && 'object', inlineArray && 'array', inlineArrow && 'arrow'].filter(Boolean);
-        detail.push(`${rel}:${line}  <${name}> — inline ${kinds.join(' + ')} in a prop`);
+        const kinds = [inlineObject && 'inline object', inlineArray && 'inline array', inlineArrow && 'inline arrow',
+          byName.length > 0 && `render-body function passed by name (${byName.map(pm => `${pm[1]}={${pm[2]}}`).join(', ')})`].filter(Boolean);
+        detail.push(`${rel}:${line}  <${name}> — ${kinds.join(' + ')} in a prop`);
         }
       }
     }
@@ -93,57 +138,65 @@ function scan(rootDir) {
   return { perFile, detail, memoised };
 }
 
-const { perFile, detail, memoised } = scan(root);
+module.exports = { scan };
 
-const baseRef = resolveBaseRef();
-const baseDir = materialiseBaseTree(baseRef, DIRS);
-let basePerFile = null;
-try {
-  if (baseDir) basePerFile = scan(baseDir).perFile;
-} finally {
-  cleanupBaseTree(baseDir);
-}
+if (require.main === module) runMain(async () => {
+  const files = DIRS.flatMap(d => walk(path.join(root, d), []));
+  const contents = await readFilesUtf8(files);
+  const { perFile, detail, memoised } = scan(files.map((abs, k) => ({
+    rel: path.relative(root, abs).replace(/\\/g, '/'),
+    content: contents[k],
+  })));
 
-const failures = [];
-const inherited = [];
-for (const [rel, count] of perFile) {
-  const allowed = BASELINE[rel] ?? 0;
-  // LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over.
-  const atBase = basePerFile === null ? null : (basePerFile.get(rel) ?? 0);
-  const v = verdict({ count, limit: allowed, atBase });
-  if (v === 'inherited') {
-    inherited.push(`${rel}: ${count} inline-prop call site(s) against a baseline of ${allowed}, but the base branch is already there.`);
-  } else if (v === 'fail') {
-    failures.push(allowed === 0
-      ? `${rel}: ${count} memoised call site(s) with an inline prop; this file is not in the baseline, so it must have zero.`
-      : `${rel}: ${count} memoised call site(s) with an inline prop, over its baseline of ${allowed}.`);
+  // #2560: read from git in memory rather than `git archive` into a temp directory and walked — the
+  // same files, and the same `null` (no base, STRICT) when they cannot all be read.
+  const baseRef = resolveBaseRef();
+  const baseFiles = treeFilesAtBase(baseRef, keptAtBase);
+  const basePerFile = baseFiles === null
+    ? null
+    : scan([...baseFiles].map(([rel, content]) => ({ rel, content }))).perFile;
+
+  const failures = [];
+  const inherited = [];
+  for (const [rel, count] of perFile) {
+    const allowed = BASELINE[rel] ?? 0;
+    // LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over.
+    const atBase = basePerFile === null ? null : (basePerFile.get(rel) ?? 0);
+    const v = verdict({ count, limit: allowed, atBase });
+    if (v === 'inherited') {
+      inherited.push(`${rel}: ${count} inline-prop call site(s) against a baseline of ${allowed}, but the base branch is already there.`);
+    } else if (v === 'fail') {
+      failures.push(allowed === 0
+        ? `${rel}: ${count} memoised call site(s) with an inline prop; this file is not in the baseline, so it must have zero.`
+        : `${rel}: ${count} memoised call site(s) with an inline prop, over its baseline of ${allowed}.`);
+    }
   }
-}
 
-// Reported whether or not the run fails, and never as a failure (Q-424).
-if (inherited.length) {
-  console.log('check-memo-prop-stability: inherited from the base branch, not caused here:');
-  inherited.forEach((f) => console.log('  • ' + f));
-}
-for (const [rel, allowed] of Object.entries(BASELINE)) {
-  const count = perFile.get(rel) ?? 0;
-  if (count < allowed) {
-    failures.push(`${rel}: down to ${count} from a baseline of ${allowed} — ${count === 0 ? 'delete its row' : `lower it to ${count}`}, the baseline is shrink-only.`);
+  // Reported whether or not the run fails, and never as a failure (Q-424).
+  if (inherited.length) {
+    console.log('check-memo-prop-stability: inherited from the base branch, not caused here:');
+    inherited.forEach((f) => console.log('  • ' + f));
   }
-}
+  for (const [rel, allowed] of Object.entries(BASELINE)) {
+    const count = perFile.get(rel) ?? 0;
+    if (count < allowed) {
+      failures.push(`${rel}: down to ${count} from a baseline of ${allowed} — ${count === 0 ? 'delete its row' : `lower it to ${count}`}, the baseline is shrink-only.`);
+    }
+  }
 
-if (failures.length) {
-  console.error('Memo prop-stability check failed:\n');
-  for (const f of failures) console.error(`  • ${f}`);
-  console.error('\n  Sites found:');
-  for (const d of detail) console.error(`    ${d}`);
-  console.error(`
-  memo() compares props shallowly, so one inline object/array/arrow defeats it entirely and the
-  component re-renders on every parent render while still looking optimised. Hoist the value with
-  useCallback/useMemo at the call site. If the call site is inside a .map() — where a hook is not
+  if (failures.length) {
+    console.error('Memo prop-stability check failed:\n');
+    for (const f of failures) console.error(`  • ${f}`);
+    console.error('\n  Sites found:');
+    for (const d of detail) console.error(`    ${d}`);
+    console.error(`
+  memo() compares props shallowly, so one inline object/array/arrow — or a function declared in the
+  render body and passed by name — defeats it entirely and the component re-renders on every parent
+  render while still looking optimised. Hoist the value with useCallback/useMemo at the call site. If the call site is inside a .map() — where a hook is not
   allowed — pass scalars instead, or move the identity into the child.`);
-  process.exit(1);
-}
+    process.exit(1);
+  }
 
-const total = [...perFile.values()].reduce((a, b) => a + b, 0);
-console.log(`check-memo-prop-stability: OK — ${memoised.size} memoised components, ${total} known defeated call site(s), none new`);
+  const total = [...perFile.values()].reduce((a, b) => a + b, 0);
+  console.log(`check-memo-prop-stability: OK — ${memoised.size} memoised components, ${total} known defeated call site(s), none new`);
+});

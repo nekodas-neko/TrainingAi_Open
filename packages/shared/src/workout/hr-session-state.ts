@@ -45,5 +45,5 @@ export function classifyHrResponse(data: HrDataResponse): SessionHrData | "none"
 export function hrEmptyMessage(state: "none" | "incomplete"): string {
   return state === "incomplete"
     ? "This workout wasn't marked complete, so there's no HR recovery to show"
-    : "No HR data — ensure Oura was worn and synced";
+    : "No HR data for this workout yet";
 }

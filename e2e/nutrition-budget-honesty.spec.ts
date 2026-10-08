@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test'
+import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 import { settleRouteBoundary } from './fixtures'
 
 /**
- * Two things the nutrition surface knew and did not say (LA-102 + TN-28).
+ * What the nutrition surface knew and did not say (LA-102).
  *
  * **LA-102** — the owner, on the resting-rate-anchored budget: *"1350 doesnt count some basic
  * metabolic needs".* He is right. BF-152 deliberately did not model the thermic effect of food or
@@ -10,12 +11,7 @@ import { settleRouteBoundary } from './fixtures'
  * and treating intake-linked digestion as an earned credit makes the budget grow as you eat. The
  * decision stands; what was missing is saying so.
  *
- * **TN-28** — `TdeeAdaptationCard` writes the user's calorie goal in one tap and was the only
- * surface printing the maintenance figure without its confidence. Its two siblings both print
- * *"(low confidence, 10 of 14 days logged)"* from the same payload fields.
- *
- * Batched because one verification pass covers both: they are the same screen, and the fixture that
- * exercises the nudge card also renders the ⓘ panel.
+ * (TN-28's check on the Calorie Nudge card was retired with the card, issue 2622.)
  *
  * The payload is stubbed rather than seeded. A calibrated maintenance that drifts from the stored
  * target is what makes the nudge card render at all, and building that from real logs means a
@@ -45,12 +41,23 @@ test.setTimeout(120_000)
  */
 const TODAY = new Intl.DateTimeFormat('en-CA', { timeZone: 'Australia/Brisbane' }).format(new Date())
 
+// Issue 2071: a payload without `deficitKcal` is read as one cached before the owner's budget and
+// gets the retired BF-152 branch, which has no chain and so no explanatory paragraph. The stub carries
+// the deficit and step credit a live payload does, and the total is asked of the shared function.
+const STUB_BALANCE = {
+  intakeKcal: 1200, expenditureKcal: 2100, restingBaseKcal: 1815, activeKcal: 285,
+  netKcal: -900, targetNetKcal: -500,
+  restingRateKcal: 1815, deficitKcal: 232, stepCreditKcal: 100,
+}
+const STUB_BUDGET = budgetProvenance(STUB_BALANCE)
+
 const PAYLOAD = {
   date: TODAY,
   balance: {
-    intakeKcal: 1200, expenditureKcal: 2100, restingBaseKcal: 1815, activeKcal: 285,
-    netKcal: -900, targetNetKcal: -500, deviationKcal: -400, remainingKcal: 400,
-    projectedWeeklyKg: -0.9, restingRateKcal: 1815,
+    ...STUB_BALANCE,
+    budgetKcal: STUB_BUDGET.total,
+    deviationKcal: 1200 - STUB_BUDGET.total, remainingKcal: STUB_BUDGET.total - 1200,
+    projectedWeeklyKg: -0.9,
     zone: 'under', zoneLabel: 'Well under', zoneColor: '#60a5fa',
   },
   // Calibrated and low-confidence: the exact shape TN-28 is about.
@@ -72,7 +79,7 @@ test.beforeEach(async ({ page }) => {
   }))
 })
 
-test('the ⓘ panel says what the base leaves out (LA-102)', async ({ page }) => {
+test('the ⓘ panel puts digestion and everyday living INTO the budget (LA-102, reworked by issue 2071)', async ({ page }) => {
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
 
@@ -88,26 +95,19 @@ test('the ⓘ panel says what the base leaves out (LA-102)', async ({ page }) =>
   await info.evaluate((el: HTMLElement) => el.click())
   await expect(info).toHaveAttribute('aria-expanded', 'true', { timeout: 10_000 })
 
-  // The two omissions, named. Asserting on the substance rather than the sentence, so a rewording
-  // that keeps the meaning does not fail and a rewording that drops one of them does.
-  // The PARAGRAPH, not the emphasised span inside it — `getByText` resolves to the innermost match,
-  // which here is a <span> holding four words and none of the substance.
-  const panel = page.locator('p').filter({ hasText: 'not in the base at all' })
-  await expect(panel, 'the ⓘ panel never named the omissions').toBeVisible({ timeout: 20_000 })
-  await expect(panel).toContainText(/digest/)
-  await expect(panel).toContainText(/standing, fidgeting, housework/)
-})
-
-test('the card that writes your goal names its confidence (TN-28)', async ({ page }) => {
-  await page.goto('/nutrition')
-  await settleRouteBoundary(page)
-
-  // The nudge card, identified by the action it offers — writing the goal is what makes the missing
-  // qualifier matter.
-  const apply = page.getByRole('button', { name: 'Use 2,045' })
-  await expect(apply, 'the nudge card never rendered').toBeVisible({ timeout: 60_000 })
-
-  // Same wording as the two siblings, in the same sentence as the figure.
-  await expect(page.getByText(/measured maintenance is 2,045 kcal \(low confidence, 10 of 14 days logged\)/))
-    .toBeVisible({ timeout: 20_000 })
+  // LA-102 asked the panel to own up that basic metabolic needs (digestion, everyday living) were
+  // not in the budget. Issue 2071 answered by putting them in — a fifth of the resting rate, less the
+  // first 3,000 steps the movement term already counts — so the panel now has to NAME that term, its
+  // size, and the chain's total. Asserting on the substance rather than the sentence, so a rewording
+  // that keeps the meaning does not fail and one that drops a term does.
+  // The PARAGRAPH, not the emphasised span inside it — `getByText` resolves to the innermost match.
+  const panel = page.locator('p').filter({ hasText: "Today's budget" }).filter({ hasText: 'daily living' })
+  await expect(panel, 'the ⓘ panel never named the daily-living term').toBeVisible({ timeout: 20_000 })
+  const chain = STUB_BUDGET.chain!
+  await expect(panel).toContainText(/digesting food/)
+  await expect(panel).toContainText(`plus ${chain.dailyLiving.toLocaleString('en-US')} kcal for daily living`)
+  await expect(panel).toContainText(`less the ${chain.stepCredit.toLocaleString('en-US')} kcal your first 3,000 steps are worth`)
+  await expect(panel).toContainText(`less ${chain.deficit.toLocaleString('en-US')} kcal for your goal`)
+  await expect(panel).toContainText(`${STUB_BUDGET.total.toLocaleString('en-US')} kcal so far`)
+  await expect(panel).toContainText(/never drops below your resting rate or 1,200 kcal/)
 })

@@ -2,6 +2,7 @@
 
 import { ChevronRight, Download } from 'lucide-react'
 import { CHANGELOG, CURRENT_VERSION } from '@trainingai/shared/changelog'
+import { OFF_ATTRIBUTION } from '@trainingai/shared/nutrition/open-food-facts'
 import { UpdateCheckCard } from '@/components/more/update-check-card'
 import { ServiceWorkerStatusRow } from '@/components/more/sw-status-row'
 import { useIsDevApp } from '@/lib/hooks/use-is-dev-app'
@@ -47,6 +48,10 @@ export function AboutPanel() {
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </a>
       )}
+      <div className="px-4 py-3">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Data sources</p>
+        <p className="text-[11px] leading-snug text-muted-foreground">{OFF_ATTRIBUTION}</p>
+      </div>
       <div className="px-4 py-3">
         <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
           What&apos;s new in v{CHANGELOG[0].version}

@@ -25,6 +25,8 @@ export interface PostgresRollupIODeps {
   getBodyFatCalibration(userId: string): Promise<BodyFatCalibration | null>
   refitDaytimeHrvModel(userId: string, timezone: string): Promise<void>
   listSleepSessions(userId: string, from: string, to: string): Promise<{ sleepStart: Date; sleepEnd: Date }[]>
+  /** Named in the slow raw-read log (#2247). */
+  caller?: string
 }
 
 /** The server-side `RollupIO`: what `aggregateOuraRawSamples` did inline before D2 Task 2. */
@@ -37,7 +39,7 @@ export function createPostgresRollupIO(deps: PostgresRollupIODeps): RollupIO {
     readRollupWatermark: (currentEpoch: number) => oura.getOuraRollupWatermark(db, userId, currentEpoch),
     writeRollupWatermark: async (lastRolledDs, epoch) => { await oura.setOuraRollupWatermark(db, userId, lastRolledDs, epoch) },
 
-    readRawFrames: (q: RollupFrameQuery) => readRawFrames(db, userId, q),
+    readRawFrames: (q: RollupFrameQuery) => readRawFrames(db, userId, { ...q, caller: deps.caller ?? 'rollup' }),
 
     deleteBleSleepSessionsForDates: async dates => {
       await db.delete(s.sleepSessions).where(and(

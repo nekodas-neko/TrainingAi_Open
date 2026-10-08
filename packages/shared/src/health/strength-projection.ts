@@ -28,6 +28,18 @@ const PLATEAU_MIN_POINTS = 4
 const PLATEAU_MIN_SPAN_DAYS = 21
 const PLATEAU_PCT_PER_WEEK = 0.002
 
+/** Fewest points `isRmPlateau` will judge; fewer reads as "not enough history", never as a plateau. */
+export const RM_PLATEAU_MIN_HISTORY = 4
+
+/**
+ * The ONE plateau verdict for a 1RM series. The Strength trend card's badge, the engine's plateau
+ * flag (`signals.ts`) and the coach's plateau report all call this, so they cannot disagree about
+ * the same points (issue 2648).
+ */
+export function isRmPlateau(history: RmPoint[]): boolean {
+  return history.length >= RM_PLATEAU_MIN_HISTORY && (projectRm(history)?.plateau ?? false)
+}
+
 export function projectRm(history: RmPoint[], daysAhead = 30): RmProjection | null {
   if (history.length < 2) return null
   const sorted = [...history].sort((a, b) => a.date.localeCompare(b.date))

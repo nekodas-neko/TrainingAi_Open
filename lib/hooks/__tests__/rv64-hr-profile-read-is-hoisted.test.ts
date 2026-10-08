@@ -80,7 +80,7 @@ describe('RV-64 — the hr-profile read is hoisted out of the remounting chart',
     const found: string[] = []
     const walk = (dir: string) => {
       for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-        if (['node_modules', '.next', '__tests__'].includes(e.name)) continue
+        if (['node_modules', '.next', '__tests__', '__check_fixture__'].includes(e.name)) continue
         const p = path.join(dir, e.name)
         if (e.isDirectory()) walk(p)
         else if (/\.tsx$/.test(e.name)) {

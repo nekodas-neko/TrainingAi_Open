@@ -50,6 +50,23 @@ SELECT
   t.created_at
 FROM public.activity_types t;
 
+CREATE VIEW claude_ro.agent_action_log AS
+SELECT
+  t.id,
+  t.job,
+  t.parameters,
+  t.actor,
+  t.approval_ref,
+  t.target_user_id,
+  t.started_at,
+  t.finished_at,
+  t.outcome,
+  t.affected_rows,
+  t.days_moved,
+  t.error
+FROM public.agent_action_log t
+WHERE t.target_user_id IS NULL OR t.target_user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.ai_call_log AS
 SELECT
   t.id,
@@ -765,6 +782,24 @@ SELECT
 FROM public.mood_logs t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
+-- native_refresh_tokens: withholding "token_hash"
+CREATE VIEW claude_ro.native_refresh_tokens AS
+SELECT
+  t.id,
+  t.user_id,
+  t.family_id,
+  t.device_label,
+  t.device_id,
+  t.created_at,
+  t.last_used_at,
+  t.expires_at,
+  t.rotated_at,
+  t.replaced_by,
+  t.revoked_at,
+  t.revoked_reason
+FROM public.native_refresh_tokens t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.nutrition_targets AS
 SELECT
   t.id,
@@ -1354,6 +1389,7 @@ SELECT
   t.name,
   t.created_at,
   t.servings,
+  t.meal_types_seeded,
   octet_length(t.image_data_uri) AS image_bytes
 FROM public.saved_meals t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
@@ -1519,6 +1555,28 @@ SELECT
 FROM public.set_logs t
 WHERE EXISTS (SELECT 1 FROM public.exercise_logs e JOIN public.workout_sessions p ON p.id = e.workout_session_id WHERE e.id = t.exercise_log_id AND p.user_id = current_setting('app.claude_ro_owner', true)::uuid);
 
+CREATE VIEW claude_ro.shadow_readiness AS
+SELECT
+  t.id,
+  t.user_id,
+  t.date,
+  t.model_version,
+  t.shadow_readiness,
+  t.sleep_pillar,
+  t.heart_pillar,
+  t.activity_pillar,
+  t.body_pillar,
+  t.pillar_detail,
+  t.units,
+  t.maturity_stage,
+  t.inputs_through,
+  t.live_readiness,
+  t.live_model_version,
+  t.computed_by,
+  t.computed_at
+FROM public.shadow_readiness t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.sleep_sessions AS
 SELECT
   t.id,
@@ -1545,7 +1603,9 @@ SELECT
   t.sleep_phase_5_min,
   t.time_in_bed_hours,
   t.source_map,
-  t.manual_sleep_start
+  t.manual_sleep_start,
+  t.manual_entry,
+  t.deleted_at
 FROM public.sleep_sessions t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
@@ -1569,7 +1629,10 @@ SELECT
   t.model_version,
   t.response_state,
   t.created_at,
-  t.updated_at
+  t.updated_at,
+  t.duration_median,
+  t.onset_median,
+  t.efficiency_median
 FROM public.sleep_verdicts t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
@@ -1776,6 +1839,7 @@ SELECT * FROM (VALUES
   ('oura_tokens', 'access_token'),
   ('oura_tokens', 'refresh_token'),
   ('oura_tokens', 'webhook_signing_key'),
+  ('native_refresh_tokens', 'token_hash'),
   ('feedback_submissions', 'screenshot_data'),
   ('saved_meals', 'image_data_uri'),
   ('food_items', 'image_data_uri')

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mkdtempSync, mkdirSync, writeFileSync } from 'fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { tmpdir } from 'os'
 import {
@@ -49,5 +49,26 @@ describe('renderServiceWorker', () => {
     expect(body).toContain('const CACHE="ta-abc123"')
     const m = body.match(/const P=(\[.*\]);/)!
     expect(JSON.parse(m[1])).toEqual(['/offline', '/_next/static/css/x.css'])
+  })
+
+  // #2608: `next dev` chunk names are reused while their contents change, so a cache-first worker
+  // served the Dev app the first version of each chunk it ever saw. Production stays cache-first.
+  it('is cache-first for _next/static by default and network-first only when told (next dev)', () => {
+    const template = 'const S=__STATIC_CACHE_FIRST__;'
+    expect(renderServiceWorker(template, { cacheName: 'c', precacheUrls: [] })).toBe('const S=true;')
+    expect(renderServiceWorker(template, { cacheName: 'c', precacheUrls: [], staticCacheFirst: false })).toBe('const S=false;')
+  })
+
+  it('the template carries the token and branches on it inside the _next/static handler', () => {
+    const sw = readFileSync(join(process.cwd(), 'public', 'sw-template.js'), 'utf8')
+    expect(sw).toContain('const STATIC_CACHE_FIRST = __STATIC_CACHE_FIRST__;')
+    const branch = sw.slice(sw.indexOf('url.pathname.startsWith("/_next/static/")'))
+    expect(branch.indexOf('if (!STATIC_CACHE_FIRST)')).toBeGreaterThan(0)
+    expect(branch.indexOf('if (!STATIC_CACHE_FIRST)')).toBeLessThan(branch.indexOf('caches.match(e.request)'))
+  })
+
+  it('the route turns cache-first off outside production', () => {
+    const route = readFileSync(join(process.cwd(), 'app', 'sw.js', 'route.ts'), 'utf8')
+    expect(route).toMatch(/staticCacheFirst:\s*process\.env\.NODE_ENV === "production"/)
   })
 })

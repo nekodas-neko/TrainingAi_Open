@@ -1,4 +1,4 @@
-import type { AiPrescription, AiPrescriptionExercise } from '@trainingai/shared/types/ai-periodization'
+import type { AiPrescription } from '@trainingai/shared/types/ai-periodization'
 
 /**
  * BF-199 Phase 1: what the rules prescriber WOULD have said, beside what the lifter was given.
