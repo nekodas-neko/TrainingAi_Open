@@ -6,10 +6,10 @@ import { toast } from 'sonner'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { invalidateActivityWrites, invalidateBiometrics, invalidatePulledDomains } from '@/lib/cache-groups'
-import { pullDelta } from '@/lib/local-store/sync-engine'
+import { pullDelta, restoreFromCloud } from '@/lib/local-store/sync-engine'
 import {
   fetchHistoryOldest, formatImportedTo, importEndMessage, importMoreHistory,
-  HISTORY_WINDOW_DAYS,
+  HISTORY_WINDOW_DAYS, RESTORE_SPAN_SLACK_MS, importNeedsRestore,
 } from '@/lib/health-connect-history-import'
 
 /**
@@ -27,6 +27,10 @@ export function HistoryImportRow({ userId }: { userId?: string }) {
   const [oldest, setOldest] = useState<string | null>(null)
   const [running, setRunning] = useState(false)
   const stopRef = useRef(false)
+  // Set when the restore pull for an imported span failed: the instant to restart that span from.
+  // The next press retries it, even if that press imports nothing new.
+  const restoreFromRef = useRef<string | null>(null)
+  const [restorePending, setRestorePending] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -48,6 +52,8 @@ export function HistoryImportRow({ userId }: { userId?: string }) {
     stopRef.current = false
     setRunning(true)
     const today = todayInTz(tz)
+    // The span's lower bound on the server's updated_at axis: rows this run writes are newer.
+    const runStartIso = new Date(Date.now() - RESTORE_SPAN_SLACK_MS).toISOString()
     try {
       const outcome = await importMoreHistory({
         tz,
@@ -63,14 +69,24 @@ export function HistoryImportRow({ userId }: { userId?: string }) {
       if (outcome.end === 'failed') toast.error(message, { duration: 15000 })
       else toast.success(message)
       // The rows landed on the server. Drop what derives from them, then pull them to this device
-      // the way "Sync now" does - the pull reaches back 90 days; older history stays on the server
-      // until "Restore from cloud".
-      if (outcome.windows > 0) {
+      // the way "Sync now" does - the pull reaches back 90 days.
+      const retrying = restoreFromRef.current !== null
+      if (outcome.windows > 0 || retrying) {
         await Promise.all([invalidateBiometrics(), invalidateActivityWrites()])
         try {
           const pulled = await pullDelta(userId, true)
           if (pulled) await invalidatePulledDomains(pulled.domains)
         } catch (err) { console.error('[history-import] pull after import failed:', err) }
+      }
+      // Older than 90 days the ordinary pull cannot reach, so run the restore pull for the imported
+      // span only (issue 2713): from where this run (or the failed run before it) started, not the
+      // whole history. The local store is the source of truth, so the days must land there.
+      if ((outcome.windows > 0 || retrying) && importNeedsRestore(outcome.oldest ?? oldest, today)) {
+        const since = restoreFromRef.current && restoreFromRef.current < runStartIso ? restoreFromRef.current : runStartIso
+        await restoreImportedSpan(userId, since)
+      } else {
+        restoreFromRef.current = null
+        setRestorePending(false)
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
@@ -81,10 +97,31 @@ export function HistoryImportRow({ userId }: { userId?: string }) {
     }
   }
 
+  /** A failed restore never hides the import result above it and never moves the stored oldest day;
+   *  it leaves a retryable message and the span to retry from. */
+  async function restoreImportedSpan(uid: string, since: string) {
+    let failed = false
+    try {
+      const res = await restoreFromCloud(uid, undefined, since)
+      if (res) await invalidatePulledDomains(res.domains)
+      failed = res === null ? false : res.failed
+    } catch (err) {
+      console.error('[history-import] restore of imported span failed:', err)
+      failed = true
+    }
+    restoreFromRef.current = failed ? since : null
+    setRestorePending(failed)
+    if (failed) {
+      toast.error('Imported, but the older days are not on this device yet - connection issue. Tap to retry.', { duration: 15000 })
+    }
+  }
+
   if (!native) return null
 
   const today = todayInTz(tz)
-  const subtitle = running
+  const subtitle = restorePending && !running && oldest
+    ? `Imported to ${formatImportedTo(oldest, today)}, but the older days are not on this device yet. Tap to retry.`
+    : running
     ? (oldest ? `Importing... reached ${formatImportedTo(oldest, today)}` : 'Importing...')
     : (oldest ? `Imported to ${formatImportedTo(oldest, today)}. Tap to go ${HISTORY_WINDOW_DAYS} days further.`
               : `Pull older Health Connect data, ${HISTORY_WINDOW_DAYS} days at a time`)

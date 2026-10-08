@@ -802,6 +802,11 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
 export async function restoreFromCloud(
   userId: string,
   onProgress?: (syncedSoFar: number) => void,
+  /** Where the drain starts (an ISO instant on the server's `updated_at` axis). Default epoch = the
+   *  whole history. A caller that only needs rows changed since a known moment (the end of "Import
+   *  more history", issue 2713) passes that moment: the same drain, the same applyDelta (which only
+   *  overwrites `synced` rows, so unsynced local edits survive), bounded to that span. */
+  since: string = new Date(0).toISOString(),
 ): Promise<{ synced: number; failed: boolean; domains: SyncedDomains } | null> {
   const store = getLocalStore(userId);
   if (!store) return null;
@@ -814,7 +819,7 @@ export async function restoreFromCloud(
   _resetSyncBackoff();
   // Seed epoch once (covers the "restore on an already-synced device" case); the loop
   // then advances the persisted cursor and never re-seeds epoch.
-  await store.setLastSyncAt(new Date(0).toISOString());
+  await store.setLastSyncAt(since);
   let total = 0;
   // Safety bound far above any real day-grained history (1000 × 20 pages × 500 rows).
   for (let guard = 0; guard < 1000; guard++) {

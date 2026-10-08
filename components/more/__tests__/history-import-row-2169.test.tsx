@@ -20,11 +20,12 @@ const cache = vi.hoisted(() => ({
   invalidatePulledDomains: vi.fn(async () => {}),
 }))
 const pullDelta = vi.hoisted(() => vi.fn(async () => ({ synced: 4, domains: {}, hasMore: false })))
+const restore = vi.hoisted(() => vi.fn(async (..._a: unknown[]) => ({ synced: 9, failed: false, domains: {} }) as { synced: number; failed: boolean; domains: object } | null))
 
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: () => native.on } }))
 vi.mock('sonner', () => ({ toast }))
 vi.mock('@/lib/cache-groups', () => cache)
-vi.mock('@/lib/local-store/sync-engine', () => ({ pullDelta }))
+vi.mock('@/lib/local-store/sync-engine', () => ({ pullDelta, restoreFromCloud: restore }))
 vi.mock('@/components/shell/user-timezone-provider', () => ({ useUserTimezone: () => 'Australia/Brisbane' }))
 vi.mock('@/lib/health-connect-history-import', async importOriginal => {
   const real = await importOriginal<typeof import('@/lib/health-connect-history-import')>()
@@ -35,6 +36,7 @@ vi.mock('@/lib/health-connect-history-import', async importOriginal => {
   }
 })
 
+import { shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 import { HistoryImportRow } from '../history-import-row'
 
 ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
@@ -58,6 +60,8 @@ beforeEach(() => {
   Object.values(toast).forEach(f => f.mockReset())
   Object.values(cache).forEach(f => f.mockClear())
   pullDelta.mockClear()
+  restore.mockClear()
+  restore.mockImplementation(async () => ({ synced: 9, failed: false, domains: {} }))
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -153,5 +157,81 @@ describe('HistoryImportRow', () => {
     await click()
     expect(toast.error).toHaveBeenCalledWith('Import failed: plugin gone', { duration: 15000 })
     expect(text()).toContain('Import more history')
+  })
+
+  // Issue 2713: past the ordinary pull's 90 days, the imported span is restored to the device.
+  describe('restore of the imported span (issue 2713)', () => {
+    const farBack = '2020-01-01'
+
+    it('runs the restore pull once, from the start of this run, when the import went past 90 days', async () => {
+      eng.run.mockResolvedValue({ oldest: farBack, windows: 4, end: 'exhausted' })
+      await mount()
+      const before = Date.now()
+      await click()
+      expect(restore).toHaveBeenCalledTimes(1)
+      const [uid, , since] = restore.mock.calls[0] as [string, unknown, string]
+      expect(uid).toBe('u1')
+      const t = new Date(since).getTime()
+      expect(t).toBeLessThanOrEqual(before)
+      expect(t).toBeGreaterThan(before - 15 * 60_000) // the run's start, not epoch
+      expect(cache.invalidatePulledDomains).toHaveBeenCalledTimes(2) // the ordinary pull and the restore
+    })
+
+    it('does not restore when the import stayed inside the ordinary pull window', async () => {
+      const recent = shiftDateStr(todayInTz('Australia/Brisbane'), -40)
+      eng.run.mockResolvedValue({ oldest: recent, windows: 1, end: 'exhausted' })
+      await mount()
+      await click()
+      expect(restore).not.toHaveBeenCalled()
+    })
+
+    it('does not restore when nothing was imported', async () => {
+      eng.run.mockResolvedValue({ oldest: farBack, windows: 0, end: 'exhausted' })
+      await mount()
+      await click()
+      expect(restore).not.toHaveBeenCalled()
+    })
+
+    it('a failed restore keeps the import result and the stored oldest day, and shows a retryable message', async () => {
+      restore.mockResolvedValueOnce({ synced: 0, failed: true, domains: {} })
+      eng.run.mockResolvedValue({ oldest: farBack, windows: 4, end: 'exhausted' })
+      await mount()
+      await click()
+      expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('Imported to 1 Jan 2020'))
+      expect(toast.error).toHaveBeenCalledTimes(1)
+      expect(String(toast.error.mock.calls[0][0])).toContain('Tap to retry')
+      expect(text()).toContain('Imported to 1 Jan 2020')
+      expect(text()).toContain('Tap to retry')
+      expect(btn()?.disabled).toBe(false)
+    })
+
+    it('the retry restores the same span even when that press imports nothing new, then clears the message', async () => {
+      restore.mockResolvedValueOnce({ synced: 0, failed: true, domains: {} })
+      eng.run.mockResolvedValueOnce({ oldest: farBack, windows: 4, end: 'exhausted' })
+      await mount()
+      await click()
+      const firstSince = (restore.mock.calls[0] as unknown[])[2] as string
+
+      eng.run.mockResolvedValueOnce({ oldest: farBack, windows: 0, end: 'exhausted' })
+      await click()
+      expect(restore).toHaveBeenCalledTimes(2)
+      const secondSince = (restore.mock.calls[1] as unknown[])[2] as string
+      expect(secondSince <= firstSince).toBe(true) // never narrower than the failed span
+      expect(text()).not.toContain('Tap to retry')
+
+      // Idempotent: a third press with nothing imported and nothing pending restores nothing.
+      eng.run.mockResolvedValueOnce({ oldest: farBack, windows: 0, end: 'exhausted' })
+      await click()
+      expect(restore).toHaveBeenCalledTimes(2)
+    })
+
+    it('a thrown restore is reported as retryable and does not hide the import', async () => {
+      restore.mockRejectedValueOnce(new Error('db locked'))
+      eng.run.mockResolvedValue({ oldest: farBack, windows: 2, end: 'exhausted' })
+      await mount()
+      await click()
+      expect(toast.success).toHaveBeenCalled()
+      expect(String(toast.error.mock.calls[0][0])).toContain('Tap to retry')
+    })
   })
 })
