@@ -124,6 +124,11 @@ export function CalorieBudgetSection({ ownTargetKcal, onSetOwnTarget, onClearOwn
             <dt className="mt-1 border-t border-border pt-1">Budget</dt>
             <dd className="mt-1 border-t border-border pt-1 text-right font-semibold">{budget.total.toLocaleString()}</dd>
           </dl>
+          {chain.totalFloored && (
+            <p className="text-xs text-muted-foreground">
+              The terms above come to less than the floor, so the budget is held at it: never below your resting rate or 1,200.
+            </p>
+          )}
           <p className="text-xs text-muted-foreground">
             It changes with your goal and goal weight above, and with how much you move. Meal plans are sized to it.
           </p>

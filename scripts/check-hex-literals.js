@@ -95,7 +95,7 @@ const BASELINE = {
   'components/nutrition/weekly-nutrition-chart.tsx': 1,
   'components/oura-score-chip-row.tsx': 4,
   'components/profile/achievements-grid.tsx': 13,
-  'components/profile/goal-targets-section.tsx': 3,
+  'components/profile/goal-targets-section.tsx': 2,
   'components/profile/level-sheet.tsx': 1,
   'components/profile/macro-targets-pane.tsx': 2,
   'components/shell/bottom-nav.tsx': 1,

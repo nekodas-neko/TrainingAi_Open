@@ -41,13 +41,13 @@ describe.skipIf(!canRun)('AI Coach — phase 3 write domains', () => {
     await pool.query(`DELETE FROM injuries WHERE user_id = ANY($1)`, [[OWNER, STRANGER]])
     await pool.query(`DELETE FROM nutrition_targets WHERE user_id = ANY($1)`, [[OWNER, STRANGER]])
     await pool.query(
-      `UPDATE users SET steps_goal = 8000, calorie_goal = 2540, water_goal_ml = 2000 WHERE id = ANY($1)`,
+      `UPDATE users SET steps_goal = 8000, calorie_goal = 2540, calorie_goal_type = 'own', water_goal_ml = 2000 WHERE id = ANY($1)`,
       [[OWNER, STRANGER]])
   })
 
   // ── user_goals ────────────────────────────────────────────────────────────────
 
-  const goalPatch = (from: number | null, to: number): CoachPatch => ({
+  const goalPatch = (from: number | null, to: number | null): CoachPatch => ({
     domain: 'user_goals',
     targetId: null,
     changes: [{ id: 'g1', field: 'calorieGoal', from, to }],
@@ -63,6 +63,44 @@ describe.skipIf(!canRun)('AI Coach — phase 3 write domains', () => {
     const { rows: recorded } = await pool.query(`SELECT domain, summary FROM coach_changes WHERE user_id = $1`, [OWNER])
     expect(recorded[0].domain).toBe('user_goals')
     expect(recorded[0].summary).toContain('2,340')
+  })
+
+  // Issue 2622 — the coach's calorie goal IS the user's own target: it sets or clears the same flag
+  // the Goals screen writes, so it cannot silently diverge from the budget on screen.
+  it('flags the number as an own target when it writes one', async () => {
+    await pool.query(`UPDATE users SET calorie_goal = 2400, calorie_goal_type = 'daily' WHERE id = $1`, [OWNER])
+    // The retired typed goal is invisible to a patch: `from` is null because no own target is set.
+    expect((await applyCoachPatch(db, OWNER, goalPatch(2400, 1900), ['g1'])).ok).toBe(false)
+    expect((await applyCoachPatch(db, OWNER, goalPatch(null, 1900), ['g1'])).ok).toBe(true)
+    const { rows } = await pool.query(`SELECT calorie_goal, calorie_goal_type FROM users WHERE id = $1`, [OWNER])
+    expect(Number(rows[0].calorie_goal)).toBe(1900)
+    expect(rows[0].calorie_goal_type).toBe('own')
+  })
+
+  it('clears the own target with a null, back to the worked-out budget', async () => {
+    const applied = await applyCoachPatch(db, OWNER, goalPatch(2540, null), ['g1'])
+    expect(applied.ok).toBe(true)
+    const { rows } = await pool.query(`SELECT calorie_goal, calorie_goal_type FROM users WHERE id = $1`, [OWNER])
+    expect(rows[0].calorie_goal).toBeNull()
+    expect(rows[0].calorie_goal_type).toBeNull()
+    expect(applied.ok && applied.summary).toContain('worked-out budget')
+  })
+
+  it('undo puts the flag back, so a restored number is not mistaken for an override', async () => {
+    await pool.query(`UPDATE users SET calorie_goal = 2400, calorie_goal_type = 'daily' WHERE id = $1`, [OWNER])
+    const applied = await applyCoachPatch(db, OWNER, goalPatch(null, 1900), ['g1'])
+    if (!applied.ok) throw new Error('setup failed')
+    await undoCoachChange(db, OWNER, applied.changeId)
+    const { rows } = await pool.query(`SELECT calorie_goal_type FROM users WHERE id = $1`, [OWNER])
+    expect(rows[0].calorie_goal_type).toBe('daily')
+  })
+
+  it('refuses an own target outside what a person could eat', async () => {
+    const low = await applyCoachPatch(db, OWNER, goalPatch(2540, 500), ['g1'])
+    expect(low.ok).toBe(false)
+    expect(low.ok === false && low.reason).toBe('invalid')
+    const { rows } = await pool.query(`SELECT calorie_goal FROM users WHERE id = $1`, [OWNER])
+    expect(Number(rows[0].calorie_goal)).toBe(2540)
   })
 
   it('refuses a goal whose stored value has moved', async () => {

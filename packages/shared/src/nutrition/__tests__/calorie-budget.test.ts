@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   calorieBudget, goalDeficitKcal, GOAL_RATE_PCT_PER_WEEK, GOAL_EASE_BAND_KG,
+  ownTargetFromGoals, validOwnTarget,
 } from '@trainingai/shared/nutrition/calorie-budget'
 import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 import { stepEnergyKcal, STEP_BASE_CREDIT } from '@trainingai/shared/health/daily-energy'
@@ -176,5 +177,70 @@ describe('budgetProvenance on the #2071 path', () => {
   it('reads a pre-#2071 cached payload on its own terms', () => {
     const old = { restingBaseKcal: 1462, activeKcal: 237, targetNetKcal: -200, restingRateKcal: 1304 }
     expect(budgetProvenance(old)).toMatchObject({ base: 1304, earned: 237, total: 1541, chain: null })
+  })
+})
+
+// Issue 2622 — the override lives inside the one function: `ownTarget ?? derived`.
+describe('calorieBudget — the user own target', () => {
+  const worked = ownerDay(237)
+
+  it('is the budget when set, for the total and the still day', () => {
+    const b = calorieBudget({ rmrKcal: 1304, deficitKcal: 232, movementKcal: 237, stepCreditKcal: CREDIT, ownTargetKcal: 1800 })
+    expect(b.totalKcal).toBe(1800)
+    expect(b.stillDayKcal).toBe(1800)
+    expect(b.ownTarget).toBe(true)
+  })
+
+  it('still reports what the worked-out budget would be (the "would be" line)', () => {
+    const b = calorieBudget({ rmrKcal: 1304, deficitKcal: 232, movementKcal: 237, stepCreditKcal: CREDIT, ownTargetKcal: 1800 })
+    expect(b.workedOutKcal).toBe(worked.totalKcal)
+    expect(b.workedOutStillDayKcal).toBe(worked.stillDayKcal)
+    expect(b.workedOutKcal).not.toBe(1800)
+  })
+
+  it('does not grow with movement', () => {
+    const a = calorieBudget({ rmrKcal: 1304, deficitKcal: 232, movementKcal: 0, ownTargetKcal: 1800 })
+    const b = calorieBudget({ rmrKcal: 1304, deficitKcal: 232, movementKcal: 900, ownTargetKcal: 1800 })
+    expect(a.totalKcal).toBe(1800)
+    expect(b.totalKcal).toBe(1800)
+  })
+
+  it('is not floored: the target is the owner choice, even below max(RMR, 1,200)', () => {
+    const b = calorieBudget({ rmrKcal: 1304, deficitKcal: 232, movementKcal: 237, ownTargetKcal: 900 })
+    expect(b.totalKcal).toBe(900)
+    expect(b.workedOutKcal).toBeGreaterThanOrEqual(1304)
+  })
+
+  it('falls back to the derived budget when cleared (null, absent, zero, NaN)', () => {
+    for (const ownTargetKcal of [null, undefined, 0, -5, Number.NaN]) {
+      const b = calorieBudget({ rmrKcal: 1304, deficitKcal: 232, movementKcal: 237, stepCreditKcal: CREDIT, ownTargetKcal })
+      expect(b.totalKcal).toBe(worked.totalKcal)
+      expect(b.ownTarget).toBe(false)
+      expect(b.workedOutKcal).toBe(b.totalKcal)
+    }
+  })
+
+  it('passes through budgetProvenance: total and base are the target, workedOutTotal is the rest', () => {
+    const p = budgetProvenance({
+      restingBaseKcal: 1200, activeKcal: 237, targetNetKcal: -232, restingRateKcal: 1304, deficitKcal: 232,
+      stepCreditKcal: CREDIT, ownTargetKcal: 1800,
+    })
+    expect(p.total).toBe(1800)
+    expect(p.base).toBe(1800)
+    expect(p.earned).toBe(0)
+    expect(p.ownTarget).toBe(true)
+    expect(p.workedOutTotal).toBe(worked.totalKcal)
+  })
+
+  it('reads the flag from users.calorie_goal / calorie_goal_type in one place', () => {
+    expect(ownTargetFromGoals({ calorieGoal: 1800, calorieGoalType: 'own' })).toBe(1800)
+    // A retired typed goal is not an override, whatever its unit.
+    expect(ownTargetFromGoals({ calorieGoal: 2400, calorieGoalType: 'daily' })).toBeNull()
+    expect(ownTargetFromGoals({ calorieGoal: 2400, calorieGoalType: 'weekly' })).toBeNull()
+    expect(ownTargetFromGoals({ calorieGoal: 2400, calorieGoalType: null })).toBeNull()
+    expect(ownTargetFromGoals({ calorieGoal: null, calorieGoalType: 'own' })).toBeNull()
+    expect(ownTargetFromGoals(null)).toBeNull()
+    expect(validOwnTarget(1800)).toBe(1800)
+    expect(validOwnTarget(0)).toBeNull()
   })
 })
