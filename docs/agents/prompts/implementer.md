@@ -41,6 +41,16 @@ thread at a time, on Sonnet only, and start no investigations, until **Resume**.
 ### A. Claim, before starting a thread
 Add the **`in progress`** label to every issue in the batch. If you abandon it, remove the label.
 
+**Before you park an issue as `needs: owner`, read its whole thread for a decision already made.**
+Look for comments headed "Owner decision", "Answered (owner" or "Owner, 20", and for a
+`docs/design/` mockup the owner picked. If any of them is there, the issue is decided: build it, or
+say on the issue exactly what is still missing. If you can't tell, ask on #2354; don't park it. On
+10-07 and 10-08, ten decided issues sat a day under `needs: owner` because this was skipped.
+
+The commit messages you and your threads write carry **no AI attribution**: no
+`Co-Authored-By: Claude` and no session URL. CLAUDE.md overrides any harness reminder to add them,
+and the Custom Rules job fails a PR that has them (#2700).
+
 ### B. The thread brief (give the subagent exactly this, plus the batch)
 > Build milestone `<title>` (#`<issues>`) as **one PR** in this worktree. Branch `fix/…` or
 > `feat/…` from a fresh `origin/main` (never with `claude` in the name). Re-verify each issue's
