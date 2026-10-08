@@ -19,17 +19,18 @@ import type { OuraBlePlugin, OuraRawRow } from '@/lib/oura-ble/plugin'
  *    off by default). With it off, this module COUNTS what a prune would remove and logs it — so the
  *    owner can judge the number before anything on the phone is deleted.
  *
- * **What it can and cannot see.** The bridge (`lib/oura-ble/plugin.ts`, unchanged — no APK) returns
- * a row's `ringTs`, `tag`, `eventName`, `bodyHex` and `measuredAt`, but **not its `synced` flag**, and
- * `markRolledUp` filters only on `rolled_up = 0`. So a row whose backup POST failed (`synced = 0`)
- * and that is old enough WILL be marked. What keeps that safe is the native prune's own predicate,
- * `rolled_up = 1 AND synced = 1 AND measured_at < ?` (`OuraRawDb.pruneRaw`): such a row is never
- * deleted while the server lacks it. The flag on it is the one dishonest bit, and the device-writer
- * switch must reset `rolled_up` where `synced = 0` before it trusts the column (plan §7).
- * Enforcing `synced = 1` at marking time needs a native change and an APK — #2583.
+ * **Unacknowledged rows are skipped (issue 2583).** The bridge returns a row's `ringTs`, `tag`,
+ * `eventName`, `bodyHex` and `measuredAt`, but not its `synced` flag. So marking goes through the
+ * native `markRolledUpIfSynced` (`... AND synced = 1`), which leaves a row whose backup POST failed
+ * (`synced = 0`) at `rolled_up = 0` until it syncs; `rolled_up` then never claims "the server holds
+ * this" for a row it does not. On an APK older than that build the bridge has no such method, and
+ * the pass falls back to the unfiltered `markRolledUp`: the flag is then the dishonest bit it was
+ * before, and what keeps that safe is the native prune's own predicate,
+ * `rolled_up = 1 AND synced = 1 AND measured_at < ?` (`OuraRawDb.pruneRaw`). The future device
+ * rollup (#2302) keeps the unfiltered `markRolledUp`.
  *
  * Nothing here touches the ring key, the BLE link, the history cursor, the server, or any row the
- * server holds: the only writes are `markRolledUp` (device flag) and, when the flag is on,
+ * server holds: the only writes are `markRolledUpIfSynced` / `markRolledUp` (device flag) and, when the flag is on,
  * `pruneRaw` (device rows).
  */
 
@@ -137,7 +138,7 @@ export interface RawStats { totalRows: number; unrolledRows: number; bytes: numb
  *  rows marked by earlier runs too. Advisory only: it undercounts after site data is cleared. */
 export type MarkedHistogram = Record<string, number>
 
-export type RawStorePlugin = Pick<OuraBlePlugin, 'getUnrolledRaw' | 'markRolledUp' | 'pruneRaw' | 'rawStats'>
+export type RawStorePlugin = Pick<OuraBlePlugin, 'getUnrolledRaw' | 'markRolledUp' | 'markRolledUpIfSynced' | 'pruneRaw' | 'rawStats'>
 
 export interface RawMaintenanceDeps {
   plugin: RawStorePlugin | null
@@ -157,6 +158,12 @@ function sumBefore(h: MarkedHistogram, cutoffMs: number): number {
   // rather than promising rows the prune will not take.
   for (const [k, v] of Object.entries(h)) if (Number(k) + DAY_MS <= cutoffMs) n += v
   return n
+}
+
+/** Capacitor rejects a bridge method the installed APK lacks with code UNIMPLEMENTED. */
+function isUnimplemented(err: unknown): boolean {
+  const e = err as { code?: unknown; message?: unknown } | null
+  return e?.code === 'UNIMPLEMENTED' || /not implemented|unimplemented/i.test(String(e?.message ?? err))
 }
 
 async function safeStats(plugin: RawStorePlugin): Promise<RawStats | null> {
@@ -212,6 +219,13 @@ export async function runRawRolledUpMaintenance(deps: RawMaintenanceDeps): Promi
   try { histogram = { ...deps.loadHistogram() } } catch { histogram = {} }
 
   // ── mark ──
+  // issue 2583: prefer the synced-only mark; fall back to the unfiltered one only on an APK that
+  // does not have it. Decided once per pass, and re-decided if the bridge says "unimplemented".
+  let markFn: (opts: { ringTsList: number[] }) => Promise<{ updated: number }> =
+    typeof plugin.markRolledUpIfSynced === 'function'
+      ? (o) => plugin.markRolledUpIfSynced!(o)
+      : (o) => plugin.markRolledUp(o)
+  let filtered = typeof plugin.markRolledUpIfSynced === 'function'
   try {
     for (let page = 0; page < MARK_MAX_PAGES; page++) {
       const { rows } = await plugin.getUnrolledRaw({ limit: MARK_PAGE_SIZE })
@@ -221,13 +235,30 @@ export async function runRawRolledUpMaintenance(deps: RawMaintenanceDeps): Promi
       // No progress possible: the oldest unmarked rows are all too new (or undated). They will
       // age past the cutoff on a later pass; reading the same page again now would only spin.
       if (!ringTsList.length) break
-      const { updated } = await plugin.markRolledUp({ ringTsList })
+      let updated: number
+      try {
+        ;({ updated } = await markFn({ ringTsList }))
+      } catch (err) {
+        if (!filtered || !isUnimplemented(err)) throw err
+        filtered = false
+        markFn = (o) => plugin.markRolledUp(o)
+        ;({ updated } = await markFn({ ringTsList }))
+      }
       result.marked += updated
+      // Nothing changed: every candidate ringTs is held back (unacknowledged rows stay unrolled and
+      // come back at the head of the next page), so reading on would only repeat this page.
+      if (updated === 0) break
+      // The histogram is advisory and errs low. With the synced-only mark, which candidate rows were
+      // held back is not visible here, so a page is counted only when every candidate row was
+      // marked (`updated` equals the candidate row count); otherwise it is left out of the estimate.
       const marked = new Set(ringTsList)
-      for (const r of rows) {
-        if (!marked.has(r.ringTs) || r.measuredAt == null) continue
-        const k = String(dayBucket(r.measuredAt))
-        histogram[k] = (histogram[k] ?? 0) + 1
+      const candidates = rows.filter((r) => marked.has(r.ringTs))
+      if (!filtered || updated === candidates.length) {
+        for (const r of candidates) {
+          if (r.measuredAt == null) continue
+          const k = String(dayBucket(r.measuredAt))
+          histogram[k] = (histogram[k] ?? 0) + 1
+        }
       }
       if (rows.length < MARK_PAGE_SIZE) break
       if (page === MARK_MAX_PAGES - 1) result.hitPageCap = true

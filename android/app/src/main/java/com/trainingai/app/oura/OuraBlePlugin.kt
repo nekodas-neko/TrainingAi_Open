@@ -357,6 +357,13 @@ class OuraBlePlugin : Plugin() {
         call.resolve(JSObject().put("updated", db.markRolledUp(list)))
     }
 
+    /** issue 2583: like markRolledUp, but skips rows the server has not acknowledged (synced = 0). */
+    @PluginMethod fun markRolledUpIfSynced(call: PluginCall) {
+        val db = rawDb(call) ?: return
+        val list = dsList(call) ?: return call.reject("ringTsList required")
+        call.resolve(JSObject().put("updated", db.markRolledUpIfSynced(list)))
+    }
+
     @PluginMethod fun markSynced(call: PluginCall) {
         val db = rawDb(call) ?: return
         val list = dsList(call) ?: return call.reject("ringTsList required")
