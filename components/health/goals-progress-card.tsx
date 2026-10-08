@@ -67,9 +67,9 @@ export const GoalsProgressCard = memo(function GoalsProgressCard({ metaToday, we
       })
     }
 
-    // Still shown only to a user who set a calorie goal, so which rows appear is unchanged; the
-    // typed figure decides whether the row exists, never what it is measured against.
-    if (userGoals?.calorieGoal != null && dayBudgetKcal != null) {
+    // Issue 2675. The row exists whenever the day has a budget — derived for everyone, the own target
+    // when one is set (it is the budget then). A stored calorie goal is no longer a precondition.
+    if (dayBudgetKcal != null) {
       rows.push({
         key: 'Calories', icon: Flame, color: '#f97316', weekly: view === 'week',
         value: view === 'today' ? metaToday?.calories ?? null : weekToDate?.calories ?? null,
