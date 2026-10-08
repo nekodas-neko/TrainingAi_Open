@@ -9,7 +9,7 @@ import { invalidateActivityWrites, invalidateBiometrics, invalidatePulledDomains
 import { pullDelta, restoreFromCloud } from '@/lib/local-store/sync-engine'
 import {
   fetchHistoryOldest, formatImportedTo, importEndMessage, importMoreHistory,
-  HISTORY_WINDOW_DAYS, RESTORE_SPAN_SLACK_MS, importNeedsRestore,
+  HISTORY_WINDOW_DAYS, HISTORY_DECLINED_MESSAGE, RESTORE_SPAN_SLACK_MS, importNeedsRestore,
 } from '@/lib/health-connect-history-import'
 
 /**
@@ -31,6 +31,8 @@ export function HistoryImportRow({ userId }: { userId?: string }) {
   // The next press retries it, even if that press imports nothing new.
   const restoreFromRef = useRef<string | null>(null)
   const [restorePending, setRestorePending] = useState(false)
+  // The last press ended because the history permission was declined; cleared by the next press.
+  const [declined, setDeclined] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -50,6 +52,7 @@ export function HistoryImportRow({ userId }: { userId?: string }) {
     if (running) { stopRef.current = true; return }
     if (!userId) return
     stopRef.current = false
+    setDeclined(false)
     setRunning(true)
     const today = todayInTz(tz)
     // The span's lower bound on the server's updated_at axis: rows this run writes are newer.
@@ -62,6 +65,11 @@ export function HistoryImportRow({ userId }: { userId?: string }) {
       })
       if (outcome === null) {
         toast.error('Import needs the app (Health Connect) - not available on web')
+        return
+      }
+      if (outcome.end === 'permission-declined') {
+        // Plain message on the row; nothing was read, so there is nothing to pull or restore.
+        setDeclined(true)
         return
       }
       if (outcome.oldest) setOldest(outcome.oldest)
@@ -119,7 +127,9 @@ export function HistoryImportRow({ userId }: { userId?: string }) {
   if (!native) return null
 
   const today = todayInTz(tz)
-  const subtitle = restorePending && !running && oldest
+  const subtitle = declined && !running
+    ? HISTORY_DECLINED_MESSAGE
+    : restorePending && !running && oldest
     ? `Imported to ${formatImportedTo(oldest, today)}, but the older days are not on this device yet. Tap to retry.`
     : running
     ? (oldest ? `Importing... reached ${formatImportedTo(oldest, today)}` : 'Importing...')

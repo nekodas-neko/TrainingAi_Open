@@ -13,6 +13,7 @@
 // writes (`upsertBodyMetrics`, `saveSleepSession`) as a live sync, so a later live sync of an
 // overlapping day merges instead of double-counting.
 import { dateStrMidnightInTz, isCalendarDate, normalizeDateParamIso, shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
+import type { HealthConnectPlugin } from '@devmaxime/capacitor-health-connect'
 import { SYNC_DAYS_COLD } from '@/lib/health-connect-sync'
 
 /** Days one window covers - one "call" of the spec. */
@@ -103,6 +104,7 @@ export type HistoryImportEnd =
   | 'limit'      // reached HISTORY_MAX_DAYS
   | 'stopped'    // the user stopped it
   | 'failed'     // a window or the save failed; press again to retry from the stored day
+  | 'permission-declined' // the user did not grant READ_HEALTH_DATA_HISTORY; nothing was read
 
 export interface HistoryImportOutcome {
   /** The oldest day imported after this run, null if nothing has been. */
@@ -111,6 +113,24 @@ export interface HistoryImportOutcome {
   windows: number
   end: HistoryImportEnd
   error?: string
+}
+
+/** The plugin's name (added by patches/@devmaxime__capacitor-health-connect.patch) for the
+ *  READ_HEALTH_DATA_HISTORY permission: without it Health Connect serves nothing older than 30 days
+ *  before the app's first grant, so an import past the cold window reads empty (issue 2712). */
+export const HISTORY_PERMISSION = 'HealthDataHistory'
+export const HISTORY_DECLINED_MESSAGE = 'Older history needs the Health Connect permission to read past data'
+
+/**
+ * Ask for the history permission just in time. Checks the grant first so a user who has given it
+ * is never prompted again; otherwise raises Android's permission sheet once. Only the import press
+ * calls this - live sync never does. True when the permission is held afterwards.
+ */
+export async function ensureHistoryPermission(hc: Pick<HealthConnectPlugin, 'getGrantedPermissions' | 'requestPermissions'>): Promise<boolean> {
+  const held = await hc.getGrantedPermissions()
+  if (held.read.includes(HISTORY_PERMISSION)) return true
+  const after = await hc.requestPermissions({ read: [HISTORY_PERMISSION], write: [] })
+  return after.read.includes(HISTORY_PERMISSION)
 }
 
 const realSleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
@@ -179,6 +199,7 @@ export function importEndMessage(o: HistoryImportOutcome, today: string): string
     case 'exhausted': return to ? `Imported to ${to}. Health Connect has nothing older.` : 'Health Connect has nothing older to import.'
     case 'limit': return `Imported to ${to}. That is as far back as the import goes.`
     case 'stopped': return to ? `Stopped. Imported to ${to}.` : 'Stopped.'
+    case 'permission-declined': return HISTORY_DECLINED_MESSAGE
     case 'failed': return `Import paused${to ? ` at ${to}` : ''}: ${o.error ?? 'something went wrong'}. Press again to continue.`
   }
 }
@@ -217,6 +238,12 @@ export async function importMoreHistory(opts: {
   if (!opened) return null
   const today = todayInTz(opts.tz)
   if ('note' in opened) return { oldest: null, windows: 0, end: 'failed', error: opened.note }
+
+  // Before the first window read: a run that cannot see past data would only find empty windows and
+  // report "Health Connect has nothing older", which is false.
+  if (!(await ensureHistoryPermission(opened.HealthConnect))) {
+    return { oldest: null, windows: 0, end: 'permission-declined' }
+  }
 
   const oldest = await fetchHistoryOldest()
   return runHistoryImport({
