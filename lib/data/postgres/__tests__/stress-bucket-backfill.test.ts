@@ -148,7 +148,7 @@ describe.skipIf(!canRun)('stress bucket backfill (issue 2236)', () => {
     }
     const tempBaseline = temp.reduce((s, t) => s + t.valueC, 0) / temp.length
     const expected = stress.buildDaytimeStressSeriesFromModel(
-      temp, met, hr, { ...MODEL, fittedAt: new Date() },
+      temp, met, hr, MODEL,
       { dhrvBaseline: 60, hrBaseline: 52, tempBaseline }, start, start + 86_400_000, [],
     )
     const stored = await oura.listDaytimeStressBuckets(db, USER, day, day)
