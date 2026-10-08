@@ -15,7 +15,7 @@
 
 import { KCAL_PER_G } from './atwater'
 import { KCAL_PER_KG, CALORIE_FLOOR_KCAL } from './tdee-adaptation'
-import { calorieBudget } from './calorie-budget'
+import { calorieBudget, validOwnTarget } from './calorie-budget'
 
 /** Intentional daily calorie offset per goal. Re-exported from the goal recommender so the
  *  deficit the bar bands against is the same one the target was built from. */
@@ -87,6 +87,9 @@ export interface CalorieBalanceInput {
   /** #2071. The first 3,000 steps' energy (`stepEnergyKcal(profile, STEP_BASE_CREDIT)`), which the
    *  budget takes out of the 20% because movement counts those steps. */
   stepCreditKcal?: number | null
+  /** Issue 2622. The user's own daily target (`users.calorie_goal` flagged as an override), or null.
+   *  It is handed to `calorieBudget`, which is the only place it replaces the worked-out budget. */
+  ownTargetKcal?: number | null
 }
 
 export interface CalorieBalanceResult {
@@ -113,6 +116,9 @@ export interface CalorieBalanceResult {
   /** #2071. THE day's budget — `budgetProvenance(...).total`, on the wire so a server reader (the
    *  coach, the digest) quotes it rather than re-deriving it. */
   budgetKcal: number
+  /** Issue 2622. The own target the budget was built with, carried on the wire so a client re-reading
+   *  the budget through `budgetProvenance` lands on the same number. Null = none set. */
+  ownTargetKcal: number | null
   zone: BalanceZone
   zoneLabel: string
   zoneColor: string
@@ -152,6 +158,7 @@ export function computeCalorieBalance(input: CalorieBalanceInput): CalorieBalanc
     restingRateKcal: input.restingRateKcal,
     deficitKcal,
     stepCreditKcal,
+    ownTargetKcal: input.ownTargetKcal,
   }).total
   const deviationKcal = Math.round(input.intakeKcal) - budgetKcal
   const { zone, label, color } = balanceZone(deviationKcal)
@@ -164,6 +171,7 @@ export function computeCalorieBalance(input: CalorieBalanceInput): CalorieBalanc
     deficitKcal,
     stepCreditKcal,
     budgetKcal,
+    ownTargetKcal: validOwnTarget(input.ownTargetKcal) != null ? Math.round(input.ownTargetKcal as number) : null,
     // `-0` is a legal result of negating 0 and leaks into equality checks; normalise it away.
     remainingKcal: deviationKcal === 0 ? 0 : -deviationKcal,
     projectedWeeklyKg: Math.round((netKcal * 7 / KCAL_PER_KG) * 100) / 100,
@@ -307,12 +315,12 @@ export function targetFromMaintenance(maintenanceKcal: number, goalDelta: number
  * conversion lives here rather than in each route — mirroring a 13,650 kcal weekly goal straight
  * into the daily macro target once made the ring demand 13,650 kcal in a day.
  */
-export function goalToDailyKcal(goalKcal: number, goalType: 'daily' | 'weekly' | null): number {
+export function goalToDailyKcal(goalKcal: number, goalType: 'daily' | 'weekly' | 'own' | null): number {
   return goalType === 'weekly' ? Math.round(goalKcal / 7) : Math.round(goalKcal)
 }
 
 /** Inverse of `goalToDailyKcal` — preserves the user's chosen daily/weekly display preference. */
-export function dailyKcalToGoal(dailyKcal: number, goalType: 'daily' | 'weekly' | null): number {
+export function dailyKcalToGoal(dailyKcal: number, goalType: 'daily' | 'weekly' | 'own' | null): number {
   return goalType === 'weekly' ? Math.round(dailyKcal * 7) : Math.round(dailyKcal)
 }
 
@@ -339,6 +347,12 @@ export interface BudgetProvenance {
     /** The floor set the whole day's total, not only the still day. */
     totalFloored: boolean
   } | null
+  /** Issue 2622. True when `total` is the user's own target, not the worked-out budget. `chain` is
+   *  then still the WORKED-OUT terms (so the Goals screen can say what it would be) and must not be
+   *  printed as the make-up of `total`. */
+  ownTarget: boolean
+  /** Issue 2622. What `total` would be with no own target. Equals `total` when none is set. */
+  workedOutTotal: number
 }
 
 /**
@@ -370,7 +384,7 @@ export interface BudgetProvenance {
  * Q-401: two budgets on one screen, 274 kcal apart, both labelled "left".
  */
 export function budgetProvenance(
-  { restingBaseKcal, activeKcal, targetNetKcal, restingRateKcal, deficitKcal, stepCreditKcal }:
+  { restingBaseKcal, activeKcal, targetNetKcal, restingRateKcal, deficitKcal, stepCreditKcal, ownTargetKcal }:
   {
     restingBaseKcal: number; activeKcal: number; targetNetKcal: number
     restingRateKcal?: number | null
@@ -378,6 +392,8 @@ export function budgetProvenance(
     deficitKcal?: number | null
     /** #2071. The first 3,000 steps' energy, taken out of the 20%. */
     stepCreditKcal?: number | null
+    /** Issue 2622. The user's own target, which replaces the worked-out budget inside `calorieBudget`. */
+    ownTargetKcal?: number | null
   },
 ): BudgetProvenance {
   const anchoredToRestingRate =
@@ -393,11 +409,13 @@ export function budgetProvenance(
   // the new total against an old remainder would put two numbers on one card until the revalidation
   // lands, which is the exact defect this function exists to prevent.
   if (anchoredToRestingRate && typeof deficitKcal === 'number' && Number.isFinite(deficitKcal)) {
-    const b = calorieBudget({ rmrKcal: restingRateKcal as number, deficitKcal, movementKcal: activeKcal, stepCreditKcal })
+    const b = calorieBudget({ rmrKcal: restingRateKcal as number, deficitKcal, movementKcal: activeKcal, stepCreditKcal, ownTargetKcal })
     return {
       base: b.stillDayKcal,
       earned: b.totalKcal - b.stillDayKcal,
       total: b.totalKcal,
+      ownTarget: b.ownTarget,
+      workedOutTotal: b.workedOutKcal,
       anchoredToRestingRate: true,
       chain: {
         rmr: b.rmrKcal, deficit: b.deficitKcal, metabolicBurn: b.metabolicBurnKcal,
@@ -414,5 +432,5 @@ export function budgetProvenance(
     ? Math.round(restingRateKcal as number)
     : Math.round(restingBaseKcal + targetNetKcal)
   const earned = Math.round(activeKcal)
-  return { base, earned, total: base + earned, anchoredToRestingRate, chain: null }
+  return { base, earned, total: base + earned, anchoredToRestingRate, chain: null, ownTarget: false, workedOutTotal: base + earned }
 }

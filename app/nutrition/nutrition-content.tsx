@@ -40,7 +40,6 @@ import type { BodyMetaRow } from "@/app/api/body-metadata/route";
 import type { NutritionAdherenceResponse } from "@/app/api/nutrition/adherence/route";
 import { getLocalStore } from "@/lib/local-store";
 import { pushThenRevalidate } from "@/lib/local-store/push-then-revalidate";
-import { TdeeAdaptationCard } from "@/components/nutrition/tdee-adaptation-card";
 import { EnergyCard } from "@/components/nutrition/energy-card";
 import { ActivePlanCard } from "@/components/nutrition/active-plan-card";
 import { MealPlanReviewCard } from "@/components/nutrition/meal-plan-review-card";
@@ -638,11 +637,6 @@ export default function NutritionContent({ userId }: { userId?: string }) {
                 onViewPlan={openPlanManage}
               />
             )}
-
-            <TdeeAdaptationCard
-              energyBalance={energyBalance?.date === selectedDate ? energyBalance : null}
-              onApplied={refreshTargets}
-            />
 
             {/* BF-24 ④: each meal is its own card with its name as a label above it — artboard 1
                 groups the food ROWS within a meal, where Q-395b grouped the MEALS within one

@@ -17,7 +17,7 @@ import { movementSummary } from '@/components/nutrition/movement-breakdown'
  * switch where an object literal would defeat it silently.
  */
 export const CalorieZoneBar = memo(function CalorieZoneBar({
-  intakeKcal, restingBaseKcal, activeKcal, targetNetKcal, restingRateKcal, deficitKcal, stepCreditKcal,
+  intakeKcal, restingBaseKcal, activeKcal, targetNetKcal, restingRateKcal, deficitKcal, stepCreditKcal, ownTargetKcal,
   workoutKcal, activityKcal, stepsKcal, compact,
 }: {
   intakeKcal: number
@@ -32,6 +32,8 @@ export const CalorieZoneBar = memo(function CalorieZoneBar({
   deficitKcal?: number | null
   /** #2071. The first 3,000 steps' energy, which the budget takes out of the 20% (payload field). */
   stepCreditKcal?: number | null
+  /** Issue 2622. The user's own target (payload `ownTargetKcal`); it IS the budget when set. */
+  ownTargetKcal?: number | null
   /** The three addends of `activeKcal`, from the service's `activeBreakdown` (BF-87). Scalars, not
    *  the object — `memo` compares shallowly and an object literal at a call site defeats it. */
   workoutKcal: number
@@ -40,8 +42,8 @@ export const CalorieZoneBar = memo(function CalorieZoneBar({
   /** Home's card is dense — tighten the bar. */
   compact?: boolean
 }) {
-  const { base, earned, total, anchoredToRestingRate, chain } =
-    budgetProvenance({ restingBaseKcal, activeKcal, targetNetKcal, restingRateKcal, deficitKcal, stepCreditKcal })
+  const { base, earned, total, anchoredToRestingRate, chain, ownTarget } =
+    budgetProvenance({ restingBaseKcal, activeKcal, targetNetKcal, restingRateKcal, deficitKcal, stepCreditKcal, ownTargetKcal })
   // #2071. With a floored still day `earned` is only what movement added ABOVE the floor; the chain
   // prints the whole movement, because the chain's own arithmetic is what lifted the day past it.
   const shownEarned = chain != null && chain.floored && !chain.totalFloored ? chain.movement : earned
@@ -82,7 +84,9 @@ export const CalorieZoneBar = memo(function CalorieZoneBar({
             the chain not reach it, and then the line names the floor instead. A still day that is
             floored but lifted clear of it by movement still prints the chain, which is what the total
             is made of (each term rounded, so it can read 1 kcal off the total). */}
-        {chain != null
+        {ownTarget
+          ? <>Your own target: {total.toLocaleString()} kcal</>
+          : chain != null
           ? chain.totalFloored
             ? <>{total.toLocaleString()} minimum budget — never below your resting rate</>
             : <>
@@ -108,7 +112,7 @@ export const CalorieZoneBar = memo(function CalorieZoneBar({
                   {Math.abs(goalDelta).toLocaleString()} for your goal</>
               )}
             </>}
-        {chain?.totalFloored
+        {ownTarget || chain?.totalFloored
           ? null
           : shownEarned > 0
           ? <>

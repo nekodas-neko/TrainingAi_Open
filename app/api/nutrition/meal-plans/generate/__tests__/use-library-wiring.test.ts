@@ -43,7 +43,11 @@ vi.mock('@/lib/nutrition/meal-top-up', () => ({
 }))
 
 vi.mock('@/lib/health/energy-balance-service', () => ({
-  computeEnergyBalance: async () => ({ target: { recommendedKcal: 2000 } }),
+  // Issue 2622: a plan is sized to the still-day budget, `budgetProvenance(balance).base` (2000 here).
+  computeEnergyBalance: async () => ({
+    target: { recommendedKcal: 2000 },
+    balance: { restingBaseKcal: 2000, activeKcal: 0, targetNetKcal: 0 },
+  }),
 }))
 
 const MEAL_TYPE_BREAKFAST = '00000000-0000-4000-8000-00000000a701'

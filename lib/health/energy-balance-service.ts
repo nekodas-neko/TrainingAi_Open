@@ -13,6 +13,7 @@ import {
   computeCalorieBalance, targetFromMaintenance, GOAL_DAILY_DELTA, scaleMacrosForEarnedKcal,
   macrosForKcal, budgetProvenance,
 } from '@trainingai/shared/nutrition/calorie-balance'
+import { ownTargetFromGoals } from '@trainingai/shared/nutrition/calorie-budget'
 import {
   resolveMaintenance, maintenanceGapMessage, activityFactor, MAX_WINDOW_DAYS, type MaintenanceDay,
 } from '@trainingai/shared/nutrition/adaptive-tdee'
@@ -54,6 +55,8 @@ export interface EnergyBalanceResult {
     stepCreditKcal?: number | null
     /** #2071. THE day's budget, `budgetProvenance(balance).total`, for server readers to quote. */
     budgetKcal?: number
+    /** Issue 2622. The user's own target when one is set; `budgetKcal` IS this number then. */
+    ownTargetKcal?: number | null
     /** #2071 (b). The weight the deficit was computed from, to 0.1 kg, and which one it was: the
      *  smoothed 30-day trend, or the latest weigh-in when there is no trend yet. */
     deficitWeightKg?: number | null
@@ -428,6 +431,9 @@ export async function computeEnergyBalance(
     // Rounded here rather than only inside `budgetProvenance`: this number goes on the wire, and a
     // float labelled kcal invites a consumer to print 1815.2992 where the card says 1,815.
     restingRateKcal: Math.round(bmr),
+    // Issue 2622. The override rides into the single budget function, so every number below
+    // (`budgetKcal`, `remainingKcal`, the zone, the macro fit) is measured against it.
+    ownTargetKcal: ownTargetFromGoals(userGoals),
   })
 
   const recommendedKcal = targetFromMaintenance(maintenanceKcal, goalDeltaKcal)
@@ -484,10 +490,12 @@ export async function computeEnergyBalance(
     },
     // The SAME inputs `computeCalorieBalance` was handed, so the grams are fitted to the very
     // budget the card prints rather than to a second derivation of it.
-    macroTargets: macroTargetsFor(activeEnergy.total, budgetProvenance({
+    // An own target does not grow with movement, so no earned kcal are added to the grams either.
+    macroTargets: macroTargetsFor(balance.ownTargetKcal != null ? 0 : activeEnergy.total, budgetProvenance({
       restingBaseKcal, activeKcal: activeEnergy.total,
       targetNetKcal: balance.targetNetKcal, restingRateKcal: Math.round(bmr),
       deficitKcal: balance.deficitKcal, stepCreditKcal: balance.stepCreditKcal,
+      ownTargetKcal: balance.ownTargetKcal,
     }).base),
     activeBreakdown,
     goal,

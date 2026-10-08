@@ -76,7 +76,7 @@ import {
   type MetaKey, type CardWidgetKey, type WidgetDef, type SectionKey,
   WIDGET_DEFS, DEFAULT_WIDGETS, DEFAULT_CARD_WIDGETS,
   loadPillColors, loadCardColors,
-  loadWidgets, loadCardWidgets, loadCalorieType, loadWeightLookback,
+  loadWidgets, loadCardWidgets, loadWeightLookback,
   loadStepsGoal, loadStepsGoalType, loadSleepGoal, loadWaterGoal, loadWaterGoalType,
   loadHiddenSections, buildDefaultOrder, loadSectionOrder,
 } from "@/lib/home/home-prefs";
@@ -110,7 +110,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   // body-battery, training-load, muscle-recovery, oura-hr-day) instead of refetchAll
   // duplicating their fetch logic inline — one fetch call site per key, not two.
   const [refreshTick, setRefreshTick] = useState(0);
-  const [calorieType, setCalorieType]       = useState<"daily" | "weekly">("daily");
   const [weightLookback, setWeightLookback] = useState<7 | 30>(7);
   const [logWidget, setLogWidget]           = useState<WidgetDef | null>(null);
   const [recommendation, setRecommendation] = useState<NextSessionRecommendation | null>(null);
@@ -193,7 +192,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     setActiveCardWidgets(cards);
     setSectionOrder(loadSectionOrder(cards));
     setHiddenSections(loadHiddenSections());
-    setCalorieType(loadCalorieType());
     setWeightLookback(loadWeightLookback());
     setStepsGoal(loadStepsGoal());
     setStepsGoalType(loadStepsGoalType());
@@ -230,7 +228,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         setActiveCardWidgets(refreshedCards);
         setSectionOrder(loadSectionOrder(refreshedCards));
         setHiddenSections(loadHiddenSections());
-        setCalorieType(loadCalorieType());
         setWeightLookback(loadWeightLookback());
         setStepsGoal(loadStepsGoal());
         setSleepGoal(loadSleepGoal());
@@ -940,7 +937,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     setGoalsProfile(prev => prev ? { ...prev, activityLevel: updated.activityLevel ?? null, fitnessGoal: updated.fitnessGoal ?? null } : prev);
   }
 
-  function handleGoalsApplied(applied: { stepsGoal?: number; calorieGoal?: number; waterGoalMl?: number }) {
+  function handleGoalsApplied(applied: { stepsGoal?: number; waterGoalMl?: number }) {
     if (applied.stepsGoal != null) setStepsGoal(applied.stepsGoal);
   }
 
@@ -1203,7 +1200,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
                   metaRecent={metaRecent}
                   metaLoading={metaLoading}
                   weekToDate={weekToDate}
-                  calorieType={calorieType}
                   weightLookback={weightLookback}
                   stepsGoal={stepsGoal}
                   stepsGoalType={stepsGoalType}

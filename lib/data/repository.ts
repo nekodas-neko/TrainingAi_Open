@@ -402,7 +402,7 @@ export interface UserGoals {
   stepsGoalType: 'daily' | 'weekly' | null
   sleepGoalHours: number | null
   calorieGoal: number | null
-  calorieGoalType: 'daily' | 'weekly' | null
+  calorieGoalType: 'daily' | 'weekly' | 'own' | null
   waterGoalMl: number | null
   waterGoalType: 'daily' | 'weekly' | null
   targetWeightKg: number | null

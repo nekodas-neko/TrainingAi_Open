@@ -27,6 +27,8 @@ let weightKg = 70.3
 /** Extra weigh-ins before today, for the trend-weight tests. */
 let history: { date: string; weightKg: number }[] = []
 let storedCalories = 1660
+/** `users.calorie_goal_type`: 'own' flags `storedCalories` as the user's OWN target (issue 2622). */
+let storedType: 'daily' | 'weekly' | 'own' | null = 'daily'
 let targetWeightKg: number | null = 60
 let digestPrompt = ''
 
@@ -55,7 +57,7 @@ const repo = {
   getNutritionTargets: async () => ({ calories: storedCalories, proteinG: 150, carbsG: 141, fatG: 55 }),
   getUserGoals: async () => ({
     stepsGoal: null, stepsGoalType: 'daily', sleepGoalHours: null,
-    calorieGoal: storedCalories, calorieGoalType: 'daily',
+    calorieGoal: storedCalories, calorieGoalType: storedType,
     waterGoalMl: null, waterGoalType: null, targetWeightKg, targetBfPct: null,
   }),
   getUserById: async () => ({ heightCm: 158, sex: 'male', dateOfBirth: '1993-01-01', fitnessGoal: 'recomp' }),
@@ -123,6 +125,7 @@ beforeEach(() => {
   weightKg = 70.3
   history = []
   storedCalories = 1660
+  storedType = 'daily'
   targetWeightKg = 60
   vi.resetModules()
 })
@@ -213,5 +216,79 @@ describe('#2071 — one calorie budget on every surface', () => {
     expect(after).toEqual(before)
     expect(Object.values(before)).not.toContain(1660)
     expect(Object.values(after)).not.toContain(2400)
+  })
+})
+
+// Issue 2622 — the owner's own target is the budget everywhere, through the same single function.
+describe('issue 2622 — an own calorie target is the one budget on every surface', () => {
+  it('every surface returns the own target, and "left" is measured against it', async () => {
+    const worked = (await budgetsBySurface()).budgets.clientSurfaces
+    storedCalories = 1800
+    storedType = 'own'
+    vi.resetModules()
+    const { budgets, remaining, payload } = await budgetsBySurface()
+    expect(new Set(Object.values(budgets))).toEqual(new Set([1800]))
+    expect(new Set(Object.values(remaining))).toEqual(new Set([1800 - 900]))
+    expect(worked).not.toBe(1800)
+    // The payload carries the override and the figure the budget would otherwise be.
+    expect(payload.balance.ownTargetKcal).toBe(1800)
+    const p = budgetProvenance(payload.balance)
+    expect(p.ownTarget).toBe(true)
+    expect(p.workedOutTotal).toBe(worked)
+    // A meal plan is sized to the still-day budget, which is the own target too.
+    expect(p.base).toBe(1800)
+  })
+
+  it('does not grow with movement, so the still day and the total are one number', async () => {
+    storedCalories = 1800
+    storedType = 'own'
+    const { payload } = await budgetsBySurface()
+    const p = budgetProvenance(payload.balance)
+    expect(p.earned).toBe(0)
+    expect(p.base).toBe(p.total)
+  })
+
+  it('clearing the flag returns every surface to the worked-out number', async () => {
+    const before = (await budgetsBySurface()).budgets
+    storedCalories = 1800
+    storedType = 'own'
+    vi.resetModules()
+    await budgetsBySurface()
+    storedType = null
+    vi.resetModules()
+    const after = (await budgetsBySurface()).budgets
+    expect(after).toEqual(before)
+  })
+
+  it('the coach tool names the own target, what the budget would be, and no breakdown of it', async () => {
+    const { buildChatTools } = await import('@/lib/ai-chat/tools')
+    const opts = { toolCallId: 't', messages: [] }
+    const run = async () => {
+      const tools = buildChatTools(repo as unknown as Repo, USER_ID, TZ, TODAY)
+      return await tools.getEnergyBalance.execute!({ date: null }, opts) as {
+        dailyBudgetKcal: number; ownTargetKcal: number | null; workedOutBudgetKcal: number; budgetBreakdown: unknown
+        storedGoal?: unknown
+      }
+    }
+    const derived = await run()
+    expect(derived.ownTargetKcal).toBeNull()
+    expect(derived.budgetBreakdown).not.toBeNull()
+    expect(derived.workedOutBudgetKcal).toBe(derived.dailyBudgetKcal)
+    storedCalories = 1800
+    storedType = 'own'
+    vi.resetModules()
+    const own = await run()
+    expect(own.dailyBudgetKcal).toBe(1800)
+    expect(own.ownTargetKcal).toBe(1800)
+    expect(own.workedOutBudgetKcal).toBe(derived.dailyBudgetKcal)
+    expect(own.budgetBreakdown).toBeNull()
+    expect(own.storedGoal).toBeUndefined()
+  })
+
+  it('a typed goal that is not flagged as an own target is still ignored', async () => {
+    storedCalories = 2400
+    storedType = 'weekly'
+    const { budgets } = await budgetsBySurface()
+    expect(Object.values(budgets)).not.toContain(2400)
   })
 })

@@ -197,13 +197,15 @@ export async function invalidateBiometrics(): Promise<void> {
  *  applying a goal recommendation or editing activity level/fitness goal in Profile. */
 export async function invalidateGoalRecommendations(): Promise<void> {
   await Promise.all([
-    // the fitness goal sets the target net the bar bands against
+    // the fitness goal sets the target net the bar bands against; and an own calorie target (issue
+    // 2622) IS the budget on Nutrition, Home, the log-food sheet and end of day, all of which read
+    // this key
     invalidateCache('energy-balance:'),
     invalidateCache('nutrition-targets'),
     invalidateCache('body-metadata'),
     invalidateCache('progress-summary'),
     invalidateCache('user-goals'),
-    // fitnessGoal feeds the nutrition screen's TDEE-adaptation-card check
+    // fitnessGoal is read from this key by the Goals screen
     invalidateCache('more-user-profile'),
     // LB-48. Recommended calories route through `personalRmr`, so a saved RMR test changes them.
     // The key belongs to this group rather than one of its own because saving an RMR is a goal

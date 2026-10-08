@@ -96,6 +96,10 @@ export interface CalorieBudgetInput {
   /** `stepEnergyKcal(profile, STEP_BASE_CREDIT)` — the first 3,000 steps' energy, which the 20%
    *  already covers. Absent/0 only for a caller that cannot compute it (an incomplete profile). */
   stepCreditKcal?: number | null
+  /** Issue 2622. The user's OWN daily target, when they set one (`users.calorie_goal` with
+   *  `calorie_goal_type = 'own'`). Null/absent/non-positive = none. It replaces the worked-out budget
+   *  here and nowhere else, so no surface can show two numbers: `ownTarget ?? derived`. */
+  ownTargetKcal?: number | null
 }
 
 export interface CalorieBudget {
@@ -117,6 +121,18 @@ export interface CalorieBudget {
   floored: boolean
   /** True when the floor set `stillDayKcal`. */
   stillDayFloored: boolean
+  /** Issue 2622. True when `totalKcal` and `stillDayKcal` are the user's own target. */
+  ownTarget: boolean
+  /** What `totalKcal` would be with no own target — the worked-out budget. Equals `totalKcal` when
+   *  none is set. */
+  workedOutKcal: number
+  /** What `stillDayKcal` would be with no own target. */
+  workedOutStillDayKcal: number
+}
+
+/** The own target as a usable number, or null. One definition of "is an override set". */
+export function validOwnTarget(v: number | null | undefined): number | null {
+  return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null
 }
 
 /**
@@ -124,7 +140,7 @@ export interface CalorieBudget {
  * provenance line prints `stillDayKcal` and what movement added, which sum to the total exactly.
  */
 export function calorieBudget(
-  { rmrKcal, deficitKcal, movementKcal, stepCreditKcal }: CalorieBudgetInput,
+  { rmrKcal, deficitKcal, movementKcal, stepCreditKcal, ownTargetKcal }: CalorieBudgetInput,
 ): CalorieBudget {
   const rmr = Number.isFinite(rmrKcal) ? Math.max(0, rmrKcal) : 0
   const deficit = Number.isFinite(deficitKcal) ? deficitKcal : 0
@@ -141,7 +157,12 @@ export function calorieBudget(
   const stillDayRaw = rmr - deficit + dailyLiving
   const stillDayKcal = Math.round(Math.max(floor, stillDayRaw))
   const raw = stillDayRaw + movement
-  const totalKcal = Math.round(Math.max(floor, raw))
+  const workedOutKcal = Math.round(Math.max(floor, raw))
+  // Issue 2622. The one override. The owner's own target is the owner's choice, so the floor does not
+  // apply to it (the write path bounds it to a plausible range instead). It is the whole day's
+  // budget: movement does not grow it, and a still day gets the same number.
+  const own = validOwnTarget(ownTargetKcal)
+  const totalKcal = own != null ? Math.round(own) : workedOutKcal
   return {
     rmrKcal: Math.round(rmr),
     deficitKcal: Math.round(deficit),
@@ -150,9 +171,27 @@ export function calorieBudget(
     dailyLivingKcal: Math.round(dailyLiving),
     movementKcal: Math.round(movement),
     floorKcal: Math.round(floor),
-    stillDayKcal,
+    stillDayKcal: own != null ? totalKcal : stillDayKcal,
     totalKcal,
     floored: raw < floor,
     stillDayFloored: stillDayRaw < floor,
+    ownTarget: own != null,
+    workedOutKcal,
+    workedOutStillDayKcal: stillDayKcal,
   }
+}
+
+/** The flag that marks `users.calorie_goal` as the user's own target (issue 2622). Any other value
+ *  ('daily', 'weekly', null) is a retired typed goal, which no longer drives anything. */
+export const OWN_TARGET_GOAL_TYPE = 'own'
+
+/**
+ * The own target stored in `users.calorie_goal` / `calorie_goal_type`, or null. The one reader of
+ * that flag: the service, the Goals screen and the coach all go through it.
+ */
+export function ownTargetFromGoals(
+  goals: { calorieGoal: number | null; calorieGoalType: string | null } | null | undefined,
+): number | null {
+  if (goals == null || goals.calorieGoalType !== OWN_TARGET_GOAL_TYPE) return null
+  return validOwnTarget(goals.calorieGoal)
 }
