@@ -1,0 +1,144 @@
+<title>Reta Heart Response</title>
+<style>
+:root{color-scheme:dark;--page:#0b100e;--page-fg:#e9efec;--page-dim:#9aa8a2;--line:#22302b;
+--background:oklch(0.145 0.020 149);--foreground:oklch(0.985 0 0);--muted:oklch(0.225 0.034 149);--muted-foreground:oklch(0.75 0 0);--border:oklch(1 0 0 / 7%);
+--series:#38bdf8;--band:rgba(56,189,248,.18);--normal:rgba(255,255,255,.07);--grid:rgba(255,255,255,.06);
+--font:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--mono:"JetBrains Mono",ui-monospace,monospace}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:var(--page);color:var(--page-fg);font-family:var(--font);line-height:1.5;padding-block:28px;padding-inline:16px}
+.wrap{max-width:860px;margin:0 auto}
+h1{font-size:24px;line-height:1.2;margin:0 0 6px;text-wrap:balance}
+p{max-width:68ch;margin:0 0 10px}
+.dim{color:var(--page-dim)}
+.meta{font-family:var(--mono);font-size:11px;color:var(--page-dim);letter-spacing:.08em;text-transform:uppercase;margin-bottom:20px}
+.pair{display:flex;flex-wrap:wrap;gap:20px;margin:16px 0}
+.col{flex:1 1 300px;min-width:0;max-width:384px}
+.tag{font-family:var(--mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--page-dim);margin-bottom:6px}
+.tag.rec{color:#22c55e}
+.phone{background:var(--background);color:var(--foreground);border:1px solid var(--line);border-radius:22px;padding:6px 0;display:flex;flex-direction:column}
+.sec{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:8px}
+.sec:last-child{border-bottom:0}
+.head{display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+.head h3{font-size:14px;font-weight:600;margin:0}
+.head span{font-size:11px;color:var(--muted-foreground)}
+.chip{align-self:flex-start;border-radius:999px;border:1px solid rgba(56,189,248,.35);background:rgba(56,189,248,.12);color:#7dd3fc;font-size:12px;font-weight:600;padding:3px 12px}
+.chip.wait{border-color:var(--border);background:var(--muted);color:var(--muted-foreground)}
+.say{font-size:13px;line-height:1.45}
+.say b{font-variant-numeric:tabular-nums}
+.small{font-size:11px;color:var(--muted-foreground)}
+.ghost{border:1px dashed var(--border);border-radius:10px;padding:10px;font-size:12px;color:var(--muted-foreground)}
+.chart{display:flex;flex-direction:column;gap:2px}
+.chart .t{font-size:12px;font-weight:600}
+.chart .t span{font-weight:400;color:var(--muted-foreground)}
+svg{width:100%;height:auto;display:block;overflow:visible}
+svg text{font-family:var(--font);font-size:10px;fill:var(--muted-foreground)}
+svg .lbl{fill:var(--foreground);font-weight:600}
+svg .hit{fill:transparent;cursor:default}
+svg .hit:hover+circle{r:5}
+ul{max-width:70ch;padding-left:20px} li{margin:6px 0}
+table.data{border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums;margin-top:6px}
+table.data th,table.data td{padding:3px 10px 3px 0;text-align:right;color:var(--page-dim)}
+table.data th:first-child,table.data td:first-child{text-align:left}
+details{margin-top:10px;max-width:70ch}
+summary{cursor:pointer;color:var(--page-dim);font-size:13px}
+.scroll{overflow-x:auto}
+</style>
+<div class="wrap">
+<h1>Reta: how your heart responds after a dose</h1>
+<p class="dim">For #2152. You asked to see "dosage night vs HR vs the last day before the next dose" so you can see how reta acts on your body. The model behind this card shipped in #2681. The numbers below are <b>real</b>: they're that model run on your four 1 mg doses (13, 20 and 27 Sep, and 5 Oct) and your nights from 25 Aug to 8 Oct.</p>
+<p class="meta">#2152 · 2026-10-08 · Supplements → Retatrutide (vial sheet) · 384 px dark</p>
+
+<div class="pair">
+<div class="col"><div class="tag rec">Recommended · under Weight response</div>
+<div class="phone">
+<div class="sec"><div class="head"><h3>Weight response</h3><span>since this vial</span></div>
+<div class="ghost">The existing card stays as it is.</div></div>
+
+<div class="sec">
+<div class="head"><h3>Heart after a dose</h3><span>1 mg · 4 doses</span></div>
+<div class="chip">Clear pattern</div>
+<p class="say">Your resting HR climbs to about <b>61</b> by day 4 (your normal is <b>51</b>) and is still about <b>57</b> the day before the next dose. HRV bottoms out at about <b>30 ms</b> on days 3–4 (normal <b>59</b>).</p>
+<div class="chart"><div class="t">Resting heart rate <span>bpm</span></div><svg id="rhr" viewBox="0 0 340 124" role="img" aria-label="Resting heart rate by day after a 1 mg dose"></svg></div>
+<div class="chart"><div class="t">HRV <span>ms</span></div><svg id="hrv" viewBox="0 0 340 124" role="img" aria-label="HRV by day after a 1 mg dose"></svg></div>
+<p class="small">Line: the middle of your doses. Band: where the middle half sat. Grey strip: your normal before your first dose. d6 is the day before the next dose. Training, sleep and stress aren't controlled, so this shows a pattern, not proof.</p>
+</div>
+
+<div class="sec">
+<div class="head"><h3>0.5 mg</h3><span>1 dose</span></div>
+<div class="chip wait">Not enough yet</div>
+<p class="small">It needs 2 doses at the same amount before it shows anything. Different amounts are never pooled.</p>
+</div>
+</div></div>
+
+<div class="col"><div class="tag">When a new amount starts (e.g. first 2 mg dose)</div>
+<div class="phone">
+<div class="sec">
+<div class="head"><h3>Heart after a dose</h3><span>2 mg · 1 dose</span></div>
+<div class="chip wait">Not enough yet</div>
+<p class="small">After your second 2 mg dose this shows how 2 mg moves your resting HR and HRV. Your 1 mg pattern stays below, on its own.</p>
+</div>
+<div class="sec">
+<div class="head"><h3>Heart after a dose</h3><span>1 mg · 4 doses</span></div>
+<div class="ghost">The 1 mg card, as above.</div>
+</div>
+<div class="sec">
+<div class="head"><h3>Heart after a dose</h3><span>1 mg · 2 doses, unclear</span></div>
+<div class="chip wait">No clear pattern yet</div>
+<p class="say">Shown when the middle half of your doses still overlaps your normal range on every day: the line is drawn, the sentence isn't.</p>
+</div>
+</div></div>
+</div>
+
+<h2 style="font-size:15px;margin:28px 0 4px">What you're deciding</h2>
+<ul>
+<li><b>Placement:</b> a section in the vial sheet, under Weight response. That's where the dose lives, and it's one sheet you already open. The alternative is its own screen, which has more room but is one more place to go.</li>
+<li><b>"Clear pattern":</b> it's shown only when, on at least one day, the middle half of your doses sits fully outside your pre-reta normal (resting HR 50–52, HRV 53–65). Otherwise it says "No clear pattern yet" and gives no sentence. Today it qualifies: on day 4, resting HR's middle half is 58–63 against a normal of 50–52. It never says reta <i>caused</i> it.</li>
+<li><b>Dose 1's time:</b> 7 Sep has no time logged because the field didn't exist yet. The card lines doses up by day, so it isn't needed. If you remember roughly when you took it, edit that dose in the app. Otherwise leave it.</li>
+</ul>
+<p class="dim">One thing the numbers show that the card says plainly: on 1 mg your resting HR hasn't come back to normal by the next dose (still about +6 on day 6), so each dose starts from a raised baseline.</p>
+
+<details><summary>The numbers behind the charts (model output, 1 mg, 4 doses)</summary>
+<div class="scroll"><table class="data" id="tbl"><tr><th>Day after dose</th><th>0</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></table></div>
+</details>
+</div>
+<script>
+// recoveryResponse() output for the owner's 1 mg doses (2026-10-08). Deviation from the pre-dose
+// baseline: resting HR median 51 (IQR 2), HRV median 59 (IQR 12), 13 nights before the first dose.
+const DAYS=[0,1,2,3,4,5,6];
+const DATA={
+  rhr:{base:51,iqr:2,unit:'bpm',n:[3,4,4,4,3,3,3],med:[6,6,7,9,10,8,6],p25:[5,5.5,5.25,7.75,7,6.5,4.5],p75:[6,6.75,8.5,11,12,10,7],lo:48,hi:65,ticks:[50,55,60,65]},
+  hrv:{base:59,iqr:12,unit:'ms',n:[3,4,4,4,3,3,3],med:[-10,-16,-19,-27.75,-29,-12,-14],p25:[-10.5,-21.125,-22.25,-31.5,-34.5,-21.5,-14.25],p75:[-9.5,-8.625,-15.375,-24.125,-17,-11.25,-8.5],lo:20,hi:70,ticks:[20,40,60]}
+};
+const NS='http://www.w3.org/2000/svg';
+const el=(t,a,p)=>{const e=document.createElementNS(NS,t);for(const k in a)e.setAttribute(k,a[k]);if(p)p.appendChild(e);return e};
+function draw(id){
+  const d=DATA[id],svg=document.getElementById(id),L=30,R=330,T=8,B=110;
+  const x=i=>L+(R-L)*i/6, y=v=>B-(B-T)*(v-d.lo)/(d.hi-d.lo);
+  const abs=a=>a.map(v=>Math.round((d.base+v)*10)/10);
+  const med=abs(d.med),p25=abs(d.p25),p75=abs(d.p75);
+  for(const t of d.ticks){el('line',{x1:L,x2:R,y1:y(t),y2:y(t),stroke:'var(--grid)'},svg);el('text',{x:L-6,y:y(t)+3,'text-anchor':'end'},svg).textContent=t}
+  el('rect',{x:L,width:R-L,y:y(d.base+d.iqr/2),height:Math.max(2,y(d.base-d.iqr/2)-y(d.base+d.iqr/2)),fill:'var(--normal)'},svg);
+  el('text',{x:R,y:y(d.base)-4,'text-anchor':'end'},svg).textContent='normal '+d.base;
+  const band=DAYS.map(i=>`${x(i)},${y(p75[i])}`).concat(DAYS.slice().reverse().map(i=>`${x(i)},${y(p25[i])}`));
+  el('polygon',{points:band.join(' '),fill:'var(--band)'},svg);
+  el('polyline',{points:DAYS.map(i=>`${x(i)},${y(med[i])}`).join(' '),fill:'none',stroke:'var(--series)','stroke-width':2,'stroke-linejoin':'round','stroke-linecap':'round'},svg);
+  const peak=id==='rhr'?med.indexOf(Math.max(...med)):med.indexOf(Math.min(...med));
+  DAYS.forEach(i=>{
+    const g=el('g',{},svg);
+    const hit=el('rect',{class:'hit',x:x(i)-20,width:40,y:T,height:B-T},g);
+    const tip=el('title',{},hit);tip.textContent=`Day ${i}: ${med[i]} ${d.unit} (middle half ${p25[i]}–${p75[i]}) · ${d.n[i]} doses`;
+    el('circle',{cx:x(i),cy:y(med[i]),r:i===peak?4.5:3,fill:'var(--series)',stroke:'var(--background)','stroke-width':2},g);
+    el('text',{x:x(i),y:B+16,'text-anchor':'middle'},svg).textContent=i===0?'dose':'d'+i;
+  });
+  el('text',{class:'lbl',x:x(peak),y:y(med[peak])+(id==='rhr'?-9:15),'text-anchor':'middle'},svg).textContent=med[peak];
+  const tbl=document.getElementById('tbl');
+  const row=(label,arr)=>{const tr=el('tr',{},null);tr.innerHTML=`<td>${label}</td>`+arr.map(v=>`<td>${v}</td>`).join('');tbl.appendChild(tr)};
+  row(id==='rhr'?'Resting HR, middle':'HRV, middle',med);
+  row('middle half',DAYS.map(i=>`${p25[i]}–${p75[i]}`));
+  if(id==='hrv')row('doses with a reading',d.n);
+}
+draw('rhr');draw('hrv');
+</script>
