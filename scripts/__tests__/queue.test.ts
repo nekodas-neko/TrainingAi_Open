@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { plan } = require('../queue.js')
+const { plan, isReady } = require('../queue.js')
 
 const issue = (number: number, labels: string[], body = '') => ({ number, title: `t${number}`, body, labelSet: new Set(labels) })
 
@@ -42,5 +42,17 @@ describe('queue plan', () => {
       issue(11, ['type: bug', 'area: sleep', 'lane: engine'], '`lib/x.ts`'),
     ])
     expect(out.map((b: { members: { number: number }[] }) => b.members.map((m) => m.number))).toEqual([[2], [11, 10]])
+  })
+})
+
+describe('queue readiness', () => {
+  it('serves an issue only when nothing parks it: blocked, later, in progress or any needs:', () => {
+    const ready = (labels: string[]) => isReady(issue(1, ['agent: implementer', ...labels]), 'implementer')
+    expect(ready([])).toBe(true)
+    expect(ready(['blocked'])).toBe(false)
+    expect(ready(['later'])).toBe(false)
+    expect(ready(['in progress'])).toBe(false)
+    expect(ready(['needs: owner'])).toBe(false)
+    expect(isReady(issue(1, ['agent: bugfix']), 'implementer')).toBe(false)
   })
 })

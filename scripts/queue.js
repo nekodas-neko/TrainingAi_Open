@@ -17,7 +17,8 @@
 // taken oldest milestone first. Creating a batch milestone is how the Orchestrator hands the
 // Implementer its next job; the agent runner (scripts/agent-runner.mjs) waits for one.
 //
-// READY means open, carrying `agent: <name>`, and neither `blocked` nor any `needs:` label.
+// READY means open, carrying `agent: <name>`, and neither `blocked`, `later` nor any `needs:` label.
+// `later` (owner, 2026-10-08) parks a someday idea out of the queue without closing it.
 // ORDER (owner, 2026-10-05): `hotfix`, then `next`, then `type: bug`, then everything else, oldest
 // first. Oldest-first preserves the migrated backlog's priority, because the migration created the
 // issues in queue order.
@@ -48,7 +49,7 @@ function rank(labels) {
 
 function isReady(issue, agent) {
   const l = issue.labelSet;
-  return l.has(`agent: ${agent}`) && !l.has('blocked') && !l.has('in progress') && ![...l].some((n) => n.startsWith('needs:'));
+  return l.has(`agent: ${agent}`) && !l.has('blocked') && !l.has('later') && !l.has('in progress') && ![...l].some((n) => n.startsWith('needs:'));
 }
 
 /** Pure: ordered batches from issues already filtered to one agent's ready set. */
@@ -87,7 +88,7 @@ function plan(issues) {
   return batches;
 }
 
-module.exports = { plan, rank };
+module.exports = { plan, rank, isReady };
 
 if (require.main === module) {
   const args = process.argv.slice(2);
@@ -109,7 +110,7 @@ if (require.main === module) {
       const has = (i, name) => i.labels.some((l) => l.name === name);
       if (issues.some((i) => has(i, 'in progress'))) continue; // another session has this batch
       if (lane && !issues.some((i) => has(i, `lane: ${lane}`))) continue;
-      const blocked = issues.filter((i) => i.labels.some((l) => l.name === 'blocked' || l.name.startsWith('needs:')));
+      const blocked = issues.filter((i) => i.labels.some((l) => l.name === 'blocked' || l.name === 'later' || l.name.startsWith('needs:')));
       if (!issues.length || blocked.length === issues.length) continue;
       if (args.includes('--json')) {
         console.log(JSON.stringify({ milestone: m.number, title: m.title, issues: issues.map((i) => ({ number: i.number, title: i.title, blocked: blocked.includes(i) })) }, null, 2));
