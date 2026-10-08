@@ -141,6 +141,8 @@ async function createFoodItem(entry: NewFoodEntry): Promise<string> {
       // accepted and stored `imageDataUri` since BF-35, so omitting it here dropped the picture on
       // the WEB path even once the local path carried it.
       imageDataUri: entry.imageDataUri ?? undefined,
+      // Issue 2219. The route has accepted the code since LB-158 and this body never sent it.
+      barcode: entry.barcode,
     }),
   })
   if (!res.ok) throw new Error('Failed to create food item')
@@ -274,6 +276,10 @@ export async function logFoodEntries(
               fiberG: entry.fiberG, sugarG: entry.sugarG,
               sodiumMg: entry.sodiumMg, satFatG: entry.satFatG, source: entry.source,
               barcode: entry.barcode,
+              // Issue 2219. The local row above kept the picture and this payload did not, so the
+              // server row stayed NULL (1 of 41 barcode items had an image) and the next pull
+              // overwrote the phone's copy with that NULL. Null, not omitted, for a typed food.
+              imageDataUri: entry.imageDataUri ?? null,
             },
           })
         }

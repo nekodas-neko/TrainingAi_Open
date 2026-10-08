@@ -2560,7 +2560,12 @@ export class SQLiteLocalStore implements LocalStore {
          -- for -- offers null, and letting excluded win would let any of them erase it. A
          -- product's code does not change, so there is no update this drops.
          barcode=COALESCE(excluded.barcode, food_items.barcode),
-         image_data_uri=excluded.image_data_uri,
+         -- Issue 2219. Same reasoning as barcode: a picture is known only where it was captured or
+         -- fetched. Logging the food again, logging a saved meal that holds it, and a pull of a row
+         -- whose server copy never received the picture all offer null, and excluded winning let each
+         -- of them blank the thumbnail the phone already had. No path clears a food's picture, so
+         -- there is no deliberate clear this drops.
+         image_data_uri=COALESCE(excluded.image_data_uri, food_items.image_data_uri),
          updated_at=excluded.updated_at`,
       [
         record.id, record.name, record.brand, record.servingSizeG, record.calories,
