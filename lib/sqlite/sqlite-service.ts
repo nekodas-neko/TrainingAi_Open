@@ -49,14 +49,29 @@ export async function initSQLite(upgrades: UpgradeStatement[]): Promise<void> {
         upgrades.map(u => ({ toVersion: u.toVersion, statements: u.statements })),
       );
 
-      // A previous init attempt can leave the connection registered without an open handle
-      // (observed on the S25: "CreateConnection: Connection trainingai already exists",
-      // 2026-08-02). That is a leaked registration, not an upgrade fault — clear it here so it
-      // doesn't get misdiagnosed as one and pushed down the version-1 fallback path.
+      // A WebView page reload (the offline screen's retry, a renderer restart, a `goto`) throws
+      // away the JS side but NOT the native plugin: it still holds the `trainingai` connection
+      // the old page opened, possibly with a transaction that page never got to commit. This
+      // fresh SQLiteConnection's connection map is empty, and in @capacitor-community/sqlite 8.1.0
+      // `isConnection()` only reads that JS map — it never asks native — so the guard that used
+      // to sit here could not see the leftover. `createConnection` then threw "Connection
+      // trainingai already exists" and every reload was misreported through the upgrade-failure
+      // fallback below (#2386; the 2026-08-02 "leaked registration" on the S25 was the same thing,
+      // as is a retry after a failed init in the same page).
+      //
+      // `checkConnectionsConsistency()` is the plugin's own API for this: it sends the JS map to
+      // native, and when JS knows of no connection, native closes every one it holds
+      // (CapacitorSQLite.java → closeAllConnections). Closing only closes the handle: committed
+      // data is already on disk, and a transaction the dead page left open is rolled back by
+      // SQLite as a unit (that page can never commit it). The DB file is not touched. If this
+      // call fails we carry on exactly as before, and the fallback still recovers. Its result is
+      // not logged: with an empty JS map it reports `false` on every cold start too, so it cannot
+      // tell a reload from a fresh launch.
       try {
-        const existing = await conn.isConnection(DB_NAME, false);
-        if (existing.result) await conn.closeConnection(DB_NAME, false);
-      } catch { /* nothing registered — the normal case */ }
+        await conn.checkConnectionsConsistency();
+      } catch (e) {
+        console.warn('[initSQLite] could not check native connections:', e);
+      }
 
       let usedFallback = false;
       try {
@@ -219,8 +234,8 @@ export async function runSQL(sql: string, values?: unknown[]): Promise<void> {
 // Real native transaction control (SQLiteDBConnection.beginTransaction/commitTransaction/
 // rollbackTransaction) — NOT literal "BEGIN"/"COMMIT"/"ROLLBACK" SQL text through runSQL,
 // which the plugin's per-call auto-wrap makes unreliable (see the _inTransaction comment
-// above). Callers doing a multi-statement atomic write must use these instead.
-export async function beginTransaction(): Promise<void> {
+// above). Private on purpose: callers go through withTransaction below, which serialises them.
+async function beginTransaction(): Promise<void> {
   await awaitOpen();
   if (!_db) {
     if (isSQLiteAvailable()) throw unavailable('transaction');
@@ -235,7 +250,7 @@ export async function beginTransaction(): Promise<void> {
   }
 }
 
-export async function commitTransaction(): Promise<void> {
+async function commitTransaction(): Promise<void> {
   if (!_db) return;
   try {
     await _db.commitTransaction();
@@ -247,7 +262,7 @@ export async function commitTransaction(): Promise<void> {
   }
 }
 
-export async function rollbackTransaction(): Promise<void> {
+async function rollbackTransaction(): Promise<void> {
   if (!_db) return;
   try {
     await _db.rollbackTransaction();
@@ -256,6 +271,56 @@ export async function rollbackTransaction(): Promise<void> {
     throw new Error(`SQL failed [ROLLBACK]: ${msg}`);
   } finally {
     _inTransaction = false;
+  }
+}
+
+// The tail of the transaction queue. Each withTransaction call chains onto it and replaces it,
+// so transactions run strictly one after another. It never rejects.
+let _txTail: Promise<void> = Promise.resolve();
+
+/**
+ * Run `fn` as ONE native transaction, after every transaction queued before it has finished.
+ * The only way to open a local-store transaction.
+ *
+ * The plugin has one native connection and one transaction slot. Two callers each doing their
+ * own begin → writes → commit used to interleave on it (#2386, seen right after a page reload;
+ * a sync pull and the nutrition loader's own applyDelta can also overlap): the second BEGIN
+ * failed "Already in transaction", its error handler then ROLLED BACK THE FIRST CALLER'S
+ * transaction and cleared `_inTransaction`, so the first caller's remaining writes each
+ * auto-committed on their own and its COMMIT failed "no current transaction" — half a delta on
+ * disk, outside any transaction. Queuing makes that impossible: a BEGIN only runs once the
+ * previous transaction has committed or rolled back.
+ *
+ * Rollback runs only for a transaction this call actually began. A failed BEGIN has nothing of
+ * ours to roll back, and rolling back anyway is exactly how the old code destroyed someone
+ * else's transaction.
+ *
+ * Not re-entrant: calling withTransaction from inside `fn` waits on itself forever. Nothing
+ * nests today (the native slot would have refused a nested BEGIN anyway).
+ *
+ * What it does NOT cover: a plain runSQL from elsewhere that lands while a transaction is open
+ * still runs inside it (runSQL cannot tell the owner's writes from a stranger's). That was
+ * true before this change too.
+ */
+export async function withTransaction<T>(fn: () => Promise<T>): Promise<T> {
+  const previous = _txTail;
+  let release!: () => void;
+  _txTail = new Promise<void>(resolve => { release = resolve; });
+  await previous;
+  try {
+    await beginTransaction();
+    try {
+      const result = await fn();
+      await commitTransaction();
+      return result;
+    } catch (err) {
+      // A failed statement may have auto-aborted the transaction already, so ROLLBACK can
+      // itself throw "no current transaction" — never let that mask the real error.
+      try { await rollbackTransaction(); } catch { /* already rolled back */ }
+      throw err;
+    }
+  } finally {
+    release();
   }
 }
 
