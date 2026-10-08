@@ -21,8 +21,12 @@ import { ON_TARGET_KCAL, OUTER_KCAL } from '@trainingai/shared/nutrition/calorie
 import { KCAL_PER_KG } from '@trainingai/shared/nutrition/tdee-adaptation'
 import type { ShadowReadinessPillar, ShadowReadinessStage } from '@trainingai/shared/types/body'
 
-/** Version 1 = the #2356 starting weights, as written (Orchestrator, 2026-10-07). */
-export const SHADOW_MODEL_VERSION = 1
+/**
+ * Version 1 = the #2356 starting weights, as written (Orchestrator, 2026-10-07).
+ * Version 2 = version 1 plus `sleep.deep_rem_share` scored (steady around the person's own normal,
+ * learned; issue 2635). Its 10 Sleep points were reserved in version 1 and dropped out.
+ */
+export const SHADOW_MODEL_VERSION = 2
 
 // ── Unit ids ─────────────────────────────────────────────────────────────────────────────────────
 
@@ -190,12 +194,13 @@ export const UNIT_DEFS: Record<ShadowUnitId, UnitDef> = {
     minMeaningfulChange: 2,
   },
   'sleep.deep_rem_share': {
-    id: 'sleep.deep_rem_share', pillar: 'sleep', shape: 'sweet_spot', reference: 'constant', weight: 10, daytime: false,
-    unavailable:
-      'The tree gives "sweet spot vs normal, constant" and points at component-references.md for the '
-      + 'sleep-stage ratio ranges, but that sheet has none: it says there is no consensus on stage '
-      + 'amounts and recommends scoring against the personal baseline only. Needs the owner to pick '
-      + 'the band (or make it learned).',
+    id: 'sleep.deep_rem_share', pillar: 'sleep', shape: 'steady', reference: 'learned', weight: 10, daytime: false,
+    // Deep + REM minutes over total sleep, in percent, against the person's own rolling 30-day normal.
+    // No fixed band and no Level: component-references.md finds no consensus on stage amounts and
+    // recommends the personal baseline only (decision on issue 2635, Orchestrator, 2026-10-07).
+    // MODEL: 2 percentage points is the smallest change that means anything (ring stage scoring
+    // wobbles by about that much night to night). A night with no staging has no value.
+    minMeaningfulChange: 2,
   },
   'sleep.latency': {
     id: 'sleep.latency', pillar: 'sleep', shape: 'sweet_spot', reference: 'constant', weight: 10, daytime: false,

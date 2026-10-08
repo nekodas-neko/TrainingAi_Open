@@ -2,6 +2,7 @@
 // a second run replaces its own rows only, a second model version coexists, a dry run writes
 // nothing, today is never replayed, and the daily hook never throws. Skips without DATABASE_URL.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { SHADOW_MODEL_VERSION } from '@trainingai/shared/health/shadow-readiness/model'
 
 const canRun = !!process.env.DATABASE_URL
 const TEST_USER_ID = '00000000-0000-4000-8000-000000237701'
@@ -62,7 +63,7 @@ describe.skipIf(!canRun)('shadow readiness service (#2377)', () => {
     const stored = await rows()
     expect(stored.map(r => r.date)).toEqual(res.rows.map(r => r.date))
     for (const r of stored) {
-      expect(r.model_version).toBe(1)
+      expect(r.model_version).toBe(SHADOW_MODEL_VERSION)
       expect(r.computed_by).toBe('replay')
       expect(r.shadow_readiness).not.toBeNull()
       if (r.inputs_through != null) expect(r.inputs_through < r.date).toBe(true)
@@ -76,9 +77,9 @@ describe.skipIf(!canRun)('shadow readiness service (#2377)', () => {
     const { replayShadowReadiness } = await import('../shadow-readiness-service')
     const { getRepository } = await import('@/lib/data')
     const repo = await getRepository()
-    // A version-2 row beside version 1, as a later weight set would write.
+    // A version-1 row beside the current version, as the first weight set wrote it (issue 2635).
     await repo.upsertShadowReadiness(TEST_USER_ID, {
-      date: from, modelVersion: 2, shadowReadiness: 12.5,
+      date: from, modelVersion: 1, shadowReadiness: 12.5,
       pillars: { sleep: 1, heart: 2, activity: 3, body: 4 },
       pillarDetail: {}, units: {}, maturityStage: 'learning', inputsThrough: null,
       liveReadiness: null, liveModelVersion: null, computedBy: 'replay',
@@ -87,16 +88,31 @@ describe.skipIf(!canRun)('shadow readiness service (#2377)', () => {
     await replayShadowReadiness(TEST_USER_ID, from, to, { tz: TZ, write: true })
     const after = await rows()
     expect(after).toHaveLength(before.length)
-    const v2 = after.find(r => r.model_version === 2)!
-    expect(v2.shadow_readiness).toBe(12.5)
-    expect(v2.computed_at.getTime()).toBe(before.find(r => r.model_version === 2)!.computed_at.getTime())
-    for (const r of after.filter(x => x.model_version === 1)) {
-      const prev = before.find(b => b.date === r.date && b.model_version === 1)!
+    const v1 = after.find(r => r.model_version === 1)!
+    expect(v1.shadow_readiness).toBe(12.5)
+    expect(v1.computed_at.getTime()).toBe(before.find(r => r.model_version === 1)!.computed_at.getTime())
+    for (const r of after.filter(x => x.model_version === SHADOW_MODEL_VERSION)) {
+      const prev = before.find(b => b.date === r.date && b.model_version === SHADOW_MODEL_VERSION)!
       expect(r.id).toBe(prev.id)
       expect(r.shadow_readiness).toBe(prev.shadow_readiness)
       expect(r.computed_at.getTime()).toBeGreaterThanOrEqual(prev.computed_at.getTime())
     }
-    await pool.query(`DELETE FROM shadow_readiness WHERE user_id = $1 AND model_version = 2`, [TEST_USER_ID])
+    await pool.query(`DELETE FROM shadow_readiness WHERE user_id = $1 AND model_version = 1`, [TEST_USER_ID])
+  }, 60_000)
+
+  it('version 2 scores deep + REM share against the person\'s own normal; an unstaged night drops out, never 0 (issue 2635)', async () => {
+    expect(SHADOW_MODEL_VERSION).toBe(2)
+    const { rows: stored } = await pool.query(
+      `SELECT date::text AS date, units->'sleep.deep_rem_share' AS u FROM shadow_readiness
+        WHERE user_id = $1 AND model_version = $2 ORDER BY date`, [TEST_USER_ID, SHADOW_MODEL_VERSION])
+    expect(stored.length).toBeGreaterThan(0)
+    const scored = stored.filter(r => r.u.score != null)
+    const dropped = stored.filter(r => r.u.score == null)
+    expect(scored.length).toBeGreaterThan(0)
+    // The seed leaves every ninth night unstaged: those have no value and no score.
+    expect(dropped.length).toBeGreaterThan(0)
+    for (const r of dropped) expect(r.u).toMatchObject({ value: null, weight: 0 })
+    for (const r of scored) expect(r.u).toMatchObject({ gap: null, weight: 10, level: null })
   }, 60_000)
 
   it('today is never replayed — it belongs to the daily step', async () => {

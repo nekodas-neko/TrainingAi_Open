@@ -345,6 +345,73 @@ describe('shadow readiness — structural rules', () => {
     expect(r.pillarDetail.body.effectiveWeight).toBeCloseTo(0.4, 3)
   })
 
+  describe('sleep.deep_rem_share: steady around the person\'s own normal (issue 2635)', () => {
+    const id = 'sleep.deep_rem_share' as const
+    const pct = (i: number) => 40 + (i % 2 === 0 ? 2 : -2)
+    const sleepUnits = (share: UnitInput): ShadowScoreInput['units'] => ({
+      'sleep.duration': { today: night(8), history: [] },
+      'sleep.efficiency': { today: night(90), history: history(40, wobble(90, 1)) },
+      'sleep.latency': { today: night(15), history: [] },
+      'sleep.timing': { today: night(0), history: history(40, wobble(0, 10)) },
+      'sleep.balance': { today: night(8), history: [] },
+      [id]: share,
+    })
+
+    it('is a learned steady unit with no fixed band and keeps its 10 Sleep points', () => {
+      const def = UNIT_DEFS[id]
+      expect(def).toMatchObject({ shape: 'steady', reference: 'learned', weight: 10 })
+      expect(def.band).toBeUndefined()
+      expect(def.unavailable).toBeUndefined()
+      expect(SHADOW_MODEL_VERSION).toBe(2)
+    })
+
+    it('a night at its normal scores near 100; a night far from it, either way, scores low', () => {
+      const h = history(40, pct)
+      const atNormal = unit(id, { today: night(40), history: h })
+      expect(atNormal.score!).toBeGreaterThan(95)
+      expect(atNormal.level).toBeNull()
+      expect(atNormal.normal).toBeCloseTo(40, 0)
+      expect(unit(id, { today: night(25), history: h }).score!).toBeLessThan(50)
+      expect(unit(id, { today: night(55), history: h }).score!).toBeLessThan(50)
+      // Nothing is fixed: the same share is fine for someone whose normal it is.
+      expect(unit(id, { today: night(25), history: history(40, i => 25 + (i % 2 === 0 ? 2 : -2)) }).score!).toBeGreaterThan(95)
+    })
+
+    it('maturity: 13 days learning (no yardstick, so it drops out), 14 provisional, 29 provisional, 30 settled', () => {
+      const at = (n: number) => unit(id, { today: night(40), history: history(n, pct) })
+      expect(at(13)).toMatchObject({ stage: 'learning', score: null, gap: 'learning' })
+      expect([at(14).stage, at(29).stage, at(30).stage]).toEqual(['provisional', 'provisional', 'settled'])
+      expect(at(14).score).not.toBeNull()
+    })
+
+    it('the minimum-meaningful-change floor stops a very steady sleeper reading 1 point as a crisis', () => {
+      expect(unit(id, { today: night(41), history: history(40, () => 40) }).score!).toBeGreaterThan(85)
+    })
+
+    it('a night with no staging yields no value (never 0)', () => {
+      const raw = emptyRaw('Australia/Brisbane')
+      const base = { date: D, sleepStart: new Date('2026-09-29T22:30:00+10:00'), sleepEnd: new Date('2026-09-30T06:30:00+10:00'), durationHours: 8 }
+      const valueFor = (stages: { deepSleepHours?: number | null; remSleepHours?: number | null }) => {
+        raw.sleepSessions = [{ ...base, ...stages }]
+        return assembleShadowInputs(prepareShadowHistory(raw), D).units[id]!.today?.value ?? null
+      }
+      expect(valueFor({})).toBeNull()
+      expect(valueFor({ deepSleepHours: null, remSleepHours: null })).toBeNull()
+      expect(valueFor({ deepSleepHours: 0, remSleepHours: 0 })).toBeNull()
+      expect(valueFor({ deepSleepHours: 1.2, remSleepHours: 2 })).toBeCloseTo(40, 5)
+    })
+
+    it('dropped, Sleep renormalises over the other five; scored, it carries 10 of 100', () => {
+      const dropped = scoreShadowReadiness({ date: D, units: sleepUnits({ today: null, history: history(40, pct) }) })
+      expect(dropped.pillarDetail.sleep.dropped[id]).toBe('missing')
+      expect(Object.keys(dropped.pillarDetail.sleep.scored)).toHaveLength(5)
+      expect(Object.values(dropped.pillarDetail.sleep.scored).reduce((a, b) => a + b, 0)).toBeCloseTo(1, 2)
+      expect(dropped.units[id].weight).toBe(0)
+      const scored = scoreShadowReadiness({ date: D, units: sleepUnits({ today: night(40), history: history(40, pct) }) })
+      expect(scored.pillarDetail.sleep.scored[id]).toBeCloseTo(0.1, 3)
+    })
+  })
+
   it('a new unit counts half until it settles (#2356)', () => {
     const hrr = history(20, wobble(25, 2), shiftDateStr(D, -1))
     const r = scoreShadowReadiness({
