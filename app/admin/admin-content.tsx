@@ -39,6 +39,10 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
   const [confirmDeleteFeedback, setConfirmDeleteFeedback] = useState<string | null>(null)
   // issue 2383 item 3: deactivating signs that user out to `/pending`, so it asks first. Activation does not.
   const [confirmDeactivate, setConfirmDeactivate] = useState<User | null>(null)
+  // issue 2651: deleting a user runs the whole account deletion, and removing an invite un-approves an
+  // email, so each asks first. Both name what the row already shows, so no new detail is exposed.
+  const [confirmDelete, setConfirmDelete] = useState<User | null>(null)
+  const [confirmRemoveInvite, setConfirmRemoveInvite] = useState<string | null>(null)
 
   async function loadAll() {
     setLoading(true)
@@ -195,7 +199,16 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
             {pending.length > 0 && (
               <div className="space-y-2">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pending approval</p>
-                {pending.map(u => <UserRow key={u.id} user={u} onToggle={toggleUser} onDelete={deleteUser} loadingId={actionLoading} />)}
+                {pending.map(u => (
+                  <UserRow
+                    key={u.id}
+                    user={u}
+                    isSelf={u.id === currentUserId}
+                    onToggle={toggleUser}
+                    onDelete={() => setConfirmDelete(u)}
+                    loadingId={actionLoading}
+                  />
+                ))}
               </div>
             )}
             {active.length > 0 && (
@@ -214,11 +227,25 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
             )}
             {users.length === 0 && <p className="text-center text-muted-foreground py-8">No users yet.</p>}
             <ConfirmDialog
+              open={!!confirmDelete}
+              onOpenChange={o => { if (!o) setConfirmDelete(null) }}
+              title="Delete user?"
+              message={confirmDelete
+                ? `Delete ${userLabel(confirmDelete)}? This permanently deletes their account and everything under it. It cannot be undone.`
+                : ''}
+              confirmLabel="Delete"
+              onConfirm={() => {
+                const u = confirmDelete
+                setConfirmDelete(null)
+                if (u) deleteUser(u.id)
+              }}
+            />
+            <ConfirmDialog
               open={!!confirmDeactivate}
               onOpenChange={o => { if (!o) setConfirmDeactivate(null) }}
               title="Deactivate user?"
               message={confirmDeactivate
-                ? `${confirmDeactivate.displayName || confirmDeactivate.name || confirmDeactivate.email} will be signed out to the pending screen until you activate them again.`
+                ? `${userLabel(confirmDeactivate)} will be signed out to the pending screen until you activate them again.`
                 : ''}
               confirmLabel="Deactivate"
               onConfirm={() => {
@@ -251,13 +278,28 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => removeInvite(email)}
+                    onClick={() => setConfirmRemoveInvite(email)}
+                    aria-label={`Remove ${email}`}
                     disabled={actionLoading === `invite-${email}`}
                   >
                     {actionLoading === `invite-${email}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 text-destructive" />}
                   </Button>
                 </div>
               ))}
+              <ConfirmDialog
+                open={!!confirmRemoveInvite}
+                onOpenChange={o => { if (!o) setConfirmRemoveInvite(null) }}
+                title="Remove invite?"
+                message={confirmRemoveInvite
+                  ? `${confirmRemoveInvite} will no longer be pre-approved. If they sign up afterwards they wait for approval.`
+                  : ''}
+                confirmLabel="Remove"
+                onConfirm={() => {
+                  const e = confirmRemoveInvite
+                  setConfirmRemoveInvite(null)
+                  if (e) removeInvite(e)
+                }}
+              />
               {invites.length === 0 && (
                 <p className="text-center text-muted-foreground py-4 text-sm">
                   No invites yet. Add an email above to pre-approve a user.
@@ -385,6 +427,11 @@ export default function AdminContent({ currentUserId }: { currentUserId: string 
   )
 }
 
+/** How the row names a user, so a confirm says exactly what the admin tapped on. */
+function userLabel(u: User): string {
+  return u.displayName || u.name || u.email
+}
+
 function UserRow({
   user,
   isSelf = false,
@@ -393,7 +440,7 @@ function UserRow({
   loadingId,
 }: {
   user: User
-  /** The signed-in admin's own row: no deactivate. The server refuses it too; this only hides it. */
+  /** The signed-in admin's own row: no deactivate, no delete. The server refuses both too; this only hides them. */
   isSelf?: boolean
   onToggle: (id: string, action: 'activate' | 'deactivate') => void
   onDelete?: (id: string) => void
@@ -423,13 +470,14 @@ function UserRow({
       )}>
         {user.isActive ? 'Active' : 'Pending'}
       </span>
-      {onDelete && !user.isActive && (
+      {onDelete && !user.isActive && !isSelf && (
         <Button
           variant="ghost"
           size="sm"
           onClick={() => onDelete(user.id)}
           disabled={isDeleteLoading}
           title="Delete user"
+          aria-label="Delete user"
         >
           {isDeleteLoading
             ? <Loader2 className="h-4 w-4 animate-spin" />
