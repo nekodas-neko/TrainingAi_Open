@@ -65,6 +65,19 @@ export interface PreparedShadowHistory {
 
 const DAY_MS = 86_400_000
 
+/**
+ * Deep + REM as a percentage of total sleep, or null when the night has no staging. Null, never 0:
+ * a manual night or a Health Connect night without stages stores no stage hours (or zeros), and
+ * scoring that as "0 % deep and REM" would punish a night nothing measured (edge case #12).
+ */
+export function deepRemSharePct(n: Pick<AggregatableSleep, 'deepSleepHours' | 'remSleepHours' | 'durationHours'>): number | null {
+  const { deepSleepHours: deep, remSleepHours: rem, durationHours: total } = n
+  if (deep == null || rem == null || total == null || !(total > 0)) return null
+  if (!(deep >= 0) || !(rem >= 0) || deep + rem <= 0) return null
+  const pct = ((deep + rem) / total) * 100
+  return pct > 100 ? null : pct
+}
+
 function obs(date: string, value: number | null | undefined, source: string, rung: UnitObservation['rung'] = null): UnitObservation | null {
   return value == null || !Number.isFinite(value) ? null : { date, value, source, rung }
 }
@@ -156,6 +169,7 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
   const series: PreparedShadowHistory['series'] = {
     'sleep.duration': duration,
     'sleep.efficiency': compact(nightList.map(([d, n]) => obs(d, n.efficiency, sleepSrc))),
+    'sleep.deep_rem_share': compact(nightList.map(([d, n]) => obs(d, deepRemSharePct(n), sleepSrc))),
     'sleep.latency': compact(nightList.map(([d, n]) => obs(d, n.onsetLatencySec == null ? null : n.onsetLatencySec / 60, sleepSrc))),
     'sleep.timing': compact(nightList.map(([d, n]) =>
       obs(d, minutesFromNoon(new Date((n.sleepStart.getTime() + n.sleepEnd.getTime()) / 2).toISOString(), tz), sleepSrc))),
@@ -185,7 +199,7 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
 
 /** Units whose value for day `D` is the night keyed to `D`. Everything else reads `D − 1`. */
 const NIGHT_UNITS: ReadonlySet<ShadowUnitId> = new Set<ShadowUnitId>([
-  'sleep.duration', 'sleep.efficiency', 'sleep.latency', 'sleep.timing', 'sleep.balance',
+  'sleep.duration', 'sleep.efficiency', 'sleep.deep_rem_share', 'sleep.latency', 'sleep.timing', 'sleep.balance',
   'heart.overnight_hrv', 'heart.overnight_rhr', 'heart.overnight_settling',
   'body.temperature', 'body.breathing_rate',
 ])

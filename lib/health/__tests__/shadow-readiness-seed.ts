@@ -53,10 +53,17 @@ export async function seedShadowHistory(pool: Pool, userId: string, opts: SeedOp
     const tempMean = Math.round(around(34.2, 0.25) * 100) / 100
     const breath = Math.round(around(15, 0.8) * 10) / 10
 
+    // Deep + REM stage hours (issue 2635), derived from the index rather than the seeded generator so
+    // the other series keep their values. Every ninth night has no staging at all, as a manual night
+    // would not.
+    const staged = i % 9 !== 8
+    const share = 0.4 + 0.04 * Math.sin(i * 1.7)
+    const deepHours = staged ? Math.round(hours * share * 0.35 * 100) / 100 : null
+    const remHours = staged ? Math.round(hours * share * 0.65 * 100) / 100 : null
     await pool.query(
-      `INSERT INTO sleep_sessions (user_id, date, sleep_start, sleep_end, duration_hours, efficiency, onset_latency_sec)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [userId, date, start, new Date(wake), hours, efficiency, latencySec],
+      `INSERT INTO sleep_sessions (user_id, date, sleep_start, sleep_end, duration_hours, efficiency, onset_latency_sec, deep_sleep_hours, rem_sleep_hours)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [userId, date, start, new Date(wake), hours, efficiency, latencySec, deepHours, remHours],
     )
     await pool.query(
       `INSERT INTO body_metrics (user_id, date, hrv_ms, resting_heart_rate, steps, spo2_pct, water_ml)
