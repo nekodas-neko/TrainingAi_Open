@@ -3488,6 +3488,16 @@ export class SQLiteLocalStore implements LocalStore {
     return rows.map(r => this.mapMutation(r));
   }
 
+  async countQueuedMutationsByDomain(userId: string): Promise<Record<string, number>> {
+    const rows = await querySQL<{ domain: string; n: number }>(
+      `SELECT domain, COUNT(*) AS n FROM mutations_outbox WHERE user_id = ? GROUP BY domain`,
+      [userId],
+    );
+    const out: Record<string, number> = {};
+    for (const r of rows) out[String(r.domain)] = Number(r.n);
+    return out;
+  }
+
   async recordMutationFailures(failures: Array<{ id: string; error: string }>): Promise<void> {
     for (const f of failures) {
       const rows = await querySQL<{ attempts: number }>(

@@ -54,6 +54,20 @@ export const DEVICE_STORAGE: Readonly<Record<string, string>> = Object.freeze({
 })
 
 /**
+ * The localStorage upload queues (JSON arrays of items not yet POSTed). They are the account's and
+ * are cleared with it, so a sign-out discards whatever they still hold: issue 2532 counts them as
+ * unsent changes before signing out (`lib/sign-out-pending.ts`). One list for both, so a new queue
+ * is cleared and counted, never only one of the two.
+ */
+export const UPLOAD_QUEUE_STORAGE: Readonly<Record<string, string>> = Object.freeze({
+  'detection-events-outbox': 'unsent activity-detection telemetry',
+  'ta-cadence-captures': 'unsent cadence calibration captures',
+  'ta-oura-ble-pending-live-steps': 'unsent live-step windows (manual tester)',
+  'ta-oura-ble-pending-live-steps-auto': 'unsent live-step windows',
+  'ta-oura-ble-pending-accel-chunks': 'unsent accelerometer chunks',
+})
+
+/**
  * Keys and key prefixes that are the account's, and are cleared. Documentation and census only —
  * clearing does not read this list (it clears everything not in `DEVICE_STORAGE`).
  */
@@ -95,11 +109,7 @@ export const ACCOUNT_STORAGE: Readonly<Record<string, string>> = Object.freeze({
   ta_workout_reminder_notified_today: 'reminder dedupe', ta_deadletter_notified_v1: 'failed-sync notices shown',
   // Sync cursors and upload queues. A queue left behind would POST under the next account.
   ta_hc_last_sync: 'Health Connect cursor — the next account backfills the window for itself',
-  'detection-events-outbox': 'unsent activity-detection telemetry',
-  'ta-cadence-captures': 'unsent cadence calibration captures',
-  'ta-oura-ble-pending-live-steps': 'unsent live-step windows (manual tester)',
-  'ta-oura-ble-pending-live-steps-auto': 'unsent live-step windows',
-  'ta-oura-ble-pending-accel-chunks': 'unsent accelerometer chunks',
+  ...UPLOAD_QUEUE_STORAGE,
   // Everything else that is one person's.
   'chat_history_': 'prefix — coach conversations',
   'ta_weather_cache': 'prefix — weather at this person\'s last coordinates',
