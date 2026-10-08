@@ -725,8 +725,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return r ? this.rowToUser(r) : null
   }
 
-  async deleteAccount(userId: string): Promise<AccountDeletionResult> {
-    return accountDeletion.deleteAccount(this.db, userId)
+  async deleteAccount(userId: string, opts: { onlyIfNoData?: boolean } = {}): Promise<AccountDeletionResult> {
+    return accountDeletion.deleteAccount(this.db, userId, opts)
+  }
+
+  /** issue 2695: which of these accounts hold data (the admin Users screen's Pending / Deactivated split). */
+  async usersWithData(userIds: readonly string[]): Promise<Set<string>> {
+    return accountDeletion.usersWithData(this.db, userIds)
   }
 
   // #2076 — native app refresh tokens. Only a hash is stored and no method returns one.

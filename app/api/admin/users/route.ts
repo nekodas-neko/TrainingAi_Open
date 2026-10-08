@@ -38,7 +38,11 @@ export async function GET(req: NextRequest) {
   const offset = parseInt(searchParams.get('offset') ?? '0', 10) || 0
   const repo = await getRepository()
   const users = await repo.listUsers(limit, offset)
-  return NextResponse.json({ users })
+  // issue 2695: the admin screen splits the inactive users into Pending (no data, deletable) and
+  // Deactivated (has data, not deletable). Only inactive rows are asked about; the server still
+  // decides again at delete time, so this is display, not the guard.
+  const withData = await repo.usersWithData(users.filter(u => !u.isActive).map(u => u.id))
+  return NextResponse.json({ users: users.map(u => ({ ...u, hasData: !u.isActive && withData.has(u.id) })) })
 }
 
 export async function PATCH(req: NextRequest) {
@@ -106,14 +110,20 @@ export async function DELETE(req: NextRequest) {
 
   // #2120: the same deletion the user's own `DELETE /api/account` runs. This used to be a bare
   // `DELETE FROM users`, which threw for any account with a custom exercise or a saved meal.
+  // issue 2695: an admin may only delete a signup that never got in. `onlyIfNoData` makes the
+  // deletion itself refuse an account holding data, inside its transaction after the row lock, so
+  // an account that gains data between the screen loading and the tap is still refused.
   let result
   try {
     const repo = await getRepository()
-    result = await repo.deleteAccount(userId)
+    result = await repo.deleteAccount(userId, { onlyIfNoData: true })
   } catch (err) {
     console.error('[admin/users] deletion failed', err)
     reportServerError(err, { userId: session.user.id, url: req.nextUrl.pathname })
     return NextResponse.json({ error: 'The account could not be deleted, and nothing was removed.' }, { status: 500 })
+  }
+  if (result.refusedHasData) {
+    return NextResponse.json({ error: 'This account has data under it, so it cannot be deleted here. Deactivate it instead.' }, { status: 409 })
   }
   if (!result.deleted) return NextResponse.json({ error: 'User not found' }, { status: 404 })
   return NextResponse.json({ ok: true })
