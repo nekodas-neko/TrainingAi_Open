@@ -1375,7 +1375,7 @@ export interface WorkoutRepository {
     rpe: number | null; reps: number; intensityPct: number | null; setTimeSec: number | null
   }>>
   getSetTimingRows(userId: string, exerciseNames: string[]): Promise<import('@trainingai/shared/workout/time-profile').TimingRow[]>
-  getExercise1rmHistory(userId: string, exerciseNames: string[], tz: string): Promise<Record<string, { date: string; rm: number }[]>>
+  getExercise1rmHistory(userId: string, exerciseNames: string[], tz: string, windowDays?: number): Promise<Record<string, { date: string; rm: number }[]>>
   getWeeklySetsByMuscleGroup(userId: string, programId: string, weekStart: string, weekEnd: string, tz: string): Promise<Record<string, number>>
   /** Weighted sets per muscle over an arbitrary span, across every programme (LB-111). `to` is inclusive. */
   getSetsByMuscleInWindow(userId: string, from: string, to: string, tz: string): Promise<Record<string, number>>

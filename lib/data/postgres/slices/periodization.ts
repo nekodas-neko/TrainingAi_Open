@@ -505,10 +505,13 @@ export const wsIsBaselineSession = sql`ws.phase_type IS NOT DISTINCT FROM 'basel
  * check all took as real. A day whose only points are baseline has no point at all — a gap, never a
  * zero. An untagged (NULL) session is still included; see `wsIsBaselineSession`.
  *
+ * `windowDays` defaults to the card's 90; the coach's plateau report asks for 180 so it reads these
+ * same points (issue 2648).
+ *
  * `getLastRealOneRmBatch` keeps reading baseline estimates on purpose: it is the working basis the
  * bar loads from, and straight after a rebuild the baseline is the only basis there is.
  */
-export async function getExercise1rmHistory(db: Db, userId: string, exerciseNames: string[], tz: string): Promise<Record<string, { date: string; rm: number }[]>> {
+export async function getExercise1rmHistory(db: Db, userId: string, exerciseNames: string[], tz: string, windowDays = 90): Promise<Record<string, { date: string; rm: number }[]>> {
   if (exerciseNames.length === 0) return {}
   type RawRow = { exercise_name: string; session_date: string; rm: number }
   const result = await db.execute<RawRow>(sql`
@@ -527,7 +530,7 @@ export async function getExercise1rmHistory(db: Db, userId: string, exerciseName
       -- that invariant has been violated in production in both directions.
       AND el.exercise_deloaded = false
       AND NOT (${wsIsBaselineSession})
-      AND ws.started_at >= NOW() - INTERVAL '90 days'
+      AND ws.started_at >= NOW() - make_interval(days => ${windowDays}::int)
       AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
     GROUP BY el.exercise_name, session_date
     ORDER BY el.exercise_name, session_date

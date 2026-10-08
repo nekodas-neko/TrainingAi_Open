@@ -5,7 +5,7 @@ import type { WorkoutRepository } from '@/lib/data/repository'
 import { pearsonCorrelation, averageByDayOfWeek, type TrendClassification } from './analytics'
 import { summarizePeriod } from './period-comparison'
 import { computeVolumeAcwr, trainingLoadBand, acwrBandByKey } from '@trainingai/shared/ai-periodization/acwr'
-import { projectRm } from '@trainingai/shared/health/strength-projection'
+import { projectRm, isRmPlateau } from '@trainingai/shared/health/strength-projection'
 import { aggregateExerciseHrTrend, summarizeHrByExercise } from '@trainingai/shared/workout/exercise-hr-trend'
 import { computeHrRecoveryProfile } from '@trainingai/shared/health/compute-hr-recovery-profile'
 import { liveReadinessByDay } from '@trainingai/shared/health/live-readiness'
@@ -378,7 +378,7 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
     }),
 
     getPlateauReport: tool({
-      description: 'Per-exercise trend (improving/plateaued/declining) from estimated-1RM history, plus days since each exercise\'s last PR. Use for "what\'s stalled" type questions.',
+      description: 'Per-exercise trend (improving/plateaued/declining) from the same estimated-1RM series the Strength trend card uses (baseline-test and deload sessions left out, last 180 days), plus days since each exercise\'s last PR. Use for "what\'s stalled" type questions.',
       inputSchema: z.object({}),
       execute: async () => {
         const from180d = daysAgo(180)
@@ -387,33 +387,29 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
           repo.getWorkoutSessionsFrom(userId, from180d),
           repo.listRecentPersonalRecords(userId, from10y, new Date()),
         ])
-        const byExercise = new Map<string, { date: Date; orm: number }[]>()
-        for (const ws of sessions) {
-          for (const el of ws.exercises) {
-            if (el.estimated1rm == null || el.estimated1rm <= 0) continue
-            const arr = byExercise.get(el.exerciseName) ?? []
-            arr.push({ date: ws.startedAt, orm: el.estimated1rm })
-            byExercise.set(el.exerciseName, arr)
-          }
-        }
+        // The sessions only name the lifts. The points come from the SAME repository series the
+        // Strength trend card and the engine read (baseline sessions and deloads left out, one
+        // point per local day), over a 180-day window, so the verdicts cannot differ (issue 2648).
+        const names = [...new Set(sessions.flatMap(ws => ws.exercises.map(el => el.exerciseName)))]
+        const history = await repo.getExercise1rmHistory(userId, names, tz, 180)
+        // First-seen order, as before, so equal days-since-PR keep their order.
+        const byExercise = new Map(names.filter(n => history[n]).map(n => [n, history[n]] as const))
         const recordDates = new Map(recentPrs.map(r => [r.exerciseName, r.achievedAt]))
         const now = Date.now()
         const report = [...byExercise.entries()]
-          .filter(([, entries]) => entries.length >= 3)
-          .map(([name, entries]) => {
-            const sorted = entries.sort((a, b) => a.date.getTime() - b.date.getTime())
-            // Day-spaced plateau verdict (projectRm) — shares the single definition the
-            // Health screen's strength-projection card uses, instead of the index-spaced
-            // classifyTrend, so the AI chat and Health screen never disagree on "plateaued".
-            const proj = projectRm(sorted.map(e => ({ date: formatInTimeZone(e.date, tz, 'yyyy-MM-dd'), rm: e.orm })))
+          .filter(([, series]) => series.length >= 3)
+          .map(([name, series]) => {
+            // The plateau verdict is isRmPlateau, the same function the Health card badge and the
+            // engine call. Only the improving/declining split of a non-plateau is the coach's own.
+            const proj = projectRm(series)
             const trend: TrendClassification =
               !proj ? 'plateaued'
-              : proj.plateau ? 'plateaued'
+              : isRmPlateau(series) ? 'plateaued'
               : proj.slopePerWeek > 0 ? 'improving'
               : 'declining'
             const prDate = recordDates.get(name)
             const daysSincePr = prDate ? Math.round((now - prDate.getTime()) / 86_400_000) : null
-            return { exerciseName: name, trend, sessionsAnalyzed: sorted.length, daysSinceLastPr: daysSincePr }
+            return { exerciseName: name, trend, sessionsAnalyzed: series.length, daysSinceLastPr: daysSincePr }
           })
           .sort((a, b) => (b.daysSinceLastPr ?? 0) - (a.daysSinceLastPr ?? 0))
         return { exercises: report }
