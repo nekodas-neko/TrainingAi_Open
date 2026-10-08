@@ -243,3 +243,19 @@ export const MAX_PLAUSIBLE_ONE_RM_KG = 600
 export function oneRmImplausible(estimated1rm: number): boolean {
   return !Number.isFinite(estimated1rm) || estimated1rm > MAX_PLAUSIBLE_ONE_RM_KG
 }
+
+// ── Own calorie target (issue 2622) ──────────────────────────────────────────────────────────────
+// The user's own daily target replaces the worked-out budget everywhere, so it is bounded to a range
+// a person could actually eat in a day. It is deliberately NOT floored at max(RMR, 1,200): the target
+// is the owner's choice. 800 is below any resting rate and above a fast; 10,000 is above any real
+// day's burn. The same bounds guard the Goals field and the PATCH route.
+export const MIN_OWN_CALORIE_TARGET_KCAL = 800
+export const MAX_OWN_CALORIE_TARGET_KCAL = 10_000
+
+/** Why this is not a usable own calorie target, in words fit for an inline error, or null if it is. */
+export function ownCalorieTargetReason(kcal: number): string | null {
+  if (!Number.isFinite(kcal) || !Number.isInteger(kcal)) return 'Enter a whole number of kcal.'
+  if (kcal < MIN_OWN_CALORIE_TARGET_KCAL) return `Enter at least ${MIN_OWN_CALORIE_TARGET_KCAL.toLocaleString()} kcal.`
+  if (kcal > MAX_OWN_CALORIE_TARGET_KCAL) return `Enter ${MAX_OWN_CALORIE_TARGET_KCAL.toLocaleString()} kcal or less.`
+  return null
+}

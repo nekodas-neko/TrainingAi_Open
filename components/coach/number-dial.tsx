@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { FIELD_LABEL, FIELD_UNIT } from "@/lib/coach/patch";
 import type { NumberDialArgs } from "@/lib/coach/widgets";
 import { GOAL_LOCAL_STORAGE_KEYS } from "@/lib/coach/domains/goals";
+import { clearCalorieGoalSeeds } from "@/lib/home/home-prefs";
 import { invalidateCoachHistory, invalidateGoalRecommendations } from "@/lib/cache-groups";
 
 interface NumberDialProps {
@@ -59,6 +60,7 @@ export function NumberDial({ args, onApplied, onCancel }: NumberDialProps) {
         setError(data.error ?? "Could not apply the change");
         return;
       }
+      if (change.field === "calorieGoal") clearCalorieGoalSeeds();
       const key = GOAL_LOCAL_STORAGE_KEYS[change.field];
       if (key) {
         try {

@@ -14,15 +14,13 @@ import {
 import type { User } from '@trainingai/shared/types'
 import type { ActivityLevel } from '@trainingai/shared/types/user'
 import { invalidateGoalRecommendations } from '@/lib/cache-groups'
-import { STEPS_GOAL_KEY, CALORIE_GOAL_KEY, WATER_GOAL_KEY } from '@/lib/home/home-prefs'
+import { STEPS_GOAL_KEY, WATER_GOAL_KEY } from '@/lib/home/home-prefs'
 
 export interface GoalRecommendationData {
   id: string
   current: {
     stepsGoal: number | null
     stepsGoalType: 'daily' | 'weekly' | null
-    calorieGoal: number | null
-    calorieGoalType: 'daily' | 'weekly' | null
     waterGoalMl: number | null
     waterGoalType: 'daily' | 'weekly' | null
     proteinG: number | null
@@ -49,17 +47,17 @@ interface GoalRecommendationSheetProps {
   onOpenChange: (open: boolean) => void
   data: GoalRecommendationData | null
   onUserSaved: (updated: User) => void
-  // Called with whichever of stepsGoal/calorieGoal/waterGoalMl were applied, so the
+  // Called with whichever of stepsGoal/waterGoalMl were applied, so the
   // caller can update its own already-rendered state (these values also live in
   // localStorage, which this component writes through to directly).
-  onGoalsApplied?: (applied: { stepsGoal?: number; calorieGoal?: number; waterGoalMl?: number }) => void
+  onGoalsApplied?: (applied: { stepsGoal?: number; waterGoalMl?: number }) => void
   // Called after a successful apply, regardless of which rows were toggled — lets
   // the caller refresh anything derived from the applied recommendation (e.g. the
   // macro targets pane, which is updated server-side via /api/nutrition/targets).
   onApplied?: () => void
 }
 
-type MetricKey = 'steps' | 'calories' | 'protein' | 'carbs' | 'fat' | 'water'
+type MetricKey = 'steps' | 'protein' | 'carbs' | 'fat' | 'water'
 
 interface MetricRow {
   key: MetricKey
@@ -110,7 +108,7 @@ export function GoalRecommendationSheet({ open, onOpenChange, data, onUserSaved,
   useEffect(() => {
     if (!data) return
     setChecked({
-      steps: true, calories: true, protein: true, carbs: true, fat: true, water: true,
+      steps: true, protein: true, carbs: true, fat: true, water: true,
       activityLevel: true,
     })
   }, [data])
@@ -120,7 +118,6 @@ export function GoalRecommendationSheet({ open, onOpenChange, data, onUserSaved,
 
   const rows: MetricRow[] = [
     { key: 'steps', label: 'Steps Goal', unit: '', current: data.current.stepsGoal, suggested: data.recommended.stepsGoal * multiplier(data.current.stepsGoalType) },
-    { key: 'calories', label: 'Calories', unit: ' kcal', current: data.current.calorieGoal, suggested: data.recommended.calories * multiplier(data.current.calorieGoalType) },
     { key: 'protein', label: 'Protein', unit: 'g', current: data.current.proteinG, suggested: data.recommended.proteinG },
     { key: 'carbs', label: 'Carbs', unit: 'g', current: data.current.carbsG, suggested: data.recommended.carbsG },
     { key: 'fat', label: 'Fat', unit: 'g', current: data.current.fatG, suggested: data.recommended.fatG },
@@ -138,10 +135,8 @@ export function GoalRecommendationSheet({ open, onOpenChange, data, onUserSaved,
     try {
       const goalsPatch: Record<string, number> = {}
       const stepsRow = rows.find(r => r.key === 'steps')!
-      const caloriesRow = rows.find(r => r.key === 'calories')!
       const waterRow = rows.find(r => r.key === 'water')!
       if (checked.steps) goalsPatch.stepsGoal = Math.round(stepsRow.suggested)
-      if (checked.calories) goalsPatch.calorieGoal = Math.round(caloriesRow.suggested)
       if (checked.water) goalsPatch.waterGoalMl = Math.round(waterRow.suggested)
       if (Object.keys(goalsPatch).length > 0) {
         if (await writeJson('/api/user/goals', 'PATCH', goalsPatch)) {
@@ -151,26 +146,20 @@ export function GoalRecommendationSheet({ open, onOpenChange, data, onUserSaved,
           // `invalidateGoalRecommendations()` below drops the `user-goals` entry so the next read
           // comes from the server.
           if (goalsPatch.stepsGoal != null) localStorage.setItem(STEPS_GOAL_KEY, String(goalsPatch.stepsGoal))
-          if (goalsPatch.calorieGoal != null) localStorage.setItem(CALORIE_GOAL_KEY, String(goalsPatch.calorieGoal))
           if (goalsPatch.waterGoalMl != null) localStorage.setItem(WATER_GOAL_KEY, String(goalsPatch.waterGoalMl))
           onGoalsApplied?.(goalsPatch)
         } else {
           if (checked.steps) failed.push('Steps Goal')
-          if (checked.calories) failed.push('Calories')
           if (checked.water) failed.push('Water')
         }
       }
 
       const targetsPatch: Record<string, number> = {}
-      if (checked.calories) targetsPatch.calories = rec.recommended.calories
       if (checked.protein) targetsPatch.proteinG = rec.recommended.proteinG
       if (checked.carbs) targetsPatch.carbsG = rec.recommended.carbsG
       if (checked.fat) targetsPatch.fatG = rec.recommended.fatG
       if (Object.keys(targetsPatch).length > 0) {
         if (!await writeJson('/api/nutrition/targets', 'PUT', targetsPatch)) {
-          // Calories can already be here from the goals PATCH — it is one metric to the reader even
-          // though two routes store it, so name it once.
-          if (checked.calories && !failed.includes('Calories')) failed.push('Calories')
           if (checked.protein) failed.push('Protein')
           if (checked.carbs) failed.push('Carbs')
           if (checked.fat) failed.push('Fat')

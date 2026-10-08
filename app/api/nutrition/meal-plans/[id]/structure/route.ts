@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
@@ -96,12 +97,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       computeEnergyBalance(repo, userId, tz, todayInTz(tz)),
       repo.getNutritionTargets(userId),
     ])
-    // Same precedence as the generator: the saved target wins, the calibration fills the gap. This
+    // Same number as the generator: the still-day budget (the user's own target when set). This
     // route never derives a third number.
-    const calories = targets?.calories ?? balance.target.recommendedKcal
+    const calories = balance.balance ? budgetProvenance(balance.balance).base : null
     if (calories == null) {
       return NextResponse.json(
-        { error: 'No calorie target to update to — set one in Nutrition first.' },
+        { error: 'No calorie budget to update to — add your weight, height, date of birth and sex in Profile.' },
         { status: 400 },
       )
     }

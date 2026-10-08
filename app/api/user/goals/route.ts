@@ -4,6 +4,8 @@ import { goalBoundSchema } from '@trainingai/shared/validation/goal-bounds'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { goalToDailyKcal } from '@trainingai/shared/nutrition/calorie-balance'
+import { OWN_TARGET_GOAL_TYPE } from '@trainingai/shared/nutrition/calorie-budget'
+import { ownCalorieTargetReason } from '@trainingai/shared/validation/plausibility'
 import type { UserGoals } from '@/lib/data/repository'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { invalidBodyResponse } from '@/lib/api/route-errors'
@@ -16,7 +18,7 @@ const GoalsSchema = z.object({
   stepsGoalType:   z.enum(['daily', 'weekly']).optional().nullable(),
   sleepGoalHours:  z.number().min(0).max(24).optional().nullable(),
   calorieGoal:     goalBoundSchema('calorieGoal').optional().nullable(),
-  calorieGoalType: z.enum(['daily', 'weekly']).optional().nullable(),
+  calorieGoalType: z.enum(['daily', 'weekly', 'own']).optional().nullable(),
   waterGoalMl:     goalBoundSchema('waterGoalMl').optional().nullable(),
   waterGoalType:   z.enum(['daily', 'weekly']).optional().nullable(),
   targetWeightKg:  z.number().min(20).max(500).optional().nullable(),
@@ -65,6 +67,25 @@ export async function PATCH(req: NextRequest) {
   }
 
   const repo = await getRepository()
+
+  // Issue 2622. `calorie_goal_type = 'own'` makes `calorie_goal` the user's own target, the budget on
+  // every surface. The two travel together: a flag with no number, or a number outside what a person
+  // could eat in a day, is refused rather than stored. Clearing is the pair of nulls.
+  if (body.calorieGoalType === OWN_TARGET_GOAL_TYPE) {
+    if (body.calorieGoal == null) {
+      return NextResponse.json({ error: 'An own calorie target needs a number.' }, { status: 400 })
+    }
+    const reason = ownCalorieTargetReason(body.calorieGoal)
+    if (reason) return NextResponse.json({ error: reason }, { status: 400 })
+  } else if (body.calorieGoal != null && body.calorieGoalType === undefined) {
+    // A bare number must not slip an out-of-range value under an existing own target.
+    const current = await repo.getUserGoals(userId)
+    if (current.calorieGoalType === OWN_TARGET_GOAL_TYPE) {
+      const reason = ownCalorieTargetReason(body.calorieGoal)
+      if (reason) return NextResponse.json({ error: reason }, { status: 400 })
+    }
+  }
+
   await repo.updateUserGoals(userId, patch)
 
   // `nutrition_targets.calories` is the single source of truth for the daily calorie target;
@@ -72,7 +93,9 @@ export async function PATCH(req: NextRequest) {
   // They drifted 200 kcal apart in production because the TDEE nudge card wrote only one of
   // them, so the Nutrition and Health tabs showed different targets. Mirror on every write —
   // converting, because this field may be a WEEKLY total while nutrition_targets is always daily.
-  if (body.calorieGoal != null) {
+  // An own target is NOT mirrored: `nutrition_targets.calories` feeds the saved macro split, and an own
+  // target is the day's budget, which the macros are fitted to instead.
+  if (body.calorieGoal != null && body.calorieGoalType !== OWN_TARGET_GOAL_TYPE) {
     const goalType = body.calorieGoalType ?? (await repo.getUserGoals(userId)).calorieGoalType
     await repo.upsertNutritionTargets(userId, { calories: goalToDailyKcal(body.calorieGoal, goalType) })
   }

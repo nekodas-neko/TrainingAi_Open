@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import { settleRouteBoundary } from './fixtures'
 
 /**
- * Two things the nutrition surface knew and did not say (LA-102 + TN-28).
+ * What the nutrition surface knew and did not say (LA-102).
  *
  * **LA-102** — the owner, on the resting-rate-anchored budget: *"1350 doesnt count some basic
  * metabolic needs".* He is right. BF-152 deliberately did not model the thermic effect of food or
@@ -10,12 +10,7 @@ import { settleRouteBoundary } from './fixtures'
  * and treating intake-linked digestion as an earned credit makes the budget grow as you eat. The
  * decision stands; what was missing is saying so.
  *
- * **TN-28** — `TdeeAdaptationCard` writes the user's calorie goal in one tap and was the only
- * surface printing the maintenance figure without its confidence. Its two siblings both print
- * *"(low confidence, 10 of 14 days logged)"* from the same payload fields.
- *
- * Batched because one verification pass covers both: they are the same screen, and the fixture that
- * exercises the nudge card also renders the ⓘ panel.
+ * (TN-28's check on the Calorie Nudge card was retired with the card, issue 2622.)
  *
  * The payload is stubbed rather than seeded. A calibrated maintenance that drifts from the stored
  * target is what makes the nudge card render at all, and building that from real logs means a
@@ -96,18 +91,4 @@ test('the ⓘ panel says what the base leaves out (LA-102)', async ({ page }) =>
   await expect(panel, 'the ⓘ panel never named the omissions').toBeVisible({ timeout: 20_000 })
   await expect(panel).toContainText(/digest/)
   await expect(panel).toContainText(/standing, fidgeting, housework/)
-})
-
-test('the card that writes your goal names its confidence (TN-28)', async ({ page }) => {
-  await page.goto('/nutrition')
-  await settleRouteBoundary(page)
-
-  // The nudge card, identified by the action it offers — writing the goal is what makes the missing
-  // qualifier matter.
-  const apply = page.getByRole('button', { name: 'Use 2,045' })
-  await expect(apply, 'the nudge card never rendered').toBeVisible({ timeout: 60_000 })
-
-  // Same wording as the two siblings, in the same sentence as the figure.
-  await expect(page.getByText(/measured maintenance is 2,045 kcal \(low confidence, 10 of 14 days logged\)/))
-    .toBeVisible({ timeout: 20_000 })
 })

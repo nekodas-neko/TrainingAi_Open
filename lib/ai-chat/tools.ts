@@ -192,8 +192,9 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
         'you give, because weight moved by a dose change is not metabolism. ' +
         '`dailyBudgetKcal` is the calorie budget for the day — resting rate, minus the deficit for the goal, plus ' +
         'the 20% for daily living less the first 3,000 steps, plus measured movement (`budgetBreakdown`) — and is the ONE budget every ' +
-        'screen shows; `kcalLeftToHitTarget` is measured against it. `storedGoal` is the calorie goal the ' +
-        'user once typed and the maintenance-based recommendation for it: never present either as the budget for today. ' +
+        'screen shows; `kcalLeftToHitTarget` is measured against it. `ownTargetKcal` is set when the user chose their ' +
+        'own daily target: it then IS `dailyBudgetKcal` (say "your own target"), and `workedOutBudgetKcal` is what the ' +
+        'budget would be without it. `recommendedMaintenanceKcal` is the maintenance-based suggestion: never present it as the budget for today. ' +
         'Quote these numbers; never recompute them.',
       inputSchema: z.object({
         date: z.string().nullable().describe('YYYY-MM-DD; null = today'),
@@ -218,7 +219,9 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
           dailyBudgetKcal: r.balance.budgetKcal ?? null,
           budgetBreakdown: (() => {
             const p = budgetProvenance(r.balance)
-            return p.chain == null ? null : {
+            // With an own target the chain is what the budget WOULD be, not what the number is made
+            // of, so it is not offered as a breakdown of it.
+            return p.chain == null || p.ownTarget ? null : {
               restingRateKcal: p.chain.rmr, goalDeficitKcal: p.chain.deficit,
               // The 20% less the first 3,000 steps' energy, which movement already counts.
               dailyLivingKcal: p.chain.dailyLiving, movementKcal: p.chain.movement,
@@ -231,7 +234,9 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
           standing: r.balance.zoneLabel,
           projectedWeeklyKg: r.balance.projectedWeeklyKg,
           maintenance: r.maintenance,
-          storedGoal: r.target,
+          ownTargetKcal: r.balance.ownTargetKcal ?? null,
+          workedOutBudgetKcal: budgetProvenance(r.balance).workedOutTotal,
+          recommendedMaintenanceKcal: r.target.recommendedKcal,
         }
       },
     }),

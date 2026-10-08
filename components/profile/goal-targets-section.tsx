@@ -8,6 +8,7 @@ import { GoalProgressBar } from '@/components/health/goal-progress-bar'
 import type { BaselineResult } from '@trainingai/shared/nutrition/goal-recommendation'
 import { RecommendedValue } from './recommended-value'
 import { MacroTargetsPane } from './macro-targets-pane'
+import { CalorieBudgetSection } from './calorie-budget-section'
 
 const FITNESS_GOAL_LABELS: Record<FitnessGoal, { label: string; description: string }> = {
   lose_weight:  { label: 'Lose Weight',                       description: 'Calorie deficit to reduce body fat' },
@@ -29,10 +30,9 @@ interface GoalTargetsSectionProps {
   sleepGoalStr: string
   onSleepGoalChange: (value: string) => void
 
-  calorieGoalStr: string
-  onCalorieGoalChange: (value: string) => void
-  calorieGoalType: 'daily' | 'weekly'
-  onCalorieGoalTypeChange: (type: 'daily' | 'weekly') => void
+  ownCalorieTargetKcal: number | null
+  onSetOwnCalorieTarget: (kcal: number) => Promise<string | null>
+  onClearOwnCalorieTarget: () => Promise<string | null>
 
   waterGoalStr: string
   onWaterGoalChange: (value: string) => void
@@ -50,7 +50,7 @@ export function GoalTargetsSection({
   fitnessGoal, onFitnessGoalChange, saving,
   stepsGoalStr, onStepsGoalChange, stepsGoalType, onStepsGoalTypeChange,
   sleepGoalStr, onSleepGoalChange,
-  calorieGoalStr, onCalorieGoalChange, calorieGoalType, onCalorieGoalTypeChange,
+  ownCalorieTargetKcal, onSetOwnCalorieTarget, onClearOwnCalorieTarget,
   waterGoalStr, onWaterGoalChange, waterGoalType, onWaterGoalTypeChange,
   todayMeta, weekToDate, macroRefreshKey, baseline,
 }: GoalTargetsSectionProps) {
@@ -209,44 +209,12 @@ export function GoalTargetsSection({
         })()}
       </div>
 
-      {/* Calorie Goal */}
-      <div className="px-4 py-3 space-y-2">
-        <Label htmlFor="goals-calorieGoal" className="text-xs text-muted-foreground">Calorie Goal</Label>
-        <Input
-          type="number" enterKeyHint="done"
-          inputMode="decimal"
-          id="goals-calorieGoal"
-          value={calorieGoalStr}
-          onChange={e => onCalorieGoalChange(e.target.value)}
-          placeholder="kcal per day"
-          className="border-border bg-muted/60 text-sm font-medium"
-        />
-        <div className="flex items-center gap-0.5 rounded-xl bg-muted p-0.5 text-xs font-semibold border border-border self-start">
-          <button type="button" onClick={() => onCalorieGoalTypeChange('daily')}
-            className={`rounded-lg px-4 py-1.5 transition ${calorieGoalType === 'daily' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}>Daily</button>
-          <button type="button" onClick={() => onCalorieGoalTypeChange('weekly')}
-            className={`rounded-lg px-4 py-1.5 transition ${calorieGoalType === 'weekly' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}>Weekly</button>
-        </div>
-        <RecommendedValue
-          recommended={baseline?.calories ?? null}
-          current={parseInt(calorieGoalStr) || null}
-          unit="kcal"
-          why="your resting rate on a rest day, adjusted for your fitness goal"
-          onApply={v => onCalorieGoalChange(String(v))}
-        />
-        {(() => {
-          const weekly = calorieGoalType === 'weekly'
-          const goalNum = parseInt(calorieGoalStr) || null
-          return (
-            <GoalProgressBar
-              value={weekly ? weekToDate?.calories ?? null : todayMeta?.calories ?? null}
-              goal={weekly && goalNum != null ? goalNum * 7 : goalNum}
-              weekly={weekly}
-              color="#f97316"
-            />
-          )
-        })()}
-      </div>
+      {/* Calorie budget (issue 2622): read-only, from the one budget function, with an own-target override. */}
+      <CalorieBudgetSection
+        ownTargetKcal={ownCalorieTargetKcal}
+        onSetOwnTarget={onSetOwnCalorieTarget}
+        onClearOwnTarget={onClearOwnCalorieTarget}
+      />
 
       {/* Macro Targets — collapsible, auto-filled by AI recommendations */}
       <MacroTargetsPane refreshKey={macroRefreshKey} baseline={baseline} />
