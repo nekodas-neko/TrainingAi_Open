@@ -25,6 +25,7 @@
 const fs = require('fs');
 const path = require('path');
 const { stripComments } = require('./lib/strip-comments');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 const { readFilesUtf8, runMain } = require('./lib/read-sources');
 
 const EXEMPT_PREFIXES = [
@@ -89,7 +90,7 @@ function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (['node_modules', '__tests__', '.next', 'dist'].includes(entry.name)) continue;
+      if (['node_modules', '__tests__', '.next', 'dist'].includes(entry.name) || isSkippedFixtureDir(entry.name)) continue;
       walk(full);
       continue;
     }

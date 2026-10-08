@@ -24,6 +24,7 @@ const fs = require('fs');
 const path = require('path');
 const { readFilesUtf8, runMain } = require('./lib/read-sources');
 const { stripComments } = require('./lib/strip-comments');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
 const DIRS = ['app', 'lib', 'packages'];
 const SKIP_DIRS = new Set(['node_modules', '.next', '__tests__']);
@@ -40,7 +41,7 @@ const OK_MARKER = /llm-json-ok:\s*\S/;
 function walk(dir, out) {
   if (!fs.existsSync(dir)) return out;
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (SKIP_DIRS.has(e.name)) continue;
+    if (SKIP_DIRS.has(e.name) || isSkippedFixtureDir(e.name)) continue;
     const p = path.join(dir, e.name);
     if (e.isDirectory()) walk(p, out);
     else if (/\.tsx?$/.test(e.name) && !/\.(test|spec)\.tsx?$/.test(e.name)) out.push(p);

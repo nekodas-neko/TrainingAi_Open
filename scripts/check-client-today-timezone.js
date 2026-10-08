@@ -44,6 +44,7 @@ const path = require('path');
 const { resolveBaseRef, countsAtBase, verdict } = require('./lib/base-ref');
 const { readFilesUtf8, runMain } = require('./lib/read-sources');
 const { stripComments } = require('./lib/strip-comments');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 const { callsUnderArity } = require('./lib/call-arity');
 
 const root = path.join(__dirname, '..');
@@ -75,7 +76,7 @@ const BASELINE = {};
 function walk(dir, out) {
   if (!fs.existsSync(dir)) return out;
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (e.name === 'node_modules' || e.name === '.next' || e.name === '__tests__') continue;
+    if (e.name === 'node_modules' || e.name === '.next' || e.name === '__tests__' || isSkippedFixtureDir(e.name)) continue;
     const p = path.join(dir, e.name);
     if (e.isDirectory()) walk(p, out);
     else if (/\.tsx?$/.test(e.name)) out.push(p);

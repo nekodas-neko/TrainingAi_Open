@@ -51,10 +51,20 @@ const CASES: Array<{ check: string; file: string; fixture: string }> = [
   { check: 'check-llm-json-parse', file: apiRoute('app/api/daily-digest'), fixture: 'const o = JSON.parse(text)' },
 ]
 
-/** The check's whole output, exit code included — a check may signal by either. */
+/**
+ * The check's whole output, exit code included — a check may signal by either.
+ *
+ * #2578. The checks skip `__check_fixture__/` unless SCAN_CHECK_FIXTURES=1, so a real check run by
+ * another suite in parallel (`strict-schema-inert`) never sees this file's copy. It is set on these
+ * child processes only, never on the test process itself.
+ */
 const run = (check: string): string => {
   try {
-    return execFileSync('node', [path.join(root, 'scripts', `${check}.js`)], { cwd: root, encoding: 'utf8' })
+    return execFileSync('node', [path.join(root, 'scripts', `${check}.js`)], {
+      cwd: root,
+      encoding: 'utf8',
+      env: { ...process.env, SCAN_CHECK_FIXTURES: '1' },
+    })
   } catch (err) {
     const e = err as { stdout?: string; stderr?: string; status?: number }
     return `exit=${e.status}\n${e.stdout ?? ''}${e.stderr ?? ''}`
