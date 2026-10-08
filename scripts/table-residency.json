@@ -39,6 +39,7 @@
     "food_logs": {"class":"DEVICE-FIRST","note":"local write + outbox push + delta pull"},
     "friendships": {"class":"SERVER-ONLY","note":"social; writer: social.ts"},
     "goal_recommendations": {"class":"SERVER-ONLY","note":"derived / AI; writer: adapter.ts"},
+    "health_connect_history_import": {"class":"SERVER-ONLY","note":"explicit Import more history progress (oldest imported day); writer: slices/health-connect-history-import.ts"},
     "health_connect_intervals": {"class":"SERVER-ONLY","note":"sensor ingest -> server (Health Connect, which is itself the device copy); writer: slices/health-connect-intervals.ts"},
     "injuries": {"class":"DEVICE-FIRST","note":"local write + outbox push + delta pull"},
     "invited_emails": {"class":"SERVER-ONLY","note":"auth / access list; writer: adapter.ts"},

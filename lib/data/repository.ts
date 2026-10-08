@@ -1464,6 +1464,12 @@ export interface WorkoutRepository {
   upsertHealthConnectIntervals(userId: string, rows: readonly HealthConnectIntervalRow[]): Promise<number>
   /** #2462. One kind's rows starting in [from, to), oldest first, overlap NOT resolved. */
   getHealthConnectIntervals(userId: string, kind: HealthConnectIntervalKind, from: Date, to: Date): Promise<HealthConnectIntervalRow[]>
+  /** issue 2169. The oldest local calendar day the user's "Import more history" run has reached
+   *  (YYYY-MM-DD), or null when they have never run it. */
+  getHealthConnectHistoryOldest(userId: string): Promise<string | null>
+  /** issue 2169. Record that history is imported back to `date`. Only ever moves the stored day
+   *  OLDER: a repeated or late call with a newer day leaves it alone. Returns the day now stored. */
+  advanceHealthConnectHistoryOldest(userId: string, date: string): Promise<string>
   getHrForWindow(userId: string, from: Date, to: Date): Promise<{ timestamp: Date; bpm: number; source: string | null }[]>
   /** The corroboration-gated observed HR profile for a window, aggregated in the database — the
    *  same answer as `computeObservedHr` over `getHrForWindow`'s rows, without materialising them

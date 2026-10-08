@@ -2219,6 +2219,15 @@ export const healthConnectIntervals = pgTable('health_connect_intervals', {
   index('health_connect_intervals_range_idx').on(t.userId, t.kind, t.startAt),
 ])
 
+/** issue 2169: how far back the user's explicit "Import more history" run has reached - the oldest
+ *  local calendar day imported, one row per account. Only ever moves older (`LEAST` in the writer).
+ *  Server-only: Health Connect is the device-side copy. */
+export const healthConnectHistoryImport = pgTable('health_connect_history_import', {
+  userId:     uuid('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  oldestDate: date('oldest_date', { mode: 'string' }).notNull(),
+  updatedAt:  timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
 export const appleHealthSamples = pgTable('apple_health_samples', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   sampleId: uuid('sample_id').notNull(),

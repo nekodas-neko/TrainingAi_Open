@@ -650,6 +650,14 @@ SELECT
 FROM public.goal_recommendations t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
+CREATE VIEW claude_ro.health_connect_history_import AS
+SELECT
+  t.user_id,
+  t.oldest_date,
+  t.updated_at
+FROM public.health_connect_history_import t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.health_connect_intervals AS
 SELECT
   t.user_id,
