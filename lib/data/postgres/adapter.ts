@@ -171,6 +171,8 @@ interface LbsToKgLogRow {
   estimated1rm: number | null
   target80: number | null
   volume: number | null
+  /** Set once the lbs-to-kg fix has converted this log (issue 2383). */
+  unitFixAppliedAt: Date | null
 }
 
 interface LbsToKgSetRow {
@@ -213,6 +215,8 @@ interface LbsToKgFixExercise {
 interface LbsToKgFix {
   logs: LbsToKgFixLog[]
   exercises: LbsToKgFixExercise[]
+  /** In-range logs left alone because an earlier Apply already converted them (issue 2383). */
+  alreadyConverted: number
 }
 
 // Pure computation shared by preview and apply — converts each affected set's
@@ -228,8 +232,10 @@ function computeLbsToKgFix(
   currentPRs: Map<string, number>,
   cutoff: Date,
 ): LbsToKgFix {
-  const inRangeLogs = allLogs.filter(l => l.loggedAt < cutoff)
-  const outOfRangeLogs = allLogs.filter(l => l.loggedAt >= cutoff)
+  // Issue 2383: a log the fix already converted is never converted again. Its stored figures are the
+  // corrected ones, so it still counts toward the personal record, as an untouched log does.
+  const inRangeLogs = allLogs.filter(l => l.loggedAt < cutoff && !l.unitFixAppliedAt)
+  const outOfRangeLogs = allLogs.filter(l => l.loggedAt >= cutoff || l.unitFixAppliedAt)
 
   const setsByLog = new Map<string, LbsToKgSetRow[]>()
   for (const set of allSets) {
@@ -300,11 +306,13 @@ function computeLbsToKgFix(
     }
   })
 
-  return { logs, exercises }
+  const alreadyConverted = allLogs.filter(l => l.loggedAt < cutoff && l.unitFixAppliedAt).length
+  return { logs, exercises, alreadyConverted }
 }
 
 function toUnitFixResult(fix: LbsToKgFix): UnitFixResult {
   return {
+    alreadyConverted: fix.alreadyConverted,
     logs: fix.logs.map(log => ({
       exerciseLogId: log.exerciseLogId,
       exerciseName: log.exerciseName,
@@ -4171,6 +4179,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       estimated1rm: s.exerciseLogs.estimated1rm,
       target80: s.exerciseLogs.target80,
       volume: s.exerciseLogs.volume,
+      unitFixAppliedAt: s.exerciseLogs.unitFixAppliedAt,
     })
       .from(s.exerciseLogs)
       .innerJoin(s.workoutSessions, eq(s.workoutSessions.id, s.exerciseLogs.workoutSessionId))
@@ -4220,12 +4229,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         estimated1rm: s.exerciseLogs.estimated1rm,
         target80: s.exerciseLogs.target80,
         volume: s.exerciseLogs.volume,
+        unitFixAppliedAt: s.exerciseLogs.unitFixAppliedAt,
       })
         .from(s.exerciseLogs)
         .innerJoin(s.workoutSessions, eq(s.workoutSessions.id, s.exerciseLogs.workoutSessionId))
         .where(and(
           eq(s.workoutSessions.userId, userId),
           inArray(s.exerciseLogs.exerciseName, exerciseNames),
+          // Same rows the preview showed the owner (it skips tombstoned logs and sessions).
+          isNull(s.exerciseLogs.deletedAt),
+          isNull(s.workoutSessions.deletedAt),
         ))
         .orderBy(asc(s.exerciseLogs.loggedAt))
 
@@ -4252,18 +4265,27 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
       const fix = computeLbsToKgFix(exerciseNames, allLogs, allSets, new Map(prRows.map(r => [r.exerciseName, r.estimated1rm])), cutoff)
 
+      // Issue 2383: claim each log first, in the statement that rewrites it, and only while its
+      // marker is still unset. A concurrent Apply that got there first leaves zero rows here, so this
+      // one skips that log's sets instead of converting them a second time.
+      const converted: LbsToKgFixLog[] = []
       for (const log of fix.logs) {
+        const claimed = await tx.update(s.exerciseLogs)
+          .set({ estimated1rm: log.newEstimated1rm, target80: log.newTarget80, volume: log.newVolume, unitFixAppliedAt: new Date() })
+          .where(and(eq(s.exerciseLogs.id, log.exerciseLogId), isNull(s.exerciseLogs.unitFixAppliedAt)))
+          .returning({ id: s.exerciseLogs.id })
+        if (claimed.length === 0) continue
         for (const set of log.sets) {
           await tx.update(s.setLogs)
             .set({ weightKg: set.newWeightKg, intensityPct: set.newIntensityPct })
             .where(eq(s.setLogs.id, set.id))
         }
-        await tx.update(s.exerciseLogs)
-          .set({ estimated1rm: log.newEstimated1rm, target80: log.newTarget80, volume: log.newVolume })
-          .where(eq(s.exerciseLogs.id, log.exerciseLogId))
+        converted.push(log)
       }
+      fix.logs = converted
 
-      for (const ex of fix.exercises) {
+      // Nothing converted (a repeat Apply) means nothing moved, so the personal record stays as it is.
+      for (const ex of converted.length === 0 ? [] : fix.exercises) {
         if (ex.newPersonalRecord != null && ex.newPersonalRecord > 0) {
           await tx.insert(s.personalRecords)
             .values({

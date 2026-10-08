@@ -436,6 +436,8 @@ export interface UnitFixExerciseSummary {
 export interface UnitFixResult {
   logs: UnitFixLogChange[]
   exercises: UnitFixExerciseSummary[]
+  /** Logs in range that an earlier Apply already converted, left alone (issue 2383). */
+  alreadyConverted?: number
 }
 
 // Daily Body Battery snapshot — see migration 100 + docs/body-battery-tuning.md.

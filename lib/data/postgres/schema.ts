@@ -242,6 +242,8 @@ export const exerciseLogs = pgTable('exercise_logs', {
   exerciseDeloaded:     boolean('exercise_deloaded').notNull().default(false),
   updatedAt:            timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt:            timestamp('deleted_at', { withTimezone: true }),
+  // Issue 2383: set once by the admin lbs-to-kg fix; the fix skips a log that carries it.
+  unitFixAppliedAt:     timestamp('unit_fix_applied_at', { withTimezone: true }),
 })
 
 export const setLogs = pgTable('set_logs', {
