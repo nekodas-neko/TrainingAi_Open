@@ -31,7 +31,7 @@ const CadencePointSchema = z.object({
 const PacerTickCount = z.number().int().nonnegative().max(MAX_ACTIVITY_DURATION_MIN * 60)
 const PacerTicksSchema = z.object({
   green: PacerTickCount, amber: PacerTickCount, red: PacerTickCount, stopped: PacerTickCount,
-})
+}).strict()
 const WalkSegmentStatSchema = z.object({
   index: z.number().int().nonnegative().max(1000),
   setNumber: z.number().int().nonnegative().max(1000),

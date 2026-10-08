@@ -9,7 +9,7 @@ import { startPacerSampler, type PacerShown } from '@/lib/walk/pacer-sampler'
 import { useGuidedWalkStore } from '@/lib/stores/guided-walk-store'
 import { ActivityLogBody } from '@trainingai/shared/validation/activity-log'
 
-const config: WalkConfig = { sets: 1, fastSec: 180, slowSec: 180, warmupSec: 60, cooldownSec: 0 }
+const config: WalkConfig = { sets: 1, fastSec: 180, slowSec: 180, warmupSec: 60, cooldownSec: 0, treadmill: false }
 const plan = buildIntervalPlan(config)
 
 function begin() {
