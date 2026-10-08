@@ -33,6 +33,7 @@ import { resilienceLevelToBand, observeResilienceCoverage } from '@/lib/health/s
 import { computeIllnessRadar, illnessAdvisory, illnessZScores, type IllnessFlag, type IllnessBiomarker, type IllnessBiomarkerKey } from '@trainingai/shared/health/illness-radar'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { scoreAvailability, metricAvailability, trailingBaselineZ, type ReadinessInputKey, type ScoreAvailability, type MetricAvailability } from '@/lib/health/score-availability'
+import { connectedSources, CONNECTED_SOURCE_WINDOW_DAYS, type ConnectedSources } from '@trainingai/shared/health/connected-sources'
 import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperature-baseline-health'
 
 /**
@@ -168,6 +169,15 @@ export interface ReadinessScoreResponse {
    * "no metrics".
    */
   availability?: MetricAvailability[]
+  /**
+   * Issue 2613. Which device sources the user has connected: ring, strap, Health Connect. Definitions
+   * in `@trainingai/shared/health/connected-sources` (strap means strap-sourced heart rate seen in
+   * the last `CONNECTED_SOURCE_WINDOW_DAYS` days).
+   *
+   * **Optional, and absent means unknown.** A payload cached on the device before this field existed
+   * lacks it, and so does one built while the source lookup failed. Never read absent as `false`.
+   */
+  connectedSources?: ConnectedSources
   // Oura fields — null when no Oura data available
   ouraScore: number | null
   // Temperature deviation vs personal baseline (°C). BLE-derived (oura_daily_summary.temp_dev_c,
@@ -357,7 +367,16 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   const from28dIso  = toAestDay(from28dDate, tz)
   const from7dIso   = toAestDay(new Date(todayMid.getTime() - 7 * 86_400_000), tz)
 
-  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents] = await Promise.all([
+  // Issue 2613: a failed lookup leaves the field out (unknown), never false.
+  const connectedSourcesP = (async () => {
+    const [ringSamples, recent] = await Promise.all([
+      repo.hasOuraBleSamples(userId),
+      repo.getRecentSourceFacts(userId, new Date(todayMid.getTime() - CONNECTED_SOURCE_WINDOW_DAYS * 86_400_000)),
+    ])
+    return connectedSources({ ringSamples, ...recent })
+  })().catch(() => undefined)
+
+  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary] = await Promise.all([
     repo.listBodyMetrics(userId, from28dIso, todayIso),
     repo.listSleepSessions(userId, from28dIso, todayIso),
     repo.getWorkoutSessionsFrom(userId, from28dDate),
@@ -372,6 +391,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     repo.getUserGoals(userId).catch(() => null),
     // TN-46: context for a flagged day, never an input to the score. A failure costs the context only.
     (async () => repo.listDoseEvents(userId, shiftDateStr(todayIso, -DOSE_EFFECT_LOOKBACK_DAYS), todayIso))().catch(() => []),
+    connectedSourcesP,
   ])
 
   const derivedToday = derivedTodayRows.find(r => r.day === todayIso) ?? null
@@ -944,6 +964,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
       metricAvailability('daytimeStress', derivedToday?.stressHighMinutes ?? null),
       metricAvailability('resilience', latestResilience?.resilienceLevel ?? null),
     ],
+    ...(connectedSourcesSummary ? { connectedSources: connectedSourcesSummary } : {}),
     ouraScore:               ouraToday?.readinessScore             ?? null,
     temperatureDeviation,
     temperatureDeviationSource,

@@ -7891,6 +7891,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getLatestOuraCloudVitals(userId: string) { return oura.getLatestOuraCloudVitals(this.db, userId) }
   async getLatestOuraBleMeasuredAt(userId: string) { return oura.getLatestOuraBleMeasuredAt(this.db, userId) }
   async hasOuraBleSamples(userId: string) { return oura.hasOuraBleSamples(this.db, userId) }
+  async getRecentSourceFacts(userId: string, since: Date) { return oura.getRecentSourceFacts(this.db, userId, since) }
   async declareOuraRekey(userId: string, note: string | null) { return oura.declareOuraRekey(this.db, userId, note) }
   async getPendingRekeyDeclaration(userId: string) { return oura.getPendingRekeyDeclaration(this.db, userId) }
   async consumeRekeyDeclaration(id: number, epoch: number) { return oura.consumeRekeyDeclaration(this.db, id, epoch) }
