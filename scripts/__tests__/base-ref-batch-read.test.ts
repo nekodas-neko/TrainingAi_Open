@@ -76,7 +76,7 @@ beforeAll(() => {
 
   // The copy, and the scripts the ratchet case runs. Untracked, so they are not part of the base.
   mkdirSync(path.join(repo, 'scripts', 'lib'), { recursive: true })
-  for (const f of ['lib/base-ref.js', 'lib/strip-comments.js', 'check-hex-literals.js']) {
+  for (const f of ['lib/base-ref.js', 'lib/strip-comments.js', 'lib/hex-literals.js', 'lib/fixture-dirs.js', 'check-hex-literals.js']) {
     copyFileSync(path.join(scripts, f), path.join(repo, 'scripts', f))
   }
 

@@ -84,7 +84,7 @@ beforeAll(() => {
 
   // The library and the ratchet the reproduction runs. Untracked, so they are not in any tree.
   mkdirSync(path.join(repo, 'scripts', 'lib'), { recursive: true })
-  for (const f of ['lib/base-ref.js', 'lib/strip-comments.js', 'check-hex-literals.js']) {
+  for (const f of ['lib/base-ref.js', 'lib/strip-comments.js', 'lib/hex-literals.js', 'lib/fixture-dirs.js', 'check-hex-literals.js']) {
     copyFileSync(path.join(scripts, f), path.join(repo, 'scripts', f))
   }
 
@@ -103,7 +103,9 @@ beforeAll(() => {
   // still find the fixture's repository.
   mkdirSync(path.join(repo, 'old', 'scripts', 'lib'), { recursive: true })
   writeFileSync(path.join(repo, 'old', 'scripts', 'lib', 'base-ref.js'), old)
-  copyFileSync(path.join(scripts, 'lib', 'strip-comments.js'), path.join(repo, 'old', 'scripts', 'lib', 'strip-comments.js'))
+  for (const f of ['strip-comments.js', 'hex-literals.js', 'fixture-dirs.js']) {
+    copyFileSync(path.join(scripts, 'lib', f), path.join(repo, 'old', 'scripts', 'lib', f))
+  }
   // The ratchet itself, unchanged except that it walks the fixture's `components/`, not `old/`'s.
   const hex = readFileSync(path.join(scripts, 'check-hex-literals.js'), 'utf8')
   const HEX_ROOT = "const root = path.join(__dirname, '..');"
