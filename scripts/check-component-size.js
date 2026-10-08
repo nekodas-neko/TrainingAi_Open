@@ -8,6 +8,7 @@
 const fs = require('fs');
 const path = require('path');
 const { resolveBaseRef, countsAtBase, verdict } = require('./lib/base-ref');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
 // Match `wc -l` (newline count), so a baseline can be read straight off the shell. The one counter for
 // both the working tree and the base: two formulas is how the base came to read a line high (#2557).
@@ -55,6 +56,7 @@ const judged = [];
 
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory() && isSkippedFixtureDir(entry.name)) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       if (entry.name === 'node_modules' || entry.name === '__tests__' || entry.name === '.next') continue;

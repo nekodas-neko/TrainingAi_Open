@@ -24,6 +24,7 @@
 const fs = require('fs');
 const path = require('path');
 const { relPosix } = require('./lib/repo-path');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
 const root = path.join(__dirname, '..');
 const REGISTRY = 'lib/sign-out-storage.ts';
@@ -67,6 +68,7 @@ function classified(key) {
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory() && isSkippedFixtureDir(entry.name)) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       if (['node_modules', '__tests__', '.next', 'dist', 'migrations'].includes(entry.name)) continue;

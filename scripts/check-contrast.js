@@ -14,6 +14,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
 function oklchToLinearSrgb(L, C, Hdeg) {
   const h = (Hdeg * Math.PI) / 180;
@@ -228,6 +229,7 @@ function opacityFailures() {
   const files = [];
   const walk = d => {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      if (e.isDirectory() && isSkippedFixtureDir(e.name)) continue;
       const full = path.join(d, e.name);
       if (e.isDirectory()) { if (e.name !== 'node_modules') walk(full); }
       else if (e.name.endsWith('.tsx')) files.push(full);

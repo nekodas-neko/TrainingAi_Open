@@ -12,6 +12,7 @@
 // one. This checks the storing, not the computing.
 const fs = require('fs')
 const path = require('path')
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs')
 
 const ROOT = path.resolve(__dirname, '..')
 const SCALARS = ['daytimeStressScaled', 'stressHighMinutes', 'recoveryHighMinutes']
@@ -24,6 +25,7 @@ const WRITE_CALL = /\b(upsertOuraDailyDerived|upsertDailyDerived)\s*\(/g
 
 function walk(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (e.isDirectory() && isSkippedFixtureDir(e.name)) continue
     if (e.name === 'node_modules' || e.name === '__tests__' || e.name.startsWith('.')) continue
     const full = path.join(dir, e.name)
     if (e.isDirectory()) walk(full, out)

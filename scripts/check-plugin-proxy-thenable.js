@@ -28,6 +28,7 @@ const { readFileSync, readdirSync } = require('fs')
 const path = require('path')
 const { findProxyReturns } = require('./lib/plugin-proxy-scan.js')
 const { toPosix } = require('./lib/repo-path')
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs')
 
 // DV-1: this was a `grep -rl … | grep -v …` shell pipeline, which **cannot run on Windows at all**
 // — under `cmd.exe` it dies with "The system cannot find the path specified." The Device
@@ -45,6 +46,7 @@ function collect(dir, out) {
     return out // a root that does not exist is not a failure — `grep` treated it the same way
   }
   for (const e of entries) {
+    if (e.isDirectory() && isSkippedFixtureDir(e.name)) continue
     const full = path.join(dir, e.name)
     if (e.isDirectory()) {
       if (e.name === 'node_modules' || e.name === '__tests__') continue

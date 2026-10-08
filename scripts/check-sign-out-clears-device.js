@@ -20,6 +20,7 @@
 const fs = require('fs');
 const path = require('path');
 const { relPosix } = require('./lib/repo-path');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
 const root = path.join(__dirname, '..');
 const OWNER = 'lib/sign-out.ts';          // the one file allowed to reach the raw server action
@@ -27,6 +28,7 @@ const ROOTS = ['app', 'components', 'lib'];
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory() && isSkippedFixtureDir(entry.name)) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       if (['node_modules', '__tests__', '.next', 'dist'].includes(entry.name)) continue;

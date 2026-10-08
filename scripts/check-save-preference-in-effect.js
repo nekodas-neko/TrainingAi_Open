@@ -27,6 +27,7 @@
 const fs = require('fs')
 const path = require('path')
 const { findSavePreferenceInEffects } = require('./lib/save-preference-in-effect.js')
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs')
 
 const root = path.join(__dirname, '..')
 const DIRS = ['app', 'components', 'lib']
@@ -55,6 +56,7 @@ const EXEMPT = new Map([
 
 function walk(dir, out) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (e.isDirectory() && isSkippedFixtureDir(e.name)) continue
     if (['node_modules', '.next', '__tests__'].includes(e.name)) continue
     const p = path.join(dir, e.name)
     if (e.isDirectory()) walk(p, out)

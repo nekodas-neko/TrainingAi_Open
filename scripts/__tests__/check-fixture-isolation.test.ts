@@ -12,7 +12,7 @@
  */
 import { describe, it, expect } from 'vitest'
 import { execFileSync } from 'node:child_process'
-import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
+import { readFileSync, readdirSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
 
 const root = path.join(__dirname, '..', '..')
@@ -74,6 +74,36 @@ describe('a fixture copy is invisible to a real check run (#2578)', () => {
     // ...and none re-implements it.
     const copies = CHECKS.filter((c) => readFileSync(path.join(root, 'scripts', `${c}.js`), 'utf8').includes(FIXTURE_DIR))
     expect(copies).toEqual([])
+  })
+
+  it('check-route-test-coverage: a parked copy of a route is not counted as an untested route (issue 2697)', () => {
+    withFixture('app/api/achievements/route.ts', '// copy', () => {
+      expect(exitOf('check-route-test-coverage', {})).toBe(0)
+      expect(exitOf('check-route-test-coverage', { SCAN_CHECK_FIXTURES: '1' })).not.toBe(0)
+    })
+  }, 60_000)
+
+  // Issue 2697: the list above is the twelve checks comment-blindness exercises. This test finds the
+  // walkers itself, so a check added later cannot miss the skip. A walker is any check-*.js that reads a
+  // directory with `withFileTypes` (it needs the entry type to recurse); a flat `readdirSync(dir)` over
+  // one fixed folder cannot reach a nested fixture directory.
+  it('every check-*.js that walks the tree skips fixture directories through the shared helper', () => {
+    const dir = path.join(root, 'scripts')
+    const read = (f: string) => readFileSync(path.join(dir, f), 'utf8')
+    const checks = readdirSync(dir).filter((f) => /^check-.*\.js$/.test(f))
+    const walkers = checks.filter((f) => /withFileTypes/.test(read(f)))
+    // A discovery that finds nothing would pass vacuously.
+    expect(walkers.length).toBeGreaterThan(30)
+    const offenders = walkers.filter((f) => !read(f).includes("require('./lib/fixture-dirs')"))
+    expect(offenders).toEqual([])
+    // Every directory read is followed by a call: at least as many calls as reads.
+    const short = walkers.filter((f) => {
+      const reads = (read(f).match(/withFileTypes/g) ?? []).length
+      return (read(f).match(/isSkippedFixtureDir\(/g) ?? []).length < reads
+    })
+    expect(short).toEqual([])
+    // ...and none re-implements the skip.
+    expect(walkers.filter((f) => read(f).includes(FIXTURE_DIR))).toEqual([])
   })
 
   it('comment-blindness sets the variable for its child processes, and only there', () => {

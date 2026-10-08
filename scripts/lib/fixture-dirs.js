@@ -12,7 +12,9 @@
 // Only check-comment-blindness sets it, and only on the child processes it spawns; CI and
 // `pnpm check:rules` never do, so a stray fixture directory cannot fail them.
 //
-// One helper, used by every check comment-blindness exercises: the skip is not copied per check.
+// One helper, used by every tree-walking check (issue 2697 extended it from the twelve comment-blindness
+// exercises to all of them): the skip is not copied per check. `check-fixture-isolation.test.ts` finds
+// the walkers itself (any check-*.js using `withFileTypes`), so a new check cannot miss it.
 
 const FIXTURE_DIR = '__check_fixture__';
 

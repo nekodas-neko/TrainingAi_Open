@@ -24,6 +24,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
 const root = path.join(__dirname, '..');
 const ROOTS = ['app', 'lib', 'packages', 'components'];
@@ -35,6 +36,7 @@ const TOUCHES_DB = /\b(getPool|getRepositoryAsync|getRepository)\s*\(|pool\.quer
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory() && isSkippedFixtureDir(entry.name)) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       if (['node_modules', '.next', 'dist'].includes(entry.name)) continue;

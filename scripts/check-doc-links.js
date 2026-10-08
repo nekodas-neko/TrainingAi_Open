@@ -11,6 +11,7 @@
 // as is a bare '#anchor' fragment on its own (no target file to resolve).
 const fs = require('fs')
 const path = require('path')
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs')
 
 const ROOT = process.cwd()
 const ROOT_MD_FILES = ['README.md', 'CLAUDE.md', 'projectOverview.md']
@@ -19,6 +20,7 @@ const DOCS_DIR = 'docs'
 function listMarkdownFiles(dir) {
   const out = []
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory() && isSkippedFixtureDir(entry.name)) continue
     const full = path.join(dir, entry.name)
     if (entry.isDirectory()) out.push(...listMarkdownFiles(full))
     else if (entry.name.endsWith('.md')) out.push(full)
