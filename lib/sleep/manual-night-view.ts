@@ -1,3 +1,4 @@
+import { shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 import { getLocalStore } from '@/lib/local-store'
 import { pendingDeletedIds } from '@trainingai/shared/sync/pending-deletes'
 import { localSleepRowsAsNights } from '@/lib/sleep/merge-sessions'
@@ -85,4 +86,22 @@ export async function withPendingManualWrites<T extends NightRef>(
   } catch {
     return [...rows]
   }
+}
+
+/** How far back the screens that show recent nights look for this device's own typed nights. */
+const PENDING_WINDOW_DAYS = 30
+
+/**
+ * Issue 2667 — a `/api/sleep-sessions` reply as a screen should hold it: the reply with this
+ * device's pending manual-night writes applied (a removed night dropped, a typed one added). Not an
+ * array (an error body, null) comes back as an empty list, as the screens did before. On the web
+ * build there is no local store, so a reply passes through with its rows unchanged.
+ */
+export async function sleepReplyWithPending<T extends NightRef>(
+  reply: unknown,
+  userId: string | undefined,
+  tz: string,
+): Promise<T[]> {
+  const rows = Array.isArray(reply) ? (reply as T[]) : []
+  return withPendingManualWrites(rows, userId, shiftDateStr(todayInTz(tz), -PENDING_WINDOW_DAYS))
 }

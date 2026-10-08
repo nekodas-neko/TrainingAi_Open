@@ -14,6 +14,7 @@ import { todayInTz, shiftDateStr } from "@trainingai/shared/date-utils";
 import { weightTrendWindowStart } from "@trainingai/shared/health/long-term-goal-progress";
 import { getLocalStore } from "@/lib/local-store";
 import { localSleepRowsAsNights } from "@/lib/sleep/merge-sessions";
+import { sleepReplyWithPending } from "@/lib/sleep/manual-night-view";
 import { pushMutations, pullDelta } from "@/lib/local-store/sync-engine";
 import { PullToSync } from "@/components/pull-to-sync";
 import type { BodyMetaRow, WeekToDate, WeightTrendPoint } from "@/app/api/body-metadata/route";
@@ -336,7 +337,8 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
       ),
       cachedFetch<SleepRow[]>(
         'sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM,
-        (data) => setSleepRows(Array.isArray(data) ? data : []),
+        // Issue 2667: the reply lags this device's own manual-night writes until the outbox pushes.
+        (data) => { void sleepReplyWithPending<SleepRow>(data, userId, tz).then(setSleepRows); },
       ),
       cachedFetchToday<ReadinessScoreResponse>(
         'readiness-score', '/api/readiness-score', READINESS_SCORE_TTL,
