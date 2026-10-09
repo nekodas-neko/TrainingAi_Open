@@ -294,6 +294,28 @@ export function deloadOverrideOutcome(
   return reverts === 'all' ? 'all-in-deload-week' : 'partial-in-deload-week'
 }
 
+/**
+ * Issue 2750. Whether a Full override that has nothing to put back should rebuild today's
+ * prescription instead of leaving the deload weights on the bar.
+ *
+ * Full reverts each exercise to the `preDeload` numbers its prescription recorded. A prescription
+ * stored before those were written, or an exercise with no progression style, has none, and the
+ * card could only say so. Rebuilding writes them for everything that can have them (the time
+ * picker's rebuild already does, and was the one-tap workaround).
+ *
+ * True when a deloaded exercise could not revert, or when the override reverted nothing at all. Not
+ * in a deload week with nothing cut: there the outcome is `nothing-to-revert` because nothing was
+ * deloaded, and a rebuild would spend a model call to change nothing.
+ */
+export function fullOverrideNeedsRebuild(
+  outcome: DeloadOverrideOutcome,
+  blockedNames: readonly string[],
+  deloadWeek: boolean,
+): boolean {
+  if (blockedNames.length > 0) return true
+  return outcome === 'nothing-to-revert' && !deloadWeek
+}
+
 /** True when every set of this session is logged as a deload whatever Full does to the weights. */
 export function overrideLogsAsDeloadWeek(outcome: DeloadOverrideOutcome): boolean {
   return outcome === 'all-in-deload-week' || outcome === 'partial-in-deload-week'

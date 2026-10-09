@@ -69,7 +69,14 @@ export function useDeloadChoice(seedFromUrl: boolean, periodization?: SessionPer
    * is a deload and the user has chosen nothing. A revert keyed on `!deload` would paint full
    * weights for a frame and then snap back to deloaded ones.
    */
-  const overrideFull = isFullOverride(chosen, prescribedDeload, deload)
+  // Issue 2750. The toggle already reads a per-exercise safety deload (soreness, the illness radar)
+  // as "deload suggested" (BF-167), but the override looked only at the session-level flag, so over
+  // a normal plan with one sore-shoulder row Full was shown as an override and overrode nothing.
+  // Adoption above stays on the session flag: a per-exercise deload must not flip the whole
+  // session to Deload.
+  const exerciseDeloaded = !!periodization && periodization.prescriptionStatus !== 'consumed'
+    && !!periodization.prescription?.exercises.some(e => e.deloaded)
+  const overrideFull = isFullOverride(chosen, prescribedDeload || exerciseDeloaded || undefined, deload)
 
   return { deload, setDeload, recommended, prescribedDeload: !!prescribedDeload, overrideFull }
 }
