@@ -5,7 +5,7 @@
 //
 //   node scripts/queue.js --agent implementer        the ordered queue, with suggested batches
 //   node scripts/queue.js --agent bugfix --json      machine-readable
-//   node scripts/queue.js --next-batch [--lane engine|surface]
+//   node scripts/queue.js --next-batch [--lane engine|surface] [--sonnet-only]
 //                                                    the next unclaimed BATCH MILESTONE, or NO_BATCH
 //
 // CLAIMING: several sessions of a role may run at once. A session labels its issues `in progress`
@@ -45,6 +45,11 @@ function rank(labels) {
   if (labels.has('next')) return 1;
   if (labels.has('type: bug')) return 2;
   return 3;
+}
+
+/** A batch needs Opus when its milestone description names it (descriptions start `Opus.` or `Sonnet.`). */
+function needsOpus(milestone) {
+  return /\bOpus\b/.test(milestone.description || '');
 }
 
 function isReady(issue, agent) {
@@ -88,13 +93,13 @@ function plan(issues) {
   return batches;
 }
 
-module.exports = { plan, rank, isReady };
+module.exports = { plan, rank, isReady, needsOpus };
 
 if (require.main === module) {
   const args = process.argv.slice(2);
   const agent = args[args.indexOf('--agent') + 1];
   if (!args.includes('--next-batch') && (!args.includes('--agent') || !agent)) {
-    console.error('Usage: queue.js --agent <implementer|bugfix|orchestrator> [--json]  |  queue.js --next-batch [--json]');
+    console.error('Usage: queue.js --agent <implementer|bugfix|orchestrator> [--json]  |  queue.js --next-batch [--sonnet-only] [--json]');
     process.exit(2);
   }
   const repo = process.env.GH_REPO || 'nekodas-neko/TrainingAi_Open';
@@ -105,7 +110,10 @@ if (require.main === module) {
     const milestones = api(`repos/${repo}/milestones?state=open&sort=due_on&direction=asc&per_page=100`)
       .filter((m) => /^Batch\b/i.test(m.title))
       .sort((a, b) => a.number - b.number);
+    // --sonnet-only (owner, 2026-10-09): in the Slow usage tier, skip batches that need Opus.
+    const sonnetOnly = args.includes('--sonnet-only');
     for (const m of milestones) {
+      if (sonnetOnly && needsOpus(m)) continue;
       const issues = api(`repos/${repo}/issues?state=open&milestone=${m.number}&per_page=100`).filter((i) => !i.pull_request);
       const has = (i, name) => i.labels.some((l) => l.name === name);
       if (issues.some((i) => has(i, 'in progress'))) continue; // another session has this batch

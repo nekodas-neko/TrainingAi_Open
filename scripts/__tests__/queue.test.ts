@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { plan, isReady } = require('../queue.js')
+const { plan, isReady, needsOpus } = require('../queue.js')
 
 const issue = (number: number, labels: string[], body = '') => ({ number, title: `t${number}`, body, labelSet: new Set(labels) })
 
@@ -54,5 +54,14 @@ describe('queue readiness', () => {
     expect(ready(['in progress'])).toBe(false)
     expect(ready(['needs: owner'])).toBe(false)
     expect(isReady(issue(1, ['agent: bugfix']), 'implementer')).toBe(false)
+  })
+})
+
+describe('batch model', () => {
+  it('reads Opus from the milestone description, so the Slow tier can skip it', () => {
+    expect(needsOpus({ description: 'Opus. Scoring change; re-derive after a snapshot.' })).toBe(true)
+    expect(needsOpus({ description: 'Sonnet. Small surface fix.' })).toBe(false)
+    expect(needsOpus({ description: '' })).toBe(false)
+    expect(needsOpus({})).toBe(false)
   })
 })

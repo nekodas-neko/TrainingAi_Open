@@ -51,26 +51,25 @@ A subagent does not inherit a sensible model: set `model` on every thread or hel
 
 **Cadence.** The Implementer loops every **~30 minutes**, not 15. When the inbox has nothing new, no
 thread needs it and `node scripts/queue.js --next-batch` returns nothing, it ends the tick at once
-without re-reading anything else. **Usage gate (automatic, owner 2026-10-08).** Every Orchestrator health check first reads
-`rate_limit_info` from the agents' session records (`get_session`). The record shows the status,
-the limit type (`five_hour` or `seven_day`) and the reset time. It never shows a percentage.
-`allowed_warning` arrives well before the end: on the weekly limit it fired at about 75% (10-08).
-The owner wants work to continue until 90%, so the two states are:
+without re-reading anything else. **Usage gate (owner, 2026-10-09).** The tiers follow the highest usage percentage on either limit
+(weekly or 5-hour). The Implementer posts both percentages on #2354 every tick, because
+`get_session`'s `rate_limit_info` gives only a status (`allowed_warning` fires around 75%), a limit
+type and the reset time. The Orchestrator reads the percentage at every health check and posts the
+tier on #2354 when it changes:
 
-- **Slow** (status `allowed_warning`): the Orchestrator posts **Slow** on #2354. The Implementer
-  runs one thread at a time, on Sonnet only, and starts no investigations. BugFix carries on as
-  normal. The Orchestrator checks every 60 minutes and starts no helpers. `--next-batch` serves the
-  oldest batch with ready work, so while Slow lasts the Orchestrator labels every ready issue that
-  needs Opus (engine formulas, migrations, scoring changes) or is an investigation `blocked`, with a
-  comment saying it lasts only until the reset, and keeps at least two Sonnet-sized batches open.
-  It lifts those labels when it posts **Resume**. Without this, the Implementer is served a batch it
-  may not take, and it reports an empty queue (10-08).
-- **Pause** (90% on either limit): when the owner says a limit has reached 90%, or the status goes
-  past warning, the Orchestrator interrupts the sessions, stops its own helpers, posts **Pause**
-  on #2354 with the reset time, and schedules its next check for just after `resetsAt`.
+- **Full (under 90%).** Full speed: two Implementer threads, Opus for engine, migration and scoring
+  batches, investigations allowed, and Orchestrator helpers allowed. Health checks every 30 minutes.
+- **Slow (90–95%).** One thread at a time, Sonnet only, no investigations. The Implementer takes
+  batches with `node scripts/queue.js --next-batch --sonnet-only`, which skips any batch whose
+  milestone description names **Opus**. Every batch description starts with `Opus.` or `Sonnet.`
+  for this reason. BugFix carries on. The Orchestrator starts no helpers and checks every 60
+  minutes.
+- **Halt (95% and over).** Work stops except a production-broken hotfix (`hotfix` label). The
+  Orchestrator interrupts the sessions, stops its helpers, posts **Halt** on #2354 with the reset
+  time, and schedules its next check for just after `resetsAt`.
 
-Once the status reads `allowed` again, it posts **Resume**. The owner can say "pause" or "resume"
-at any time.
+**After the reset**, the Orchestrator posts **Full** and everything restarts at full speed. The
+owner can override the tier at any time ("pause", "slow", "full").
 
 ## What the Orchestrator can do from the cloud
 
