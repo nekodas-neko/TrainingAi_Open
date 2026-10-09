@@ -207,7 +207,7 @@ the prod database** can't be validated here:
 
 ## Not in scope (endgame projects — need their own planning session, not listed above)
 
-- Bundle-the-shell-into-the-APK + native FCM push (removes the online-only web fallback; the
-  E6 cron/proactive layer rides on this).
+- The v2 native app, which replaces the bundled-shell plan (owner, 2026-10-09). It removes the
+  online-only web fallback, and the E6 cron/proactive layer rides on it. Toolkit: #2765.
 - wasm-SQLite in the browser (one local-first path on web too) — against the current APK-only policy.
 - Progress photos / voice logging (device camera/mic) — unplanned Batch O features.
