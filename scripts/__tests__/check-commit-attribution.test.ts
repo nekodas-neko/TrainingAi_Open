@@ -6,6 +6,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 
 const script = path.join(__dirname, '..', 'check-commit-attribution.js')
 let repo: string
@@ -22,11 +23,18 @@ function commit(message: string) {
   git('commit', '-q', '-F', msgFile)
 }
 
-function run() {
+function run(overrides: Record<string, string> = {}, cwd = repo) {
   const env = { ...process.env }
+  delete env.PR_BASE_SHA
   delete env.PR_HEAD_SHA
   delete env.PR_COMMITS
-  return spawnSync('node', [script, '--repo', repo], { encoding: 'utf8', env })
+  return spawnSync('node', [script, '--repo', cwd], { encoding: 'utf8', env: { ...env, ...overrides } })
+}
+
+function commitTree(message: string, ...parents: string[]) {
+  return execFileSync('git', ['commit-tree', 'HEAD^{tree}', ...parents.flatMap(sha => ['-p', sha])], {
+    cwd: repo, encoding: 'utf8', input: message,
+  }).trim()
 }
 
 beforeAll(() => {
@@ -75,6 +83,35 @@ describe('check-commit-attribution', () => {
     expect(res.stderr).toContain(line)
     expect(res.stderr).toContain(pattern)
     expect(res.stderr).toContain('git commit --amend')
+  })
+
+  it('checks only PR commits after merging a base with AI attribution', () => {
+    const base = commitTree('Main change\n\nCo-authored-by: Claude <noreply@anthropic.com>\n', git('rev-parse', 'origin/main'))
+    const head = commitTree('Merge main\n', git('rev-parse', 'HEAD'), base)
+    const res = run({ PR_BASE_SHA: base, PR_HEAD_SHA: head, PR_COMMITS: '3' })
+    expect(res.status).toBe(0)
+    expect(res.stdout).toContain('3 commit(s)')
+
+    const offending = commitTree('PR change\n\nCo-authored-by: Claude <noreply@anthropic.com>\n', head)
+    const rejected = run({ PR_BASE_SHA: base, PR_HEAD_SHA: offending, PR_COMMITS: '4' })
+    expect(rejected.status).toBe(1)
+    expect(rejected.stderr).toContain(offending.slice(0, 10))
+    expect(rejected.stderr).not.toContain(base.slice(0, 10))
+  })
+
+  it('fails when CI cannot identify every PR commit', () => {
+    const env = { PR_BASE_SHA: git('rev-parse', 'origin/main'), PR_HEAD_SHA: git('rev-parse', 'HEAD'), PR_COMMITS: '2' }
+    expect(run({ ...env, PR_BASE_SHA: '' }).status).toBe(1)
+    expect(run({ ...env, PR_BASE_SHA: 'f'.repeat(40) }).status).toBe(1)
+    expect(run({ ...env, PR_COMMITS: '3' }).stderr).toContain('expected 3 PR commits, found 2')
+  })
+
+  it('rejects a shallow CI checkout instead of overlooking missing history', () => {
+    const shallow = path.join(scratch, 'shallow')
+    execFileSync('git', ['clone', '-q', '--depth=1', '--no-checkout', pathToFileURL(repo).href, shallow])
+    const res = run({ PR_BASE_SHA: git('rev-parse', 'origin/main'), PR_HEAD_SHA: git('rev-parse', 'HEAD'), PR_COMMITS: '2' }, shallow)
+    expect(res.status).toBe(1)
+    expect(res.stderr).toContain('full-history checkout')
   })
 
   it('skips, passing, when there is no base to compare against', () => {

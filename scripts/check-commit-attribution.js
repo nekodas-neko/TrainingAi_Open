@@ -11,10 +11,8 @@
 // Commits only: PR descriptions and GitHub comments are not commit messages and are not read.
 //
 // Which commits:
-//   - CI (`pull_request`): the job's checkout is depth 1 of the merge commit, so the PR's own
-//     commits are not there. When PR_HEAD_SHA and PR_COMMITS are set (the workflow step passes them)
-//     this fetches that many commits behind the PR head and reads exactly those. A fetch failure
-//     fails the check; a gate that cannot look must not pass as if it had.
+//   - CI (`pull_request`): PR_BASE_SHA..PR_HEAD_SHA excludes merged base commits.
+//     Missing history or a count mismatch fails the check.
 //   - Locally, nothing set: `<base>..HEAD`, with the base from the same candidates the ratchets use
 //     (origin/main, then main). With no base to be had it says so and passes, since there is
 //     nothing to compare against; CI is the gate.
@@ -79,11 +77,19 @@ function collectCommits(cwd, env) {
   const count = Number(env.PR_COMMITS);
   if (headSha) {
     if (!Number.isInteger(count) || count < 1) return { error: `PR_HEAD_SHA is set but PR_COMMITS is not a positive integer (${env.PR_COMMITS})` };
-    const fetched = git(cwd, ['fetch', '--no-tags', `--depth=${count + 1}`, 'origin', headSha]);
-    if (!fetched.ok) return { error: `could not fetch the PR's commits (${headSha}): ${fetched.reason}` };
-    const log = git(cwd, ['log', '-n', String(count), LOG_FORMAT, headSha]);
+    const baseSha = env.PR_BASE_SHA;
+    if (!/^[a-f0-9]{40}$/i.test(baseSha || '') || !/^[a-f0-9]{40}$/i.test(headSha)) {
+      return { error: 'PR_BASE_SHA and PR_HEAD_SHA must be full commit SHAs' };
+    }
+    const shallow = git(cwd, ['rev-parse', '--is-shallow-repository']);
+    if (!shallow.ok || shallow.stdout.trim() !== 'false') {
+      return { error: 'PR commit checks require a full-history checkout (fetch-depth: 0)' };
+    }
+    const log = git(cwd, ['log', LOG_FORMAT, `${baseSha}..${headSha}`]);
     if (!log.ok) return { error: `git log failed: ${log.reason}` };
-    return { commits: parseLog(log.stdout), label: `the ${count} commit(s) of this PR` };
+    const commits = parseLog(log.stdout);
+    if (commits.length !== count) return { error: `expected ${count} PR commits, found ${commits.length}` };
+    return { commits, label: `the ${count} commit(s) of this PR` };
   }
   const base = resolveBase(cwd);
   if (!base) return { skip: 'no base branch resolved (tried origin/main, main); CI is the gate for this rule.' };
