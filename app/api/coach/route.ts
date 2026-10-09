@@ -8,6 +8,7 @@ import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
+import { buildInjuryContext } from '@/lib/ai-chat/context'
 import { buildChatTools } from '@/lib/ai-chat/tools'
 import { buildWidgetTools } from '@/lib/coach/tools'
 import { coachScope, pickTools } from '@/lib/coach/scopes'
@@ -216,6 +217,16 @@ export async function POST(req: Request) {
     // A widget the user typed past instead of tapping has no result, and the provider refuses a
     // thread containing an unanswered tool call — which wedged the conversation permanently rather
     // than for one turn. Close those off first (see `dangling-widgets.ts`).
+    // Issue 2213. Always-on, not a tool: an injury has to constrain an answer the model did not
+    // realise was about injury. Fails to "no line" — a read failure must not take chat down, and
+    // the workout engine applies the injury regardless.
+    let injuryLine = ''
+    try {
+      injuryLine = buildInjuryContext(await repo.listInjuries(userId), todayIso)
+    } catch (error) {
+      errorLog(error, 'API /coach injury context')
+    }
+
     const modelMessages = await convertToModelMessages(
       resolveDanglingWidgetCalls(parsed.data.messages as UIMessage[]),
     )
@@ -224,9 +235,11 @@ export async function POST(req: Request) {
       { section: 'coach', userId, model: COACH_MODEL_ID },
       {
         model: coachModel(),
-        system: scope.systemSection
-          ? `${SYSTEM.replace('TODAY_ISO', todayIso)}\n\n${scope.systemSection}`
-          : SYSTEM.replace('TODAY_ISO', todayIso),
+        system: [
+          SYSTEM.replace('TODAY_ISO', todayIso),
+          scope.systemSection,
+          injuryLine,
+        ].filter(Boolean).join('\n\n'),
         messages: modelMessages,
         tools: {
           // Scoped by WITHHOLDING, never by instructing (LA-47): a prompt saying "do not read

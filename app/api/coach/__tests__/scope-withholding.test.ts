@@ -11,7 +11,9 @@ vi.mock('@/auth', () => ({
   auth: vi.fn(async () => ({ user: { id: USER_ID, timezone: 'Australia/Brisbane' } })),
 }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => true }))
-vi.mock('@/lib/data', () => ({ getRepositoryAsync: async () => ({}) }))
+let injuryRows: unknown[] = []
+const listInjuries = vi.fn(async (_userId: string) => injuryRows)
+vi.mock('@/lib/data', () => ({ getRepositoryAsync: async () => ({ listInjuries }) }))
 vi.mock('@ai-sdk/google', () => ({ google: { tools: { googleSearch: () => ({}) } } }))
 vi.mock('@/lib/ai/instrument', () => ({
   COACH_MODEL_ID: 'test',
@@ -69,7 +71,22 @@ const CALORIE_PATCH = {
 }
 
 describe('the coach route scopes by withholding (LA-47)', () => {
-  beforeEach(() => { captured = null })
+  beforeEach(() => { captured = null; injuryRows = []; listInjuries.mockClear() })
+
+  // Issue 2213: the injury line is read for the signed-in user only, and absent when none is active.
+  it('adds the active-injury line for the signed-in user, and no section when there is none', async () => {
+    expect((await post()).system).not.toContain('Logged injuries')
+    injuryRows = [
+      { id: 'a', userId: USER_ID, muscleName: 'Lower Back', notes: null, severity: 'mild', startedDate: '2026-10-01', resolvedDate: null, createdAt: '', updatedAt: '' },
+      { id: 'b', userId: USER_ID, muscleName: 'Left Knee', notes: null, severity: 'mild', startedDate: '2026-09-01', resolvedDate: '2026-09-10', createdAt: '', updatedAt: '' },
+    ]
+    const { system } = await post('nutrition')
+    expect(listInjuries).toHaveBeenLastCalledWith(USER_ID)
+    expect(system).toContain('Logged injuries')
+    expect(system).toContain('Lower Back')
+    expect(system).not.toContain('Left Knee')
+    expect(system).toContain('This conversation is about food')
+  })
 
   it('an unscoped request is unchanged — every tool, no extra prompt section', async () => {
     const { tools, system } = await post()
