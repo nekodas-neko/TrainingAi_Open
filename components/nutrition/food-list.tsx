@@ -12,7 +12,7 @@ import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { getLocalStore } from '@/lib/local-store'
 import { createFoodItem } from '@trainingai/shared/nutrition/create-food-item'
 import { useFoodDatabaseSearch, type ExternalFood } from '@/lib/hooks/use-food-database-search'
-import type { FoodItem, SavedMeal } from '@trainingai/shared/types/nutrition'
+import type { FoodItem, MealType, SavedMeal } from '@trainingai/shared/types/nutrition'
 import { foodSecondaryLine } from './food-name-line'
 
 /** Shared with `capture-actions.tsx`, which reads the same seeded list to suggest the user's own
@@ -39,6 +39,8 @@ interface Props {
   onRequestDeleteMeal: (meal: SavedMeal) => void
   onLabelMeal: (meal: SavedMeal) => void
   planSavedMealIds: Set<string>
+  /** For the meal-type icons on meal rows (issue 2154). Pass the state-held array. */
+  mealTypes?: MealType[]
   onBuildFirst: () => void
   /**
    * A food's tap goes to the **assign** step — pick a meal type, pick a quantity — which lives in
@@ -74,7 +76,7 @@ interface Props {
  */
 export function FoodList({
   show, meals, loadingMeals, query, onQueryChange, selectedIds, onToggleSelected,
-  onOpenMeal, onEditMeal, onRequestDeleteMeal, onLabelMeal, planSavedMealIds,
+  onOpenMeal, onEditMeal, onRequestDeleteMeal, onLabelMeal, planSavedMealIds, mealTypes,
   onBuildFirst, onSelectFood, userId,
 }: Props) {
   const [foods, setFoods] = useState<FoodItem[]>([])
@@ -278,6 +280,7 @@ export function FoodList({
                     onRequestDelete={onRequestDeleteMeal}
                     onLabel={onLabelMeal}
                     fromPlan={planSavedMealIds.has(row.meal.id)}
+                    mealTypes={mealTypes}
                   />
                 ) : (
                   <FoodListRow key={row.food.id} item={row.food} onSelect={onSelectFood} />
