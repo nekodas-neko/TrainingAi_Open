@@ -40,8 +40,9 @@ question is never re-litigated per change.
   affordance). The APK is a WebView loading the Railway URL remotely (`capacitor.config.ts`
   `server.url`), so the SW is what gives the APK offline cold-start AND is the push-notification
   transport. Removing it is a device regression, not a cleanup. Full PWA removal only makes sense
-  as part of the unscoped "bundle the shell into the APK + native FCM push" endgame project (noted
-  in `docs/implementation-backlog.md`, not yet planned).
+  once the v2 native app replaces the WebView screens. The owner decided on 2026-10-09 that v2 is
+  native, not a bundled shell; the toolkit is open in #2765. See
+  `docs/superpowers/plans/2026-08-02-native-convergence-goal-layout.md`.
 - **Green `pnpm dev` is necessary, never sufficient.** For any change touching an offline-first
   domain, a native plugin, safe-area, gestures, or notifications, the merge gate is the on-device
   smoke run (`docs/device-smoke-checklist.md`) — or, when no device is available in-session, an
