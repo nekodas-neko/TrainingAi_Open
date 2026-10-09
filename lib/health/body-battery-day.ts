@@ -2,13 +2,13 @@ import type { WorkoutRepository, BodyBatteryDailyRow } from '@/lib/data/reposito
 import { shiftDateStr, ageFromDob, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { reportServerError } from '@/lib/observability'
 import { tryEnsureServerOuraConstants } from '@/lib/oura-models/constants-inject'
-import { hrMaxFromAge, hrReserve, HR_REST_THRESHOLD } from '@trainingai/shared/health/hr-zones'
+import { hrMaxFromAge, hrReserve } from '@trainingai/shared/health/hr-zones'
 import { computeObservedHr } from '@trainingai/shared/health/observed-hr'
 import { resolveBatteryHrMax, batteryConfidence, HR_PEAK_WINDOW_DAYS, type BatteryConfidence } from '@trainingai/shared/health/body-battery-inputs'
 import { computeSleepScore, sleepScoreBaselines } from '@trainingai/shared/health/sleep-score'
 import type { BodyBatteryLabel } from '@trainingai/shared/health/body-battery-band'
 import { nightSessions, nightWokenFrom } from '@trainingai/shared/health/sleep-night'
-import { walkBodyBattery } from '@trainingai/shared/health/body-battery-walk'
+import { walkBodyBattery, restThresholdFromOffset } from '@trainingai/shared/health/body-battery-walk'
 import { buildDaytimeStressSeriesFromModel, summarizeStressDay, type StressPoint, type DhrvBaselines } from '@/lib/health/daytime-stress'
 import { resolveAnchor, type AnchorSource } from '@/lib/health/body-battery-anchor'
 import { buildReadinessPayload } from '@/lib/health/readiness-payload'
@@ -64,13 +64,21 @@ export interface BodyBatteryResponse {
 
 // ── Tuning constants ─────────────────────────────────────────────────────────
 // Battery is anchored at the morning readiness score and walked forward minute
-// by minute off the heart-rate series. At or below REST_THRESHOLD of HR reserve
-// the tank charges at a flat rate; above it, it drains in proportion to intensity.
-// HR_REST_THRESHOLD (lib/health/hr-zones.ts) — the reserve fraction at/under which we recharge
-// (awake sitting HR sits ~0.05–0.10 of reserve, so only genuine low-HR rest charges;
-//  ordinary waking activity holds steady or drains gently). Shared with the Activity score's
-// "moved this hour" signal (lib/health/hourly-movement.ts) — one rest/active boundary, not two.
-const REST_THRESHOLD = HR_REST_THRESHOLD
+// by minute off the heart-rate series. At or below resting HR + WAKING_REST_OFFSET_BPM the tank
+// charges at a flat rate; above it, it drains in proportion to intensity.
+//
+// v7 (issue 2235, owner sign-off 2026-10-05 "start at 9 bpm"): the boundary is anchored to WAKING
+// rest as a fixed bpm offset above resting HR, not to 0.05 of HR reserve. The reserve fraction put
+// the ceiling ~6 bpm over a resting HR that is measured asleep, so ordinary seated waking HR drained;
+// it also moved whenever hrMax was re-estimated. 9 was fitted by replaying 56 finished days through
+// `walkBodyBattery` (bracket 8–12; 9 sits closest to the middle of the 55–65 mean-end band — the
+// table is on issue 2235). `restThresholdFromOffset` (body-battery-walk.ts) turns it into the
+// reserve fraction the walk takes.
+//
+// This DELIBERATELY parts from HR_REST_THRESHOLD (hr-zones.ts), which the Activity score's "moved
+// this hour" signal and the HR grade still use: the owner signed a Body Battery change, not an
+// Activity one. Whether those follow is issue 2743.
+export const WAKING_REST_OFFSET_BPM = 9
 // ⚠ PROVISIONAL, and deliberately so — TN-55, 2026-09-24. These are fitted numbers, but they were
 // fitted inside a window the calibration-period rule calls too early: the dose stepped
 // 0.5 mg → 1 mg on 2026-09-13, so the earliest honest fit is 2026-10-04. The owner chose on
@@ -105,7 +113,9 @@ const STRESS_DRAIN_RATE = 0.020 // battery points per minute at a full (100%) be
 // rebalanced. The prefix has to move even though the interpolated constants already changed, because
 // they cannot express a change in the walk's SHAPE — a v5 row and a v6 row carrying identical
 // constants would still not be comparable.
-export const BODY_BATTERY_MODEL_VERSION = `v6:rest${REST_THRESHOLD}:chg${CHARGE_RATE}:drn${DRAIN_RATE}:str${STRESS_DRAIN_RATE}:hrmax-observed:oura-rule`
+// v7 (issue 2235): the charge ceiling is resting HR + WAKING_REST_OFFSET_BPM, not 0.05 of reserve.
+// `rest+9bpm` replaces `rest0.05` so a reader can tell the two boundary forms apart from the stamp.
+export const BODY_BATTERY_MODEL_VERSION = `v7:rest+${WAKING_REST_OFFSET_BPM}bpm:chg${CHARGE_RATE}:drn${DRAIN_RATE}:str${STRESS_DRAIN_RATE}:hrmax-observed:oura-rule`
 
 function labelFor(v: number): BodyBatteryResponse['label'] {
   if (v >= 75) return 'Charged'
@@ -329,7 +339,7 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
     hrRows.map(r => ({ tsMs: r.timestamp.getTime(), bpm: r.bpm })),
     {
       anchor, wakeTime, restingHr, reserve,
-      restThreshold: REST_THRESHOLD,
+      restThreshold: restThresholdFromOffset(WAKING_REST_OFFSET_BPM, reserve),
       chargeRate: CHARGE_RATE,
       drainRate: DRAIN_RATE,
       stressDrainRate: STRESS_DRAIN_RATE,

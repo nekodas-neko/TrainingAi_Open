@@ -59,7 +59,7 @@ physiological plausibility bounds.
 | HR zones | `ZONE_DEFS` hr-zones.ts:45 | Karvonen lower bounds 0 / 0.60 / 0.70 / 0.80 / 0.90 of HRR | Zone 1–5 edges, used by run prescriptions and zone minutes | GUARDED | The convention works for the population, but individual LT1/LT2 land anywhere from about 55% to 85% HRR. With a field test (talk test, HRR-at-threshold) the edges could be personalised inside the convention's range. Low priority. |
 | Active minutes | `MODERATE_INTENSITY_FRAC` hr-zones.ts:71 | 0.40 HRR | Where moderate activity starts (WHO minutes) | CONSTANT | ACSM definition (40–59% HRR). |
 | Active minutes | vigorous floor = zone 3 packages/shared/src/health/zone-minutes.ts:96 | 0.70 HRR | Minutes counted ×2 | CONSTANT | **Inconsistency, not personalisation.** ACSM puts vigorous at ≥60% HRR, which is the zone 2 floor. Minutes between 60% and 70% HRR are counted once when the guideline would count them twice. |
-| Rest / move | `HR_REST_THRESHOLD` hr-zones.ts:23 | 0.05 of HRR | Body Battery charge-or-drain line, and the Activity score's "moved this hour" | LEARNED | **GAP (big).** Awake seated HR sits at a different reserve fraction per person (0.05–0.10 for the owner, according to the code comment). Someone whose seated HR is 8% of reserve never charges and is always "moving". It should be a percentile of the person's own waking seated HR. This is TN-2's open question. |
+| Rest / move | `HR_REST_THRESHOLD` hr-zones.ts:26 | 0.05 of HRR | The Activity score's "moved this hour" and the HR grade's "Resting" band. Body Battery left it in v7 (issue 2235, see the Battery row); whether these follow is issue 2743 | LEARNED | **GAP (big).** Awake seated HR sits at a different reserve fraction per person (0.05–0.10 for the owner, according to the code comment). Someone whose seated HR is 8% of reserve never charges and is always "moving". It should be a percentile of the person's own waking seated HR. This is TN-2's open question. |
 | Walk target | `WALK_FAST_BAND_PCT_OF_MAX` hr-zones.ts:137 | 60–70% of HRmax | Guided-walk fast block band | GUARDED | It was moved from 0.70 HRR because the owner hit it on 0 of 44 blocks. Whether a target is reachable depends on fitness and age, so it should be personal inside the 60–70% range. |
 | Resting HR | `DEFAULT_RESTING_HR` packages/shared/src/health/hr-zones.ts | 60 bpm | Fallback resting HR | MODEL | Fallback only. Was defined twice (hr-profile, fitness-snapshot); one home since #2375. |
 | Resting HR | `RESTING_HR_WINDOW_DAYS` / `OBSERVED_WINDOW_DAYS` hr-profile.ts:7,47 | 28 / 90 days | Baseline windows | MODEL | Window lengths. |
@@ -160,7 +160,7 @@ physiological plausibility bounds.
 |---|---|---|---|---|---|
 | Battery | `CHARGE_RATE` / `DRAIN_RATE` lib/health/body-battery-day.ts:78-79 | 0.120 points/min at rest; 0.080 points/min per unit of HRR above the threshold | Up and down slope of the battery | LEARNED | **GAP.** These were fitted (TN-55) so that the owner's typical day nets about 0 over 66 replayed days. A person who sits more or less, or has a different reserve, will trend to the floor or the ceiling. The *gain* can stay central (MODEL). The charge/drain *ratio* should be fitted per person to that balance condition. |
 | Battery | `STRESS_DRAIN_RATE` body-battery-day.ts:89 | 0.020 points/min at full stress | Extra drain from daytime stress | MODEL | Deliberately de-weighted because the input is untrusted (TN-33). It is not a per-person value. |
-| Battery | `REST_THRESHOLD = HR_REST_THRESHOLD` body-battery-day.ts:~65 | 0.05 HRR | Charge or drain boundary | LEARNED | **GAP.** See the Heart section. This is the TN-2 open question. |
+| Battery | `WAKING_REST_OFFSET_BPM` lib/health/body-battery-day.ts, via `restThresholdFromOffset` packages/shared/src/health/body-battery-walk.ts | resting HR + 9 bpm (model v7, issue 2235; was 0.05 HRR in v6) | Charge or drain boundary: a reading at or below it charges | MODEL | **Partly closed.** Anchored to waking rest as a bpm offset, so re-estimating hrMax no longer moves it. Fitted on the owner's 56 days (bracket 8–12; table on issue 2235) and signed 2026-10-05. Still one number for everyone: learning it per person is issue 2341. |
 | Battery | `GAP_HOLD_MIN` / `SAMPLE_CAP_MIN` body-battery-day.ts:80-81 | 30 / 7 min | Gaps in ring wear | MODEL | Integration hygiene. |
 | Battery | `labelFor` body-battery-day.ts:103-105 | Charged ≥ 75, Good ≥ 50, Low ≥ 25, otherwise Drained | Label | MODEL | Display. |
 | Battery | default anchor lib/health/body-battery-anchor.ts:52 | 50 | Wake level when there is no readiness or sleep score | MODEL | Fallback. |
@@ -231,8 +231,9 @@ duration model) or are guard ranges working as intended.
    (`daily-goals.ts:15`, `goal-recommendation.ts:37`). It is identical for a 25-year-old and a
    70-year-old. Paluch's plateau is 6–8k at 60+ and 8–10k under 60, and 12,000 exceeds it for
    every age. It should be GUARDED by age, nudged toward the person's sustained level.
-4. **Rest/charge threshold, 0.05 HRR** (`hr-zones.ts:23`). It drives Body Battery charging and the
-   Activity score's move hours. Awake seated HR sits at a person-specific fraction of reserve, so
+4. **Rest/charge threshold, 0.05 HRR** (`hr-zones.ts:26`). It drives the Activity score's move
+   hours (Body Battery moved to resting HR + 9 bpm in v7, issue 2235; issue 2743 asks whether the
+   Activity line follows). Awake seated HR sits at a person-specific fraction of reserve, so
    some people never charge and others always "move". It should be a percentile of the person's
    own waking seated HR (TN-2).
 5. **Body Battery charge/drain rates** (`body-battery-day.ts:78-79`). They were fitted so the
