@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { invalidatePrescriptionChanged } from "@/lib/cache-groups";
 import { warmupGoalSecFor } from "@trainingai/shared/workout/duration-model";
@@ -13,6 +13,9 @@ type Args = {
   durationPreset: DurationPreset | undefined;
   fetchExercises: () => void;
   loadPeriodization: (opts?: { afterWrite?: boolean }) => void;
+  /** Issue 2750: Full was chosen over a deload and has nothing to put back, so rebuild once. */
+  overrideFull?: boolean;
+  fullNeedsRebuild?: boolean;
 };
 
 /**
@@ -34,6 +37,8 @@ export function useDurationPreset({
   durationPreset,
   fetchExercises,
   loadPeriodization,
+  overrideFull = false,
+  fullNeedsRebuild = false,
 }: Args) {
   // A duration-preset switch is in flight. Separate from aiPrescriptionPending (which is
   // server-derived) because this one is a local, user-initiated regeneration — it drives the
@@ -45,9 +50,10 @@ export function useDurationPreset({
     [sessionBudgetMin, durationPreset],
   );
 
-  const handleDurationPresetChange = useCallback(async (preset: DurationPreset) => {
-    if (!programSessionId) return;
+  const handleDurationPresetChange = useCallback(async (preset: DurationPreset, forFull = false): Promise<boolean> => {
+    if (!programSessionId) return false;
     setDurationSwitching(true);
+    const failure = forFull ? "Couldn't rebuild for Full — try again" : "Couldn't rebuild for that length — try again";
     try {
       const res = await fetch(`/api/ai-periodization/session/${programSessionId}/prescribe`, {
         method: 'POST',
@@ -57,18 +63,33 @@ export function useDurationPreset({
       if (!res.ok) {
         toast.error(res.status === 429
           ? "Too many plan rebuilds this hour — try again shortly"
-          : "Couldn't rebuild for that length — try again");
-        return;
+          : failure);
+        return false;
       }
       await invalidatePrescriptionChanged(programSessionId);
       fetchExercises();
       loadPeriodization({ afterWrite: true });
+      return true;
     } catch {
-      toast.error("Couldn't rebuild for that length — try again");
+      toast.error(failure);
+      return false;
     } finally {
       setDurationSwitching(false);
     }
   }, [programSessionId, fetchExercises, loadPeriodization]);
+
+  // Issue 2750. Choosing Full over a stored deload that recorded no full numbers used to leave the
+  // deload on the bar and tell the lifter so, with changing the time preset as the unmentioned way
+  // out. Rebuild once per Full choice instead: an exercise with no progression style stays deloaded
+  // after the rebuild, and `triedRef` is what stops that becoming a loop of model calls. It resets
+  // only when Full is dropped, so choosing Deload and then Full again is a new choice.
+  const triedRef = useRef(false);
+  useEffect(() => {
+    if (!overrideFull) { triedRef.current = false; return; }
+    if (!fullNeedsRebuild || triedRef.current || durationSwitching || !programSessionId) return;
+    triedRef.current = true;
+    void handleDurationPresetChange(durationPreset ?? 'standard', true);
+  }, [overrideFull, fullNeedsRebuild, durationSwitching, programSessionId, durationPreset, handleDurationPresetChange]);
 
   return { warmupGoalSec, durationSwitching, handleDurationPresetChange };
 }
