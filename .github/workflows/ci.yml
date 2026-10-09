@@ -307,21 +307,22 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # pull-requests: read is for the commit-attribution step, which lists the PR's commits.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - name: Fetch the base branch, for the ratchets' base comparison
         # Keep local runs from making an existing full-history clone shallow.
         run: git rev-parse --verify --quiet origin/main >/dev/null || git fetch --depth=1 origin main || true
 
       - name: No AI attribution in commit messages
-        # Compare the PR's exact base and head; merged main commits are already on the base.
+        # Read the PR's commit list so merged main commits stay exempt.
         env:
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_COMMITS: ${{ github.event.pull_request.commits }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
         run: node scripts/check-commit-attribution.js
 
       - name: No unresolved conflict markers

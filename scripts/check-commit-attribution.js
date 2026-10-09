@@ -11,12 +11,11 @@
 // Commits only: PR descriptions and GitHub comments are not commit messages and are not read.
 //
 // Which commits:
-//   - CI (`pull_request`): PR_BASE_SHA..PR_HEAD_SHA excludes merged base commits.
-//     Missing history or a count mismatch fails the check.
+//   - CI (`pull_request`): GitHub lists the PR commits; merged main commits stay exempt.
+//     Missing commit data fails the check.
 //   - Locally, nothing set: `<base>..HEAD`, with the base from the same candidates the ratchets use
 //     (origin/main, then main). With no base to be had it says so and passes, since there is
 //     nothing to compare against; CI is the gate.
-// The commits are read in ONE `git log`, however many there are.
 const { spawnSync } = require('child_process');
 
 // `Co-authored-by: Delan …` is a person and must pass; only a trailer naming Claude or the Anthropic
@@ -71,25 +70,53 @@ function resolveBase(cwd) {
   return null;
 }
 
-/** @returns {{ commits: Array, label: string } | { skip: string } | { error: string }} */
-function collectCommits(cwd, env) {
-  const headSha = env.PR_HEAD_SHA;
-  const count = Number(env.PR_COMMITS);
-  if (headSha) {
-    if (!Number.isInteger(count) || count < 1) return { error: `PR_HEAD_SHA is set but PR_COMMITS is not a positive integer (${env.PR_COMMITS})` };
-    const baseSha = env.PR_BASE_SHA;
-    if (!/^[a-f0-9]{40}$/i.test(baseSha || '') || !/^[a-f0-9]{40}$/i.test(headSha)) {
-      return { error: 'PR_BASE_SHA and PR_HEAD_SHA must be full commit SHAs' };
+// `GET /pulls/{n}/commits` lists at most 250 commits, 100 a page.
+const PR_COMMITS_PER_PAGE = 100;
+const PR_COMMITS_MAX_PAGES = 3;
+
+/** The PR's own commits as GitHub lists them. `fetchImpl` is the tests' seam. */
+async function fetchPrCommits({ repo, number, token, apiUrl, fetchImpl }) {
+  const commits = [];
+  for (let page = 1; page <= PR_COMMITS_MAX_PAGES; page++) {
+    const url = `${apiUrl}/repos/${repo}/pulls/${number}/commits?per_page=${PR_COMMITS_PER_PAGE}&page=${page}`;
+    const headers = { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    let body;
+    try {
+      const res = await fetchImpl(url, { headers });
+      if (!res.ok) return { error: `could not list the PR's commits (${url}): HTTP ${res.status}` };
+      body = await res.json();
+    } catch (e) {
+      return { error: `could not list the PR's commits (${url}): ${e && e.message ? e.message : e}` };
     }
-    const shallow = git(cwd, ['rev-parse', '--is-shallow-repository']);
-    if (!shallow.ok || shallow.stdout.trim() !== 'false') {
-      return { error: 'PR commit checks require a full-history checkout (fetch-depth: 0)' };
+    if (!Array.isArray(body)) return { error: `could not list the PR's commits (${url}): the response is not a list` };
+    for (const c of body) {
+      if (!c || typeof c.sha !== 'string' || !c.commit || typeof c.commit.message !== 'string') {
+        return { error: `could not list the PR's commits (${url}): an entry has no sha or message` };
+      }
+      commits.push({ sha: c.sha, message: c.commit.message });
     }
-    const log = git(cwd, ['log', LOG_FORMAT, `${baseSha}..${headSha}`]);
-    if (!log.ok) return { error: `git log failed: ${log.reason}` };
-    const commits = parseLog(log.stdout);
-    if (commits.length !== count) return { error: `expected ${count} PR commits, found ${commits.length}` };
-    return { commits, label: `the ${count} commit(s) of this PR` };
+    if (body.length < PR_COMMITS_PER_PAGE) break;
+  }
+  return { commits };
+}
+
+/** @returns {Promise<{ commits: Array, label: string } | { skip: string } | { error: string }>} */
+async function collectCommits(cwd, env, fetchImpl = globalThis.fetch) {
+  if (env.PR_NUMBER) {
+    const number = Number(env.PR_NUMBER);
+    if (!Number.isInteger(number) || number < 1) return { error: `PR_NUMBER is not a positive integer (${env.PR_NUMBER})` };
+    if (!env.GITHUB_REPOSITORY) return { error: 'PR_NUMBER is set but GITHUB_REPOSITORY is not' };
+    const got = await fetchPrCommits({
+      repo: env.GITHUB_REPOSITORY,
+      number,
+      token: env.GH_TOKEN || env.GITHUB_TOKEN,
+      apiUrl: env.GITHUB_API_URL || 'https://api.github.com',
+      fetchImpl,
+    });
+    if (got.error) return got;
+    if (got.commits.length === 0) return { error: `GitHub listed no commits for PR #${number}` };
+    return { commits: got.commits, label: `the ${got.commits.length} commit(s) of PR #${number}` };
   }
   const base = resolveBase(cwd);
   if (!base) return { skip: 'no base branch resolved (tried origin/main, main); CI is the gate for this rule.' };
@@ -98,10 +125,10 @@ function collectCommits(cwd, env) {
   return { commits: parseLog(log.stdout), label: `${base}..HEAD` };
 }
 
-function main() {
+async function main() {
   const repoArg = process.argv.indexOf('--repo');
   const cwd = repoArg >= 0 ? process.argv[repoArg + 1] : process.cwd();
-  const got = collectCommits(cwd, process.env);
+  const got = await collectCommits(cwd, process.env);
   if (got.error) {
     console.error(`check-commit-attribution: ${got.error}`);
     process.exit(1);
@@ -128,6 +155,11 @@ function main() {
   process.exit(1);
 }
 
-if (require.main === module) main();
+if (require.main === module) {
+  main().catch((e) => {
+    console.error(`check-commit-attribution: ${e && e.stack ? e.stack : e}`);
+    process.exit(1);
+  });
+}
 
-module.exports = { PATTERNS, findViolations, parseLog };
+module.exports = { PATTERNS, findViolations, parseLog, collectCommits };
