@@ -507,6 +507,9 @@ jobs:
       - name: Theme tokens meet WCAG AA contrast
         run: node scripts/check-contrast.js
 
+      - name: No new sub-12px text dimmed below WCAG AA (ratchet)
+        run: node scripts/check-small-text-contrast.js
+
       - name: Controls have accessible names (icon buttons, switches)
         run: node scripts/check-icon-button-names.js
 
