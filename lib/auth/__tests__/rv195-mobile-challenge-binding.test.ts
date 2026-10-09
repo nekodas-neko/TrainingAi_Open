@@ -32,7 +32,7 @@ describe('challengeMatchesCookie', () => {
 describe('GET /mobile-signin/begin', () => {
   it('stores the challenge in an httpOnly cookie and continues to the Google step', async () => {
     const res = await begin(new NextRequest(`http://x/mobile-signin/begin?challenge=${CHALLENGE}`))
-    expect(res.headers.get('location')).toBe(`http://x/mobile-signin?challenge=${CHALLENGE}`)
+    expect(res.headers.get('location')).toBe(`/mobile-signin?challenge=${CHALLENGE}`)
     const cookie = res.cookies.get(MOBILE_CHALLENGE_COOKIE)
     expect(cookie?.value).toBe(CHALLENGE)
     expect(cookie?.httpOnly).toBe(true)
@@ -41,8 +41,18 @@ describe('GET /mobile-signin/begin', () => {
 
   it('sets nothing for a malformed challenge', async () => {
     const res = await begin(new NextRequest('http://x/mobile-signin/begin?challenge=nope'))
-    expect(res.headers.get('location')).toBe('http://x/sign-in')
+    expect(res.headers.get('location')).toBe('/sign-in')
     expect(res.cookies.get(MOBILE_CHALLENGE_COOKIE)).toBeUndefined()
+  })
+
+  it('never puts the request\'s own host in the redirect (production sent the tab to localhost:8080)', async () => {
+    // Behind Railway's proxy a route handler sees the container's address as req.url. The tab
+    // must follow a path, which the browser resolves against the public origin it is already on.
+    const res = await begin(new NextRequest(`https://localhost:8080/mobile-signin/begin?challenge=${CHALLENGE}`))
+    expect(res.status).toBe(307)
+    expect(res.headers.get('location')).toBe(`/mobile-signin?challenge=${CHALLENGE}`)
+    const bad = await begin(new NextRequest('https://localhost:8080/mobile-signin/begin?challenge=nope'))
+    expect(bad.headers.get('location')).toBe('/sign-in')
   })
 })
 
