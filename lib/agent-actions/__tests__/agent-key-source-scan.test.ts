@@ -12,7 +12,7 @@ import { AGENT_JOB_IDS, AgentActionRequest } from '../jobs'
 import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
 const ROOT = path.resolve(__dirname, '../../..')
-const SKIP = new Set(['node_modules', '.next', '.git', 'android', 'coverage', 'test-results', 'playwright-report', '.claude', 'docs'])
+const SKIP = new Set(['node_modules', '__check_fixture__', '.next', '.git', 'android', 'coverage', 'test-results', 'playwright-report', '.claude', 'docs'])
 
 function* sourceFiles(dir: string): Generator<string> {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
