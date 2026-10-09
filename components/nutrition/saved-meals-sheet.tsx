@@ -605,7 +605,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                   onEditMeal={openBuild}
                   onRequestDeleteMeal={requestDelete}
                   onLabelMeal={setLabelMeal}
-                  planSavedMealIds={planSavedMealIds}
+                  planSavedMealIds={planSavedMealIds} mealTypes={mealTypes}
                   onBuildFirst={openBuild}
                   onSelectFood={onSelectFood}
                   userId={userId}
