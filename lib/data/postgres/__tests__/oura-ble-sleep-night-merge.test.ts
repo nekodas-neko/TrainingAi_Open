@@ -80,7 +80,8 @@ describe.skipIf(!canRun)('aggregateOuraRawSamples — merge a night\'s split clu
     expect(Number(rows[0].time_in_bed_hours)).toBeLessThan(16) // never exceeds the cap
 
     // Orphan cleanup: an old-shape BLE row for the same wake-day (e.g. a second cluster from a
-    // prior rollup) must be DELETED on re-run, not left for mergeByDate to sum back in.
+    // prior rollup) must be retired on re-run, not left for mergeByDate to sum back in. Issue 2546:
+    // retired is a tombstone (deleted_at), never a DELETE, so a device that pulled it hears about it.
     const date = rows[0].date
     await pool.query(
       `INSERT INTO sleep_sessions (user_id, oura_id, date, sleep_start, sleep_end, duration_hours)
@@ -89,9 +90,12 @@ describe.skipIf(!canRun)('aggregateOuraRawSamples — merge a night\'s split clu
     )
     await repo.aggregateOuraRawSamples(TEST_USER_ID, 'Australia/Brisbane')
     const { rows: after } = await pool.query(
-      `SELECT count(*)::int AS n FROM sleep_sessions WHERE user_id = $1 AND oura_id LIKE 'ble:%'`,
+      `SELECT count(*) FILTER (WHERE deleted_at IS NULL)::int AS n,
+              bool_and(deleted_at IS NOT NULL) FILTER (WHERE oura_id = 'ble:stale-orphan') AS orphan_tombstoned
+         FROM sleep_sessions WHERE user_id = $1 AND oura_id LIKE 'ble:%'`,
       [TEST_USER_ID],
     )
-    expect(after[0].n).toBe(1) // the orphan is gone; still exactly one BLE night
+    expect(after[0].n).toBe(1) // still exactly one live BLE night
+    expect(after[0].orphan_tombstoned).toBe(true)
   })
 })
