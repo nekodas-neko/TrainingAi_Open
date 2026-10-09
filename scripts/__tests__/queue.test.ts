@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { plan, isReady, needsOpus, pickBatch } = require('../queue.js')
+const { plan, isReady, needsOpus, pickBatch, batchPriority } = require('../queue.js')
 
 const issue = (number: number, labels: string[], body = '') => ({ number, title: `t${number}`, body, labelSet: new Set(labels) })
 
@@ -66,41 +66,46 @@ describe('batch model', () => {
   })
 })
 
-describe('next batch by priority', () => {
+describe('next batch by the Orchestrator\'s priority', () => {
   const ms = (number: number, description = '') => ({ number, title: `Batch: ${number}`, description })
   const iss = (number: number, labels: string[]) => ({ number, title: `t${number}`, labels: labels.map((name) => ({ name })) })
 
-  it('serves the most urgent batch first, then the oldest: hotfix, next, bug, the rest', () => {
-    const milestones = [ms(10), ms(20), ms(30), ms(40)]
-    const by = new Map([
-      [10, [iss(1, ['type: feature'])]],
-      [20, [iss(2, ['type: bug'])]],
-      [30, [iss(3, ['next', 'type: feature'])]],
-      [40, [iss(4, ['type: bug'])]],
-    ])
-    expect(pickBatch(milestones, by).milestone.number).toBe(30)
-    by.set(30, [iss(3, ['next', 'type: feature', 'blocked'])])
-    expect(pickBatch(milestones, by).milestone.number).toBe(20)
+  it('reads P0–P3 from the start of the description, and treats none as P3', () => {
+    expect(batchPriority(ms(1, 'P1 Opus. A data-correctness bug.'))).toBe(1)
+    expect(batchPriority(ms(1, 'P2 Sonnet. A feature.'))).toBe(2)
+    expect(batchPriority(ms(1, 'Opus. No priority yet.'))).toBe(3)
+    expect(batchPriority({ number: 1 })).toBe(3)
   })
 
-  it('skips claimed, fully parked and (under sonnetOnly) Opus batches', () => {
-    const milestones = [ms(10, 'Opus. A bug fix.'), ms(20), ms(30)]
+  it('serves the highest-priority batch first, then the oldest', () => {
+    const milestones = [ms(10, 'P3 Sonnet.'), ms(20, 'P2 Opus.'), ms(30, 'P1 Opus.'), ms(40, 'P1 Sonnet.')]
+    const by = new Map([10, 20, 30, 40].map((n) => [n, [iss(n, ['type: feature'])]]))
+    expect(pickBatch(milestones, by).milestone.number).toBe(30)
+    by.set(30, [iss(30, ['type: feature', 'blocked'])])
+    expect(pickBatch(milestones, by).milestone.number).toBe(40)
+  })
+
+  it('lets a ready hotfix make a batch P0 and the owner\'s next make it at least P1', () => {
+    const milestones = [ms(10, 'P1 Opus.'), ms(20, 'P3 Sonnet.'), ms(30, 'P2 Sonnet.')]
+    const by = new Map([[10, [iss(1, ['type: bug'])]], [20, [iss(2, ['type: feature', 'hotfix'])]], [30, [iss(3, ['next'])]]])
+    expect(pickBatch(milestones, by).milestone.number).toBe(20)
+    by.delete(20)
+    expect(pickBatch(milestones, by).milestone.number).toBe(10)
+  })
+
+  it('skips claimed, fully parked and (under sonnetOnly) Opus batches; urgentOnly keeps only P0 and P1', () => {
+    const milestones = [ms(10, 'P1 Opus.'), ms(20, 'P1 Sonnet.'), ms(30, 'P2 Sonnet.')]
     const by = new Map([
       [10, [iss(1, ['type: bug'])]],
       [20, [iss(2, ['type: bug', 'in progress'])]],
       [30, [iss(3, ['type: feature']), iss(4, ['type: bug', 'later'])]],
     ])
     expect(pickBatch(milestones, by).milestone.number).toBe(10)
-    const slow = pickBatch(milestones, by, { sonnetOnly: true })
-    expect(slow.milestone.number).toBe(30)
-    expect(slow.blocked.map((i: { number: number }) => i.number)).toEqual([4])
-    expect(pickBatch([ms(50)], new Map([[50, [iss(5, ['blocked'])]]]))).toBeNull()
-  })
-
-  it('under urgentOnly keeps only batches holding a hotfix, a next or a bug', () => {
-    const milestones = [ms(10), ms(20)]
-    const by = new Map([[10, [iss(1, ['type: feature'])]], [20, [iss(2, ['type: tuning']), iss(3, ['type: bug'])]]])
-    expect(pickBatch(milestones, by, { urgentOnly: true }).milestone.number).toBe(20)
-    expect(pickBatch([ms(10)], by, { urgentOnly: true })).toBeNull()
+    const slowSonnet = pickBatch(milestones, by, { sonnetOnly: true })
+    expect(slowSonnet.milestone.number).toBe(30)
+    expect(slowSonnet.blocked.map((i: { number: number }) => i.number)).toEqual([4])
+    expect(pickBatch(milestones, by, { urgentOnly: true }).milestone.number).toBe(10)
+    expect(pickBatch([ms(30, 'P2 Sonnet.')], by, { urgentOnly: true })).toBeNull()
+    expect(pickBatch([ms(50, 'P1')], new Map([[50, [iss(5, ['blocked'])]]]))).toBeNull()
   })
 })

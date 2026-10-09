@@ -47,18 +47,30 @@ function rank(labels) {
   return 3;
 }
 
-/** A batch needs Opus when its milestone description names it (descriptions start `Opus.` or `Sonnet.`). */
+/** A batch needs Opus when its milestone description names it (descriptions read `P1 Opus. …` or `P2 Sonnet. …`). */
 function needsOpus(milestone) {
   return /\bOpus\b/.test(milestone.description || '');
 }
 
 /**
- * Pure: the batch to build next (owner, 2026-10-09: "prioritise the higher priority tasks").
- * A batch ranks by its most urgent ready issue (`hotfix`, then `next`, then a bug, then the rest;
- * the same order as `rank`), and ties go to the oldest milestone. A batch someone has claimed
- * (`in progress`), one outside `lane`, one needing Opus under `sonnetOnly`, and one with nothing
- * ready are skipped. `urgentOnly` (the Slow usage tier) keeps only batches holding a hotfix, a `next`
- * or a bug.
+ * The priority the Orchestrator gave a batch (owner, 2026-10-09: "it will be up to you to group issues
+ * into a batch and assign a priority to it, so we push out the important changes first"). It is the
+ * `P0`–`P3` at the start of the milestone description, e.g. `P1 Opus. …`:
+ *   P0 production broken (hotfix) · P1 do next: release-critical, data-correctness bugs, unblockers,
+ *   anything the owner marks `next` · P2 owner-signed improvements and asked-for features ·
+ *   P3 chores and long-range work. A batch with no priority sorts last, as P3.
+ */
+function batchPriority(milestone) {
+  const m = /^\s*P([0-3])\b/.exec(milestone.description || '');
+  return m ? Number(m[1]) : 3;
+}
+
+/**
+ * Pure: the batch to build next. The batch's own priority decides (`batchPriority`); a ready `hotfix`
+ * issue makes it P0 and a ready `next` issue (the owner's steer) makes it at least P1. Ties go to the
+ * oldest milestone. A batch someone has claimed (`in progress`), one outside `lane`, one needing Opus
+ * under `sonnetOnly`, and one with nothing ready are skipped. `urgentOnly` (the Slow usage tier)
+ * keeps only P0 and P1.
  */
 function pickBatch(milestones, issuesByMilestone, { sonnetOnly = false, urgentOnly = false, lane = null } = {}) {
   const names = (i) => new Set(i.labels.map((l) => (typeof l === 'string' ? l : l.name)));
@@ -72,11 +84,13 @@ function pickBatch(milestones, issuesByMilestone, { sonnetOnly = false, urgentOn
     if (lane && !labelSets.some((l) => l.has(`lane: ${lane}`))) continue;
     const readySets = labelSets.filter((l) => !parked(l));
     if (!readySets.length) continue;
-    const best = Math.min(...readySets.map(rank));
-    if (urgentOnly && best > 2) continue; // the Slow tier takes only hotfix, next and bug batches
-    candidates.push({ milestone: m, issues, blocked: issues.filter((_, k) => parked(labelSets[k])), best });
+    let priority = batchPriority(m);
+    if (readySets.some((l) => l.has('next'))) priority = Math.min(priority, 1);
+    if (readySets.some((l) => l.has('hotfix'))) priority = 0;
+    if (urgentOnly && priority > 1) continue; // the Slow tier takes only P0 and P1
+    candidates.push({ milestone: m, issues, blocked: issues.filter((_, k) => parked(labelSets[k])), priority });
   }
-  candidates.sort((a, b) => a.best - b.best || a.milestone.number - b.milestone.number);
+  candidates.sort((a, b) => a.priority - b.priority || a.milestone.number - b.milestone.number);
   return candidates[0] || null;
 }
 
@@ -121,7 +135,7 @@ function plan(issues) {
   return batches;
 }
 
-module.exports = { plan, rank, isReady, needsOpus, pickBatch };
+module.exports = { plan, rank, isReady, needsOpus, pickBatch, batchPriority };
 
 if (require.main === module) {
   const args = process.argv.slice(2);
@@ -160,7 +174,7 @@ if (require.main === module) {
     if (args.includes('--json')) {
       console.log(JSON.stringify({ milestone: m.number, title: m.title, issues: issues.map((i) => ({ number: i.number, title: i.title, blocked: blocked.includes(i) })) }, null, 2));
     } else {
-      console.log(`NEXT BATCH: milestone #${m.number} — ${m.title}`);
+      console.log(`NEXT BATCH (P${picked.priority}): milestone #${m.number} — ${m.title}`);
       for (const i of issues) console.log(`  #${i.number}  ${i.title}${blocked.includes(i) ? '   (blocked — leave it, say so in the PR)' : ''}`);
     }
     process.exit(0);
