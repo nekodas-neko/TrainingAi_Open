@@ -14,7 +14,6 @@ import { todayInTz, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared
 import { computeObservedHr } from '@trainingai/shared/health/observed-hr'
 
 const TZ = 'Australia/Brisbane'
-const USER = 'u-2235'
 const DAYS = 28
 
 const h = vi.hoisted(() => ({ repo: null as unknown }))
