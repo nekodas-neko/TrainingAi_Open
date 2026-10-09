@@ -24,7 +24,9 @@ prescription coach, the cardio hub/trends/picker surfaces, and guided walk.
 `completedAs`, because the planner reads a null as a run (LB-179). Device pass still owed —
 [`docs/overview/known-issues.md`](../../overview/known-issues.md).
 
-**ACWR has exactly one implementation** (`computeVolumeAcwr`) and clients render the route's
+**ACWR has exactly one implementation** (`computeVolumeAcwr`, the 7:28 call of `loadRatio`; its acute
+window is 7 local days since issue 2194, and `computeBlockTrend` is the 28:90 call, issue 2340) and
+clients render the route's
 `interpretation` rather than re-banding numbers — see [`docs/module-map.md`](../../module-map.md) §6.
 
 ## Reference docs

@@ -63,8 +63,6 @@ export interface PreparedShadowHistory {
   excluded: Map<string, 'low_wear' | 'unwell'>
 }
 
-const DAY_MS = 86_400_000
-
 /**
  * Deep + REM as a percentage of total sleep, or null when the night has no staging. Null, never 0:
  * a manual night or a Health Connect night without stages stores no stage hours (or zeros), and
@@ -142,15 +140,20 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
   const loadDays = new Set<string>()
   for (const s of sessions) for (let i = 0; i < 28; i++) loadDays.add(shiftDateStr(toAestDay(s.startedAt, tz), i))
   const trainingLoad = compact([...loadDays].sort().map(d => {
+    // The same framing as the live callers (issue 2194): `asOf` is the START of the scored day, the
+    // window runs from 28 local days before it to the day's end. Passing the day's END as `asOf`
+    // made the acute window today's-end minus 7 days, which a 7-day window inclusive of today
+    // would shrink to six.
+    const dayMid = dateStrMidnightInTz(d, tz)
     const end = dateStrMidnightInTz(shiftDateStr(d, 1), tz)
-    const start = end.getTime() - 28 * DAY_MS
+    const start = dateStrMidnightInTz(shiftDateStr(d, -28), tz).getTime()
     // OR-210: for the first 28 days of a program the chronic window still holds the previous
     // routine, so the ratio is withheld — the same rule every ACWR consumer applies. The program is
     // the one active now (no history of programs is stored), so a replayed day before it began is
     // withheld too.
     if (acwrBaselineDaysRemaining(raw.program, end) > 0) return null
     const window = sessions.filter(s => s.startedAt.getTime() >= start && s.startedAt.getTime() < end.getTime())
-    return obs(d, computeVolumeAcwr(window, end).acwr, 'workout_sessions')
+    return obs(d, computeVolumeAcwr(window, dayMid, { tz }).acwr, 'workout_sessions')
   }))
 
   // WHO minutes for the week ending each day; every one of the seven days must have been computed.

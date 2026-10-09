@@ -511,6 +511,7 @@ export async function aggregateSignals(
       volumeKg: ws.exercises.reduce((sum, ex) => sum + (ex.volume ?? 0), 0),
     })),
     todayMid,
+    { tz },
   ).acwr
   const acwr = acwrBaselineDaysRemaining(program, todayMid) > 0 ? null : acwrRaw
 

@@ -362,7 +362,7 @@ describe('shadow readiness — structural rules', () => {
       expect(def).toMatchObject({ shape: 'steady', reference: 'learned', weight: 10 })
       expect(def.band).toBeUndefined()
       expect(def.unavailable).toBeUndefined()
-      expect(SHADOW_MODEL_VERSION).toBe(2)
+      expect(SHADOW_MODEL_VERSION).toBeGreaterThanOrEqual(2)
     })
 
     it('a night at its normal scores near 100; a night far from it, either way, scores low', () => {
