@@ -6,14 +6,15 @@
  * `packages/shared/src/running/heart-health.ts`, on the server, and arrives on the payload.
  *
  * No word here names a run. The prescription is a heart-health activity that any activity can
- * complete through its minutes in zone 2 or above (owner, 2026-10-05).
+ * complete through its minutes at moderate effort or above (owner, 2026-10-05; floor moved from
+ * zone 2 to moderate effort, 40% of heart-rate reserve, on 2026-10-09, issue 2746).
  */
 import type { HeartHealthActivity, HeartHealthDayOutcome } from '@trainingai/shared/running/heart-health'
 
 export const CARD_TITLE = 'Heart-health activity'
 export const ANY_ACTIVITY = 'Any activity counts'
-export const RATIONALE = 'Aerobic time to build your base. A walk, a ride or anything else counts for its minutes in zone 2 or above.'
-export const PROGRESS_LABEL = 'Zone 2+ minutes today'
+export const RATIONALE = 'Aerobic time to build your base. A walk, a ride or anything else counts for its minutes at moderate effort or above.'
+export const PROGRESS_LABEL = 'Moderate-effort minutes today'
 
 /** "Zone 2" · "Zones 2–3" · "Zones 1, 3 and 4" — ranges only when the ids are contiguous. */
 export function zoneLabel(zoneIds: number[]): string | null {
@@ -25,9 +26,9 @@ export function zoneLabel(zoneIds: number[]): string | null {
   return `Zones ${ids.slice(0, -1).join(', ')} and ${ids[ids.length - 1]}`
 }
 
-/** "30 min in zone 2 or above", or the rule alone when the prescription states no minutes. */
+/** "30 min at moderate effort or above", or the rule alone when the prescription states no minutes. */
 export function criterionLine(targetMin: number | null): string {
-  return targetMin != null && targetMin > 0 ? `${targetMin} min in zone 2 or above` : 'Time in zone 2 or above'
+  return targetMin != null && targetMin > 0 ? `${targetMin} min at moderate effort or above` : 'Time at moderate effort or above'
 }
 
 /** "22 of 30" — the progress figure beside the bar. */
@@ -54,12 +55,12 @@ export function shownActivity(
 }
 
 /** The small line under a history row: the measured minutes, or why there are none. */
-export function zoneMinutesLine(activities: readonly HeartHealthActivity[], countedMin: number): string {
+export function countedMinutesLine(activities: readonly HeartHealthActivity[], countedMin: number): string {
   if (activities.length === 0) return ''
-  const measured = activities.some((a) => a.zone2PlusMin != null)
+  const measured = activities.some((a) => a.effortMin != null)
   if (!measured) return 'No heart rate recorded'
   const across = activities.length > 1 ? ` across ${activities.length} activities` : ''
-  return `${countedMin} min in zone 2+${across}`
+  return `${countedMin} min at moderate effort or above${across}`
 }
 
 export const OUTCOME_LABEL: Record<HeartHealthDayOutcome, string> = {

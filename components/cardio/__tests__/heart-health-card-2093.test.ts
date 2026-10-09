@@ -5,25 +5,32 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   ANY_ACTIVITY, CARD_TITLE, OUTCOME_LABEL, PROGRESS_LABEL, RATIONALE,
-  activityLine, criterionLine, progressFigure, shownActivity, zoneLabel, zoneMinutesLine,
+  activityLine, criterionLine, progressFigure, shownActivity, zoneLabel, countedMinutesLine,
 } from '../todays-cardio-copy'
 import { completionsDue } from '@/lib/activity/heart-health-completion'
 
-const walk = { id: 'w', title: 'Treadmill walk', activityType: 'treadmill', durationMin: 34, zone2PlusMin: 31 }
-const stroll = { id: 's', title: 'Evening stroll', activityType: 'walk', durationMin: 41, zone2PlusMin: 6 }
+const walk = { id: 'w', title: 'Treadmill walk', activityType: 'treadmill', durationMin: 34, effortMin: 31 }
+const stroll = { id: 's', title: 'Evening stroll', activityType: 'walk', durationMin: 41, effortMin: 6 }
 
 describe('issue 2093 — the card, to the 10-05 mockup, with no run framing', () => {
-  it('states the rule in zone 2+ minutes', () => {
+  it('states the rule as moderate effort or above (issue 2746)', () => {
     expect(CARD_TITLE).toBe('Heart-health activity')
-    expect(criterionLine(30)).toBe('30 min in zone 2 or above')
-    expect(criterionLine(null)).toBe('Time in zone 2 or above')
-    expect(PROGRESS_LABEL).toBe('Zone 2+ minutes today')
+    expect(criterionLine(30)).toBe('30 min at moderate effort or above')
+    expect(criterionLine(null)).toBe('Time at moderate effort or above')
+    expect(PROGRESS_LABEL).toBe('Moderate-effort minutes today')
     expect(progressFigure(22, 30)).toBe('22 of 30')
   })
 
   it('never names a run anywhere in its copy', () => {
     const copy = [CARD_TITLE, ANY_ACTIVITY, RATIONALE, PROGRESS_LABEL, criterionLine(30), ...Object.values(OUTCOME_LABEL)]
     for (const line of copy) expect(line).not.toMatch(/\brun\b/i)
+  })
+
+  it('no user-visible line still says zone 2 is the bar (issue 2746)', () => {
+    const copy = [RATIONALE, PROGRESS_LABEL, criterionLine(30), criterionLine(null), countedMinutesLine([walk], 31)]
+    for (const line of copy) expect(line).not.toMatch(/zone 2/i)
+    const card = readFileSync(join(__dirname, '../todays-cardio-card.tsx'), 'utf8')
+    expect(card).not.toMatch(/zone 2 or above|zone 2\+/i)
   })
 
   it('names zones as a range only when they are contiguous', () => {
@@ -47,10 +54,10 @@ describe('issue 2093 — the history shows what was actually done', () => {
   })
 
   it('states the measured minutes, or that nothing measured them', () => {
-    expect(zoneMinutesLine([walk], 31)).toBe('31 min in zone 2+')
-    expect(zoneMinutesLine([walk, stroll], 37)).toBe('37 min in zone 2+ across 2 activities')
-    expect(zoneMinutesLine([{ ...walk, zone2PlusMin: null }], 0)).toBe('No heart rate recorded')
-    expect(zoneMinutesLine([], 0)).toBe('')
+    expect(countedMinutesLine([walk], 31)).toBe('31 min at moderate effort or above')
+    expect(countedMinutesLine([walk, stroll], 37)).toBe('37 min at moderate effort or above across 2 activities')
+    expect(countedMinutesLine([{ ...walk, effortMin: null }], 0)).toBe('No heart rate recorded')
+    expect(countedMinutesLine([], 0)).toBe('')
   })
 
   it('labels each outcome as the mockup does', () => {

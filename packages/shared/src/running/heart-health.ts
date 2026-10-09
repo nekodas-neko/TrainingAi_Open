@@ -1,33 +1,50 @@
 import { fromZonedTime } from 'date-fns-tz'
 import { shiftDateStr } from '../date-utils'
+import { moderateIntensityBpm } from '../health/hr-zones'
+import { DEFAULT_MAX_GAP_SEC, type HrReading } from '../health/zone-minutes'
 
 /**
  * Issue 2093. The day's prescription is a heart-health activity, and this file is the ONE place
  * that decides whether a day did it.
  *
- * The owner's rule (2026-10-05): ANY activity can count, but only its minutes in zone 2 or above go
- * toward the prescription. A brisk treadmill walk counts; a slow stroll does not yet; a run counts
- * only for the minutes it actually spent at that effort. How the activity was started (from the
- * prescription or not) no longer matters — the measured minutes decide.
+ * The owner's rule (2026-10-05): ANY activity can count, but only its minutes at moderate effort or
+ * above go toward the prescription. A brisk treadmill walk counts for its brisk stretches; a run
+ * counts only for the minutes it actually spent at that effort. How the activity was started (from
+ * the prescription or not) no longer matters — the measured minutes decide.
+ *
+ * The floor (owner, 2026-10-09, issue 2746) is the moderate-effort line, `MODERATE_INTENSITY_FRAC`
+ * (40% of heart-rate reserve) via `moderateIntensityBpm` — the same line WHO active minutes use
+ * (TN-78). It was zone 2 (60% of reserve) until then, which no treadmill walk of the owner's ever
+ * reached. There is no second copy of the floor: this file reads it from `hr-zones.ts`.
  *
  * Every reader goes through here: the running-plan route that paints the card and the week's
  * history, the client hook that marks today done, and the admin back-fill that re-scores past
  * days. Two copies of this rule would be two answers to "did I do it today?".
  */
 
-/** The lowest zone (of `hr-zones.ts`'s five) whose minutes count. Zone 1 fills from ordinary
- *  movement, the same reason `zone-quota.ts` keeps it out of the training totals. */
-export const HEART_HEALTH_FLOOR_ZONE = 2
+/** The bpm at which a minute starts to count: moderate effort, 40% of reserve (issue 2746). */
+export function heartHealthFloorBpm(profile: { maxHr: number; restingHr: number }): number {
+  return moderateIntensityBpm(profile)
+}
 
-/** Whole minutes at or above the floor zone, from `accumulateZoneSeconds`'s five-slot result
- *  (index 0 = zone 1). */
-export function zone2PlusMinutes(zoneSeconds: readonly number[]): number {
+/** Whole minutes at or above `floorBpm` across a heart-rate series. Counted minute by minute, so a
+ *  walk earns its brisk stretches and not its slow ones. Each interval belongs to its EARLIER
+ *  reading and is capped at `maxGapSec`, the same accounting as `accumulateZoneSeconds`, so a gap
+ *  in the data never inflates the count. A reading exactly at the floor counts. */
+export function heartHealthMinutes(
+  readings: readonly HrReading[],
+  floorBpm: number,
+  maxGapSec = DEFAULT_MAX_GAP_SEC,
+): number {
   let sec = 0
-  for (let i = HEART_HEALTH_FLOOR_ZONE - 1; i < 5; i++) sec += zoneSeconds[i] ?? 0
+  for (let i = 0; i + 1 < readings.length; i++) {
+    const dt = Math.min((readings[i + 1].timestamp - readings[i].timestamp) / 1000, maxGapSec)
+    if (dt > 0 && readings[i].bpm >= floorBpm) sec += dt
+  }
   return Math.round(sec / 60)
 }
 
-/** One logged activity as the rule sees it. `zone2PlusMin` is null when nothing measured a heart
+/** One logged activity as the rule sees it. `effortMin` (minutes at moderate effort or above) is null when nothing measured a heart
  *  rate across the activity (no ring or strap data, or no start time to place it): unknown, which
  *  counts nothing, and is never shown as zero. */
 export interface HeartHealthActivity {
@@ -35,16 +52,16 @@ export interface HeartHealthActivity {
   title: string
   activityType: string
   durationMin: number | null
-  zone2PlusMin: number | null
+  effortMin: number | null
 }
 
 export interface HeartHealthVerdict {
   /** The prescription's minutes, or null when it states none (nothing to meet). */
   targetMin: number | null
-  /** Zone 2+ minutes across every activity on the day. */
+  /** Minutes at moderate effort or above across every activity on the day. */
   countedMin: number
   met: boolean
-  /** The activity credited with the day: the one with the most zone 2+ minutes. Null when no
+  /** The activity credited with the day: the one with the most counted minutes. Null when no
    *  activity has any. Its id is what a completion links as `activityLogId`. */
   credited: HeartHealthActivity | null
 }
@@ -57,13 +74,13 @@ export function heartHealthVerdict(
   let countedMin = 0
   let credited: HeartHealthActivity | null = null
   for (const a of activities) {
-    const z = a.zone2PlusMin ?? 0
+    const z = a.effortMin ?? 0
     countedMin += z
     if (z <= 0) continue
     if (
       credited == null
-      || z > (credited.zone2PlusMin ?? 0)
-      || (z === (credited.zone2PlusMin ?? 0) && (a.durationMin ?? 0) > (credited.durationMin ?? 0))
+      || z > (credited.effortMin ?? 0)
+      || (z === (credited.effortMin ?? 0) && (a.durationMin ?? 0) > (credited.durationMin ?? 0))
     ) credited = a
   }
   return { targetMin: target, countedMin, met: target != null && countedMin >= target, credited }
@@ -119,7 +136,7 @@ export function completedAsForActivity(activityType: string | null): 'run' | 'wa
 /**
  * The instant window an activity log covers, from its local date and "HH:MM[:SS]" clock times.
  * Null without a start time: a log with only a duration cannot be placed against the heart-rate
- * series, so its zone minutes are unknown rather than guessed. An end before the start crossed
+ * series, so its minutes are unknown rather than guessed. An end before the start crossed
  * midnight.
  */
 export function activityLogWindow(

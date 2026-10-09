@@ -9,12 +9,13 @@ import { rescoreHeartHealth } from '@/lib/health/heart-health-service'
 import { DEFAULT_TZ, todayInTz, normalizeDateParamIso, shiftDateStr, daysBetweenDateStrs } from '@trainingai/shared/date-utils'
 
 /**
- * Re-score past heart-health days under the zone-minutes rule (issue 2093).
+ * Re-score past heart-health days under the measured-minutes rule (issue 2093; floor moved to
+ * moderate effort, 40% of reserve, by issue 2746).
  *
  * Until 2093 a prescription completed only when an activity was started from it, so past days with
  * a walk on them stayed `pending`. This applies `heartHealthRescore` (the same rule the device uses
  * for this week) to the admin's own stored rows: a `pending` day whose activities reached the
- * prescribed minutes in zone 2 or above becomes `completed`, linked to the credited activity. A
+ * prescribed minutes at moderate effort or above becomes `completed`, linked to the credited activity. A
  * completed row is never taken back and a skipped one is never touched. It writes only
  * `prescribed_runs.status`, `activity_log_id` and `completed_as`, every value derived here.
  *
@@ -94,7 +95,7 @@ export async function POST(req: NextRequest) {
         pendingNotMet: count((d) => d.status === 'pending' && !d.met),
         // Reported, never written: a skip was the user's choice.
         skippedThatMet: count((d) => d.status === 'skipped' && d.met),
-        noHeartRate: count((d) => d.activities.length > 0 && d.activities.every((a) => a.zone2PlusMin == null)),
+        noHeartRate: count((d) => d.activities.length > 0 && d.activities.every((a) => a.effortMin == null)),
       },
       changes: result.changes,
       days: result.days.map((d) => ({
@@ -103,7 +104,7 @@ export async function POST(req: NextRequest) {
         targetMin: d.targetMin,
         countedMin: d.countedMin,
         met: d.met,
-        activities: d.activities.map((a) => ({ title: a.title, activityType: a.activityType, durationMin: a.durationMin, zone2PlusMin: a.zone2PlusMin })),
+        activities: d.activities.map((a) => ({ title: a.title, activityType: a.activityType, durationMin: a.durationMin, effortMin: a.effortMin })),
       })),
     })
   } catch (err) {
