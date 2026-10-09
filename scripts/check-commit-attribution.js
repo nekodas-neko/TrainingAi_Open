@@ -11,14 +11,19 @@
 // Commits only: PR descriptions and GitHub comments are not commit messages and are not read.
 //
 // Which commits:
-//   - CI (`pull_request`): the job's checkout is depth 1 of the merge commit, so the PR's own
-//     commits are not there. When PR_HEAD_SHA and PR_COMMITS are set (the workflow step passes them)
-//     this fetches that many commits behind the PR head and reads exactly those. A fetch failure
-//     fails the check; a gate that cannot look must not pass as if it had.
+//   - CI (`pull_request`): the PR's own commits, as GitHub lists them on the PR (the workflow step
+//     passes PR_NUMBER and a read token). The checkout is depth 1 of the merge commit, so they are
+//     not in the clone, and git cannot list them from a shallow fetch: this used to read the newest
+//     PR_COMMITS commits behind the PR head, which walks BOTH parents of a "merge main into the
+//     branch" commit and so read `main`'s own newest commits as the PR's. Those carry the
+//     `Co-authored-by: Claude` line GitHub adds when it squash-merges an agent's PR, so #2508 failed
+//     on two commits that were already on `main` and not its author's. The API list is exactly the
+//     commits the PR adds. A failed request fails the check; a gate that cannot look must not pass
+//     as if it had.
 //   - Locally, nothing set: `<base>..HEAD`, with the base from the same candidates the ratchets use
 //     (origin/main, then main). With no base to be had it says so and passes, since there is
-//     nothing to compare against; CI is the gate.
-// The commits are read in ONE `git log`, however many there are.
+//     nothing to compare against; CI is the gate. A full clone has the history, so `..` already
+//     leaves out commits a merge brought in from `main`.
 const { spawnSync } = require('child_process');
 
 // `Co-authored-by: Delan …` is a person and must pass; only a trailer naming Claude or the Anthropic
@@ -73,17 +78,53 @@ function resolveBase(cwd) {
   return null;
 }
 
-/** @returns {{ commits: Array, label: string } | { skip: string } | { error: string }} */
-function collectCommits(cwd, env) {
-  const headSha = env.PR_HEAD_SHA;
-  const count = Number(env.PR_COMMITS);
-  if (headSha) {
-    if (!Number.isInteger(count) || count < 1) return { error: `PR_HEAD_SHA is set but PR_COMMITS is not a positive integer (${env.PR_COMMITS})` };
-    const fetched = git(cwd, ['fetch', '--no-tags', `--depth=${count + 1}`, 'origin', headSha]);
-    if (!fetched.ok) return { error: `could not fetch the PR's commits (${headSha}): ${fetched.reason}` };
-    const log = git(cwd, ['log', '-n', String(count), LOG_FORMAT, headSha]);
-    if (!log.ok) return { error: `git log failed: ${log.reason}` };
-    return { commits: parseLog(log.stdout), label: `the ${count} commit(s) of this PR` };
+// `GET /pulls/{n}/commits` lists at most 250 commits, 100 a page.
+const PR_COMMITS_PER_PAGE = 100;
+const PR_COMMITS_MAX_PAGES = 3;
+
+/** The PR's own commits as GitHub lists them. `fetchImpl` is the tests' seam. */
+async function fetchPrCommits({ repo, number, token, apiUrl, fetchImpl }) {
+  const commits = [];
+  for (let page = 1; page <= PR_COMMITS_MAX_PAGES; page++) {
+    const url = `${apiUrl}/repos/${repo}/pulls/${number}/commits?per_page=${PR_COMMITS_PER_PAGE}&page=${page}`;
+    const headers = { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    let body;
+    try {
+      const res = await fetchImpl(url, { headers });
+      if (!res.ok) return { error: `could not list the PR's commits (${url}): HTTP ${res.status}` };
+      body = await res.json();
+    } catch (e) {
+      return { error: `could not list the PR's commits (${url}): ${e && e.message ? e.message : e}` };
+    }
+    if (!Array.isArray(body)) return { error: `could not list the PR's commits (${url}): the response is not a list` };
+    for (const c of body) {
+      if (!c || typeof c.sha !== 'string' || !c.commit || typeof c.commit.message !== 'string') {
+        return { error: `could not list the PR's commits (${url}): an entry has no sha or message` };
+      }
+      commits.push({ sha: c.sha, message: c.commit.message });
+    }
+    if (body.length < PR_COMMITS_PER_PAGE) break;
+  }
+  return { commits };
+}
+
+/** @returns {Promise<{ commits: Array, label: string } | { skip: string } | { error: string }>} */
+async function collectCommits(cwd, env, fetchImpl = globalThis.fetch) {
+  if (env.PR_NUMBER) {
+    const number = Number(env.PR_NUMBER);
+    if (!Number.isInteger(number) || number < 1) return { error: `PR_NUMBER is not a positive integer (${env.PR_NUMBER})` };
+    if (!env.GITHUB_REPOSITORY) return { error: 'PR_NUMBER is set but GITHUB_REPOSITORY is not' };
+    const got = await fetchPrCommits({
+      repo: env.GITHUB_REPOSITORY,
+      number,
+      token: env.GH_TOKEN || env.GITHUB_TOKEN,
+      apiUrl: env.GITHUB_API_URL || 'https://api.github.com',
+      fetchImpl,
+    });
+    if (got.error) return got;
+    if (got.commits.length === 0) return { error: `GitHub listed no commits for PR #${number}` };
+    return { commits: got.commits, label: `the ${got.commits.length} commit(s) of PR #${number}` };
   }
   const base = resolveBase(cwd);
   if (!base) return { skip: 'no base branch resolved (tried origin/main, main); CI is the gate for this rule.' };
@@ -92,10 +133,10 @@ function collectCommits(cwd, env) {
   return { commits: parseLog(log.stdout), label: `${base}..HEAD` };
 }
 
-function main() {
+async function main() {
   const repoArg = process.argv.indexOf('--repo');
   const cwd = repoArg >= 0 ? process.argv[repoArg + 1] : process.cwd();
-  const got = collectCommits(cwd, process.env);
+  const got = await collectCommits(cwd, process.env);
   if (got.error) {
     console.error(`check-commit-attribution: ${got.error}`);
     process.exit(1);
@@ -122,6 +163,11 @@ function main() {
   process.exit(1);
 }
 
-if (require.main === module) main();
+if (require.main === module) {
+  main().catch((e) => {
+    console.error(`check-commit-attribution: ${e && e.stack ? e.stack : e}`);
+    process.exit(1);
+  });
+}
 
-module.exports = { PATTERNS, findViolations, parseLog };
+module.exports = { PATTERNS, findViolations, parseLog, collectCommits };

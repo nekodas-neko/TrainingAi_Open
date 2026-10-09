@@ -24,7 +24,7 @@ import {
   applyDeloadReverts,
   deloadRevertNames,
   deloadOverrideBlocked,
-  deloadOverrideOutcome,
+  deloadOverrideOutcome, fullOverrideNeedsRebuild,
   exerciseSetCount,
   sessionContextLabel,
 } from "@/components/workout/utils";
@@ -508,8 +508,8 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
     programSessionId,
     sessionBudgetMin,
     durationPreset: periodization?.state.prescription?.durationPreset,
-    fetchExercises,
-    loadPeriodization,
+    fetchExercises, loadPeriodization, overrideFull,
+    fullNeedsRebuild: fullOverrideNeedsRebuild(overrideOutcome, overrideBlockedNames, phaseStatus?.isDeloadActive ?? false),
   });
 
   const refreshExercises = useCallback(() => {

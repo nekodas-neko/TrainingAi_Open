@@ -307,6 +307,10 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # pull-requests: read is for the commit-attribution step, which lists the PR's commits.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v5
 
@@ -341,11 +345,13 @@ jobs:
 
       - name: No AI attribution in commit messages
         # issue 2700. Checkout is depth 1 of the merge commit, so the PR's own commits are not in
-        # the clone; the script fetches exactly PR_COMMITS of them behind the PR head. The env is
-        # empty under `pnpm check:rules`, where it falls back to origin/main..HEAD.
+        # the clone; the script asks GitHub for the PR's commit list instead (a shallow fetch behind
+        # the head also pulls in `main` commits a merge brought in, which is how #2508 was failed on
+        # two commits that were not its author's). The env is empty under `pnpm check:rules`, where
+        # it falls back to origin/main..HEAD.
         env:
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_COMMITS: ${{ github.event.pull_request.commits }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
         run: node scripts/check-commit-attribution.js
 
       - name: No unresolved conflict markers

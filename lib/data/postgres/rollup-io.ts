@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, isNull, notInArray, or, sql } from 'drizzle-orm'
+import { and, eq, gte, inArray, isNull, notInArray, or } from 'drizzle-orm'
 import * as s from './schema'
 import * as oura from './slices/oura'
 import { readRawFrames } from './slices/oura-raw-frames'
@@ -41,14 +41,14 @@ export function createPostgresRollupIO(deps: PostgresRollupIODeps): RollupIO {
 
     readRawFrames: (q: RollupFrameQuery) => readRawFrames(db, userId, { ...q, caller: deps.caller ?? 'rollup' }),
 
-    deleteBleSleepSessionsForDates: async dates => {
-      await db.delete(s.sleepSessions).where(and(
-        eq(s.sleepSessions.userId, userId),
-        sql`${s.sleepSessions.ouraId} LIKE 'ble:%'`,
-        inArray(s.sleepSessions.date, dates),
-      ))
+    // Issue 2546: a tombstone, never a DELETE, so the delta pull can tell a device the night is gone.
+    tombstoneBleSleepSessionsExcept: async (dates, keepStarts) => {
+      await oura.tombstoneBleSleepNightsExcept(db, userId, dates, keepStarts)
     },
-    upsertSleepSessions: rows => oura.upsertOuraSleep(db, userId, rows, 'oura_ble'),
+    upsertSleepSessions: async rows => {
+      await oura.reseatBleSleepOuraIds(db, userId, rows)
+      await oura.upsertOuraSleep(db, userId, rows, 'oura_ble', { replaceOwnBle: true })
+    },
 
     readStepLiveWindows: () => db
       .select({ startDs: s.stepLiveWindows.startDs, endDs: s.stepLiveWindows.endDs, steps: s.stepLiveWindows.steps })

@@ -1,16 +1,14 @@
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
-import { computeHrZones } from '@trainingai/shared/health/hr-zones'
-import { accumulateZoneSeconds } from '@trainingai/shared/health/zone-minutes'
 import {
-  activityLogWindow, heartHealthDayOutcome, heartHealthRescore, heartHealthVerdict, zone2PlusMinutes,
+  activityLogWindow, heartHealthDayOutcome, heartHealthFloorBpm, heartHealthMinutes, heartHealthRescore, heartHealthVerdict,
   type HeartHealthActivity, type HeartHealthDayOutcome,
 } from '@trainingai/shared/running/heart-health'
 import { todayInTz } from '@trainingai/shared/date-utils'
 
 /**
- * Issue 2093. Server half of the heart-health activity: measures each logged activity's zone 2+
- * minutes against the heart-rate series, and applies the one rule in
+ * Issue 2093. Server half of the heart-health activity: measures each logged activity's minutes at
+ * moderate effort or above (issue 2746) against the heart-rate series, and applies the one rule in
  * `packages/shared/src/running/heart-health.ts` to every prescription day in a range.
  *
  * Measured here because the heart-rate series lives on the server (`oura_heartrate`, merged with
@@ -27,17 +25,17 @@ export interface HeartHealthDay {
   countedMin: number
   met: boolean
   outcome: HeartHealthDayOutcome
-  /** The activity credited with the day, when any has zone 2+ minutes. */
+  /** The activity credited with the day, when any has counted minutes. */
   creditedId: string | null
   activities: HeartHealthActivity[]
 }
 
 type Profile = { maxHr: number; restingHr: number }
 
-/** Zone 2+ minutes inside one activity's window, or null when it cannot be placed or nothing
- *  recorded a heart rate across it. */
-async function activityZone2PlusMin(
-  repo: WorkoutRepository, userId: string, tz: string, zones: ReturnType<typeof computeHrZones>,
+/** Minutes at or above the heart-health floor inside one activity's window, or null when it cannot
+ *  be placed or nothing recorded a heart rate across it. */
+async function activityEffortMin(
+  repo: WorkoutRepository, userId: string, tz: string, floorBpm: number,
   log: { date: string; startTime?: string | null; endTime?: string | null; durationMin?: number | null },
 ): Promise<number | null> {
   const window = activityLogWindow(log, tz)
@@ -48,10 +46,10 @@ async function activityZone2PlusMin(
     timestamp: (r.timestamp instanceof Date ? r.timestamp : new Date(r.timestamp)).getTime(),
     bpm: r.bpm,
   }))
-  return zone2PlusMinutes(accumulateZoneSeconds(readings, zones))
+  return heartHealthMinutes(readings, floorBpm)
 }
 
-/** Every prescription day in [from, to] with its activities, their zone 2+ minutes and the verdict. */
+/** Every prescription day in [from, to] with its activities, their counted minutes and the verdict. */
 export async function heartHealthDays(
   repo: WorkoutRepository, userId: string, tz: string, from: string, to: string,
   profile?: Profile,
@@ -62,7 +60,7 @@ export async function heartHealthDays(
     profile ? Promise.resolve(profile) : resolveHrProfile(repo, userId, tz),
   ])
   if (runs.length === 0) return []
-  const zones = computeHrZones({ maxHr: resolved.maxHr, restingHr: resolved.restingHr })
+  const floorBpm = heartHealthFloorBpm({ maxHr: resolved.maxHr, restingHr: resolved.restingHr })
   const runDates = new Set(runs.map((r) => r.date))
   const today = todayInTz(tz)
 
@@ -74,7 +72,7 @@ export async function heartHealthDays(
       title: l.title,
       activityType: l.activityType,
       durationMin: l.durationMin ?? null,
-      zone2PlusMin: await activityZone2PlusMin(repo, userId, tz, zones, l).catch(() => null),
+      effortMin: await activityEffortMin(repo, userId, tz, floorBpm, l).catch(() => null),
     },
   ]))
   const byDate = new Map<string, HeartHealthActivity[]>()

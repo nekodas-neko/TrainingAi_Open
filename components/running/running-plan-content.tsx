@@ -203,7 +203,7 @@ export function RunningPlanContent({ userId }: { userId: string }) {
 
   const onStart = useCallback(() => {
     // Hand off to the guided-activity flow to execute + log the run. Issue 2093: nothing is armed —
-    // the day completes from its measured zone 2+ minutes, whatever was done and however started.
+    // the day completes from its measured moderate-effort minutes, whatever was done and however started.
     useActivityStore.getState().startActivity('run', 'Run', 'PersonSimpleRun', true)
     router.push('/activity')
   }, [router])

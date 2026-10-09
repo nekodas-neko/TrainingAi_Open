@@ -7,7 +7,7 @@ import { formatDateDisplay } from '@trainingai/shared/date-utils'
 import type { HeartHealthActivity, HeartHealthDayOutcome } from '@trainingai/shared/running/heart-health'
 import {
   ANY_ACTIVITY, CARD_TITLE, OUTCOME_COLOR, OUTCOME_LABEL, PROGRESS_LABEL, RATIONALE,
-  activityLine, criterionLine, progressFigure, shownActivity, zoneLabel, zoneMinutesLine,
+  activityLine, criterionLine, progressFigure, shownActivity, zoneLabel, countedMinutesLine,
 } from './todays-cardio-copy'
 
 /** The presets the treadmill row offers. 30 is drawn first because it clears a 25-minute target
@@ -65,7 +65,7 @@ function ChooserRow({ onClick, icon, title, note }: {
 
 function HistoryRow({ day }: { day: HeartHealthDayView }) {
   const shown = shownActivity(day.activities, day.creditedId)
-  const sub = zoneMinutesLine(day.activities, day.countedMin)
+  const sub = countedMinutesLine(day.activities, day.countedMin)
   return (
     <li className="flex items-center gap-2.5 rounded-xl border border-[color:var(--border)] bg-[color:var(--card)] px-2.5 py-2 text-xs">
       <span className="w-8 shrink-0 tabular-nums text-[color:var(--muted-foreground)]">
@@ -93,7 +93,7 @@ export const TodaysCardioCard = memo(function TodaysCardioCard(p: TodaysCardioCa
   const zone = zoneLabel(p.targetZoneIds)
   const credited = p.today ? shownActivity(p.today.activities, p.today.creditedId) : null
   const others = p.today ? p.today.activities.length - (credited ? 1 : 0) : 0
-  const unmeasured = p.today != null && p.today.activities.length > 0 && p.today.activities.every((a) => a.zone2PlusMin == null)
+  const unmeasured = p.today != null && p.today.activities.length > 0 && p.today.activities.every((a) => a.effortMin == null)
   const pct = target ? Math.min(100, Math.round((counted / target) * 100)) : 0
 
   return (
@@ -144,7 +144,7 @@ export const TodaysCardioCard = memo(function TodaysCardioCard(p: TodaysCardioCa
           )}
           {unmeasured && (
             <span className="text-[11px] text-[color:var(--muted-foreground)]">
-              No heart rate recorded during it, so it has no zone minutes yet.
+              No heart rate recorded during it, so it has no counted minutes yet.
             </span>
           )}
         </div>
@@ -166,7 +166,7 @@ export const TodaysCardioCard = memo(function TodaysCardioCard(p: TodaysCardioCa
               </button>
             </div>
             <p className="text-[11px] leading-snug text-[color:var(--muted-foreground)]">
-              Any of these counts for its minutes in zone 2 or above.
+              Any of these counts for its minutes at moderate effort or above.
             </p>
             <ChooserRow
               onClick={p.onGuidedWalk}
