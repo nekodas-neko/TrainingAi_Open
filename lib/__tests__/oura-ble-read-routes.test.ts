@@ -28,7 +28,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 type Row = Record<string, unknown>
 
-const getUserById = vi.fn(async (_id: string) => ({ isAdmin: true }) as Row | null)
+const getUserById = vi.fn(async (_id: string) => ({ isActive: true, isAdmin: true }) as Row | null)
 const getOuraRawSampleSummary = vi.fn(async (_u: string) => ({}) as Row)
 const getOuraRawSamplesByTags = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getOuraStorageStats = vi.fn(async () => ({}) as Row)
@@ -64,7 +64,7 @@ beforeEach(() => {
   for (const m of [getUserById, getOuraRawSampleSummary, getOuraRawSamplesByTags,
                    getOuraStorageStats, getLatestOuraBleMeasuredAt, rateLimit]) m.mockClear()
   rateLimit.mockReturnValue(true)
-  getUserById.mockResolvedValue({ isAdmin: true })
+  getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
   getOuraRawSampleSummary.mockResolvedValue({ total: 0 })
   getOuraRawSamplesByTags.mockResolvedValue([])
   getOuraStorageStats.mockResolvedValue({ tables: [] })
@@ -86,7 +86,7 @@ describe('the admin gate on the Oura-BLE tester routes', () => {
     // and answer correctly, so the rule — a revoked admin keeps a token for up to 30 days — would
     // not be under test at all.
     sessionUser = { id: 'u-1', isAdmin: true }
-    getUserById.mockResolvedValue({ isAdmin: false })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     for (const [name, call] of ADMIN_GATED) {
       const res = await call()
       expect(res.status, name).toBe(403)
@@ -101,7 +101,7 @@ describe('the admin gate on the Oura-BLE tester routes', () => {
     // The other direction: the claim is absent, the row says admin, and the route proceeds. Without
     // this, "always 403" would pass the case above.
     sessionUser = { id: 'u-1' }
-    getUserById.mockResolvedValue({ isAdmin: true })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
     for (const [name, call] of ADMIN_GATED) {
       expect((await call()).status, name).toBe(200)
     }
@@ -174,11 +174,11 @@ describe('GET /api/oura-ble/db-stats', () => {
   it('rate-limits the scan, and checks admin BEFORE spending the bucket', async () => {
     // The raw-sample split scans an archival table, hence the limit. Checking admin first means a
     // non-admin cannot exhaust an admin's allowance.
-    getUserById.mockResolvedValue({ isAdmin: false })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     expect((await getDbStats()).status).toBe(403)
     expect(rateLimit).not.toHaveBeenCalled()
 
-    getUserById.mockResolvedValue({ isAdmin: true })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
     rateLimit.mockReturnValue(false)
     expect((await getDbStats()).status).toBe(429)
     expect(getOuraStorageStats).not.toHaveBeenCalled()
@@ -196,7 +196,7 @@ describe('GET /api/oura-ble/freshness', () => {
     // A `requireAdmin` here would break start-up for any non-admin. The asymmetry with its three
     // siblings is the design, not an oversight.
     sessionUser = { id: 'u-1', isAdmin: false }
-    getUserById.mockResolvedValue({ isAdmin: false })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     expect((await getFreshness()).status).toBe(200)
     expect(getUserById).not.toHaveBeenCalled()
   })

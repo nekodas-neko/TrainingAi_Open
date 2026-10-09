@@ -11,19 +11,11 @@
 // Commits only: PR descriptions and GitHub comments are not commit messages and are not read.
 //
 // Which commits:
-//   - CI (`pull_request`): the PR's own commits, as GitHub lists them on the PR (the workflow step
-//     passes PR_NUMBER and a read token). The checkout is depth 1 of the merge commit, so they are
-//     not in the clone, and git cannot list them from a shallow fetch: this used to read the newest
-//     PR_COMMITS commits behind the PR head, which walks BOTH parents of a "merge main into the
-//     branch" commit and so read `main`'s own newest commits as the PR's. Those carry the
-//     `Co-authored-by: Claude` line GitHub adds when it squash-merges an agent's PR, so #2508 failed
-//     on two commits that were already on `main` and not its author's. The API list is exactly the
-//     commits the PR adds. A failed request fails the check; a gate that cannot look must not pass
-//     as if it had.
+//   - CI (`pull_request`): GitHub lists the PR commits; merged main commits stay exempt.
+//     Missing commit data fails the check.
 //   - Locally, nothing set: `<base>..HEAD`, with the base from the same candidates the ratchets use
 //     (origin/main, then main). With no base to be had it says so and passes, since there is
-//     nothing to compare against; CI is the gate. A full clone has the history, so `..` already
-//     leaves out commits a merge brought in from `main`.
+//     nothing to compare against; CI is the gate.
 const { spawnSync } = require('child_process');
 
 // `Co-authored-by: Delan …` is a person and must pass; only a trailer naming Claude or the Anthropic

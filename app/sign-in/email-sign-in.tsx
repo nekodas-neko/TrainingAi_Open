@@ -16,20 +16,12 @@ export default function EmailSignIn() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-
-  // Sign-out disables cache writes so in-flight requests cannot re-seed the outgoing account's data
-  // after the clear (lib/sqlite/cache.ts). Reaching this screen is the one point where a new session
-  // provably begins, so it is where the latch comes off — but a request that started before sign-out
-  // can still land in the gap between the clear and this mount, so the cache is swept once more
-  // first. Measured: without the sweep, two keys reappeared after an otherwise clean sign-out.
   useEffect(() => {
     void clearAllCache().catch(() => {}).finally(() => { enableCacheWrites() })
   }, [])
 
   useEffect(() => {
     if (searchParams.get('registered') === '1') {
-      // LA-162: since RV-192 EVERY password registration starts inactive, invited or not, so the old
-      // "Sign in below" half sent an invited registrant into /pending, reading the opposite advice.
       toast.success('Account created', { description: AWAITING_APPROVAL_SENTENCE })
     }
     if (searchParams.get('error') === 'CredentialsSignin') {
@@ -40,18 +32,12 @@ export default function EmailSignIn() {
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-    // Let Auth.js handle all redirects:
-    // - success        → callbackUrl (/)
-    // - inactive user  → /pending   (from signIn callback)
-    // - wrong password → /sign-in?error=CredentialsSignin (handled by useEffect below)
     await signIn('credentials', { email, password, callbackUrl: '/' })
   }
 
   return (
     <form onSubmit={submit} className="space-y-3 text-left">
-      {/* The placeholder is a hint, never the label: it disappears on focus, so the field loses
-          its identity exactly while it is being typed into (WCAG 3.3.2), and a screen reader
-          announces an unnamed box. This is the first screen a new account sees. */}
+
       <Input
         type="email"
         aria-label="Email"

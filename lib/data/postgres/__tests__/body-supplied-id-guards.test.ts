@@ -50,8 +50,8 @@ describe.skipIf(!canRun)('a body-supplied id gets an answer that means what it s
     // `requireAdmin` reads `is_admin` out of the database rather than trusting the session claim,
     // so the mocked `isAdmin: true` above is not enough on its own for the two admin routes.
     await pool.query(
-      `INSERT INTO users (id, email, password_hash, timezone, is_admin)
-       VALUES ($1, $2, 'x', 'Australia/Brisbane', true) ON CONFLICT (id) DO NOTHING`,
+      `INSERT INTO users (id, email, password_hash, timezone, is_admin, is_active)
+       VALUES ($1, $2, 'x', 'Australia/Brisbane', true, true) ON CONFLICT (id) DO NOTHING`,
       [USER, `rv47-${USER}@example.com`])
   })
 

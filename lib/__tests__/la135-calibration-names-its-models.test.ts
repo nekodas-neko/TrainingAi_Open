@@ -19,7 +19,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 type Row = Record<string, unknown>
 
-const getUserById = vi.fn(async (_id: string) => ({ isAdmin: true }) as Row | null)
+const getUserById = vi.fn(async (_id: string) => ({ isActive: true, isAdmin: true }) as Row | null)
 const getBodyBatteryHistory = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const listDayCheckins = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const buildBatteryRecoveryCalibration = vi.fn((i: Row) => ({
@@ -53,7 +53,7 @@ const call = async () => {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  getUserById.mockResolvedValue({ isAdmin: true })
+  getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
   listDayCheckins.mockResolvedValue([])
 })
 

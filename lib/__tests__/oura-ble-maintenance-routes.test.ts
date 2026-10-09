@@ -28,7 +28,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 type Row = Record<string, unknown>
 
-const getUserById = vi.fn(async (_id: string) => ({ isAdmin: true }) as Row | null)
+const getUserById = vi.fn(async (_id: string) => ({ isActive: true, isAdmin: true }) as Row | null)
 const countPackableBuckets = vi.fn(async (_u: string) => ({ buckets: 0, sealBelowDs: null }) as Row)
 const packOuraRawBuckets = vi.fn(async (..._a: unknown[]) => ({ packed: 0, buckets: [] }) as Row)
 const nullHistoricalDecoded = vi.fn(async (..._a: unknown[]) => ({ nulled: 0, remaining: 0 }) as Row)
@@ -57,7 +57,7 @@ const nullDecoded = (b?: unknown) => post(backfill, b, '/api/oura-ble/samples/ba
 beforeEach(() => {
   for (const m of [getUserById, countPackableBuckets, packOuraRawBuckets, nullHistoricalDecoded, rateLimit]) m.mockClear()
   rateLimit.mockReturnValue(true)
-  getUserById.mockResolvedValue({ isAdmin: true })
+  getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
   countPackableBuckets.mockResolvedValue({ buckets: 0, sealBelowDs: null })
   packOuraRawBuckets.mockResolvedValue({ packed: 0, buckets: [] })
   nullHistoricalDecoded.mockResolvedValue({ nulled: 0, remaining: 0 })
@@ -83,7 +83,7 @@ describe('the gate on the destructive levers', () => {
     // still refuse — and the whole point of the DB round-trip is a revoked admin whose 30-day token
     // still says otherwise. On the one endpoint that drops archival frames, that matters most.
     sessionUser = { id: 'u-1', isAdmin: true }
-    getUserById.mockResolvedValue({ isAdmin: false })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     for (const [name, call] of CALLS) expect((await call()).status, name).toBe(403)
     expect(packOuraRawBuckets).not.toHaveBeenCalled()
     expect(nullHistoricalDecoded).not.toHaveBeenCalled()
@@ -148,11 +148,11 @@ describe('POST /api/oura-ble/samples/pack', () => {
   })
 
   it('rate-limits the run, and checks admin BEFORE spending the bucket', async () => {
-    getUserById.mockResolvedValue({ isAdmin: false })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     expect((await pack()).status).toBe(403)
     expect(rateLimit).not.toHaveBeenCalled()
 
-    getUserById.mockResolvedValue({ isAdmin: true })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
     rateLimit.mockReturnValue(false)
     expect((await pack()).status).toBe(429)
     expect(packOuraRawBuckets).not.toHaveBeenCalled()

@@ -185,6 +185,8 @@ export const WITHHELD_COLUMNS: Record<string, string[]> = {
 }
 
 export const EXCLUDED: Record<string, Exclusion> = {
+  auth_identities: { category: 'credentials', reason: 'private provider authentication identifiers' },
+  apple_auth_attempts: { category: 'credentials', reason: 'short-lived authentication challenges' },
   // ── Credentials. Exporting these hands the reader a working key. ────────────
   oura_tokens: { category: 'credentials', reason: 'OAuth/PAT credentials and the webhook signing key' },
   native_refresh_tokens: { category: 'credentials', reason: 'credential material: refresh-token hashes for the native app sign-in (#2076)' },
