@@ -34,12 +34,11 @@ const SETUP = {
   activityIcon: 'footprints',
   isDistanceBased: true,
   title: 'Walk Home From Train',
-  prescribedRunId: 'run-1',
 }
 
 function state(over: Partial<ActivityState>): ActivityState {
   return {
-    activitySessionId: 's1', prescribedRunId: null, activityType: null, activityLabel: '',
+    activitySessionId: 's1', activityType: null, activityLabel: '',
     activityIcon: '', isDistanceBased: false, title: '', mode: 'pre', isPaused: false,
     startMs: null, endMs: null, pauseStartMs: null, accumulatedPauseMs: 0, rawPoints: [],
     distanceKm: 0, currentPaceSecPerKm: null, draftSummary: null,
@@ -56,7 +55,6 @@ describe('a session demoted to pre loses its setup', () => {
     // A null type is precisely what routes activity-screen to SelectActivityTypeScreen.
     expect(s.activityType).toBeNull()
     expect(s.title).toBe('')
-    expect(s.prescribedRunId, 'a stale prescribed run would re-arm the wrong session too').toBeNull()
   })
 
   it('after an active session past the 12-hour recovery bound', () => {
@@ -116,7 +114,7 @@ describe('clearActivitySetup', () => {
     clearActivitySetup(s)
     expect(s).toMatchObject({
       activityType: null, activityLabel: '', activityIcon: '',
-      isDistanceBased: false, title: '', prescribedRunId: null,
+      isDistanceBased: false, title: '',
     })
   })
 

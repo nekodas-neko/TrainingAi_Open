@@ -1,18 +1,19 @@
 /**
- * RV-166. What today's cardio prescription says, and how much of it is done.
+ * Issue 2093 (was RV-166). What the heart-health activity card says.
  *
- * Pure so the wording and the arithmetic can be tested without the hub's live payload — the card
- * itself renders this and decides nothing.
+ * Pure so the wording can be tested without the hub's live payload. The card renders this and
+ * decides nothing: whether a day counted is decided once, by `heartHealthVerdict` in
+ * `packages/shared/src/running/heart-health.ts`, on the server, and arrives on the payload.
+ *
+ * No word here names a run. The prescription is a heart-health activity that any activity can
+ * complete through its minutes in zone 2 or above (owner, 2026-10-05).
  */
+import type { HeartHealthActivity, HeartHealthDayOutcome } from '@trainingai/shared/running/heart-health'
 
-export interface CardioCriterion {
-  /** "25 min in Zone 2", or "Easy 25 min" when the prescription has no zone target. */
-  headline: string
-  /** "107–134 bpm · a run or a walk both count" — never the only place the rule is stated. */
-  detail: string
-}
-
-const BOTH_COUNT = 'a run or a walk both count'
+export const CARD_TITLE = 'Heart-health activity'
+export const ANY_ACTIVITY = 'Any activity counts'
+export const RATIONALE = 'Aerobic time to build your base. A walk, a ride or anything else counts for its minutes in zone 2 or above.'
+export const PROGRESS_LABEL = 'Zone 2+ minutes today'
 
 /** "Zone 2" · "Zones 2–3" · "Zones 1, 3 and 4" — ranges only when the ids are contiguous. */
 export function zoneLabel(zoneIds: number[]): string | null {
@@ -24,78 +25,51 @@ export function zoneLabel(zoneIds: number[]): string | null {
   return `Zones ${ids.slice(0, -1).join(', ')} and ${ids[ids.length - 1]}`
 }
 
-/** The prescription's own run-type word, capitalised for a heading. */
-function runTypeWord(runType: string): string {
-  const t = runType.trim()
-  return t ? t.charAt(0).toUpperCase() + t.slice(1) : 'Cardio'
+/** "30 min in zone 2 or above", or the rule alone when the prescription states no minutes. */
+export function criterionLine(targetMin: number | null): string {
+  return targetMin != null && targetMin > 0 ? `${targetMin} min in zone 2 or above` : 'Time in zone 2 or above'
 }
 
-export function cardioCriterion(p: {
-  runType: string
-  durationMin: number | null
-  targetZoneIds: number[]
-  targetHrLow: number | null
-  targetHrHigh: number | null
-}): CardioCriterion {
-  const zone = zoneLabel(p.targetZoneIds)
-  const mins = p.durationMin != null && p.durationMin > 0 ? `${p.durationMin} min` : null
-
-  // Zone wording is only reachable because TN-78 moved the moderate floor to 40% of heart-rate
-  // reserve (#1774). At the old 60% floor the target was 134 bpm, which a treadmill walk never
-  // reached, so a zone-stated criterion would have been unmeetable on foot.
-  const headline = zone && mins ? `${mins} in ${zone}` : `${runTypeWord(p.runType)}${mins ? ` ${mins}` : ''}`
-
-  const bpm = p.targetHrLow != null && p.targetHrHigh != null
-    ? `${p.targetHrLow}–${p.targetHrHigh} bpm`
-    : null
-  return { headline, detail: bpm ? `${bpm} · ${BOTH_COUNT}` : BOTH_COUNT }
+/** "22 of 30" — the progress figure beside the bar. */
+export function progressFigure(countedMin: number, targetMin: number | null): string {
+  return targetMin != null && targetMin > 0 ? `${countedMin} of ${targetMin}` : `${countedMin} min`
 }
 
-export type CardioCardStatus = 'todo' | 'in-progress' | 'done' | 'skipped'
-
-export function cardioStatus(runStatus: string, countedMin: number): CardioCardStatus {
-  if (runStatus === 'completed') return 'done'
-  if (runStatus === 'skipped') return 'skipped'
-  return countedMin > 0 ? 'in-progress' : 'todo'
+/** "Treadmill walk · 34 min" — what was actually done, never the prescription's name. */
+export function activityLine(a: Pick<HeartHealthActivity, 'title' | 'durationMin'>): string {
+  const mins = a.durationMin != null && a.durationMin > 0 ? ` · ${Math.round(a.durationMin)} min` : ''
+  return `${a.title}${mins}`
 }
 
-export const STATUS_LABEL: Record<CardioCardStatus, string> = {
-  todo: 'To do',
-  'in-progress': 'In progress',
-  done: 'Done',
-  skipped: 'Skipped',
+/** The activity a day is shown by: the credited one, else the longest logged. */
+export function shownActivity(
+  activities: readonly HeartHealthActivity[],
+  creditedId: string | null,
+): HeartHealthActivity | null {
+  const credited = creditedId != null ? activities.find((a) => a.id === creditedId) : undefined
+  if (credited) return credited
+  let best: HeartHealthActivity | null = null
+  for (const a of activities) if (best == null || (a.durationMin ?? 0) > (best.durationMin ?? 0)) best = a
+  return best
 }
 
-/**
- * How many minutes count toward the target, and whether that number was measured.
- *
- * A treadmill walk with no heart rate DOES count (owner, 2026-09-27): refusing to complete a walk
- * he actually did is the worse failure. Its minutes are the logged ones and the day reads
- * `estimated` — the discriminator `observed-hr.ts` already uses for exactly this distinction, so a
- * third source can be added later without rewriting every reader.
- */
-export interface CountedProgress {
-  min: number
-  source: 'observed' | 'estimated'
+/** The small line under a history row: the measured minutes, or why there are none. */
+export function zoneMinutesLine(activities: readonly HeartHealthActivity[], countedMin: number): string {
+  if (activities.length === 0) return ''
+  const measured = activities.some((a) => a.zone2PlusMin != null)
+  if (!measured) return 'No heart rate recorded'
+  const across = activities.length > 1 ? ` across ${activities.length} activities` : ''
+  return `${countedMin} min in zone 2+${across}`
 }
 
-export function countedProgress(
-  zoneDoneMin: number,
-  walkWithoutHr: { durationMin: number | null } | null,
-): CountedProgress {
-  if (zoneDoneMin > 0) return { min: zoneDoneMin, source: 'observed' }
-  const logged = walkWithoutHr?.durationMin
-  if (logged != null && logged > 0) return { min: logged, source: 'estimated' }
-  return { min: 0, source: 'observed' }
+export const OUTCOME_LABEL: Record<HeartHealthDayOutcome, string> = {
+  counted: 'Counted ✓',
+  'not-counted': "Didn't count",
+  'nothing-logged': 'Nothing logged',
+  today: 'Today',
 }
 
-/** "Completed as a walk · 28 min" — the actual activity when it is known, the word alone when not. */
-export function completedLine(
-  completedAs: 'run' | 'walk' | null,
-  activity: { durationMin: number | null } | null,
-): string {
-  // `completedAs` is null on rows finished before LB-179 tracked it, and every one of those was a run.
-  const word = completedAs === 'walk' ? 'a walk' : 'a run'
-  const mins = activity?.durationMin
-  return mins != null && mins > 0 ? `Completed as ${word} · ${mins} min` : `Completed as ${word}`
+export const OUTCOME_COLOR: Partial<Record<HeartHealthDayOutcome, string>> = {
+  counted: 'var(--accent-green)',
+  'not-counted': 'var(--accent-amber)',
 }

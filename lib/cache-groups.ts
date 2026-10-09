@@ -255,6 +255,9 @@ export async function invalidateOuraSync(): Promise<void> {
     invalidateCache('zone-minutes:'),
     // new HR rows change the hub's quota actuals and observed HR profile
     invalidateCache('cardio-week'),
+    // issue 2093: the heart-health activity's zone 2+ minutes and the week's history ride on the
+    // running-plan payload, and both are measured from these HR rows
+    invalidateCache('running-plan'),
     invalidateCache('home-day-timeline'),
     invalidateCache('training-load'),
     invalidateCache('progress-summary'),
