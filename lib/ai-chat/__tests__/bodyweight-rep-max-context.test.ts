@@ -8,8 +8,9 @@ import { build1RmTargets } from '@/lib/ai-chat/context'
 import { calcAmrap1RM, BW_REF } from '@trainingai/shared/1rm'
 import { stripComments } from '../../../scripts/lib/strip-comments.js'
 
-// The owner's Hanging Leg Raise: eleven reps, stored as 128.
-const STORED = calcAmrap1RM(BW_REF, 11)
+// The owner's Hanging Leg Raise: eleven reps, stored as 128 under the stepped discount. Issue 2193 (a)
+// did not rewrite stored rows, so 128 is still what the database holds; the same set stores 129.25 now.
+const STORED = 128
 
 const sessions = (estimated1rm: number, exerciseName = 'Hanging Leg Raise') => ([{
   startedAt: new Date('2026-09-12T08:00:00Z'),
@@ -20,8 +21,8 @@ const bodyweight = new Map([['Hanging Leg Raise', 'bodyweight']])
 
 describe('build1RmTargets — bodyweight', () => {
   it('quotes the rep max the estimate actually came from', () => {
-    expect(STORED).toBe(128)
     expect(build1RmTargets(sessions(STORED), bodyweight)).toContain('11 RM')
+    expect(build1RmTargets(sessions(calcAmrap1RM(BW_REF, 11)), bodyweight)).toContain('11 RM')
   })
 
   // The defect this test exists for: the line read `repMaxFromOneRm(orm * 0.8)`. Taking 80% of the

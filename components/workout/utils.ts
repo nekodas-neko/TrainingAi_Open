@@ -6,6 +6,7 @@ import { rowUnderFull } from "@trainingai/shared/ai-periodization/prescription-f
 import { formatDateDisplay } from "@trainingai/shared/date-utils";
 import { categoricalColor } from "@trainingai/shared/chart-colors";
 import { prescriptionDrivesLoad } from "@trainingai/shared/ai-periodization/apply-prescription";
+import { withPrescribedBars, type RMStyleSet } from "@trainingai/shared/1rm";
 
 export const DEFAULT_SETS = 3;
 export const DEFAULT_REPS = 8;
@@ -91,6 +92,20 @@ export function prescribedBarWeights(ex: BarInputs | undefined, sets: number): (
 export function plannedWeightsPayload(ex: BarInputs | undefined, sets: number): (number | null)[] | undefined {
   const bars = prescribedBarWeights(ex, sets);
   return bars.some((w) => w != null) ? bars : undefined;
+}
+
+/** Issue 2200: the style the 1RM estimate scores against. Each prescribed set carries the bar it was
+ *  given and the 1RM that bar came from, so hitting a rounded-up bar exactly leaves the 1RM where it
+ *  was. The device estimate, the live readout and the server (via `prescriptionBasisPayload`) all
+ *  read the same bars from `prescribedBarWeights`. */
+export function styleWithPrescribedBars(ex: BarInputs | undefined, sets: number): RMStyleSet[] | null {
+  return withPrescribedBars(ex?.progressionStyle ?? null, prescribedBarWeights(ex, sets), ex?.estimated1rm);
+}
+
+/** `prescriptionBasisKg` for the log payload: the 1RM the bars in `plannedWeights` were computed
+ *  from, sent only beside them. The server scores the set against the same bar the device did. */
+export function prescriptionBasisPayload(ex: BarInputs | undefined, sets: number): number | undefined {
+  return plannedWeightsPayload(ex, sets) && ex?.estimated1rm ? ex.estimated1rm : undefined;
 }
 
 // Same formula used everywhere sets/reps are initialized for an exercise —

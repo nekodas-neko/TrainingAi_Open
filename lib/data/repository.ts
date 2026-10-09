@@ -940,6 +940,11 @@ export interface WorkoutRepository {
   /** Last non-deload 1RM per exercise — the prescription basis (Q-202). Distinct from the
    *  method above, which still returns the genuinely most recent log for display. */
   getLastRealOneRmBatch(userId: string, exerciseNames: string[], programId?: string): Promise<Map<string, LastRealOneRm>>
+  /** Issue 2200: the same last non-deload 1RM, as it stood before `before` — the basis a past
+   *  log's prescribed bars were computed from, for the server paths that are not sent it (a
+   *  stranded replay, an edit). `excludeLogId` keeps a log from being its own basis. Null when
+   *  no earlier real log exists. */
+  getPrescriptionBasisBefore(userId: string, exerciseName: string, before: Date, excludeLogId?: string): Promise<number | null>
   getExerciseSummary(userId: string): Promise<ExerciseLog[]>
   // Exercise-history sheet: the last `limit` logs for one exercise, filtered in SQL
   // against idx_el_name_date_ws instead of hydrating N days of full session trees.

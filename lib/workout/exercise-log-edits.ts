@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { getPool } from '@/lib/data/postgres/client'
 import { getRepository } from '@/lib/data'
-import { estimateOneRm, BW_REF, type OneRmSetInput } from '@trainingai/shared/1rm'
+import { estimateOneRm, BW_REF, withPrescribedBars, type OneRmSetInput } from '@trainingai/shared/1rm'
 import { computeSetAggregates, computeIntensityPct } from '@trainingai/shared/workout/set-aggregates'
 
 /**
@@ -40,8 +40,8 @@ export async function editExerciseLog(userId: string, edit: ExerciseLogEdit): Pr
   if (!(await ownsExerciseLog(userId, exerciseLogId))) return false
 
   const db = getPool()
-  const { rows: ctxRows } = await db.query<{ exercise_name: string; style_id: string | null; phase_type: string | null; workout_session_id: string }>(
-    `SELECT el.exercise_name, el.style_id, ws.phase_type, el.workout_session_id
+  const { rows: ctxRows } = await db.query<{ exercise_name: string; style_id: string | null; phase_type: string | null; workout_session_id: string; logged_at: Date }>(
+    `SELECT el.exercise_name, el.style_id, ws.phase_type, el.workout_session_id, el.logged_at
      FROM exercise_logs el JOIN workout_sessions ws ON ws.id = el.workout_session_id
      WHERE el.id = $1 AND el.deleted_at IS NULL`,
     [exerciseLogId],
@@ -51,8 +51,26 @@ export async function editExerciseLog(userId: string, edit: ExerciseLogEdit): Pr
   const repo = await getRepository()
   const exerciseType = await repo.getExerciseType(exerciseName)
   const styles = await repo.listProgressionStyles(userId)
-  const style = styles.find(st => st.id === ctxRows[0].style_id)?.sets ?? null
   const isBaseline = ctxRows[0].phase_type === 'baseline'
+
+  // Issue 2200: an edit re-scores each set against the bar it was given (`planned_weight_kg`, kept
+  // by set number) and the last real 1RM before this log, the basis the bars came from. A bar that
+  // basis could not have produced is ignored per set, so a row with no stored bar — every row
+  // before #2445 — re-scores exactly as it did before.
+  const baseStyle = styles.find(st => st.id === ctxRows[0].style_id)?.sets ?? null
+  let style = baseStyle
+  if (baseStyle && exerciseType !== 'bodyweight') {
+    const { rows: barRows } = await db.query<{ set_number: number; planned_weight_kg: number | null }>(
+      `SELECT set_number, planned_weight_kg FROM set_logs
+       WHERE exercise_log_id = $1 AND deleted_at IS NULL AND planned_weight_kg IS NOT NULL`,
+      [exerciseLogId],
+    )
+    if (barRows.length > 0) {
+      const bars = weights.map((_, i) => barRows.find(r => r.set_number === i + 1)?.planned_weight_kg ?? null)
+      const basisKg = await repo.getPrescriptionBasisBefore(userId, exerciseName, new Date(ctxRows[0].logged_at), exerciseLogId)
+      style = withPrescribedBars(baseStyle, bars, basisKg)
+    }
+  }
 
   const sets: OneRmSetInput[] = weights.map((w, i) => ({ weightKg: w, reps: reps[i] ?? 0 }))
   const { estimated1rm, target80 } = estimateOneRm(sets, { exerciseType, style, isBaseline })

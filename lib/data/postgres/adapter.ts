@@ -1570,6 +1570,28 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return map
   }
 
+  // Issue 2200. getLastRealOneRmBatch's two-marker gate, as of an earlier moment: the basis a past
+  // log's bars were prescribed from. Seeds and PRs are not consulted — they are reached only when no
+  // real log exists, and a PR read now includes everything logged since.
+  async getPrescriptionBasisBefore(userId: string, exerciseName: string, before: Date, excludeLogId?: string): Promise<number | null> {
+    const result = await this.db.execute<{ estimated_1rm: number }>(sql`
+      SELECT el.estimated_1rm
+      FROM exercise_logs el
+      JOIN workout_sessions ws ON ws.id = el.workout_session_id
+      WHERE ws.user_id = ${userId}
+        AND el.exercise_name = ${exerciseName}
+        AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
+        AND el.estimated_1rm > 0
+        AND el.exercise_deloaded = false
+        AND el.logged_at < ${before.toISOString()}
+        ${excludeLogId ? sql`AND el.id <> ${excludeLogId}` : sql``}
+      ORDER BY el.logged_at DESC
+      LIMIT 1
+    `)
+    const v = result.rows[0]?.estimated_1rm
+    return v != null && Number(v) > 0 ? Number(v) : null
+  }
+
   async getLastExerciseLogsBatch(userId: string, exerciseNames: string[], programId?: string): Promise<Map<string, ExerciseLog>> {
     if (!exerciseNames.length) return new Map()
 

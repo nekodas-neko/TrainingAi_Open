@@ -73,6 +73,37 @@ describe.skipIf(!canRun)('offline edits and deletes of logged work reach the ser
     expect(Number(log.estimated_1rm)).toBeGreaterThan(0)
   })
 
+  // Issue 2200: an edit re-scores against the bar each set was given (planned_weight_kg) and the
+  // last real 1RM before the log. 27.5 x 10 at 70.5 % of 36.5 is exactly the prescription: 36.5,
+  // where the planned percentage alone gives 39.0. A set with no stored bar keeps the old arithmetic.
+  it('exercise_log_edit scores against the stored bar and the basis before the log (issue 2200)', async () => {
+    const style = (await pool.query(
+      `INSERT INTO progression_styles (user_id, name) VALUES ($1, 'Issue2200 70.5x10') RETURNING id`, [USER])).rows[0].id
+    try {
+      for (const n of [1, 2]) {
+        await pool.query(`INSERT INTO style_sets (style_id, set_number, pct, reps) VALUES ($1, $2, 70.5, 10)`, [style, n])
+      }
+      const ws = (await pool.query(`SELECT workout_session_id FROM exercise_logs WHERE id = $1`, [logId])).rows[0].workout_session_id
+      // The earlier real log the bars came from, and a later one that must not be the basis.
+      await pool.query(
+        `INSERT INTO exercise_logs (workout_session_id, exercise_name, estimated_1rm, logged_at)
+         VALUES ($1, 'RV175 Bench', 36.5, now() - interval '3 days'), ($1, 'RV175 Bench', 50, now())`, [ws])
+      await pool.query(`UPDATE exercise_logs SET style_id = $1 WHERE id = $2`, [style, logId])
+      await pool.query(`UPDATE set_logs SET planned_weight_kg = 27.5, planned_pct = 70.5 WHERE exercise_log_id = $1`, [logId])
+
+      expect((await push('exercise_log_edit', { exerciseLogId: logId, weights: [27.5, 27.5], reps: [10, 10] })).errors).toEqual([])
+      const est = async () => Number((await pool.query(`SELECT estimated_1rm FROM exercise_logs WHERE id = $1`, [logId])).rows[0].estimated_1rm)
+      expect(await est()).toBe(36.5)
+
+      await pool.query(`UPDATE set_logs SET planned_weight_kg = NULL WHERE exercise_log_id = $1`, [logId])
+      expect((await push('exercise_log_edit', { exerciseLogId: logId, weights: [27.5, 27.5], reps: [10, 10] })).errors).toEqual([])
+      expect(await est()).toBe(39)
+    } finally {
+      await pool.query(`UPDATE exercise_logs SET style_id = NULL WHERE style_id = $1`, [style])
+      await pool.query(`DELETE FROM progression_styles WHERE id = $1`, [style])
+    }
+  })
+
   it('exercise_log_edit on a log that is not there goes to errors, so the client retries it', async () => {
     const res = await push('exercise_log_edit', { exerciseLogId: '00000000-0000-4000-8000-0000001759ff', weights: [50], reps: [5] })
     expect(res.errors.map(e => e.error)).toEqual(['No matching exercise log for exercise_log_edit'])

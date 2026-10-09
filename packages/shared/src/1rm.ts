@@ -2,13 +2,24 @@ export interface RMStyleSet {
   pct: number
   reps: number
   useFor1rm?: boolean
+  /**
+   * Issue 2200: the bar the app actually put up for this set, after plate rounding
+   * (`set_logs.planned_weight_kg`), and the 1RM it was computed from. When both are present and
+   * consistent with `pct`, the set is scored against the bar's real share of that 1RM rather than
+   * the planned percentage. See {@link withPrescribedBars}.
+   */
+  barKg?: number | null
+  basisKg?: number | null
 }
 
 export function mround(value: number, multiple: number): number {
   return Math.round(value / multiple) * multiple
 }
 
-// One rep ceiling for every estimation path — formulas are meaningless past this.
+// One rep ceiling for every estimation path — formulas are meaningless past this. A set above it
+// is COUNTED AT the ceiling on every path (issue 2193 (c)); it used to be dropped on one path
+// (calculate1RM) and clamped on the others, so the same 32-rep set was worth 0 or a full set
+// depending on which estimator read it.
 export const REP_CEILING = 30
 
 // Multiplier from weight to estimated 1RM at a given rep count. Average of Epley and
@@ -24,22 +35,73 @@ export function repFactor(reps: number): number {
 // Average of Epley and Brzycki for more consistent 1RM estimates
 export function calc1RM(weight: number, reps: number): number {
   if (reps <= 0 || weight <= 0) return weight
-  return mround(weight * repFactor(reps), 0.25)
+  return mround(weight * repFactor(Math.min(reps, REP_CEILING)), 0.25)
 }
 
-// AMRAP-adjusted 1RM: applies a rep-band scale factor to compensate for formula
-// inflation at high reps (fatigue limits AMRAP sets more than strength does above ~10 reps)
+/**
+ * AMRAP discount: compensates for formula inflation at high reps (fatigue limits an all-out set
+ * more than strength does above ~10 reps).
+ *
+ * Issue 2193 (a), owner-signed 2026-10-06: a straight line between the same anchors
+ * (5: 1.00, 8: 0.97, 12: 0.93, 20: 0.88, 30: 0.82) instead of steps at 5/8/12/20. The steps
+ * made one more rep LOWER the estimate across each boundary (at 80 kg: 8→9 reps −1.0 kg,
+ * 12→13 −2.25, 20→21 −7.75); 3,252 such inversions across 5–250 kg. The line keeps every anchor
+ * value, so a set ON an anchor scores as before, and the product with `repFactor` never falls
+ * as reps rise, up to the ceiling.
+ */
+const AMRAP_ANCHORS: readonly (readonly [reps: number, factor: number])[] = [
+  [5, 1.0], [8, 0.97], [12, 0.93], [20, 0.88], [REP_CEILING, 0.82],
+]
+
 export function amrapScaleFactor(reps: number): number {
-  if (reps <= 5) return 1.0
-  if (reps <= 8) return 0.97
-  if (reps <= 12) return 0.93
-  if (reps <= 20) return 0.88
-  return 0.82
+  const [firstReps, firstFactor] = AMRAP_ANCHORS[0]
+  if (reps <= firstReps) return firstFactor
+  for (let i = 1; i < AMRAP_ANCHORS.length; i++) {
+    const [r1, f1] = AMRAP_ANCHORS[i]
+    if (reps <= r1) {
+      const [r0, f0] = AMRAP_ANCHORS[i - 1]
+      return f0 + (f1 - f0) * (reps - r0) / (r1 - r0)
+    }
+  }
+  return AMRAP_ANCHORS[AMRAP_ANCHORS.length - 1][1]
 }
 
+// Rounded ONCE (issue 2193 (a)): it used to round `calc1RM` to 0.25 and then round the discounted
+// value again, which on its own could cost one extra rep its gain.
 export function calcAmrap1RM(weight: number, reps: number): number {
   if (reps <= 0 || weight <= 0) return weight
-  return mround(calc1RM(weight, reps) * amrapScaleFactor(reps), 0.25)
+  const r = Math.min(reps, REP_CEILING)
+  return mround(weight * repFactor(r) * amrapScaleFactor(r), 0.25)
+}
+
+/**
+ * The most the app's plate rounding can add to a prescribed bar: the barbell step, two 1.25 kg
+ * plates (`BARBELL_WEIGHT_STEP_KG` in components/workout/utils.ts; other equipment rounds to 1.25).
+ * `mroundStepUp` also floors every bar at 5 kg and caps it at 250.
+ */
+export const MAX_BAR_ROUNDING_KG = 2.5
+const MIN_BAR_KG = 5
+const MAX_BAR_KG = 250
+
+/**
+ * The bar's real share of the 1RM it was prescribed from, in percent, or null when this set has no
+ * usable bar (issue 2200).
+ *
+ * A bar is used only when rounding `basisKg × pct` up to the plate grid could have produced it.
+ * A bar that belongs to a different basis or a different percentage (a stale value, an edited
+ * payload) therefore cannot rescale the estimate: that set falls back to the planned percentage,
+ * the arithmetic every set used before issue 2200.
+ */
+function barSharePct(set: RMStyleSet): number | null {
+  const { pct, barKg, basisKg } = set
+  if (barKg == null || basisKg == null) return null
+  if (!Number.isFinite(barKg) || !Number.isFinite(basisKg) || barKg <= 0 || basisKg <= 0) return null
+  const raw = basisKg * pct / 100
+  const eps = 1e-6
+  const roundedUp = barKg >= raw - eps && (barKg - raw <= MAX_BAR_ROUNDING_KG + eps || barKg <= MIN_BAR_KG + eps)
+  const capped = barKg >= MAX_BAR_KG - eps && raw > MAX_BAR_KG
+  if (!roundedUp && !capped) return null
+  return barKg / basisKg * 100
 }
 
 // A progression style prescribes hitting `targetReps` at `pct`% of 1RM. Feeding that
@@ -48,12 +110,43 @@ export function calcAmrap1RM(weight: number, reps: number): number {
 // session even when the lifter matches the prescription exactly. This factor rescales
 // calc1RM's output so that hitting the prescription exactly reproduces the previous
 // 1RM, while exceeding/missing it moves the estimate up/down accordingly.
+//
+// Issue 2200 (owner-signed 2026-10-06): "the prescription" is the bar the app actually loaded, not
+// the percentage it started from. The bar is `mroundStepUp(basis × pct/100, step)`, a CEILING round,
+// so dividing by the planned pct credited every exactly-hit set with the round-up: 27.5 × 10
+// prescribed at 70.5 % of 36.5 stored 39.0 (+6.8 %). Against the bar's real share (27.5 / 36.5 =
+// 75.3 %) the same set stores 36.5. More weight or more reps than prescribed still raise it, fewer
+// still lower it. A set with no stored bar (every row before #2445, an override with no
+// prescription) keeps the planned percentage.
+//
 // Returns null when no style prescribes this set, rather than 1 — a real prescription can
 // legitimately resolve to exactly 1 (Q-304), and the caller needs to tell "no correction applies"
-// from "the correction happens to be 1" so it knows to fall back to the AMRAP band correction.
-function prescriptionFactor(pct?: number, targetReps?: number): number | null {
+// from "the correction happens to be 1".
+function prescriptionFactor(set: RMStyleSet | undefined): number | null {
+  if (!set) return null
+  const { pct, reps: targetReps } = set
   if (!pct || pct <= 0 || !targetReps || targetReps <= 0 || targetReps >= 37) return null
-  return 1 / ((pct / 100) * repFactor(targetReps))
+  const share = barSharePct(set) ?? pct
+  return 1 / ((share / 100) * repFactor(targetReps))
+}
+
+/**
+ * Attach the prescribed bars, and the 1RM they came from, to a style so the estimate scores each
+ * set against the bar it was given (issue 2200). `bars[i]` is set i's `set_logs.planned_weight_kg`,
+ * null where no style percentage set a bar. With no basis or no bar the style comes back as it was,
+ * and every set keeps the planned-percentage arithmetic.
+ */
+export function withPrescribedBars<T extends RMStyleSet>(
+  style: T[] | null | undefined,
+  bars: readonly (number | null | undefined)[] | null | undefined,
+  basisKg: number | null | undefined,
+): T[] | null {
+  if (!style) return null
+  if (!bars?.length || basisKg == null || !Number.isFinite(basisKg) || basisKg <= 0) return style
+  return style.map((s, i) => {
+    const bar = bars[i]
+    return bar != null && Number.isFinite(bar) && bar > 0 ? { ...s, barKg: bar, basisKg } : s
+  })
 }
 
 export function calculate1RM(
@@ -67,14 +160,17 @@ export function calculate1RM(
   const oneRMs = indices
     .map(i => {
       const w = weights[i] ?? weights[weights.length - 1] ?? 0
-      const r = reps[i] ?? 0
-      if (!(w && r) || r > REP_CEILING) return 0  // beyond the ceiling: estimation formulas break down
-      // Q-304: a set with no prescribed pct/targetReps is an AMRAP set by construction, and
-      // amrapScaleFactor is the correction that already exists for exactly that — it was applied
-      // to bodyweight/baseline sets (amrapAverage1Rm) but not here, so an unprescribed set at
-      // 13+ reps fed the estimate un-discounted. A prescribed set keeps its own rescale; the two
-      // never combine (double-correcting a prescribed set would deflate the estimate instead).
-      const factor = prescriptionFactor(style?.[i]?.pct, style?.[i]?.reps) ?? amrapScaleFactor(r)
+      // Issue 2193 (c): a set above the ceiling counts AT the ceiling, as it already did in
+      // amrapAverage1Rm and bestSetOneRm. It used to be dropped here, so 31 reps scored nothing.
+      const r = Math.min(reps[i] ?? 0, REP_CEILING)
+      if (!(w && r)) return 0
+      // Issue 2357 (owner-signed 2026-10-06): a working set from a slot with no prescription (no
+      // style, or a set past the style's length) uses the plain rep-factor estimate. Q-304 had given
+      // it the AMRAP discount on the premise that an unprescribed set is all-out; it is not — those
+      // are chosen working sets — so the discount understated each one by about 3 %. The discount
+      // stays where a set really is all-out: baseline tests and bodyweight sets (amrapAverage1Rm).
+      // A prescribed set keeps its own rescale.
+      const factor = prescriptionFactor(style?.[i]) ?? 1
       return mround(w * repFactor(r) * factor, 0.25)
     })
     .filter(v => v > 0)
@@ -94,7 +190,7 @@ export function runningEstimate1RM(
 ): number {
   const primary = calculate1RM(weights, reps, style).estimated1rm
   if (primary > 0) return primary
-  const flat = style?.map(s => ({ pct: s.pct, reps: s.reps }))
+  const flat = style?.map(s => ({ pct: s.pct, reps: s.reps, barKg: s.barKg, basisKg: s.basisKg }))
   return calculate1RM(weights, reps, flat).estimated1rm
 }
 
@@ -252,26 +348,23 @@ export function repMaxFromOneRm(oneRm: number, addedKg = 0): number {
  * formula therefore reports fewer reps than were performed, by exactly the discount — measured on
  * the owner's account, 11 logged reps stored 128 and displayed as **8 RM**.
  *
- * **Nearest match, and a full scan, because the forward map is neither monotone nor injective.**
- * `amrapScaleFactor` steps down at 5/8/12/20 reps, so `calcAmrap1RM` DIPS across each boundary —
- * 8 reps gives 121.75 and 9 gives 120.25. A "largest r that does not exceed" search (what
- * `repMaxFromOneRm` can safely do against a monotone `calc1RM`) overshoots badly here: 20 reps
- * would read back as 28. Scanning for the closest value instead round-trips 29 of the 30 rep
- * counts exactly.
- *
- * **The 30th is a genuine collision, not a bug to fix later:** 5 reps and 6 reps both store 114.5,
- * because the 1.0 → 0.97 step cancels the rep-factor gain. No inverse can separate them, which is
- * the standing argument for eventually displaying the logged reps rather than inverting an index
- * the app already has `avg_reps` for.
+ * **Nearest match, and a full scan, because the forward map is not injective.** Since issue 2193 (a)
+ * the AMRAP discount is a straight line between its anchors, so `calcAmrap1RM` never falls as reps
+ * rise (it used to dip across each step: 8 reps gave 121.75 and 9 gave 120.25). Above 20 reps the
+ * discount and the rep factor nearly cancel, so neighbouring counts can still round to the same
+ * stored value. Scanning for the closest value round-trips 28 of the 30 rep counts at the reference
+ * weight; 27 and 30 read back as 26 and 29, a collision no inverse can separate. Below 20 reps,
+ * every count round-trips (the old 5-vs-6 collision is gone). That is why the display prefers the
+ * logged reps (`bodyweightRepMax`).
  */
 /**
  * The rep max to SHOW for a bodyweight exercise: the reps actually performed when they are known,
  * and only otherwise the number recovered by inverting a stored 1RM estimate.
  *
- * BF-151. The card used to invert unconditionally. That is lossy, and for 5 vs 6 reps it is
- * impossible — the rep-factor gain from the extra rep is exactly cancelled by `amrapScaleFactor`'s
- * 1.0 → 0.97 step, so both store the identical 1RM and `repMaxFromAmrapOneRm` can only return the
- * lower of the tie. `exercise_logs.avg_reps` holds the real figure.
+ * BF-151. The card used to invert unconditionally. That is lossy: before issue 2193 (a) 5 and 6
+ * reps stored the identical 1RM (the 1.0 → 0.97 step cancelled the extra rep), and above 20 reps
+ * neighbouring counts can still share a stored value, so `repMaxFromAmrapOneRm` can only return the
+ * lower of a tie. `exercise_logs.avg_reps` holds the real figure.
  *
  * It lives here rather than in the card for the reason Q-401 records: both vitest projects run in a
  * `node` environment and cannot parse JSX, so arithmetic inside a `.tsx` cannot be asserted at all —
@@ -291,13 +384,32 @@ export function bodyweightRepMax(
   return repMaxFromAmrapOneRm(oneRm, addedKg)
 }
 
+/**
+ * How a bodyweight or baseline estimate was encoded BEFORE issue 2193 (a): the stepped discount,
+ * applied to an already-rounded `calc1RM`. Every bodyweight estimate stored until that release
+ * carries this encoding, and the owner ruled past 1RMs are not rewritten, so the inverse below must
+ * still read them: against the smooth map alone, 11 logged reps (stored 128) would read back as 10
+ * and 25 as 19. **Read-only**: nothing computes a new estimate with it.
+ */
+function legacySteppedAmrap1RM(weight: number, reps: number): number {
+  const r = Math.min(reps, REP_CEILING)
+  const f = r <= 5 ? 1.0 : r <= 8 ? 0.97 : r <= 12 ? 0.93 : r <= 20 ? 0.88 : 0.82
+  return mround(calc1RM(weight, r) * f, 0.25)
+}
+
 export function repMaxFromAmrapOneRm(oneRm: number, addedKg = 0): number {
   if (oneRm <= 0) return 0
   const ref = Math.max(1, BW_REF + addedKg)
   let best = 0
   let bestDistance = Infinity
   for (let r = 1; r <= REP_CEILING; r++) {
-    const distance = Math.abs(calcAmrap1RM(ref, r) - oneRm)
+    // Nearest under either encoding (see legacySteppedAmrap1RM). The legacy map never sits above
+    // the current one, so a value stored under the CURRENT map always reads back exactly; a legacy
+    // value that happens to equal a lower rep count's current value reads as that lower count.
+    const distance = Math.min(
+      Math.abs(calcAmrap1RM(ref, r) - oneRm),
+      Math.abs(legacySteppedAmrap1RM(ref, r) - oneRm),
+    )
     // Strictly-less keeps the LOWEST rep count of a tie, which is the honest reading of a
     // collision: it is the claim the stored number actually supports.
     if (distance < bestDistance) { bestDistance = distance; best = r }

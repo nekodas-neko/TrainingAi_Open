@@ -59,10 +59,12 @@ describe('prevRepMaxReps carries the reps behind the basis', () => {
 
   // The whole reason the field exists rather than an inverse: these two are indistinguishable
   // downstream of the stored number, so only the stored reps can separate them.
-  it('separates 5 reps from 6, which store the identical 1RM', () => {
-    const five = calcAmrap1RM(70, 5)
-    const six = calcAmrap1RM(70, 6)
-    expect(five).toBe(six)
+  // Before issue 2193 (a) smoothed the discount, 5 and 6 reps at +70 kg both stored 80.25, and rows
+  // stored then still hold it. The current map separates them (80.25 vs 81.75).
+  it('separates 5 reps from 6, which stored the identical 1RM', () => {
+    const five = 80.25
+    expect(calcAmrap1RM(70, 5)).toBe(five)
+    expect(calcAmrap1RM(70, 6)).toBeGreaterThan(five)
     for (const reps of [5, 6]) {
       const ex = build({
         lastRealOneRm: new Map([['Hanging Leg Raise', { estimated1rm: five, target80: null, avgReps: reps }]]),
@@ -124,9 +126,8 @@ describe('bodyweightRepMax prefers the stored reps over the inverse', () => {
 
   // The collision, at the level the card actually reads: both rep counts store the same 1RM, so the
   // inverse returns one answer for two different sessions and only the stored reps separate them.
-  it('separates 5 from 6 where the inverse cannot', () => {
-    const tied = calcAmrap1RM(70, 5)
-    expect(tied).toBe(calcAmrap1RM(70, 6))
+  it('separates 5 from 6 where the inverse cannot (a row stored before issue 2193)', () => {
+    const tied = 80.25 // 5 and 6 reps at +70 kg, both, under the stepped discount
     expect(bodyweightRepMax({ storedReps: 5, oneRm: tied })).toBe(5)
     expect(bodyweightRepMax({ storedReps: 6, oneRm: tied })).toBe(6)
     // Without the reps both collapse to the same recovered number — the defect being fixed.

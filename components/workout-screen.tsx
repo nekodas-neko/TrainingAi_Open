@@ -19,6 +19,8 @@ import {
   mroundStepUp,
   prescribedBarWeights,
   plannedWeightsPayload,
+  prescriptionBasisPayload,
+  styleWithPrescribedBars,
   weightStepFor,
   defaultRpeFromPct,
   applyDeloadReverts,
@@ -1213,7 +1215,9 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       snapWeights.map((w, i) => ({ weightKg: w, reps: snapReps[i] ?? 0 })),
       {
         exerciseType: ex.exerciseType === "bodyweight" ? "bodyweight" : "weighted",
-        style: ex.progressionStyle,
+        // Issue 2200: scored against the bars this screen put up, the same ones `plannedWeights`
+        // sends, so the stored estimate and the server's agree.
+        style: styleWithPrescribedBars(ex, snapWeights.length),
         isBaseline,
         deloaded: isDeloadedForEstimate({ exerciseDeloaded: ex.deloaded, isAnyDeload, isBaseline }),
       },
@@ -1264,6 +1268,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       prepTimeSec: ex.supersetGroup == null ? (prepSecRef.current ?? undefined) : undefined,
       progressionStyle: ex.progressionStyle ?? undefined,
       plannedWeights: plannedWeightsPayload(ex, snapWeights.length), // #2445
+      prescriptionBasisKg: prescriptionBasisPayload(ex, snapWeights.length), // issue 2200
       styleName: ex.styleName ?? undefined,
       styleId: ex.styleId,
       muscleGroups: ex.muscleGroups?.length ? ex.muscleGroups : undefined,
