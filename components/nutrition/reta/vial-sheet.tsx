@@ -246,7 +246,7 @@ export function VialSheet({ open, onOpenChange, supplementId, supplementName, de
           <WeightResponseCard userId={userId} sinceDate={current?.openedOn ?? null} />
 
           {/* Issue 2152. Under Weight response, one section per dose amount. */}
-          <HeartResponseCard supplementId={supplementId} />
+          <HeartResponseCard supplementId={supplementId} supplementName={supplementName} userId={userId} />
         </div>
 
         <div className="flex-none px-4 pt-2 border-t">

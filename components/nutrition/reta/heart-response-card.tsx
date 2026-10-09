@@ -1,7 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
+import { getLocalStore, type LocalStore } from "@/lib/local-store";
+import { subscribeToInvalidation } from "@/lib/sqlite/cache";
+import { shiftDateStr, todayInTz } from "@trainingai/shared/date-utils";
 import { TTL_MEDIUM } from "@trainingai/shared/cache-ttl";
 import { CATEGORICAL_PALETTE } from "@trainingai/shared/chart-colors";
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
@@ -146,18 +149,81 @@ export function HeartResponseBody({ doses, nights, tz }: Inputs & { tz: string }
   );
 }
 
-export function HeartResponseCard({ supplementId }: { supplementId: string }) {
+/** The longest window the overlay allows; the server route used the same. */
+export const HEART_WINDOW_DAYS = 180;
+
+/**
+ * Issue 2724 — the card's inputs from the on-device store: this supplement's dose logs and each
+ * night's resting HR and HRV, over the last `HEART_WINDOW_DAYS` local days. Resting HR is the
+ * night's LOW and HRV the night's average, exactly as the server route reads them.
+ * Exported so the offline path can be tested without React.
+ */
+export async function readLocalHeartInputs(
+  store: Pick<LocalStore, "getSupplementLogsRange" | "getOuraDailySummary">,
+  supplementId: string,
+  tz: string,
+  supplementName = "",
+): Promise<Inputs> {
+  const to = todayInTz(tz);
+  const from = shiftDateStr(to, -(HEART_WINDOW_DAYS - 1));
+  const [logs, summaries] = await Promise.all([
+    store.getSupplementLogsRange(from, to, supplementId),
+    store.getOuraDailySummary(from, to),
+  ]);
+  return {
+    doses: logs.map(l => ({
+      supplementId: l.supplementId, supplementName, date: l.logDate,
+      amount: l.amount ?? null, unit: l.unit ?? null, doseText: l.doseText ?? null, takenAt: l.takenAt ?? null,
+    })),
+    nights: summaries.map(r => ({ date: r.day, restingHr: r.rhrLowBpm, hrvMs: r.hrvAvgMs })),
+  };
+}
+
+/**
+ * Local first. Doses come from the device (a dose logged offline is there before it syncs); nights
+ * come from the device unless the server read saw a LONGER run of them, because the baseline is the
+ * nights before the first dose and a shorter local window would fold dosed nights into it. With no
+ * local store (the web build) the server read is the whole answer.
+ */
+export function mergeHeartInputs(local: Inputs | null, server: Inputs | null): Inputs | null {
+  if (!local) return server;
+  const nights = server && server.nights.length > local.nights.length ? server.nights : local.nights;
+  return { doses: local.doses, nights };
+}
+
+export function HeartResponseCard({ supplementId, supplementName, userId }: { supplementId: string; supplementName?: string; userId?: string }) {
   const tz = useUserTimezone();
   const [failed, setFailed] = useState(false);
+  const [local, setLocal] = useState<Inputs | null>(null);
   // Seeded from the cache synchronously, so a repeat visit paints at once; nothing is drawn (and no
-  // skeleton) until there is data. The key is a prefix of `reta-heart:` for `cache-groups.ts`.
-  const data = useCachedValue<Inputs>(
+  // skeleton) until there is data. The server read stays as the nights' fallback and the web build's
+  // only source; the key is a prefix of `reta-heart:` for `cache-groups.ts`.
+  const server = useCachedValue<Inputs>(
     `reta-heart:${supplementId}`,
     `/api/supplements/${supplementId}/heart-response`,
     TTL_MEDIUM,
     { onError: () => setFailed(true) },
   );
 
+  useEffect(() => {
+    const store = userId ? getLocalStore(userId) : null;
+    if (!store) return;
+    let alive = true;
+    const load = () => {
+      readLocalHeartInputs(store, supplementId, tz, supplementName)
+        .then(d => { if (alive) setLocal(d) })
+        .catch(() => { /* the server read, if any, stands */ });
+    };
+    load();
+    // A dose logged on this device invalidates `reta-heart:` through its cache group; re-read then.
+    const unsubscribe = subscribeToInvalidation(prefix => {
+      const key = `reta-heart:${supplementId}`;
+      if (key.startsWith(prefix) || prefix.startsWith(key)) load();
+    });
+    return () => { alive = false; unsubscribe() };
+  }, [userId, supplementId, supplementName, tz]);
+
+  const data = mergeHeartInputs(local, server);
   if (!data) {
     return failed ? (
       <p className="text-[11px] text-muted-foreground">Couldn&apos;t load your heart response.</p>

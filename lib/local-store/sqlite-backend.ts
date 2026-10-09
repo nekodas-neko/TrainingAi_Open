@@ -90,6 +90,36 @@ async function otherQueuedMutations(domains: string[], rowId: string, confirming
   return Number(cnt) > 0
 }
 
+/** Issue 2724 — the one row→object mapper for `supplement_logs`, shared by the day and range reads. */
+function mapSupplementLogRow(r: Record<string, unknown>): LocalSupplementLog {
+  return {
+    id:           String(r.id),
+    supplementId: String(r.supplement_id),
+    logDate:      String(r.log_date),
+    amount:       r.amount == null ? null : Number(r.amount),
+    unit:         r.unit ? String(r.unit) : null,
+    doseText:     r.dose_text ? String(r.dose_text) : null,
+    source:       r.source === 'meal' ? 'meal' : 'manual',
+    sourceRef:    r.source_ref ? String(r.source_ref) : null,
+    // LA-97 — OR-102a's four columns were written and never read back. The SELECT is `*`, so the
+    // rows carried them the whole time; this mapper listed ten fields and stopped. That made the
+    // freeze write-only: `enrichPayload` reads a log through here to build its push payload, so
+    // the server got `amount`/`unit`/`doseText` and nothing else, and `logSupplement` then
+    // stamped `taken_at` at PUSH time and re-read whatever vial was current then — the
+    // retroactive rewrite `upsertSupplementLog`'s own comment says the freeze exists to prevent.
+    //
+    // CLAUDE.md, sessions 29 and 64: when adding a DB column, update EVERY row→object mapper. A
+    // missed one fails silently, and this one failed silently for the whole of OR-102a's life.
+    takenAt:        r.taken_at ? String(r.taken_at) : null,
+    vialStrengthMg: r.vial_strength_mg == null ? null : Number(r.vial_strength_mg),
+    vialWaterMl:    r.vial_water_ml == null ? null : Number(r.vial_water_ml),
+    vialUnitsPerMl: r.vial_units_per_ml == null ? null : Number(r.vial_units_per_ml),
+    updatedAt:    String(r.updated_at),
+    deletedAt:    r.deleted_at ? String(r.deleted_at) : null,
+    syncStatus:   String(r.sync_status) as 'pending' | 'synced',
+  };
+}
+
 export class SQLiteLocalStore implements LocalStore {
   async getBodyMetrics(cutoffDate: string): Promise<LocalBodyMetric[]> {
     const rows = await querySQL<Record<string, unknown>>(
@@ -3110,32 +3140,24 @@ export class SQLiteLocalStore implements LocalStore {
       `SELECT * FROM supplement_logs WHERE log_date = ? AND deleted_at IS NULL`,
       [date],
     );
-    return rows.map(r => ({
-      id:           String(r.id),
-      supplementId: String(r.supplement_id),
-      logDate:      String(r.log_date),
-      amount:       r.amount == null ? null : Number(r.amount),
-      unit:         r.unit ? String(r.unit) : null,
-      doseText:     r.dose_text ? String(r.dose_text) : null,
-      source:       r.source === 'meal' ? 'meal' : 'manual',
-      sourceRef:    r.source_ref ? String(r.source_ref) : null,
-      // LA-97 — OR-102a's four columns were written and never read back. The SELECT is `*`, so the
-      // rows carried them the whole time; this mapper listed ten fields and stopped. That made the
-      // freeze write-only: `enrichPayload` reads a log through here to build its push payload, so
-      // the server got `amount`/`unit`/`doseText` and nothing else, and `logSupplement` then
-      // stamped `taken_at` at PUSH time and re-read whatever vial was current then — the
-      // retroactive rewrite `upsertSupplementLog`'s own comment says the freeze exists to prevent.
-      //
-      // CLAUDE.md, sessions 29 and 64: when adding a DB column, update EVERY row→object mapper. A
-      // missed one fails silently, and this one failed silently for the whole of OR-102a's life.
-      takenAt:        r.taken_at ? String(r.taken_at) : null,
-      vialStrengthMg: r.vial_strength_mg == null ? null : Number(r.vial_strength_mg),
-      vialWaterMl:    r.vial_water_ml == null ? null : Number(r.vial_water_ml),
-      vialUnitsPerMl: r.vial_units_per_ml == null ? null : Number(r.vial_units_per_ml),
-      updatedAt:    String(r.updated_at),
-      deletedAt:    r.deleted_at ? String(r.deleted_at) : null,
-      syncStatus:   String(r.sync_status) as 'pending' | 'synced',
-    }));
+    return rows.map(mapSupplementLogRow);
+  }
+
+  /**
+   * Issue 2724 — the live logs from `fromDate` to `toDate`, both INCLUSIVE local days, oldest first
+   * (then by `taken_at`, then id, so equal days are stable). Tombstones (`deleted_at`) are excluded.
+   * `supplementId` narrows to one supplement. Uses `idx_supplement_logs_date`; no schema change.
+   * The range twin of `getSupplementLogs`: same mapper, and rows are read whatever their sync
+   * status, so a dose logged offline and still `pending` is in it.
+   */
+  async getSupplementLogsRange(fromDate: string, toDate: string, supplementId?: string): Promise<LocalSupplementLog[]> {
+    const rows = await querySQL<Record<string, unknown>>(
+      `SELECT * FROM supplement_logs WHERE log_date >= ? AND log_date <= ? AND deleted_at IS NULL`
+        + (supplementId ? ` AND supplement_id = ?` : ``)
+        + ` ORDER BY log_date, taken_at, id`,
+      supplementId ? [fromDate, toDate, supplementId] : [fromDate, toDate],
+    );
+    return rows.map(mapSupplementLogRow);
   }
 
   async upsertSupplementLog(record: LocalSupplementLog): Promise<void> {
