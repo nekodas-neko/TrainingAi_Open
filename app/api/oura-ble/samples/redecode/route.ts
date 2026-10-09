@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { z } from 'zod'
-import { runRedecodeOffLoop, runStressBackfillOffLoop } from '@/lib/oura-ble/rollup-worker'
+import { runRedecodeOffLoop } from '@/lib/oura-ble/rollup-worker'
+import { startStressBackfillJob, describeRedecodeJob } from '@/lib/oura-ble/stress-backfill-job'
 import { rateLimit } from '@/lib/rate-limit'
 import { reportRollupStepErrors } from '@/lib/oura-ble/report-step-errors'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { getRepositoryAsync } from '@/lib/data'
-import { redecodeJobKind, isStressBackfillKind, REDECODE_BUSY_FOR_BACKFILL_MESSAGE, REDECODE_BUSY_FOR_STRESS_MESSAGE } from '@/lib/oura-ble/redecode-job-kind'
+import { redecodeJobKind, REDECODE_BUSY_FOR_BACKFILL_MESSAGE, REDECODE_BUSY_FOR_STRESS_MESSAGE } from '@/lib/oura-ble/redecode-job-kind'
 
 // Issue 2236: `?stressBackfill=1` adds the daytime-stress buckets history never got. Its own strict
 // schema: any other parameter (date, dump, allowStepsDecrease, a typo) is a 400 rather than ignored,
@@ -104,9 +105,35 @@ export async function POST(req: Request) {
     )
   }
 
-  const opts: Record<string, unknown> = stressRequested
-    ? { fullHistory: true, stressBackfill: true, dryRun: stressDryRun }
-    : { debugDate: debugDate ?? null, fullHistory: true, allowStepsDecrease }
+  if (stressRequested) {
+    // Issue 2381: the start lives in one place, shared with the agent key.
+    const started = await startStressBackfillJob(repo, userId, tz, stressDryRun)
+    if (started.state === 'refused') {
+      return NextResponse.json(
+        {
+          error: REDECODE_BUSY_FOR_STRESS_MESSAGE,
+          refused: true,
+          runningJobId: started.job.id,
+          runningKind: redecodeJobKind(started.job.opts),
+          requestedKind: redecodeJobKind({ fullHistory: true, stressBackfill: true, dryRun: stressDryRun }),
+        },
+        { status: 409, headers: { 'Cache-Control': 'private, no-store' } },
+      )
+    }
+    return NextResponse.json(
+      {
+        jobId: started.job.id, status: 'running', startedAt: started.job.startedAt.toISOString(),
+        alreadyRunning: started.state === 'following',
+        kind: redecodeJobKind(started.job.opts),
+        note: started.state === 'following'
+          ? 'A redecode is already running; this did not start a second. Poll this job id.'
+          : 'Started. Poll GET ?jobId=… for the report.',
+      },
+      { headers: { 'Cache-Control': 'private, no-store' } },
+    )
+  }
+
+  const opts: Record<string, unknown> = { debugDate: debugDate ?? null, fullHistory: true, allowStepsDecrease }
 
   // A job whose process died mid-run would otherwise hold the one-at-a-time slot forever. Reaped
   // here rather than by a sweeper — there is no cron layer in this app, and the only reader that
@@ -119,7 +146,7 @@ export async function POST(req: Request) {
   if (refused) {
     return NextResponse.json(
       {
-        error: isStressBackfillKind(redecodeJobKind(opts)) ? REDECODE_BUSY_FOR_STRESS_MESSAGE : REDECODE_BUSY_FOR_BACKFILL_MESSAGE,
+        error: REDECODE_BUSY_FOR_BACKFILL_MESSAGE,
         refused: true,
         runningJobId: job.id,
         runningKind: redecodeJobKind(job.opts),
@@ -134,25 +161,6 @@ export async function POST(req: Request) {
         jobId: job.id, status: 'running', startedAt: job.startedAt.toISOString(), alreadyRunning: true,
         kind: redecodeJobKind(job.opts),
         note: 'A redecode is already running; this did not start a second. Poll this job id.',
-      },
-      { headers: { 'Cache-Control': 'private, no-store' } },
-    )
-  }
-
-  if (stressRequested) {
-    // Reads stored data and adds rows; redecodes and re-aggregates nothing. Failure is reported into
-    // the job row (`aggregateError`) by the worker, and the `.catch` covers anything that is not.
-    void runStressBackfillOffLoop(userId, tz, stressDryRun)
-      .then(phases => repo.finishRedecodeJob(job.id, phases as unknown as Record<string, unknown>, null))
-      .catch(async err => {
-        console.error('[oura-ble] stress backfill job threw:', err instanceof Error ? err.message : String(err))
-        await repo.finishRedecodeJob(job.id, null, err instanceof Error ? err.message : String(err)).catch(() => {})
-      })
-    return NextResponse.json(
-      {
-        jobId: job.id, status: 'running', startedAt: job.startedAt.toISOString(), alreadyRunning: false,
-        kind: redecodeJobKind(job.opts),
-        note: 'Started. Poll GET ?jobId=… for the report.',
       },
       { headers: { 'Cache-Control': 'private, no-store' } },
     )
@@ -221,29 +229,5 @@ export async function GET(req: Request) {
   const job = id != null ? await repo.getRedecodeJob(userId, id) : await repo.getLatestRedecodeJob(userId)
   if (!job) return NextResponse.json({ job: null }, { headers: { 'Cache-Control': 'private, no-store' } })
 
-  const phases = job.result as { redecodeError?: string | null; aggregateError?: string | null } | null
-  const status = job.finishedAt == null
-    ? 'running'
-    : job.error != null || phases?.redecodeError != null || phases?.aggregateError != null
-      ? 'failed'
-      : 'done'
-
-  return NextResponse.json(
-    {
-      job: {
-        jobId: job.id,
-        status,
-        startedAt: job.startedAt.toISOString(),
-        finishedAt: job.finishedAt?.toISOString() ?? null,
-        opts: job.opts,
-        error: job.error,
-        ...(job.result ?? {}),
-        // Issue 2383: what this run was asked to write, read from the row rather than from the
-        // request that is polling it. The step-backfill screen only says "Backfill applied" when
-        // this is 'step-backfill'. Placed after the spread so a result payload cannot shadow it.
-        kind: redecodeJobKind(job.opts),
-      },
-    },
-    { headers: { 'Cache-Control': 'private, no-store' } },
-  )
+  return NextResponse.json({ job: describeRedecodeJob(job) }, { headers: { 'Cache-Control': 'private, no-store' } })
 }
