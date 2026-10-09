@@ -3,6 +3,11 @@ import { PKCE_CHALLENGE_RE } from '@/lib/auth/mobile/pkce'
 import { MOBILE_CHALLENGE_COOKIE, MOBILE_CHALLENGE_MAX_AGE_S } from '@/lib/auth/mobile/challenge-cookie'
 import { IOS_STATE_RE, IOS_TRANSACTION_COOKIE, IOS_TRANSACTION_MAX_AGE, signIosTransaction } from '@/lib/auth/mobile/ios-transaction'
 
+// Relative Locations, never `new URL(path, req.url)`: behind Railway's proxy a route handler's
+// `req.url` is the container's own address, so production sent the Android sign-in tab to
+// https://localhost:8080/mobile-signin and a fresh Google sign-in could not start.
+const redirectTo = (path: string) => new NextResponse(null, { status: 307, headers: { Location: path } })
+
 export async function GET(req: NextRequest) {
   const challenge = req.nextUrl.searchParams.get('challenge') ?? ''
   const client = req.nextUrl.searchParams.get('client')
@@ -14,11 +19,9 @@ export async function GET(req: NextRequest) {
     if (client === 'ios') {
       return NextResponse.json({ error: 'Invalid mobile transaction' }, { status: 400 })
     }
-    return NextResponse.redirect(new URL('/sign-in', req.url))
+    return redirectTo('/sign-in')
   }
-  const res = client === 'ios'
-    ? new NextResponse(null, { status: 307, headers: { Location: '/mobile-signin/ios' } })
-    : NextResponse.redirect(new URL(`/mobile-signin?challenge=${challenge}`, req.url))
+  const res = redirectTo(client === 'ios' ? '/mobile-signin/ios' : `/mobile-signin?challenge=${challenge}`)
   if (client === 'ios') {
     res.cookies.set(IOS_TRANSACTION_COOKIE, await signIosTransaction({ challenge, state }), {
       httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax',
