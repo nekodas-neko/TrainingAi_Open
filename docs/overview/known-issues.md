@@ -87,17 +87,18 @@
   invisible from here.
 - **Strike this row** when both are VERIFIED.
 
-### [cardio][activity] RV-166's walk completion is NOT device-verified, and the local store is the whole path
+### [cardio][activity] The heart-health activity completion (issue 2093, was RV-166) is NOT device-verified
 
-- v1.482.0 lets a walk finish the day's prescribed run from the new *Today's cardio* card. The link
-  writes through `store.upsertPrescribedRun` + the outbox, and **`getLocalStore` returns null in the
-  browser** — so the write, the `completedAs: 'walk'` payload and the pull-back have never run
-  anywhere but a unit test. The card's rendering IS covered (`e2e/rv166-todays-cardio-card.spec.ts`).
-- **Owed (Lane DV):** from the Cardio Hub, `Walk it` → a duration chip → Save. The card must then
-  read **Done · Completed as a walk**, `prescribed_runs.completed_as` must be `'walk'`, and the next
-  prescription must be unaffected by it (a walk must not satisfy the planner as a run, LB-179).
-- Also unexercised: the **estimated** path — a treadmill walk with no heart rate counting from its
-  logged minutes. No sandbox row has that shape.
+- Issue 2093 replaced RV-166's "start it from the card" completion: any activity now completes the
+  day through its zone 2+ minutes, measured server-side and recorded on the device by
+  `useHeartHealthCompletion` → `linkPrescribedRun` (`store.upsertPrescribedRun` + the outbox).
+  **`getLocalStore` returns null in the browser**, so that write, its `completedAs` payload and the
+  pull-back have run only in unit tests. The card's rendering is covered
+  (`e2e/heart-health-card-2093.spec.ts`).
+- **Owed (Lane DV):** a treadmill walk with the ring on, saved any way at all; once it has synced and
+  the ring's heart rate has landed, the Cardio Hub card must read **Counted ✓** with the walk named,
+  `prescribed_runs.completed_as` must be `'walk'`, and the next prescription must be unaffected (a
+  walk must not satisfy the planner as a run, LB-179).
 - **Strike this row** when that is VERIFIED.
 
 ### [readiness][platform] LB-190's local v46 and LB-198's v47 (day_checkins.vs_normal, vs_question, vs_normal_touched) are NOT device-verified

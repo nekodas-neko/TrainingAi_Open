@@ -21,7 +21,6 @@ import {
 // function whose parameter type is private cannot be called from anywhere that has to name it.
 export interface ActivityState {
   activitySessionId: string
-  prescribedRunId: string | null
   activityType: string | null
   activityLabel: string
   activityIcon: string
@@ -46,8 +45,6 @@ interface ActivityActions {
   startActivity: (typeId: string, label: string, icon: string, isDistanceBased: boolean) => void
   /** RV-166 — a session that already happened, straight to the summary for confirmation. */
   logCompletedActivity: (typeId: string, label: string, icon: string, durationMin: number) => void
-  /** null clears it — a prescription must not be satisfied twice by two activities (RV-166). */
-  linkPrescribedRun: (id: string | null) => void
   setTitle: (title: string) => void
   begin: () => void
   pause: () => void
@@ -73,7 +70,6 @@ const MAX_ACTIVE_RECOVERY_MS = 12 * 60 * 60 * 1000
 
 const INITIAL_STATE: ActivityState = {
   activitySessionId: '',
-  prescribedRunId: null,
   activityType: null,
   activityLabel: '',
   activityIcon: '',
@@ -115,7 +111,6 @@ export function clearActivitySetup(state: ActivityState): void {
   state.activityIcon = ''
   state.isDistanceBased = false
   state.title = ''
-  state.prescribedRunId = null
 }
 
 /**
@@ -169,7 +164,6 @@ export const useActivityStore = create<ActivityStore>()(
         mode: 'pre',
       }),
 
-      linkPrescribedRun: (id) => set({ prescribedRunId: id }),
 
       // RV-166. A treadmill walk the owner already did: arm the session as FINISHED so it lands on
       // the done screen with the minutes filled in, and the one activity-log writer in
