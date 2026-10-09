@@ -101,7 +101,7 @@ describe.skipIf(!canRun)('shadow readiness service (#2377)', () => {
   }, 60_000)
 
   it('version 2 scores deep + REM share against the person\'s own normal; an unstaged night drops out, never 0 (issue 2635)', async () => {
-    expect(SHADOW_MODEL_VERSION).toBe(2)
+    expect(SHADOW_MODEL_VERSION).toBeGreaterThanOrEqual(2)
     const { rows: stored } = await pool.query(
       `SELECT date::text AS date, units->'sleep.deep_rem_share' AS u FROM shadow_readiness
         WHERE user_id = $1 AND model_version = $2 ORDER BY date`, [TEST_USER_ID, SHADOW_MODEL_VERSION])

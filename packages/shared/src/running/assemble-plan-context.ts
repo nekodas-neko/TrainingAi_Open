@@ -67,7 +67,7 @@ export async function assembleInputs(
   }
 
   // ACWR + Foster monotony over the 28-day / 7-day windows.
-  const load = computeVolumeAcwr(sessionLoads.map(ws => ({ startedAt: ws.startedAt, volumeKg: ws.volume })), todayMid)
+  const load = computeVolumeAcwr(sessionLoads.map(ws => ({ startedAt: ws.startedAt, volumeKg: ws.volume })), todayMid, { tz })
   const last7 = Array.from({ length: 7 }, (_, i) => new Date(todayMid.getTime() - i * 86_400_000))
   const loadByDay = new Map(last7.map(d => [toAestDay(d, tz), 0]))
   for (const ws of sessionLoads) {

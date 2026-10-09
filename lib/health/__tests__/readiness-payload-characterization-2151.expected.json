@@ -562,7 +562,7 @@
     "earlyDeloadRecommended": true,
     "earlyDeload": {
       "score": 43,
-      "acwr": 3.9740259740259734,
+      "acwr": 3.3594470046082954,
       "scoreThreshold": 45,
       "acwrThreshold": 1.2
     },

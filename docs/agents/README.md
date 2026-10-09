@@ -57,13 +57,13 @@ without re-reading anything else. **Usage gate (owner, 2026-10-09).** The tiers 
 type and the reset time. The Orchestrator reads the percentage at every health check and posts the
 tier on #2354 when it changes:
 
-- **Full (under 90%).** Full speed: two Implementer threads, Opus for engine, migration and scoring
+- **Full (under 90%).** Full speed: two Implementer threads, taking `--next-batch` in priority order (`hotfix`, `next`, bugs, then the rest, oldest first), Opus for engine, migration and scoring
   batches, investigations allowed, and Orchestrator helpers allowed. Health checks every 30 minutes.
-- **Slow (90–95%).** One thread at a time, Sonnet only, no investigations. The Implementer takes
-  batches with `node scripts/queue.js --next-batch --sonnet-only`, which skips any batch whose
-  milestone description names **Opus**. Every batch description starts with `Opus.` or `Sonnet.`
-  for this reason. BugFix carries on. The Orchestrator starts no helpers and checks every 60
-  minutes.
+- **Slow (90–95%).** One thread at a time, on the most important work only (owner, 2026-10-09:
+  "prioritise the higher priority tasks"). The Implementer takes batches with
+  `node scripts/queue.js --next-batch --urgent-only`, which serves only batches holding a `hotfix`,
+  a `next` or a bug, most urgent first, with whatever model the batch needs. No investigations,
+  and no Orchestrator helpers; checks every 60 minutes. BugFix carries on.
 - **Halt (95% and over).** Work stops except a production-broken hotfix (`hotfix` label). The
   Orchestrator interrupts the sessions, stops its helpers, posts **Halt** on #2354 with the reset
   time, and schedules its next check for just after `resetsAt`.

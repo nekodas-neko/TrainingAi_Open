@@ -6,6 +6,7 @@ import { useTransitionRouter } from "@/lib/view-transition";
 import { cachedFetchToday, cachedFetch, readTodayCacheSync, readCacheSync } from '@/lib/sqlite/cache'
 import { getLocalStore } from '@/lib/local-store'
 import { useActivityStore } from '@/lib/stores/activity-store'
+import { useHeartHealthCompletion, type MeasuredDay } from '@/lib/activity/heart-health-completion'
 import { invalidateRunningPlan } from '@/lib/cache-groups'
 import { RUNNING_PLAN_TTL, RUNNING_BESTS_TTL, RUN_TYPE_STATS_TTL, CARDIO_WEEK_TTL } from '@trainingai/shared/cache-ttl'
 import { todayInTz } from '@trainingai/shared/date-utils'
@@ -39,6 +40,8 @@ interface PlanResponse {
   zoneTargets?: WeeklyZoneTargets
   goal?: { key: string; label: string; blurb: string } | null
   isPushSession?: boolean
+  /** Issue 2093 — this week's measured heart-health days. */
+  heartHealth?: { days: MeasuredDay[] }
 }
 
 // Reused from the Cardiovascular hub's own payload — only the quota is needed here, and
@@ -199,14 +202,15 @@ export function RunningPlanContent({ userId }: { userId: string }) {
   }, [carouselIndex, applyOverride])
 
   const onStart = useCallback(() => {
-    // Hand off to the guided-activity flow to execute + log the run. startActivity resets
-    // the whole session (including prescribedRunId), so it must fire first — linking the
-    // prescription id after is what lets completion route back to this row (device round-trip).
-    const store = useActivityStore.getState()
-    store.startActivity('run', 'Run', 'PersonSimpleRun', true)
-    if (data?.run?.id) store.linkPrescribedRun(data.run.id)
+    // Hand off to the guided-activity flow to execute + log the run. Issue 2093: nothing is armed —
+    // the day completes from its measured zone 2+ minutes, whatever was done and however started.
+    useActivityStore.getState().startActivity('run', 'Run', 'PersonSimpleRun', true)
     router.push('/activity')
-  }, [router, data?.run?.id])
+  }, [router])
+
+  // Issue 2093: the Running screen reads the same measured week, so a day that met the rule is
+  // recorded here too when this is the screen that loads it first.
+  useHeartHealthCompletion(userId, data?.heartHealth?.days)
 
   const status = localStatus ?? data?.run?.status ?? 'pending'
 
@@ -273,7 +277,7 @@ export function RunningPlanContent({ userId }: { userId: string }) {
       {data?.plan && status === 'completed' && (
         <div className="mt-4 flex flex-col items-center gap-3 rounded-2xl border border-[color:var(--border)] bg-[color:var(--card)] p-6 text-center">
           <CheckCircle2 className="h-8 w-8" style={{ color: 'var(--accent-green)' }} aria-hidden />
-          <p className="text-sm font-medium">Today&apos;s run is done — nice work.</p>
+          <p className="text-sm font-medium">Today&apos;s heart-health activity is done — nice work.</p>
           <Button variant="outline" onClick={() => router.push('/cardio')}>Back to Cardio</Button>
         </div>
       )}

@@ -5,7 +5,7 @@
 //
 //   node scripts/queue.js --agent implementer        the ordered queue, with suggested batches
 //   node scripts/queue.js --agent bugfix --json      machine-readable
-//   node scripts/queue.js --next-batch [--lane engine|surface] [--sonnet-only]
+//   node scripts/queue.js --next-batch [--lane engine|surface] [--urgent-only] [--sonnet-only]
 //                                                    the next unclaimed BATCH MILESTONE, or NO_BATCH
 //
 // CLAIMING: several sessions of a role may run at once. A session labels its issues `in progress`
@@ -52,6 +52,34 @@ function needsOpus(milestone) {
   return /\bOpus\b/.test(milestone.description || '');
 }
 
+/**
+ * Pure: the batch to build next (owner, 2026-10-09: "prioritise the higher priority tasks").
+ * A batch ranks by its most urgent ready issue (`hotfix`, then `next`, then a bug, then the rest;
+ * the same order as `rank`), and ties go to the oldest milestone. A batch someone has claimed
+ * (`in progress`), one outside `lane`, one needing Opus under `sonnetOnly`, and one with nothing
+ * ready are skipped. `urgentOnly` (the Slow usage tier) keeps only batches holding a hotfix, a `next`
+ * or a bug.
+ */
+function pickBatch(milestones, issuesByMilestone, { sonnetOnly = false, urgentOnly = false, lane = null } = {}) {
+  const names = (i) => new Set(i.labels.map((l) => (typeof l === 'string' ? l : l.name)));
+  const parked = (l) => l.has('blocked') || l.has('later') || [...l].some((n) => n.startsWith('needs:'));
+  const candidates = [];
+  for (const m of milestones) {
+    if (sonnetOnly && needsOpus(m)) continue;
+    const issues = issuesByMilestone.get(m.number) || [];
+    const labelSets = issues.map(names);
+    if (labelSets.some((l) => l.has('in progress'))) continue;
+    if (lane && !labelSets.some((l) => l.has(`lane: ${lane}`))) continue;
+    const readySets = labelSets.filter((l) => !parked(l));
+    if (!readySets.length) continue;
+    const best = Math.min(...readySets.map(rank));
+    if (urgentOnly && best > 2) continue; // the Slow tier takes only hotfix, next and bug batches
+    candidates.push({ milestone: m, issues, blocked: issues.filter((_, k) => parked(labelSets[k])), best });
+  }
+  candidates.sort((a, b) => a.best - b.best || a.milestone.number - b.milestone.number);
+  return candidates[0] || null;
+}
+
 function isReady(issue, agent) {
   const l = issue.labelSet;
   return l.has(`agent: ${agent}`) && !l.has('blocked') && !l.has('later') && !l.has('in progress') && ![...l].some((n) => n.startsWith('needs:'));
@@ -93,13 +121,13 @@ function plan(issues) {
   return batches;
 }
 
-module.exports = { plan, rank, isReady, needsOpus };
+module.exports = { plan, rank, isReady, needsOpus, pickBatch };
 
 if (require.main === module) {
   const args = process.argv.slice(2);
   const agent = args[args.indexOf('--agent') + 1];
   if (!args.includes('--next-batch') && (!args.includes('--agent') || !agent)) {
-    console.error('Usage: queue.js --agent <implementer|bugfix|orchestrator> [--json]  |  queue.js --next-batch [--sonnet-only] [--json]');
+    console.error('Usage: queue.js --agent <implementer|bugfix|orchestrator> [--json]  |  queue.js --next-batch [--urgent-only] [--sonnet-only] [--json]');
     process.exit(2);
   }
   const repo = process.env.GH_REPO || 'nekodas-neko/TrainingAi_Open';
@@ -108,27 +136,33 @@ if (require.main === module) {
   const lane = args.includes('--lane') ? args[args.indexOf('--lane') + 1] : null;
   if (args.includes('--next-batch')) {
     const milestones = api(`repos/${repo}/milestones?state=open&sort=due_on&direction=asc&per_page=100`)
-      .filter((m) => /^Batch\b/i.test(m.title))
-      .sort((a, b) => a.number - b.number);
-    // --sonnet-only (owner, 2026-10-09): in the Slow usage tier, skip batches that need Opus.
-    const sonnetOnly = args.includes('--sonnet-only');
-    for (const m of milestones) {
-      if (sonnetOnly && needsOpus(m)) continue;
-      const issues = api(`repos/${repo}/issues?state=open&milestone=${m.number}&per_page=100`).filter((i) => !i.pull_request);
-      const has = (i, name) => i.labels.some((l) => l.name === name);
-      if (issues.some((i) => has(i, 'in progress'))) continue; // another session has this batch
-      if (lane && !issues.some((i) => has(i, `lane: ${lane}`))) continue;
-      const blocked = issues.filter((i) => i.labels.some((l) => l.name === 'blocked' || l.name === 'later' || l.name.startsWith('needs:')));
-      if (!issues.length || blocked.length === issues.length) continue;
-      if (args.includes('--json')) {
-        console.log(JSON.stringify({ milestone: m.number, title: m.title, issues: issues.map((i) => ({ number: i.number, title: i.title, blocked: blocked.includes(i) })) }, null, 2));
-      } else {
-        console.log(`NEXT BATCH: milestone #${m.number} — ${m.title}`);
-        for (const i of issues) console.log(`  #${i.number}  ${i.title}${blocked.includes(i) ? '   (blocked — leave it, say so in the PR)' : ''}`);
-      }
+      .filter((m) => /^Batch\b/i.test(m.title));
+    // One paginated read of every open issue, grouped by milestone, instead of a call per milestone.
+    const open = [];
+    for (let page = 1; ; page++) {
+      const batch = api(`repos/${repo}/issues?state=open&milestone=*&per_page=100&page=${page}`);
+      open.push(...batch.filter((i) => !i.pull_request));
+      if (batch.length < 100) break;
+    }
+    const byMilestone = new Map();
+    for (const i of open) {
+      const list = byMilestone.get(i.milestone.number) || [];
+      list.push(i);
+      byMilestone.set(i.milestone.number, list);
+    }
+    // --sonnet-only (owner, 2026-10-09) skips batches that need Opus.
+    const picked = pickBatch(milestones, byMilestone, { sonnetOnly: args.includes('--sonnet-only'), urgentOnly: args.includes('--urgent-only'), lane });
+    if (!picked) {
+      console.log('NO_BATCH');
       process.exit(0);
     }
-    console.log('NO_BATCH');
+    const { milestone: m, issues, blocked } = picked;
+    if (args.includes('--json')) {
+      console.log(JSON.stringify({ milestone: m.number, title: m.title, issues: issues.map((i) => ({ number: i.number, title: i.title, blocked: blocked.includes(i) })) }, null, 2));
+    } else {
+      console.log(`NEXT BATCH: milestone #${m.number} — ${m.title}`);
+      for (const i of issues) console.log(`  #${i.number}  ${i.title}${blocked.includes(i) ? '   (blocked — leave it, say so in the PR)' : ''}`);
+    }
     process.exit(0);
   }
 

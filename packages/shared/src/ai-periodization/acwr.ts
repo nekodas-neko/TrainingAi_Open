@@ -1,7 +1,14 @@
 import { median } from '@trainingai/shared/stats'
+import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, toAestDay } from '@trainingai/shared/date-utils'
 
 export interface AcwrSession { startedAt: Date; volumeKg: number }
-export interface AcwrOptions { minSpanDays?: number; minSessions?: number; minChronicWeeklyLoadKg?: number }
+export interface AcwrOptions {
+  minSpanDays?: number
+  minSessions?: number
+  minChronicWeeklyLoadKg?: number
+  /** The user's timezone. The acute window starts at a LOCAL midnight, so a DST day is still a day. */
+  tz?: string
+}
 export interface AcwrResult {
   acwr: number | null
   acuteLoadKg: number
@@ -11,30 +18,116 @@ export interface AcwrResult {
   typicalSessionVolumeKg: number
 }
 
-// Volume-load acute:chronic workload ratio over ALL sessions (not one session type).
-// Chronic load divides by the REAL data span in weeks, so a 3-week-old program is judged
-// against 3 weeks of history, not an imaginary 4 — the flat ÷4 inflated ACWR ~2× on new
-// programs and fired spurious emergency deloads.
-export function computeVolumeAcwr(sessions: AcwrSession[], todayMid: Date, opts: AcwrOptions = {}): AcwrResult {
-  const { minSpanDays = 21, minSessions = 6, minChronicWeeklyLoadKg = 100 } = opts
-  const from7d = todayMid.getTime() - 7 * 86_400_000
-  let acuteLoadKg = 0, chronicLoad = 0, todayVolumeKg = 0
+/**
+ * The training-load windows, in whole local days (issue 2194, issue 2340). Every ratio is
+ * "weekly-average load over the short window ÷ weekly-average load over the long one", so 1.0 means
+ * steady at every scale.
+ *
+ *   acute    7  this week, today inclusive. Issue 2194: it was 8 (`todayMid − 7d` plus today),
+ *               which read ~14% hot against bands calibrated on a 7-day acute load. Owner-signed
+ *               2026-10-05; every threshold kept.
+ *   chronic 28  the 7:28 ACWR's reference. Unchanged.
+ *   block   90  the 28:90 block trend's reference (issue 2340). A trend and an insight only: it
+ *               gates no action, so no stored score moves. Owner-signed 2026-10-07. 90:365 is not
+ *               built yet (it needs a year of history).
+ */
+export const LOAD_WINDOW_DAYS = { acute: 7, chronic: 28, block: 90 } as const
+
+export interface LoadRatioOptions {
+  /** Default: three quarters of the long window (21 for 7:28, the gate ACWR always had). */
+  minSpanDays?: number
+  /** Default 6. */
+  minSessions?: number
+  /** Default 100 kg/week. Below it the ratio is noise over a trivial base. */
+  minLongWeeklyLoadKg?: number
+  tz?: string
+}
+
+export interface LoadRatioResult {
+  /** Null until the gates pass. */
+  ratio: number | null
+  /** Load in the short window: `shortDays` local days ending with `asOf`'s day, inclusive. */
+  shortLoadKg: number
+  shortWeeklyAvgKg: number
+  longWeeklyAvgKg: number
+  /** The long window's real data span, in weeks (never under 1). */
+  dataSpanWeeks: number
+  spanDays: number
+  /** The sessions inside the long window — what the minimum-sessions gate counts. */
+  sessions: AcwrSession[]
+}
+
+/** The local midnight `days` whole days before `asOf`'s local day. DST-safe: never `asOf − n×24h`. */
+function localMidnightDaysBefore(asOf: Date, days: number, tz: string): number {
+  return dateStrMidnightInTz(shiftDateStr(toAestDay(asOf, tz), -days), tz).getTime()
+}
+
+/**
+ * One formula for every training-load ratio (issue 2340): 7:28 is the ACWR, 28:90 the block trend.
+ *
+ * `asOf` is the local midnight that starts the day being scored; that day's sessions count.
+ * - The SHORT window is `shortDays` local days, today inclusive: 7 means today and the six before.
+ * - The LONG window reaches back `longDays` whole local days before today, plus today. That is the
+ *   shape the chronic window has always had (every caller fetches from `todayMid − 28d`), kept so
+ *   issue 2194 moves the acute side alone.
+ * - The long average divides by the REAL data span in weeks, measured from the earliest session in
+ *   the window, so a 3-week-old program is judged against 3 weeks of history, not an imaginary 4 —
+ *   the flat ÷4 inflated ACWR ~2× on new programs and fired spurious emergency deloads.
+ */
+export function loadRatio(
+  sessions: AcwrSession[],
+  shortDays: number,
+  longDays: number,
+  asOf: Date,
+  opts: LoadRatioOptions = {},
+): LoadRatioResult {
+  const {
+    minSpanDays = Math.round((longDays * 3) / 4),
+    minSessions = 6,
+    minLongWeeklyLoadKg = 100,
+    tz = DEFAULT_TZ,
+  } = opts
+  const shortFrom = localMidnightDaysBefore(asOf, shortDays - 1, tz)
+  const longFrom = localMidnightDaysBefore(asOf, longDays, tz)
+  const inLong = sessions.filter(s => s.startedAt.getTime() >= longFrom)
+  let shortLoadKg = 0, longLoadKg = 0
   let earliest: number | null = null
-  const vols: number[] = []
-  for (const s of sessions) {
+  for (const s of inLong) {
     const t = s.startedAt.getTime()
-    chronicLoad += s.volumeKg
-    if (t >= from7d) acuteLoadKg += s.volumeKg
-    if (t >= todayMid.getTime()) todayVolumeKg += s.volumeKg
-    if (s.volumeKg > 0) vols.push(s.volumeKg)
+    longLoadKg += s.volumeKg
+    if (t >= shortFrom) shortLoadKg += s.volumeKg
     if (earliest == null || t < earliest) earliest = t
   }
-  const spanMs = earliest != null ? todayMid.getTime() - earliest : 0
+  const spanMs = earliest != null ? asOf.getTime() - earliest : 0
   // Round to whole days so a session logged a few hours into "21 days ago" still counts
   // as a full 21-day span, rather than being nudged just under the gate by its time-of-day.
   const spanDays = Math.round(spanMs / 86_400_000)
   const dataSpanWeeks = Math.max(1, spanDays / 7)
-  const chronicWeeklyAvgKg = chronicLoad / dataSpanWeeks
+  const longWeeklyAvgKg = longLoadKg / dataSpanWeeks
+  const shortWeeklyAvgKg = shortLoadKg / (shortDays / 7)
+  const gatesPass =
+    spanDays >= minSpanDays &&
+    inLong.length >= minSessions &&
+    longWeeklyAvgKg > minLongWeeklyLoadKg
+  return {
+    ratio: gatesPass ? shortWeeklyAvgKg / longWeeklyAvgKg : null,
+    shortLoadKg, shortWeeklyAvgKg, longWeeklyAvgKg, dataSpanWeeks, spanDays, sessions: inLong,
+  }
+}
+
+// Volume-load acute:chronic workload ratio over ALL sessions (not one session type): the 7:28
+// `loadRatio`. Callers pass the chronic window's sessions (from `todayMid − 28d`) and today's.
+export function computeVolumeAcwr(sessions: AcwrSession[], todayMid: Date, opts: AcwrOptions = {}): AcwrResult {
+  const { minSpanDays = 21, minSessions = 6, minChronicWeeklyLoadKg = 100, tz } = opts
+  const r = loadRatio(sessions, LOAD_WINDOW_DAYS.acute, LOAD_WINDOW_DAYS.chronic, todayMid, {
+    minSpanDays, minSessions, minLongWeeklyLoadKg: minChronicWeeklyLoadKg, tz,
+  })
+  let todayVolumeKg = 0
+  const vols: number[] = []
+  for (const s of r.sessions) {
+    if (s.startedAt.getTime() >= todayMid.getTime()) todayVolumeKg += s.volumeKg
+    if (s.volumeKg > 0) vols.push(s.volumeKg)
+  }
   // The shared median (LA-151). This read `sorted[floor(n/2)]` — the UPPER of the two middles —
   // which over the owner's real 119 sessions differs on 39% of rolling 28-day windows, always
   // upward, by a median 1.85% and up to 21%. It is REPORTED, not scored: Q-190 took the volume
@@ -42,14 +135,42 @@ export function computeVolumeAcwr(sessions: AcwrSession[], todayMid: Date, opts:
   // 0 for an empty window keeps the `number` contract every consumer is typed against, and the
   // window is gated by `minSessions` before anything acts on it.
   const typicalSessionVolumeKg = median(vols) ?? 0
-  const gatesPass =
-    spanDays >= minSpanDays &&
-    sessions.length >= minSessions &&
-    chronicWeeklyAvgKg > minChronicWeeklyLoadKg
   return {
-    acwr: gatesPass ? acuteLoadKg / chronicWeeklyAvgKg : null,
-    acuteLoadKg, chronicWeeklyAvgKg, dataSpanWeeks, todayVolumeKg, typicalSessionVolumeKg,
+    acwr: r.ratio,
+    // A 7-day short window is exactly one week, so its sum is its weekly average.
+    acuteLoadKg: r.shortLoadKg,
+    chronicWeeklyAvgKg: r.longWeeklyAvgKg,
+    dataSpanWeeks: r.dataSpanWeeks,
+    todayVolumeKg,
+    typicalSessionVolumeKg,
   }
+}
+
+/**
+ * Issue 2340. Bands for the 28:90 block trend, the owner-approved starting point: under 0.8 the
+ * block is detraining, 0.8–1.2 steady, over 1.2 building. To be refit per person under the adaptive
+ * scoring rules. They gate nothing: the 28:90 ratio is a trend and an insight only.
+ */
+export const BLOCK_TREND_THRESHOLDS = { detrainingMax: 0.8, buildingMin: 1.2 } as const
+
+export type BlockTrendBand = 'detraining' | 'steady' | 'building'
+
+export function blockTrendBand(ratio: number): BlockTrendBand {
+  if (ratio < BLOCK_TREND_THRESHOLDS.detrainingMax) return 'detraining'
+  if (ratio > BLOCK_TREND_THRESHOLDS.buildingMin) return 'building'
+  return 'steady'
+}
+
+export interface BlockTrendResult { ratio: number | null; band: BlockTrendBand | null }
+
+/**
+ * Issue 2340. Is this block building or detraining? The 28:90 `loadRatio`: weekly-average load over
+ * the last 28 local days against the weekly average over the 90 before today. Additive: no score,
+ * gate or prescription reads it yet. Callers pass at least the 90-day window's sessions.
+ */
+export function computeBlockTrend(sessions: AcwrSession[], todayMid: Date, opts: { tz?: string } = {}): BlockTrendResult {
+  const { ratio } = loadRatio(sessions, LOAD_WINDOW_DAYS.chronic, LOAD_WINDOW_DAYS.block, todayMid, { tz: opts.tz })
+  return { ratio, band: ratio == null ? null : blockTrendBand(ratio) }
 }
 
 /**
