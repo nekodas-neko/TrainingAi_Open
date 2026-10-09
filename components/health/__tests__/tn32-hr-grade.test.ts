@@ -25,8 +25,8 @@ describe('TN-32 — the page must not alarm at a rate inside the user’s own Zo
   })
 
   it('calls a true resting rate Resting, not Recovery', () => {
-    // HR_REST_THRESHOLD is 0.05 of a 133 reserve ≈ 6.7 bpm above rest, the same boundary Body
-    // Battery and the activity score use.
+    // HR_REST_THRESHOLD is 0.05 of a 133 reserve ≈ 6.7 bpm above rest, the same boundary the
+    // activity score uses (Body Battery moved to resting HR + 9 bpm in issue 2235; see issue 2743).
     expect(gradeHeartRate(52, PROFILE)!.label).toBe('Resting')
     expect(gradeHeartRate(58, PROFILE)!.label).toBe('Resting')
     expect(gradeHeartRate(60, PROFILE)!.label).toBe('Recovery')

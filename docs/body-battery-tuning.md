@@ -136,6 +136,27 @@ a 16-hour day) because the same absolute count means different things at 8am and
 the walk **actually used** (the resolved value), not the age estimate — on v4 rows it is the age
 estimate, on v5 rows usually the observed peak. Split by `model_version` before comparing.
 
+## ✅ v7 — waking-rest offset, 2026-10 (issue 2235)
+
+The charge ceiling is **resting HR + 9 bpm** (`WAKING_REST_OFFSET_BPM`, `lib/health/body-battery-day.ts`),
+passed to the walk as `restThresholdFromOffset(9, reserve)`. It was 0.05 of reserve (about 6 bpm
+over a resting HR measured asleep), so ordinary seated waking HR drained, and the line moved every
+time hrMax was re-estimated. The rates are unchanged; the stamp is `v7:rest+9bpm:chg0.12:…`.
+
+- **The fit** (Orchestrator, on the owner's 56 finished days through the shipped walk): offsets 8, 9
+  and 10 pass the mean, @0 and @100 tests; none reaches sd ≥ 28, because spread is set by the gain,
+  not the threshold. 9 sits nearest the middle of the 55–65 band (mean end 59.4, 4 days at 100).
+  Signed by the owner 2026-10-05. The table is on issue 2235.
+- **Edge:** a reading exactly at resting HR + 9 still charges (`hrr <= restThreshold`), as in the fit.
+- **Days moved:** every stored day is re-stamped by the re-derive. On the owner's history the
+  proposal measured a median +12 end-of-day points, max +34. On the repo's synthetic 28-day fixture
+  (`app/api/admin/rederive-body-battery/__tests__/waking-rest-2235.test.ts`) 22 of 28 days end
+  higher (+1 to +53), none lower; the 6 that stay were already at 100.
+- **History:** re-derived by the owner through `POST /api/admin/rederive-body-battery` after a
+  verified snapshot. Steps: `docs/admin-actions.md` §11. The re-derive overwrites each day's row in
+  place (one row per user and day), so the snapshot is the only copy of the v6 values.
+- Not shared with the Activity score's move hours or the HR grade, which stay on 0.05 HRR (issue 2743).
+
 ## Open follow-up
 
 - **[ ] Re-run analysis #1 against v5 once ~2 weeks of v5 days exist.** It failed on v4

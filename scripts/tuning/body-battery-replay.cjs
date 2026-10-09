@@ -33,9 +33,17 @@ const DIR = process.env.BB_REPLAY_DIR || '/tmp/bb-replay'
 const API = 'https://trainingai-production.up.railway.app/api/admin/db-query'
 const TZ = 'Australia/Brisbane'
 
-// Shipped constants — mirrored from app/api/body-battery/route.ts. If they change there, change
-// them here in the same PR; this file deliberately does not import the route.
+// Shipped constants — mirrored from lib/health/body-battery-day.ts. If they change there, change
+// them here in the same PR; this file deliberately does not import that module.
+// v7 (issue 2235): the charge ceiling is a bpm offset over resting HR, so the reserve fraction the
+// walk takes is per day — `buildDay` derives it with the bundled `restThresholdFromOffset`.
 const SHIPPED = {
+  restOffsetBpm: 9, chargeRate: 0.120, drainRate: 0.080,
+  stressDrainRate: 0.020, gapHoldMin: 30, sampleCapMin: 7,
+}
+// v6 (2026-09-24 → issue 2235): the same rates with the old reserve-fraction ceiling. `--validate`
+// against stored v6 rows needs this in place of SHIPPED.
+const V6 = {
   restThreshold: 0.05, chargeRate: 0.120, drainRate: 0.080,
   stressDrainRate: 0.020, gapHoldMin: 30, sampleCapMin: 7,
 }
@@ -45,7 +53,8 @@ const SHIPPED = {
 // today's row and no other path writes the table — so every row stamped `v5:` stays v5 forever.
 // Validating against one of those needs V5 below *and* a checkout from before that commit, because
 // `bundleShared()` bundles the live walk and the charge ramp is no longer the ramp those rows were
-// built with. From a few days of v6 rows onward, `--validate` works again against the default.
+// built with. Once the issue 2235 re-derive has run, every stored row is v7 and `--validate` works
+// against the default; before it, validate v6 rows with V6.
 const V5 = {
   restThreshold: 0.05, chargeRate: 0.20, drainRate: 0.60,
   stressDrainRate: 0.2, gapHoldMin: 30, sampleCapMin: 7,
@@ -110,7 +119,7 @@ function load() {
   // `packages/shared` ships as TypeScript with no build output, so bundle the two shipped modules
   // on the fly. Bundling rather than reimplementing is the whole point: a hand-copied walk would
   // drift from production silently, and the arithmetic being compared is the arithmetic that runs.
-  const { walkBodyBattery, nightSessions } = bundleShared()
+  const { walkBodyBattery, restThresholdFromOffset, nightSessions } = bundleShared()
   const brisDay = ms => new Date(ms).toLocaleDateString('en-CA', { timeZone: TZ })
 
   const sessions = read('sleep.json').map(x => {
@@ -130,7 +139,7 @@ function load() {
     }
   }
   for (const v of hr.values()) v.sort((a, b) => a.tsMs - b.tsMs)
-  return { days: read('days.json'), wake, hr, walkBodyBattery }
+  return { days: read('days.json'), wake, hr, walkBodyBattery, restThresholdFromOffset }
 }
 
 function buildDay(ctx, row) {
@@ -143,7 +152,10 @@ function buildDay(ctx, row) {
   return {
     d, samples, restingHr, reserve, wakeTime, anchor: Number(row.anchor),
     stored: { charged: Number(row.total_charged), drained: Number(row.total_drained), n: Number(row.hr_sample_count) },
-    params: { ...SHIPPED, anchor: Number(row.anchor), wakeTime, restingHr, reserve, stressAt: () => null },
+    params: {
+      ...SHIPPED, restThreshold: ctx.restThresholdFromOffset(SHIPPED.restOffsetBpm, reserve),
+      anchor: Number(row.anchor), wakeTime, restingHr, reserve, stressAt: () => null,
+    },
   }
 }
 
@@ -215,7 +227,7 @@ function summarise(rows, prefix) {
   }
 }
 
-function check(prefix = 'v6') {
+function check(prefix = 'v7') {
   const rows = JSON.parse(fs.readFileSync(path.join(DIR, 'days.json'), 'utf8')).rows
   const s = summarise(rows, prefix)
   console.log(`Stored ${prefix} rows: ${s.days} days, ${s.informativeDays} informative (>= ${MIN_SAMPLES} HR samples).`)
@@ -232,8 +244,8 @@ if (require.main === module) {
   const arg = process.argv[2]
   if (arg === '--pull') pull(Number(process.argv[3]) || 70)
   else if (arg === '--validate') process.exit(validate(load()) ? 0 : 1)
-  else if (arg === '--check') check(process.argv[3] || 'v6')
+  else if (arg === '--check') check(process.argv[3] || 'v7')
   else console.log(fs.readFileSync(__filename, 'utf8').split('*/')[0])
 }
 
-module.exports = { load, buildDay, validate, summarise, SHIPPED, V5 }
+module.exports = { load, buildDay, validate, summarise, SHIPPED, V6, V5 }
