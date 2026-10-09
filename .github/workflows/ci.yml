@@ -314,8 +314,13 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # #2559: this step stays FIRST. The base-aware ratchets below compare against `origin/main`;
+      # when it ran after them they fell back to `FETCH_HEAD`, the PR's own merge commit, and passed
+      # a branch's growth as "inherited". A new base-aware step goes anywhere below this one.
       - name: Fetch the base branch, for the ratchets' base comparison
-        # Keep local runs from making an existing full-history clone shallow.
+        # `|| true`: with no base the ratchets fall back to the stricter absolute check, so a network
+        # blip cannot weaken the gate. LA-130: the guard stops `pnpm check:rules` re-shallowing a
+        # full local clone, which once left four PRs unmergeable ("unrelated histories").
         run: git rev-parse --verify --quiet origin/main >/dev/null || git fetch --depth=1 origin main || true
 
       - name: No AI attribution in commit messages
