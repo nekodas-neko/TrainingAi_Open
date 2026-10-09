@@ -25,8 +25,12 @@ import type { ShadowReadinessPillar, ShadowReadinessStage } from '@trainingai/sh
  * Version 1 = the #2356 starting weights, as written (Orchestrator, 2026-10-07).
  * Version 2 = version 1 plus `sleep.deep_rem_share` scored (steady around the person's own normal,
  * learned; issue 2635). Its 10 Sleep points were reserved in version 1 and dropped out.
+ * Version 3 = version 2 with the `activity.acwr` input on the live framing (issue 2194): the ACWR
+ * is computed as of the START of each day over the same window the live callers fetch (28 local
+ * days before it, plus the day). The acute window was already 7 days here; the chronic window
+ * gains one day and its span is measured from the day's start, as live has always done.
  */
-export const SHADOW_MODEL_VERSION = 2
+export const SHADOW_MODEL_VERSION = 3
 
 // ── Unit ids ─────────────────────────────────────────────────────────────────────────────────────
 

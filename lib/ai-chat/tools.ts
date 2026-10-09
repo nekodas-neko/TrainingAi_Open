@@ -450,6 +450,7 @@ export function buildChatTools(repo: WorkoutRepository, userId: string, tz: stri
         const load = computeVolumeAcwr(
           loads.map(l => ({ startedAt: l.startedAt, volumeKg: l.volume })),
           todayMid,
+          { tz },
         )
         const band = trainingLoadBand(load, program, todayMid)
         const k = band.interpretation

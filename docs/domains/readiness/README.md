@@ -280,6 +280,14 @@ Live at the time of writing (2026-07-30):
   `EARLY_DELOAD_ACWR_MIN` (1.2) is deliberately below `ACWR_THRESHOLDS.optimalMax` (1.3). See
   [`the journal entry`](../../overview/history-2026-08-08.md).
 
+- ✅ **The ACWR acute window is 7 local days, today inclusive** (issue 2194, owner-signed
+  2026-10-05). It summed 8, so the ratio the early-deload card and the emergency deload read ran
+  ~14% hot. Thresholds unchanged. On the committed fixture replay 67 of 170 scored days move, the
+  1.2 early-deload line goes from 54 days to 29 and the 1.5 hard-action line from 17 to 10
+  (`load-ratio-2194-2340.test.ts`). The shadow model's ACWR input now uses the live framing
+  (model version 3). The fallback readiness score with no own composite still adds the ACWR
+  `loadScore`, so it moves with it.
+
 - 🔴 **Nightly temperature treats one frame's simultaneous probes as consecutive samples** —
   open, and it is backlog item Q-2.
 - **The readiness composite is persisted under the wrong day** — found via Admin → Day Review,
