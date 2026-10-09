@@ -394,6 +394,24 @@ Live at the time of writing (2026-07-30):
 
 ## Gotchas specific to this domain
 
+- **A prescribed set is scored against the bar it was given, not its planned % (issue 2200,
+  batch ms44).** The bar is `mroundStepUp(basis × pct/100, step)`, a ceiling round; dividing by the
+  planned pct credited every exactly-hit set with the round-up (27.5 × 10 at 70.5 % of 36.5 stored
+  39.0). `withPrescribedBars(style, bars, basis)` attaches the stored bar (`planned_weight_kg`) and
+  the basis to the style; `estimateOneRm` then uses the bar's real share, but only when that bar is
+  what rounding `basis × pct` up could have produced — a stale or foreign bar falls back to the
+  planned pct. Every estimate path must pass both: the device (`styleWithPrescribedBars`), the live
+  readout (same), the server log (`prescriptionBasisKg` in the payload, else the last real 1RM before
+  the log via `getPrescriptionBasisBefore`, which is all a stranded replay has) and the edit path
+  (stored bars + `getPrescriptionBasisBefore`). Rows before #2445 have no bar and score as before.
+- **A styleless working set is undiscounted; baseline and bodyweight sets keep the AMRAP discount
+  (issue 2357 reversed Q-304).** The discount is a straight line between its anchors (issue 2193),
+  and above 30 reps a set counts at 30 on every path. **Stored bodyweight estimates keep the old
+  stepped encoding** (past rows are not rewritten), so `repMaxFromAmrapOneRm` reads both; a few
+  legacy values equal a lower rep count's current value (10 reps then = 9 reps now at bodyweight)
+  and read one rep low. Prefer the logged reps (`bodyweightRepMax({ storedReps })`) wherever you
+  have them.
+
 - **Every exercise PICKER filters `mergedInto` itself (RV-51).** `listExerciseLibrary` is
   deliberately unfiltered — the catalogue is global and other consumers resolve metadata for rows
   another user still has logged — so a picker that forgets offers duplicates. `generate-program`,

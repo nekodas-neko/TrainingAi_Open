@@ -5,7 +5,7 @@ import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { CalculatorIcon, ChevronLeftIcon, DumbbellIcon, ListIcon, SkipForwardIcon, ZapIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { WorkoutExercise } from "@/app/api/workout-data/route";
-import { formatSheetDate, mroundStep, mroundStepUp, weightStepFor, plateBreakdown } from "./utils";
+import { formatSheetDate, mroundStep, mroundStepUp, weightStepFor, plateBreakdown, styleWithPrescribedBars } from "./utils";
 import { ActiveSetCard } from "./active-set-card";
 import { SetsGrid } from "./sets-grid";
 import { Live1rmReadout } from "./live-1rm-readout";
@@ -225,9 +225,10 @@ export function ActiveWorkoutScreen({
 
   const isBodyweight = exercise?.exerciseType === "bodyweight";
 
+  // Issue 2200: the same bars the saved estimate scores against, so the live number matches it.
   const live1rmStyle = useMemo(
-    () => exercise?.progressionStyle?.slice(0, currentSet) ?? null,
-    [exercise?.progressionStyle, currentSet],
+    () => styleWithPrescribedBars(exercise, exercise?.progressionStyle?.length ?? 0)?.slice(0, currentSet) ?? null,
+    [exercise, currentSet],
   );
 
   // Stable identity so the memoized MuscleHeatmap doesn't re-render on every

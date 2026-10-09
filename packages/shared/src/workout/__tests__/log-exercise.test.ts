@@ -11,6 +11,7 @@ const logExerciseAndSets         = vi.fn(async () => ({ exerciseLog: { id: 'el-1
 const upsertPersonalRecordIfBetter = vi.fn(async () => true)
 const countAllSessionsSinceStart = vi.fn(async () => new Map())
 const getSessionPeriodization    = vi.fn(async () => null)
+const getPrescriptionBasisBefore = vi.fn(async (): Promise<number | null> => null)
 // Newest-first, exactly as the real listBodyMetrics returns (ORDER BY date DESC). The ordering is
 // load-bearing: taking the last element instead of the first prices bodyweight volume at a weigh-in
 // up to 90 days stale (Q-13 regression, caught on the dev server at 81.85 kg vs the real 82.50).
@@ -34,6 +35,7 @@ vi.mock('@/lib/data', () => ({
     countAllSessionsSinceStart,
     getSessionPeriodization,
     listBodyMetrics,
+    getPrescriptionBasisBefore,
   }),
 }))
 
@@ -121,6 +123,7 @@ beforeEach(() => {
   upsertPersonalRecordIfBetter.mockReset().mockResolvedValue(true)
   countAllSessionsSinceStart.mockReset().mockResolvedValue(new Map())
   getSessionPeriodization.mockReset().mockResolvedValue(null)
+  getPrescriptionBasisBefore.mockReset().mockResolvedValue(null)
 })
 
 describe('logExerciseFromPayload — ai_dynamic deload PR gate (AI-8)', () => {
@@ -388,5 +391,56 @@ describe('logExerciseFromPayload — deload provenance (Q-298)', () => {
     await logExerciseFromPayload('u1', basePayload, TZ)
     expect(storedDeloaded()).toBe(false)
     expect(storedEstimate()).toBeGreaterThan(0)
+  })
+})
+
+// Issue 2200: the server scores each set against the bar the device put up.
+describe('score against the bar loaded (issue 2200)', () => {
+  beforeEach(() => {
+    getActiveProgramWithPhases.mockResolvedValue(null)
+    getActiveProgram.mockResolvedValue(null)
+  })
+  const skull = {
+    ...basePayload,
+    exercise: 'Barbell Skull Crusher',
+    weights: [27.5, 27.5],
+    sets: 2,
+    reps: [10, 10],
+    progressionStyle: [{ pct: 70.5, reps: 10, restSec: 90 }, { pct: 70.5, reps: 10, restSec: 90 }],
+    plannedWeights: [27.5, 27.5],
+  }
+
+  it('the prescribed bar hit exactly holds the basis the device sent', async () => {
+    const out = await logExerciseFromPayload('u1', { ...skull, prescriptionBasisKg: 36.5 }, TZ)
+    expect(out.estimated1rm).toBe(36.5)
+    expect(getPrescriptionBasisBefore).not.toHaveBeenCalled()
+  })
+
+  it('a replay with bars but no basis reads the last real 1RM before the log', async () => {
+    getPrescriptionBasisBefore.mockResolvedValueOnce(36.5)
+    const out = await logExerciseFromPayload('u1', { ...skull, exerciseLogId: '00000000-0000-4000-8000-000000002200', setEndTimes: [1_759_700_000_000, 1_759_700_100_000] }, TZ)
+    expect(out.estimated1rm).toBe(36.5)
+    expect(getPrescriptionBasisBefore).toHaveBeenCalledWith('u1', 'Barbell Skull Crusher', new Date(1_759_700_100_000), '00000000-0000-4000-8000-000000002200')
+  })
+
+  it('with no basis anywhere it scores as before (the planned percentage)', async () => {
+    const out = await logExerciseFromPayload('u1', skull, TZ)
+    expect(out.estimated1rm).toBe(39)
+  })
+
+  it('a basis that could not have produced the bar is ignored', async () => {
+    const out = await logExerciseFromPayload('u1', { ...skull, prescriptionBasisKg: 30 }, TZ)
+    expect(out.estimated1rm).toBe(39)
+  })
+
+  it('without bars the basis is never looked up', async () => {
+    await logExerciseFromPayload('u1', { ...skull, plannedWeights: undefined }, TZ)
+    expect(getPrescriptionBasisBefore).not.toHaveBeenCalled()
+  })
+
+  it('rejects a non-positive basis at the schema', () => {
+    const valid = { sessionName: 'Push', exercise: 'Barbell Skull Crusher', weights: [27.5], sets: 1, reps: [10], plannedWeights: [27.5] }
+    expect(LogExercisePayloadSchema.safeParse({ ...valid, prescriptionBasisKg: 0 }).success).toBe(false)
+    expect(LogExercisePayloadSchema.safeParse({ ...valid, prescriptionBasisKg: 36.5 }).success).toBe(true)
   })
 })

@@ -6,6 +6,7 @@ import { rederiveBodyBattery } from '@/lib/health/rederive-body-battery'
 import { startStressBackfillJob } from '@/lib/oura-ble/stress-backfill-job'
 import { redecodeJobKind } from '@/lib/oura-ble/redecode-job-kind'
 import { tagBaselineSessions } from '@/lib/admin/baseline-phase-tag.mjs'
+import { rederiveStylelessOneRm } from '@/lib/workout/rederive-styleless-one-rm'
 import type { FinishAgentActionInput } from '@/lib/data/postgres/slices/agent-actions'
 
 /**
@@ -154,6 +155,26 @@ export const AGENT_JOBS = {
       return { status: 202, body: { alreadyRunning: false, job, note: 'Started. Poll GET /api/agent-actions?job=stress-backfill&jobId=…' }, finish: { pending } }
     },
   } satisfies AgentJobDef<z.infer<typeof DryRunOnly>>,
+
+  /**
+   * Issue 2357. Re-derives the stored 1RMs of styleless working sets without the AMRAP discount,
+   * upward only, through `rederiveStylelessOneRm` (`POST /api/admin/rederive-styleless-one-rm`).
+   * A write overwrites stored 1RMs, so it needs an approval.
+   */
+  'rederive-styleless-one-rm': {
+    params: DryRunOnly,
+    losesData: p => !p.dryRun,
+    run: async (ctx, p) => {
+      const result = await rederiveStylelessOneRm({ repo: ctx.repo, userId: ctx.userId, tz: ctx.tz, dryRun: p.dryRun })
+      if (!result.ok) return { status: 409, body: { error: result.error }, finish: { outcome: 'failed', error: result.error } }
+      const { summary } = result.report
+      return {
+        status: 200,
+        body: { report: result.report },
+        finish: { outcome: 'succeeded', affectedRows: summary.written, daysMoved: p.dryRun ? 0 : summary.daysMoved },
+      }
+    },
+  } satisfies AgentJobDef<z.infer<typeof DryRunOnly>>,
 } as const
 
 export type AgentJobId = keyof typeof AGENT_JOBS
@@ -195,6 +216,7 @@ export const AgentActionRequest = z.discriminatedUnion('job', [
   requestSchema('rederive-body-battery'),
   requestSchema('backfill-baseline-phase-tag'),
   requestSchema('stress-backfill'),
+  requestSchema('rederive-styleless-one-rm'),
 ])
 export type AgentActionRequest = z.infer<typeof AgentActionRequest>
 

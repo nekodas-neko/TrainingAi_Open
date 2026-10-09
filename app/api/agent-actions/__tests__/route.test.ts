@@ -314,6 +314,64 @@ describe.skipIf(!canRun)('/api/agent-actions (issue 2381)', () => {
     })
   })
 
+  describe('rederive-styleless-one-rm (issue 2357)', () => {
+    // A styleless log stored with the old 0.97 AMRAP discount (32.5 x 8 → 39.5), a styled log, an
+    // edited-down styleless log stored above its re-derived value, and the other account's
+    // styleless log. Only the first may move.
+    const ids: Record<string, string> = {}
+    const log = async (user: string, name: string, est: number, styleName: string | null, sets: [number, number][], plannedPct: number | null = null) => {
+      const { rows: [ws] } = await pool.query(
+        `INSERT INTO workout_sessions (user_id, session_name, started_at)
+         VALUES ($1, 'Issue2357', '2026-09-10T08:00:00+10:00') RETURNING id`, [user])
+      const { rows: [el] } = await pool.query(
+        `INSERT INTO exercise_logs (workout_session_id, exercise_name, estimated_1rm, target_80, style_name, logged_at)
+         VALUES ($1, $2, $3, $4, $5, '2026-09-10T08:30:00+10:00') RETURNING id`, [ws.id, name, est, est * 0.8, styleName])
+      for (const [i, [w, r]] of sets.entries()) {
+        await pool.query(
+          `INSERT INTO set_logs (exercise_log_id, set_number, weight_kg, reps, intensity_pct, planned_pct) VALUES ($1, $2, $3, $4, 1, $5)`,
+          [el.id, i + 1, w, r, plannedPct])
+      }
+      return el.id as string
+    }
+    const est = async (id: string) => Number((await pool.query(`SELECT estimated_1rm FROM exercise_logs WHERE id = $1`, [id])).rows[0].estimated_1rm)
+
+    beforeEach(async () => {
+      await pool.query(`DELETE FROM workout_sessions WHERE user_id = ANY($1)`, [[OWNER, OTHER]])
+      ids.styleless = await log(OWNER, 'Issue2357 Curl', 39.5, null, [[32.5, 8], [32.5, 8], [32.5, 8]])
+      ids.styled = await log(OWNER, 'Issue2357 Press', 50, 'Hypertrophy', [[40, 8]], 75)
+      ids.higher = await log(OWNER, 'Issue2357 Row', 90, null, [[50, 5]])
+      ids.other = await log(OTHER, 'Issue2357 Curl', 39.5, null, [[32.5, 8]])
+    })
+
+    it('a write without approval is refused; a dry run writes nothing; with approval it writes once', async () => {
+      expect((await post(req('rederive-styleless-one-rm', { dryRun: false }))).status).toBe(403)
+      expect(await est(ids.styleless)).toBe(39.5)
+
+      const dry = await (await post(req('rederive-styleless-one-rm', { dryRun: true }))).json()
+      expect(dry.report.summary).toMatchObject({ wouldWrite: 1, wouldLower: 1, written: 0, daysMoved: 1 })
+      expect(dry.report.sample).toEqual([expect.objectContaining({ exerciseLogId: ids.styleless, before: 39.5, after: 40.75 })])
+      expect(await est(ids.styleless)).toBe(39.5)
+
+      const write = await (await post(req('rederive-styleless-one-rm', { dryRun: false }, { approval: APPROVAL }))).json()
+      expect(write.report.summary).toMatchObject({ written: 1, remaining: 0 })
+      expect((await logRows()).at(-1)).toMatchObject({ job: 'rederive-styleless-one-rm', outcome: 'succeeded', approval_ref: APPROVAL, affected_rows: 1, days_moved: 1 })
+      expect(await est(ids.styleless)).toBe(40.75)
+      expect(await est(ids.styled)).toBe(50)
+      expect(await est(ids.higher)).toBe(90)
+      expect(await est(ids.other)).toBe(39.5)
+      const { rows: sets } = await pool.query(`SELECT intensity_pct FROM set_logs WHERE exercise_log_id = $1`, [ids.styleless])
+      expect(sets.map(s => Number(s.intensity_pct))).toEqual([79.8, 79.8, 79.8])
+
+      const again = await (await post(req('rederive-styleless-one-rm', { dryRun: false }, { approval: APPROVAL }))).json()
+      expect(again.report.summary).toMatchObject({ wouldWrite: 0, written: 0 })
+      expect((await logRows()).at(-1)).toMatchObject({ outcome: 'succeeded', affected_rows: 0, days_moved: 0 })
+    })
+
+    it('refuses an unknown parameter', async () => {
+      expect((await post(req('rederive-styleless-one-rm', { dryRun: true, limit: 5 }))).status).toBe(400)
+    })
+  })
+
   it('a finished log row cannot be changed or deleted', async () => {
     await post(req('backfill-baseline-phase-tag', { dryRun: true }))
     const last = (await logRows()).at(-1)
