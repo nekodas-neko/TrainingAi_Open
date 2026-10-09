@@ -61,7 +61,7 @@ Each of these renders from the server today, so the screen is blank or stale wit
 | **The Oura BLE rollup** | `aggregateOuraRawSamples`, `lib/data/postgres/adapter.ts:4658–~5764` (**~1,100 lines**) | Already has a detailed, in-progress plan — see below, not "needs one" |
 | Cross-session aggregates | `app/api/{weekly-stats,weekly-muscle-sets,weights-summary,muscle-recovery}/route.ts` | Server-computed *by design* today; each needs an on-device implementation or a stored rollup. **Not yet planned.** |
 | The day timeline | `app/api/day-timeline/route.ts` | Sanctioned server-only exception today (session 287, SYNC-R3) — a cross-domain server-assembled aggregate. **Not yet planned.** |
-| The app shell itself | `capacitor.config.ts` `server.url` | The WebView loads the Railway URL, so even the UI is a network fetch. This is Phase 3 (Q-1) — Task 4 decided (option B), workspace-split plan written 2026-07-30 |
+| The app shell itself | `capacitor.config.ts` `server.url` | The WebView loads the Railway URL, so even the UI is a network fetch. **2026-10-09 (owner): v2 replaces it with native screens, not a bundled shell**; the toolkit is open in #2765. Phase 3's API split and client-held auth stay as that client's prerequisite |
 | Auth | `middleware.ts`, `auth.ts` | Server-gated. Phase 3 Task 3 moves it client-side with a bearer token — PR #932 (a related but distinct fix, the 24h deactivation re-read) is open; Task 3 itself is queued after the workspace split |
 
 **Phase 3 is step one and it is necessary, but it is not sufficient.** Bundling the shell stops the
@@ -120,7 +120,11 @@ not yet resolved — see the backlog Q-30 entry for the current state of that te
 > parallel** — it is the item that actually makes the app render without the network. See
 > [`superpowers/plans/2026-08-02-public-repo-migration-roadmap.md`](superpowers/plans/2026-08-02-public-repo-migration-roadmap.md).
 
-1. **Phase 3 — bundle the shell** (Q-1). Decided: option B, two apps in a workspace. Workspace-split
+1. **Phase 3 — bundle the shell** (Q-1). **Superseded 2026-10-09: the owner chose a native v2 over a
+   bundled shell** (see the update atop
+   [`superpowers/plans/2026-08-02-native-convergence-goal-layout.md`](superpowers/plans/2026-08-02-native-convergence-goal-layout.md);
+   toolkit in #2765). The API split and client-held auth below still apply. As written before that:
+   decided option B, two apps in a workspace. Workspace-split
    plan written 2026-07-30
    ([`docs/superpowers/plans/2026-07-30-phase-3-workspace-split.md`](superpowers/plans/2026-07-30-phase-3-workspace-split.md)).
    Nothing else in this document can start until the shell runs without the server, but the Oura

@@ -12,7 +12,7 @@ vi.mock('@/lib/cache-groups', () => ({ invalidateRunningPlan: vi.fn(async () => 
 
 const { linkPrescribedRun, completedAsFor } = await import('../link-prescribed-run')
 
-const TZ = 'Australia/Brisbane'
+const DAY = '2026-10-06'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -22,7 +22,7 @@ beforeEach(() => {
 
 describe('RV-166 / LB-179 — a walk must SAY it was a walk', () => {
   it('writes completedAs to the local row and the queued mutation together', async () => {
-    await linkPrescribedRun('u1', 'run-1', 'log-9', TZ, 'walk')
+    await linkPrescribedRun('u1', 'run-1', 'log-9', DAY, 'walk')
 
     expect(store.upsertPrescribedRun.mock.calls[0][0]).toMatchObject({
       id: 'run-1', status: 'completed', activityLogId: 'log-9', completedAs: 'walk',
@@ -35,7 +35,7 @@ describe('RV-166 / LB-179 — a walk must SAY it was a walk', () => {
   })
 
   it('still records a run as a run', async () => {
-    await linkPrescribedRun('u1', 'run-1', 'log-9', TZ, 'run')
+    await linkPrescribedRun('u1', 'run-1', 'log-9', DAY, 'run')
     expect(store.queueMutation.mock.calls[0][0].payload.completedAs).toBe('run')
   })
 
@@ -44,7 +44,7 @@ describe('RV-166 / LB-179 — a walk must SAY it was a walk', () => {
     const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => ({ ok: true }))
     vi.stubGlobal('fetch', fetchMock)
 
-    await linkPrescribedRun(undefined, 'run-1', 'log-9', TZ, 'walk')
+    await linkPrescribedRun(undefined, 'run-1', 'log-9', DAY, 'walk')
 
     expect(fetchMock).toHaveBeenCalledTimes(1)
     const [url, init] = fetchMock.mock.calls[0]
@@ -57,7 +57,7 @@ describe('RV-166 / LB-179 — a walk must SAY it was a walk', () => {
 
   it('does not invent a row that is not there, but still queues the mutation', async () => {
     store.getPrescribedRuns.mockResolvedValue([])
-    await linkPrescribedRun('u1', 'run-1', 'log-9', TZ, 'walk')
+    await linkPrescribedRun('u1', 'run-1', 'log-9', DAY, 'walk')
     expect(store.upsertPrescribedRun).not.toHaveBeenCalled()
     expect(store.queueMutation).toHaveBeenCalledTimes(1)
   })

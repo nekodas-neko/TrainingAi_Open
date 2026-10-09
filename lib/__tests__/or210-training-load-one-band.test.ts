@@ -12,7 +12,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  ACWR_BASELINE_DAYS, acwrBaselineDaysRemaining, programAgeDays, trainingLoadBand, computeVolumeAcwr,
+  ACWR_BASELINE_DAYS, acwrBaselineDaysRemaining, programAgeDays, trainingLoadBand, computeVolumeAcwr, loadRatio,
 } from '@trainingai/shared/ai-periodization/acwr'
 import { buildChatTools } from '@/lib/ai-chat/tools'
 import type { WorkoutRepository } from '@/lib/data/repository'
@@ -102,8 +102,9 @@ describe('the Health route and the chat tool agree (OR-210 b)', () => {
     expect(tool.interpretation).toBe(route.interpretation)
     expect(tool.acwr).toBe(route.acwr)
 
-    // The old tool's window, to prove this fixture actually separates the two readings.
-    const old56 = computeVolumeAcwr(sessions.map(s => ({ startedAt: s.startedAt, volumeKg: s.volume })), new Date('2026-10-04T14:00:00.000Z')).acwr
+    // The old tool's window, to prove this fixture actually separates the two readings. Issue 2340:
+    // `computeVolumeAcwr` now windows its own 28 days, so the old 56-day reading is `loadRatio` 7:56.
+    const old56 = loadRatio(sessions.map(s => ({ startedAt: s.startedAt, volumeKg: s.volume })), 7, 56, new Date('2026-10-04T14:00:00.000Z'), { minSpanDays: 21 }).ratio
     const win28 = computeVolumeAcwr(sessions.filter(s => s.startedAt >= new Date(NOW.getTime() - 28 * 86_400_000)).map(s => ({ startedAt: s.startedAt, volumeKg: s.volume })), new Date('2026-10-04T14:00:00.000Z')).acwr
     expect(old56).not.toBeCloseTo(win28 ?? 0, 1)
   })

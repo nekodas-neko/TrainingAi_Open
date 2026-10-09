@@ -34,9 +34,9 @@ export interface BatteryWalkParams {
   /**
    * Reserve fraction at or under which the tank charges rather than drains.
    *
-   * TN-2's change lands here: an explicit bpm offset above resting HR becomes
-   * `offsetBpm / reserve`, which keeps this function's shape identical while making the boundary
-   * immune to `hrMax` re-estimation. Nothing in this file needs to change for that.
+   * Since v7 (issue 2235) the caller passes `restThresholdFromOffset(WAKING_REST_OFFSET_BPM,
+   * reserve)`: an explicit bpm offset above resting HR, which keeps this function's shape identical
+   * while making the boundary immune to `hrMax` re-estimation.
    */
   restThreshold: number
   /** Battery points per minute anywhere at or below `restThreshold`. */
@@ -67,6 +67,17 @@ export interface BatteryWalkResult {
   series: BatteryWalkPoint[]
   /** Samples that actually drove the arc — `0` means the day is unmeasured, not calm. */
   sampleCount: number
+}
+
+/**
+ * The charge ceiling as the reserve fraction `walkBodyBattery` takes, from a bpm offset above
+ * resting HR (issue 2235, model v7). A reading at or below `restingHr + offsetBpm` charges, whatever
+ * the reserve, so re-estimating `hrMax` no longer moves the boundary. This is the one place the
+ * offset becomes a fraction; the live route, the admin re-derive and the tuning replay all use it.
+ * `reserve` is never zero — `hrReserve` floors it at 30.
+ */
+export function restThresholdFromOffset(offsetBpm: number, reserve: number): number {
+  return offsetBpm / reserve
 }
 
 function clamp(n: number, lo: number, hi: number): number {

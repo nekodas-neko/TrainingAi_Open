@@ -5,8 +5,11 @@ import { useTransitionRouter } from '@/lib/view-transition'
 import { ChevronLeft } from 'lucide-react'
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { COLLECTION_TTL } from '@trainingai/shared/cache-ttl'
-import { LADDERS, STEPS_MAX_REST_GAP, SLEEP_MAX_REST_GAP, type CollectionState, type Ladder } from '@trainingai/shared/collection/ladder'
-import { nextMerge, mergeLine, totalHeld, restGapSentence, FAUCET_TITLE, type FaucetKey } from '@/components/home/collection-summary'
+import {
+  V2_LADDERS, STEPS_UNITS_PER_T1, STEPS_DRAIN_PER_DAY, HEALTH_POINTS_PER_T1, HEALTH_DRAIN_PER_DAY,
+  CARDIO_UNITS_PER_SESSION, CARDIO_UNITS_PER_T1, CARDIO_DRAIN_PER_DAY, type CollectionState, type V2Ladder,
+} from '@trainingai/shared/collection/ladder'
+import { nextMerge, mergeLine, totalHeld, FAUCET_TITLE, FAUCET_ORDER, type FaucetKey } from '@/components/home/collection-summary'
 import { CatSprite } from '@/components/home/cat-sprite'
 import { CatRoster } from './cat-roster'
 import type { CollectionResponse } from '@/components/home/collection-card'
@@ -25,6 +28,8 @@ export function CollectionContent() {
   const data = useCachedValue<CollectionResponse>(
     'collection', '/api/collection', COLLECTION_TTL, { onError: () => setFailed(true) },
   )
+  // Collection rules v2 (#2187): the only block this screen reads.
+  const collections = data?.v2?.collections
 
   return (
     <div className="min-h-dvh pb-safe-action">
@@ -44,16 +49,16 @@ export function CollectionContent() {
         <p className="px-4 pb-4 text-sm text-muted-foreground">Couldn&rsquo;t load your collection.</p>
       )}
 
-      {!failed && data == null && (
+      {!failed && collections == null && (
         <div className="space-y-3 px-4" aria-busy="true" aria-label="Loading collection">
-          {[0, 1, 2].map(i => <div key={i} className="h-28 rounded-2xl bg-muted/50 animate-pulse" />)}
+          {[0, 1, 2, 3].map(i => <div key={i} className="h-28 rounded-2xl bg-muted/50 animate-pulse" />)}
         </div>
       )}
 
-      {!failed && data != null && (
+      {!failed && collections != null && (
         <div className="space-y-3 px-4">
-          {(Object.keys(LADDERS) as FaucetKey[]).map(faucet => (
-            <LadderCard key={faucet} faucet={faucet} ladder={LADDERS[faucet]} state={data.collections[faucet]} />
+          {FAUCET_ORDER.map(faucet => (
+            <LadderCard key={faucet} faucet={faucet} ladder={V2_LADDERS[faucet]} state={collections[faucet]} />
           ))}
           <Rules />
         </div>
@@ -62,7 +67,7 @@ export function CollectionContent() {
   )
 }
 
-function LadderCard({ faucet, ladder, state }: { faucet: FaucetKey; ladder: Ladder; state: CollectionState | undefined }) {
+function LadderCard({ faucet, ladder, state }: { faucet: FaucetKey; ladder: V2Ladder; state: CollectionState | undefined }) {
   if (!state) return null
   const next = nextMerge(state, ladder)
   const held = totalHeld(state)
@@ -70,7 +75,11 @@ function LadderCard({ faucet, ladder, state }: { faucet: FaucetKey; ladder: Ladd
   return (
     <section className="rounded-2xl border border-border bg-card p-4">
       <div className="flex items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold">{FAUCET_TITLE[faucet]}</h2>
+        <h2 className="text-sm font-semibold">
+          {FAUCET_TITLE[faucet]}
+          {/* The owner marked the Rogue's numbers provisional (#2085): say so on the row itself. */}
+          {faucet === 'cardio' && <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">provisional</span>}
+        </h2>
         <p className="text-xs text-muted-foreground">{held === 1 ? '1 held' : `${held} held`}</p>
       </div>
 
@@ -107,38 +116,60 @@ function LadderCard({ faucet, ladder, state }: { faucet: FaucetKey; ladder: Ladd
  * an explanation worse than none.
  */
 function Rules() {
+  const { workout, steps, health, cardio } = V2_LADDERS
+  const tiers = workout.tiers.length
   return (
     <section className="rounded-2xl border border-border bg-card p-4 space-y-3 text-xs leading-relaxed text-muted-foreground">
       <h2 className="text-sm font-semibold text-foreground">How this works</h2>
 
       <p>
-        <span className="font-medium text-foreground">One a day, per row.</span> Every day you train
-        gives you a {LADDERS.workout.tiers[0].name}. So does every day with steps recorded, and every
-        night you sleep. Twice in a day still counts once.
+        <span className="font-medium text-foreground">Four rows, {tiers} tiers each.</span> Every
+        workout you do gives the Tank row a {workout.tiers[0].name}. Steps, health logging and
+        cardio sessions fill a bank that turns into {steps.tiers[0].name}, {health.tiers[0].name} and{' '}
+        {cardio.tiers[0].name} cats.
       </p>
 
       <p>
         <span className="font-medium text-foreground">They merge upward.</span>{' '}
-        {LADDERS.workout.tiers[1].mergeCost} {LADDERS.workout.tiers[0].name}s become a{' '}
-        {LADDERS.workout.tiers[1].name}, and {LADDERS.workout.tiers[2].mergeCost} of those become a{' '}
-        {LADDERS.workout.tiers[2].name}. The step and sleep rows work the same way with their own
-        creatures.
+        {workout.tiers.slice(1).map(t => t.mergeCost).join(' · ')} cats of one tier make the next on
+        the Tank row. On the other three rows it is {steps.tiers[1].mergeCost} of one tier for one of
+        the next, all the way up.
       </p>
 
       <p>
-        <span className="font-medium text-foreground">Gaps cost you one at a time.</span> Leave it too
-        long between days and the row loses its smallest creature — and a big one breaks back down
-        into smaller ones rather than vanishing, so a long gap costs you progress, never the lot.
+        <span className="font-medium text-foreground">Steps.</span> {STEPS_UNITS_PER_T1.toLocaleString('en-AU')}{' '}
+        steps in a day make a {steps.tiers[0].name}. Each day the bank drains{' '}
+        {STEPS_DRAIN_PER_DAY.toLocaleString('en-AU')} steps, so a day of {STEPS_UNITS_PER_T1.toLocaleString('en-AU')}{' '}
+        banks {(STEPS_UNITS_PER_T1 - STEPS_DRAIN_PER_DAY).toLocaleString('en-AU')} net.
+      </p>
+
+      <p>
+        <span className="font-medium text-foreground">Health.</span> One point each for sleep
+        recorded, any food logged and a weight, per day. {HEALTH_POINTS_PER_T1} points make a{' '}
+        {health.tiers[0].name}; the bank drains {HEALTH_DRAIN_PER_DAY} a day, so logging two of the
+        three holds it level.
+      </p>
+
+      <p>
+        <span className="font-medium text-foreground">Cardio.</span> One walk, run, treadmill, hike,
+        cycle, swim or HIIT session makes a {cardio.tiers[0].name}
+        {CARDIO_UNITS_PER_SESSION === CARDIO_UNITS_PER_T1 ? '' : ' (part of one)'}; the bank drains{' '}
+        {CARDIO_DRAIN_PER_DAY}/{CARDIO_UNITS_PER_SESSION} of a session a day. These numbers are
+        provisional and may be retuned.
+      </p>
+
+      <p>
+        <span className="font-medium text-foreground">Gaps cost you one at a time.</span> When a bank
+        runs down, the row loses its smallest creature — and a big one breaks back down into smaller
+        ones rather than vanishing, so a long gap costs you progress, never the lot. The days
+        underneath still count.
       </p>
 
       <p>
         <span className="font-medium text-foreground">Your own rest days are free.</span> How long a
-        gap can be for the training row comes from{' '}
-        <span className="text-foreground">your schedule</span>, not a fixed number — and a rest day
-        you chose, or a deload the app asked you to take, does not count against it at all. Following
-        your own plan never costs you anything. The steps and sleep rows allow{' '}
-        {restGapSentence(STEPS_MAX_REST_GAP, SLEEP_MAX_REST_GAP)}, since neither has a schedule to
-        read.
+        gap can be for the Tank row comes from <span className="text-foreground">your schedule</span>,
+        not a fixed number — and a rest day you chose, or a deload the app asked you to take, does not
+        count against it at all. Following your own plan never costs you anything.
       </p>
     </section>
   )

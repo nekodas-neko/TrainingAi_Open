@@ -1,21 +1,3 @@
-// RV-192 — registering with an invited address activated the account, and nothing proved the
-// registrant could read that inbox.
-//
-// The path, end to end: an attacker who knows an address the owner has invited registers it with a
-// password. `createEmailUser` defaulted `isActive` to `isInvited(email)`, so the account came up
-// ACTIVE. When the real invitee later signs in with Google, the signIn callback links Google onto
-// that same row — and left `password_hash` in place, so the attacker's password kept working on an
-// account the invitee is now using.
-//
-// Two changes, each closing one half, and each asserted here against a real Postgres because both
-// are single statements in the adapter: a mock of the adapter would only restate the change.
-//
-//   1. A password account starts INACTIVE. Google sign-in still honours the invite (`upsertUser`),
-//      because there Google has verified the address; here nothing has.
-//   2. Linking an OAuth account CLEARS the password.
-//
-// What this does NOT do is verify email — there is no mail-sending path in this repo at all, and
-// adding one is infrastructure plus a product decision. Recorded on the entry; the owner's.
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 
 const USER = '00000000-0000-4000-8000-000000192aaa'
@@ -77,12 +59,25 @@ describe.skipIf(!canRun)('RV-192 — an invite is not proof of email ownership',
     expect(rows[0].password_hash).toBeNull()
   })
 
-  it('leaves a cleared password unusable rather than blank-accepting', async () => {
-    // auth.ts's credentials provider returns null on a falsy hash, so a null column is a refusal
-    // and not an empty password that bcrypt might compare against. Pinned because the whole fix
-    // rests on it: clearing the hash would be worse than useless if null meant "no password
-    // required".
-    const src = await import('fs').then((fs) => fs.readFileSync('auth.ts', 'utf8'))
-    expect(src).toContain('if (!user?.passwordHash) return null')
+  it('does not let a second Google identity replace the first', async () => {
+    await pool.query('DELETE FROM users WHERE email = $1', [EMAIL])
+    await repo.createEmailUser(EMAIL, 'original-password')
+    const user = await repo.getUserByEmail(EMAIL)
+    expect(await repo.linkOAuthAccount(user!.id, 'google-sub-rv192-first')).toBe(true)
+    await repo.updateUserPassword(user!.id, 'new-password')
+    expect(await repo.linkOAuthAccount(user!.id, 'google-sub-rv192-second')).toBe(false)
+    expect((await repo.getUserByOAuthSub('google-sub-rv192-first'))?.id).toBe(user!.id)
+    expect((await repo.getUserCredentials(user!.id))?.passwordHash).toBe('new-password')
+  })
+
+  it('guards an email collision in the atomic OAuth upsert', async () => {
+    await pool.query('DELETE FROM users WHERE email = $1', [EMAIL])
+    const user = await repo.createEmailUser(EMAIL, 'unverified-password')
+    const first = await repo.upsertUser({ email: EMAIL, oauthSub: 'google-sub-rv192-upsert', timezone: 'Australia/Brisbane' })
+    expect(first.id).toBe(user.id)
+    expect((await repo.getUserCredentials(user.id))?.passwordHash).toBeUndefined()
+    await expect(repo.upsertUser({ email: EMAIL, oauthSub: 'google-sub-rv192-conflict', timezone: 'Australia/Brisbane' }))
+      .rejects.toThrow('already linked')
+    expect((await repo.getUserByOAuthSub('google-sub-rv192-upsert'))?.id).toBe(user.id)
   })
 })

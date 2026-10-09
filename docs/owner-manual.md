@@ -397,11 +397,32 @@ and the checks start.
   harmless**, unlike the real app. Details:
   [`canonical-runtime-android.md`](canonical-runtime-android.md#trainingai-dev--unreleased-code-on-the-phone-2367).
 
+### The agent key: turning it on, rotating it, turning it off (issue 2381)
+
+The agent key lets an agent run a short list of repeatable maintenance jobs on your account itself
+(the Body Battery re-derive, the baseline phase tag, the stress-bucket backfill), after a snapshot,
+with your approval link when a run overwrites data. Every run is a row in `agent_action_log`. Only
+you set the key; agents never do.
+
+- **Turn it on:** run `openssl rand -hex 32` on your machine. In Railway → the app service →
+  Variables, add **`AGENT_ACTIONS_SECRET`** with that value, and redeploy. Paste the same value
+  into the Orchestrator's cloud environment secrets only, never into an issue, chat or file. A
+  value shorter than 32 characters is treated as unset.
+- **Rotate it:** generate a new value and replace it in both places. The old key stops working on
+  the next deploy.
+- **Turn it off:** delete `AGENT_ACTIONS_SECRET` in Railway and redeploy. Every agent route then
+  answers 401 to everything, and your admin buttons work as before.
+- **See what ran:** `SELECT job, actor, approval_ref, outcome, affected_rows, days_moved, started_at
+  FROM claude_ro.agent_action_log ORDER BY started_at DESC LIMIT 20`.
+
+How an agent calls it and the job list: [`admin-actions.md`](admin-actions.md#12-the-agent-key-issue-2381).
+
 ### A secret has leaked
 
 Revoke it at its source first (Railway, Google, AWS), then replace it in Railway and in the
 `release` environment, then tell the Orchestrator. Secrets are never committed, so the repository
-itself needs nothing.
+itself needs nothing. For the agent key, deleting `AGENT_ACTIONS_SECRET` on Railway is enough to stop
+it at once.
 
 ---
 
@@ -445,6 +466,7 @@ Independent of the switch-over; none blocks it.
 | **`.constants.json` values (TN-2)** | Calibration numbers only you have | Send them in chat; the Orchestrator files them |
 | **One week wearing the chest strap (PS-44)** | Needs you to wear it | Wear it daily for a week; nothing to report until it's done |
 | **Sleep ratings (TN-33)** | Your own judgement of how nights felt | Rate the nights it asks about, in the app |
+| **`AGENT_ACTIONS_SECRET` (issue 2381)** | Secrets are yours | After the release that carries the agent key: set it on Railway as in [Part 5](#the-agent-key-turning-it-on-rotating-it-turning-it-off-issue-2381), then tell the Orchestrator so the queued production fixes it covers (#2409, #2460, the stress-bucket backfill) can run |
 | **PR #1499** (auth, read-only pivot) | Auth is yours, and it is held for the first release | Decide at release 1; its build is currently red at the type-check step, which the Implementer fixes once it's in a milestone |
 
 ---

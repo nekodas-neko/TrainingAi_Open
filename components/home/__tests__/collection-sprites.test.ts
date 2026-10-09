@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'fs'
 import path from 'path'
-import { LADDERS } from '@trainingai/shared/collection/ladder'
+import { V2_LADDERS as LADDERS } from '@trainingai/shared/collection/ladder'
 import { tierArt, classArt, tierGlyph, ART_TIERS, LADDER_CLASS, CAT_CLASSES, CAT_VARIANTS } from '../collection-sprites'
 import { penCats, shownForWidth, tagsForWidth } from '../collection-pen-cats'
 import { renderAll } from '../../../scripts/collection-art/build.mjs'
@@ -43,7 +43,7 @@ describe('the drawn cats (BF-126)', () => {
     }
   })
 
-  it('give each ladder its own class, so three ladders never draw the same cat', () => {
+  it('give each ladder its own class, so four ladders never draw the same cat', () => {
     expect(new Set(Object.values(LADDER_CLASS)).size).toBe(Object.keys(LADDERS).length)
   })
 

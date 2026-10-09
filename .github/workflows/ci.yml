@@ -307,45 +307,22 @@ jobs:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # pull-requests: read is for the commit-attribution step, which lists the PR's commits.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v5
 
-      # Q-424: the size ratchet asks whether THIS BRANCH grew a file, which needs the base branch's
-      # copy to compare against. `actions/checkout` is shallow (depth 1), so `main` is not present —
-      # one depth-1 fetch of that ref is all it takes, and the script degrades to baseline-only if it
-      # is missing rather than failing.
-      #
-      # #2559: this step is FIRST, before any check, and has to stay first. It used to sit after
-      # most of the base-aware ratchets (component size, hex literals, the timezone pair, fetch-once
-      # effects, strict request schemas, toggle ARIA, memo props), so they ran with no `origin/main`
-      # and `scripts/lib/base-ref.js` fell through to `FETCH_HEAD` — which checkout had just pointed
-      # at the PR's own merge commit. The base read was the branch itself, and growth past a
-      # baseline passed as "inherited". A new base-aware step goes anywhere BELOW this one.
       - name: Fetch the base branch, for the ratchets' base comparison
-        # `|| true` because a fetch failure must not fail the gate. The checks degrade to the plain
-        # absolute comparison when no base resolves, which is STRICTER than the base-aware one — so
-        # the worst case is the behaviour we had before Q-424, never a weaker check. Without this the
-        # step turns a transient network blip into a red Custom Rules run on an unrelated change,
-        # which is the same "failure that is not the branch author's" this whole class is about. It
-        # bit locally the first time it was flaky.
-        #
-        # LA-130: guarded on the ref being ABSENT, which is what makes it safe to replay locally.
-        # `pnpm check:rules` runs every step of this job against the developer's own clone, so an
-        # unguarded `--depth=1` fetch re-shallowed that clone on every run — measured, 1,445 commits
-        # to 2. A shallow local clone then loses its ancestry, `git merge origin/main` fails with
-        # "refusing to merge unrelated histories", and GitHub reads the resulting PR as conflicted
-        # and never gives it a workflow run. Four PRs were abandoned to that, blamed on a plain
-        # `git fetch origin main` that was innocent. In CI `origin/main` genuinely is not there after
-        # a depth-1 checkout, so the fetch still runs and nothing about the gate changes.
+        # Keep local runs from making an existing full-history clone shallow.
         run: git rev-parse --verify --quiet origin/main >/dev/null || git fetch --depth=1 origin main || true
 
       - name: No AI attribution in commit messages
-        # issue 2700. Checkout is depth 1 of the merge commit, so the PR's own commits are not in
-        # the clone; the script fetches exactly PR_COMMITS of them behind the PR head. The env is
-        # empty under `pnpm check:rules`, where it falls back to origin/main..HEAD.
+        # Read the PR's commit list so merged main commits stay exempt.
         env:
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_COMMITS: ${{ github.event.pull_request.commits }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
         run: node scripts/check-commit-attribution.js
 
       - name: No unresolved conflict markers
@@ -507,6 +484,9 @@ jobs:
       - name: Theme tokens meet WCAG AA contrast
         run: node scripts/check-contrast.js
 
+      - name: No new sub-12px text dimmed below WCAG AA (ratchet)
+        run: node scripts/check-small-text-contrast.js
+
       - name: Controls have accessible names (icon buttons, switches)
         run: node scripts/check-icon-button-names.js
 
@@ -641,6 +621,9 @@ jobs:
 
       - name: CLAUDE.md names only paths that exist
         run: node scripts/check-claude-md-paths.js
+
+      - name: Docs point at the generated withheld-columns list
+        run: node scripts/check-withheld-columns-docs.js
 
       - name: No dormant vendored model files
         run: node scripts/check-oura-models-dormancy.js

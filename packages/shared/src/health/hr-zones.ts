@@ -22,7 +22,9 @@ export function hrReserve(maxHr: number, restingHr: number): number {
 /** HR-reserve fraction at/under which a reading counts as "at rest" — the single threshold that
  *  distinguishes rest from any movement. Originally a private constant in the Body Battery route
  *  (charge below this, drain above it); shared here so the Activity Score's "moved this hour" signal
- *  uses the exact same rest/active boundary rather than a second invented threshold. */
+ *  uses the exact same rest/active boundary rather than a second invented threshold. Body Battery
+ *  itself left it in v7 for resting HR + `WAKING_REST_OFFSET_BPM` (lib/health/body-battery-day.ts,
+ *  issue 2235); the Activity score and the HR grade still use this one (issue 2743). */
 export const HR_REST_THRESHOLD = 0.05
 
 export interface HrZone {

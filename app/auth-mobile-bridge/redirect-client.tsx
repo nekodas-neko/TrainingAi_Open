@@ -2,17 +2,17 @@
 
 import { useEffect } from "react";
 
-export function MobileBridgeRedirect({ token }: { token: string }) {
+export function MobileBridgeRedirect({ returnUrl }: { returnUrl: string }) {
   useEffect(() => {
-    // Next.js redirect() silently ignores custom URL schemes.
-    // window.location.href is the only reliable way to trigger the deep link
-    // from inside a Chrome Custom Tab.
-    window.location.href = `trainingai://auth-complete?token=${token}`;
-  }, [token]);
+    window.location.href = returnUrl;
+  }, [returnUrl]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
-      <p className="text-muted-foreground text-sm">Returning to app…</p>
+      <div className="space-y-4 text-center">
+        <p className="text-muted-foreground text-sm">Returning to app…</p>
+        <a href={returnUrl} className="underline">Return to app</a>
+      </div>
     </div>
   );
 }

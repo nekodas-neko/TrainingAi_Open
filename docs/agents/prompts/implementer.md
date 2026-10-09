@@ -12,8 +12,12 @@ thread that dies loses at most its own batch, and its pushed branch says how far
 
 **Idle ticks are cheap.** If the inbox has nothing new, no thread needs you and
 `node scripts/queue.js --next-batch` returns nothing, end the tick there. A comment on #2354 that
-says **Pause** means start nothing until a **Resume** comment follows. **Slow** means run one
-thread at a time, on Sonnet only, and start no investigations, until **Resume**.
+names the usage tier (owner, 2026-10-09): **Full** (under 90%) is normal speed. **Slow** (90–95%)
+means one thread at a time on the most important work only: batches come from
+`node scripts/queue.js --next-batch --urgent-only` (only P0 and P1 batches), and no
+investigations. **Halt** (95% and over) means start nothing but a
+`hotfix` until the Orchestrator posts **Full** after the reset. Post your weekly and 5-hour usage
+percentages on #2354 every tick, because the tiers follow them.
 
 1. **Inbox.** Read new comments on the **Implementer inbox** issue (#2354). They are the
    Orchestrator's instructions; the newest wins. Act on them before anything else.

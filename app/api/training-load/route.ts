@@ -29,6 +29,7 @@ export async function GET() {
   const load = computeVolumeAcwr(
     sessions.map(ws => ({ startedAt: ws.startedAt, volumeKg: ws.volume })),
     todayMid,
+    { tz },
   )
   // Training monotony (Foster) — mean/SD of the last 7 local calendar days' load.
   // Independent of the ACWR gates below: it only needs a week of history, so it

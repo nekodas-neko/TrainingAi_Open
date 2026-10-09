@@ -318,8 +318,11 @@ describe.skipIf(!canRun)('removing a hand-entered night (issue 2606)', () => {
       const { createPostgresRollupIO } = await import('@/lib/data/postgres/rollup-io')
       const { getDb } = await import('@/lib/data/postgres/client')
       const io = createPostgresRollupIO({ db: getDb(), userId: USER } as never)
-      await io.deleteBleSleepSessionsForDates([DATE])
-      expect(await rows()).toEqual([expect.objectContaining({ id, manual_entry: true, deleted_at: expect.any(Date) })])
+      // Issue 2546: the ring night the pass did not reproduce is tombstoned too, not deleted.
+      await io.tombstoneBleSleepSessionsExcept([DATE], [])
+      const after = await rows()
+      expect(after.find(r => r.id === id)).toMatchObject({ manual_entry: true, deleted_at: expect.any(Date) })
+      expect(after.filter(r => r.id !== id)).toEqual([expect.objectContaining({ manual_entry: false, deleted_at: expect.any(Date) })])
       // With the ring night gone, nothing is the night: the removed entry does not come back.
       expect(await repo.listSleepSessions(USER, DATE, DATE)).toEqual([])
       await io.upsertSleepSessions([{

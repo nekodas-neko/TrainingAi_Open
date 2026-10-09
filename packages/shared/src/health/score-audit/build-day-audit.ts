@@ -118,6 +118,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
       volumeKg: ws.exercises.reduce((s, ex) => s + (ex.volume ?? 0), 0),
     })),
     dayMid,
+    { tz },
   )
   const programTooNew = acwrBaselineDaysRemaining(program, dayMid) > 0
   const acwr = programTooNew ? null : load.acwr

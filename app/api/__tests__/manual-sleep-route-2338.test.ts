@@ -234,8 +234,10 @@ describe.skipIf(!canRun)('manual sleep entry (#2338)', () => {
       const { createPostgresRollupIO } = await import('@/lib/data/postgres/rollup-io')
       const { getDb } = await import('@/lib/data/postgres/client')
       const io = createPostgresRollupIO({ db: getDb(), userId: USER } as never)
-      await io.deleteBleSleepSessionsForDates([DATE])
-      const left = await rows()
+      // Issue 2546: the pass tombstones the ring night it did not reproduce rather than deleting it.
+      await io.tombstoneBleSleepSessionsExcept([DATE], [])
+      const left = (await pool.query(
+        `SELECT manual_entry, sleep_start FROM sleep_sessions WHERE user_id = $1 AND deleted_at IS NULL`, [USER])).rows
       expect(left).toHaveLength(1)
       expect(left[0]).toMatchObject({ manual_entry: true, sleep_start: new Date(BED) })
       // …and once the ring night is gone, the manual one is the night again.

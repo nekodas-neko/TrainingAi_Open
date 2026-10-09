@@ -3,13 +3,14 @@
 import { useState } from 'react'
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { COLLECTION_TTL } from '@trainingai/shared/cache-ttl'
-import { LADDERS, type CollectionState } from '@trainingai/shared/collection/ladder'
+import { V2_LADDERS, type CollectionState } from '@trainingai/shared/collection/ladder'
 import { nearestMerge, mergeCountLine, totalHeld, restlessLine, lostLine, type FaucetKey } from '@/components/home/collection-summary'
 import { CollectionPen } from '@/components/home/collection-pen'
 
 export interface CollectionResponse {
-  collections: Record<FaucetKey, CollectionState>
-  rulesVersion: number
+  /** Collection rules v2 (#2187) — the only block the surface reads. Absent on a response cached
+   *  before the route returned it, which reads as still loading until the revalidation lands. */
+  v2?: { rulesVersion: number; collections: Record<FaucetKey, CollectionState> }
   today: string
 }
 
@@ -17,7 +18,7 @@ export interface CollectionResponse {
  * BF-122b — the collection on Home: a pen of every cat you hold, wandering (`CollectionPen`), over
  * one line about the next merge.
  *
- * Three ladders do not fit a card that sits under the nutrition donut, so this shows **the ladder
+ * Four ladders do not fit a card that sits under the nutrition donut, so this shows **the ladder
  * whose next merge is fewest faucet days away** and rotates itself as that changes. It answers
  * "what do I do today" in a glance, which a three-column grid does not, and it needs no interaction
  * to be useful — the tap goes to the full collection, matching every other card here.
@@ -42,7 +43,7 @@ export function CollectionCard() {
     )
   }
 
-  if (data == null) {
+  if (data?.v2 == null) {
     return (
       <div className="p-4">
         <Heading />
@@ -51,15 +52,16 @@ export function CollectionCard() {
     )
   }
 
-  const next = nearestMerge(data.collections, LADDERS)
-  const held = (Object.values(data.collections) as CollectionState[]).reduce((sum, s) => sum + totalHeld(s), 0)
+  const collections = data.v2.collections
+  const next = nearestMerge(collections, V2_LADDERS)
+  const held = (Object.values(collections) as CollectionState[]).reduce((sum, s) => sum + totalHeld(s), 0)
 
   if (next == null) {
     return (
       <div className="p-4">
         <Heading />
-        <CollectionPen collections={data.collections} />
-        {restlessLine(data.collections) && <p className="mt-2 text-xs font-semibold text-brand">{restlessLine(data.collections)}</p>}
+        <CollectionPen collections={collections} />
+        {restlessLine(collections) && <p className="mt-2 text-xs font-semibold text-brand">{restlessLine(collections)}</p>}
         <p className="mt-2 text-sm text-muted-foreground">
           {held > 0 ? `${held} in your collection.` : 'Train, walk or sleep and your first cat turns up.'}
         </p>
@@ -71,14 +73,14 @@ export function CollectionCard() {
   // card is not showing. It is still a LIFETIME count — the fold reports how many decays fired over
   // all history and carries no recency — so the wording says "have" rather than implying it just
   // happened, which would be a claim the engine cannot support.
-  const decayed = data.collections[next.faucet]?.decayEvents ?? 0
-  const restless = restlessLine(data.collections)
-  const lost = lostLine(data.collections[next.faucet])
+  const decayed = collections[next.faucet]?.decayEvents ?? 0
+  const restless = restlessLine(collections)
+  const lost = lostLine(collections[next.faucet])
 
   return (
     <div className="p-4">
       <Heading />
-      <CollectionPen collections={data.collections} />
+      <CollectionPen collections={collections} />
       {restless && <p className="mt-2 text-xs font-semibold text-brand">{restless}</p>}
       <div className="mt-2 flex items-center gap-3">
         <div className="min-w-0 flex-1">

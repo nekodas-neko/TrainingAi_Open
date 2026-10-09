@@ -29,7 +29,7 @@ import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 
 type Row = Record<string, unknown>
 
-const getUserById = vi.fn(async (_id: string) => ({ isAdmin: true }) as Row | null)
+const getUserById = vi.fn(async (_id: string) => ({ isActive: true, isAdmin: true }) as Row | null)
 const getOuraBatteryPolls = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getOuraBatteryEvents = vi.fn(async (..._a: unknown[]) => [] as Row[])
 const getDaytimeTagCoverage = vi.fn(async (..._a: unknown[]) => ({}) as Row)
@@ -56,7 +56,7 @@ const coverage = (qs = '') => daytimeCoverage(new Request(`http://localhost/api/
 beforeEach(() => {
   for (const m of [getUserById, getOuraBatteryPolls, getOuraBatteryEvents, getDaytimeTagCoverage, rateLimit]) m.mockClear()
   rateLimit.mockReturnValue(true)
-  getUserById.mockResolvedValue({ isAdmin: true })
+  getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
   getOuraBatteryPolls.mockResolvedValue([])
   getOuraBatteryEvents.mockResolvedValue([])
   getDaytimeTagCoverage.mockResolvedValue({ tags: [] })
@@ -72,7 +72,7 @@ describe('GET /api/oura-ble/battery-latest', () => {
     // `requireAdmin` ignores the claim by design and the sibling would have answered 200 for the
     // wrong reason. (It did, on the first draft of this case.)
     sessionUser = { id: 'u-1', isAdmin: false }
-    getUserById.mockResolvedValue({ isAdmin: false })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     expect((await batteryLatest()).status).toBe(200)
     expect(getUserById).not.toHaveBeenCalled()   // this route never asks
 
@@ -172,14 +172,14 @@ describe('GET /api/oura-ble/battery-analytics', () => {
   })
 
   it('refuses a non-admin, answers 503 when the check cannot run, and gates before the limiter', async () => {
-    getUserById.mockResolvedValue({ isAdmin: false })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     expect((await analytics()).status).toBe(403)
     expect(rateLimit).not.toHaveBeenCalled()
 
     getUserById.mockRejectedValue(new Error('connection terminated unexpectedly'))
     expect((await analytics()).status).toBe(503)
 
-    getUserById.mockResolvedValue({ isAdmin: true })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
     rateLimit.mockReturnValue(false)
     expect((await analytics()).status).toBe(429)
     expect(getOuraBatteryEvents).not.toHaveBeenCalled()
@@ -221,7 +221,7 @@ describe('GET /api/oura-ble/daytime-coverage', () => {
     getDaytimeTagCoverage.mockResolvedValue({ tags: [{ tag: 126, hours: [0, 0, 3] }] })
     expect(await (await coverage()).json()).toEqual({ tags: [{ tag: 126, hours: [0, 0, 3] }] })
 
-    getUserById.mockResolvedValue({ isAdmin: false })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     expect((await coverage()).status).toBe(403)
     expect(rateLimit).toHaveBeenCalledTimes(1)   // only the successful call above spent one
   })

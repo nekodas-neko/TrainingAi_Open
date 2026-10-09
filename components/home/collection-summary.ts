@@ -1,15 +1,19 @@
-import type { CollectionState, Ladder } from '@trainingai/shared/collection/ladder'
+import type { CollectionState, V2Ladder } from '@trainingai/shared/collection/ladder'
 
 /**
  * BF-122b — what the home widget says, decided in one place because the card has room for one line.
  *
- * Three ladders do not fit under the nutrition donut, so the card shows **the one nearest its next
+ * Four ladders do not fit under the nutrition donut, so the card shows **the one nearest its next
  * merge** and rotates itself as that changes. Nothing here fetches or renders; the widget and the
  * collection screen both read these, and the tests can run them (this project's vitest is
  * `environment: 'node'`, so a `.tsx` cannot be imported).
  */
 
-export type FaucetKey = Ladder['faucet']
+/** Collection rules v2 (#2187): the surface reads the v2 block, so its rows are v2's four. */
+export type FaucetKey = V2Ladder['faucet']
+
+/** The order rows are listed in on the screen and tie-broken in on the card. */
+export const FAUCET_ORDER: readonly FaucetKey[] = ['workout', 'steps', 'health', 'cardio']
 
 /**
  * The heading for a faucet's row. Written out rather than derived from `FAUCET_NOUN` with a CSS
@@ -17,15 +21,19 @@ export type FaucetKey = Ladder['faucet']
  */
 export const FAUCET_TITLE: Record<FaucetKey, string> = {
   workout: 'Workouts',
-  steps: 'Days with steps',
-  sleep: 'Nights of sleep',
+  steps: 'Steps',
+  health: 'Health logging',
+  cardio: 'Cardio sessions',
 }
 
 /** What a faucet day IS, in the user's words. The engine counts days, not thresholds. */
 export const FAUCET_NOUN: Record<FaucetKey, { one: string; many: string }> = {
   workout: { one: 'workout', many: 'workouts' },
-  steps: { one: 'day with steps', many: 'days with steps' },
-  sleep: { one: 'night of sleep', many: 'nights of sleep' },
+  // The banked rows count in tier-I cats: a Ranger I is 5,000 steps, a Health cat I a fully logged
+  // day, a Rogue I one session. The bank drains daily, so "days" would be a promise it cannot keep.
+  steps: { one: 'tier I cat', many: 'tier I cats' },
+  health: { one: 'tier I cat', many: 'tier I cats' },
+  cardio: { one: 'tier I cat', many: 'tier I cats' },
 }
 
 export interface MergeProgress {
@@ -44,7 +52,7 @@ export interface MergeProgress {
 }
 
 /** What one item of tier `i` costs in faucet days: 1 at the bottom, times each merge cost above. */
-function unitCostInDays(ladder: Ladder, tier: number): number {
+function unitCostInDays(ladder: V2Ladder, tier: number): number {
   let cost = 1
   for (let i = 1; i <= tier; i++) cost *= ladder.tiers[i].mergeCost
   return cost
@@ -68,7 +76,7 @@ function unitCostInDays(ladder: Ladder, tier: number): number {
  * a next merge; null means the ladder has no rung above the bottom at all, or every rung is
  * momentarily at its cost, which `settle` resolves on the next spawn.
  */
-export function nextMerge(state: CollectionState, ladder: Ladder): MergeProgress | null {
+export function nextMerge(state: CollectionState, ladder: V2Ladder): MergeProgress | null {
   let best: MergeProgress | null = null
   for (let i = 0; i < ladder.tiers.length - 1; i++) {
     const need = ladder.tiers[i + 1].mergeCost
@@ -91,8 +99,8 @@ export function nextMerge(state: CollectionState, ladder: Ladder): MergeProgress
  */
 export function nearestMerge(
   collections: Partial<Record<FaucetKey, CollectionState>>,
-  ladders: Record<FaucetKey, Ladder>,
-  order: readonly FaucetKey[] = ['workout', 'steps', 'sleep'],
+  ladders: Record<FaucetKey, V2Ladder>,
+  order: readonly FaucetKey[] = FAUCET_ORDER,
 ): MergeProgress | null {
   let best: MergeProgress | null = null
   for (const faucet of order) {
@@ -133,23 +141,12 @@ export function totalHeld(state: CollectionState): number {
   return state.stock.reduce((sum, n) => sum + n, 0)
 }
 
-/**
- * How the collection screen describes the step and sleep allowances.
- *
- * A function rather than inline copy because the two constants are equal today and need not stay
- * that way — written inline, TypeScript narrows them to literals and the "if they differ" branch is
- * dead code the compiler rejects, which is how a page ends up quietly asserting they are the same.
- */
-export function restGapSentence(stepsGap: number, sleepGap: number): string {
-  const days = (n: number) => `${n} missed ${n === 1 ? 'day' : 'days'}`
-  return stepsGap === sleepGap ? days(stepsGap) : `${days(stepsGap)} for steps and ${days(sleepGap)} for sleep`
-}
-
 /** What keeps a restless ladder whole today, in the user's words. */
 const KEEP_TODAY: Record<FaucetKey, string> = {
   workout: 'train today to keep everyone',
   steps: 'a walk today keeps everyone',
-  sleep: "log tonight's sleep to keep everyone",
+  health: 'log your sleep, food or weight today to keep everyone',
+  cardio: 'a walk or a workout today keeps everyone',
 }
 
 /**
@@ -158,7 +155,7 @@ const KEEP_TODAY: Record<FaucetKey, string> = {
  * show up; a number that might shrink is not.
  */
 export function restlessLine(collections: Partial<Record<FaucetKey, CollectionState>>): string | null {
-  for (const faucet of ['workout', 'steps', 'sleep'] as FaucetKey[]) {
+  for (const faucet of FAUCET_ORDER) {
     const s = collections[faucet]
     if (!s?.restless || !s.cats?.length) continue
     const smallest = Math.min(...s.cats.map(c => c.tier))

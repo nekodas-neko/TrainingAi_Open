@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { refreshIsActiveClaim, ISACTIVE_RECHECK_MS } from '../is-active-refresh'
+import { refreshIsActiveClaim } from '../is-active-refresh'
 
 const NOW = 1_800_000_000_000
 const active = async () => ({ isActive: true })
@@ -7,20 +7,18 @@ const deactivated = async () => ({ isActive: false })
 
 describe('refreshIsActiveClaim', () => {
   it('picks up a deactivation once the recheck is due', async () => {
-    const token = { userId: 'u1', isActive: true, isActiveCheckedAt: NOW - ISACTIVE_RECHECK_MS - 1 }
+    const token = { userId: 'u1', isActive: true, isActiveCheckedAt: NOW - 1 }
     await refreshIsActiveClaim(token, deactivated, NOW)
     expect(token.isActive).toBe(false)
     expect(token.isActiveCheckedAt).toBe(NOW)
   })
 
-  it('does not hit the lookup before the recheck is due', async () => {
-    // The jwt callback runs on every auth() call, so an unthrottled read would be a
-    // DB query per request — this throttle is the whole reason the approach is viable.
+  it('checks even a freshly persisted timestamp', async () => {
     const lookup = vi.fn(deactivated)
-    const token = { userId: 'u1', isActive: true, isActiveCheckedAt: NOW - 1000 }
+    const token = { userId: 'u1', isActive: true, isActiveCheckedAt: NOW }
     await refreshIsActiveClaim(token, lookup, NOW)
-    expect(lookup).not.toHaveBeenCalled()
-    expect(token.isActive).toBe(true)
+    expect(lookup).toHaveBeenCalledWith('u1')
+    expect(token.isActive).toBe(false)
   })
 
   it('checks immediately on a token that has never been checked', async () => {
@@ -35,24 +33,25 @@ describe('refreshIsActiveClaim', () => {
     expect(token.isActive).toBe(true)
   })
 
-  it('leaves the claim alone when the lookup throws, and does not advance the timestamp', async () => {
-    // A DB blip must never sign everyone out, and must not suppress the retry for a day.
-    const token = { userId: 'u1', isActive: true, isActiveCheckedAt: 0 }
+  it.each([true, false, undefined])('keeps isActive=%s and retries after a database outage', async isActive => {
+    const token = { userId: 'u1', isActive, isAdmin: true, isActiveCheckedAt: 0 }
+    const original = { ...token }
+    const lookup = vi.fn().mockRejectedValueOnce(new Error('db down'))
+      .mockResolvedValue({ isActive: false, isAdmin: false })
     await expect(
-      refreshIsActiveClaim(token, async () => { throw new Error('db down') }, NOW),
-    ).resolves.toBeDefined()
-    expect(token.isActive).toBe(true)
-    expect(token.isActiveCheckedAt).toBe(0)
+      refreshIsActiveClaim(token, lookup, NOW),
+    ).resolves.toBe(token)
+    expect(token).toEqual(original)
+    await refreshIsActiveClaim(token, lookup, NOW + 1)
+    expect(lookup).toHaveBeenCalledTimes(2)
+    expect(token).toEqual({ userId: 'u1', isActive: false, isAdmin: false, isActiveCheckedAt: NOW + 1 })
   })
 
   it('treats a DELETED user row as deactivation (RV-195 ②)', async () => {
-    // This assertion is inverted from what it was, deliberately, and the pair above is what makes
-    // the inversion safe: an outage THROWS and is handled there. Reaching this line means the
-    // query ran and answered "no such user", which is the strongest form of deactivation there is.
-    // Before, a deleted account stayed signed in until its token expired — up to seven days.
-    const token = { userId: 'u1', isActive: true, isActiveCheckedAt: 0 }
+    const token = { userId: 'u1', isActive: true, isAdmin: true, isActiveCheckedAt: 0 }
     await refreshIsActiveClaim(token, async () => null, NOW)
     expect(token.isActive).toBe(false)
+    expect(token.isAdmin).toBe(false)
     expect(token.isActiveCheckedAt).toBe(0) // nothing to re-check; a restored row takes effect at once
   })
 
@@ -62,9 +61,7 @@ describe('refreshIsActiveClaim', () => {
     expect(lookup).not.toHaveBeenCalled()
   })
 
-  it('a continuously-active user is re-checked about once a day, not signed out', async () => {
-    // Walks a week of steady use one hour at a time: the claim stays true throughout
-    // (no re-auth, no interruption) and the lookup fires roughly daily, not hourly.
+  it('a continuously-active user is checked on every request', async () => {
     const lookup = vi.fn(active)
     const token: { userId?: string; isActive?: boolean; isActiveCheckedAt?: number } =
       { userId: 'u1', isActive: true, isActiveCheckedAt: NOW }
@@ -72,13 +69,9 @@ describe('refreshIsActiveClaim', () => {
       await refreshIsActiveClaim(token, lookup, NOW + h * 60 * 60 * 1000)
       expect(token.isActive).toBe(true)
     }
-    expect(lookup).toHaveBeenCalledTimes(7)
+    expect(lookup).toHaveBeenCalledTimes(24 * 7)
   })
-
-  // ── isAdmin, added 2026-08-10 alongside the ADMIN_EMAIL boot grant ───────────────────────────
   it('picks up an admin grant made after the token was minted', async () => {
-    // The exact bootstrapAdmin case: the row is created by sign-in with is_admin false, and the
-    // boot grant flips it afterwards. Without this the admin UI stays hidden until re-login.
     const token = { userId: 'u1', isActive: true, isAdmin: false, isActiveCheckedAt: 0 }
     await refreshIsActiveClaim(token, async () => ({ isActive: true, isAdmin: true }), NOW)
     expect(token.isAdmin).toBe(true)
@@ -90,33 +83,17 @@ describe('refreshIsActiveClaim', () => {
     expect(token.isAdmin).toBe(false)
   })
 
-  it('leaves the claim alone when the lookup does not supply isAdmin', async () => {
-    // A lookup that omits the field says nothing about it. Treating absent as false would strip
-    // admin from every session the moment any caller passed a narrower row.
+  it('does not grant admin when the lookup does not supply isAdmin', async () => {
     const token = { userId: 'u1', isActive: true, isAdmin: true, isActiveCheckedAt: 0 }
     await refreshIsActiveClaim(token, async () => ({ isActive: true }), NOW)
-    expect(token.isAdmin).toBe(true)
+    expect(token.isAdmin).toBe(false)
   })
 })
-
-// ── PS-24: the throttle that never engages, and why that is now load-bearing ─────────────────
-//
-// The checkpoint filed "every authenticated request performs the once-per-day users-row read" as a
-// cost. It is, but it is also the only reason PS-24's fix works, so it must not be "optimised".
-//
-// `isActiveCheckedAt` lives in the token. The token is re-signed by the Edge middleware from the
-// cookie on every request, and the cookie never carries the stamp — so every request arrives with
-// an unstamped token and the throttle cannot fire. Making it persist would restore a staleness
-// window of `ISACTIVE_RECHECK_MS`, which is exactly the vulnerability `auth()`'s refusal closes.
-//
-// If a future change makes the stamp survive, `ISACTIVE_RECHECK_MS` becomes the deactivation
-// latency again and that trade needs deciding on purpose, not inheriting.
 describe('the per-request read PS-24 depends on', () => {
   it('fires on every request, because the stamp never arrives with the token', async () => {
     let reads = 0
     const lookup = async () => { reads++; return { isActive: false, isAdmin: false } }
     for (let i = 0; i < 3; i++) {
-      // What actually reaches the callback: the claim as stamped at sign-in, and no stamp.
       const fromCookie: { userId: string; isActive: boolean; isActiveCheckedAt?: number } =
         { userId: 'u1', isActive: true }
       const token = await refreshIsActiveClaim(fromCookie, lookup)
@@ -126,9 +103,6 @@ describe('the per-request read PS-24 depends on', () => {
   })
 
   it('and the same read keeps isAdmin fresh for every Node caller', async () => {
-    // So the checkpoint's "an isAdmin revocation never reaches a live session" holds only for the
-    // Edge middleware, which does not read isAdmin at all. Anything going through `auth()` — every
-    // route handler and server component — gets the row's value.
     const fromCookie = { userId: 'u1', isActive: true, isAdmin: true }
     const token = await refreshIsActiveClaim(fromCookie, async () => ({ isActive: true, isAdmin: false }))
     expect(token.isAdmin).toBe(false)

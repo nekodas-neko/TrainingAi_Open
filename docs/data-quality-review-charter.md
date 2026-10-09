@@ -56,9 +56,10 @@ don't guess table shapes.
   by SQL inspection. Every write form fails, including `WITH x AS (INSERT … RETURNING *) SELECT * FROM x`.
 - **Row-scoped to the owner's account.** Other users exist and hold real health data; their rows are
   invisible by design. Don't try to work around it.
-- **Withheld columns:** `users.password_hash`, all four `oura_tokens` secrets,
-  `feedback_submissions.screenshot_data`, the three `push_subscriptions` Web-Push columns. Presence
-  stand-ins exist (`has_pat`, `screenshot_bytes`).
+- **Withheld columns:** not listed here, so the list cannot drift (issue 2641). The one source is
+  `SELECT * FROM claude_ro._meta_withheld_columns` (from `DENY` in
+  `scripts/generate-claude-ro-views.js`). Presence and size stand-ins exist where a value is
+  withheld (`DERIVED` in the same file).
 - **Denied tables:** `invited_emails`, `rate_limits`.
 - Every query writes an audit row to `db_query_log`.
 

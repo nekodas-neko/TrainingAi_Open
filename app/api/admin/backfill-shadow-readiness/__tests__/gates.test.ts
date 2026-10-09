@@ -32,7 +32,7 @@ describe('POST /api/admin/backfill-shadow-readiness (issue 2636)', () => {
 
   beforeEach(() => {
     session.value = { user: { id: 'u1', timezone: TZ, isAdmin: true } }
-    repo.getUserById.mockReset().mockResolvedValue({ id: 'u1', isAdmin: true })
+    repo.getUserById.mockReset().mockResolvedValue({ id: 'u1', isActive: true, isAdmin: true })
     repo.getShadowReadiness.mockClear()
     replay.mockReset().mockResolvedValue({ rows: [], written: 0, dryRun: true })
     limited.value = true
@@ -45,7 +45,7 @@ describe('POST /api/admin/backfill-shadow-readiness (issue 2636)', () => {
   })
 
   it('403 for a non-admin, judged by the database and not the token flag', async () => {
-    repo.getUserById.mockResolvedValue({ id: 'u1', isAdmin: false })
+    repo.getUserById.mockResolvedValue({ id: 'u1', isActive: true, isAdmin: false })
     expect((await post(`from=${d(-5)}&to=${d(-3)}`)).status).toBe(403)
     expect(replay).not.toHaveBeenCalled()
   })

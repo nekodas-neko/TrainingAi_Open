@@ -1,3 +1,4 @@
+import type { AuthProvider, AppleAuthAttempt } from '@/lib/auth/identity'
 import type { SyncedMutationDomain } from '@trainingai/shared/sync/mutation-schema'
 import type { UserPreferences } from '@trainingai/shared/user/preferences'
 import type {
@@ -633,6 +634,15 @@ export interface WorkoutRepository {
   activateUser(userId: string): Promise<boolean>
   deactivateUser(userId: string): Promise<boolean>
   getUserById(userId: string): Promise<User | null>
+  getUserByOAuthSub(oauthSub: string): Promise<User | null>
+  getUserByProvider(provider: AuthProvider, subject: string): Promise<User | null>
+  getUserProviders(userId: string): Promise<AuthProvider[]>
+  linkIdentity(userId: string, provider: AuthProvider, subject: string, email?: string): Promise<boolean>
+  createProviderUser(provider: AuthProvider, subject: string, email: string, name?: string): Promise<User>
+  createAppleAuthAttempt(nonceHash: string, userId: string | null): Promise<AppleAuthAttempt>
+  getAppleAuthAttempt(id: string): Promise<AppleAuthAttempt | null>
+  consumeAppleAuthAttempt(id: string): Promise<AppleAuthAttempt | null>
+  getUserCredentials(userId: string): Promise<(User & { passwordHash?: string }) | null>
   /** #2120. Deletes the account and everything that cascades from it, in one transaction; the
    *  one path for both self-service and admin deletion. `deleted: false` means no row matched. */
   deleteAccount(userId: string, opts?: { onlyIfNoData?: boolean }): Promise<AccountDeletionResult>
@@ -660,7 +670,7 @@ export interface WorkoutRepository {
   touchLastGoalReviewAt(userId: string): Promise<void>
   updateUserAvatar(userId: string, avatar: string): Promise<User>
   updateUserPassword(userId: string, passwordHash: string): Promise<void>
-  linkOAuthAccount(userId: string, oauthSub: string): Promise<void>
+  linkOAuthAccount(userId: string, oauthSub: string): Promise<boolean>
   getTimingBaselineDate(userId: string): Promise<string | null>
   setTimingBaselineDate(userId: string, date: string | null): Promise<void>
   createEmailUser(email: string, passwordHash: string, name?: string, isActive?: boolean): Promise<User>

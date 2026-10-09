@@ -114,7 +114,7 @@ export function TrainingLoadCard({ trainingLoad, failed = false }: { trainingLoa
               {trainingLoad?.baselineDaysRemaining != null ? ` (${trainingLoad.baselineDaysRemaining} days remaining)` : ''}
             </p>
           )}
-          <p className="text-xs text-muted-foreground">7-day avg vs 28-day baseline · green zone: 0.8–1.3</p>
+          <p className="text-xs text-muted-foreground">Last 7 days vs 28-day weekly avg · green zone: 0.8–1.3</p>
           {trainingLoad?.monotony != null && (
             <MonotonyMeter monotony={trainingLoad.monotony} strain={trainingLoad.strain ?? null} />
           )}

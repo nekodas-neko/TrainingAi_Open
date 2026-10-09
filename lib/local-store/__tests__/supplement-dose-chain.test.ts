@@ -142,7 +142,8 @@ describe('the push sends what was recorded, not what the definition says now', (
 // Greps source because native SQLite does not run in node — the same reason this whole suite does.
 // The behavioural half is `supplement-vial-freeze.test.ts`, which drives the server for real.
 describe('the local read surfaces what the local write froze (LA-97)', () => {
-  const getter = fnBody(backend, 'async getSupplementLogs(')
+  // Issue 2724: the day and range reads share one module-level mapper; it is what carries the columns.
+  const getter = backend.slice(backend.indexOf('function mapSupplementLogRow('), backend.indexOf('export class SQLiteLocalStore'))
 
   it('maps every OR-102a column back out of the row', () => {
     expect(getter).toContain('takenAt:')

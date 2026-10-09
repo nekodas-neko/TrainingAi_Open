@@ -31,12 +31,12 @@ export async function GET() {
   // LB-180: a pure read of the users row. It used to add `workoutCount`, which nothing read. That
   // count made every workout completion a writer of `more-user-profile`, and was the only thing
   // keeping that key off `freshWithinTtl`.
-  const userWithHash = await repo.getUserByEmail(session.user.email!)
+  const userWithHash = await repo.getUserCredentials(session.user.id)
   if (!userWithHash) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const { passwordHash, ...user } = userWithHash
   return NextResponse.json(
-    { user, hasPassword: !!passwordHash },
+    { user, hasPassword: !!passwordHash, signInProviders: await repo.getUserProviders(user.id) },
     { headers: { "Cache-Control": "private, no-store" } },
   )
 }

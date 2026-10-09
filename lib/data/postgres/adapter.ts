@@ -1,3 +1,5 @@
+import * as authData from './slices/auth'
+import type { AuthProvider } from '@/lib/auth/identity'
 import { randomUUID } from 'crypto'
 import { rejectMealImage, mealImageRejectionMessage, FOOD_ITEM_IMAGE_MAX_BYTES } from '@trainingai/shared/nutrition/meal-image'
 import { normalizeEmail } from '@trainingai/shared/validation/email'
@@ -482,27 +484,39 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // LA-61: normalised here, at the boundary, so no caller can store or match a raw provider value.
     const email = normalizeEmail(user.email)
     const invited = forceActive ?? await this.isInvited(email)
-    const [r] = await this.db.insert(s.users)
-      .values({ oauthSub: user.oauthSub ?? null, email, name: user.name ?? null, isActive: invited })
-      .onConflictDoUpdate({
-        // Conflict on email — works for both OAuth and password users.
-        // oauthSub UNIQUE doesn't fire when oauthSub is NULL (NULL != NULL in Postgres).
-        target: s.users.email,
-        set: {
-          name: sql`EXCLUDED.name`,
-          oauthSub: sql`COALESCE(EXCLUDED.oauth_sub, ${s.users.oauthSub})`,
-        },
-      })
-      .returning()
+    const r = await this.db.transaction(async x => {
+      const [r] = await x.insert(s.users)
+        .values({ oauthSub: user.oauthSub ?? null, email, name: user.name ?? null, isActive: invited })
+        .onConflictDoUpdate({
+          target: s.users.email,
+          set: {
+            name: sql`EXCLUDED.name`,
+            oauthSub: sql`COALESCE(${s.users.oauthSub}, EXCLUDED.oauth_sub)`,
+            passwordHash: sql`CASE WHEN ${s.users.oauthSub} IS NULL AND EXCLUDED.oauth_sub IS NOT NULL
+              AND NOT EXISTS (SELECT 1 FROM auth_identities WHERE user_id = users.id)
+              THEN NULL ELSE ${s.users.passwordHash} END`,
+          },
+          setWhere: or(isNull(s.users.oauthSub), eq(s.users.oauthSub, user.oauthSub ?? '')),
+        })
+        .returning()
+      if (!r) {
+        throw new Error('Email is already linked to another Google account')
+      }
 
-    // Generate friend code if the user doesn't have one yet
-    if (!r.friendCode) {
+      if (user.oauthSub) {
+        await x.insert(s.authIdentities).values({ userId: r.id, provider: 'google', subject: user.oauthSub, email }).onConflictDoNothing()
+      }
+      return r
+    })
+    return this.ensureUserDefaults(this.rowToUser(r))
+  }
+
+  private async ensureUserDefaults(returnedUser: User): Promise<User> {
+    if (!returnedUser.friendCode) {
       const code = await this.generateUniqueFriendCode()
-      await this.db.update(s.users).set({ friendCode: code }).where(eq(s.users.id, r.id))
-      r.friendCode = code
+      await this.db.update(s.users).set({ friendCode: code }).where(eq(s.users.id, returnedUser.id))
+      returnedUser.friendCode = code
     }
-
-    const returnedUser = this.rowToUser(r)
 
     // Gate all seeding behind a single existence check — established users skip 4+ queries per login.
     const [hasStyles] = await this.db
@@ -734,6 +748,37 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return r ? this.rowToUser(r) : null
   }
 
+  async getUserByOAuthSub(oauthSub: string): Promise<User | null> {
+    const linked = await this.getUserByProvider('google', oauthSub)
+    if (linked) {
+      return linked
+    }
+    const [row] = await this.db.select().from(s.users).where(eq(s.users.oauthSub, oauthSub)).limit(1)
+    return row ? this.rowToUser(row) : null
+  }
+
+  async getUserByProvider(provider: AuthProvider, subject: string): Promise<User | null> {
+    const row = await authData.getUserByProvider(this.db, provider, subject)
+    return row ? this.rowToUser(row) : null
+  }
+
+  async getUserProviders(userId: string) { return authData.getUserProviders(this.db, userId) }
+  async linkIdentity(userId: string, provider: AuthProvider, subject: string, email?: string) {
+    return authData.linkIdentity(this.db, userId, provider, subject, email)
+  }
+  async createProviderUser(provider: AuthProvider, subject: string, email: string, name?: string): Promise<User> {
+    const row = await authData.createProviderUser(this.db, provider, subject, email, name, await this.isInvited(email))
+    return this.ensureUserDefaults(this.rowToUser(row))
+  }
+  async createAppleAuthAttempt(nonceHash: string, userId: string | null) { return authData.createAppleAuthAttempt(this.db, nonceHash, userId) }
+  async getAppleAuthAttempt(id: string) { return authData.getAppleAuthAttempt(this.db, id) }
+  async consumeAppleAuthAttempt(id: string) { return authData.consumeAppleAuthAttempt(this.db, id) }
+
+  async getUserCredentials(userId: string): Promise<(User & { passwordHash?: string }) | null> {
+    const [r] = await this.db.select().from(s.users).where(eq(s.users.id, userId)).limit(1)
+    return r ? { ...this.rowToUser(r), passwordHash: r.passwordHash ?? undefined } : null
+  }
+
   async deleteAccount(userId: string, opts: { onlyIfNoData?: boolean } = {}): Promise<AccountDeletionResult> {
     return accountDeletion.deleteAccount(this.db, userId, opts)
   }
@@ -817,12 +862,17 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     await this.db.update(s.users).set({ timingBaselineDate: date }).where(eq(s.users.id, userId))
   }
 
-  // Linking CLEARS the password (RV-192). The row being linked to was created by someone who typed
-  // that address and was never asked to prove they read it; the person arriving now proved it, via
-  // Google. Leaving the hash in place leaves a credential belonging to whoever registered first.
-  // They lose nothing they are using — they are signing in with Google as this runs.
-  async linkOAuthAccount(userId: string, oauthSub: string): Promise<void> {
-    await this.db.update(s.users).set({ oauthSub, passwordHash: null }).where(eq(s.users.id, userId))
+  async linkOAuthAccount(userId: string, oauthSub: string): Promise<boolean> {
+    return this.db.transaction(async x => {
+      const rows = await x.update(s.users).set({ oauthSub, passwordHash: sql`CASE WHEN EXISTS (SELECT 1 FROM auth_identities WHERE user_id = ${s.users.id}) THEN ${s.users.passwordHash} ELSE NULL END` })
+        .where(and(eq(s.users.id, userId), isNull(s.users.oauthSub)))
+        .returning({ id: s.users.id, email: s.users.email })
+      if (!rows.length) {
+        return false
+      }
+      await x.insert(s.authIdentities).values({ userId, provider: 'google', subject: oauthSub, email: rows[0].email })
+      return true
+    })
   }
 
   // An invite is not proof that the registrant owns that inbox (RV-192). This defaulted to

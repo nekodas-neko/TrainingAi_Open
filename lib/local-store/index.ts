@@ -63,6 +63,12 @@ export interface LocalStore {
   hydrateSavedMeals(serverMeals: SavedMeal[]): Promise<void>;
   getSupplements(): Promise<LocalSupplement[]>;
   getSupplementLogs(date: string): Promise<LocalSupplementLog[]>;
+  /**
+   * Issue 2724 — live logs from `fromDate` to `toDate`, INCLUSIVE local days, oldest first;
+   * tombstones excluded; `supplementId` optionally narrows to one supplement. Includes `pending`
+   * (not yet synced) rows.
+   */
+  getSupplementLogsRange(fromDate: string, toDate: string, supplementId?: string): Promise<LocalSupplementLog[]>;
   getInjuries(): Promise<LocalInjury[]>;
   getExerciseLogs(workoutSessionId: string): Promise<LocalExerciseLog[]>;
   getSetLogs(exerciseLogId: string): Promise<LocalSetLog[]>;

@@ -29,7 +29,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 type Row = Record<string, unknown>
 
-const getUserById = vi.fn(async (_id: string) => ({ isAdmin: true }) as Row | null)
+const getUserById = vi.fn(async (_id: string) => ({ isActive: true, isAdmin: true }) as Row | null)
 const rateLimit = vi.fn((..._a: unknown[]) => true)
 const downloadMedia = vi.fn(async (_k: string) => null as unknown)
 const uploadExerciseMedia = vi.fn(async (..._a: unknown[]) => 'https://cdn.example/x.gif' as string | null)
@@ -94,7 +94,7 @@ beforeEach(() => {
   for (const m of [getUserById, rateLimit, downloadMedia, uploadExerciseMedia, isStorageConfigured,
                    findDirectUrl, findBestMatch, loadDataset, insertValues, onConflictDoUpdate]) m.mockClear()
   rateLimit.mockReturnValue(true)
-  getUserById.mockResolvedValue({ isAdmin: true })
+  getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
   downloadMedia.mockResolvedValue(null)
   uploadExerciseMedia.mockResolvedValue('https://cdn.example/x.gif')
   isStorageConfigured.mockReturnValue(true)
@@ -114,7 +114,7 @@ describe('the admin gate on both media tools (the #1019 fix, pinned at the route
 
   it('refuses a non-admin, whatever the token claims', async () => {
     sessionUser = { id: 'u-1', isAdmin: true }
-    getUserById.mockResolvedValue({ isAdmin: false })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     for (const [name, call] of ALL) expect((await call()).status, name).toBe(403)
     expect(uploadExerciseMedia).not.toHaveBeenCalled()
   })

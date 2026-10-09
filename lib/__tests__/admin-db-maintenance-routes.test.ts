@@ -30,7 +30,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 type Row = Record<string, unknown>
 
-const getUserById = vi.fn(async (_id: string) => ({ isAdmin: true }) as Row | null)
+const getUserById = vi.fn(async (_id: string) => ({ isActive: true, isAdmin: true }) as Row | null)
 const rateLimit = vi.fn((..._a: unknown[]) => true)
 const reportServerError = vi.fn((..._a: unknown[]) => undefined)
 const safeCompare = vi.fn((a: string, b: string) => a === b)
@@ -123,7 +123,7 @@ beforeEach(() => {
                    bulkWindowFor, resolveRequestedTables, streamTableRows, vacuumTableFull,
                    getActiveProgram, listProgressionStyles, getExerciseEquipment]) m.mockClear()
   rateLimit.mockReturnValue(true)
-  getUserById.mockResolvedValue({ isAdmin: true })
+  getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
   safeCompare.mockImplementation((a: string, b: string) => a === b)
   auditQuery.mockResolvedValue({ rows: [] })
   roQuery.mockResolvedValue({ rows: [{ n: 2 }] })
@@ -160,7 +160,7 @@ describe('the admin gate on all three', () => {
 
   it('refuses a non-admin, whatever the token claims', async () => {
     sessionUser = { id: 'u-1', isAdmin: true }
-    getUserById.mockResolvedValue({ isAdmin: false })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     for (const [name, call] of ALL) expect((await call()).status, name).toBe(403)
     expect(vacuumTableFull).not.toHaveBeenCalled()
     expect(readTableColumns).not.toHaveBeenCalled()
@@ -196,7 +196,7 @@ describe('GET /api/admin/db-snapshot — the two ways in', () => {
     // The property worth having a test for. Without it, the secret alone would be a second,
     // weaker admin credential rather than another way to reach the same one.
     sessionUser = null
-    getUserById.mockResolvedValue({ isAdmin: false })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     const res = await bearer('snapshot-secret')
     expect(res.status).toBe(403)
     expect(readTableColumns).not.toHaveBeenCalled()

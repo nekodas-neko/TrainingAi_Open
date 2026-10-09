@@ -51,26 +51,25 @@ A subagent does not inherit a sensible model: set `model` on every thread or hel
 
 **Cadence.** The Implementer loops every **~30 minutes**, not 15. When the inbox has nothing new, no
 thread needs it and `node scripts/queue.js --next-batch` returns nothing, it ends the tick at once
-without re-reading anything else. **Usage gate (automatic, owner 2026-10-08).** Every Orchestrator health check first reads
-`rate_limit_info` from the agents' session records (`get_session`). The record shows the status,
-the limit type (`five_hour` or `seven_day`) and the reset time. It never shows a percentage.
-`allowed_warning` arrives well before the end: on the weekly limit it fired at about 75% (10-08).
-The owner wants work to continue until 90%, so the two states are:
+without re-reading anything else. **Usage gate (owner, 2026-10-09).** The tiers follow the highest usage percentage on either limit
+(weekly or 5-hour). The Implementer posts both percentages on #2354 every tick, because
+`get_session`'s `rate_limit_info` gives only a status (`allowed_warning` fires around 75%), a limit
+type and the reset time. The Orchestrator reads the percentage at every health check and posts the
+tier on #2354 when it changes:
 
-- **Slow** (status `allowed_warning`): the Orchestrator posts **Slow** on #2354. The Implementer
-  runs one thread at a time, on Sonnet only, and starts no investigations. BugFix carries on as
-  normal. The Orchestrator checks every 60 minutes and starts no helpers. `--next-batch` serves the
-  oldest batch with ready work, so while Slow lasts the Orchestrator labels every ready issue that
-  needs Opus (engine formulas, migrations, scoring changes) or is an investigation `blocked`, with a
-  comment saying it lasts only until the reset, and keeps at least two Sonnet-sized batches open.
-  It lifts those labels when it posts **Resume**. Without this, the Implementer is served a batch it
-  may not take, and it reports an empty queue (10-08).
-- **Pause** (90% on either limit): when the owner says a limit has reached 90%, or the status goes
-  past warning, the Orchestrator interrupts the sessions, stops its own helpers, posts **Pause**
-  on #2354 with the reset time, and schedules its next check for just after `resetsAt`.
+- **Full (under 90%).** Full speed: two Implementer threads, taking `--next-batch` in priority order (P0 to P3, then oldest first), Opus for engine, migration and scoring
+  batches, investigations allowed, and Orchestrator helpers allowed. Health checks every 30 minutes.
+- **Slow (90–95%).** One thread at a time, on the most important work only (owner, 2026-10-09:
+  "prioritise the higher priority tasks"). The Implementer takes batches with
+  `node scripts/queue.js --next-batch --urgent-only`, which serves only **P0 and P1** batches, highest
+  priority first, with whatever model the batch needs. No investigations,
+  and no Orchestrator helpers; checks every 60 minutes. BugFix carries on.
+- **Halt (95% and over).** Work stops except a production-broken hotfix (`hotfix` label). The
+  Orchestrator interrupts the sessions, stops its helpers, posts **Halt** on #2354 with the reset
+  time, and schedules its next check for just after `resetsAt`.
 
-Once the status reads `allowed` again, it posts **Resume**. The owner can say "pause" or "resume"
-at any time.
+**After the reset**, the Orchestrator posts **Full** and everything restarts at full speed. The
+owner can override the tier at any time ("pause", "slow", "full").
 
 ## What the Orchestrator can do from the cloud
 
@@ -107,6 +106,14 @@ of that, the **Orchestrator can send instructions straight to a running agent** 
    `next`, then bugs, then the rest oldest first** — and groups 1–10 related ones (same files, same
    area) into a **milestone titled `Batch: <what it is>`**. One batch becomes one PR. A migration is
    always its own batch. The **owner** steers with the `next` label; nothing else needs his say.
+   **Every batch gets a priority from the Orchestrator** (owner, 2026-10-09: "push out the
+   important changes first"), at the start of its milestone description, followed by the model:
+   `P1 Opus. …`. **P0** production broken (hotfix) · **P1** do next: release-critical,
+   data-correctness bugs, work that unblocks other work, anything the owner marks `next` ·
+   **P2** owner-signed improvements and asked-for features · **P3** chores and long-range work.
+   `--next-batch` serves the highest priority first, then the oldest; a ready `hotfix` makes a batch
+   P0 and a ready `next` makes it at least P1. A batch with no priority sorts as P3, so the
+   Orchestrator sets one on every batch it creates and revisits them at each grooming pass.
    The Orchestrator closes a batch milestone once it has no open issues, and keeps the queue ahead
    of the Implementer: an idle Implementer with ready issues and no open batch is the
    Orchestrator's miss.

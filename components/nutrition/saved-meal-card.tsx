@@ -6,7 +6,8 @@ import { SwipeActions, type SwipeAction } from '@/components/ui/swipe-actions'
 import { cn } from '@trainingai/shared/utils'
 import { MealThumb } from './meal-thumb'
 import { portionRows, sumRows } from './saved-meal-totals'
-import type { SavedMeal } from '@trainingai/shared/types/nutrition'
+import { MealTypeIcons } from './meal-type-icons'
+import type { MealType, SavedMeal } from '@trainingai/shared/types/nutrition'
 
 interface Props {
   meal: SavedMeal
@@ -29,6 +30,8 @@ interface Props {
   onLabel: (meal: SavedMeal) => void
   /** This meal was copied from the meal plan (Q-398) — provenance, derived by join, never stored. */
   fromPlan?: boolean
+  /** The user's live meal types (state-held); the icons read `meal.mealTypeIds` against them. */
+  mealTypes?: MealType[]
 }
 
 /**
@@ -53,7 +56,7 @@ interface Props {
  * drag loses nothing.
  */
 export const SavedMealCard = memo(function SavedMealCard({
-  meal, selected, onToggleSelected, onOpen, onEdit, onRequestDelete, onLabel, fromPlan,
+  meal, selected, onToggleSelected, onOpen, onEdit, onRequestDelete, onLabel, fromPlan, mealTypes,
 }: Props) {
   const portion = sumRows(portionRows(meal))
   const itemCount = portionRows(meal).length
@@ -112,6 +115,7 @@ export const SavedMealCard = memo(function SavedMealCard({
           )}
         </span>
         <span className="mt-0.5 block truncate text-xs text-muted-foreground">{secondary}</span>
+        {mealTypes && <MealTypeIcons mealTypes={mealTypes} mealTypeIds={meal.mealTypeIds} />}
       </span>
       <span className="w-16 flex-none text-right text-sm font-semibold tabular-nums">
         {Math.round(portion.calories).toLocaleString()}

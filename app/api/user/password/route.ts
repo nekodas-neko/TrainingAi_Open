@@ -1,12 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import bcrypt from 'bcryptjs'
+import { hashPassword, verifyPassword, validNewPassword, PASSWORD_ERROR } from '@/lib/auth/password'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
-
-// Two passwords. The route's own floor is 8 characters and nothing caps the top, but bcrypt only
-// consumes the first 72 bytes, so 4 KB is generous past any usable input.
 const MAX_BODY_BYTES = 4 * 1024
 
 export async function PATCH(req: NextRequest) {
@@ -16,9 +13,6 @@ export async function PATCH(req: NextRequest) {
   if (!rateLimit(`pw-change:${session.user.id}`, 5, 60 * 60 * 1000)) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
-
-  // Bare `req.json()` also threw on malformed JSON, which Next answered as a 500 on a credential
-  // route. `readJsonLimited` answers 400.
   const read = await readJsonLimited(req, MAX_BODY_BYTES)
   if (!read.ok) {
     return read.reason === 'too_large'
@@ -27,25 +21,26 @@ export async function PATCH(req: NextRequest) {
   }
   const { currentPassword, newPassword } = (read.body ?? {}) as
     { currentPassword?: unknown; newPassword?: unknown }
-  if (typeof newPassword !== 'string' || newPassword.length < 8) {
-    return NextResponse.json({ error: 'New password must be at least 8 characters.' }, { status: 400 })
+  if (!validNewPassword(newPassword)) {
+    return NextResponse.json({ error: PASSWORD_ERROR }, { status: 400 })
   }
 
   const repo = await getRepository()
-  const user = await repo.getUserByEmail(session.user.email!)
-
-  // If the account has an existing password, verify it before allowing a change
+  const user = await repo.getUserCredentials(session.user.id)
+  if (!user) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
   if (user?.passwordHash) {
     if (typeof currentPassword !== 'string' || !currentPassword) {
       return NextResponse.json({ error: 'Current password is required.' }, { status: 400 })
     }
-    const valid = await bcrypt.compare(currentPassword, user.passwordHash)
+    const valid = await verifyPassword(currentPassword, user.passwordHash)
     if (!valid) {
       return NextResponse.json({ error: 'Current password is incorrect.' }, { status: 400 })
     }
   }
 
-  const hash = await bcrypt.hash(newPassword, 12)
+  const hash = await hashPassword(newPassword)
   await repo.updateUserPassword(session.user.id, hash)
   return NextResponse.json({ ok: true })
 }

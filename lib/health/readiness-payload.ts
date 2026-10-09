@@ -476,6 +476,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   const load = computeVolumeAcwr(
     recentSessions.map(ws => ({ startedAt: ws.startedAt, volumeKg: ws.exercises.reduce((s2, ex) => s2 + (ex.volume ?? 0), 0) })),
     todayMid,
+    { tz },
   )
   const todayWorkoutVolumeKg = load.todayVolumeKg
 

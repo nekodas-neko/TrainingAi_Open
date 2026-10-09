@@ -20,10 +20,12 @@ import { heartCardView, levelLabel } from '../heart-response-view'
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
 const hoisted = vi.hoisted(() => ({ cached: null as unknown }))
+const localStoreMock = vi.hoisted(() => ({ current: null as unknown }))
+vi.mock('@/lib/local-store', () => ({ getLocalStore: () => localStoreMock.current }))
 vi.mock('@/lib/hooks/use-cached-value', () => ({ useCachedValue: () => hoisted.cached }))
 vi.mock('@/components/shell/user-timezone-provider', () => ({ useUserTimezone: () => 'Australia/Brisbane' }))
 
-import { HeartResponseBody, HeartResponseCard } from '../heart-response-card'
+import { HeartResponseBody, HeartResponseCard, HEART_WINDOW_DAYS, mergeHeartInputs, readLocalHeartInputs } from '../heart-response-card'
 
 const TZ = 'Australia/Brisbane'
 const SUB = 'sub-reta'
@@ -166,6 +168,55 @@ describe('HeartResponseCard', () => {
     act(() => { root.render(createElement(HeartResponseCard, { supplementId: SUB })) })
     expect(host.textContent).toContain('Heart after a dose')
     act(() => root.unmount())
+  })
+})
+
+// issue 2724 — the card reads the device first.
+describe('issue 2724: local-first inputs', () => {
+  const store = (logs: Array<Record<string, unknown>>, days: RecoveryNight[]) => ({
+    getSupplementLogsRange: vi.fn(async (..._a: unknown[]) => logs),
+    getOuraDailySummary: vi.fn(async () => days.map(n => ({ day: n.date, rhrLowBpm: n.restingHr, hrvAvgMs: n.hrvMs }))),
+  })
+  const logRows = (dates: string[]) =>
+    dates.map(d => ({ supplementId: SUB, logDate: d, amount: 1, unit: 'mg', doseText: null, takenAt: `${d}T00:00:00.000Z` }))
+
+  it('reads a 180-day local window and maps logs and nights into the model inputs', async () => {
+    const nights = build(MG1, tight, 10)
+    const s = store(logRows(MG1), nights)
+    const out = await readLocalHeartInputs(s as never, SUB, TZ, 'Retatrutide')
+    const [from, to, id] = s.getSupplementLogsRange.mock.calls[0] as string[]
+    expect(Math.round((Date.parse(to) - Date.parse(from)) / 86_400_000)).toBe(HEART_WINDOW_DAYS - 1)
+    expect(id).toBe(SUB)
+    expect(out.doses).toHaveLength(4)
+    expect(out.doses[0]).toMatchObject({ supplementId: SUB, supplementName: 'Retatrutide', date: MG1[0], amount: 1, unit: 'mg' })
+    expect(out.nights[0]).toEqual({ date: nights[0].date, restingHr: nights[0].restingHr, hrvMs: nights[0].hrvMs })
+    // The same model takes the local inputs as it takes the server's.
+    expect(recoveryResponse({ doses: out.doses, nights: out.nights, tz: TZ })[0].levels).toHaveLength(1)
+  })
+
+  it('a dose logged offline shows before it syncs: local doses win; server nights win only when longer', () => {
+    const nights = build(MG1, tight, 10)
+    const server = { doses: MG1.slice(0, 3).map(d => dose(d, 1)), nights }
+    const offline = { doses: MG1.map(d => dose(d, 1)), nights: nights.slice(0, 20) }
+    const merged = mergeHeartInputs(offline, server)!
+    expect(merged.doses).toHaveLength(4)
+    expect(merged.nights).toBe(nights)
+    expect(mergeHeartInputs(null, server)).toBe(server)
+    expect(mergeHeartInputs(offline, null)!.nights).toBe(offline.nights)
+  })
+
+  it('draws from local data alone when the server read has nothing (offline)', async () => {
+    hoisted.cached = null
+    localStoreMock.current = store(logRows(MG1), build(MG1, tight, 10))
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => { root.render(createElement(HeartResponseCard, { supplementId: SUB, userId: 'u1' })) })
+    expect(host.textContent).toContain('Heart after a dose')
+    expect(host.textContent).toContain('Clear pattern')
+    act(() => root.unmount())
+    host.remove()
+    localStoreMock.current = null
   })
 })
 
