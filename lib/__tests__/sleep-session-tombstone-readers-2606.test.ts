@@ -65,12 +65,12 @@ const ALLOWED: { file: string; marker: string; reason: string }[] = [
     reason: 'an insert writes a new live row; it reads nothing' },
   { file: 'lib/data/postgres/adapter.ts', marker: '.where(eq(s.sleepSessions.id, night.id)).limit(1)',
     reason: 'asks whether an id is taken at all, by any row of anyone: a removed row still owns its id' },
-  { file: 'lib/data/postgres/rollup-io.ts', marker: "LIKE 'ble:%'",
-    reason: 'deletes only ring rollup rows (oura_id ble:%), which are never tombstoned; a manual row is never touched' },
+  { file: 'lib/data/postgres/slices/oura.ts', marker: 'LEFT JOIN sleep_sessions taken',
+    reason: 'issue 2546: asks whether the (user_id, sleep_start) unique key is taken, which a tombstoned row still holds' },
   { file: 'lib/data/postgres/adapter.ts', marker: "if (!row) return 'not_found'",
     reason: 'deleteManualSleepNight explaining a zero-row removal: it must see a removed row to answer already_removed' },
   { file: 'lib/data/postgres/slices/oura.ts', marker: '.insert(s.sleepSessions)',
-    reason: 'the device-night upsert; its conflict arm clears deleted_at when it takes over a removed typed night (tested)' },
+    reason: 'the device-night upsert; its conflict arm clears deleted_at when it takes over a removed typed night or revives a ring night the rollup tombstoned (issue 2546; both tested)' },
   { file: 'lib/local-store/sqlite-backend.ts', marker: "UPDATE sleep_sessions SET sync_status='synced' WHERE id=?`, [id]",
     reason: 'confirms a sync_status flag by id; a removal must be confirmed like any other write' },
   { file: 'lib/local-store/sqlite-backend.ts', marker: "WHERE id=? AND manual_entry=1`, [id]",
@@ -83,7 +83,6 @@ const ALLOWED: { file: string; marker: string; reason: string }[] = [
 const MODULES = [
   'lib/achievements.ts',
   'lib/data/postgres/adapter.ts',
-  'lib/data/postgres/rollup-io.ts',
   'lib/data/postgres/slices/oura.ts',
   'lib/local-store/sqlite-backend.ts',
 ]

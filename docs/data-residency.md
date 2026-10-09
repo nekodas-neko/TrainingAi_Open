@@ -76,16 +76,18 @@ API route, no repository method, no local-store write, no outbox branch. Only ac
 removes them, by cascade, and that wipes the device too. Whoever adds a delete must add `deleted_at`
 first.
 
-**`sleep_sessions` has a server hard delete, and devices do not hear about it.** Filed as #2546.
-Every rollup pass that writes a night first deletes that day's BLE rows
-(`deleteBleSleepSessionsForDates`, `lib/oura-ble/rollup/run.ts`) and reinserts them with new random
-ids. The local mirror is keyed on the server id and the delta carries only live rows. So each
-re-roll leaves the device holding the old row next to the new one, and a night the server drops for
-good (#2486's short evening window) stays on the device. The device reads it first, before the
-server response replaces it.
-A typed night the user removes (issue 2606) is the one tombstoned case: `deleted_at` is set, every read
-skips it, and the delta pull carries it. Only `manual_entry` rows can be removed that way; the BLE
-re-roll above is unchanged.
+**`sleep_sessions` had a server hard delete that devices never heard about. Fixed (#2546).**
+Every rollup pass that wrote a night first deleted that day's BLE rows and reinserted them with new
+random ids, so each re-roll left the device holding the old row next to the new one, and a night the
+server dropped for good (#2486's short evening window) stayed on the device. Now the rollup upserts
+first (a night at the same `sleep_start` keeps its id and is replaced, or revived if tombstoned; a
+`ble:` id whose start drifted moves with it, `reseatBleSleepOuraIds`), then tombstones the BLE rows on
+those dates that the pass did not reproduce (`tombstoneBleSleepNightsExcept`, both in
+`lib/data/postgres/slices/oura.ts`). The delta pull carries `deleted_at`, and the device's
+`applyDelta` and `getSleepSessions` already honour it (issue 2606 built that path for typed nights
+the user removes). Rows hard-deleted before the fix are already gone from the server, so no
+tombstone will ever reach a device still holding one, and Restore from cloud does not clear them
+either: that clean-up is its own issue.
 
 **`manual_bedtime` wrote the outbox but not the local row the card reads. Fixed (#2547).**
 `components/health/sleep/manual-bedtime-card.tsx` reads `manual_sleep_start` from the local
