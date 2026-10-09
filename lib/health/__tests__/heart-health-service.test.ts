@@ -4,12 +4,17 @@
 // and 4 skipped, 17 of the pending days with something logged — but every heart rate in it is
 // invented. It proves the mechanics and pins how a history of that shape moves; the owner's own
 // numbers are what the admin route's dry run reports.
+//
+// Issue 2746 moved the floor from zone 2 (60% of reserve) to moderate effort (40%). The fixture is
+// unchanged from issue 2093's, so the counts below are the before/after the PR states.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { shiftDateStr } from '@trainingai/shared/date-utils'
-import { activityLogWindow } from '@trainingai/shared/running/heart-health'
+import { computeHrZones } from '@trainingai/shared/health/hr-zones'
+import { activityLogWindow, heartHealthMinutes, heartHealthVerdict } from '@trainingai/shared/running/heart-health'
 
 vi.mock('@trainingai/shared/health/hr-profile', () => ({
-  // Zone 2 starts at 60% of reserve: 60 + 0.6 × 130 = 138 bpm.
+  // Moderate effort (the floor since issue 2746) starts at 60 + 0.4 × 130 = 112 bpm; zone 2, the
+  // floor before it, at 60 + 0.6 × 130 = 138.
   resolveHrProfile: vi.fn(async () => ({ maxHr: 190, restingHr: 60 })),
 }))
 
@@ -76,20 +81,44 @@ describe('issue 2093 — re-scoring a synthetic history', () => {
   it('measures each activity in its own window', async () => {
     const days = await heartHealthDays(f.repo as never, 'u1', TZ, FIRST, LAST)
     const day0 = days.find((d) => d.date === FIRST)!
-    expect(day0.activities[0]).toMatchObject({ title: 'Treadmill walk', durationMin: 34, zone2PlusMin: 34 })
+    expect(day0.activities[0]).toMatchObject({ title: 'Treadmill walk', durationMin: 34, effortMin: 34 })
     expect(day0).toMatchObject({ met: true, countedMin: 34, creditedId: 'log-0', outcome: 'counted' })
+    // The stroll sits at 112 bpm, exactly the moderate floor: every minute of it counts now.
     const stroll = days.find((d) => d.date === shiftDateStr(FIRST, 1))!
-    expect(stroll).toMatchObject({ met: false, countedMin: 0, outcome: 'not-counted' })
+    expect(stroll).toMatchObject({ met: true, countedMin: 34, outcome: 'counted' })
+    // The short run is all above the floor, but 20 minutes is short of the prescribed 25.
+    const run = days.find((d) => d.date === shiftDateStr(FIRST, 10))!
+    expect(run).toMatchObject({ met: false, countedMin: 20, outcome: 'not-counted' })
     const noHr = days.find((d) => d.date === shiftDateStr(FIRST, 5))!
-    expect(noHr.activities[0].zone2PlusMin).toBeNull()
+    expect(noHr.activities[0].effortMin).toBeNull()
   })
 
-  it('moves 9 of the 26 days, all pending to completed; a dry run writes nothing', async () => {
+  it('days moved: 9 of 26 under the zone 2 floor, 13 of 26 under moderate effort (issue 2746)', async () => {
+    // Before: the same readings scored against the old floor, zone 2 (138 bpm). Test-only — the
+    // rule itself has no second floor.
+    const zone2Floor = computeHrZones({ maxHr: 190, restingHr: 60 })[1].minBpm
+    expect(zone2Floor).toBe(138)
+    const days = await heartHealthDays(f.repo as never, 'u1', TZ, FIRST, LAST)
+    let before = 0
+    for (const d of days) {
+      if (d.status !== 'pending') continue
+      const acts = await Promise.all(d.activities.map(async (a) => {
+        const log = { date: d.date, ...(a.effortMin == null ? {} : { startTime: '07:00:00', durationMin: a.durationMin }) }
+        const w = activityLogWindow(log, TZ)
+        const rows = w ? await f.repo.getHrForWindow('u1', w.from, w.to) : []
+        const readings = rows.map((r) => ({ timestamp: r.timestamp.getTime(), bpm: r.bpm }))
+        return { ...a, effortMin: rows.length < 2 ? null : heartHealthMinutes(readings, zone2Floor) }
+      }))
+      if (heartHealthVerdict(d.targetMin, acts).met) before++
+    }
+    expect(before).toBe(9)
+
     const r = await rescoreHeartHealth(f.repo as never, 'u1', TZ, FIRST, LAST, { write: false })
     expect(r.days).toHaveLength(26)
-    // The 9 brisk walks. Not the strolls (zone 1 throughout), not the logs with no heart rate, and
-    // not the 20-minute run: all 20 of its minutes were zone 2+, and 20 is short of 25.
-    expect(r.changes).toHaveLength(9)
+    // After: the 9 brisk walks and the 4 strolls (at 112 bpm, between the two floors). Not the logs
+    // with no heart rate (the owner kept that), and not the 20-minute run: 20 is short of 25.
+    expect(r.changes).toHaveLength(13)
+    expect(r.changes.length - before).toBe(4)
     expect(r.changes.every((c) => c.completedAs === 'walk' && c.countedMin >= 25)).toBe(true)
     expect(r.written).toBe(0)
     expect(f.repo.updatePrescribedRun).not.toHaveBeenCalled()

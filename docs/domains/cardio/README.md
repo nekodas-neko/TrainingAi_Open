@@ -18,10 +18,14 @@ prescription coach, the cardio hub/trends/picker surfaces, and guided walk.
 | Fitness & load | `packages/shared/src/health/vo2max.ts`, `vdot.ts`, `training-stress.ts`, `cardio-trends.ts`, `session-picker.ts`, `fitness-tests.ts`, `packages/shared/src/fitness-tests/` |
 | UI | `app/cardio/`, `app/running/`, `app/baselines/`, `components/cardio/`, `components/running/`, `components/guided-walk/`, `components/cadence/` |
 
-**The day's prescription is a heart-health activity, and any activity completes it through its zone 2+
-minutes** (issue 2093, owner 2026-10-05, built to `docs/design/2026-10-05-heart-health-activity.html`).
-The rule lives once, in `packages/shared/src/running/heart-health.ts` (`heartHealthVerdict`: the day's
-activities' minutes in zone 2 or above, each measured inside its own start–end window, against the
+**The day's prescription is a heart-health activity, and any activity completes it through its minutes
+at moderate effort or above** (issue 2093, owner 2026-10-05, built to
+`docs/design/2026-10-05-heart-health-activity.html`; the floor moved from zone 2, 60% of heart-rate
+reserve, to moderate effort, 40%, on 2026-10-09 — issue 2746). The floor is `heartHealthFloorBpm` =
+`moderateIntensityBpm` (`MODERATE_INTENSITY_FRAC`, the same line WHO active minutes use), never a
+second constant. The rule lives once, in `packages/shared/src/running/heart-health.ts`
+(`heartHealthMinutes` counts each minute at or above the floor; `heartHealthVerdict`: the day's
+activities' counted minutes, each measured inside its own start–end window, against the
 prescribed minutes; `heartHealthRescore`: only a `pending` row moves, never a completed or skipped one).
 `lib/health/heart-health-service.ts` measures each activity against `getHrForWindow` and carries the
 week on the `running-plan` payload (`heartHealth.days`); the hub card

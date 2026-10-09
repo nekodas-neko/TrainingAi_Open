@@ -29,7 +29,7 @@ export function completionsDue(days: readonly MeasuredDay[]): { date: string; ru
 }
 
 /**
- * Issue 2093. Records a completion once a day's measured zone 2+ minutes meet the rule — any
+ * Issue 2093. Records a completion once a day's measured moderate-effort minutes meet the rule — any
  * activity, however it was started. Written through the local store and the outbox like every
  * other device write (`linkPrescribedRun`); each row is asked once per mount, and a failed write
  * is asked again on the next payload.

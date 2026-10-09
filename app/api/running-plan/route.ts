@@ -28,7 +28,7 @@ const NO_STORE = 'private, no-store'
 
 /**
  * Issue 2093 — this week's heart-health days (Mon to today), each with what was actually done and
- * its zone 2+ minutes. Measured after today's row exists, so today is in it. Fail-soft: the card
+ * its minutes at moderate effort or above. Measured after today's row exists, so today is in it. Fail-soft: the card
  * still paints the prescription when the heart-rate reads fail, just without the history.
  */
 async function weekHeartHealth(repo: Awaited<ReturnType<typeof getRepository>>, userId: string, tz: string): Promise<{ days: HeartHealthDay[] }> {
