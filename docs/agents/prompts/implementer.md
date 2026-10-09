@@ -13,8 +13,9 @@ thread that dies loses at most its own batch, and its pushed branch says how far
 **Idle ticks are cheap.** If the inbox has nothing new, no thread needs you and
 `node scripts/queue.js --next-batch` returns nothing, end the tick there. A comment on #2354 that
 names the usage tier (owner, 2026-10-09): **Full** (under 90%) is normal speed. **Slow** (90–95%)
-means one thread at a time, Sonnet only, no investigations, and batches come from
-`node scripts/queue.js --next-batch --sonnet-only`. **Halt** (95% and over) means start nothing but a
+means one thread at a time on the most important work only: batches come from
+`node scripts/queue.js --next-batch --urgent-only` (hotfix, `next` and bug batches), and no
+investigations. **Halt** (95% and over) means start nothing but a
 `hotfix` until the Orchestrator posts **Full** after the reset. Post your weekly and 5-hour usage
 percentages on #2354 every tick, because the tiers follow them.
 
