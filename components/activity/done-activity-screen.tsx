@@ -291,7 +291,6 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
         }),
       })
       if (!res.ok) throw new Error()
-      const { activityLog } = await res.json()
       await invalidateActivityWrites()
       toast.success('Activity saved')
       resetSession()
