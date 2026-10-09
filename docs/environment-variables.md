@@ -49,6 +49,16 @@ Optional:
   it can read that user's health history, so treat it as a credential: generate with
   `openssl rand -hex 32`, never commit it, rotate by changing the Railway var. Leave it unset and the
   route is session-only. `ADMIN_SNAPSHOT_SECRET` is the same idea for `GET /api/admin/db-snapshot` (Q-530) — a separate secret, since that route returns the whole database, not scores.
+- `AGENT_ACTIONS_SECRET` — the agent key (issue 2381). Enables `POST /api/agent-actions` (and its
+  `GET` job poll): `Authorization: Bearer …` runs one job from the allow-list in
+  `lib/agent-actions/jobs.ts` on the owner's account (`ADMIN_EXPORT_USER_ID`, falling back to
+  `WEBHOOK_USER_ID`, which must still be an admin), and every run is a row in `agent_action_log`.
+  **Fail-closed:** unset, or shorter than 32 characters, and every agent route answers 401; the
+  session cookie is never accepted there. Read in one place only (`lib/agent-actions/guard.ts`, held
+  by a source-scan test). **Set by the owner, never by an agent**: generate with
+  `openssl rand -hex 32`, rotate by replacing the Railway var, switch off by deleting it
+  ([owner manual](owner-manual.md#the-agent-key-turning-it-on-rotating-it-turning-it-off-issue-2381)).
+  Tests use a fake value.
 - ~~`GITHUB_RELEASES_TOKEN`~~ — **no longer needed (Q-49, 2026-08-17).** It was required while the
   releases lived in a private repo, where an unauthenticated call could only 404. The repo is public,
   so `lib/github-release.ts` now sends the `Authorization` header only when a token happens to be

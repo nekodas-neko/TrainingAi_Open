@@ -12,9 +12,11 @@ wrong, and #2379 fixed it.
 **Auth legend.** *admin session* means the route calls `requireAdmin` on the NextAuth session, and
 the page itself is `isAdminUser`-gated. *native* means a Capacitor `OuraBle` plugin method, which
 runs only in the APK and has no server auth. *user session* means any signed-in user. *local* means
-browser or device storage only. **No write route in this catalogue accepts a bearer token.** The
-only bearer routes are reads: `db-query` and `replay` (`CLAUDE_DB_QUERY_SECRET`), `day-review`
-(`ADMIN_EXPORT_SECRET`) and `db-snapshot` (`ADMIN_SNAPSHOT_SECRET`).
+browser or device storage only. **No admin write route accepts a bearer token.** The admin
+bearer routes are reads: `db-query` and `replay` (`CLAUDE_DB_QUERY_SECRET`), `day-review`
+(`ADMIN_EXPORT_SECRET`) and `db-snapshot` (`ADMIN_SNAPSHOT_SECRET`). The one write path for a
+bearer is the **agent key** (`/api/agent-actions`, `AGENT_ACTIONS_SECRET`, section 12), which runs
+only the jobs listed there, through the same code as the buttons.
 
 **Danger legend.** none · slow (long server job or radio time) · ring-state (changes the ring's
 on-device config) · **destructive** (data or credentials are lost or rewritten, and cannot be undone
@@ -107,12 +109,13 @@ One exception:
 | D0 historical step backfill > **Preview backfill** | `step-backfill-console.tsx:75` | `GET /api/oura-ble/samples/step-backfill-preview` | Lists the days whose step count would drop. | full history | yes | admin session | none | |
 | … > **Run backfill now** | `step-backfill-console.tsx` (confirm) | `runRedecodeJob('allowStepsDecrease=1')`, a **full-history redecode** with the "steps only go up" guard lifted | Rewrites inflated historical step days **downward** to the step_counter total. Manual entries are untouched. If a plain Redecode is already running, the server **refuses with 409** and starts nothing ("A redecode is already running. Wait for it to finish, then run the backfill."), and the console says *Not started … Nothing was changed.* It says *Done. Backfill applied* only when the finished job's `kind` (read from the job row by the status poll) is `step-backfill` (issue 2383, F9). | full history | Idempotent once applied, but the old values are gone. A second press during a running backfill follows that backfill. | admin session | **destructive** (the old step values are not recoverable). slow. | One-off D0 correction. A third caller of the full-history redecode. Run it when no Redecode or Sync & Redecode is in flight. |
 | Daytime-stress bucket backfill > **Dry run** | `stress-backfill-console.tsx` | `runRedecodeJob('stressBackfill=1')`, i.e. `POST /api/oura-ble/samples/redecode?async=1&stressBackfill=1` (dry run is the default) | Computes, from stored data, which past days would gain `oura_daytime_stress_buckets` rows, and reports it. **Writes nothing.** Uses the rollup's own series builder (`lib/oura-ble/rollup/stress-series.ts`) over the raw frames (both tiers, read-only), the nightly summary baselines, the fitted daytime-HRV model and the recorded sleep windows. | full history | yes | admin session, `rateLimit` 4/min, strict query | slow (a full-history raw read, in the rollup worker, in the one job slot) | Before the write, always. Compare its numbers to the write's (see the entry below). |
-| … > **Add N buckets** | `stress-backfill-console.tsx` (confirm; offered only after a dry run found something to add) | `runRedecodeJob('stressBackfill=1&dryRun=false')` | **Adds** the missing buckets. **Add-only (issue 2236):** it never deletes a bucket and never changes one. A day that already has any bucket is skipped whole, and each insert is `ON CONFLICT DO NOTHING` on `(user_id, bucket_mid)`. Today is left to the forward writer. A day it cannot score (no raw data, no model, no HRV or resting-HR baseline, no temperature, no scorable bucket) is reported with the reason and gets nothing. One transaction that **rolls back** unless the rows written equal the rows planned. It is a separate job kind (`stress-backfill`), so a plain redecode, a step backfill or another full-history pass cannot join it or be joined by it: a request while another kind runs gets **409**, nothing started. The console says *Done … added* only when the finished job's `kind` is `stress-backfill` and its report says it was not a dry run. | full history | yes: a second run finds every day populated and adds 0 | admin session | additive only; no deletes, no overwrites. slow. **Production run: snapshot first** (policy below). | One-off, by the owner or the Orchestrator, after a verified snapshot and a dry run whose numbers were read. NOT behind the future agent key. |
+| … > **Add N buckets** | `stress-backfill-console.tsx` (confirm; offered only after a dry run found something to add) | `runRedecodeJob('stressBackfill=1&dryRun=false')` | **Adds** the missing buckets. **Add-only (issue 2236):** it never deletes a bucket and never changes one. A day that already has any bucket is skipped whole, and each insert is `ON CONFLICT DO NOTHING` on `(user_id, bucket_mid)`. Today is left to the forward writer. A day it cannot score (no raw data, no model, no HRV or resting-HR baseline, no temperature, no scorable bucket) is reported with the reason and gets nothing. One transaction that **rolls back** unless the rows written equal the rows planned. It is a separate job kind (`stress-backfill`), so a plain redecode, a step backfill or another full-history pass cannot join it or be joined by it: a request while another kind runs gets **409**, nothing started. The console says *Done … added* only when the finished job's `kind` is `stress-backfill` and its report says it was not a dry run. | full history | yes: a second run finds every day populated and adds 0 | admin session | additive only; no deletes, no overwrites. slow. **Production run: snapshot first** (policy below). | One-off, by the owner or the Orchestrator, after a verified snapshot and a dry run whose numbers were read. **Agent path:** job `stress-backfill` (section 12; added to the key by the owner's 2026-10-08 decision on issue 2381). |
 
 ### 6a. Running the stress-bucket backfill in production (issue 2236)
 
 Policy (docs/rules/git-safety-and-packages.md): it only adds rows, but it is a production write, so
-the order is fixed. The owner or the Orchestrator runs it, never an agent on its own.
+the order is fixed. The owner or the Orchestrator runs it, after the snapshot; the Orchestrator does
+so with the agent key's `stress-backfill` job (section 12), the same steps with `dryRun` in the body.
 
 1. **Snapshot first**: take a database snapshot and verify it restores (as for any production write).
 2. **Dry run** (the default): `POST /api/oura-ble/samples/redecode?async=1&stressBackfill=1`, then poll
@@ -204,7 +207,58 @@ Device pairing **Forget** buttons (`components/settings/{chest-strap,scale,colmi
 
 **Issue 2093 re-score (heart-health activity: any activity, by its zone 2+ minutes; owner decision 2026-10-05).** `POST /api/admin/backfill-heart-health` applies `heartHealthRescore` (`packages/shared/src/running/heart-health.ts`) to the admin's own `prescribed_runs` rows: a `pending` day whose activities reached the prescribed minutes in zone 2 or above becomes `completed`, linked to the credited activity, with `completed_as` `'run'` for a run and `'walk'` for anything else. A completed row is never taken back and a skipped row is never touched (the dry run reports `skippedThatMet`). It writes only `status`, `activity_log_id` and `completed_as`, every value derived server-side. Admin session (DB check), rate limit 4/min, strict `from`/`to`/`dryRun`, 31 days per call, never today (the device records today as its minutes arrive), dry run unless `dryRun=false`. Zone minutes are measured from the heart-rate series under each activity's start–end window, so days older than the raw HR retention (`HR_RETENTION_DAYS`) have no heart rate and cannot move. **Production run, by the owner, after the release that carries it, in this order:** (1) a verified snapshot (`scripts/local-db/snapshot.js`); (2) the dry run, `POST /api/admin/backfill-heart-health?from=YYYY-MM-DD&to=YYYY-MM-DD`, one 31-day page at a time from the plan's first prescription, reading `summary.wouldComplete` (the days that move) and the `changes` list; (3) the same request with `&dryRun=false` per page, checking `summary.written` equals `wouldComplete`; (4) verify read-only: `SELECT status, completed_as, count(*) FROM claude_ro.prescribed_runs WHERE deleted_at IS NULL GROUP BY 1, 2` — completed rows rise by the written total. Repeating it is safe: a completed row is never selected again.
 
-`POST /api/admin/rederive-baselines` (re-folds the stored personal baselines), `POST /api/admin/rederive-body-battery` (recomputes past `body_battery_daily` under the current model; a day the TN-20 write guard refuses, because the recompute recorded no movement over a day that did, is reported `kept` and stays out of `written` and the deltas, in a dry run too), `POST /api/admin/backfill-derived-scores` (persists Sleep and Readiness scores across history). `POST /api/admin/backfill-set-hrr1` (#2457) re-measures every stored `set_hr_stats` row's `hrr1_bpm` from dense HR and **rewrites `rest_adequate` from it, null included**; dry run unless `dryRun=false`, one transaction that rolls back if the rows written differ from the rows planned, and it needs a verified snapshot first because it overwrites stored verdicts. All four are admin session only, rate-limited, and full history. They are idempotent re-derives, **but each one moves past scores**, which is `type: tuning` territory. Read-only routes: `GET device-comparison`, `GET app-load-report`, and the bearer routes `db-query`, `replay`, `day-review`, `db-snapshot` (`scripts/local-db/snapshot.js`).
+`POST /api/admin/rederive-baselines` (re-folds the stored personal baselines), `POST /api/admin/rederive-body-battery` (recomputes past `body_battery_daily` under the current model; a day the TN-20 write guard refuses, because the recompute recorded no movement over a day that did, is reported `kept` and stays out of `written` and the deltas, in a dry run too; the work is `rederiveBodyBattery` in `lib/health/rederive-body-battery.ts`, and its agent path is job `rederive-body-battery`, section 12), `POST /api/admin/backfill-derived-scores` (persists Sleep and Readiness scores across history). `POST /api/admin/backfill-set-hrr1` (#2457) re-measures every stored `set_hr_stats` row's `hrr1_bpm` from dense HR and **rewrites `rest_adequate` from it, null included**; dry run unless `dryRun=false`, one transaction that rolls back if the rows written differ from the rows planned, and it needs a verified snapshot first because it overwrites stored verdicts. All four are admin session only, rate-limited, and full history. They are idempotent re-derives, **but each one moves past scores**, which is `type: tuning` territory. Read-only routes: `GET device-comparison`, `GET app-load-report`, and the bearer routes `db-query`, `replay`, `day-review`, `db-snapshot` (`scripts/local-db/snapshot.js`).
+
+## 12. The agent key (issue 2381)
+
+`POST /api/agent-actions` with `Authorization: Bearer <AGENT_ACTIONS_SECRET>` runs **one job from an
+allow-list** (`lib/agent-actions/jobs.ts`) on the **owner's account** and writes one row to
+`agent_action_log` (`claude_ro.agent_action_log`). The owner sets the secret on Railway; agents never
+do ([owner manual](owner-manual.md#the-agent-key-turning-it-on-rotating-it-turning-it-off-issue-2381)).
+Every job reuses the code its admin route runs. Production policy is unchanged: **a verified snapshot
+before any write**, a dry run first, and the numbers posted on the issue.
+
+```
+POST /api/agent-actions
+Authorization: Bearer $AGENT_ACTIONS_SECRET
+{ "job": "rederive-body-battery", "actor": "orchestrator",
+  "targetUserId": "<owner uuid, from claude_ro.users>",
+  "approval": "https://github.com/nekodas-neko/TrainingAi_Open/issues/2409#issuecomment-…",
+  "params": { "from": "2026-08-01", "to": "2026-08-31", "dryRun": false } }
+```
+
+| Job | Issue | Code it runs (shared with) | Params (strict) | Needs `approval` | Idempotent |
+|---|---|---|---|---|---|
+| `rederive-body-battery` | #2409 | `rederiveBodyBattery` (`POST /api/admin/rederive-body-battery`) | `from?`, `to?` (≤ 31 days, `-` or `/`), `dryRun` | when `dryRun` is false: it overwrites stored days | yes: a second run is all `unchanged` |
+| `backfill-baseline-phase-tag` | #2460 | `tagBaselineSessions` in `lib/admin/baseline-phase-tag.mjs` (`scripts/backfill-baseline-phase-tag.mjs`), scoped to the owner | `dryRun` | no: sets only NULL tags | yes: a second run tags 0 |
+| `stress-backfill` | #2236 / PR #2680 | `startStressBackfillJob` (`POST /api/oura-ble/samples/redecode?stressBackfill=1`) | `dryRun` | no: add-only | yes: a second run adds 0 |
+
+`stress-backfill` answers **202** with a job id; poll `GET /api/agent-actions?job=stress-backfill&jobId=N`
+(same key). Its log row is finished when the job ends. The job slot rules hold: another kind
+running is a **409**, logged as `refused`.
+
+**Refused, and how:**
+- No key, a wrong key, the secret unset or shorter than 32 characters, no owner id configured, or a
+  session cookie without the key: **401**, decided before any database read, and nothing is logged.
+  Key attempts are rate-limited per IP (10 a minute) before the compare.
+- An unknown job, an unknown field, a mistyped parameter, a bad actor name or an approval that is not
+  a link to one comment on this repository: **400**, nothing runs, nothing is logged.
+- `targetUserId` that is not the owner's: **403**, logged as `refused`. The key never acts on another
+  account, because every job here is owner-scoped as its admin route is.
+- More than 4 runs of one job a minute: **429**, logged as `refused`.
+- A run that overwrites data with no `approval`: **403**, logged as `refused`. The server checks the
+  link's shape, not who wrote the comment: the owner audits `approval_ref` in the log.
+
+**Not on the allow-list, deliberately:** every ring and key operation (they are native and go only
+through the Implementer's device harness), re-key, Pack, Null historical decoded, the D0 step
+backfill, Fix lbs as kg, VACUUM, users, invites, feedback, exercise and activity deletes, and AI
+generation. A job is added by adding it to `AGENT_JOBS` with a test; the source-scan test
+(`lib/agent-actions/__tests__/agent-key-source-scan.test.ts`) holds that the schema accepts exactly
+that list and that only the guard reads the secret.
+
+**Queued fixes not covered yet:** #2357 (re-derive stored 1RMs) and #2601 (recompute `hrr1_best`)
+have no job to expose until their batches build one; each should register it here. #2399 (four
+`exercise_logs` marked deload) is a one-off correction with no job, decided as a guarded migration.
 
 ---
 
