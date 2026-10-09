@@ -1,4 +1,4 @@
-import { runSQL, querySQL, beginTransaction, commitTransaction, rollbackTransaction } from '@/lib/sqlite/sqlite-service';
+import { runSQL, querySQL, withTransaction } from '@/lib/sqlite/sqlite-service';
 import { MAX_MUTATION_ATTEMPTS, nextRetryDelayMs } from './sync-helpers';
 import type { LocalStore, LocalWorkoutHistory } from './index';
 import type {
@@ -473,9 +473,7 @@ export class SQLiteLocalStore implements LocalStore {
     const exerciseLogId = payload.exerciseLogId ?? crypto.randomUUID();
     const localDate = (payload.localDate ?? now).slice(0, 10);
 
-    try {
-      await beginTransaction();
-
+    await withTransaction(async () => {
       // Upsert the workout session row (idempotent — session may already exist).
       // session_id/intensity_mode/was_override carried through so a stranded
       // (dead-lettered-then-recovered) replay keeps its real program-session +
@@ -574,12 +572,7 @@ export class SQLiteLocalStore implements LocalStore {
           ],
         );
       }
-
-      await commitTransaction();
-    } catch (err) {
-      try { await rollbackTransaction(); } catch { /* already rolled back — keep the real error */ }
-      throw err;
-    }
+    });
   }
 
   async setSessionRpe(workoutSessionId: string, rpe: number): Promise<void> {
@@ -1447,16 +1440,7 @@ export class SQLiteLocalStore implements LocalStore {
   }
 
   async applyDelta(delta: Parameters<LocalStore['applyDelta']>[0]): Promise<void> {
-    try {
-      await beginTransaction();
-      await this.applyDeltaBody(delta);
-      await commitTransaction();
-    } catch (err) {
-      // A failed statement may have auto-aborted the transaction already, so ROLLBACK
-      // can itself throw "no current transaction" — never let that mask the real error.
-      try { await rollbackTransaction(); } catch { /* already rolled back */ }
-      throw err;
-    }
+    await withTransaction(() => this.applyDeltaBody(delta));
   }
 
   private async applyDeltaBody(delta: Parameters<LocalStore['applyDelta']>[0]): Promise<void> {
@@ -2538,8 +2522,7 @@ export class SQLiteLocalStore implements LocalStore {
   // GET is safe (no local edit can ever be pending to clobber) and avoids ever going stale on
   // a deleted/reordered row the way an upsert-only mirror would.
   async replaceMealTypes(entries: LocalMealType[]): Promise<void> {
-    await beginTransaction();
-    try {
+    await withTransaction(async () => {
       await runSQL(`DELETE FROM meal_types`, []);
       for (const e of entries) {
         await runSQL(
@@ -2550,11 +2533,7 @@ export class SQLiteLocalStore implements LocalStore {
            e.remindersEnabled ? 1 : 0, e.required ? 1 : 0],
         );
       }
-      await commitTransaction();
-    } catch (err) {
-      await rollbackTransaction();
-      throw err;
-    }
+    });
   }
 
   async getMealTypes(): Promise<LocalMealType[]> {
