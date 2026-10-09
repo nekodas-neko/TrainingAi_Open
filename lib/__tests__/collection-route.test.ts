@@ -229,4 +229,11 @@ describe('GET /api/collection feeds the v2 Rogue', () => {
     const json = await body()
     expect(json.v2.collections.cardio?.stock.every(n => n === 0)).toBe(true)
   })
+
+  // Issue 2187 — the collection surface reads this block, so it must keep serving every row it draws.
+  it('issue 2187: v2 carries a real six-tier state for each of the four rows the surface reads', async () => {
+    const json = await body()
+    expect(Object.keys(json.v2.collections).sort()).toEqual(['cardio', 'health', 'steps', 'workout'])
+    for (const state of Object.values(json.v2.collections)) expect(state?.stock).toHaveLength(6)
+  })
 })
