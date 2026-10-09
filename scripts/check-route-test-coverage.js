@@ -43,6 +43,7 @@ const path = require('path');
 const { stripComments } = require('./lib/strip-comments');
 const { resolveBaseRef, materialiseBaseTree, cleanupBaseTree } = require('./lib/base-ref');
 const { lostRouteCoverage } = require('./lib/coverage-regression');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
 const root = path.join(__dirname, '..');
 /** Everything the scan reads: the routes themselves, plus every directory tests live in. */
@@ -75,6 +76,7 @@ const BASELINE = 0;
 
 function walk(dir, out = []) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (e.isDirectory() && isSkippedFixtureDir(e.name)) continue;
     if (e.name === 'node_modules' || e.name === '.next' || e.name === '.git') continue;
     const p = path.join(dir, e.name);
     if (e.isDirectory()) walk(p, out);

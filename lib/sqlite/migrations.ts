@@ -390,6 +390,16 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   // reason it is not `sleep_start` — see docs/reviews/2026-08-26-manual-bedtime-write-audit.md.
   { table: 'sleep_sessions', column: 'manual_sleep_start', ddl: `ALTER TABLE sleep_sessions ADD COLUMN manual_sleep_start TEXT` },
   { table: 'sleep_sessions', column: 'sync_status',       ddl: `ALTER TABLE sleep_sessions ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'synced'` },
+  // #2414 (v50). The night's own window and awake time, so a local row can render the hypnogram
+  // (which needs sleep_start/sleep_end) and be clustered like the server's /api/sleep-sessions does.
+  // Nullable: every row pulled before v50 stays NULL until the server re-sends it.
+  { table: 'sleep_sessions', column: 'sleep_start',       ddl: `ALTER TABLE sleep_sessions ADD COLUMN sleep_start TEXT` },
+  { table: 'sleep_sessions', column: 'sleep_end',         ddl: `ALTER TABLE sleep_sessions ADD COLUMN sleep_end TEXT` },
+  { table: 'sleep_sessions', column: 'awake_hours',       ddl: `ALTER TABLE sleep_sessions ADD COLUMN awake_hours REAL` },
+  // #2338 (v51). A night the user entered by hand; 0 on every existing row, which is what they are.
+  { table: 'sleep_sessions', column: 'manual_entry',      ddl: `ALTER TABLE sleep_sessions ADD COLUMN manual_entry INTEGER NOT NULL DEFAULT 0` },
+  // issue 2606 (v52). A manual night the user removed; NULL on every existing row, which is live.
+  { table: 'sleep_sessions', column: 'deleted_at',        ddl: `ALTER TABLE sleep_sessions ADD COLUMN deleted_at TEXT` },
   // oura_daily gains sync_status so the applyDelta pull can clobber-guard a device-authored
   // (BLE rollup) row against a stale server pull — the D4 finding. Default 'synced' (existing
   // rows are server-mirrored); the device-write path that sets 'pending' lands with D2.
@@ -1704,6 +1714,42 @@ export const MIGRATIONS: UpgradeStatement[] = [
     toVersion: 49,
     statements: [
       `ALTER TABLE set_logs ADD COLUMN rpe_source TEXT`,
+    ],
+  },
+  {
+    // #2414. The server's sleep_sessions.sleep_start / sleep_end / awake_hours, which the pull has
+    // always carried and the device dropped — so a cold-open sleep detail painted from the local
+    // store had no window to draw the hypnogram against. Same shape as v48: the ALTER reaches fresh
+    // installs and upgraded devices alike (CREATE_SLEEP_SESSIONS predates every Oura column),
+    // RECONCILE_COLUMNS covers a half-applied upgrade. No backfill here: old rows stay NULL and
+    // render exactly as before; applyDelta fills them when the server re-sends a row.
+    toVersion: 50,
+    statements: [
+      `ALTER TABLE sleep_sessions ADD COLUMN sleep_start TEXT`,
+      `ALTER TABLE sleep_sessions ADD COLUMN sleep_end TEXT`,
+      `ALTER TABLE sleep_sessions ADD COLUMN awake_hours REAL`,
+    ],
+  },
+  {
+    // #2338, mirroring Postgres migration 202610071309. Whether a night was entered by hand, so the
+    // device can let a ring or Health Connect night win over it exactly as the server does
+    // (`preferDeviceNights`). Same shape as v50: the ALTER reaches fresh installs and upgraded
+    // devices alike, RECONCILE_COLUMNS covers a half-applied upgrade. NOT NULL DEFAULT 0, so every
+    // row already on the device reads as the device night it is. No unique index here: the server's
+    // partial key is the authority, and `upsertManualSleepLocally` edits the date's existing row.
+    toVersion: 51,
+    statements: [
+      `ALTER TABLE sleep_sessions ADD COLUMN manual_entry INTEGER NOT NULL DEFAULT 0`,
+    ],
+  },
+  {
+    // issue 2606, mirroring Postgres migration 202610072213. A manual night the user removed: the
+    // tombstone the delta pull carries, and the mark `removeManualSleepLocally` sets. Same shape as
+    // v51: the ALTER reaches fresh installs and upgraded devices alike, RECONCILE_COLUMNS covers a
+    // half-applied upgrade. No default and no backfill: every row already on the device is live.
+    toVersion: 52,
+    statements: [
+      `ALTER TABLE sleep_sessions ADD COLUMN deleted_at TEXT`,
     ],
   },
 ];

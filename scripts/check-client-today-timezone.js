@@ -8,6 +8,13 @@
 //   todayInTz()          falls back to DEFAULT_TZ, i.e. Brisbane        — wrong for anyone else
 //   localDateString()    the DEVICE's zone                              — a third answer entirely
 //
+// RV-179 widened what counts as the wrong answers, each measured at zero in client code when added
+// (so no baseline row): `todayInTz(DEFAULT_TZ)` and `todayInTz('Australia/Brisbane')`, which spell
+// the fallback out instead of leaving it implicit; `localDatetimeString()`, the device's clock and
+// date together; and the tz-less day-window helpers, `todayMidnightUtc()` with no argument and
+// `toAestDay(d)` with one — the tz is the first argument of the first and the SECOND of the second,
+// which is why the second is counted by balanced-paren arity (`lib/call-arity`) and not by regex.
+//
 // While a user is on `Australia/Brisbane` all three agree and nothing is broken, which is why this
 // has survived: the wrong call compiles, type-checks, lints clean, and is correct on the only device
 // anyone tests on. **Setting the timezone is what introduces the bug** — the server moves to the new
@@ -34,8 +41,11 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { resolveBaseRef, countAtBase, verdict } = require('./lib/base-ref');
+const { resolveBaseRef, countsAtBase, verdict } = require('./lib/base-ref');
+const { readFilesUtf8, runMain } = require('./lib/read-sources');
 const { stripComments } = require('./lib/strip-comments');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
+const { callsUnderArity } = require('./lib/call-arity');
 
 const root = path.join(__dirname, '..');
 
@@ -46,7 +56,9 @@ const SKIP_PREFIX = ['app/api/'];
 
 // A bare call — no argument at all. `todayInTz(tz)` and `todayInTz(user?.timezone)` are the
 // correct shape and are not counted.
-const BARE = /\b(todayInTz|localDateString)\s*\(\s*\)/g;
+const BARE = /\b(todayInTz|localDateString|localDatetimeString)\s*\(\s*\)/g;
+// The fallback spelled out. A call that PASSES a zone is right only if the zone is the user's.
+const DEFAULT_SPELLED = /\btodayInTz\s*\(\s*(?:DEFAULT_TZ|['"]Australia\/Brisbane['"])\s*\)/g;
 
 // Files allowed a bare call, each with the reason. Not a count — a claim that the file has no user
 // timezone available, which is a thing to defend rather than to baseline.
@@ -64,7 +76,7 @@ const BASELINE = {};
 function walk(dir, out) {
   if (!fs.existsSync(dir)) return out;
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (e.name === 'node_modules' || e.name === '.next' || e.name === '__tests__') continue;
+    if (e.name === 'node_modules' || e.name === '.next' || e.name === '__tests__' || isSkippedFixtureDir(e.name)) continue;
     const p = path.join(dir, e.name);
     if (e.isDirectory()) walk(p, out);
     else if (/\.tsx?$/.test(e.name)) out.push(p);
@@ -76,76 +88,95 @@ function walk(dir, out) {
 function countBare(raw) {
   const src = stripComments(raw);
   BARE.lastIndex = 0;
-  return [...src.matchAll(BARE)].length;
+  DEFAULT_SPELLED.lastIndex = 0;
+  return [...src.matchAll(BARE)].length
+    + [...src.matchAll(DEFAULT_SPELLED)].length
+    + callsUnderArity(src, 'todayMidnightUtc', 1).length
+    + callsUnderArity(src, 'toAestDay', 2).length;
 }
 
 const counts = new Map();
 let scanned = 0;
 
-for (const dir of DIRS) {
-  for (const full of walk(path.join(root, dir), [])) {
-    const rel = path.relative(root, full).split(path.sep).join('/');
-    if (SKIP_PREFIX.some(p => rel.startsWith(p))) continue;
+module.exports = { countBare };
+
+if (require.main === module) runMain(async () => {
+  const files = [];
+  for (const dir of DIRS) {
+    for (const full of walk(path.join(root, dir), [])) {
+      const rel = path.relative(root, full).split(path.sep).join('/');
+      if (SKIP_PREFIX.some(p => rel.startsWith(p))) continue;
+      files.push({ full, rel });
+    }
+  }
+  // #2560: read together (lib/read-sources.js), and a file that never spells either name counts zero
+  // without being stripped. Stripping only turns characters into whitespace, so it cannot create one.
+  const contents = await readFilesUtf8(files.map(f => f.full));
+  files.forEach(({ rel }, k) => {
     scanned++;
-    const n = countBare(fs.readFileSync(full, 'utf8'));
+    if (!/todayInTz|localDateString|localDatetimeString|todayMidnightUtc|toAestDay/.test(contents[k])) return;
+    const n = countBare(contents[k]);
     if (n > 0) counts.set(rel, n);
+  });
+
+  const total = [...counts.values()].reduce((a, b) => a + b, 0);
+
+  if (process.argv.includes('--print')) {
+    for (const [rel, n] of [...counts].sort((a, b) => b[1] - a[1])) console.log(`${String(n).padStart(3)}  ${rel}`);
+    console.log(`\n${total} bare call(s) across ${counts.size} file(s); ${scanned} client file(s) scanned.`);
+    process.exit(0);
   }
-}
 
-const total = [...counts.values()].reduce((a, b) => a + b, 0);
-
-if (process.argv.includes('--print')) {
-  for (const [rel, n] of [...counts].sort((a, b) => b[1] - a[1])) console.log(`${String(n).padStart(3)}  ${rel}`);
-  console.log(`\n${total} bare call(s) across ${counts.size} file(s); ${scanned} client file(s) scanned.`);
-  process.exit(0);
-}
-
-const baseRef = resolveBaseRef();
-const offenders = [];
-const inherited = [];
-for (const [rel, n] of counts) {
-  if (EXEMPT.has(rel)) continue;
-  const allowed = BASELINE[rel] ?? 0;
-  // LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over.
-  const v = verdict({ count: n, limit: allowed, atBase: countAtBase(baseRef, rel, countBare) });
-  if (v === 'inherited') {
-    inherited.push(`${rel}: ${n} bare call(s) against a baseline of ${allowed}, but the base branch is already there.`);
-  } else if (v === 'fail') {
-    offenders.push({ rel, n, allowed });
+  const baseRef = resolveBaseRef();
+  const offenders = [];
+  const inherited = [];
+  // One read of the base for every file, not one git process per file (#2081).
+  const atBase = countsAtBase(baseRef, [...counts.keys()].filter((rel) => !EXEMPT.has(rel)), countBare);
+  for (const [rel, n] of counts) {
+    if (EXEMPT.has(rel)) continue;
+    const allowed = BASELINE[rel] ?? 0;
+    // LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over.
+    const v = verdict({ count: n, limit: allowed, atBase: atBase.get(rel) });
+    if (v === 'inherited') {
+      inherited.push(`${rel}: ${n} bare call(s) against a baseline of ${allowed}, but the base branch is already there.`);
+    } else if (v === 'fail') {
+      offenders.push({ rel, n, allowed });
+    }
   }
-}
 
-// Reported whether or not the run fails, and never as a failure (Q-424).
-if (inherited.length > 0) {
-  console.log('check-client-today-timezone: inherited from the base branch, not caused here:');
-  inherited.forEach((f) => console.log('  • ' + f));
-}
-const stale = Object.keys(BASELINE).filter(rel => (counts.get(rel) ?? 0) < BASELINE[rel]);
-const staleExempt = [...EXEMPT.keys()].filter(rel => !counts.has(rel));
-
-if (offenders.length > 0) {
-  console.error('Client code computing "today" in the wrong timezone (Q-477).');
-  console.error('A bare `todayInTz()` falls back to DEFAULT_TZ (Brisbane) and a bare');
-  console.error('`localDateString()` reads the DEVICE\'s zone — neither follows the user\'s setting,');
-  console.error('which the server already honours. Pass the timezone from `useUserTimezone()`:');
-  console.error('  const tz = useUserTimezone()   →   todayInTz(tz)');
-  for (const o of offenders) {
-    console.error(`  ${o.rel}  ${o.n} bare call(s), baseline ${o.allowed}`);
+  // Reported whether or not the run fails, and never as a failure (Q-424).
+  if (inherited.length > 0) {
+    console.log('check-client-today-timezone: inherited from the base branch, not caused here:');
+    inherited.forEach((f) => console.log('  • ' + f));
   }
-  process.exit(1);
-}
+  const stale = Object.keys(BASELINE).filter(rel => (counts.get(rel) ?? 0) < BASELINE[rel]);
+  const staleExempt = [...EXEMPT.keys()].filter(rel => !counts.has(rel));
 
-if (stale.length > 0) {
-  console.error('BASELINE is shrink-only and these files have improved — lower them in the same PR,');
-  console.error('so the reclaimed ground cannot be given back silently.');
-  for (const rel of stale) console.error(`  ${rel}  now ${counts.get(rel) ?? 0}, baseline ${BASELINE[rel]}`);
-  process.exit(1);
-}
+  if (offenders.length > 0) {
+    console.error('Client code computing "today" in the wrong timezone (Q-477).');
+    console.error('A bare `todayInTz()` falls back to DEFAULT_TZ (Brisbane), `todayInTz(DEFAULT_TZ)` says so out loud,');
+    console.error('`localDateString()`/`localDatetimeString()` read the DEVICE\'s zone, and `todayMidnightUtc()` /');
+    console.error('`toAestDay(d)` with no zone fall back to Brisbane — none follows the user\'s setting,');
+    console.error('which the server already honours. Pass the timezone from `useUserTimezone()`:');
+    console.error('  const tz = useUserTimezone()   →   todayInTz(tz)');
+    for (const o of offenders) {
+      console.error(`  ${o.rel}  ${o.n} bare call(s), baseline ${o.allowed}`);
+    }
+    process.exit(1);
+  }
 
-if (staleExempt.length > 0) {
-  console.error('EXEMPT names files with no bare call left — drop the entry in the same PR.');
-  for (const rel of staleExempt) console.error(`  ${rel}`);
-  process.exit(1);
-}
+  if (stale.length > 0) {
+    console.error('BASELINE is shrink-only and these files have improved — lower them in the same PR,');
+    console.error('so the reclaimed ground cannot be given back silently.');
+    for (const rel of stale) console.error(`  ${rel}  now ${counts.get(rel) ?? 0}, baseline ${BASELINE[rel]}`);
+    process.exit(1);
+  }
 
-console.log(`check-client-today-timezone: ${total} bare call(s) across ${counts.size} file(s) (baseline held); ${scanned} client file(s) scanned.`);
+  if (staleExempt.length > 0) {
+    console.error('EXEMPT names files with no bare call left — drop the entry in the same PR.');
+    for (const rel of staleExempt) console.error(`  ${rel}`);
+    process.exit(1);
+  }
+
+  console.log(`check-client-today-timezone: ${total} bare call(s) across ${counts.size} file(s) (baseline held); ${scanned} client file(s) scanned.`);
+});

@@ -45,14 +45,31 @@ export function formatInjuryContext(injuries: Injury[], today: string): string {
   if (active.length === 0) return ''
   return active
     .map(i => {
-      const days = Math.max(0, daysBetweenDateStrs(i.startedDate, today))
-      const since = days === 0 ? 'started today' : `active ${days} day${days === 1 ? '' : 's'}`
+      const { severity, since } = injuryFacts(i, today)
       // LA-69. Both of these are free text the user typed — `muscleName` is
       // `z.string().min(1).max(100)`, not a picker — and they arrive here from a STORED row, which
       // is the second-order shape PS-32 fenced in the meal planner and left open here. The note used
       // to be wrapped in a `"` the value itself can close.
       const note = i.notes?.trim() ? ` — ${userTextBlock([i.notes])}` : ''
-      return `- ${userTextBlock([i.muscleName])} (${i.severity}, ${since})${note}`
+      return `- ${userTextBlock([i.muscleName])} (${severity}, ${since})${note}`
     })
     .join('\n')
+}
+
+/** The severity and "how long" wording, shared by the prompt line above and the wizard's notice so
+ *  the owner reads the same words the model was given. */
+function injuryFacts(i: Injury, today: string): { severity: string; since: string } {
+  const days = Math.max(0, daysBetweenDateStrs(i.startedDate, today))
+  const since = days === 0 ? 'started today' : `active ${days} day${days === 1 ? '' : 's'}`
+  return { severity: i.severity, since }
+}
+
+/**
+ * The same wording as `formatInjuryContext`, one injury, for a person to read: no `<user_text>`
+ * fence (a prompt-injection guard that would show as literal tags on screen) and no note. React
+ * escapes the muscle name on render, so the fence has nothing to do here.
+ */
+export function describeInjury(i: Injury, today: string): string {
+  const { severity, since } = injuryFacts(i, today)
+  return `${i.muscleName.trim()} (${severity}, ${since})`
 }

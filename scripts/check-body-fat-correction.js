@@ -19,6 +19,7 @@
 // Either way the file must import the calibration, or be listed with the reason it does not.
 const fs = require('fs')
 const path = require('path')
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs')
 
 const ROOT = path.resolve(__dirname, '..')
 // PS-34 added `calculateBaseline`. It derives a BMR/TDEE from body composition exactly as its three
@@ -67,6 +68,7 @@ const PASSTHROUGH_EXEMPT = {
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory() && isSkippedFixtureDir(entry.name)) continue
     if (entry.name === 'node_modules' || entry.name === '__tests__' || entry.name.startsWith('.')) continue
     const full = path.join(dir, entry.name)
     if (entry.isDirectory()) walk(full, out)

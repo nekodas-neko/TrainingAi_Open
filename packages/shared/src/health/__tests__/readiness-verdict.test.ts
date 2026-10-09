@@ -14,7 +14,6 @@ import {
   READINESS_VERDICT_MODEL_VERSION,
   type ReadinessVerdictDay,
 } from '@trainingai/shared/health/readiness-verdict'
-import { VERDICT_IQR_MULTIPLIER } from '@trainingai/shared/health/sleep-verdict'
 import { shiftDateStr } from '@trainingai/shared/date-utils'
 
 const TARGET = '2026-10-06'
@@ -32,22 +31,54 @@ function ordinaryDays(n = READINESS_VERDICT_BASELINE_DAYS, modelVersion: string 
   }))
 }
 
-// Four each of 60..66: p25 = 61, p75 = 65, median 63 — so 1.0 × IQR gives 57..69.
-const ORDINARY_BAND = { median: 63, low: 57, high: 69 }
+// Four each of 60..66: p25 = 61, p75 = 65 (IQR 4), median 63 — so 0.65 × IQR (2.6) gives 58.4..67.6.
+const ORDINARY_BAND = { median: 63, low: 58.4, high: 67.6 }
 
 const day = (over: Partial<ReadinessVerdictDay> = {}): ReadinessVerdictDay => ({
   date: TARGET, score: 63, modelVersion: V6, ...over,
 })
 
-describe('the copied calibration', () => {
-  it('starts at the sleep multiplier, as #2105 says, under its own version', () => {
-    // Copied rather than imported so a later sleep recalibration cannot move this rule silently.
-    // Tuning it on the owner's real readiness scores is #2430, and a change there moves
-    // READINESS_VERDICT_MODEL_VERSION with it — the rate test over his distribution lands with it.
-    expect(READINESS_VERDICT_IQR_MULTIPLIER).toBe(VERDICT_IQR_MULTIPLIER)
-    expect(READINESS_VERDICT_IQR_MULTIPLIER).toBe(1.0)
-    expect(READINESS_VERDICT_MODEL_VERSION).toBe(1)
+describe('the calibrated multiplier (#2430)', () => {
+  it('is the owner-approved 0.65, under verdict version 2', () => {
+    // Signed off 2026-10-06 from a sweep over his real scores (about five prompts a month). Its own
+    // constant, not sleep's, so a later sleep recalibration cannot move this rule silently, and any
+    // change here moves the version so a stored rating can still be paired with the rule that
+    // prompted it. Re-check after 30 more days of scores: the owner's note says confidence is low.
+    expect(READINESS_VERDICT_IQR_MULTIPLIER).toBe(0.65)
+    expect(READINESS_VERDICT_MODEL_VERSION).toBe(2)
     expect(READINESS_VERDICT_BASELINE_DAYS).toBe(28)
+  })
+
+  it('narrows the band a score is judged against: 58.4..67.6, not the copied 57..69', () => {
+    const r = readinessVerdictForDay(day(), ordinaryDays())
+    expect(r?.band).toEqual({ median: 63, low: 58.4, high: 67.6 })
+  })
+
+  it('turns a score the old band called normal into a verdict, which is the point', () => {
+    // 57 and 69 were the edges of the copied band, so 57..69 was all "normal". At 0.65 a 58 is poor
+    // and a 68 is good.
+    expect(readinessVerdictForDay(day({ score: 58 }), ordinaryDays())?.verdict).toBe('poor')
+    expect(readinessVerdictForDay(day({ score: 68 }), ordinaryDays())?.verdict).toBe('good')
+  })
+
+  it('gives the signed-off rate over the scores it was calibrated on: 55 judged, 9 poor, 1 good', () => {
+    // The owner's 83 scored days up to 2026-10-06, in order, as the sweep saw them (re-read from
+    // production on 2026-10-08 and checked against the proposal's counts). Bare scores only: this
+    // repository is public, so the days carry made-up consecutive dates and no contributors. The
+    // baseline is "the last 28 scored days", so only the order matters, not the real gaps.
+    const scores = [
+      48, 69, 63, 62, 48, 37, 70, 80, 84, 60, 29, 83, 74, 74, 87, 74, 63, 77, 83, 80, 79, 76, 76, 65,
+      70, 73, 68, 73, 62, 77, 73, 69, 58, 77, 50, 66, 76, 71, 62, 73, 52, 52, 33, 67, 74, 73, 25, 69,
+      58, 76, 74, 51, 66, 74, 50, 38, 46, 51, 38, 48, 55, 40, 31, 37, 36, 74, 52, 53, 57, 44, 59, 54,
+      56, 45, 48, 43, 51, 38, 42, 39, 33, 49, 63,
+    ]
+    const days: ReadinessVerdictDay[] = scores.map((score, i) => ({
+      date: shiftDateStr('2026-01-01', i), score, modelVersion: null,
+    }))
+    const verdicts = days.map(d => readinessVerdictForDay(d, days)).filter(r => r !== null)
+    expect(verdicts).toHaveLength(55)
+    expect(verdicts.filter(r => r.verdict === 'poor')).toHaveLength(9)
+    expect(verdicts.filter(r => r.verdict === 'good')).toHaveLength(1)
   })
 })
 
@@ -67,10 +98,20 @@ describe('readinessVerdictForDay', () => {
   })
 
   it('treats the band edges as inside it', () => {
-    expect(readinessVerdictForDay(day({ score: 57 }), ordinaryDays())?.verdict).toBe('normal')
-    expect(readinessVerdictForDay(day({ score: 69 }), ordinaryDays())?.verdict).toBe('normal')
-    expect(readinessVerdictForDay(day({ score: 56 }), ordinaryDays())?.verdict).toBe('poor')
-    expect(readinessVerdictForDay(day({ score: 70 }), ordinaryDays())?.verdict).toBe('good')
+    // The edges are 58.4 and 67.6, between the whole scores, so 59 and 67 are the innermost
+    // verdicts on each side and 58 and 68 the first outside it. A fractional edge is exercised
+    // on its own below, where a score can land exactly on it.
+    expect(readinessVerdictForDay(day({ score: 59 }), ordinaryDays())?.verdict).toBe('normal')
+    expect(readinessVerdictForDay(day({ score: 67 }), ordinaryDays())?.verdict).toBe('normal')
+    expect(readinessVerdictForDay(day({ score: 58 }), ordinaryDays())?.verdict).toBe('poor')
+    expect(readinessVerdictForDay(day({ score: 68 }), ordinaryDays())?.verdict).toBe('good')
+  })
+
+  it('treats a score exactly ON an edge as inside it (strict inequality)', () => {
+    expect(readinessVerdictForDay(day({ score: 58.4 }), ordinaryDays())?.verdict).toBe('normal')
+    expect(readinessVerdictForDay(day({ score: 67.6 }), ordinaryDays())?.verdict).toBe('normal')
+    expect(readinessVerdictForDay(day({ score: 58.39 }), ordinaryDays())?.verdict).toBe('poor')
+    expect(readinessVerdictForDay(day({ score: 67.61 }), ordinaryDays())?.verdict).toBe('good')
   })
 
   it('says nothing off a thin baseline', () => {

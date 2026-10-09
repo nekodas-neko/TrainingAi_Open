@@ -6,7 +6,6 @@ import { Clock, Dumbbell, Calendar, MessageCircle, Moon, BedDouble, TriangleAler
 import type { ProgramSession, NextSessionRecommendation } from "@trainingai/shared/types/program";
 import type { MoodLog } from "@trainingai/shared/types/mood";
 import type { PhaseStatus, PerSessionPhaseStatus } from "@/app/api/workout-data/route";
-import { getPaletteEntry } from "@trainingai/shared/session-palette";
 import { getSessionIcon } from "@/lib/session-icon";
 import { ColorSwatchPicker } from "@/components/ui/color-swatch-picker";
 import { CARD_DEFAULT_COLORS } from "../constants";
@@ -43,6 +42,9 @@ interface RecommendationCardProps {
   moodLog: MoodLog | null | undefined;
   phaseStatus: PhaseStatus | null;
   perSessionPhaseStatus: PerSessionPhaseStatus[];
+  /** Duration-model minutes per program session (#2362); the card's own figure for a session
+   *  that is not today's recommendation. */
+  estMinBySession: Record<string, number>;
   cardColors: Record<string, string>;
   sectionEditMode: boolean;
   dayKey: (daysAgo?: number) => string;
@@ -63,6 +65,7 @@ function RecommendationCardComponent({
   moodLog,
   phaseStatus,
   perSessionPhaseStatus,
+  estMinBySession,
   cardColors,
   sectionEditMode,
   dayKey,
@@ -80,6 +83,12 @@ function RecommendationCardComponent({
     ? (perSessionPhaseStatus.find(p => p.sessionId === displaySession.id)?.phaseStatus ?? phaseStatus)
     : phaseStatus;
   const isTrainedToday = todaySessionName !== null;
+  // The session screen's own model, not exercises × a constant (#2362): the recommendation
+  // carries the prescription-aware figure; any other session reads the program-level one.
+  const estMin = displaySession
+    ? (displaySession.id === recommendation?.session?.id ? recommendation.estimatedDurationMin : null)
+      ?? estMinBySession[displaySession.id] ?? null
+    : null;
   // lastSessionDay does a raw readCacheSync('workout-card:<id>') read internally rather than
   // taking the card data as an argument, so this memo needs workoutCardEpoch as a dependency —
   // the workout-data:all batch fetch only bumps that counter (a setCached side effect outside
@@ -179,9 +188,11 @@ function RecommendationCardComponent({
             </div>
           </div>
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <Clock className="h-3 w-3" /> ~{Math.round(displaySession.exercises.length * 9)} min
-            </span>
+            {estMin !== null && (
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3" /> ~{estMin} min
+              </span>
+            )}
             <span className="flex items-center gap-1">
               <Dumbbell className="h-3 w-3" /> {displaySession.exercises.length} exercises
             </span>

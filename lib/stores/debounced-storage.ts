@@ -16,6 +16,11 @@ export function debouncedLocalStorage(delayMs: number) {
         timeout = null
       }, delayMs)
     },
-    removeItem: (name: string) => localStorage.removeItem(name),
+    // A removal supersedes a write still waiting on the timer. Without this, sign-out's clear
+    // (#2453, lib/sign-out-storage.ts) was undone up to `delayMs` later by the write it came after.
+    removeItem: (name: string) => {
+      if (pending?.name === name) pending = null
+      localStorage.removeItem(name)
+    },
   }
 }

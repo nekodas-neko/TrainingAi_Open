@@ -4,7 +4,7 @@ import React from "react";
 import dynamic from "next/dynamic";
 import { InfoIcon } from "lucide-react";
 import { accentCardStyle } from "@trainingai/shared/utils";
-import { goalProgressPct, evaluateWeightRateVsGoalBand } from "@trainingai/shared/health/long-term-goal-progress";
+import { evaluateWeightRateVsGoalBand } from "@trainingai/shared/health/long-term-goal-progress";
 import { scoreBand } from "@trainingai/shared/health/score-band";
 import { bodyComposition } from "@trainingai/shared/health/body-composition";
 import { displayBodyFat, type BodyFatCalibrationMeta } from "@/components/health/body-fat-display";
@@ -17,7 +17,6 @@ import { AiPeriodizationStatusCard } from "@/components/health/ai-periodization-
 import { WeeklyMuscleSetsCard } from "@/components/health/weekly-muscle-sets-card";
 import { MovementBalanceCard } from "@/components/health/movement-balance-card";
 import { WeekInReviewCard } from "@/components/health/week/week-in-review-card";
-import { BodyMuscleCard } from "@/components/health/body-muscle-card";
 import { EnergyBudgetPrompt } from "@/components/health/energy-budget-prompt";
 import { EmptyState } from "@/components/ui/empty-state";
 import { CellEmpty } from "@/components/health/cell-empty";
@@ -669,9 +668,8 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
       case "weeklyStats":     return <WeeklyStatsHub key="weeklyStats" data={weeklyStats} loading={weeklyStats === null} error={weeklyStatsError} onRetry={retryWeeklyStats} sessions={activeSessions} />;
       case "timeInZone":      return <TimeInZoneCard key="timeInZone" />;
       case "aiPeriodization": return <AiPeriodizationStatusCard key="aiPeriodization" />;
-      case "muscleSets":      return <WeeklyMuscleSetsCard key="muscleSets" muscles={muscleSets ?? []} loading={muscleSets === null} title="Muscle Volume This Week" trainingGoal={trainingGoal} />;
+      case "muscleSets":      return <WeeklyMuscleSetsCard key="muscleSets" muscles={muscleSets ?? []} loading={muscleSets === null} title="Muscle Volume This Week" trainingGoal={trainingGoal} injuredMuscles={(injuries ?? []).filter(i => i.resolvedDate == null).map(i => i.muscleName)} />;
       case "movementBalance": return <MovementBalanceCard key="movementBalance" />;
-      case "muscleMap":       return <BodyMuscleCard key="muscleMap" muscleSets={muscleSets} recoveryMuscles={recoveryMuscles} />;
       case "activityHistory": return <ActivityHistoryCard key="activityHistory" userId={userId} />;
       case "workoutDensity":  return <WorkoutDensityCard key="workoutDensity" trends={healthTrends} />;
       default: return null;

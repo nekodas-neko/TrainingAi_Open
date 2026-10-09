@@ -36,6 +36,7 @@ const fs = require('fs');
 const path = require('path');
 const { relPosix } = require('./lib/repo-path');
 const { stripComments } = require('./lib/strip-comments');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
 const root = path.join(__dirname, '..');
 const E2E = path.join(root, 'e2e');
@@ -88,6 +89,7 @@ const DATE_LITERAL = /['"](\d{4}-\d{2}-\d{2})(?:[T ][^'"]*)?['"]/g;
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory() && isSkippedFixtureDir(entry.name)) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) { walk(full, out); continue; }
     if (entry.name.endsWith('.ts')) out.push(full);

@@ -20,14 +20,17 @@
 //
 // Counting caveat, so the number stays comparable with the ones above: this is the same expression
 // CLAUDE.md and the 2026-08-14 review used, over .tsx under app/ + components/. It is a proxy — it
-// also matches a `#1279`-style PR reference in a comment. Kept identical anyway, because a baseline
-// whose number cannot be reproduced from a shell is a baseline nobody will trust:
+// also matches a `#1279`-style PR reference. Comments are stripped before counting (#2557), and an
+// all-digit reference of four or more digits outside a colour position (a test name, JSX text) is
+// left out (#2652; the rule is in scripts/lib/hex-literals.js). Otherwise identical, because a
+// baseline whose number cannot be reproduced from a shell is a baseline nobody will trust:
 //   grep -rhoE '#[0-9a-fA-F]{3,8}\b' app components --include=*.tsx | wc -l
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { resolveBaseRef, countAtBase, verdict } = require('./lib/base-ref');
+const { resolveBaseRef, countsAtBase, verdict } = require('./lib/base-ref');
 const { stripComments } = require('./lib/strip-comments');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
 const HEX = /#[0-9a-fA-F]{3,8}\b/g;
 
@@ -64,7 +67,6 @@ const BASELINE = {
   'components/google-sign-in.tsx': 4,
   'components/health/body-cards/rhr-hrv-spo2-card.tsx': 15,
   'components/health/body-cards/sleep-card.tsx': 5,
-  'components/health/body-muscle-card.tsx': 1,
   'components/health/detail-hero.tsx': 55,
   'components/health/goals-progress-card.tsx': 6,
   'components/health/injury-card.tsx': 3,
@@ -96,7 +98,7 @@ const BASELINE = {
   'components/nutrition/weekly-nutrition-chart.tsx': 1,
   'components/oura-score-chip-row.tsx': 4,
   'components/profile/achievements-grid.tsx': 13,
-  'components/profile/goal-targets-section.tsx': 3,
+  'components/profile/goal-targets-section.tsx': 2,
   'components/profile/level-sheet.tsx': 1,
   'components/profile/macro-targets-pane.tsx': 2,
   'components/shell/bottom-nav.tsx': 1,
@@ -124,12 +126,13 @@ const inherited = [];
 const stale = [];
 let total = 0;
 const seen = new Set();
+const judged = [];
 
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name === 'node_modules' || entry.name === '.next') continue;
+      if (entry.name === 'node_modules' || entry.name === '.next' || isSkippedFixtureDir(entry.name)) continue;
       walk(full);
       continue;
     }
@@ -138,16 +141,7 @@ function walk(dir) {
     const count = countHex(stripComments(fs.readFileSync(full, 'utf8')));
     total += count;
     seen.add(rel);
-    const allowed = BASELINE[rel] ?? 0;
-    // LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over. The base count
-    // runs the SAME matcher over the base content — never a second regex, which would disagree with
-    // the working-tree count for reasons nobody could see.
-    const v = verdict({ count, limit: allowed, atBase: countAtBase(baseRef, rel, countHex) });
-    if (v === 'inherited') {
-      inherited.push(`${rel}: ${count} against a baseline of ${allowed}, but the base branch already has ${count}. Not this branch's growth.`);
-    } else if (v === 'fail') {
-      failures.push({ rel, count, allowed });
-    }
+    judged.push({ rel, count, allowed: BASELINE[rel] ?? 0 });
     if (count === 0 && rel in BASELINE) stale.push(rel);
   }
 }
@@ -155,6 +149,23 @@ function walk(dir) {
 const baseRef = resolveBaseRef();
 
 for (const top of ['app', 'components']) walk(path.join(root, top));
+
+// LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over. The base count
+// runs the SAME matcher over the base content — never a second regex, which would disagree with
+// the working-tree count for reasons nobody could see. Read after the walk, for every file at once:
+// one git process per run, not one per file (#2081).
+// The SAME counting as the working tree above — comments stripped first (#2557). Counting the base's
+// comments too (a `(#919)` PR reference reads as a hex literal) inflates the base, and `count <= atBase`
+// would then pass a branch's real addition as inherited.
+const atBase = countsAtBase(baseRef, judged.map((j) => j.rel), (c) => countHex(stripComments(c)));
+for (const { rel, count, allowed } of judged) {
+  const v = verdict({ count, limit: allowed, atBase: atBase.get(rel) });
+  if (v === 'inherited') {
+    inherited.push(`${rel}: ${count} against a baseline of ${allowed}, but the base branch already has ${count}. Not this branch's growth.`);
+  } else if (v === 'fail') {
+    failures.push({ rel, count, allowed });
+  }
+}
 
 // A row for a file that is now clean (or gone) has to come out, or the list rots into an allowlist
 // that permits hex to come back to a file that had been fixed. Same rule the sibling checks use.

@@ -3,6 +3,9 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { z } from 'zod'
 import type { AiPrescription, AiPrescriptionExercise } from '@trainingai/shared/types/ai-periodization'
+import { hasFullSessionRevert, fullSessionAlongside } from '@trainingai/shared/ai-periodization/prescription-figures'
+import { loadFigureSignals } from '@trainingai/shared/ai-periodization/signals'
+import { reportServerError } from '@/lib/observability'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
@@ -131,6 +134,20 @@ export async function POST(
       confidence: 1.0,
       confidenceReasons: [],
       droppedExerciseIds,
+    }
+    // Issue 2592 (#2403): rows kept from the existing prescription can still be deloaded with a
+    // `preDeload`, and the rebuilt blob used to drop `fullSession`, so under Full the card fell back
+    // to the review's projected minutes. Cost what Full changes over these rows, through the one
+    // figures function, and add it to the figures stored above. A failed load stores none: the
+    // surfaces then read the stored figures, which is what they did before.
+    if (hasFullSessionRevert(prescription.exercises)) {
+      try {
+        const figureSignals = await loadFigureSignals(repo, userId, programSession)
+        const fullSession = fullSessionAlongside(prescription.exercises, prescription, figureSignals)
+        if (fullSession) prescription.fullSession = fullSession
+      } catch (err) {
+        reportServerError(err, { userId, url: '/api/workout-review/session/apply#recost' })
+      }
     }
     await repo.storePrescription(userId, programSessionId, prescription, new Date(Date.now() + 7 * 86_400_000))
     // storePrescription writes status 'pending'; accept it so it drives the bar this cycle.

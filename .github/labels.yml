@@ -82,6 +82,9 @@
 - name: 'blocked'
   color: 'e99695'
   description: Waiting on another issue — say which in the body ("Blocked by #N")
+- name: 'later'
+  color: 'ededed'
+  description: Parked idea — kept, not queued. The daily grooming pass reviews it; remove to queue it
 
 # --- who picks it up (owner request, 2026-10-05: triage assigns to BugFix or the Implementer) ---
 - name: 'agent: bugfix'

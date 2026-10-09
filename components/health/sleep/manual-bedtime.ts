@@ -49,3 +49,24 @@ export function bedtimeInstant(nightDate: string, clock: string, tz: string): st
   const midnight = aestMidnight(y, m, d + dayOffset, tz)
   return new Date(midnight.getTime() + minutes * 60_000).toISOString()
 }
+
+/**
+ * Issue 2338 — the two instants of a night typed as a bed clock and a wake clock, for the wake date
+ * `wakeDate`. The wake clock is on `wakeDate` itself; the bed clock follows {@link bedtimeInstant}'s
+ * noon split, so 23:10 is the evening before and 00:30 is the same day. Null when either clock is
+ * not a time. The night's own date is NOT decided here: the writer derives it from the wake instant
+ * in the user's zone, so this only has to place the two instants in the right zone.
+ */
+export function manualNightWindow(
+  wakeDate: string,
+  bedClock: string,
+  wakeClock: string,
+  tz: string,
+): { sleepStart: string; sleepEnd: string } | null {
+  const bed = bedtimeInstant(wakeDate, bedClock, tz)
+  const wakeMinutes = parseClock(wakeClock)
+  const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(wakeDate.replace(/\//g, '-'))
+  if (!bed || wakeMinutes == null || !parts) return null
+  const midnight = aestMidnight(Number(parts[1]), Number(parts[2]), Number(parts[3]), tz)
+  return { sleepStart: bed, sleepEnd: new Date(midnight.getTime() + wakeMinutes * 60_000).toISOString() }
+}

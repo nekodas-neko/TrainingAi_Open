@@ -167,6 +167,113 @@ export function computeChronicStress(
   return runCumulativeStress(input)
 }
 
+/**
+ * The nine series the model's `enhanced_final_check` requires `min_days_required` non-NaN values in
+ * before it will score, in the order `runCumulativeStress` stacks their counts into `debugMetrics`.
+ */
+export const CHRONIC_STRESS_GATED_SERIES = [
+  'gotUps',
+  'normHrMin',
+  'sleepFragmentationIndex',
+  'normHrvMedianHR5min',
+  'medianHrvQuality5min',
+  'averageMetMinutes',
+  'normalisedIqr',
+  'medianbaselineRatioNhrv',
+  'normTempWake',
+] as const
+export type ChronicStressGatedSeries = (typeof CHRONIC_STRESS_GATED_SERIES)[number]
+
+// Positions in the model's 20-element `debugMetrics`, as `runCumulativeStress` assembles them.
+// Pinned by a test against the model itself, so a reorder there fails here rather than mislabels.
+const DEBUG_INDEX: Record<ChronicStressGatedSeries | 'feverMasked' | 'canProduceScore', number> = {
+  gotUps: 7,
+  normHrMin: 9,
+  sleepFragmentationIndex: 10,
+  normHrvMedianHR5min: 11,
+  medianHrvQuality5min: 12,
+  averageMetMinutes: 13,
+  normalisedIqr: 14,
+  medianbaselineRatioNhrv: 15,
+  normTempWake: 16,
+  feverMasked: 17,
+  canProduceScore: 18,
+}
+
+/**
+ * Why the model did or did not score — read from the model's own `debugMetrics`, so it is the gate's
+ * verdict rather than a second opinion of it.
+ *
+ * - `scored` — a finite score came back.
+ * - `series_below_gate` — the model's own gate refused: at least one series in `belowGate` has
+ *   fewer valid nights than it needs.
+ * - `non_finite_after_gate` — the gate passed and the score was still not finite.
+ * - `model_error_path` — the model took its all-NaN default path before counting anything
+ *   (empty or malformed input).
+ * - `no_input` — there were no summary rows to run it on.
+ */
+export type ChronicStressRefusal =
+  | 'scored'
+  | 'series_below_gate'
+  | 'non_finite_after_gate'
+  | 'model_error_path'
+  | 'no_input'
+
+export interface ChronicStressDiagnostics {
+  reason: ChronicStressRefusal
+  /** Summary rows inside the model's 31-night window. */
+  windowNights: number
+  /** `usableGranularNights` — nights in the window with a non-empty stash. */
+  granularNights: number
+  /** Nights the model's fever mask removed (`highestTemp > fever limit || tempDev > tempDevLimit`). */
+  feverMaskedNights: number | null
+  /** Valid (non-NaN) nights per gated series, as the model counted them. */
+  validNights: Record<ChronicStressGatedSeries, number> | null
+  /** The gated series with fewer than `CHRONIC_STRESS_MIN_DAYS` valid nights. */
+  belowGate: ChronicStressGatedSeries[]
+}
+
+const finiteOrNull = (x: number | undefined): number | null => (x != null && Number.isFinite(x) ? x : null)
+
+/**
+ * Issue 2422. TN-1's `usableGranularNights` said 28 while the score stayed null, which put the
+ * refusal inside the model — and the model already counts, per series, exactly what its gate
+ * refused on. The rollup threw that away with the rest of the result. This reads it back out.
+ *
+ * Changes no score: it only reads `res`, which `computeChronicStress` has already produced.
+ */
+export function chronicStressDiagnostics(
+  summaryRows: DailySummaryRow[],
+  signalsByDate: Map<string, ChronicStressNightSignals>,
+  res: CumulativeStressResult | null,
+): ChronicStressDiagnostics {
+  const windowNights = Math.min(summaryRows.length, CHRONIC_STRESS_WINDOW)
+  const granularNights = usableGranularNights(summaryRows, signalsByDate)
+  const empty = { windowNights, granularNights, feverMaskedNights: null, validNights: null, belowGate: [] }
+  if (res == null) return { reason: 'no_input', ...empty }
+
+  const dm = res.debugMetrics
+  if (!Number.isFinite(dm[DEBUG_INDEX.canProduceScore])) return { reason: 'model_error_path', ...empty }
+
+  const validNights = Object.fromEntries(
+    CHRONIC_STRESS_GATED_SERIES.map((s) => [s, dm[DEBUG_INDEX[s]]]),
+  ) as Record<ChronicStressGatedSeries, number>
+  const belowGate = CHRONIC_STRESS_GATED_SERIES.filter((s) => validNights[s] < CHRONIC_STRESS_MIN_DAYS)
+  const reason: ChronicStressRefusal = Number.isFinite(res.chronicStressScore)
+    ? 'scored'
+    : dm[DEBUG_INDEX.canProduceScore] > 0.5
+      ? 'non_finite_after_gate'
+      : 'series_below_gate'
+  return {
+    reason,
+    windowNights,
+    granularNights,
+    feverMaskedNights: finiteOrNull(dm[DEBUG_INDEX.feverMasked]),
+    validNights,
+    belowGate,
+  }
+}
+
 /** Round the model score to the INTEGER column, mapping NaN/out-of-range → null. */
 export function chronicStressScoreToInt(score: number): number | null {
   if (!Number.isFinite(score)) return null

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
+
 import Link from "next/link";
 import { CalendarIcon, CheckIcon, SparklesIcon, ShareIcon, DumbbellIcon, TrophyIcon, NotebookTextIcon, FlameIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -495,8 +495,8 @@ export function DoneScreen({
                 {hrLoading
                   ? 'Loading HR data…'
                   : hrAttempted
-                    ? 'No HR data for this session — wear the chest strap (or the ring) during the workout; ring data arrives via its background sync'
-                    : 'Tap Load to check for ring HR data from this workout'}
+                    ? 'No HR data for this session yet. A chest strap, a ring or Health Connect records it; ring data can arrive later through its background sync'
+                    : 'Tap Load to check for HR data from this workout'}
               </p>
             )}
           </div>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { aggregateSignals } from '@trainingai/shared/ai-periodization/signals'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
 import { prescriptionDrivesLoad } from '@trainingai/shared/ai-periodization/apply-prescription'
@@ -48,7 +48,6 @@ export async function POST(
   if (badId) return badId
   const repo = await getRepository()
   const tz = session.user?.timezone ?? DEFAULT_TZ
-  const today = todayInTz(tz)
 
   const state = await repo.getSessionPeriodization(userId, programSessionId)
   if (!state) {

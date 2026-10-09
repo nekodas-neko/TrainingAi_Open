@@ -109,8 +109,9 @@
 const fs = require('fs');
 const path = require('path');
 const { toPosix } = require('./lib/repo-path');
-const { resolveBaseRef, countAtBase, verdict } = require('./lib/base-ref');
+const { resolveBaseRef, countsAtBase, verdict } = require('./lib/base-ref');
 const { stripComments } = require('./lib/strip-comments');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 const { countInertStrict } = require('./lib/inert-strict');
 
 const ROOTS = ['app/api', 'packages/shared/src/validation'];
@@ -196,6 +197,7 @@ function countNonStrict(src) {
 // means it cannot.
 function walk(dir, hit) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (isSkippedFixtureDir(e.name)) continue;
     const p = path.join(dir, e.name);
     if (e.isDirectory()) walk(p, hit);
     else if (p.endsWith('.ts') && !p.includes('__tests__')) {
@@ -224,6 +226,10 @@ if (process.argv.includes('--print')) {
 const baseRef = resolveBaseRef();
 const failures = [];
 const inherited = [];
+// One read of the base for every file, not one git process per file (#2081).
+// Comments stripped first, as the working-tree scan does (#2557): a base count that kept them could
+// read higher than the branch's and pass a real addition as inherited.
+const baseCounts = countsAtBase(baseRef, Object.keys(found), (c) => countNonStrict(stripComments(c)));
 for (const [file, n] of Object.entries(found)) {
   const limit = BASELINE[file];
   // LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over. `countNonStrict` is
@@ -232,7 +238,7 @@ for (const [file, n] of Object.entries(found)) {
   // intermittently on one file six times; `verdict` turns three different base readings — absent,
   // zero, and a real number — into one word, and only the absent case warns, so five of those six
   // occurrences left nothing behind that could tell them apart.
-  const atBase = countAtBase(baseRef, file, countNonStrict);
+  const atBase = baseCounts.get(file);
   const v = verdict({ count: n, limit: limit ?? 0, atBase });
   const seen = `(base ${baseRef ?? 'unresolved'}: ${atBase === null ? 'file absent' : `${atBase} non-strict`})`;
   if (v === 'inherited') {

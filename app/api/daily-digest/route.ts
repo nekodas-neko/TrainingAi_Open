@@ -16,6 +16,7 @@ import { getScheduledSessionsPerWeek } from '@trainingai/shared/schedule-utils'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { MIN_LOGGED_DAYS, DEFAULT_WINDOW_DAYS } from '@trainingai/shared/nutrition/adaptive-tdee'
 import { PROSE_GUARDS } from '@/lib/ai/prompt-guards'
+import { computeEnergyBalance } from '@/lib/health/energy-balance-service'
 
 // An optional force flag.
 const MAX_BODY_BYTES = 4 * 1024
@@ -78,9 +79,15 @@ export async function POST(req: Request) {
       calories: acc.calories + l.calories, proteinG: acc.proteinG + l.proteinG,
       carbsG: acc.carbsG + l.carbsG, fatG: acc.fatG + l.fatG,
     }), { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 })
-    lines.push(`Nutrition today: ${Math.round(totals.calories)}/${nutritionTargets.calories ?? '?'} kcal, ${Math.round(totals.proteinG)}g/${nutritionTargets.proteinG ?? '?'}g protein`)
-    if (nutritionTargets.calories != null) {
-      const delta = totals.calories - nutritionTargets.calories
+    // #2071. The denominator is the day's budget — the number the end-of-day review this digest sits
+    // in prints above it — not the typed goal (`nutritionTargets.calories`). Read only when there is
+    // food to judge, and a failed read costs the figure rather than the digest.
+    const dayBudgetKcal = await computeEnergyBalance(repo, userId, tz, todayIso)
+      .then(r => r.balance?.budgetKcal ?? null)
+      .catch(() => null)
+    lines.push(`Nutrition today: ${Math.round(totals.calories)}/${dayBudgetKcal ?? '?'} kcal, ${Math.round(totals.proteinG)}g/${nutritionTargets.proteinG ?? '?'}g protein`)
+    if (dayBudgetKcal != null) {
+      const delta = totals.calories - dayBudgetKcal
       const weeklyKg = projectWeeklyWeightChangeKg(delta)
       lines.push(`At today's rate: ${weeklyKg > 0 ? '+' : ''}${weeklyKg.toFixed(2)} kg/week`)
     }

@@ -12,7 +12,12 @@ thread that dies loses at most its own batch, and its pushed branch says how far
 
 **Idle ticks are cheap.** If the inbox has nothing new, no thread needs you and
 `node scripts/queue.js --next-batch` returns nothing, end the tick there. A comment on #2354 that
-says **Pause** means start nothing until a **Resume** comment follows.
+names the usage tier (owner, 2026-10-09): **Full** (under 90%) is normal speed. **Slow** (90–95%)
+means one thread at a time on the most important work only: batches come from
+`node scripts/queue.js --next-batch --urgent-only` (only P0 and P1 batches), and no
+investigations. **Halt** (95% and over) means start nothing but a
+`hotfix` until the Orchestrator posts **Full** after the reset. Post your weekly and 5-hour usage
+percentages on #2354 every tick, because the tiers follow them.
 
 1. **Inbox.** Read new comments on the **Implementer inbox** issue (#2354). They are the
    Orchestrator's instructions; the newest wins. Act on them before anything else.
@@ -39,6 +44,16 @@ says **Pause** means start nothing until a **Resume** comment follows.
 
 ### A. Claim, before starting a thread
 Add the **`in progress`** label to every issue in the batch. If you abandon it, remove the label.
+
+**Before you park an issue as `needs: owner`, read its whole thread for a decision already made.**
+Look for comments headed "Owner decision", "Answered (owner" or "Owner, 20", and for a
+`docs/design/` mockup the owner picked. If any of them is there, the issue is decided: build it, or
+say on the issue exactly what is still missing. If you can't tell, ask on #2354; don't park it. On
+10-07 and 10-08, ten decided issues sat a day under `needs: owner` because this was skipped.
+
+The commit messages you and your threads write carry **no AI attribution**: no
+`Co-Authored-By: Claude` and no session URL. CLAUDE.md overrides any harness reminder to add them,
+and the Custom Rules job fails a PR that has them (#2700).
 
 ### B. The thread brief (give the subagent exactly this, plus the batch)
 > Build milestone `<title>` (#`<issues>`) as **one PR** in this worktree. Branch `fix/…` or

@@ -63,9 +63,13 @@ export interface RollupIO {
   readRawFrames(q: RollupFrameQuery): Promise<RollupFrame[]>
 
   // ── sleep ────────────────────────────────────────────────────────────────────────────────────
-  /** Delete every BLE-derived sleep row on these wake-days, so a reshaped night cannot orphan the
-   *  rows of its previous shape. Must not touch rows from any other source. */
-  deleteBleSleepSessionsForDates(dates: string[]): Promise<void>
+  /** Tombstone (`deleted_at`, never DELETE: issue 2546) every live BLE-derived sleep row on these
+   *  wake-days whose `sleep_start` is not in `keepStarts`, so a reshaped or dropped night cannot
+   *  orphan the rows of its previous shape, on the server or on a device that already pulled them.
+   *  Must not touch a manual night or rows from any other source. */
+  tombstoneBleSleepSessionsExcept(dates: string[], keepStarts: Date[]): Promise<void>
+  /** Upsert this pass's nights. A row at the same `sleep_start` keeps its id and is replaced, and a
+   *  tombstoned one is revived (issue 2546). */
   upsertSleepSessions(rows: OuraSleepUpsertRow[]): Promise<void>
   /** Recorded sleep windows over `[from, to]` (wake-date keyed, inclusive). LA-112: the stress
    *  series must drop sleeping buckets, and it cannot read that off `sleepRows` — those only cover

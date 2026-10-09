@@ -17,6 +17,7 @@ import { resolveColor } from "@trainingai/shared/chart-colors";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
 import { ZONE_MINUTES_TTL } from "@trainingai/shared/cache-ttl";
 import { todayInTz, shiftDateStr } from "@trainingai/shared/date-utils";
+import { noHrDataCopy } from "@/components/health/hr-source-copy";
 import { formatHoursMinutes } from '@trainingai/shared/format/units'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip);
@@ -34,6 +35,8 @@ interface ZoneMinutesResponse {
   to: string;
   profile: { maxHr: number; restingHr: number };
   days: { day: string; seconds: [number, number, number, number, number] }[];
+  /** #2337 — `false` only when nothing has recorded this person's heart rate; absent on an older cached payload. */
+  hasHrSource?: boolean | null;
 }
 
 function fmtDuration(sec: number): string {
@@ -156,7 +159,7 @@ export const TimeInZoneCard = memo(function TimeInZoneCard() {
         </p>
       ) : (
         <p className="py-6 text-center text-xs text-muted-foreground">
-          No heart-rate data in this window yet — wear the ring or strap during a workout.
+          {noHrDataCopy(data?.hasHrSource, "window")}
         </p>
       )}
     </div>

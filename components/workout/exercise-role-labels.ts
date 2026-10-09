@@ -1,32 +1,30 @@
 /**
- * The three exercise roles, named once.
+ * The three exercise roles as the UI shows them: the words, plus the badge colours.
  *
- * BF-125: the builder review screen said *Main / Compound / Accessory* and the program editor said
- * *Main Compound / Secondary Compound / Accessory* — same three enum values, two wordings, and the
- * user meets both while doing one thing (spot a bad role on review, go to the editor to change it).
+ * The WORDS live in `@trainingai/shared/workout/role-labels` (#2240) — one place for both role axes,
+ * exercise (Primary / Secondary / Accessory) and muscle (Target / Assisting) — and are re-exported
+ * here so component imports stay put. This file adds what is component-only: the BF-15 fallback for
+ * a missing role and the badge classes.
  *
- * The wording is the short set, for two reasons. *Main* and *Compound* were not parallel — a main
- * lift **is** a compound, so the old review labels read as two different axes rather than a
- * ranking. And the long set is what overflowed the editor's role row (BF-124): three buttons in a
- * non-wrapping flex, the longest wrapping to two lines and `Accessory` clipped at the right edge.
+ * BF-125: the builder review screen and the program editor once used two wordings for the same
+ * three enum values; BF-124: the long wording overflowed the editor's role row. Both are why the set
+ * is short, single words.
  */
 import type { ExerciseRole } from '@trainingai/shared/types/program'
+import { EXERCISE_ROLE_LABEL } from '@trainingai/shared/workout/role-labels'
 
-/** Ordered for display. The type stays the canonical one in `types/program` — this file names the
- *  words the user reads, not the values the app stores. */
-export const EXERCISE_ROLES: readonly ExerciseRole[] = ['primary', 'secondary', 'accessory']
-
-export const EXERCISE_ROLE_LABEL: Record<ExerciseRole, string> = {
-  primary: 'Main',
-  secondary: 'Secondary',
-  accessory: 'Accessory',
-}
+export {
+  EXERCISE_ROLES,
+  EXERCISE_ROLE_LABEL,
+  MUSCLE_ROLES,
+  MUSCLE_ROLE_LABEL,
+} from '@trainingai/shared/workout/role-labels'
 
 /**
  * A missing or unrecognised role reads as the unclassified role (`accessory`, BF-15), matching what
- * the editor's selected-pill logic does with `ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE`. The two have to agree: a badge that named the
- * raw enum value while the editor highlighted Main would be the same mismatch this file exists to
- * remove, one layer down.
+ * the editor's selected-pill logic does with `ex.exerciseRole ?? UNCLASSIFIED_EXERCISE_ROLE`. The two
+ * have to agree: a badge that named the raw enum value while the editor highlighted Primary would be
+ * the same mismatch this file exists to remove, one layer down.
  */
 export function exerciseRoleLabel(role: string | null | undefined): string {
   return EXERCISE_ROLE_LABEL[role as ExerciseRole] ?? EXERCISE_ROLE_LABEL.accessory

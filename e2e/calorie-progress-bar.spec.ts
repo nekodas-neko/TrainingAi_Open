@@ -58,8 +58,14 @@ async function balanceFromRoute(page: Page) {
   // The discriminator, copied from the sibling for the same reason it exists there: asking the shared
   // function is only worth something if the fixture can tell the answers apart. If the anchored budget
   // ever equalled the old expression this file would pass against a reverted `budgetProvenance`.
-  expect(budget, 'fixture must separate the real budget from the pre-anchor expression')
-    .not.toBe(Math.round(b.restingBaseKcal + b.targetNetKcal) + Math.round(b.activeKcal))
+  // Issue 2071: the old discriminator (`restingBase + targetNet + earned`) can no longer separate
+  // anything. The owner's budget is RMR − deficit + (20% of RMR − step credit) + movement, which is
+  // built from the same terms as `restingBase` (RMR scaled up, less the step credit) and `targetNet`
+  // (the deficit), so on an unfloored day the two coincide (both read 2,804 on this fixture).
+  // What a reverted `budgetProvenance` would print is the BF-152 budget — the bare resting rate
+  // plus movement — so that is what the fixture must be separated from.
+  expect(budget, 'fixture must separate the real budget from the BF-152 one (resting rate + movement)')
+    .not.toBe(Math.round(b.restingRateKcal) + Math.round(b.activeKcal))
 
   return { budget, intake: Math.round(b.intakeKcal) }
 }

@@ -25,7 +25,9 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
-  MIN_DISTANCE_M, MIN_AVG_SPEED_KMH, MIN_DURATION_SEC, MAX_DURATION_SEC,
+  MIN_DISTANCE_M,
+  MIN_DURATION_SEC,
+  MAX_DURATION_SEC,
 } from '@/lib/activity/detection-thresholds'
 
 type Row = Record<string, unknown>

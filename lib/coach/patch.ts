@@ -129,7 +129,7 @@ export const PatchChangeSchema = z.discriminatedUnion('field', [
   // — up to 50× tighter — so the model could write a number the form refuses. The bounds are now
   // imported per field from `GOAL_BOUNDS`, which is also where the user routes read them, so the
   // two cannot drift again.
-  ...(['calories', 'proteinG', 'carbsG', 'fatG', 'stepsGoal', 'calorieGoal', 'waterGoalMl'] as const).map(
+  ...(['calories', 'proteinG', 'carbsG', 'fatG', 'stepsGoal', 'waterGoalMl'] as const).map(
     f => z.object({
       id: z.string().min(1),
       field: z.literal(f),
@@ -137,6 +137,15 @@ export const PatchChangeSchema = z.discriminatedUnion('field', [
       to: goalBoundSchema(f),
     }),
   ),
+
+  // Issue 2622. The calorie goal is the user's OWN target: `to` sets it, null clears it back to the
+  // worked-out budget. `from` is the current own target, or null when there is none.
+  z.object({
+    id: z.string().min(1),
+    field: z.literal('calorieGoal'),
+    from: goalBoundSchema('calorieGoal').nullable(),
+    to: goalBoundSchema('calorieGoal').nullable(),
+  }),
 
   // ── program_phase (tier 3) ────────────────────────────────────────────────────
   z.object({
@@ -224,7 +233,7 @@ export const FIELD_LABEL: Record<PatchChange['field'], string> = {
   carbsG: 'Carbs',
   fatG: 'Fat',
   stepsGoal: 'Steps goal',
-  calorieGoal: 'Calorie goal',
+  calorieGoal: 'Own calorie target',
   waterGoalMl: 'Water goal',
   muscleName: 'Area',
   severity: 'Severity',

@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
@@ -401,6 +401,9 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
       setSaving(false)
     }
   }
+  // The footer is memo(); `handleSave` is new every render, so reach it through a ref (RV-179).
+  const handleSaveRef = useRef(handleSave); handleSaveRef.current = handleSave
+  const onSave = useCallback(() => { void handleSaveRef.current() }, [])
 
   /**
    * Set or clear a meal's photo from the meal's own screen (BF-46 ①a).
@@ -602,7 +605,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                   onEditMeal={openBuild}
                   onRequestDeleteMeal={requestDelete}
                   onLabelMeal={setLabelMeal}
-                  planSavedMealIds={planSavedMealIds}
+                  planSavedMealIds={planSavedMealIds} mealTypes={mealTypes}
                   onBuildFirst={openBuild}
                   onSelectFood={onSelectFood}
                   userId={userId}
@@ -755,7 +758,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
               saving={saving}
               editing={editingMeal != null}
               canSave={!!mealName.trim() && ingredients.length > 0}
-              onSave={handleSave}
+              onSave={onSave}
             />
             </>
             )}

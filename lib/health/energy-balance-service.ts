@@ -13,12 +13,15 @@ import {
   computeCalorieBalance, targetFromMaintenance, GOAL_DAILY_DELTA, scaleMacrosForEarnedKcal,
   macrosForKcal, budgetProvenance,
 } from '@trainingai/shared/nutrition/calorie-balance'
+import { ownTargetFromGoals } from '@trainingai/shared/nutrition/calorie-budget'
 import {
   resolveMaintenance, maintenanceGapMessage, activityFactor, MAX_WINDOW_DAYS, type MaintenanceDay,
 } from '@trainingai/shared/nutrition/adaptive-tdee'
 import {
   doseChangesInWindow, doseChangeCaveat, DOSE_HISTORY_LOOKBACK_DAYS,
 } from '@trainingai/shared/health/dose-change-caveat'
+import { goalDeficitKcal } from '@trainingai/shared/nutrition/calorie-budget'
+import { computeTrendWeightKg, weightTrendWindowStart } from '@trainingai/shared/health/long-term-goal-progress'
 import type { FitnessGoal } from '@trainingai/shared/types/user'
 import type { RestingRateSource } from '@trainingai/shared/nutrition/resting-rate-source'
 import type { WorkoutRepository } from '@/lib/data/repository'
@@ -44,6 +47,20 @@ export interface EnergyBalanceResult {
     /** The test date, when `restingRateSource` is 'measured'. The rate is that test re-scaled onto
      *  today's fat-free mass, so word it "carried forward from", never as the test's own figure. */
     restingRateMeasuredOn?: string | null
+    /** #2071. The goal's deficit (kcal/day, positive = below the burn) the budget was built with.
+     *  Optional so a payload cached before it existed still types — `budgetProvenance` then returns
+     *  the budget that payload's `remainingKcal` was computed against. */
+    deficitKcal?: number | null
+    /** #2071. The step credit taken out of the 20% (see `calorieBudget`). Optional for old payloads. */
+    stepCreditKcal?: number | null
+    /** #2071. THE day's budget, `budgetProvenance(balance).total`, for server readers to quote. */
+    budgetKcal?: number
+    /** Issue 2622. The user's own target when one is set; `budgetKcal` IS this number then. */
+    ownTargetKcal?: number | null
+    /** #2071 (b). The weight the deficit was computed from, to 0.1 kg, and which one it was: the
+     *  smoothed 30-day trend, or the latest weigh-in when there is no trend yet. */
+    deficitWeightKg?: number | null
+    deficitWeightSource?: 'trend' | 'latest' | null
     zone: string
     zoneLabel: string
     zoneColor: string
@@ -123,11 +140,15 @@ export async function computeEnergyBalance(
   // MAX_WINDOW_DAYS of COMPLETED days ending yesterday — `date` is excluded from the calibration
   // (see windowDays below), so the window starts one day further back than the span it covers.
   const windowStart = shiftDateStr(date, -MAX_WINDOW_DAYS)
+  // #2071 (b). The deficit reads the Body screen's 30-day Weight Trend, whose window starts a day or
+  // two before the calibration window, so the weigh-ins are read from whichever starts first.
+  const trendStart = weightTrendWindowStart(date)
+  const metricsStart = trendStart < windowStart ? trendStart : windowStart
 
   // The whole window is fetched, not just the requested day: a calibrated maintenance needs the
   // window's average movement to separate resting burn from habitual movement (see below).
   const [metrics, foodSummary, activityLogs, workouts, targets, userGoals, profile, dayCheckins, bodyFatCalibration, measuredRmr] = await Promise.all([
-    repo.listBodyMetrics(userId, windowStart, date).catch(() => []),
+    repo.listBodyMetrics(userId, metricsStart, date).catch(() => []),
     repo.listFoodLogsSummary(userId, windowStart, date).catch(() => []),
     repo.listActivityLogs(userId, windowStart, date).catch(() => []),
     repo.getWorkoutSessionsFrom(userId, localMidnightUtc(windowStart, tz)).catch(() => []),
@@ -206,7 +227,24 @@ export async function computeEnergyBalance(
   }
 
   const intakeKcal = Math.round(intakeByDate.get(date) ?? 0)
+  // The RECOMMENDATION's offset (`target.recommendedKcal`, the TDEE nudge). Unchanged by #2071: it is
+  // what turns the maintenance estimate into a suggested stored goal, and the maintenance estimate is
+  // explicitly not this change's to move.
   const goalDeltaKcal = goal ? GOAL_DAILY_DELTA[goal] : 0
+  // #2071. The BUDGET's deficit, derived from the goal and the weight — never typed. Rounded here so
+  // the figure on the wire is exactly the one the budget was built with (see `computeCalorieBalance`).
+  //
+  // (b) The weight is the SMOOTHED 30-day trend — the Body screen's Weight Trend line read at its
+  // latest weigh-in (`computeTrendWeightKg`, the same fit as that card's rate, never a second
+  // smoothing). Fallback, stated: with fewer than three weigh-ins in the window there is no trend, and
+  // the latest weigh-in is used instead. The RMR keeps the latest weigh-in, as before.
+  const trendWeightKg = computeTrendWeightKg(metrics.filter(m => m.date >= trendStart && m.date <= date))
+  const deficitWeightKg = trendWeightKg ?? latestWeightKg
+  const deficitWeightSource: 'trend' | 'latest' | null =
+    trendWeightKg != null ? 'trend' : latestWeightKg != null ? 'latest' : null
+  const deficitKcal = Math.round(goalDeficitKcal({
+    goal, currentWeightKg: deficitWeightKg, targetWeightKg: userGoals?.targetWeightKg ?? null,
+  }))
 
   const missingProfileFields = [
     latestWeightKg == null ? 'weight' : null,
@@ -328,7 +366,16 @@ export async function computeEnergyBalance(
   // them never. This is the second one: resting base plus the movement actually measured. It fails
   // in unrelated ways to the intake/weight calibration, which is exactly what makes it a usable
   // check on it. For the owner on 2026-09-09 it read 1,895 against a calibrated 2,245.
-  const measuredMovementMaintenance = Math.round(formulaBaseline + avgActiveOverWindow)
+  //
+  // **#2474: built on the CREDITED base, not `formulaBaseline`.** `formulaBaseline` still holds the
+  // energy of the first 3,000 steps, and since BF-88 the movement total counts steps from the first
+  // one, so the same walking was in both terms and this read about one credit (~100 kcal for the
+  // owner) high, which made the `above_measured_movement` ceiling that much looser. The credited
+  // base is what the measured activity factor below already uses. The 1.15 ratio is unchanged, and
+  // the owner signed it off on 2026-10-06 with 0 of 41 days moving.
+  const stepBaseCreditKcal = stepEnergyKcal(energyProfile, STEP_BASE_CREDIT)
+  const formulaRestingBaseKcal = Math.max(Math.round(bmr), formulaBaseline - stepBaseCreditKcal)
+  const measuredMovementMaintenance = Math.round(formulaRestingBaseKcal + avgActiveOverWindow)
 
   const { maintenanceKcal, source, estimate } =
     resolveMaintenance(windowDays, formulaBaseline, bmr, measuredMovementMaintenance)
@@ -355,7 +402,7 @@ export async function computeEnergyBalance(
   // the base is `maintenance − avgActiveKcal` where `maintenance` is MEASURED: lowering the step
   // floor raises `avgActiveKcal`, so the subtraction already happens there. Applying the credit to
   // both double-subtracts it.
-  const stepBaseCreditKcal = stepEnergyKcal(energyProfile, STEP_BASE_CREDIT)
+  // (`stepBaseCreditKcal` is computed above the ceiling, which needs the same credited base.)
 
   // Floored at BMR for the same reason the calibrated branch is: a resting burn below BMR is not a
   // number this model is allowed to report, whatever the credit arithmetic says. It only binds for
@@ -363,7 +410,7 @@ export async function computeEnergyBalance(
   // is not a guarantee, and this is the cheaper half of being wrong.
   const restingBaseKcal = source === 'calibrated'
     ? Math.max(Math.round(bmr), Math.round(maintenanceKcal - avgActiveKcal))
-    : Math.max(Math.round(bmr), formulaBaseline - stepBaseCreditKcal)
+    : formulaRestingBaseKcal
 
   const currentKcal = targets?.calories ?? userGoals?.calorieGoal ?? null
 
@@ -374,20 +421,28 @@ export async function computeEnergyBalance(
   // anchored to the stored target instead. `bmr` is the measured RMR re-scaled onto today's fat-free
   // mass when there is one and a prediction otherwise, so the anchor tracks the body without
   // tracking the estimator. The stored target goes back to being a target (`target.currentKcal`).
+  // #2071: the goal's net is the budget's deficit (`targetNetKcal = −deficit`), so the coach's
+  // "target net" and the budget are one decision rather than the recommender's −200 beside it.
   const balance = computeCalorieBalance({
-    restingBaseKcal, activeKcal: activeEnergy.total, intakeKcal, goalDeltaKcal,
+    restingBaseKcal, activeKcal: activeEnergy.total, intakeKcal, goalDeltaKcal: 0 - deficitKcal, deficitKcal,
+    // (a) The first 3,000 steps' energy, out of the 20% — the same per-user credit the formula
+    // resting base above already takes, so the two halves of the energy model agree on it.
+    stepCreditKcal: stepBaseCreditKcal,
     // Rounded here rather than only inside `budgetProvenance`: this number goes on the wire, and a
     // float labelled kcal invites a consumer to print 1815.2992 where the card says 1,815.
     restingRateKcal: Math.round(bmr),
+    // Issue 2622. The override rides into the single budget function, so every number below
+    // (`budgetKcal`, `remainingKcal`, the zone, the macro fit) is measured against it.
+    ownTargetKcal: ownTargetFromGoals(userGoals),
   })
 
   const recommendedKcal = targetFromMaintenance(maintenanceKcal, goalDeltaKcal)
 
   // LB-50. The measured factor uses the FORMULA-path resting base on both paths, so it stays
   // independent of the calibration: on the calibrated path `restingBaseKcal` is derived from the
-  // maintenance itself and would just hand the calibrated factor back. It is also not
-  // `measuredMovementMaintenance`, which adds the movement to `formulaBaseline` — that still holds
-  // the BF-88 step credit the movement total now counts too, so it reads ~one credit high.
+  // maintenance itself and would just hand the calibrated factor back. Since #2474 it is the same
+  // base the ceiling (`measuredMovementMaintenance`) is built on, so the two cannot disagree about
+  // the step credit.
   const gapMessage = source === 'formula' ? maintenanceGapMessage(estimate) : null
   // #2184. Over the days the ACCEPTED estimate actually used — the long or the short window, both
   // ending yesterday — so a change only the 28-day window saw is not blamed on a 14-day figure.
@@ -399,7 +454,6 @@ export async function computeEnergyBalance(
         shiftDateStr(date, -estimate.daysInWindow), shiftDateStr(date, -1),
       ))
     : null
-  const formulaRestingBaseKcal = Math.max(Math.round(bmr), formulaBaseline - stepBaseCreditKcal)
   const calibratedFactor = source === 'calibrated' ? activityFactor(maintenanceKcal, bmr) : null
   const measuredFactor = windowDays.length > 0
     ? activityFactor(formulaRestingBaseKcal + avgActiveOverWindow, bmr)
@@ -411,6 +465,8 @@ export async function computeEnergyBalance(
       ...balance, intakeKcal, restingBaseKcal, activeKcal: activeEnergy.total,
       restingRateSource: measuredBmr != null ? 'measured' : 'formula',
       restingRateMeasuredOn: measuredBmr != null ? measuredRmr?.measuredOn ?? null : null,
+      deficitWeightKg: deficitWeightKg == null ? null : Math.round(deficitWeightKg * 10) / 10,
+      deficitWeightSource,
     },
     maintenance: {
       kcal: maintenanceKcal,
@@ -434,9 +490,12 @@ export async function computeEnergyBalance(
     },
     // The SAME inputs `computeCalorieBalance` was handed, so the grams are fitted to the very
     // budget the card prints rather than to a second derivation of it.
-    macroTargets: macroTargetsFor(activeEnergy.total, budgetProvenance({
+    // An own target does not grow with movement, so no earned kcal are added to the grams either.
+    macroTargets: macroTargetsFor(balance.ownTargetKcal != null ? 0 : activeEnergy.total, budgetProvenance({
       restingBaseKcal, activeKcal: activeEnergy.total,
       targetNetKcal: balance.targetNetKcal, restingRateKcal: Math.round(bmr),
+      deficitKcal: balance.deficitKcal, stepCreditKcal: balance.stepCreditKcal,
+      ownTargetKcal: balance.ownTargetKcal,
     }).base),
     activeBreakdown,
     goal,

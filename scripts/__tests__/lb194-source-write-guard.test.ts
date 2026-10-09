@@ -29,7 +29,8 @@ describe('the source-write guard (LB-194)', () => {
   })
 
   it('allows a fixture copy in a __check_fixture__ folder', () => {
-    const dir = path.join(root, 'components', '__check_fixture__')
+    // Issue 2707: its own child folder, so removing it cannot touch another suite's copy.
+    const dir = path.join(root, 'components', '__check_fixture__', '__fx_lb194-guard')
     mkdirSync(dir, { recursive: true })
     try {
       writeFileSync(path.join(dir, 'probe.tsx'), 'x')

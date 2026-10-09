@@ -2,9 +2,10 @@
 
 import { memo, useState } from 'react'
 import dynamic from 'next/dynamic'
+import { noHrDataCopy } from '@/components/health/hr-source-copy'
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { CARDIO_TRENDS_TTL } from '@trainingai/shared/cache-ttl'
-import type { WeeklyZoneStack, EfficiencyPoint, CadenceTrendPoint } from '@trainingai/shared/health/cardio-trends'
+import { zoneStacksUnmeasured, type WeeklyZoneStack, type EfficiencyPoint, type CadenceTrendPoint } from '@trainingai/shared/health/cardio-trends'
 
 const ZoneStackChart = dynamic(() => import('./zone-stack-chart').then((m) => ({ default: m.ZoneStackChart })), {
   ssr: false, loading: () => <div className="h-40 w-full" />,
@@ -20,6 +21,8 @@ interface CardioTrendsResponse {
   weeklyZoneStacks: WeeklyZoneStack[]
   efficiencyCurve: EfficiencyPoint[]
   cadenceTrend: CadenceTrendPoint[]
+  /** #2337 — false when nothing records heart rate; absent on a payload cached before it existed. */
+  hasHrSource?: boolean | null
 }
 
 const CACHE_KEY = 'cardio-trends'
@@ -68,7 +71,11 @@ export const CardioTrendsSection = memo(function CardioTrendsSection() {
       ) : !data ? (
         <div className="h-40 w-full animate-pulse rounded-xl bg-muted" />
       ) : view === 'zones' ? (
-        data.weeklyZoneStacks.length > 0 ? (
+        zoneStacksUnmeasured(data.weeklyZoneStacks, data.hasHrSource) ? (
+          <p className="py-6 text-center text-xs text-muted-foreground">
+            {noHrDataCopy(data.hasHrSource, 'workout')}
+          </p>
+        ) : data.weeklyZoneStacks.length > 0 ? (
           <ZoneStackChart weeks={data.weeklyZoneStacks} />
         ) : (
           <p className="text-xs text-muted-foreground">Not enough history yet — keep logging zone minutes.</p>

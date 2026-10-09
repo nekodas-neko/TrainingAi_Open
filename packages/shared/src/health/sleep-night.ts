@@ -78,6 +78,76 @@ export function recordsSleep(durationHours: number | null | undefined): boolean 
   return durationHours != null && durationHours > 0
 }
 
+/** The fields {@link preferDeviceNights} reads. A server `SleepSession` (Date windows) and a local
+ *  store row (ISO-string windows, null before SQLite v50) both satisfy it. */
+export interface RankableSleepRow {
+  date: string
+  sleepStart: Date | string | null
+  sleepEnd: Date | string | null
+  durationHours?: number | null
+  /** #2338 — true on a night the user entered by hand. Absent or false is a device night. */
+  manualEntry?: boolean | null
+  updatedAt?: Date | string | null
+}
+
+const instantMs = (v: Date | string | null | undefined): number | null => {
+  if (v == null) return null
+  const ms = (v instanceof Date ? v : new Date(v)).getTime()
+  return Number.isFinite(ms) ? ms : null
+}
+
+/**
+ * **The ranked source merge for whole nights (#2338): a night the user typed in loses to any device
+ * night for the same sleep.** The owner's condition when he approved manual entry (2026-10-05).
+ *
+ * Every row-level reader goes through this before it groups, merges or scores — the server's
+ * `listSleepSessions` and the device's `getSleepSessions` both return its output — so a manual night
+ * reaches a consumer only when no device saw that night. It cannot be left to the night pickers
+ * downstream: `groupSleepPeriods` would treat a typed 23:00-07:00 and a measured 23:20-06:40 as two
+ * fragments of one night and SUM them into a 15-hour night, and `mergeByDate` adds same-source rows
+ * the same way (a manual row and a Health Connect row both have a null `ouraId`).
+ *
+ * A manual row is dropped when a device row that records sleep
+ * - **overlaps its window** — the device saw part of the very sleep the user describes. It wins even
+ *   when it saw only part of it: the owner's rule is "device data wins", and a remembered bedtime for
+ *   a night the ring caught late has its own field (`manualSleepStart`, Q-519);
+ * - **is on the same wake date and is a night on any clock** — at least
+ *   {@link ALWAYS_NIGHT_MIN_HOURS}, the classifier's own bar, so a short daytime nap on that date
+ *   does not erase the night the user entered; or
+ * - **is on the same wake date and has no window** — a local row pulled before SQLite v50 cannot be
+ *   placed, and a device row of unknown shape still outranks a typed one.
+ *
+ * Deliberately timezone-free, so the two repositories can apply it without loading the user. And it
+ * is not `SOURCE_RANK`: that ladder ranks `manual` HIGHEST, because it is about a user correcting one
+ * measured field — the opposite question.
+ *
+ * Two manual rows for one date (two devices that each entered the night before either synced; the
+ * server's unique index stops it there) keep only the newest by `updatedAt`. Order is preserved.
+ */
+export function preferDeviceNights<T extends RankableSleepRow>(rows: readonly T[]): T[] {
+  const devices = rows.filter(r => !r.manualEntry && recordsSleep(r.durationHours))
+  const newestManualByDate = new Map<string, T>()
+  for (const r of rows) {
+    if (!r.manualEntry) continue
+    const incumbent = newestManualByDate.get(r.date)
+    if (!incumbent || (instantMs(r.updatedAt) ?? 0) >= (instantMs(incumbent.updatedAt) ?? 0)) {
+      newestManualByDate.set(r.date, r)
+    }
+  }
+  const shadowed = (m: T): boolean => {
+    const ms = instantMs(m.sleepStart)
+    const me = instantMs(m.sleepEnd)
+    return devices.some(d => {
+      const ds = instantMs(d.sleepStart)
+      const de = instantMs(d.sleepEnd)
+      if (ds == null || de == null) return d.date === m.date
+      if (ms != null && me != null && ds < me && de > ms) return true
+      return d.date === m.date && (d.durationHours ?? 0) >= ALWAYS_NIGHT_MIN_HOURS
+    })
+  }
+  return rows.filter(r => !r.manualEntry || (newestManualByDate.get(r.date) === r && !shadowed(r)))
+}
+
 /** {@link recordsSleep} for a whole window. */
 function hasSleep(w: SleepWindow): boolean {
   return recordsSleep(w.durationHours)
@@ -160,12 +230,22 @@ export function totalSleepHours<T extends SleepWindow>(period: SleepPeriod<T>): 
  * 2026-08-27 a 4.75 h daytime window (HRV 26.5 and RHR 74, i.e. awake values) replaced the real
  * 7.42 h night in `oura_daily_summary`, and readiness for that day scored on a nap that did not
  * happen. `nightForDate` below had the correct rule the whole time. Both now call this.
+ *
+ * **A short evening period is no date's night (#2487).** The same {@link isDatesNight} rule the
+ * aggregated pickers apply (#2456), read off the period as a whole: total sleep across its windows,
+ * from the first window's start to the last one's end — exactly the session {@link aggregateNight}
+ * would hand `canonicalNightForDate`. Without it, a date whose only night-band period was a one-hour
+ * evening bout got that bout as its night here, and the BLE rollup wrote it to `oura_daily_summary`
+ * with its evening HRV, heart rate and BDI. Such a date now has no night, the same as a date with no
+ * ring overnight; an evening sleep of {@link ALWAYS_NIGHT_MIN_HOURS} or more still counts.
  */
 export function nightPeriodsByDate<T extends SleepWindow>(
   periods: SleepPeriod<T>[],
+  tz: string,
 ): Map<string, SleepPeriod<T>> {
   const byDate = new Map<string, SleepPeriod<T>>()
   for (const period of periods) {
+    if (!isDatesNight(periodAsNight(period), tz)) continue
     const incumbent = byDate.get(period.date)
     if (incumbent && totalSleepHours(incumbent) >= totalSleepHours(period)) continue
     byDate.set(period.date, period)
@@ -173,17 +253,29 @@ export function nightPeriodsByDate<T extends SleepWindow>(
   return byDate
 }
 
+/** A period seen as the one session {@link aggregateNight} would make of it — the shape
+ *  {@link isDatesNight} reads. */
+function periodAsNight<T extends SleepWindow>(period: SleepPeriod<T>): DatedNight {
+  return {
+    date: period.date,
+    sleepStart: period.windows[0].sleepStart,
+    sleepEnd: period.windows[period.windows.length - 1].sleepEnd,
+    durationHours: totalSleepHours(period),
+  }
+}
+
 /**
  * The night belonging to a given wake day, or null. When a day somehow carries more than one night
- * period (a very early night plus a very late one), the longer wins — total sleep, not recency.
+ * period (a very early night plus a very late one), the longer wins — total sleep, not recency. A
+ * short evening period never counts (see {@link nightPeriodsByDate}).
  */
 export function nightForDate<T extends SleepWindow>(
   sessions: T[],
   date: string,
-  tz: string = DEFAULT_TZ,
+  tz: string,
 ): SleepPeriod<T> | null {
   const { nights } = groupSleepPeriods(sessions, tz)
-  return nightPeriodsByDate(nights).get(date) ?? null
+  return nightPeriodsByDate(nights, tz).get(date) ?? null
 }
 
 /**
@@ -197,14 +289,16 @@ export function nightForDate<T extends SleepWindow>(
  * of about 76, and readiness took that 42 as the previous night and scored 44.
  *
  * So the latest DATE is resolved first, and `nightPeriodsByDate` then picks that date's real night.
+ * A latest date holding only a short evening period is passed over for the date before it, as
+ * {@link canonicalLatestNight} does (#2487).
  */
 export function latestNight<T extends SleepWindow>(
   sessions: T[],
-  tz: string = DEFAULT_TZ,
+  tz: string,
 ): SleepPeriod<T> | null {
   const { nights } = groupSleepPeriods(sessions, tz)
   let latest: SleepPeriod<T> | null = null
-  for (const period of nightPeriodsByDate(nights).values()) {
+  for (const period of nightPeriodsByDate(nights, tz).values()) {
     if (!latest || period.date > latest.date) latest = period
   }
   return latest

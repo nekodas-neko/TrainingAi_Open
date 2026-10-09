@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { auth } from '@/auth'
 import { rateLimit } from '@/lib/rate-limit'
 import { reportServerError } from '@/lib/observability'
-import { offProductToNutrition, offFetchJson, fetchOffThumbDataUri, OFF_FIELDS, OFF_TIMEOUT_MS, type OffProduct } from '@trainingai/shared/nutrition/open-food-facts'
+import { offProductToNutrition, offFetchJson, fetchOffThumbDataUri, offThumbUrl, OFF_FIELDS, OFF_TIMEOUT_MS, type OffProduct } from '@trainingai/shared/nutrition/open-food-facts'
 import { FOOD_ITEM_IMAGE_MAX_BYTES } from '@trainingai/shared/nutrition/meal-image'
 
 // Built from `searchParams` below, not a raw client body — `.strict()` guards nothing today but
@@ -84,7 +84,7 @@ export async function GET(req: Request) {
   // `fetchOffThumbDataUri` swallows every failure and returns null, so this cannot turn a working
   // barcode scan into a failed one — the worst case is the placeholder tile BF-32 already ships.
   result.imageDataUri = await fetchOffThumbDataUri(
-    (data.product as OffProduct).image_front_thumb_url,
+    offThumbUrl(data.product as OffProduct),
     FOOD_ITEM_IMAGE_MAX_BYTES,
   )
 

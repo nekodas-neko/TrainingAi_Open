@@ -85,7 +85,7 @@ export default function WorkoutSelectContent() {
 
   // Current session index + swipe direction for AnimatePresence
   const [currentIdx, setCurrentIdx] = useState(0);
-  const [hasSeeded, setHasSeeded] = useState(false);
+  const [, setHasSeeded] = useState(false);
   const [recommendedId, setRecommendedId] = useState<string | null>(null);
   const [direction, setDirection] = useState(0); // -1 = swiped up (next), 1 = swiped down (prev)
   const recovery = useCachedValue<{ muscles: MuscleRecoveryEntry[] }>(
@@ -94,6 +94,11 @@ export default function WorkoutSelectContent() {
   const recoveryMuscles = recovery?.muscles ?? EMPTY_RECOVERY;
   const [phaseStatus, setPhaseStatus] = useState<import('@/app/api/workout-data/route').PhaseStatus | null>(null);
   const [perSessionPhaseStatus, setPerSessionPhaseStatus] = useState<import('@/app/api/workout-data/route').PerSessionPhaseStatus[]>([]);
+  // "~N min" per session (#2362) — the duration model's number, computed server-side from the
+  // program's styles; `recommendedEstMin` is the prescription-aware one for today's pick, so this
+  // card and Home's read the same figure the session screen opens with.
+  const [estMinBySession, setEstMinBySession] = useState<Record<string, number>>({});
+  const [recommendedEstMin, setRecommendedEstMin] = useState<number | null>(null);
 
   const currentSession = sessions[currentIdx] ?? sessions[0];
   const p = getPaletteEntry(currentSession?.position ?? 0);
@@ -107,7 +112,9 @@ export default function WorkoutSelectContent() {
   const lastTrained = useMemo(() => getLastTrainedLabel(currentSession, tz), [currentSession, dataEpoch, tz]);
   const trainedToday = lastTrained === "Trained today";
   const exCount = currentSession?.exercises.length ?? 0;
-  const estMin = Math.round(exCount * 9);
+  const estMin = currentSession
+    ? (currentSession.id === recommendedId ? recommendedEstMin : null) ?? estMinBySession[currentSession.id] ?? null
+    : null;
 
   const muscleActivations = useMemo(
     () => (library.length > 0 && currentSession ? buildMuscleActivations(currentSession, library) : []),
@@ -132,7 +139,7 @@ export default function WorkoutSelectContent() {
   // ── Data ─────────────────────────────────────────────────────────────────
 
   useLayoutEffect(() => {
-    const meta = readCacheSync<{ program?: { sessions?: ProgramSession[] }; phaseStatus?: import('@/app/api/workout-data/route').PhaseStatus | null; perSessionPhaseStatus?: import('@/app/api/workout-data/route').PerSessionPhaseStatus[] }>("workout-data:meta");
+    const meta = readCacheSync<{ program?: { sessions?: ProgramSession[] }; phaseStatus?: import('@/app/api/workout-data/route').PhaseStatus | null; perSessionPhaseStatus?: import('@/app/api/workout-data/route').PerSessionPhaseStatus[]; estimatedMinBySession?: Record<string, number> }>("workout-data:meta");
     if (meta) setProgramLoaded(true);
     if (meta?.program?.sessions?.length) {
       const loaded = meta.program.sessions;
@@ -141,10 +148,12 @@ export default function WorkoutSelectContent() {
       const rec = readTodayCacheSync<NextSessionRecommendation>('next-session');
       if (rec?.session) {
         setRecommendedId(rec.session.id);
+        setRecommendedEstMin(rec.estimatedDurationMin ?? null);
         const idx = loaded.findIndex(s => s.id === rec.session!.id);
         if (idx >= 0) { setCurrentIdx(idx); setHasSeeded(true); }
       }
     }
+    if (meta?.estimatedMinBySession) setEstMinBySession(meta.estimatedMinBySession);
     if (meta?.phaseStatus) setPhaseStatus(meta.phaseStatus);
     if (meta?.perSessionPhaseStatus) setPerSessionPhaseStatus(meta.perSessionPhaseStatus);
     const lib = readCacheSync<{ exercises: ExerciseLibraryEntry[] }>("exercise-library");
@@ -156,14 +165,15 @@ export default function WorkoutSelectContent() {
     try {
       let loaded: ProgramSession[] = [];
       await Promise.all([
-        cachedFetch<{ program?: { sessions?: ProgramSession[] }; phaseStatus?: import('@/app/api/workout-data/route').PhaseStatus | null; perSessionPhaseStatus?: import('@/app/api/workout-data/route').PerSessionPhaseStatus[] }>(
+        cachedFetch<{ program?: { sessions?: ProgramSession[] }; phaseStatus?: import('@/app/api/workout-data/route').PhaseStatus | null; perSessionPhaseStatus?: import('@/app/api/workout-data/route').PerSessionPhaseStatus[]; estimatedMinBySession?: Record<string, number> }>(
           "workout-data:meta", "/api/workout-data?tab=meta", TTL_LONG,
-          (meta) => { loaded = meta?.program?.sessions ?? []; setSessions(loaded); setProgramLoaded(true); setPhaseStatus(meta?.phaseStatus ?? null); setPerSessionPhaseStatus(meta?.perSessionPhaseStatus ?? []); },
+          (meta) => { loaded = meta?.program?.sessions ?? []; setSessions(loaded); setProgramLoaded(true); setPhaseStatus(meta?.phaseStatus ?? null); setPerSessionPhaseStatus(meta?.perSessionPhaseStatus ?? []); setEstMinBySession(meta?.estimatedMinBySession ?? {}); },
         ),
         cachedFetchToday<NextSessionRecommendation>(
           'next-session', '/api/next-session', NEXT_SESSION_TTL,
           (rec) => {
             setRecommendedId(rec?.session?.id ?? null);
+            setRecommendedEstMin(rec?.estimatedDurationMin ?? null);
             setHasSeeded(prev => {
               if (!prev && rec?.session && loaded.length > 0) {
                 const idx = loaded.findIndex(s => s.id === rec.session!.id);
@@ -414,7 +424,7 @@ export default function WorkoutSelectContent() {
                   {exCount > 0 && (
                     <div className="flex flex-col items-end gap-0.5 flex-none text-xs text-muted-foreground">
                       <span>{exCount} exercises</span>
-                      <span>~{estMin} min</span>
+                      {estMin !== null && <span>~{estMin} min</span>}
                     </div>
                   )}
                 </motion.div>

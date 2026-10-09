@@ -35,6 +35,13 @@ interface UnitFixExerciseSummary {
 interface UnitFixResult {
   logs: UnitFixLogChange[];
   exercises: UnitFixExerciseSummary[];
+  alreadyConverted?: number;
+}
+
+// The sync-first line is not decoration: the push path has no merge rule (issue 2716), so a phone with
+// an unsynced edit to one of these workouts would push the old weights back over the converted ones.
+export function applyConfirmMessage(sessions: number, exercises: string[], beforeDate: string): string {
+  return `Convert ${sessions} session(s) for ${exercises.join(", ")} logged before ${beforeDate} from lbs to kg? This cannot be undone automatically. Sync your phone first (More → Data → Sync now). An unsynced edit to one of these workouts would put the old weights back.`;
 }
 
 export default function ExerciseUnitFix() {
@@ -152,10 +159,17 @@ export default function ExerciseUnitFix() {
         <div className="space-y-3 rounded-lg border p-3">
           {result.logs.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No sessions found for the selected exercise(s) before {beforeDate}.
+              {result.alreadyConverted
+                ? `Nothing to convert: ${result.alreadyConverted} session(s) before ${beforeDate} were already converted and are left alone.`
+                : `No sessions found for the selected exercise(s) before ${beforeDate}.`}
             </p>
           ) : (
             <>
+              {!!result.alreadyConverted && (
+                <p className="text-xs text-muted-foreground">
+                  {result.alreadyConverted} more session(s) were already converted and are left alone.
+                </p>
+              )}
               <div className="space-y-1">
                 {result.exercises.map(ex => (
                   <p key={ex.exerciseName} className="text-xs">
@@ -203,9 +217,7 @@ export default function ExerciseUnitFix() {
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
         title="Convert these weights to kg?"
-        message={result
-          ? `Convert ${result.logs.length} session(s) for ${selected.join(", ")} logged before ${beforeDate} from lbs to kg? This cannot be undone automatically.`
-          : ""}
+        message={result ? applyConfirmMessage(result.logs.length, selected, beforeDate) : ""}
         confirmLabel="Convert"
         onConfirm={applyFix}
       />

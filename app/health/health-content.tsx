@@ -13,6 +13,8 @@ import { ScreenHeader } from "@/components/shell/screen-header";
 import { todayInTz, shiftDateStr } from "@trainingai/shared/date-utils";
 import { weightTrendWindowStart } from "@trainingai/shared/health/long-term-goal-progress";
 import { getLocalStore } from "@/lib/local-store";
+import { localSleepRowsAsNights } from "@/lib/sleep/merge-sessions";
+import { sleepReplyWithPending } from "@/lib/sleep/manual-night-view";
 import { pushMutations, pullDelta } from "@/lib/local-store/sync-engine";
 import { PullToSync } from "@/components/pull-to-sync";
 import type { BodyMetaRow, WeekToDate, WeightTrendPoint } from "@/app/api/body-metadata/route";
@@ -21,7 +23,7 @@ import { cachedFetch, readCacheSync, setCached, cachedFetchToday, readTodayCache
 import { useDayRolloverRefresh } from '@/components/shell/local-day-provider';
 import { useUserTimezone } from '@/components/shell/user-timezone-provider';
 import { runWithConcurrency } from "@/lib/async/run-with-concurrency";
-import { invalidateReadinessInputs, invalidateOuraSync, invalidateBiometrics, invalidateHealthTrends, invalidateBodyMetricWrite } from "@/lib/cache-groups";
+import { invalidateReadinessInputs, invalidateOuraSync, invalidateBiometrics, invalidateHealthTrends, invalidateBodyMetricWrite, invalidatePulledDomains } from "@/lib/cache-groups";
 import { TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, HEALTH_TRENDS_SUMMARY_TTL } from '@trainingai/shared/cache-ttl';
 import type { HealthTrendsResponse } from "@/app/api/health/trends/route";
 import type { SleepDetailReading } from "@/components/health-metric-sheet";
@@ -40,6 +42,7 @@ import type { ReadinessScoreResponse } from '@/app/api/readiness-score/route'
 import { useBmiClassification, useWeightTrend, useEnergyBalanceToday } from "@/app/health/hooks/use-health-calcs";
 import { useInvalidationRefetch } from "@/lib/hooks/use-invalidation-refetch";
 import { DEFAULT_WATER_GOAL_ML } from '@trainingai/shared/nutrition/goal-recommendation';
+import { recentBodyRows } from '@trainingai/shared/health/body-recent-window';
 
 type Tab = "body" | "training" | "progress";
 
@@ -286,9 +289,13 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
         // this the corrected value flickers back to the scale's number whenever the local seed
         // arrives after the network. Carry the correction forward per date; a local row genuinely
         // newer than the server's is still the one that supplies the raw value and everything else.
+        // #2505: the SAME window the route calls `recent` — newest first, last 7 days — not the
+        // store's oldest-first month. Every reader of `metaRecent` (the latest-weight tile, the
+        // sparklines) assumes the network shape. The 30-day `filtered` below still feeds the weight
+        // trend and today's tile, which have their own windows.
         setMetaRecent(prev => {
           const corrected = new Map(prev.map(r => [r.date, r]));
-          return filtered.map(m => {
+          return recentBodyRows(filtered, todayInTz(tz)).map(m => {
             const row = toRow(m);
             const had = corrected.get(row.date);
             if (had?.bodyFatCorrected != null && had.bodyFat === row.bodyFat) {
@@ -317,7 +324,10 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
         });
         setMetaLoading(false);
       }
-      if (localSleep.length > 0) setSleepRows(localSleep as unknown as SleepRow[]);
+      // #2414: one row per night, newest first, as the route returns — not the raw per-session
+      // rows the store holds. Rows pulled before SQLite v50 carry no window and pass through
+      // unmerged; see `localSleepRowsAsNights` for why merging those would invent a night.
+      if (localSleep.length > 0) setSleepRows(localSleepRowsAsNights(localSleep));
     })();
     const networkPromise = Promise.all([
       cachedFetch<{ today: BodyMetaRow | null; recent: BodyMetaRow[]; weekToDate?: WeekToDate | null; activeEnergyKcalToday?: number | null; bodyFatCalibration?: BodyFatCalibrationMeta | null }>(
@@ -327,7 +337,8 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
       ),
       cachedFetch<SleepRow[]>(
         'sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM,
-        (data) => setSleepRows(Array.isArray(data) ? data : []),
+        // Issue 2667: the reply lags this device's own manual-night writes until the outbox pushes.
+        (data) => { void sleepReplyWithPending<SleepRow>(data, userId, tz).then(setSleepRows); },
       ),
       cachedFetchToday<ReadinessScoreResponse>(
         'readiness-score', '/api/readiness-score', READINESS_SCORE_TTL,
@@ -545,7 +556,9 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
     // The Oura Cloud half of this pull is gone (owner, 2026-08-13): the ring has been on our own
     // BLE key since the re-key, so the Cloud had nothing to hand back. The ring itself is drained
     // by the BLE service; a manual pull reconciles the outbox and re-reads local data.
-    if (userId) await pullDelta(userId, true).catch(() => {});
+    const pulled = userId ? await pullDelta(userId, true).catch(() => null) : null;
+    // What the pull wrote, beyond this screen's own caches below (#2550).
+    if (pulled) await invalidatePulledDomains(pulled.domains).catch(() => {});
     Promise.all([invalidateOuraSync(), invalidateBiometrics(), invalidateHealthTrends()])
       .then(() => refreshVisibleHealthData())
       .catch(() => {});

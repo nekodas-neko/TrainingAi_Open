@@ -53,6 +53,8 @@ export const SOFT_DELETED: Record<string, string> = {
   session_exercises: 'deleted_at',
   rest_days: 'deleted_at',
   set_logs: 'deleted_at',
+  // issue 2606: only a manual night the user removed is ever tombstoned
+  sleep_sessions: 'deleted_at',
   supplement_logs: 'deleted_at',
   supplement_vials: 'deleted_at',
   supplements: 'deleted_at',
@@ -110,6 +112,7 @@ export const EXPORTED: Record<string, ExportScope> = {
   season_results: { kind: 'user_id' },
   session_periodization: { kind: 'user_id' },
   set_hr_stats: { kind: 'user_id' },
+  shadow_readiness: { kind: 'user_id' },
   sleep_sessions: { kind: 'user_id' },
   sleep_verdicts: { kind: 'user_id' },
   step_live_windows: { kind: 'user_id' },
@@ -159,6 +162,23 @@ export const EXPORTED: Record<string, ExportScope> = {
   program_phases: { kind: 'via', predicate: 'EXISTS (SELECT 1 FROM public.phase_sets ps WHERE ps.id = t.phase_set_id AND ps.user_id = $1)' },
 }
 
+/**
+ * Lines that are NOT a table read: a repository call whose result is written as one more domain
+ * (#2427). `goals` was the only one, and it sat outside every list, so the coverage check could not
+ * see it — a new repo call added the same way would have been just as invisible, and could have read
+ * a table the map deliberately excludes.
+ *
+ * `scripts/check-export-coverage.js` now reads `full-export.ts` and fails when a `repo.<method>(`
+ * call or a literal `domain:` there is not declared here, when an entry here is no longer called,
+ * or when a `sourceTables` entry is not itself in `EXPORTED`. That last rule is the safety one: a
+ * derived line may only re-present data the export already carries, never reach around an
+ * exclusion. One entry per line — the check reads them with a line regex.
+ */
+export interface DerivedDomain { repoCall: string; sourceTables: string[]; reason: string }
+export const DERIVED_DOMAINS: Record<string, DerivedDomain> = {
+  goals: { repoCall: 'getUserGoals', sourceTables: ['users'], reason: 'the goal columns of the user\'s own row, named as the app names them; the same values are in the users line' },
+}
+
 /** Columns never written to a takeout, even from an exported table. */
 export const WITHHELD_COLUMNS: Record<string, string[]> = {
   users: ['password_hash'],
@@ -169,6 +189,7 @@ export const EXCLUDED: Record<string, Exclusion> = {
   apple_auth_attempts: { category: 'credentials', reason: 'short-lived authentication challenges' },
   // ── Credentials. Exporting these hands the reader a working key. ────────────
   oura_tokens: { category: 'credentials', reason: 'OAuth/PAT credentials and the webhook signing key' },
+  native_refresh_tokens: { category: 'credentials', reason: 'credential material: refresh-token hashes for the native app sign-in (#2076)' },
 
   // ── Shared catalogue. Seed data the app ships, not anything the user created. ─
   activity_types: { category: 'catalogue', reason: 'shipped catalogue of activity types' },
@@ -180,6 +201,7 @@ export const EXCLUDED: Record<string, Exclusion> = {
 
   // ── App-internal bookkeeping. Not the user's content, and meaningless outside this database. ─
   ai_call_log: { category: 'ops', reason: 'token/latency accounting, no user content' },
+  agent_action_log: { category: 'ops', reason: 'audit trail of maintenance jobs agents ran (#2381); a job run on their data is not content the user created' },
   prescription_shadow: { category: 'ops', reason: 'BF-199 evidence: the given prescription beside what the rules prescriber would have said. Derived per model call, nothing the user wrote, and it duplicates the prescription the export already carries' },
   app_load_metrics: { category: 'ops', reason: 'page-load timing telemetry, pruned at 14 days' },
   applied_mutations: { category: 'ops', reason: 'sync idempotency ledger' },
@@ -193,6 +215,7 @@ export const EXCLUDED: Record<string, Exclusion> = {
   oura_bucket: { category: 'ops', reason: 'rollup working set' },
   oura_redecode_jobs: { category: 'ops', reason: 'decoder backfill job state' },
   oura_rollup_state: { category: 'ops', reason: 'rollup cursor' },
+  health_connect_history_import: { category: 'ops', reason: 'import-more-history progress cursor' },
   rate_limits: { category: 'ops', reason: 'request-timing keys that embed other users\' ids' },
   schema_migrations: { category: 'ops', reason: 'migration ledger' },
   // TN-54. Device-connection bookkeeping, the same category as its ring sibling

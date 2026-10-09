@@ -111,6 +111,7 @@ export const DEVICE_LOCAL_PREFERENCES: Readonly<Record<string, string>> = Object
   ta_pref_run_chip: 'drives an Android status-bar chip; meaningless outside the APK',
   ta_ring_auto_capture: 'the ring is paired to one device over BLE; a second device cannot act on this',
   ta_ring_continuous_capture: 'the ring is paired to one device over BLE; a second device cannot act on this',
+  ta_ring_raw_prune: 'prunes this phone\'s own raw ring store (oura_raw.db); another device has no such store, and a sign-out must not quietly re-enable or disable a delete the owner chose (#2579)',
   ta_paired_hr_strap_v1: 'a BLE pairing belongs to the device that holds it',
   ta_paired_scale_v1: 'a BLE pairing belongs to the device that holds it',
   ta_scale_bg_sync_v1: 'background scale sync runs on the paired device only',

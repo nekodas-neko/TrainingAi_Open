@@ -53,7 +53,9 @@ export function DeloadInfoSheet({ exercise, onClose, onToggleRevert }: DeloadInf
         {exercise && (
           <div className="space-y-4 px-1 pb-2">
             <p className="text-sm text-amber-700 dark:text-amber-400">
-              {exercise.deloadNote ?? "Deload — sore muscle flagged in your check-in"}
+              {/* #2405. A neutral label, not a guess: this used to claim a sore muscle for every deloaded row
+                with no note, which a sick day, a high-load day and a deload phase all hit. */}
+              {exercise.deloadNote ?? "Deload"}
             </p>
             <div className="space-y-1 text-sm tabular-nums">
               <p>

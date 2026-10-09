@@ -38,6 +38,9 @@ describe('scripts/run-custom-rules.js', () => {
   it('is the gate `pnpm ci:local` runs, not a subset of check scripts', () => {
     const pkg = JSON.parse(readFileSync(path.join(repoRoot, 'package.json'), 'utf8'))
     expect(pkg.scripts['check:rules']).toContain('scripts/run-custom-rules.js')
-    expect(pkg.scripts['ci:local']).toContain('check:rules')
+    // ci:local is `node scripts/ci-local.mjs` (issue 2144); the step list lives in that script.
+    expect(pkg.scripts['ci:local']).toContain('scripts/ci-local.mjs')
+    const runner = readFileSync(path.join(repoRoot, 'scripts/ci-local.mjs'), 'utf8')
+    expect(runner).toContain("'check:rules'")
   })
 })

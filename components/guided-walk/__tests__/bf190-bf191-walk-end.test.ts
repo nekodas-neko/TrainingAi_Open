@@ -46,7 +46,7 @@ describe('BF-190 — the elapsed time reaches the summary', () => {
     const s = src(SUMMARY)
     // The three fields BF-190 named: duration, end time, average pace.
     expect(s).toMatch(/const durationMin = Math\.round\(actualSec \/ 60\)/)
-    expect(s).toMatch(/msToHHMMInTz\(startedAtMs \+ actualSec \* 1000\)/)
+    expect(s).toMatch(/msToHHMMInTz\(startedAtMs \+ actualSec \* 1000,\s*tz\)/)
     expect(s).toMatch(/computeAvgPaceSecPerKm\(distanceKm!,\s*actualSec\)/)
     // …and none of them is still reading plan.totalSec.
     expect(s).not.toMatch(/Math\.round\(plan\.totalSec \/ 60\)/)

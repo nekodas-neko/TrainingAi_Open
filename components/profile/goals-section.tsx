@@ -10,14 +10,15 @@ import type { ActivityLevel, FitnessGoal } from '@trainingai/shared/types/user'
 import { invalidateGoalRecommendations } from '@/lib/cache-groups'
 import {
   hydrateGoalSeeds, type GoalSeedValues,
-  STEPS_GOAL_KEY, STEPS_GOAL_TYPE_KEY, SLEEP_GOAL_KEY, CALORIE_GOAL_KEY, CALORIE_TYPE_KEY,
-  WATER_GOAL_KEY, WATER_GOAL_TYPE_KEY, TARGET_WEIGHT_KEY, TARGET_BF_KEY,
+  STEPS_GOAL_KEY, STEPS_GOAL_TYPE_KEY, SLEEP_GOAL_KEY,
+  CALORIE_GOAL_KEY, CALORIE_TYPE_KEY, WATER_GOAL_KEY, WATER_GOAL_TYPE_KEY, TARGET_WEIGHT_KEY, TARGET_BF_KEY,
 } from '@/lib/home/home-prefs'
 import { formatDateDisplay, todayInTz } from '@trainingai/shared/date-utils'
 import { displayBodyFat, type BodyFatReading } from '@/components/health/body-fat-display'
 import { cachedFetch, isBodyMetadataFresh } from '@/lib/sqlite/cache'
 import { TTL_LONG, TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import type { MeasuredRmr } from '@trainingai/shared/health/body-composition'
+import { ownTargetFromGoals } from '@trainingai/shared/nutrition/calorie-budget'
 import { goalBaseline } from './goal-baseline'
 import { RequiredInfoSection } from './required-info-section'
 import { GoalTargetsSection } from './goal-targets-section'
@@ -50,8 +51,9 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
   const [stepsGoalStr, setStepsGoalStr] = useState('')
   const [stepsGoalType, setStepsGoalType] = useState<'daily' | 'weekly'>('daily')
   const [sleepGoalStr, setSleepGoalStr] = useState('')
-  const [calorieGoalStr, setCalorieGoalStr] = useState('')
-  const [calorieGoalType, setCalorieGoalType] = useState<'daily' | 'weekly'>('daily')
+  // Issue 2622. The stored own target (`calorie_goal` flagged 'own'), or null while the worked-out
+  // budget rules. The retired typed goal and its Daily/Weekly switch are no longer held here.
+  const [ownCalorieTarget, setOwnCalorieTarget] = useState<number | null>(null)
   const [waterGoalStr, setWaterGoalStr] = useState('')
   const [waterGoalType, setWaterGoalType] = useState<'daily' | 'weekly'>('daily')
   const [targetWeightStr, setTargetWeightStr] = useState('')
@@ -70,10 +72,10 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
     if (st === 'weekly') setStepsGoalType('weekly')
     const slg = localStorage.getItem(SLEEP_GOAL_KEY)
     if (slg) setSleepGoalStr(slg)
-    const cg = localStorage.getItem(CALORIE_GOAL_KEY)
-    if (cg) setCalorieGoalStr(cg)
-    const ct = localStorage.getItem(CALORIE_TYPE_KEY)
-    if (ct === 'weekly') setCalorieGoalType('weekly')
+    setOwnCalorieTarget(ownTargetFromGoals({
+      calorieGoal: Number(localStorage.getItem(CALORIE_GOAL_KEY)) || null,
+      calorieGoalType: localStorage.getItem(CALORIE_TYPE_KEY),
+    }))
     const wg = localStorage.getItem(WATER_GOAL_KEY)
     if (wg) setWaterGoalStr(wg)
     const wt = localStorage.getItem(WATER_GOAL_TYPE_KEY)
@@ -98,8 +100,7 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
       setStepsGoalStr(d.stepsGoal != null ? String(d.stepsGoal) : '')
       setStepsGoalType(d.stepsGoalType === 'weekly' ? 'weekly' : 'daily')
       setSleepGoalStr(d.sleepGoalHours != null ? String(d.sleepGoalHours) : '')
-      setCalorieGoalStr(d.calorieGoal != null ? String(d.calorieGoal) : '')
-      setCalorieGoalType(d.calorieGoalType === 'weekly' ? 'weekly' : 'daily')
+      setOwnCalorieTarget(ownTargetFromGoals(d))
       setWaterGoalStr(d.waterGoalMl != null ? String(d.waterGoalMl) : '')
       setWaterGoalType(d.waterGoalType === 'weekly' ? 'weekly' : 'daily')
       setTargetWeightStr(d.targetWeightKg != null ? String(d.targetWeightKg) : '')
@@ -211,19 +212,38 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
     else if (value.trim() === '') patchGoalsDebounced({ sleepGoalHours: null })
   }
 
-  function handleCalorieGoalChange(value: string) {
-    setCalorieGoalStr(value)
-    localStorage.setItem(CALORIE_GOAL_KEY, value)
-    const n = parseInt(value)
-    if (!isNaN(n) && n > 0) patchGoalsDebounced({ calorieGoal: n })
-    else if (value.trim() === '') patchGoalsDebounced({ calorieGoal: null })
+  // Issue 2622. Setting or clearing the own target is a deliberate save, not a debounced keystroke
+  // PATCH: a half-typed "1" must never reach the server, and the screen has to say when a save did not
+  // land. Each resolves null on success, or the message for the field.
+  async function writeOwnTarget(patch: { calorieGoal: number | null; calorieGoalType: 'own' | null }): Promise<string | null> {
+    try {
+      const res = await fetch('/api/user/goals', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => null) as { error?: unknown } | null
+        return typeof body?.error === 'string' ? body.error : "Couldn't save. Try again."
+      }
+    } catch {
+      return "Couldn't save. Check your connection and try again."
+    }
+    // Seeds only after the server has taken it (see `hydrateGoalSeeds`), then the one goals group:
+    // energy-balance, user-goals and nutrition-targets are what Nutrition, Home and the coach read.
+    try {
+      if (patch.calorieGoal == null) localStorage.removeItem(CALORIE_GOAL_KEY)
+      else localStorage.setItem(CALORIE_GOAL_KEY, String(patch.calorieGoal))
+      if (patch.calorieGoalType == null) localStorage.removeItem(CALORIE_TYPE_KEY)
+      else localStorage.setItem(CALORIE_TYPE_KEY, patch.calorieGoalType)
+    } catch { /* private mode: the server value is still what the next read gets */ }
+    setOwnCalorieTarget(patch.calorieGoalType === 'own' ? patch.calorieGoal : null)
+    await invalidateGoalRecommendations()
+    return null
   }
 
-  function handleCalorieGoalTypeChange(type: 'daily' | 'weekly') {
-    setCalorieGoalType(type)
-    localStorage.setItem(CALORIE_TYPE_KEY, type)
-    patchGoalsDebounced({ calorieGoalType: type })
-  }
+  const handleSetOwnCalorieTarget = (kcal: number) => writeOwnTarget({ calorieGoal: kcal, calorieGoalType: 'own' })
+  const handleClearOwnCalorieTarget = () => writeOwnTarget({ calorieGoal: null, calorieGoalType: null })
 
   function handleWaterGoalChange(value: string) {
     setWaterGoalStr(value)
@@ -355,10 +375,9 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
               onStepsGoalTypeChange={handleStepsGoalTypeChange}
               sleepGoalStr={sleepGoalStr}
               onSleepGoalChange={handleSleepGoalChange}
-              calorieGoalStr={calorieGoalStr}
-              onCalorieGoalChange={handleCalorieGoalChange}
-              calorieGoalType={calorieGoalType}
-              onCalorieGoalTypeChange={handleCalorieGoalTypeChange}
+              ownCalorieTargetKcal={ownCalorieTarget}
+              onSetOwnCalorieTarget={handleSetOwnCalorieTarget}
+              onClearOwnCalorieTarget={handleClearOwnCalorieTarget}
               waterGoalStr={waterGoalStr}
               onWaterGoalChange={handleWaterGoalChange}
               waterGoalType={waterGoalType}
@@ -403,7 +422,6 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
         onUserSaved={onUserSaved}
         onGoalsApplied={(applied) => {
           if (applied.stepsGoal != null) setStepsGoalStr(String(applied.stepsGoal))
-          if (applied.calorieGoal != null) setCalorieGoalStr(String(applied.calorieGoal))
           if (applied.waterGoalMl != null) setWaterGoalStr(String(applied.waterGoalMl))
         }}
         onApplied={() => setMacroRefreshKey(k => k + 1)}

@@ -8,6 +8,8 @@
 const fs = require('fs');
 const path = require('path');
 const { stripComments } = require('./lib/strip-comments');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
+const { readFilesUtf8, runMain } = require('./lib/read-sources');
 
 // Dash-only schemas still on disk. Q-130 (#1148) widened seven of the original eleven; these four
 // files are what remains, and none is fed from localDateString() — verified by tracing its call
@@ -29,45 +31,57 @@ const root = path.join(__dirname, '..');
 // line and silently missed both const-assigned copies.
 const DASH_ONLY = '/^\\d{4}-\\d{2}-\\d{2}';
 const offenders = new Map();
+const scanned = [];
 
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (['node_modules', '__tests__', '.next', 'dist'].includes(entry.name)) continue;
+      if (['node_modules', '__tests__', '.next', 'dist'].includes(entry.name) || isSkippedFixtureDir(entry.name)) continue;
       walk(full);
       continue;
     }
     if (!entry.name.endsWith('.ts')) continue;
-    const rel = path.relative(root, full).split(path.sep).join('/');
-    const lines = stripComments(fs.readFileSync(full, 'utf8')).split('\n');
-    lines.forEach((line, i) => {
-      if (!line.includes(DASH_ONLY)) return;
-      if (!offenders.has(rel)) offenders.set(rel, []);
-      offenders.get(rel).push(i + 1);
-    });
+    scanned.push({ full, rel: path.relative(root, full).split(path.sep).join('/') });
   }
 }
 
-for (const top of ['app', 'lib', 'packages']) {
-  const dir = path.join(root, top);
-  if (fs.existsSync(dir)) walk(dir);
+function scan(rel, content) {
+  // #2560: a file that never spells the literal is not stripped. Stripping keeps every character's
+  // position and only turns characters into whitespace, so it cannot create one.
+  if (!content.includes(DASH_ONLY)) return;
+  const lines = stripComments(content).split('\n');
+  lines.forEach((line, i) => {
+    if (!line.includes(DASH_ONLY)) return;
+    if (!offenders.has(rel)) offenders.set(rel, []);
+    offenders.get(rel).push(i + 1);
+  });
 }
 
-const newOffenders = [...offenders.keys()].filter(f => !GRANDFATHERED.has(f));
-const fixed = [...GRANDFATHERED].filter(f => !offenders.has(f));
+runMain(async () => {
+  for (const top of ['app', 'lib', 'packages']) {
+    const dir = path.join(root, top);
+    if (fs.existsSync(dir)) walk(dir);
+  }
+  // Read together (lib/read-sources.js), scanned in walk order so offenders keep their order.
+  const contents = await readFilesUtf8(scanned.map(f => f.full));
+  scanned.forEach((f, k) => scan(f.rel, contents[k]));
 
-if (newOffenders.length > 0) {
-  console.error('Dash-only date regex in a Zod schema — the client\'s localDateString() emits YYYY/MM/DD with SLASHES, so this rejects every such request with a Zod error before the handler runs (CLAUDE.md: Date Arithmetic).');
-  console.error('Use /^\\d{4}[-/]\\d{2}[-/]\\d{2}$/ instead:');
-  for (const f of newOffenders) console.error(`  ${f}: line(s) ${offenders.get(f).join(', ')}`);
-  process.exit(1);
-}
+  const newOffenders = [...offenders.keys()].filter(f => !GRANDFATHERED.has(f));
+  const fixed = [...GRANDFATHERED].filter(f => !offenders.has(f));
 
-if (fixed.length > 0) {
-  console.error('These files no longer carry a dash-only date regex — remove them from GRANDFATHERED in this script so they stay fixed:');
-  for (const f of fixed) console.error(`  ${f}`);
-  process.exit(1);
-}
+  if (newOffenders.length > 0) {
+    console.error('Dash-only date regex in a Zod schema — the client\'s localDateString() emits YYYY/MM/DD with SLASHES, so this rejects every such request with a Zod error before the handler runs (CLAUDE.md: Date Arithmetic).');
+    console.error('Use /^\\d{4}[-/]\\d{2}[-/]\\d{2}$/ instead:');
+    for (const f of newOffenders) console.error(`  ${f}: line(s) ${offenders.get(f).join(', ')}`);
+    process.exit(1);
+  }
 
-console.log(`check-date-param-regex: no new dash-only date schemas (${GRANDFATHERED.size} pre-existing awaiting widening).`);
+  if (fixed.length > 0) {
+    console.error('These files no longer carry a dash-only date regex — remove them from GRANDFATHERED in this script so they stay fixed:');
+    for (const f of fixed) console.error(`  ${f}`);
+    process.exit(1);
+  }
+
+  console.log(`check-date-param-regex: no new dash-only date schemas (${GRANDFATHERED.size} pre-existing awaiting widening).`);
+});

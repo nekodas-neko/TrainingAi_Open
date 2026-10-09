@@ -37,6 +37,7 @@
 const fs = require('fs');
 const path = require('path');
 const { stripComments } = require('./lib/strip-comments');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
 const root = path.join(__dirname, '..');
 
@@ -80,6 +81,7 @@ function walk(dir, out = []) {
   let entries;
   try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return out; }
   for (const e of entries) {
+    if (e.isDirectory() && isSkippedFixtureDir(e.name)) continue;
     if (e.name === 'node_modules' || e.name === '.next' || e.name === '__tests__') continue;
     const p = path.join(dir, e.name);
     if (e.isDirectory()) walk(p, out);

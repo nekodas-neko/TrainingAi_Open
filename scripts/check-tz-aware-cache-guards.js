@@ -16,6 +16,8 @@
 const fs = require('fs');
 const path = require('path');
 const { stripComments } = require('./lib/strip-comments');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
+const { readFilesUtf8, runMain } = require('./lib/read-sources');
 
 const root = path.join(__dirname, '..');
 const GUARDS = ['isBodyMetadataFresh', 'isWorkoutDataToday'];
@@ -26,7 +28,7 @@ const EXEMPT = new Set(['lib/sqlite/cache.ts', 'lib/__tests__/cache-fetch.test.t
 
 function walk(dir, out) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (e.name === 'node_modules' || e.name === '.next') continue;
+    if (e.name === 'node_modules' || e.name === '.next' || isSkippedFixtureDir(e.name)) continue;
     const p = path.join(dir, e.name);
     if (e.isDirectory()) walk(p, out);
     else if (/\.tsx?$/.test(e.name)) out.push(p);
@@ -40,45 +42,56 @@ const files = DIRS.filter(d => fs.existsSync(path.join(root, d)))
 const bad = [];
 let checked = 0;
 
-for (const abs of files) {
-  const rel = path.relative(root, abs).replace(/\\/g, '/');
-  if (EXEMPT.has(rel)) continue;
-  const src = stripComments(fs.readFileSync(abs, 'utf8'));
-  for (const guard of GUARDS) {
-    let from = 0;
-    for (;;) {
-      const i = src.indexOf(`${guard}(`, from);
-      if (i === -1) break;
-      from = i + guard.length;
-      // An import naming the guard is not a call.
-      const lineStart = src.lastIndexOf('\n', i) + 1;
-      const line = src.slice(lineStart, src.indexOf('\n', i));
-      if (/^\s*import\b/.test(line)) continue;
-      checked++;
-      // Walk the argument list to its matching close paren, counting only top-level commas so a
-      // nested call or an object literal in argument one is not mistaken for a second argument.
-      let depth = 0, comma = false, j = src.indexOf('(', i);
-      for (; j < src.length; j++) {
-        const c = src[j];
-        if (c === '(' || c === '[' || c === '{') depth++;
-        else if (c === ')' || c === ']' || c === '}') { depth--; if (depth === 0) break; }
-        else if (c === ',' && depth === 1) comma = true;
-      }
-      if (!comma) {
-        const lineNo = src.slice(0, i).split('\n').length;
-        bad.push(`${rel}:${lineNo}  ${guard}(…) has no timezone argument\n      ${line.trim()}`);
+// #2560: the files are read together rather than one after another (see lib/read-sources.js), and
+// a file that never spells `<guard>(` is not stripped at all. That skip cannot hide a call:
+// `stripComments` keeps every character's position and only ever turns one into whitespace, so
+// any `<guard>(` in the stripped text is the same characters at the same place in the raw text.
+const CALLS = GUARDS.map(g => `${g}(`);
+
+runMain(async () => {
+  const scanned = files.filter(abs => !EXEMPT.has(path.relative(root, abs).replace(/\\/g, '/')));
+  const contents = await readFilesUtf8(scanned);
+
+  for (let k = 0; k < scanned.length; k++) {
+    const rel = path.relative(root, scanned[k]).replace(/\\/g, '/');
+    if (!CALLS.some(c => contents[k].includes(c))) continue;
+    const src = stripComments(contents[k]);
+    for (const guard of GUARDS) {
+      let from = 0;
+      for (;;) {
+        const i = src.indexOf(`${guard}(`, from);
+        if (i === -1) break;
+        from = i + guard.length;
+        // An import naming the guard is not a call.
+        const lineStart = src.lastIndexOf('\n', i) + 1;
+        const line = src.slice(lineStart, src.indexOf('\n', i));
+        if (/^\s*import\b/.test(line)) continue;
+        checked++;
+        // Walk the argument list to its matching close paren, counting only top-level commas so a
+        // nested call or an object literal in argument one is not mistaken for a second argument.
+        let depth = 0, comma = false, j = src.indexOf('(', i);
+        for (; j < src.length; j++) {
+          const c = src[j];
+          if (c === '(' || c === '[' || c === '{') depth++;
+          else if (c === ')' || c === ']' || c === '}') { depth--; if (depth === 0) break; }
+          else if (c === ',' && depth === 1) comma = true;
+        }
+        if (!comma) {
+          const lineNo = src.slice(0, i).split('\n').length;
+          bad.push(`${rel}:${lineNo}  ${guard}(…) has no timezone argument\n      ${line.trim()}`);
+        }
       }
     }
   }
-}
 
-if (bad.length) {
-  console.error('Timezone-blind cache guard check failed:\n');
-  for (const b of bad) console.error(`  • ${b}\n`);
-  console.error(`  Pass the user's timezone — \`useUserTimezone()\` in a component, \`user?.timezone\``);
-  console.error(`  where the user object is already in scope. If there is genuinely none to pass,`);
-  console.error(`  pass \`undefined\` explicitly so the choice is visible in the diff.`);
-  process.exit(1);
-}
+  if (bad.length) {
+    console.error('Timezone-blind cache guard check failed:\n');
+    for (const b of bad) console.error(`  • ${b}\n`);
+    console.error(`  Pass the user's timezone — \`useUserTimezone()\` in a component, \`user?.timezone\``);
+    console.error(`  where the user object is already in scope. If there is genuinely none to pass,`);
+    console.error(`  pass \`undefined\` explicitly so the choice is visible in the diff.`);
+    process.exit(1);
+  }
 
-console.log(`check-tz-aware-cache-guards: OK — ${checked} call sites, all timezone-aware`);
+  console.log(`check-tz-aware-cache-guards: OK — ${checked} call sites, all timezone-aware`);
+});

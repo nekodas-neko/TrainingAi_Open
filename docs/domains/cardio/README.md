@@ -18,13 +18,30 @@ prescription coach, the cardio hub/trends/picker surfaces, and guided walk.
 | Fitness & load | `packages/shared/src/health/vo2max.ts`, `vdot.ts`, `training-stress.ts`, `cardio-trends.ts`, `session-picker.ts`, `fitness-tests.ts`, `packages/shared/src/fitness-tests/` |
 | UI | `app/cardio/`, `app/running/`, `app/baselines/`, `components/cardio/`, `components/running/`, `components/guided-walk/`, `components/cadence/` |
 
-**A walk can satisfy the day's prescribed run** (RV-166, v1.482.0) — the *Today's cardio* card
-(`components/cardio/todays-cardio-card.tsx`) states the criterion in zone terms and offers both routes;
-`lib/activity/link-prescribed-run.ts` is the one writer of the completion and **always** carries
-`completedAs`, because the planner reads a null as a run (LB-179). Device pass still owed —
+**The day's prescription is a heart-health activity, and any activity completes it through its minutes
+at moderate effort or above** (issue 2093, owner 2026-10-05, built to
+`docs/design/2026-10-05-heart-health-activity.html`; the floor moved from zone 2, 60% of heart-rate
+reserve, to moderate effort, 40%, on 2026-10-09 — issue 2746). The floor is `heartHealthFloorBpm` =
+`moderateIntensityBpm` (`MODERATE_INTENSITY_FRAC`, the same line WHO active minutes use), never a
+second constant. The rule lives once, in `packages/shared/src/running/heart-health.ts`
+(`heartHealthMinutes` counts each minute at or above the floor; `heartHealthVerdict`: the day's
+activities' counted minutes, each measured inside its own start–end window, against the
+prescribed minutes; `heartHealthRescore`: only a `pending` row moves, never a completed or skipped one).
+`lib/health/heart-health-service.ts` measures each activity against `getHrForWindow` and carries the
+week on the `running-plan` payload (`heartHealth.days`); the hub card
+(`components/cardio/todays-cardio-card.tsx`) shows today's progress and a *This week* history naming
+what was actually done. **How an activity was started no longer matters**: the save paths link
+nothing, and `useHeartHealthCompletion` (`lib/activity/heart-health-completion.ts`) records a measured
+day through `linkPrescribedRun`, the one client writer, which **always** carries `completedAs`
+(`'walk'` = any non-run) because the planner reads a null as a run (LB-179). Past days are re-scored
+by `POST /api/admin/backfill-heart-health` ([`docs/admin-actions.md`](../../admin-actions.md) §11).
+An activity with no start time, or no heart rate across it, has unknown zone minutes and counts
+nothing (this replaces RV-166's "estimated from logged minutes"). Device pass still owed —
 [`docs/overview/known-issues.md`](../../overview/known-issues.md).
 
-**ACWR has exactly one implementation** (`computeVolumeAcwr`) and clients render the route's
+**ACWR has exactly one implementation** (`computeVolumeAcwr`, the 7:28 call of `loadRatio`; its acute
+window is 7 local days since issue 2194, and `computeBlockTrend` is the 28:90 call, issue 2340) and
+clients render the route's
 `interpretation` rather than re-banding numbers — see [`docs/module-map.md`](../../module-map.md) §6.
 
 ## Reference docs

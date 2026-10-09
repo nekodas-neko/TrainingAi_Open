@@ -1,11 +1,24 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { requireAdmin, adminErrorResponse } from '@/lib/admin'
+import { z } from 'zod'
 import { runRedecodeOffLoop } from '@/lib/oura-ble/rollup-worker'
+import { startStressBackfillJob, describeRedecodeJob } from '@/lib/oura-ble/stress-backfill-job'
 import { rateLimit } from '@/lib/rate-limit'
 import { reportRollupStepErrors } from '@/lib/oura-ble/report-step-errors'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { getRepositoryAsync } from '@/lib/data'
+import { redecodeJobKind, REDECODE_BUSY_FOR_BACKFILL_MESSAGE, REDECODE_BUSY_FOR_STRESS_MESSAGE } from '@/lib/oura-ble/redecode-job-kind'
+
+// Issue 2236: `?stressBackfill=1` adds the daytime-stress buckets history never got. Its own strict
+// schema: any other parameter (date, dump, allowStepsDecrease, a typo) is a 400 rather than ignored,
+// so a request that mixes this mode with a redecode lever never runs as something it did not say.
+// `dryRun` is the dry run unless it is exactly `false`.
+const StressBackfillQuery = z.object({
+  stressBackfill: z.literal('1'),
+  async: z.literal('1'),
+  dryRun: z.enum(['true', 'false']).optional(),
+}).strict()
 
 // Re-stamp measured_at / event_name over stored rows, then re-aggregate into the
 // product tables. Under Lever 1 the decoders run during the re-aggregate (from the
@@ -31,15 +44,12 @@ export async function POST(req: Request) {
   // (see aggregateOuraRawSamples's steps step / upsertBodyMetrics sourceMap merge). Requires the
   // full-history redecode path (below) — irrelevant to dumpOnly, which writes nothing.
   const allowStepsDecrease = params.get('allowStepsDecrease') === '1'
-  // ?async=1 → return a job id immediately instead of holding the request open (Q-535).
-  //
-  // **Opt-in, not the default, and that is a lane seam rather than timidity.** Both existing callers
-  // read the synchronous shape and report completion from it: `oura-ble-debug.tsx` falls back to
-  // "redecode ran … data refreshed", and `step-backfill-console.tsx` says "Done. Backfill applied".
-  // Flipping the default without their poller would make both of them state that finished work had
-  // finished when it had only started — a quieter and more misleading failure than the 502 this
-  // replaces. `components/**` belongs to the other implementation lane, so the poller and the
-  // default flip are Q-318.
+  // ?async=1 → start a job and return its id (Q-535). The full-history pass REQUIRES it: it runs
+  // inside the one-at-a-time job slot (`oura_redecode_jobs`, migration 196), because two full-history
+  // passes at once are the event-loop starvation that took production down on 2026-08-13. A request
+  // that held the connection open instead never touched the slot, so it could run alongside a job
+  // that held it, and a second one alongside that. Every caller already sends `?async=1`
+  // (`runRedecodeJob` in components/oura-ble/redecode-job.ts), so nothing used that path.
   const asyncJob = params.get('async') === '1'
 
   try {
@@ -56,6 +66,19 @@ export async function POST(req: Request) {
   const tz = session.user.timezone ?? DEFAULT_TZ
   const repo = await getRepositoryAsync()
 
+  const stressRequested = params.has('stressBackfill')
+  let stressDryRun = true
+  if (stressRequested) {
+    const parsed = StressBackfillQuery.safeParse(Object.fromEntries(params))
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'stressBackfill takes only async=1 and an optional dryRun=true|false, and nothing else' },
+        { status: 400, headers: { 'Cache-Control': 'private, no-store' } },
+      )
+    }
+    stressDryRun = parsed.data.dryRun !== 'false'
+  }
+
   // Lightweight dump: no full re-decode, bounded (recent-window) aggregate — just enough to return
   // the requested night's per-epoch diagnostic without timing out.
   if (dumpOnly) {
@@ -64,48 +87,79 @@ export async function POST(req: Request) {
     return NextResponse.json({ scanned: 0, updated: 0, redecodeError: null, aggregated, aggregateError })
   }
 
-  // Both phases are re-runnable over the archival body_hex, so neither should ever
-  // 500 the request (a raw 500 shows as a scary "redecode failed" in the tester and
-  // hides the cause). They run independently and report per-phase errors as JSON —
-  // a redecode failure must not prevent the re-aggregate, and vice versa.
+  // The job's two phases are re-runnable over the archival body_hex, so neither 500s the request
+  // (a raw 500 shows as a scary "redecode failed" and hides the cause): they run independently and
+  // report per-phase errors into the job row. Both run in the rollup worker (Q-213). `fullHistory` is
+  // required: a new/fixed decoder backfills every stored day, so this must bypass the incremental
+  // read window and rebuild the full daily-summary table.
   //
-  // Both run in the rollup worker (Q-213). `fullHistory` is required: a new/fixed decoder backfills
-  // every stored day, so this must bypass the incremental read window and rebuild the full
-  // daily-summary table.
-  //
-  // Q-535: the request no longer WAITS for it. It used to, and on real data that exceeded the
-  // gateway timeout — so Railway returned 502 and the tester printed "redecode failed" for work
-  // that had completed (measured: `scanned=1098158`, every `sleep_sessions` row stamped after the
-  // 502 landed). That is not cosmetic: a false failure invites a retry, and a retry is another
-  // full-history pass of the operation whose own comment names it as the event-loop starvation that
-  // took production down on 2026-08-13. The UI was encouraging the thing most likely to hurt.
+  // Q-535: the request does not WAIT for it. It used to, and on real data that exceeded the gateway
+  // timeout — Railway returned 502 and the tester printed "redecode failed" for work that had
+  // completed (measured: `scanned=1098158`, every `sleep_sessions` row stamped after the 502
+  // landed). A false failure invites a retry, and a retry is another full-history pass. So a request
+  // for the full-history pass that does not say `?async=1` is refused, with nothing started.
   if (!asyncJob) {
-    // The original synchronous path, unchanged. Still 502s on real data — that is what `?async=1`
-    // exists to fix, and what Q-318 will switch the callers to.
-    const { redecoded, redecodeError, aggregated, aggregateError } = await runRedecodeOffLoop(
-      userId, tz, { debugDate, fullHistory: true, allowStepsDecrease }, true,
+    return NextResponse.json(
+      { error: 'The full-history redecode runs as a job. Call with ?async=1 and poll GET ?jobId=…' },
+      { status: 400, headers: { 'Cache-Control': 'private, no-store' } },
     )
-    if (redecodeError) console.error('[oura-ble] redecode failed:', redecodeError)
-    if (aggregateError) console.error('[oura-ble] re-aggregate failed:', aggregateError)
-    // The MOST blind of the three paths, not the least: this one holds the request open past the
-    // gateway timeout, so the 502 means the caller never receives the JSON that carries
-    // `stepErrors` at all. Q-535 is the record of that — work completing behind a response nobody
-    // sees. Reported before the return so it lands whether or not the response does.
-    reportRollupStepErrors(aggregated?.stepErrors, { userId, url: '/api/oura-ble/samples/redecode' })
-    return NextResponse.json({ ...(redecoded ?? { scanned: 0, updated: 0, restamped: 0 }), redecodeError, aggregated, aggregateError })
   }
 
-  const opts = { debugDate: debugDate ?? null, fullHistory: true, allowStepsDecrease }
+  if (stressRequested) {
+    // Issue 2381: the start lives in one place, shared with the agent key.
+    const started = await startStressBackfillJob(repo, userId, tz, stressDryRun)
+    if (started.state === 'refused') {
+      return NextResponse.json(
+        {
+          error: REDECODE_BUSY_FOR_STRESS_MESSAGE,
+          refused: true,
+          runningJobId: started.job.id,
+          runningKind: redecodeJobKind(started.job.opts),
+          requestedKind: redecodeJobKind({ fullHistory: true, stressBackfill: true, dryRun: stressDryRun }),
+        },
+        { status: 409, headers: { 'Cache-Control': 'private, no-store' } },
+      )
+    }
+    return NextResponse.json(
+      {
+        jobId: started.job.id, status: 'running', startedAt: started.job.startedAt.toISOString(),
+        alreadyRunning: started.state === 'following',
+        kind: redecodeJobKind(started.job.opts),
+        note: started.state === 'following'
+          ? 'A redecode is already running; this did not start a second. Poll this job id.'
+          : 'Started. Poll GET ?jobId=… for the report.',
+      },
+      { headers: { 'Cache-Control': 'private, no-store' } },
+    )
+  }
+
+  const opts: Record<string, unknown> = { debugDate: debugDate ?? null, fullHistory: true, allowStepsDecrease }
 
   // A job whose process died mid-run would otherwise hold the one-at-a-time slot forever. Reaped
   // here rather than by a sweeper — there is no cron layer in this app, and the only reader that
   // matters is the one asking whether it may start another.
   await repo.reapStaleRedecodeJobs(userId)
-  const { job, alreadyRunning } = await repo.startRedecodeJob(userId, opts)
+  const { job, alreadyRunning, refused } = await repo.startRedecodeJob(userId, opts)
+  // Issue 2383: a step backfill must never follow a run that will not apply the step correction.
+  // Refused rather than queued — no hidden queue, and the owner presses again once it finishes.
+  // Nothing was started and no row was written, so the caller has nothing to poll.
+  if (refused) {
+    return NextResponse.json(
+      {
+        error: REDECODE_BUSY_FOR_BACKFILL_MESSAGE,
+        refused: true,
+        runningJobId: job.id,
+        runningKind: redecodeJobKind(job.opts),
+        requestedKind: redecodeJobKind(opts),
+      },
+      { status: 409, headers: { 'Cache-Control': 'private, no-store' } },
+    )
+  }
   if (alreadyRunning) {
     return NextResponse.json(
       {
         jobId: job.id, status: 'running', startedAt: job.startedAt.toISOString(), alreadyRunning: true,
+        kind: redecodeJobKind(job.opts),
         note: 'A redecode is already running; this did not start a second. Poll this job id.',
       },
       { headers: { 'Cache-Control': 'private, no-store' } },
@@ -135,6 +189,7 @@ export async function POST(req: Request) {
   return NextResponse.json(
     {
       jobId: job.id, status: 'running', startedAt: job.startedAt.toISOString(), alreadyRunning: false,
+      kind: redecodeJobKind(job.opts),
       note: 'Started. Poll GET ?jobId=… — this can take minutes, and the response arriving before it finishes is the point.',
     },
     { headers: { 'Cache-Control': 'private, no-store' } },
@@ -174,25 +229,5 @@ export async function GET(req: Request) {
   const job = id != null ? await repo.getRedecodeJob(userId, id) : await repo.getLatestRedecodeJob(userId)
   if (!job) return NextResponse.json({ job: null }, { headers: { 'Cache-Control': 'private, no-store' } })
 
-  const phases = job.result as { redecodeError?: string | null; aggregateError?: string | null } | null
-  const status = job.finishedAt == null
-    ? 'running'
-    : job.error != null || phases?.redecodeError != null || phases?.aggregateError != null
-      ? 'failed'
-      : 'done'
-
-  return NextResponse.json(
-    {
-      job: {
-        jobId: job.id,
-        status,
-        startedAt: job.startedAt.toISOString(),
-        finishedAt: job.finishedAt?.toISOString() ?? null,
-        opts: job.opts,
-        error: job.error,
-        ...(job.result ?? {}),
-      },
-    },
-    { headers: { 'Cache-Control': 'private, no-store' } },
-  )
+  return NextResponse.json({ job: describeRedecodeJob(job) }, { headers: { 'Cache-Control': 'private, no-store' } })
 }

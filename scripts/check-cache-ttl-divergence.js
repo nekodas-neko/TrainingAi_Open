@@ -20,6 +20,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
 const root = path.join(__dirname, '..');
 const ROOTS = ['app', 'components', 'lib'];
@@ -102,6 +103,7 @@ function scan(file, rel) {
 
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory() && isSkippedFixtureDir(entry.name)) continue;
     const full = path.join(dir, entry.name);
     const rel = path.relative(root, full).split(path.sep).join('/');
     if (entry.isDirectory()) {

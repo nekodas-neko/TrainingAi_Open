@@ -51,15 +51,25 @@ A subagent does not inherit a sensible model: set `model` on every thread or hel
 
 **Cadence.** The Implementer loops every **~30 minutes**, not 15. When the inbox has nothing new, no
 thread needs it and `node scripts/queue.js --next-batch` returns nothing, it ends the tick at once
-without re-reading anything else. **Usage gate (automatic, owner 2026-10-06).** Every Orchestrator health check first reads
-`rate_limit_info` from the agents' session records (`get_session`). When its `status` turns
-`allowed_warning`, the Orchestrator:
-1. interrupts the sessions and stops its own helpers;
-2. posts **Pause** on #2354 with the reset time;
-3. schedules its next check for just after `resetsAt`.
+without re-reading anything else. **Usage gate (owner, 2026-10-09).** The tiers follow the highest usage percentage on either limit
+(weekly or 5-hour). The Implementer posts both percentages on #2354 every tick, because
+`get_session`'s `rate_limit_info` gives only a status (`allowed_warning` fires around 75%), a limit
+type and the reset time. The Orchestrator reads the percentage at every health check and posts the
+tier on #2354 when it changes:
 
-Once the status reads `allowed` again, it posts **Resume**. The record shows the status and reset
-time, not the percentage. The owner can still say "pause" at any time.
+- **Full (under 90%).** Full speed: two Implementer threads, taking `--next-batch` in priority order (P0 to P3, then oldest first), Opus for engine, migration and scoring
+  batches, investigations allowed, and Orchestrator helpers allowed. Health checks every 30 minutes.
+- **Slow (90–95%).** One thread at a time, on the most important work only (owner, 2026-10-09:
+  "prioritise the higher priority tasks"). The Implementer takes batches with
+  `node scripts/queue.js --next-batch --urgent-only`, which serves only **P0 and P1** batches, highest
+  priority first, with whatever model the batch needs. No investigations,
+  and no Orchestrator helpers; checks every 60 minutes. BugFix carries on.
+- **Halt (95% and over).** Work stops except a production-broken hotfix (`hotfix` label). The
+  Orchestrator interrupts the sessions, stops its helpers, posts **Halt** on #2354 with the reset
+  time, and schedules its next check for just after `resetsAt`.
+
+**After the reset**, the Orchestrator posts **Full** and everything restarts at full speed. The
+owner can override the tier at any time ("pause", "slow", "full").
 
 ## What the Orchestrator can do from the cloud
 
@@ -96,6 +106,24 @@ of that, the **Orchestrator can send instructions straight to a running agent** 
    `next`, then bugs, then the rest oldest first** — and groups 1–10 related ones (same files, same
    area) into a **milestone titled `Batch: <what it is>`**. One batch becomes one PR. A migration is
    always its own batch. The **owner** steers with the `next` label; nothing else needs his say.
+   **Every batch gets a priority from the Orchestrator** (owner, 2026-10-09: "push out the
+   important changes first"), at the start of its milestone description, followed by the model:
+   `P1 Opus. …`. **P0** production broken (hotfix) · **P1** do next: release-critical,
+   data-correctness bugs, work that unblocks other work, anything the owner marks `next` ·
+   **P2** owner-signed improvements and asked-for features · **P3** chores and long-range work.
+   `--next-batch` serves the highest priority first, then the oldest; a ready `hotfix` makes a batch
+   P0 and a ready `next` makes it at least P1. A batch with no priority sorts as P3, so the
+   Orchestrator sets one on every batch it creates and revisits them at each grooming pass.
+   The Orchestrator closes a batch milestone once it has no open issues, and keeps the queue ahead
+   of the Implementer: an idle Implementer with ready issues and no open batch is the
+   Orchestrator's miss.
+   **Grooming, daily (owner, 2026-10-08; weekly once the backlog is under control).** The
+   Orchestrator reads the open backlog and acts on what it finds: it closes what is already done,
+   superseded, a duplicate or stale (with the evidence: a merged PR or `file:line`), folds a
+   long-range programme's entries under one tracker, parks a someday idea with **`later`** (kept,
+   never queued; remove the label to queue it), unblocks an issue whose blocker has closed, and
+   batches what is ready. Read-only helpers may propose; only the Orchestrator applies, and a bug or
+   an owner-signed decision is never parked.
 4. The **Implementer** takes the oldest open batch (`node scripts/queue.js --next-batch`) and builds
    it as one PR; **BugFix** takes single small fixes labelled `agent: bugfix`. Either opens a draft PR with `Closes #N` when they start (that is the claim), and turn on
    auto-merge when it is ready.

@@ -69,12 +69,12 @@ describe('stale-surface-subscribe — each surface subscribes the key it reads',
   });
 
   it('RV-107 leaves exactly one fetch expression for nutrition-targets', () => {
-    // The TDEE card’s `onApplied` had a second, identical `cachedFetch` for this key — one write
-    // path fixed site-by-site while its siblings were not. Two expressions for one key is what the
-    // TTL-divergence rule exists to stop.
+    // The TDEE card’s `onApplied` had a second, identical `cachedFetch` for this key (the card is
+    // gone since issue 2622). Two expressions for one key is what the TTL-divergence rule exists to
+    // stop.
     const screen = src('app/nutrition/nutrition-content.tsx');
     expect(screen, 'the screen still fetches nutrition-targets itself').not.toMatch(/cachedFetch<NutritionTargets>/);
-    expect(screen).toMatch(/onApplied=\{refreshTargets\}/);
+    expect(screen).toMatch(/useNutritionTargetsRefresh\(setTargets\)/);
   });
 
   it('the HR card’s stress read was already correct and is left alone', () => {

@@ -95,12 +95,18 @@ export async function GET() {
   // against the target, so the target has to reflect the sessions those sets came from. Early in
   // the week nothing is logged and the list is empty, which scales by 1 — the accumulation
   // baseline, and exactly what the card showed before this existed.
+  //
+  // **`session_id`, not `program_session_id` (#2561).** `workout_sessions` has two foreign keys to
+  // `program_sessions`; `session_id` is the live one and `program_session_id` is dead (see the note
+  // above `workoutSessions` in the schema), NULL on every row. This read the dead one, so it always
+  // returned nothing and the phase scale was 1 whatever phase the week's sessions were in. The column
+  // is aliased to the name `phaseBySession` is keyed on below.
   const phaseRows = program ? await db.execute<{ program_session_id: string }>(sql`
-    SELECT ws.program_session_id
+    SELECT ws.session_id AS program_session_id
     FROM workout_sessions ws
     WHERE ws.user_id = ${userId}::uuid
       AND ws.started_at >= ${weekStartUtc.toISOString()}
-      AND ws.program_session_id IS NOT NULL
+      AND ws.session_id IS NOT NULL
       AND ws.deleted_at IS NULL
   `) : { rows: [] as { program_session_id: string }[] }
   const periodization = program ? await repo.listSessionPeriodizationForProgram(userId, program.id) : []

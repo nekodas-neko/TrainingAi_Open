@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@trainingai/shared/utils";
-import { EXERCISE_ROLES, EXERCISE_ROLE_LABEL } from "@/components/workout/exercise-role-labels";
+import { EXERCISE_ROLES, EXERCISE_ROLE_LABEL, MUSCLE_ROLES, MUSCLE_ROLE_LABEL } from "@/components/workout/exercise-role-labels";
 import { ExerciseLibraryDatalist, EXERCISE_LIBRARY_LIST_ID } from "@/components/config/exercise-library-datalist";
 import { getPaletteEntry } from "@trainingai/shared/session-palette";
 import { SortableRow } from "@/components/config/sortable-row";
@@ -836,11 +836,11 @@ export function ProgramEditorSheet({
                                     )}
                                     {/* 2-pill muscle assignment UI */}
                                     <div className="space-y-1.5 pt-0.5">
-                                      {(["main", "secondary"] as const).map(role => {
+                                      {MUSCLE_ROLES.map(role => {
                                         const muscles = role === "main" ? (ex.mainMuscles ?? []) : (ex.secondaryMuscles ?? []);
                                         const pillColor = role === "main" ? "bg-brand/10 border-brand/30" : "bg-amber-50 border-amber-300 dark:bg-amber-950/30 dark:border-amber-800";
                                         const chipColor = role === "main" ? "bg-brand text-brand-foreground" : "bg-amber-400 text-white";
-                                        const label = role === "main" ? "Primary" : "Secondary";
+                                        const label = MUSCLE_ROLE_LABEL[role];
                                         const available = MUSCLE_GROUPS.filter(g => !muscles.includes(g));
                                         return (
                                           <div key={role} className={cn("flex flex-wrap items-center gap-1.5 rounded-lg border px-2 py-1.5 min-h-[32px]", pillColor)}>

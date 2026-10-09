@@ -99,6 +99,16 @@ describe('GET /api/sleep-verdict', () => {
     const bands = record.bands as Record<string, number | null>
     expect(record.components).toEqual({ durationHours: 5.2, onsetMinutes: -60, efficiency: 89 })
     expect(bands.durationLow).toBeGreaterThan(5.2)
+    // #2094: the middle of each band is pinned beside its edges, inside them, never null when
+    // the band exists.
+    for (const c of ['duration', 'onset', 'efficiency'] as const) {
+      const median = bands[`${c}Median`]
+      expect(median).not.toBeNull()
+      expect(median as number).toBeGreaterThanOrEqual(bands[`${c}Low`] as number)
+      expect(median as number).toBeLessThanOrEqual(bands[`${c}High`] as number)
+    }
+    // Durations cycle 7.5/7.75/8.0/8.25 over 28 nights, so the middle is 7.875 exactly.
+    expect(bands.durationMedian).toBeCloseTo(7.875, 6)
     expect(record).not.toHaveProperty('responseState')  // the upsert must never set it
   })
 

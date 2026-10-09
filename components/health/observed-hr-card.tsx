@@ -72,8 +72,8 @@ export function ObservedHrCard() {
         )}
         {!obs.isReliable && !maxNote.standIn && (
           <p className="text-amber-600 dark:text-amber-400">
-            Not enough monitored heart-rate data yet for a confident max — wear the ring/strap on a few
-            harder sessions. Using the age estimate for now.
+            Not enough monitored heart-rate data yet for a confident max — a few harder sessions with
+            heart rate recorded will sharpen it. Using the age estimate for now.
           </p>
         )}
         {obs.isReliable && obs.highestPlausible != null && obs.max != null && (

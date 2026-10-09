@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
+import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 import { generateObject } from 'ai'
 import { userTextBlock, USER_TEXT_NOTE } from '@trainingai/shared/ai/untrusted-text'
 import { auth } from '@/auth'
@@ -23,6 +24,7 @@ import { macrosForDayType } from '@trainingai/shared/nutrition/rest-day-macros'
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { invalidBodyResponse } from '@/lib/api/route-errors'
+import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
 
 // The schema's own caps total well under 100 KB (200 excluded foods x 80 chars is the largest
 // array). 256 KB is generous past that.
@@ -149,12 +151,13 @@ export async function POST(req: Request) {
     ...(input.keepMeals ?? []).map(m => ({ id: null, name: m.name, ingredients: m.ingredients })),
   ].filter(m => m.ingredients.length > 0)
 
-  // The daily target is whatever the user's saved target says, falling back to what the
-  // calibration recommends. This route never derives a third number — see D4.
-  const dailyCalories = targets?.calories ?? balance.target.recommendedKcal
+  // Issue 2622. A plan is sized to the day's still-day budget (no movement counted) — the budget
+  // function's own `base`, which is the user's own target when they set one. This route never
+  // derives a number of its own; the saved `nutrition_targets.calories` no longer sizes anything.
+  const dailyCalories = balance.balance ? budgetProvenance(balance.balance).base : null
   if (dailyCalories == null) {
     return NextResponse.json(
-      { error: 'Set a calorie target first — add your weight, height, date of birth and sex in Profile.' },
+      { error: 'No calorie budget yet — add your weight, height, date of birth and sex in Profile.' },
       { status: 400 },
     )
   }
@@ -288,6 +291,8 @@ export async function POST(req: Request) {
           input.splitTrainingRest
             ? '- In "restDayAdjustment", say in one line what to change on a rest day (typically slightly fewer carbs).'
             : '- Return "" for "restDayAdjustment".',
+          '',
+          `${PROSE_FIELD_GUARDS}`,
         ].filter(Boolean).join('\n'),
       }))
     return result.object

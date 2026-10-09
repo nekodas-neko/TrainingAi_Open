@@ -6,6 +6,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { z } from 'zod'
 import { reportServerError } from '@/lib/observability'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
 
 // One exercise name, capped at 120 characters by the schema below.
 const MAX_BODY_BYTES = 4 * 1024
@@ -28,7 +29,9 @@ const SYSTEM_PROMPT = `You are a fitness expert. Given an exercise name, return:
 - normalizedName: the full proper name in Title Case — expand abbreviations (DB → Dumbbell, BB → Barbell, RDL → Romanian Deadlift, OHP → Overhead Press, etc.). If the input doesn't already specify equipment, prefix the name with the single most common equipment used to perform it (e.g. "Hip Thrust" → "Barbell Hip Thrust", "Bicep Curl" → "Dumbbell Bicep Curl", "Lateral Raise" → "Dumbbell Lateral Raise", "Leg Press" → "Machine Leg Press"). Only omit the prefix for exercises that are inherently bodyweight (e.g. "Push-Up", "Pull-Up", "Plank").
 - instructions: 2-4 sentences explaining setup, form cues, and execution
 - muscles: each with role "main" or "secondary"
-- equipment: the equipment matching the name's prefix must be listed first. Only add further entries if the exercise is commonly performed interchangeably with near-identical form on that equipment (e.g. dumbbell/kettlebell goblet squats).`
+- equipment: the equipment matching the name's prefix must be listed first. Only add further entries if the exercise is commonly performed interchangeably with near-identical form on that equipment (e.g. dumbbell/kettlebell goblet squats).
+
+${PROSE_FIELD_GUARDS}`
 
 export async function POST(req: NextRequest) {
   const session = await auth()

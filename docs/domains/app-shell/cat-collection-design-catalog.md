@@ -22,9 +22,9 @@ This file is only about the designs.
 |---|---|---|---|
 | **Tank** | workouts | grey cat; helmet → sword & shield → plate → cape & tower shield → crown & aura → gold horned helm | **wired** (workout ladder) |
 | **Ranger** | steps | ginger tabby; hood → bow → leather & quiver → cloak & longbow → laurel & aura → antlers & spirit bow | **wired** (steps ladder) |
-| **Mage** | sleep | blue-grey cat; wizard hat → moon staff → star robe → night cape & floating moon → gold-band hat & aura → mythic starfield | **wired** (sleep ladder, from this PR) |
-| **Rogue** | cardio (runs/walks) | black cat; bandit mask → dagger → twin daggers & vest → purple cape & scarf → circlet & aura → glowing daggers & smoke | art only (PS-49, rate open in PS-48) |
-| **Health cat** (Cleric art) | logging: sleep, food, weight | white cat; halo → staff → robe → wings → radiant halo & aura → great wings & star staff | art only (PS-49) |
+| **Mage** | sleep | blue-grey cat; wizard hat → moon staff → star robe → night cape & floating moon → gold-band hat & aura → mythic starfield | art only (the sleep ladder was retired by collection rules v2, #2187) |
+| **Rogue** | cardio (runs/walks) | black cat; bandit mask → dagger → twin daggers & vest → purple cape & scarf → circlet & aura → glowing daggers & smoke | **wired** (cardio ladder, #2187; provisional)|
+| **Health cat** (Cleric art) | logging: sleep, food, weight | white cat; halo → staff → robe → wings → radiant halo & aura → great wings & star staff | **wired** (health ladder, #2187) |
 | **Alchemist** | nutrition | cream cat; goggles → potion flask → apron → potion pack & big flask → gold goggles & aura → crown & philosopher's stone | art only, no ladder planned yet |
 | **Monk** | mood & recovery | brown cat; headband → prayer beads & hand wraps → saffron robe → cape & glowing beads → third eye & aura → lotus seat & orbs | art only, no ladder planned yet |
 

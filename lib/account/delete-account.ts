@@ -54,3 +54,10 @@ export async function deleteAccountAndSignOut(
   }
   return { ok: true }
 }
+
+/**
+ * Issue 2532 — the same prepare step as Sign Out: sync, recount, and list what deleting would leave
+ * unsent. Deleting is server-first, so unsent changes are about to be orphaned with the account; the
+ * dialog decides. Available only; `deleteAccountAndSignOut` above is unchanged.
+ */
+export { prepareSignOut as prepareAccountDeletion } from '@/lib/sign-out-pending'

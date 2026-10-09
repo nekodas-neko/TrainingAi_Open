@@ -17,7 +17,7 @@ import { Meteors } from "@/components/ui/meteors";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScreenHeader } from "@/components/shell/screen-header";
 import { toast } from "sonner";
-import { RefreshCwIcon, LayoutGridIcon, Clock, Dumbbell, Calendar, Eye } from "lucide-react";
+import { RefreshCwIcon, LayoutGridIcon, Eye } from "lucide-react";
 import { HomeSortableSection } from "@/components/home-sortable-section";
 import { DragDropProvider, PointerSensor } from "@dnd-kit/react";
 import { useHomeSectionDrag } from "@/lib/hooks/use-home-section-drag";
@@ -41,13 +41,15 @@ import { formatInTimeZone } from "date-fns-tz";
 import { cachedFetch, readCacheSync, setCached, cachedFetchToday, readTodayCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { useInvalidationRefetch } from "@/lib/hooks/use-invalidation-refetch";
-import { invalidateWorkoutSummaries, invalidateReadinessInputs, invalidateOuraSync, invalidateWorkoutMetaRefresh, invalidatePrescriptionChanged, invalidateUserProfile } from "@/lib/cache-groups";
+import { invalidateWorkoutSummaries, invalidateReadinessInputs, invalidateOuraSync, invalidateWorkoutMetaRefresh, invalidatePrescriptionChanged, invalidateUserProfile, invalidatePulledDomains } from "@/lib/cache-groups";
 import { mergeCalendarOverlay, readLocalCalendarOverlay } from "@/lib/calendar/local-overlay";
 import { syncOuraRing } from "@/lib/oura-ble/sync";
 import { getLocalStore } from "@/lib/local-store";
+import { localSleepRowsAsNights } from "@/lib/sleep/merge-sessions";
+import { useSleepReply } from "@/lib/sleep/use-sleep-reply";
 import { pushMutations, pullDelta, isSyncBackedOff } from "@/lib/local-store/sync-engine";
 import { PullToSync } from "@/components/pull-to-sync";
-import { BODY_BATTERY_TTL, TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, NEXT_SESSION_TTL, MOOD_TTL } from '@trainingai/shared/cache-ttl';
+import { TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, NEXT_SESSION_TTL, MOOD_TTL } from '@trainingai/shared/cache-ttl';
 import { GoalRecommendationSheet, type GoalRecommendationData } from '@/components/profile/goal-recommendation-sheet'
 import type { User } from '@trainingai/shared/types'
 import { HomeCardWidget } from "@/components/home/home-card-widget";
@@ -75,7 +77,7 @@ import {
   type MetaKey, type CardWidgetKey, type WidgetDef, type SectionKey,
   WIDGET_DEFS, DEFAULT_WIDGETS, DEFAULT_CARD_WIDGETS,
   loadPillColors, loadCardColors,
-  loadWidgets, loadCardWidgets, loadCalorieGoal, loadCalorieType, loadWeightLookback,
+  loadWidgets, loadCardWidgets, loadWeightLookback,
   loadStepsGoal, loadStepsGoalType, loadSleepGoal, loadWaterGoal, loadWaterGoalType,
   loadHiddenSections, buildDefaultOrder, loadSectionOrder,
 } from "@/lib/home/home-prefs";
@@ -90,8 +92,7 @@ import { useBodyBattery } from "@/lib/hooks/use-body-battery";
 // needs, plus `provisional`, which the local-store seed below cannot supply and which the Home
 // score chip reads. A `Pick` keeps the seed's narrow object literal assignable.
 type HomeSleepRow = Pick<SleepRow,
-  'date' | 'durationHours' | 'deepSleepHours' | 'remSleepHours' | 'lightSleepHours' | 'awakHours' | 'provisional'>;
-
+  'date' | 'durationHours' | 'deepSleepHours' | 'remSleepHours' | 'lightSleepHours' | 'awakHours' | 'sleepStart' | 'sleepEnd' | 'provisional'>;
 
 export default function SessionSelectContent({ userId, isAdmin }: { userId?: string; isAdmin?: boolean }) {
   const router = useTransitionRouter();
@@ -109,8 +110,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   // body-battery, training-load, muscle-recovery, oura-hr-day) instead of refetchAll
   // duplicating their fetch logic inline — one fetch call site per key, not two.
   const [refreshTick, setRefreshTick] = useState(0);
-  const [calorieGoal, setCalorieGoal]       = useState<number | null>(null);
-  const [calorieType, setCalorieType]       = useState<"daily" | "weekly">("daily");
   const [weightLookback, setWeightLookback] = useState<7 | 30>(7);
   const [logWidget, setLogWidget]           = useState<WidgetDef | null>(null);
   const [recommendation, setRecommendation] = useState<NextSessionRecommendation | null>(null);
@@ -139,6 +138,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [userAvatar, setUserAvatar] = useState<string | null>(null);
   const [sleepData, setSleepData] = useState<HomeSleepRow[]>([]);
+  const applySleepReply = useSleepReply<HomeSleepRow>(userId, tz, setSleepData); // issue 2667: apply pending manual-night writes
   // RV-85. `readiness === null` covers two different situations — still loading, and gave up — and
   // the row rendered nothing for both. `/api/readiness-score` has no null-payload path (it answers
   // a payload or an error status), so once `fetchWithRetry` reports exhaustion, null is a failure.
@@ -168,6 +168,9 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const [isAiDynamic, setIsAiDynamic] = useState(false)
   const [phaseStatus, setPhaseStatus] = useState<import('@/app/api/workout-data/route').PhaseStatus | null>(null)
   const [perSessionPhaseStatus, setPerSessionPhaseStatus] = useState<import('@/app/api/workout-data/route').PerSessionPhaseStatus[]>([])
+  // Duration-model "~N min" per program session (#2362), for the card's already-trained-today
+  // session; today's pick reads the prescription-aware figure off `recommendation` instead.
+  const [estMinBySession, setEstMinBySession] = useState<Record<string, number>>({})
   const [earlyDeloadDismissed, setEarlyDeloadDismissed] = useState(false)
   const [adminBadge, setAdminBadge] = useState(0)
   const [goalsProfile, setGoalsProfile] = useState<{ activityLevel: string | null; fitnessGoal: string | null; lastGoalReviewAt: string | null } | null>(null);
@@ -190,8 +193,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     setActiveCardWidgets(cards);
     setSectionOrder(loadSectionOrder(cards));
     setHiddenSections(loadHiddenSections());
-    setCalorieGoal(loadCalorieGoal());
-    setCalorieType(loadCalorieType());
     setWeightLookback(loadWeightLookback());
     setStepsGoal(loadStepsGoal());
     setStepsGoalType(loadStepsGoalType());
@@ -228,8 +229,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         setActiveCardWidgets(refreshedCards);
         setSectionOrder(loadSectionOrder(refreshedCards));
         setHiddenSections(loadHiddenSections());
-        setCalorieGoal(loadCalorieGoal());
-        setCalorieType(loadCalorieType());
         setWeightLookback(loadWeightLookback());
         setStepsGoal(loadStepsGoal());
         setSleepGoal(loadSleepGoal());
@@ -296,11 +295,13 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         if (d?.program?.sessions?.length) setActiveSessions(d.program.sessions);
         if (d?.phaseStatus) setPhaseStatus(d.phaseStatus);
         if (d?.perSessionPhaseStatus) setPerSessionPhaseStatus(d.perSessionPhaseStatus);
+        if (d?.estimatedMinBySession) setEstMinBySession(d.estimatedMinBySession);
       } else {
-        const cachedMeta = readCacheSync<{ program?: { sessions?: ProgramSession[]; phaseMode?: string }; phaseStatus?: import('@/app/api/workout-data/route').PhaseStatus | null; perSessionPhaseStatus?: import('@/app/api/workout-data/route').PerSessionPhaseStatus[] }>('workout-data:meta');
+        const cachedMeta = readCacheSync<{ program?: { sessions?: ProgramSession[]; phaseMode?: string }; phaseStatus?: import('@/app/api/workout-data/route').PhaseStatus | null; perSessionPhaseStatus?: import('@/app/api/workout-data/route').PerSessionPhaseStatus[]; estimatedMinBySession?: Record<string, number> }>('workout-data:meta');
         if (cachedMeta?.program?.sessions?.length) setActiveSessions(cachedMeta.program.sessions);
         if (cachedMeta?.phaseStatus) setPhaseStatus(cachedMeta.phaseStatus);
         if (cachedMeta?.perSessionPhaseStatus) setPerSessionPhaseStatus(cachedMeta.perSessionPhaseStatus);
+        if (cachedMeta?.estimatedMinBySession) setEstMinBySession(cachedMeta.estimatedMinBySession);
       }
     } catch { /* ignore */ }
 
@@ -527,7 +528,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
       // Fire next-session and streak in parallel with the meta fetch —
       // none of them depend on the sessions list, so there's no reason to sequence them.
       await Promise.all([
-        cachedFetch<{ program?: { sessions?: ProgramSession[]; schedule?: { type?: string; restAfterN?: number; days?: unknown[] }; phaseMode?: string }; phaseStatus?: import('@/app/api/workout-data/route').PhaseStatus | null; perSessionPhaseStatus?: import('@/app/api/workout-data/route').PerSessionPhaseStatus[] }>(
+        cachedFetch<{ program?: { sessions?: ProgramSession[]; schedule?: { type?: string; restAfterN?: number; days?: unknown[] }; phaseMode?: string }; phaseStatus?: import('@/app/api/workout-data/route').PhaseStatus | null; perSessionPhaseStatus?: import('@/app/api/workout-data/route').PerSessionPhaseStatus[]; estimatedMinBySession?: Record<string, number> }>(
           'workout-data:meta', '/api/workout-data?tab=meta', TTL_LONG,
           (metaData) => {
             if (metaData?.program?.sessions?.length) {
@@ -536,6 +537,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
             }
             setPhaseStatus(metaData?.phaseStatus ?? null);
             setPerSessionPhaseStatus(metaData?.perSessionPhaseStatus ?? []);
+            setEstMinBySession(metaData?.estimatedMinBySession ?? {});
             const aiDynamic = metaData?.program?.phaseMode === 'ai_dynamic';
             setIsAiDynamic(aiDynamic);
             setStreakSchedule((metaData?.program?.schedule ?? null) as StreakSchedule);
@@ -659,12 +661,11 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     await Promise.allSettled([
       fetchMeta(),
       fetchWorkoutData(),
-      cachedFetch<HomeSleepRow[]>('sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM,
-        d => setSleepData(Array.isArray(d) ? d : [])),
+      cachedFetch<HomeSleepRow[]>('sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM, applySleepReply),
       loadTodayMood(),
     ]);
     setRefreshTick(t => t + 1);
-  }, [fetchMeta, fetchWorkoutData, loadTodayMood]);
+  }, [fetchMeta, fetchWorkoutData, loadTodayMood, applySleepReply]);
 
   // A check-in changes what this screen prescribes — the whole-session deload trigger is driven
   // entirely by the sore muscles it reports. Storing the log in local state was all this did, so a
@@ -698,6 +699,8 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     let pullRes: Awaited<ReturnType<typeof pullDelta>> | undefined;
     if (userId) pushRes = await pushMutations(userId).catch(() => null);
     if (userId) pullRes = await pullDelta(userId, true).catch(() => null);
+    // What the pull wrote too, beside the fixed list below — e.g. a supplement changed elsewhere (#2550).
+    if (pullRes) await invalidatePulledDomains(pullRes.domains).catch(() => {});
     const online = typeof navigator !== 'undefined' ? navigator.onLine : true;
     if (online && userId && getLocalStore(userId) && (pushRes === null || pullRes === null)) {
       toast.error(wasBackedOff
@@ -707,11 +710,8 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     // Targeted invalidations: preserve slow-changing config caches (program structure,
     // styles, exercise-library) while clearing everything that could change from a sync.
     // (invalidateOuraSync() already covers 'sleep-performance-correlation' — no separate call needed.)
-    await Promise.all([
-      invalidateWorkoutSummaries(),
-      invalidateReadinessInputs(),
-      invalidateOuraSync(),
-    ]).catch(() => {});
+    await Promise.all([invalidateWorkoutSummaries(), invalidateReadinessInputs(), invalidateOuraSync()])
+      .catch(() => {});
     refetchAll().catch(() => {});
   }, [userId, refetchAll]);
 
@@ -729,7 +729,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
 
   // Was on the BLE event; the invalidation is wider (`invalidateBiometrics` clears this key too).
   useInvalidationRefetch('sleep-sessions', () => {
-    cachedFetch<HomeSleepRow[]>('sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM, d => setSleepData(Array.isArray(d) ? d : []));
+    cachedFetch<HomeSleepRow[]>('sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM, applySleepReply);
   });
 
   // Q-359: synced into state, not derived — `goalsProfile` also takes optimistic local writes that
@@ -757,13 +757,15 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         const cutoff = toAestDay(new Date(todayMidnightUtc(tz).getTime() - 14 * 24 * 60 * 60 * 1000), tz);
         store.getSleepSessions(cutoff).then(local => {
           if (local.length > 0 && !cancelled) {
-            setSleepData(local.map(s => ({
+            // #2414: one row per night, newest first, as the route returns — so the card's
+            // find-by-date lands on the night, not on whichever nap the store listed first.
+            setSleepData(localSleepRowsAsNights(local).map(s => ({
               date: s.date,
               durationHours: s.durationHours,
               deepSleepHours: s.deepSleepHours,
               remSleepHours: s.remSleepHours,
               lightSleepHours: s.lightSleepHours,
-              awakHours: null, // LocalSleepSession has no awake column — render handles null
+              awakHours: s.awakHours, sleepStart: s.sleepStart, sleepEnd: s.sleepEnd, // awakHours is null on a row pulled before SQLite v50 — render handles it
             })));
           }
         }).catch(() => { /* store unavailable — network path below still runs */ });
@@ -771,11 +773,11 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     }
     fetchWithRetry<HomeSleepRow[]>(
       'sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM,
-      (data) => setSleepData(Array.isArray(data) ? data : []),
+      applySleepReply,
       () => cancelled,
     );
     return () => { cancelled = true; };
-  }, [userId, tz]);
+  }, [userId, tz, applySleepReply]);
 
   useEffect(() => { loadTodayMood(); }, [loadTodayMood, localDay]);
 
@@ -935,9 +937,8 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     setGoalsProfile(prev => prev ? { ...prev, activityLevel: updated.activityLevel ?? null, fitnessGoal: updated.fitnessGoal ?? null } : prev);
   }
 
-  function handleGoalsApplied(applied: { stepsGoal?: number; calorieGoal?: number; waterGoalMl?: number }) {
+  function handleGoalsApplied(applied: { stepsGoal?: number; waterGoalMl?: number }) {
     if (applied.stepsGoal != null) setStepsGoal(applied.stepsGoal);
-    if (applied.calorieGoal != null) setCalorieGoal(applied.calorieGoal);
   }
 
   const handleHideSection = useCallback((id: string) => {
@@ -1089,7 +1090,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
                 fetchWorkoutData();
                 fetchMeta();
                 void syncOuraRing();                              // BLE drain — replaces the dead Cloud sync
-                if (userId) pullDelta(userId, true).catch(() => {});
+                if (userId) pullDelta(userId, true).then(res => { if (res) return invalidatePulledDomains(res.domains); }).catch(() => {});
               }}
               disabled={refreshing}
               className="rounded-xl p-2 min-h-11 min-w-11 flex items-center justify-center text-muted-foreground hover:bg-muted transition"
@@ -1199,8 +1200,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
                   metaRecent={metaRecent}
                   metaLoading={metaLoading}
                   weekToDate={weekToDate}
-                  calorieGoal={calorieGoal}
-                  calorieType={calorieType}
                   weightLookback={weightLookback}
                   stepsGoal={stepsGoal}
                   stepsGoalType={stepsGoalType}
@@ -1250,6 +1249,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
                         moodLog={moodLog}
                         phaseStatus={phaseStatus}
                         perSessionPhaseStatus={perSessionPhaseStatus}
+                        estMinBySession={estMinBySession}
                         cardColors={cardColors}
                         sectionEditMode={sectionEditMode}
                         dayKey={dayKey}

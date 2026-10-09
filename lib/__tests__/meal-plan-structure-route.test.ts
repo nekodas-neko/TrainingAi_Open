@@ -14,8 +14,8 @@
  *     is shown against unchanged ingredients so the drift is visible rather than hidden.
  *   · **A slot that did not exist before is reported, not disguised.** `unnamedPositions` is what
  *     lets the client say "placeholder" instead of implying new food was invented.
- *   · **`retarget` never derives a third number** — the saved target wins, the calibration fills
- *     the gap, and when neither exists it refuses rather than guessing.
+ *   · **`retarget` never derives a third number** — it is sized to the still-day budget
+ *     (the user's own target when set), and with no budget it refuses rather than guessing.
  *   · **Changing the day-type split is a rebuild, not a reshape**, so the plan keeps whichever
  *     variants it already had.
  *
@@ -29,8 +29,10 @@ type Row = Record<string, unknown>
 const getMealPlan = vi.fn(async (_id: string, _u: string) => plan() as Row | null)
 const replaceMealPlanStructure = vi.fn(async (_id: string, _u: string, _s: Row) => ({ id: 'plan-1' }) as Row | null)
 const getNutritionTargets = vi.fn(async (_u: string) => null as Row | null)
-const computeEnergyBalance = vi.fn(async (..._a: unknown[]) =>
-  ({ target: { recommendedKcal: null as number | null } }) as Row)
+// Issue 2622: a retarget is sized to the still-day budget — `budgetProvenance(balance).base`, which is
+// the user's own target when one is set. `stillDay(n)` is a balance whose still-day budget is n.
+const stillDay = (n: number) => ({ balance: { restingBaseKcal: n, activeKcal: 0, targetNetKcal: 0 } })
+const computeEnergyBalance = vi.fn(async (..._a: unknown[]) => ({ balance: null }) as Row)
 
 let sessionUser: { id: string; timezone?: string } | null = { id: 'u-1', timezone: 'Australia/Brisbane' }
 vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser } : null) }))
@@ -85,7 +87,7 @@ beforeEach(() => {
   getMealPlan.mockResolvedValue(plan())
   replaceMealPlanStructure.mockResolvedValue({ id: 'plan-1' })
   getNutritionTargets.mockResolvedValue(null)
-  computeEnergyBalance.mockResolvedValue({ target: { recommendedKcal: null } })
+  computeEnergyBalance.mockResolvedValue({ balance: null })
 })
 
 describe('PATCH …/meal-plans/[id]/structure — refusals', () => {
@@ -246,34 +248,43 @@ describe('PATCH …/structure — retarget', () => {
     expect(computeEnergyBalance).not.toHaveBeenCalled()
   })
 
-  // The saved target wins; the calibration fills the gap. The route never derives a third number.
-  it('prefers the saved targets over the calibration', async () => {
+  // The budget sizes it; the saved calorie target no longer does. Saved macros still carry the split.
+  it('sizes to the still-day budget, not the saved calorie target', async () => {
     getNutritionTargets.mockResolvedValue({ calories: 2000, proteinG: 160, carbsG: 200, fatG: 60 })
-    computeEnergyBalance.mockResolvedValue({ target: { recommendedKcal: 9999 } })
+    computeEnergyBalance.mockResolvedValue(stillDay(1700))
     await patch({ retarget: true })
-    expect(stored().targetCalories).toBe(2000)
+    expect(stored().targetCalories).toBe(1700)
     expect(stored().targetProteinG).toBe(160)
   })
 
-  it('falls back to the calibration when nothing is saved', async () => {
-    computeEnergyBalance.mockResolvedValue({ target: { recommendedKcal: 1800 } })
+  it('derives protein and fat from the budget when no macros are saved', async () => {
+    computeEnergyBalance.mockResolvedValue(stillDay(1800))
     await patch({ retarget: true })
     expect(stored().targetCalories).toBe(1800)
-    // Protein and fat are derived from that number rather than left at the old plan's.
     expect(stored().targetProteinG).toBe(Math.round(1800 * 0.3 / 4))
     expect(stored().targetFatG).toBe(Math.round(1800 * 0.25 / 9))
   })
 
-  it('refuses rather than guessing when there is no target anywhere', async () => {
+  it('an own calorie target is the still-day budget', async () => {
+    computeEnergyBalance.mockResolvedValue({ balance: {
+      restingBaseKcal: 1200, activeKcal: 300, targetNetKcal: -200, restingRateKcal: 1304, deficitKcal: 232,
+      stepCreditKcal: 0, ownTargetKcal: 2100,
+    } })
+    await patch({ retarget: true })
+    expect(stored().targetCalories).toBe(2100)
+  })
+
+  it('refuses rather than guessing when there is no budget', async () => {
     const res = await patch({ retarget: true })
     expect(res.status).toBe(400)
-    expect((await res.json()).error).toContain('set one in Nutrition first')
+    expect((await res.json()).error).toContain('No calorie budget')
     expect(replaceMealPlanStructure).not.toHaveBeenCalled()
   })
 
   // Saved macros need not sum to the calorie goal; the same reconciliation the generator applies.
   it('reconciles saved macros that do not add up to their own calorie goal', async () => {
     getNutritionTargets.mockResolvedValue({ calories: 2000, proteinG: 150, carbsG: 400, fatG: 60 })
+    computeEnergyBalance.mockResolvedValue(stillDay(2000))
     await patch({ retarget: true })
     const { targetCalories, targetProteinG, targetCarbsG, targetFatG } = stored()
     expect(targetCalories).toBe(2000)
@@ -286,7 +297,7 @@ describe('PATCH …/structure — retarget', () => {
 
   it('uses the caller\'s timezone for the calibration day', async () => {
     sessionUser = { id: 'u-tz', timezone: 'Etc/GMT-14' }
-    computeEnergyBalance.mockResolvedValue({ target: { recommendedKcal: 1800 } })
+    computeEnergyBalance.mockResolvedValue(stillDay(1800))
     await patch({ retarget: true })
     const [, , tz, day] = computeEnergyBalance.mock.calls[0]
     expect(tz).toBe('Etc/GMT-14')

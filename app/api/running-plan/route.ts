@@ -3,7 +3,8 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { z } from 'zod'
-import { DEFAULT_TZ, todayInTz, normalizeDateParamIso } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ, todayInTz, normalizeDateParamIso, startOfWeekInTz } from '@trainingai/shared/date-utils'
+import { heartHealthDays, type HeartHealthDay } from '@/lib/health/heart-health-service'
 import { prescribeNextRun, OVERRIDE_RATIONALE_PREFIX } from '@trainingai/shared/running/prescription'
 import { defaultFrameworkForGoal, CARDIO_GOALS } from '@trainingai/shared/running/cardio-goals'
 import { weeklyZoneTargets } from '@trainingai/shared/running/zone-targets'
@@ -24,6 +25,16 @@ const MAX_BODY_BYTES = 128 * 1024
 // handler. The app's cachedFetchToday + explicit invalidation already provides real caching with
 // correct invalidation, so the extra HTTP-cache layer is redundant and actively wrong here.
 const NO_STORE = 'private, no-store'
+
+/**
+ * Issue 2093 — this week's heart-health days (Mon to today), each with what was actually done and
+ * its minutes at moderate effort or above. Measured after today's row exists, so today is in it. Fail-soft: the card
+ * still paints the prescription when the heart-rate reads fail, just without the history.
+ */
+async function weekHeartHealth(repo: Awaited<ReturnType<typeof getRepository>>, userId: string, tz: string): Promise<{ days: HeartHealthDay[] }> {
+  const days = await heartHealthDays(repo, userId, tz, startOfWeekInTz(tz), todayInTz(tz)).catch(() => [])
+  return { days }
+}
 
 const CreateBody = z.object({
   goalKind: z.enum(['speed', 'endurance', 'heart_health', 'recovery', 'intervals', 'cardio_health', 'distance_event']).default('heart_health'),
@@ -75,11 +86,12 @@ export async function GET() {
     const zoneTargets = weeklyZoneTargets(plan.frameworkKey, fitness.weeklyBaseMinutes)
     const goalMeta = CARDIO_GOALS[plan.goalKind as GoalKind] ?? null
     const goal = goalMeta ? { key: goalMeta.key, label: goalMeta.label, blurb: goalMeta.blurb } : null
+    const heartHealth = await weekHeartHealth(repo, userId, tz)
     return NextResponse.json(
       {
         plan, prescription,
         gateAction: existingBeforeCompute.gateAction as GateAction, gateReasons: [],
-        run: existingBeforeCompute, zoneTargets, goal, isPushSession: false,
+        run: existingBeforeCompute, zoneTargets, goal, isPushSession: false, heartHealth,
       },
       { headers: { 'Cache-Control': NO_STORE } },
     )
@@ -111,9 +123,10 @@ export async function GET() {
   const zoneTargets = weeklyZoneTargets(plan.frameworkKey, fitness.weeklyBaseMinutes)
   const goalMeta = CARDIO_GOALS[plan.goalKind as GoalKind] ?? null
   const goal = goalMeta ? { key: goalMeta.key, label: goalMeta.label, blurb: goalMeta.blurb } : null
+  const heartHealth = await weekHeartHealth(repo, userId, tz)
 
   return NextResponse.json(
-    { plan, prescription, gateAction, gateReasons, run, zoneTargets, goal, isPushSession: pushCtx.isPush },
+    { plan, prescription, gateAction, gateReasons, run, zoneTargets, goal, isPushSession: pushCtx.isPush, heartHealth },
     { headers: { 'Cache-Control': NO_STORE } },
   )
 }

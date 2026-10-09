@@ -1,13 +1,21 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import {
   computeChronicStress,
   chronicStressScoreToInt,
+  chronicStressDiagnostics,
   usableGranularNights,
+  CHRONIC_STRESS_GATED_SERIES,
   type ChronicStressNightSignals,
 } from '../chronic-stress-assembly'
 import type { DailySummaryRow } from '../daily-summary'
 // Relative, not `@/` — packages/shared has no path mapping into the app root.
 import { hasRealConstants } from '../../../../../lib/oura-models/__fixtures__/real-constants'
+import {
+  setCumulativeStressConstants,
+  __clearCumulativeStressConstants,
+} from '../../../../../lib/oura-models/cumulative-stress'
+import { ensureServerOuraConstants } from '../../../../../lib/oura-models/constants-inject'
+import type { CumulativeStressConstants } from '../../../../../lib/oura-models/constants'
 
 // A fully-populated synthetic night `d` (0-indexed). Small per-metric ramps keep the factor
 // analysis non-singular; the values are physiologically plausible but arbitrary.
@@ -102,6 +110,97 @@ describe('computeChronicStress assembly', () => {
     expect(chronicStressScoreToInt(NaN)).toBeNull()
     expect(chronicStressScoreToInt(42.6)).toBe(43)
     expect(chronicStressScoreToInt(Infinity)).toBeNull()
+  })
+})
+
+// Issue 2422: production has 28 usable granular nights and a null score, so the refusal is inside
+// the model. These cases run the model's gate for real, which the synthetic fixture constants cannot
+// do (their fever limit is 2 degC, so every night is masked, and their day gate is 1). The gate values
+// below are the ones `CumulativeStressConstants` documents; the factor tables are shape-correct
+// placeholders that only matter after the gate, so no score here is a real chronic-stress number.
+describe('chronicStressDiagnostics (issue 2422)', () => {
+  const GATE_CONSTANTS: CumulativeStressConstants = {
+    feverLimit: 38,
+    lutealPhaseCorrection: 0.2,
+    minHrvCoverage: 0.2,
+    minDaysRequired: 21,
+    faModelMean: Array(9).fill(0),
+    faModelStd: Array(9).fill(1),
+    faModelWeights: Array.from({ length: 54 }, (_, i) => ((i * 7) % 11) / 10 - 0.5),
+    dimToDrop: 0,
+    clusterCentroids: Array.from({ length: 25 }, (_, i) => ((i * 3) % 7) / 5 - 0.6),
+    positiveClusters: [1, 3],
+    contributorMeans: Array(5).fill(0),
+    contributor01p: Array(5).fill(-1),
+    contributor99p: Array(5).fill(1),
+    contributorLevels: [100, -2, -2, -2, -2, -2, 85, -1, -1, -1, -1, -1, 70, 0, 0, 0, 0, 0, 60, 1, 1, 1, 1, 1, 0, 2, 2, 2, 2, 2],
+  }
+  beforeAll(() => setCumulativeStressConstants(GATE_CONSTANTS))
+  afterAll(() => {
+    __clearCumulativeStressConstants()
+    ensureServerOuraConstants()
+  })
+
+  const nights = (over: (d: number, s: ChronicStressNightSignals) => ChronicStressNightSignals = (_, s) => s) => {
+    const rows = Array.from({ length: 31 }, (_, d) => makeRow(d))
+    const signals = new Map(rows.map((r, d) => [r.date, over(d, makeSignals(d))]))
+    return { rows, signals }
+  }
+  const run = ({ rows, signals }: ReturnType<typeof nights>) => {
+    const res = computeChronicStress(rows, signals)
+    return { res, diag: chronicStressDiagnostics(rows, signals, res) }
+  }
+
+  it('reports a scored pass as scored, with every series at or above the gate', () => {
+    const { res, diag } = run(nights())
+    expect(Number.isFinite(res!.chronicStressScore)).toBe(true)
+    expect(diag.reason).toBe('scored')
+    expect(diag.belowGate).toEqual([])
+    expect(diag.granularNights).toBe(31)
+    expect(diag.feverMaskedNights).toBe(0)
+    for (const s of CHRONIC_STRESS_GATED_SERIES) expect(diag.validNights![s]).toBeGreaterThanOrEqual(21)
+  })
+
+  // The finding. `normaliseTemperatureWake` keeps a skin-temp sample only when its timestamp lies
+  // within 5 s of a 1-minute grid anchored at bedtime floored to an absolute 30-s boundary. Our BLE
+  // timestamps carry the ring's own phase, so a night whose samples sit off that grid contributes no
+  // `normTempWake` at all — and every night in the window does the same, whatever the stash count.
+  it('names normTempWake when every skin-temp sample sits off the bedtime 30-s grid', () => {
+    const { res, diag } = run(nights((_, s) => ({ ...s, tempSkinTimestamps: s.tempSkinTimestamps.map(t => t + 17_000) })))
+    expect(chronicStressScoreToInt(res!.chronicStressScore)).toBeNull()
+    expect(diag.reason).toBe('series_below_gate')
+    expect(diag.belowGate).toEqual(['normTempWake'])
+    expect(diag.validNights!.normTempWake).toBe(0)
+    // TN-1's count cannot see this: every one of these nights has a non-empty stash.
+    expect(diag.granularNights).toBe(31)
+  })
+
+  it('counts the fever mask from the model itself, and names the series it starves', () => {
+    const masked = new Set([2, 5, 8, 11, 14, 17, 20, 23, 26, 29, 1])
+    const { rows, signals } = nights()
+    for (const d of masked) rows[d] = { ...rows[d], tempDevC: 1.2 }
+    const { diag } = run({ rows, signals })
+    expect(diag.reason).toBe('series_below_gate')
+    // Pins the debugMetrics positions: these two numbers must move together if the index is right.
+    expect(diag.feverMaskedNights).toBe(masked.size)
+    expect(diag.validNights!.gotUps).toBe(31 - masked.size)
+    expect(diag.belowGate).toContain('sleepFragmentationIndex')
+    expect(diag.belowGate).toContain('normTempWake')
+  })
+
+  it('separates no input and the model\'s error path from a gate refusal', () => {
+    expect(chronicStressDiagnostics([], new Map(), null).reason).toBe('no_input')
+    const { rows, signals } = nights()
+    const res = computeChronicStress(rows, signals)!
+    const errorPath = { ...res, chronicStressScore: NaN, debugMetrics: Array(20).fill(NaN) }
+    expect(chronicStressDiagnostics(rows, signals, errorPath)).toMatchObject({ reason: 'model_error_path', validNights: null })
+  })
+
+  it('reads the result only — the score is the same with or without the diagnostic', () => {
+    const input = nights()
+    const before = computeChronicStress(input.rows, input.signals)!.chronicStressScore
+    chronicStressDiagnostics(input.rows, input.signals, computeChronicStress(input.rows, input.signals))
+    expect(computeChronicStress(input.rows, input.signals)!.chronicStressScore).toBe(before)
   })
 })
 

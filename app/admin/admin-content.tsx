@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { toast } from 'sonner'
 import { UserCheck, UserX, Trash2, Plus, Loader2, ArrowLeft, Bluetooth, Footprints, ClipboardList } from 'lucide-react'
 import { cn } from '@trainingai/shared/utils'
@@ -17,10 +18,11 @@ import { initialsOf } from '@/lib/initials';
 
 type Tab = 'users' | 'invites' | 'exercises' | 'activities' | 'feedback' | 'devices'
 
-export default function AdminContent() {
+/** `currentUserId` is the signed-in admin, so their own row offers no deactivate (issue 2383 item 3). */
+export default function AdminContent({ currentUserId }: { currentUserId: string }) {
   const router = useTransitionRouter()
   const [tab, setTab] = useState<Tab>('users')
-  const [users, setUsers] = useState<User[]>([])
+  const [users, setUsers] = useState<AdminUser[]>([])
   const [invites, setInvites] = useState<string[]>([])
   const [inviteInput, setInviteInput] = useState('')
   const [loading, setLoading] = useState(true)
@@ -35,6 +37,12 @@ export default function AdminContent() {
   const [feedbackLoading, setFeedbackLoading] = useState(false)
   const [expandedFeedback, setExpandedFeedback] = useState<string | null>(null)
   const [confirmDeleteFeedback, setConfirmDeleteFeedback] = useState<string | null>(null)
+  // issue 2383 item 3: deactivating signs that user out to `/pending`, so it asks first. Activation does not.
+  const [confirmDeactivate, setConfirmDeactivate] = useState<User | null>(null)
+  // issue 2651: deleting a user runs the whole account deletion, and removing an invite un-approves an
+  // email, so each asks first. Both name what the row already shows, so no new detail is exposed.
+  const [confirmDelete, setConfirmDelete] = useState<User | null>(null)
+  const [confirmRemoveInvite, setConfirmRemoveInvite] = useState<string | null>(null)
 
   async function loadAll() {
     setLoading(true)
@@ -71,12 +79,15 @@ export default function AdminContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, action }),
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        const data = await res.json().catch(() => null) as { error?: unknown } | null
+        throw new Error(typeof data?.error === 'string' ? data.error : 'Action failed')
+      }
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, isActive: action === 'activate' } : u))
       invalidateAdminPendingCount().catch(() => {})
       toast.success(action === 'activate' ? 'User activated' : 'User deactivated')
-    } catch {
-      toast.error('Action failed')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Action failed')
     } finally {
       setActionLoading(null)
     }
@@ -111,6 +122,12 @@ export default function AdminContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId }),
       })
+      if (res.status === 409) {
+        // issue 2695: the account gained data after the list loaded. The server's refusal is the plain-words reason.
+        const body = await res.json().catch(() => null) as { error?: string } | null
+        toast.error(body?.error ?? 'This account has data under it, so it cannot be deleted.')
+        return
+      }
       if (!res.ok) throw new Error()
       setUsers(prev => prev.filter(u => u.id !== userId))
       toast.success('User deleted')
@@ -147,7 +164,12 @@ export default function AdminContent() {
     )
   }
 
-  const pending = users.filter(u => !u.isActive)
+  // issue 2695: an inactive user with no data under the account is a signup that never got in
+  // (Pending: Activate or Delete); one with data was in and was deactivated (Deactivated: Activate
+  // only). `hasData` missing is read as "has data", so an unknown never offers the trash.
+  const inactive = users.filter(u => !u.isActive)
+  const pending = inactive.filter(u => u.hasData === false)
+  const deactivated = inactive.filter(u => u.hasData !== false)
   const active = users.filter(u => u.isActive)
 
   return (
@@ -175,7 +197,7 @@ export default function AdminContent() {
               )}
             >
               {t === 'users'
-                ? `Users${pending.length > 0 ? ` (${pending.length})` : ''}`
+                ? `Users${inactive.length > 0 ? ` (${inactive.length})` : ''}`
                 : t === 'feedback' && feedbackSubmissions.length > 0
                     ? <><span>Feedback</span> <span className="ml-0.5 inline-flex items-center justify-center rounded-full bg-blue-500 text-white text-[9px] font-bold w-4 h-4">{feedbackSubmissions.length}</span></>
                     : t}
@@ -188,16 +210,75 @@ export default function AdminContent() {
             {pending.length > 0 && (
               <div className="space-y-2">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Pending approval</p>
-                {pending.map(u => <UserRow key={u.id} user={u} onToggle={toggleUser} onDelete={deleteUser} loadingId={actionLoading} />)}
+                {pending.map(u => (
+                  <UserRow
+                    key={u.id}
+                    user={u}
+                    isSelf={u.id === currentUserId}
+                    onToggle={toggleUser}
+                    onDelete={() => setConfirmDelete(u)}
+                    loadingId={actionLoading}
+                  />
+                ))}
+              </div>
+            )}
+            {deactivated.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Deactivated</p>
+                {deactivated.map(u => (
+                  <UserRow
+                    key={u.id}
+                    user={u}
+                    isSelf={u.id === currentUserId}
+                    onToggle={toggleUser}
+                    loadingId={actionLoading}
+                  />
+                ))}
               </div>
             )}
             {active.length > 0 && (
               <div className="space-y-2">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Active</p>
-                {active.map(u => <UserRow key={u.id} user={u} onToggle={toggleUser} loadingId={actionLoading} />)}
+                {active.map(u => (
+                  <UserRow
+                    key={u.id}
+                    user={u}
+                    isSelf={u.id === currentUserId}
+                    onToggle={(id, action) => action === 'deactivate' ? setConfirmDeactivate(u) : toggleUser(id, action)}
+                    loadingId={actionLoading}
+                  />
+                ))}
               </div>
             )}
             {users.length === 0 && <p className="text-center text-muted-foreground py-8">No users yet.</p>}
+            <ConfirmDialog
+              open={!!confirmDelete}
+              onOpenChange={o => { if (!o) setConfirmDelete(null) }}
+              title="Delete user?"
+              message={confirmDelete
+                ? `Delete ${userLabel(confirmDelete)}? This permanently deletes their account and everything under it. It cannot be undone.`
+                : ''}
+              confirmLabel="Delete"
+              onConfirm={() => {
+                const u = confirmDelete
+                setConfirmDelete(null)
+                if (u) deleteUser(u.id)
+              }}
+            />
+            <ConfirmDialog
+              open={!!confirmDeactivate}
+              onOpenChange={o => { if (!o) setConfirmDeactivate(null) }}
+              title="Deactivate user?"
+              message={confirmDeactivate
+                ? `${userLabel(confirmDeactivate)} will be signed out to the pending screen until you activate them again.`
+                : ''}
+              confirmLabel="Deactivate"
+              onConfirm={() => {
+                const u = confirmDeactivate
+                setConfirmDeactivate(null)
+                if (u) toggleUser(u.id, 'deactivate')
+              }}
+            />
           </div>
         )}
 
@@ -222,13 +303,28 @@ export default function AdminContent() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => removeInvite(email)}
+                    onClick={() => setConfirmRemoveInvite(email)}
+                    aria-label={`Remove ${email}`}
                     disabled={actionLoading === `invite-${email}`}
                   >
                     {actionLoading === `invite-${email}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 text-destructive" />}
                   </Button>
                 </div>
               ))}
+              <ConfirmDialog
+                open={!!confirmRemoveInvite}
+                onOpenChange={o => { if (!o) setConfirmRemoveInvite(null) }}
+                title="Remove invite?"
+                message={confirmRemoveInvite
+                  ? `${confirmRemoveInvite} will no longer be pre-approved. If they sign up afterwards they wait for approval.`
+                  : ''}
+                confirmLabel="Remove"
+                onConfirm={() => {
+                  const e = confirmRemoveInvite
+                  setConfirmRemoveInvite(null)
+                  if (e) removeInvite(e)
+                }}
+              />
               {invites.length === 0 && (
                 <p className="text-center text-muted-foreground py-4 text-sm">
                   No invites yet. Add an email above to pre-approve a user.
@@ -356,13 +452,24 @@ export default function AdminContent() {
   )
 }
 
+/** How the row names a user, so a confirm says exactly what the admin tapped on. */
+function userLabel(u: User): string {
+  return u.displayName || u.name || u.email
+}
+
+/** `hasData` is sent by `GET /api/admin/users` for inactive users (issue 2695). */
+type AdminUser = User & { hasData?: boolean }
+
 function UserRow({
   user,
+  isSelf = false,
   onToggle,
   onDelete,
   loadingId,
 }: {
-  user: User
+  user: AdminUser
+  /** The signed-in admin's own row: no deactivate, no delete. The server refuses both too; this only hides them. */
+  isSelf?: boolean
   onToggle: (id: string, action: 'activate' | 'deactivate') => void
   onDelete?: (id: string) => void
   loadingId: string | null
@@ -389,34 +496,38 @@ function UserRow({
         'shrink-0 rounded-full px-2 py-0.5 text-xs font-medium',
         user.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-muted text-muted-foreground'
       )}>
-        {user.isActive ? 'Active' : 'Pending'}
+        {user.isActive ? 'Active' : user.hasData === false ? 'Pending' : 'Deactivated'}
       </span>
-      {onDelete && !user.isActive && (
+      {onDelete && !user.isActive && user.hasData === false && !isSelf && (
         <Button
           variant="ghost"
           size="sm"
           onClick={() => onDelete(user.id)}
           disabled={isDeleteLoading}
           title="Delete user"
+          aria-label="Delete user"
         >
           {isDeleteLoading
             ? <Loader2 className="h-4 w-4 animate-spin" />
             : <Trash2 className="h-4 w-4 text-destructive" />}
         </Button>
       )}
-      <Button
-        variant="ghost"
-        size="sm"
-        onClick={() => onToggle(user.id, user.isActive ? 'deactivate' : 'activate')}
-        disabled={isToggleLoading}
-        title={user.isActive ? 'Deactivate' : 'Activate'}
-      >
-        {isToggleLoading
-          ? <Loader2 className="h-4 w-4 animate-spin" />
-          : user.isActive
-            ? <UserX className="h-4 w-4 text-destructive" />
-            : <UserCheck className="h-4 w-4 text-green-500" />}
-      </Button>
+      {!(isSelf && user.isActive) && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => onToggle(user.id, user.isActive ? 'deactivate' : 'activate')}
+          disabled={isToggleLoading}
+          title={user.isActive ? 'Deactivate' : 'Activate'}
+          aria-label={user.isActive ? 'Deactivate' : 'Activate'}
+        >
+          {isToggleLoading
+            ? <Loader2 className="h-4 w-4 animate-spin" />
+            : user.isActive
+              ? <UserX className="h-4 w-4 text-destructive" />
+              : <UserCheck className="h-4 w-4 text-green-500" />}
+        </Button>
+      )}
     </div>
   )
 }

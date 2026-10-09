@@ -31,6 +31,11 @@ const { Client } = require('pg')
 const DENY = {
   users: ['password_hash'],
   oura_tokens: ['personal_access_token', 'access_token', 'refresh_token', 'webhook_signing_key'],
+  // #2076. A SHA-256 of a 256-bit random token cannot be turned back into the token, so this is
+  // defence in depth rather than a live secret; but nothing an audit asks needs it. The rest of the
+  // row (device, family, created/used/expires, rotated, revoked and why) is what answers "why was
+  // the app signed out", so the table gets a view rather than going to DENIED.
+  native_refresh_tokens: ['token_hash'],
   feedback_submissions: ['screenshot_data'],
   // Q-396. A base64 thumbnail has no audit value and every row carries one, so a SELECT * over this
   // view would return kilobytes per meal for nothing. The size stand-in below is strictly MORE
@@ -140,6 +145,12 @@ const VIA = {
   // only FK there is, so there is no second path to choose wrongly.
   blood_analytes:         t => `EXISTS (SELECT 1 FROM public.blood_panels bp WHERE bp.id = ${t}.panel_id AND bp.user_id = $OWNER)`,
   users:                  t => `${t}.id = $OWNER`,
+  // #2381. An ops log, not health data, but a run can target ONE account and its parameters name
+  // that account's dates and ids, so the rule that every view is row-scoped still holds: the
+  // owner's runs plus the global ones (VACUUM, target NULL), never a run on another account. A row
+  // whose account was deleted is unlinked (SET NULL) and shows as global; the migration keeps
+  // personal data out of `parameters` for exactly that reason.
+  agent_action_log:       t => `${t}.target_user_id IS NULL OR ${t}.target_user_id = $OWNER`,
   friendships:            t => `${t}.requester_id = $OWNER OR ${t}.addressee_id = $OWNER`,
 }
 

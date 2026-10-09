@@ -1,5 +1,5 @@
 import type { CollectionState } from '@trainingai/shared/collection/ladder'
-import type { FaucetKey } from '@/components/home/collection-summary'
+import { FAUCET_ORDER, type FaucetKey } from '@/components/home/collection-summary'
 
 /** Pure half of `CollectionPen`: which cats it draws, and a stable seed for each one's wander. */
 
@@ -34,7 +34,7 @@ export function shownForWidth(width: number): number {
 export function tagsForWidth(width: number): number {
   return Math.max(1, Math.min(4, Math.floor(width / 116)))
 }
-const FAUCETS: FaucetKey[] = ['workout', 'steps', 'sleep']
+const FAUCETS = FAUCET_ORDER
 
 export interface PenCat { id: string; faucet: FaucetKey; tier: number; name?: string }
 

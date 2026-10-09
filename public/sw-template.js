@@ -1,5 +1,7 @@
 const CACHE = "__CACHE_NAME__";
 const PRECACHE_URLS = __PRECACHE_URLS__;
+// false under `next dev` only (#2608): see the `_next/static` branch below.
+const STATIC_CACHE_FIRST = __STATIC_CACHE_FIRST__;
 const META = "ta-meta";           // persistent — holds the previous build's cache name
 const OFFLINE_URL = "/offline";
 
@@ -146,6 +148,25 @@ self.addEventListener("fetch", (e) => {
 
   // Cache-first for static assets (_next/static). Only store ok responses.
   if (url.pathname.startsWith("/_next/static/")) {
+    // Under `next dev` (the Dev app on a sitting) a chunk's URL is NOT content-addressed: Turbopack
+    // keeps the same file name while its contents change with every edit, branch switch and server
+    // restart. Cache-first there served the first version it ever saw, and `caches.match` searches
+    // the oldest cache first, so a sitting ran a mixture of old and new chunks and nothing an agent
+    // edited reached the screen (#2608). Dev goes to the network and keeps the cache for offline.
+    if (!STATIC_CACHE_FIRST) {
+      e.respondWith(
+        fetch(e.request, { cache: "no-cache" })
+          .then((res) => {
+            if (res.ok) {
+              const clone = res.clone();
+              caches.open(CACHE).then((c) => c.put(e.request, clone));
+            }
+            return res;
+          })
+          .catch(async () => (await matchLiveCaches(e.request)) ?? Response.error())
+      );
+      return;
+    }
     e.respondWith(
       caches.match(e.request).then((cached) => {
         if (cached) return cached;

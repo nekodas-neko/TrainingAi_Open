@@ -7,6 +7,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@trainingai/shared/utils";
 import { FIELD_LABEL, FIELD_UNIT, type PatchChange } from "@/lib/coach/patch";
 import { GOAL_LOCAL_STORAGE_KEYS } from "@/lib/coach/domains/goals";
+import { clearCalorieGoalSeeds } from "@/lib/home/home-prefs";
 import { invalidateCoachHistory, invalidateGoalRecommendations } from "@/lib/cache-groups";
 import type { ChangePreviewArgs } from "@/lib/coach/widgets";
 import type { Consequence, Drift } from "@/lib/coach/consequences";
@@ -230,6 +231,7 @@ function writeGoalsThrough(patch: ChangePreviewArgs["patch"], acceptedIds: strin
   try {
     for (const change of patch.changes) {
       if (!acceptedIds.includes(change.id)) continue;
+      if (change.field === "calorieGoal") clearCalorieGoalSeeds();
       const key = GOAL_LOCAL_STORAGE_KEYS[change.field];
       if (key) localStorage.setItem(key, String(Math.round(Number(change.to))));
     }

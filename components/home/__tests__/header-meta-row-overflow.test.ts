@@ -31,7 +31,7 @@ describe('the header meta row can absorb a shortfall', () => {
    * because any layout where it is makes its width depend on the weather chip again.
    */
   it('puts the date on its own line below the chips, outside the chip row (#2174)', () => {
-    const chipRow = row.match(/<div className="flex items-center gap-2 min-w-0 overflow-hidden">([\s\S]*?)<\/div>/);
+    const chipRow = row.match(/<div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0 overflow-hidden">([\s\S]*?)<\/div>/);
     expect(chipRow, 'the chip row should be findable').not.toBeNull();
     expect(chipRow![1].trim(), 'the chip row holds the chips and nothing else').toBe('<HeaderChips />');
     const dateAt = row.indexOf("formatInTimeZone(new Date(), tz, 'EEEE d MMMM')");
@@ -44,7 +44,16 @@ describe('the header meta row can absorb a shortfall', () => {
   });
 
   it('clips inside the row so chips alone cannot reach the buttons', () => {
-    expect(row).toMatch(/flex items-center gap-2 min-w-0 overflow-hidden/);
+    expect(row).toMatch(/flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0 overflow-hidden/);
+  });
+
+  /**
+   * #2361. At 384 dp the column is 196 px and a sunny-day chip row is 200-209 px, so the last chip's
+   * border was cut. A row that wraps drops that chip to a second line whole; without `flex-wrap` the
+   * clip returns. The chips stay `shrink-0`, so wrapping is the only thing that absorbs a shortfall.
+   */
+  it('wraps a chip that does not fit rather than clipping it (#2361)', () => {
+    expect(row).toMatch(/className="flex flex-wrap [^"]*overflow-hidden"/);
   });
 
   it('keeps the chips unshrinkable, because wrapping them is the bug BF-96 fixed', () => {

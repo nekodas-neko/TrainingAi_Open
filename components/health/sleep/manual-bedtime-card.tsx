@@ -31,10 +31,10 @@ interface Props {
  * *window*, one of which turned a 3-hour night into 9 hours at 34% efficiency and moved five awake
  * hours into a nightly training set. `docs/reviews/2026-08-26-manual-bedtime-write-audit.md`.
  *
- * **The current value is read from the local store, not from `/api/sleep-sessions`** — that route
- * does not return `manualSleepStart`, so on the web build this reads as unset even when it is set.
- * The APK is the canonical runtime and reads it correctly; adding the field to the route is Lane A's
- * and is filed on Q-519.
+ * **The current value is read from the local store.** `/api/sleep-sessions` returns
+ * `manualSleepStart` too since #2264, but this card has not been moved onto it: on the web build,
+ * which has no local store, it still reads as unset. The APK is the canonical runtime and reads it
+ * correctly.
  */
 export function ManualBedtimeCard({ date, measuredStart, userId }: Props) {
   const tz = useUserTimezone()
@@ -65,6 +65,9 @@ export function ManualBedtimeCard({ date, measuredStart, userId }: Props) {
       if (store) {
         // Queued rather than posted directly, so a bedtime entered offline survives to the next
         // sync — the same shape every other offline-first write here uses.
+        // The local row first, in the same turn: the card reads its value from it, so a remount before
+        // the push lands (or any time offline) must find the new bedtime there (#2547).
+        await store.setManualSleepStartLocally(date, at)
         await store.queueMutation({ userId: userId!, domain: 'manual_bedtime', date, payload: { at } })
         pushMutations(userId!).catch(() => {})
       } else {
@@ -102,8 +105,8 @@ export function ManualBedtimeCard({ date, measuredStart, userId }: Props) {
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
           {measuredStart
-            ? `Your ring started recording at ${formatTimeOfDay(measuredStart, tz)}. If you were asleep before that, tell it when — the recorded night is left exactly as it was, and only your bedtime average uses this.`
-            : 'If the ring missed the start of this night, tell it when you went to bed. Only your bedtime average uses this.'}
+            ? `This night's recording started at ${formatTimeOfDay(measuredStart, tz)}. If you were asleep before that, tell it when — the recorded night is left exactly as it was, and only your bedtime average uses this.`
+            : 'If the start of this night was not recorded, tell it when you went to bed. Only your bedtime average uses this.'}
         </p>
       </div>
 

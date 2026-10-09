@@ -7,7 +7,12 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { resolveBaseRef, lineCountAtBase, verdict } = require('./lib/base-ref');
+const { resolveBaseRef, countsAtBase, verdict } = require('./lib/base-ref');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
+
+// Match `wc -l` (newline count), so a baseline can be read straight off the shell. The one counter for
+// both the working tree and the base: two formulas is how the base came to read a line high (#2557).
+const wcLines = (src) => src.split('\n').length - (src.endsWith('\n') ? 1 : 0);
 
 const LIMIT = 800;
 
@@ -26,8 +31,8 @@ const BASELINE = {
   // too, so an edited sleep row used to leave this screen stale until a remount. Two lines is the
   // wrapper the hook call needs; the event listener it replaced is already down to its minimum
   // (it still bumps `refreshTick` for the four gated effects, which are not cache reads).
-  'app/session-select/session-select-content.tsx': 1448,
-  'components/config-screen.tsx': 997,
+  'app/session-select/session-select-content.tsx': 1439,
+  'components/config-screen.tsx': 996,
   // Raised 2026-08-18 (Lane B, Q-478): 911 -> 912. Net +1 after paying for what could be paid
   // for — the file's two `@/app/api/body-metadata/route` type imports were merged, reclaiming a
   // line against the two this needed (`useUserTimezone` + `const tz`). The remaining line buys
@@ -47,9 +52,11 @@ const BASELINE = {
 const root = path.join(__dirname, '..');
 const failures = [];
 const inherited = [];
+const judged = [];
 
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory() && isSkippedFixtureDir(entry.name)) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       if (entry.name === 'node_modules' || entry.name === '__tests__' || entry.name === '.next') continue;
@@ -57,18 +64,8 @@ function walk(dir) {
     } else if (entry.name.endsWith('.tsx')) {
       const rel = path.relative(root, full).split(path.sep).join('/');
       const src = fs.readFileSync(full, 'utf8');
-      // Match `wc -l` (newline count), so a baseline can be read straight off the shell.
-      const lines = src.split('\n').length - (src.endsWith('\n') ? 1 : 0);
-      const allowed = BASELINE[rel] ?? LIMIT;
-      // LA-16 / Q-424: ask whether THIS BRANCH grew the file, not whether it is over. A file already
-      // over its number on the base is not this branch's to fix, and failing it here reports someone
-      // else's merge as this author's oversized change.
-      const v = verdict({ count: lines, limit: allowed, atBase: lineCountAtBase(baseRef, rel) });
-      if (v === 'inherited') {
-        inherited.push(`${rel}: ${lines} lines against a ${allowed}-line baseline, but the base branch is already there. Not this branch's growth.`);
-      } else if (v === 'fail') {
-        failures.push({ rel, lines, allowed, grandfathered: rel in BASELINE });
-      }
+      const lines = wcLines(src);
+      judged.push({ rel, lines, allowed: BASELINE[rel] ?? LIMIT });
     }
   }
 }
@@ -76,6 +73,23 @@ function walk(dir) {
 const baseRef = resolveBaseRef();
 
 for (const top of ['app', 'components']) walk(path.join(root, top));
+
+// LA-16 / Q-424: ask whether THIS BRANCH grew the file, not whether it is over. A file already
+// over its number on the base is not this branch's to fix, and failing it here reports someone
+// else's merge as this author's oversized change. Read after the walk, for every file at once:
+// one git process per run, not one per file (#2081).
+// The working tree's own count over the base's copy (#2557). `lineCountsAtBase` is
+// `split('\n').length`, one more than `wcLines` for a file ending in a newline, so every base read one
+// line high and a file over its baseline could grow by exactly one line and read as inherited.
+const atBase = countsAtBase(baseRef, judged.map((j) => j.rel), wcLines);
+for (const { rel, lines, allowed } of judged) {
+  const v = verdict({ count: lines, limit: allowed, atBase: atBase.get(rel) });
+  if (v === 'inherited') {
+    inherited.push(`${rel}: ${lines} lines against a ${allowed}-line baseline, but the base branch is already there. Not this branch's growth.`);
+  } else if (v === 'fail') {
+    failures.push({ rel, lines, allowed, grandfathered: rel in BASELINE });
+  }
+}
 
 // Reported whether or not the run fails, and never as a failure (Q-424).
 if (inherited.length > 0) {

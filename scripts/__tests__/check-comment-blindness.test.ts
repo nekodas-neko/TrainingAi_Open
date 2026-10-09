@@ -22,8 +22,11 @@ import { describe, it, expect } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
+import { FIXTURE_DIR, fixtureChildDir } from '../lib/fixture-dirs'
 
 const root = path.join(__dirname, '..', '..')
+/** Issue 2707: this suite's own fixture folder and scan token, so no other suite's copy is scanned or removed. */
+const TAG = 'comment-blindness'
 
 /**
  * The API-route paths are joined rather than written whole, and that is not style.
@@ -48,12 +51,23 @@ const CASES: Array<{ check: string; file: string; fixture: string }> = [
   { check: 'check-date-param-regex', file: apiRoute('app/api/user/goals'), fixture: 'date: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/)' },
   { check: 'check-api-no-store', file: apiRoute('app/api/user/goals'), fixture: "headers: { 'Cache-Control': 'private, max-age=60' }" },
   { check: 'check-strict-request-schemas', file: apiRoute('app/api/user/goals'), fixture: 'const S = z.object({ a: z.string() })' },
+  { check: 'check-llm-json-parse', file: apiRoute('app/api/daily-digest'), fixture: 'const o = JSON.parse(text)' },
 ]
 
-/** The check's whole output, exit code included — a check may signal by either. */
+/**
+ * The check's whole output, exit code included — a check may signal by either.
+ *
+ * #2578. The checks skip `__check_fixture__/` unless SCAN_CHECK_FIXTURES names its folder (issue 2707), so a real check run by
+ * another suite in parallel (`strict-schema-inert`) never sees this file's copy. It is set on these
+ * child processes only, never on the test process itself.
+ */
 const run = (check: string): string => {
   try {
-    return execFileSync('node', [path.join(root, 'scripts', `${check}.js`)], { cwd: root, encoding: 'utf8' })
+    return execFileSync('node', [path.join(root, 'scripts', `${check}.js`)], {
+      cwd: root,
+      encoding: 'utf8',
+      env: { ...process.env, SCAN_CHECK_FIXTURES: TAG },
+    })
   } catch (err) {
     const e = err as { stdout?: string; stderr?: string; status?: number }
     return `exit=${e.status}\n${e.stdout ?? ''}${e.stderr ?? ''}`
@@ -71,9 +85,8 @@ const run = (check: string): string => {
  * content so every check sees a realistic file. Each case compares runs made WITH the copy present,
  * so the copy's own pre-existing findings cancel out.
  */
-const FIXTURE_DIR = '__check_fixture__'
 const withCopy = (rel: string, line: string | null, fn: () => string): string => {
-  const dir = path.join(root, path.dirname(rel), FIXTURE_DIR)
+  const dir = path.join(root, path.dirname(rel), FIXTURE_DIR, fixtureChildDir(TAG))
   const copy = path.join(dir, path.basename(rel))
   const original = readFileSync(path.join(root, rel), 'utf8')
   try {
@@ -96,9 +109,15 @@ describe.each(CASES)('$check ignores its banned pattern inside a comment', ({ ch
     // "this check never looked at that file", which is the reading that makes the whole pass wrong.
     expect(asCode, `fixture for ${check} must trigger it in ${file}`).not.toEqual(clean)
     expect(asComment, `${check} counts its banned pattern inside a comment`).toEqual(clean)
-    // 120 s, not 30 (LA-163). `check-hex-literals` measured 15 s per run on Windows against ~6 s on
-    // Linux, and this runs it three times. Profiled: 98% of it is `spawnSync` — `lib/base-ref.js`
-    // starts one `git show` per file for the base comparison, and a process spawn costs far more on
-    // Windows. Batching those reads would speed every ratchet; until then this is the honest limit.
-  }, 120_000)
+    // 30 s, back from 120 (LA-163, #2081, #2560). Two causes held it up. `check-hex-literals` ran one
+    // `git show` per file, which #2081 batched. Then `check-tz-aware-cache-guards`,
+    // `check-timezone-rendering` and `check-memo-prop-stability` took 49.4, 42.5 and 35.2 s a case
+    // under `pnpm test` on the owner's Windows machine. Most of each run was `readFileSync` on
+    // ~2,800 files, one at a time. #2560 reads them concurrently (`lib/read-sources.js`), as it does
+    // for `check-fetch-once-effects`, `check-client-today-timezone` and `check-date-param-regex`.
+    // The memo check also stopped extracting a `git archive` of the base. Measured in two full
+    // `pnpm test` runs on Windows after the change, with other test runs sharing the machine
+    // (2026-10-07): the three cases took 3.0/2.4, 5.4/5.8 and 3.6/6.6 s. The slowest of all eleven
+    // cases was 6.6 s. That leaves more than 4x headroom under 30 s.
+  }, 30_000)
 })

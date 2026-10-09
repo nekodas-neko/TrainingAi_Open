@@ -2,7 +2,7 @@
 import { HR_PROFILE_TTL } from '@trainingai/shared/cache-ttl'
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { cachedFetch } from '@/lib/sqlite/cache'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTransitionRouter } from "@/lib/view-transition";
 import dynamic from 'next/dynamic'
 import { toast } from 'sonner'
@@ -11,15 +11,14 @@ import { StatTile } from '@/components/ui/stat-tile'
 import { formatMinutes } from '@trainingai/shared/format/units'
 import { pullDelta } from '@/lib/local-store/sync-engine'
 import { getLocalStore } from '@/lib/local-store'
-import { useActivityStore } from '@/lib/stores/activity-store'
-import { linkPrescribedRun } from '@/lib/activity/link-prescribed-run'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { omitNullFields } from '@/lib/local-store/sync-helpers'
-import { invalidateActivityWrites } from '@/lib/cache-groups'
+import { invalidateActivityWrites, invalidatePulledDomains } from '@/lib/cache-groups'
 import { todayInTz, msToHHMMInTz } from '@trainingai/shared/date-utils'
 import { buildIntervalPlan, type WalkConfig } from '@/lib/walk/interval-plan'
 import { ZoneBreakdown } from '@/components/health/zone-breakdown'
 import { useGuidedWalkStore } from '@/lib/stores/guided-walk-store'
+import { registerWalkExit } from '@/lib/walk/walk-exit'
 import {
   computeTotalDistanceKm, computeSplits, computeBestEfforts, computePaceSeries,
   computeElevationChange, computeElevationProfile, computeAvgPaceSecPerKm,
@@ -63,7 +62,14 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
   // on. `/cardio`, where the walk was launched from, is the other candidate and loses for that
   // reason: it is where you go to begin one, not where you see the one you did.
   useEffect(() => { router.prefetch('/health') }, [router])
+  const leave = useCallback(() => { onDone(); navigateToTab(router, '/health') }, [onDone, router])
+  // issue 2595. The Android back gesture off this screen is Done. It used to navigate away with the walk
+  // still `'done'` in the store, so the next "Guided walk" tap remounted a summary that had lost the
+  // samples and elapsed time and showed a 0-minute walk. `MobileAuthHandler` asks through the same
+  // registry the active screen uses for its Exit prompt.
+  useEffect(() => registerWalkExit(leave), [leave])
   const rawPoints = useGuidedWalkStore(s => s.rawPoints)
+  const pacerTallies = useGuidedWalkStore(s => s.pacerTallies)
   const plan = buildIntervalPlan(config)
   // Never above the plan: a walk cannot run longer than it was told to, and the 1 Hz tick can land
   // a second past `totalSec` before the finish fires.
@@ -72,8 +78,11 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
   const bpms = samples.map(s => s.bpm)
   const avgHr = avg(bpms)
   const maxHr = bpms.length ? Math.max(...bpms) : null
-  const savedRef = useRef(false)
-  const [saved, setSaved] = useState(false)
+  // DV-19 ③. A remount of a walk already saved writes nothing and says so — see `claimWalkSave`.
+  const [saved, setSaved] = useState(() => {
+    const s = useGuidedWalkStore.getState()
+    return s.savedWalkId != null && s.savedWalkId === s.walkId
+  })
   /**
    * The server-derived calories (BF-107), which do not exist when this screen first paints.
    *
@@ -91,9 +100,9 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
   // ephemeral display that used to be thrown away on save).
   const segmentStats = useMemo(
     () => computeWalkSegmentStats({
-      plan, startedAtMs, hrSamples: samples, rawPoints, cadenceSeries: cadence?.series ?? null,
+      plan, startedAtMs, hrSamples: samples, rawPoints, cadenceSeries: cadence?.series ?? null, pacerTallies,
     }),
-    [plan, startedAtMs, samples, rawPoints, cadence],
+    [plan, startedAtMs, samples, rawPoints, cadence, pacerTallies],
   )
 
   // Time-in-zone + Session Load — same shared primitive the regular activity detail view uses
@@ -138,26 +147,20 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
   }, [])
 
   useEffect(() => {
-    if (savedRef.current) return
-    savedRef.current = true
-    void saveWalk()
+    // DV-19 ③. Once per WALK, not per mount: the claim lives in the persisted store, so a summary
+    // remounted on a walk still `'done'` (Back off this screen, then the walk route again) finds
+    // it taken. That mount has lost the samples and the elapsed time, and its write would have
+    // replaced the real walk with a 0-minute one.
+    const walkId = useGuidedWalkStore.getState().claimWalkSave()
+    if (!walkId) return
+    void saveWalk(walkId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // RV-166. Armed by the cardio card's "Walk it -> Guided walk" and read here because this screen
-  // owns the walk's own save — the field lives on the activity store, which is its one home.
-  function satisfyPrescription(activityLogId: string) {
-    const store = useActivityStore.getState()
-    const prescribedRunId = store.prescribedRunId
-    if (!prescribedRunId) return
-    store.linkPrescribedRun(null)
-    linkPrescribedRun(userId, prescribedRunId, activityLogId, tz, 'walk').catch(() => {})
-  }
-
-  async function saveWalk() {
+  async function saveWalk(walkId: string) {
     const date = todayInTz(tz)
-    const startTime = msToHHMMInTz(startedAtMs)
-    const endTime = msToHHMMInTz(startedAtMs + actualSec * 1000)
+    const startTime = msToHHMMInTz(startedAtMs, tz)
+    const endTime = msToHHMMInTz(startedAtMs + actualSec * 1000, tz)
 
     // Treadmill walks save as the `treadmill` activity type (is_distance_based=false), so the
     // cardio aggregates that filter on a non-null distance/pace exclude them automatically —
@@ -202,7 +205,8 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
       if (store) {
         try {
         const now = new Date().toISOString()
-        const logId = crypto.randomUUID()
+        // The walk's own id, so a second write for this walk can only ever upsert its one row.
+        const logId = walkId
         await store.upsertActivityLog({
           id: logId, date, activityType, title,
           durationMin, distanceKm, steps: stepsEstimate,
@@ -231,7 +235,6 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
           }),
         })
         invalidateActivityWrites().catch(() => {})
-        satisfyPrescription(logId)
         setSaved(true)
         // BF-107. The push only flips the row to `synced`; the derived calories arrive on a PULL, so
         // one is forced here and the row read back. It stays inside `pushThenRevalidate`'s callback
@@ -239,7 +242,9 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
         // pushed — and because revalidating around a local write instead of after it is its own bug.
         pushThenRevalidate(userId!, async () => {
           await invalidateActivityWrites()
-          await pullDelta(userId!, true)
+          const pulled = await pullDelta(userId!, true)
+          // The pull carries whatever else changed since the cursor, not only this walk (#2550).
+          if (pulled) await invalidatePulledDomains(pulled.domains)
           const rows = await store.getActivityLogs(date)
           const mine = rows.find(r => r.id === logId)
           if (mine?.caloriesBurned != null) setKcal(mine.caloriesBurned)
@@ -275,7 +280,6 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
       // and this response was being thrown away.
       const body = await res.json().catch(() => null) as { activityLog?: { id?: string; caloriesBurned?: number | null } } | null
       if (body?.activityLog?.caloriesBurned != null) setKcal(body.activityLog.caloriesBurned)
-      if (body?.activityLog?.id) satisfyPrescription(body.activityLog.id)
       await invalidateActivityWrites()
       setSaved(true)
     } catch {
@@ -283,6 +287,7 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
       // and the server write failed too. So there is nothing queued for the outbox to retry, and
       // claiming otherwise by setting `saved` told the lifter their walk was safe when it was gone
       // (Q-216). Leave it unsaved so the button stays live and the walk can be saved again.
+      useGuidedWalkStore.getState().releaseWalkSave(walkId)
       toast.error('Failed to save walk — try again')
     }
   }
@@ -344,7 +349,7 @@ export function WalkSummary({ config, samples, cadence, elapsedSec, startedAtMs,
       <p className="text-[10px] text-muted-foreground">
         {saved ? 'Saved to your activity history.' : 'Saving…'}
       </p>
-      <Button className="h-12" onClick={() => { onDone(); navigateToTab(router, '/health') }}>Done</Button>
+      <Button className="h-12" onClick={leave}>Done</Button>
     </div>
   )
 }

@@ -304,6 +304,14 @@ Admin, `year-review`, `stats`, `exercise-manager`, and other low-frequency scree
 indefinitely. This is the documented endpoint, not an unfinished migration — MyFitnessPal and Garmin
 Connect both visibly ship webviews for low-frequency content for exactly this reason.
 
+> **Play Store distribution is out of scope until after Stage 7 (2026-10-07, #2491).** The listing
+> brings a privacy policy, data-safety declarations and a Health Connect declared-use-case review
+> with an external lead time, none of which any stage above depends on. Those items are tracked in
+> [`docs/public-launch-checklist.md`](../../public-launch-checklist.md), which is the gate for
+> sharing the app beyond the owner: the owner's start on the Health Connect review is the first
+> step, because its lead time sets the earliest launch date. If the owner wants a listing sooner,
+> that is a new stage after this one, not a change to the stages above.
+
 ---
 
 ## 5. Preserved vs replaced

@@ -5,8 +5,7 @@ import { DEFAULT_TZ, todayInTz, todayMidnightUtc, toAestDay, secondsSinceLocalMi
 import { rateLimit } from '@/lib/rate-limit'
 import { wornHours } from '@trainingai/shared/health/wear-confidence'
 import { aggregateWorkoutDay, type DaySession } from '@trainingai/shared/health/workout-density'
-import { analyseHrRecovery } from '@trainingai/shared/workout/hr-analysis'
-import { rollupDailyBestHrr } from '@trainingai/shared/workout/hrr-trend'
+import { rollupDailyBestHrr, setHrr60Values } from '@trainingai/shared/workout/hrr-trend'
 
 export interface HealthTrendDay {
   date: string            // YYYY-MM-DD
@@ -15,7 +14,7 @@ export interface HealthTrendDay {
   activityScore: number | null
   hrvMs: number | null
   rhrBpm: number | null
-  hrr1Bpm: number | null  // best-session 60s HR-recovery drop (bpm/min); derived, not stored
+  hrr1Bpm: number | null  // best-session median HRR60 (bpm/min, dense HR only); derived, not stored; null = not measured
   wornHours: number | null
   sessionDurationMin: number | null
   workoutDensity: number | null  // kg lifted per active minute
@@ -67,10 +66,12 @@ export async function GET() {
     sessionsByDate.set(day, list)
   }
 
-  // HRR trend — re-derive each completed session's HRR1 from its stored HR window (no persisted
-  // column; server-only aggregate, same posture as weekly-stats). Reuses analyseHrRecovery — the
-  // single HRR formula. Bounded: one HR-window read + one set-timestamp read per completed session
-  // in range (≤ ~14), parallelised.
+  // HRR trend — re-derive each completed session's per-set HRR60 from its HR window (server-only
+  // aggregate, same posture as weekly-stats). HRR60 (`deriveHrr60`, #2457) is the one measured
+  // one-minute recovery: it needs dense HR, so a ring-only set is null and its day a gap. #2234: the
+  // nearest-reading `hrr1` from analyseHrRecovery turned two idle ring readings a minute apart into
+  // a 0-bpm "recovery", which the sparkline plotted as a point. Bounded: one HR-window read + one
+  // set-timestamp read per completed session in range (≤ ~14), parallelised.
   const completedSessions = workoutSessions.filter(ws => ws.completedAt != null)
   const perSessionHrr = await Promise.all(
     completedSessions.map(async ws => {
@@ -80,8 +81,7 @@ export async function GET() {
         repo.getHrForWindow(userId, from, to),
         repo.getSetTimestampsForSession(userId, ws.id),
       ])
-      const stats = analyseHrRecovery(readings, sets)
-      return { day: toAestDay(ws.startedAt, tz), hrr1Values: stats.map(s => s.hrr1) }
+      return { day: toAestDay(ws.startedAt, tz), hrr1Values: setHrr60Values(readings, sets) }
     }),
   )
   const hrrByDay = rollupDailyBestHrr(perSessionHrr)

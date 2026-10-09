@@ -18,6 +18,10 @@ export interface ExerciseSummaryData {
   // All-time PR 1RM the "New Personal Record!" badge must beat (E1-7) — distinct
   // from prevEst1rm (last session). null when the exercise has no PR yet.
   allTimePr1rm: number | null;
+  /** Leave out the change against the previous estimate: this run is a baseline, or the previous
+   *  estimate was one. Either way one side is AMRAP-scaled from a single unprescribed set and the
+   *  other is not, so the difference is a large loss or gain that did not happen. Display only. */
+  suppressRmChange?: boolean;
   newEst1rm: number;
   target80: number;
   progressionStyle?: { pct: number; reps: number }[];

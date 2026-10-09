@@ -12,7 +12,7 @@ import { toast } from 'sonner'
 import {
   Bluetooth, Camera, Cat, Check, CloudDownload, Copy, Dumbbell, Info, LogOut, Scan, Settings, Shield, Sparkles, UserRound,
 } from 'lucide-react'
-import { signOutAndClearDevice } from '@/lib/sign-out'
+import { useSignOutFlow } from './sign-out-flow'
 import type { AchievementResult } from '@/components/profile/achievements-grid'
 import { EditProfileSheet } from '@/components/profile/edit-profile-sheet'
 import { GoalsSection } from '@/components/profile/goals-section'
@@ -95,6 +95,7 @@ interface ProfileTabProps {
 
 export function ProfileTab({ user, profileFailed, seasons, equippedTitle, friendCode, onUserSaved, onTitleChange }: ProfileTabProps) {
   const router = useTransitionRouter()
+  const signOutFlow = useSignOutFlow(user?.id)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [avatarOverride, setAvatarOverride] = useState<string | null>(null)
@@ -512,12 +513,13 @@ export function ProfileTab({ user, profileFailed, seasons, equippedTitle, friend
         <FeedbackSection />
         <EditProfileSheet user={user} onSaved={(updated) => { onUserSaved(updated); invalidateUserProfile().catch(() => {}) }} />
         <Button variant="ghost" className="w-full text-destructive hover:text-destructive"
-          onClick={() => { void signOutAndClearDevice(); }}>
+          disabled={signOutFlow.busy} onClick={signOutFlow.start}>
           <LogOut className="w-4 h-4 mr-2" />
-          Sign Out
+          {signOutFlow.busy ? 'Syncing…' : 'Sign Out'}
         </Button>
+        {signOutFlow.dialog}
         {/* #2120. Last and quietest: the one irreversible action in the app, behind a typed phrase. */}
-        <DeleteAccountSheet />
+        <DeleteAccountSheet userId={user?.id} />
       </div>
 
       <TitlePickerSheet

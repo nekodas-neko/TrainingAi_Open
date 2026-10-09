@@ -1,5 +1,46 @@
+diff --git a/android/src/main/java/com/devmaxime/capacitor/health/connect/AndroidHealthConnect.kt b/android/src/main/java/com/devmaxime/capacitor/health/connect/AndroidHealthConnect.kt
+index f4da53e6bbf4c4bc98e075a12b73ebe207c9e3e7..e4ac9bccefcb82bf45b87f9260595997801e0bf7 100644
+--- a/android/src/main/java/com/devmaxime/capacitor/health/connect/AndroidHealthConnect.kt
++++ b/android/src/main/java/com/devmaxime/capacitor/health/connect/AndroidHealthConnect.kt
+@@ -33,6 +33,12 @@ data class PermissionSetResult(
+     val invalidRecords: Set<String>
+ )
+ 
++/**
++ * Not a record type: the name JS uses for READ_HEALTH_DATA_HISTORY, the permission that lets an app
++ * read more than 30 days before its first grant (issue 2712). Read-only; it has no write form.
++ */
++const val HISTORY_PERMISSION_NAME = "HealthDataHistory"
++
+ class HealthConnect {
+ 
+     /**
+@@ -51,7 +57,9 @@ class HealthConnect {
+                 val record = array.optString(i)
+                 if (record.isNotEmpty()) {
+                     val recordType = RECORDS_TYPE_NAME_MAP[record]
+-                    if (recordType != null) {
++                    if (record == HISTORY_PERMISSION_NAME) {
++                        validPermissions.add(HealthPermission.PERMISSION_READ_HEALTH_DATA_HISTORY)
++                    } else if (recordType != null) {
+                         validPermissions.add(HealthPermission.getReadPermission(recordType = recordType))
+                     } else {
+                         invalidRecords.add(record)
+@@ -136,6 +144,12 @@ class HealthConnect {
+     * Returns null if no match is found.
+     */
+     fun reversePermission(permission: String): JSObject? {
++        if (permission == HealthPermission.PERMISSION_READ_HEALTH_DATA_HISTORY) {
++            val result = JSObject()
++            result.put("operation", "read")
++            result.put("record", HISTORY_PERMISSION_NAME)
++            return result
++        }
+         // Iterate through each entry in RECORDS_TYPE_NAME_MAP.
+         for ((recordName, recordType) in RECORDS_TYPE_NAME_MAP) {
+             val expectedRead = HealthPermission.getReadPermission(recordType = recordType)
 diff --git a/android/src/main/java/com/devmaxime/capacitor/health/connect/RecordConverter.kt b/android/src/main/java/com/devmaxime/capacitor/health/connect/RecordConverter.kt
-index 2953566eabb2d3ec1dddfbbffa2d8a3954b4b4b5..a64920491e36d81082c088b9f379b18e2140bb84 100644
+index c9e7e7e5437e72e38991195fab3a3927649003f4..0790d0b286e4757a30f0f2aef8d8aff7b468f52e 100644
 --- a/android/src/main/java/com/devmaxime/capacitor/health/connect/RecordConverter.kt
 +++ b/android/src/main/java/com/devmaxime/capacitor/health/connect/RecordConverter.kt
 @@ -8,6 +8,13 @@ import androidx.health.connect.client.records.ExerciseSessionRecord
@@ -112,15 +153,17 @@ index 2953566eabb2d3ec1dddfbbffa2d8a3954b4b4b5..a64920491e36d81082c088b9f379b18e
      }
  }
 diff --git a/dist/esm/definitions.d.ts b/dist/esm/definitions.d.ts
-index d0960a9ddc422de7191092996aadd41e5caed96f..c778737cfde49b0b31c02b7186aa6cb0bb94628a 100644
+index 35144cdde8854e83bdc6345ea4fb8d03ddf85d1b..2a6b8669c291e09ba6f99d768d25c40999db6838 100644
 --- a/dist/esm/definitions.d.ts
 +++ b/dist/esm/definitions.d.ts
-@@ -37,7 +37,7 @@ export interface HealthConnectPlugin {
+@@ -37,7 +37,9 @@ export interface HealthConnectPlugin {
      }): Promise<AggregateResponse>;
  }
  export declare type HealthConnectAvailability = 'Available' | 'NotSupported' | 'NotInstalled';
 -export declare type RecordType = 'Steps' | 'Weight' | 'ActivitySession' | 'SleepSession' | 'RestingHeartRate';
-+export declare type RecordType = 'Steps' | 'Weight' | 'ActivitySession' | 'SleepSession' | 'RestingHeartRate' | 'BodyFat' | 'Nutrition' | 'HeartRateVariabilityRmssd' | 'OxygenSaturation' | 'HeartRateSeries' | 'ActiveCaloriesBurned' | 'StepsCadenceSeries';
++/** 'HealthDataHistory' is READ_HEALTH_DATA_HISTORY, not a record type: read only, request and check it
++ *  through requestPermissions / getGrantedPermissions like any other read type (issue 2712). */
++export declare type RecordType = 'Steps' | 'Weight' | 'ActivitySession' | 'SleepSession' | 'RestingHeartRate' | 'BodyFat' | 'Nutrition' | 'HeartRateVariabilityRmssd' | 'OxygenSaturation' | 'HeartRateSeries' | 'ActiveCaloriesBurned' | 'StepsCadenceSeries' | 'HealthDataHistory';
  export declare type AggregateRecordType = 'Steps' | 'Distance' | 'TotalCaloriesBurned' | 'ActiveCaloriesBurned' | 'HeartRate';
  export declare type AggregateGroupBy = 'day' | 'hour' | 'week' | 'month';
  /**

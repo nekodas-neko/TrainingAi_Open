@@ -3,12 +3,14 @@
 import { ClockIcon } from "lucide-react";
 import { cn } from "@trainingai/shared/utils";
 import { useRovingRadioGroup } from "@/lib/hooks/use-roving-radio-group";
-import { budgetForPreset, type DurationPreset } from "@trainingai/shared/workout/duration-model";
+import {
+  presetForLength, requestedBudgetMin, sessionLengthOptions, type DurationPreset,
+} from "@trainingai/shared/workout/duration-model";
 
 interface SessionDurationPickerProps {
-  /** Which preset the currently-shown prescription was built for. */
+  /** Which length the currently-shown prescription was built for. */
   value: DurationPreset;
-  /** The session's own configured budget, shown as the "Standard" sublabel. */
+  /** The session's own configured budget: the anchor, marked "usual" and the default. */
   standardMin: number;
   /** Estimated working minutes for the current plan, shown alongside. */
   estimatedMin?: number | null;
@@ -18,22 +20,17 @@ interface SessionDurationPickerProps {
   onChange: (preset: DurationPreset) => void;
 }
 
-// Sublabels are derived, never hardcoded: short/long are the session's own budget ±30, so a
-// 45-minute session must read 15/45/75 rather than a fixed 30/90 that doesn't apply to it.
-const OPTIONS: Array<{ preset: DurationPreset; label: string }> = [
-  { preset: 'short', label: 'Quick' },
-  { preset: 'standard', label: 'Normal' },
-  { preset: 'long', label: 'Long' },
-];
-
-/** Per-day time-budget choice for today's session — "30 minutes before work" vs a
+/** Per-day time-budget choice for today's session — "45 minutes before work" vs a
  *  weekend session with time to spare. Picking one regenerates the prescription against
- *  that budget; the choice lives on the resulting plan, never on the program. */
+ *  that budget; the choice lives on the resulting plan, never on the program.
+ *  The four lengths come from `sessionLengthOptions` (30/45/60/90 around the session's own). */
 export function SessionDurationPicker({
   value, standardMin, estimatedMin, disabled = false, hideHeader = false, onChange,
 }: SessionDurationPickerProps) {
-  // Always one of the presets, so `hasSelection` is unconditionally true.
-  const lengthGroup = useRovingRadioGroup(true);
+  const lengths = sessionLengthOptions(standardMin);
+  // The stored value may be a legacy label, so compare in minutes rather than by identity.
+  const selectedMin = requestedBudgetMin(standardMin, value);
+  const lengthGroup = useRovingRadioGroup(lengths.includes(selectedMin));
   return (
     <div className="mb-4">
       {!hideHeader && (
@@ -50,28 +47,29 @@ export function SessionDurationPicker({
       <div
         {...lengthGroup.groupProps}
         aria-label="Session length for today"
-        className="grid grid-cols-3 gap-1 rounded-xl bg-muted/60 p-1"
+        className="grid grid-cols-4 gap-1 rounded-xl bg-muted/60 p-1"
       >
-        {OPTIONS.map((opt, i) => {
-          const active = opt.preset === value;
+        {lengths.map((min, i) => {
+          const active = min === selectedMin;
           return (
             <button
-              key={opt.preset}
+              key={min}
               type="button"
               {...lengthGroup.getRadioProps(active, i)}
               disabled={disabled}
-              onClick={() => { if (!active) onChange(opt.preset); }}
+              // A tap commits on release (click fires on pointer-up): one rebuild per choice.
+              onClick={() => { if (!active) onChange(presetForLength(standardMin, min)); }}
               className={cn(
-                "flex min-h-12 flex-col items-center justify-center rounded-lg px-2 py-1.5 transition-colors",
+                "flex min-h-12 flex-col items-center justify-center rounded-lg px-1 py-1.5 transition-colors",
                 "disabled:opacity-50",
                 active
                   ? "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <span className="text-sm font-semibold leading-tight">{opt.label}</span>
-              <span className="text-[10px] leading-tight opacity-70 tabular-nums">
-                {budgetForPreset(standardMin, opt.preset)} min
+              <span className="text-sm font-semibold leading-tight tabular-nums">{min} min</span>
+              <span className="text-[10px] leading-tight opacity-70">
+                {min === standardMin ? "usual" : " "}
               </span>
             </button>
           );

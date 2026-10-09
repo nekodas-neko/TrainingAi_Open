@@ -99,7 +99,7 @@ export function setNullToUsers(g: SchemaGraph): Set<string> {
 let seq = 0
 const unique = (tag: string) => `${tag}-${process.pid}-${++seq}-${Math.random().toString(36).slice(2, 8)}`
 
-function genericValue(table: string, col: Column, g: SchemaGraph): unknown {
+function genericValue(table: string, col: Column, g: SchemaGraph, at?: Date): unknown {
   const e = g.enumValue.get(`${table}.${col.name}`)
   if (e !== undefined) return e
   switch (col.udt) {
@@ -110,7 +110,7 @@ function genericValue(table: string, col: Column, g: SchemaGraph): unknown {
     case 'int2': case 'int4': case 'int8': case 'float4': case 'float8': case 'numeric': return 1
     case 'bool': return false
     case 'date': return '2026-09-15'
-    case 'timestamptz': case 'timestamp': return new Date()
+    case 'timestamptz': case 'timestamp': return at ?? new Date()
     case 'time': case 'timetz': return '08:00'
     case 'interval': return '1 minute'
     case 'jsonb': case 'json': return '{}'
@@ -134,10 +134,18 @@ async function insertRow(pool: Pool, table: string, values: Row): Promise<Row> {
   }
 }
 
-/** A row in a table the fixture does not own (a catalogue), created only when none exists yet. */
+/**
+ * A row in a table the fixture does not own (a catalogue), created for THIS seed and handed back in
+ * `createdCatalogue` for the caller to remove.
+ *
+ * It used to reuse whatever row `SELECT … LIMIT 1` found, which is a row another test file owns. When
+ * `repository-ownership-scoping.test.ts` ran beside `account-deletion.test.ts` the row found was its
+ * `B TEST SEASON`, and that file's `afterAll` deleted it; `season_results → seasons` cascades, so the
+ * seeded user lost a row before the export count was read (#2571). `exercise_library` and
+ * `dietary_restrictions` had the same shape (SET NULL and CASCADE). A row nobody else holds cannot be
+ * deleted from under the seed.
+ */
 async function catalogueRow(pool: Pool, g: SchemaGraph, table: string, created: Row[]): Promise<Row> {
-  const { rows: [existing] } = await pool.query(`SELECT * FROM public."${table}" LIMIT 1`)
-  if (existing) return existing
   const values: Row = {}
   for (const col of g.columns.get(table) ?? []) {
     if (col.notNull && !col.hasDefault) values[col.name] = genericValue(table, col, g)
@@ -168,6 +176,9 @@ export async function seedEveryUserTable(
     parentOverride?: Record<string, Row>
     /** Column values for one table, where a generic value breaks a multi-column CHECK. */
     overrides?: Record<string, Row>
+    /** The instant every generated timestamp takes, instead of "now" — lets a caller line the
+     *  timestamps up with the fixture's fixed date so one query window sees both. */
+    at?: Date
   } = {},
 ): Promise<SeededUser> {
   const owned = new Set([...cascadeClosure(g), ...setNullToUsers(g)])
@@ -201,7 +212,7 @@ export async function seedEveryUserTable(
     for (const col of g.columns.get(table) ?? []) {
       if (col.name in values) continue
       if (col.name === 'deleted_at' && opts.softDelete) values[col.name] = new Date()
-      else if (col.notNull && !col.hasDefault) values[col.name] = genericValue(table, col, g)
+      else if (col.notNull && !col.hasDefault) values[col.name] = genericValue(table, col, g, opts.at)
     }
     rows.set(table, await insertRow(pool, table, values))
   }

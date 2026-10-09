@@ -160,10 +160,21 @@ export const TAIL_BAND_POINTS = 20
  * the knee.
  */
 function compressTails(raw: number): number {
+  return compressHighTail(compressLowTail(raw))
+}
+
+/** The top half of `compressTails`: a score above `100 - TAIL_BAND_POINTS` bends toward 100 without
+ *  reaching it. Untouched below the knee. */
+function compressHighTail(raw: number): number {
   const W = TAIL_BAND_POINTS
-  if (raw > 100 - W) return 100 - W / (1 + (raw - (100 - W)) / W)
-  if (raw < W) return W / (1 + (W - raw) / W)
-  return raw
+  return raw > 100 - W ? 100 - W / (1 + (raw - (100 - W)) / W) : raw
+}
+
+/** The bottom half: a score below `TAIL_BAND_POINTS` bends toward 0 without reaching it. Untouched
+ *  above the knee. */
+function compressLowTail(raw: number): number {
+  const W = TAIL_BAND_POINTS
+  return raw < W ? W / (1 + (W - raw) / W) : raw
 }
 
 /** Maps a personal-baseline z-score to a 0-100 sub-score. Linear through the middle; past the knee
@@ -182,7 +193,13 @@ function zToScore(
   const raw = direction === 'closer-better'
     ? 100 - Math.abs(z) * (2 * Z_POINTS_PER_UNIT)
     : 50 + (direction === 'higher-better' ? z : -z) * Z_POINTS_PER_UNIT
-  return { score: Math.max(0, Math.min(100, Math.round(compressTails(raw)))), provisional: false, input: z, gap: null }
+  // Closer-better compresses only the BAD end (#2359). Its good end is z = 0, a single point that
+  // cannot be exceeded, so there is no rail up there for a tail to stop extreme days piling onto: the
+  // compression just pulled "exactly at baseline" down to 90 (raw 100 bends to 100 − 20/2) and cost
+  // readiness about 1.1 points on every day with a normal temperature. The bad end, where a fever
+  // pushes the raw score toward 0, keeps the TN-60 shape so extreme days stay ordered.
+  const shaped = direction === 'closer-better' ? compressLowTail(raw) : compressTails(raw)
+  return { score: Math.max(0, Math.min(100, Math.round(shaped))), provisional: false, input: z, gap: null }
 }
 
 function plainScore(v: number | null): ReadinessContributor {
@@ -194,8 +211,11 @@ function plainScore(v: number | null): ReadinessContributor {
  *  model that produced it. Bump whenever the weights, curves or z-slope change — Q-273.
  *  Rows written before 2026-08-18 carry no stamp at all.
  *  v6: a baseline under 64 nights old warms its deviation up instead of climbing from zero (#2159),
- *  which changes every z built from a young baseline. A mature ring baseline scores identically. */
-export const READINESS_MODEL_VERSION = 'v6:dev-warmup:2026-10-06'
+ *  which changes every z built from a young baseline. A mature ring baseline scores identically.
+ *  v7: a temperature at baseline scores 100, not 90 (#2359) — the closer-better contributor no longer
+ *  compresses its good end, which lifts every day with |tempZ| under 0.3 (raw above the 80 knee) by up to
+ *  ~1.1 points on the 0-100 scale. */
+export const READINESS_MODEL_VERSION = 'v7:temp-100-at-baseline:2026-10-07'
 
 /** Recovery Index hours at which this contributor scores 100. `hoursToSettle` is measured from the
  *  overnight HR minimum to wake, so MORE hours = the heart settled earlier = better.

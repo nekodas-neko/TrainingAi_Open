@@ -330,7 +330,11 @@ export async function clearAllCache(): Promise<void> {
   inFlightStartSeq.clear();
   if (typeof window !== 'undefined') {
     Object.keys(sessionStorage).filter(k => k.startsWith(SS_PREFIX)).forEach(k => sessionStorage.removeItem(k));
-    Object.keys(localStorage).filter(k => k.startsWith('ta_')).forEach(k => localStorage.removeItem(k));
+    // The cache's own mirror only. This used to sweep every `ta_` key, which made it the de facto
+    // sign-out wipe of browser storage — clearing the strap/scale pairings and the theme with the
+    // workout, and missing every account key not spelled `ta_` (#2453). That wipe is now
+    // `clearAccountStorage()` in `lib/sign-out-storage.ts`, against a classified list.
+    Object.keys(localStorage).filter(k => k.startsWith(LS_PREFIX)).forEach(k => localStorage.removeItem(k));
   }
   if (isSQLiteAvailable()) {
     try {
@@ -511,7 +515,7 @@ async function cachedFetchCore<T>(
       // storing that under a long TTL would serve the fallback for as long as the real answer
       // would have lived — the recap's is 24h, on a card whose only retry is a refetch.
       if (!shouldCache || shouldCache(data)) await setCached(key, toStored(data), ttlSeconds);
-    } catch (err) {
+    } catch {
       // Network-level throw. Offline is not an error (queue + show saved data);
       // only report a genuine failure while online with nothing cached to show.
       //

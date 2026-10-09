@@ -72,7 +72,7 @@ export async function GET() {
   const exerciseNames = programSession.exercises.map(ex => ex.exerciseName);
   const isAiDynamic = program.phaseMode === 'ai_dynamic';
 
-  const [lastLogs, lastRealOneRm, prMap, periodization, estimates] = await Promise.all([
+  const [, lastRealOneRm, prMap, periodization, estimates] = await Promise.all([
     repo.getLastExerciseLogsBatch(userId, exerciseNames),
     repo.getLastRealOneRmBatch(userId, exerciseNames),
     repo.listPersonalRecords(userId),
@@ -101,7 +101,6 @@ export async function GET() {
   const exercises: NextSessionExercisePreview[] = programSession.exercises
     .filter(ex => !droppedThisCycle.has(ex.id))
     .map(ex => {
-      const lastLog = lastLogs.get(ex.exerciseName) ?? null;
       const libEntry = libByName.get(ex.exerciseName.toLowerCase());
       const exerciseType: ExerciseType = libEntry?.exerciseType ?? 'weighted';
 

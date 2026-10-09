@@ -18,6 +18,12 @@ interface ResilienceTileProps {
    * at the call site — that would defeat the `memo` silently (Q-490).
    */
   unavailable: ResilienceCoverage | null;
+  /**
+   * The availability module's reason there is no level (`scoreGapText`), a string rather than an
+   * object so the `memo` holds. It speaks only when `unavailable` has nothing to say: the coverage
+   * line is the more specific explanation and two reasons for one absence would contradict.
+   */
+  gapText?: string | null;
 }
 
 /**
@@ -30,14 +36,16 @@ interface ResilienceTileProps {
  * nothing is the failure that entry was filed on: the tile had been showing a five-day-old level as
  * current, and would have gone blank without a word once that day left the window.
  *
- * Returns null only when there is neither a level nor an observation — a payload from before those
- * fields existed. Absent data is not a state worth a sentence.
+ * Returns null only when there is no level, no observation and no availability reason — a payload
+ * from before those fields existed. Absent data with nothing to say is not a state worth a sentence.
+ * With a reason (issue 2423) it is: the tile was the one place that rendered nothing at all.
  */
-function ResilienceTileImpl({ level, band, confidence, asOf, unavailable }: ResilienceTileProps) {
+function ResilienceTileImpl({ level, band, confidence, asOf, unavailable, gapText = null }: ResilienceTileProps) {
   const tz = useUserTimezone();
   const hasLevel = level != null && band != null;
   const shortfall = hasLevel ? null : unavailable ? resilienceShortfallLine(unavailable) : null;
-  if (!hasLevel && shortfall == null) return null;
+  const gap = hasLevel || shortfall != null ? null : gapText;
+  if (!hasLevel && shortfall == null && gap == null) return null;
 
   const bandLabel = band ? band.charAt(0).toUpperCase() + band.slice(1) : null;
   const learning = hasLevel && confidence != null && confidence < 1;
@@ -60,6 +68,7 @@ function ResilienceTileImpl({ level, band, confidence, asOf, unavailable }: Resi
           </span>
         )}
         {shortfall && <span className="block text-muted-foreground">{shortfall}</span>}
+        {gap && <span className="block text-muted-foreground">{gap}</span>}
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 import { isSQLiteAvailable, isLocalStoreDead, runSQL, querySQL } from '@/lib/sqlite/sqlite-service';
 import type {
-  LocalBodyMetric, LocalMoodLog, LocalSleepSession, LocalWorkoutSession,
+  LocalBodyMetric, LocalMoodLog, LocalSleepSession, LocalManualSleepNight, LocalWorkoutSession,
   LocalActivityLog, LocalFitnessTest, LocalPrescribedRun, LocalProgram, LocalProgressionStyle, PendingMutation,
   LocalFoodLog, LocalFoodItem, LocalDayCheckin, LocalSupplement, LocalSupplementLog, LocalSupplementVial, LocalInjury,
   LocalExerciseLog, LocalSetLog, LocalPersonalRecord, LocalOuraDaily,
@@ -63,6 +63,12 @@ export interface LocalStore {
   hydrateSavedMeals(serverMeals: SavedMeal[]): Promise<void>;
   getSupplements(): Promise<LocalSupplement[]>;
   getSupplementLogs(date: string): Promise<LocalSupplementLog[]>;
+  /**
+   * Issue 2724 — live logs from `fromDate` to `toDate`, INCLUSIVE local days, oldest first;
+   * tombstones excluded; `supplementId` optionally narrows to one supplement. Includes `pending`
+   * (not yet synced) rows.
+   */
+  getSupplementLogsRange(fromDate: string, toDate: string, supplementId?: string): Promise<LocalSupplementLog[]>;
   getInjuries(): Promise<LocalInjury[]>;
   getExerciseLogs(workoutSessionId: string): Promise<LocalExerciseLog[]>;
   getSetLogs(exerciseLogId: string): Promise<LocalSetLog[]>;
@@ -121,6 +127,38 @@ export interface LocalStore {
   // on-device rollup writer); flipping the flag doesn't need one. Currently inert:
   // nothing queues these mutations until D2 lands, but the arm is cheap+correct now.
   markSleepSessionSynced(id: string): Promise<void>;
+  /**
+   * #2547. The bedtime the user remembers, written to the night's local row in the same turn as its
+   * queued `manual_bedtime` mutation, and marked `pending` so a pull landing before the push cannot
+   * revert it (`applyDelta`'s sleep upsert only overwrites a `synced` row). Touches
+   * `manual_sleep_start` and nothing else on the row. A date with no local row changes nothing; the
+   * mutation still goes to the server, which quarantines it when it has no night either.
+   */
+  setManualSleepStartLocally(date: string, at: string | null): Promise<void>;
+  /** Confirm a queued `manual_bedtime` mutation: the row goes back to `synced` unless another
+   *  bedtime for that night is still queued behind it. `confirmingIds` is the batch being confirmed. */
+  markManualBedtimeSynced(date: string, confirmingIds?: string[]): Promise<void>;
+  /**
+   * #2338. A night the user entered by hand, written to the local `sleep_sessions` mirror as
+   * `manual_entry = 1` and `pending` in the same turn as its queued `manual_sleep` mutation, so it
+   * reads back at once, offline, and a pull landing before the push cannot revert it. One manual
+   * night per date, as on the server: when the date already has one, that row is edited and keeps its
+   * id. **Returns the id it wrote** — the caller queues the mutation with it, so the server row and
+   * this row stay one row. Never touches a device row.
+   */
+  upsertManualSleepLocally(night: LocalManualSleepNight): Promise<string>;
+  /**
+   * Issue 2606. Remove a night the user entered: the local row gets `deleted_at` and goes `pending`
+   * in the same turn as its queued `manual_sleep` `{ id, deleted: true }` mutation, so it disappears
+   * from `getSleepSessions` at once, offline, and a pull landing before the push cannot bring it
+   * back. Only a `manual_entry = 1` row is touched. **Returns the night's wake date** (the outbox
+   * entry's date), or null — changing nothing — for a device night or an id the store does not hold,
+   * so the caller queues nothing.
+   */
+  removeManualSleepLocally(id: string): Promise<string | null>;
+  /** Confirm a queued `manual_sleep` mutation: the row goes back to `synced` unless another edit of
+   *  the same night is still queued behind it. `confirmingIds` is the batch being confirmed. */
+  markManualSleepSynced(id: string, confirmingIds?: string[]): Promise<void>;
   markOuraDailySummarySynced(day: string): Promise<void>;
   markOuraDailyDerivedSynced(day: string): Promise<void>;
   // D2 prep (Phase-1 Task 1): reads let anything local-first read Oura's device-computed
@@ -205,6 +243,10 @@ export interface LocalStore {
    *  path that forgets it during the backoff window puts the row back on screen. */
   getQueuedMutationsForDomain(userId: string, domain: string): Promise<PendingMutation[]>;
   getFailedMutations(userId: string): Promise<PendingMutation[]>;
+  /** Issue 2532. How many mutations are queued per domain, **whatever their status or retry
+   *  backoff** — the sign-out warning counts everything not yet acknowledged, including rows
+   *  waiting out a backoff or dead-lettered, because all of them are lost by a sign-out. */
+  countQueuedMutationsByDomain(userId: string): Promise<Record<string, number>>;
   recordMutationFailures(failures: Array<{ id: string; error: string }>): Promise<void>;
   retryFailedMutation(id: string): Promise<void>;
   // One-shot heal for food logs stranded by the D-1 envelope bug: for each

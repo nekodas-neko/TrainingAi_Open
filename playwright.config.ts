@@ -13,6 +13,17 @@ const SANDBOX_CHROMIUM = '/opt/pw-browsers/chromium'
 const executablePath = existsSync(SANDBOX_CHROMIUM) ? SANDBOX_CHROMIUM : undefined
 
 /**
+ * Which Chromium Playwright launches: unset is its default, `chromium_headless_shell`; `chromium` is
+ * the full browser in new headless mode. CI sets `chromium` (issue 2166): on the shard runner the
+ * headless shell took SIGSEGV at address 0x1b0 mid-suite and every spec on that worker then failed
+ * with `browser.newContext: Target page, context or browser has been closed`, with no test body run.
+ * Measured on one commit, 12 repeats of six victim specs, retries off, same runner image:
+ * headless shell 6 browser crashes, `--disable-gpu` 2, full Chromium 0 (about 230 tests per arm).
+ * Left unset locally and in the sandbox, which pins its own `executablePath` above.
+ */
+const E2E_CHANNEL = process.env.E2E_CHROMIUM_CHANNEL || undefined
+
+/**
  * Q-249 — the first harness in this repo that actually runs the app.
  *
  * Read `e2e/README.md` before adding a spec. The short version of what this can and cannot prove:
@@ -55,11 +66,11 @@ export default defineConfig({
   projects: [
     // Both setups run before the specs: the seeded user every spec uses by default, and the
     // zero-data account (Q-352) that specs opt into with `test.use({ storageState: … })`.
-    { name: 'setup', testMatch: /(auth|zero-data)\.setup\.ts/, use: { launchOptions: { executablePath } } },
+    { name: 'setup', testMatch: /(auth|zero-data)\.setup\.ts/, use: { channel: E2E_CHANNEL, launchOptions: { executablePath } } },
     {
       name: 'mobile-chromium',
       dependencies: ['setup'],
-      use: { browserName: 'chromium', storageState: STORAGE_STATE, launchOptions: { executablePath } },
+      use: { browserName: 'chromium', channel: E2E_CHANNEL, storageState: STORAGE_STATE, launchOptions: { executablePath } },
     },
   ],
   // `pnpm dev`, deliberately, not `pnpm start`. The pg pool turns SSL on whenever

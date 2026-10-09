@@ -32,6 +32,9 @@ export const OUTSIDE_THE_CASCADE: Record<string, { disposition: 'anonymised' | '
   // A custom exercise is already in the catalogue every account reads, and other accounts' programs
   // and logs may name it. SET NULL by its FK (migration 202610060645).
   exercise_library: { disposition: 'anonymised', how: 'created_by SET NULL; the exercise stays in the shared catalogue' },
+  // #2381. The record of what an agent did to their data must outlive them, and the table is
+  // append-only (its trigger lets the FK unlink a row and nothing else). Holds no personal data.
+  agent_action_log: { disposition: 'anonymised', how: 'target_user_id SET NULL by its FK; job, actor, approval link, times and counts stay' },
 
   // Owner, 2026-09-24: purged, because `sql_text` can carry the user's data and nulling a column
   // does not anonymise a payload. It has no user column, so "theirs" is defined below.
@@ -49,8 +52,10 @@ export const OUTSIDE_THE_CASCADE: Record<string, { disposition: 'anonymised' | '
 }
 
 export interface AccountDeletionResult {
-  /** False when no user row matched — nothing was changed. */
+  /** False when no user row matched or the deletion was refused — nothing was changed. */
   deleted: boolean
+  /** True when `onlyIfNoData` was set and the account holds data, so nothing was changed (issue 2695). */
+  refusedHasData?: boolean
   /** Rows kept with the user unlinked. */
   anonymised: { aiCallLog: number; errorEvents: number; authoredExercises: number }
   /** Rows outside the cascade removed because they named this user. */
@@ -103,10 +108,56 @@ async function auditSubjects(tx: Tx): Promise<Set<string>> {
   return subjects
 }
 
+/**
+ * issue 2695 — what a signup holds the moment it exists, which must not count as "data under the
+ * account". `upsertUser` seeds every new user with progression styles and the built-in phase sets
+ * (`is_default = true`); their child rows (`style_sets`, `program_phases`) hang off those two. These
+ * are the only direct children of `users` a signup that never got in can have. `null` means the
+ * whole table is seeded; a string is the condition that picks out rows the person made themselves.
+ */
+const SIGNUP_SEEDED_ROOTS = new Map<string, string | null>([
+  ['progression_styles', null],
+  ['phase_sets', 'is_default = false'],
+])
+
+/**
+ * issue 2695 — which of these accounts hold data. "Data" is what `deleteAccount` removes through the
+ * cascade: every table whose foreign key to `users` is `ON DELETE CASCADE`, read from the live
+ * schema the way the deletion test reads it (`cascadeClosure`), so a table added later is covered
+ * without touching a list here. A row in any deeper table implies a row in one of these direct
+ * children, so checking the direct children is complete. Tables kept with the user unlinked
+ * (`ON DELETE SET NULL`) are not data under the account. Fails closed: if the schema read finds no
+ * cascade table at all it throws rather than answer "no data".
+ */
+export async function usersWithData(db: Db | Tx, userIds: readonly string[]): Promise<Set<string>> {
+  if (userIds.length === 0) return new Set()
+  const { rows: fks } = await db.execute<{ tbl: string; col: string; bare: string }>(sql`
+    SELECT format('%I', cl.relname) AS tbl, format('%I', a.attname) AS col, cl.relname::text AS bare
+    FROM pg_constraint con
+    JOIN pg_class cl ON cl.oid = con.conrelid
+    JOIN pg_class pc ON pc.oid = con.confrelid
+    JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = con.conkey[1]
+    WHERE con.contype = 'f' AND con.confdeltype = 'c' AND array_length(con.conkey, 1) = 1
+      AND pc.relname = 'users' AND pc.relnamespace = 'public'::regnamespace
+      AND cl.relnamespace = 'public'::regnamespace
+    ORDER BY cl.relname`)
+  if (fks.length === 0) throw new Error('usersWithData: no cascade foreign keys to users found')
+  const ids = sql`ARRAY[${sql.join(userIds.map(u => sql`${u}`), sql`, `)}]::uuid[]`
+  const parts = fks.flatMap(({ tbl, col, bare }) => {
+    const seeded = SIGNUP_SEEDED_ROOTS.get(bare)
+    if (seeded === null) return []
+    // Identifiers come from the catalogue through format('%I'); the ids are bound parameters.
+    const extra = seeded ? sql` AND ${sql.raw(seeded)}` : sql``
+    return [sql`SELECT ${sql.raw(col)}::text AS uid FROM ${sql.raw(tbl)} WHERE ${sql.raw(col)} = ANY(${ids})${extra}`]
+  })
+  const { rows } = await db.execute<{ uid: string }>(sql`SELECT DISTINCT uid FROM (${sql.join(parts, sql` UNION ALL `)}) t`)
+  return new Set(rows.map(r => r.uid))
+}
+
 export async function deleteAccount(
   db: Db,
   userId: string,
-  opts: { auditSubjectIds?: readonly string[] } = {},
+  opts: { auditSubjectIds?: readonly string[]; onlyIfNoData?: boolean } = {},
 ): Promise<AccountDeletionResult> {
   return db.transaction(async tx => {
     // The row lock serialises two deletions of the same account, and it makes every concurrent
@@ -115,6 +166,13 @@ export async function deleteAccount(
     // than recreating rows for an account that no longer exists.
     const { rows: [me] } = await tx.execute<{ email: string }>(sql`SELECT email FROM users WHERE id = ${userId} FOR UPDATE`)
     if (!me) return NOT_FOUND
+
+    // issue 2695: checked AFTER the row lock, so a write that references this user is either already
+    // visible here or waits for the outcome and then fails on the FK. The admin route sets this; a
+    // person deleting their own account does not.
+    if (opts.onlyIfNoData && (await usersWithData(tx, [userId])).has(userId)) {
+      return { ...NOT_FOUND, refusedHasData: true }
+    }
 
     await tx.execute(sql.raw(`SET LOCAL statement_timeout = '${DELETION_STATEMENT_TIMEOUT}'`))
     // The food FKs (migration 202610060645) are NO ACTION DEFERRABLE: checked at COMMIT, after the

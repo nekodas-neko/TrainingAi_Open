@@ -14,7 +14,7 @@ vi.mock('@/auth', () => ({
 const upsertOuraHeartrate = vi.fn(async (_userId: string, _rows: unknown[]) => {})
 const insertRrIntervals = vi.fn(async (_userId: string, _rows: { at: Date; rrMs: number }[]) => {})
 vi.mock('@/lib/data', () => ({
-  getRepositoryAsync: vi.fn(async () => ({ upsertOuraHeartrate, insertRrIntervals })),
+  getRepositoryAsync: vi.fn(async () => ({ upsertOuraHeartrate, insertRrIntervals, dropZoneMinutesFrom: async () => {} })),
 }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: vi.fn(() => true) }))
 

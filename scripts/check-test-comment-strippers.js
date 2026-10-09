@@ -20,6 +20,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
 const ROOT = path.resolve(__dirname, '..');
 const SELF = 'scripts/check-test-comment-strippers.js';
@@ -41,6 +42,7 @@ const BASELINE = {};
 
 function walk(dir, out) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (e.isDirectory() && isSkippedFixtureDir(e.name)) continue;
     if (e.name === 'node_modules' || e.name === '.git' || e.name === '.next') continue;
     const p = path.join(dir, e.name);
     if (e.isDirectory()) walk(p, out);

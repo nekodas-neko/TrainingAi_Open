@@ -33,6 +33,7 @@ const ZERO_ARG_MOCK = /(?:const|let)\s+([A-Za-z_$][\w$]*)\s*=\s*vi\.fn\s*\(\s*(?
 
 function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory() && isSkippedFixtureDir(entry.name)) continue;
     if (entry.name === 'node_modules' || entry.name === '.next' || entry.name === '.git') continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) walk(full, out);
@@ -41,7 +42,8 @@ function walk(dir, out = []) {
   return out;
 }
 
-const { resolveBaseRef, countAtBase, verdict } = require('./lib/base-ref');
+const { resolveBaseRef, countsAtBase, verdict } = require('./lib/base-ref');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
 // Recorded 2026-09-10 (LB-62). Every one predates the check, and every one is a REAL error: the
 // type checker reports 52 TS2493s across the tree, and each site below appears in that output.
@@ -104,10 +106,12 @@ for (const file of walk(root)) {
   if (count > 0) perFile.set(rel, { count, hits });
 }
 
+// One read of the base for every file, not one git process per file (#2081).
+const atBase = countsAtBase(baseRef, [...perFile.keys()], (c) => countSites(c).count);
 for (const [rel, { count, hits }] of perFile) {
   const allowed = BASELINE[rel] ?? 0;
   // Q-424: whether THIS BRANCH added one, not whether the file is over.
-  const v = verdict({ count, limit: allowed, atBase: countAtBase(baseRef, rel, (c) => countSites(c).count) });
+  const v = verdict({ count, limit: allowed, atBase: atBase.get(rel) });
   if (v === 'inherited') {
     inherited.push(`${rel}: ${count} site(s) against a baseline of ${allowed}, but the base branch is already there.`);
   } else if (v === 'fail') {

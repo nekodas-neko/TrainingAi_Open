@@ -23,6 +23,13 @@ export interface OffProduct {
    * BF-32's placeholder tile is the answer.
    */
   image_front_thumb_url?: string
+  /** Issue 2219. Any selected image's thumbnail: the fallback for a product with no front image chosen. */
+  image_thumb_url?: string
+}
+
+/** The thumbnail URL to fetch: the front of pack first, then whatever image the product has. */
+export function offThumbUrl(p: OffProduct): string | undefined {
+  return p.image_front_thumb_url || p.image_thumb_url || undefined
 }
 
 const NUM = String.raw`(\d+(?:[.,]\d+)?)`
@@ -102,8 +109,19 @@ export function offProductToNutrition(p: OffProduct): NutritionScanResult | null
 }
 
 /** The fields both the barcode and search calls ask OFF for. */
-export const OFF_FIELDS = 'code,product_name,brands,serving_size,nutriments,image_front_thumb_url'
+export const OFF_FIELDS = 'code,product_name,brands,serving_size,nutriments,image_front_thumb_url,image_thumb_url'
 export const OFF_USER_AGENT = 'TrainingAI/1.0'
+
+/**
+ * Issue 2219. The credit Open Food Facts asks for: its product photos are CC BY-SA 3.0 and its
+ * database is ODbL, and both require attribution wherever the data or the pictures are used. A
+ * barcode scan now stores the photo on the food item, so the app owes the line. It lives in the
+ * About screen (components/more/about-panel.tsx), which every installed build can reach; the
+ * diary row stays as it was, because a credit per row would be a layout change to a daily screen.
+ */
+export const OFF_ATTRIBUTION =
+  'Product data and pictures for scanned foods come from Open Food Facts (openfoodfacts.org). ' +
+  'The data is under the Open Database Licence and the pictures are CC BY-SA 3.0, contributed by the Open Food Facts community.'
 
 /**
  * Fetch an OFF thumbnail and return it as a capped base64 data URI, or `null`.
@@ -127,22 +145,63 @@ export async function fetchOffThumbDataUri(
   maxBytes: number,
   opts?: { signal?: AbortSignal },
 ): Promise<string | null> {
-  if (!url) return null
+  if (!isOffImageUrl(url)) return null
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': OFF_USER_AGENT }, signal: opts?.signal })
+    // Issue 2219. The URL is read out of an Open Food Facts product, and that database is edited by
+    // anyone: an unchecked fetch of it is a server-side request to an address a stranger chose. So
+    // https and an openfoodfacts.org host only, no redirect (a redirect is how an allowed host
+    // hands the request to a disallowed one), and a deadline, because this was awaited inside the
+    // scan with no timeout at all.
+    const signal = opts?.signal
+      ? AbortSignal.any([opts.signal, AbortSignal.timeout(OFF_TIMEOUT_MS)])
+      : AbortSignal.timeout(OFF_TIMEOUT_MS)
+    const res = await fetch(url, { headers: { 'User-Agent': OFF_USER_AGENT }, signal, redirect: 'error' })
     if (!res.ok) return null
     const type = (res.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase()
     if (!OFF_THUMB_MIME.includes(type)) return null
-    const bytes = new Uint8Array(await res.arrayBuffer())
+    const declared = Number(res.headers.get('content-length'))
+    if (Number.isFinite(declared) && declared > maxBytes) return null
+    const bytes = await readCapped(res, maxBytes)
     // Checked before encoding: base64 is 4/3 the size, so encoding first to measure would allocate
     // a third more than the thing we are about to throw away.
-    if (bytes.byteLength === 0 || bytes.byteLength > maxBytes) return null
+    if (!bytes || bytes.byteLength === 0 || bytes.byteLength > maxBytes) return null
     let binary = ''
     for (const b of bytes) binary += String.fromCharCode(b)
     return `data:${type};base64,${btoa(binary)}`
   } catch {
     return null
   }
+}
+
+/** Only https on openfoodfacts.org or one of its subdomains (images., static.) is ever fetched. */
+export function isOffImageUrl(url: string | undefined | null): url is string {
+  if (!url) return false
+  try {
+    const u = new URL(url)
+    return u.protocol === 'https:' && !u.username && !u.password && !u.port
+      && (u.hostname === 'openfoodfacts.org' || u.hostname.endsWith('.openfoodfacts.org'))
+  } catch {
+    return false
+  }
+}
+
+/** Read a body but stop at the cap, so a response with no Content-Length cannot be buffered whole. */
+async function readCapped(res: Response, maxBytes: number): Promise<Uint8Array | null> {
+  if (!res.body?.getReader) return new Uint8Array(await res.arrayBuffer())
+  const reader = res.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.byteLength
+    if (total > maxBytes) { await reader.cancel(); return null }
+    chunks.push(value)
+  }
+  const out = new Uint8Array(total)
+  let at = 0
+  for (const c of chunks) { out.set(c, at); at += c.byteLength }
+  return out
 }
 
 /** What OFF actually serves for a thumbnail, and what every target can render. */

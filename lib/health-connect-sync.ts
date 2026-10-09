@@ -7,8 +7,8 @@
 
 import type { HealthConnectPlugin } from '@devmaxime/capacitor-health-connect';
 import { intervalsToPhase5Min, type SleepStage, type StageInterval } from '@trainingai/shared/health/hypnogram';
-import { msToHHMMInTz, toAestDay, DEFAULT_TZ } from '@trainingai/shared/date-utils';
-import { formatInTimeZone } from 'date-fns-tz';
+import { msToHHMMInTz, toAestDay, shiftDateStr, dateStrMidnightInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils';
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 
 // Verified against the pinned plugin source (RecordConverter.kt:390-400, v1.1.0) — those seven
 // strings are the complete set it can emit. SLEEPING and UNKNOWN are deliberately absent: they
@@ -114,6 +114,10 @@ export interface SyncPayload {
   exerciseSessions: ExerciseSession[];
   sleepRecords: SleepRecord[];
   heartRateSamples?: HeartRateSample[];
+  /** issue 2169: set only by the explicit "Import more history" run, to the first local day of the
+   *  window being imported. It tells `/api/sync-health` that heart-rate and interval rows this old
+   *  are deliberate, not a broken clock. Absent on every ordinary sync. */
+  historyFrom?: string;
 }
 
 /** One intraday heart-rate reading, at the source's own resolution. `at` is epoch ms. */
@@ -171,24 +175,26 @@ export function chunkHeartRateSamples(
  *  it is still inside the window. `label` and `unit` word the note. */
 async function uploadSeries<T>(
   field: 'heartRateSamples' | 'activityIntervals', items: readonly T[], size: number, maxChunks: number,
-  label: string, unit: string,
-): Promise<{ sent: number; note?: string }> {
+  label: string, unit: string, historyFrom?: string,
+): Promise<{ sent: number; requests: number; failed?: true; note?: string }> {
   let sent = 0
+  let requests = 0
   for (const chunk of chunkNewestFirst(items, size, maxChunks)) {
+    requests += 1
     try {
       const res = await fetch('/api/sync-health', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ [field]: chunk }),
+        body: JSON.stringify({ [field]: chunk, ...(historyFrom ? { historyFrom } : {}) }),
       })
-      if (!res.ok) return { sent, note: `${label} stopped at sync-health ${res.status}` }
+      if (!res.ok) return { sent, requests, failed: true, note: `${label} stopped at sync-health ${res.status}` }
     } catch (err) {
-      return { sent, note: `${label} stopped: ${err instanceof Error ? err.message : String(err)}` }
+      return { sent, requests, failed: true, note: `${label} stopped: ${err instanceof Error ? err.message : String(err)}` }
     }
     sent += chunk.length
   }
   const left = items.length - sent
-  return left > 0 ? { sent, note: `${label}: ${left} older ${unit} over the per-sync cap` } : { sent }
+  return left > 0 ? { sent, requests, note: `${label}: ${left} older ${unit} over the per-sync cap` } : { sent, requests }
 }
 
 // ── Per-interval movement (#2462) ────────────────────────────────────────────
@@ -347,12 +353,39 @@ export interface EnrichmentCandidate {
   endTime?: string;   // "HH:MM", local time
 }
 
-// Builds the UTC instant for a local date + "HH:MM" time. `dayOffset` shifts
-// the date forward, used when a session's end time crosses midnight.
-function localDateTimeToIso(date: string, time: string, dayOffset = 0): string {
-  const [y, m, d] = date.split('-').map(Number);
-  const [h, mi] = time.split(':').map(Number);
-  return new Date(y, m - 1, d + dayOffset, h, mi).toISOString();
+/**
+ * The UTC instant for a date + "HH:MM" wall time IN THE USER'S ZONE. `dayOffset` shifts the date
+ * forward, used when a session's end time crosses midnight.
+ *
+ * #2438. This was `new Date(y, m - 1, d + dayOffset, h, mi)`, which reads the DEVICE's zone. LB-113
+ * threaded the user's zone into `enrichActivityLogs` and this never took it, so on a phone set to
+ * another zone the HR, distance and calorie enrichment read the wrong hours. The date is shifted as
+ * a calendar string first, so the offset cannot be skewed by a DST change on the day.
+ */
+export function localDateTimeToIso(date: string, time: string, tz: string, dayOffset = 0): string {
+  return fromZonedTime(`${shiftDateStr(date, dayOffset)}T${time}:00`, tz).toISOString();
+}
+
+/**
+ * The sync window: the user's local midnight `daysBack - 1` days before today, to the user's local
+ * midnight AFTER today.
+ *
+ * #2438. These were device-local midnights, while every bucket is dated in the user's zone
+ * (`toLocalDate(…, tz)`). The old comment said device midnight is what keeps the plugin's 24-hour
+ * aggregate windows on one calendar day, and that holds only when the two zones agree. The windows
+ * must start at the midnight the BUCKETS are cut at, which is the user's.
+ */
+export function syncWindowIso(todayStr: string, daysBack: number, tz: string): { startIso: string; endIso: string } {
+  return {
+    startIso: dateStrMidnightInTz(shiftDateStr(todayStr, -(daysBack - 1)), tz).toISOString(),
+    endIso: dateStrMidnightInTz(shiftDateStr(todayStr, 1), tz).toISOString(),
+  };
+}
+
+/** A session's start and end as the user's wall clock, "HH:MM". Without a zone `msToHHMMInTz` falls
+ *  back to Brisbane, which stored every non-Brisbane user's sessions with the wrong clock (#2438). */
+export function sessionClockTimes(startIso: string, endIso: string, tz: string): { startTime: string; endTime: string } {
+  return { startTime: msToHHMMInTz(startIso, tz), endTime: msToHHMMInTz(endIso, tz) };
 }
 
 // Backfills HR/distance/calories on activity logs that were saved without
@@ -377,8 +410,8 @@ export async function enrichActivityLogs(candidates: EnrichmentCandidate[], tz: 
 
   for (const c of candidates) {
     if (!c.startTime || !c.endTime) continue;
-    const start = localDateTimeToIso(c.date, c.startTime);
-    const end = localDateTimeToIso(c.date, c.endTime, c.endTime <= c.startTime ? 1 : 0);
+    const start = localDateTimeToIso(c.date, c.startTime, tz);
+    const end = localDateTimeToIso(c.date, c.endTime, tz, c.endTime <= c.startTime ? 1 : 0);
     const metrics = await getSessionMetrics(HealthConnect, canRead, start, end);
     if (!Object.keys(metrics).length) continue;
 
@@ -392,37 +425,67 @@ export async function enrichActivityLogs(candidates: EnrichmentCandidate[], tz: 
   }
 }
 
-export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metrics: number; sessions: number; sleep: number; heartRate: number; intervals: number; note?: string } | null> {
+/** What one sync of one window sends. `requests` counts the POSTs made to `/api/sync-health` (the
+ *  route allows 60 a minute, which the history import paces itself against). `failed` is set when a
+ *  series upload stopped early: the window did not fully land, so an import must not move past it. */
+export interface SyncResult {
+  metrics: number; sessions: number; sleep: number; heartRate: number; intervals: number;
+  note?: string; requests?: number; failed?: boolean;
+}
+
+/** An open, permission-checked Health Connect: the plugin and the record types the user granted. */
+export interface HealthConnectSession { HealthConnect: HealthConnectPlugin; canRead: Set<string> }
+
+/** Open Health Connect for a sync. `null` off the native app; `{ note }` when the platform cannot
+ *  serve it (not installed, needs an update). Shared by the ordinary sync and the history import so
+ *  the two request the same permissions. */
+export async function openHealthConnect(): Promise<HealthConnectSession | { note: string } | null> {
   const { Capacitor } = await import('@capacitor/core');
   if (!Capacitor.isNativePlatform()) return null;
 
   const { HealthConnect } = await import('@devmaxime/capacitor-health-connect');
 
   const { availability } = await HealthConnect.checkAvailability();
-  if (availability !== 'Available') return { metrics: 0, sessions: 0, sleep: 0, heartRate: 0, intervals: 0, note: `HC ${availability}` };
+  if (availability !== 'Available') return { note: `HC ${availability}` };
 
   const perms = await HealthConnect.requestPermissions({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     read: [...HC_SYNC_READ_TYPES] as any,
     write: [],
   });
-  const canRead: Set<string> = new Set(perms.read);
+  return { HealthConnect, canRead: new Set(perms.read) };
+}
+
+export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<SyncResult | null> {
+  const opened = await openHealthConnect();
+  if (!opened) return null;
+  if ('note' in opened) return { metrics: 0, sessions: 0, sleep: 0, heartRate: 0, intervals: 0, note: opened.note };
 
   const lastSync  = localStorage.getItem(LAST_SYNC_KEY);
   const daysBack  = lastSync ? SYNC_DAYS_HOT : SYNC_DAYS_COLD;
 
-  // Align query window to local calendar day boundaries. The plugin loops over
-  // 24h windows from `startInstant`, so if start isn't a local midnight the
-  // windows straddle two calendar days and aggregate steps from both into one
-  // bucket. Using new Date(y, m-1, d, 0, 0, 0) creates midnight in the device's
-  // own timezone, so every bucket maps to exactly one local calendar day.
-  const todayStr      = toLocalDate(new Date().toISOString(), tz);
-  const [ty, tm, td]  = todayStr.split('-').map(Number);
-  const start         = new Date(ty, tm - 1, td - (daysBack - 1), 0, 0, 0);
-  const end           = new Date(ty, tm - 1, td + 1, 0, 0, 0);
-  const startIso      = start.toISOString();
-  const endIso        = end.toISOString();
+  // Align the query window to the USER's calendar day boundaries. The plugin loops over 24h windows
+  // from `startInstant`, so if start isn't a local midnight the windows straddle two calendar days
+  // and aggregate steps from both into one bucket. Every bucket below is dated in `tz`, so the
+  // midnight has to be `tz`'s, not the device's (#2438).
+  const todayStr = toLocalDate(new Date().toISOString(), tz);
+  const { startIso, endIso } = syncWindowIso(todayStr, daysBack, tz);
 
+  return syncWindow(opened, tz, startIso, endIso, { onPosted: () => localStorage.setItem(LAST_SYNC_KEY, endIso) });
+}
+
+/**
+ * Read one window out of Health Connect and send it through `/api/sync-health`: the same reads and
+ * the same ranked-merge writes (`upsertBodyMetrics`, `saveSleepSession`) whether the window is the
+ * last 7 days or a month from last year, so a later live sync of an overlapping day merges rather
+ * than double-counts (issue 2169). `opts.historyFrom` marks an explicit history import;
+ * `opts.onPosted` runs once the window's daily payload has landed (or there was nothing to send).
+ */
+export async function syncWindow(
+  { HealthConnect, canRead }: HealthConnectSession, tz: string, startIso: string, endIso: string,
+  opts: { historyFrom?: string; onPosted?: () => void } = {},
+): Promise<SyncResult> {
+  const { historyFrom, onPosted } = opts;
   const dayBuckets: Record<string, DailyMetric> = {};
   function bucket(date: string): DailyMetric {
     if (!dayBuckets[date]) dayBuckets[date] = { date };
@@ -560,8 +623,7 @@ export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metr
           date:         toLocalDate(r.startTime, tz),
           title:        r.title || r.exerciseType || 'Workout',
           activityType: mapExerciseTypeToActivityType(r.exerciseType),
-          startTime:    msToHHMMInTz(r.startTime),
-          endTime:      msToHHMMInTz(r.endTime),
+          ...sessionClockTimes(r.startTime, r.endTime, tz),
           durationMin:  Math.round(durationMin * 10) / 10,
           ...metrics,
         });
@@ -651,26 +713,29 @@ export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metr
   const dailyMetrics = Object.values(dayBuckets);
   const hasDaily = dailyMetrics.length > 0 || exerciseSessions.length > 0 || sleepRecords.length > 0;
   if (!hasDaily && !heartRateSamples.length && !activityIntervals.length) {
-    localStorage.setItem(LAST_SYNC_KEY, end.toISOString());
-    return { metrics: 0, sessions: 0, sleep: 0, heartRate: 0, intervals: 0, note: 'no data from HC' };
+    onPosted?.();
+    return { metrics: 0, sessions: 0, sleep: 0, heartRate: 0, intervals: 0, note: 'no data from HC', requests: 0 };
   }
 
   let enrichmentCandidates: EnrichmentCandidate[] | undefined;
+  let requests = 0;
   if (hasDaily) {
+    requests += 1;
     const res = await fetch('/api/sync-health', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ dailyMetrics, exerciseSessions, sleepRecords } satisfies SyncPayload),
+      body: JSON.stringify({ dailyMetrics, exerciseSessions, sleepRecords, ...(historyFrom ? { historyFrom } : {}) } satisfies SyncPayload),
     });
 
     if (!res.ok) throw new Error(`sync-health ${res.status}: ${await res.text()}`);
     ({ enrichmentCandidates } = await res.json() as { enrichmentCandidates?: EnrichmentCandidate[] });
   }
 
-  localStorage.setItem(LAST_SYNC_KEY, end.toISOString());
+  onPosted?.();
 
-  const heartRate = await uploadSeries('heartRateSamples', heartRateSamples, HR_UPLOAD_CHUNK, HR_UPLOAD_MAX_CHUNKS, 'heart rate', 'samples');
-  const intervals = await uploadSeries('activityIntervals', activityIntervals, INTERVAL_UPLOAD_CHUNK, INTERVAL_UPLOAD_MAX_CHUNKS, 'intervals', 'rows');
+  const heartRate = await uploadSeries('heartRateSamples', heartRateSamples, HR_UPLOAD_CHUNK, HR_UPLOAD_MAX_CHUNKS, 'heart rate', 'samples', historyFrom);
+  const intervals = await uploadSeries('activityIntervals', activityIntervals, INTERVAL_UPLOAD_CHUNK, INTERVAL_UPLOAD_MAX_CHUNKS, 'intervals', 'rows', historyFrom);
+  requests += heartRate.requests + intervals.requests;
   const note = [heartRate.note, intervals.note].filter(Boolean).join('; ');
 
   if (enrichmentCandidates?.length) {
@@ -682,6 +747,8 @@ export async function syncHealthConnect(tz: string = DEFAULT_TZ): Promise<{ metr
 
   return {
     metrics: dailyMetrics.length, sessions: exerciseSessions.length, sleep: sleepRecords.length,
-    heartRate: heartRate.sent, intervals: intervals.sent, ...(note ? { note } : {}),
+    heartRate: heartRate.sent, intervals: intervals.sent, requests,
+    ...(heartRate.failed || intervals.failed ? { failed: true } : {}),
+    ...(note ? { note } : {}),
   };
 }

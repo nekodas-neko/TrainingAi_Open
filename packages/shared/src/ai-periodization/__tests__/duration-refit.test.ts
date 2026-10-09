@@ -292,3 +292,32 @@ describe('what falls through to a full generation instead', () => {
     expect(getSessionPeriodization).not.toHaveBeenCalled()
   })
 })
+
+describe('#2403 — a re-fit re-costs the session Full trains', () => {
+  const withCurlDeloaded = () => storedPrescription({
+    exercises: storedPrescription().exercises.map(ex => ex.sessionExerciseId === CURL
+      ? { ...ex, sets: 2, reps: 15, pct: 50, restSec: 60, deloaded: true, preDeload: { sets: 4, reps: 10, pct: 70, restSec: 120 } }
+      : ex),
+    // A stale block from the previous budget, which the re-fit must not carry forward.
+    fullSession: { estimatedSessionDurationMin: 999, weeklyVolumeContribution: { biceps: 99 } },
+  })
+
+  it('writes a fresh fullSession for the new budget, with the cut row back on its full numbers', async () => {
+    const res = await refit('long', periodizationState({ prescription: withCurlDeloaded() }))
+    if (!res.ok) throw new Error('did not re-fit')
+    const full = res.prescription.fullSession!
+    expect(full.estimatedSessionDurationMin).not.toBe(999)
+    expect(full.estimatedSessionDurationMin).toBeGreaterThan(res.prescription.estimatedSessionDurationMin)
+    // Curl trains only biceps: its full 4 sets, whatever the stage left its deload.
+    expect(full.weeklyVolumeContribution.biceps).toBe(4)
+    expect(full.weeklyVolumeContribution.quads).toBe(res.prescription.weeklyVolumeContribution.quads)
+    expect(storePrescription.mock.calls[0][2].fullSession).toEqual(full)
+  })
+
+  it('drops a stale block when nothing is deloaded any more, so the stored plan is what it was', async () => {
+    const stale = storedPrescription({ fullSession: { estimatedSessionDurationMin: 999, weeklyVolumeContribution: {} } })
+    const res = await refit('long', periodizationState({ prescription: stale }))
+    if (!res.ok) throw new Error('did not re-fit')
+    expect('fullSession' in res.prescription).toBe(false)
+  })
+})

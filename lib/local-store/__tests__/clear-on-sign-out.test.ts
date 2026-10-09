@@ -59,20 +59,25 @@ describe('clearLocalStoreData (Q-172)', () => {
     // `components/chat.tsx` was the second entry here until Q-189 deleted the unreachable
     // chat surface along with its two sign-out buttons. One control remains, which is the
     // point — Q-172's leak was that the two disagreed.
-    for (const file of ['components/more/profile-tab.tsx']) {
+    // Issue 2532: the control is a button on profile-tab that runs the shared flow, which calls the handler.
+    expect(read('components/more/profile-tab.tsx')).toContain('useSignOutFlow')
+    for (const file of ['components/more/profile-tab.tsx', 'components/more/sign-out-flow.tsx']) {
       const src = read(file)
-      expect(src, file).toContain('signOutAndClearDevice')
+      if (file.endsWith('sign-out-flow.tsx')) expect(src, file).toContain('signOutAndClearDevice')
       expect(src, file).not.toMatch(/from ['"]@\/app\/actions['"]/)
       expect(src, file).not.toMatch(/<form[^>]*action=\{[^}]*signOut/)
     }
   })
 
-  it('the shared handler clears the store and the cache before the server sign-out', () => {
+  it('the shared handler clears the store, the cache and browser storage before the server sign-out', () => {
     const src = read('lib/sign-out.ts')
-    const order = ['clearLocalStoreData', 'clearAllCache', 'serverSignOut']
+    // #2453: clearAccountStorage after clearAllCache, so the cache's mirror keys are already gone and
+    // the classified sweep takes the rest; before serverSignOut, which navigates away.
+    const order = ['clearLocalStoreData', 'clearAllCache', 'clearAccountStorage', 'serverSignOut']
       .map(name => src.indexOf(`${name}(`, src.indexOf('export async function signOutAndClearDevice')))
     expect(order[0]).toBeGreaterThan(-1)
     expect(order[1]).toBeGreaterThan(order[0])
     expect(order[2]).toBeGreaterThan(order[1])
+    expect(order[3]).toBeGreaterThan(order[2])
   })
 })

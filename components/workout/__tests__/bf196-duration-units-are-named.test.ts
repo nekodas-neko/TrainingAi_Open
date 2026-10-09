@@ -26,7 +26,8 @@ describe('BF-196 — the working estimate names its unit', () => {
 
   it('matches the picker rendering the same number on the same screen', () => {
     // pre-workout-screen mounts SessionDurationPicker directly above AiPrescriptionCard and feeds
-    // both from prescription.estimatedSessionDurationMin. One quantity, one phrase.
+    // both the same estimate — since #2403 through prescriptionFiguresAsTrained, so under a Full
+    // override both show the full session's minutes. One quantity, one phrase.
     const picker = code('components/workout/session-duration-picker.tsx')
     const card = code('components/workout/ai-prescription-card.tsx')
     const phrase = /min of work/
@@ -34,7 +35,9 @@ describe('BF-196 — the working estimate names its unit', () => {
     expect(card).toMatch(phrase)
 
     const screen = code('components/workout/pre-workout-screen.tsx')
-    expect(screen).toMatch(/estimatedMin=\{periodization\.state\.prescription\.estimatedSessionDurationMin\}/)
+    expect(screen).toMatch(/estimatedMin=\{prescriptionFiguresAsTrained\(\s*periodization\.state\.prescription,\s*overrideFull && overrideRunsFull\(overrideOutcome\),\s*\)\.estimatedSessionDurationMin\}/)
+    expect(card).toMatch(/prescriptionFiguresAsTrained\(prescription, runsFull\)/)
+    expect(card).toMatch(/const runsFull = overrideFull && overrideRunsFull\(overrideOutcome\)/)
   })
 })
 

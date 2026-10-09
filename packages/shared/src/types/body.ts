@@ -83,6 +83,12 @@ export interface ActivityLog {
     avgPaceSecPerKm: number | null; distanceKm: number | null; avgCadenceSpm: number | null
     // LA-48. Optional because pre-2026-09-14 walks have no `steps` key — see schema.ts.
     steps?: number | null
+    // Issue 2242 (LA-48). Optional, and ABSENT (never 0) on walks saved before this and on segments the
+    // pacer never judged. Counts are seconds the walker was shown each band; adherence is derived once
+    // in `packages/shared/src/health/pacer-adherence.ts`.
+    pacerSignal?: 'cadence' | 'speed' | 'hr' | null
+    pacerAdherence?: number | null
+    pacerTicks?: { green: number; amber: number; red: number; stopped: number } | null
   }[]
   createdAt: Date
 }
@@ -112,6 +118,12 @@ export interface SleepVerdictRecord {
     durationLow: number | null; durationHigh: number | null
     onsetLow: number | null; onsetHigh: number | null
     efficiencyLow: number | null; efficiencyHigh: number | null
+    /**
+     * #2094: each band's median, so a correction can be asked how far from centre the night sat,
+     * not only which edge it crossed. `null` on every verdict stored before the column existed:
+     * its trailing window has moved, so the middle it was judged against cannot be recovered.
+     */
+    durationMedian: number | null; onsetMedian: number | null; efficiencyMedian: number | null
   }
   baselineNights: number
   modelVersion: number
@@ -144,6 +156,43 @@ export interface ReadinessVerdictRecord {
   modelVersion: number
   /** `none` until he rates the day or dismisses the prompt. Silence is never promoted to an answer. */
   responseState: 'none' | 'rated' | 'dismissed'
+}
+
+/** #2377. The four sub-pillars of the #2356 readiness tree (owner, 2026-10-06). */
+export type ShadowReadinessPillar = 'sleep' | 'heart' | 'activity' | 'body'
+
+/** #2377. Readiness-tree maturity: 0–13 valid days learning, 14–29 provisional, 30+ settled. */
+export type ShadowReadinessStage = 'learning' | 'provisional' | 'settled'
+
+/**
+ * #2377 — one day of the #2356 pillar readiness model, computed beside the live score and shown
+ * nowhere (`shadow_readiness`). One row per (date, modelVersion): a new model version is stored
+ * beside the old, and a recompute of the same version replaces its own row.
+ *
+ * Every score is 0–100 or `null` for "could not be scored", never a stand-in 0 or 50.
+ */
+export interface ShadowReadinessRecord {
+  /** The readiness day, `YYYY-MM-DD` — the same key as `oura_daily_derived.day`. */
+  date: string
+  /** Version of the shadow model (weights, curves, references) that produced this row. */
+  modelVersion: number
+  shadowReadiness: number | null
+  pillars: Record<ShadowReadinessPillar, number | null>
+  /** Per pillar: effective weight, units scored and dropped. Shape owned by the scorer. */
+  pillarDetail: Record<string, unknown>
+  /** Unit results keyed by a stable unit id (`sleep.duration`, …). Shape owned by the scorer. */
+  units: Record<string, unknown>
+  /** The least mature of the units that scored. */
+  maturityStage: ShadowReadinessStage
+  /** Last calendar day whose daytime data any unit read, `YYYY-MM-DD`. Always before `date`
+   *  (enforced by the table); null when no unit read daytime data. */
+  inputsThrough: string | null
+  /** The live readiness when this row was computed, and its model version — frozen, because
+   *  `oura_daily_derived.readiness_score` is rewritten on every read. */
+  liveReadiness: number | null
+  liveModelVersion: string | null
+  /** `daily` = the day's own run; `replay` = back-filled from stored history. */
+  computedBy: 'daily' | 'replay'
 }
 
 export interface SleepSession {
@@ -185,4 +234,11 @@ export interface SleepSession {
    * is a different quantity, so it never enters that merge.
    */
   manualSleepStart?: Date | null     // migration 233
+  /**
+   * #2338 — a night the user ENTERED (bed time → wake time), not one a device measured. Distinct from
+   * `manualSleepStart`, which corrects one field of a measured night. `listSleepSessions` drops a
+   * manual night whenever a device recorded the same night (`preferDeviceNights`), so a consumer only
+   * ever sees one where nothing measured it.
+   */
+  manualEntry?: boolean
 }

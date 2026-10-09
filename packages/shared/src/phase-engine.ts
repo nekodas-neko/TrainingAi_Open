@@ -45,7 +45,6 @@ export function getCurrentPhase(
   for (const phase of phases) {
     if (completedCycles < accumulated + phase.durationCycles) {
       const cycleInPhase = completedCycles - accumulated + 1
-      const cyclesRemaining = totalProgramCycles - completedCycles
       return {
         phase,
         cycleInPhase,

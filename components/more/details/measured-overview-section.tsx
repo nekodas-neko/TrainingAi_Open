@@ -12,6 +12,7 @@ import {
   type MetricRow, type ReadingGroup, type SleepNight,
 } from "./measured-overview";
 import { ReadingGroupCard } from "./reading-group-card";
+import { sleepReplyWithPending } from "@/lib/sleep/manual-night-view";
 
 interface Props {
   userId?: string
@@ -63,8 +64,17 @@ export function MeasuredOverviewSection({ userId, serverRecent }: Props) {
   // the section's empty branch is `return null` — so on a cold start with the route down the whole
   // of "What the app has measured" was simply absent, with nothing anywhere saying why.
   const [failed, setFailed] = useState(false)
-  const nights = useCachedValue<SleepNight[]>('sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM,
+  const serverNights = useCachedValue<SleepNight[]>('sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM,
     { onError: () => setFailed(true) })
+  // Issue 2667: the reply lags this device's own manual-night writes until the outbox pushes, so a
+  // night just removed on the Sleep screen would still count toward these averages.
+  const [nights, setNights] = useState<SleepNight[] | null | undefined>(undefined)
+  useEffect(() => {
+    if (!Array.isArray(serverNights)) { setNights(serverNights); return }
+    let alive = true
+    void sleepReplyWithPending<SleepNight>(serverNights, userId, tz).then(r => { if (alive) setNights(r) })
+    return () => { alive = false }
+  }, [serverNights, userId, tz])
   const sleep = Array.isArray(nights) ? sleepAverages(nights) : null
   const bedtime = Array.isArray(nights)
     // The minutes-of-day are computed in the USER's zone before the circular mean, not the device's

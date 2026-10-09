@@ -10,6 +10,7 @@ import { isPlausibleCadence, MIN_PLAUSIBLE_SPM, MAX_PLAUSIBLE_SPM } from "@train
 import { ingestDayRejection, INGEST_FUTURE_TOLERANCE_MS } from "@trainingai/shared/validation/ingest-clock";
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { HR_UPLOAD_CHUNK, INTERVAL_UPLOAD_CHUNK, SYNC_DAYS_COLD, type ActivityInterval } from '@/lib/health-connect-sync'
+import { historyDayRejection, importPastToleranceStartMs } from '@/lib/health-connect-history-import'
 import type { HealthConnectIntervalRow } from '@/lib/data/repository'
 
 // Three arrays of at most MAX_ITEMS (400) rows of bounded numbers — about 300 KB at the schema's
@@ -108,6 +109,10 @@ const SyncHealthSchema = z.object({
     origin:   z.string().max(MAX_ID_LEN).optional(),
     device:   z.string().max(MAX_ID_LEN).optional(),
   }).strict()).max(MAX_INTERVALS).optional(),
+  // issue 2169. Sent only by the explicit "Import more history" run: the first local day of the
+  // window it is importing. Shape only here; whether it is a usable day is judged below, where a bad
+  // one is dropped with a note instead of failing the batch.
+  historyFrom: z.string().regex(DATE_RE).optional(),
 }).strict();
 
 /**
@@ -171,6 +176,18 @@ export async function POST(req: NextRequest) {
   const tz = session.user.timezone ?? DEFAULT_TZ;
   const today = todayInTz(tz);
   const unusableDay = (date: string) => ingestDayRejection(date, today);
+
+  // Heart-rate and interval rows are bounded to the cold-sync window (above) because a row older than
+  // that is a broken clock. An explicit history import is the one legitimate sender of older ones, and
+  // says how far back it is reading with `historyFrom`. The widening is bounded - a usable day, no
+  // older than `HISTORY_MAX_DAYS` - and only ever widens: it can never make the window narrower.
+  let importFloorMs: number | null = null;
+  if (body.historyFrom) {
+    const reason = historyDayRejection(body.historyFrom, today);
+    if (reason) rejected.push(`historyFrom ${body.historyFrom}: ${reason}`);
+    else importFloorMs = importPastToleranceStartMs(body.historyFrom, tz);
+  }
+  const pastFloorMs = (now: number) => Math.min(now - HR_PAST_TOLERANCE_MS, importFloorMs ?? Infinity);
 
   // ── Body metrics (weight, body fat, steps, distance, calories, macros) ────
   const usableMetrics = (body.dailyMetrics ?? []).filter(d => {
@@ -288,7 +305,7 @@ export async function POST(req: NextRequest) {
   if (body.heartRateSamples?.length) {
     const now = Date.now()
     const usable = body.heartRateSamples
-      .filter(s => s.at >= now - HR_PAST_TOLERANCE_MS && s.at <= now + INGEST_FUTURE_TOLERANCE_MS)
+      .filter(s => s.at >= pastFloorMs(now) &&s.at <= now + INGEST_FUTURE_TOLERANCE_MS)
       .map(s => ({ timestamp: new Date(s.at), bpm: Math.round(s.bpm) }))
       .filter(s => s.bpm >= MIN_PLAUSIBLE_BPM && s.bpm <= MAX_PLAUSIBLE_BPM)
     const dropped = body.heartRateSamples.length - usable.length
@@ -314,7 +331,7 @@ export async function POST(req: NextRequest) {
       const usable: HealthConnectIntervalRow[] = []
       const reasons = new Map<string, number>()
       for (const r of body.activityIntervals) {
-        const reason = (r.startMs < now - HR_PAST_TOLERANCE_MS || r.endMs > now + INGEST_FUTURE_TOLERANCE_MS)
+        const reason = (r.startMs < pastFloorMs(now) || r.endMs > now + INGEST_FUTURE_TOLERANCE_MS)
           ? 'outside the sync window'
           : intervalRejection(r)
         if (reason) {

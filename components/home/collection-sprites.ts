@@ -18,9 +18,10 @@ import type { FaucetKey } from './collection-summary'
 
 /** Tier index within its ladder → the glyph shown for it. Bottom rung first. */
 const GLYPHS: Record<FaucetKey, string[]> = {
-  workout: ['🐱', '🐈', '🛡️'],
-  steps: ['🐱', '🐈', '🏹'],
-  sleep: ['🐱', '🐈', '🔮'],
+  workout: ['🐱', '🐈', '🐾', '🛡️', '⚔️', '👑'],
+  steps: ['🐱', '🐈', '🐾', '🏹', '🎯', '👑'],
+  health: ['🐱', '🐈', '🐾', '✨', '💫', '👑'],
+  cardio: ['🐱', '🐈', '🐾', '🗡️', '⚡', '👑'],
 }
 
 /**
@@ -36,11 +37,12 @@ export const ART_TIERS = 6
 export type CatVariant = 'shiny' | 'frost' | 'ember'
 export const CAT_VARIANTS: readonly CatVariant[] = ['shiny', 'frost', 'ember']
 
-/** Which class each existing ladder is drawn as. Sleep is the Mage's; the Health cat waits for its logging ladder. */
+/** Which class each ladder is drawn as (collection rules v2): the Health cat is the Cleric, cardio the Rogue. The Mage is unwired for now. */
 export const LADDER_CLASS: Record<FaucetKey, CatClass> = {
   workout: 'tank',
   steps: 'ranger',
-  sleep: 'mage',
+  health: 'cleric',
+  cardio: 'rogue',
 }
 
 export function tierGlyph(faucet: FaucetKey, tier: number): string {

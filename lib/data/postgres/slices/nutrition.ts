@@ -1,4 +1,4 @@
-import { eq, and, inArray, gte, lte, asc, desc, sql, isNull } from 'drizzle-orm'
+import { eq, and, inArray, gte, lte, asc, desc, sql, isNull, or } from 'drizzle-orm'
 import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { resolveEatenAt } from '@trainingai/shared/nutrition/eaten-at'
 import { findDuplicateFoodItem, identityCalories } from '@trainingai/shared/nutrition/food-item-identity'
@@ -306,7 +306,11 @@ export async function createFoodItem(
     const [existing] = await db.select().from(s.foodItems)
       .where(and(eq(s.foodItems.id, id), eq(s.foodItems.userId, userId)))
     if (!existing) throw new UserFacingError('That food item id is already taken.', 409)
-    return rowToFoodItem(existing)
+    // Issue 2684. A re-push of the same id is how a device tells us the saved copy of a food gained
+    // a picture or a barcode (see `createFoodItem` in packages/shared). The insert above did
+    // nothing, so without this the gap never reaches the server and the next pull would hand the
+    // phone back the imageless row.
+    return fillFoodItemGaps(db, userId, existing, rest)
   }
   if (opts.reuseExisting) {
     // Prefilter on `calories` alone: an integer column, so an exact comparison with no text
@@ -317,10 +321,47 @@ export async function createFoodItem(
       .where(and(eq(s.foodItems.userId, userId), eq(s.foodItems.calories, identityCalories(rest.calories))))
       .orderBy(asc(s.foodItems.createdAt))
     const duplicate = findDuplicateFoodItem(rest, sameCalories.map(rowToFoodItem))
-    if (duplicate) return duplicate
+    if (duplicate) {
+      // Issue 2684. Handing back the saved copy must not throw away the picture and barcode this
+      // scan just fetched when the saved copy lacks them.
+      const [row] = await db.select().from(s.foodItems)
+        .where(and(eq(s.foodItems.id, duplicate.id), eq(s.foodItems.userId, userId)))
+      return row ? fillFoodItemGaps(db, userId, row, rest) : duplicate
+    }
   }
   const [r] = await db.insert(s.foodItems).values({ userId, ...rest }).returning()
   return rowToFoodItem(r)
+}
+
+/**
+ * Issue 2684. Fill a saved food's NULL picture and/or barcode from a later write of the same food.
+ * Add-only: a value already stored is never overwritten (two products can share a name and
+ * macros, and which picture is right is not ours to decide) and nothing is ever nulled. Scoped on
+ * `userId`, so another user's row with the same id or name is untouched. The WHERE clause only
+ * matches when there is a gap this write can fill, so a replay changes nothing. `barcode` has no
+ * unique index, so filling one that another of the user's items carries violates nothing.
+ */
+async function fillFoodItemGaps(
+  db: Db, userId: string, existing: typeof s.foodItems.$inferSelect,
+  offered: { imageDataUri?: string | null; barcode?: string | null },
+): Promise<FoodItem> {
+  const image = offered.imageDataUri || null
+  const barcode = offered.barcode?.trim() || null
+  const canFillImage = existing.imageDataUri == null && image != null
+  const canFillBarcode = existing.barcode == null && barcode != null
+  if (!canFillImage && !canFillBarcode) return rowToFoodItem(existing)
+  const [updated] = await db.update(s.foodItems).set({
+    imageDataUri: sql`COALESCE(${s.foodItems.imageDataUri}, ${image}::text)`,
+    barcode: sql`COALESCE(${s.foodItems.barcode}, ${barcode}::text)`,
+  }).where(and(
+    eq(s.foodItems.id, existing.id),
+    eq(s.foodItems.userId, userId),
+    or(
+      and(isNull(s.foodItems.imageDataUri), sql`${image}::text IS NOT NULL`),
+      and(isNull(s.foodItems.barcode), sql`${barcode}::text IS NOT NULL`),
+    ),
+  )).returning()
+  return rowToFoodItem(updated ?? existing)
 }
 
 export async function searchFoodItems(db: Db, userId: string, query: string): Promise<FoodItem[]> {

@@ -6,15 +6,31 @@
 // York). Use formatTimeOfDay/formatInTimeZone from @trainingai/shared/date-utils, or pass an
 // explicit `timeZone` option.
 //
+// RV-179 widened this from `toLocale(Date|Time)String` alone to the other spellings of the same
+// bug, each measured against the tree before it was added:
+//   - `.toLocaleString(` on a DATE. It is mostly called on numbers (128 sites), so it counts only
+//     when the call is provably a date rendering: the receiver is `new Date(…)`, or its option bag
+//     names a date/time field (`hour: 'numeric'`, `dateStyle: …`) — a number's bag never does.
+//   - `Intl.DateTimeFormat(` without a `timeZone`. `Intl.DateTimeFormat().resolvedOptions()` is how
+//     the app READS the device zone, so that spelling is not a rendering and is skipped.
+//   - `.getHours()` / `.getMinutes()` / `.getSeconds()`, which read the device's clock and cannot
+//     take a zone at all. Whether a given use is a bug depends on the Date, so these are triaged
+//     per file below, the way the original pattern was.
+// Not covered, and said so: `.toLocaleString()` through a variable (`d.toLocaleString()`) is
+// indistinguishable from a number without types.
+//
 // Deliberately exempt (CLAUDE.md): the admin and oura-ble debug consoles, where device-local IS
 // the useful reading because you are holding the device.
 'use strict';
 const fs = require('fs');
 const path = require('path');
 const { stripComments } = require('./lib/strip-comments');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
+const { readFilesUtf8, runMain } = require('./lib/read-sources');
 
 const EXEMPT_PREFIXES = [
   'components/admin/',
+  'app/admin/',
   'components/oura-ble/',
   // The helper that implements timezone-correct rendering — it necessarily calls the raw APIs.
   'packages/shared/src/date-utils.ts',
@@ -35,6 +51,11 @@ const EXEMPT_PREFIXES = [
 // are deleted rather than kept, per this check's own rule — the four it named were
 // `nutrition-content`, `recommendation-card`, `week-day-sheet` and `weekly-nutrition-chart`.
 const REVIEWED_BENIGN = new Set([
+  // RV-179 triage of the device-clock getters (2026-10-07). Each was read; none is a rendering bug.
+  'app/api/day-log/route.ts',                       // getHours() on `toZonedTime(startedAt, tz)` — the zoned-time idiom, already in the user's zone
+  'lib/day-review-reminders.ts',                    // getMinutes() is arithmetic on the Date it just set to the user's bedtime for a device notification; nothing is rendered
+  'lib/oura-ble/continuous-capture.ts',             // the phone's own hour decides whether the ring's daytime capture runs — device-local is the point of that battery policy
+  'packages/shared/src/utils.ts',                   // localDateString / localDatetimeString: device-local by name and by contract
   // The one LB-126 deliberately did NOT convert: this renders a MONTH and YEAR from
   // `(viewYear, viewMonth - 1, 1)`, while `formatDateDisplay` takes a `YYYY-MM-DD` string and has
   // no month-year style. Still benign for the original reason — a calendar-component Date.
@@ -63,52 +84,86 @@ const root = path.join(__dirname, '..');
 const PATTERN = /\.toLocale(?:Date|Time)String\s*\(/;
 const offenders = new Map();
 
+const scanned = [];
+
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (['node_modules', '__tests__', '.next', 'dist'].includes(entry.name)) continue;
+      if (['node_modules', '__tests__', '.next', 'dist'].includes(entry.name) || isSkippedFixtureDir(entry.name)) continue;
       walk(full);
       continue;
     }
     if (!/\.tsx?$/.test(entry.name)) continue;
     const rel = path.relative(root, full).split(path.sep).join('/');
     if (EXEMPT_PREFIXES.some(p => rel.startsWith(p))) continue;
-
-    const lines = stripComments(fs.readFileSync(full, 'utf8')).split('\n');
-    lines.forEach((line, i) => {
-      if (!PATTERN.test(line)) return;
-      // The option object can span lines; scan a small window for an explicit timeZone.
-      const window = lines.slice(i, i + 6).join('\n');
-      if (/timeZone\s*:/.test(window)) return;
-      if (!offenders.has(rel)) offenders.set(rel, []);
-      offenders.get(rel).push(i + 1);
-    });
+    scanned.push({ full, rel });
   }
 }
 
-for (const top of ['app', 'components', 'lib', 'packages']) {
-  const dir = path.join(root, top);
-  if (fs.existsSync(dir)) walk(dir);
+// A date rendering is only provable from the call itself: the receiver, or the option bag.
+const DATE_OPTION = /\b(?:hour|minute|second|weekday|day|month|year|era|dateStyle|timeStyle|timeZoneName)\s*:\s*['"]|\b(?:hour12|hourCycle)\s*:/;
+const NEW_DATE_RECEIVER = /new Date\([^)]*\)\s*\.toLocaleString\s*\(/;
+const LOCALE_STRING = /\.toLocaleString\s*\(/;
+const INTL_FORMAT = /\bIntl\.DateTimeFormat\s*\(/;
+const INTL_READS_ZONE = /\bIntl\.DateTimeFormat\s*\(\s*\)\s*\.resolvedOptions\s*\(/;
+const CLOCK_GETTER = /\.get(?:Hours|Minutes|Seconds)\s*\(\s*\)/;
+
+/** The 1-based lines of `content` that render or read a date/time device-locally. Pure. */
+function findOffenderLines(content) {
+  // #2560: a file with none of the trigger words is not stripped or split. That cannot hide a hit —
+  // `stripComments` keeps every character's position and only turns characters into whitespace,
+  // so a match in the stripped text is the same characters in the raw text.
+  if (!/\.toLocale|Intl\.DateTimeFormat|\.get(?:Hours|Minutes|Seconds)\s*\(/.test(content)) return [];
+  const lines = stripComments(content).split('\n');
+  const hit = [];
+  lines.forEach((line, i) => {
+    // The option object can span lines; scan a small window for an explicit timeZone.
+    const window = lines.slice(i, i + 6).join('\n');
+    const hasZone = /timeZone\s*:/.test(window);
+    if (PATTERN.test(line) && !hasZone) hit.push(i + 1);
+    else if (LOCALE_STRING.test(line) && !hasZone && (NEW_DATE_RECEIVER.test(line) || DATE_OPTION.test(window))) hit.push(i + 1);
+    else if (INTL_FORMAT.test(line) && !INTL_READS_ZONE.test(line) && !hasZone) hit.push(i + 1);
+    else if (CLOCK_GETTER.test(line)) hit.push(i + 1);
+  });
+  return hit;
 }
 
-const newOffenders = [...offenders.keys()].filter(f => !GRANDFATHERED.has(f));
-const fixed = [...GRANDFATHERED].filter(f => !offenders.has(f));
-
-if (newOffenders.length > 0) {
-  console.error('toLocaleDateString/toLocaleTimeString without an explicit `timeZone` — this renders in the DEVICE timezone, not the user\'s (CLAUDE.md: Timezone).');
-  console.error('Use formatTimeOfDay/formatInTimeZone from @trainingai/shared/date-utils, or pass { timeZone }:');
-  for (const f of newOffenders) console.error(`  ${f}: line(s) ${offenders.get(f).join(', ')}`);
-  process.exit(1);
+function scan(rel, content) {
+  const lines = findOffenderLines(content);
+  if (lines.length > 0) offenders.set(rel, lines);
 }
 
-if (fixed.length > 0) {
-  console.error('These files no longer call toLocale*String without a timeZone — remove them from GRANDFATHERED in this script so they stay fixed:');
-  for (const f of fixed) console.error(`  ${f}`);
-  process.exit(1);
-}
+module.exports = { findOffenderLines };
 
-console.log(
-  `check-timezone-rendering: no new device-local date/time rendering ` +
-  `(${REVIEWED_BENIGN.size} triaged benign, ${BLOCKED_ON_CLIENT_TZ.size} real but blocked on client-side timezone access — Q-148).`,
-);
+if (require.main === module) runMain(async () => {
+  for (const top of ['app', 'components', 'lib', 'packages']) {
+    const dir = path.join(root, top);
+    if (fs.existsSync(dir)) walk(dir);
+  }
+
+  // Read together, scanned in walk order, so offenders are reported in the order they always were.
+  const contents = await readFilesUtf8(scanned.map(f => f.full));
+  scanned.forEach((f, k) => scan(f.rel, contents[k]));
+
+  const newOffenders = [...offenders.keys()].filter(f => !GRANDFATHERED.has(f));
+  const fixed = [...GRANDFATHERED].filter(f => !offenders.has(f));
+
+  if (newOffenders.length > 0) {
+    console.error('A date/time rendered or read in the DEVICE timezone, not the user\'s (CLAUDE.md: Timezone): toLocale{Date,Time}String, a date-bearing toLocaleString, Intl.DateTimeFormat without `timeZone`, or getHours/getMinutes/getSeconds.');
+    console.error('Use formatTimeOfDay/formatInTimeZone/msToHHMMInTz from @trainingai/shared/date-utils, or pass { timeZone }. A clock getter that is genuinely fine (a zoned Date, arithmetic) is triaged in REVIEWED_BENIGN with its reason:');
+    for (const f of newOffenders) console.error(`  ${f}: line(s) ${offenders.get(f).join(', ')}`);
+    process.exit(1);
+  }
+
+  if (fixed.length > 0) {
+    console.error('These files no longer render or read a date device-locally — remove them from GRANDFATHERED in this script so they stay fixed:');
+    for (const f of fixed) console.error(`  ${f}`);
+    process.exit(1);
+  }
+
+  console.log(
+    `check-timezone-rendering: no new device-local date/time rendering ` +
+    `(${REVIEWED_BENIGN.size} triaged benign, ${BLOCKED_ON_CLIENT_TZ.size} real but blocked on client-side timezone access — Q-148).`,
+  );
+});

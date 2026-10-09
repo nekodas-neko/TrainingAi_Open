@@ -1,4 +1,7 @@
 import { computeWeightRateFit, type WeightPoint } from '@trainingai/shared/health/long-term-goal-progress'
+import { doseDiffers, type DoseLogEntry } from '@trainingai/shared/health/dose-change-caveat'
+import { daysBetweenDateStrs, isCalendarDate, shiftDateStr, toAestDay } from '@trainingai/shared/date-utils'
+import { iqrBand, median, quantile } from '@trainingai/shared/stats'
 
 /**
  * Weight response over the current dosing period, as a rate with its uncertainty (OR-102b ④).
@@ -190,4 +193,271 @@ export type ResponseState = 'verdict' | 'undecided' | 'insufficient'
 export function responseState(result: WeightResponse | null): ResponseState {
   if (!result) return 'insufficient'
   return result.verdict ? 'verdict' : 'undecided'
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// Recovery response: resting HR and HRV by days since each dose (issue 2152, BF-184).
+//
+// **The same module on purpose.** The owner's decision (2026-09-30) was to extend this file rather
+// than add a second reta module, so dose and response stay in step. Nothing here is a new estimator
+// of a kind this repo already has: the baseline is `iqrBand`'s median (the readiness and sleep
+// verdicts' band), the spread is `quantile`, and what counts as a CHANGE of dose is `doseDiffers`
+// from the dose-change caveat. Resting HR and HRV are not recomputed — the caller hands in the
+// nights it already reads (`oura_daily_summary`: `rhrLowBpm`, `hrvAvgMs`).
+//
+// **What it returns is numbers and a state, never a claim.** Each dose is its own cycle, aligned on
+// its dose day; for every day-since-dose offset the result is the median across cycles of the
+// DEVIATION from the person's own baseline, with the 25th-75th percentile range and how many cycles
+// contributed. Two cycles with training load, sleep and stress uncontrolled is an observation, not
+// a finding: under `RECOVERY_MIN_CYCLES` usable cycles the answer is the typed `insufficient`
+// state, never zeros and never a null that reads as zero.
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+
+/** Fewer usable cycles than this is `insufficient`. Two is the owner's floor (issue 2152). */
+export const RECOVERY_MIN_CYCLES = 2
+/** A cycle needs this many nights WITH a reading of the metric inside its window to count. */
+export const RECOVERY_MIN_NIGHTS_PER_CYCLE = 3
+/** A cycle runs from its dose day to the day before the next dose, capped here (the last dose has
+ *  no next one, and a long gap is a different regime from "between doses"). */
+export const RECOVERY_MAX_CYCLE_DAYS = 14
+/** Nights before the first dose needed for the baseline to be a PRE-dose reference. */
+export const RECOVERY_MIN_BASELINE_NIGHTS = 5
+/** An offset reached by fewer cycles than this reports its count and no centre or range. */
+export const RECOVERY_MIN_CYCLES_PER_OFFSET = 2
+
+export type RecoveryMetric = 'rhr' | 'hrv'
+
+/** One night, keyed by the date the app keys it under. A missing reading is null, never 0. */
+export interface RecoveryNight {
+  date: string
+  restingHr: number | null
+  hrvMs: number | null
+}
+
+/** A dose-log row plus its time. `date` is the user's local `log_date` and is the dose day. */
+export interface RecoveryDose extends DoseLogEntry {
+  /** ISO instant, or null for a dose logged without a time (the first Retatrutide row). */
+  takenAt: string | null
+}
+
+export interface RecoveryOffset {
+  /** Days since the dose day: 0 is the dose day itself. */
+  offset: number
+  /** Cycles with a reading at this offset. */
+  cycles: number
+  /** Median deviation from baseline across cycles; null when `cycles` is under the per-offset floor. */
+  median: number | null
+  p25: number | null
+  p75: number | null
+}
+
+export interface RecoveryBaseline {
+  median: number
+  iqr: number
+  nights: number
+  /** `all_nights` means fewer than `RECOVERY_MIN_BASELINE_NIGHTS` nights pre-date the first dose, so
+   *  the reference includes dosed nights and the deviations read smaller than a true pre-dose
+   *  reference would give. */
+  source: 'before_first_dose' | 'all_nights'
+}
+
+export type MetricRecoveryResponse =
+  | { state: 'insufficient'; cycles: number; neededCycles: number }
+  | { state: 'ok'; cycles: number; baseline: RecoveryBaseline; offsets: RecoveryOffset[] }
+
+export interface DoseLevelRecovery {
+  /** The dose this group shares. `amount` null means no amount was logged (text, or nothing). */
+  amount: number | null
+  unit: string | null
+  doseText: string | null
+  doses: number
+  /** Doses with a parseable `takenAt`. */
+  timedDoses: number
+  /** Doses with no time. Day-level alignment only: such a dose cannot place a dose NIGHT. */
+  untimedDoses: number
+  /** Timed doses whose local calendar day (in `tz`) is not their `log_date`. `log_date` still rules. */
+  timeDayDisagrees: number
+  rhr: MetricRecoveryResponse
+  hrv: MetricRecoveryResponse
+}
+
+export interface SubstanceRecoveryResponse {
+  supplementId: string
+  supplementName: string
+  /** One group per distinct dose, oldest first. Cycles are never pooled across groups. */
+  levels: DoseLevelRecovery[]
+  /** More than one dose level was logged: the groups are not comparable with each other. */
+  mixedDoseLevels: boolean
+}
+
+export interface RecoveryResponseInput {
+  doses: RecoveryDose[]
+  nights: RecoveryNight[]
+  /** The user's timezone, used only to check a dose's `takenAt` against its `log_date`. */
+  tz: string
+}
+
+const dayKey = (d: string) => d.replace(/\//g, '-')
+const finite = (n: number | null | undefined): n is number => typeof n === 'number' && Number.isFinite(n)
+
+/** Same dose level? Only like is compared with like: an amount against an amount, text against text. */
+function sameLevel(a: DoseLogEntry, b: DoseLogEntry): boolean {
+  if ((a.amount != null) !== (b.amount != null)) return false
+  return !doseDiffers(a, b)
+}
+
+function metricResponse(
+  metric: RecoveryMetric,
+  cycles: string[][],
+  byDate: Map<string, RecoveryNight>,
+  baseline: RecoveryBaseline | null,
+): MetricRecoveryResponse {
+  const read = (date: string): number | null => {
+    const n = byDate.get(date)
+    const v = n ? (metric === 'rhr' ? n.restingHr : n.hrvMs) : null
+    return finite(v) ? v : null
+  }
+  const usable = cycles
+    .map(days => days.flatMap((d, offset) => { const value = read(d); return value === null ? [] : [{ offset, value }] }))
+    .filter(readings => readings.length >= RECOVERY_MIN_NIGHTS_PER_CYCLE)
+
+  if (!baseline || usable.length < RECOVERY_MIN_CYCLES) {
+    return { state: 'insufficient', cycles: usable.length, neededCycles: RECOVERY_MIN_CYCLES }
+  }
+
+  const maxOffset = Math.max(...usable.flatMap(c => c.map(r => r.offset)))
+  const offsets: RecoveryOffset[] = []
+  for (let offset = 0; offset <= maxOffset; offset++) {
+    const deviations = usable.flatMap(c => c.filter(r => r.offset === offset).map(r => r.value - baseline.median))
+    const enough = deviations.length >= RECOVERY_MIN_CYCLES_PER_OFFSET
+    offsets.push({
+      offset,
+      cycles: deviations.length,
+      median: enough ? median(deviations) : null,
+      p25: enough ? quantile(deviations, 0.25) : null,
+      p75: enough ? quantile(deviations, 0.75) : null,
+    })
+  }
+  return { state: 'ok', cycles: usable.length, baseline, offsets }
+}
+
+function baselineFor(metric: RecoveryMetric, nights: RecoveryNight[], firstDoseDate: string): RecoveryBaseline | null {
+  const valuesOf = (rows: RecoveryNight[]) => rows.map(n => (metric === 'rhr' ? n.restingHr : n.hrvMs)).filter(finite)
+  const pre = valuesOf(nights.filter(n => n.date < firstDoseDate))
+  const source = pre.length >= RECOVERY_MIN_BASELINE_NIGHTS ? 'before_first_dose' : 'all_nights'
+  const values = source === 'before_first_dose' ? pre : valuesOf(nights)
+  // Multiplier 0: the band collapses to the interquartile range itself, so the spread is the
+  // readiness verdict's definition without a second quantile routine.
+  const band = iqrBand(values, 0)
+  return band ? { median: band.median, iqr: band.high - band.low, nights: values.length, source } : null
+}
+
+/**
+ * Resting HR and HRV by days since each dose, per substance and per dose level.
+ *
+ * - **Cycle = one dose.** Day 0 is the dose day (`log_date`, the user's local day); the cycle runs
+ *   to the day before that substance's next dose, at most `RECOVERY_MAX_CYCLE_DAYS`.
+ * - **Alignment is day-level for every dose.** A timed dose could place the dose NIGHT, but the
+ *   first Retatrutide row has no `takenAt`, and mixing the two alignments would put one offset on
+ *   different nights. Timed and untimed counts are returned so the reader knows which they have.
+ * - **Never pooled across a dose change.** Cycles group by `doseDiffers` (the caveat module's
+ *   definition of a change); `mixedDoseLevels` flags a substance with more than one group.
+ * - **Baseline** is the median of nights BEFORE the substance's first dose when there are
+ *   `RECOVERY_MIN_BASELINE_NIGHTS` of them (so a cycle never helps judge itself), otherwise the
+ *   median of all nights, marked `all_nights`.
+ * - **A missing night is a gap**: skipped, never counted as 0.
+ */
+export function recoveryResponse(input: RecoveryResponseInput): SubstanceRecoveryResponse[] {
+  const nights = input.nights
+    .map(n => ({ ...n, date: dayKey(n.date) }))
+    .filter(n => isCalendarDate(n.date))
+    .sort((a, b) => a.date.localeCompare(b.date))
+  const byDate = new Map(nights.map(n => [n.date, n]))
+
+  const doses = input.doses
+    .map(d => ({ ...d, date: dayKey(d.date) }))
+    .filter(d => isCalendarDate(d.date))
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.takenAt ?? '').localeCompare(b.takenAt ?? ''))
+
+  const bySubstance = new Map<string, typeof doses>()
+  for (const d of doses) {
+    const list = bySubstance.get(d.supplementId) ?? []
+    // Two logs on one day are one dose day (the first stands), not two cycles.
+    if (!list.some(x => x.date === d.date)) list.push(d)
+    bySubstance.set(d.supplementId, list)
+  }
+
+  const out: SubstanceRecoveryResponse[] = []
+  for (const [supplementId, list] of bySubstance) {
+    const baselines = { rhr: baselineFor('rhr', nights, list[0].date), hrv: baselineFor('hrv', nights, list[0].date) }
+    const groups: { rep: DoseLogEntry; members: { dose: (typeof list)[number]; days: string[] }[] }[] = []
+    list.forEach((dose, i) => {
+      const gap = i + 1 < list.length ? daysBetweenDateStrs(dose.date, list[i + 1].date) : RECOVERY_MAX_CYCLE_DAYS
+      const days = Array.from({ length: Math.min(gap, RECOVERY_MAX_CYCLE_DAYS) }, (_, k) => shiftDateStr(dose.date, k))
+      let group = groups.find(g => sameLevel(g.rep, dose))
+      if (!group) groups.push((group = { rep: dose, members: [] }))
+      group.members.push({ dose, days })
+    })
+
+    const levels: DoseLevelRecovery[] = groups.map(g => {
+      const cycles = g.members.map(m => m.days)
+      const timed = g.members.filter(m => m.dose.takenAt && !Number.isNaN(Date.parse(m.dose.takenAt)))
+      return {
+        amount: g.rep.amount,
+        unit: g.rep.unit,
+        doseText: g.rep.doseText,
+        doses: g.members.length,
+        timedDoses: timed.length,
+        untimedDoses: g.members.length - timed.length,
+        timeDayDisagrees: timed.filter(m => toAestDay(new Date(m.dose.takenAt as string), input.tz) !== m.dose.date).length,
+        rhr: metricResponse('rhr', cycles, byDate, baselines.rhr),
+        hrv: metricResponse('hrv', cycles, byDate, baselines.hrv),
+      }
+    })
+    out.push({ supplementId, supplementName: list[0].supplementName, levels, mixedDoseLevels: levels.length > 1 })
+  }
+  return out.sort((a, b) => a.supplementName.localeCompare(b.supplementName) || a.supplementId.localeCompare(b.supplementId))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// Reading the recovery response (issue 2152, the "Heart after a dose" card).
+//
+// This is NOT a second estimator: `recoveryResponse` above produces every number. What lives here is
+// the one owner-specified gate on top of them, kept beside the model so every reader applies the
+// same rule.
+//
+// **"Clear pattern" = on some day, the middle half of the doses (p25 to p75) sits FULLY outside the
+// person's own normal, baseline median ± IQR/2.** Anything less, including a median that is outside
+// but a band that still overlaps, is "no clear pattern yet". It describes a pattern in the owner's
+// numbers and never names a cause: training, sleep and stress are uncontrolled.
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+
+export interface MetricPattern {
+  /** The gate above held on at least one day. */
+  clear: boolean
+  /** Days (offsets) on which the middle half sat fully outside the normal. */
+  clearOffsets: number[]
+  /** Of those days, the one whose median is furthest from the baseline (absolute value); null when not clear. */
+  peak: { offset: number; value: number; direction: 'up' | 'down' } | null
+  /** The last day with a centre: its absolute median, and whether that median is outside the normal. */
+  last: { offset: number; value: number; outside: boolean } | null
+}
+
+export function metricPattern(r: MetricRecoveryResponse): MetricPattern {
+  if (r.state !== 'ok') return { clear: false, clearOffsets: [], peak: null, last: null }
+  const half = r.baseline.iqr / 2
+  const clearOffsets: number[] = []
+  let peak: MetricPattern['peak'] = null
+  let last: MetricPattern['last'] = null
+  for (const o of r.offsets) {
+    if (o.median === null || o.p25 === null || o.p75 === null) continue
+    last = { offset: o.offset, value: r.baseline.median + o.median, outside: Math.abs(o.median) > half }
+    if (o.p25 > half || o.p75 < -half) {
+      clearOffsets.push(o.offset)
+      if (!peak || Math.abs(o.median) > Math.abs(peak.value - r.baseline.median)) {
+        peak = { offset: o.offset, value: r.baseline.median + o.median, direction: o.median >= 0 ? 'up' : 'down' }
+      }
+    }
+  }
+  return { clear: clearOffsets.length > 0, clearOffsets, peak, last }
 }

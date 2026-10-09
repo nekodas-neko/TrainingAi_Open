@@ -13,7 +13,6 @@ import { invalidateActivityWrites } from '@/lib/cache-groups'
 import { decodeRoute } from '@/lib/activity/route-encoding'
 import { todayInTz, msToHHMMInTz } from '@trainingai/shared/date-utils'
 import { getLocalStore } from '@/lib/local-store'
-import { linkPrescribedRun, completedAsFor } from '@/lib/activity/link-prescribed-run'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { omitNullFields } from '@/lib/local-store/sync-helpers'
 import { calculateSteps } from '@/lib/activity/treadmill-utils'
@@ -47,11 +46,10 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
   // Same as done-screen: every activity ends here and all three exits go to /workout-select, so
   // warm it while the summary is being read. Button pushes get no automatic prefetch (#919).
   useEffect(() => { router.prefetch('/workout') }, [router])
-  const { activityType, title, activityLabel, startMs, endMs, draftSummary, resetSession, prescribedRunId } = useActivityStore(
+  const { activityType, title, activityLabel, startMs, endMs, draftSummary, resetSession } = useActivityStore(
     useShallow(s => ({
       activityType: s.activityType, title: s.title, activityLabel: s.activityLabel,
       startMs: s.startMs, endMs: s.endMs, draftSummary: s.draftSummary, resetSession: s.resetSession,
-      prescribedRunId: s.prescribedRunId,
     }))
   )
   const [notes, setNotes] = useState('')
@@ -204,8 +202,8 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
           avgHr: saveAvgHr ?? null,
           maxHr: saveMaxHr ?? null,
           caloriesBurned: null,
-          startTime: msToHHMMInTz(startMs),
-          endTime: msToHHMMInTz(endMs),
+          startTime: msToHHMMInTz(startMs, tz),
+          endTime: msToHHMMInTz(endMs, tz),
           notes: noteText,
           routePolyline: draftSummary.routePolyline ?? null,
           splits: draftSummary.splits ?? null,
@@ -238,8 +236,8 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
             caloriesBurned: null,
             avgHr: saveAvgHr ?? null,
             maxHr: saveMaxHr ?? null,
-            startTime: msToHHMMInTz(startMs),
-            endTime: msToHHMMInTz(endMs),
+            startTime: msToHHMMInTz(startMs, tz),
+            endTime: msToHHMMInTz(endMs, tz),
             notes: noteText,
             routePolyline: draftSummary.routePolyline ?? null,
             splits: draftSummary.splits ?? null,
@@ -260,11 +258,6 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
         navigateToTab(router, '/workout')
         pushThenRevalidate(userId!, invalidateActivityWrites)
         savedLocally = true
-        // RV-166: any activity started FROM the prescription satisfies it, run or walk — the id is
-        // only ever armed by the cardio card's own two actions, so nothing else can reach this.
-        if (prescribedRunId) {
-          linkPrescribedRun(userId, prescribedRunId, logId, tz, completedAsFor(activityType)).catch(() => {})
-        }
       } catch (sqliteErr) {
         console.error('Activity log SQLite write failed, falling back to API:', sqliteErr)
       }
@@ -279,8 +272,8 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
           date: today,
           activityType,
           title: title.trim() || activityLabel,
-          startTime: msToHHMMInTz(startMs),
-          endTime: msToHHMMInTz(endMs),
+          startTime: msToHHMMInTz(startMs, tz),
+          endTime: msToHHMMInTz(endMs, tz),
           durationMin: draftSummary.durationMin,
           distanceKm: saveDistanceKm,
           avgHr: saveAvgHr,
@@ -298,10 +291,6 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
         }),
       })
       if (!res.ok) throw new Error()
-      const { activityLog } = await res.json()
-      if (prescribedRunId) {
-        linkPrescribedRun(userId, prescribedRunId, activityLog.id, tz, completedAsFor(activityType)).catch(() => {})
-      }
       await invalidateActivityWrites()
       toast.success('Activity saved')
       resetSession()

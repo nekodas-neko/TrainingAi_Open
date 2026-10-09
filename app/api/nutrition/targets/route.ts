@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { OWN_TARGET_GOAL_TYPE } from '@trainingai/shared/nutrition/calorie-budget'
 import { z } from 'zod'
 import { goalBoundSchema } from '@trainingai/shared/validation/goal-bounds'
 import { auth } from '@/auth'
@@ -55,7 +56,11 @@ export async function PUT(req: Request) {
   // display preference, and never writes a daily number into a weekly-typed field.
   if (parsed.data.calories != null) {
     const { calorieGoalType } = await repo.getUserGoals(userId)
-    await repo.updateUserGoals(userId, { calorieGoal: dailyKcalToGoal(parsed.data.calories, calorieGoalType) })
+    // Issue 2622. When `calorie_goal` holds the user's OWN target it is not a mirror of this row, and
+    // overwriting it here would change the budget on every surface as a side effect of a macro edit.
+    if (calorieGoalType !== OWN_TARGET_GOAL_TYPE) {
+      await repo.updateUserGoals(userId, { calorieGoal: dailyKcalToGoal(parsed.data.calories, calorieGoalType) })
+    }
   }
   return NextResponse.json(targets)
 }

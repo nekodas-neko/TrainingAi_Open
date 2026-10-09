@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import {
   deloadOverrideOutcome, deloadRevertNames, deloadOverrideBlocked, overrideRunsFull, prescriptionRowAsTrained,
+  prescriptionFiguresAsTrained,
 } from '@/components/workout/utils'
 import { stripComments } from '../../scripts/lib/strip-comments.js'
 
@@ -112,9 +113,36 @@ describe('#2360 — the outcome follows the session that will actually run', () 
     expect(deloadOverrideOutcome([ex('Skull Crusher', true, false)], true, pendingEmergency)).toBe('nothing-to-revert')
   })
 
-  it('a deload week is never called full — every set of it is logged as a deload', () => {
-    expect(deloadOverrideOutcome(BF198, true, { ...DRIVES, deloadWeek: true })).toBe('nothing-to-revert')
+  // #2404. This used to read "a deload week is never called full" and answered `nothing-to-revert`,
+  // so the card said "Full is on, but these weights are unchanged". The weights DO change: Full
+  // reverts every deloaded exercise that recorded full numbers (`deloadRevertNames`), and the bar
+  // loads them. What does not change is the logging, which stays a deload because
+  // `isAnyDeload = deload || phaseStatus.isDeloadActive`. Both halves are said, not one.
+  it('a deload week under Full loads the full numbers and says every set is still logged as a deload', () => {
+    expect(deloadOverrideOutcome(BF198, true, { ...DRIVES, deloadWeek: true })).toBe('all-in-deload-week')
+  })
+
+  it('a deload week where some exercises cannot revert is partial, and still logged as a deload', () => {
+    expect(deloadOverrideOutcome([ex('Squat', true, true), ex('Bench', true, false)], true, { ...DRIVES, deloadWeek: true }))
+      .toBe('partial-in-deload-week')
+  })
+
+  it('a deload week with nothing recorded to revert still says the weights are unchanged', () => {
+    expect(deloadOverrideOutcome([ex('Skull Crusher', true, false)], true, { ...DRIVES, deloadWeek: true })).toBe('nothing-to-revert')
+  })
+
+  it('a deload week with no deloaded exercise makes no claim of a revert', () => {
+    // Nothing was cut, so nothing was put back. Not upgraded to a "full in deload week".
     expect(deloadOverrideOutcome(program, true, { ...pendingEmergency, deloadWeek: true })).toBe('nothing-to-revert')
+  })
+
+  it('every outcome that put the session back on full numbers runs full, in a deload week or not', () => {
+    for (const outcome of ['all', 'partial', 'all-in-deload-week', 'partial-in-deload-week'] as const) {
+      expect(overrideRunsFull(outcome), outcome).toBe(true)
+    }
+    for (const outcome of ['none', 'nothing-to-revert'] as const) {
+      expect(overrideRunsFull(outcome), outcome).toBe(false)
+    }
   })
 
   it('no prescription at all cannot be on the bar', () => {
@@ -146,6 +174,37 @@ describe('#2360 — the card rows show the numbers the bar will load', () => {
     expect(overrideRunsFull('partial')).toBe(true)
     expect(overrideRunsFull('nothing-to-revert')).toBe(false)
     expect(overrideRunsFull('none')).toBe(false)
+  })
+})
+
+describe('#2403 — the minutes and the volume pills follow the rows', () => {
+  const stored = {
+    estimatedSessionDurationMin: 19,
+    weeklyVolumeContribution: { chest: 2 },
+    fullSession: { estimatedSessionDurationMin: 30, weeklyVolumeContribution: { chest: 4 } },
+  }
+
+  it('under a working override they are the full session the engine costed', () => {
+    expect(prescriptionFiguresAsTrained(stored, true)).toEqual(stored.fullSession)
+  })
+
+  it('without one they are the stored figures, exactly as before', () => {
+    expect(prescriptionFiguresAsTrained(stored, false)).toEqual({ estimatedSessionDurationMin: 19, weeklyVolumeContribution: { chest: 2 } })
+  })
+
+  it('a prescription stored before the block existed falls back to the stored figures', () => {
+    const old = { estimatedSessionDurationMin: 19, weeklyVolumeContribution: { chest: 2 } }
+    expect(prescriptionFiguresAsTrained(old, true)).toEqual(old)
+  })
+
+  it('the card and the picker above it both read it, with the same runsFull', () => {
+    const card = source('components/workout/ai-prescription-card.tsx')
+    expect(card).toMatch(/const figures = prescriptionFiguresAsTrained\(prescription, runsFull\)/)
+    expect(card).toMatch(/figures\.estimatedSessionDurationMin\} min of work/)
+    expect(card).toMatch(/Object\.entries\(figures\.weeklyVolumeContribution\)/)
+    expect(card).not.toMatch(/prescription\.estimatedSessionDurationMin|prescription\.weeklyVolumeContribution/)
+    const screen = source('components/workout/pre-workout-screen.tsx')
+    expect(screen).not.toMatch(/estimatedMin=\{periodization\.state\.prescription\.estimatedSessionDurationMin\}/)
   })
 })
 

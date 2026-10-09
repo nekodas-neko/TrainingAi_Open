@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { LADDERS, replayCollection, type CollectionState } from '@trainingai/shared/collection/ladder'
-import { nextMerge, nearestMerge, mergeLine, mergeCountLine, totalHeld, restGapSentence, FAUCET_NOUN, FAUCET_TITLE } from '../collection-summary'
+import { V2_LADDERS as LADDERS, replayCollection, type CollectionState } from '@trainingai/shared/collection/ladder'
+import { nextMerge, nearestMerge, mergeLine, mergeCountLine, totalHeld, FAUCET_NOUN, FAUCET_TITLE } from '../collection-summary'
 import { tierGlyph, ladderGlyphs } from '../collection-sprites'
 
 const state = (stock: number[]): CollectionState => ({ stock, duplicateDays: 0, decayEvents: 0 })
@@ -11,14 +11,14 @@ describe('which merge the card is working toward (BF-122b)', () => {
     // 15 workouts away. Ranking on fraction picks the Tank and then has to say "3 more cat scouts",
     // which is not a unit anyone can spend a day earning.
     const p = nextMerge(state([3, 1, 0]), LADDERS.workout)
-    expect(p).toMatchObject({ fromTier: 0, towardName: 'cat scout', have: 3, need: 5, daysNeeded: 2 })
+    expect(p).toMatchObject({ fromTier: 0, towardName: 'Tank II', have: 3, need: 5, daysNeeded: 2 })
   })
 
   it('prefers the higher tier when the effort is identical', () => {
     // 5 workouts either way: 5 slimes for a scout, or the 1 scout that completes a Tank. Same cost,
     // better prize — and it is the case the entry's own example line describes.
     const p = nextMerge(state([0, 3, 0]), LADDERS.workout)
-    expect(p).toMatchObject({ fromTier: 1, towardName: 'cat Tank', daysNeeded: 5 })
+    expect(p).toMatchObject({ fromTier: 1, towardName: 'Tank III', daysNeeded: 5 })
   })
 
   it('costs a higher rung through every merge below it', () => {
@@ -45,23 +45,23 @@ describe('which merge the card is working toward (BF-122b)', () => {
 
   it('keeps offering a next merge after the top tier is reached, because the ladder never ends', () => {
     // Owning a Tank does not stop slimes spawning. A card that went blank here would read as broken.
-    expect(nextMerge(state([0, 0, 1]), LADDERS.workout)).toMatchObject({ fromTier: 0, towardName: 'cat scout' })
+    expect(nextMerge(state([0, 0, 0, 0, 0, 1]), LADDERS.workout)).toMatchObject({ fromTier: 0, towardName: 'Tank II' })
   })
 
   it('ranks the three ladders on that same number, not on which faucet it is', () => {
     const nearest = nearestMerge(
-      { workout: state([1, 0, 0]), steps: state([6, 0, 0]), sleep: state([2, 0, 0]) },
+      { workout: state([1]), steps: state([2]), health: state([0]) },
       LADDERS,
     )
-    // steps needs 1 day, workout 4, sleep 5.
+    // steps needs 1 tier I cat, workout 4, health 3.
     expect(nearest?.faucet).toBe('steps')
     expect(nearest?.daysNeeded).toBe(1)
   })
 
   it('breaks a tie on the given order, so the card does not swap ladders between refreshes', () => {
-    // Both ladders empty: workout is 5 days away, sleep 7 — but make them equal to force the tie.
-    const a = nearestMerge({ workout: state([2, 0, 0]), sleep: state([4, 0, 0]) }, LADDERS)
-    const b = nearestMerge({ workout: state([2, 0, 0]), sleep: state([4, 0, 0]) }, LADDERS)
+    // Workout is 3 workouts away and health 3 tier I cats: equal, to force the tie.
+    const a = nearestMerge({ workout: state([2]), health: state([0]) }, LADDERS)
+    const b = nearestMerge({ workout: state([2]), health: state([0]) }, LADDERS)
     expect(a?.daysNeeded).toBe(3)
     expect(a?.faucet).toBe('workout')
     expect(a?.faucet).toBe(b?.faucet)
@@ -74,18 +74,18 @@ describe('which merge the card is working toward (BF-122b)', () => {
 
 describe('the sentence under the sprite', () => {
   it('always counts faucet days, in the words of that faucet', () => {
-    expect(mergeLine(nextMerge(state([3, 0, 0]), LADDERS.workout)!)).toBe('2 more workouts for a cat scout')
-    expect(mergeLine(nextMerge(state([6, 0, 0]), LADDERS.sleep)!)).toBe('1 more night of sleep for a cat acolyte')
+    expect(mergeLine(nextMerge(state([3, 0, 0]), LADDERS.workout)!)).toBe('2 more workouts for a Tank II')
+    expect(mergeLine(nextMerge(state([2]), LADDERS.health)!)).toBe('1 more tier I cat for a Health cat II')
   })
 
   it('stays in days above the bottom rung rather than naming a unit nobody earns directly', () => {
-    expect(mergeLine(nextMerge(state([0, 3, 0]), LADDERS.workout)!)).toBe('5 more workouts for a cat Tank')
+    expect(mergeLine(nextMerge(state([0, 3, 0]), LADDERS.workout)!)).toBe('5 more workouts for a Tank III')
   })
 
   it('drops the target for the card, which already names it on the line above', () => {
     const p = nextMerge(state([3, 0, 0]), LADDERS.workout)!
     expect(mergeCountLine(p)).toBe('2 more workouts')
-    expect(mergeCountLine(p)).not.toContain('cat scout')
+    expect(mergeCountLine(p)).not.toContain('Tank II')
     // Still the same number as the long form, which is the only thing that must not drift.
     expect(mergeLine(p).startsWith(mergeCountLine(p))).toBe(true)
   })
@@ -117,7 +117,7 @@ describe('the glyphs', () => {
   })
 
   it('show the shared bottom rung as one creature, because it IS one', () => {
-    // All three ladders spawn `cat slime`. Three different glyphs would read as three species.
+    // All four ladders spawn `cat slime`. Four different glyphs would read as three species.
     const bottoms = new Set(Object.keys(LADDERS).map(f => tierGlyph(f as keyof typeof LADDERS, 0)))
     expect(bottoms.size).toBe(1)
   })
@@ -128,17 +128,6 @@ describe('against the real fold, not a hand-built stock', () => {
     const days = ['2026-09-01', '2026-09-02', '2026-09-03']
     const s = replayCollection({ days, ladder: LADDERS.workout, maxRestGap: 1, today: '2026-09-03' })
     expect(totalHeld(s)).toBe(3)
-    expect(mergeLine(nextMerge(s, LADDERS.workout)!)).toBe('2 more workouts for a cat scout')
-  })
-})
-
-describe('the rest-gap sentence on the collection screen', () => {
-  it('says it once when the two allowances agree', () => {
-    expect(restGapSentence(2, 2)).toBe('2 missed days')
-    expect(restGapSentence(1, 1)).toBe('1 missed day')
-  })
-
-  it('names both when they differ — the branch that is dead code if the copy is written inline', () => {
-    expect(restGapSentence(2, 3)).toBe('2 missed days for steps and 3 missed days for sleep')
+    expect(mergeLine(nextMerge(s, LADDERS.workout)!)).toBe('2 more workouts for a Tank II')
   })
 })

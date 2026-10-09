@@ -12,7 +12,7 @@ import type { AiPrescription, PrescriptionStatus, PeriodizationPhase } from "@tr
 import { LOW_CONFIDENCE_THRESHOLD } from "@trainingai/shared/ai-periodization/confidence";
 import { explainExerciseChoice } from "@trainingai/shared/ai-periodization/explain";
 import { prescriptionDrivesLoad } from "@trainingai/shared/ai-periodization/apply-prescription";
-import { mroundStepUp, weightStepFor, overrideRunsFull, prescriptionRowAsTrained, type DeloadOverrideOutcome } from "@/components/workout/utils";
+import { mroundStepUp, weightStepFor, overrideRunsFull, overrideLogsAsDeloadWeek, prescriptionRowAsTrained, prescriptionFiguresAsTrained, type DeloadOverrideOutcome } from "@/components/workout/utils";
 import { intensityZoneForPct } from "@trainingai/shared/workout/intensity-zone";
 import { isBodyweightType } from "@trainingai/shared/1rm";
 import { RoleChip } from "./role-chip";
@@ -130,6 +130,10 @@ export function AiPrescriptionCard({
   // and a fresh cycle is starting — offer building a new program as an alternative.
   const isCycleRestart = isTransitionRecommended && prescription.phase === 'accumulation';
   const runsFull = overrideFull && overrideRunsFull(overrideOutcome);
+  // #2404: Full put the weights back, but a deload week still logs every set as a deload.
+  const loggedAsDeload = overrideFull && overrideLogsAsDeloadWeek(overrideOutcome);
+  // #2403: the minutes and the weekly-volume pills follow the rows — under Full, the full session.
+  const figures = prescriptionFiguresAsTrained(prescription, runsFull);
 
   // Exercises dropped for this cycle are not part of today's session — workout-data filters
   // them out of what actually loads, so the card must not advertise them either (the
@@ -215,7 +219,7 @@ export function AiPrescriptionCard({
             </p>
             <p className="text-[11px] text-muted-foreground truncate">
               {prescription.deload
-                ? (runsFull ? "Deload overridden" : "Deload session")
+                ? (loggedAsDeload ? "Full weights, logged as deload" : runsFull ? "Deload overridden" : "Deload session")
                 : `Confidence ${Math.round(prescription.confidence * 100)}%`}
               {/* "of work", not a bare number (BF-196). The estimate is measured against the
                   WORKING budget — the session budget minus the measured warm-up carve-out — so on a
@@ -225,7 +229,7 @@ export function AiPrescriptionCard({
                   The wording matches SessionDurationPicker, which renders the SAME number directly
                   above this card and already named it. Two phrasings for one quantity, six lines
                   apart in pre-workout-screen, is the divergence worth more than the nicer phrase. */}
-              {prescription.estimatedSessionDurationMin > 0 && ` · ~${prescription.estimatedSessionDurationMin} min of work`}
+              {figures.estimatedSessionDurationMin > 0 && ` · ~${figures.estimatedSessionDurationMin} min of work`}
               {/* Once a transition has been APPLIED (auto or accepted) the action is history —
                   still calling it "suggested" would invite a tap on a decision already made. */}
               {isTransitionRecommended && (isPending
@@ -256,8 +260,26 @@ export function AiPrescriptionCard({
                 <p className="text-[11px] font-semibold">
                   {overrideOutcome === 'nothing-to-revert'
                     ? "Full is on, but these weights are unchanged"
+                    : loggedAsDeload
+                    ? "Running full weights in your deload week"
                     : "Running full, overriding the deload"}
                 </p>
+                {loggedAsDeload ? (
+                  /* #2404. Its own paragraph rather than more branches in the chain below: that chain
+                     is guarded as "nothing to revert, else the blocked check" and says "these sets
+                     count toward your 1RM", which a deload week must not. */
+                  <p className="text-2xs text-muted-foreground leading-relaxed">
+                    {overrideOutcome === 'all-in-deload-week'
+                      ? "Every exercise is back to its pre-deload weights and sets. This is your deload week, so these sets are still logged as a deload and do not count toward your 1RM."
+                      : `Most exercises are back to their pre-deload weights and sets. ${
+                          overrideBlockedNames.length === 1
+                            ? `${overrideBlockedNames[0]} stays`
+                            : `${overrideBlockedNames.slice(0, -1).join(", ")} and ${overrideBlockedNames.at(-1)} stay`
+                        } deloaded, because the prescription did not record full numbers for ${
+                          overrideBlockedNames.length === 1 ? "it" : "them"
+                        }. This is your deload week, so every set is logged as a deload and none count toward your 1RM.`}
+                  </p>
+                ) : (
                 <p className="text-[11px] text-muted-foreground leading-relaxed">
                   {/* LB-47. `blocked.length === 0` used to render the "every exercise is back" line
                       for BOTH "everything reverted" and "there was nothing to revert", so the card
@@ -278,6 +300,7 @@ export function AiPrescriptionCard({
                         overrideBlockedNames.length === 1 ? "it" : "them"
                       }, so ${overrideBlockedNames.length === 1 ? "its" : "their"} sets will not count toward your 1RM.`}
                 </p>
+                )}
               </div>
             </div>
           )}
@@ -381,9 +404,9 @@ export function AiPrescriptionCard({
 
           {/* Per-muscle weekly volume this prescription contributes (sets/week), mirroring the
               workout-review sheet's weekly-impact pills — highest-volume muscles first. */}
-          {Object.keys(prescription.weeklyVolumeContribution ?? {}).length > 0 && (
+          {Object.keys(figures.weeklyVolumeContribution ?? {}).length > 0 && (
             <div className="flex flex-wrap gap-1.5 border-t border-brand/10 pt-1.5">
-              {Object.entries(prescription.weeklyVolumeContribution)
+              {Object.entries(figures.weeklyVolumeContribution)
                 .sort((a, b) => b[1] - a[1])
                 .map(([muscle, sets]) => (
                   <span key={muscle} className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-500">

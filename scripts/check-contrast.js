@@ -14,33 +14,10 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
-function oklchToLinearSrgb(L, C, Hdeg) {
-  const h = (Hdeg * Math.PI) / 180;
-  const a = C * Math.cos(h);
-  const b = C * Math.sin(h);
-  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
-  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
-  const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
-  const l = l_ ** 3, m = m_ ** 3, s = s_ ** 3;
-  return [
-    +4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
-    -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
-    -0.0041960863 * l - 0.7034186147 * m + 1.7076147010 * s,
-  ];
-}
-const clamp = v => Math.min(1, Math.max(0, v));
-// WCAG relative luminance is defined on LINEARISED sRGB, which is what the transform above
-// already returns — there is no gamma round-trip to do here.
-const lum = ([L, C, H]) => {
-  const [r, g, b] = oklchToLinearSrgb(L, C, H).map(clamp);
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-};
-function ratioFromLum(l1, l2) {
-  const [hi, lo] = l1 > l2 ? [l1, l2] : [l2, l1];
-  return (hi + 0.05) / (lo + 0.05);
-}
-const ratio = (fg, bg) => ratioFromLum(lum(fg), lum(bg));
+const { oklchToLinearSrgb, clamp, lum, ratioFromLum, ratio, toGamma, toLinear, relLum } = require('./lib/contrast-math');
+const { tokens } = require('./lib/contrast-math');
 
 function hexLum(hex) {
   const n = parseInt(hex.slice(1), 16);
@@ -102,17 +79,6 @@ const darkSrc = css.slice(darkAt);
 // Before this, such a token simply did not match the literal-triple regex, the dark palette came
 // back empty, and the identity guard below stopped the run — which is the correct failure and the
 // reason this was noticed rather than silently unmeasured.
-function tokens(src) {
-  const out = {};
-  const RE = /--([a-z0-9-]+):\s*oklch\(\s*([0-9.]+)\s+([0-9.]+)\s+(?:([0-9.]+)|var\(\s*--brand-hue\s*,\s*([0-9.]+)\s*\))/g;
-  for (const m of src.matchAll(RE)) {
-    const fixed = m[4] !== undefined;
-    out[m[1]] = [parseFloat(m[2]), parseFloat(m[3]), parseFloat(fixed ? m[4] : m[5])];
-    if (!fixed) out[m[1]].hueVaries = true;
-  }
-  return out;
-}
-
 // The worst ratio across every hue either side can take. Identical to `ratio` when both are fixed.
 const HUE_STEP = 3;
 function worstRatio(fg, bg) {
@@ -228,6 +194,7 @@ function opacityFailures() {
   const files = [];
   const walk = d => {
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      if (e.isDirectory() && isSkippedFixtureDir(e.name)) continue;
       const full = path.join(d, e.name);
       if (e.isDirectory()) { if (e.name !== 'node_modules') walk(full); }
       else if (e.name.endsWith('.tsx')) files.push(full);
@@ -259,9 +226,6 @@ function opacityFailures() {
 // really 2.34:1 — a difference that would have made the error message quote a number nobody could
 // reproduce in a browser. CSS alpha-composites in the encoded space, so the round trip is
 // linear → encoded → blend → linear → luminance.
-const toGamma = c => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
-const toLinear = c => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
-const relLum = ([r, g, b]) => 0.2126 * r + 0.7152 * g + 0.0722 * b;
 
 function alphaRatio(fgToken, bgToken, pct, T) {
   if (!T[fgToken] || !T[bgToken]) return null;
@@ -285,17 +249,22 @@ if (opacityBad.length) {
   process.exit(1);
 }
 
-// ---- RV-101: the muscle heatmap's volume ramp ----
+// ---- RV-101: the muscle heatmap's volume colours ----
 //
-// WCAG 1.4.11 puts the floor for a graphical object at 3:1 against what sits next to it. For this
-// ramp the neighbour is NOT `--card`: it is the heatmap's own `defaultFill`, a grey composited over
-// the card, which is what an untouched muscle is painted with. Measured against `--card` the bottom
-// two stops read 2.04:1 and 2.60:1; against the fill they are worse, 1.65:1 and 2.11:1 — so a muscle
-// trained to a fifth of its target was indistinguishable from one never trained at all.
+// WCAG 1.4.11 puts the floor for a graphical object at 3:1 against what sits next to it. For the
+// body map the neighbour is NOT `--card`: it is the heatmap's own `defaultFill`, a grey composited
+// over the card, which is what an untouched muscle is painted with. (The old green ramp's bottom
+// two stops measured 1.65:1 and 2.11:1 against it, so a muscle trained to a fifth of its target
+// could not be told from one never trained.)
 //
-// Both operands are read out of the component rather than restated here, so editing either the ramp
-// or the fill is what re-runs this check.
+// Since #2554 the patches are the bars' own colours — the `--accent-green`, `--accent-amber` and
+// `--destructive` tokens, via `muscleVolumeColor` in `components/health/volume-band.ts` — and they
+// change with the theme, so each is scored in BOTH themes, at the card's worst brand hue.
+//
+// Both operands are read rather than restated: the fill from the component, the three colours from
+// the rule's own table in volume-band.ts, so editing either re-runs this check.
 const HEATMAP = path.join(__dirname, '..', 'components', 'muscle-heatmap.tsx');
+const VOLUME_BAND = path.join(__dirname, '..', 'components', 'health', 'volume-band.ts');
 const NON_TEXT_FLOOR = 3;
 
 function compositeLum(rgb255, a, bgOklch) {
@@ -305,41 +274,52 @@ function compositeLum(rgb255, a, bgOklch) {
 }
 
 const heatmapSrc = fs.readFileSync(HEATMAP, 'utf8');
-const rampSrc = /const VOLUME_TINT_STEPS = \[([^\]]*)\]/.exec(heatmapSrc);
+const bandSrc = fs.readFileSync(VOLUME_BAND, 'utf8');
 const fillSrc = /defaultFill="rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*([0-9.]+)\s*\)"/.exec(heatmapSrc);
-const ramp = rampSrc ? [...rampSrc[1].matchAll(/"(#[0-9a-fA-F]{6})"/g)].map(m => m[1]) : [];
+const tableSrc = /const TARGET_BAND_COLOR[^=]*=\s*\{([^}]*)\}/.exec(bandSrc);
+// Every `var(--token)` the rule can return for a trained muscle. `untrained` is the grey the
+// fill itself is, so it is not a patch colour and is excluded by name.
+const bandTokens = tableSrc
+  ? [...tableSrc[1].matchAll(/^\s*(\w+):\s*'var\(--([a-z-]+)\)'/gm)].filter(m => m[1] !== 'untrained').map(m => m[2])
+  : [];
 
 // A regex that stops matching is the failure this whole file is written to avoid — it would report
-// a clean ramp while measuring nothing.
-if (!ramp.length || !fillSrc || !dark.card) {
-  console.error('check-contrast: could not read the volume ramp, the default fill, or --card from');
-  console.error(`  ${path.relative(path.join(__dirname, '..'), HEATMAP)} / app/globals.css.`);
-  console.error('  Refusing to report the ramp as passing when nothing was measured.');
+// a clean palette while measuring nothing.
+if (bandTokens.length !== 3 || !fillSrc || !dark.card || !light.card) {
+  console.error('check-contrast: could not read the volume-band colours, the default fill, or --card from');
+  console.error(`  ${path.relative(path.join(__dirname, '..'), VOLUME_BAND)} / ${path.relative(path.join(__dirname, '..'), HEATMAP)} / app/globals.css.`);
+  console.error(`  (found ${bandTokens.length} band tokens, expected 3.) Refusing to report them as passing when nothing was measured.`);
   process.exit(1);
 }
 
 const fillRgb = [Number(fillSrc[1]), Number(fillSrc[2]), Number(fillSrc[3])];
 const fillAlpha = Number(fillSrc[4]);
-// `--card` takes the user's brand hue, so score the ramp at its WORST hue rather than at the
-// `var()` fallback — the same rule the token pairs above are held to.
-const hues = dark.card.hueVaries ? Array.from({ length: 360 / HUE_STEP }, (_, i) => i * HUE_STEP) : [dark.card[2]];
-const rampBad = [];
-for (const tint of ramp) {
-  let worst = Infinity, at = null;
-  for (const h of hues) {
-    const r = ratioFromLum(hexLum(tint), compositeLum(fillRgb, fillAlpha, [dark.card[0], dark.card[1], h]));
-    if (r < worst) { worst = r; at = h; }
+const bandBad = [];
+for (const [themeName, T] of [['light', light], ['dark', dark]]) {
+  // `--card` takes the user's brand hue, so score at its WORST hue rather than at the `var()`
+  // fallback — the same rule the token pairs above are held to.
+  const hues = T.card.hueVaries ? Array.from({ length: 360 / HUE_STEP }, (_, i) => i * HUE_STEP) : [T.card[2]];
+  for (const name of bandTokens) {
+    const tok = T[name];
+    if (!tok) {
+      console.error(`check-contrast: --${name} (a volume-band colour) is not parsed from the ${themeName} theme.`);
+      process.exit(1);
+    }
+    let worst = Infinity, at = null;
+    for (const h of hues) {
+      const r = ratioFromLum(lum(tok), compositeLum(fillRgb, fillAlpha, [T.card[0], T.card[1], h]));
+      if (r < worst) { worst = r; at = h; }
+    }
+    if (worst < NON_TEXT_FLOOR) bandBad.push({ themeName, name, r: worst, hue: at });
   }
-  if (worst < NON_TEXT_FLOOR) rampBad.push({ tint, r: worst, hue: at });
 }
-if (rampBad.length) {
-  console.error(`Volume-ramp stops below the ${NON_TEXT_FLOOR}:1 non-text floor against an untouched muscle:`);
-  for (const b of rampBad) {
-    console.error(`  ${b.tint} — ${b.r.toFixed(2)}:1 at brand hue ${b.hue}`);
+if (bandBad.length) {
+  console.error(`Volume-band colours below the ${NON_TEXT_FLOOR}:1 non-text floor against an untouched muscle:`);
+  for (const b of bandBad) {
+    console.error(`  --${b.name} (${b.themeName}) — ${b.r.toFixed(2)}:1 at brand hue ${b.hue}`);
   }
-  console.error('A stop below the floor cannot be told from a muscle with no sets logged, which is the');
-  console.error('one distinction the heatmap exists to draw. Lift the ramp — note that lifting only the');
-  console.error('bottom stops does not work, there is not enough room beneath the next one.');
+  console.error('A colour below the floor cannot be told from a muscle with no sets logged, which is the');
+  console.error('one distinction the heatmap exists to draw.');
   process.exit(1);
 }
 
@@ -350,4 +330,4 @@ if (staleExempt.length) {
   process.exit(1);
 }
 
-console.log(`check-contrast: ${results.length} token pairs meet WCAG AA (${GRANDFATHERED.size} grandfathered below minimum); opacity-modified text is at or above /${OPACITY_FLOOR} (${OPACITY_EXEMPT.size} non-text sites exempt); all ${ramp.length} volume-ramp stops clear ${NON_TEXT_FLOOR}:1 against an untouched muscle.`);
+console.log(`check-contrast: ${results.length} token pairs meet WCAG AA (${GRANDFATHERED.size} grandfathered below minimum); opacity-modified text is at or above /${OPACITY_FLOOR} (${OPACITY_EXEMPT.size} non-text sites exempt); all ${bandTokens.length} volume-band colours clear ${NON_TEXT_FLOOR}:1 against an untouched muscle in both themes.`);

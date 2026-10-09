@@ -19,11 +19,11 @@ import { metExclusionWindows, rmssdSamples, hrvMsFromSamples, nightlyHeartRate, 
 import { clampToDenseSensing } from '@/lib/sleep/sensing-span'
 import { computeDailySummaries, type NightInput } from '@trainingai/shared/health/daily-summary'
 import { computeHrv5MinSeries } from '@trainingai/shared/health/hrv-5min'
-import { computeChronicStress, chronicStressScoreToInt, usableGranularNights, CHRONIC_STRESS_MIN_DAYS, type ChronicStressNightSignals } from '@trainingai/shared/health/chronic-stress-assembly'
+import { computeChronicStress, chronicStressScoreToInt, chronicStressDiagnostics, usableGranularNights, CHRONIC_STRESS_MIN_DAYS, type ChronicStressDiagnostics, type ChronicStressNightSignals } from '@trainingai/shared/health/chronic-stress-assembly'
 import { illnessFromSummaries, illnessZScores } from '@trainingai/shared/health/illness-radar'
 import { computeSleepScore, sleepScoreBaselines } from '@trainingai/shared/health/sleep-score'
 import { computeReadinessComposite } from '@trainingai/shared/health/readiness-composite'
-import { buildDaytimeStressSeriesFromModel, type DhrvBaselines } from '@/lib/health/daytime-stress'
+import { collectStressInputs, buildDayStressSeries, nightHrvMsOf } from './stress-series'
 import { computeResilienceForDay, type DailyIndices } from '@/lib/health/stress-resilience'
 import type { SleepSession } from '@trainingai/shared/types'
 import { sourceRank } from '@trainingai/shared/health/source-rank'
@@ -96,14 +96,18 @@ export async function runOuraRollup(
   // pegged main thread on every deploy, measured in production. The persisted watermark says how
   // far the last successful run reached, so a cold start narrows from there like a warm one.
   // Null (no row, or a row from a previous clock epoch) still falls back to the full window.
-  const persistedSinceDs = fullHistory ? null
+  // Issue 2383 (item 4): a `dumpOnly` pass reads the whole promised 35 days. It must not inherit the
+  // watermark or the caller's span, which narrow an ingest's read to the last few days and made a
+  // dump for an older night answer "no BLE night".
+  const dumpOnly = opts?.dumpOnly === true
+  const persistedSinceDs = fullHistory || dumpOnly ? null
     : await io.readRollupWatermark(currentEpoch(anchors) ?? 0)
   // The run must cover BOTH: everything since the last successful rollup (the watermark) and
   // whatever this batch carried. Taking the caller's span alone was wrong — a batch ingested before
   // a restart, after the last rollup, sits older than the incoming batch's span and would never be
   // rolled up. Normally the watermark is the older of the two and wins; the caller's span wins only
   // when a batch back-fills data older than the watermark. Either way, the minimum is the safe floor.
-  const spans = [opts?.sinceDs, persistedSinceDs].filter((v): v is number => v != null)
+  const spans = [dumpOnly ? null : opts?.sinceDs, persistedSinceDs].filter((v): v is number => v != null)
   const effectiveSinceDs = spans.length > 0 ? Math.min(...spans) : null
   const incrementalFloorDs = effectiveSinceDs != null ? effectiveSinceDs - 3 * DS_PER_DAY : null
   const windowFloorDs = anchor.anchorDs - ROLLUP_WINDOW_DAYS * DS_PER_DAY
@@ -629,8 +633,14 @@ export async function runOuraRollup(
    * `ALWAYS_NIGHT_MIN_HOURS` short-circuits the circadian check, and the detector emitted a sleep
    * window over 468 logged steps to begin with. Both stay open on PS-17 — this makes the summary
    * pick the real night; it does not stop the phantom existing or being listed.
+   *
+   * #2487. `nightPeriodsByDate` also drops a period shorter than ALWAYS_NIGHT_MIN_HOURS that sat on
+   * the evening of its own wake date, so a date whose only night-band window is an evening bout gets
+   * no night here: no sleep fields, HRV, heart rate or BDI from that bout reach its summary row. The
+   * bout's own `sleep_sessions` row is still written above; only the date's night pick changes. Both
+   * calls take the user's timezone — they used to fall back to Brisbane.
    */
-  for (const period of nightPeriodsByDate(groupSleepPeriods(nightCandidates).nights).values()) {
+  for (const period of nightPeriodsByDate(groupSleepPeriods(nightCandidates, timezone).nights, timezone).values()) {
     const parts = period.windows
     const durs = parts.map(p => p.durationHours ?? 0)
     const totalSleep = durs.reduce((a, b) => a + b, 0)
@@ -682,6 +692,12 @@ export async function runOuraRollup(
   // downstream metric (this is exactly how SpO₂ went missing in prod while HRV
   // wrote, 2026-07-08). Errors are collected and returned, never thrown.
   const stepErrors: string[] = []
+  // Issue 2383 (item 4): the debug dump is a read. Everything above only reads and every write is in
+  // the steps below, so stopping here is what makes Sleep epochs > Compute and SleepNet > Run dump
+  // write nothing (they used to re-run the whole recent-window rollup).
+  if (dumpOnly) {
+    return { sleepSessions: 0, bodyMetricDays: 0, daysWritten: [], hrSeriesPoints: 0, wearDays: 0, stepErrors, debugNight }
+  }
   const step = async (name: string, fn: () => Promise<void>) => {
     try { await fn() } catch (err) {
       const msg = `${name}: ${err instanceof Error ? err.message : String(err)}`
@@ -689,6 +705,9 @@ export async function runOuraRollup(
       console.error('[oura-ble] aggregate step failed —', msg)
     }
   }
+  // Issue 2422: why chronic stress did or did not score on this pass. Returned with the result, so a
+  // Redecode's job row (`oura_redecode_jobs.result`) keeps it without a column of its own.
+  let chronicStress: ChronicStressDiagnostics | null = null
 
   if (sleepRows.length > 0) await step('sleep', async () => {
     // Own our derived rows: delete every BLE sleep row for the wake-days we're about to
@@ -697,9 +716,14 @@ export async function runOuraRollup(
     // window, the night's SECOND old cluster row survived and mergeByDate summed it back in
     // (07-09 stuck at 15.7h on Redecode). Keying delete on the wake-day is also robust to the
     // clock anchor drifting the derived sleep_start between drains.
+    //
+    // Issue 2546: "delete" is now a tombstone, and only for the rows this pass did not reproduce. A
+    // hard delete plus a reinsert under a fresh id left every device that had already pulled the
+    // night holding the old row as a ghost. Upsert first (a night at the same sleep_start keeps its
+    // id and is replaced or revived), then tombstone the leftovers, so the night is never absent.
     const dates = Array.from(new Set(sleepRows.map(r => r.date)))
-    await io.deleteBleSleepSessionsForDates(dates)
     await io.upsertSleepSessions(sleepRows)
+    await io.tombstoneBleSleepSessionsExcept(dates, sleepRows.map(r => r.sleepStart))
   })
 
   // body_metrics per local day: HRV + RHR from each night (keyed to the wake
@@ -1035,20 +1059,9 @@ export async function runOuraRollup(
     await step('resilience', async () => {
       const dhrvModel = await io.readDaytimeHrvModel()
       const toMs = (ds: number) => toDate(ds).getTime()
-      const collect = <T>(rows: { ds: unknown; decoded: unknown }[], key: string, map: (v: number, tsMs: number) => T): T[] => {
-        const out: T[] = []
-        for (const r of rows) { const t = toMs(Number(r.ds)); for (const v of numArr(r.decoded, key)) out.push(map(v, t)) }
-        return out
-      }
-      const allTemp = [
-        ...collect(tempRows, 'temps_c', (valueC, tsMs) => ({ tsMs, valueC })),
-        ...collect(sleepSignal.filter(r => Number(r.tag) === 0x75), 'temps_c', (valueC, tsMs) => ({ tsMs, valueC })),
-      ].sort((a, b) => a.tsMs - b.tsMs)
-      const allMet = collect(metRows, 'met', (value, tsMs) => ({ tsMs, value })).sort((a, b) => a.tsMs - b.tsMs)
-      const allHr = [
-        ...collect(ibiRows, 'hr_bpm', (bpm, tsMs) => ({ tsMs, bpm })),
-        ...collect(aohrRows, 'bpm', (bpm, tsMs) => ({ tsMs, bpm })),
-      ].filter(h => h.bpm >= 35 && h.bpm <= 200).sort((a, b) => a.tsMs - b.tsMs)
+      // Issue 2236: the inputs and the per-day series are assembled in `stress-series.ts`, which the
+      // stress-bucket backfill calls too — one definition of the series, two callers.
+      const stressInputs = collectStressInputs(rollupRows, toMs)
 
       const sleepByDate = new Map(sleepRows.map(sr => [sr.date, sr]))
       const dayMinus = (dayStr: string, n: number): string => {
@@ -1092,9 +1105,7 @@ export async function runOuraRollup(
 
         // Night HRV baseline (ms): the smoothed personal baseline (×8 fixed-point), else the
         // night's own average as a cold-start proxy. Doubles as the daytime-stress scaling anchor.
-        const nightHrvMs = latest.hrvBaseline != null ? latest.hrvBaseline.meanX8 / 8 : latest.hrvAvgMs
-        const dayTemp = allTemp.filter(s => s.tsMs >= dayStartMs && s.tsMs < dayEndMs)
-        const tempBaseline = dayTemp.length ? dayTemp.reduce((s, t) => s + t.valueC, 0) / dayTemp.length : null
+        const nightHrvMs = nightHrvMsOf(latest)
 
         // D5: own-model daytime-HRV (dhrvModel) replaces the ONNX imputation in production. No
         // ONNX fallback when dhrvModel is null (cold start / not enough training data yet) —
@@ -1108,21 +1119,18 @@ export async function runOuraRollup(
         // which put two numbers behind one metric: measured in production, the sign disagreed on
         // **6 of 8** days and high-stress minutes by 4–8×.
         let stressSummary: ReturnType<typeof summarizeStressDay> = null
-        if (dhrvModel && nightHrvMs != null && nightHrvMs > 0 && latest.rhrLowBpm != null && latest.rhrLowBpm > 0 && tempBaseline != null && tempBaseline > 0) {
-          const baselines: DhrvBaselines = { dhrvBaseline: nightHrvMs, hrBaseline: latest.rhrLowBpm, tempBaseline }
-          const pts = buildDaytimeStressSeriesFromModel(
-            dayTemp,
-            allMet.filter(s => s.tsMs >= dayStartMs && s.tsMs < dayEndMs),
-            allHr.filter(s => s.tsMs >= dayStartMs && s.tsMs < dayEndMs),
-            dhrvModel, baselines, dayStartMs, dayEndMs,
-            // Both nights that can touch this day: the one that ENDED this morning and the one that
-            // STARTS tonight. Measured 2026-09-16, the owner's stored buckets ran densest in Brisbane
-            // 00:00–06:59 (289 of 672) and 22:00–23:59 — the evening tail is the second night, and
-            // filtering only on the wake-keyed row for `day` would leave it in.
-            sleepSpan.filter(w => w.sleepEnd.getTime() > dayStartMs && w.sleepStart.getTime() < dayEndMs),
-          )
-          series = pts.map(p => ({ tMs: p.t, level: p.stressLevel }))
-          stressSummary = summarizeStressDay(pts)
+        // Both nights that can touch this day (the one that ENDED this morning and the one that
+        // STARTS tonight) are dropped inside buildDayStressSeries. Measured 2026-09-16, the owner's
+        // stored buckets ran densest in Brisbane 00:00–06:59 (289 of 672) and 22:00–23:59 — the
+        // evening tail is the second night, and filtering only on the wake-keyed row for the day
+        // would leave it in.
+        const built = buildDayStressSeries({
+          dayStartMs, dayEndMs, inputs: stressInputs, model: dhrvModel,
+          nightHrvMs, rhrLowBpm: latest.rhrLowBpm, sleepWindows: sleepSpan,
+        })
+        if (built.skipped == null) {
+          series = built.points.map(p => ({ tMs: p.t, level: p.stressLevel }))
+          stressSummary = summarizeStressDay(built.points)
         }
 
         // TN-3a — persist the buckets. `summarizeStressDay` reduces this series to three daily
@@ -1242,6 +1250,10 @@ export async function runOuraRollup(
       const granularNights = usableGranularNights(summaryRows, chronicStressSignalsByDate)
       const res = computeChronicStress(summaryRows, chronicStressSignalsByDate)
       const score = res ? chronicStressScoreToInt(res.chronicStressScore) : null
+      // Read from the model's own per-series counts; changes nothing the model returned. Logged as
+      // well as returned because the ingest path keeps no job row.
+      chronicStress = chronicStressDiagnostics(summaryRows, chronicStressSignalsByDate, res)
+      if (chronicStress.reason !== 'scored') console.info('[oura-ble] chronic stress not scored —', JSON.stringify(chronicStress))
       await io.upsertDailyDerived(summaryRows[summaryRows.length - 1].date, {
         chronicStressGranularNights: granularNights,
         ...(res != null && score != null ? {
@@ -1284,5 +1296,6 @@ export async function runOuraRollup(
     wearDays: wearRows.length,
     stepErrors,
     debugNight,
+    chronicStress,
   }
 }

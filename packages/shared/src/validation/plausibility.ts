@@ -183,6 +183,46 @@ export function sleepImplausibleReason(sl: SleepPlausibilityInput): string | nul
 }
 
 /**
+ * #2338 — the bounds on a night the user enters by hand (bed time → wake time).
+ *
+ * There was no bound to reuse: every existing sleep check compares a device's own fields against
+ * each other ({@link sleepImplausibleReason}), and a typed night has only its two ends. These reject
+ * the mistyped (a wake time before the bed time, a.m./p.m. swapped into a 22-hour night, a year
+ * slip), not the unusual:
+ *
+ * - **At least one hour.** Shorter is a nap or a slip of the thumb, and the entry is for nights.
+ * - **At most sixteen hours** — the same ceiling the ring's rollup puts on one sleep window
+ *   (`MAX_SLEEP_DS` in `lib/oura-ble/rollup/run.ts`), so a typed night can never be longer than a
+ *   measured one is allowed to be.
+ * - **Woken by now**, with five minutes for a clock that runs a little ahead.
+ * - **Within the last thirty days.** Further back is outside every window that reads sleep (the
+ *   sleep list, readiness and its baselines read 28-30 days), so it would be stored and never seen.
+ */
+export const MANUAL_SLEEP_MIN_HOURS = 1
+export const MANUAL_SLEEP_MAX_HOURS = 16
+export const MANUAL_SLEEP_MAX_AGE_DAYS = 30
+export const MANUAL_SLEEP_CLOCK_SKEW_MS = 5 * 60_000
+
+/** Why a typed night cannot be stored, or null when it can. `now` is passed in so a test can pin it. */
+export function manualSleepImplausibleReason(
+  w: { sleepStart: Date; sleepEnd: Date },
+  now: Date,
+): string | null {
+  const startMs = w.sleepStart.getTime()
+  const endMs = w.sleepEnd.getTime()
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return 'bed time or wake time is not a time'
+  if (endMs <= startMs) return 'wake time is not after bed time'
+  const hours = (endMs - startMs) / 3_600_000
+  if (hours < MANUAL_SLEEP_MIN_HOURS) return `a ${hours.toFixed(2)} h night is shorter than ${MANUAL_SLEEP_MIN_HOURS} h`
+  if (hours > MANUAL_SLEEP_MAX_HOURS) return `a ${hours.toFixed(1)} h night is longer than ${MANUAL_SLEEP_MAX_HOURS} h`
+  if (endMs > now.getTime() + MANUAL_SLEEP_CLOCK_SKEW_MS) return 'wake time is in the future'
+  if (endMs < now.getTime() - MANUAL_SLEEP_MAX_AGE_DAYS * 86_400_000) {
+    return `wake time is more than ${MANUAL_SLEEP_MAX_AGE_DAYS} days ago`
+  }
+  return null
+}
+
+/**
  * No human has lifted this much, so an estimated 1RM above it is arithmetic, not strength.
  * The heaviest deadlift ever recorded is ~501 kg; the ceiling sits clear of it so a real lift
  * can never be rejected.
@@ -202,4 +242,20 @@ export const MAX_PLAUSIBLE_ONE_RM_KG = 600
  */
 export function oneRmImplausible(estimated1rm: number): boolean {
   return !Number.isFinite(estimated1rm) || estimated1rm > MAX_PLAUSIBLE_ONE_RM_KG
+}
+
+// ── Own calorie target (issue 2622) ──────────────────────────────────────────────────────────────
+// The user's own daily target replaces the worked-out budget everywhere, so it is bounded to a range
+// a person could actually eat in a day. It is deliberately NOT floored at max(RMR, 1,200): the target
+// is the owner's choice. 800 is below any resting rate and above a fast; 10,000 is above any real
+// day's burn. The same bounds guard the Goals field and the PATCH route.
+export const MIN_OWN_CALORIE_TARGET_KCAL = 800
+export const MAX_OWN_CALORIE_TARGET_KCAL = 10_000
+
+/** Why this is not a usable own calorie target, in words fit for an inline error, or null if it is. */
+export function ownCalorieTargetReason(kcal: number): string | null {
+  if (!Number.isFinite(kcal) || !Number.isInteger(kcal)) return 'Enter a whole number of kcal.'
+  if (kcal < MIN_OWN_CALORIE_TARGET_KCAL) return `Enter at least ${MIN_OWN_CALORIE_TARGET_KCAL.toLocaleString()} kcal.`
+  if (kcal > MAX_OWN_CALORIE_TARGET_KCAL) return `Enter ${MAX_OWN_CALORIE_TARGET_KCAL.toLocaleString()} kcal or less.`
+  return null
 }

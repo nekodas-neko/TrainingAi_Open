@@ -24,7 +24,7 @@ import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/s
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { getDailyGoals, type DailyGoals } from '@trainingai/shared/health/daily-goals'
 import { hrMaxFromAge, computeHrZones, moderateIntensityBpm } from '@trainingai/shared/health/hr-zones'
-import { accumulateZoneSeconds, activeMinutesFromReadings } from '@trainingai/shared/health/zone-minutes'
+import { activeMinutesFromReadings } from '@trainingai/shared/health/zone-minutes'
 import { computeMovedHours, moveHoursGoal } from '@trainingai/shared/health/hourly-movement'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { baselineZ } from '@trainingai/shared/health/personal-baseline'
@@ -33,7 +33,7 @@ import { resilienceLevelToBand, observeResilienceCoverage } from '@/lib/health/s
 import { computeIllnessRadar, illnessAdvisory, illnessZScores, type IllnessFlag, type IllnessBiomarker, type IllnessBiomarkerKey } from '@trainingai/shared/health/illness-radar'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
 import { scoreAvailability, metricAvailability, trailingBaselineZ, type ReadinessInputKey, type ScoreAvailability, type MetricAvailability } from '@/lib/health/score-availability'
-import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperature-baseline-health'
+import { connectedSources, CONNECTED_SOURCE_WINDOW_DAYS, type ConnectedSources } from '@trainingai/shared/health/connected-sources'
 
 /**
  * Early-deload trigger: a low readiness score *and* an elevated acute:chronic load ratio.
@@ -121,7 +121,16 @@ export interface ActivityBlendResult {
 }
 
 export interface ReadinessScoreResponse {
-  score: number
+  /**
+   * The readiness score, or `null` when there is no recovery signal to score from (#2336).
+   *
+   * It used to be a number always: with no sleep, RHR or HRV the recovery components are all 0 and
+   * only load contributed, so a user with no ring data got `5` and "Low", and the rest-day card told
+   * them to rest fully. `null` is the same condition `readinessDisplayScore` already encoded, now on
+   * the field the consumers actually read; the rest-day guidance and the check-in headers already
+   * have a branch for it.
+   */
+  score: number | null
   label: 'High' | 'Moderate' | 'Low'
   components: {
     sleep: number   // 0–40 (custom signal — kept for fallback + ACWR display)
@@ -159,6 +168,15 @@ export interface ReadinessScoreResponse {
    * "no metrics".
    */
   availability?: MetricAvailability[]
+  /**
+   * Issue 2613. Which device sources the user has connected: ring, strap, Health Connect. Definitions
+   * in `@trainingai/shared/health/connected-sources` (strap means strap-sourced heart rate seen in
+   * the last `CONNECTED_SOURCE_WINDOW_DAYS` days).
+   *
+   * **Optional, and absent means unknown.** A payload cached on the device before this field existed
+   * lacks it, and so does one built while the source lookup failed. Never read absent as `false`.
+   */
+  connectedSources?: ConnectedSources
   // Oura fields — null when no Oura data available
   ouraScore: number | null
   // Temperature deviation vs personal baseline (°C). BLE-derived (oura_daily_summary.temp_dev_c,
@@ -271,7 +289,11 @@ export interface ReadinessScoreResponse {
   } | null
 }
 
-/** Exported for TN-6a's pass test: the ladder's contribution has to be measured, not read. */
+/**
+ * Exported for TN-6a's pass test: the ladder's contribution has to be measured, not read.
+ * issue 2151: no production path calls this any more (its only caller was the Oura-score arm, which
+ * never ran). It stays, with `temp-penalty-suspension.test.ts`, as the record of what the ladder did.
+ */
 export function computeBlendedScore(
   ouraScore: number,
   acwr: number | null,
@@ -348,7 +370,16 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   const from28dIso  = toAestDay(from28dDate, tz)
   const from7dIso   = toAestDay(new Date(todayMid.getTime() - 7 * 86_400_000), tz)
 
-  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents] = await Promise.all([
+  // Issue 2613: a failed lookup leaves the field out (unknown), never false.
+  const connectedSourcesP = (async () => {
+    const [ringSamples, recent] = await Promise.all([
+      repo.hasOuraBleSamples(userId),
+      repo.getRecentSourceFacts(userId, new Date(todayMid.getTime() - CONNECTED_SOURCE_WINDOW_DAYS * 86_400_000)),
+    ])
+    return connectedSources({ ringSamples, ...recent })
+  })().catch(() => undefined)
+
+  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary] = await Promise.all([
     repo.listBodyMetrics(userId, from28dIso, todayIso),
     repo.listSleepSessions(userId, from28dIso, todayIso),
     repo.getWorkoutSessionsFrom(userId, from28dDate),
@@ -363,6 +394,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     repo.getUserGoals(userId).catch(() => null),
     // TN-46: context for a flagged day, never an input to the score. A failure costs the context only.
     (async () => repo.listDoseEvents(userId, shiftDateStr(todayIso, -DOSE_EFFECT_LOOKBACK_DAYS), todayIso))().catch(() => []),
+    connectedSourcesP,
   ])
 
   const derivedToday = derivedTodayRows.find(r => r.day === todayIso) ?? null
@@ -444,6 +476,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   const load = computeVolumeAcwr(
     recentSessions.map(ws => ({ startedAt: ws.startedAt, volumeKg: ws.exercises.reduce((s2, ex) => s2 + (ex.volume ?? 0), 0) })),
     todayMid,
+    { tz },
   )
   const todayWorkoutVolumeKg = load.todayVolumeKg
 
@@ -551,11 +584,6 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // Temp deviation, BLE-first: the rollup already persists last night's deviation vs the
   // prior night's baseline (daily-summary.ts → oura_daily_summary.temp_dev_c). The Cloud
   // field froze at the re-key — it survives only as an explicitly-tagged fallback.
-  // TN-6a. The 28-day summary window is already loaded above, so the suspension condition costs
-  // one pass over it — no extra query, and it re-evaluates on every request, which is what lets it
-  // clear itself the moment a Redecode re-derivation centres the stored deviations.
-  const tempLadderTrusted = isTemperatureBaselineCentred(dailySummaries.map(d => d.tempDevC))
-
   const bleTempDevC = latestSummary?.tempDevC ?? null
   const cloudTempDevC = ouraToday?.temperatureDeviation ?? null
   const temperatureDeviation = bleTempDevC ?? cloudTempDevC
@@ -660,16 +688,10 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   let score: number
   let source: ReadinessScoreResponse['source']
 
-  if (ouraToday?.readinessScore != null) {
-    const blended = computeBlendedScore(
-      ouraToday.readinessScore,
-      acwr,
-      ouraToday.temperatureDeviation ?? null,
-      tempLadderTrusted,
-    )
-    score  = blended.score
-    source = blended.source
-  } else if (ownComposite) {
+  // issue 2151: there used to be a first arm here that blended Oura's own readiness score with ACWR
+  // and the temperature ladder. `oura_daily.readiness_score` has been NULL since the 2026-07-07
+  // re-key (the Cloud integration is gone), so it never ran; only these arms do.
+  if (ownComposite) {
     score  = ownComposite.score
     source = 'custom'
   } else {
@@ -685,16 +707,13 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
 
   const label: ReadinessScoreResponse['label'] = scoreBand(score).label
 
-  // Readiness for the chip/detail: Oura's when present, else our composite — but only when we
+  // Readiness for the chip/detail: our composite — but only when we
   // actually have a recovery signal (an HRV or RHR baseline, or the A4 daily_summary composite).
   // Without one the composite is just sleep+load and would mislead, so leave it null and let
   // the chip hide itself.
-  const readinessDisplayScore = ouraToday?.readinessScore != null
-    ? score
-    : (baselineHrv != null || baselineRhr != null || ownComposite != null) ? score : null
+  const readinessDisplayScore = (baselineHrv != null || baselineRhr != null || ownComposite != null) ? score : null
 
-  const hasSufficientData = ouraToday?.readinessScore != null ||
-    (sleepHours != null && (baselineHrv != null || baselineRhr != null || ownComposite != null))
+  const hasSufficientData = sleepHours != null && (baselineHrv != null || baselineRhr != null || ownComposite != null)
 
   // Early deload — the periodization modes the app drives, and not already in deload.
   //
@@ -742,7 +761,9 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
       const { phase } = getCurrentPhase(phaseList, program.sessionsPerCycle, sessionsCount)
       inDeloadPhase = phase.phaseType === 'deload'
     }
-    if (!inDeloadPhase && (baselineHrv != null || ouraToday?.readinessScore != null) && acwr != null) {
+    // issue 2151: early deload is gated on the HRV baseline alone. Oura's readiness score used to be
+    // a second way in, but it is permanently null, so it never opened this gate.
+    if (!inDeloadPhase && baselineHrv != null && acwr != null) {
       earlyDeloadRecommended = score < EARLY_DELOAD_SCORE_MAX && acwr > EARLY_DELOAD_ACWR_MIN
       if (earlyDeloadRecommended) {
         earlyDeload = {
@@ -892,20 +913,20 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     console.error('[readiness-score] derived persist merge refused (read still served):', err)
   }
 
-  // An Oura readiness score is a whole-picture number by construction, so it reports as full
-  // regardless of which of our own inputs happen to be present today.
-  const availability: ScoreAvailability = ouraToday?.readinessScore != null
-    ? { available: ['sleep', 'hrv', 'restingHeartRate', 'temperature', 'activity'], missing: [], confidence: 'full', limited: false }
-    : scoreAvailability({
-        sleep: sleepScore100 != null,
-        hrv: baselineHrv != null || hrvZ != null,
-        restingHeartRate: baselineRhr != null || rhrZ != null,
-        temperature: temperatureDeviation != null || tempZ != null,
-        activity: ownActivityScore != null,
-      })
+  const availability: ScoreAvailability = scoreAvailability({
+    sleep: sleepScore100 != null,
+    hrv: baselineHrv != null || hrvZ != null,
+    restingHeartRate: baselineRhr != null || rhrZ != null,
+    temperature: temperatureDeviation != null || tempZ != null,
+    activity: ownActivityScore != null,
+  })
 
   return {
-    score, label,
+    // `score` is what a reader shows and acts on, so it is the display score: null without a recovery
+    // signal. The local `score` above stays a number because the early-deload gate and the band label
+    // read it, and the gate is itself closed without a recovery baseline. The load component stays in
+    // `components` below, so the breakdown still shows what did contribute.
+    score: readinessDisplayScore, label,
     components: { sleep: sleepComponent, hrv: hrvScore, rhr: rhrScore, load: loadScore },
     hasSufficientData,
     earlyDeloadRecommended,
@@ -919,10 +940,19 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     // contributor breakdown of their own, so they can only report present/absent honestly — which is
     // still more than the surfaces had.
     availability: [
-      metricAvailability('readiness', score, ownComposite?.contributors ?? {}),
+      // Keyed on the DISPLAY score: derived from the raw one it read `present` for a score of 5 built
+      // from load alone, and the chip showed a dash with no reason (#2336).
+      metricAvailability('readiness', readinessDisplayScore, ownComposite?.contributors ?? {}),
       metricAvailability('sleep', sleepScore100),
       metricAvailability('activity', ownActivityScore),
+      // #2423. The two lowest-coverage pillars. Present/absent only, like sleep and activity: neither
+      // has contributors, and inventing some so they could say `awaiting_baseline` would be a claim
+      // nothing computes. Stress is present when today's high-stress minutes were derived (0 is a
+      // real reading); resilience when any recent day published a level.
+      metricAvailability('daytimeStress', derivedToday?.stressHighMinutes ?? null),
+      metricAvailability('resilience', latestResilience?.resilienceLevel ?? null),
     ],
+    ...(connectedSourcesSummary ? { connectedSources: connectedSourcesSummary } : {}),
     ouraScore:               ouraToday?.readinessScore             ?? null,
     temperatureDeviation,
     temperatureDeviationSource,

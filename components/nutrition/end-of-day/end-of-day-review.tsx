@@ -16,24 +16,18 @@ import { prefillEveningScales } from '@trainingai/shared/nutrition/day-checkin-p
 import { buildTodayInsight } from '@trainingai/shared/nutrition/day-insight'
 import type { EveningScaleKey } from '@trainingai/shared/types/day-checkin'
 import type { FoodLogWithItem, MealType, NutritionTargets } from '@trainingai/shared/types/nutrition'
-import type { BodyBatteryLabel } from '@trainingai/shared/health/body-battery-band'
 import { DaySummaryCard } from './day-summary-card'
 import { MealBackfillSection } from './meal-backfill-section'
 import { WellnessSection } from './wellness-section'
 import { JournalSection } from './journal-section'
 import { TodayInsightCard } from './today-insight-card'
+import { measuredBattery, type EndOfDayBattery } from './measured-battery'
 import { DayDigestCard } from './day-digest-card'
 import { DayReadThroughSection } from './day-read-through-section'
 import { DayTrendsSection } from './day-trends-section'
 import { visibleReviewSteps, STEP_TITLES } from './review-steps'
 
-interface BodyBattery {
-  current: number
-  label: BodyBatteryLabel
-  trend: string
-  charged: number
-  drained: number
-}
+type BodyBattery = EndOfDayBattery
 
 interface Props {
   open: boolean
@@ -43,6 +37,9 @@ interface Props {
   date: string
   userId?: string
   targets: NutritionTargets | null
+  /** #2071. The day's calorie budget (`budgetProvenance(...).total`), or null when there is none. The
+   *  summary prints this, never `targets.calories`, which is the typed goal. */
+  dayBudgetKcal: number | null
   onLogged: (log?: FoodLogWithItem) => void
 }
 
@@ -54,7 +51,7 @@ const DEFAULT_SCALES: Record<EveningScaleKey, number> = {
   lateHeavyMeal: 3,
 }
 
-export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, targets, onLogged }: Props) {
+export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, targets, dayBudgetKcal, onLogged }: Props) {
   const tz = useUserTimezone()
   const pageGradient = usePageGradient('sleep')
   const isLight = useHeroColorScheme() === 'light'
@@ -120,7 +117,7 @@ export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, t
         setJournal(saved.journal ?? '')
       } else {
         const pre = prefillEveningScales({
-          batteryLabel: (bb?.label ?? null) as 'Charged' | 'Good' | 'Low' | 'Drained' | null,
+          batteryLabel: (measuredBattery(bb)?.label ?? null) as 'Charged' | 'Good' | 'Low' | 'Drained' | null,
           steps,
           waterMl,
         })
@@ -151,9 +148,10 @@ export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, t
     { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 },
   )
 
+  const measured = measuredBattery(battery)
   const insight = buildTodayInsight({
-    batteryCurrent: battery?.current ?? null,
-    batteryDrained: battery?.drained ?? null,
+    batteryCurrent: measured?.current ?? null,
+    batteryDrained: measured?.drained ?? null,
     scales,
     soreMuscles,
   })
@@ -246,7 +244,7 @@ export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, t
               {/* The narrative opener, above the numbers it is talking about (Q-112a), then the
                   day's totals, then the read-through those totals came out of (Q-112b). */}
               <DayDigestCard active={open} />
-              <DaySummaryCard totals={totals} targets={targets} battery={battery} />
+              <DaySummaryCard totals={totals} targets={targets} dayBudgetKcal={dayBudgetKcal} battery={measured} />
               <DayTrendsSection date={date} />
               <DayReadThroughSection date={date} tz={tz} logs={logs} />
             </>

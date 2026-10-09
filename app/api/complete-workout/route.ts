@@ -26,9 +26,8 @@ export async function POST(req: NextRequest) {
   const parsed = CompleteWorkoutPayloadSchema.safeParse(read.body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 
-  let result: { alreadyCompleted: boolean; programSessionId: string | null };
   try {
-    result = await completeWorkoutFromPayload(userId, parsed.data);
+    await completeWorkoutFromPayload(userId, parsed.data);
   } catch (err) {
     // K8: the heaviest offline-first side-effect route reported nothing. A drifted
     // prod-data failure here dead-letters the outbox mutation (K3) with no server

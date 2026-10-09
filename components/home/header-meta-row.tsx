@@ -25,13 +25,20 @@ const HeaderChips = dynamic(() => import('@/components/home/header-chips').then(
  * it restores the two-line wrap it fixed. `overflow-hidden` on the chip row is the floor for a future
  * fourth chip — clipped inside the row rather than spilling across the action buttons.
  *
+ * **#2361: the chip row wraps instead of clipping.** The row is 196 px at 384 dp and the sunny-day
+ * chips measure 200–209 px (`UV 11` is 208.6), so the last chip lost up to 13 px and its right border.
+ * `flex-wrap` lets a chip that does not fit drop to a second line, whole. On every day the chips fit,
+ * nothing wraps and the row is unchanged, so this is invisible until the row would otherwise clip —
+ * and it holds for any width the weather chip takes, because nothing here is sized to it.
+ * `overflow-hidden` stays as the floor for a single chip wider than the column.
+ *
  * **The date still truncates**, but now only against the full column, which `EEEE d MMMM` (at most
  * 158.7 px) fits with room to spare.
  */
 export function HeaderMetaRow({ tz }: { tz: string }) {
   return (
     <div className="min-w-0">
-      <div className="flex items-center gap-2 min-w-0 overflow-hidden">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0 overflow-hidden">
         <HeaderChips />
       </div>
       <p className="mt-[3px] text-xs text-muted-foreground truncate">

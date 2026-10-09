@@ -14,6 +14,7 @@ import { todayInTz } from "@trainingai/shared/date-utils";
 import type { SupplementVial } from "@trainingai/shared/types/supplement";
 import { concentrationWorking, doseWorking, planDose, DEFAULT_BARREL_UNITS } from "./vial-plan";
 import { WeightResponseCard } from "./weight-response-card";
+import { HeartResponseCard } from "./heart-response-card";
 import { VialOpenedNote } from "./vial-opened-note";
 import { openedOnBounds, openedOnProblem } from "./vial-date";
 
@@ -243,6 +244,9 @@ export function VialSheet({ open, onOpenChange, supplementId, supplementName, de
           </section>
 
           <WeightResponseCard userId={userId} sinceDate={current?.openedOn ?? null} />
+
+          {/* Issue 2152. Under Weight response, one section per dose amount. */}
+          <HeartResponseCard supplementId={supplementId} supplementName={supplementName} userId={userId} />
         </div>
 
         <div className="flex-none px-4 pt-2 border-t">

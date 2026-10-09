@@ -13,6 +13,11 @@
 // Extending this is deliberately cheap — add a row to READERS or a case to the destructive block.
 // The full uncovered list is in `docs/reviews/2026-08-09-ownership-mutation-coverage.md`.
 //
+// Part 2 (#2425): `repository-ownership-scoping-sweep.test.ts` seeds the other user in EVERY table
+// and holds a row per method the 2026-10-07 re-run found uncovered (308 of 353 predicates survived
+// this file alone). New coverage generally belongs there; re-measure with
+// `scripts/ownership-mutation-sweep/` — `docs/reviews/2026-10-07-ownership-mutation-coverage.md`.
+//
 // Runs only against a real local dev Postgres — skips cleanly elsewhere (CI's "Tests" job has no
 // DATABASE_URL) so CI stays green.
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
@@ -356,9 +361,13 @@ describe.skipIf(!canRun)('repository ownership scoping (Q-155)', () => {
 
   it('deleteMealType cannot delete another user\'s meal type', async () => {
     await repo.deleteMealType(bIds.emptyMealType, USER_A).catch(() => {})
+    // deleteMealType is a SOFT delete: it sets deleted_at and leaves the name alone. Asserting only
+    // on the name — as this did until #2425 — could never fail, and the 2026-10-07 sweep found the
+    // predicate surviving here. The seventh unfalsifiable assertion in this file.
     const { rows } = await pool.query(
-      `SELECT name FROM meal_types WHERE id = $1`, [bIds.emptyMealType])
+      `SELECT name, deleted_at FROM meal_types WHERE id = $1`, [bIds.emptyMealType])
     expect(rows).toHaveLength(1)
+    expect(rows[0].deleted_at).toBeNull()
     expect(rows[0].name).toBe('B SECRET SNACK')
   })
 

@@ -122,31 +122,65 @@ export function quoteIdent(id: string): string {
   return `"${id.replace(/"/g, '""')}"`
 }
 
+/** `timestamptz::text` as Postgres prints it (`2026-01-15 12:00:00.123456+00`), to an ISO string that
+ *  keeps every fractional digit — but ONLY when there are digits below the millisecond. A JS `Date`
+ *  holds milliseconds and a primary key can hold microseconds, so two keys differing only below the
+ *  millisecond would collapse to one on restore. `null` (keep the driver's value) for anything with
+ *  millisecond precision or less, and for text that is not a finite timestamptz. */
+export function subMillisecondIso(text: string): string | null {
+  const m = /^(\d{4}-\d\d-\d\d) (\d\d:\d\d:\d\d)(?:\.(\d+))?([+-]\d\d)(?::?(\d\d))?$/.exec(text)
+  if (!m || !m[3] || m[3].length <= 3 || /^0*$/.test(m[3].slice(3))) return null
+  const whole = Date.parse(`${m[1]}T${m[2]}${m[4]}:${m[5] ?? '00'}`)
+  if (Number.isNaN(whole)) return null
+  return new Date(whole).toISOString().replace(/\.000Z$/, `.${m[3].padEnd(6, '0')}Z`)
+}
+
 /**
  * Streams one table's rows via keyset pagination on its primary key — never a single buffered
  * `SELECT *`, which is the defect the plan's §7 found in `/api/export`'s per-table reads (harmless
  * at 26 small tables, an OOM the moment a bulk table is added). `chunkSize` rows per query keeps
  * each query well inside the readonly pool's 10s statement_timeout without touching that setting.
+ *
+ * **The cursor is Postgres's own text for each key column, not the driver's value.** A `timestamptz`
+ * arrives as a JS `Date` (milliseconds) while Postgres stores microseconds, so a cursor rebuilt from
+ * the `Date` sits below the real last key and the next page returns that row again (issue 2645).
+ * Each key column is also selected `::text` (`__pk0`…); the next page binds those strings and
+ * Postgres parses them at full precision. The helper columns are stripped before a row is yielded.
+ * A key timestamp with sub-millisecond digits is also EMITTED with them (ISO string), because the
+ * millisecond `Date` would collide with its neighbour on restore; every other row is emitted
+ * exactly as before.
  */
 export async function* streamTableRows(
   pool: Pool, table: string, pkCols: string[], chunkSize = 5_000,
   since?: { column: string; date: Date },
 ): AsyncGenerator<Record<string, unknown>> {
   const cols = pkCols.map(quoteIdent).join(', ')
-  let cursor: unknown[] | null = null
+  const keyText = pkCols.map((c, i) => `${quoteIdent(c)}::text AS ${quoteIdent(`__pk${i}`)}`).join(', ')
+  let cursor: string[] | null = null
   for (;;) {
-    const params: unknown[] = cursor ?? []
+    const params: unknown[] = cursor ? [...cursor] : []
     const clauses: string[] = []
     if (cursor) clauses.push(`(${cols}) > (${pkCols.map((_, i) => `$${i + 1}`).join(', ')})`)
     if (since) { params.push(since.date); clauses.push(`${quoteIdent(since.column)} >= $${params.length}`) }
     const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : ''
     const { rows } = await pool.query(
-      `SELECT * FROM claude_ro.${quoteIdent(table)} ${where} ORDER BY ${cols} LIMIT ${chunkSize}`,
+      `SELECT *, ${keyText} FROM claude_ro.${quoteIdent(table)} ${where} ORDER BY ${cols} LIMIT ${chunkSize}`,
       params,
     )
-    for (const row of rows) yield row
+    let lastKey: string[] = []
+    for (const row of rows) {
+      lastKey = pkCols.map((_, i) => row[`__pk${i}`] as string)
+      for (const [i, c] of pkCols.entries()) {
+        delete row[`__pk${i}`]
+        if (row[c] instanceof Date) {
+          const exact = subMillisecondIso(lastKey[i])
+          if (exact) row[c] = exact
+        }
+      }
+      yield row
+    }
     if (rows.length < chunkSize) return
-    cursor = pkCols.map(c => rows[rows.length - 1][c])
+    cursor = lastKey
   }
 }
 

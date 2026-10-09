@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mapExerciseTypeToActivityType, HC_SYNC_READ_TYPES, HC_ENRICH_READ_TYPES, toLocalDate, hourInTz } from '../health-connect-sync'
+import { mapExerciseTypeToActivityType, HC_SYNC_READ_TYPES, HC_ENRICH_READ_TYPES, toLocalDate, hourInTz, localDateTimeToIso, syncWindowIso, sessionClockTimes } from '../health-connect-sync'
 
 describe('mapExerciseTypeToActivityType', () => {
   it('maps known Health Connect exercise types to activity_types slugs', () => {
@@ -87,5 +87,77 @@ describe('TN-44 — Health Connect buckets in the USER\'s timezone, not the devi
     const iso = '2026-03-01T14:00:00.000Z'
     expect(hourInTz(iso, BRISBANE)).toBe(0)
     expect(toLocalDate(iso, BRISBANE)).toBe('2026-03-02')
+  })
+})
+
+
+// #2438 — three places built or formatted an instant in a zone other than the user's, which shows only
+// when the phone's zone differs from the profile zone (or the user is outside Brisbane). Fixed-offset
+// zones and explicit instants, so they fire on every CI run rather than only in the window where the
+// bug shows. `Etc/GMT-10` is UTC+10 and `Etc/GMT+5` is UTC-5; the sign is inverted in that namespace.
+describe('#2438 — Health Connect builds and formats instants in the USER\'s timezone', () => {
+  const BRISBANE = 'Etc/GMT-10'   // UTC+10
+  const NEW_YORK = 'Etc/GMT+5'    // UTC-5
+
+  describe('enrichment: a session\'s local date + "HH:MM" becomes the right instant', () => {
+    it('reads 07:30 on 2026-03-02 as 21:30Z the day before for a UTC+10 user', () => {
+      expect(localDateTimeToIso('2026-03-02', '07:30', BRISBANE)).toBe('2026-03-01T21:30:00.000Z')
+    })
+
+    it('reads the same wall time as 12:30Z for a UTC-5 user: the zone is the user\'s, not the device\'s', () => {
+      // The old builder used `new Date(y, m - 1, d, h, mi)`, the DEVICE's zone, so both of these
+      // returned the same instant on any one phone whatever the profile said.
+      expect(localDateTimeToIso('2026-03-02', '07:30', NEW_YORK)).toBe('2026-03-02T12:30:00.000Z')
+      expect(localDateTimeToIso('2026-03-02', '07:30', BRISBANE)).not.toBe(localDateTimeToIso('2026-03-02', '07:30', NEW_YORK))
+    })
+
+    it('carries an over-midnight end into the next calendar day, across a month end', () => {
+      expect(localDateTimeToIso('2026-02-28', '00:20', BRISBANE, 1)).toBe('2026-02-28T14:20:00.000Z')
+      expect(localDateTimeToIso('2026-12-31', '00:10', NEW_YORK, 1)).toBe('2027-01-01T05:10:00.000Z')
+    })
+  })
+
+  describe('the sync window starts and ends at the user\'s local midnight', () => {
+    it('is user-local midnight to user-local midnight, so each 24 h aggregate window is one user day', () => {
+      const w = syncWindowIso('2026-03-10', 3, BRISBANE)
+      expect(w).toEqual({ startIso: '2026-03-07T14:00:00.000Z', endIso: '2026-03-10T14:00:00.000Z' })
+      // 3 days of 24 h, ending at the midnight AFTER today.
+      expect((Date.parse(w.endIso) - Date.parse(w.startIso)) / 3_600_000).toBe(72)
+    })
+
+    it('moves with the user\'s zone, not the phone\'s', () => {
+      const bris = syncWindowIso('2026-03-10', 1, BRISBANE)
+      const ny = syncWindowIso('2026-03-10', 1, NEW_YORK)
+      expect(bris.startIso).toBe('2026-03-09T14:00:00.000Z')
+      expect(ny.startIso).toBe('2026-03-10T05:00:00.000Z')
+    })
+
+    it('a window of one day is exactly today', () => {
+      const w = syncWindowIso('2026-03-10', 1, BRISBANE)
+      expect(toLocalDate(w.startIso, BRISBANE)).toBe('2026-03-10')
+      expect(toLocalDate(new Date(Date.parse(w.endIso) - 1).toISOString(), BRISBANE)).toBe('2026-03-10')
+    })
+  })
+
+  describe('exercise sessions are stored with the user\'s clock times', () => {
+    // 2026-03-01T21:30Z to 22:15Z is 07:30 to 08:15 on 2026-03-02 for UTC+10 and 16:30 to 17:15
+    // on 2026-03-01 for UTC-5.
+    const start = '2026-03-01T21:30:00.000Z'
+    const end = '2026-03-01T22:15:00.000Z'
+
+    it('formats a UTC+10 user\'s session as 07:30 to 08:15', () => {
+      expect(sessionClockTimes(start, end, BRISBANE)).toEqual({ startTime: '07:30', endTime: '08:15' })
+    })
+
+    it('formats a UTC-5 user\'s as 16:30 to 17:15, not Brisbane\'s clock', () => {
+      // `msToHHMMInTz(r.startTime)` with no zone fell back to Brisbane for everyone.
+      expect(sessionClockTimes(start, end, NEW_YORK)).toEqual({ startTime: '16:30', endTime: '17:15' })
+    })
+  })
+
+  it('stores an enrichment round trip consistently: stored clock time maps back to the session instant', () => {
+    const { startTime } = sessionClockTimes('2026-03-01T21:30:00.000Z', '2026-03-01T22:15:00.000Z', NEW_YORK)
+    const date = toLocalDate('2026-03-01T21:30:00.000Z', NEW_YORK)
+    expect(localDateTimeToIso(date, startTime, NEW_YORK)).toBe('2026-03-01T21:30:00.000Z')
   })
 })

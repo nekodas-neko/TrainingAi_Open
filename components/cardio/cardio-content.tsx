@@ -14,11 +14,10 @@ import { LazyDayCreditCard } from './lazy-day-credit-card'
 import { ModalityPicker } from './modality-picker'
 import { TimePickerSheet } from './time-picker-sheet'
 import { CardioTrendsSection } from './trends-section'
-import { TodaysCardioCard } from './todays-cardio-card'
-import { countedProgress } from './todays-cardio-copy'
+import { TodaysCardioCard, type HeartHealthDayView } from './todays-cardio-card'
 import { useActivityStore } from '@/lib/stores/activity-store'
 import { useUserTimezone } from '@/components/shell/user-timezone-provider'
-import { getLocalStore } from '@/lib/local-store'
+import { useHeartHealthCompletion } from '@/lib/activity/heart-health-completion'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { LatestBaselineCard } from '@/components/fitness-tests/latest-baseline-card'
 import type { ZoneQuota } from '@trainingai/shared/health/zone-quota'
@@ -62,16 +61,13 @@ interface RunningPlanPayload {
     activityLogId?: string | null
     completedAs?: 'run' | 'walk' | null
   }
+  /** Issue 2093 — this week's measured days. Absent on a payload cached before it existed. */
+  heartHealth?: { days: HeartHealthDayView[] }
 }
-
-/** Only what the card needs off today's logs — it names the activity that satisfied the
- *  prescription, and whether that activity had a heart rate (RV-166's estimated case). */
-interface TodayActivity { id: string; durationMin: number | null; avgHr: number | null }
 
 export function CardioContent({ userId }: { userId?: string }) {
   const [data, setData] = useState<CardioWeek | null>(null)
   const [runningPlan, setRunningPlan] = useState<RunningPlanPayload | null>(null)
-  const [todayActivities, setTodayActivities] = useState<TodayActivity[] | null>(null)
   const [loadError, setLoadError] = useState(false)
   const router = useRouter()
   const tz = useUserTimezone()
@@ -92,18 +88,7 @@ export function CardioContent({ userId }: { userId?: string }) {
     // cache entry, no new route. Failure here is non-fatal: the picker just falls back to
     // walk/activity recommendations (handled by the runningPlanForRecommend default below).
     cachedFetchToday<RunningPlanPayload>('running-plan', '/api/running-plan', RUNNING_PLAN_TTL, (d) => setRunningPlan(d)).catch(() => {})
-    // Local-first, per the offline-first rule: activity_logs is a domain this app writes locally, so
-    // the card reads what it wrote rather than waiting for a sync. Null on web/dev, where there is
-    // no native SQLite — the card then states the day's verdict without the activity's own minutes.
-    if (userId) {
-      const store = getLocalStore(userId)
-      if (store) {
-        store.getActivityLogs(todayInTz(tz))
-          .then((rows) => setTodayActivities(rows.map((r) => ({ id: r.id, durationMin: r.durationMin, avgHr: r.avgHr }))))
-          .catch(() => {})
-      }
-    }
-  }, [userId, tz])
+  }, [])
 
   useEffect(() => {
     const seed = readTodayCacheSync<CardioWeek>('cardio-week')
@@ -114,57 +99,36 @@ export function CardioContent({ userId }: { userId?: string }) {
   }, [refresh])
 
   const run = runningPlan?.run
+  const week = runningPlan?.heartHealth?.days
+  // Issue 2093: a measured day that met the rule is recorded done, whatever the activity was.
+  useHeartHealthCompletion(userId, week)
   const prescriptionCard = useMemo(() => {
     if (run == null || data == null) return null
-    const zoneIds = run.targetZoneIds ?? []
-    const zoneDoneMin = data.dayQuota.zones
-      .filter((z) => zoneIds.includes(z.zoneId))
-      .reduce((sum, z) => sum + z.doneMin, 0)
-    const satisfying = run.activityLogId != null
-      ? todayActivities?.find((a) => a.id === run.activityLogId) ?? null
-      : null
-    // The minutes count even with no heart rate (owner, 2026-09-27) — and with no zone target there
-    // is nothing for a heart rate to be measured against, so the logged minutes ARE the measure.
-    const walkable = todayActivities?.find((a) => a.durationMin != null) ?? null
-    const fromLoggedMinutes = zoneIds.length === 0 || (walkable != null && walkable.avgHr == null)
+    const today = todayInTz(tz)
     return {
-      runType: run.runType ?? 'Cardio',
       durationMin: run.durationMin ?? null,
-      targetZoneIds: zoneIds,
-      targetHrLow: run.targetHrLow ?? null,
-      targetHrHigh: run.targetHrHigh ?? null,
+      targetZoneIds: run.targetZoneIds ?? [],
       runStatus: run.status,
-      completedAs: run.completedAs ?? null,
-      completedActivity: satisfying,
-      progress: countedProgress(zoneDoneMin, fromLoggedMinutes ? walkable : null),
+      today: week?.find((d) => d.date === today) ?? null,
+      week: week ?? [],
     }
-  }, [run, data, todayActivities])
+  }, [run, data, week, tz])
 
-  // startActivity/logCompletedActivity both reset the session, prescribedRunId included, so the
-  // link must follow the arm — the ordering running-plan-content.tsx documents.
-  const onRunIt = useCallback(() => {
-    if (!run) return
-    const store = useActivityStore.getState()
-    store.startActivity('run', 'Run', 'PersonSimpleRun', true)
-    store.linkPrescribedRun(run.id)
+  // No prescription id is armed any more: the measured minutes decide, so starting from this card
+  // and starting from anywhere else are the same thing.
+  const onRun = useCallback(() => {
+    useActivityStore.getState().startActivity('run', 'Run', 'PersonSimpleRun', true)
     router.push('/activity')
-  }, [run, router])
+  }, [router])
 
   const onGuidedWalk = useCallback(() => {
-    if (!run) return
-    // The guided walk keeps its own store, but the prescription id lives on the activity store and
-    // walk-summary reads it from there — one home for the field rather than a second copy.
-    useActivityStore.getState().linkPrescribedRun(run.id)
     router.push('/activity/guided-walk')
-  }, [run, router])
+  }, [router])
 
   const onTreadmillWalk = useCallback((durationMin: number) => {
-    if (!run) return
-    const store = useActivityStore.getState()
-    store.logCompletedActivity('treadmill', 'Treadmill walk', 'PersonSimpleWalk', durationMin)
-    store.linkPrescribedRun(run.id)
+    useActivityStore.getState().logCompletedActivity('treadmill', 'Treadmill walk', 'PersonSimpleWalk', durationMin)
     router.push('/activity')
-  }, [run, router])
+  }, [router])
 
   const runningPlanForRecommend = {
     hasPlan: runningPlan?.plan != null,
@@ -210,6 +174,7 @@ export function CardioContent({ userId }: { userId?: string }) {
             isReliable={data.heart.isReliable}
             maxHrSource={data.heart.maxHrSource}
             restingHrSource={data.heart.restingHrSource}
+            hasHrSource={data.quota.hasHrSource}
           />
           {/* BF-159. Moved off the Health tab's Training list, which is otherwise all lifting, and
               placed against the heart profile: that card is what the heart is doing lately, this is
@@ -232,9 +197,10 @@ export function CardioContent({ userId }: { userId?: string }) {
           {prescriptionCard && (
             <TodaysCardioCard
               {...prescriptionCard}
-              onRunIt={onRunIt}
+              onRun={onRun}
               onGuidedWalk={onGuidedWalk}
               onTreadmillWalk={onTreadmillWalk}
+              onOtherActivity={openLogSheet}
             />
           )}
           <p className="mt-1 px-0.5 font-mono text-[10px] uppercase tracking-widest text-[color:var(--muted-foreground)]">

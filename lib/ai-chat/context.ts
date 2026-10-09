@@ -5,6 +5,9 @@ import type { SleepSession } from '@trainingai/shared/types'
 import type { OuraDailyRow, OuraDailyDerivedRow } from '@/lib/data/repository'
 import type { DayCheckin } from '@trainingai/shared/types/day-checkin'
 import { illnessAdvisory, type LatestIllness } from '@trainingai/shared/health/illness-radar'
+import type { Injury } from '@trainingai/shared/types/injury'
+import { activeInjuries, formatInjuryContext } from '@trainingai/shared/workout/injury-context'
+import { USER_TEXT_NOTE } from '@trainingai/shared/ai/untrusted-text'
 import { liveReadinessByDay } from '@trainingai/shared/health/live-readiness'
 
 export function buildProgramSummary(program: Program | null): string {
@@ -174,4 +177,34 @@ export function buildRecoverySummary(
   if (!morning && !evening) lines.push('No check-ins logged.')
 
   return lines.join('\n')
+}
+
+/** Most injuries one prompt lists, and the longest note kept. Both exist so a pile of stored free
+ *  text cannot grow the always-on system prompt without bound. */
+const MAX_PROMPT_INJURIES = 8
+const MAX_INJURY_NOTE_CHARS = 200
+const MAX_INJURY_MUSCLE_CHARS = 60
+
+/**
+ * Issue 2213. The one always-on injury line for the Coach chat: what the user has logged as
+ * injured and not yet resolved, in the same words the workout engine's prompts use
+ * (`formatInjuryContext` — one formatter, so the surfaces cannot drift). Empty string when nothing
+ * is active, so the caller appends it unconditionally and no empty section appears.
+ *
+ * It states facts and nothing else: no advice, no diagnosis. The user's note and muscle name are
+ * free text from a stored row, so both are clipped here and fenced by `formatInjuryContext`.
+ * `injuries` must already be the signed-in user's own rows (`repo.listInjuries(userId)`).
+ */
+export function buildInjuryContext(injuries: Injury[], today: string): string {
+  const active = activeInjuries(injuries).slice(0, MAX_PROMPT_INJURIES).map(i => ({
+    ...i,
+    muscleName: i.muscleName.slice(0, MAX_INJURY_MUSCLE_CHARS),
+    notes: i.notes ? i.notes.slice(0, MAX_INJURY_NOTE_CHARS) : null,
+  }))
+  if (active.length === 0) return ''
+  return `## Logged injuries (still active)
+The user has logged these. The workout screen already works around them, so keep your answers
+consistent with that and do not contradict it. State only what is logged here; do not diagnose.
+${formatInjuryContext(active, today)}
+${USER_TEXT_NOTE}`
 }

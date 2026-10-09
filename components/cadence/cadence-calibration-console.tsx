@@ -15,7 +15,6 @@ import {
   RING_STRIDE_INTERPRETATIONS,
   RING_STRIDE_HZ_TO_SPM,
   cadenceFromStrideHz,
-  compareCadence,
   type CadenceSummary,
 } from '@trainingai/shared/health/cadence'
 

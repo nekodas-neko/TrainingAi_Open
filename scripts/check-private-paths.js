@@ -32,6 +32,7 @@
  */
 const fs = require('node:fs')
 const path = require('node:path')
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs')
 
 const ROOT = process.cwd()
 const MANIFEST = path.join(ROOT, 'scripts', 'private-paths.json')
@@ -49,6 +50,7 @@ function walk(dir, out = []) {
     return out
   }
   for (const e of entries) {
+    if (e.isDirectory() && isSkippedFixtureDir(e.name)) continue
     if (e.name === 'node_modules' || e.name === '.next') continue
     const full = path.join(dir, e.name)
     if (e.isDirectory()) walk(full, out)
@@ -160,6 +162,7 @@ function allFiles(dir, out = []) {
     return out
   }
   for (const e of entries) {
+    if (e.isDirectory() && isSkippedFixtureDir(e.name)) continue
     const full = path.join(dir, e.name)
     if (e.isDirectory()) allFiles(full, out)
     else out.push(full)

@@ -4,9 +4,8 @@ import { memo, useState } from "react";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import type { StrengthTrendEntry } from "@/app/api/strength-trend/route";
 import { Sparkline } from "@/components/ui/sparkline";
-import { projectRm } from "@trainingai/shared/health/strength-projection";
+import { projectRm, isRmPlateau } from "@trainingai/shared/health/strength-projection";
 import { displayOneRm, displayOneRmSeries, oneRmUnit } from "@trainingai/shared/1rm";
-import { formatDayShort } from "@trainingai/shared/date-utils";
 
 interface Props {
   exercises: StrengthTrendEntry[];
@@ -39,10 +38,6 @@ export const StrengthTrendCard = memo(function StrengthTrendCard({ exercises, lo
   const unit = oneRmUnit(ex.exerciseType);
   const unitSuffix = unit === "RM" ? " reps" : " kg";
   const values = displayOneRmSeries(ex.history.map(h => h.rm), ex.exerciseType);
-  // `new Date(isoDay + 'T00:00:00Z')` is UTC midnight, so west of UTC it rendered the previous
-  // day — correct on a Brisbane device, off by one everywhere behind UTC (the Q-130 class).
-  // formatDayShort constructs component-wise and is the one place this format lives.
-  const labels = ex.history.map(h => formatDayShort(h.date));
 
   const color = gainColor(ex.gainPct);
   const brandColor = "var(--color-brand)";
@@ -83,7 +78,7 @@ export const StrengthTrendCard = memo(function StrengthTrendCard({ exercises, lo
               <span className="text-[10px] text-muted-foreground">
                 → ~{displayOneRm(projection.projectedRm, ex.exerciseType).value}{unitSuffix} in 30d
               </span>
-              {projection.plateau && (
+              {isRmPlateau(ex.history) && (
                 <span className="text-[9px] font-semibold rounded-full px-1.5 py-0.5 bg-amber-500/15 text-amber-500">
                   Plateau
                 </span>

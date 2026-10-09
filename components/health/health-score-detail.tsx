@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { cachedFetchToday, readTodayCacheSync } from "@/lib/sqlite/cache";
 import { HEALTH_TRENDS_SUMMARY_TTL, READINESS_SCORE_TTL } from '@trainingai/shared/cache-ttl';
 import { todayInTz } from "@trainingai/shared/date-utils";
+import { useInvalidationRefetch } from "@/lib/hooks/use-invalidation-refetch";
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { getLocalStore } from "@/lib/local-store";
 import type { ReadinessScoreResponse } from "@/app/api/readiness-score/route";
@@ -12,6 +13,7 @@ import { scoreGapText } from "@/components/health/score-gap-copy";
 import type { HealthTrendsResponse, HealthTrendDay } from "@/app/api/health/trends/route";
 import { DetailHero, usePageGradient, useHeroColorScheme, type ColorScheme } from "@/components/health/detail-hero";
 import { TrendSparkline } from "@/components/health/trend-sparkline-lazy";
+import { scoreTrendEmpty } from "@/components/health/trend-empty-copy";
 import { scoreBand } from "@trainingai/shared/health/score-band";
 import { useCountUp } from "@/lib/hooks/use-count-up";
 import { Activity } from "lucide-react";
@@ -106,6 +108,8 @@ export interface HealthScoreDetailProps {
   sparklineColor: string;
   contributorsTitle: string;
   extraCards?: (data: ReadinessScoreResponse, color: string, trends: HealthTrendDay[] | undefined) => ReactNode;
+  /** Issue 2338: a card that belongs directly under the score, above the contributor charts, and does not wait on the readiness payload (the Sleep screen's "log last night" card). */
+  leadCard?: ReactNode;
   // Optional richer detail (readiness screen): a "how the score is built" card rendered
   // above contributors, a graph-style contributor chart instead of the flat bars, and a
   // "vs your 14-day average" context chip under the score. Off by default so Sleep/Activity
@@ -133,7 +137,7 @@ function averageChip(trends: HealthTrendDay[] | undefined, field: HealthScoreDet
 }
 
 export function HealthScoreDetail({
-  userId, theme, title, subtitle, aiSection, scoreField, trendField, contributorsField, sparklineColor, contributorsTitle, extraCards,
+  userId, theme, title, subtitle, aiSection, scoreField, trendField, contributorsField, sparklineColor, contributorsTitle, extraCards, leadCard,
   breakdown, contributorChart, averageContext, hideContributors,
 }: HealthScoreDetailProps) {
   // Was `todayInTz(DEFAULT_TZ)`, which keyed every user's readiness and activity detail to
@@ -205,6 +209,14 @@ export function HealthScoreDetail({
     });
   }, [today, userId, scoreField]);
 
+  // Issue 2338: a write on this screen (a night logged or removed by hand) clears the readiness
+  // cache; without this the score above stayed on the old figure until the screen was reopened.
+  useInvalidationRefetch("readiness-score", () => {
+    cachedFetchToday<ReadinessScoreResponse>("readiness-score", "/api/readiness-score", READINESS_SCORE_TTL, d => {
+      if (d) setData(d);
+    });
+  });
+
   const score = data?.[scoreField] ?? null;
   const contributors = data?.[contributorsField] ?? null;
   const scheme = useHeroColorScheme();
@@ -253,6 +265,7 @@ export function HealthScoreDetail({
             Computed by the app from your health and training data.
           </p>
         )}
+        {leadCard}
         {title === "Readiness" && data?.illnessAdvisory && (
           <div role="status" className="flex items-start gap-2.5 rounded-xl border border-border bg-muted/60 px-3 py-2.5">
             <Activity className="mt-0.5 h-4 w-4 shrink-0 text-foreground" aria-hidden />
@@ -276,6 +289,7 @@ export function HealthScoreDetail({
             confidence={data.ownResilienceConfidence}
             asOf={data.ownResilienceAsOf}
             unavailable={data.ownResilienceUnavailable}
+            gapText={scoreGapText(data.availability, "resilience")}
           />
         )}
         {breakdown && data && breakdown(data)}
@@ -289,7 +303,7 @@ export function HealthScoreDetail({
         {data && extraCards?.(data, color, trends?.trends)}
 
         {trends?.trends && (
-          <TrendSparkline trends={trends.trends} field={trendField} label={`${title} Score`} color={sparklineColor} unit="" />
+          <TrendSparkline trends={trends.trends} field={trendField} label={`${title} Score`} color={sparklineColor} unit="" emptyText={scoreTrendEmpty(title)} />
         )}
 
         {/* No score for this section means nothing measured today, and the model turns that into

@@ -51,7 +51,7 @@ export async function GET(req: Request) {
   const days = Number.isFinite(rawDays) ? Math.min(14, Math.max(1, rawDays)) : 3
 
   const repo = await getRepositoryAsync()
-  const rows = await repo.getOuraRawSamplesForTags(userId, BIOMETRIC_TAGS, days)
+  const rows = await repo.getOuraRawSamplesForTags(userId, BIOMETRIC_TAGS, days, 'device-metrics')
 
   // Bucket by user-local day using the already-stamped measured_at.
   //

@@ -1,7 +1,8 @@
 import type { ExerciseType } from "@trainingai/shared/types/program";
 import type { PhaseStatus } from "@trainingai/shared/workout/session-data";
 import type { WorkoutExercise } from "@/app/api/workout-data/route";
-import type { AiPrescriptionExercise, SessionPeriodization } from "@trainingai/shared/types/ai-periodization";
+import type { AiPrescription, AiPrescriptionExercise, PrescriptionFigures, SessionPeriodization } from "@trainingai/shared/types/ai-periodization";
+import { rowUnderFull } from "@trainingai/shared/ai-periodization/prescription-figures";
 import { formatDateDisplay } from "@trainingai/shared/date-utils";
 import { categoricalColor } from "@trainingai/shared/chart-colors";
 import { prescriptionDrivesLoad } from "@trainingai/shared/ai-periodization/apply-prescription";
@@ -256,10 +257,17 @@ export function deloadRevertNames(
  * percentages baked in (nothing to revert), or a pending recommendation that never reached the bar,
  * which is today's emergency deload — under `Full` the program's own numbers run, and they count.
  *
- * A deload week stays `nothing-to-revert`: the workout screen logs every set of it as a deload
- * whatever the toggle says (`isAnyDeload`), so the card must not promise a full session there.
+ * **A deload week is two facts, and the card used to say only the false one (#2404).** It answered
+ * `nothing-to-revert` ("these weights are unchanged"), but Full DOES put the deloaded exercises back
+ * on their recorded full numbers, and the bar loads them. What it cannot change is the logging:
+ * `isAnyDeload` includes the phase, so every set of a deload week is logged as a deload and earns no
+ * 1RM. So a deload week reports the same revert it would anywhere else, with `-in-deload-week` on
+ * the end to say the sets still log as a deload. It is only claimed when something was actually
+ * deloaded: a deload week with nothing cut has nothing put back.
  */
-export type DeloadOverrideOutcome = 'none' | 'all' | 'partial' | 'nothing-to-revert'
+export type DeloadOverrideOutcome =
+  | 'none' | 'all' | 'partial' | 'nothing-to-revert'
+  | 'all-in-deload-week' | 'partial-in-deload-week'
 
 export function deloadOverrideOutcome(
   preOverrideExercises: readonly Pick<WorkoutExercise, 'name' | 'deloaded' | 'preDeloadStyle'>[],
@@ -270,29 +278,53 @@ export function deloadOverrideOutcome(
   },
 ): DeloadOverrideOutcome {
   if (!overrideFull) return 'none'
-  if (context.deloadWeek) return 'nothing-to-revert'
   const deloaded = preOverrideExercises.filter(ex => ex.deloaded)
   if (deloaded.length === 0) {
+    // Nothing was cut, so in a deload week as anywhere else there is nothing put back. Not upgraded
+    // to a `-in-deload-week` outcome: that would claim a revert that did not happen.
+    if (context.deloadWeek) return 'nothing-to-revert'
     const p = context.periodization
     const reachesBar = !!p?.prescription && prescriptionDrivesLoad(p.prescription.phaseAction, p.prescriptionStatus)
     return reachesBar ? 'nothing-to-revert' : 'all'
   }
-  return deloaded.every(ex => ex.preDeloadStyle) ? 'all'
+  const reverts = deloaded.every(ex => ex.preDeloadStyle) ? 'all'
     : deloaded.some(ex => ex.preDeloadStyle) ? 'partial'
     : 'nothing-to-revert'
+  if (!context.deloadWeek || reverts === 'nothing-to-revert') return reverts
+  return reverts === 'all' ? 'all-in-deload-week' : 'partial-in-deload-week'
+}
+
+/** True when every set of this session is logged as a deload whatever Full does to the weights. */
+export function overrideLogsAsDeloadWeek(outcome: DeloadOverrideOutcome): boolean {
+  return outcome === 'all-in-deload-week' || outcome === 'partial-in-deload-week'
 }
 
 /** Whether the override really put this session back on full numbers — what the card's header,
  *  rows and the exercise chips follow (#2360). */
 export function overrideRunsFull(outcome: DeloadOverrideOutcome): boolean {
-  return outcome === 'all' || outcome === 'partial'
+  return outcome === 'all' || outcome === 'partial' || overrideLogsAsDeloadWeek(outcome)
 }
 
 /** A prescription row as it will be trained: under a working override, an exercise the deload cut
  *  shows the full numbers it recorded (`preDeload`), which is what the revert loads. One with no
  *  record stays deloaded on the bar, so it keeps its deload numbers and its Deload tag. */
 export function prescriptionRowAsTrained(ex: AiPrescriptionExercise, runsFull: boolean): AiPrescriptionExercise {
-  return runsFull && ex.deloaded && ex.preDeload ? { ...ex, ...ex.preDeload, deloaded: false } : ex
+  return runsFull ? rowUnderFull(ex) : ex
+}
+
+/** The prescription's "~N min of work" and weekly-volume figures as the session will be trained
+ *  (#2403). Under a working override they are the stored `fullSession` block — the same rows
+ *  `prescriptionRowAsTrained` shows, costed by the engine. Everywhere else, and on a prescription
+ *  stored before that block existed, they are the stored figures exactly as before. */
+export function prescriptionFiguresAsTrained(
+  prescription: Pick<AiPrescription, 'estimatedSessionDurationMin' | 'weeklyVolumeContribution' | 'fullSession'>,
+  runsFull: boolean,
+): PrescriptionFigures {
+  if (runsFull && prescription.fullSession) return prescription.fullSession
+  return {
+    estimatedSessionDurationMin: prescription.estimatedSessionDurationMin,
+    weeklyVolumeContribution: prescription.weeklyVolumeContribution,
+  }
 }
 
 /** Deloaded exercises a session-level override could NOT revert, because the prescription carried

@@ -2,6 +2,7 @@
 import { getOuraBle, type OuraBlePlugin } from '@/lib/oura-ble/plugin'
 import { invalidateOuraSync } from '@/lib/cache-groups'
 import { waitForRollup, type RollupState } from '@/lib/oura-ble/rollup-wait'
+import { maintainOuraRawStore } from '@/lib/oura-ble/raw-store-maintenance'
 
 // Native ingest lands asynchronously after drainHistory()/startService() resolve — poll
 // the `draining` status flag (native-ingest-build-only field; absent on older APKs/web) so
@@ -52,6 +53,10 @@ async function afterDrainSettles(plugin: OuraBlePlugin): Promise<void> {
   // A `timeout` is not a failure: a drain carrying nothing the rollup changes never moves it.
   await waitForRollup({ read: readRollupState, sleep, baseline })
   await announceOuraSynced()
+  // #2579: the server has just folded (or had its chance to fold) this drain, so this is when its
+  // watermark is freshest. Throttled to once an hour; marks device raw rows "folded on the server",
+  // and prunes them only if the owner has turned the prune flag on.
+  void maintainOuraRawStore()
 }
 
 /**

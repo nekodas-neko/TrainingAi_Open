@@ -22,6 +22,7 @@
 const fs = require('fs');
 const path = require('path');
 const { stripComments } = require('./lib/strip-comments');
+const { isSkippedFixtureDir } = require('./lib/fixture-dirs');
 
 const root = path.join(__dirname, '..');
 const API = path.join(root, 'app', 'api');
@@ -40,7 +41,7 @@ function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (['__tests__', 'node_modules'].includes(entry.name)) continue;
+      if (['__tests__', 'node_modules'].includes(entry.name) || isSkippedFixtureDir(entry.name)) continue;
       walk(full, out);
       continue;
     }
