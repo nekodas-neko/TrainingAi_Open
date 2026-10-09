@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useRovingRadioGroup } from '@/lib/hooks/use-roving-radio-group'
 import { ACTIVITY_LEVELS, type ActivityLevel } from '@trainingai/shared/types/user'
+import { CalibratedActivityRow } from './calibrated-activity-row'
 import { navigateToTab } from "@/lib/shell-nav";
 
 /**
@@ -165,6 +166,7 @@ export function RequiredInfoSection({
             )
           })}
         </div>
+        <CalibratedActivityRow />
       </div>
     </div>
   )
