@@ -716,9 +716,14 @@ export async function runOuraRollup(
     // window, the night's SECOND old cluster row survived and mergeByDate summed it back in
     // (07-09 stuck at 15.7h on Redecode). Keying delete on the wake-day is also robust to the
     // clock anchor drifting the derived sleep_start between drains.
+    //
+    // Issue 2546: "delete" is now a tombstone, and only for the rows this pass did not reproduce. A
+    // hard delete plus a reinsert under a fresh id left every device that had already pulled the
+    // night holding the old row as a ghost. Upsert first (a night at the same sleep_start keeps its
+    // id and is replaced or revived), then tombstone the leftovers, so the night is never absent.
     const dates = Array.from(new Set(sleepRows.map(r => r.date)))
-    await io.deleteBleSleepSessionsForDates(dates)
     await io.upsertSleepSessions(sleepRows)
+    await io.tombstoneBleSleepSessionsExcept(dates, sleepRows.map(r => r.sleepStart))
   })
 
   // body_metrics per local day: HRV + RHR from each night (keyed to the wake

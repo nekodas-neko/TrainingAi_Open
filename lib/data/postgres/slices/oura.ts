@@ -530,7 +530,24 @@ export async function listOuraTags(db: Db, userId: string, startDay: string, end
 
 // ── Sleep ──────────────────────────────────────────────────────────────────────
 
-export async function upsertOuraSleep(db: Db, userId: string, sessions: OuraSleepUpsertRow[], source: HealthSource): Promise<void> {
+/**
+ * Issue 2546. How the ring rollup writes its own nights. It used to hard-delete every BLE row on the
+ * wake-days it re-rolled and insert a fresh set, so each pass minted new ids and a device that had
+ * already pulled the old ones kept them as ghost rows (a hard delete never reaches a device). Now
+ * the rollup upserts with `replaceOwnBle` and tombstones only the BLE rows the pass did not
+ * reproduce (`tombstoneBleSleepNightsExcept`). A night re-detected at the same `sleep_start` keeps
+ * its id, and the upsert REPLACES it: every column takes the new value, as the old delete +
+ * reinsert did, rather than going through the rank merge (which keeps a stored value wherever the
+ * new one is null, and never moves a device row's `date` or `sleep_end`).
+ */
+export interface UpsertOuraSleepOptions {
+  /** Replace, rather than rank-merge into, a live row this rollup owns (`oura_id LIKE 'ble:%'`). */
+  replaceOwnBle?: boolean
+}
+
+export async function upsertOuraSleep(
+  db: Db, userId: string, sessions: OuraSleepUpsertRow[], source: HealthSource, opts: UpsertOuraSleepOptions = {},
+): Promise<void> {
   if (sessions.length === 0) return
   // Two re-segmentations of the same night reach here with one `sleep_start` — the conflict target
   // — and would reject the whole batch (21000). Every row shares `source`, so the rank arm reduces
@@ -570,7 +587,7 @@ export async function upsertOuraSleep(db: Db, userId: string, sessions: OuraSlee
     // 2. Re-syncing an existing Oura row (same oura_id → same sleep_start)
     .onConflictDoUpdate({
       target: [s.sleepSessions.userId, s.sleepSessions.sleepStart],
-      set: {
+      set: replaceWhen({
         ...merged,
         // #2338. A device night that starts at the very instant a typed-in night does IS that night,
         // measured, and a device night always wins over a typed one. The manual row carries no
@@ -586,10 +603,88 @@ export async function upsertOuraSleep(db: Db, userId: string, sessions: OuraSlee
         // becomes that device night, visible: the user removed their guess, not the measurement, and
         // a device night always wins. Only manual rows are ever tombstoned, so a device row keeps
         // its value (NULL).
-        deletedAt:      sql.raw(`CASE WHEN sleep_sessions.manual_entry THEN NULL ELSE sleep_sessions.deleted_at END`),
+        //
+        // Issue 2546: the ring rollup tombstones its own nights too, and a device write landing on a
+        // tombstoned row's start means that night exists again. So a device write always leaves the
+        // row live: a tombstoned row is revived (same id) rather than shadowed by a second row.
+        deletedAt:      sql`NULL`,
         updatedAt: sql`NOW()`,
-      },
+      }),
     })
+
+  // A tombstoned row is dead, so the write that revives it is what a fresh INSERT would have been:
+  // every column (date, window, provenance) takes the incoming value instead of merging with the
+  // removed row's. The rollup's `replaceOwnBle` does the same to the live BLE rows it re-rolls
+  // (issue 2546). `manual_sleep_start` is not in the set, so a bedtime the user recorded survives.
+  function replaceWhen(set: Record<string, SQL>): Record<string, SQL> {
+    const cond = sql.raw(opts.replaceOwnBle
+      ? `(sleep_sessions.deleted_at IS NOT NULL OR (sleep_sessions.oura_id LIKE 'ble:%' AND NOT sleep_sessions.manual_entry))`
+      : `(sleep_sessions.deleted_at IS NOT NULL)`)
+    const fresh: [string, string][] = [
+      ['date', 'date'], ['sleepEnd', 'sleep_end'], ['sourceMap', 'source_map'],
+      ...OURA_SLEEP_SOURCE_COLS.map(c => [c.prop, c.col] as [string, string]),
+    ]
+    const out: Record<string, SQL> = { ...set }
+    for (const [prop, col] of fresh) {
+      out[prop] = sql`CASE WHEN ${cond} THEN ${sql.raw(`EXCLUDED.${col}`)} ELSE ${set[prop]} END`
+    }
+    return out
+  }
+}
+
+/**
+ * Issue 2546. Before the rollup upserts its nights, move each `ble:` id to the start it now has.
+ *
+ * `oura_id` is unique per user and the rollup derives it from the ring's counter (`ble:<startDs>`),
+ * while `sleep_start` comes from the clock anchor, which can drift between drains. So the same night
+ * can come back with the same `oura_id` at a slightly different `sleep_start`. The old hard delete
+ * freed the id; a tombstone keeps holding it, and the insert would fail on
+ * `sleep_sessions_user_oura_id_key`. So the row holding the id is moved to the new start (same row,
+ * same id, and the upsert then replaces it). If another row already sits at the new start, the
+ * holder is retired instead: tombstoned, with its `oura_id` cleared so the night's id can move.
+ * Never touches a manual night.
+ */
+export async function reseatBleSleepOuraIds(db: Db, userId: string, rows: OuraSleepUpsertRow[]): Promise<void> {
+  for (const r of rows) {
+    if (!r.ouraId?.startsWith('ble:')) continue
+    const start = r.sleepStart.toISOString()
+    await db.execute(sql`
+      UPDATE sleep_sessions h
+         SET sleep_start = CASE WHEN taken.id IS NULL THEN ${start}::timestamptz ELSE h.sleep_start END,
+             oura_id     = CASE WHEN taken.id IS NULL THEN h.oura_id ELSE NULL END,
+             deleted_at  = CASE WHEN taken.id IS NULL THEN h.deleted_at ELSE COALESCE(h.deleted_at, NOW()) END,
+             updated_at  = NOW()
+        FROM (SELECT 1) one
+        LEFT JOIN sleep_sessions taken ON taken.user_id = ${userId} AND taken.sleep_start = ${start}::timestamptz
+       WHERE h.user_id = ${userId} AND h.oura_id = ${r.ouraId} AND NOT h.manual_entry
+         AND h.sleep_start <> ${start}::timestamptz`)
+  }
+}
+
+/**
+ * Issue 2546. Tombstone the ring rollup's own nights on `dates` that this pass did not reproduce
+ * (their `sleep_start` is not in `keepStarts`). Never touches a manual night or another source's
+ * row, and never re-stamps a row that is already tombstoned, so an unchanged re-roll writes nothing
+ * here. `deleted_at` rides the delta pull, which is how a device that already holds the night
+ * learns it is gone (docs/rules/offline-first-and-storage.md).
+ */
+export async function tombstoneBleSleepNightsExcept(
+  db: Db, userId: string, dates: string[], keepStarts: Date[],
+): Promise<number> {
+  if (dates.length === 0) return 0
+  const keep = keepStarts.map(d => sql`${d.toISOString()}::timestamptz`)
+  const rows = await db.update(s.sleepSessions)
+    .set({ deletedAt: sql`NOW()`, updatedAt: sql`NOW()` })
+    .where(and(
+      eq(s.sleepSessions.userId, userId),
+      sql`${s.sleepSessions.ouraId} LIKE 'ble:%'`,
+      eq(s.sleepSessions.manualEntry, false),
+      isNull(s.sleepSessions.deletedAt),
+      inArray(s.sleepSessions.date, dates),
+      ...(keep.length > 0 ? [sql`${s.sleepSessions.sleepStart} NOT IN (${sql.join(keep, sql`, `)})`] : []),
+    ))
+    .returning({ id: s.sleepSessions.id })
+  return rows.length
 }
 
 // ── Heart Rate ─────────────────────────────────────────────────────────────────
