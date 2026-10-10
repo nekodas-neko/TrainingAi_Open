@@ -1,31 +1,27 @@
-import { Pressable, Text, View, type ColorValue } from 'react-native';
-import type { AppStyles } from '../../shared/theme/useAppTheme';
+import { BottomNavigation, Icon, type IconName } from '../../shared/ui';
 import { tabs, type Tab } from './tabs';
 
-export function TabBar({
-  selected,
-  onSelect,
-  styles: s,
-  tint,
-}: {
-  selected: Tab;
-  onSelect: (tab: Tab) => void;
-  styles: AppStyles;
-  tint: ColorValue;
-}) {
+const tabIcons: Record<Tab, IconName> = {
+  Home: 'home',
+  Health: 'health',
+  Workout: 'workout',
+  Nutrition: 'nutrition',
+  More: 'more',
+};
+
+export function TabBar({ selected, onSelect }: { selected: Tab; onSelect: (tab: Tab) => void }) {
   return (
-    <View style={s.tabs}>
-      {tabs.map((tab) => (
-        <Pressable
-          key={tab}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: selected === tab }}
-          onPress={() => onSelect(tab)}
-          style={s.tab}
-        >
-          <Text style={[s.tabText, selected === tab && { color: tint }]}>{tab}</Text>
-        </Pressable>
-      ))}
-    </View>
+    <BottomNavigation
+      selected={selected}
+      onSelect={onSelect}
+      items={tabs.map((tab) => ({
+        key: tab,
+        label: tab,
+        emphasized: tab === 'Workout',
+        renderIcon: (color: string, size: number) => (
+          <Icon name={tabIcons[tab]} color={color} size={size} />
+        ),
+      }))}
+    />
   );
 }

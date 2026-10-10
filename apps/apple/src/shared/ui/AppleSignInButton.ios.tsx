@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react';
+import { useTheme } from '../theme/ThemeProvider';
 import * as AppleAuthentication from 'expo-apple-authentication';
 
 export function AppleSignInButton({
   onPress,
   connecting = false,
-  dark,
 }: {
   onPress(): void;
   connecting?: boolean;
-  dark: boolean;
 }) {
+  const { theme } = useTheme();
+  const dark = theme.mode === 'dark';
   const [available, setAvailable] = useState(false);
   useEffect(() => {
     let active = true;
@@ -40,8 +41,8 @@ export function AppleSignInButton({
           ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
           : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
       }
-      cornerRadius={6}
-      style={{ height: 44, width: '100%' }}
+      cornerRadius={theme.radii.control}
+      style={{ height: theme.sizes.button, width: '100%' }}
     />
   );
 }

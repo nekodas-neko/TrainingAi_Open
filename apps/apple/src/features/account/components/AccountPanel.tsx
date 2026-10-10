@@ -1,9 +1,7 @@
-import { ActivityIndicator, Button, Text, View } from 'react-native';
+import { AppText, AppButton, Card, LoadingIndicator, AppleSignInButton } from '../../../shared/ui';
 import { useAccountContext } from '../AccountProvider';
-import { AppleSignInButton } from './AppleSignInButton';
-import type { AppStyles } from '../../../shared/theme/useAppTheme';
 
-export function AccountPanel({ styles: s, dark }: { styles: AppStyles; dark: boolean }) {
+export function AccountPanel() {
   const account = useAccountContext();
   const accountStatus = {
     loading: 'Loading account…',
@@ -14,43 +12,44 @@ export function AccountPanel({ styles: s, dark }: { styles: AppStyles; dark: boo
     storageError: 'Sign-in storage needs attention',
   }[account.state.status];
   return (
-    <View style={s.card}>
-      <Text style={s.heading}>TrainingAi account</Text>
+    <Card>
+      <AppText variant="heading">TrainingAi account</AppText>
       {account.reason ? (
-        <Text style={s.muted}>{account.reason}</Text>
+        <AppText tone="muted">{account.reason}</AppText>
       ) : (
         <>
-          <Text style={s.label}>{accountStatus}</Text>
+          <AppText variant="label">{accountStatus}</AppText>
           {['loading', 'signingIn', 'checking'].includes(account.state.status) && (
-            <ActivityIndicator accessibilityLabel="Checking account sign-in" />
+            <LoadingIndicator accessibilityLabel="Checking account sign-in" />
           )}
           {account.state.profile && (
             <>
-              <Text style={s.label}>
+              <AppText variant="label">
                 {account.state.profile.name ?? account.state.profile.email}
-              </Text>
-              <Text style={s.muted}>{account.state.profile.email}</Text>
+              </AppText>
+              <AppText tone="muted">{account.state.profile.email}</AppText>
               {account.state.profile.timezone && (
-                <Text style={s.small}>{account.state.profile.timezone}</Text>
+                <AppText variant="caption" tone="muted">
+                  {account.state.profile.timezone}
+                </AppText>
               )}
             </>
           )}
           {account.state.message && (
-            <Text accessibilityRole="alert" style={s.muted}>
+            <AppText accessibilityRole="alert" tone="muted">
               {account.state.message}
-            </Text>
+            </AppText>
           )}
           {account.state.status === 'signedOut' && (
             <>
               {account.appleAvailable && (
                 <AppleSignInButton
-                  dark={dark}
                   onPress={() => {
                     void account.signInWithApple();
                   }}
                 />
               )}
-              <Button
+              <AppButton
                 title="Sign in with Google or email"
                 onPress={() => {
                   void account.signIn();
@@ -63,9 +62,10 @@ export function AccountPanel({ styles: s, dark }: { styles: AppStyles; dark: boo
             !account.state.profile.signInProviders.includes('apple') &&
             account.appleAvailable && (
               <>
-                <Text style={s.small}>Connect Apple to this account</Text>
+                <AppText variant="caption" tone="muted">
+                  Connect Apple to this account
+                </AppText>
                 <AppleSignInButton
-                  dark={dark}
                   connecting
                   onPress={() => {
                     void account.signInWithApple();
@@ -74,18 +74,21 @@ export function AccountPanel({ styles: s, dark }: { styles: AppStyles; dark: boo
               </>
             )}
           {account.state.profile?.signInProviders.includes('apple') && (
-            <Text style={s.small}>Apple connected</Text>
+            <AppText variant="caption" tone="muted">
+              Apple connected
+            </AppText>
           )}
           {account.state.status === 'signingIn' && (
-            <Button
+            <AppButton
               title="Cancel sign-in"
+              variant="ghost"
               onPress={() => {
                 void account.cancel();
               }}
             />
           )}
           {account.state.status === 'storageError' && (
-            <Button
+            <AppButton
               title="Retry clearing sign-in"
               onPress={() => {
                 void account.signOut();
@@ -94,26 +97,28 @@ export function AccountPanel({ styles: s, dark }: { styles: AppStyles; dark: boo
           )}
           {account.state.hasSession && (
             <>
-              <Button
+              <AppButton
                 title="Retry account check"
+                variant="secondary"
                 disabled={account.state.status === 'checking'}
                 onPress={() => {
                   void account.retry();
                 }}
               />
-              <Button
+              <AppButton
                 title="Sign out"
+                variant="danger"
                 onPress={() => {
                   void account.signOut();
                 }}
               />
             </>
           )}
-          <Text style={s.small}>
+          <AppText variant="caption" tone="muted">
             Apple Health readings stay on this device. Signing in does not upload them.
-          </Text>
+          </AppText>
         </>
       )}
-    </View>
+    </Card>
   );
 }

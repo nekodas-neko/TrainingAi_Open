@@ -106,8 +106,8 @@ function launch(name, script, args, env) {
 function instructions(host) {
   console.log(`\nOpen the installed TrainingAi app on your iPhone (same home network).`);
   console.log(`Select the development server, or enter: http://${host}:8088`);
-  console.log('Apple Health: Data > Connect/Refresh Apple Health.');
-  console.log('Feedback: Data > Send report to PC.');
+  console.log('Apple Health: Health > Apple Health > Connect/Refresh Apple Health.');
+  console.log('Feedback: Health > Apple Health > Send report to PC.');
   console.log(`Latest report: ${join(root, '.expo', 'diagnostics', 'latest.json')}`);
   console.log('To stop: pnpm dev:stop');
 }

@@ -1,12 +1,12 @@
-import { Button, Text, View } from 'react-native';
+import { AppearancePanel } from '../components/AppearancePanel';
+import { AppText, AppButton, Card } from '../../../shared/ui';
 import { useAccountContext } from '../../account/AccountProvider';
 import { useHealthContext } from '../../health/HealthProvider';
 import { useReportsContext } from '../../../development/diagnostics/ReportsProvider';
-import type { AppStyles } from '../../../shared/theme/useAppTheme';
 import { diagnosticsAvailable } from '../../../development/diagnostics/client';
 import { AccountPanel } from '../../account/components/AccountPanel';
 
-export function SettingsScreen({ styles: s, dark }: { styles: AppStyles; dark: boolean }) {
+export function SettingsScreen() {
   const account = useAccountContext();
   const health = useHealthContext();
   const reports = useReportsContext();
@@ -14,21 +14,22 @@ export function SettingsScreen({ styles: s, dark }: { styles: AppStyles; dark: b
   const { report, reportBusy, reportStatus } = reports;
   return (
     <>
-      <View style={s.card}>
-        <Text style={s.heading}>Apple Health</Text>
-        <Text style={s.muted}>
+      <AppearancePanel />
+      <Card>
+        <AppText variant="heading">Apple Health</AppText>
+        <AppText tone="muted">
           Read access only. An empty result can mean no data or no read permission; Apple does not
           reveal which.
-        </Text>
-      </View>
-      <AccountPanel styles={s} dark={dark} />
+        </AppText>
+      </Card>
+      <AccountPanel />
       {diagnosticsAvailable && (
-        <View style={s.card}>
-          <Text style={s.heading}>Sign-in feedback</Text>
-          <Text style={s.muted}>
+        <Card>
+          <AppText variant="heading">Sign-in feedback</AppText>
+          <AppText tone="muted">
             Send sign-in progress to your PC. No passwords, tokens or health readings are included.
-          </Text>
-          <Button
+          </AppText>
+          <AppButton
             title={reportBusy ? 'Sending report…' : 'Send sign-in report to PC'}
             disabled={reportBusy}
             onPress={() => {
@@ -39,14 +40,15 @@ export function SettingsScreen({ styles: s, dark }: { styles: AppStyles; dark: b
             }}
           />
           {reportStatus && (
-            <Text accessibilityRole="alert" style={s.muted}>
+            <AppText accessibilityRole="alert" tone="muted">
               {reportStatus}
-            </Text>
+            </AppText>
           )}
-        </View>
+        </Card>
       )}
-      <Button
+      <AppButton
         title="Clear loaded readings"
+        variant="secondary"
         disabled={busy}
         onPress={() => {
           health.clear();

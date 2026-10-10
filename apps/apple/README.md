@@ -10,23 +10,29 @@ Implementation scope and checklist: [Native App Implementation Plan](https://cha
 | --- | --- |
 | `src/app` | App composition, providers and navigation. |
 | `src/features/account` | Backend sign-in API, session lifecycle and account UI. |
-| `src/features/home` | Today screen; future home dashboard. |
-| `src/features/health` | Health models, interval calculations and reading state. |
-| `src/features/settings` | Settings screen and account controls. |
-| `src/features/workouts`, `programs` | Reserved for the first workout flow and training programs. |
+| `src/features/home` | Home dashboard shell. |
+| `src/features/health` | Health overview, models, interval calculations and reading state. |
+| `src/features/settings` | More shell, settings screen and account controls. |
+| `src/features/workouts`, `programs` | Workout overview shell and reserved program management. |
 | `src/features/activities`, `progress` | Reserved for cardio, activity history and progress. |
-| `src/features/nutrition`, `meal-plans` | Reserved for food logging, nutrition goals and meal plans. |
+| `src/features/nutrition`, `meal-plans` | Nutrition overview shell and reserved meal planning. |
 | `src/features/coach`, `social`, `devices` | Reserved for coaching, community/rewards and device integrations. |
 | `src/integrations/auth` | iOS keychain, browser callback and native Apple sign-in adapters. |
 | `src/integrations/apple-health` | iOS HealthKit queries and source inspection. |
 | `src/core/storage`, `sync` | Reserved for account-scoped local storage and backend synchronization. |
-| `src/shared` | Shared native UI and system appearance. |
+| `src/shared` | Reusable native UI library and central theme tokens. |
 | `src/development/diagnostics` | Opt-in local development reports. |
 | `tests` | Centralized pure logic and API/session tests. |
 
-Reserved directories contain `.gitkeep` files only. Storage, sync and the remaining feature implementations are not built yet. Sleep, readiness and body measurements belong to health; history and reviews belong to progress. Notifications and background work should get their own platform adapters when their first feature needs them.
+The remaining reserved directories contain `.gitkeep` files only. Workout and Nutrition have overview shells, with their feature actions still disabled. Storage, sync and the remaining feature implementations are not built yet. Sleep, readiness and body measurements belong to health; history and reviews belong to progress. Notifications and background work should get their own platform adapters when their first feature needs them.
 
 Features own their logic and state. App composition connects providers and screens. Native services live behind platform adapters, with `.ios` implementations and unavailable fallbacks. Reusable code belongs in `shared`; do not import the backend's Next.js pages, server modules or root dependencies into this app. Any future shared package needs an explicit dependency and must be native-compatible.
+
+## UI library
+
+Build screens with the components exported by `src/shared/ui`. The theme provider supplies semantic colours, spacing, typography, radii and control sizes from `src/shared/theme`; changing those tokens updates the library together. `ThemeProvider` also accepts overrides for future re-theming. Feature screens own content and actions; shared components own control styling and interaction states. Native Apple sign-in keeps Apple’s official button appearance.
+
+Use the shared `Icon` component for Lucide icons, matching the existing app’s navigation. Icon names are mapped centrally and their colours, sizes and stroke width follow the theme. Adding the SVG renderer requires a new signed development build once; later icon and styling edits use reload.
 
 ## Local development
 
@@ -39,9 +45,9 @@ pnpm dev:status
 pnpm dev:stop
 ```
 
-On Windows, `Start Development.cmd` and `Stop Development.cmd` run the same managed launcher. It starts Metro on port 8088 and the local report receiver on port 8090, detects the private LAN address and maintains `.env.local`. The iPhone and PC must share a network. Open the installed development client and connect to the launcher URL.
+On Windows, `src/development/Start Development.cmd` and `src/development/Stop Development.cmd` run the same managed launcher. It starts Metro on port 8088 and the local report receiver on port 8090, detects the private LAN address and maintains `.env.local`. The iPhone and PC must share a network. Open the installed development client and connect to the launcher URL.
 
-Browser Google/email sign-in, account verification, native Apple sign-in/linking and Apple Health queries have been carried across from the prototype. Device verification of this refactor is still needed. The three existing Today/Data/Settings screens and system appearance remain. Expo Go supports previews; native account and HealthKit access require the signed iPhone development build.
+Browser Google/email sign-in, account verification, native Apple sign-in/linking and Apple Health queries have been carried across from the prototype. Device verification of this refactor is still needed. The shell uses Home, Health, Workout, Nutrition and More tabs. Unimplemented feature rows are disabled and labelled Coming soon. Apple Health reading is available from Health > Apple Health; account controls and sign-in feedback are at More > Account & settings. The shell follows the existing app’s green accent, tinted dark surfaces, health colours and raised Workout tab. More > Appearance opens session-only controls for system/light/dark mode and eight accent presets. Expo Go supports previews; native account and HealthKit access require the signed iPhone development build.
 
 ```powershell
 pnpm typecheck
@@ -54,6 +60,8 @@ The Apple CI workflow runs these checks independently. Backend TypeScript, ESLin
 ## Native builds and privacy
 
 `pnpm build:ios` runs the Windows EAS launcher with this app as its project root. Apple credentials and two-factor codes are entered by the user in their terminal. Keep the registered bundle ID and scheme `com.fitnessai.training`, Expo project `meowi/trainingai-mobile` and existing EAS project ID. Moving source files requires no new signing identity or app installation.
+
+You can also double-click `src/development/Build iPhone.cmd`. It uses saved signing without prompts, waits for the build, opens the builds page and starts the development server. On a signing/setup error, choose S in the launcher to run with interactive prompts. Bookmark [iPhone builds](https://expo.dev/accounts/meowi/projects/trainingai-mobile/builds) on your phone and install the latest finished iOS development build from there. Apple still asks you to confirm installation. Regular UI/JavaScript edits use reload; only native library or configuration changes need a new build.
 
 `.env.local`, `.expo` reports/logs and signing credentials are ignored and excluded from EAS uploads. Development reports are opt-in and stay on the PC. Signing in does not upload health readings. Missing or denied health metrics remain unavailable and retain their source information.
 

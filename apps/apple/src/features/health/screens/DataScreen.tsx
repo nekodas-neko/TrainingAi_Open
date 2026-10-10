@@ -1,12 +1,11 @@
-import { ActivityIndicator, Button, Switch, Text, View } from 'react-native';
+import { Platform } from 'react-native';
+import { AppText, AppButton, Card, Stack, LoadingIndicator, SwitchRow } from '../../../shared/ui';
 import { useHealthContext } from '../HealthProvider';
 import { useReportsContext } from '../../../development/diagnostics/ReportsProvider';
-import type { AppStyles } from '../../../shared/theme/useAppTheme';
 import { isRunningInExpoGo } from 'expo';
-import { Platform } from 'react-native';
 import { diagnosticsAvailable } from '../../../development/diagnostics/client';
 
-export function DataScreen({ styles: s }: { styles: AppStyles }) {
+export function DataScreen() {
   const health = useHealthContext();
   const reports = useReportsContext();
   const { snapshot, busy, error } = health;
@@ -22,75 +21,75 @@ export function DataScreen({ styles: s }: { styles: AppStyles }) {
   }
   return (
     <>
-      <View style={s.card}>
-        <Text style={s.heading}>Read Apple Health</Text>
+      <Card>
+        <AppText variant="heading">Read Apple Health</AppText>
         {healthPreviewOnly ? (
-          <Text style={s.muted}>
+          <AppText tone="muted">
             Apple Health needs a separate iPhone development build. This preview supports sample
             data only.
-          </Text>
+          </AppText>
         ) : busy ? (
-          <ActivityIndicator accessibilityLabel="Reading Apple Health" />
+          <LoadingIndicator accessibilityLabel="Reading Apple Health" />
         ) : (
-          <Button
+          <AppButton
             title={snapshot?.mode === 'device' ? 'Refresh Apple Health' : 'Connect Apple Health'}
             disabled={reportBusy}
             onPress={connect}
           />
         )}
-      </View>
+      </Card>
       {diagnosticsAvailable && (
-        <View style={s.card}>
-          <Text style={s.heading}>Development feedback</Text>
-          <Text style={s.muted}>
+        <Card>
+          <AppText variant="heading">Development feedback</AppText>
+          <AppText tone="muted">
             Send the displayed health values, record counts, sources, timestamps and query errors to
             your PC. The report stays in a local development file.
-          </Text>
-          <Button
+          </AppText>
+          <AppButton
             title={reportBusy ? 'Sending report…' : 'Send report to PC'}
             disabled={reportBusy || busy || (!snapshot && !error)}
             onPress={() => {
               void report(snapshot, 'Data', error);
             }}
           />
-          <View style={s.row}>
-            <Text style={s.label}>Send after each refresh</Text>
-            <Switch
-              value={reportAutomatically}
-              disabled={reportBusy || busy}
-              onValueChange={setReportAutomatically}
-            />
-          </View>
-          <Text style={s.small}>Off by default. Resets when the app reloads.</Text>
+          <SwitchRow
+            label="Send after each refresh"
+            value={reportAutomatically}
+            disabled={reportBusy || busy}
+            onValueChange={setReportAutomatically}
+          />
+          <AppText variant="caption" tone="muted">
+            Off by default. Resets when the app reloads.
+          </AppText>
           {reportStatus && (
-            <Text accessibilityRole="alert" style={s.muted}>
+            <AppText accessibilityRole="alert" tone="muted">
               {reportStatus}
-            </Text>
+            </AppText>
           )}
-        </View>
+        </Card>
       )}
       {snapshot?.inspection ? (
         <>
-          <View style={s.card}>
-            <Text style={s.heading}>Readable records · last 7 days</Text>
-            <Text style={s.muted}>
+          <Card>
+            <AppText variant="heading">Readable records · last 7 days</AppText>
+            <AppText tone="muted">
               {new Date(snapshot.inspection.startAt).toLocaleString()} –{' '}
               {new Date(snapshot.inspection.endAt).toLocaleString()}
-            </Text>
-            <Text style={s.muted}>
+            </AppText>
+            <AppText tone="muted">
               Latest samples, not daily totals. Each type returns up to 2,000 records; counts and
               sources can be incomplete at the limit.
-            </Text>
-            <Text style={s.muted}>
+            </AppText>
+            <AppText tone="muted">
               No readable records can mean no data in this period or read permission is off. Workout
               routes are not inspected.
-            </Text>
-          </View>
+            </AppText>
+          </Card>
           {snapshot.inspection.entries.map((entry) => (
-            <View key={entry.key} style={s.card}>
-              <View style={s.row}>
-                <Text style={s.label}>{entry.label}</Text>
-                <Text style={s.value}>
+            <Card key={entry.key}>
+              <Stack direction="row" align="center" justify="space-between" wrap>
+                <AppText variant="label">{entry.label}</AppText>
+                <AppText variant="heading">
                   {entry.status === 'records'
                     ? `${entry.limited ? 'At least ' : ''}${entry.count?.toLocaleString()} records`
                     : entry.status === 'empty'
@@ -98,35 +97,39 @@ export function DataScreen({ styles: s }: { styles: AppStyles }) {
                       : entry.status === 'unsupported'
                         ? 'Not supported on this iPhone'
                         : 'Could not read'}
-                </Text>
-              </View>
-              {entry.latestValue && <Text style={s.heading}>Latest: {entry.latestValue}</Text>}
+                </AppText>
+              </Stack>
+              {entry.latestValue && (
+                <AppText variant="heading">Latest: {entry.latestValue}</AppText>
+              )}
               {entry.latestStart && (
-                <Text style={s.muted}>
+                <AppText tone="muted">
                   {new Date(entry.latestStart).toLocaleString()} –{' '}
                   {new Date(entry.latestEnd!).toLocaleString()}
-                </Text>
+                </AppText>
               )}
-              {entry.detail && <Text style={s.muted}>{entry.detail}</Text>}
+              {entry.detail && <AppText tone="muted">{entry.detail}</AppText>}
               {entry.sources.map((source) => (
-                <View key={source.bundleIdentifier}>
-                  <Text style={s.small}>
+                <Stack key={source.bundleIdentifier}>
+                  <AppText variant="caption" tone="muted">
                     {source.name} · {source.count.toLocaleString()} returned records
-                  </Text>
-                  <Text style={s.small}>Latest: {new Date(source.latestAt).toLocaleString()}</Text>
-                </View>
+                  </AppText>
+                  <AppText variant="caption" tone="muted">
+                    Latest: {new Date(source.latestAt).toLocaleString()}
+                  </AppText>
+                </Stack>
               ))}
-            </View>
+            </Card>
           ))}
         </>
       ) : (
-        <View style={s.card}>
-          <Text style={s.heading}>No inspection loaded</Text>
-          <Text style={s.muted}>
+        <Card>
+          <AppText variant="heading">No inspection loaded</AppText>
+          <AppText tone="muted">
             Use the Apple Health button above to check data types, sources and timestamps. Sample
             data does not include this inspection.
-          </Text>
-        </View>
+          </AppText>
+        </Card>
       )}
     </>
   );
