@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "TrainingAi",
+    "slug": "trainingai-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "com.fitnessai.training",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.fitnessai.training",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "usesAppleSignIn": true
+    },
+    "plugins": [
+      "expo-dev-client",
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "TrainingAi reads your sleep, heart rate, resting heart rate, steps and active energy to show your health history.",
+          "NSHealthUpdateUsageDescription": false,
+          "background": false
+        }
+      ],
+      "expo-web-browser",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false
+        }
+      ],
+      "expo-apple-authentication"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "60c9f273-9824-4a24-b987-7a2555b6232f"
+      }
+    },
+    "owner": "meowi"
+  }
+}
