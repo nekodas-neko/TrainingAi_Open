@@ -2298,6 +2298,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         eq(s.bodyMetrics.userId, userId),
         gte(s.bodyMetrics.date, from),
         lte(s.bodyMetrics.date, to),
+        // #2802. A tombstoned row is a deletion, not a reading: every caller (energy budget, resting
+        // HR, trends, digests) reads these as measurements. Sync and export do not come through here.
+        isNull(s.bodyMetrics.deletedAt),
       ))
       .orderBy(desc(s.bodyMetrics.date))
     return rows.map(r => ({
