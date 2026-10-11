@@ -30,10 +30,10 @@ const QUERIES = {
                 calorie_goal, calorie_goal_type, timezone
          FROM claude_ro.users`,
   target: `SELECT calories FROM claude_ro.nutrition_targets LIMIT 1`,
-  // `listBodyMetrics` reads every row in range, deleted or not; this mirrors it.
+  // `listBodyMetrics` skips tombstoned rows (#2802); this mirrors it.
   metrics: `SELECT date::text AS date, weight_kg::float AS weight_kg, body_fat_pct::float AS body_fat_pct,
                    source_map->>'body_fat_pct' AS body_fat_source, steps, bmr_kcal::float AS bmr_kcal
-            FROM claude_ro.body_metrics ORDER BY date`,
+            FROM claude_ro.body_metrics WHERE deleted_at IS NULL ORDER BY date`,
   dexa: `SELECT scanned_on::text AS scanned_on, pct_fat::float AS pct_fat FROM claude_ro.dexa_scans WHERE pct_fat IS NOT NULL`,
   rmr: `SELECT measured_on::text AS measured_on, rmr_kcal::float AS rmr_kcal, ffm_kg_at_test::float AS ffm_kg_at_test
         FROM claude_ro.measured_rmr`,

@@ -2298,6 +2298,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         eq(s.bodyMetrics.userId, userId),
         gte(s.bodyMetrics.date, from),
         lte(s.bodyMetrics.date, to),
+        // #2802. A tombstoned row is a deletion, not a reading: every caller (energy budget, resting
+        // HR, trends, digests) reads these as measurements. Sync and export do not come through here.
+        isNull(s.bodyMetrics.deletedAt),
       ))
       .orderBy(desc(s.bodyMetrics.date))
     return rows.map(r => ({
@@ -2327,12 +2330,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const [weightRow] = await this.db
       .select({ weightKg: s.bodyMetrics.weightKg })
       .from(s.bodyMetrics)
-      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg)))
+      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg), isNull(s.bodyMetrics.deletedAt)))
       .orderBy(asc(s.bodyMetrics.date)).limit(1)
     const [bfRow] = await this.db
       .select({ bodyFatPct: s.bodyMetrics.bodyFatPct })
       .from(s.bodyMetrics)
-      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.bodyFatPct)))
+      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.bodyFatPct), isNull(s.bodyMetrics.deletedAt)))
       .orderBy(asc(s.bodyMetrics.date)).limit(1)
     return { weightKg: weightRow?.weightKg ?? null, bodyFatPct: bfRow?.bodyFatPct ?? null }
   }
@@ -2342,7 +2345,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const [row] = await this.db
       .select({ weightKg: s.bodyMetrics.weightKg })
       .from(s.bodyMetrics)
-      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg)))
+      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg), isNull(s.bodyMetrics.deletedAt)))
       .orderBy(desc(s.bodyMetrics.date)).limit(1)
     return row?.weightKg ?? null
   }
@@ -2489,7 +2492,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       this.getUserById(userId),
       this.db.select({ weightKg: s.bodyMetrics.weightKg })
         .from(s.bodyMetrics)
-        .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg)))
+        .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg), isNull(s.bodyMetrics.deletedAt)))
         .orderBy(desc(s.bodyMetrics.date)).limit(1),
     ])
     const ageYears = ageFromDob(user?.dateOfBirth ?? null, new Date())
@@ -4615,7 +4618,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         bmrKcal: s.bodyMetrics.bmrKcal,
       })
       .from(s.bodyMetrics)
-      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.bodyFatPct)))
+      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.bodyFatPct), isNull(s.bodyMetrics.deletedAt)))
 
     const [profile] = await this.db
       .select({ heightCm: s.users.heightCm, dateOfBirth: s.users.dateOfBirth, sex: s.users.sex })
