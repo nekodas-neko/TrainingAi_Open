@@ -14,7 +14,7 @@ export function AppButton({
   ...props
 }: Omit<PressableProps, 'children'> & {
   title: string;
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
+  variant?: 'primary' | 'secondary' | 'surface' | 'ghost' | 'danger';
   busy?: boolean;
   icon?: IconName;
 }) {
@@ -26,19 +26,23 @@ export function AppButton({
       ? theme.colors.onBrand
       : variant === 'danger'
         ? theme.colors.danger
-        : theme.colors.brandText;
+        : variant === 'surface'
+          ? theme.colors.text
+          : theme.colors.brandText;
   const background = blocked
     ? theme.colors.raised
     : variant === 'primary'
       ? theme.colors.brand
       : variant === 'secondary'
         ? theme.colors.brandSurface
-        : 'transparent';
+        : variant === 'surface'
+          ? theme.colors.surface
+          : 'transparent';
   return (
     <Pressable
       {...props}
       accessibilityRole="button"
-      accessibilityState={{ disabled: blocked, busy }}
+      accessibilityState={{ ...props.accessibilityState, disabled: blocked, busy }}
       disabled={blocked}
       style={(state) => [
         {
@@ -49,6 +53,8 @@ export function AppButton({
           justifyContent: 'center',
           alignItems: 'center',
           backgroundColor: background,
+          borderWidth: variant === 'surface' ? 1 : 0,
+          borderColor: theme.colors.border,
           opacity: state.pressed ? 0.75 : 1,
         },
         typeof style === 'function' ? style(state) : style,

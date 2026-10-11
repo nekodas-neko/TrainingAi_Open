@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'apps/apple/**'
+      - 'packages/shared/**'
       - '.github/workflows/apple.yml'
   workflow_dispatch:
 
@@ -31,7 +32,7 @@ jobs:
           package_json_file: apps/apple/package.json
       - uses: actions/setup-node@v5
         with:
-          node-version: '24'
+          node-version: '22'
           cache: pnpm
           cache-dependency-path: apps/apple/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile

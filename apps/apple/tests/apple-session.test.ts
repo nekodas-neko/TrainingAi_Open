@@ -111,3 +111,44 @@ test('sign-out during the native sheet prevents late proof from restoring a sess
   assert.ok(!f.storage.has('fitnessai.session.v1'));
   assert.ok(!f.calls.some(x => x.path.endsWith('/complete')));
 });
+
+test('saved account identity remains available for scoped reads when profile refresh is offline', async t => {
+  const f = fixture(true);
+  t.mock.method(globalThis, 'fetch', async () => { throw new Error('offline'); });
+  await f.controller.initialize(null);
+  assert.equal(f.controller.dataReader?.userId, profile.id);
+  assert.equal(f.controller.dataReader?.origin, origin);
+});
+
+test('a reader rejects late data after sign-out and cannot make further authenticated requests', async t => {
+  const f = fixture(true);
+  t.mock.method(globalThis, 'fetch', f.fetcher);
+  await f.controller.initialize(null);
+  const reader = f.controller.dataReader!;
+  let release!: (response: Response) => void;
+  t.mock.method(globalThis, 'fetch', () => new Promise<Response>(resolve => { release = resolve; }));
+  const request = reader.get('/api/workout-data', { tab: 'meta' });
+  const rejected = assert.rejects(request, /account changed/);
+  while (!release) { await new Promise(resolve => setImmediate(resolve)); }
+  await f.controller.signOut();
+  release(json({ program: 'late-data' }));
+  await rejected;
+  assert.equal(f.controller.dataReader, null);
+  await assert.rejects(reader.get('/api/workout-data'), /Sign in/);
+});
+
+test('a previous account reader cannot use a different account’s new session', async t => {
+  const f = fixture(true);
+  t.mock.method(globalThis, 'fetch', f.fetcher);
+  await f.controller.initialize(null);
+  const previous = f.controller.dataReader!;
+  await f.controller.signOut();
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) =>
+    new URL(String(input)).pathname === '/api/user/profile'
+      ? json({ user: { ...profile, id: 'other-user' } }) : f.fetcher(input, init));
+  await f.controller.signInWithApple();
+  assert.equal(f.controller.dataReader?.userId, 'other-user');
+  const calls = f.calls.length;
+  await assert.rejects(previous.get('/api/workout-data'), /Sign in/);
+  assert.equal(f.calls.length, calls);
+});

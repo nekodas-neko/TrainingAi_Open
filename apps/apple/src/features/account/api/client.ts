@@ -19,16 +19,19 @@ export type SessionToken = { accessToken: string; expiresAt: number };
 
 export function createApiClient(baseUrl: string, getToken: () => Promise<string | null>) {
   const base = backendOrigin(baseUrl);
-  async function request(path: string, method: 'GET' | 'POST', body?: unknown, authenticated = method === 'GET'): Promise<unknown> {
+  async function request(path: string, method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', body?: unknown, authenticated = method === 'GET', query?: Record<string, string>): Promise<unknown> {
     if (!/^\/api\/[a-zA-Z0-9/_-]+$/.test(path)) {
       throw new Error('Expected a relative /api/ path.');
     }
     const token = authenticated ? await getToken() : null;
     if (authenticated && !token) { throw new Error('Sign in before contacting TrainingAi.'); }
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 15_000);
+    const slow = /^\/api\/(generate-program|builder-chat|ai-periodization\/session\/[^/]+\/prescribe)/.test(path);
+    const timeout = setTimeout(() => controller.abort(), slow ? 65_000 : 15_000);
     try {
-      const response = await fetch(new URL(path, base), {
+      const url = new URL(path, base);
+      if (query) { url.search = new URLSearchParams(query).toString(); }
+      const response = await fetch(url, {
         method, credentials: 'omit', cache: 'no-store', redirect: 'error',
         headers: { Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: body ? JSON.stringify(body) : undefined, signal: controller.signal,
@@ -48,7 +51,31 @@ export function createApiClient(baseUrl: string, getToken: () => Promise<string 
     } finally { clearTimeout(timeout); }
   }
   return {
-    get(path: string) { return request(path, 'GET'); },
+    get(path: string, query?: Record<string, string>) { return request(path, 'GET', undefined, true, query); },
+    post(path: string, body: unknown) { return request(path, 'POST', body, true); },
+    put(path: string, body: unknown) { return request(path, 'PUT', body, true); },
+    patch(path: string, body: unknown) { return request(path, 'PATCH', body, true); },
+    delete(path: string, body: unknown) { return request(path, 'DELETE', body, true); },
+    async media(source: string): Promise<string> {
+      const url = new URL(source, base);
+      if (url.protocol !== 'https:' || url.username || url.password) { throw new Error('Invalid exercise media URL.'); }
+      const own = url.origin === base;
+      if (own && url.pathname.startsWith('/exercise-media/')) { url.pathname = `/api${url.pathname}`; }
+      if (own && !url.pathname.startsWith('/api/exercise-media/')) { throw new Error('Invalid exercise media path.'); }
+      const token = own ? await getToken() : null;
+      if (own && !token) { throw new Error('Sign in before loading exercise media.'); }
+      const response = await fetch(url, { credentials: 'omit', redirect: 'error', headers: { Accept: 'image/*', ...(token ? { Authorization: `Bearer ${token}` } : {}) }, signal: AbortSignal.timeout(20_000) });
+      if (!response.ok) { throw new ApiError(response.status); }
+      const type = response.headers.get('content-type')?.split(';')[0];
+      if (!type || !['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(type)) { throw new Error('Invalid exercise media response.'); }
+      const length = Number(response.headers.get('content-length'));
+      if (length > 8 * 1024 * 1024) { throw new Error('Exercise media is too large.'); }
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes.length > 8 * 1024 * 1024) { throw new Error('Exercise media is too large.'); }
+      let binary = '';
+      for (let index = 0; index < bytes.length; index += 16_384) { binary += String.fromCharCode(...bytes.subarray(index, index + 16_384)); }
+      return `data:${type};base64,${btoa(binary)}`;
+    },
     async exchange(token: string, verifier: string): Promise<SessionToken> {
       const value = await request('/api/auth/exchange-mobile-token', 'POST', { token, verifier, responseType: 'token' }) as Record<string, unknown> | null;
       return sessionResponse(value);

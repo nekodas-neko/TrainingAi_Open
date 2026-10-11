@@ -33,6 +33,6 @@ export function useAccount() {
     const timeout = setTimeout(() => { void controller.refresh(); }, Math.max(0, state.expiresAt * 1000 - Date.now()));
     return () => clearTimeout(timeout);
   }, [controller, state.expiresAt]);
-  return { state, reason: setup.reason, appleAvailable: nativeAppleAuthAvailable(), diagnostics: () => controller ? { ...controller.diagnostics, displayedStatus: state.status } : null,
+  return { state, dataReader: controller?.dataReader ?? null, reason: setup.reason, appleAvailable: nativeAppleAuthAvailable(), diagnostics: () => controller ? { ...controller.diagnostics, displayedStatus: state.status } : null,
     signInWithApple: () => controller?.signInWithApple(), signIn: () => controller?.signIn(), cancel: () => controller?.cancel(), retry: () => controller?.refresh(), signOut: () => controller?.signOut() };
 }

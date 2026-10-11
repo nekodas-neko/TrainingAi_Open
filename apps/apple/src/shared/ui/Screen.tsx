@@ -1,5 +1,5 @@
-import type { PropsWithChildren } from 'react';
-import { ScrollView } from 'react-native';
+import type { PropsWithChildren, ReactNode } from 'react';
+import { KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { AppText } from './AppText';
 import { AppButton } from './AppButton';
 import { Stack } from './Stack';
@@ -10,37 +10,77 @@ export function Screen({
   backLabel,
   onBack,
   children,
-}: PropsWithChildren<{ title: string; backLabel?: string; onBack?: () => void }>) {
+  compact = false,
+  footer,
+}: PropsWithChildren<{
+  title: string;
+  backLabel?: string;
+  onBack?: () => void;
+  compact?: boolean;
+  footer?: ReactNode;
+}>) {
   const { theme } = useTheme();
   return (
-    <ScrollView
-      contentContainerStyle={{
-        padding: theme.spacing.lg,
-        paddingBottom: theme.spacing.xxl,
-        gap: theme.spacing.xl,
-        maxWidth: theme.sizes.contentWidth,
-        width: '100%',
-        alignSelf: 'center',
-      }}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      style={{ flex: 1 }}
     >
-      <Stack gap="xs">
-        {onBack ? (
-          <AppButton
-            title={backLabel ?? 'Back'}
-            icon="back"
-            accessibilityLabel={`Back to ${backLabel ?? 'previous screen'}`}
-            variant="ghost"
-            onPress={onBack}
-            style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }}
-          />
-        ) : (
-          <AppText variant="eyebrow" tone="brand">
-            TrainingAi
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        contentContainerStyle={{
+          padding: theme.spacing.lg,
+          paddingBottom: theme.spacing.xxl,
+          gap: theme.spacing.xl,
+          flexGrow: 1,
+          maxWidth: theme.sizes.contentWidth,
+          width: '100%',
+          alignSelf: 'center',
+        }}
+      >
+        <Stack
+          gap="xs"
+          direction={compact ? 'row' : 'column'}
+          align={compact ? 'center' : undefined}
+          justify={compact ? 'space-between' : undefined}
+        >
+          {onBack ? (
+            <AppButton
+              title={backLabel ?? 'Back'}
+              icon="back"
+              accessibilityLabel={`Back to ${backLabel ?? 'previous screen'}`}
+              variant="ghost"
+              onPress={onBack}
+              style={{ alignSelf: 'flex-start', paddingHorizontal: 0 }}
+            />
+          ) : (
+            <AppText variant="eyebrow" tone="brand">
+              TrainingAi
+            </AppText>
+          )}
+          <AppText
+            variant={compact ? 'heading' : 'title'}
+            numberOfLines={compact ? 1 : undefined}
+            style={compact ? { flexShrink: 1 } : undefined}
+          >
+            {title}
           </AppText>
-        )}
-        <AppText variant="title">{title}</AppText>
-      </Stack>
-      {children}
-    </ScrollView>
+        </Stack>
+        {children}
+      </ScrollView>
+      {footer && (
+        <Stack
+          style={{
+            paddingHorizontal: theme.spacing.lg,
+            paddingVertical: theme.spacing.sm,
+            backgroundColor: theme.colors.background,
+            borderTopWidth: 1,
+            borderTopColor: theme.colors.border,
+          }}
+        >
+          {footer}
+        </Stack>
+      )}
+    </KeyboardAvoidingView>
   );
 }

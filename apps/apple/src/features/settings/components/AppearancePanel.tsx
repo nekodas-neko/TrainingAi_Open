@@ -1,9 +1,19 @@
-import { AppText, Card, ColorChoice, Grid, SegmentedControl } from '../../../shared/ui';
+import {
+  AppButton,
+  AppText,
+  Card,
+  ColorChoice,
+  Grid,
+  Notice,
+  SegmentedControl,
+} from '../../../shared/ui';
+import { useAppearancePreferences } from '../AppearanceProvider';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { palettes, type Brand } from '../../../shared/theme/palettes';
 
 export function AppearancePanel() {
   const { theme, mode, setMode, brand, setBrand } = useTheme();
+  const { saveStatus, retry } = useAppearancePreferences();
   return (
     <Card>
       <AppText variant="heading">Appearance</AppText>
@@ -29,9 +39,22 @@ export function AppearancePanel() {
           />
         ))}
       </Grid>
-      <AppText variant="caption" tone="muted">
-        Changes apply for this session.
-      </AppText>
+      {saveStatus === 'error' ? (
+        <>
+          <Notice
+            title="Preferences not saved"
+            message="Your changes apply now, but could not be saved for next time."
+            error
+          />
+          <AppButton title="Retry saving preferences" variant="secondary" onPress={retry} />
+        </>
+      ) : (
+        <AppText variant="caption" tone="muted" accessibilityLiveRegion="polite">
+          {saveStatus === 'saving'
+            ? 'Saving preferences…'
+            : 'Preferences are saved on this iPhone.'}
+        </AppText>
+      )}
     </Card>
   );
 }

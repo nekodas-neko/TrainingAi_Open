@@ -5,7 +5,34 @@ import Heart from 'lucide-react-native/icons/heart';
 import Home from 'lucide-react-native/icons/house';
 import MoreHorizontal from 'lucide-react-native/icons/ellipsis';
 import Utensils from 'lucide-react-native/icons/utensils';
+import SlidersHorizontal from 'lucide-react-native/icons/sliders-horizontal';
+import RefreshCw from 'lucide-react-native/icons/refresh-cw';
+import HeartPulse from 'lucide-react-native/icons/heart-pulse';
+import Footprints from 'lucide-react-native/icons/footprints';
+import Activity from 'lucide-react-native/icons/activity';
+import Zap from 'lucide-react-native/icons/zap';
+import Brain from 'lucide-react-native/icons/brain';
+import Flame from 'lucide-react-native/icons/flame';
+import Target from 'lucide-react-native/icons/target';
+import Award from 'lucide-react-native/icons/award';
+import Bike from 'lucide-react-native/icons/bike';
+import Waves from 'lucide-react-native/icons/waves-horizontal';
+import Users from 'lucide-react-native/icons/users';
+import Mountain from 'lucide-react-native/icons/mountain';
+import Swords from 'lucide-react-native/icons/swords';
+import Wind from 'lucide-react-native/icons/wind';
+import Timer from 'lucide-react-native/icons/timer';
+import TrendingUp from 'lucide-react-native/icons/trending-up';
+import TrendingDown from 'lucide-react-native/icons/trending-down';
+import X from 'lucide-react-native/icons/x';
+import Calculator from 'lucide-react-native/icons/calculator';
+import SkipForward from 'lucide-react-native/icons/skip-forward';
+import Check from 'lucide-react-native/icons/check';
+import Share from 'lucide-react-native/icons/share';
+import ArrowUp from 'lucide-react-native/icons/arrow-up';
+import ArrowDown from 'lucide-react-native/icons/arrow-down';
 import type { LucideProps } from 'lucide-react-native';
+import { Platform } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
 
 const icons = {
@@ -16,6 +43,32 @@ const icons = {
   more: MoreHorizontal,
   back: ChevronLeft,
   forward: ChevronRight,
+  program: SlidersHorizontal,
+  refresh: RefreshCw,
+  cardio: HeartPulse,
+  legs: Footprints,
+  activity: Activity,
+  power: Zap,
+  mind: Brain,
+  flame: Flame,
+  target: Target,
+  award: Award,
+  bike: Bike,
+  waves: Waves,
+  users: Users,
+  mountain: Mountain,
+  swords: Swords,
+  wind: Wind,
+  timer: Timer,
+  upper: TrendingUp,
+  lower: TrendingDown,
+  close: X,
+  calculator: Calculator,
+  skip: SkipForward,
+  check: Check,
+  share: Share,
+  up: ArrowUp,
+  down: ArrowDown,
 };
 
 export type IconName = keyof typeof icons;
@@ -43,10 +96,14 @@ export function Icon({
       color={color ?? theme.colors[tone === 'brand' ? 'brandText' : tone]}
       strokeWidth={strokeWidth ?? theme.icons.strokeWidth}
       style={style}
-      accessible={false}
       aria-hidden
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
+      {...(Platform.OS === 'web'
+        ? {}
+        : {
+            accessible: false,
+            accessibilityElementsHidden: true,
+            importantForAccessibility: 'no-hide-descendants' as const,
+          })}
       focusable={false}
       pointerEvents="none"
     />

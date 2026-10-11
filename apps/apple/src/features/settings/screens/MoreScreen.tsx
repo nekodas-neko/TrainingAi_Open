@@ -1,7 +1,7 @@
 import { Card, Avatar, Stack, AppText, Section, FeatureRow } from '../../../shared/ui';
 import { useAccountContext } from '../../account/AccountProvider';
 
-export function MoreScreen({ openSettings }: { openSettings: () => void }) {
+export function MoreScreen({ openSettings, openPrograms, openLibrary, openHistory, openStrength }: { openSettings: () => void; openPrograms: () => void; openLibrary: () => void; openHistory: () => void; openStrength: () => void }) {
   const { state } = useAccountContext();
   return (
     <>
@@ -38,8 +38,9 @@ export function MoreScreen({ openSettings }: { openSettings: () => void }) {
           title="Profile & goals"
           subtitle="Your details, fitness goals and preferences"
         />
-        <FeatureRow title="Progress & reviews" subtitle="History, trends and weekly reviews" />
+        <FeatureRow title="Progress & reviews" subtitle="History, trends and weekly reviews" onPress={openStrength}/>
       </Section>
+      <Section title="Training"><FeatureRow title="Programs" subtitle="Sessions, schedules and progression" onPress={openPrograms}/><FeatureRow title="Exercise library" onPress={openLibrary}/><FeatureRow title="Workout history" onPress={openHistory}/></Section>
       <Section title="Coaching & community">
         <FeatureRow title="AI coach" subtitle="Conversations and personalised guidance" />
         <FeatureRow title="Friends & feed" subtitle="Connect and share your progress" />

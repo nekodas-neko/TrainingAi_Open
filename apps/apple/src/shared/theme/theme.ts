@@ -7,6 +7,10 @@ import {
   icons,
   typography,
   domainTones,
+  anatomy,
+  sessionTones,
+  sessionFills,
+  effortColors,
   type TextVariant,
 } from './tokens.ts';
 
@@ -27,6 +31,8 @@ export type ThemeColors = {
   border: string;
   danger: string;
   disabled: string;
+  scrim: string;
+  onSignal: string;
 };
 export type Theme = {
   mode: 'light' | 'dark';
@@ -37,6 +43,9 @@ export type Theme = {
   icons: typeof icons;
   typography: Record<TextVariant, TextStyle>;
   tones: Record<Tone, TonePalette>;
+  anatomy: typeof anatomy;
+  sessions: TonePalette[];
+  effort: Record<number, string>;
 };
 export type ThemeOverrides = {
   colors?: Partial<ThemeColors>;
@@ -46,6 +55,9 @@ export type ThemeOverrides = {
   icons?: Partial<typeof icons>;
   typography?: Partial<Record<TextVariant, TextStyle>>;
   tones?: Partial<Record<Tone, Partial<TonePalette>>>;
+  anatomy?: Partial<typeof anatomy>;
+  sessions?: TonePalette[];
+  effort?: Record<number, string>;
 };
 
 export function createTheme(
@@ -60,6 +72,8 @@ export function createTheme(
     border: mode === 'dark' ? '#ffffff18' : '#e8e8e8',
     danger: mode === 'dark' ? '#ff8d86' : '#c62828',
     disabled: mode === 'dark' ? '#809084' : '#717a73',
+    scrim: '#00000088',
+    onSignal: '#000000',
     ...overrides.colors,
   };
   const tones = {
@@ -86,6 +100,15 @@ export function createTheme(
     radii: { ...radii, ...overrides.radii },
     sizes: { ...sizes, ...overrides.sizes },
     icons: { ...icons, ...overrides.icons },
+    anatomy: { ...anatomy, ...overrides.anatomy },
+    effort: { ...effortColors, ...overrides.effort },
+    sessions:
+      overrides.sessions ??
+      sessionTones[mode].map((foreground, index) => ({
+        foreground,
+        background: `${sessionFills[index]}33`,
+        border: `${sessionFills[index]}4d`,
+      })),
     typography: textStyles,
   };
 }

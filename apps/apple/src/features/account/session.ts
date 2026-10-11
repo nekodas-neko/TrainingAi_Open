@@ -6,7 +6,20 @@ const SESSION_KEY = 'fitnessai.session.v1';
 const PENDING_KEY = 'fitnessai.pending.v1';
 const TRANSACTION_AGE = 10 * 60 * 1000;
 const RANDOM_RE = /^[A-Za-z0-9_-]{43}$/;
-type SavedSession = SessionToken & { origin: string; userId: string | null };
+type SavedSession = SessionToken & { origin: string; userId: string | null; timezone?: string | null };
+export type AccountReader = {
+  origin: string;
+  userId: string;
+  get(path: string, query?: Record<string, string>): Promise<unknown>;
+};
+export type AccountConnection = AccountReader & {
+  readonly timezone: string | null;
+  post(path: string, body: unknown): Promise<unknown>;
+  put?(path: string, body: unknown): Promise<unknown>;
+  patch?(path: string, body: unknown): Promise<unknown>;
+  delete?(path: string, body: unknown): Promise<unknown>;
+  media?(source: string): Promise<string>;
+};
 type Pending = { origin: string; verifier: string; state: string; createdAt: number };
 export type AccountState = {
   status: 'loading' | 'signedOut' | 'signingIn' | 'checking' | 'signedIn' | 'storageError';
@@ -49,12 +62,56 @@ export class AccountSession {
   private api: ReturnType<typeof createApiClient>;
   private platform: AuthPlatform;
   private events: { at: string; event: string; httpStatus?: number }[] = [];
+  private reader: AccountConnection | null = null;
   constructor(origin: string, platform: AuthPlatform) {
     this.platform = platform;
     this.origin = backendOrigin(origin);
     this.api = createApiClient(this.origin, async () => this.session && this.session.expiresAt > Date.now() / 1000 ? this.session.accessToken : null);
   }
   get state() { return this.current; }
+  get dataReader(): AccountConnection | null {
+    const userId = this.session?.userId;
+    if (!userId || !this.session || this.session.expiresAt <= Date.now() / 1000) { return null; }
+    if (this.reader?.userId === userId) { return this.reader; }
+    const api = createApiClient(this.origin, async () => this.session?.userId === userId
+      && this.session.expiresAt > Date.now() / 1000 ? this.session.accessToken : null);
+    const controller = this;
+    this.reader = {
+      origin: this.origin, userId,
+      get timezone() { return controller.session?.timezone ?? null; },
+      get: async (path, query) => {
+        const value = await api.get(path, query);
+        if (this.session?.userId !== userId) { throw new Error('The account changed during the request.'); }
+        return value;
+      },
+      post: async (path, body) => {
+        const value = await api.post(path, body);
+        if (this.session?.userId !== userId) { throw new Error('The account changed during the request.'); }
+        return value;
+      },
+      put: async (path, body) => {
+        const value = await api.put(path, body);
+        if (this.session?.userId !== userId) { throw new Error('The account changed during the request.'); }
+        return value;
+      },
+      patch: async (path, body) => {
+        const value = await api.patch(path, body);
+        if (this.session?.userId !== userId) { throw new Error('The account changed during the request.'); }
+        return value;
+      },
+      delete: async (path, body) => {
+        const value = await api.delete(path, body);
+        if (this.session?.userId !== userId) { throw new Error('The account changed during the request.'); }
+        return value;
+      },
+      media: async source => {
+        const value = await api.media(source);
+        if (this.session?.userId !== userId) { throw new Error('The account changed during the request.'); }
+        return value;
+      },
+    };
+    return this.reader;
+  }
   get diagnostics() {
     return { status: this.current.status, hasSession: this.session !== null, hasProfile: this.current.profile !== null,
       hasPending: this.pending !== null, events: [...this.events] };
@@ -92,7 +149,8 @@ export class AccountSession {
       if (generation !== this.generation) { return; }
       if (raw && raw.origin === this.origin && typeof raw.accessToken === 'string' && raw.accessToken.length > 0
         && raw.accessToken.length <= 16_384 && typeof raw.expiresAt === 'number' && Number.isSafeInteger(raw.expiresAt)
-        && raw.expiresAt > Date.now() / 1000 && (raw.userId === null || typeof raw.userId === 'string')) {
+        && raw.expiresAt > Date.now() / 1000 && (raw.userId === null || typeof raw.userId === 'string')
+        && (raw.timezone == null || typeof raw.timezone === 'string')) {
         this.session = raw as SavedSession;
       } else {
         await this.write(() => this.platform.remove(SESSION_KEY));
@@ -232,7 +290,7 @@ export class AccountSession {
       if (this.session.userId && this.session.userId !== profile.id) {
         await this.signOut('The account did not match the saved session. Sign in again.'); return;
       }
-      const session = { ...this.session, userId: profile.id };
+      const session = { ...this.session, userId: profile.id, timezone: profile.timezone };
       await this.write(() => this.platform.set(SESSION_KEY, JSON.stringify(session)));
       if (generation !== this.generation) { return; }
       this.session = session;
