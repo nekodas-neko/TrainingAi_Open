@@ -7,9 +7,13 @@ deeper doc._
 
 ## In one minute
 
-- **Every number sits on one of five layers**, decided by the owner on 2026-10-11:
-  `source → metric → unit → score → root`. Devices plug in only at the bottom. Nothing above the
-  metric layer is meant to know which device a value came from.
+- **Every number sits on one of five layers**, fixed in this order by the owner on 2026-10-11:
+  `source → metric → unit → score → root`. These are working names, not final ones. Devices plug in
+  only at the bottom, and nothing above the metric layer is meant to know which device a value came
+  from.
+- **A few units can act on readiness directly.** Duration, overnight HRV, resting HR, training load,
+  temperature and breathing rate can move readiness outside their score pillar's average: through
+  the illness check today, and through proposed caps in the new model.
 - **The only supported runtime is the APK on the owner's Samsung S25 Ultra**: a Capacitor WebView
   that loads the Next.js app from Railway, plus about 6,200 lines of Kotlin for Bluetooth and
   background services.
@@ -25,17 +29,19 @@ deeper doc._
 - **Changes are paused** while the native work is under way: agents do read-only analysis and docs
   only, and nothing is released until the owner lifts the pause.
 
-![Every layer from source to readiness, coloured by source](scoring-flow.svg)
+![Every layer expanded, from readiness down to the sources](scoring-flow.svg)
 
-_Read the picture from the bottom up. Each colour is one source; follow it to see which scores that
-device can move. Health and Nutrition are possible score pillars that don't exist yet: today their
-units sit inside Body._
+_Every score pillar expands into its units, every unit into the metrics it reads, and every metric
+into the sources that can send it. A filled source pill sends the metric today; a dashed one is
+planned or possible. Red marks the units that can act on readiness directly. Health and Nutrition are
+possible score pillars that don't exist yet: today their units sit inside Body._
 
 ## 1. The five layers
 
-Each layer is called a **pillar**; "pillar" and "layer" mean the same thing.
+Each layer is called a **pillar**; "pillar" and "layer" mean the same thing. The owner fixed the
+number and order of the layers on 2026-10-11, not the words. Every name below is a working name.
 
-| # | Layer | Example | What it is | Scored? | Code id | Today's code calls it |
+| # | Layer (working name) | Example | What it is | Scored? | Code id, if adopted | Today's code calls it |
 |---|---|---|---|---|---|---|
 | 1 | **Root pillar** | Readiness | The day's one number | 0–100 | `root.readiness` | Readiness |
 | 2 | **Score pillar** | Sleep, Heart, Activity, Body | A scored zone | 0–100 | `score.sleep` | Pillar |
@@ -55,7 +61,7 @@ In running text the second word can drop once the layer is clear: "the latency u
 4. **A source never appears above the metric layer.** This is the line every device, vendor API and
    future integration plugs into.
 
-The code still says Pillar and Input. Renaming it is #2809, which waits for the pause to lift.
+The code still says Pillar and Input. Nothing is renamed until the owner chooses final names (#2809).
 
 ## 2. How a score is built
 
@@ -107,6 +113,22 @@ other 25.
 out and the rest reweight. The owner is weighing **red-flag caps** on top (fever caps readiness at
 40, an HRV crash at 60, and so on), because an average dilutes one alarming night. The caps are a
 proposal, not built.
+
+**Some units act on readiness directly**, outside their score pillar's average, because one
+alarming night shouldn't be diluted into a few points:
+
+| Unit | Red flag | Live readiness today | Shadow model (proposed cap) |
+|---|---|---|---|
+| Temperature | Fever, illness | Illness check: −25 for fever, −10 when "elevated" | Fever caps readiness at 40; illness signs at 60 |
+| Breathing rate | Illness | Part of the illness check | Illness signs: 60 |
+| Resting HR | Illness | Part of the illness check | Illness signs: 60 |
+| Overnight HRV | HRV crash, illness | Part of the illness check | HRV unit at 20 or below: 60 |
+| Duration | Very short sleep | — | 5½ h or less: 60 |
+| Training load | Overload | — | Load ratio 1.6 or more: 65 |
+
+The illness check weighs how far temperature (40%), breathing (25%), resting HR (20%) and HRV (15%)
+sit from normal, the bad way. In 72 days it fired "watch" twice and never reached "elevated" or
+"fever".
 
 The **live readiness** users see today (`lib/health/readiness-payload.ts`) is older. It has 8
 contributors copied from Oura's layout, counts HRV and heart rate twice, and applies a flat illness
@@ -316,6 +338,8 @@ and [`owner-manual.md`](../owner-manual.md).
 
 ## 9. Open decisions that touch this
 
+- **Layer names:** the five layers and their order are fixed; the words are working names until the
+  owner chooses final ones.
 - **Readiness recipe:** weighted score pillars plus red-flag caps, and the cap numbers.
 - **Score pillar weights:** keep Sleep 30 · Heart 30 · Activity 20 · Body 20?
 - **Health and Nutrition:** split them out of Body as their own score pillars, or keep them inside?
