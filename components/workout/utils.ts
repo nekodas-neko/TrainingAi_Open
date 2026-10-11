@@ -1,3 +1,4 @@
+import { expectedRpePrefill } from "@trainingai/shared/ai-periodization/expected-rpe";
 import type { ExerciseType } from "@trainingai/shared/types/program";
 import type { PhaseStatus } from "@trainingai/shared/workout/session-data";
 import type { WorkoutExercise } from "@/app/api/workout-data/route";
@@ -146,9 +147,15 @@ export function exerciseSetCount(ex: { progressionStyle?: { reps: number }[] | n
   return ex.progressionStyle ? ex.progressionStyle.length : (ex.defaultSets ?? DEFAULT_SETS);
 }
 
-export function defaultRpeFromPct(pct: number | undefined): number {
-  if (pct === undefined) return 7
-  return Math.min(10, Math.max(6, Math.floor(pct / 10)))
+/** #2253: the value set `i`'s RPE picker opens on — the shared expectation for the set as planned
+ *  (`expectedRpePrefill`). Bodyweight work has no % to state an expectation from. */
+export function rpePrefill(
+  ex: { exerciseType?: string | null } | undefined,
+  style: readonly { reps: number; pct?: number | null }[] | null | undefined,
+  i: number,
+): number {
+  const set = ex?.exerciseType === 'bodyweight' ? undefined : style?.[i]
+  return expectedRpePrefill(set?.pct, set?.reps)
 }
 
 // The example phrasing shown under the Voice button and named in its failure message. One string,

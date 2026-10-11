@@ -21,12 +21,12 @@ import {
   prescriptionBasisPayload,
   styleWithPrescribedBars,
   weightStepFor,
-  defaultRpeFromPct,
   applyDeloadReverts,
   deloadRevertNames,
   deloadOverrideBlocked,
   deloadOverrideOutcome, fullOverrideNeedsRebuild,
   exerciseSetCount,
+  rpePrefill,
   sessionContextLabel,
 } from "@/components/workout/utils";
 import { estimateOneRm, isDeloadedForEstimate } from "@trainingai/shared/1rm";
@@ -829,7 +829,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       store.setReps(repsInit);
       store.initRpeValues(
         Array.from({ length: ds }, (_, i) =>
-          defaultRpeFromPct(ex?.exerciseType === "bodyweight" ? undefined : style?.[i]?.pct)
+          rpePrefill(ex, style, i)
         )
       );
       store.setCurrentIdx(idx);
@@ -871,7 +871,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
     store.setReps(repsInit);
     store.initRpeValues(
       Array.from({ length: ds }, (_, i) =>
-        defaultRpeFromPct(ex.exerciseType === "bodyweight" ? undefined : style?.[i]?.pct)
+        rpePrefill(ex, style, i)
       )
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -909,7 +909,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
         store.setReps(nextStyle ? nextStyle.map((s) => s.reps) : Array(ds).fill(DEFAULT_REPS));
         store.initRpeValues(
           Array.from({ length: ds }, (_, i) =>
-            defaultRpeFromPct(nextEx?.exerciseType === "bodyweight" ? undefined : nextStyle?.[i]?.pct)
+            rpePrefill(nextEx, nextStyle, i)
           )
         );
         store.setTimerStarted(false);
@@ -1057,7 +1057,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       s.setReps(repsInit);
       s.initRpeValues(
         Array.from({ length: ds }, (_, i) =>
-          defaultRpeFromPct(ex?.exerciseType === "bodyweight" ? undefined : style?.[i]?.pct)
+          rpePrefill(ex, style, i)
         )
       );
       s.setTimerStarted(false);

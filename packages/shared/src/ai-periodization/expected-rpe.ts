@@ -1,4 +1,5 @@
 import { repFactor } from '@trainingai/shared/1rm'
+import type { RpeSource } from '@trainingai/shared/workout/rpe-source'
 
 // Reps-aware expected RPE, used by RPE autoregulation.
 //
@@ -71,28 +72,66 @@ export function pctForExpectedRpe(targetRpe: number, reps: number): number {
   return Math.round(pct * 2) / 2 // 0.5 precision, matching the codebase's pct rounding
 }
 
-export interface RpeTrendInputSet { rpe: number | null; intensityPct: number | null; reps: number }
+// The values the RPE picker offers (`components/workout/rpe-strip.tsx`).
+export const RPE_PICKER_MIN = 6
+export const RPE_PICKER_MAX = 10
+
+/**
+ * #2253 (owner, 2026-10-06): the value the RPE picker opens on — the engine's own expectation for
+ * the set as planned, rounded onto the picker. One formula: the pre-fill used to be `floor(pct/10)`
+ * (`defaultRpeFromPct`, deleted), which ran 0.71 below `expectedRpe`, so every untouched set read
+ * back as "felt easy" and produced all six phantom "+reps / +set" pushes in the replay. With no %
+ * (bodyweight, or an exercise with no style) there is no expectation to state, and it opens on 7.
+ */
+export function expectedRpePrefill(pct: number | undefined | null, plannedReps: number | undefined | null): number {
+  if (pct == null || plannedReps == null) return 7
+  return Math.min(RPE_PICKER_MAX, Math.max(RPE_PICKER_MIN, Math.round(expectedRpe(pct, plannedReps))))
+}
+
+export interface RpeTrendInputSet {
+  rpe: number | null; intensityPct: number | null; reps: number
+  /** #2253: `expected` is the untouched pre-fill and reads as "went as planned"; `rated` and a
+   *  pre-#2450 null are read as reported. */
+  rpeSource?: RpeSource | null
+}
+
+/** The RPE a set counts as: the reported value, or the expectation itself when the lifter left the
+ *  pre-fill alone (#2253: "assume it's correctly predicted if nothing is said"). */
+const reportedOrExpected = (s: RpeTrendInputSet & { rpe: number; intensityPct: number }): number =>
+  s.rpeSource === 'expected' ? expectedRpe(s.intensityPct, s.reps) : s.rpe
 
 // Program-wide RPE trend used by the emergency-deload safety net. Reps-aware like
 // expectedRpe, so an honest AMRAP set reads as on-target rather than a false "too hard".
+// An untouched set counts as delta 0 rather than being left out (#2253): the owner taps only when a
+// set was harder than planned, so a rated-only mean would be biased upward toward the 2.0 trigger.
 export function rpeTrendFromSets(sets: RpeTrendInputSet[]): { avgActual: number; avgExpected: number; delta: number } | null {
-  const rated = sets.filter(s => s.rpe != null && s.intensityPct != null)
+  const rated = sets.filter((s): s is RpeTrendInputSet & { rpe: number; intensityPct: number } =>
+    s.rpe != null && s.intensityPct != null)
   if (rated.length < 3) return null
-  const avgActual = rated.reduce((sum, s) => sum + s.rpe!, 0) / rated.length
-  const avgExpected = rated.reduce((sum, s) => sum + expectedRpe(s.intensityPct!, s.reps), 0) / rated.length
+  const avgActual = rated.reduce((sum, s) => sum + reportedOrExpected(s), 0) / rated.length
+  const avgExpected = rated.reduce((sum, s) => sum + expectedRpe(s.intensityPct, s.reps), 0) / rated.length
   return { avgActual, avgExpected, delta: avgActual - avgExpected }
 }
 
 export interface RpeDeltaInputSet extends RpeTrendInputSet { exerciseName: string }
 
+/** #2253: the fewest RATED sets an exercise needs before its delta moves next week's plan. Was 3
+ *  over every set; untouched sets now carry no information, so the count is of ratings only. */
+export const RPE_DELTA_MIN_RATED_SETS = 2
+
 // Per-exercise mean autoregulation delta (reported RPE − expected), the input to the back-off and
 // push arms. Sets whose expectation the model cannot state are dropped rather than neutralised —
 // see `isExpectedRpeRepresentable`. An exercise left with fewer than `minSets` usable sets is
 // omitted entirely, which is why the caller gets a Map rather than a value per exercise.
-export function perExerciseRpeDelta(sets: RpeDeltaInputSet[], minSets = 3): Map<string, number> {
+// #2253: only a rating the lifter gave moves the plan. An untouched pre-fill (`expected`) is left
+// out, not averaged in as a zero: averaging it in is what diluted the owner's hard-set taps so a
+// load cut never came. A pre-#2450 row (null source) still counts, as it did; the engine reads the
+// last three sessions, so those age out within about a week.
+export function perExerciseRpeDelta(sets: RpeDeltaInputSet[], minSets = RPE_DELTA_MIN_RATED_SETS): Map<string, number> {
   const byExercise = new Map<string, number[]>()
   for (const sl of sets) {
     if (sl.rpe == null || sl.intensityPct == null) continue
+    if (sl.rpeSource === 'expected') continue
     if (!isExpectedRpeRepresentable(sl.intensityPct, sl.reps)) continue
     const arr = byExercise.get(sl.exerciseName) ?? []
     arr.push(sl.rpe - expectedRpe(sl.intensityPct, sl.reps))
