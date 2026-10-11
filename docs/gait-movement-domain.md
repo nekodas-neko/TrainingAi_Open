@@ -103,7 +103,13 @@ read 114 steps naive → 0 gated; walk-30 → 31; calibrated on real captures 20
 - **AD-1 (interim, v1.201.2):** notification held behind a sustained GPS distance+elapsed gate
   (200 m / 90 s) so indoor GPS drift stops firing "Recording your walk". Stopgap — GPS-based.
   Plan: [`superpowers/plans/2026-07-22-activity-detection-notification-gate.md`](superpowers/plans/2026-07-22-activity-detection-notification-gate.md).
-- **AD-2 (✅ SHIPPED v1.208.0, NOT device-verified):** confirms walk/run from the **ring's stride
+- **#2471 (2026-10-11): AD-2 and the ring's live walk trigger are REMOVED.** The ring delivers its
+  gate windows in hourly drains (median 33 min old), so a drain started GPS and confirmed walks that
+  had already ended, and the walking flag read "walking" in a third of sleep windows. The phone's
+  motion sensor is the only live trigger now; walks the ring saw are offered after the fact from its
+  MET (`packages/shared/src/health/walk-detection.ts`, `lib/activity/ring-walks.ts`). The history
+  below is kept as the record of why.
+- **AD-2 (✅ SHIPPED v1.208.0, NOT device-verified; removed by #2471):** confirms walk/run from the **ring's stride
   cadence** (`lib/health/gait-classifier.ts` + `lib/activity/gait-confirm.ts`'s sustained-window
   accumulator), not GPS — GPS demoted to route recording, session start backdated to the true
   onset via a probe-phase point buffer. This is the derivation that belongs to this domain. The
@@ -149,7 +155,8 @@ read 114 steps naive → 0 gated; walk-30 → 31; calibrated on real captures 20
 | Continuous daytime accel capture | `lib/oura-ble/continuous-capture.ts` |
 | Shared ring gate feed (steps + detection) | `lib/oura-ble/gate-feed.ts` (`subscribeGateFeed`) |
 | Walk/run detection service + GPS | `lib/activity/auto-detection-service.ts`, `gps-watchdog.ts`, `motion-gate.ts` |
-| Gait cadence classifier + confirm (AD-2, shipped, Hz bands provisional) | `lib/health/gait-classifier.ts`, `lib/activity/gait-confirm.ts` |
+| Gait cadence classifier (Hz bands provisional; its AD-2 confirm was removed by #2471) | `packages/shared/src/health/gait-classifier.ts` |
+| Walks found after the fact in ring MET (#2471) | `packages/shared/src/health/walk-detection.ts`, `app/api/activity-detection/walks/route.ts`, `lib/activity/ring-walks.ts` |
 | **Cadence (spm) — both sources, shared autocorr primitive** | `lib/health/cadence.ts`, live fusion `lib/activity/cadence-tracker.ts`, console `/admin/cadence` |
 | Oura's gold-standard classifier (future) | `lib/oura-models/` `automatic_activity_detection_3_1_11` (heavy; WASM-spike-gated) |
 
