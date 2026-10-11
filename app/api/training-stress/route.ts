@@ -117,6 +117,7 @@ async function evaluateTrainingStressDay(
   const grid = metGridFromDaytimeSamples(daytime.met)
   const met = resolveDayMetPerMinute({
     ringGrid: grid,
+    ringMotion: daytime.motion ?? [],
     ringStillFramesMs: daytime.still ?? [],
     sleepSessions: sleepRows.map(r => ({
       startMs: new Date(r.sleepStart).getTime(), endMs: new Date(r.sleepEnd).getTime(),

@@ -135,6 +135,56 @@ export function cadenceMetCandidates(steps: readonly Resolved[]): Candidate[] {
 }
 
 /**
+ * #2781: the default map from the ring's motion to MET (rung 2a of `MET/min`, #2115 v4), fitted by
+ * the v4 proposer on alternate days of the owner's paired minutes (ring MET and `0x47` events) and
+ * tested on the rest: MAE 0.138 against 0.287 for a constant; active (> 1.8) sensitivity 0.72 at PPV
+ * 0.80. 92 bins, each of at least 60 paired minutes. Three adjacent steps run slightly downhill
+ * (3.2 → 2.85 among them); the table ships exactly as evaluated, because the held-out figures
+ * describe this table and no other.
+ *
+ * Feature `L(m)`: the summed low intensity of every `0x47` event in minute m − 1 or minute m (the
+ * motion leads the ring's own MET by about a minute in the fit). An event belongs to the minute it
+ * closes: `floor((ms − 1) / 60 000)`. Lookup: the last bin whose edge is ≤ L. `cut` is the Youden
+ * point on the derived scale for "active" (a regression map shrinks toward the mean, so 1.8 would
+ * under-detect); the active-hour rule (#2226) reads it, training load does not.
+ */
+export const RING_MOTION_MET_MAP_V1 = {
+  edges: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 79, 81, 83, 85, 87, 90, 92, 96, 100, 104, 109, 113, 117, 129],
+  met: [0.9, 1.0, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.2, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.3, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.4, 1.5, 1.5, 1.5, 1.5, 1.5, 1.5, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.6, 1.7, 1.7, 1.7, 1.7, 1.7, 1.8, 1.8, 1.8, 1.9, 1.8, 1.9, 1.9, 1.9, 1.9, 1.9, 1.9, 2.0, 2.0, 2.0, 2.0, 2.1, 2.1, 2.3, 2.3, 2.3, 2.3, 2.3, 2.5, 2.5, 2.55, 2.8, 2.9, 3.0, 3.2, 2.85, 3.3, 3.6, 3.9, 4.0, 4.4, 4.8, 5.2, 5.4, 5.8, 5.3],
+  cut: 1.5,
+} as const
+
+/** The map's MET for a summed low intensity: the last bin whose edge is ≤ `l`, never below the first. */
+export function ringMotionMet(l: number, map: { edges: readonly number[]; met: readonly number[] } = RING_MOTION_MET_MAP_V1): number {
+  let i = 0
+  while (i + 1 < map.edges.length && map.edges[i + 1] <= l) i++
+  return map.met[i]
+}
+
+/**
+ * Rung-2a MET from the ring's `0x47` motion events through `RING_MOTION_MET_MAP_V1`. A minute gets a
+ * value when it or the minute before holds at least one event; minutes with neither stay absent.
+ */
+export function ringMotionMetCandidates(
+  events: readonly { tsMs: number; lowIntensity: number }[], source: string,
+): Candidate[] {
+  const sumByMinute = new Map<number, number>()
+  for (const e of events) {
+    if (!Number.isFinite(e.tsMs) || !Number.isFinite(e.lowIntensity)) continue
+    const k = Math.floor((e.tsMs - 1) / MINUTE_MS)
+    sumByMinute.set(k, (sumByMinute.get(k) ?? 0) + e.lowIntensity)
+  }
+  const minutes = new Set<number>()
+  for (const k of sumByMinute.keys()) { minutes.add(k); minutes.add(k + 1) }
+  return [...minutes].map((m) => ({
+    slot: m * MINUTE_MS,
+    value: ringMotionMet((sumByMinute.get(m - 1) ?? 0) + (sumByMinute.get(m) ?? 0)),
+    route: 'accel_met',
+    source,
+  }))
+}
+
+/**
  * Rung-2b MET from the ring's sleep-motion marker (`0x72`, sleep_acm_period): a minute holding one
  * of its frames is a still minute and reads `SLEEP_MET`. Takes the frames' wall-clock instants.
  */
