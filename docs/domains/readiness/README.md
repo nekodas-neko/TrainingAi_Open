@@ -29,6 +29,7 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
 
 ## Reference docs
 
+- [`docs/architecture/scoring-layers-and-data-inputs.md`](../../architecture/scoring-layers-and-data-inputs.md) — **2026-10-11: the five scoring layers and every data input, in one place.** Written for the native move: root → score → unit → metric → source pillars (the owner's names), how the shadow model scores a unit, where each source lands and what it can't do, and the rules a native app must keep. Start here before the deeper docs below.
 - [`docs/architecture/adaptive-scoring.md`](../../architecture/adaptive-scoring.md) — **2026-10-05: scores that learn the person** — any new signal declared once, baselines at hour/week/month/season scale, scores as per-person configuration, and an insights engine ("how does X affect you") with accuracy guards. Epic #2321.
 
 - [`docs/architecture/scoring-structure.md`](../../architecture/scoring-structure.md) — **2026-10-05: how every score is built**: each pillar's components, weights, curves, inputs and adjustments, and how the owner's "value per component" tuning method maps onto them.
