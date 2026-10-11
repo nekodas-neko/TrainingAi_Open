@@ -69,6 +69,10 @@ export interface CollectionState {
    *  how far the next cat is. */
   bank?: number
   unitsPerT1?: number
+  /** #2189. The first day each tier was ever held, indexed to match the tiers; null where never.
+   *  A high-water mark: decay never lowers it, so a title earned once stays earned even after the
+   *  cat that earned it breaks back down. Derived by the replay, never stored. */
+  reached?: (string | null)[]
 }
 
 /**
@@ -102,6 +106,11 @@ function settle(held: Held, ladder: AnyLadder, day: string): void {
       }
     }
   }
+}
+
+/** Record the first day each tier is held. Called after every settle, the only place a tier rises. */
+function markReached(held: Held, reached: (string | null)[], day: string): void {
+  for (let i = 0; i < held.length; i++) if (reached[i] == null && held[i].length > 0) reached[i] = day
 }
 
 /**
@@ -168,6 +177,7 @@ export function replayCollection(input: ReplayInput): CollectionState {
   const { ladder, maxRestGap, today } = input
   const paused = new Set(input.pausedDays ?? [])
   const held: Held = ladder.tiers.map(() => [])
+  const reached: (string | null)[] = ladder.tiers.map(() => null)
   let lastLost: CollectionState['lastLost'] = null
 
   const distinct = [...new Set(input.days)].sort()
@@ -208,6 +218,7 @@ export function replayCollection(input: ReplayInput): CollectionState {
     const id = `${ladder.faucet}-${day}`
     held[0].push({ id, tier: 0, name: spawnName(id), born: day, parts: [] })
     settle(held, ladder, day)
+    markReached(held, reached, day)
     previous = day
   }
   if (previous) applyGap(previous, today)
@@ -220,7 +231,7 @@ export function replayCollection(input: ReplayInput): CollectionState {
     id: c.id, tier: c.tier, name: c.name, born: c.born, from: c.parts.map(p => p.name),
   }))
 
-  return { stock, duplicateDays, decayEvents, cats, restless, lastLost }
+  return { stock, duplicateDays, decayEvents, cats, restless, lastLost, reached }
 }
 
 /** The three ladders, one per faucet. Constants, per the versioning note at the top of this file. */
@@ -370,6 +381,7 @@ export interface BankReplayInput {
 export function replayBankCollection(input: BankReplayInput): CollectionState {
   const { ladder, unitsPerT1, drainPerDay, today } = input
   const held: Held = ladder.tiers.map(() => [])
+  const reached: (string | null)[] = ladder.tiers.map(() => null)
   const dates = [...input.gains.keys()].filter(d => d <= today).sort()
   let bank = 0
   let t1 = 0
@@ -384,7 +396,7 @@ export function replayBankCollection(input: BankReplayInput): CollectionState {
         const id = `${ladder.faucet}-${day}-${k}`
         held[0].push({ id, tier: 0, name: spawnName(id), born: day, parts: [] })
       }
-      if (target > t1) settle(held, ladder, day)
+      if (target > t1) { settle(held, ladder, day); markReached(held, reached, day) }
       for (let k = target; k < t1; k++) {
         const lost = decayOnce(held)
         if (lost) { decayEvents++; lastLost = { name: lost.name, day } }
@@ -400,7 +412,7 @@ export function replayBankCollection(input: BankReplayInput): CollectionState {
   // A day with no gain tomorrow would drain below the current T1 count. Tomorrow's drain comes off
   // today's closing balance, the same order as the loop above.
   const restless = t1 > 0 && Math.floor(Math.max(0, bank - drainPerDay) / unitsPerT1) < t1
-  return { stock, duplicateDays: 0, decayEvents, cats, restless, lastLost, bank, unitsPerT1 }
+  return { stock, duplicateDays: 0, decayEvents, cats, restless, lastLost, bank, unitsPerT1, reached }
 }
 
 /** v2's own version, returned in the route's `v2` block beside v1's. */
