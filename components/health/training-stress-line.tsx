@@ -27,6 +27,11 @@ export function TrainingStressLine() {
       <span className="text-muted-foreground">Training stress (today)</span>
       <span className="font-semibold tabular-nums" style={{ color: '#f59e0b' }}>{data.ots.toFixed(1)}</span>
       {data.high && <span className="text-[11px] text-muted-foreground">· high load</span>}
+      {/* #2115 v4: the share of the last 12 hours no source measured, which the score was averaged
+          over rather than counted as zero. Hidden under 1%. */}
+      {data.residualShare != null && data.residualShare >= 0.01 && (
+        <span className="text-[11px] text-muted-foreground">· {Math.round(data.residualShare * 100)}% of the last 12 h had no reading</span>
+      )}
       {data.rhrFromDay && (
         <span className="text-[11px] text-muted-foreground">· resting HR from {formatDayShort(data.rhrFromDay)}</span>
       )}
