@@ -71,6 +71,9 @@ export function maxHrSourceNote(source: HrProfile['maxHrSource'] | undefined | n
   switch (source) {
     case 'observed':
       return { label: 'your recorded max', standIn: false }
+    case 'cooper-blend':
+      // #2182: the owner's own rule, halfway between the Cooper test's peak and the age estimate.
+      return { label: 'from your Cooper test and age', standIn: false }
     case 'estimated-age-unread':
       // The distinction that matters: this is not 220 − age, it is the no-age 190. For this owner
       // that moves every zone boundary by 6 bpm, so a quota measured against it is measured against

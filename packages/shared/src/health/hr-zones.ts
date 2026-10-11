@@ -10,6 +10,26 @@ export function hrMaxFromAge(age: number | null | undefined): number {
   return age != null ? 220 - age : 190
 }
 
+/**
+ * #2182 (owner, 2026-09-09 and 09-17): the ceiling the zones are built on, when a maximal test exists.
+ * The owner's own rule, used twice: blend the measured peak of the latest Cooper 12-minute run with
+ * the age-predicted max, 50/50 — "treat 175 as the floor and 187 as the top, and choose in between".
+ * For the owner today that is (175 + 187) / 2 = 181. With no Cooper test it is the age-predicted max.
+ *
+ * Derived, not stored (Orchestrator, 2026-10-11, the owner can reverse it): nothing has to be written,
+ * and a later Cooper test moves it by itself — say so in the release notes when one does.
+ */
+export function zoneMaxFromTests(
+  ageMax: number,
+  tests: readonly { testType: string; date: string; maxHr?: number | null }[],
+): { maxHr: number; cooperPeak: number | null; cooperDate: string | null } {
+  const latest = tests
+    .filter(t => t.testType === 'cooper12' && t.maxHr != null && Number.isFinite(t.maxHr) && t.maxHr > 0)
+    .reduce<(typeof tests)[number] | null>((best, t) => (best == null || t.date > best.date ? t : best), null)
+  if (!latest) return { maxHr: ageMax, cooperPeak: null, cooperDate: null }
+  return { maxHr: Math.round((latest.maxHr! + ageMax) / 2), cooperPeak: latest.maxHr!, cooperDate: latest.date }
+}
+
 /** The resting heart rate assumed when none has been measured — every resolver falls back to this one. */
 export const DEFAULT_RESTING_HR = 60
 
