@@ -165,3 +165,86 @@ describe('issue 2340: one loadRatio for every window', () => {
     expect(blockTrendBand(1.21)).toBe('building')
   })
 })
+
+/**
+ * Issue 2741 (from 2126 and 2340): the owner asked that any change of the 7:28 FORMULA be
+ * re-measured on this committed harness before it is built. This adds the comparison and nothing
+ * else — test-only, no production code; nothing switches formula without a new owner sign-off.
+ *
+ * The EWMA is the uncoupled form the 2026-09-03 review measured on production
+ * (docs/reviews/2026-09-03-acwr-ewma-day-shift.md): daily load per local day (0 on a rest day),
+ * acute λ = 2/(7+1) through today, chronic λ = 2/(28+1) through YESTERDAY (so today's load is not
+ * in its own denominator — the coupling criticism), both seeded from the first day. Compared only
+ * on days the rolling sum scores and only after 28 days of burn-in, as the review did.
+ */
+describe('issue 2741: the rolling-sum 7:28 against the uncoupled EWMA, on the same fixture', () => {
+  const dailyLoad = (): number[] => {
+    const byDay = new Map<string, number>()
+    for (const s of fixtureLoadHistory()) {
+      const d = toAestDay(s.startedAt, FIXTURE_TZ)
+      byDay.set(d, (byDay.get(d) ?? 0) + s.volumeKg)
+    }
+    return fixtureDays().map(d => byDay.get(d) ?? 0)
+  }
+  const ewmaRatios = (): Record<string, number | null> => {
+    const loads = dailyLoad()
+    const la = 2 / (7 + 1), lc = 2 / (28 + 1)
+    let acute = loads[0], chronic = loads[0]
+    const out: Record<string, number | null> = {}
+    fixtureDays().forEach((d, i) => {
+      const chronicYesterday = chronic
+      if (i > 0) {
+        acute = la * loads[i] + (1 - la) * acute
+        chronic = lc * loads[i] + (1 - lc) * chronic
+      }
+      out[d] = i < 28 || chronicYesterday <= 0 ? null : round4(acute / chronicYesterday)
+    })
+    return out
+  }
+
+  const rolling = replay()
+  const ewma = ewmaRatios()
+  const compared = Object.keys(rolling).filter(d => rolling[d] != null && ewma[d] != null)
+  const early = (x: number) => x >= ACWR_THRESHOLDS.elevatedMin
+  const hard = (x: number) => x > ACWR_THRESHOLDS.highMax
+  const count = (m: Record<string, number | null>, f: (x: number) => boolean) => compared.filter(d => f(m[d]!)).length
+
+  it('states the days that would move if the formula switched', () => {
+    const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); return round4((s[(s.length - 1) >> 1] + s[s.length >> 1]) / 2) }
+    expect({
+      compared: compared.length,
+      medianRolling: median(compared.map(d => rolling[d]!)),
+      medianEwma: median(compared.map(d => ewma[d]!)),
+      bandChanged: compared.filter(d => acwrBand(rolling[d]!).key !== acwrBand(ewma[d]!).key).length,
+      earlyDeloadLine: [count(rolling, early), count(ewma, early)],
+      earlyDeloadCrossed: compared.filter(d => early(rolling[d]!) !== early(ewma[d]!)).length,
+      hardActionLine: [count(rolling, hard), count(ewma, hard)],
+      hardActionCrossed: compared.filter(d => hard(rolling[d]!) !== hard(ewma[d]!)).length,
+    }).toEqual({
+      // 163 days compared. Switching would change the band on 70 of them and move the early-deload
+      // line (≥ 1.2) on 30 — the EWMA fires on 50 days where the rolling sum fires on 26 — and the
+      // hard-action line (> 1.5) on 16. The crossings fall in every phase of the fixture, and 27 of
+      // the 30 go upward: on a training day the EWMA's acute term takes a quarter of that day's
+      // session at once, where the rolling sum spreads it over seven days. The production
+      // measurement (2026-09-03) found the opposite for the taper, the EWMA damping single heavy
+      // sessions. Both are facts about their histories, which is why a switch needs the owner's
+      // reading of the production figure, not this one.
+      compared: 163,
+      medianRolling: 0.8933,
+      medianEwma: 0.9277,
+      bandChanged: 70,
+      earlyDeloadLine: [26, 50],
+      earlyDeloadCrossed: 30,
+      hardActionLine: [10, 16],
+      hardActionCrossed: 16,
+    })
+  })
+
+  it('is a comparison only: production still computes the rolling sum', () => {
+    const sessions = fixtureLoadHistory()
+    const d = compared[compared.length - 1]
+    const mid = dateStrMidnightInTz(d, FIXTURE_TZ)
+    const window = sessions.filter(s => s.startedAt < new Date(mid.getTime() + DAY))
+    expect(round4(computeVolumeAcwr(window, mid, { tz: FIXTURE_TZ }).acwr!)).toBe(rolling[d])
+  })
+})
