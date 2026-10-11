@@ -26,6 +26,14 @@ export function zoneLabel(zoneIds: number[]): string | null {
   return `Zones ${ids.slice(0, -1).join(', ')} and ${ids[ids.length - 1]}`
 }
 
+/** The card's pill: "Target: Zone 2" (owner, 2026-10-09, #2755). The zone is the prescription's
+ *  suggested effort, not what counts (moderate effort, from 40% of reserve, counts), so it is worded
+ *  as a target rather than a bare zone that reads like the bar. */
+export function targetZoneLabel(zoneIds: number[]): string | null {
+  const zone = zoneLabel(zoneIds)
+  return zone ? `Target: ${zone}` : null
+}
+
 /** "30 min at moderate effort or above", or the rule alone when the prescription states no minutes. */
 export function criterionLine(targetMin: number | null): string {
   return targetMin != null && targetMin > 0 ? `${targetMin} min at moderate effort or above` : 'Time at moderate effort or above'

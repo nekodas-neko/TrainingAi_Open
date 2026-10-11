@@ -7,7 +7,7 @@ import { formatDateDisplay } from '@trainingai/shared/date-utils'
 import type { HeartHealthActivity, HeartHealthDayOutcome } from '@trainingai/shared/running/heart-health'
 import {
   ANY_ACTIVITY, CARD_TITLE, OUTCOME_COLOR, OUTCOME_LABEL, PROGRESS_LABEL, RATIONALE,
-  activityLine, criterionLine, progressFigure, shownActivity, zoneLabel, countedMinutesLine,
+  activityLine, criterionLine, progressFigure, shownActivity, targetZoneLabel, countedMinutesLine,
 } from './todays-cardio-copy'
 
 /** The presets the treadmill row offers. 30 is drawn first because it clears a 25-minute target
@@ -90,7 +90,7 @@ export const TodaysCardioCard = memo(function TodaysCardioCard(p: TodaysCardioCa
   const target = p.today?.targetMin ?? (p.durationMin != null && p.durationMin > 0 ? Math.round(p.durationMin) : null)
   const counted = p.today?.countedMin ?? 0
   const isDone = p.runStatus === 'completed' || p.today?.met === true
-  const zone = zoneLabel(p.targetZoneIds)
+  const zone = targetZoneLabel(p.targetZoneIds)
   const credited = p.today ? shownActivity(p.today.activities, p.today.creditedId) : null
   const others = p.today ? p.today.activities.length - (credited ? 1 : 0) : 0
   const unmeasured = p.today != null && p.today.activities.length > 0 && p.today.activities.every((a) => a.effortMin == null)
@@ -106,7 +106,7 @@ export const TodaysCardioCard = memo(function TodaysCardioCard(p: TodaysCardioCa
           <h2 className="text-lg font-bold">{CARD_TITLE}</h2>
           {zone && (
             <span
-              className="ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+              className="ml-auto shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
               style={{ color: 'var(--accent-cyan)', background: 'color-mix(in oklch, var(--accent-cyan) 15%, transparent)' }}
             >
               {zone}

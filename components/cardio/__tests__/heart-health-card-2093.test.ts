@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   ANY_ACTIVITY, CARD_TITLE, OUTCOME_LABEL, PROGRESS_LABEL, RATIONALE,
-  activityLine, criterionLine, progressFigure, shownActivity, zoneLabel, countedMinutesLine,
+  activityLine, criterionLine, progressFigure, shownActivity, zoneLabel, targetZoneLabel, countedMinutesLine,
 } from '../todays-cardio-copy'
 import { completionsDue } from '@/lib/activity/heart-health-completion'
 
@@ -38,6 +38,14 @@ describe('issue 2093 — the card, to the 10-05 mockup, with no run framing', ()
     expect(zoneLabel([3, 2])).toBe('Zones 2–3')
     expect(zoneLabel([1, 3, 4])).toBe('Zones 1, 3 and 4')
     expect(zoneLabel([])).toBeNull()
+  })
+
+  // #2755 (owner, 2026-10-09): the pill names the prescription's suggested effort as a target, so it
+  // does not read as the bar for the moderate-effort minutes beside it.
+  it('words the pill as a target', () => {
+    expect(targetZoneLabel([2])).toBe('Target: Zone 2')
+    expect(targetZoneLabel([3, 2])).toBe('Target: Zones 2–3')
+    expect(targetZoneLabel([])).toBeNull()
   })
 })
 
