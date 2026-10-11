@@ -27,7 +27,7 @@ vi.mock('@capacitor-community/sqlite', () => ({
   CapacitorSQLite: {},
   SQLiteConnection: class {
     addUpgradeStatement = vi.fn().mockResolvedValue(undefined)
-    isConnection = vi.fn().mockResolvedValue({ result: false })
+    checkConnectionsConsistency = vi.fn().mockResolvedValue({ result: false })
     closeConnection = vi.fn().mockResolvedValue(undefined)
     createConnection = vi.fn().mockResolvedValue({ open, run, query, execute })
   },

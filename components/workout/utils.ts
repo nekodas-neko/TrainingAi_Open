@@ -65,12 +65,22 @@ export function weightStepFor(equipment?: string[] | null): number {
   return equipment?.includes("barbell") ? BARBELL_WEIGHT_STEP_KG : DEFAULT_WEIGHT_STEP_KG;
 }
 
+/** The bar range every plate-rounded weight is clamped to. */
+export const MIN_BAR_KG = 5;
+export const MAX_BAR_KG = 250;
+
 export function mroundStep(value: number, step: number): number {
-  return Math.max(5, Math.min(250, Math.round(value / step) * step));
+  return Math.max(MIN_BAR_KG, Math.min(MAX_BAR_KG, Math.round(value / step) * step));
 }
 
 export function mroundStepUp(value: number, step: number): number {
-  return Math.max(5, Math.min(250, Math.ceil(value / step) * step));
+  return Math.max(MIN_BAR_KG, Math.min(MAX_BAR_KG, Math.ceil(value / step) * step));
+}
+
+/** #2762: true when `mroundStepUp` would cut this prescription down to MAX_BAR_KG, so the screen
+ *  can say the bar is capped instead of showing 250 as if it were the real figure. */
+export function barIsCapped(value: number | null | undefined): boolean {
+  return value != null && value > MAX_BAR_KG;
 }
 
 type BarInputs = Pick<WorkoutExercise, "exerciseType" | "progressionStyle" | "estimated1rm" | "equipment">;
@@ -85,6 +95,28 @@ export function prescribedBarWeights(ex: BarInputs | undefined, sets: number): (
   if (ex?.exerciseType === "bodyweight" || !style || !basis) return Array.from({ length: sets }, () => null);
   const step = weightStepFor(ex.equipment);
   return Array.from({ length: sets }, (_, i) => (style[i] ? mroundStepUp(basis * style[i].pct / 100, step) : null));
+}
+
+// Shared per-set weight derivation — used at init (launchExercise, the per-set-weights
+// effect) and after an injury swap, so all three paths agree on how a set's target
+// weight is picked. One Formula, One Place.
+export function computeInitialWeights(ex: WorkoutExercise | undefined, sets: number): number[] {
+  if (ex?.exerciseType === "bodyweight") {
+    return Array.from({ length: sets }, () => 0);
+  }
+  const step = weightStepFor(ex?.equipment);
+  const prescribed = prescribedBarWeights(ex, sets);
+  return Array.from({ length: sets }, (_, i) => {
+    const bar = prescribed[i];
+    if (bar != null) return bar;
+    // #2762: up, like the card's "Target weight" and every other prescription, so the field opens
+    // on the bar the lifter is shown.
+    if (ex?.target80 != null) return mroundStepUp(ex.target80, step);
+    // Fallback for old logs that predate the target_80 column: derive from 1RM or last weight
+    if (ex?.estimated1rm) return mroundStepUp(ex.estimated1rm * 0.8, step);
+    if (ex?.latestWeight != null) return mroundStep(ex.latestWeight, step);
+    return 60;
+  });
 }
 
 /** `plannedWeights` for the log payload: omitted when no set had a prescribed bar, so a freeform
@@ -307,6 +339,28 @@ export function deloadOverrideOutcome(
     : 'nothing-to-revert'
   if (!context.deloadWeek || reverts === 'nothing-to-revert') return reverts
   return reverts === 'all' ? 'all-in-deload-week' : 'partial-in-deload-week'
+}
+
+/**
+ * Issue 2750. Whether a Full override that has nothing to put back should rebuild today's
+ * prescription instead of leaving the deload weights on the bar.
+ *
+ * Full reverts each exercise to the `preDeload` numbers its prescription recorded. A prescription
+ * stored before those were written, or an exercise with no progression style, has none, and the
+ * card could only say so. Rebuilding writes them for everything that can have them (the time
+ * picker's rebuild already does, and was the one-tap workaround).
+ *
+ * True when a deloaded exercise could not revert, or when the override reverted nothing at all. Not
+ * in a deload week with nothing cut: there the outcome is `nothing-to-revert` because nothing was
+ * deloaded, and a rebuild would spend a model call to change nothing.
+ */
+export function fullOverrideNeedsRebuild(
+  outcome: DeloadOverrideOutcome,
+  blockedNames: readonly string[],
+  deloadWeek: boolean,
+): boolean {
+  if (blockedNames.length > 0) return true
+  return outcome === 'nothing-to-revert' && !deloadWeek
 }
 
 /** True when every set of this session is logged as a deload whatever Full does to the weights. */

@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 const authMock = vi.fn(async () => null as unknown)
 vi.mock('@/auth', () => ({ auth: () => authMock() }))
 
-const getUserById = vi.fn(async () => ({ id: 'admin-1', isAdmin: true, timezone: 'Australia/Brisbane' }))
+const getUserById = vi.fn(async () => ({ id: 'admin-1', isActive: true, isAdmin: true, timezone: 'Australia/Brisbane' }))
 vi.mock('@/lib/data', () => ({
   getRepository: vi.fn(async () => ({ getUserById })),
 }))
@@ -37,7 +37,7 @@ describe('GET /api/admin/day-review — auth', () => {
   beforeEach(() => {
     authMock.mockReset().mockResolvedValue(null)
     buildDayAudit.mockClear()
-    getUserById.mockReset().mockResolvedValue({ id: 'admin-1', isAdmin: true, timezone: 'Australia/Brisbane' })
+    getUserById.mockReset().mockResolvedValue({ id: 'admin-1', isActive: true, isAdmin: true, timezone: 'Australia/Brisbane' })
     process.env.ADMIN_EXPORT_SECRET = SECRET
     process.env.ADMIN_EXPORT_USER_ID = 'admin-1'
   })
@@ -83,13 +83,13 @@ describe('GET /api/admin/day-review — auth', () => {
   })
 
   it('403s when the token resolves to a non-admin — a token widens transport, never authority', async () => {
-    getUserById.mockResolvedValue({ id: 'admin-1', isAdmin: false, timezone: 'Australia/Brisbane' })
+    getUserById.mockResolvedValue({ id: 'admin-1', isActive: true, isAdmin: false, timezone: 'Australia/Brisbane' })
     expect((await get('/api/admin/day-review?date=2026-07-24', withToken(SECRET))).status).toBe(403)
   })
 
   it('403s a signed-in non-admin session', async () => {
     authMock.mockResolvedValue({ user: { id: 'u2', isAdmin: true } })
-    getUserById.mockResolvedValue({ id: 'u2', isAdmin: false, timezone: 'Australia/Brisbane' })
+    getUserById.mockResolvedValue({ id: 'u2', isActive: true, isAdmin: false, timezone: 'Australia/Brisbane' })
     expect((await get('/api/admin/day-review?date=2026-07-24')).status).toBe(403)
   })
 
@@ -102,7 +102,7 @@ describe('GET /api/admin/day-review — date handling', () => {
   beforeEach(() => {
     authMock.mockReset().mockResolvedValue(null)
     buildDayAudit.mockClear()
-    getUserById.mockReset().mockResolvedValue({ id: 'admin-1', isAdmin: true, timezone: 'Australia/Brisbane' })
+    getUserById.mockReset().mockResolvedValue({ id: 'admin-1', isActive: true, isAdmin: true, timezone: 'Australia/Brisbane' })
     process.env.ADMIN_EXPORT_SECRET = SECRET
     process.env.ADMIN_EXPORT_USER_ID = 'admin-1'
   })

@@ -35,8 +35,9 @@ export function gradeHeartRate(bpm: number | null | undefined, profile: HrProfil
 
   const zones = computeHrZones(profile)
 
-  // At rest is its own reading, and it is the same boundary Body Battery and the activity score
-  // use — `HR_REST_THRESHOLD` of the reserve above resting. Zone 1 spans from rest to 60% of
+  // At rest is its own reading, and it is the same boundary the activity score uses —
+  // `HR_REST_THRESHOLD` of the reserve above resting. Body Battery left it in v7 for resting HR +
+  // 9 bpm (issue 2235); whether this follows is issue 2743. Zone 1 spans from rest to 60% of
   // reserve, so without this everything from a true resting rate upward reads as "Recovery".
   const restCeiling = profile.restingHr + HR_REST_THRESHOLD * hrReserve(profile.maxHr, profile.restingHr)
   if (bpm <= restCeiling) return { label: 'Resting', color: zones[0].color }

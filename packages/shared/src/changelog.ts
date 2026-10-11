@@ -7,10 +7,21 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: "1.489.0",
-    date: "2026-10-06",
+    date: "2026-10-09",
     changes: [
-      "Health → Body now has one Weight Trend card, with the weekly change, the chart and your weight and body-fat goal bars together. It replaces the separate Trend tile and the Weight Trend card that sat on Progress, which is now four cards.",
-      "The Balance tile on Body is gone. Its number is the Net figure on the Energy Balance card further down, so that card is now the only place today's energy answer appears.",
+      "One calorie budget everywhere: your resting burn minus your goal's deficit, plus what you burn training and moving. The Goals card shows it as a line instead of a typed Calorie Goal box, and you can still set your own target.",
+      "You can log last night's sleep by hand on the Sleep screen, then edit or remove it. A night from the ring always wins over a typed one, and Home's sleep card now shows your bed and wake times.",
+      "Heart-health minutes count from moderate effort (about 107 bpm for you) instead of zone 2, and any activity counts, not just cardio sessions. Most of your treadmill walks now count.",
+      "Body Battery charges whenever your heart rate is at or below resting + 9 bpm, so calm awake time now recharges it. Past days are re-worked after this release.",
+      "Training load now compares your last 7 days with your longer-term load through one formula everywhere, so some past days read a little lower.",
+      "Reta: a new card shows how your resting heart rate and HRV respond in the days after each dose.",
+      "Health Connect: \"Import more history\" pulls older data when you ask for it, and asks for the history permission only when you tap it.",
+      "Health → Body has one Weight Trend card, with the weekly change, the chart and your weight and body-fat goal bars together. The separate Balance tile is gone; its number is the Net figure on the Energy Balance card.",
+      "Saved meals show which meals they suit as small icons, and a scanned food keeps its picture and barcode even when it matches one you already saved.",
+      "Signing out now syncs your unsent changes first, and warns you if any would be lost. You can also delete your account.",
+      "Workouts: session length offers 30, 45, 60 and 90 minutes, the card shows the % of 1RM the rounded bar really is, and \"Full\" now also overrides a single deloaded exercise.",
+      "The collection screen and its Home card use the new rules, and cards with nothing to show say what is missing instead of showing a zero.",
+      "Fixes: reloading the app no longer trips over its own database, warm tabs paint without a loading skeleton, and the iPhone sign-in groundwork changes nothing about how you sign in on Android.",
     ],
   },
   {

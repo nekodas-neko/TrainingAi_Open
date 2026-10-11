@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { prescribedBarWeights, plannedWeightsPayload, styleWithPrescribedBars, prescriptionBasisPayload } from "../utils";
+import { prescribedBarWeights, plannedWeightsPayload, styleWithPrescribedBars, prescriptionBasisPayload, computeInitialWeights, mroundStepUp, barIsCapped } from "../utils";
 import { calculate1RM } from "@trainingai/shared/1rm";
 
 // #2445: the bar stored as set_logs.planned_weight_kg is the one the screen opens each set on —
@@ -68,5 +68,27 @@ describe("styleWithPrescribedBars / prescriptionBasisPayload", () => {
 
   it("leaves a style without a 1RM untouched", () => {
     expect(styleWithPrescribedBars({ ...skull, estimated1rm: null } as never, 2)).toEqual(skull.progressionStyle);
+  });
+});
+
+// #2762: with no progression style the field opened on the NEAREST plate while the card's "Target
+// weight" showed the bar rounded UP, so the two could disagree by a step.
+describe("computeInitialWeights with no progression style", () => {
+  const base = { exerciseType: "weighted" as const, equipment: ["barbell"], progressionStyle: null, estimated1rm: 80 };
+
+  it("opens on the same rounded-up bar the card shows", () => {
+    // 61.0 is nearer 60 on a 2.5 kg step; the card shows mroundStepUp → 62.5.
+    const ex = { ...base, target80: 61.0 };
+    expect(computeInitialWeights(ex as never, 2)).toEqual([62.5, 62.5]);
+    expect(computeInitialWeights(ex as never, 1)[0]).toBe(mroundStepUp(61.0, 2.5));
+  });
+});
+
+describe("barIsCapped", () => {
+  it("is true only past the bar limit that mroundStepUp clamps to", () => {
+    expect(barIsCapped(250)).toBe(false);
+    expect(barIsCapped(250.1)).toBe(true);
+    expect(mroundStepUp(260, 2.5)).toBe(250);
+    expect(barIsCapped(null)).toBe(false);
   });
 });

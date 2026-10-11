@@ -32,7 +32,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 type Row = Record<string, unknown>
 
-const getUserById = vi.fn(async (_id: string) => ({ isAdmin: true }) as Row | null)
+const getUserById = vi.fn(async (_id: string) => ({ isActive: true, isAdmin: true }) as Row | null)
 const rateLimit = vi.fn((..._a: unknown[]) => true)
 const reportServerError = vi.fn((..._a: unknown[]) => undefined)
 const reportRollupStepErrors = vi.fn((..._a: unknown[]) => undefined)
@@ -119,7 +119,7 @@ beforeEach(() => {
                    getLatestRedecodeJob, previewStepsBackfill, listSessionsMissingHrStats,
                    upsertWorkoutHrStats, computeWorkoutHr]) m.mockClear()
   rateLimit.mockReturnValue(true)
-  getUserById.mockResolvedValue({ isAdmin: true })
+  getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
   runRedecodeOffLoop.mockResolvedValue({
     redecoded: { scanned: 10, updated: 3, restamped: 2 },
     redecodeError: null,
@@ -156,7 +156,7 @@ describe('the admin gate on all three levers', () => {
 
   it('refuses a non-admin, whatever the token claims', async () => {
     sessionUser = { id: 'u-1', isAdmin: true }
-    getUserById.mockResolvedValue({ isAdmin: false })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     for (const [name, call] of ALL) expect((await call()).status, name).toBe(403)
     expect(runRedecodeOffLoop).not.toHaveBeenCalled()
     expect(runStressBackfillOffLoop).not.toHaveBeenCalled()

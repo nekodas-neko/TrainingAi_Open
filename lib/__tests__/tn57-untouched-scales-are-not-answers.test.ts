@@ -28,7 +28,7 @@ const getOuraDailyDerived = vi.fn(async (..._a: unknown[]) => [] as unknown[])
 // `requireAdmin` (lib/admin.ts) re-reads the row and never trusts the JWT claim, so the admin route
 // needs this rather than an isAdmin session field. Without it the route answers 503 — Q-548's
 // "could not decide" — and every assertion below would pass on an error body.
-const getUserById = vi.fn(async (_id: string) => ({ id: 'u-tn57', isAdmin: true }) as unknown)
+const getUserById = vi.fn(async (_id: string) => ({ id: 'u-tn57', isActive: true, isAdmin: true }) as unknown)
 
 let sessionUser: { id: string; timezone: string; isAdmin?: boolean } = {
   id: 'u-tn57', timezone: 'Australia/Brisbane', isAdmin: true,
@@ -54,7 +54,7 @@ const checkin = (logDate: string, over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   for (const m of [listDayCheckins, getBodyBatteryHistory, listSleepSessions, getOuraDaily,
                    getOuraDailyDerived]) { m.mockClear(); m.mockResolvedValue([]) }
-  getUserById.mockClear(); getUserById.mockResolvedValue({ id: 'u-tn57', isAdmin: true })
+  getUserById.mockClear(); getUserById.mockResolvedValue({ id: 'u-tn57', isActive: true, isAdmin: true })
   sessionUser = { id: 'u-tn57', timezone: 'Australia/Brisbane', isAdmin: true }
 })
 

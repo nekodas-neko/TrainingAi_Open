@@ -1,8 +1,10 @@
 // "Move every hour" for the Activity score (W-B follow-up, 2026-07-23). Oura's own version buckets
 // steps per hour, which this app doesn't store at hourly granularity — so this uses an honest proxy
 // from the same intraday HR series already fetched for hrCurrent/hrMin/hrMax/hrAvg: an hour counts as
-// "moved" when at least one reading that hour is above the SAME rest/active boundary Body Battery
-// already uses (HR_REST_THRESHOLD, lib/health/hr-zones.ts) — not a second invented threshold.
+// "moved" when at least one reading that hour is above the rest/active boundary in
+// HR_REST_THRESHOLD (lib/health/hr-zones.ts) — not a second invented threshold. Body Battery used
+// the same one until v7 moved it to resting HR + 9 bpm (issue 2235); whether this follows is a
+// scoring decision for the owner, issue 2743.
 
 import { hrReserve, HR_REST_THRESHOLD } from '@trainingai/shared/health/hr-zones'
 

@@ -141,7 +141,8 @@ split is "does it feel slow" vs "is it actually slow at the source".
   back clean: all seven `freshWithinTtl` sites have every writer in a group, and the fetch-once
   CAN-BITE group is empty.
 - [`docs/handoffs/handoff-phase-3-bundled-shell.md`](../../handoffs/handoff-phase-3-bundled-shell.md) — the live
-  Phase 3 baton (bundling the shell into the APK). Task 4 is now **decided** (option B).
+  Phase 3 baton (bundling the shell into the APK). **Superseded 2026-10-09: v2 is native, not a
+  bundled shell** (toolkit in #2765); its auth and API-split notes still apply to a native client.
 - [`2026-08-19-cache-invalidation-signal`](../../overview/history-2026-09-10-folded-1.md#2026-08-19-cache-invalidation-signal)
   — **Q-402: the shell has no unmount, so a fetch-once effect in it never fetches again.** All six
   write groups evicted `energy-balance:` correctly and the owner still had to restart the app,
@@ -315,7 +316,8 @@ Live at the time of writing (2026-07-30):
 - **Screen transition timing + prefetch** (v1.241.1) — not device-verified.
 - **Q-1, the native-feel performance push, is the live owner-directed initiative** — the network
   side is exhausted; remaining wins come from device Performance profiles, which only the owner can
-  capture. Phase 3 (bundled shell) is the stated architecture and is owner-gated.
+  capture. **The v2 architecture is native screens, not a bundled shell** (owner, 2026-10-09;
+  toolkit open in #2765).
 - **Home-day-timeline reads server-only** — a documented, sanctioned exception to offline-first.
 
 ## Decided

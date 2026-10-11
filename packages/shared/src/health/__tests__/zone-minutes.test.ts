@@ -65,19 +65,21 @@ describe('zoneBreakdownFromReadings', () => {
 })
 
 describe('activeMinutesFromZoneSeconds', () => {
-  it('counts Zone 2 (moderate) minutes once', () => {
-    // 600s (10min) in Zone 2 only.
-    expect(activeMinutesFromZoneSeconds([0, 600, 0, 0, 0])).toBe(10)
+  // #2198: vigorous starts at 60% of reserve (ACSM), which is the Zone 2 floor, so every zone from 2
+  // up counts double. Before, Zone 2 counted once and doubling began at Zone 3 (70%).
+  it('counts Zone 2 minutes double: the whole zone sits at or above the 60% vigorous line', () => {
+    // 600s (10min) in Zone 2 only → 20.
+    expect(activeMinutesFromZoneSeconds([0, 600, 0, 0, 0])).toBe(20)
   })
   it('counts Zone 3+ (vigorous) minutes double, per the WHO 2020 guideline', () => {
     // 300s (5min) in Zone 3 → 5 * 2 = 10 "active minutes".
     expect(activeMinutesFromZoneSeconds([0, 0, 300, 0, 0])).toBe(10)
   })
-  it('sums moderate + double-counted vigorous together', () => {
-    // 10min Zone 2 (moderate, x1) + 5min Zone 4 (vigorous, x2) = 10 + 10 = 20.
-    expect(activeMinutesFromZoneSeconds([0, 600, 0, 300, 0])).toBe(20)
+  it('sums every vigorous zone, each doubled', () => {
+    // 10min Zone 2 + 5min Zone 4, all vigorous: (10 + 5) * 2 = 30.
+    expect(activeMinutesFromZoneSeconds([0, 600, 0, 300, 0])).toBe(30)
   })
-  it('ignores Zone 1 (below moderate)', () => {
+  it('ignores Zone 1, which a per-zone total cannot split at the 40% moderate line', () => {
     expect(activeMinutesFromZoneSeconds([600, 0, 0, 0, 0])).toBe(0)
   })
   it('is zero for an all-zero day', () => {

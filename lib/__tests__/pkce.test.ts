@@ -1,7 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computePkceChallenge, verifyPkce, PKCE_CHALLENGE_RE, PKCE_VERIFIER_RE } from '../pkce'
-
-// RFC 7636 Appendix B vector
+import { computePkceChallenge, verifyPkce, PKCE_CHALLENGE_RE, PKCE_VERIFIER_RE } from '../auth/mobile/pkce'
 const VERIFIER = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk'
 const CHALLENGE = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM'
 

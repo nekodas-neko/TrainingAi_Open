@@ -2,7 +2,7 @@ import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, toAestDay, ageFromDob } 
 import { computeVolumeAcwr, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
-import { hrMaxFromAge, computeHrZones, moderateIntensityBpm } from '@trainingai/shared/health/hr-zones'
+import { hrMaxFromAge, moderateIntensityBpm, vigorousIntensityBpm } from '@trainingai/shared/health/hr-zones'
 import { activeMinutesFromReadings } from '@trainingai/shared/health/zone-minutes'
 import { computeMovedHours, moveHoursGoal } from '@trainingai/shared/health/hourly-movement'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
@@ -135,11 +135,10 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
   let zoneMinutes: number | null = null
   let moveHours: number | null = null
   if (baselineRhr != null && hrRows.length > 0) {
-    const zones = computeHrZones({ maxHr: hrMaxFromAge(ageYears), restingHr: baselineRhr })
+    const profile = { maxHr: hrMaxFromAge(ageYears), restingHr: baselineRhr }
     zoneMinutes = activeMinutesFromReadings(
       hrRows.map(r => ({ timestamp: r.timestamp.getTime(), bpm: r.bpm })),
-      zones,
-      moderateIntensityBpm({ maxHr: hrMaxFromAge(ageYears), restingHr: baselineRhr }),
+      { moderateFloorBpm: moderateIntensityBpm(profile), vigorousFloorBpm: vigorousIntensityBpm(profile) },
     )
     moveHours = computeMovedHours({ hrRows, maxHr: hrMaxFromAge(ageYears), restingHr: baselineRhr, tz, dateIso: date })
   }

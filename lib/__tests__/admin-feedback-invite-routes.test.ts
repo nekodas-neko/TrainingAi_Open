@@ -25,7 +25,7 @@ import { NextRequest } from 'next/server'
 
 type Row = Record<string, unknown>
 
-const getUserById = vi.fn(async (_id: string) => ({ isAdmin: true }) as Row | null)
+const getUserById = vi.fn(async (_id: string) => ({ isActive: true, isAdmin: true }) as Row | null)
 const listFeedback = vi.fn(async () => [] as Row[])
 const deleteFeedback = vi.fn(async (_id: string) => undefined)
 const listInvites = vi.fn(async () => [] as string[])
@@ -56,7 +56,7 @@ const rmInv = (b: unknown) => removeInviteRoute(body('DELETE', b))
 
 beforeEach(() => {
   for (const m of [getUserById, listFeedback, deleteFeedback, listInvites, addInvite, removeInvite]) m.mockClear()
-  getUserById.mockResolvedValue({ isAdmin: true })
+  getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
   listFeedback.mockResolvedValue([])
   listInvites.mockResolvedValue([])
   sessionUser = { id: 'u-1', isAdmin: true }
@@ -80,7 +80,7 @@ describe('the admin gate across both queues', () => {
   it('ignores a stale isAdmin claim and asks the database', async () => {
     // Claim true, row false. With both false the route could read either and still refuse.
     sessionUser = { id: 'u-1', isAdmin: true }
-    getUserById.mockResolvedValue({ isAdmin: false })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     for (const [name, call] of ALL) expect((await call()).status, name).toBe(403)
     expect(deleteFeedback).not.toHaveBeenCalled()
     expect(addInvite).not.toHaveBeenCalled()

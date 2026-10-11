@@ -1,10 +1,21 @@
+import { auth } from '@/auth';
 import { Suspense } from "react";
 import { Meteors } from "@/components/ui/meteors";
 import { Typewriter } from "@/components/ui/typewriter-text";
 import { GoogleSignIn } from "@/components/google-sign-in";
 import EmailSignIn from "./email-sign-in";
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { iosLoginContinuation } from '@/lib/auth/mobile/ios-transaction';
 
-export default function SignInPage() {
+export default async function SignInPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const { error } = await searchParams;
+  if (error && await iosLoginContinuation(await cookies())) {
+    redirect('/mobile-signin/ios?error=authentication_failed');
+  }
+  if (!error && await auth()) {
+    redirect('/');
+  }
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-background text-foreground">
       <Meteors number={30} />

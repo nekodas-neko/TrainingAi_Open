@@ -1,30 +1,11 @@
-/**
- * PS-39 — the account cluster: `user/password`, `user/profile`, `user/preferences`, `user/avatar`
- * and `auth/exchange-mobile-token`.
- *
- * Batched because they are the write paths onto a user's own credentials and identity, and they
- * verify as a set — the password change reads the hash that `user/profile` must never return, and
- * the token exchange is what mints the session all four of the others authenticate with.
- *
- * Each carries a decision that is invisible from the response shape and has a note in the source
- * saying why:
- *
- *   · **A captured mobile token burns on the attacker's first attempt.** The one-time token is
- *     consumed BEFORE the PKCE verifier is checked, so a failed exchange leaves nothing redeemable.
- *   · **`user/profile` strips the password hash and reports only whether one exists.** The
- *     repository hands the route the whole row, hash included.
- *   · **Omitted and explicitly-null are different** on both PATCH routes (BF-78). Collapsing them
- *     meant no profile field could ever be cleared.
- *   · **The avatar MIME whitelist is a whitelist, not a prefix.** The old `data:image/` check
- *     accepted `svg+xml` — a script-bearing format stored and re-served as a user's avatar.
- *   · **A malformed body on a credential route is a 400, not a 500.** Bare `req.json()` threw, and
- *     Next answered 500 on a password change.
- */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 type Row = Record<string, unknown>
 
-const getUserByEmail = vi.fn(async (_e: string) => userRow() as Row | null)
+const getUserById = vi.fn(async () => ({ isActive: true, isAdmin: false }))
+const sessionTokenFrom = vi.fn(async () => ({ userId: 'u-1', exp: Math.floor(Date.now() / 1000) + 3600 }) as { userId: string; exp: number } | null)
+
+const getUserCredentials = vi.fn(async (_e: string) => userRow() as Row | null)
 const updateUserPassword = vi.fn(async (_u: string, _h: string) => undefined)
 const updateUserProfile = vi.fn(async (_u: string, _p: Row) => ({ id: 'u-1', displayName: 'Sam' }) as Row)
 const updateUserAvatar = vi.fn(async (_u: string, _a: string) => ({ avatar: 'stored.png' }) as Row)
@@ -39,10 +20,9 @@ const bcryptHash = vi.fn(async (_p: string, _r: number) => 'hashed:' + _r)
 let sessionUser: { id: string; email?: string } | null = { id: 'u-1', email: 'me@example.com' }
 vi.mock('@/auth', () => ({ auth: async () => (sessionUser ? { user: sessionUser } : null) }))
 vi.mock('@/lib/data', () => {
-  // Built inside the returned function: `vi.mock` is hoisted above the consts above.
   const repo = async () => ({
-    getUserByEmail, updateUserPassword, updateUserProfile, updateUserAvatar,
-    countWorkoutSessions, getUserPreferences, updateUserPreferences,
+    getUserCredentials, getUserById, updateUserPassword, updateUserProfile, updateUserAvatar,
+    countWorkoutSessions, getUserPreferences, updateUserPreferences, getUserProviders: async () => ['google'],
   })
   return { getRepository: repo, getRepositoryAsync: repo }
 })
@@ -52,16 +32,19 @@ vi.mock('bcryptjs', () => ({
     hash: (p: string, r: number) => bcryptHash(p, r),
   },
 }))
-vi.mock('@/lib/mobile-auth-tokens', () => ({ consumeMobileAuthToken: (t: string) => consumeMobileAuthToken(t) }))
-vi.mock('@/lib/pkce', () => ({ verifyPkce: (v: string, c: string) => verifyPkce(v, c) }))
+vi.mock('@/lib/auth/mobile/tokens', () => ({ consumeMobileAuthToken: (t: string) => consumeMobileAuthToken(t) }))
+vi.mock('@/lib/auth/mobile/pkce', () => ({ verifyPkce: (v: string, c: string) => verifyPkce(v, c) }))
 
 import { PATCH as changePassword } from '@/app/api/user/password/route'
 import { GET as readProfile, PATCH as patchProfile } from '@/app/api/user/profile/route'
 import { GET as readPreferences, PATCH as patchPreferences } from '@/app/api/user/preferences/route'
 import { POST as uploadAvatar } from '@/app/api/user/avatar/route'
+vi.mock('@/lib/auth/session-token', () => ({
+  sessionTokenFrom: (_headers: Headers) => sessionTokenFrom(),
+}))
+
 import { POST as exchangeToken } from '@/app/api/auth/exchange-mobile-token/route'
 
-/** The row the repository hands back — hash included, which is the point. */
 const userRow = (over: Row = {}) => ({
   id: 'u-1', email: 'me@example.com', name: 'Sam', displayName: 'Sam',
   passwordHash: '$2b$12$aRealLookingBcryptHashThatMustNeverLeak',
@@ -74,7 +57,7 @@ const send = (
 ) => handler(Object.assign(new Request(`http://localhost${url}`, {
   method, headers: { 'Content-Type': 'application/json', ...headers },
   body: body === undefined ? undefined : typeof body === 'string' ? body : JSON.stringify(body),
-}), { nextUrl: new URL(`http://localhost${url}`) }) as never)
+}), { nextUrl: new URL(`http://localhost${url}`), cookies: { getAll: () => [] } }) as never)
 
 const password = (body: unknown) => send(changePassword as never, '/api/user/password', 'PATCH', body)
 const profilePatch = (body: unknown) => send(patchProfile as never, '/api/user/profile', 'PATCH', body)
@@ -84,25 +67,24 @@ const exchange = (body: unknown, headers: Record<string, string> = {}) =>
   send(exchangeToken as never, '/api/auth/exchange-mobile-token', 'POST', body, headers)
 
 let seq = 0
-/** Every case gets its own user id. The password and avatar routes are rate-limited per user, and
- *  `beforeEach` resets mocks but NOT the limiter — cases sharing one id spend each other's budget
- *  and start answering 429 for reasons that have nothing to do with what they assert. */
+
 const freshUser = () => { sessionUser = { id: `u-${++seq}`, email: `u${seq}@example.com` } }
 const me = () => sessionUser!.id
-/** The exchange route rate-limits by IP, so each case needs its own. */
+
 let ipSeq = 0
 const freshIp = () => ({ 'x-forwarded-for': `10.0.0.${++ipSeq}` })
 
 beforeEach(() => {
   vi.clearAllMocks()
   freshUser()
-  getUserByEmail.mockResolvedValue(userRow())
+  getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
+  sessionTokenFrom.mockResolvedValue({ userId: 'u-1', exp: Math.floor(Date.now() / 1000) + 3600 })
+  getUserCredentials.mockResolvedValue(userRow())
   updateUserProfile.mockResolvedValue({ id: 'u-1', displayName: 'Sam' })
   updateUserAvatar.mockResolvedValue({ avatar: 'stored.png' })
   countWorkoutSessions.mockResolvedValue(42)
   getUserPreferences.mockResolvedValue({ scoreRingStyle: 'solid' })
   updateUserPreferences.mockResolvedValue({ scoreRingStyle: 'solid' })
-  // `clearAllMocks` clears calls, not implementations — a rejection from one case would leak.
   bcryptCompare.mockResolvedValue(true)
   bcryptHash.mockResolvedValue('hashed:12')
   verifyPkce.mockReturnValue(true)
@@ -114,8 +96,6 @@ describe('PATCH /api/user/password', () => {
     sessionUser = null
     expect((await password({ currentPassword: 'a', newPassword: 'longenough' })).status).toBe(401)
   })
-
-  // Bare `req.json()` threw here, and Next answered 500 — on a credential route.
   it('answers 400 to a malformed body, not 500', async () => {
     const res = await password('{not json')
     expect(res.status).toBe(400)
@@ -131,7 +111,28 @@ describe('PATCH /api/user/password', () => {
       const res = await password({ currentPassword: 'old', newPassword })
       expect(res.status).toBe(400)
     }
-    expect(getUserByEmail).not.toHaveBeenCalled()
+    expect(getUserCredentials).not.toHaveBeenCalled()
+    expect(updateUserPassword).not.toHaveBeenCalled()
+  })
+
+  it('uses the session ID even when no email claim exists', async () => {
+    sessionUser = { id: 'id-only-account' }
+    getUserCredentials.mockResolvedValue(userRow({ passwordHash: null }))
+    expect((await password({ newPassword: 'longenough' })).status).toBe(200)
+    expect(getUserCredentials).toHaveBeenCalledWith('id-only-account')
+    expect(updateUserPassword).toHaveBeenCalledWith('id-only-account', 'hashed:12')
+  })
+
+  it('refuses a password bcrypt would truncate', async () => {
+    for (const newPassword of ['a'.repeat(73), '🔒'.repeat(19)]) {
+      expect((await password({ newPassword })).status).toBe(400)
+    }
+    expect(updateUserPassword).not.toHaveBeenCalled()
+  })
+
+  it('does not set a password for a missing account', async () => {
+    getUserCredentials.mockResolvedValue(null)
+    expect((await password({ newPassword: 'longenough' })).status).toBe(404)
     expect(updateUserPassword).not.toHaveBeenCalled()
   })
 
@@ -150,11 +151,8 @@ describe('PATCH /api/user/password', () => {
     expect((await password({ currentPassword: 'right', newPassword: 'longenough' })).status).toBe(200)
     expect(bcryptCompare).toHaveBeenLastCalledWith('right', userRow().passwordHash)
   })
-
-  // An OAuth-only account has no hash to verify against; requiring one would lock it out of ever
-  // setting a password.
   it('lets an account with no password set one without a current password', async () => {
-    getUserByEmail.mockResolvedValue(userRow({ passwordHash: null }))
+    getUserCredentials.mockResolvedValue(userRow({ passwordHash: null }))
     expect((await password({ newPassword: 'longenough' })).status).toBe(200)
     expect(bcryptCompare).not.toHaveBeenCalled()
     expect(updateUserPassword).toHaveBeenCalledTimes(1)
@@ -182,36 +180,30 @@ describe('/api/user/profile', () => {
     expect((await readProfile()).status).toBe(401)
     expect((await profilePatch({ displayName: 'Sam' })).status).toBe(401)
   })
-
-  // The repository hands over the whole row. Only `hasPassword` may survive of it.
   it('never returns the password hash, only whether one exists', async () => {
     const body = await (await readProfile()).json()
     expect(body.hasPassword).toBe(true)
     expect(body.user).not.toHaveProperty('passwordHash')
     expect(JSON.stringify(body)).not.toContain('$2b$12$')
-    // LB-180: a pure read of the users row, so nothing a workout writes can stale it.
     expect(body).not.toHaveProperty('workoutCount')
     expect(countWorkoutSessions).not.toHaveBeenCalled()
 
-    getUserByEmail.mockResolvedValue(userRow({ passwordHash: null }))
+    getUserCredentials.mockResolvedValue(userRow({ passwordHash: null }))
     expect((await (await readProfile()).json()).hasPassword).toBe(false)
   })
 
   it('404s when the session names a user the repository cannot find', async () => {
-    getUserByEmail.mockResolvedValue(null)
+    getUserCredentials.mockResolvedValue(null)
     expect((await readProfile()).status).toBe(404)
   })
 
   it('rejects an unknown key and an out-of-range value', async () => {
-    // Each against a body that would otherwise succeed, so the schema is what refuses it.
     expect((await profilePatch({ displayName: 'Sam', isAdmin: true })).status).toBe(400)
     expect((await profilePatch({ heightCm: 1000 })).status).toBe(400)
     expect((await profilePatch({ dateOfBirth: '15/06/1993' })).status).toBe(400)
     expect((await profilePatch({ sex: 'unspecified' })).status).toBe(400)
     expect(updateUserProfile).not.toHaveBeenCalled()
   })
-
-  // BF-78. Collapsing the two meant no field could ever be cleared.
   it('keeps "omitted" and "explicitly null" different', async () => {
     await profilePatch({ displayName: 'Sam' })
     expect(updateUserProfile.mock.calls[0][1]).toEqual({ displayName: 'Sam' })
@@ -255,11 +247,6 @@ describe('/api/user/preferences', () => {
   it('rejects a value the schema bounds', async () => {
     expect((await prefsPatch({ weightLookback: 99999 })).status).toBe(400)
   })
-
-  // `null` clears a key, absence leaves it alone — that distinction is what this pins. The route's
-  // `value !== undefined` filter beside it is NOT covered and cannot be: JSON has no `undefined`, so
-  // no HTTP body can produce a parsed key holding one. Mutating that filter away fails nothing,
-  // which is the honest reading of a guard that is unreachable from the wire rather than a gap here.
   it('forwards an explicit null to clear a key, and nothing at all when the body is empty', async () => {
     await prefsPatch({ scoreRingStyle: null })
     expect(updateUserPreferences.mock.calls[0][1]).toEqual({ scoreRingStyle: null })
@@ -277,8 +264,6 @@ describe('/api/user/preferences', () => {
 })
 
 describe('POST /api/user/avatar', () => {
-  // A real PNG header followed by padding — RV-191 validates the leading bytes, so an all-'A'
-  // payload is no longer an image as far as the route is concerned.
   const PNG = 'data:image/png;base64,iVBORw0KGgoAAAAN' + 'A'.repeat(100)
 
   it('refuses without a session', async () => {
@@ -291,9 +276,6 @@ describe('POST /api/user/avatar', () => {
     expect((await avatar({ avatar: 42 })).status).toBe(400)
     expect(updateUserAvatar).not.toHaveBeenCalled()
   })
-
-  // The old check was a `data:image/` PREFIX, which accepts svg+xml — a script-bearing format
-  // stored and re-served as a user's avatar.
   it('refuses SVG and anything else outside the whitelist', async () => {
     for (const bad of [
       'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=',
@@ -308,10 +290,6 @@ describe('POST /api/user/avatar', () => {
     }
     expect(updateUserAvatar).not.toHaveBeenCalled()
   })
-
-  // RV-191: the fixtures carry REAL leading bytes now. They used to be `AAAA` under every declared
-  // type, which the route accepted because it only read the declaration — the defect that sweep
-  // closed. A payload that is not the type it claims is rejected, so a placeholder no longer works.
   const REAL_HEADER: Record<string, string> = {
     'image/png': 'iVBORw0KGgoAAAAN',
     'image/jpeg': '/9j/4AAQSkY=',
@@ -339,10 +317,6 @@ describe('POST /api/user/avatar', () => {
   })
 
   it('rejects a decoded image over the size cap', async () => {
-    // The two limits are 260 KB apart and the case has to land between them: base64 is 4/3 of the
-    // payload, so the 5 MiB decoded cap is 6,990,507 characters and the 7 MiB stream guard is
-    // 7,340,032 bytes of whole body. 7.1 M characters clears the first and stays under the second,
-    // so this lands on the decoded-size check rather than the transport one.
     const big = 'data:image/png;base64,' + 'A'.repeat(7_100_000)
     const res = await avatar({ avatar: big })
     expect(res.status).toBe(400)
@@ -377,23 +351,31 @@ describe('POST /api/auth/exchange-mobile-token', () => {
     expect(res.status).toBe(401)
     expect(await res.json()).toEqual({ error: 'Invalid or expired token' })
   })
-
-  // The one-time token is consumed BEFORE the verifier is checked, deliberately: a captured token
-  // burns on the attacker's first attempt rather than staying redeemable for the real client.
-  //
-  // The ordering is structural rather than a choice a mutation can undo — the challenge to verify
-  // AGAINST only exists inside the consumed entry, so there is no verify-then-consume to write. What
-  // this pins is the consequence: the failed attempt consumed it, and the retry finds nothing.
   it('burns the token even when the verifier fails', async () => {
     consumeMobileAuthToken.mockReturnValue(entry)
     verifyPkce.mockReturnValue(false)
     expect((await exchange({ token: 'tok', verifier: 'wrong' }, freshIp())).status).toBe(401)
     expect(consumeMobileAuthToken).toHaveBeenCalledWith('tok')
-
-    // The real client retrying with the right verifier now finds nothing to redeem.
     consumeMobileAuthToken.mockReturnValue(null)
     verifyPkce.mockReturnValue(true)
     expect((await exchange({ token: 'tok', verifier: 'right' }, freshIp())).status).toBe(401)
+  })
+
+  it('checks the account again before issuing either response type', async () => {
+    getUserById.mockResolvedValue({ isActive: false, isAdmin: false })
+    consumeMobileAuthToken.mockReturnValue(entry)
+    for (const responseType of ['cookie', 'token']) {
+      expect((await exchange({ token: 'tok', verifier: 'right', responseType }, freshIp())).status).toBe(401)
+    }
+  })
+
+  it('refuses expired or invalid sessions before setting a cookie', async () => {
+    consumeMobileAuthToken.mockReturnValue(entry)
+    sessionTokenFrom.mockResolvedValue(null)
+    expect((await exchange({ token: 'tok', verifier: 'right' }, freshIp())).status).toBe(401)
+    sessionTokenFrom.mockResolvedValue({ userId: 'u-1', exp: 1 })
+    expect((await exchange({ token: 'tok', verifier: 'right' }, freshIp())).status).toBe(401)
+    expect(getUserById).not.toHaveBeenCalled()
   })
 
   it('sets an httpOnly session cookie and never puts it in the body', async () => {
@@ -406,7 +388,7 @@ describe('POST /api/auth/exchange-mobile-token', () => {
     expect(cookie).toContain('a.session.jwt')
     expect(cookie).toMatch(/HttpOnly/i)
     expect(cookie).toMatch(/SameSite=lax/i)
-    expect(cookie).toContain('Max-Age=2592000')  // 30 days
+    expect(cookie).toContain('Max-Age=3600')
     expect(verifyPkce).toHaveBeenCalledWith('right', 'chal')
   })
 
@@ -415,7 +397,6 @@ describe('POST /api/auth/exchange-mobile-token', () => {
     consumeMobileAuthToken.mockReturnValue(null)
     for (let i = 0; i < 10; i++) expect((await exchange({ token: `t${i}`, verifier: 'v' }, ip)).status).toBe(401)
     expect((await exchange({ token: 't10', verifier: 'v' }, ip)).status).toBe(429)
-    // A different address is unaffected — the limit is per-IP, not global.
     expect((await exchange({ token: 't11', verifier: 'v' }, freshIp())).status).toBe(401)
   })
 })

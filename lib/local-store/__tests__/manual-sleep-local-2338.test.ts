@@ -12,7 +12,7 @@ const bindable = (v: unknown) => (v === undefined ? null : typeof v === 'boolean
 vi.mock('@/lib/sqlite/sqlite-service', () => ({
   runSQL: vi.fn(async (sql: string, p: unknown[] = []) => { local.db!.prepare(sql).run(...(p.map(bindable) as never[])) }),
   querySQL: vi.fn(async (sql: string, p: unknown[] = []) => local.db!.prepare(sql).all(...(p.map(bindable) as never[]))),
-  beginTransaction: vi.fn(), commitTransaction: vi.fn(), rollbackTransaction: vi.fn(),
+  withTransaction: vi.fn(async (fn: () => Promise<unknown>) => fn()),
   isSQLiteAvailable: () => true, isLocalStoreDead: () => false,
 }))
 

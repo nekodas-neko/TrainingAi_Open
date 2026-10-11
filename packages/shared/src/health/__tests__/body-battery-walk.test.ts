@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { walkBodyBattery, type BatteryWalkParams } from '../body-battery-walk'
+import { walkBodyBattery, restThresholdFromOffset, type BatteryWalkParams } from '../body-battery-walk'
 
 // The walk was inline in `/api/body-battery` and could only be exercised through a DB-backed route
 // test, which is why its arithmetic had never been pinned directly. Every expected value below is
@@ -181,5 +181,36 @@ describe('the threshold is expressible as a bpm offset — what TN-2 needs', () 
     // Explicit offset: it does not.
     expect(ceiling({ ...wide, restThreshold: OFFSET_BPM / 137 }))
       .toBe(ceiling({ ...narrow, restThreshold: OFFSET_BPM / 118 }))
+  })
+})
+
+describe('v7: the charge ceiling is resting HR + 9 bpm (issue 2235)', () => {
+  // The owner signed 9 bpm on 2026-10-05 against the walk as shipped, whose charge branch is
+  // `hrr <= restThreshold`: a reading AT the ceiling charges. That inclusive edge was part of the fit
+  // and is pinned here unchanged; what moves is where the ceiling sits.
+  const OFFSET = 9
+  const REST = 50
+
+  it('turns the offset into the reserve fraction the walk takes', () => {
+    expect(restThresholdFromOffset(OFFSET, 100)).toBeCloseTo(0.09, 12)
+    expect(restThresholdFromOffset(OFFSET, 120)).toBeCloseTo(0.075, 12)
+  })
+
+  it('charges below and at resting HR + 9, drains above it, for any reserve', () => {
+    for (const reserve of [60, 100, 118, 137]) {
+      const p = { ...P, restingHr: REST, reserve, restThreshold: restThresholdFromOffset(OFFSET, reserve) }
+      const end = (bpm: number) => walkBodyBattery([{ tsMs: 5 * MIN, bpm }], p).battery
+      expect(end(REST + 8)).toBeCloseTo(51, 6)   // 0.2/min × 5 min, flat
+      expect(end(REST + 9)).toBeCloseTo(51, 6)   // at the ceiling: still the charge branch
+      expect(end(REST + 10)).toBeLessThan(50)    // one bpm over: draining
+    }
+  })
+
+  it('the old 0.05-of-reserve ceiling drained readings that now charge', () => {
+    // reserve 120: old ceiling 6 bpm over rest, new 9. A reading 7 bpm over rest flips.
+    const old = { ...P, restingHr: REST, reserve: 120, restThreshold: 0.05 }
+    const v7 = { ...old, restThreshold: restThresholdFromOffset(OFFSET, 120) }
+    expect(walkBodyBattery([{ tsMs: 5 * MIN, bpm: REST + 7 }], old).battery).toBeLessThan(50)
+    expect(walkBodyBattery([{ tsMs: 5 * MIN, bpm: REST + 7 }], v7).battery).toBeCloseTo(51, 6)
   })
 })

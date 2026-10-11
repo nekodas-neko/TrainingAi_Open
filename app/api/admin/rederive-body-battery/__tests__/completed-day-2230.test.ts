@@ -73,8 +73,8 @@ describe.skipIf(!canRun)('a recompute keeps a completed Body Battery day (#2230)
     day = du.shiftDateStr(du.todayInTz(TZ), -1)
     mid = du.dateStrMidnightInTz(day, TZ).getTime()
     await pool.query(
-      `INSERT INTO users (id, email, password_hash, timezone, is_admin) VALUES ($1, $2, 'x', $3, true)
-       ON CONFLICT (id) DO UPDATE SET is_admin = true`, [USER, `n2230-${USER}@example.com`, TZ],
+      `INSERT INTO users (id, email, password_hash, timezone, is_admin, is_active) VALUES ($1, $2, 'x', $3, true, true)
+       ON CONFLICT (id) DO UPDATE SET is_admin = true, is_active = true`, [USER, `n2230-${USER}@example.com`, TZ],
     )
   })
 

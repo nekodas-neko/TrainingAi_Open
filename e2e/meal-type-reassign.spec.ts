@@ -33,12 +33,15 @@ async function cleanup(db: Client) {
   await db.query('DELETE FROM meal_types WHERE id = $1', [TYPE_ID])
 }
 
-test.beforeAll(async () => {
+test.beforeEach(async ({ request }) => {
   await withDb(async db => {
     const { rows } = await db.query<{ id: string }>('SELECT id FROM users WHERE email = $1', [SEED_EMAIL])
     const userId = rows[0]?.id
     expect(userId, `${SEED_EMAIL} is not seeded — run pnpm db:local`).toBeTruthy()
     await cleanup(db)
+    const mealTypes = await request.get('/api/nutrition/meal-types')
+    expect(mealTypes.ok()).toBe(true)
+    expect(await mealTypes.json()).toHaveLength(6)
     // sort_order 99 keeps it last, so it cannot shift the seeded rows other specs count on.
     await db.query(
       `INSERT INTO meal_types (id, user_id, name, emoji, sort_order, time_start_hour, time_end_hour)

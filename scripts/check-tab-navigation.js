@@ -16,16 +16,16 @@
  * `router.push` while reading as a tab flip. Converting them would be misleading, not safer. The
  * real sweep was the other 15.
  */
-const { execSync } = require('node:child_process');
-const { readFileSync } = require('node:fs');
+const { execFileSync } = require('node:child_process');
+const { readFileSync, existsSync } = require('node:fs');
 
 // Mirrors components/shell/tabs.ts — a tab is an EXACT path match, and the full-screen workout
 // route is explicitly not one.
 const TAB_PATHS = ['/', '/health', '/workout', '/nutrition', '/more'];
 
-const files = execSync('git ls-files app components lib', { encoding: 'utf8' })
+const files = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard', 'app', 'components', 'lib'], { encoding: 'utf8' })
   .split('\n')
-  .filter(f => /\.tsx?$/.test(f) && !f.includes('__tests__'));
+  .filter(f => /\.tsx?$/.test(f) && !f.includes('__tests__') && existsSync(f));
 
 const offenders = [];
 for (const file of files) {

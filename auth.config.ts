@@ -1,12 +1,12 @@
 import type { NextAuthConfig } from "next-auth"
 import Google from "next-auth/providers/google"
+import { sessionFromToken, SESSION_MAX_AGE_SECONDS } from '@/lib/auth/session'
 
-// Edge-compatible config — no Node.js-only imports (no bcrypt, no pg).
-// Middleware imports this directly. auth.ts merges it with the full Node.js config.
-export const authConfig: NextAuthConfig = {
+// Middleware dependencies must support the Edge runtime.
+export const authConfig = {
   secret: process.env.AUTH_SECRET,
   trustHost: true,
-  session: { strategy: "jwt", maxAge: 7 * 24 * 60 * 60, updateAge: 24 * 60 * 60 },
+  session: { strategy: "jwt", maxAge: SESSION_MAX_AGE_SECONDS, updateAge: 24 * 60 * 60 },
   pages: {
     signIn: "/sign-in",
     error: "/sign-in",
@@ -35,33 +35,21 @@ export const authConfig: NextAuthConfig = {
       if (typeof user?.isActive === "boolean") token.isActive = user.isActive
       if (typeof user?.isAdmin === "boolean") token.isAdmin = user.isAdmin
       if (user?.timezone) token.timezone = user.timezone
-      if ('sex' in (user ?? {})) token.sex = (user as any).sex ?? null
-      if ('heightCm' in (user ?? {})) token.heightCm = (user as any).heightCm ?? null
-      if ('dateOfBirth' in (user ?? {})) token.dateOfBirth = (user as any).dateOfBirth ?? null
-      if ('activityLevel' in (user ?? {})) token.activityLevel = (user as any).activityLevel ?? null
-      if ('friendCode' in (user ?? {})) token.friendCode = (user as any).friendCode ?? null
-      if ('equippedTitle' in (user ?? {})) token.equippedTitle = (user as any).equippedTitle ?? null
+      if (user) {
+        if ('sex' in user) token.sex = user.sex ?? null
+        if ('heightCm' in user) token.heightCm = user.heightCm ?? null
+        if ('dateOfBirth' in user) token.dateOfBirth = user.dateOfBirth ?? null
+        if ('activityLevel' in user) token.activityLevel = user.activityLevel ?? null
+        if ('friendCode' in user) token.friendCode = user.friendCode ?? null
+        if ('equippedTitle' in user) token.equippedTitle = user.equippedTitle ?? null
+      }
       if (account?.provider === "google" && account.refresh_token) {
-        token.refreshToken = account.refresh_token as string
+        token.refreshToken = account.refresh_token
       }
       return token
     },
     session({ session, token }) {
-      if (token.userId) session.user.id = token.userId
-      // The Google refresh token stays in the JWT and is deliberately NOT copied here (RV-193).
-      // This object is what `GET /api/auth/session` returns to page JavaScript, and the token is
-      // long-lived, can write to Google Calendar, and outlives sign-out. Its only consumer is the
-      // server; it reads it from the cookie via `lib/auth/session-token.ts`.
-      if (typeof token.isActive === "boolean") session.isActive = token.isActive
-      if (typeof token.isAdmin === "boolean") session.user.isAdmin = token.isAdmin
-      if (token.timezone) session.user.timezone = token.timezone
-      session.user.sex = token.sex ?? null
-      session.user.heightCm = token.heightCm ?? null
-      session.user.dateOfBirth = token.dateOfBirth ?? null
-      session.user.activityLevel = token.activityLevel ?? null
-      session.user.friendCode = token.friendCode ?? null
-      session.user.equippedTitle = token.equippedTitle ?? null
-      return session
+      return sessionFromToken(session, token)
     },
   },
-}
+} satisfies NextAuthConfig

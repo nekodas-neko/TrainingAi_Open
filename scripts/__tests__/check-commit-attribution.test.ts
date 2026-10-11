@@ -1,6 +1,7 @@
 // issue 2700 — a commit message that carries AI attribution fails the Custom Rules step.
 // The fixture is a throwaway repository: `origin/main` points at a clean base commit, and each case
-// adds one commit on top, so the local fallback (`origin/main..HEAD`) is the path under test.
+// adds one commit on top, so the local fallback (`origin/main..HEAD`) is the path under test. The CI
+// path (the PR's commit list from GitHub) is tested at the bottom through a stand-in for fetch.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
@@ -8,14 +9,16 @@ import os from 'node:os'
 import path from 'node:path'
 
 const script = path.join(__dirname, '..', 'check-commit-attribution.js')
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { collectCommits, findViolations } = require('../check-commit-attribution.js')
 let repo: string
 let scratch: string
 
 const git = (...args: string[]) =>
   execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim()
 
-function commit(message: string) {
-  writeFileSync(path.join(repo, 'f.txt'), `${Math.random()}\n`)
+function commit(message: string, file = 'f.txt') {
+  writeFileSync(path.join(repo, file), `${Math.random()}\n`)
   git('add', '.')
   const msgFile = path.join(scratch, 'msg.txt')
   writeFileSync(msgFile, message)
@@ -24,8 +27,7 @@ function commit(message: string) {
 
 function run() {
   const env = { ...process.env }
-  delete env.PR_HEAD_SHA
-  delete env.PR_COMMITS
+  delete env.PR_NUMBER
   return spawnSync('node', [script, '--repo', repo], { encoding: 'utf8', env })
 }
 
@@ -82,5 +84,73 @@ describe('check-commit-attribution', () => {
     const res = run()
     expect(res.status).toBe(0)
     expect(res.stdout).toContain('skipped')
+  })
+})
+
+describe('a branch that merged main', () => {
+  it('reads only its own commits, not the main commits the merge brought in (#2508)', () => {
+    // main moves on with an agent's squash commit, which carries the co-author line GitHub adds;
+    // the branch then merges main. Only the branch's own commit and the merge are its commits.
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD') // the case above deleted it
+    commit('Branch work\n\nA body.\n')
+    git('checkout', '-q', '-b', 'mainline', 'refs/remotes/origin/main')
+    commit('Agent change (#2751)\n\nCo-authored-by: Claude <noreply@anthropic.com>\n', 'g.txt')
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD')
+    git('checkout', '-q', 'work')
+    git('merge', '-q', '--no-ff', '-m', 'Merge main', 'refs/remotes/origin/main')
+    const res = run()
+    expect(res.status).toBe(0)
+    expect(res.stdout).toContain('2 commit(s)')
+  })
+})
+
+describe('in CI: the commit list GitHub has for the PR', () => {
+  type Call = { url: string; auth: string | undefined }
+  const entry = (sha: string, message: string) => ({ sha, commit: { message } })
+  const env = { PR_NUMBER: '2508', GITHUB_REPOSITORY: 'owner/repo', GH_TOKEN: 'tok' }
+
+  function stub(pages: unknown[][], status = 200) {
+    const calls: Call[] = []
+    const fetchImpl = async (url: string, init: { headers: Record<string, string> }) => {
+      calls.push({ url, auth: init.headers.Authorization })
+      const page = Number(new URL(url).searchParams.get('page'))
+      return { ok: status === 200, status, json: async () => pages[page - 1] ?? [] }
+    }
+    return { calls, fetchImpl }
+  }
+
+  it('reads exactly the listed commits, with the token, and judges only those', async () => {
+    const { calls, fetchImpl } = stub([[
+      entry('a'.repeat(40), 'Add iPhone sign-in\n\nBody.\n'),
+      entry('b'.repeat(40), 'Merge main into the branch\n'),
+    ]])
+    const got = await collectCommits('/nonexistent', env, fetchImpl)
+    expect(got.commits.map((c: { sha: string }) => c.sha[0])).toEqual(['a', 'b'])
+    expect(got.label).toBe('the 2 commit(s) of PR #2508')
+    expect(findViolations(got.commits)).toEqual([])
+    expect(calls).toEqual([{ url: 'https://api.github.com/repos/owner/repo/pulls/2508/commits?per_page=100&page=1', auth: 'Bearer tok' }])
+  })
+
+  it('still fails a PR commit that carries attribution', async () => {
+    const { fetchImpl } = stub([[entry('c'.repeat(40), 'Fix\n\nClaude-Session: https://claude.ai/code/session_x\n')]])
+    const got = await collectCommits('/nonexistent', env, fetchImpl)
+    expect(findViolations(got.commits).map((v: { pattern: string }) => v.pattern)).toEqual(['Claude session URL'])
+  })
+
+  it('follows a full page to the next, and stops at a short one', async () => {
+    const full = Array.from({ length: 100 }, (_, i) => entry(String(i).padStart(40, '0'), 'Clean\n'))
+    const { calls, fetchImpl } = stub([full, [entry('d'.repeat(40), 'Clean\n')]])
+    const got = await collectCommits('/nonexistent', env, fetchImpl)
+    expect(got.commits).toHaveLength(101)
+    expect(calls.map(c => new URL(c.url).searchParams.get('page'))).toEqual(['1', '2'])
+  })
+
+  it('fails closed when GitHub cannot be asked', async () => {
+    expect((await collectCommits('/nonexistent', env, stub([], 403).fetchImpl)).error).toContain('HTTP 403')
+    const throwing = async () => { throw new Error('getaddrinfo ENOTFOUND') }
+    expect((await collectCommits('/nonexistent', env, throwing)).error).toContain('ENOTFOUND')
+    expect((await collectCommits('/nonexistent', env, stub([[]]).fetchImpl)).error).toContain('no commits')
+    expect((await collectCommits('/nonexistent', { ...env, GITHUB_REPOSITORY: '' }, stub([]).fetchImpl)).error).toContain('GITHUB_REPOSITORY')
+    expect((await collectCommits('/nonexistent', { ...env, PR_NUMBER: 'x' }, stub([]).fetchImpl)).error).toContain('PR_NUMBER')
   })
 })

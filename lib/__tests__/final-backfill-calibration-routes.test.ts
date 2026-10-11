@@ -19,7 +19,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 type Row = Record<string, unknown>
 
-const getUserById = vi.fn(async (_id: string) => ({ isAdmin: true }) as Row | null)
+const getUserById = vi.fn(async (_id: string) => ({ isActive: true, isAdmin: true }) as Row | null)
 const rateLimit = vi.fn((..._a: unknown[]) => true)
 const reportServerError = vi.fn((..._a: unknown[]) => undefined)
 
@@ -70,7 +70,7 @@ beforeEach(() => {
                    buildBatteryRecoveryCalibration,
                    listSessionsMissingSetHrStats, upsertSetHrStats, computeWorkoutHr]) m.mockClear()
   rateLimit.mockReturnValue(true)
-  getUserById.mockResolvedValue({ isAdmin: true })
+  getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
   getBodyBatteryHistory.mockResolvedValue([])
   listDayCheckins.mockResolvedValue([])
   buildBatteryRecoveryCalibration.mockReturnValue({ from: 'x', to: 'y', rows: [] })
@@ -89,7 +89,7 @@ describe('the admin gate', () => {
 
   it('refuses a non-admin on the two admin routes, whatever the token claims', async () => {
     sessionUser = { id: 'u-1', isAdmin: true }
-    getUserById.mockResolvedValue({ isAdmin: false })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     for (const [name, call] of ADMIN_ONLY) expect((await call()).status, name).toBe(403)
     expect(upsertSetHrStats).not.toHaveBeenCalled()
   })

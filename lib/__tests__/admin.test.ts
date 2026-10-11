@@ -9,11 +9,11 @@ beforeEach(() => getUserById.mockReset())
 
 describe('requireAdmin', () => {
   it('resolves for an admin user', async () => {
-    getUserById.mockResolvedValue({ id: 'u1', isAdmin: true })
+    getUserById.mockResolvedValue({ id: 'u1', isActive: true, isAdmin: true })
     await expect(requireAdmin('u1')).resolves.toBeUndefined()
   })
   it('throws AdminError for a non-admin user', async () => {
-    getUserById.mockResolvedValue({ id: 'u1', isAdmin: false })
+    getUserById.mockResolvedValue({ id: 'u1', isActive: true, isAdmin: false })
     await expect(requireAdmin('u1')).rejects.toBeInstanceOf(AdminError)
   })
   it('throws AdminError for an empty userId without hitting the repo', async () => {
@@ -21,7 +21,7 @@ describe('requireAdmin', () => {
     expect(getUserById).not.toHaveBeenCalled()
   })
   it('ignores a stale JWT isAdmin=true flag — the DB is authoritative', async () => {
-    getUserById.mockResolvedValue({ id: 'u1', isAdmin: false })
+    getUserById.mockResolvedValue({ id: 'u1', isActive: true, isAdmin: false })
     await expect(requireAdmin('u1', true)).rejects.toBeInstanceOf(AdminError)
   })
 })

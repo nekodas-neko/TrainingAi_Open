@@ -48,8 +48,8 @@ describe.skipIf(!canRun)('backfill-set-hrr1 (#2457)', () => {
     pool = getPool()
     for (const [id, admin] of [[USER, true], [OTHER, false]] as const) {
       await pool.query(
-        `INSERT INTO users (id, email, password_hash, timezone, is_admin) VALUES ($1, $2, 'x', $3, $4)
-         ON CONFLICT (id) DO UPDATE SET is_admin = $4`,
+        `INSERT INTO users (id, email, password_hash, timezone, is_admin, is_active) VALUES ($1, $2, 'x', $3, $4, true)
+         ON CONFLICT (id) DO UPDATE SET is_admin = $4, is_active = true`,
         [id, `hrr1-${id}@example.com`, TZ, admin])
     }
   })

@@ -7,7 +7,25 @@ const { runSQL, querySQL, beginTransaction, commitTransaction, rollbackTransacti
   commitTransaction:  vi.fn().mockResolvedValue(undefined),
   rollbackTransaction: vi.fn().mockResolvedValue(undefined),
 }))
-vi.mock('@/lib/sqlite/sqlite-service', () => ({ runSQL, querySQL, beginTransaction, commitTransaction, rollbackTransaction }))
+// The backend's only transaction entry point is sqlite-service's withTransaction. Stand it in with
+// the same begin → body → commit / rollback-on-throw shape so the begin/commit/rollback spies say
+// which writes ran inside the transaction. Its queueing is tested against the real helper in
+// lib/sqlite/__tests__/reload-and-transaction-queue.test.ts.
+vi.mock('@/lib/sqlite/sqlite-service', () => ({
+  runSQL,
+  querySQL,
+  withTransaction: async <T,>(fn: () => Promise<T>): Promise<T> => {
+    await beginTransaction()
+    try {
+      const result = await fn()
+      await commitTransaction()
+      return result
+    } catch (err) {
+      try { await rollbackTransaction() } catch { /* keep the real error */ }
+      throw err
+    }
+  },
+}))
 
 import { SQLiteLocalStore } from '../sqlite-backend'
 

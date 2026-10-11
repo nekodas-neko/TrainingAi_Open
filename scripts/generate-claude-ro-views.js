@@ -165,6 +165,8 @@ const GLOBAL = new Set([
 
 /** Third-party personal data with no audit value — no view is generated at all. */
 const DENIED = new Set([
+  'auth_identities',
+  'apple_auth_attempts',
   'invited_emails', // other people's email addresses
   'rate_limits',    // keys embed other users' ids and request timing
   'email_normalisation_preimage', // LA-61's undo record: every account's pre-backfill address

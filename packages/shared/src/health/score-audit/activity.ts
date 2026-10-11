@@ -12,7 +12,8 @@ export interface ActivityAuditInput {
   goalProfile: Record<string, unknown>
   steps: number | null
   activeCalories: number | null
-  /** Minutes in zone 2+ (vigorous double-counted), or null when no HR series was derivable. */
+  /** WHO active minutes (moderate from 40% of HR reserve; vigorous from 60%, double-counted), or null
+   *  when no HR series was derivable. */
   zoneMinutes: number | null
   moveHours: number | null
   /** Whether a strength session was logged on this day — with zero zone minutes, that combination

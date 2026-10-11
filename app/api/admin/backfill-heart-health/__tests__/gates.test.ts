@@ -29,7 +29,7 @@ describe('POST /api/admin/backfill-heart-health (issue 2093)', () => {
 
   beforeEach(() => {
     session.value = { user: { id: 'u1', timezone: TZ, isAdmin: true } }
-    repo.getUserById.mockReset().mockResolvedValue({ id: 'u1', isAdmin: true })
+    repo.getUserById.mockReset().mockResolvedValue({ id: 'u1', isActive: true, isAdmin: true })
     rescore.mockReset().mockResolvedValue({ days: [], changes: [], written: 0 })
     limited.value = true
   })
@@ -41,7 +41,7 @@ describe('POST /api/admin/backfill-heart-health (issue 2093)', () => {
   })
 
   it('403 for a non-admin, judged by the database and not the token flag', async () => {
-    repo.getUserById.mockResolvedValue({ id: 'u1', isAdmin: false })
+    repo.getUserById.mockResolvedValue({ id: 'u1', isActive: true, isAdmin: false })
     expect((await post(`from=${d(-5)}&to=${d(-3)}`)).status).toBe(403)
     expect(rescore).not.toHaveBeenCalled()
   })

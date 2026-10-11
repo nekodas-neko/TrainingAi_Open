@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 const authMock = vi.fn(async () => null as unknown)
 vi.mock('@/auth', () => ({ auth: () => authMock() }))
 
-const getUserById = vi.fn(async () => ({ id: 'admin-1', isAdmin: true }))
+const getUserById = vi.fn(async () => ({ id: 'admin-1', isActive: true, isAdmin: true }))
 vi.mock('@/lib/data', () => ({ getRepository: vi.fn(async () => ({ getUserById })) }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: vi.fn(() => true) }))
 
@@ -47,7 +47,7 @@ const withToken = (t: string) => ({ authorization: `Bearer ${t}` })
 beforeEach(() => {
   configured = true
   authMock.mockReset().mockResolvedValue(null)
-  getUserById.mockReset().mockResolvedValue({ id: 'admin-1', isAdmin: true })
+  getUserById.mockReset().mockResolvedValue({ id: 'admin-1', isActive: true, isAdmin: true })
   roQuery.mockReset().mockResolvedValue({ rows: [{ n: 1 }], fields: [{ name: 'n' }] })
   auditInsert.mockClear()
   process.env.CLAUDE_DB_QUERY_SECRET = SECRET
@@ -77,7 +77,7 @@ describe('POST /api/admin/db-query — auth', () => {
   })
 
   it('403s when the token resolves to a non-admin', async () => {
-    getUserById.mockResolvedValue({ id: 'admin-1', isAdmin: false })
+    getUserById.mockResolvedValue({ id: 'admin-1', isActive: true, isAdmin: false })
     expect((await post('SELECT 1', withToken(SECRET))).status).toBe(403)
   })
 

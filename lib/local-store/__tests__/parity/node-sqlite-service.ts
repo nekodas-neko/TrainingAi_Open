@@ -51,3 +51,16 @@ export async function commitTransaction(): Promise<void> { inTransaction = false
 export async function rollbackTransaction(): Promise<void> {
   if (inTransaction) { inTransaction = false; vectorDb().exec('ROLLBACK') }
 }
+
+/** The backend's only transaction entry point; same begin / commit / rollback-on-throw as the real one. */
+export async function withTransaction<T>(fn: () => Promise<T>): Promise<T> {
+  await beginTransaction()
+  try {
+    const result = await fn()
+    await commitTransaction()
+    return result
+  } catch (err) {
+    try { await rollbackTransaction() } catch { /* keep the real error */ }
+    throw err
+  }
+}

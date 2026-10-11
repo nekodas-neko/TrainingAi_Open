@@ -11,6 +11,20 @@ implementation plan — individual stages have (or get) their own plans in
 > folds the public-repo cut (Q-32) into a single ordering. Everything that doc says about the data
 > layer still holds and is not re-litigated here.
 
+> **Update, 2026-10-09 (owner): v2 is native, not a bundled shell.** The owner's "Swift-like feel"
+> goal is about how screens draw, which only native screens change. Bundling only changes where the
+> web files come from. So the bundling half of Stage 2 is **dropped**: the static export and shipping
+> the shell inside the APK. The other half **stays as the native client's prerequisite**, as F1 of the
+> [2026-08-02 review](../../reviews/2026-08-02-native-convergence-roadmap-review.md) argued: the
+> client-held bearer token and `apiUrl()` transport, the default-deny client gate, and serving
+> `/api/**` on its own. The v2 milestone starts after 2–3 clean weekly releases.
+>
+> **The toolkit is re-opened.** This plan assumed Android-only Kotlin/Compose, written when the app
+> was Android-only. iPhone support (#2508) changes that. React Native, Compose, Compose Multiplatform
+> or Swift + Kotlin is decided in #2765, with the owner and jsboiss, before any screen is built. The
+> destination in §1 and the step-by-step, never-broken approach in §2 and §6 hold whichever toolkit
+> wins. §1's "single-user Android app" now reads as Android first, with iPhone in scope.
+
 ---
 
 ## 1. The destination
@@ -208,6 +222,11 @@ Consequences that hold:
   disaster-recovery path but a routine one.
 
 ### Stage 2 — Land Phase 3 (Q-1): shell bundled, API split, auth client-side
+
+> **2026-10-09: the "shell bundled" part is dropped (owner: v2 is native, see the update at the
+> top).** What remains of this stage is the API split and client-held auth, which a native client
+> needs. The "boots with the radio off" exit criterion moves to the native screens.
+
 Unblocked by Gate A. The code exists. Re-merge the workspace split onto the provisioned service.
 
 Exit criteria: the APK boots and renders its shell with the radio off; `/api/**` served from the

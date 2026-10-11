@@ -28,7 +28,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 type Row = Record<string, unknown>
 
-const getUserById = vi.fn(async (_id: string) => ({ isAdmin: true }) as Row | null)
+const getUserById = vi.fn(async (_id: string) => ({ isActive: true, isAdmin: true }) as Row | null)
 const rateLimit = vi.fn((..._a: unknown[]) => true)
 const generateExercisePair = vi.fn(async (..._a: unknown[]) => ({
   start: Buffer.from('start-png'),
@@ -146,7 +146,7 @@ beforeEach(() => {
                    applyLbsToKgFix, reportModelBucketAssets, reportConstantsBucketAssets,
                    verifyModelAssets, insertValues, conflictSet]) m.mockClear()
   rateLimit.mockReturnValue(true)
-  getUserById.mockResolvedValue({ isAdmin: true })
+  getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
   generateExercisePair.mockResolvedValue({ start: Buffer.from('start-png'), end: Buffer.from('end-png') })
   createExerciseGif.mockResolvedValue(Buffer.from('gif-bytes'))
   uploadExerciseMedia.mockResolvedValue('https://cdn.example/x')
@@ -177,7 +177,7 @@ describe('the admin gate on all three tools', () => {
     // so setting only the claim would leave every one of these answering 200 — the fixture has to
     // disagree with itself or it tests nothing.
     sessionUser = { id: 'u-1', isAdmin: true }
-    getUserById.mockResolvedValue({ isAdmin: false })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     for (const [name, call] of ALL) expect((await call()).status, name).toBe(403)
     expect(generateExercisePair).not.toHaveBeenCalled()
     expect(applyLbsToKgFix).not.toHaveBeenCalled()

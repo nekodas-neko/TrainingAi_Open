@@ -37,7 +37,7 @@ describe.skipIf(!canRun)('backfill-shadow-readiness (issue 2636)', () => {
     today = dateUtils.todayInTz(TZ)
     await pool.query(`DELETE FROM users WHERE id = $1`, [TEST_USER_ID])
     await pool.query(
-      `INSERT INTO users (id, email, password_hash, timezone, is_admin) VALUES ($1, $2, 'x', $3, true)`,
+      `INSERT INTO users (id, email, password_hash, timezone, is_active, is_admin) VALUES ($1, $2, 'x', $3, true, true)`,
       [TEST_USER_ID, `backfill-shadow-${TEST_USER_ID}@example.com`, TZ],
     )
     await seedShadowHistory(pool, TEST_USER_ID, { end: shiftDateStr(today, -1), days: 60, tz: TZ })

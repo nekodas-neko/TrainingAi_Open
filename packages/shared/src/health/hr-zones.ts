@@ -22,7 +22,9 @@ export function hrReserve(maxHr: number, restingHr: number): number {
 /** HR-reserve fraction at/under which a reading counts as "at rest" — the single threshold that
  *  distinguishes rest from any movement. Originally a private constant in the Body Battery route
  *  (charge below this, drain above it); shared here so the Activity Score's "moved this hour" signal
- *  uses the exact same rest/active boundary rather than a second invented threshold. */
+ *  uses the exact same rest/active boundary rather than a second invented threshold. Body Battery
+ *  itself left it in v7 for resting HR + `WAKING_REST_OFFSET_BPM` (lib/health/body-battery-day.ts,
+ *  issue 2235); the Activity score and the HR grade still use this one (issue 2743). */
 export const HR_REST_THRESHOLD = 0.05
 
 export interface HrZone {
@@ -76,6 +78,39 @@ export const MODERATE_INTENSITY_FRAC = 0.4
 /** The bpm at which moderate activity begins for a profile (TN-78). */
 export function moderateIntensityBpm({ maxHr, restingHr }: { maxHr: number; restingHr: number }): number {
   return Math.round(restingHr + MODERATE_INTENSITY_FRAC * hrReserve(maxHr, restingHr))
+}
+
+/**
+ * Where VIGOROUS activity begins, as a fraction of heart-rate reserve: ACSM's vigorous floor
+ * (60-89% HRR), completing the definition `MODERATE_INTENSITY_FRAC` took (owner, 2026-10-05, #2198).
+ *
+ * WHO counts a vigorous minute double toward the weekly moderate-equivalent target. Before this,
+ * the two roll-ups each picked a different zone edge for "vigorous" and neither was ACSM's: the
+ * Activity score's zone minutes doubled from Zone 3 (70%) and the run plan's "meets 150 min"
+ * doubled from Zone 4 (80%). Like the moderate floor, it is a constant, not a zone edge, so run
+ * prescriptions (which read the bands) do not move.
+ */
+export const VIGOROUS_INTENSITY_FRAC = 0.6
+
+/** The bpm at which vigorous activity begins for a profile (#2198). */
+export function vigorousIntensityBpm({ maxHr, restingHr }: { maxHr: number; restingHr: number }): number {
+  return Math.round(restingHr + VIGOROUS_INTENSITY_FRAC * hrReserve(maxHr, restingHr))
+}
+
+/**
+ * What a minute in a zone is worth toward WHO's moderate-equivalent minutes, for the roll-ups that
+ * only have per-zone totals (zone seconds, the run plan's zone targets): 2 when the whole zone sits
+ * at or above `VIGOROUS_INTENSITY_FRAC`, 1 when it sits wholly in [moderate, vigorous), and 0
+ * otherwise. Zone 1 spans 0-60% of reserve, so a per-zone total cannot say how much of it was
+ * moderate; it scores 0, as it always has. The readings roll-up (`activeMinutesFromReadings`)
+ * has the bpm and credits that band.
+ */
+export function whoMinuteWeightForZone(zoneId: HrZone['id']): 0 | 1 | 2 {
+  const def = ZONE_DEFS.find(z => z.id === zoneId)
+  if (!def) return 0
+  if (def.lowerFrac >= VIGOROUS_INTENSITY_FRAC) return 2
+  if (def.lowerFrac >= MODERATE_INTENSITY_FRAC) return 1
+  return 0
 }
 
 /** Build the five HR zones as absolute bpm bands for a given profile. */

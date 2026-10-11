@@ -26,7 +26,7 @@ import { NextRequest } from 'next/server'
 
 type Row = Record<string, unknown>
 
-const getUserById = vi.fn(async (_id: string) => ({ isAdmin: true }) as Row | null)
+const getUserById = vi.fn(async (_id: string) => ({ isActive: true, isAdmin: true }) as Row | null)
 const listErrorEvents = vi.fn(async (_n: number) => [] as Row[])
 const countInactiveUsers = vi.fn(async () => 0)
 const countFeedback = vi.fn(async () => 0)
@@ -64,7 +64,7 @@ beforeEach(() => {
   for (const m of [getUserById, listErrorEvents, countInactiveUsers, countFeedback,
                    getAiCallUsageSummary, getTimingAuditData, rateLimit]) m.mockClear()
   rateLimit.mockReturnValue(true)
-  getUserById.mockResolvedValue({ isAdmin: true })
+  getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
   listErrorEvents.mockResolvedValue([])
   countInactiveUsers.mockResolvedValue(0)
   countFeedback.mockResolvedValue(0)
@@ -84,7 +84,7 @@ describe('the admin gate on the reports', () => {
     // The claim says true and the row says false. With both false the route could read either and
     // still refuse, so the rule — a revoked admin keeps a 30-day token — would not be under test.
     sessionUser = { id: 'u-1', isAdmin: true }
-    getUserById.mockResolvedValue({ isAdmin: false })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     for (const [name, call] of ALL) expect((await call()).status, name).toBe(403)
     expect(listErrorEvents).not.toHaveBeenCalled()
     expect(getTimingAuditData).not.toHaveBeenCalled()
@@ -108,7 +108,7 @@ describe('the admin gate on the reports', () => {
     // The other half of the same change: the repository call now sits outside the try, so a broken
     // query throws to the framework and is recorded, instead of being flattened into a 403 that
     // says the admin lacks permission.
-    getUserById.mockResolvedValue({ isAdmin: true })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
     listErrorEvents.mockRejectedValue(new Error('statement timeout'))
     await expect(getErrors()).rejects.toThrow('statement timeout')
 
@@ -167,11 +167,11 @@ describe('GET /api/admin/ai-usage', () => {
   })
 
   it('rate-limits, and checks admin BEFORE spending the bucket', async () => {
-    getUserById.mockResolvedValue({ isAdmin: false })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: false })
     expect((await aiUsage()).status).toBe(403)
     expect(rateLimit).not.toHaveBeenCalled()
 
-    getUserById.mockResolvedValue({ isAdmin: true })
+    getUserById.mockResolvedValue({ isActive: true, isAdmin: true })
     rateLimit.mockReturnValue(false)
     expect((await aiUsage()).status).toBe(429)
     expect(getAiCallUsageSummary).not.toHaveBeenCalled()
