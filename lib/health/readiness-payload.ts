@@ -23,9 +23,8 @@ import { computeSleepScore, sleepComponentsToContributors, sleepScoreBaselines }
 import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { getDailyGoals, type DailyGoals } from '@trainingai/shared/health/daily-goals'
-import { hrMaxFromAge, moderateIntensityBpm, vigorousIntensityBpm } from '@trainingai/shared/health/hr-zones'
-import { activeMinutesFromReadings } from '@trainingai/shared/health/zone-minutes'
-import { computeMovedHours, moveHoursGoal } from '@trainingai/shared/health/hourly-movement'
+import { hrMaxFromAge } from '@trainingai/shared/health/hr-zones'
+import { intradayHrContributors } from '@trainingai/shared/health/intraday-hr-contributors'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { baselineZ } from '@trainingai/shared/health/personal-baseline'
 import { computeReadinessComposite, READINESS_MODEL_VERSION, type ReadinessCompositeResult } from '@trainingai/shared/health/readiness-composite'
@@ -510,16 +509,15 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // Zone-minutes + move-every-hour, from the SAME intraday HR series already fetched above for
   // hrCurrent/hrMin/hrMax/hrAvg (todayHrRows) — this doesn't need any new data pipeline, only a
   // resting-HR + max-HR profile to derive zones from (same Karvonen basis Body Battery already uses).
+  // #2437: a sparse Health Connect hour is missing, not low (`intradayHrContributors`).
   let zoneMinutesToday: number | null = null
   let movedHoursToday: number | null = null
+  let moveGoalToday: number | null = null
   if (baselineRhr != null && todayHrRows.length > 0) {
-    const maxHr = hrMaxFromAge(ageYears)
-    const profile = { maxHr, restingHr: baselineRhr }
-    zoneMinutesToday = activeMinutesFromReadings(
-      todayHrRows.map(r => ({ timestamp: r.timestamp.getTime(), bpm: r.bpm })),
-      { moderateFloorBpm: moderateIntensityBpm(profile), vigorousFloorBpm: vigorousIntensityBpm(profile) },
-    )
-    movedHoursToday = computeMovedHours({ hrRows: todayHrRows, maxHr, restingHr: baselineRhr, tz, dateIso: todayIso })
+    const c = intradayHrContributors({ hrRows: todayHrRows, maxHr: hrMaxFromAge(ageYears), restingHr: baselineRhr, tz, dateIso: todayIso })
+    zoneMinutesToday = c.zoneMinutes
+    movedHoursToday = c.moveHours
+    moveGoalToday = c.moveHoursGoal
   }
 
   const activityResult = computeActivityScore({
@@ -527,7 +525,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     activeCalories: todayMetrics?.activeCalories ?? null,
     zoneMinutes: zoneMinutesToday,
     moveHours: movedHoursToday,
-    moveHoursGoal: movedHoursToday != null ? moveHoursGoal() : null,
+    moveHoursGoal: moveGoalToday,
     strengthSessionToday,
     sessions7d,
     volume7dKg,
@@ -972,7 +970,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     // as sleepContributors above) — this is what powers the Activity detail screen's contributor
     // chart + "how to improve" guide, which was silently empty while Oura's field stayed null.
     activityContributors:    ouraToday?.activityContributors ?? activityResult?.components ?? null,
-    activityGoals:           activityResult ? { ...goals, moveHoursGoal: movedHoursToday != null ? moveHoursGoal() : null } : null,
+    activityGoals:           activityResult ? { ...goals, moveHoursGoal: moveGoalToday } : null,
     activitySignals:         activityResult
       ? {
           steps: todayMetrics?.steps ?? null, activeCalories: todayMetrics?.activeCalories ?? null,
