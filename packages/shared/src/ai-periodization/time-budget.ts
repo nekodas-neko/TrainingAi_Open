@@ -272,16 +272,18 @@ export function expandToBudget<T extends TimedExercise>(
   mrvByMuscle: Map<string, number> = new Map(),
   /** #2133: ids never grown (a deloaded row keeps its deload), and the most weighted sets any one
    *  muscle may take in this session. */
-  opts: { frozenIds?: ReadonlySet<string>; sessionMuscleCap?: number } = {},
+  opts: { frozenIds?: ReadonlySet<string>; sessionMuscleCap?: number; ceilingFor?: (e: T) => number } = {},
 ): T[] {
   const budgetSec = Math.max(0, budgetMin) * 60
   const out = exercises.map(e => ({ ...e }))
+  // The role's ceiling, or a lower one the caller sets (the allocator's phase cap, #2133).
+  const ceiling = (e: T) => Math.min(roleCeiling(e.role), opts.ceilingFor?.(e) ?? Infinity)
   // Upper bound: every exercise from its current sets to its ceiling. +1 guards an empty list.
-  const maxIters = out.reduce((n, e) => n + Math.max(0, roleCeiling(e.role) - e.sets), 0) + 1
+  const maxIters = out.reduce((n, e) => n + Math.max(0, ceiling(e) - e.sets), 0) + 1
 
   for (let i = 0; i < maxIters; i++) {
     const eligible = out.filter(e =>
-      e.sets < roleCeiling(e.role)
+      e.sets < ceiling(e)
       && !opts.frozenIds?.has(e.sessionExerciseId)
       && !(opts.sessionMuscleCap != null && wouldBreachSessionCap(e, out, opts.sessionMuscleCap))
       && !(muscleVolume && wouldBreachMrv(e, out, muscleVolume, mrvByMuscle)),
@@ -442,7 +444,8 @@ export function fitToBudget<T extends TimedExercise>(
 //     rather than flooring every exercise. Only if two exercises still overrun are sets trimmed.
 //  3. Spend what is left one set at a time on the exercise whose muscles are furthest behind the
 //     week (expandToBudget's growth order), within each role's ceiling, the weekly MRV, and
-//     ALLOCATOR_SESSION_MUSCLE_CAP weighted sets per muscle in one session.
+//     ALLOCATOR_SESSION_MUSCLE_CAP weighted sets per muscle in one session. In an intensity phase
+//     (MODEL_SETS_CAP_PHASES) the ceiling is also the model's own count.
 //
 // Evidence, labelled as such: weekly hard sets per muscle is the strongest predictor of growth and
 // returns within a session flatten after about 6-10 hard sets (Schoenfeld, Ogborn & Krieger 2017,
@@ -456,7 +459,18 @@ export function allocatorMinSets(role: string): number {
   return ALLOCATOR_MIN_SETS[role] ?? ALLOCATOR_DEFAULT_MIN_SETS
 }
 
+/**
+ * Phases whose job is intensity, not volume (owner decision via the Orchestrator, 2026-10-11, #2788):
+ * there the model cuts sets on purpose so the load can rise (block periodization), and refilling
+ * them to the role ceiling because the clock allows would undo the program's own phase. In these
+ * the fill stops at the model's own count (never under the minimum); accumulation and anything
+ * else fills to the role ceiling.
+ */
+export const MODEL_SETS_CAP_PHASES: ReadonlySet<string> = new Set(['intensification', 'realisation'])
+
 export interface AllocateOptions {
+  /** The prescription's phase. In `MODEL_SETS_CAP_PHASES` the fill stops at the model's own count. */
+  phase?: string | null
   /** Exercises that earned a set through RPE autoregulation: they start at their given count (never
    *  under the minimum) and are dropped only after every other exercise. */
   protectedIds?: ReadonlySet<string>
@@ -502,9 +516,14 @@ export function allocateToBudget<T extends TimedExercise>(
     : dropped.exercises
 
   // Step 3.
+  // The model's own counts, read before step 1 reset them, cap step 3 in an intensity phase.
+  const modelCap = opts.phase != null && MODEL_SETS_CAP_PHASES.has(opts.phase)
+    ? new Map(exercises.map(e => [e.sessionExerciseId, Math.max(e.sets, allocatorMinSets(e.role))]))
+    : null
   const grown = expandToBudget(fitted, budgetMin, opts.muscleVolume, opts.mrvByMuscle ?? new Map(), {
     frozenIds: frozen,
     sessionMuscleCap: ALLOCATOR_SESSION_MUSCLE_CAP,
+    ...(modelCap && { ceilingFor: (e: T) => modelCap.get(e.sessionExerciseId) ?? Infinity }),
   })
   return { exercises: grown, droppedIds: dropped.droppedIds }
 }

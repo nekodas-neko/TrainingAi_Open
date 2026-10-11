@@ -255,6 +255,14 @@ describe('a standard session is sized to its budget (#2133)', () => {
     expect(res.estimatedSessionDurationMin).toBeLessThanOrEqual(90)
   })
 
+  it('passes the phase through: an intensity phase keeps the model\'s counts, accumulation fills (#2788)', () => {
+    // The model asked for 2 sets each; the main lift's minimum is 3.
+    const run = (phase: string) => [...applyBudgetStage(stageExercises(2, 2), stageSignals(90, 2) as never, 60, 'standard', new Set(), undefined, phase).sets.values()]
+    expect(run('intensification')).toEqual([3, 2])
+    expect(run('realisation')).toEqual([3, 2])
+    expect(run('accumulation')).toEqual([6, 4])
+  })
+
   it('drops whole exercises when even the minimums overrun, keeping the main lift and at least two', () => {
     // Six exercises in 20 working minutes cannot fit at their minimums. The least-behind accessories
     // go whole instead of all six being floored to two sets.

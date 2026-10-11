@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  allocateToBudget, fitToBudget, estimateSessionDurationSec, ALLOCATOR_SESSION_MUSCLE_CAP,
+  allocateToBudget, fitToBudget, estimateSessionDurationSec, ALLOCATOR_SESSION_MUSCLE_CAP, MODEL_SETS_CAP_PHASES,
   type TimedExercise, type MuscleVolumeState,
 } from '../time-budget'
 
@@ -104,3 +104,47 @@ describe('allocateToBudget', () => {
     expect(JSON.stringify(PUSH)).toBe(before)
   })
 })
+
+// #2788 (decided 2026-10-11): the model's own set count caps the fill in the intensity phases, where
+// it cuts volume on purpose so the load can rise; accumulation fills to the role ceiling; a deload
+// row stays frozen in every phase. The model asked for 3 sets of each here, and there is time for more.
+describe('the phase cap on the fill (#2788)', () => {
+  const modelPlan = PUSH.map(e => ({ ...e, sets: 3 }))
+  const roomy = 600
+  const run = (phase: string | null) => setsOf(allocateToBudget(modelPlan, roomy, { phase }).exercises)
+
+  it('names exactly the two intensity phases', () => {
+    expect([...MODEL_SETS_CAP_PHASES].sort()).toEqual(['intensification', 'realisation'])
+  })
+
+  it('accumulation fills past the model\'s count, to the role ceilings', () => {
+    expect(run('accumulation')).toEqual({ bench: 6, ohp: 5, fly: 4, lateral: 4, pushdown: 4 })
+  })
+
+  it('intensification stops at the model\'s count', () => {
+    expect(run('intensification')).toEqual({ bench: 3, ohp: 3, fly: 3, lateral: 3, pushdown: 3 })
+  })
+
+  it('realisation stops at the model\'s count', () => {
+    expect(run('realisation')).toEqual({ bench: 3, ohp: 3, fly: 3, lateral: 3, pushdown: 3 })
+  })
+
+  it('never caps below the minimum, though the model asked for fewer', () => {
+    const lean = PUSH.map(e => ({ ...e, sets: 1 }))
+    expect(setsOf(allocateToBudget(lean, roomy, { phase: 'intensification' }).exercises))
+      .toEqual({ bench: 3, ohp: 2, fly: 2, lateral: 2, pushdown: 2 })
+  })
+
+  it('keeps a deload row frozen in any phase', () => {
+    const withDeload = modelPlan.map(e => (e.sessionExerciseId === 'ohp' ? { ...e, sets: 1 } : e))
+    for (const phase of ['accumulation', 'intensification', 'realisation']) {
+      const out = setsOf(allocateToBudget(withDeload, roomy, { phase, frozenIds: new Set(['ohp']) }).exercises)
+      expect(out.ohp, phase).toBe(1)
+    }
+  })
+
+  it('with no phase given, fills as accumulation does', () => {
+    expect(run(null)).toEqual(run('accumulation'))
+  })
+})
+

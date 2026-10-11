@@ -109,6 +109,9 @@ export function applyBudgetStage(
   /** #2403: the full numbers (`preDeload`) of each row a deload cut, so the result can carry the
    *  figures for the session the `Full` override trains. Omitted or empty: no `fullSession`. */
   fullShapeById?: ReadonlyMap<string, { sets: number; reps: number; pct: number; restSec: number }>,
+  /** The prescription's phase (#2788): in intensification and realisation the fill stops at the
+   *  model's own set count. Omitted: no cap, as in accumulation. */
+  phase?: string | null,
 ): BudgetStageResult {
   // Time-budget enforcement — the AI is asked to fit the budget, but trim deterministically
   // so the session is guaranteed to fit the allocated time. Sets are cut by muscle-overage
@@ -176,6 +179,7 @@ export function applyBudgetStage(
     frozenIds: new Set(fullShapeById?.keys() ?? []),
     muscleVolume,
     mrvByMuscle,
+    phase,
   })
   const sized = allocated.exercises
   const droppedIds = new Set(allocated.droppedIds)
