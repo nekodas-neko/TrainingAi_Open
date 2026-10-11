@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { oneRmImplausible } from '@trainingai/shared/validation/plausibility'
 import { aestMidnight, todayInTz, normalizeDateParam, shiftDateStr } from '@trainingai/shared/date-utils';
 import { getCurrentPhase, isDeloadActive } from '@trainingai/shared/phase-engine';
-import { estimateOneRm, BW_REF } from '@trainingai/shared/1rm';
+import { estimateOneRm, BW_REF, withPrescribedBars } from '@trainingai/shared/1rm';
 import { computeSetAggregates, computeIntensityPct } from '@trainingai/shared/workout/set-aggregates';
 import { bodyweightSetLoadKg } from '@trainingai/shared/workout/bodyweight-load';
 import { defaultUseFor1rm } from '@trainingai/shared/workout/default-use-for-1rm';
@@ -40,6 +40,10 @@ export const LogExercisePayloadSchema = z.object({
   // #2445: the bar the app put up for each set, after plate rounding — `null` where no style
   // percentage set it. Stored as set_logs.planned_weight_kg; same bounds as `weights`.
   plannedWeights:       z.array(z.number().min(0).max(500).nullable()).max(20).optional(),
+  // Issue 2200: the 1RM the bars in `plannedWeights` were computed from. Not stored; the estimate
+  // scores each set against its bar's real share of it. A bar that this basis could not have
+  // produced is ignored (`barSharePct`), so a wrong value here cannot inflate an estimate.
+  prescriptionBasisKg:  z.number().positive().max(1000).optional(),
   styleName:            z.string().optional(),
   styleId:              z.string().optional(),
   muscleGroups:         z.array(z.string()).optional(),
@@ -94,7 +98,7 @@ export async function logExerciseFromPayload(
     exercise, weights, reps,
     localDate, timeToCompleteSet, setTimes, restTimes,
     setStartTimes, setEndTimes, interExerciseRestSec, prepTimeSec,
-    progressionStyle, plannedWeights, styleName, styleId, muscleGroups, workoutStartedAt, warmupEndedAtMs,
+    progressionStyle, plannedWeights, prescriptionBasisKg, styleName, styleId, muscleGroups, workoutStartedAt, warmupEndedAtMs,
     rpeValues, rpeSources, intensityMode, wasOverride, exerciseDeloaded,
   } = payload;
 
@@ -236,9 +240,27 @@ export async function logExerciseFromPayload(
   // (exerciseDeloaded) — must never feed the 1RM estimate itself, not just be excluded from
   // becoming a new PR (Q-115). Baseline is the same carve-out as the PR gate: a baseline test
   // is a genuine max-effort attempt even during an otherwise-active deload window.
+  // E1-2: stamp the exercise at its real completion time, not server-receive time.
+  // An outbox replay days later would otherwise date the log to sync day, corrupting
+  // 1RM history/trend ordering (`ORDER BY loggedAt`) and PR tiebreaks. Prefer the
+  // last set's end, then the workout start; fall back to now only when the payload
+  // carries no timing at all (never true for a normal client submit).
+  const lastSetEndMs = setEndTimes?.filter((t): t is number => typeof t === 'number').at(-1);
+  const loggedAt = lastSetEndMs != null ? new Date(lastSetEndMs)
+    : workoutStartedAt != null ? new Date(workoutStartedAt)
+    : new Date();
+
+  // Issue 2200: each set is scored against the bar it was given. The basis is the one the device
+  // sent beside the bars. A stranded replay rebuilt from local rows carries the bars but not the
+  // basis, so it falls back to the last real 1RM logged before this one: the working basis the
+  // session was built from (resolveWorkingBasis). A basis that could not have produced the bars is
+  // ignored per set inside the estimate, so the fallback can only ever reach the old arithmetic.
+  const hasBars = exerciseType !== 'bodyweight' && !deloadedForEstimate && (plannedWeights?.some(w => w != null) ?? false);
+  const basisKg = !hasBars ? null
+    : prescriptionBasisKg ?? await repo.getPrescriptionBasisBefore(userId, exercise, loggedAt, clientExerciseLogId);
   const { estimated1rm, target80 } = estimateOneRm(
     weights.map((w, i) => ({ weightKg: w, reps: reps[i] ?? 0 })),
-    { exerciseType, style: progressionStyle, isBaseline, deloaded: deloadedForEstimate },
+    { exerciseType, style: withPrescribedBars(progressionStyle, plannedWeights, basisKg), isBaseline, deloaded: deloadedForEstimate },
   );
 
   // Volume must be priced at what the lifter actually moved. A bodyweight set logs weight 0, so
@@ -287,15 +309,6 @@ export async function logExerciseFromPayload(
     };
   });
 
-  // E1-2: stamp the exercise at its real completion time, not server-receive time.
-  // An outbox replay days later would otherwise date the log to sync day, corrupting
-  // 1RM history/trend ordering (`ORDER BY loggedAt`) and PR tiebreaks. Prefer the
-  // last set's end, then the workout start; fall back to now only when the payload
-  // carries no timing at all (never true for a normal client submit).
-  const lastSetEndMs = setEndTimes?.filter((t): t is number => typeof t === 'number').at(-1);
-  const loggedAt = lastSetEndMs != null ? new Date(lastSetEndMs)
-    : workoutStartedAt != null ? new Date(workoutStartedAt)
-    : new Date();
 
   // RV-32: `exercise_logs.style_id` is a client-supplied FK into a strictly user-scoped table, and
   // it arrived here unchecked on both the web route and the outbox's `pushMutations` branch — this

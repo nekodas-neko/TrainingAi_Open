@@ -9,11 +9,11 @@ const gate = (estimated1rm: number) =>
 describe('one-rep-max plausibility (Q-24 §7)', () => {
   it('the individually-legal payload really does produce an absurd 1RM', () => {
     // Both inputs pass their own schema bounds: weights <= 500, reps <= 100.
-    // Measured, not quoted: 1612.75 kg. (The Q-24 entry says ~2,166 — that figure does not
-    // match either 1RM path here; calc1RM gives 1612.75 and calcAmrap1RM 1322.5. The exact
-    // number does not change the finding, since every one of them is impossible.)
+    // Measured, not quoted: 1029.5 kg since issue 2193 (c) counts 100 reps at the 30-rep ceiling
+    // (1612.75 before; the Q-24 entry says ~2,166). The exact number does not change the finding,
+    // since every one of them is impossible.
     const absurd = calc1RM(500, 100)
-    expect(absurd).toBeCloseTo(1612.75, 2)
+    expect(absurd).toBeCloseTo(1029.5, 2)
     expect(oneRmImplausible(absurd)).toBe(true)
     expect(oneRmImplausible(calcAmrap1RM(500, 100))).toBe(true)
   })

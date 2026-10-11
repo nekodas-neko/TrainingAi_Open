@@ -110,9 +110,9 @@ export function ExerciseSummaryScreen({ summaryData, workoutStartMs, onNext, use
   // written by `amrapAverage1Rm`, so it must be inverted through the AMRAP-scaled formula it came
   // from. `repMaxFromOneRm` inverts the unscaled `calc1RM` and under-reported by the discount.
   // BF-151. Read the reps the database stores rather than reconstructing them from the estimate.
-  // The inverse is lossy, and for 5 vs 6 reps it is impossible: the rep-factor gain from the extra
-  // rep is exactly cancelled by `amrapScaleFactor`'s 1.0 → 0.97 step, so both store the same 1RM and
-  // `repMaxFromAmrapOneRm` can only return the lower of the tie.
+  // The inverse is lossy: rows stored before issue 2193 (a) kept the stepped discount, under which 5
+  // and 6 reps stored the same 1RM, and a few legacy values equal a lower count's current value
+  // (10 reps then = 9 reps now), so `repMaxFromAmrapOneRm` can only return the lower of a tie.
   //
   // It stays as the FALLBACK, not deleted: `prevRepMaxReps` is null when the previous basis was a
   // seed or an all-time PR, and a historical series has no per-set reps to hand either.
