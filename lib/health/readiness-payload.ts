@@ -24,6 +24,7 @@ import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/s
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { getDailyGoals, type DailyGoals } from '@trainingai/shared/health/daily-goals'
 import { hrMaxFromAge } from '@trainingai/shared/health/hr-zones'
+import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
 import { intradayHrContributors } from '@trainingai/shared/health/intraday-hr-contributors'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { baselineZ } from '@trainingai/shared/health/personal-baseline'
@@ -378,6 +379,8 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     return connectedSources({ ringSamples, ...recent })
   })().catch(() => undefined)
 
+  // #2182: the zone ceiling is the HR profile's — one max for the zone bar and Activity's zone minutes.
+  const hrProfileP = resolveHrProfile(repo, userId, tz).catch(() => null)
   const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary] = await Promise.all([
     repo.listBodyMetrics(userId, from28dIso, todayIso),
     repo.listSleepSessions(userId, from28dIso, todayIso),
@@ -514,7 +517,8 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   let movedHoursToday: number | null = null
   let moveGoalToday: number | null = null
   if (baselineRhr != null && todayHrRows.length > 0) {
-    const c = intradayHrContributors({ hrRows: todayHrRows, maxHr: hrMaxFromAge(ageYears), restingHr: baselineRhr, tz, dateIso: todayIso })
+    const maxHr = (await hrProfileP)?.maxHr ?? hrMaxFromAge(ageYears)
+    const c = intradayHrContributors({ hrRows: todayHrRows, maxHr, restingHr: baselineRhr, tz, dateIso: todayIso })
     zoneMinutesToday = c.zoneMinutes
     movedHoursToday = c.moveHours
     moveGoalToday = c.moveHoursGoal
