@@ -1,4 +1,5 @@
 import { runTrainingStressScore } from '@/lib/oura-models/inference/ots'
+import { fillOtsGaps, otsFillConstants } from '@/lib/oura-models/inference/ots-gap-fill'
 import { deriveVo2Max, type Vo2MaxInputs } from '@trainingai/shared/health/vo2max'
 
 /**
@@ -9,6 +10,22 @@ import { deriveVo2Max, type Vo2MaxInputs } from '@trainingai/shared/health/vo2ma
 export interface MetGridDimensions {
   metGridLen: number
   metValidMin: number
+  /**
+   * #2115 v4: the recency-weighted share of the last 12 hours that no `MET/min` route filled, once
+   * the cap has been evaluated. The screen says it ("5% of the last 12 hours had no reading"); above
+   * `MAX_RESIDUAL_SHARE` the day is `insufficient_met`. Absent on gates decided before the cap.
+   */
+  residualShare?: number
+  /** How the day's minutes were filled, per rung, when the caller resolved them through the cascade. */
+  metMix?: MetMix
+}
+
+/** Minutes per rung of `MET/min` (`provided`, `derived`, `estimated`) and minutes nothing filled. */
+export interface MetMix {
+  provided: number
+  derived: number
+  estimated: number
+  missing: number
 }
 
 export type TrainingStressResult =
@@ -17,7 +34,9 @@ export type TrainingStressResult =
 
 export interface TrainingStressInputs {
   startTimestampMs: number
-  metsPerMinute: (number | null)[]     // day's 1-min MET series (nulls → NaN, cleaned by the core)
+  /** The day's 1-min `MET/min` series, resolved through the cascade; `null` where no route filled it. */
+  metsPerMinute: (number | null)[]
+  metMix?: MetMix
   age: number | null
   sex: string | null
   rhr: number | null                   // body_metrics.resting_heart_rate
@@ -79,18 +98,29 @@ export function computeTrainingStress(i: TrainingStressInputs): TrainingStressRe
   // also record what the day's MET input looked like. A row that reads `no_readiness` with a
   // 1400-minute grid says something different from one with a 90-minute grid.
   const validMin = i.metsPerMinute.filter(v => v != null && v >= 0.9).length
-  const dims: MetGridDimensions = { metGridLen: i.metsPerMinute.length, metValidMin: validMin }
+  const dims: MetGridDimensions = {
+    metGridLen: i.metsPerMinute.length, metValidMin: validMin, ...(i.metMix ? { metMix: i.metMix } : {}),
+  }
 
   if (i.readiness == null) return { status: 'gated', reason: 'no_readiness', ...dims }
   if (i.readinessProvisional) return { status: 'gated', reason: 'readiness_learning', ...dims }
   if (i.age == null || i.sex == null || i.rhr == null) return { status: 'gated', reason: 'no_profile', ...dims }
+  // The model's own floors, checked before any constant is read. The 20% cap below is stricter (it
+  // implies at least 576 measured minutes in the window), so these only short-circuit.
   if (i.metsPerMinute.length < 720 || validMin < 360) return { status: 'gated', reason: 'insufficient_met', ...dims }
+
+  // #2115 v4: a minute nothing measured is neither zero nor rest. Cap the recency-weighted empty
+  // share of the last 12 hours at 20%, and fill the rest so the weighted mean is the measured one.
+  const filled = fillOtsGaps(i.metsPerMinute, otsFillConstants())
+  if (filled.status !== 'ok') {
+    return { status: 'gated', reason: 'insufficient_met', ...dims, residualShare: filled.residualShare }
+  }
 
   const vo2 = deriveVo2Max(i.vo2maxInputs)
   const biologicalSex = i.sex === 'female' ? -1 : i.sex === 'male' ? 1 : 0
   const out = runTrainingStressScore({
     startTimestampMs: i.startTimestampMs,
-    mets: Float32Array.from(i.metsPerMinute.map(v => v == null ? NaN : v)),
+    mets: Float32Array.from(filled.mets),
     age: i.age, biologicalSex, rhr: i.rhr, noOts: 0, tzChange: i.tzChange,
     readiness: i.readiness, vo2max: vo2.value ?? NaN,
   })
@@ -103,6 +133,9 @@ export function computeTrainingStress(i: TrainingStressInputs): TrainingStressRe
   // nothing and the reason named the wrong half of the pipeline.
   //
   // A distinct reason costs one string and makes the next day of production say which half it is.
-  if (!out) return { status: 'gated', reason: 'scorer_no_output', ...dims }
-  return { status: 'ok', ots: out.ots, high: out.high, vo2max: vo2.value, vo2maxMethod: vo2.method, ...dims }
+  if (!out) return { status: 'gated', reason: 'scorer_no_output', ...dims, residualShare: filled.residualShare }
+  return {
+    status: 'ok', ots: out.ots, high: out.high, vo2max: vo2.value, vo2maxMethod: vo2.method,
+    ...dims, residualShare: filled.residualShare,
+  }
 }

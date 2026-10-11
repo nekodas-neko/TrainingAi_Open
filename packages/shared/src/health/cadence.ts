@@ -527,3 +527,42 @@ export function cadenceFieldsForSave(summary: CadenceSummary | null | undefined)
     cadenceSource: summary?.source ?? null,
   }
 }
+
+// ---------------------------------------------------------------------------
+// Cadence → MET (#2115 v4, rung 2c of `MET/min`)
+// ---------------------------------------------------------------------------
+
+/**
+ * Walking cadence to METs, from CADENCE-adults Table 2 (Tudor-Locke et al., Int J Behav Nutr Phys Act
+ * 2019;16:8; n = 76, ages 21-40, treadmill). 100 steps/min interpolates to about 3.1 METs (the
+ * paper's regression puts 3 METs at 102.2) and 129 to 6.2. Not validated free-living, where a
+ * minute's count mixes walking and standing; companion papers cover older ages and should be checked
+ * before this table is used for them.
+ */
+export const CADENCE_MET_TABLE: ReadonlyArray<readonly [spm: number, met: number]> = [
+  [45.4, 2.1], [67.8, 2.4], [83.8, 2.6], [96.1, 2.9], [105.8, 3.4], [113.6, 4.0], [121.5, 5.0], [129.0, 6.2],
+]
+/** Below this the minute is outside the calibrated range (standing, pottering, cycling): no MET. */
+export const CADENCE_MET_MIN_SPM = 45
+/** Above this the study has no data (running), so the value is held at the table's top and marked. */
+export const CADENCE_MET_MAX_SPM = 129
+
+/**
+ * METs for a minute's cadence: `null` below `CADENCE_MET_MIN_SPM`, the table's top value with
+ * `capped: true` above `CADENCE_MET_MAX_SPM`, and a straight-line interpolation in between (held at
+ * the first row's value from 45 to 45.4).
+ */
+export function cadenceToMet(spm: number): { met: number; capped: boolean } | null {
+  if (!Number.isFinite(spm) || spm < CADENCE_MET_MIN_SPM) return null
+  const t = CADENCE_MET_TABLE
+  if (spm > CADENCE_MET_MAX_SPM) return { met: t[t.length - 1][1], capped: true }
+  if (spm <= t[0][0]) return { met: t[0][1], capped: false }
+  for (let i = 1; i < t.length; i++) {
+    const [x1, y1] = t[i]
+    if (spm <= x1) {
+      const [x0, y0] = t[i - 1]
+      return { met: Math.round((y0 + (y1 - y0) * (spm - x0) / (x1 - x0)) * 100) / 100, capped: false }
+    }
+  }
+  return { met: t[t.length - 1][1], capped: false }
+}

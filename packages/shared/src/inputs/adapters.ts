@@ -3,7 +3,7 @@
  *
  * An adapter only reshapes and labels — it never re-derives a metric that already lives elsewhere.
  * The step plausibility gate and overlap dedupe come from `health/step-estimate.ts`, the low-wear
- * test from `health/wear-confidence.ts`, the HR reserve from `health/hr-zones.ts`, the per-set drop
+ * test from `health/wear-confidence.ts`, cadence → MET from `health/cadence.ts`, the per-set drop
  * from `workout/set-hr-stats.ts` (passed in as rows), the ring MET grid from `metGridFromDaytimeSamples`
  * (passed in as its output) and a logged activity's Compendium MET from `metForActivity` (passed in as
  * a number, so this module does not pull the model-constants chain into the WebView).
@@ -14,10 +14,7 @@
 import { MINUTE_MS, minuteOf, type Candidate, type Resolved } from './cascade'
 import { isPlausibleStepWindow, dedupeOverlappingWindows, type StepCountWindow } from '@trainingai/shared/health/step-estimate'
 import { isLowWearDay } from '@trainingai/shared/health/wear-confidence'
-import { hrReserve } from '@trainingai/shared/health/hr-zones'
-
-/** Resting VO₂ — one MET — in ml/kg/min. */
-const ML_KG_MIN_PER_MET = 3.5
+import { cadenceToMet } from '@trainingai/shared/health/cadence'
 
 /**
  * Spread step-count windows across the minutes they cover, in proportion to overlap.
@@ -74,37 +71,91 @@ export function minuteMeanCandidates(
   return [...acc].map(([slot, a]) => ({ slot, value: a.sum / a.n, route, source }))
 }
 
-export interface HrReserveMetContext {
-  /** VO₂max in ml/kg/min (`health/vo2max.ts`). Without it the route cannot fill. */
-  vo2maxMlKgMin: number | null
-  maxHr: number
-  /**
-   * Resting HR **per HR source** (#2162 (e)): the ring reads ~10 bpm under the strap, so a reserve
-   * built on the other source's resting HR would shift every estimate. A source with no resting HR
-   * of its own does not fill.
-   */
-  restingHrBySource: Record<string, number | null | undefined>
+/**
+ * #2115 v4 constants for the `MET/min` routes below, each with its source.
+ *
+ * - `SLEEP_MET`: 2024 Adult Compendium code 07030 "Sleeping" is 1.0 (the 2011 edition's 0.95 is
+ *   superseded). On the owner's ring, MET averages 1.01 over 28,793 in-session minutes, so 1.0 is also
+ *   the unbiased value for a model that averages. Used for the ring's sleep-motion marker and for any
+ *   device's sleep record, so there is one sleeping value, not two.
+ * - `KCAL_PER_KG_MIN_PER_MET`: ACSM, kcal/min = MET × 3.5 × kg ÷ 200, so one MET is 0.0175 kcal/kg/min.
+ * - `MAX_KCAL_RECORD_MIN`: an active-calorie record longer than this is too coarse to place in minutes,
+ *   so its minutes stay empty rather than receive a smeared average.
+ */
+export const SLEEP_MET = 1.0
+export const KCAL_PER_KG_MIN_PER_MET = 0.0175
+export const MAX_KCAL_RECORD_MIN = 15
+
+/**
+ * Rung-1b MET from a device's active calories and the user's weight:
+ *   MET = 1 + activeKcalPerMin ÷ (0.0175 × kg)
+ * Health Connect's `ActiveCaloriesBurned` excludes BMR, and the ACSM identity is for gross energy, so
+ * the `1 +` puts a resting minute at 1 MET rather than 0. A record is spread evenly over the minutes it
+ * covers; one longer than `MAX_KCAL_RECORD_MIN` fills nothing, and without a weight nothing fills.
+ * The caller passes only sources that provide active calories (a source flag, never a device name).
+ */
+export function activeKcalMetCandidates(
+  records: readonly { startMs: number; endMs: number; kcal: number; source: string }[],
+  weightKg: number | null,
+): Candidate[] {
+  if (weightKg == null || !(weightKg > 0)) return []
+  const perMinute = new Map<number, { kcal: number; source: string }>()
+  for (const r of records) {
+    const span = r.endMs - r.startMs
+    if (!(span > 0) || span > MAX_KCAL_RECORD_MIN * MINUTE_MS || !Number.isFinite(r.kcal) || r.kcal < 0) continue
+    for (let m = minuteOf(r.startMs); m < r.endMs; m += MINUTE_MS) {
+      const overlap = Math.min(r.endMs, m + MINUTE_MS) - Math.max(r.startMs, m)
+      if (overlap <= 0) continue
+      const prev = perMinute.get(m)
+      perMinute.set(m, { kcal: (prev?.kcal ?? 0) + (r.kcal * overlap) / span, source: prev?.source ?? r.source })
+    }
+  }
+  return [...perMinute].map(([slot, { kcal, source }]) => ({
+    slot, value: 1 + kcal / (KCAL_PER_KG_MIN_PER_MET * weightKg), route: 'active_kcal_met', source,
+  }))
 }
 
 /**
- * Rung-3 MET from heart rate: %HRR tracks %VO₂ reserve (Swain & Leutholtz 1997; ACSM), so
- *   MET = 1 + %HRR × (VO₂max/3.5 − 1)
- * with %HRR clamped to [0, 1]. Reads the resolved `HR/min` series, so each minute inherits that
- * minute's HR source and uses that source's own resting HR. Low wear carries through.
+ * Rung-2c MET from step cadence, through `cadenceToMet` (CADENCE-adults). Reads the resolved
+ * `steps/min` series, so each minute keeps its step source. Below 45 steps/min the minute stays empty;
+ * above 129 the value is held at the table's top and marked `capped`.
  */
-export function hrReserveMetCandidates(hr: readonly Resolved[], ctx: HrReserveMetContext): Candidate[] {
-  if (ctx.vo2maxMlKgMin == null || !(ctx.vo2maxMlKgMin > ML_KG_MIN_PER_MET)) return []
-  const maxMet = ctx.vo2maxMlKgMin / ML_KG_MIN_PER_MET
+export function cadenceMetCandidates(steps: readonly Resolved[]): Candidate[] {
   const out: Candidate[] = []
-  for (const r of hr) {
+  for (const r of steps) {
     if (r.missing) continue
-    const rest = ctx.restingHrBySource[r.provenance.source]
-    if (rest == null || !(rest > 0)) continue
-    const frac = Math.min(1, Math.max(0, (r.value - rest) / hrReserve(ctx.maxHr, rest)))
+    const m = cadenceToMet(r.value)
+    if (!m) continue
     out.push({
-      slot: r.slot, value: 1 + frac * (maxMet - 1), route: 'hr_reserve_met', source: r.provenance.source,
-      ...(r.provenance.lowWear ? { lowWear: true } : {}),
+      slot: r.slot, value: m.met, route: 'cadence_met', source: r.provenance.source,
+      ...(m.capped ? { capped: true } : {}), ...(r.provenance.lowWear ? { lowWear: true } : {}),
     })
+  }
+  return out
+}
+
+/**
+ * Rung-2b MET from the ring's sleep-motion marker (`0x72`, sleep_acm_period): a minute holding one
+ * of its frames is a still minute and reads `SLEEP_MET`. Takes the frames' wall-clock instants.
+ */
+export function ringStillMetCandidates(frameTimesMs: readonly number[], source: string): Candidate[] {
+  const minutes = new Set(frameTimesMs.filter(Number.isFinite).map(minuteOf))
+  return [...minutes].map((slot) => ({ slot, value: SLEEP_MET, route: 'ring_still_met', source }))
+}
+
+/**
+ * Rung-2d MET from a sleep record from any device: every minute inside the session reads
+ * `SLEEP_MET`. The resolver gives it only the minutes no better route filled.
+ */
+export function sleepSessionMetCandidates(
+  sessions: readonly { startMs: number; endMs: number; source: string }[],
+): Candidate[] {
+  const out: Candidate[] = []
+  for (const sess of sessions) {
+    if (!(sess.endMs > sess.startMs)) continue
+    for (let m = minuteOf(sess.startMs); m < sess.endMs; m += MINUTE_MS) {
+      out.push({ slot: m, value: SLEEP_MET, route: 'sleep_session_met', source: sess.source })
+    }
   }
   return out
 }

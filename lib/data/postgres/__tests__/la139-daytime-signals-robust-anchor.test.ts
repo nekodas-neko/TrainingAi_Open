@@ -79,6 +79,6 @@ describe.skipIf(!canRun)('daytime signals resolve against the anchor series (LA-
     await addMetFrame(TRUE_DS)
     const out = await repo.getOuraDaytimeSignals(
       USER, new Date(TRUE_MS - 3600_000), new Date(TRUE_MS + 3600_000))
-    expect(out).toEqual({ temp: [], met: [] })
+    expect(out).toEqual({ temp: [], met: [], still: [] })
   })
 })

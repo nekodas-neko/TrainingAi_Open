@@ -2,12 +2,21 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import type { WorkoutRepository } from '@/lib/data/repository'
-import { DEFAULT_TZ, todayInTz, normalizeDateParamIso, ageFromDob, dateStrMidnightInTz, shiftDateStr } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ, todayInTz, normalizeDateParamIso, ageFromDob, dateStrMidnightInTz, shiftDateStr, localClockTimeToDate } from '@trainingai/shared/date-utils'
 import { rateLimit } from '@/lib/rate-limit'
 import { computeTrainingStress, metGridFromDaytimeSamples, type TrainingStressResult } from '@trainingai/shared/health/training-stress'
 import { restingHrForDay, TRAINING_STRESS_RHR_WINDOW_DAYS } from '@trainingai/shared/health/training-stress-rhr'
 import { staleTrainingStressDays, TRAINING_STRESS_RECHECK_DAYS } from '@trainingai/shared/health/training-stress-recheck'
 import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite'
+import { resolveDayMetPerMinute } from '@trainingai/shared/health/met-input'
+import { ouraIdForActivityType } from '@trainingai/shared/health/daily-energy'
+import { metForActivity, intensityFromRpe } from '@trainingai/shared/health/workout-energy'
+import type { ActivityLog } from '@trainingai/shared/types/body'
+import { resolveMinutes } from '@trainingai/shared/inputs/cascade'
+import { stepCandidates, MAX_KCAL_RECORD_MIN } from '@trainingai/shared/inputs/adapters'
+
+/** #2115 v4: how far back rung 1b may reach for a weight to convert active calories with. */
+const KCAL_MET_WEIGHT_WINDOW_DAYS = 30
 
 /** `rhrFromDay` is set only when the day had no resting heart rate of its own and an earlier one was used (#2401). */
 export type TrainingStressResponse = TrainingStressResult & { rhrFromDay?: string }
@@ -72,13 +81,22 @@ async function evaluateTrainingStressDay(
   const dayStart = dateStrMidnightInTz(date, tz)
   const dayEnd = new Date(dayStart.getTime() + 86_400_000)
   const rhrWindowStart = shiftDateStr(date, -TRAINING_STRESS_RHR_WINDOW_DAYS)
+  // #2115 v4: rung 1b converts active calories with the latest weight within 30 days.
+  const weightWindowStart = shiftDateStr(date, -KCAL_MET_WEIGHT_WINDOW_DAYS)
+  // A Health Connect record that starts before midnight can still cover the day's first minutes.
+  const intervalsFrom = new Date(dayStart.getTime() - MAX_KCAL_RECORD_MIN * 60_000)
 
-  const [derivedRows, summaryRows, bodyMetrics, user, daytime] = await Promise.all([
+  const [derivedRows, summaryRows, bodyMetrics, user, daytime, sleepRows, activityRows, kcalRows, stepRows] = await Promise.all([
     repo.getOuraDailyDerived(userId, date, date),
     repo.getOuraDailySummary(userId, date, date),
-    repo.listBodyMetrics(userId, rhrWindowStart, date),
+    repo.listBodyMetrics(userId, weightWindowStart < rhrWindowStart ? weightWindowStart : rhrWindowStart, date),
     repo.getUserById(userId),
     repo.getOuraDaytimeSignals(userId, dayStart, dayEnd),
+    // The night ending this morning is dated today; the one starting tonight is dated tomorrow.
+    repo.listSleepSessions(userId, date, shiftDateStr(date, 1)),
+    repo.listActivityLogs(userId, date, date),
+    repo.getHealthConnectIntervals(userId, 'active_kcal', intervalsFrom, dayEnd),
+    repo.getHealthConnectIntervals(userId, 'steps', intervalsFrom, dayEnd),
   ])
 
   const derived = derivedRows[0] ?? null
@@ -89,16 +107,38 @@ async function evaluateTrainingStressDay(
   // Weight stays the day's own; only the resting heart rate borrows from earlier days (#2401).
   const latestBm = bodyMetrics.filter(m => m.date === date).at(-1) ?? null
   const rhr = restingHrForDay(bodyMetrics, date, rhrWindowStart)
+  const kcalWeightKg = bodyMetrics.filter(m => m.date >= weightWindowStart && m.weightKg != null).at(-1)?.weightKg ?? null
   const age = ageFromDob(user?.dateOfBirth, new Date())
 
-  // Build a true 1-min MET grid keyed on each bin's wall-clock minute (J-6): non-wear/charger
-  // gaps become nulls the OTS core cleans, instead of compressing the day by array index.
+  // #2115 v4: the day's `MET/min`, minute by minute from local midnight to the end of the day (or
+  // now, for today), each minute from the best route that has it. The ring's own grid is rung 1 (J-6:
+  // keyed on each bin's wall-clock minute, so charger gaps stay gaps); a minute nothing fills stays
+  // null, and `computeTrainingStress` caps and renormalises over those.
   const grid = metGridFromDaytimeSamples(daytime.met)
-  const startTimestampMs = grid.metsPerMinute.length > 0 ? grid.startTimestampMs : dayStart.getTime()
+  const met = resolveDayMetPerMinute({
+    ringGrid: grid,
+    ringStillFramesMs: daytime.still ?? [],
+    sleepSessions: sleepRows.map(r => ({
+      startMs: new Date(r.sleepStart).getTime(), endMs: new Date(r.sleepEnd).getTime(),
+      source: r.ouraId?.startsWith('ble:') ? 'oura_ble' : 'sleep_record',
+    })),
+    activities: activityRows.flatMap(a => activityWindow(a, tz)),
+    activeKcal: kcalRows.map(r => ({
+      startMs: r.startAt.getTime(), endMs: r.endAt.getTime(), kcal: r.value, source: r.dataOrigin ?? 'health_connect',
+    })),
+    weightKg: kcalWeightKg,
+    // Rung 2c reads the named input `steps/min`, so Health Connect's step records are resolved into
+    // it first (overlapping apps de-duplicated by `stepCandidates`), then mapped through cadence.
+    stepsPerMinute: resolveMinutes('steps/min', stepCandidates(
+      stepRows.map(r => ({ startMs: r.startAt.getTime(), endMs: r.endAt.getTime(), steps: r.value })),
+      'device_steps', 'health_connect',
+    ), dayStart.getTime(), dayEnd.getTime()),
+  }, dayStart.getTime(), Math.min(dayEnd.getTime(), Date.now()))
 
   const result = computeTrainingStress({
-    startTimestampMs,
-    metsPerMinute: grid.metsPerMinute,
+    startTimestampMs: met.startTimestampMs,
+    metsPerMinute: met.metsPerMinute,
+    metMix: met.mix,
     age,
     sex: user?.sex ?? null,
     rhr: rhr?.value ?? null,
@@ -137,4 +177,17 @@ async function evaluateTrainingStressDay(
     console.error('[training-stress] persist failed (read still served):', err)
   }
   return rhr != null && rhr.day !== date ? { ...result, rhrFromDay: rhr.day } : result
+}
+
+/** A logged activity's minutes and Compendium MET (rung 3 of `MET/min`), or nothing when it has no
+ *  clock times. The type maps to the energy table's activity id, never by name (identity is the id). */
+function activityWindow(a: ActivityLog, tz: string): { startMs: number; endMs: number; met: number | null; source: string }[] {
+  const start = localClockTimeToDate(a.date, a.startTime, tz)
+  let end = localClockTimeToDate(a.date, a.endTime, tz)
+  if (!start) return []
+  if (!end && a.durationMin != null && a.durationMin > 0) end = new Date(start.getTime() + a.durationMin * 60_000)
+  if (!end) return []
+  // An end before the start crossed midnight.
+  const endMs = end.getTime() <= start.getTime() ? end.getTime() + 86_400_000 : end.getTime()
+  return [{ startMs: start.getTime(), endMs, met: metForActivity(ouraIdForActivityType(a.activityType), intensityFromRpe(null)), source: 'activity_log' }]
 }
