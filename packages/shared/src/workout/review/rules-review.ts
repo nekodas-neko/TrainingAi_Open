@@ -1,6 +1,8 @@
 import {
   applyRoleSetPlausibility,
   dropToBudget,
+  estimateSessionDurationSec,
+  fitToBudget,
 } from '@trainingai/shared/ai-periodization/time-budget'
 import {
   buildBudgetMuscleVolume,
@@ -24,14 +26,18 @@ import type { ReviewModelExercise } from '@trainingai/shared/workout/review/reco
  * what makes a review and a prescription AGREE — before this, the review could propose a shape
  * the prescription would never generate, with no way to tell which was right.
  *
- * **#2133 moved the prescription onto `allocateToBudget`** (minimums, drop whole exercises before
- * flooring any, then fill for the muscles behind). The review still trims and then drops, and never
- * adds work, because it answers a different question: what of the session you already have does not
- * fit. Whether it should drop before trimming too is #2787, not changed here.
+ * **#2787 (Orchestrator decision, 2026-10-11): the review drops before it trims, like the allocator.**
+ * #2133 moved the prescription onto `allocateToBudget`, which drops whole exercises before flooring
+ * any. A review that trimmed first could propose "everything at 2 sets" for a session a fresh
+ * prescription would cut to fewer exercises at proper sets — the shape the owner called worse
+ * training on 2026-09-24 — and put the two paths back in disagreement. So the review drops whole
+ * exercises from the session the user has, at the sets they have, in the allocator's value order
+ * (least behind the week first, never below MIN_KEPT_EXERCISES, the last drop keeping a pair that
+ * fits), and trims sets toward the 2-set floor only if the two it keeps still overrun. It never adds
+ * work: the allocator's fill (step 3) has no place in a review.
  *
- * **Where this is deliberately weaker than the model: the free-text drop reason.**
- * `reconcileReview` already falls back to `'Dropped to fit the time budget.'`, which is the true
- * reason in every case this produces one — nothing here drops for any other cause.
+ * **Each drop says why** on the sheet (`dropReason`): least behind this week, lowest priority when
+ * no weekly target covers its muscles, or the pair rule.
  *
  * **And where it is deliberately stronger:** `dropToBudget` runs whenever the session overruns
  * after its sets are floored. `applyBudgetStage` declines to drop unless the user explicitly
@@ -55,13 +61,24 @@ export function buildRulesReview(params: {
 
   const plausible = applyRoleSetPlausibility(buildTimedExercises(exercises, signals), muscleVolume)
 
-  // `dropToBudget` IS "trim first, then drop": it runs `fitToBudget` itself and only enters its
-  // drop loop while the trimmed session is still over. So sets remain the cheap lever and a whole
-  // exercise remains the last resort, with no guard needed here to sequence them — an earlier
-  // version had one and the mutation pass proved it could never change an answer.
-  const dropped = dropToBudget(plausible, budgetMin, new Set(), muscleVolume)
+  // Drop first, at the user's own set counts: `refit` hands the survivors back unchanged, so the
+  // loop sheds whole exercises in value order while the session overruns. Only when the two it keeps
+  // still overrun are sets trimmed, toward the 2-set floor.
+  const dropped = dropToBudget(plausible, budgetMin, new Set(), muscleVolume, { refit: subset => subset.map(e => ({ ...e })) })
+  const kept = estimateSessionDurationSec(dropped.exercises) > budgetMin * 60
+    ? fitToBudget(dropped.exercises, budgetMin, new Set(), muscleVolume)
+    : dropped.exercises
   const droppedIds = new Set(dropped.droppedIds)
-  const finalSets = new Map(dropped.exercises.map(t => [t.sessionExerciseId, t.sets]))
+  const pairFitIds = new Set(dropped.pairFitIds)
+  const finalSets = new Map(kept.map(t => [t.sessionExerciseId, t.sets]))
+  const timedById = new Map(plausible.map(t => [t.sessionExerciseId, t]))
+  const dropReason = (id: string): string => {
+    if (pairFitIds.has(id)) return `Dropped to fit the ${budgetMin}-min budget: the two exercises left fit together, and dropping the next in line would not.`
+    const covered = (timedById.get(id)?.muscleGroups ?? []).some(m => muscleVolume.has(m.muscle))
+    return covered
+      ? `Dropped to fit the ${budgetMin}-min budget: least behind this week.`
+      : `Dropped to fit the ${budgetMin}-min budget: lowest priority in the session (no weekly target covers its muscles).`
+  }
 
   const modelExercises: ReviewModelExercise[] = []
   for (const ex of exercises) {
@@ -70,9 +87,7 @@ export function buildRulesReview(params: {
       modelExercises.push({
         sessionExerciseId: ex.sessionExerciseId, name, action: 'drop',
         sets: ex.sets, reps: ex.reps, pct: ex.pct, restSec: ex.restSec,
-        // Left undefined on purpose: `reconcileReview` supplies the fallback string, so the
-        // sentence lives in ONE place rather than being duplicated here.
-        dropReason: undefined,
+        dropReason: dropReason(ex.sessionExerciseId),
       })
       continue
     }
@@ -92,7 +107,7 @@ export function buildRulesReview(params: {
   if (dropCount > 0) {
     const names = exercises
       .filter(ex => droppedIds.has(ex.sessionExerciseId)).map(ex => ex.name).join(', ')
-    parts.push(`${names} ${dropCount === 1 ? 'does' : 'do'} not fit the ${budgetMin}-min working budget even at minimum sets, so ${dropCount === 1 ? 'it is' : 'they are'} dropped for today — the muscles furthest ahead of their weekly target go first.`)
+    parts.push(`${names} ${dropCount === 1 ? 'is' : 'are'} dropped for today to fit the ${budgetMin}-min working budget: whole exercises go before any sets are cut.`)
   }
   if (adjusted > 0) {
     parts.push(`${adjusted} ${adjusted === 1 ? 'exercise has its' : 'exercises have their'} set count trimmed to fit the ${budgetMin}-min working budget.`)

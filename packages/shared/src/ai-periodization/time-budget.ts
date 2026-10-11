@@ -347,11 +347,12 @@ export function dropToBudget<T extends TimedExercise>(
    *  allocator (#2133) passes a copy instead, so it drops whole exercises at their MINIMUM sets
    *  rather than first flooring every exercise. Ids in `undroppable` are never the victim. */
   opts: { refit?: (subset: T[]) => T[]; undroppable?: ReadonlySet<string> } = {},
-): { exercises: T[]; droppedIds: string[] } {
+): { exercises: T[]; droppedIds: string[]; /** The drops made by the pair-fits rule, not value order. */ pairFitIds: string[] } {
   const budgetSec = Math.max(0, budgetMin) * 60
   const refit = opts.refit ?? ((subset: T[]) => fitToBudget(subset, budgetMin, protectedIds, muscleVolume))
   let kept = refit(exercises)
   const droppedIds: string[] = []
+  const pairFitIds: string[] = []
   // Re-trim from the ORIGINAL set counts of the survivors: dropping an exercise frees time, so
   // sets cut to fit the old, more crowded session should be given back.
   const refitWithout = (victim: T): T[] => {
@@ -375,6 +376,7 @@ export function dropToBudget<T extends TimedExercise>(
         if (estimateSessionDurationSec(without) <= budgetSec) {
           victim = candidate
           next = without
+          pairFitIds.push(candidate.sessionExerciseId)
           break
         }
       }
@@ -383,7 +385,7 @@ export function dropToBudget<T extends TimedExercise>(
     kept = next
   }
 
-  return { exercises: kept, droppedIds }
+  return { exercises: kept, droppedIds, pairFitIds }
 }
 
 // Rest at a shorter-than-usual session (#2284, owner 2026-08-23, option (a) with a 45 s floor):
@@ -460,7 +462,7 @@ export function allocatorMinSets(role: string): number {
 }
 
 /**
- * Phases whose job is intensity, not volume (owner decision via the Orchestrator, 2026-10-11, #2788):
+ * Phases whose job is intensity, not volume (Orchestrator decision, 2026-10-11 (#2788); the owner can reverse it):
  * there the model cuts sets on purpose so the load can rise (block periodization), and refilling
  * them to the role ceiling because the clock allows would undo the program's own phase. In these
  * the fill stops at the model's own count (never under the minimum); accumulation and anything
@@ -507,7 +509,11 @@ export function allocateToBudget<T extends TimedExercise>(
       refit: subset => subset.map(e => ({ ...e })),
       undroppable: frozen,
     })
-    dropped = { exercises: again.exercises, droppedIds: [...dropped.droppedIds, ...again.droppedIds] }
+    dropped = {
+      exercises: again.exercises,
+      droppedIds: [...dropped.droppedIds, ...again.droppedIds],
+      pairFitIds: [...dropped.pairFitIds, ...again.pairFitIds],
+    }
   }
 
   // Still over with the fewest exercises kept: the old last resort, trimming toward the 2-set floor.
