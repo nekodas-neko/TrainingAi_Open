@@ -12,6 +12,7 @@ import { buildInjuryContext } from '@/lib/ai-chat/context'
 import { buildChatTools } from '@/lib/ai-chat/tools'
 import { buildWidgetTools } from '@/lib/coach/tools'
 import { coachScope, pickTools } from '@/lib/coach/scopes'
+import { COACH_MAX_STEPS, coachStepOverride } from '@/lib/coach/step-limit'
 import { resolveDanglingWidgetCalls } from '@/lib/coach/dangling-widgets'
 import { errorLog } from '@trainingai/shared/logger'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
@@ -241,15 +242,17 @@ export async function POST(req: Request) {
       resolveDanglingWidgetCalls(parsed.data.messages as UIMessage[]),
     )
 
+    const system = [
+      SYSTEM.replace('TODAY_ISO', todayIso),
+      scope.systemSection,
+      injuryLine,
+    ].filter(Boolean).join('\n\n')
+
     const result = loggedStreamText(
       { section: 'coach', userId, model: COACH_MODEL_ID },
       {
         model: coachModel(),
-        system: [
-          SYSTEM.replace('TODAY_ISO', todayIso),
-          scope.systemSection,
-          injuryLine,
-        ].filter(Boolean).join('\n\n'),
+        system,
         messages: modelMessages,
         tools: {
           // Scoped by WITHHOLDING, never by instructing (LA-47): a prompt saying "do not read
@@ -277,7 +280,12 @@ export async function POST(req: Request) {
         providerOptions: { google: { thinkingConfig: { thinkingLevel: 'minimal' } } },
         // The read-only tools may chain; a widget tool ends the turn by suspending, so this bounds
         // data gathering rather than widget rendering.
-        stopWhen: stepCountIs(6),
+        stopWhen: stepCountIs(COACH_MAX_STEPS),
+        // #2792: the last step answers. A question that chains read tools used to spend all six steps
+        // reading and end with no answer at all — "Which of my sessions has the most volume?" and a
+        // bench-vs-squat comparison did so in 5 of 6 runs on 2026-10-11. On the final step only the
+        // chart stays available and the model is told to answer from what it has read.
+        prepareStep: ({ stepNumber }) => coachStepOverride(stepNumber, system),
         // A mid-stream failure is delivered to the client as an error *part*, not an HTTP error,
         // and the SDK masks its text. Without this the server records nothing and the only symptom
         // is a chat that stops — log it here so a failure is diagnosable.
