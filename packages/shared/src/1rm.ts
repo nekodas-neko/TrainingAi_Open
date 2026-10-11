@@ -403,9 +403,11 @@ export function repMaxFromAmrapOneRm(oneRm: number, addedKg = 0): number {
   let best = 0
   let bestDistance = Infinity
   for (let r = 1; r <= REP_CEILING; r++) {
-    // Nearest under either encoding (see legacySteppedAmrap1RM). The legacy map never sits above
-    // the current one, so a value stored under the CURRENT map always reads back exactly; a legacy
-    // value that happens to equal a lower rep count's current value reads as that lower count.
+    // Nearest under either encoding (see legacySteppedAmrap1RM). The legacy map sits at or below
+    // the current one (at most one 0.25 rounding step above, at a single rep count per load), so a
+    // value stored under the CURRENT map reads back exactly outside its own high-rep collisions; a
+    // legacy value that happens to equal a lower rep count's current value reads as that lower count
+    // until #2760's re-encode rewrites it.
     const distance = Math.min(
       Math.abs(calcAmrap1RM(ref, r) - oneRm),
       Math.abs(legacySteppedAmrap1RM(ref, r) - oneRm),

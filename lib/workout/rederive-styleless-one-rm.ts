@@ -2,7 +2,7 @@ import { getPool } from '@/lib/data/postgres/client'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { toAestDateStr } from '@trainingai/shared/date-utils'
 import {
-  planStylelessOneRmRederive, medianStylelessMovePct, type StylelessLogInput,
+  planStylelessOneRmRederive, medianStylelessMovePct, type StylelessLogInput, type StylelessLogChange,
 } from '@trainingai/shared/workout/styleless-one-rm-rederive'
 
 /**
@@ -129,53 +129,12 @@ export async function rederiveStylelessOneRm(args: {
   const toWrite = plan.changes.slice(0, MAX_WRITES)
   let written = 0
   if (!dryRun && toWrite.length > 0) {
-    const client = await db.connect()
-    try {
-      await client.query('BEGIN')
-      for (const c of toWrite) {
-        // Conditional on the value this change was planned from: a log edited since the read is
-        // left alone, and the count check below then rolls the whole run back.
-        const res = await client.query(
-          `UPDATE exercise_logs SET estimated_1rm = $1, target_80 = $2, updated_at = now()
-           WHERE id = $3 AND estimated_1rm = $4 AND deleted_at IS NULL`,
-          [c.after.estimated1rm, c.after.target80, c.exerciseLogId, c.before.estimated1rm],
-        )
-        if (res.rowCount !== 1) continue
-        written++
-        for (const s of c.sets) {
-          await client.query(
-            `UPDATE set_logs SET intensity_pct = $1, updated_at = now() WHERE id = $2 AND exercise_log_id = $3`,
-            [s.intensityPct, s.setLogId, c.exerciseLogId],
-          )
-        }
-      }
-      if (written !== toWrite.length) {
-        await client.query('ROLLBACK')
-        return { ok: false, error: `wrote ${written} of ${toWrite.length} planned logs (a log changed during the run); rolled back, nothing written` }
-      }
-      await client.query('COMMIT')
-    } catch (e) {
-      await client.query('ROLLBACK')
-      throw e
-    } finally {
-      client.release()
-    }
+    const applied = await applyOneRmRewrite(toWrite)
+    if (!applied.ok) return applied
+    written = applied.written
   }
 
-  // Bests: reported, not written (see the header).
-  const maxByExercise = new Map<string, number>()
-  for (const c of plan.changes) {
-    maxByExercise.set(c.exerciseName, Math.max(maxByExercise.get(c.exerciseName) ?? 0, c.after.estimated1rm))
-  }
-  const names = [...maxByExercise.keys()]
-  const { rows: prRows } = names.length === 0 ? { rows: [] } : await db.query<{ exercise_name: string; estimated_1rm: number }>(
-    `SELECT exercise_name, estimated_1rm FROM personal_records WHERE user_id = $1 AND exercise_name = ANY($2::text[])`,
-    [userId, names],
-  )
-  const bestByName = new Map(prRows.map(r => [r.exercise_name, Number(r.estimated_1rm)]))
-  const bestsBehindLogs = names
-    .filter(n => (bestByName.get(n) ?? 0) < maxByExercise.get(n)!)
-    .map(n => ({ exerciseName: n, storedBest: bestByName.get(n) ?? null, rederivedLogMax: maxByExercise.get(n)! }))
+  const bestsBehindLogs = await bestsBehindRewrite(userId, plan.changes)
 
   const movePcts = plan.changes.map(c => (c.after.estimated1rm / c.before.estimated1rm - 1) * 100)
   const days = new Set(plan.changes.map(c => toAestDateStr(c.loggedAt, tz)))
@@ -194,7 +153,7 @@ export async function rederiveStylelessOneRm(args: {
         wouldLower: plan.wouldLower.length,
         written,
         remaining: plan.changes.length - (dryRun ? 0 : written),
-        exercises: names.length,
+        exercises: new Set(plan.changes.map(c => c.exerciseName)).size,
         daysMoved: days.size,
         medianMovePct: medianStylelessMovePct(plan.changes),
         largestMovePct: movePcts.length ? Math.round(Math.max(...movePcts) * 10) / 10 : null,
@@ -207,4 +166,68 @@ export async function rederiveStylelessOneRm(args: {
       })),
     },
   }
+}
+
+/**
+ * Write planned 1RM changes in one transaction: each log update is conditional on the stored value
+ * it was planned from, each set's `intensity_pct` follows, `updated_at` moves so the delta pull
+ * carries the rows to the device, and the whole run rolls back unless every planned log was written.
+ * Shared by the issue 2357 re-derive and the #2760 bodyweight re-encode, which plan differently and
+ * write identically.
+ */
+export async function applyOneRmRewrite(
+  toWrite: readonly StylelessLogChange[],
+): Promise<{ ok: true; written: number } | { ok: false; error: string }> {
+  const client = await getPool().connect()
+  let written = 0
+  try {
+    await client.query('BEGIN')
+    for (const c of toWrite) {
+      // Conditional on the value this change was planned from: a log edited since the read is
+      // left alone, and the count check below then rolls the whole run back.
+      const res = await client.query(
+        `UPDATE exercise_logs SET estimated_1rm = $1, target_80 = $2, updated_at = now()
+         WHERE id = $3 AND estimated_1rm = $4 AND deleted_at IS NULL`,
+        [c.after.estimated1rm, c.after.target80, c.exerciseLogId, c.before.estimated1rm],
+      )
+      if (res.rowCount !== 1) continue
+      written++
+      for (const s of c.sets) {
+        await client.query(
+          `UPDATE set_logs SET intensity_pct = $1, updated_at = now() WHERE id = $2 AND exercise_log_id = $3`,
+          [s.intensityPct, s.setLogId, c.exerciseLogId],
+        )
+      }
+    }
+    if (written !== toWrite.length) {
+      await client.query('ROLLBACK')
+      return { ok: false, error: `wrote ${written} of ${toWrite.length} planned logs (a log changed during the run); rolled back, nothing written` }
+    }
+    await client.query('COMMIT')
+    return { ok: true, written }
+  } catch (e) {
+    await client.query('ROLLBACK')
+    throw e
+  } finally {
+    client.release()
+  }
+}
+
+/** Each stored best a rewritten log would pass. Reported, never written (see the header). */
+export async function bestsBehindRewrite(
+  userId: string, changes: readonly StylelessLogChange[],
+): Promise<{ exerciseName: string; storedBest: number | null; rederivedLogMax: number }[]> {
+  const maxByExercise = new Map<string, number>()
+  for (const c of changes) {
+    maxByExercise.set(c.exerciseName, Math.max(maxByExercise.get(c.exerciseName) ?? 0, c.after.estimated1rm))
+  }
+  const names = [...maxByExercise.keys()]
+  const { rows: prRows } = names.length === 0 ? { rows: [] } : await getPool().query<{ exercise_name: string; estimated_1rm: number }>(
+    `SELECT exercise_name, estimated_1rm FROM personal_records WHERE user_id = $1 AND exercise_name = ANY($2::text[])`,
+    [userId, names],
+  )
+  const bestByName = new Map(prRows.map(r => [r.exercise_name, Number(r.estimated_1rm)]))
+  return names
+    .filter(n => (bestByName.get(n) ?? 0) < maxByExercise.get(n)!)
+    .map(n => ({ exerciseName: n, storedBest: bestByName.get(n) ?? null, rederivedLogMax: maxByExercise.get(n)! }))
 }

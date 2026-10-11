@@ -372,6 +372,69 @@ describe.skipIf(!canRun)('/api/agent-actions (issue 2381)', () => {
     })
   })
 
+  describe('reencode-bodyweight-one-rm (#2760)', () => {
+    // A bodyweight log stored under the old stepped discount (10 reps → what 9 reps stores now), one
+    // already under the current map, a weighted log, and the other account's legacy log. Only the
+    // first may move.
+    const ids: Record<string, string> = {}
+    const legacy10 = async () => {
+      const { calc1RM, mround, BW_REF } = await import('@trainingai/shared/1rm')
+      return mround(calc1RM(BW_REF, 10) * 0.93, 0.25)
+    }
+    const log = async (user: string, name: string, est: number, sets: [number, number][]) => {
+      const { rows: [ws] } = await pool.query(
+        `INSERT INTO workout_sessions (user_id, session_name, started_at)
+         VALUES ($1, 'Issue2760', '2026-09-12T08:00:00+10:00') RETURNING id`, [user])
+      const { rows: [el] } = await pool.query(
+        `INSERT INTO exercise_logs (workout_session_id, exercise_name, estimated_1rm, target_80, logged_at)
+         VALUES ($1, $2, $3, $4, '2026-09-12T08:30:00+10:00') RETURNING id`, [ws.id, name, est, est * 0.8])
+      for (const [i, [w, r]] of sets.entries()) {
+        await pool.query(
+          `INSERT INTO set_logs (exercise_log_id, set_number, weight_kg, reps, intensity_pct) VALUES ($1, $2, $3, $4, 1)`,
+          [el.id, i + 1, w, r])
+      }
+      return el.id as string
+    }
+    const est = async (id: string) => Number((await pool.query(`SELECT estimated_1rm FROM exercise_logs WHERE id = $1`, [id])).rows[0].estimated_1rm)
+
+    beforeEach(async () => {
+      const { calcAmrap1RM, BW_REF } = await import('@trainingai/shared/1rm')
+      await pool.query(`DELETE FROM workout_sessions WHERE user_id = ANY($1)`, [[OWNER, OTHER]])
+      ids.legacy = await log(OWNER, 'Push-Up', await legacy10(), [[0, 10]])
+      ids.current = await log(OWNER, 'Chin-Up', calcAmrap1RM(BW_REF, 12), [[0, 12]])
+      ids.weighted = await log(OWNER, 'Issue2760 Bench', 60, [[50, 5]])
+      ids.other = await log(OTHER, 'Push-Up', await legacy10(), [[0, 10]])
+    })
+
+    it('a write without approval is refused; a dry run writes nothing; with approval it writes once', async () => {
+      const { calcAmrap1RM, BW_REF } = await import('@trainingai/shared/1rm')
+      const old = await legacy10()
+      const fresh = calcAmrap1RM(BW_REF, 10)
+      expect((await post(req('reencode-bodyweight-one-rm', { dryRun: false }))).status).toBe(403)
+      expect(await est(ids.legacy)).toBe(old)
+
+      const dry = await (await post(req('reencode-bodyweight-one-rm', { dryRun: true }))).json()
+      expect(dry.report.summary).toMatchObject({ logsExamined: 2, wouldWrite: 1, unchanged: 1, written: 0, daysMoved: 1 })
+      expect(dry.report.sample).toEqual([expect.objectContaining({ exerciseLogId: ids.legacy, before: old, after: fresh })])
+      expect(await est(ids.legacy)).toBe(old)
+
+      const write = await (await post(req('reencode-bodyweight-one-rm', { dryRun: false }, { approval: APPROVAL }))).json()
+      expect(write.report.summary).toMatchObject({ written: 1, remaining: 0 })
+      expect((await logRows()).at(-1)).toMatchObject({ job: 'reencode-bodyweight-one-rm', outcome: 'succeeded', approval_ref: APPROVAL, affected_rows: 1, days_moved: 1 })
+      expect(await est(ids.legacy)).toBe(fresh)
+      expect(await est(ids.current)).toBe(calcAmrap1RM(BW_REF, 12))
+      expect(await est(ids.weighted)).toBe(60)
+      expect(await est(ids.other)).toBe(old)
+
+      const again = await (await post(req('reencode-bodyweight-one-rm', { dryRun: false }, { approval: APPROVAL }))).json()
+      expect(again.report.summary).toMatchObject({ wouldWrite: 0, written: 0 })
+    })
+
+    it('refuses an unknown parameter', async () => {
+      expect((await post(req('reencode-bodyweight-one-rm', { dryRun: true, limit: 5 }))).status).toBe(400)
+    })
+  })
+
   it('a finished log row cannot be changed or deleted', async () => {
     await post(req('backfill-baseline-phase-tag', { dryRun: true }))
     const last = (await logRows()).at(-1)
