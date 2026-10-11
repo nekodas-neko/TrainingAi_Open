@@ -804,6 +804,9 @@ export interface WorkoutRepository {
    *  A caller left on a default would silently write rank-0 and win over the ring forever. */
   saveSleepSession(userId: string, session: Omit<SleepSession, 'id' | 'userId' | 'createdAt'>, source: HealthSource): Promise<void>
   listSleepSessions(userId: string, from: string, to: string): Promise<SleepSession[]>
+  /** #2752: every sleep_sessions id the server holds for the user, live or tombstoned, and the server
+   *  time the list was read at. Read-only; the device uses it to find rows the server no longer has. */
+  listSleepSessionIds(userId: string): Promise<{ asOf: Date; ids: string[] }>
 
   // TN-81 — the app's announced sleep verdict. `upsertSleepVerdict` is idempotent per
   // (user, date) and deliberately does NOT touch `response_state`: re-announcing the same night

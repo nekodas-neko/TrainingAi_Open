@@ -3180,6 +3180,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * it neither shows nor shadows anything. For a user who never removed a night the predicate
    * filters nothing, and every consumer's input is exactly what it was.
    */
+  async listSleepSessionIds(userId: string): Promise<{ asOf: Date; ids: string[] }> {
+    // One statement, so `as_of` is the snapshot the ids were read at. Tombstoned rows are included:
+    // a tombstone reaches the device through the pull and is not a ghost.
+    const result = await this.db.execute<{ as_of: Date | string; ids: string[] | null }>(
+      sql`SELECT now() AS as_of, array_agg(id::text) AS ids FROM sleep_sessions WHERE user_id = ${userId}`,
+    )
+    const r = result.rows[0]
+    return { asOf: new Date(r.as_of), ids: r.ids ?? [] }
+  }
+
   async listSleepSessions(userId: string, from: string, to: string): Promise<SleepSession[]> {
     const rows = await this.db.select().from(s.sleepSessions)
       .where(and(

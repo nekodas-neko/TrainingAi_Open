@@ -3661,4 +3661,43 @@ export class SQLiteLocalStore implements LocalStore {
       [iso],
     );
   }
+
+  async getSyncMeta(key: string): Promise<string | null> {
+    const rows = await querySQL<{ value: string }>(`SELECT value FROM sync_meta WHERE key = ?`, [key]);
+    return rows.length ? rows[0].value : null;
+  }
+
+  async setSyncMeta(key: string, value: string): Promise<void> {
+    await runSQL(
+      `INSERT INTO sync_meta (key, value) VALUES (?, ?)
+       ON CONFLICT(key) DO UPDATE SET value=excluded.value`,
+      [key, value],
+    );
+  }
+
+  // #2752. A ghost is a ring night this device pulled before #2749, whose server row the old rollup
+  // hard-deleted: it is 'synced' (nothing local to lose), carries a `ble:` oura_id, is not a typed
+  // night, and its id is missing from the server's full list (which includes tombstones). The
+  // `updated_at` bound compares instants, not strings, because a pulled row stores the server's ISO
+  // form and a local write stores the device's.
+  async deleteGhostBleSleepRows(serverIds: ReadonlySet<string>, before: Date): Promise<number> {
+    const rows = await querySQL<{ id: string; updated_at: string | null }>(
+      `SELECT id, updated_at FROM sleep_sessions
+        WHERE sync_status = 'synced' AND oura_id LIKE 'ble:%' AND COALESCE(manual_entry, 0) = 0`,
+      [],
+    );
+    const ghosts = rows.filter(r => {
+      if (serverIds.has(String(r.id))) return false;
+      const at = r.updated_at ? new Date(r.updated_at).getTime() : NaN;
+      return Number.isFinite(at) && at < before.getTime();
+    }).map(r => String(r.id));
+    for (let i = 0; i < ghosts.length; i += 200) {
+      const chunk = ghosts.slice(i, i + 200);
+      await runSQL(
+        `DELETE FROM sleep_sessions WHERE sync_status = 'synced' AND id IN (${chunk.map(() => '?').join(',')})`,
+        chunk,
+      );
+    }
+    return ghosts.length;
+  }
 }

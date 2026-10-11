@@ -268,6 +268,13 @@ export interface LocalStore {
   // Sync meta
   getLastSyncAt(): Promise<Date>;
   setLastSyncAt(iso: string): Promise<void>;
+  /** A value in `sync_meta` by key, or null. */
+  getSyncMeta(key: string): Promise<string | null>;
+  setSyncMeta(key: string, value: string): Promise<void>;
+  /** #2752: delete the synced ring (`ble:`) sleep rows whose id the server no longer holds. Only rows
+   *  whose `updated_at` is before `before` are considered, so a row pulled after the server read its
+   *  id list is never taken for a ghost. Never touches a pending or manual row. Returns the count. */
+  deleteGhostBleSleepRows(serverIds: ReadonlySet<string>, before: Date): Promise<number>;
 }
 
 // Per-user factory. Each call with the same userId returns the same instance.
