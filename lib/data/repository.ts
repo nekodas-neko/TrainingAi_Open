@@ -1396,6 +1396,8 @@ export interface WorkoutRepository {
   getSetLogsForSessions(workoutSessionIds: string[]): Promise<Array<{
     workoutSessionId: string; exerciseName: string; setNumber: number;
     rpe: number | null; reps: number; intensityPct: number | null; setTimeSec: number | null
+    /** #2253: `rated` or the untouched pre-fill (`expected`); null before #2450 and with no RPE. */
+    rpeSource?: import('@trainingai/shared/workout/rpe-source').RpeSource | null
   }>>
   getSetTimingRows(userId: string, exerciseNames: string[]): Promise<import('@trainingai/shared/workout/time-profile').TimingRow[]>
   getExercise1rmHistory(userId: string, exerciseNames: string[], tz: string, windowDays?: number): Promise<Record<string, { date: string; rm: number }[]>>

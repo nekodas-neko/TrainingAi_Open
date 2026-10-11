@@ -171,6 +171,7 @@ export function ActiveWorkoutScreen({
   // BF-220 — the set he JUST logged, read here rather than in the card because the card unmounts
   // during rest (see the pill's placement note below).
   const prevRpe = useWorkoutStore((s) => (currentSet > 0 ? s.rpeValues?.[currentSet - 1] : undefined));
+  const prevRated = useWorkoutStore((s) => (currentSet > 0 ? s.rpeRated[currentSet - 1] : undefined));
   const prevReps = useWorkoutStore((s) => (currentSet > 0 ? s.reps[currentSet - 1] : undefined));
   const currentWeight = useWorkoutStore((s) => s.perSetWeights[currentSet]);
   const [dismissedSuggestionSet, setDismissedSuggestionSet] = useState<number | null>(null);
@@ -178,6 +179,7 @@ export function ActiveWorkoutScreen({
     ? rpeLoadSuggestion(
         {
           loggedRpe: prevRpe,
+          rated: prevRated,
           repsDone: prevReps,
           prescribedReps: exercise?.progressionStyle?.[currentSet - 1]?.reps,
           pct: exercise?.progressionStyle?.[currentSet - 1]?.pct,

@@ -1767,7 +1767,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const elIds = rows.map(r => r.id)
     const setRows = await this.db.select({
       exerciseLogId: s.setLogs.exerciseLogId, weightKg: s.setLogs.weightKg, reps: s.setLogs.reps,
-      intensityPct: s.setLogs.intensityPct, rpe: s.setLogs.rpe,
+      intensityPct: s.setLogs.intensityPct, rpe: s.setLogs.rpe, rpeSource: s.setLogs.rpeSource,
     })
       .from(s.setLogs)
       .where(and(inArray(s.setLogs.exerciseLogId, elIds), isNull(s.setLogs.deletedAt)))
@@ -1779,7 +1779,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       isEarlyDeload: r.is_early_deload, phaseType: (r.phase_type as ProgramPhaseType | null) ?? undefined,
       sets: setRows.filter(ss => ss.exerciseLogId === r.id).map(ss => ({
         weightKg: ss.weightKg, reps: ss.reps,
-        intensityPct: ss.intensityPct ?? undefined, rpe: ss.rpe ?? undefined,
+        intensityPct: ss.intensityPct ?? undefined, rpe: ss.rpe ?? undefined, rpeSource: ss.rpeSource ?? undefined,
       })),
     }))
   }

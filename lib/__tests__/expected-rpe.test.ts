@@ -150,8 +150,10 @@ describe('perExerciseRpeDelta', () => {
     expect(perExerciseRpeDelta(sets).get('Bench Press')).toBeCloseTo(expected, 6)
   })
 
-  it('applies the >=3 usable-set floor AFTER dropping, not before', () => {
-    const mixed = [set('Row', 80, 6, 9), set('Row', 80, 6, 9), set('Row', 54.3, 12, 7), set('Row', 54.3, 12, 7)]
+  // #2253 lowered the floor from 3 sets to RPE_DELTA_MIN_RATED_SETS (2) rated ones, so the fixture
+  // keeps ONE usable set (was two) among four: still enough before dropping, not after.
+  it('applies the usable-set floor AFTER dropping, not before', () => {
+    const mixed = [set('Row', 80, 6, 9), set('Row', 54.3, 12, 7), set('Row', 54.3, 12, 7), set('Row', 54.3, 12, 7)]
     expect(perExerciseRpeDelta(mixed).has('Row')).toBe(false)
   })
 
