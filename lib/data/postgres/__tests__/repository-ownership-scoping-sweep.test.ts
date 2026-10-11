@@ -509,7 +509,7 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['reapStaleRedecodeJobs', r => r.reapStaleRedecodeJobs(USER_A)],
     ['markOuraWorkoutReviewed', r => r.markOuraWorkoutReviewed(USER_A, bId('oura_workouts'))],
     ['markHrSynced', r => r.markHrSynced(USER_A, bId('workout_sessions'))],
-    ['writeSetHrr1', r => r.writeSetHrr1(USER_A, [{ setLogId: bId('set_logs'), hrr1Bpm: 99, restAdequate: true }])],
+    ['writeSetHrr1', r => r.writeSetHrr1(USER_A, [{ setLogId: bId('set_logs'), hrr1Bpm: 99, restAdequate: true, drop30s: null, drop60s: null, drop90s: null, drop120s: null }])],
     ['nullHistoricalDecoded', r => r.nullHistoricalDecoded(USER_A),
       v => { expect(v).toEqual({ nulled: 0, remaining: 0 }) }],
     ['packOuraRawBuckets', r => r.packOuraRawBuckets(USER_A)],

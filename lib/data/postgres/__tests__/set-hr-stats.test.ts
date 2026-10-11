@@ -246,9 +246,11 @@ describe.skipIf(!canRun)('computeWorkoutHr → per-set rows (integration)', () =
       `INSERT INTO set_logs (id,exercise_log_id,set_number,weight_kg,reps,intensity_pct,rest_time_sec,set_start_ms,set_end_ms)
        VALUES ($1,$2,1,140,3,90,120,$3,$4)`, [SLA, EL3, setStart.getTime(), setEnd.getTime()])
     // HR readings: rising through the set (peak 172), then recovering during the rest.
+    // #2601: the rest is 1 Hz, as a strap reports it. The drop curve now takes the dense HRR60 rule
+    // at every offset, and the 15–20 s spacing this fixture used to have would give it no drop at all.
     const pts: [number, number][] = [
       [0, 120], [10, 150], [25, 165], [38, 172], [40, 168],       // within the set
-      [55, 150], [70, 135], [90, 118], [110, 105], [130, 98],      // rest recovery
+      ...Array.from({ length: 90 }, (_, k): [number, number] => [41 + k, Math.round(168 - (k + 1) * 0.78)]), // rest recovery to ~98
     ]
     for (const [sec, bpm] of pts) {
       await pool.query(

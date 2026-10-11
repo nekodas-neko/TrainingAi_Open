@@ -228,16 +228,18 @@ export function compendiumMetCandidates(
 }
 
 /**
- * Per-set HRR60 from `computeSetHrStats` rows. A set without enough readings (`coverageOk` false) or
- * whose rest ended before 60 s (`drop60s` null) is missing, not zero. Source is the row's own —
- * `'mixed'` when the window spanned devices, `'unknown'` when no reading carried one.
+ * Per-set HRR60 from `computeSetHrStats` rows: `hrr1Bpm`, the dense-HR measurement (`deriveHrr60`,
+ * #2299 step 2). A set the series could not see — a ring-only set, a gap — is missing, not zero.
+ * It used to read `drop60s` gated on `coverageOk`, which a ring set could pass with a noise drop.
+ * Source is the row's own — `'mixed'` when the window spanned devices, `'unknown'` when no reading
+ * carried one.
  */
 export function hrr60Candidates(
-  rows: readonly { setLogId: string; drop60s: number | null; coverageOk: boolean; source: string | null }[],
+  rows: readonly { setLogId: string; hrr1Bpm: number | null; source: string | null }[],
 ): Candidate[] {
   return rows
-    .filter((r) => r.coverageOk && r.drop60s != null)
-    .map((r) => ({ slot: r.setLogId, value: r.drop60s!, route: 'dense_hr_drop60', source: r.source ?? 'unknown' }))
+    .filter((r) => r.hrr1Bpm != null)
+    .map((r) => ({ slot: r.setLogId, value: r.hrr1Bpm!, route: 'dense_hr_hrr60', source: r.source ?? 'unknown' }))
 }
 
 /**

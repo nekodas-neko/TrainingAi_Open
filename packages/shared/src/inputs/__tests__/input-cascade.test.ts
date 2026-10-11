@@ -223,10 +223,12 @@ describe('MET while asleep (#2115 v4, rungs 2b and 2d)', () => {
 
 describe('HRR60', () => {
   it('is per set, from dense HR, and missing when the set could not support it', () => {
+    // #2299 step 2: the input is `hrr1Bpm` (dense HRR60), not `drop60s` gated on coverage, which a
+    // ring set could pass with a noise drop. 'c' is that ring set: no HRR60, so missing.
     const rows = [
-      { setLogId: 'a', drop60s: 24, coverageOk: true, source: 'chest_strap' },
-      { setLogId: 'b', drop60s: null, coverageOk: true, source: 'chest_strap' },
-      { setLogId: 'c', drop60s: 30, coverageOk: false, source: 'oura_ble' },
+      { setLogId: 'a', hrr1Bpm: 24, source: 'chest_strap' },
+      { setLogId: 'b', hrr1Bpm: null, source: 'chest_strap' },
+      { setLogId: 'c', hrr1Bpm: null, source: 'oura_ble' },
     ]
     const r = resolveSlots('HRR60', hrr60Candidates(rows))
     expect(r.get('a')).toMatchObject({ value: 24, provenance: { rung: 'derived', source: 'chest_strap' } })

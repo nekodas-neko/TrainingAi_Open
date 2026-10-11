@@ -1547,10 +1547,12 @@ export async function upsertSetHrStats(db: Db, userId: string, workoutSessionId:
         peakBpm:         sql`COALESCE(excluded.peak_bpm, ${s.setHrStats.peakBpm})`,
         avgBpm:          sql`COALESCE(excluded.avg_bpm, ${s.setHrStats.avgBpm})`,
         bpmAtEnd:        sql`COALESCE(excluded.bpm_at_end, ${s.setHrStats.bpmAtEnd})`,
-        drop30s:         sql`COALESCE(excluded.drop_30s, ${s.setHrStats.drop30s})`,
-        drop60s:         sql`COALESCE(excluded.drop_60s, ${s.setHrStats.drop60s})`,
-        drop90s:         sql`COALESCE(excluded.drop_90s, ${s.setHrStats.drop90s})`,
-        drop120s:        sql`COALESCE(excluded.drop_120s, ${s.setHrStats.drop120s})`,
+        // Written as computed (#2601), like hrr1_bpm below: the drop curve is now a dense-HR
+        // measurement, and under COALESCE a ring set's old nearest-reading drop could never clear.
+        drop30s:         sql`excluded.drop_30s`,
+        drop60s:         sql`excluded.drop_60s`,
+        drop90s:         sql`excluded.drop_90s`,
+        drop120s:        sql`excluded.drop_120s`,
         troughBpm:       sql`COALESCE(excluded.trough_bpm, ${s.setHrStats.troughBpm})`,
         secToPreset:     sql`COALESCE(excluded.sec_to_preset, ${s.setHrStats.secToPreset})`,
         recoveredPreset: sql`COALESCE(excluded.recovered_preset, ${s.setHrStats.recoveredPreset})`,
@@ -1637,6 +1639,7 @@ export async function listSetHrStatsForHrr1Backfill(db: Db, userId: string) {
     .select({
       setLogId: s.setHrStats.setLogId, workoutSessionId: s.setHrStats.workoutSessionId,
       loggedAt: s.setHrStats.loggedAt, hrr1Bpm: s.setHrStats.hrr1Bpm, restAdequate: s.setHrStats.restAdequate,
+      drop30s: s.setHrStats.drop30s, drop60s: s.setHrStats.drop60s, drop90s: s.setHrStats.drop90s, drop120s: s.setHrStats.drop120s,
     })
     .from(s.setHrStats)
     .where(eq(s.setHrStats.userId, userId))
@@ -1644,21 +1647,31 @@ export async function listSetHrStatsForHrr1Backfill(db: Db, userId: string) {
 }
 
 /**
- * Write re-measured `hrr1_bpm` / `rest_adequate` onto stored rows (#2457), null included — a direct
+ * Write re-measured `hrr1_bpm` / `rest_adequate` and the drop curve onto stored rows (#2457, #2601),
+ * null included — a direct
  * SET, not the COALESCE upsert, because clearing a stale verdict is the purpose. One transaction:
  * every row is matched on its id AND the caller's user, and if the number of rows written differs
  * from the number asked for, the whole write rolls back and this throws. Returns the count written.
  */
+export type SetHrr1Write = {
+  setLogId: string; hrr1Bpm: number | null; restAdequate: boolean | null
+  drop30s: number | null; drop60s: number | null; drop90s: number | null; drop120s: number | null
+}
+
 export async function writeSetHrr1(
   db: Db, userId: string,
-  updates: readonly { setLogId: string; hrr1Bpm: number | null; restAdequate: boolean | null }[],
+  updates: readonly SetHrr1Write[],
 ): Promise<number> {
   if (!updates.length) return 0
   return db.transaction(async tx => {
     let written = 0
     for (const u of updates) {
       const res = await tx.update(s.setHrStats)
-        .set({ hrr1Bpm: u.hrr1Bpm, restAdequate: u.restAdequate })
+        .set({
+          hrr1Bpm: u.hrr1Bpm, restAdequate: u.restAdequate,
+          // #2601: the drop curve under the same dense rule, null included.
+          drop30s: u.drop30s, drop60s: u.drop60s, drop90s: u.drop90s, drop120s: u.drop120s,
+        })
         .where(and(eq(s.setHrStats.setLogId, u.setLogId), eq(s.setHrStats.userId, userId)))
         .returning({ id: s.setHrStats.setLogId })
       written += res.length
