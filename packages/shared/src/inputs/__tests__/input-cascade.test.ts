@@ -186,7 +186,7 @@ describe('MET from the ring\'s motion (#2781, rung 2a)', () => {
       { tsMs: min(1) + 30_000, lowIntensity: 10 },
     ], 'oura_ble')
     const byMinute = new Map(c.map((x) => [x.slot, x.value]))
-    expect([...byMinute.keys()].sort((a, b) => a - b)).toEqual([min(0), min(1), min(2)])
+    expect([...byMinute.keys()].sort((a, b) => Number(a) - Number(b))).toEqual([min(0), min(1), min(2)])
     expect(byMinute.get(min(0))).toBe(ringMotionMet(10)) // minute -1 empty + minute 0's 10
     expect(byMinute.get(min(1))).toBe(ringMotionMet(20)) // 10 + 10
     expect(byMinute.get(min(2))).toBe(ringMotionMet(10)) // minute 1's 10, nothing in minute 2
