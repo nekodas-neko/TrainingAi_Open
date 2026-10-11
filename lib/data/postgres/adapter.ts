@@ -2330,12 +2330,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const [weightRow] = await this.db
       .select({ weightKg: s.bodyMetrics.weightKg })
       .from(s.bodyMetrics)
-      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg)))
+      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg), isNull(s.bodyMetrics.deletedAt)))
       .orderBy(asc(s.bodyMetrics.date)).limit(1)
     const [bfRow] = await this.db
       .select({ bodyFatPct: s.bodyMetrics.bodyFatPct })
       .from(s.bodyMetrics)
-      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.bodyFatPct)))
+      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.bodyFatPct), isNull(s.bodyMetrics.deletedAt)))
       .orderBy(asc(s.bodyMetrics.date)).limit(1)
     return { weightKg: weightRow?.weightKg ?? null, bodyFatPct: bfRow?.bodyFatPct ?? null }
   }
@@ -2345,7 +2345,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const [row] = await this.db
       .select({ weightKg: s.bodyMetrics.weightKg })
       .from(s.bodyMetrics)
-      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg)))
+      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg), isNull(s.bodyMetrics.deletedAt)))
       .orderBy(desc(s.bodyMetrics.date)).limit(1)
     return row?.weightKg ?? null
   }
@@ -2492,7 +2492,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       this.getUserById(userId),
       this.db.select({ weightKg: s.bodyMetrics.weightKg })
         .from(s.bodyMetrics)
-        .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg)))
+        .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg), isNull(s.bodyMetrics.deletedAt)))
         .orderBy(desc(s.bodyMetrics.date)).limit(1),
     ])
     const ageYears = ageFromDob(user?.dateOfBirth ?? null, new Date())
@@ -4618,7 +4618,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         bmrKcal: s.bodyMetrics.bmrKcal,
       })
       .from(s.bodyMetrics)
-      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.bodyFatPct)))
+      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.bodyFatPct), isNull(s.bodyMetrics.deletedAt)))
 
     const [profile] = await this.db
       .select({ heightCm: s.users.heightCm, dateOfBirth: s.users.dateOfBirth, sex: s.users.sex })
