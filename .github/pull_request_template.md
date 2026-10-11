@@ -10,6 +10,7 @@ Closes #
 
 - [ ] `pnpm dev` run, every changed API route and UI flow exercised
 - [ ] Unit tests added or updated
+- [ ] Live AI calls made while testing: N (or none)
 - [ ] Checked on the device (APK on the S25)
 - [ ] Docs only / no runtime behaviour changes
 
