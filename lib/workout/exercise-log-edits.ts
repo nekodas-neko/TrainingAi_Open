@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import { getPool } from '@/lib/data/postgres/client'
 import { getRepository } from '@/lib/data'
-import { estimateOneRm, BW_REF, type OneRmSetInput } from '@trainingai/shared/1rm'
+import { estimateOneRm, isDeloadedForEstimate, BW_REF, type OneRmSetInput } from '@trainingai/shared/1rm'
 import { computeSetAggregates, computeIntensityPct } from '@trainingai/shared/workout/set-aggregates'
 
 /**
@@ -40,8 +40,12 @@ export async function editExerciseLog(userId: string, edit: ExerciseLogEdit): Pr
   if (!(await ownsExerciseLog(userId, exerciseLogId))) return false
 
   const db = getPool()
-  const { rows: ctxRows } = await db.query<{ exercise_name: string; style_id: string | null; phase_type: string | null; workout_session_id: string }>(
-    `SELECT el.exercise_name, el.style_id, ws.phase_type, el.workout_session_id
+  const { rows: ctxRows } = await db.query<{
+    exercise_name: string; style_id: string | null; phase_type: string | null; workout_session_id: string
+    exercise_deloaded: boolean; is_early_deload: boolean
+  }>(
+    `SELECT el.exercise_name, el.style_id, ws.phase_type, el.workout_session_id,
+            el.exercise_deloaded, ws.is_early_deload
      FROM exercise_logs el JOIN workout_sessions ws ON ws.id = el.workout_session_id
      WHERE el.id = $1 AND el.deleted_at IS NULL`,
     [exerciseLogId],
@@ -53,9 +57,13 @@ export async function editExerciseLog(userId: string, edit: ExerciseLogEdit): Pr
   const styles = await repo.listProgressionStyles(userId)
   const style = styles.find(st => st.id === ctxRows[0].style_id)?.sets ?? null
   const isBaseline = ctxRows[0].phase_type === 'baseline'
+  const isAnyDeload = ctxRows[0].phase_type === 'deload' || ctxRows[0].is_early_deload
+  // The same predicate the log path and the device use (#2761): a correction to deload work must
+  // keep `estimated_1rm = 0`, or a phase-deload log enters the working 1RM basis on its next edit.
+  const deloaded = isDeloadedForEstimate({ exerciseDeloaded: ctxRows[0].exercise_deloaded, isAnyDeload, isBaseline })
 
   const sets: OneRmSetInput[] = weights.map((w, i) => ({ weightKg: w, reps: reps[i] ?? 0 }))
-  const { estimated1rm, target80 } = estimateOneRm(sets, { exerciseType, style, isBaseline })
+  const { estimated1rm, target80 } = estimateOneRm(sets, { exerciseType, style, isBaseline, deloaded })
   const effectiveWeights = exerciseType === 'bodyweight'
     ? weights.map(w => Math.max(1, BW_REF + w))
     : weights
