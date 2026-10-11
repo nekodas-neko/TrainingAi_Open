@@ -10,6 +10,7 @@ import { dueForEstimate, estimateSlotsFor } from '@trainingai/shared/nutrition/m
 import { todayInTz, nowDatetimeInTz } from '@trainingai/shared/date-utils'
 import { getLocalStore } from '@/lib/local-store'
 import { pushMutations } from '@/lib/local-store/sync-engine'
+import { notifyPlanMealAnswersChanged } from './use-estimated-meals'
 
 interface Options {
   mealPlan: MealPlan | null
@@ -227,6 +228,8 @@ export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef,
         payload: { id, planMealId: e.planMealId, logDate: date, answer: 'estimated', ...est },
       })
     }
+    // #2072: the Nutrition ring counts these; tell it to re-read.
+    notifyPlanMealAnswersChanged()
     pushMutations(userId).catch(() => {})
   }, [userId, mealPlan, mealTypes, isTrainingDay, tz])
 
@@ -282,6 +285,7 @@ export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef,
           payload: { planMealId: meal.id, logDate: date, ...(declined ? {} : { deleted: true }) },
         })
         queued = true
+        notifyPlanMealAnswersChanged()
         pushMutations(userId).catch(() => {})
       } catch { /* dead local store — fall through to the API */ }
     }

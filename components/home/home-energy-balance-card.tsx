@@ -3,6 +3,7 @@
 import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 import { CalorieProgressBar } from '@/components/nutrition/calorie-progress-bar'
 import { useEnergyBalanceToday } from '@/app/health/hooks/use-health-calcs'
+import { EstimatedKcalLine } from '@/components/nutrition/estimated-kcal'
 
 /**
  * Home's compact calories-in-vs-out card. Same shared bar and the same server payload as the
@@ -50,12 +51,14 @@ export function HomeEnergyBalanceCard() {
 
       {/* Same bar as Nutrition's and Home's nutrition card — a sibling surface drawing its own
           would be the drift that put two budgets on one screen (Q-401). */}
-      <CalorieProgressBar intakeKcal={b.intakeKcal} budgetKcal={budgetProvenance(b).total} />
+      <CalorieProgressBar intakeKcal={b.intakeKcal} budgetKcal={budgetProvenance(b).total} estimatedKcal={b.estimatedKcal} />
 
       <p className="mt-2 text-[10px] text-muted-foreground tabular-nums">
         {b.intakeKcal.toLocaleString()} eaten · {b.expenditureKcal.toLocaleString()} burned
         {data.maintenance?.source === 'calibrated' && <> · {data.maintenance.kcal.toLocaleString()} maintenance</>}
       </p>
+      {/* #2072. "Eaten" above includes assumed plan meals; this says how much of it. */}
+      <EstimatedKcalLine estimatedKcal={b.estimatedKcal} className="mt-1.5" />
     </div>
   )
 }
