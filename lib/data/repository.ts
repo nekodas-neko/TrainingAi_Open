@@ -1226,6 +1226,8 @@ export interface WorkoutRepository {
     met: { tsMs: number; value: number }[]
     /** #2115 v4: wall-clock instants of the ring's `0x72` sleep-motion frames (rung 2b of `MET/min`). */
     still: number[]
+    /** #2781: the ring's `0x47` motion events, each with its low-intensity value (rung 2a of `MET/min`). */
+    motion: { tsMs: number; lowIntensity: number }[]
   }>
   /** Decoded 0x61 battery telemetry (level changes + charging-time) in a wall-clock window,
    *  anchored via the ring clock. Empty when the ring has no clock anchor. Read-only. */

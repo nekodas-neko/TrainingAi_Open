@@ -254,6 +254,17 @@ function decodeMotion(body: Uint8Array): Record<string, unknown> | null {
   return v
 }
 
+/**
+ * #2781: a `motion_event` (0x47)'s low-intensity value as the training-load motion map was fitted on
+ * it: `body[4] & 0x3f`, and 0 when the byte is absent or flagged invalid (bit 0x40). Read from the
+ * bytes rather than `decodeMotion`, which drops the WHOLE event when the high-intensity byte is
+ * flagged; the fit kept the low value in that case. Layout per open_oura `decode_motion`. Never throws.
+ */
+export function motionLowIntensity(body: Uint8Array): number {
+  if (body.length < 5 || body[4] & 0x40) return 0
+  return body[4] & 0x3f
+}
+
 /** bedtime_period (0x76): detected sleep window as two u32 LE ring deciseconds. */
 function decodeBedtimePeriod(body: Uint8Array): Record<string, unknown> | null {
   if (body.length < 8) return null
