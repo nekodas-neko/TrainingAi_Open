@@ -73,6 +73,29 @@ describe.skipIf(!canRun)('offline edits and deletes of logged work reach the ser
     expect(Number(log.estimated_1rm)).toBeGreaterThan(0)
   })
 
+  // #2761: the edit used to re-estimate with no `deloaded`, so correcting a typo in deload work
+  // wrote a real-looking 1RM onto it and a phase-deload log then entered the working 1RM basis.
+  it.each([
+    ['a deload phase', `UPDATE workout_sessions SET phase_type = 'deload' WHERE id = $1`],
+    ['an early deload', `UPDATE workout_sessions SET is_early_deload = true WHERE id = $1`],
+    ['a per-exercise deload', `UPDATE exercise_logs SET exercise_deloaded = true WHERE workout_session_id = $1`],
+  ])('exercise_log_edit keeps a log in %s at estimated_1rm 0', async (_label, sql) => {
+    await pool.query(sql, [sessionId])
+    const res = await push('exercise_log_edit', { exerciseLogId: logId, weights: [50, 50], reps: [5, 5] })
+    expect(res.errors).toEqual([])
+    const log = (await pool.query(`SELECT estimated_1rm, target_80 FROM exercise_logs WHERE id = $1`, [logId])).rows[0]
+    expect(Number(log.estimated_1rm)).toBe(0)
+    expect(Number(log.target_80)).toBe(0)
+  })
+
+  it('exercise_log_edit still estimates a baseline test inside an early-deload window', async () => {
+    await pool.query(`UPDATE workout_sessions SET phase_type = 'baseline', is_early_deload = true WHERE id = $1`, [sessionId])
+    const res = await push('exercise_log_edit', { exerciseLogId: logId, weights: [50, 50], reps: [5, 5] })
+    expect(res.errors).toEqual([])
+    const log = (await pool.query(`SELECT estimated_1rm FROM exercise_logs WHERE id = $1`, [logId])).rows[0]
+    expect(Number(log.estimated_1rm)).toBeGreaterThan(0)
+  })
+
   it('exercise_log_edit on a log that is not there goes to errors, so the client retries it', async () => {
     const res = await push('exercise_log_edit', { exerciseLogId: '00000000-0000-4000-8000-0000001759ff', weights: [50], reps: [5] })
     expect(res.errors.map(e => e.error)).toEqual(['No matching exercise log for exercise_log_edit'])

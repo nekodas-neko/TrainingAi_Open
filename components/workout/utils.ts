@@ -64,12 +64,22 @@ export function weightStepFor(equipment?: string[] | null): number {
   return equipment?.includes("barbell") ? BARBELL_WEIGHT_STEP_KG : DEFAULT_WEIGHT_STEP_KG;
 }
 
+/** The bar range every plate-rounded weight is clamped to. */
+export const MIN_BAR_KG = 5;
+export const MAX_BAR_KG = 250;
+
 export function mroundStep(value: number, step: number): number {
-  return Math.max(5, Math.min(250, Math.round(value / step) * step));
+  return Math.max(MIN_BAR_KG, Math.min(MAX_BAR_KG, Math.round(value / step) * step));
 }
 
 export function mroundStepUp(value: number, step: number): number {
-  return Math.max(5, Math.min(250, Math.ceil(value / step) * step));
+  return Math.max(MIN_BAR_KG, Math.min(MAX_BAR_KG, Math.ceil(value / step) * step));
+}
+
+/** #2762: true when `mroundStepUp` would cut this prescription down to MAX_BAR_KG, so the screen
+ *  can say the bar is capped instead of showing 250 as if it were the real figure. */
+export function barIsCapped(value: number | null | undefined): boolean {
+  return value != null && value > MAX_BAR_KG;
 }
 
 type BarInputs = Pick<WorkoutExercise, "exerciseType" | "progressionStyle" | "estimated1rm" | "equipment">;
@@ -84,6 +94,28 @@ export function prescribedBarWeights(ex: BarInputs | undefined, sets: number): (
   if (ex?.exerciseType === "bodyweight" || !style || !basis) return Array.from({ length: sets }, () => null);
   const step = weightStepFor(ex.equipment);
   return Array.from({ length: sets }, (_, i) => (style[i] ? mroundStepUp(basis * style[i].pct / 100, step) : null));
+}
+
+// Shared per-set weight derivation — used at init (launchExercise, the per-set-weights
+// effect) and after an injury swap, so all three paths agree on how a set's target
+// weight is picked. One Formula, One Place.
+export function computeInitialWeights(ex: WorkoutExercise | undefined, sets: number): number[] {
+  if (ex?.exerciseType === "bodyweight") {
+    return Array.from({ length: sets }, () => 0);
+  }
+  const step = weightStepFor(ex?.equipment);
+  const prescribed = prescribedBarWeights(ex, sets);
+  return Array.from({ length: sets }, (_, i) => {
+    const bar = prescribed[i];
+    if (bar != null) return bar;
+    // #2762: up, like the card's "Target weight" and every other prescription, so the field opens
+    // on the bar the lifter is shown.
+    if (ex?.target80 != null) return mroundStepUp(ex.target80, step);
+    // Fallback for old logs that predate the target_80 column: derive from 1RM or last weight
+    if (ex?.estimated1rm) return mroundStepUp(ex.estimated1rm * 0.8, step);
+    if (ex?.latestWeight != null) return mroundStep(ex.latestWeight, step);
+    return 60;
+  });
 }
 
 /** `plannedWeights` for the log payload: omitted when no set had a prescribed bar, so a freeform
