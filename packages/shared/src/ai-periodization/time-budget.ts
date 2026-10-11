@@ -1,8 +1,11 @@
 // Time-budget enforcement for AI periodization prescriptions.
 //
 // The AI is asked to fit the session into its time budget, but that's a soft request.
-// This module estimates the realistic duration (shared model: lib/workout/duration-model.ts)
-// and trims sets (accessories first, never dropping an exercise) until the session fits.
+// This module estimates the realistic duration (shared model: lib/workout/duration-model.ts) and
+// sizes the session to it. `allocateToBudget` (#2133) is what the prescription runs: minimums, then
+// whole exercises dropped before any set is floored, then time spent on the muscles behind the week.
+// `fitToBudget`, `dropToBudget` and `expandToBudget` are its parts, and still serve the deload
+// builders and the Workout Review.
 
 import {
   setWorkSec,
@@ -200,6 +203,17 @@ function wouldBreachMrv<T extends TimedExercise>(
   return false
 }
 
+// Would one more set of this exercise take any of its muscles past `cap` weighted sets in this
+// session alone (#2133)? Within one session the returns per muscle flatten after roughly 6-10 hard
+// sets, so past that the time is better spent elsewhere or handed back.
+function wouldBreachSessionCap<T extends TimedExercise>(exercise: T, all: T[], cap: number): boolean {
+  for (const { muscle, weight } of exercise.muscleGroups ?? []) {
+    const inSession = all.reduce((sum, e) => sum + e.sets * (e.muscleGroups?.find(m => m.muscle === muscle)?.weight ?? 0), 0)
+    if (inSession + weight > cap) return true
+  }
+  return false
+}
+
 // How far below its weekly MAV a muscle must sit before the session may break role order on
 // VOLUME, on muscleOverageRatio's scale (a fraction of MAV; negative = under target). At -0.25
 // a muscle a quarter below its weekly target may carry more sets than its exercise's role
@@ -256,6 +270,9 @@ export function expandToBudget<T extends TimedExercise>(
   budgetMin: number,
   muscleVolume?: Map<string, MuscleVolumeState>,
   mrvByMuscle: Map<string, number> = new Map(),
+  /** #2133: ids never grown (a deloaded row keeps its deload), and the most weighted sets any one
+   *  muscle may take in this session. */
+  opts: { frozenIds?: ReadonlySet<string>; sessionMuscleCap?: number } = {},
 ): T[] {
   const budgetSec = Math.max(0, budgetMin) * 60
   const out = exercises.map(e => ({ ...e }))
@@ -265,6 +282,8 @@ export function expandToBudget<T extends TimedExercise>(
   for (let i = 0; i < maxIters; i++) {
     const eligible = out.filter(e =>
       e.sets < roleCeiling(e.role)
+      && !opts.frozenIds?.has(e.sessionExerciseId)
+      && !(opts.sessionMuscleCap != null && wouldBreachSessionCap(e, out, opts.sessionMuscleCap))
       && !(muscleVolume && wouldBreachMrv(e, out, muscleVolume, mrvByMuscle)),
     )
     if (eligible.length === 0) break
@@ -322,25 +341,29 @@ export function dropToBudget<T extends TimedExercise>(
   budgetMin: number,
   protectedIds: Set<string> = new Set(),
   muscleVolume?: Map<string, MuscleVolumeState>,
+  /** How the survivors are re-sized after each drop. Default: trimmed by `fitToBudget`. The
+   *  allocator (#2133) passes a copy instead, so it drops whole exercises at their MINIMUM sets
+   *  rather than first flooring every exercise. Ids in `undroppable` are never the victim. */
+  opts: { refit?: (subset: T[]) => T[]; undroppable?: ReadonlySet<string> } = {},
 ): { exercises: T[]; droppedIds: string[] } {
   const budgetSec = Math.max(0, budgetMin) * 60
-  let kept = fitToBudget(exercises, budgetMin, protectedIds, muscleVolume)
+  const refit = opts.refit ?? ((subset: T[]) => fitToBudget(subset, budgetMin, protectedIds, muscleVolume))
+  let kept = refit(exercises)
   const droppedIds: string[] = []
   // Re-trim from the ORIGINAL set counts of the survivors: dropping an exercise frees time, so
   // sets cut to fit the old, more crowded session should be given back.
   const refitWithout = (victim: T): T[] => {
     const survivorIds = new Set(kept.filter(e => e !== victim).map(e => e.sessionExerciseId))
-    return fitToBudget(
-      exercises.filter(e => survivorIds.has(e.sessionExerciseId)),
-      budgetMin, protectedIds, muscleVolume,
-    )
+    return refit(exercises.filter(e => survivorIds.has(e.sessionExerciseId)))
   }
+  const droppable = (e: T) => !opts.undroppable?.has(e.sessionExerciseId)
 
   while (kept.length > MIN_KEPT_EXERCISES && estimateSessionDurationSec(kept) > budgetSec) {
     // Highest trim priority = least valuable to keep. Without muscle data trimPriority
     // degrades to the role bias, so accessories go first — the same order as set trimming.
     const mv = muscleVolume ?? new Map<string, MuscleVolumeState>()
-    const byValue = [...kept].sort((a, b) => trimPriority(b, kept, mv) - trimPriority(a, kept, mv))
+    const byValue = kept.filter(droppable).sort((a, b) => trimPriority(b, kept, mv) - trimPriority(a, kept, mv))
+    if (byValue.length === 0) break
     let victim = byValue[0]
     let next = refitWithout(victim)
     if (next.length === MIN_KEPT_EXERCISES && estimateSessionDurationSec(next) > budgetSec) {
@@ -403,4 +426,85 @@ export function fitToBudget<T extends TimedExercise>(
     target.sets -= 1
   }
   return out
+}
+
+// ── The weekly-volume allocator (#2133) ───────────────────────────────────────────────────────
+//
+// The owner, 2026-09-24: the goal "was to be able to add more exercises/sets in when the time
+// permitted ... happy to go with fewer exercises and more sets if that's gonna be better results ...
+// ideally it was dynamic and could adjust itself." Trimming the model's plan toward a 2-set floor
+// did the opposite: on 21 of 23 measured sessions every exercise sat at 2 sets and weekly volume
+// landed at 66% of his own targets. The signed proposal (2026-10-05) replaces it with this:
+//
+//  1. Every exercise starts at its MINIMUM: the main lift 3 sets, everything else 2.
+//  2. If the minimums don't fit, drop the whole exercise whose muscles are least behind their
+//     weekly target (dropToBudget's value order, at minimum sets, never below MIN_KEPT_EXERCISES),
+//     rather than flooring every exercise. Only if two exercises still overrun are sets trimmed.
+//  3. Spend what is left one set at a time on the exercise whose muscles are furthest behind the
+//     week (expandToBudget's growth order), within each role's ceiling, the weekly MRV, and
+//     ALLOCATOR_SESSION_MUSCLE_CAP weighted sets per muscle in one session.
+//
+// Evidence, labelled as such: weekly hard sets per muscle is the strongest predictor of growth and
+// returns within a session flatten after about 6-10 hard sets (Schoenfeld, Ogborn & Krieger 2017,
+// general literature, not a measurement of the owner). That is why fewer exercises with more sets is
+// acceptable only while the week's sets per muscle are still covered, which step 3 is built to do.
+export const ALLOCATOR_MIN_SETS: Record<string, number> = { primary: 3 }
+export const ALLOCATOR_DEFAULT_MIN_SETS = 2
+export const ALLOCATOR_SESSION_MUSCLE_CAP = 10
+
+export function allocatorMinSets(role: string): number {
+  return ALLOCATOR_MIN_SETS[role] ?? ALLOCATOR_DEFAULT_MIN_SETS
+}
+
+export interface AllocateOptions {
+  /** Exercises that earned a set through RPE autoregulation: they start at their given count (never
+   *  under the minimum) and are dropped only after every other exercise. */
+  protectedIds?: ReadonlySet<string>
+  /** Rows held as given: a deloaded exercise keeps its deload. Never reset, grown or dropped. */
+  frozenIds?: ReadonlySet<string>
+  muscleVolume?: Map<string, MuscleVolumeState>
+  mrvByMuscle?: Map<string, number>
+}
+
+/** Size a session to `budgetMin` by the three steps above. Returns the kept exercises with their
+ *  sets, and the ids dropped. Inputs are not mutated. */
+export function allocateToBudget<T extends TimedExercise>(
+  exercises: T[],
+  budgetMin: number,
+  opts: AllocateOptions = {},
+): { exercises: T[]; droppedIds: string[] } {
+  const frozen = opts.frozenIds ?? new Set<string>()
+  const protectedIds = new Set(opts.protectedIds ?? [])
+  const start = exercises.map(e => {
+    if (frozen.has(e.sessionExerciseId)) return { ...e }
+    const min = allocatorMinSets(e.role)
+    return { ...e, sets: protectedIds.has(e.sessionExerciseId) ? Math.max(e.sets, min) : min }
+  })
+
+  // Step 2. Protected and frozen rows are dropped last and never, respectively: the value order runs
+  // over the rest first, and only then may a protected exercise go.
+  const undroppable = new Set([...frozen, ...protectedIds])
+  let dropped = dropToBudget(start, budgetMin, new Set(protectedIds), opts.muscleVolume, {
+    refit: subset => subset.map(e => ({ ...e })),
+    undroppable,
+  })
+  if (protectedIds.size > 0 && estimateSessionDurationSec(dropped.exercises) > budgetMin * 60) {
+    const again = dropToBudget(dropped.exercises, budgetMin, new Set(protectedIds), opts.muscleVolume, {
+      refit: subset => subset.map(e => ({ ...e })),
+      undroppable: frozen,
+    })
+    dropped = { exercises: again.exercises, droppedIds: [...dropped.droppedIds, ...again.droppedIds] }
+  }
+
+  // Still over with the fewest exercises kept: the old last resort, trimming toward the 2-set floor.
+  const fitted = estimateSessionDurationSec(dropped.exercises) > budgetMin * 60
+    ? fitToBudget(dropped.exercises, budgetMin, new Set(protectedIds), opts.muscleVolume)
+    : dropped.exercises
+
+  // Step 3.
+  const grown = expandToBudget(fitted, budgetMin, opts.muscleVolume, opts.mrvByMuscle ?? new Map(), {
+    frozenIds: frozen,
+    sessionMuscleCap: ALLOCATOR_SESSION_MUSCLE_CAP,
+  })
+  return { exercises: grown, droppedIds: dropped.droppedIds }
 }

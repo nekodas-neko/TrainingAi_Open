@@ -24,6 +24,11 @@ import type { ReviewModelExercise } from '@trainingai/shared/workout/review/reco
  * what makes a review and a prescription AGREE — before this, the review could propose a shape
  * the prescription would never generate, with no way to tell which was right.
  *
+ * **#2133 moved the prescription onto `allocateToBudget`** (minimums, drop whole exercises before
+ * flooring any, then fill for the muscles behind). The review still trims and then drops, and never
+ * adds work, because it answers a different question: what of the session you already have does not
+ * fit. Whether it should drop before trimming too is #2787, not changed here.
+ *
  * **Where this is deliberately weaker than the model: the free-text drop reason.**
  * `reconcileReview` already falls back to `'Dropped to fit the time budget.'`, which is the true
  * reason in every case this produces one — nothing here drops for any other cause.

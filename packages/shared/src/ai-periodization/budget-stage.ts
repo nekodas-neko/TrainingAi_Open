@@ -7,9 +7,7 @@
 // different budget cost ~30 s and a token spend for work that is pure arithmetic (RV-202 ②).
 
 import {
-  fitToBudget,
-  expandToBudget,
-  dropToBudget,
+  allocateToBudget,
   applyRoleSetPlausibility,
   shortSessionRestSec,
   SHORT_SESSION_REST_FLOOR_SEC,
@@ -159,37 +157,28 @@ export function applyBudgetStage(
   // to repair a shape the model chose blind.
   const plausible = applyRoleSetPlausibility(timedExercises, muscleVolume)
 
-  // A short session is the one case where trimming alone can't reach the budget — five
-  // exercises floored at two sets still overrun a 30-minute ask, and two token sets each is
-  // worse training than doing fewer exercises properly. dropToBudget drops whole exercises
-  // in trim-priority order; they ride out on the prescription's existing droppedExerciseIds,
-  // which every render path already honours.
-  const dropped = direction < 0
-    ? dropToBudget(plausible, fitMin, earnedSetIds, muscleVolume)
-    : null
-  const trimmed = dropped?.exercises ?? fitToBudget(
-    plausible,
-    fitMin,
-    earnedSetIds,
-    muscleVolume,
-  )
-  const droppedIds = new Set(dropped?.droppedIds ?? [])
-
-  // Filling the budget is the 'long' preset's whole point: fitToBudget only removes sets, so
-  // without this a 90-minute session returned the 60-minute plan and handed the surplus back.
+  // #2133 (owner direction 2026-09-24, proposal signed 2026-10-05): the session is SIZED to the
+  // budget rather than trimmed toward a floor. Every exercise starts at its minimum (main lift 3,
+  // the rest 2); if that does not fit, whole exercises go, least-behind muscles first, instead of
+  // flooring all of them; then the time left buys sets for the muscles furthest behind the week.
+  // It runs on every preset: a short day gets fewer exercises done properly and a long day more
+  // sets. The finish-early margin that used to justify never filling a standard session now lives
+  // in `fitMin` (the budget less the lifter's p75 overrun, #2132).
   //
-  // Gated on an EXPLICIT long request, never run on a standard session. The duration model
-  // is deliberately conservative (duration-model.ts) and that under-fill IS the finish-early
-  // margin — the owner's sessions land on time because of it. Expanding by default would
-  // spend exactly that margin.
-  let sized = trimmed
-  if (direction > 0) {
-    const mrvByMuscle = new Map<string, number>(
-      [...new Set(timedExercises.flatMap(e => (e.muscleGroups ?? []).map(m => m.muscle)))]
-        .map(muscle => [muscle, volumeLandmarks(signals.trainingGoal, muscle).mrv]),
-    )
-    sized = expandToBudget(trimmed, fitMin, muscleVolume, mrvByMuscle)
-  }
+  // A deloaded row (one the caller can restore with `Full`) keeps its deload: never reset, grown or
+  // dropped. An earned set (RPE autoregulation) is kept and its exercise is dropped last.
+  const mrvByMuscle = new Map<string, number>(
+    [...new Set(timedExercises.flatMap(e => (e.muscleGroups ?? []).map(m => m.muscle)))]
+      .map(muscle => [muscle, volumeLandmarks(signals.trainingGoal, muscle).mrv]),
+  )
+  const allocated = allocateToBudget(plausible, fitMin, {
+    protectedIds: earnedSetIds,
+    frozenIds: new Set(fullShapeById?.keys() ?? []),
+    muscleVolume,
+    mrvByMuscle,
+  })
+  const sized = allocated.exercises
+  const droppedIds = new Set(allocated.droppedIds)
 
   const fittedSets = new Map(sized.map(f => [f.sessionExerciseId, f.sets]))
   // A DROPPED exercise is absent from `sized`, so falling back to the model's count would hand

@@ -48,10 +48,14 @@ describe('#2078 — Quick on Pull keeps a session, not one movement', () => {
     expect(estimateSessionDurationSec(plan)).toBe(asShipped - (180 + 127 + 90 + 90 + 90) - 319)
   })
 
-  it('keeps three of five at a 24-minute working budget, the main lift among them', () => {
+  it('keeps a session at a 24-minute working budget, the main lift among it at its 3-set minimum', () => {
+    // #2133: every exercise starts at its minimum (the main lift 3 sets), and whole exercises go
+    // before any set is floored, so Quick keeps fewer exercises done properly. It was three of five
+    // at two sets each; it is now the main lift at three and one more, never one movement (#2078).
     const res = applyBudgetStage(stage(PULL, 2), signalsFor(PULL, 24), 60, 'short', new Set())
-    expect(res.droppedIds.size).toBe(2)
+    expect(PULL.length - res.droppedIds.size).toBeGreaterThanOrEqual(2)
     expect(res.droppedIds.has('row')).toBe(false)
+    expect(res.sets.get('row')).toBeGreaterThanOrEqual(3)
     expect(res.estimatedSessionDurationMin).toBeLessThanOrEqual(24)
     expect(res.budgetNote).toContain('dropped for today')
     expect(res.budgetNote).not.toContain('expect to run over')
@@ -78,10 +82,15 @@ describe('#2284 — a shorter day shortens accessory and secondary rest, never t
     expect(standard.budgetNote).not.toContain('cut by a quarter')
   })
 
-  it('buys back the time it saves — 2 rests each on four exercises', () => {
-    const saved = 2 * ((127 - 95) + 3 * (90 - 70))
-    const diffMin = roomy(undefined).estimatedSessionDurationMin - roomy(90).estimatedSessionDurationMin
-    expect(diffMin).toBe(Math.round(saved / 60))
+  it('buys back the time it saves — every rest between sets on the four non-main exercises', () => {
+    // #2133: the roomy budget fills each exercise to its ceiling, the same on both days, so the only
+    // difference left is the rest: (sets − 1) rests per exercise at the shortened length.
+    const standard = roomy(undefined), short = roomy(90)
+    expect(Object.fromEntries(short.sets)).toEqual(Object.fromEntries(standard.sets))
+    const rests = (id: string) => (standard.sets.get(id) ?? 0) - 1
+    const saved = rests('pulldown') * (127 - 95) + (rests('curl') + rests('facepull') + rests('reardelt')) * (90 - 70)
+    const diffMin = standard.estimatedSessionDurationMin - short.estimatedSessionDurationMin
+    expect(Math.abs(diffMin - saved / 60)).toBeLessThanOrEqual(1)
   })
 
   it('scales a MEASURED rest by the same ratio, or the fit would never see the saving', () => {
@@ -98,9 +107,14 @@ describe('#2284 — a shorter day shortens accessory and secondary rest, never t
     ]
     const run = (preset: number | undefined) =>
       applyBudgetStage(stage(specs, 4), signalsFor(specs, 200), 120, preset, new Set())
-    const work = 4 * setWorkSec(6) + 3 * 180 + 4 * setWorkSec(10) + 319
-    expect(run(undefined).estimatedSessionDurationMin).toBe(Math.round((work + 3 * 120) / 60))
-    expect(run(90).estimatedSessionDurationMin).toBe(Math.round((work + 3 * (120 * 70 / 90)) / 60))
+    // #2133: the sets are whatever the allocator gave (the same on both days); the measured rest is
+    // what differs, scaled by 70/90 on the shorter one.
+    const standard = run(undefined)
+    const rowSets = standard.sets.get('row')!, curlSets = standard.sets.get('curl')!
+    expect(Object.fromEntries(run(90).sets)).toEqual(Object.fromEntries(standard.sets))
+    const work = rowSets * setWorkSec(6) + (rowSets - 1) * 180 + curlSets * setWorkSec(10) + 319
+    expect(standard.estimatedSessionDurationMin).toBe(Math.round((work + (curlSets - 1) * 120) / 60))
+    expect(run(90).estimatedSessionDurationMin).toBe(Math.round((work + (curlSets - 1) * (120 * 70 / 90)) / 60))
   })
 })
 
@@ -114,12 +128,15 @@ describe('#2132 — the p75 margin decides the fit; the working budget is what t
   ]
   const total = (sets: Map<string, number>) => [...sets.values()].reduce((a, b) => a + b, 0)
 
-  it('keeps every third set at the median, and some — not all — at his 75th percentile', () => {
+  it('fits fewer sets at his 75th percentile than at the median, and still more than the minimums', () => {
+    // #2133: the allocator fills whatever fit budget it is given, so the margin shows up as fewer
+    // sets bought, never as an exercise floored. Minimums are 3 + 2 × 4 = 11.
     const atMedian = applyBudgetStage(stage(FIVE, 3), signalsFor(FIVE, 55), 60, undefined, new Set())
-    expect(total(atMedian.sets)).toBe(15)
     const withMargin = applyBudgetStage(stage(FIVE, 3), signalsFor(FIVE, 55, 55 / 1.2), 60, undefined, new Set())
-    expect(total(withMargin.sets)).toBeGreaterThan(10)
-    expect(total(withMargin.sets)).toBeLessThan(15)
+    expect(atMedian.droppedIds.size).toBe(0)
+    expect(withMargin.droppedIds.size).toBe(0)
+    expect(total(withMargin.sets)).toBeGreaterThanOrEqual(11)
+    expect(total(withMargin.sets)).toBeLessThan(total(atMedian.sets))
     // The estimate stays the honest median one, and is inside the budget he sees — so no overrun note.
     expect(withMargin.estimatedSessionDurationMin).toBeLessThanOrEqual(55 / 1.2 + 0.5)
     expect(withMargin.budgetNote).toBe('')
