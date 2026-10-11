@@ -24,7 +24,10 @@ export interface PostgresRollupIODeps {
   upsertBodyMetrics(userId: string, rows: Omit<BodyMetrics, 'id' | 'userId' | 'createdAt'>[], source: HealthSource): Promise<void>
   getBodyFatCalibration(userId: string): Promise<BodyFatCalibration | null>
   refitDaytimeHrvModel(userId: string, timezone: string): Promise<void>
-  listSleepSessions(userId: string, from: string, to: string): Promise<{ sleepStart: Date; sleepEnd: Date }[]>
+  listSleepSessions(userId: string, from: string, to: string): Promise<{
+    sleepStart: Date; sleepEnd: Date; durationHours?: number | null
+    avgHeartRate?: number | null; averageHrvMs?: number | null; lowestHeartRate?: number | null
+  }[]>
   /** Named in the slow raw-read log (#2247). */
   caller?: string
 }
@@ -90,7 +93,10 @@ export function createPostgresRollupIO(deps: PostgresRollupIODeps): RollupIO {
     upsertOuraDaily: rows => oura.upsertOuraDaily(db, userId, rows, 'oura_ble'),
     readLatestDailySummaryBefore: date => oura.getLatestOuraDailySummaryBefore(db, userId, date),
     readSleepWindows: async (from, to) => (await deps.listSleepSessions(userId, from, to))
-      .map(r => ({ sleepStart: r.sleepStart, sleepEnd: r.sleepEnd })),
+      .map(r => ({
+        sleepStart: r.sleepStart, sleepEnd: r.sleepEnd, durationHours: r.durationHours ?? null,
+        avgHeartRate: r.avgHeartRate ?? null, averageHrvMs: r.averageHrvMs ?? null, lowestHeartRate: r.lowestHeartRate ?? null,
+      })),
     replaceDailySummary: rows => oura.replaceOuraDailySummary(db, userId, rows),
     upsertDailySummary: rows => oura.upsertOuraDailySummary(db, userId, rows),
     readDailyDerived: (from, to) => oura.getOuraDailyDerived(db, userId, from, to),

@@ -15,7 +15,7 @@ const TEST_USER_ID = '00000000-0000-4000-8000-00000000f7a6'
 const H = 3600 * 10
 const NIGHT_START = 5_000_000, NIGHT_END = NIGHT_START + 9 * H // ~9h night
 const FRAG_START = NIGHT_START + 3 * H, FRAG_END = FRAG_START + Math.round(0.5 * H) // 30-min fragment inside
-const ANCHOR_UTC = '2026-07-09T07:00:00.000Z'
+const ANCHOR_UTC = '2026-07-08T21:00:00.000Z'
 
 describe.skipIf(!canRun)('aggregateOuraRawSamples — bedtime fragment must not shrink the night', () => {
   let pool: import('pg').Pool

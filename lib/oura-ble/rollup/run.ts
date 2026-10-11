@@ -13,6 +13,7 @@ import { lfhfFromIbi } from '@trainingai/shared/health/hrv-frequency'
 import { spo2VariabilityFromSamples } from '@trainingai/shared/health/spo2-variability'
 import { nightlyTemperatureCentiC, temperatureFrameSeries } from '@trainingai/shared/health/temperature-baseline'
 import { groupSleepPeriods, nightPeriodsByDate } from '@trainingai/shared/health/sleep-night'
+import { isDaytimeStart, napGateReference, napGateVerdict, NAP_GATE_REFERENCE_DAYS, type NapGateWindow } from '@trainingai/shared/health/nap-gate'
 import { computeRecoveryIndex, nightRecoveryIndexHours } from '@trainingai/shared/health/recovery-index'
 import { type ExclusionWindow } from '@trainingai/shared/health/daily-medians'
 import { metExclusionWindows, rmssdSamples, hrvMsFromSamples, nightlyHeartRate, HR_BIN_DS, numericField as numArr } from '@trainingai/shared/health/night-vitals'
@@ -27,7 +28,7 @@ import { collectStressInputs, buildDayStressSeries, nightHrvMsOf } from './stres
 import { computeResilienceForDay, type DailyIndices } from '@/lib/health/stress-resilience'
 import type { SleepSession } from '@trainingai/shared/types'
 import { sourceRank } from '@trainingai/shared/health/source-rank'
-import { aestMidnight, toAestDay, secondsSinceLocalMidnight } from '@trainingai/shared/date-utils'
+import { aestMidnight, toAestDay, secondsSinceLocalMidnight, shiftDateStr } from '@trainingai/shared/date-utils'
 import type { RollupIO } from './io'
 import type { ModelRuntime } from '@/lib/oura-models/inference/runtime'
 
@@ -274,13 +275,13 @@ export async function runOuraRollup(
     .filter(({ raw, clamped }) => !isTruncatable(raw) && !frozenWakeDays.has(wakeDayOf(clamped.endDs)))
     .map(({ clamped }) => clamped)
 
-  const sleepRows: import('@/lib/data/repository').OuraSleepUpsertRow[] = []
+  let sleepRows: import('@/lib/data/repository').OuraSleepUpsertRow[] = []
   const nightInputsByDate = new Map<string, NightInput>()
   // One entry per sleep WINDOW; collapsed into one NightInput per night below.
   // `recovery` rides alongside `input` rather than inside it: `NightInput` is the shared shape
   // `computeDailySummaries` consumes, and the merge below needs the minimum's absolute TIME, which a
   // scalar hours-to-settle cannot carry (Q-509).
-  const nightCandidates: {
+  let nightCandidates: {
     sleepStart: Date; sleepEnd: Date; durationHours: number | null
     input: NightInput
     recovery: { settledAt: Date; lowestBpm: number } | null
@@ -292,6 +293,9 @@ export async function runOuraRollup(
   // Raw per-night signals for the chronic-stress model (the granular data not captured in the
   // DailySummaryRow). Populated in the night loop; consumed by the chronic_stress step below.
   const chronicStressSignalsByDate = new Map<string, ChronicStressNightSignals>()
+  // Per window, in loop order, so the nap gate below can drop a window's signals before the
+  // per-date map is built (it is last-wins per date, so a dropped desk window must not reach it).
+  const chronicStressByWindow: { startMs: number; date: string; signals: ChronicStressNightSignals }[] = []
   for (const w of nightWindows) {
     const inWindow = <T extends { ds: number }>(rows: T[], slackDs = 0) =>
       rows.filter(r => Number(r.ds) >= w.startDs && Number(r.ds) <= w.endDs + slackDs)
@@ -604,7 +608,7 @@ export async function runOuraRollup(
       .map(r => ({ startMs: toDate(Number(r.ds)).getTime(), ibiMs: numArr(r.decoded, 'ibi_ms'), quality: numArr(r.decoded, 'quality') }))
     const hrv5 = computeHrv5MinSeries(ibi5MinEvents)
     const tempSkinC = tempSamples.map(t => t.centi / 100)
-    chronicStressSignalsByDate.set(wakeDate, {
+    chronicStressByWindow.push({ startMs: toDate(w.startDs).getTime(), date: wakeDate, signals: {
       sleepPhase30Sec,
       hrvItems: nightRmssd.map(s => s.value),
       hrvMedianHR5min: hrv5.hrvMedianHR5min,
@@ -613,7 +617,35 @@ export async function runOuraRollup(
       tempSkinTimestamps: tempSamples.map(t => toDate(t.ds).getTime()),
       bedtimeStart: toDate(w.startDs).getTime(),
       highestTemperature: tempSkinC.length ? Math.max(...tempSkinC) : NaN,
-    })
+    } })
+  }
+  // #2348 — the nap gate. A window that STARTS in the daytime (04:00–20:00 local) is written as sleep
+  // only if it looks like one of the person's own nights (`nap-gate.ts`): 25 of the owner's daytime
+  // windows since 08-01 were a desk, not a nap. A dropped window's wake date still goes to the
+  // tombstone step, so a phantom an earlier pass wrote is retired, not left behind. Nights are never
+  // gated. The reference is the person's nights over the trailing NAP_GATE_REFERENCE_DAYS, this
+  // pass's own and the persisted ones, so an incremental pass and a Redecode judge a window alike.
+  const gatedWakeDates = new Set<string>()
+  if (sleepRows.some(r => isDaytimeStart(r.sleepStart, timezone))) {
+    const lastWake = sleepRows.reduce((m, r) => (r.date > m ? r.date : m), sleepRows[0].date)
+    const fromDate = shiftDateStr(lastWake, -NAP_GATE_REFERENCE_DAYS)
+    const byStart = new Map<number, NapGateWindow>()
+    for (const r of await io.readSleepWindows(fromDate, lastWake)) byStart.set(r.sleepStart.getTime(), r)
+    for (const r of sleepRows) if (r.date >= fromDate) byStart.set(r.sleepStart.getTime(), r)
+    const ref = napGateReference([...byStart.values()], timezone)
+    const dropped = new Set<number>()
+    for (const r of sleepRows) {
+      if (napGateVerdict(r, ref, timezone).keep) continue
+      dropped.add(r.sleepStart.getTime())
+      gatedWakeDates.add(r.date)
+    }
+    if (dropped.size > 0) {
+      sleepRows = sleepRows.filter(r => !dropped.has(r.sleepStart.getTime()))
+      nightCandidates = nightCandidates.filter(c => !dropped.has(c.sleepStart.getTime()))
+    }
+    for (const c of chronicStressByWindow) if (!dropped.has(c.startMs)) chronicStressSignalsByDate.set(c.date, c.signals)
+  } else {
+    for (const c of chronicStressByWindow) chronicStressSignalsByDate.set(c.date, c.signals)
   }
   // Resolve the per-window candidates into one row per night: naps are dropped entirely (they are
   // not sleep-baseline material — their HRV/HR are measured awake) and a night broken by a wake-up
@@ -709,7 +741,7 @@ export async function runOuraRollup(
   // Redecode's job row (`oura_redecode_jobs.result`) keeps it without a column of its own.
   let chronicStress: ChronicStressDiagnostics | null = null
 
-  if (sleepRows.length > 0) await step('sleep', async () => {
+  if (sleepRows.length > 0 || gatedWakeDates.size > 0) await step('sleep', async () => {
     // Own our derived rows: delete every BLE sleep row for the wake-days we're about to
     // write, then insert the fresh set. Deleting only the reproduced oura_ids (as before)
     // orphaned rows when a night's shape changed — e.g. after clusters were merged into one
@@ -721,8 +753,8 @@ export async function runOuraRollup(
     // hard delete plus a reinsert under a fresh id left every device that had already pulled the
     // night holding the old row as a ghost. Upsert first (a night at the same sleep_start keeps its
     // id and is replaced or revived), then tombstone the leftovers, so the night is never absent.
-    const dates = Array.from(new Set(sleepRows.map(r => r.date)))
-    await io.upsertSleepSessions(sleepRows)
+    const dates = Array.from(new Set([...sleepRows.map(r => r.date), ...gatedWakeDates]))
+    if (sleepRows.length > 0) await io.upsertSleepSessions(sleepRows)
     await io.tombstoneBleSleepSessionsExcept(dates, sleepRows.map(r => r.sleepStart))
   })
 

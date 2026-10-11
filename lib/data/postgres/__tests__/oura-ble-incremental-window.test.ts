@@ -16,7 +16,7 @@ const TEST_USER_ID = '00000000-0000-4000-8000-00000000bee6'
 
 const DS_PER_DAY = 24 * 3600 * 10
 const NOW_DS = 60_000_000
-const ANCHOR_UTC = '2026-07-20T21:00:00.000Z'
+const ANCHOR_UTC = '2026-07-20T13:00:00.000Z'
 
 // Two nights inside the 14-day HR-series window, far enough apart that a narrowed run covering only
 // the recent one would drop the older one if the delete were not clamped.

@@ -30,7 +30,7 @@ const TZ = 'Australia/Brisbane'
 const DS_PER_DAY = 24 * 3600 * 10
 const DS_PER_HOUR = 3600 * 10
 const NOW_DS = 60_000_000
-const ANCHOR_UTC = '2026-07-20T21:00:00.000Z'
+const ANCHOR_UTC = '2026-07-20T13:00:00.000Z'
 
 // Five days back, so the 35-day window floor is nowhere near it and only `sinceDs` can clip.
 const NIGHT_START = NOW_DS - 5 * DS_PER_DAY

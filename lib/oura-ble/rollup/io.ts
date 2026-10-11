@@ -35,6 +35,15 @@ export interface RollupExistingSteps {
   sourceMap: Record<string, string> | null
 }
 
+export interface RollupSleepWindow {
+  sleepStart: Date
+  sleepEnd: Date
+  durationHours: number | null
+  avgHeartRate: number | null
+  averageHrvMs: number | null
+  lowestHeartRate: number | null
+}
+
 export interface RollupWorkoutWindow {
   startedAt: Date
   completedAt: Date | null
@@ -75,7 +84,8 @@ export interface RollupIO {
    *  series must drop sleeping buckets, and it cannot read that off `sleepRows` — those only cover
    *  the nights THIS pass reconstructed, while the series is recomputed over a fixed trailing
    *  window. Deriving it from the pass would make a day's stress depend on how wide the pass was. */
-  readSleepWindows(from: string, to: string): Promise<{ sleepStart: Date; sleepEnd: Date }[]>
+  /** #2348: the figures the nap gate learns the person's nights from ride along on the same read. */
+  readSleepWindows(from: string, to: string): Promise<RollupSleepWindow[]>
 
   // ── steps / body metrics ─────────────────────────────────────────────────────────────────────
   readStepLiveWindows(): Promise<RollupStepLiveWindow[]>
