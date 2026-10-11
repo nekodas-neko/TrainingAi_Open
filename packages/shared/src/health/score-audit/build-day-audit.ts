@@ -2,9 +2,8 @@ import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, toAestDay, ageFromDob } 
 import { computeVolumeAcwr, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
-import { hrMaxFromAge, moderateIntensityBpm, vigorousIntensityBpm } from '@trainingai/shared/health/hr-zones'
-import { activeMinutesFromReadings } from '@trainingai/shared/health/zone-minutes'
-import { computeMovedHours, moveHoursGoal } from '@trainingai/shared/health/hourly-movement'
+import { hrMaxFromAge } from '@trainingai/shared/health/hr-zones'
+import { intradayHrContributors } from '@trainingai/shared/health/intraday-hr-contributors'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite'
 import type { WorkoutRepository } from '@/lib/data/repository'
@@ -132,15 +131,15 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
   const volume7dKg = sessions7dRows.reduce((s, ws) => s + ws.exercises.reduce((s2, ex) => s2 + (ex.volume ?? 0), 0), 0)
 
   // ── Zone minutes / moved hours from the audited day's intraday HR ──
+  // The live payload's computation, so the audit and the score cannot disagree (#2437 density rule).
   let zoneMinutes: number | null = null
   let moveHours: number | null = null
+  let moveGoal: number | null = null
   if (baselineRhr != null && hrRows.length > 0) {
-    const profile = { maxHr: hrMaxFromAge(ageYears), restingHr: baselineRhr }
-    zoneMinutes = activeMinutesFromReadings(
-      hrRows.map(r => ({ timestamp: r.timestamp.getTime(), bpm: r.bpm })),
-      { moderateFloorBpm: moderateIntensityBpm(profile), vigorousFloorBpm: vigorousIntensityBpm(profile) },
-    )
-    moveHours = computeMovedHours({ hrRows, maxHr: hrMaxFromAge(ageYears), restingHr: baselineRhr, tz, dateIso: date })
+    const c = intradayHrContributors({ hrRows, maxHr: hrMaxFromAge(ageYears), restingHr: baselineRhr, tz, dateIso: date })
+    zoneMinutes = c.zoneMinutes
+    moveHours = c.moveHours
+    moveGoal = c.moveHoursGoal
   }
 
   const pillars: PillarAudit[] = []
@@ -167,7 +166,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     date, goals, goalProfile,
     steps: dayMetrics?.steps ?? null,
     activeCalories: dayMetrics?.activeCalories ?? null,
-    zoneMinutes, moveHours,
+    zoneMinutes, moveHours, moveHoursGoal: moveGoal,
     strengthSessionToday: sessionsUpToDay.some(ws => new Date(ws.startedAt).getTime() >= dayMid.getTime()),
     sessions7d: sessions7dRows.length,
     volume7dKg,
@@ -177,7 +176,7 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
   }
   const preTaperActivity = computeActivityScore({
     steps: activityInput.steps, activeCalories: activityInput.activeCalories,
-    zoneMinutes, moveHours, moveHoursGoal: moveHours != null ? moveHoursGoal() : null,
+    zoneMinutes, moveHours, moveHoursGoal: moveGoal,
     strengthSessionToday: activityInput.strengthSessionToday,
     sessions7d: activityInput.sessions7d, volume7dKg,
     goals, acwr,

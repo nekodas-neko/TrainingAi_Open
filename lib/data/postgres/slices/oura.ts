@@ -1,3 +1,4 @@
+import { dropSparseHrHours } from '@trainingai/shared/health/intraday-hr-contributors'
 import { eq, and, or, gte, lte, lt, asc, desc, isNotNull, isNull, inArray, sql, type SQL } from 'drizzle-orm'
 import type { getDb } from '../client'
 import { getPool } from '../client'
@@ -1179,7 +1180,8 @@ export async function computeDayZoneSeconds(
 ): Promise<[number, number, number, number, number]> {
   const from = fromZonedTime(`${day}T00:00:00`, tz)
   const to = fromZonedTime(`${day}T23:59:59`, tz)
-  const rows = await getHrForWindow(db, userId, from, to)
+  // #2437: a sparse Health Connect hour is missing, the same rule the Activity score applies.
+  const rows = dropSparseHrHours(await getHrForWindow(db, userId, from, to), tz).rows
   const readings: HrReading[] = rows.map(r => ({
     timestamp: (r.timestamp instanceof Date ? r.timestamp : new Date(r.timestamp)).getTime(),
     bpm: r.bpm,
