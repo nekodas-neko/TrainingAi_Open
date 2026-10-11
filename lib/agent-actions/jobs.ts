@@ -8,6 +8,8 @@ import { redecodeJobKind } from '@/lib/oura-ble/redecode-job-kind'
 import { tagBaselineSessions } from '@/lib/admin/baseline-phase-tag.mjs'
 import { rederiveStylelessOneRm } from '@/lib/workout/rederive-styleless-one-rm'
 import { reencodeBodyweightOneRm } from '@/lib/workout/reencode-bodyweight-one-rm'
+import { recomputeHrr1Best } from '@/lib/workout/recompute-hrr1-best'
+import { backfillSetHrr1 } from '@/lib/workout/backfill-set-hrr1'
 import type { FinishAgentActionInput } from '@/lib/data/postgres/slices/agent-actions'
 
 /**
@@ -195,6 +197,43 @@ export const AGENT_JOBS = {
       }
     },
   } satisfies AgentJobDef<z.infer<typeof DryRunOnly>>,
+  /**
+   * #2457 / #2601 / #2299 step 2. Re-measures every stored `set_hr_stats` row's HRR60, verdict (the
+   * person's bar) and drop curve from dense HR, through `backfillSetHrr1`
+   * (`POST /api/admin/backfill-set-hrr1`). A write clears ring-only drops and verdicts, so it needs an
+   * approval. Run before `recompute-hrr1-best`, which reads what this writes.
+   */
+  'backfill-set-hrr1': {
+    params: DryRunOnly,
+    losesData: p => !p.dryRun,
+    run: async (ctx, p) => {
+      const report = await backfillSetHrr1({ repo: ctx.repo, userId: ctx.userId, tz: ctx.tz, dryRun: p.dryRun })
+      return {
+        status: 200,
+        body: { report },
+        finish: { outcome: 'succeeded', affectedRows: report.summary.written, daysMoved: p.dryRun ? 0 : report.summary.daysChanged },
+      }
+    },
+  } satisfies AgentJobDef<z.infer<typeof DryRunOnly>>,
+  /**
+   * #2601 (owner approved 2026-10-07). Recomputes `workout_hr_stats.hrr1_best` as the max of each
+   * session's HRR60, through `recomputeHrr1Best` (`POST /api/admin/recompute-hrr1-best`). About 25
+   * ring-only sessions lose their value, so a write needs an approval. Run `backfill-set-hrr1` first.
+   */
+  'recompute-hrr1-best': {
+    params: DryRunOnly,
+    losesData: p => !p.dryRun,
+    run: async (ctx, p) => {
+      const result = await recomputeHrr1Best({ userId: ctx.userId, tz: ctx.tz, dryRun: p.dryRun })
+      if (!result.ok) return { status: 409, body: { error: result.error }, finish: { outcome: 'failed', error: result.error } }
+      const { summary } = result.report
+      return {
+        status: 200,
+        body: { report: result.report },
+        finish: { outcome: 'succeeded', affectedRows: summary.written, daysMoved: summary.daysMoved },
+      }
+    },
+  } satisfies AgentJobDef<z.infer<typeof DryRunOnly>>,
 } as const
 
 export type AgentJobId = keyof typeof AGENT_JOBS
@@ -238,6 +277,8 @@ export const AgentActionRequest = z.discriminatedUnion('job', [
   requestSchema('stress-backfill'),
   requestSchema('rederive-styleless-one-rm'),
   requestSchema('reencode-bodyweight-one-rm'),
+  requestSchema('backfill-set-hrr1'),
+  requestSchema('recompute-hrr1-best'),
 ])
 export type AgentActionRequest = z.infer<typeof AgentActionRequest>
 

@@ -435,6 +435,51 @@ describe.skipIf(!canRun)('/api/agent-actions (issue 2381)', () => {
     })
   })
 
+  describe('recompute-hrr1-best (#2601)', () => {
+    // A ring-only session (stored best 23, no set with HRR60) and the other account's: only the
+    // owner's moves, to null, as the owner approved.
+    const sessionWith = async (user: string, best: number) => {
+      const { rows: [ws] } = await pool.query(
+        `INSERT INTO workout_sessions (user_id, session_name, started_at)
+         VALUES ($1, 'Issue2601', '2026-09-20T08:00:00+10:00') RETURNING id`, [user])
+      await pool.query(`INSERT INTO workout_hr_stats (workout_session_id, user_id, hrr1_best) VALUES ($1, $2, $3)`, [ws.id, user, best])
+      return ws.id as string
+    }
+    const best = async (id: string) => (await pool.query(`SELECT hrr1_best FROM workout_hr_stats WHERE workout_session_id = $1`, [id])).rows[0].hrr1_best
+    let mine = '', theirs = ''
+
+    beforeEach(async () => {
+      await pool.query(`DELETE FROM workout_sessions WHERE user_id = ANY($1)`, [[OWNER, OTHER]])
+      mine = await sessionWith(OWNER, 23)
+      theirs = await sessionWith(OTHER, 23)
+    })
+
+    it('a write without approval is refused; a dry run writes nothing; with approval it writes once', async () => {
+      expect((await post(req('recompute-hrr1-best', { dryRun: false }))).status).toBe(403)
+      const dry = await (await post(req('recompute-hrr1-best', { dryRun: true }))).json()
+      expect(dry.report.summary).toMatchObject({ sessionsExamined: 1, sessionsChanged: 1, toNull: 1, written: 0 })
+      expect(await best(mine)).toBe(23)
+
+      const write = await (await post(req('recompute-hrr1-best', { dryRun: false }, { approval: APPROVAL }))).json()
+      expect(write.report.summary).toMatchObject({ written: 1 })
+      expect((await logRows()).at(-1)).toMatchObject({ job: 'recompute-hrr1-best', outcome: 'succeeded', approval_ref: APPROVAL, affected_rows: 1 })
+      expect(await best(mine)).toBeNull()
+      expect(await best(theirs)).toBe(23)
+
+      const again = await (await post(req('recompute-hrr1-best', { dryRun: true }))).json()
+      expect(again.report.summary).toMatchObject({ sessionsChanged: 0 })
+    })
+  })
+
+  describe('backfill-set-hrr1 (#2457, #2601)', () => {
+    it('dry-runs through the same work as the admin route, and refuses a write without approval', async () => {
+      expect((await post(req('backfill-set-hrr1', { dryRun: false }))).status).toBe(403)
+      const res = await post(req('backfill-set-hrr1', { dryRun: true }))
+      expect(res.status).toBe(200)
+      expect((await res.json()).report.summary).toMatchObject({ written: 0 })
+    })
+  })
+
   it('a finished log row cannot be changed or deleted', async () => {
     await post(req('backfill-baseline-phase-tag', { dryRun: true }))
     const last = (await logRows()).at(-1)

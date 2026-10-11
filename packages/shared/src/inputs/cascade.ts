@@ -106,7 +106,7 @@ export const INPUTS: Record<InputName, InputDef> = {
     name: 'HRR60', slot: 'event', unit: 'bpm',
     routes: [
       // No device reports it; it is always derived from dense HR around the set.
-      { id: 'dense_hr_drop60', rung: 'derived', label: 'from heart rate after the set' },
+      { id: 'dense_hr_hrr60', rung: 'derived', label: 'from heart rate after the set' },
     ],
     // A drop can be negative (HR still rising after the set), so only finiteness and a sane span.
     plausible: inRange(-MAX_PLAUSIBLE_BPM, MAX_PLAUSIBLE_BPM),
