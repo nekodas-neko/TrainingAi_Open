@@ -13,6 +13,7 @@
  * console that renders it against a treadmill's displayed cadence.
  */
 import { subscribeGateFeed } from '@/lib/oura-ble/gate-feed'
+import { ensureStepsDecoderConstants } from './steps-decoder-constants-client'
 import {
   runStepsMotionDecoder,
   hasStepsDecoderConstants,
@@ -219,6 +220,9 @@ export class CadenceTracker {
     this.lastRingRecordAt = -Infinity
     this.ringBurstIdx = null
 
+    // The ring decoder's table (Q-221). Fire-and-forget: until it lands `onRingWindow` reads nothing.
+    // Auto-detection used to fetch it at launch; #2471 removed that path, so the tracker asks itself.
+    void ensureStepsDecoderConstants()
     this.unsubGateFeed = await subscribeGateFeed(ev => {
       if (!this.running) return
       if (ev.type === 'disconnect') { this.ring = null; this.emit(); return }
@@ -257,7 +261,7 @@ export class CadenceTracker {
     if (this.lastRingDs !== null && ds < this.lastRingDs) return
     this.lastRingDs = ds
 
-    // No table, no reading (Q-221 — see auto-detection-service). A cadence number decoded from an
+    // No table, no reading (Q-221 — see steps-decoder-constants-client). A cadence number decoded from an
     // absent dequantisation table would be plausible and wrong, which is worse than showing nothing.
     if (!hasStepsDecoderConstants()) return
     const decoded = runStepsMotionDecoder({ timestamps: [nowMs], data: [columns] })

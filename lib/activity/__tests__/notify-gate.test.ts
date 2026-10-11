@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { shouldNotifyActivity, shouldNotifyRingConfirmedActivity, isWorkoutInProgress } from '../auto-detection-service'
+import { shouldNotifyActivity, isWorkoutInProgress } from '../auto-detection-service'
 import { isGuidedWalkActive } from '@/lib/stores/guided-walk-store'
 import { isActivityActive } from '@/lib/stores/activity-store'
 
@@ -92,43 +92,6 @@ describe('dispatchGate motionTrigger suppression (workout + guided walk + manual
   })
 })
 
-// ── Q-68: the ring-confirm path had no distance corroboration at all ────────────────────────────
-// AD-1's sensor path has run behind shouldNotifyActivity for a while; AD-2's ring-confirm path —
-// active whenever the ring is connected, so the common case — fired the moment cadence confirmed.
-// The owner saw "Recording your walk or run" in the same minute as a scale weigh-in.
-describe('shouldNotifyRingConfirmedActivity', () => {
-  const args = (o: Partial<Parameters<typeof shouldNotifyRingConfirmedActivity>[0]>) =>
-    shouldNotifyRingConfirmedActivity({
-      pointCount: 0, distanceM: 0, elapsedSec: 0, alreadyNotified: false, ...o,
-    })
-
-  it('vetoes a confirmation GPS says did not move — the reported false positive', () => {
-    // Shuffling around a room: GPS has a fix and it shows almost nothing.
-    expect(args({ pointCount: 12, distanceM: 15, elapsedSec: 120 })).toBe(false)
-  })
-
-  it('still fires for a real walk', () => {
-    expect(args({ pointCount: 40, distanceM: 400, elapsedSec: 300 })).toBe(true)
-  })
-
-  it('trusts the ring when GPS has NO fix — the case AD-2 exists for', () => {
-    // A genuine indoor walk can have zero GPS points. Requiring distance here would silently break
-    // exactly what the ring path was built to do better than GPS. This is the veto/requirement
-    // distinction, and getting it backwards is the way this fix could do more harm than the bug.
-    expect(args({ pointCount: 0, distanceM: 0, elapsedSec: 0 })).toBe(true)
-  })
-
-  it('trusts the ring on a single point — one position is not a distance', () => {
-    expect(args({ pointCount: 1, distanceM: 0, elapsedSec: 200 })).toBe(true)
-  })
-
-  it('vetoes real distance covered too quickly to be a walk window', () => {
-    // Distance alone is not enough: a short burst clears 200 m without being a sustained walk.
-    expect(args({ pointCount: 8, distanceM: 400, elapsedSec: 30 })).toBe(false)
-  })
-
-  it('holds the one-shot latch, GPS or not', () => {
-    expect(args({ alreadyNotified: true, pointCount: 40, distanceM: 400, elapsedSec: 300 })).toBe(false)
-    expect(args({ alreadyNotified: true, pointCount: 0 })).toBe(false)
-  })
-})
+// The ring-confirm notification gate (Q-68, `shouldNotifyRingConfirmedActivity`) is gone with the
+// path it guarded: #2471 removed the ring's live trigger, because its windows arrive in hourly
+// drains and every one was read as "now". Walks the ring saw are offered from its MET instead.
