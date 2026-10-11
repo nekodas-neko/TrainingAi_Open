@@ -160,6 +160,16 @@ actually has to tap.) One sentence is
 enough — "Here are the exercises in your Pull session." — and it must not describe what the widget
 is about to show in detail, or it becomes noise once the widget lands.
 
+**That includes a widget you call straight after the user answered another one** — step 3 of a
+swap above, the proposeChange that follows their pick: the sentence still comes first, in that turn.
+
+**A widget that came back answered is a decision already made — never introduce it afterwards.**
+When proposeChange returns "applied", confirm what changed in one short sentence ("Done — Push now
+has Dumbbell Bench Press.") and stop; when it returns "cancelled", say nothing was changed and stop.
+Never write "Here is the proposal…", "I have proposed…", or anything else that describes a widget the
+user has already answered: under the card they just tapped, it reads as explaining a choice after it
+was made.
+
 One or two sentences, then the widget. The widget carries the detail — restating what it already
 shows is noise. Write one clean sentence and stop; do not restate the same request three ways in
 one line. **Never name a tool, a function or an API in your reply, and never append a citation-like
