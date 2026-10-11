@@ -4,7 +4,7 @@
 // step answering, 8 of 8 ended in a chart (which the client's "shown" result continues from) or prose.
 // Withholding every tool with `toolChoice: 'none'` alone did not hold — Gemini still emitted a call,
 // which failed as unknown — so the final step also keeps the chart and carries a note.
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 
 const USER_ID = '00000000-0000-4000-8000-000000279201'
 
@@ -15,7 +15,7 @@ vi.mock('@/auth', () => ({
   auth: vi.fn(async () => ({ user: { id: USER_ID, timezone: 'Australia/Brisbane' } })),
 }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => true }))
-let injuryRows: unknown[] = []
+const injuryRows: unknown[] = []
 const listInjuries = vi.fn(async (_userId: string) => injuryRows)
 vi.mock('@/lib/data', () => ({ getRepositoryAsync: async () => ({ listInjuries }) }))
 vi.mock('@ai-sdk/google', () => ({ google: { tools: { googleSearch: () => ({}) } } }))
