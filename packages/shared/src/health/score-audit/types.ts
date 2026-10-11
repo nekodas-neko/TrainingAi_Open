@@ -78,7 +78,8 @@ export interface PillarAudit {
    * without re-deriving them from the presentation `contributors` above — which are a different
    * shape and would be a second, drifting definition of "what gets stored".
    */
-  persist?: { score: number; contributors: unknown } | null
+  /** `modelVersion` is the scoring model's stamp for `model_versions`, where the pillar has one (#2237). */
+  persist?: { score: number; contributors: unknown; modelVersion?: string } | null
 }
 
 /** Everything else about the day that plausibly explains how it felt, but isn't a scored pillar. */

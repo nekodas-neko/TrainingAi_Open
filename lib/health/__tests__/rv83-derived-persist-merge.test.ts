@@ -63,18 +63,25 @@ describe('mergeDerivedPersists', () => {
   })
 
   it('refuses a key two pillars both claim, naming the key and both pillars', () => {
-    // The invariant the merge rests on, asserted rather than assumed. If a later pillar starts
-    // stamping `modelVersions` too, a silent Object.assign would pick a winner and drop the other's
-    // stamp — the exact clobber Q-273 removed from this table. This is the mutation that a test
-    // asserting only the happy path would pass straight through.
-    const alsoStamps: DerivedPersist = {
-      day: '2026-09-21',
-      pillar: 'illness',
-      patch: { illnessScore: 12, modelVersions: { illness: 'v1' } },
-    }
+    // The invariant the merge rests on, asserted rather than assumed: a silent Object.assign would
+    // pick a winner and drop the other pillar's value.
+    const alsoScoresSleep: DerivedPersist = { day: '2026-09-21', pillar: 'nap', patch: { sleepScore: 40 } }
+    expect(() => mergeDerivedPersists([SLEEP, alsoScoresSleep]))
+      .toThrowError(/sleepScore.*sleep.*nap.*2026-09-21/)
+  })
 
-    expect(() => mergeDerivedPersists([READINESS, alsoStamps]))
-      .toThrowError(/modelVersions.*readiness.*illness.*2026-09-21/)
+  it('merges model_versions per pillar key, as the database does, and refuses one key twice (#2237)', () => {
+    // Each pillar stamps its own key in the `model_versions` map (Q-273 merges per key in SQL), so
+    // sleep stamping beside readiness is one write carrying both stamps, not a clash. A plain
+    // Object.assign would have kept only the later map, which is the clobber Q-273 removed.
+    const sleepStamped: DerivedPersist = { ...SLEEP, patch: { ...SLEEP.patch, modelVersions: { sleep: 'v2:even-gain:2026-10-14' } } }
+    const [group] = mergeDerivedPersists([READINESS, sleepStamped])
+    expect(group.patch.modelVersions).toEqual({ readiness: 'v3:ri5:2026-08-18', sleep: 'v2:even-gain:2026-10-14' })
+    expect(group.patch.sleepScore).toBe(81)
+
+    const readinessAgain: DerivedPersist = { day: '2026-09-21', pillar: 'illness', patch: { modelVersions: { readiness: 'v9' } } }
+    expect(() => mergeDerivedPersists([READINESS, readinessAgain]))
+      .toThrowError(/modelVersions\.readiness written twice on 2026-09-21/)
   })
 
   it('is empty for no persists, so a gated-out request writes nothing', () => {
