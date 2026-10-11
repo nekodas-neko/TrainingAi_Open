@@ -118,21 +118,32 @@ export function dueForEstimate(input: {
  * Today's intake only. The adaptive-TDEE window is built from logged food (`intakeByDate`) and never
  * sees this, so an assumption cannot calibrate the maintenance estimate.
  */
-export function countedEstimateKcal(input: {
+export interface CountedEstimateInput {
   answers: readonly { planMealId: string; answer: string; estCalories?: number | null }[]
   /** Every meal of the user's plan, across variants. */
   planMeals: readonly { id: string; mealTypeId: string | null; suggestedTime: string | null }[]
   mealTypes: readonly MealType[]
   loggedMealTypeIds: ReadonlySet<string | null | undefined>
-}): number {
+}
+
+export function countedEstimateKcal(input: CountedEstimateInput): number {
+  return Math.round(countedEstimates(input).reduce((sum, e) => sum + e.kcal, 0))
+}
+
+/**
+ * #2072. The same rule as `countedEstimateKcal`, one row per counted estimate, so a surface can say
+ * WHICH meals were assumed ("incl. 480 estimated · lunch"). The sum of `kcal` is that function's
+ * answer before rounding; it is built on this, so the two cannot disagree.
+ */
+export function countedEstimates(input: CountedEstimateInput): { planMealId: string; mealTypeId: string; kcal: number }[] {
   const mealById = new Map(input.planMeals.map(m => [m.id, m]))
-  let kcal = 0
+  const out: { planMealId: string; mealTypeId: string; kcal: number }[] = []
   for (const a of input.answers) {
     if (a.answer !== 'estimated' || a.estCalories == null || !(a.estCalories > 0)) continue
     const meal = mealById.get(a.planMealId)
     const type = meal ? planMealTypeId(meal, input.mealTypes as MealType[]) : null
     if (!type || input.loggedMealTypeIds.has(type)) continue
-    kcal += a.estCalories
+    out.push({ planMealId: a.planMealId, mealTypeId: type, kcal: a.estCalories })
   }
-  return Math.round(kcal)
+  return out
 }

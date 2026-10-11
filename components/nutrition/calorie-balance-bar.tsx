@@ -3,6 +3,7 @@
 import { memo, useState } from 'react'
 import { Info } from 'lucide-react'
 import { CalorieZoneBar } from './calorie-zone-bar'
+import { EstimatedKcalLine } from './estimated-kcal'
 import { EnergyExplainer } from './energy-explainer'
 import type { EnergyBalanceResponse } from '@/app/api/nutrition/energy-balance/route'
 
@@ -86,6 +87,7 @@ export const CalorieBalanceBar = memo(function CalorieBalanceBar({ data, isToday
           put two different calorie budgets on one screen. */}
       <CalorieZoneBar
         intakeKcal={b.intakeKcal}
+        estimatedKcal={b.estimatedKcal}
         restingBaseKcal={b.restingBaseKcal}
         activeKcal={b.activeKcal}
         targetNetKcal={b.targetNetKcal}
@@ -103,6 +105,8 @@ export const CalorieBalanceBar = memo(function CalorieBalanceBar({ data, isToday
         <Stat label="Burned" value={b.expenditureKcal} />
         <Stat label="Net" value={b.netKcal} signed />
       </div>
+      {/* #2072. "Eaten" includes assumed plan meals; say how much. */}
+      <EstimatedKcalLine estimatedKcal={b.estimatedKcal} className="mt-2" />
 
       {m != null && (
         <p className="mt-3 text-[11px] leading-snug text-muted-foreground">

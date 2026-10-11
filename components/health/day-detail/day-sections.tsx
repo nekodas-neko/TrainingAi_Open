@@ -10,6 +10,7 @@ import { shortSessionName } from "@trainingai/shared/utils";
 import { exerciseWeight } from "./exercise-weight";
 import type { EnergyBalanceResponse } from "@/app/api/nutrition/energy-balance/route";
 import { energyDaySummary, type SessionKcal } from "@/components/health/day-detail/energy-summary";
+import { EstimatedKcalLine } from "@/components/nutrition/estimated-kcal";
 import { displayBodyFat } from "@/components/health/body-fat-display";
 import { formatHoursMinutes } from '@trainingai/shared/format/units'
 import { formatKg } from '@trainingai/shared/format/units'
@@ -344,6 +345,8 @@ export const EnergySection = memo(function EnergySection({ energy }: { energy: E
             label={summary.netLabel}
           />
         </div>
+        {/* #2072. "Eaten" includes assumed plan meals; say how much. */}
+        <EstimatedKcalLine estimatedKcal={summary.estimatedKcal} className="mt-2.5" />
         <div className="mt-3 border-t border-white/5 pt-2.5">
           <KeyValues rows={summary.breakdown.map(b => [b.label, `${b.kcal.toLocaleString()} kcal`] as [string, string])} />
         </div>
