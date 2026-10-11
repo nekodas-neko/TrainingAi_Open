@@ -6,6 +6,7 @@ import {
 import {
   stepCandidates, metGridCandidates, minuteMeanCandidates, compendiumMetCandidates,
   activeKcalMetCandidates, cadenceMetCandidates, ringStillMetCandidates, sleepSessionMetCandidates, SLEEP_MET,
+  ringMotionMetCandidates, ringMotionMet, RING_MOTION_MET_MAP_V1,
   hrr60Candidates, nightlyCandidates,
 } from '../adapters'
 import { excludeLowWearDays, toOuraByDate } from '@trainingai/shared/health/wear-confidence'
@@ -155,6 +156,51 @@ describe('MET from step cadence (#2115 v4, rung 2c)', () => {
     expect(c).toMatchObject({ value: 6.2, capped: true, route: 'cadence_met', source: 'hc' })
     const series = resolveMinutes('MET/min', [c], min(0), min(1))
     expect(series[0].provenance).toMatchObject({ route: 'cadence_met', rung: 'derived', capped: true })
+  })
+})
+
+describe('MET from the ring\'s motion (#2781, rung 2a)', () => {
+  it('looks up the last bin whose edge is at or under the summed low intensity', () => {
+    expect(ringMotionMet(0)).toBe(0.9)
+    expect(ringMotionMet(1)).toBe(1.0)
+    expect(ringMotionMet(77)).toBe(2.8)
+    expect(ringMotionMet(78)).toBe(2.8) // between edges 77 and 79
+    expect(ringMotionMet(79)).toBe(2.9)
+    expect(ringMotionMet(500)).toBe(5.3)
+    expect(ringMotionMet(-3)).toBe(0.9)
+  })
+
+  it('ships the evaluated table as is: 92 bins, edges rising, cut 1.5', () => {
+    const { edges, met, cut } = RING_MOTION_MET_MAP_V1
+    expect(edges).toHaveLength(92)
+    expect(met).toHaveLength(92)
+    edges.slice(1).forEach((e, i) => expect(e).toBeGreaterThan(edges[i]))
+    expect(cut).toBe(1.5)
+  })
+
+  it('sums the events of minute m − 1 and m, and an event on a boundary closes the minute before it', () => {
+    // 4 at 0:30 and 6 exactly at 1:00 both belong to minute 0; 10 at 1:30 belongs to minute 1.
+    const c = ringMotionMetCandidates([
+      { tsMs: min(0) + 30_000, lowIntensity: 4 },
+      { tsMs: min(1), lowIntensity: 6 },
+      { tsMs: min(1) + 30_000, lowIntensity: 10 },
+    ], 'oura_ble')
+    const byMinute = new Map(c.map((x) => [x.slot, x.value]))
+    expect([...byMinute.keys()].sort((a, b) => Number(a) - Number(b))).toEqual([min(0), min(1), min(2)])
+    expect(byMinute.get(min(0))).toBe(ringMotionMet(10)) // minute -1 empty + minute 0's 10
+    expect(byMinute.get(min(1))).toBe(ringMotionMet(20)) // 10 + 10
+    expect(byMinute.get(min(2))).toBe(ringMotionMet(10)) // minute 1's 10, nothing in minute 2
+    expect(c.every((x) => x.route === 'accel_met' && x.source === 'oura_ble')).toBe(true)
+  })
+
+  it('sits under the ring\'s own MET and above its still marker', () => {
+    const series = resolveMinutes('MET/min', [
+      ...metGridCandidates({ startTimestampMs: min(0), metsPerMinute: [2.2] }, 'oura_ble'),
+      ...ringMotionMetCandidates([{ tsMs: min(0) + 30_000, lowIntensity: 30 }], 'oura_ble'),
+      ...ringStillMetCandidates([min(0) + 1_000, min(1) + 1_000], 'oura_ble'),
+    ], min(0), min(2))
+    expect(series.map((r) => r.provenance?.route)).toEqual(['device_met', 'accel_met'])
+    expect(series[1].value).toBe(ringMotionMet(30))
   })
 })
 

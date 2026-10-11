@@ -26,6 +26,8 @@ vi.mock('@/lib/data', () => ({
       met: [1.4, 1.6, 1.8].map(value => ({ tsMs: at(12, 2), value })),
       // Sleep-motion frames at 23:00 and 23:01.
       still: [at(23, 0) + 5_000, at(23, 1) + 5_000],
+      // #2781: two motion events, at 14:00:30 and 14:01:30, so minutes 14:00, 14:01 and 14:02 fill.
+      motion: [{ tsMs: at(14, 0) + 30_000, lowIntensity: 30 }, { tsMs: at(14, 1) + 30_000, lowIntensity: 30 }],
     }),
     // The night ending this morning: 22:00 the evening before to 06:00.
     listSleepSessions: async () => [{ sleepStart: new Date(at(-2)), sleepEnd: new Date(at(6)), ouraId: 'ble:1' }],
@@ -46,12 +48,12 @@ describe('/api/training-stress reads MET/min through the cascade (#2115 v4)', ()
     const res = await GET(new Request(`http://x/api/training-stress?date=${DAY}`))
     const body = await res.json()
     // Ring MET 3, active calories 10 (rung 1, "provided"); sleep 360 (00:00-06:00) + still 2 +
-    // cadence 30 (rung 2, "derived"); the remaining 1440 - 405 minutes nothing measured.
-    expect(body.metMix).toEqual({ provided: 13, derived: 392, estimated: 0, missing: 1035 })
+    // motion 3 + cadence 30 (rung 2, "derived"); the remaining 1440 - 408 minutes nothing measured.
+    expect(body.metMix).toEqual({ provided: 13, derived: 395, estimated: 0, missing: 1032 })
     expect(body.metGridLen).toBe(1440)
     // A day this empty is not scored, and it is the MET gate that says so, with the share.
     expect(body).toMatchObject({ status: 'gated', reason: 'insufficient_met' })
-    // 12:00-24:00 holds 3 ring + 2 still + 30 cadence minutes: almost all of the window is empty.
+    // 12:00-24:00 holds 3 ring + 3 motion + 2 still + 30 cadence minutes: almost all of it is empty.
     expect(body.residualShare).toBeGreaterThan(0.9)
   })
 })

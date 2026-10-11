@@ -22,7 +22,7 @@ import { inSequence } from './in-sequence'
 
 /** Q-481 — at most one `applied_mutations` prune per day per process. */
 const APPLIED_MUTATIONS_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
-import { measuredAtMs, cadenceSecFromDs, decodeEventBody, hexToBytes, eventName } from '@/lib/oura-ble/decode'
+import { measuredAtMs, cadenceSecFromDs, decodeEventBody, hexToBytes, eventName, motionLowIntensity } from '@/lib/oura-ble/decode'
 
 /** Hard cap on `getOuraRawSamplesForTags`' lookback — the scan is over the biggest table in the DB
  *  (812k rows). Exported so callers size their own lookback against it rather than asking for more
@@ -6682,6 +6682,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     temp: { tsMs: number; valueC: number }[]
     met: { tsMs: number; value: number }[]
     still: number[]
+    motion: { tsMs: number; lowIntensity: number }[]
   }> {
     // LA-139: resolve against the WHOLE anchor series, not the newest one. `getOuraClockAnchor`
     // returns a single `(ring_ds ↔ utc)` pair; measured 2026-09-25 the table holds 12,545 of them
@@ -6693,21 +6694,24 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // the observation nearest that frame, not the newest". These four were the exceptions.
     const clock = await this.getOuraClockOffsets(userId)   // RV-182 ②
     const epoch = clock.epoch
-    if (epoch == null) return { temp: [], met: [], still: [] }
+    if (epoch == null) return { temp: [], met: [], still: [], motion: [] }
     const fromDs = msToDs(from.getTime(), clock, epoch)
     const toDs = msToDs(to.getTime(), clock, epoch)
-    if (fromDs == null || toDs == null) return { temp: [], met: [], still: [] }
+    if (fromDs == null || toDs == null) return { temp: [], met: [], still: [], motion: [] }
     const startDs = Math.floor(fromDs)
     const endDs = Math.ceil(toDs)
-    const rows = await readRawFrames(this.db, userId, { tags: [0x46, 0x69, 0x50, 0x72], startDs, endDs, caller: 'oura-daytime-signals' })
+    const rows = await readRawFrames(this.db, userId, { tags: [0x46, 0x69, 0x50, 0x72, 0x47], startDs, endDs, caller: 'oura-daytime-signals' })
     const temp: { tsMs: number; valueC: number }[] = []
     const met: { tsMs: number; value: number }[] = []
     const still: number[] = []
+    const motion: { tsMs: number; lowIntensity: number }[] = []
     for (const r of rows) {
       const tsMs = dsToMs(Number(r.ds), clock, epoch)
       if (tsMs == null) continue
       // #2115 v4: a 0x72 frame marks a still minute; its presence is the signal, not its values.
       if (r.tag === 0x72) { still.push(tsMs); continue }
+      // #2781: the motion map reads the low-intensity byte as fitted (see `motionLowIntensity`).
+      if (r.tag === 0x47) { if (r.bodyHex) motion.push({ tsMs, lowIntensity: motionLowIntensity(hexToBytes(r.bodyHex)) }); continue }
       const decoded = r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null)
       if (!decoded) continue
       if (r.tag === 0x50) {
@@ -6716,7 +6720,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         for (const c of numArr(decoded, 'temps_c')) temp.push({ tsMs, valueC: c })
       }
     }
-    return { temp, met, still }
+    return { temp, met, still, motion }
   }
 
   async getOuraBatteryEvents(userId: string, from: Date, to: Date): Promise<Array<{
