@@ -148,9 +148,9 @@ fill a rung does; the best available rung wins.
 
 | Rung | Meaning | Example: `MET/min` | Example: `steps/min` | Example: `HRR60` |
 |---|---|---|---|---|
-| 1 · provided | the device reports it | Oura MET | Oura / Health Connect steps | — |
-| 2 · derived | computed from rawer data we hold | from raw accelerometer | counted from raw accelerometer | from dense HR (strap, or any ≥1 Hz series) around the set |
-| 3 · estimated | inferred from a coarser signal | from heart rate (HR reserve), or a logged activity's compendium MET | — | — |
+| 1 · provided | the device reports it | Oura MET; a watch's active calories with your weight | Oura / Health Connect steps | — |
+| 2 · derived | computed from rawer data we hold | from the ring's motion, step cadence, or a sleep record (asleep = 1.0) | counted from raw accelerometer | from dense HR (strap, or any ≥1 Hz series) around the set |
+| 3 · estimated | inferred from a coarser signal | a logged activity's compendium MET (not heart rate: #2115 v4, owner 2026-10-06, it did worse than a constant) | — | — |
 | 4 · missing | nothing can fill it | unit not scored | unit not scored | unit not scored |
 
 Rules (owner, 2026-10-06):

@@ -137,6 +137,16 @@ export function dateStrMidnightInTz(dateStr: string, tz = DEFAULT_TZ): Date {
   return fromZonedTime(`${dateStr}T00:00:00`, tz)
 }
 
+/** The instant a local wall-clock "HH:MM" on `dateStr` names in `tz` (so DST-correct), or null when
+ *  `hhmm` is not a time of day. The inverse of `msToHHMMInTz` for a known date. */
+export function localClockTimeToDate(dateStr: string, hhmm: string | null | undefined, tz = DEFAULT_TZ): Date | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm ?? '')
+  if (!m) return null
+  const h = Number(m[1]), min = Number(m[2])
+  if (h > 23 || min > 59) return null
+  return fromZonedTime(`${dateStr}T${String(h).padStart(2, '0')}:${m[2]}:00`, tz)
+}
+
 // Seconds elapsed since local-midnight-today in `tz`, clamped to [0, 86400].
 // Used to treat "today" as a partial day for cumulative per-day metrics
 // (e.g. Oura non-wear time) instead of assuming a full 86,400 s.

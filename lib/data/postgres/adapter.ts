@@ -6659,6 +6659,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getOuraDaytimeSignals(userId: string, from: Date, to: Date): Promise<{
     temp: { tsMs: number; valueC: number }[]
     met: { tsMs: number; value: number }[]
+    still: number[]
   }> {
     // LA-139: resolve against the WHOLE anchor series, not the newest one. `getOuraClockAnchor`
     // returns a single `(ring_ds ↔ utc)` pair; measured 2026-09-25 the table holds 12,545 of them
@@ -6670,27 +6671,30 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // the observation nearest that frame, not the newest". These four were the exceptions.
     const clock = await this.getOuraClockOffsets(userId)   // RV-182 ②
     const epoch = clock.epoch
-    if (epoch == null) return { temp: [], met: [] }
+    if (epoch == null) return { temp: [], met: [], still: [] }
     const fromDs = msToDs(from.getTime(), clock, epoch)
     const toDs = msToDs(to.getTime(), clock, epoch)
-    if (fromDs == null || toDs == null) return { temp: [], met: [] }
+    if (fromDs == null || toDs == null) return { temp: [], met: [], still: [] }
     const startDs = Math.floor(fromDs)
     const endDs = Math.ceil(toDs)
-    const rows = await readRawFrames(this.db, userId, { tags: [0x46, 0x69, 0x50], startDs, endDs, caller: 'oura-daytime-signals' })
+    const rows = await readRawFrames(this.db, userId, { tags: [0x46, 0x69, 0x50, 0x72], startDs, endDs, caller: 'oura-daytime-signals' })
     const temp: { tsMs: number; valueC: number }[] = []
     const met: { tsMs: number; value: number }[] = []
+    const still: number[] = []
     for (const r of rows) {
-      const decoded = r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null)
-      if (!decoded) continue
       const tsMs = dsToMs(Number(r.ds), clock, epoch)
       if (tsMs == null) continue
+      // #2115 v4: a 0x72 frame marks a still minute; its presence is the signal, not its values.
+      if (r.tag === 0x72) { still.push(tsMs); continue }
+      const decoded = r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null)
+      if (!decoded) continue
       if (r.tag === 0x50) {
         for (const v of numArr(decoded, 'met')) met.push({ tsMs, value: v })
       } else {
         for (const c of numArr(decoded, 'temps_c')) temp.push({ tsMs, valueC: c })
       }
     }
-    return { temp, met }
+    return { temp, met, still }
   }
 
   async getOuraBatteryEvents(userId: string, from: Date, to: Date): Promise<Array<{
