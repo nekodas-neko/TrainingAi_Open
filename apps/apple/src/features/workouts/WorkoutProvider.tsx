@@ -22,6 +22,7 @@ type WorkoutContext = CatalogState & {
 };
 const Context = createContext<WorkoutContext | null>(null);
 const empty: CatalogState = {
+  cacheReady: false,
   status: 'loading',
   catalog: null,
   refreshing: false,

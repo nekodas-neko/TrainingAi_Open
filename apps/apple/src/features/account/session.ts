@@ -17,7 +17,7 @@ export type AccountConnection = AccountReader & {
   post(path: string, body: unknown): Promise<unknown>;
   put?(path: string, body: unknown): Promise<unknown>;
   patch?(path: string, body: unknown): Promise<unknown>;
-  delete?(path: string, body: unknown): Promise<unknown>;
+  delete?(path: string, body: unknown, query?:Record<string,string>): Promise<unknown>;
   media?(source: string): Promise<string>;
 };
 type Pending = { origin: string; verifier: string; state: string; createdAt: number };
@@ -63,6 +63,7 @@ export class AccountSession {
   private platform: AuthPlatform;
   private events: { at: string; event: string; httpStatus?: number }[] = [];
   private reader: AccountConnection | null = null;
+  private profileRequest: { generation: number; promise: Promise<void> } | null = null;
   constructor(origin: string, platform: AuthPlatform) {
     this.platform = platform;
     this.origin = backendOrigin(origin);
@@ -99,8 +100,8 @@ export class AccountSession {
         if (this.session?.userId !== userId) { throw new Error('The account changed during the request.'); }
         return value;
       },
-      delete: async (path, body) => {
-        const value = await api.delete(path, body);
+      delete: async (path, body, query) => {
+        const value = await api.delete(path, body, query);
         if (this.session?.userId !== userId) { throw new Error('The account changed during the request.'); }
         return value;
       },
@@ -144,7 +145,10 @@ export class AccountSession {
     this.record(initialUrl?.startsWith('com.fitnessai.training:') ? 'initialize_callback' : 'initialize');
     const generation = ++this.generation;
     try {
-      const stored = await this.platform.get(SESSION_KEY);
+      const [stored, savedPending] = await Promise.all([
+        this.platform.get(SESSION_KEY),
+        this.platform.get(PENDING_KEY),
+      ]);
       const raw = stored ? JSON.parse(stored) as Partial<SavedSession> : null;
       if (generation !== this.generation) { return; }
       if (raw && raw.origin === this.origin && typeof raw.accessToken === 'string' && raw.accessToken.length > 0
@@ -155,7 +159,6 @@ export class AccountSession {
       } else {
         await this.write(() => this.platform.remove(SESSION_KEY));
       }
-      const savedPending = await this.platform.get(PENDING_KEY);
       const pending: unknown = savedPending ? JSON.parse(savedPending) : null;
       if (generation !== this.generation) { return; }
       this.pending = this.validPending(pending) ? pending : null;
@@ -163,7 +166,7 @@ export class AccountSession {
         await this.complete(initialUrl);
       } else {
         this.pending = null;
-        await this.write(() => this.platform.remove(PENDING_KEY));
+        if (savedPending) { await this.write(() => this.platform.remove(PENDING_KEY)); }
         if (generation !== this.generation) { return; }
         if (this.session) { await this.refresh(); }
         else { this.publish('signedOut', savedPending ? 'The previous sign-in was interrupted. Start again.' : null); }
@@ -278,11 +281,20 @@ export class AccountSession {
         : 'Could not exchange or save the session. Start sign-in again.');
     }
   }
-  async refresh() {
-    if (!this.session) { return; }
-    if (this.session.expiresAt <= Date.now() / 1000) { await this.signOut('Your session expired. Sign in again.'); return; }
+  refresh(): Promise<void> {
+    if (!this.session) { return Promise.resolve(); }
+    if (this.session.expiresAt <= Date.now() / 1000) { return this.signOut('Your session expired. Sign in again.'); }
+    if (this.profileRequest?.generation === this.generation) { return this.profileRequest.promise; }
     const generation = ++this.generation;
-    this.publish('checking');
+    const profile = this.current.profile;
+    this.publish('checking', null, profile);
+    const promise = this.verifyProfile(generation, profile).finally(() => {
+      if (this.profileRequest?.generation === generation) { this.profileRequest = null; }
+    });
+    this.profileRequest = { generation, promise };
+    return promise;
+  }
+  private async verifyProfile(generation: number, previousProfile: AccountProfile | null) {
     this.record('profile_started');
     try {
       const profile = await this.api.profile();
@@ -303,7 +315,7 @@ export class AccountSession {
       else { this.publish('signedIn', error instanceof ApiError && error.status === 403
         ? 'Your account cannot access this backend. Contact the account administrator or sign out.'
         : error instanceof ApiError && error.status === 429 ? 'Too many requests. Wait a moment, then retry.'
-        : 'Could not verify your account. Check the connection and retry. Your saved session is retained.'); }
+        : 'Could not verify your account. Check the connection and retry. Your saved session is retained.', previousProfile); }
     }
   }
   async cancel(message = 'Sign-in cancelled.') {

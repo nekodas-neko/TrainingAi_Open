@@ -1,6 +1,16 @@
 import type { TextStyle } from 'react-native';
 
-export const spacing = { none: 0, xxs: 2, xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32 };
+export const spacing = {
+  none: 0,
+  xxs: 2,
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
+};
 export const radii = { small: 8, control: 12, card: 16, pill: 999 };
 export const icons = { strokeWidth: 2 };
 export const sizes = {
@@ -15,10 +25,17 @@ export const sizes = {
   workoutLift: 24,
   contentWidth: 680,
   timerRing: 180,
+  scoreRing: 128,
+  nutritionRing: 104,
+  mealLabel: 189,
+  foodThumbnail:32,
+  healthHero: 260,
   wheelRow: 44,
   demonstration: 64,
   summaryWidth: 320,
   chartHeight: 96,
+  miniChart: 48,
+  weekVolumeChart: 128,
 };
 export const typography = {
   title: { fontSize: 28, lineHeight: 34, fontWeight: '700' },

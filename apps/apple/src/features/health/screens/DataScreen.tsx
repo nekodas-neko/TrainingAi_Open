@@ -1,5 +1,12 @@
 import { Platform } from 'react-native';
-import { AppText, AppButton, Card, Stack, LoadingIndicator, SwitchRow } from '../../../shared/ui';
+import {
+  AppText,
+  AppButton,
+  Card,
+  Stack,
+  SwitchRow,
+  StatusIndicator,
+} from '../../../shared/ui';
 import { useHealthContext } from '../HealthProvider';
 import { useReportsContext } from '../../../development/diagnostics/ReportsProvider';
 import { isRunningInExpoGo } from 'expo';
@@ -9,7 +16,8 @@ export function DataScreen() {
   const health = useHealthContext();
   const reports = useReportsContext();
   const { snapshot, busy, error } = health;
-  const { report, reportBusy, reportStatus, reportAutomatically, setReportAutomatically } = reports;
+  const { report, reportBusy, reportStatus, reportAutomatically, setReportAutomatically } =
+    reports;
   const healthPreviewOnly = Platform.OS !== 'ios' || isRunningInExpoGo();
   function connect() {
     reports.setReportStatus(null);
@@ -28,25 +36,32 @@ export function DataScreen() {
             Apple Health needs a separate iPhone development build. This preview supports sample
             data only.
           </AppText>
-        ) : busy ? (
-          <LoadingIndicator accessibilityLabel="Reading Apple Health" />
         ) : (
           <AppButton
-            title={snapshot?.mode === 'device' ? 'Refresh Apple Health' : 'Connect Apple Health'}
+            title={
+              snapshot?.mode === 'device' ? 'Refresh Apple Health' : 'Connect Apple Health'
+            }
             disabled={reportBusy}
+            busy={busy}
             onPress={connect}
           />
         )}
       </Card>
       {diagnosticsAvailable && (
         <Card>
-          <AppText variant="heading">Development feedback</AppText>
+          <Stack direction="row" align="center" justify="space-between">
+            <AppText variant="heading" style={{ flex: 1 }}>
+              Development feedback
+            </AppText>
+            <StatusIndicator label="Report status" busy={reportBusy} message={reportStatus} />
+          </Stack>
           <AppText tone="muted">
-            Send the displayed health values, record counts, sources, timestamps and query errors to
-            your PC. The report stays in a local development file.
+            Send the displayed health values, record counts, sources, timestamps and query
+            errors to your PC. The report stays in a local development file.
           </AppText>
           <AppButton
-            title={reportBusy ? 'Sending report…' : 'Send report to PC'}
+            title="Send report to PC"
+            busy={reportBusy}
             disabled={reportBusy || busy || (!snapshot && !error)}
             onPress={() => {
               void report(snapshot, 'Data', error);
@@ -61,11 +76,6 @@ export function DataScreen() {
           <AppText variant="caption" tone="muted">
             Off by default. Resets when the app reloads.
           </AppText>
-          {reportStatus && (
-            <AppText accessibilityRole="alert" tone="muted">
-              {reportStatus}
-            </AppText>
-          )}
         </Card>
       )}
       {snapshot?.inspection ? (
@@ -77,12 +87,12 @@ export function DataScreen() {
               {new Date(snapshot.inspection.endAt).toLocaleString()}
             </AppText>
             <AppText tone="muted">
-              Latest samples, not daily totals. Each type returns up to 2,000 records; counts and
-              sources can be incomplete at the limit.
+              Latest samples, not daily totals. Each type returns up to 2,000 records; counts
+              and sources can be incomplete at the limit.
             </AppText>
             <AppText tone="muted">
-              No readable records can mean no data in this period or read permission is off. Workout
-              routes are not inspected.
+              No readable records can mean no data in this period or read permission is off.
+              Workout routes are not inspected.
             </AppText>
           </Card>
           {snapshot.inspection.entries.map((entry) => (
@@ -126,8 +136,8 @@ export function DataScreen() {
         <Card>
           <AppText variant="heading">No inspection loaded</AppText>
           <AppText tone="muted">
-            Use the Apple Health button above to check data types, sources and timestamps. Sample
-            data does not include this inspection.
+            Use the Apple Health button above to check data types, sources and timestamps.
+            Sample data does not include this inspection.
           </AppText>
         </Card>
       )}

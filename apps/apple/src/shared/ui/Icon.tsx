@@ -31,6 +31,13 @@ import Check from 'lucide-react-native/icons/check';
 import Share from 'lucide-react-native/icons/share';
 import ArrowUp from 'lucide-react-native/icons/arrow-up';
 import ArrowDown from 'lucide-react-native/icons/arrow-down';
+import Pencil from 'lucide-react-native/icons/pencil';
+import Trash from 'lucide-react-native/icons/trash';
+import Plus from 'lucide-react-native/icons/plus';
+import Settings from 'lucide-react-native/icons/settings';
+import Info from 'lucide-react-native/icons/info';
+import Droplets from 'lucide-react-native/icons/droplets';
+import UtensilsCrossed from 'lucide-react-native/icons/utensils-crossed';
 import type { LucideProps } from 'lucide-react-native';
 import { Platform } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
@@ -69,6 +76,13 @@ const icons = {
   share: Share,
   up: ArrowUp,
   down: ArrowDown,
+  edit: Pencil,
+  delete: Trash,
+  plus: Plus,
+  settings: Settings,
+  info: Info,
+  water: Droplets,
+  foods: UtensilsCrossed,
 };
 
 export type IconName = keyof typeof icons;

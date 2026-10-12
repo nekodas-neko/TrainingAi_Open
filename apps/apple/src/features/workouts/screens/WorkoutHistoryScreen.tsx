@@ -1,19 +1,22 @@
 import { useState } from 'react';
+import { Pressable } from 'react-native';
+import { ExerciseHistory } from '../components/ExerciseHistory';
+import { formatTimeOfDay } from '@trainingai/shared/date-utils';
 import { toAestDay } from '@trainingai/shared/date-utils';
 import {
   AppButton,
   AppText,
-  Badge,
   Card,
   ConfirmationCard,
   IconButton,
   ListRow,
   Notice,
   NumericStepper,
+  MonthCalendar,
   Sheet,
   Stack,
+  StatusIndicator,
 } from '../../../shared/ui';
-import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { WorkoutLayout } from '../components/WorkoutLayout';
 import { ResourceStatus } from '../components/ResourceStatus';
 import { useWorkoutResource } from '../data/WorkoutDataProvider';
@@ -25,7 +28,21 @@ import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import { useWorkoutAction } from '../data/useWorkoutAction';
 import { formatSetLoad } from '../logging/targets';
 
-function HistoryDay({ date }: { date: string }) {
+export function HistoryDay({
+  date,
+  embedded = false,
+  compact = false,
+  readOnly = false,
+  sessionEnergy,
+}: {
+  date: string;
+  embedded?: boolean;
+  compact?: boolean;
+  readOnly?: boolean;
+  sessionEnergy?: { id: string; kcal: number; source: 'hr' | 'met' }[];
+}) {
+  const { timezone } = useWorkoutContext();
+  const [history, setHistory] = useState<string | null>(null);
   const state = useWorkoutResource(daySpec(date));
   const queue = useHistoryQueue();
   const journal = useWorkoutJournal();
@@ -41,7 +58,9 @@ function HistoryDay({ date }: { date: string }) {
   const entries = overlayHistory(state.data?.exercises ?? [], queue.operations);
   const sessionIds = [...new Set(entries.map((entry) => entry.workoutSessionId))];
   function awaitingUpload(id: string) {
-    return journal.data.workouts.some((workout) => workout.id === id && workout.pending.length > 0);
+    return journal.data.workouts.some(
+      (workout) => workout.id === id && workout.pending.length > 0,
+    );
   }
   async function save() {
     if (!edit || !queue.queue) {
@@ -94,18 +113,36 @@ function HistoryDay({ date }: { date: string }) {
     <>
       <Stack direction="row" align="center" justify="space-between">
         <AppText variant="eyebrow" tone="muted">
-          Workouts
+          {compact ? 'Training' : 'Workouts'}
         </AppText>
-        <IconButton
-          icon="refresh"
-          label="Refresh day"
-          busy={state.refreshing}
-          onPress={state.refresh}
-        />
+        {embedded && (
+          <StatusIndicator
+            label="Workout records"
+            busy={state.loading || state.refreshing || queue.syncing}
+            error={state.error ?? queue.error ?? action.error}
+            message={
+              queue.operations.length
+                ? `${queue.operations.length} workout changes saved on phone.`
+                : null
+            }
+            onRetry={() => {
+              state.refresh();
+              void queue.queue?.sync();
+            }}
+          />
+        )}
+        {!compact && (
+          <IconButton
+            icon="refresh"
+            label="Refresh day"
+            busy={state.refreshing}
+            onPress={state.refresh}
+          />
+        )}
       </Stack>
-      <ResourceStatus state={state} refresh={state.refresh} />
-      {queue.error && <Notice title="History upload" message={queue.error} />}{' '}
-      {queue.operations.length > 0 && (
+      {!embedded && <ResourceStatus state={state} refresh={state.refresh} />}
+      {!embedded && queue.error && <Notice title="History upload" message={queue.error} />}
+      {!embedded && queue.operations.length > 0 && (
         <AppButton
           title={queue.syncing ? 'Uploading changes…' : 'Retry history upload'}
           variant="ghost"
@@ -115,84 +152,189 @@ function HistoryDay({ date }: { date: string }) {
           }}
         />
       )}
-      {action.error && <Notice title="History change" message={action.error} />}
+      {!embedded && action.error && <Notice title="History change" message={action.error} />}
       {sessionIds.map((id) => (
         <Card key={id}>
           <Stack direction="row" justify="space-between">
             <AppText variant="heading">
               {entries.find((entry) => entry.workoutSessionId === id)?.sessionName}
             </AppText>
-            <AppButton
-              title="Delete workout"
-              variant="danger"
-              disabled={!queue.ready || awaitingUpload(id)}
-              onPress={() =>
-                setRemove({
-                  workoutSessionId: id,
-                  name:
-                    entries.find((entry) => entry.workoutSessionId === id)?.sessionName ??
-                    'workout',
-                })
-              }
-            />
+            {readOnly?null:compact ? (
+              <IconButton
+                icon="delete"
+                label="Delete workout"
+                disabled={!queue.ready || awaitingUpload(id)}
+                onPress={() =>
+                  setRemove({
+                    workoutSessionId: id,
+                    name:
+                      entries.find((e) => e.workoutSessionId === id)?.sessionName ?? 'workout',
+                  })
+                }
+              />
+            ) : (
+              <AppButton
+                title="Delete workout"
+                variant="danger"
+                disabled={!queue.ready || awaitingUpload(id)}
+                onPress={() =>
+                  setRemove({
+                    workoutSessionId: id,
+                    name:
+                      entries.find((entry) => entry.workoutSessionId === id)?.sessionName ??
+                      'workout',
+                  })
+                }
+              />
+            )}
           </Stack>
           {state.data?.workoutDurationsById?.[id] && (
             <AppText variant="caption" tone="muted">
+              {compact
+                ? `${formatTimeOfDay(state.data.workoutDurationsById[id]!.start, timezone)} → ${formatTimeOfDay(state.data.workoutDurationsById[id]!.end, timezone)} · `
+                : ''}
               {Math.round(state.data.workoutDurationsById[id]!.minutes)} min
             </AppText>
           )}
           {entries
             .filter((entry) => entry.workoutSessionId === id)
-            .map((entry) => (
-              <Stack key={entry.exerciseLogId}>
-                <AppText variant="label">{entry.name}</AppText>
-                {entry.reps.map((rep, index) => (
-                  <AppText key={index} variant="caption" tone="muted">
-                    Set {index + 1} ·{' '}
-                    {entry.setWeights[index] === undefined
-                      ? `${rep} reps · load unavailable`
-                      : formatSetLoad(
-                          {
-                            exerciseType:
-                              entry.exerciseType === 'bodyweight' ? 'bodyweight' : 'weighted',
-                          },
-                          { weight: String(entry.setWeights[index]), reps: String(rep) },
-                        )}
+            .map((entry) =>
+              compact ? (
+                <Stack key={entry.exerciseLogId} direction="row" align="center" gap="xs">
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={entry.name + ' history'}
+                    onPress={() => setHistory(entry.name)}
+                    style={{ flex: 1 }}
+                  >
+                    <AppText variant="caption">{entry.name}</AppText>
+                  </Pressable>
+                  <AppText variant="micro" tone="muted">
+                    {entry.sets ?? entry.reps.length} × {entry.reps[0] ?? '—'}
                   </AppText>
-                ))}
-                <Stack direction="row">
-                  <AppButton
-                    title="Edit"
-                    variant="surface"
+                  <AppText variant="micro">
+                    {entry.exerciseType === 'bodyweight'
+                      ? entry.weightKg
+                        ? `BW +${entry.weightKg} kg`
+                        : 'BW'
+                      : entry.weightKg == null
+                        ? '—'
+                        : `${entry.weightKg} kg`}
+                  </AppText>
+                  {!readOnly && <>
+                  <IconButton
+                    icon="edit"
+                    label={'Edit ' + entry.name}
                     disabled={!queue.ready || awaitingUpload(id)}
                     onPress={() => {
                       setEdit(entry);
                       setReps(entry.reps.map(String));
                       setWeights(
-                        entry.reps.map((_, index) =>
-                          entry.setWeights[index] === undefined
-                            ? ''
-                            : String(entry.setWeights[index]),
+                        entry.reps.map((_, i) =>
+                          entry.setWeights[i] === undefined ? '' : String(entry.setWeights[i]),
                         ),
                       );
                     }}
                   />
-                  <AppButton
-                    title="Delete exercise"
-                    variant="danger"
+                  <IconButton
+                    icon="delete"
+                    label={'Delete ' + entry.name}
                     disabled={!queue.ready || awaitingUpload(id)}
                     onPress={() =>
                       setRemove({ exerciseLogId: entry.exerciseLogId, name: entry.name })
                     }
                   />
+                  </>}
                 </Stack>
-              </Stack>
-            ))}
+              ) : (
+                <Stack key={entry.exerciseLogId}>
+                  <AppText variant="label">{entry.name}</AppText>
+                  {entry.reps.map((rep, index) => (
+                    <AppText key={index} variant="caption" tone="muted">
+                      Set {index + 1} ·{' '}
+                      {entry.setWeights[index] === undefined
+                        ? `${rep} reps · load unavailable`
+                        : formatSetLoad(
+                            {
+                              exerciseType:
+                                entry.exerciseType === 'bodyweight' ? 'bodyweight' : 'weighted',
+                            },
+                            { weight: String(entry.setWeights[index]), reps: String(rep) },
+                          )}
+                    </AppText>
+                  ))}
+                  <Stack direction="row">
+                    <AppButton
+                      title="Edit"
+                      variant="surface"
+                      disabled={!queue.ready || awaitingUpload(id)}
+                      onPress={() => {
+                        setEdit(entry);
+                        setReps(entry.reps.map(String));
+                        setWeights(
+                          entry.reps.map((_, index) =>
+                            entry.setWeights[index] === undefined
+                              ? ''
+                              : String(entry.setWeights[index]),
+                          ),
+                        );
+                      }}
+                    />
+                    <AppButton
+                      title="Delete exercise"
+                      variant="danger"
+                      disabled={!queue.ready || awaitingUpload(id)}
+                      onPress={() =>
+                        setRemove({ exerciseLogId: entry.exerciseLogId, name: entry.name })
+                      }
+                    />
+                  </Stack>
+                </Stack>
+              ),
+            )}
+          {compact && (
+            <Stack direction="row" justify="space-between">
+              <AppText variant="micro" tone="muted">
+                {Math.round(
+                  entries
+                    .filter((e) => e.workoutSessionId === id)
+                    .reduce(
+                      (n, e) =>
+                        n + e.setWeights.reduce((sum, w, i) => sum + w * (e.reps[i] ?? 0), 0),
+                      0,
+                    ),
+                ).toLocaleString()}{' '}
+                kg volume
+              </AppText>
+              <AppText variant="micro" tone="muted">
+                {entries.filter((e) => e.workoutSessionId === id).length} exercises
+              </AppText>
+              <AppText variant="micro" tone="muted">
+                {entries
+                  .filter((e) => e.workoutSessionId === id)
+                  .reduce((n, e) => n + e.reps.length, 0)}{' '}
+                sets
+              </AppText>
+              {sessionEnergy?.find((e) => e.id === id && e.kcal > 0) && (
+                <AppText variant="micro" tone="muted">
+                  ~{Math.round(sessionEnergy.find((e) => e.id === id)!.kcal)} est.{' '}
+                  {sessionEnergy.find((e) => e.id === id)!.source.toUpperCase()} kcal
+                </AppText>
+              )}
+            </Stack>
+          )}
         </Card>
       ))}
       {state.data && entries.length === 0 && (
         <AppText tone="muted">No workouts recorded for this day.</AppText>
       )}
+      <Sheet
+        visible={history !== null}
+        title={history ?? 'Exercise history'}
+        onClose={() => setHistory(null)}
+      >
+        {history && <ExerciseHistory name={history} />}
+      </Sheet>
       <Sheet
         visible={edit !== null}
         title={`Edit ${edit?.name ?? 'exercise'}`}
@@ -217,7 +359,9 @@ function HistoryDay({ date }: { date: string }) {
                 label="Reps"
                 value={reps[index]}
                 max={100}
-                onChange={(rep) => setReps(reps.map((value, at) => (at === index ? rep : value)))}
+                onChange={(rep) =>
+                  setReps(reps.map((value, at) => (at === index ? rep : value)))
+                }
               />
             </Stack>
           </Card>
@@ -258,21 +402,23 @@ export function WorkoutHistoryScreen({
   openWorkout: (id: string) => void;
 }) {
   const { timezone } = useWorkoutContext();
-  const { theme } = useTheme();
   const journal = useWorkoutJournal();
   const today = toAestDay(new Date(), timezone);
   const [month, setMonth] = useState(today.slice(0, 7));
   const [selected, setSelected] = useState<string | null>(null);
   const [year, number] = month.split('-').map(Number);
   const state = useWorkoutResource(calendarSpec(year, number));
-  const first = (new Date(Date.UTC(year, number - 1, 1)).getUTCDay() + 6) % 7;
-  const count = new Date(Date.UTC(year, number, 0)).getUTCDate();
   const local = journal.data.workouts.filter(
     (workout) => workout.status === 'completed' && workout.date.startsWith(month),
   );
-  function move(direction: number) {
-    const next = new Date(Date.UTC(year, number - 1 + direction, 1));
-    setMonth(`${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}`);
+  const markers: Record<string, string[]> = {};
+  for (const [date, names] of Object.entries(state.data?.trainedDays ?? {})) {
+    markers[date.replace(/\//g, '-')] = names;
+  }
+  for (const workout of local) {
+    markers[workout.date] = [
+      ...new Set([...(markers[workout.date] ?? []), workout.sessionName]),
+    ];
   }
   return (
     <WorkoutLayout
@@ -287,69 +433,23 @@ export function WorkoutHistoryScreen({
         />
       }
     >
-      <ResourceStatus state={state} refresh={state.refresh} />
       <Card>
-        <Stack direction="row" justify="space-between" align="center">
-          <IconButton
-            icon="back"
-            label="Previous month"
-            onPress={year > 2000 || number > 1 ? () => move(-1) : undefined}
-          />
-          <AppText variant="heading">
-            {new Intl.DateTimeFormat('en-AU', {
-              month: 'long',
-              year: 'numeric',
-              timeZone: 'UTC',
-            }).format(new Date(Date.UTC(year, number - 1, 1)))}
-          </AppText>
-          <IconButton
-            icon="forward"
-            label="Next month"
-            onPress={year < 2100 || number < 12 ? () => move(1) : undefined}
-          />
-        </Stack>
-        <Stack direction="row" style={{ gap: 0 }}>
-          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
-            <AppText
-              key={index}
-              variant="micro"
-              tone="muted"
-              style={{ width: '14.2857%', textAlign: 'center' }}
-            >
-              {day}
-            </AppText>
-          ))}
-        </Stack>
-        <Stack direction="row" wrap style={{ gap: 0 }}>
-          {Array.from({ length: first + count }, (_, index) => {
-            const day = index - first + 1;
-            if (day < 1) {
-              return (
-                <Stack
-                  key={index}
-                  style={{ width: '14.2857%', minHeight: theme.sizes.touchTarget }}
-                />
-              );
-            }
-            const date = `${month}-${String(day).padStart(2, '0')}`;
-            const trained =
-              (
-                state.data?.trainedDays[date] ??
-                state.data?.trainedDays[date.replace(/-/g, '/')] ??
-                []
-              ).length > 0 || local.some((workout) => workout.date === date);
-            return (
-              <AppButton
-                key={index}
-                title={`${day}${trained ? ' •' : ''}`}
-                accessibilityLabel={`${date}${trained ? ', workout recorded' : ''}`}
-                variant={date === today ? 'primary' : trained ? 'secondary' : 'ghost'}
-                onPress={() => setSelected(date)}
-                style={{ width: '14.2857%', paddingHorizontal: 0 }}
-              />
-            );
-          })}
-        </Stack>
+        <MonthCalendar
+          status={
+            <ResourceStatus
+              inline
+              label="Calendar records"
+              state={state}
+              refresh={state.refresh}
+            />
+          }
+          month={month}
+          today={today}
+          selected={selected ?? undefined}
+          onMonthChange={setMonth}
+          onSelect={setSelected}
+          markers={markers}
+        />
       </Card>
       {local.length > 0 && (
         <>

@@ -1,11 +1,18 @@
 import type { z } from 'zod';
+import type { ReactNode } from 'react';
 import { todayInTz } from '@trainingai/shared/date-utils';
 import { AppText, Badge, BarChart, Card, Stack } from '../../shared/ui';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { useWorkoutContext } from '../workouts/WorkoutProvider';
 import { weeklySpec } from '../workouts/data/models';
 
-export function WeeklyTrainingCard({ data }: { data: z.infer<typeof weeklySpec.schema> }) {
+export function WeeklyTrainingCard({
+  data,
+  status,
+}: {
+  data: z.infer<typeof weeklySpec.schema>;
+  status?: ReactNode;
+}) {
   const { theme } = useTheme();
   const { timezone, catalog } = useWorkoutContext();
   const sessions = catalog?.program?.sessions ?? [];
@@ -32,9 +39,12 @@ export function WeeklyTrainingCard({ data }: { data: z.infer<typeof weeklySpec.s
   ];
   return (
     <Card>
-      <AppText variant="eyebrow" tone="muted">
-        Training Load
-      </AppText>
+      <Stack direction="row" align="center" justify="space-between">
+        <AppText variant="eyebrow" tone="muted" style={{ flex: 1 }}>
+          Training Load
+        </AppText>
+        {status}
+      </Stack>
       <BarChart
         label="This week's training load"
         bars={data.days.map((day) => ({
@@ -42,7 +52,9 @@ export function WeeklyTrainingCard({ data }: { data: z.infer<typeof weeklySpec.s
           value: day.volume > 0 ? day.volume : day.deloadVolume,
           colors: day.sessions.map(color),
           reduced: day.volume === 0 && day.deloadVolume > 0,
-          annotation: [day.isDeload ? 'D' : '', day.isTesting ? 'T' : ''].filter(Boolean).join('·'),
+          annotation: [day.isDeload ? 'D' : '', day.isTesting ? 'T' : '']
+            .filter(Boolean)
+            .join('·'),
           selected: day.dateKey.replace(/-/g, '/') === today,
         }))}
       />

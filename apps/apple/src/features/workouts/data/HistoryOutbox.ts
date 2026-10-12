@@ -5,20 +5,27 @@ import type { AccountConnection } from '../../account/session.ts';
 
 const operation = MutationSchema.extend({
   id: z.uuid(),
-  domain: z.enum(['exercise_log_edit', 'exercise_log_delete', 'workout_session_delete']),
+  domain: z.enum([
+    'exercise_log_edit',
+    'exercise_log_delete',
+    'workout_session_delete',
+    'activity_logs',
+  ]),
 }).superRefine((change, context) => {
   const schema =
-    change.domain === 'exercise_log_edit'
-      ? z
-          .object({
-            exerciseLogId: z.uuid(),
-            weights: z.array(z.number().min(-100).max(500)).min(1).max(20),
-            reps: z.array(z.number().int().min(0).max(100)).min(1).max(20),
-          })
-          .strict()
-      : change.domain === 'exercise_log_delete'
-        ? z.object({ exerciseLogId: z.uuid() }).strict()
-        : z.object({ workoutSessionId: z.uuid() }).strict();
+    change.domain === 'activity_logs'
+      ? z.object({ id: z.uuid(), deleted: z.literal(true) }).strict()
+      : change.domain === 'exercise_log_edit'
+        ? z
+            .object({
+              exerciseLogId: z.uuid(),
+              weights: z.array(z.number().min(-100).max(500)).min(1).max(20),
+              reps: z.array(z.number().int().min(0).max(100)).min(1).max(20),
+            })
+            .strict()
+        : change.domain === 'exercise_log_delete'
+          ? z.object({ exerciseLogId: z.uuid() }).strict()
+          : z.object({ workoutSessionId: z.uuid() }).strict();
   if (!schema.safeParse(change.payload).success) {
     context.addIssue({ code: 'custom', message: 'Invalid history change.', path: ['payload'] });
   }
@@ -148,7 +155,9 @@ export class HistoryOutbox {
       await this.writes;
       while (generation === this.generation && this.current.operations.length) {
         const change = this.current.operations[0];
-        const result = (await this.connection.post('/api/sync/push', { mutations: [change] })) as {
+        const result = (await this.connection.post('/api/sync/push', {
+          mutations: [change],
+        })) as {
           processed?: number;
           errors?: unknown[];
         };
@@ -157,6 +166,21 @@ export class HistoryOutbox {
         }
         if (generation !== this.generation) {
           return;
+        }
+        if (change.domain === 'activity_logs') {
+          const day = z
+            .object({ date: z.string(), activityLogs: z.array(z.object({ id: z.string() })) })
+            .parse(await this.connection.get('/api/day-log', { date: change.date }));
+          if (generation !== this.generation) {
+            return;
+          }
+          if (
+            day.date.replace(/\//g, '-') !== change.date.replace(/\//g, '-') ||
+            day.activityLogs.some((log) => log.id === change.payload.id)
+          ) {
+            throw new Error('Activity deletion readback not confirmed.');
+          }
+          this.invalidate(change);
         }
         await this.write((operations) =>
           operations.filter((operation) => operation.id !== change.id),

@@ -3,18 +3,26 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { AppProvider } from './providers/AppProvider';
 import { LocalStorageProvider } from './providers/LocalStorageProvider';
+import { AppStartupGate } from './providers/AppStartupGate';
 import { useTheme } from '../shared/theme/ThemeProvider';
 import { Screen, Notice } from '../shared/ui';
 import { useHealthContext } from '../features/health/HealthProvider';
 import type { Tab, DetailScreen } from './navigation/tabs';
 import { TabBar } from './navigation/TabBar';
+import { RetainedView } from '../shared/ui/RetainedView';
+import { AccountProvider, useAccountContext } from '../features/account/AccountProvider';
 import { HomeScreen } from '../features/home/screens/HomeScreen';
-import { HealthScreen } from '../features/health/screens/HealthScreen';
+import { HealthScreen, type HealthPanel } from '../features/health/screens/HealthScreen';
+import {
+  HealthDetailScreen,
+  type HealthDetail,
+} from '../features/health/screens/HealthDetailScreen';
 import { WorkoutScreen } from '../features/workouts/screens/WorkoutScreen';
 import { SessionScreen } from '../features/workouts/screens/SessionScreen';
 import { WorkoutLogScreen } from '../features/workouts/screens/WorkoutLogScreen';
 import { useWorkoutContext } from '../features/workouts/WorkoutProvider';
 import { NutritionScreen } from '../features/nutrition/screens/NutritionScreen';
+import {ProfileGoalsScreen} from '../features/settings/screens/ProfileGoalsScreen';
 import { MoreScreen } from '../features/settings/screens/MoreScreen';
 import { DataScreen } from '../features/health/screens/DataScreen';
 import { SettingsScreen } from '../features/settings/screens/SettingsScreen';
@@ -24,13 +32,21 @@ import { ExerciseLibraryScreen } from '../features/workouts/screens/ExerciseLibr
 import { WorkoutHistoryScreen } from '../features/workouts/screens/WorkoutHistoryScreen';
 import { StrengthScreen } from '../features/progress/StrengthScreen';
 import { ActiveWorkoutBar } from '../features/workouts/components/ActiveWorkoutBar';
+import { ClinicalScreen } from '../features/health/screens/ClinicalScreen';
+import { HealthDayScreen } from '../features/health/screens/HealthDayScreen';
+import { HealthWeekScreen } from '../features/health/screens/HealthWeekScreen';
 
 function AppShell() {
   const health = useHealthContext();
+  const { dataReader } = useAccountContext();
+  const accountKey = JSON.stringify([dataReader?.origin, dataReader?.userId]);
   const { theme } = useTheme();
   const [tab, setTab] = useState<Tab>('Home');
   const [detail, setDetail] = useState<DetailScreen | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [healthDetail, setHealthDetail] = useState<HealthDetail | null>(null);
+  const [healthDate, setHealthDate] = useState('');
+  const [healthPanel, setHealthPanel] = useState<HealthPanel>('training');
   const [workoutId, setWorkoutId] = useState<string | null>(null);
   const [workoutReturn, setWorkoutReturn] = useState<{
     detail: DetailScreen | null;
@@ -38,6 +54,7 @@ function AppShell() {
   } | null>(null);
   const workouts = useWorkoutContext();
   function selectTab(next: Tab) {
+    setHealthDetail(null);
     setDetail(null);
     setTab(next);
     if (next === 'Workout') {
@@ -63,7 +80,8 @@ function AppShell() {
     setWorkoutId(id);
     setDetail('workout-log');
   }
-  const fullScreen = detail !== null && !['health-data', 'settings'].includes(detail);
+  const fullScreen =
+    !!healthDetail || (detail !== null && !['health-data', 'settings'].includes(detail));
   function closeWorkout() {
     setDetail(workoutReturn?.detail ?? null);
     if (workoutReturn) {
@@ -77,7 +95,48 @@ function AppShell() {
       style={{ flex: 1, backgroundColor: theme.colors.background }}
     >
       <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
-      {detail === 'workout-log' ? (
+      <RetainedView
+        key={`health:${accountKey}`}
+        active={!healthDetail && !detail && tab === 'Health'}
+      >
+        <HealthScreen
+          panel={healthPanel}
+          onPanelChange={setHealthPanel}
+          openData={openHealth}
+          openDetail={setHealthDetail}
+          openPrograms={() => setDetail('programs')}
+          openSettings={openSettings}
+          openDay={(date) => {
+            setHealthDate(date);
+            setDetail('health-day');
+          }}
+          openWeek={(week) => {
+            setHealthDate(week);
+            setDetail('health-week');
+          }}
+        />
+      </RetainedView>
+      <RetainedView
+        key={`workout:${accountKey}`}
+        active={!healthDetail && !detail && tab === 'Workout'}
+      >
+        <WorkoutScreen
+          openSettings={openSettings}
+          openWorkout={openWorkout}
+          openSession={openSession}
+          openPrograms={() => setDetail('programs')}
+        />
+      </RetainedView>
+      <RetainedView key={`nutrition:${accountKey}`} active={!healthDetail && !detail && tab==='Nutrition'}>
+        <NutritionScreen openSettings={openSettings} />
+      </RetainedView>
+      {healthDetail ? (
+        <HealthDetailScreen
+          key={`${healthDetail}:${accountKey}`}
+          detail={healthDetail}
+          onBack={() => setHealthDetail(null)}
+        />
+      ) : detail === 'workout-log' ? (
         <WorkoutLogScreen
           workoutId={workoutId}
           openSettings={openSettings}
@@ -106,14 +165,21 @@ function AppShell() {
         <WorkoutHistoryScreen onBack={() => setDetail(null)} openWorkout={openWorkout} />
       ) : detail === 'strength-progress' ? (
         <StrengthScreen onBack={() => setDetail(null)} />
-      ) : !detail && tab === 'Workout' ? (
-        <WorkoutScreen
-          openSettings={openSettings}
-          openWorkout={openWorkout}
-          openSession={openSession}
-          openPrograms={() => setDetail('programs')}
+      ) : detail === 'profile-goals' ? (<ProfileGoalsScreen onBack={()=>setDetail(null)}/>) : detail === 'clinical' ? (
+        <ClinicalScreen key={accountKey} onBack={() => setDetail(null)} />
+      ) : detail === 'health-day' ? (
+        <HealthDayScreen
+          key={`${accountKey}:${healthDate}`}
+          initialDate={healthDate}
+          onBack={() => setDetail(null)}
         />
-      ) : (
+      ) : detail === 'health-week' ? (
+        <HealthWeekScreen
+          key={`${accountKey}:${healthDate}`}
+          week={healthDate}
+          onBack={() => setDetail(null)}
+        />
+      ) : !detail && (tab === 'Health' || tab === 'Workout' || tab === 'Nutrition') ? null : (
         <Screen
           key={detail ?? tab}
           title={
@@ -128,10 +194,8 @@ function AppShell() {
             <SettingsScreen />
           ) : tab === 'Home' ? (
             <HomeScreen openHealth={openHealth} />
-          ) : tab === 'Health' ? (
-            <HealthScreen openData={openHealth} />
           ) : tab === 'Nutrition' ? (
-            <NutritionScreen />
+            <NutritionScreen openSettings={openSettings} />
           ) : (
             <MoreScreen
               openSettings={() => setDetail('settings')}
@@ -139,6 +203,8 @@ function AppShell() {
               openLibrary={() => setDetail('exercise-library')}
               openHistory={() => setDetail('workout-history')}
               openStrength={() => setDetail('strength-progress')}
+              openClinical={() => setDetail('clinical')}
+              openGoals={()=>setDetail('profile-goals')}
             />
           )}
           {health.error && (tab === 'Health' || tab === 'Home') && (
@@ -154,11 +220,15 @@ function AppShell() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <LocalStorageProvider>
-        <AppProvider>
-          <AppShell />
-        </AppProvider>
-      </LocalStorageProvider>
+      <AccountProvider>
+        <LocalStorageProvider>
+          <AppProvider>
+            <AppStartupGate>
+              <AppShell />
+            </AppStartupGate>
+          </AppProvider>
+        </LocalStorageProvider>
+      </AccountProvider>
     </SafeAreaProvider>
   );
 }

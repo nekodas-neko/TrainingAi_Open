@@ -10,7 +10,6 @@ export function useHealthReadings() {
   async function connect(afterRead?: (snapshot: HealthSnapshot | null, error: string | null) => Promise<void>) {
     setBusy(true);
     setError(null);
-    setSnapshot(null);
     try {
       const readings = await readHealthSnapshot();
       setSnapshot(readings);

@@ -8,6 +8,10 @@ Keep feature logic in `src/features`, iOS adapters in `src/integrations`, app co
 
 For cached data, show saved content immediately and refresh quietly when stale. Choose freshness per feature, share overlapping requests, back off after failures and invalidate affected data after successful writes. Manual refresh bypasses freshness and shows progress; routine background checks should not disrupt the screen. Keep authentication and permission checks independent of display-cache freshness.
 
+Preserve expensive views when switching tabs, limit offscreen rendering and show placeholders during initial asset layout/loading. Check local rendering costs as well as network requests; raise confirmed backend limitations as issues when the user requests that.
+
+Loading, refresh and saved-state indicators must not insert/remove rows that shift existing controls. Use reserved header space, fixed-size placeholders or overlays; keep errors and retry actions accessible.
+
 Apple Health spans contributing sources. Preserve provenance, do not turn absent/denied metrics into zero and do not double-count overlapping samples.
 
 Do not stage, unstage, commit, reset, stash or push without explicit user instruction. Do not use `codex/` branch names. Never reply to GitHub comments for the user. Keep comments short and avoid unnecessary documentation or tests.

@@ -15,7 +15,7 @@ type ReadyStorage = {
   preferences: AppearancePreferences;
 };
 
-function StartupScreen({ error, retry }: { error: string | null; retry: () => void }) {
+export function StartupScreen({ error, retry }: { error: string | null; retry?: () => void }) {
   const { theme } = useTheme();
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.background }}>

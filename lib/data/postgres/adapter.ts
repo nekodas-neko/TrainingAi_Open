@@ -1,4 +1,5 @@
 import * as authData from './slices/auth'
+import * as mealLogging from './slices/meal-logging-statuses'
 import type { AuthProvider } from '@/lib/auth/identity'
 import { randomUUID } from 'crypto'
 import { rejectMealImage, mealImageRejectionMessage, FOOD_ITEM_IMAGE_MAX_BYTES } from '@trainingai/shared/nutrition/meal-image'
@@ -4362,6 +4363,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   // ── Nutrition (delegated to slices/nutrition.ts) ───────────────────────────
 
   async listMealTypes(userId: string) { return n.listMealTypes(this.db, userId) }
+  listMealLoggingStatuses(userId: string, date: string) { return mealLogging.listMealLoggingStatuses(this.db, userId, date) }
+  ensureMealLoggingDay(userId: string, date: string) { return mealLogging.ensureMealLoggingDay(this.db, userId, date) }
+  setMealLoggingStatus(userId: string, date: string, mealTypeId: string, skipped: boolean, decisionId: string) { return mealLogging.setMealLoggingStatus(this.db, userId, date, mealTypeId, skipped, decisionId) }
+  listMealLoggingCompleteness(userId: string, from: string, to: string) { return mealLogging.listMealLoggingCompleteness(this.db, userId, from, to) }
   async createMealType(userId: string, data: Omit<MealType, 'id' | 'userId' | 'createdAt'>) { return n.createMealType(this.db, userId, data) }
   async updateMealType(id: string, userId: string, data: Partial<Omit<MealType, 'id' | 'userId' | 'createdAt'>>) { return n.updateMealType(this.db, id, userId, data) }
   async deleteMealType(id: string, userId: string) { return n.deleteMealType(this.db, id, userId) }

@@ -32,7 +32,22 @@
         }
       ],
       "expo-apple-authentication",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "TrainingAi uses the camera to scan food barcodes.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "TrainingAi uses photos you choose to identify food and save recipe thumbnails.",
+          "cameraPermission": "TrainingAi uses the camera to photograph food.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "extra": {
       "eas": {

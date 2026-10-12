@@ -13,6 +13,7 @@ import { useLocalStorage } from '../../../core/storage/StorageProvider';
 import { useAccountContext } from '../../account/AccountProvider';
 import { useWorkoutContext } from '../WorkoutProvider';
 import { WorkoutJournalStore, type JournalState } from './WorkoutJournalStore';
+import { healthReadPaths } from '../../../core/sync/health-invalidation';
 import { emptyJournal } from './workout';
 import { useWorkoutResources } from '../data/WorkoutDataProvider';
 
@@ -27,9 +28,9 @@ const empty: JournalState = {
 };
 const emptySnapshot = () => empty;
 const emptySubscribe = () => () => {};
-const Context = createContext<(JournalState & { controller: WorkoutJournalStore | null }) | null>(
-  null,
-);
+const Context = createContext<
+  (JournalState & { controller: WorkoutJournalStore | null }) | null
+>(null);
 
 export function WorkoutJournalProvider({ children }: PropsWithChildren) {
   const account = useAccountContext();
@@ -49,6 +50,7 @@ export function WorkoutJournalProvider({ children }: PropsWithChildren) {
       '/api/personal-records',
       '/api/weekly-stats',
       '/api/training-stress',
+      ...healthReadPaths,
     ]);
     void resources?.refreshVisible();
   }, [workouts.invalidate, resources]);
@@ -67,7 +69,9 @@ export function WorkoutJournalProvider({ children }: PropsWithChildren) {
     [storage, connection, uploaded],
   );
   return (
-    <WorkoutJournalStateProvider controller={controller}>{children}</WorkoutJournalStateProvider>
+    <WorkoutJournalStateProvider controller={controller}>
+      {children}
+    </WorkoutJournalStateProvider>
   );
 }
 

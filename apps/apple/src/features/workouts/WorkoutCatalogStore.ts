@@ -12,6 +12,7 @@ import {
 } from './catalog.ts';
 
 export type CatalogState = {
+  cacheReady: boolean;
   status: 'loading' | 'ready' | 'error' | 'unauthorized';
   catalog: WorkoutCatalog | null;
   refreshing: boolean;
@@ -25,6 +26,7 @@ export class WorkoutCatalogStore {
   private storage: ScopedStorage;
   private reader: AccountReader;
   private current: CatalogState = {
+    cacheReady: false,
     status: 'loading',
     catalog: null,
     refreshing: false,
@@ -96,6 +98,7 @@ export class WorkoutCatalogStore {
       this.freshness.succeeded(catalog.savedAt);
     }
     this.publish({
+      cacheReady: true,
       status: catalog ? 'ready' : 'loading',
       catalog,
       refreshing: false,
@@ -199,6 +202,7 @@ export class WorkoutCatalogStore {
         this.freshness.succeeded(catalog.savedAt);
       }
       this.publish({
+        cacheReady: true,
         status: 'ready',
         catalog,
         refreshing: false,
@@ -217,6 +221,7 @@ export class WorkoutCatalogStore {
         this.freshness.failed();
       }
       this.publish({
+        cacheReady: true,
         status: unauthorized ? 'unauthorized' : catalog ? 'ready' : 'error',
         catalog,
         refreshing: false,

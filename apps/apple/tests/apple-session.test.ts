@@ -120,6 +120,87 @@ test('saved account identity remains available for scoped reads when profile ref
   assert.equal(f.controller.dataReader?.origin, origin);
 });
 
+test('saved identity is restored before a slow backend account check finishes', async t => {
+  const f = fixture(true);
+  let release!: (response: Response) => void;
+  t.mock.method(globalThis, 'fetch', () => new Promise<Response>(resolve => { release = resolve; }));
+  const startup = f.controller.initialize(null);
+  while (!release) { await new Promise(resolve => setImmediate(resolve)); }
+  assert.equal(f.controller.state.status, 'checking');
+  assert.equal(f.controller.dataReader?.userId, profile.id);
+  release(json({ user: profile }));
+  await startup;
+});
+
+test('overlapping background checks share a request and retain the displayed profile on failure', async t => {
+  const f = fixture(true);
+  t.mock.method(globalThis, 'fetch', f.fetcher);
+  await f.controller.initialize(null);
+  const savedProfile = f.controller.state.profile;
+  let release!: (response: Response) => void;
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', () => {
+    calls++;
+    return new Promise<Response>(resolve => { release = resolve; });
+  });
+  const first = f.controller.refresh();
+  const second = f.controller.refresh();
+  while (!release) { await new Promise(resolve => setImmediate(resolve)); }
+  assert.equal(first, second);
+  assert.equal(calls, 1);
+  assert.equal(f.controller.state.profile, savedProfile);
+  release(json({ error: 'temporary_outage' }, 503));
+  await Promise.all([first, second]);
+  assert.equal(f.controller.state.profile, savedProfile);
+  assert.equal(f.controller.dataReader?.userId, profile.id);
+});
+
+test('a new account check cannot share or accept the previous account’s pending response', async t => {
+  const f = fixture(true);
+  t.mock.method(globalThis, 'fetch', f.fetcher);
+  await f.controller.initialize(null);
+  let release!: (response: Response) => void;
+  t.mock.method(globalThis, 'fetch', () => new Promise<Response>(resolve => { release = resolve; }));
+  const previous = f.controller.refresh();
+  await f.controller.signOut();
+  t.mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) =>
+    new URL(String(input)).pathname === '/api/user/profile'
+      ? json({ user: { ...profile, id: 'other-user' } }) : f.fetcher(input, init));
+  await f.controller.signInWithApple();
+  release(json({ user: profile }));
+  await previous;
+  assert.equal(f.controller.state.profile?.id, 'other-user');
+  assert.equal(f.controller.dataReader?.userId, 'other-user');
+});
+
+test('expired saved sessions are cleared locally without waiting for the backend', async t => {
+  const f = fixture(true);
+  f.storage.set('fitnessai.session.v1', JSON.stringify({
+    origin, userId: profile.id, accessToken: 'expired', expiresAt: 1,
+  }));
+  t.mock.method(globalThis, 'fetch', () => { throw new Error('Unexpected network request'); });
+  await f.controller.initialize(null);
+  assert.equal(f.controller.state.status, 'signedOut');
+  assert.equal(f.controller.dataReader, null);
+  assert.equal(f.storage.has('fitnessai.session.v1'), false);
+});
+
+test('session expiry still clears sign-in while a shared profile check is in flight', async t => {
+  const f = fixture(true);
+  t.mock.method(globalThis, 'fetch', f.fetcher);
+  await f.controller.initialize(null);
+  let release!: (response: Response) => void;
+  t.mock.method(globalThis, 'fetch', () => new Promise<Response>(resolve => { release = resolve; }));
+  const pending = f.controller.refresh();
+  t.mock.method(Date, 'now', () => (expiresAt + 1) * 1000);
+  await f.controller.refresh();
+  assert.equal(f.controller.state.status, 'signedOut');
+  release(json({ user: profile }));
+  await pending;
+  assert.equal(f.controller.state.status, 'signedOut');
+  assert.equal(f.controller.dataReader, null);
+});
+
 test('a reader rejects late data after sign-out and cannot make further authenticated requests', async t => {
   const f = fixture(true);
   t.mock.method(globalThis, 'fetch', f.fetcher);

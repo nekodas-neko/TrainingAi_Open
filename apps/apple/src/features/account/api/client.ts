@@ -26,7 +26,7 @@ export function createApiClient(baseUrl: string, getToken: () => Promise<string 
     const token = authenticated ? await getToken() : null;
     if (authenticated && !token) { throw new Error('Sign in before contacting TrainingAi.'); }
     const controller = new AbortController();
-    const slow = /^\/api\/(generate-program|builder-chat|ai-periodization\/session\/[^/]+\/prescribe)/.test(path);
+    const slow = ['/api/nutrition/scan','/api/nutrition/meal-plans/generate','/api/daily-digest','/api/nutrition-goals/recommend','/api/generate-program','/api/builder-chat','/api/ai-periodization/session/'].some(prefix => path.startsWith(prefix));
     const timeout = setTimeout(() => controller.abort(), slow ? 65_000 : 15_000);
     try {
       const url = new URL(path, base);
@@ -55,7 +55,7 @@ export function createApiClient(baseUrl: string, getToken: () => Promise<string 
     post(path: string, body: unknown) { return request(path, 'POST', body, true); },
     put(path: string, body: unknown) { return request(path, 'PUT', body, true); },
     patch(path: string, body: unknown) { return request(path, 'PATCH', body, true); },
-    delete(path: string, body: unknown) { return request(path, 'DELETE', body, true); },
+    delete(path: string, body: unknown, query?:Record<string,string>) { return request(path, 'DELETE', body, true, query); },
     async media(source: string): Promise<string> {
       const url = new URL(source, base);
       if (url.protocol !== 'https:' || url.username || url.password) { throw new Error('Invalid exercise media URL.'); }

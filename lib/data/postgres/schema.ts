@@ -847,6 +847,18 @@ export const mealTypes = pgTable('meal_types', {
   deletedAt:     timestamp('deleted_at', { withTimezone: true }),
 })
 
+export const mealLoggingStatuses = pgTable('meal_logging_statuses', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  mealTypeId: uuid('meal_type_id').notNull().references(() => mealTypes.id, { onDelete: 'cascade' }),
+  logDate: date('log_date', { mode: 'string' }).notNull(),
+  skipped: boolean('skipped').notNull().default(false),
+  decisionId: uuid('decision_id').notNull(),
+  decidedAt: timestamp('decided_at', { withTimezone: true }).notNull().defaultNow(),
+  retired: boolean('retired').notNull().default(false),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [unique().on(t.userId, t.logDate, t.mealTypeId)])
+
 export const foodItems = pgTable('food_items', {
   id:           uuid('id').primaryKey().defaultRandom(),
   userId:       uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),

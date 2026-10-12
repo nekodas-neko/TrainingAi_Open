@@ -84,7 +84,14 @@ export const phaseSetsSpec = {
                 name: text,
                 position: finite,
                 durationCycles: finite,
-                phaseType: z.enum(['normal', 'peak', 'deload', 'accessory', 'testing', 'baseline']),
+                phaseType: z.enum([
+                  'normal',
+                  'peak',
+                  'deload',
+                  'accessory',
+                  'testing',
+                  'baseline',
+                ]),
                 primaryStyleId: text.nullish(),
                 secondaryStyleId: text.nullish(),
                 primaryStyleName: text.nullish(),
@@ -215,13 +222,15 @@ export type DayExercise = z.infer<typeof dayExerciseSchema>;
 export const daySpec = (date: string) => ({
   path: '/api/day-log',
   query: { date },
-  schema: z.object({
-    date: text,
-    exercises: z.array(dayExerciseSchema),
-    workoutDurationsById: z
-      .record(text, z.object({ start: text, end: text, minutes: finite }).nullable())
-      .optional(),
-  }),
+  schema: z
+    .object({
+      date: text,
+      exercises: z.array(dayExerciseSchema),
+      workoutDurationsById: z
+        .record(text, z.object({ start: text, end: text, minutes: finite }).nullable())
+        .optional(),
+    })
+    .passthrough(),
   ttl: 300_000,
 });
 export const recapSpec = (id: string) => ({
@@ -241,7 +250,9 @@ export const nextPrescriptionSpec = {
         z.object({
           name: text,
           exerciseType: z.enum(['weighted', 'bodyweight']),
-          sets: z.array(z.object({ weightKg: finite.nullable(), reps: finite, restSec: finite })),
+          sets: z.array(
+            z.object({ weightKg: finite.nullable(), reps: finite, restSec: finite }),
+          ),
         }),
       )
       .optional(),
@@ -296,7 +307,10 @@ export const periodizationSchema = z.object({
           reasoning: text,
           deload: z.boolean(),
           estimatedSessionDurationMin: finite,
-          fullSession: z.object({ estimatedSessionDurationMin: finite }).passthrough().optional(),
+          fullSession: z
+            .object({ estimatedSessionDurationMin: finite })
+            .passthrough()
+            .optional(),
         })
         .passthrough()
         .nullable()

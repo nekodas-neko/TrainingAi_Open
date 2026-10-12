@@ -10,9 +10,12 @@ import { HealthSummary } from '../../health/components/HealthSummary';
 import { HealthNotice } from '../../health/components/HealthNotice';
 import { useHealthContext } from '../../health/HealthProvider';
 import { diagnosticsAvailable } from '../../../development/diagnostics/client';
+import { useState } from 'react';
+import { MorningCheckinSheet } from '../../health/components/MorningCheckinSheet';
 
 export function HomeScreen({ openHealth }: { openHealth: () => void }) {
   const { snapshot } = useHealthContext();
+  const [morning, setMorning] = useState(false);
   return (
     <>
       <PlaceholderCard
@@ -28,9 +31,14 @@ export function HomeScreen({ openHealth }: { openHealth: () => void }) {
       </Stack>
       {snapshot && <HealthNotice snapshot={snapshot} reportsAvailable={diagnosticsAvailable} />}
       <Section title="Daily check-in">
-        <FeatureRow title="Morning check-in" subtitle="Sleep, recovery and how you feel" />
+        <FeatureRow
+          title="Morning check-in"
+          subtitle="Sleep, recovery and how you feel"
+          onPress={() => setMorning(true)}
+        />
         <FeatureRow title="Mood & energy" subtitle="Keep track of your day" />
       </Section>
+      {morning && <MorningCheckinSheet onClose={() => setMorning(false)} />}
       <Section title="Your overview">
         <FeatureRow title="Weekly progress" subtitle="Training, activity and your goals" />
         <FeatureRow title="Calendar & history" subtitle="Your sessions and daily reviews" />

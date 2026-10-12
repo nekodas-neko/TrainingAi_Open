@@ -689,6 +689,20 @@ SELECT
 FROM public.injuries t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
+CREATE VIEW claude_ro.meal_logging_statuses AS
+SELECT
+  t.id,
+  t.user_id,
+  t.meal_type_id,
+  t.log_date,
+  t.skipped,
+  t.decision_id,
+  t.updated_at,
+  t.decided_at,
+  t.retired
+FROM public.meal_logging_statuses t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.meal_plan_meals AS
 SELECT
   t.id,

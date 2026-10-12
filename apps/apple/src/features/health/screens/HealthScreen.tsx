@@ -1,40 +1,134 @@
-import { AppButton, Section, FeatureRow } from '../../../shared/ui';
-import { HealthSummary } from '../components/HealthSummary';
-import { HealthNotice } from '../components/HealthNotice';
-import { useHealthContext } from '../HealthProvider';
-import { diagnosticsAvailable } from '../../../development/diagnostics/client';
+import { useEffect, useState } from 'react';
+import { View } from 'react-native';
+import {
+  AppButton,
+  Carousel,
+  IconButton,
+  PageLayout,
+  SegmentedControl,
+  StateCard,
+  TabPanel,
+  StatusIndicator,
+} from '../../../shared/ui';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
+import { useHealthData } from '../data/HealthDataProvider';
+import { BodyPanel } from '../components/BodyPanel';
+import { TrainingPanel } from '../components/TrainingPanel';
+import { ProgressPanel } from '../components/ProgressPanel';
+import type { HealthDetail } from './HealthDetailScreen';
+import { HealthViewReady } from '../components/HealthViewReady';
+import { HealthSyncNotice } from '../components/HealthSyncNotice';
 
-export function HealthScreen({ openData }: { openData: () => void }) {
-  const health = useHealthContext();
+const panels = [
+  { id: 'body', label: 'Body' },
+  { id: 'training', label: 'Training' },
+  { id: 'progress', label: 'Progress' },
+] as const;
+export type HealthPanel = (typeof panels)[number]['id'];
+export function HealthScreen({
+  openData,
+  openDetail,
+  openPrograms,
+  openSettings,
+  panel,
+  onPanelChange,
+  openDay,
+  openWeek,
+}: {
+  openData: () => void;
+  openDetail: (detail: HealthDetail) => void;
+  openPrograms: () => void;
+  openSettings: () => void;
+  panel?: HealthPanel;
+  onPanelChange?: (panel: HealthPanel) => void;
+  openDay: (date: string) => void;
+  openWeek: (week: string) => void;
+}) {
+  const { theme } = useTheme();
+  const health = useHealthData();
+  const resources = useWorkoutResources();
+  const [localTab, setTab] = useState<HealthPanel>('training');
+  const tab = panel ?? localTab;
+  const [visited, setVisited] = useState<Set<HealthPanel>>(() => new Set([tab]));
+  function select(panel: HealthPanel) {
+    setTab(panel);
+    onPanelChange?.(panel);
+    setVisited((old) => new Set([...old, panel]));
+  }
+  useEffect(() => {
+    void health.store?.refresh();
+  }, [health.store, health.today]);
+  function refresh() {
+    health.refresh();
+    void resources?.refreshVisible();
+  }
   return (
-    <>
-      <HealthNotice snapshot={health.snapshot} reportsAvailable={diagnosticsAvailable} />
-      <HealthSummary />
-      <Section title="Health insights">
-        <FeatureRow title="Sleep" subtitle="Stages, trends and sleep quality" />
-        <FeatureRow title="Readiness & recovery" subtitle="Understand your recovery and stress" />
-        <FeatureRow title="Heart & fitness" subtitle="Heart rate, HRV and fitness trends" />
-        <FeatureRow title="Body measurements" subtitle="Weight, composition and your goals" />
-        <FeatureRow title="Activity & energy" subtitle="Movement, steps and energy balance" />
-      </Section>
-      <Section title="Data sources">
-        <FeatureRow
-          title="Apple Health"
-          subtitle="Read your data, sources and permissions"
-          onPress={openData}
+    <PageLayout
+      title="Health"
+      subtitle="Body & training"
+      actions={
+        <>
+          <HealthSyncNotice inline />
+          <StatusIndicator
+            label="Health records"
+            busy={!health.ready}
+            error={health.bodyError ?? health.sleepError ?? health.error}
+            onRetry={health.refresh}
+          />
+          <IconButton
+            icon="refresh"
+            label="Refresh Health"
+            busy={health.refreshing}
+            onPress={refresh}
+          />
+        </>
+      }
+    >
+      <View style={{ paddingHorizontal: theme.spacing.lg }}>
+        <SegmentedControl
+          label="Health views"
+          options={panels.map((panel) => ({ value: panel.id, label: panel.label }))}
+          value={tab}
+          onChange={select}
         />
-        <FeatureRow
-          title="Devices & integrations"
-          subtitle="Rings, sensors and connected services"
+      </View>
+      {!health.connected || health.denied ? (
+        <View style={{ paddingHorizontal: theme.spacing.lg }}>
+          <StateCard
+            title="Connect your account"
+            message={health.error ?? 'Sign in to load your health records.'}
+          />
+          <AppButton title="Account settings" onPress={openSettings} />
+        </View>
+      ) : (
+        <Carousel
+          items={panels}
+          selectedId={tab}
+          onSelect={(id) => select(id as HealthPanel)}
+          showDots={false}
+          label={(panel) => panel.label}
+          renderItem={(panel) => (
+            <TabPanel refreshing={health.refreshing} onRefresh={refresh}>
+              {visited.has(panel.id) && (
+                <HealthViewReady view={panel.id}>
+                  {panel.id === 'body' ? (
+                    <BodyPanel openDetail={openDetail} openData={openData} />
+                  ) : panel.id === 'training' ? (
+                    <TrainingPanel
+                      openPrograms={openPrograms}
+                      openDay={openDay}
+                      openWeek={openWeek}
+                    />
+                  ) : (
+                    <ProgressPanel />
+                  )}
+                </HealthViewReady>
+              )}
+            </TabPanel>
+          )}
         />
-      </Section>
-
-      <AppButton
-        variant="secondary"
-        title="Explore sample data"
-        disabled={health.busy}
-        onPress={health.loadSample}
-      />
-    </>
+      )}
+    </PageLayout>
   );
 }

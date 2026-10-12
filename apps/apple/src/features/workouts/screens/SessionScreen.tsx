@@ -170,7 +170,7 @@ export function SessionScreen({
                     message="This exercise involves an injured muscle. You can choose a safe alternative from its preparation screen."
                   />
                 )}
-                {selected.preDeloadStyle?.length && (
+                {!!selected.preDeloadStyle?.length && (
                   <Stack>
                     <AppText variant="caption" tone="muted">
                       {selected.deloaded
@@ -179,7 +179,7 @@ export function SessionScreen({
                     </AppText>
                   </Stack>
                 )}
-                {selected.preDeloadStyle?.length && (
+                {!!selected.preDeloadStyle?.length && (
                   <AppButton
                     variant="secondary"
                     title={

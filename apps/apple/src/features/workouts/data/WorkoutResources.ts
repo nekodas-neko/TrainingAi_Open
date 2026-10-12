@@ -11,6 +11,7 @@ export type ResourceSpec<T> = {
   query?: Record<string, string>;
   schema: ZodType<T>;
   ttl?: number;
+  partition?: string;
   cache?: (data: T) => boolean;
 };
 export type ResourceState<T = unknown> = {
@@ -42,16 +43,18 @@ type Entry = {
   denied: boolean;
 };
 
-export function resourceKey(spec: Pick<ResourceSpec<unknown>, 'path' | 'query'>) {
+export function resourceKey(spec: Pick<ResourceSpec<unknown>, 'path' | 'query' | 'partition'>) {
   return JSON.stringify([
     spec.path,
     Object.entries(spec.query ?? {}).sort(([a], [b]) => a.localeCompare(b)),
+    ...(spec.partition === undefined ? [] : [spec.partition]),
   ]);
 }
 
 export class WorkoutResources {
   private entries = new Map<string, Entry>();
   private listeners = new Set<() => void>();
+  private invalidationListeners = new Set<(paths: string[]) => void>();
   private generation = 0;
   private writes: Promise<unknown> = Promise.resolve();
   private invalidationWrites: Promise<unknown> = Promise.resolve();
@@ -112,6 +115,12 @@ export class WorkoutResources {
     entry.state = state;
     this.listeners.forEach((listener) => listener());
   }
+  subscribeInvalidation = (listener: (paths: string[]) => void) => {
+    this.invalidationListeners.add(listener);
+    return () => {
+      this.invalidationListeners.delete(listener);
+    };
+  };
   state<T>(spec: ResourceSpec<T>): ResourceState<T> {
     return (this.entries.get(resourceKey(spec))?.state ?? empty) as ResourceState<T>;
   }
@@ -120,7 +129,13 @@ export class WorkoutResources {
     let entry = this.entries.get(key);
     if (!entry) {
       entry = {
-        spec: { path: spec.path, query: spec.query, schema: spec.schema, ttl: spec.ttl },
+        spec: {
+          path: spec.path,
+          query: spec.query,
+          schema: spec.schema,
+          ttl: spec.ttl,
+          partition: spec.partition,
+        },
         cache: spec.cache ? (data) => spec.cache!(spec.schema.parse(data)) : undefined,
         state: empty,
         policy: new RefreshPolicy(this.now, spec.ttl ?? 300_000),
@@ -215,7 +230,11 @@ export class WorkoutResources {
           ) {
             const data = entry.spec.schema.parse(saved.data);
             await this.changes.seed(entry.spec.path, data);
-            if (entry.revision === 0 && cacheEpoch >= 0 && (saved.cacheEpoch ?? 0) === cacheEpoch) {
+            if (
+              entry.revision === 0 &&
+              cacheEpoch >= 0 &&
+              (saved.cacheEpoch ?? 0) === cacheEpoch
+            ) {
               entry.policy.succeeded(saved.savedAt);
             }
             this.publish(entry, {
@@ -296,7 +315,8 @@ export class WorkoutResources {
       if (generation !== this.generation) {
         return;
       }
-      const denied = error instanceof ApiError && (error.status === 401 || error.status === 403);
+      const denied =
+        error instanceof ApiError && (error.status === 401 || error.status === 403);
       if (denied) {
         entry.denied = true;
       }
@@ -319,6 +339,7 @@ export class WorkoutResources {
     if (!paths.length) {
       return;
     }
+    this.invalidationListeners.forEach((listener) => listener(paths));
     this.invalidationWrites = this.invalidationWrites
       .then(async () => {
         const epoch = Number(await this.storage.get('workout-resource-epoch.v1')) || 0;
@@ -335,7 +356,25 @@ export class WorkoutResources {
   applyHistory(change: HistoryOperation) {
     const names = new Map<string, string[]>();
     for (const entry of this.entries.values()) {
-      if (entry.spec.path !== '/api/day-log' || !entry.state.data) {
+      if (
+        !entry.state.data ||
+        (entry.spec.path !== '/api/day-log' &&
+          !(change.domain === 'activity_logs' && entry.spec.path === '/api/activity-logs'))
+      ) {
+        continue;
+      }
+      if (change.domain === 'activity_logs') {
+        const data = entry.state.data as { activityLogs?: { id: string }[] };
+        this.publish(entry, {
+          ...entry.state,
+          data: entry.spec.schema.parse({
+            ...data,
+            activityLogs: (data.activityLogs ?? []).filter(
+              (log) => log.id !== change.payload.id,
+            ),
+          }),
+          saved: true,
+        });
         continue;
       }
       const data = entry.state.data as {
@@ -466,6 +505,7 @@ export class WorkoutResources {
     return data;
   }
   cancel() {
+    this.invalidationListeners.clear();
     this.generation++;
     this.entries.clear();
     this.mediaRequests.clear();

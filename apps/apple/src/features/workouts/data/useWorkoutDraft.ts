@@ -6,11 +6,17 @@ export function useWorkoutDraft<T>(key: string, schema: ZodType<T>, initial: T) 
   const resources = useWorkoutResources();
   const [value, setValue] = useState(initial);
   const [ready, setReady] = useState(false);
+  const [loadedKey, setLoadedKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const identity = resources ? `${resources.connection.origin}:${resources.connection.userId}` : '';
+  const identity = resources
+    ? `${resources.connection.origin}:${resources.connection.userId}`
+    : '';
+  const scopeKey = JSON.stringify([identity, key]);
+  const activeReady = ready && loadedKey === scopeKey;
   useEffect(() => {
     let current = true;
     setReady(false);
+    setLoadedKey(null);
     setError(null);
     setValue(initial);
     if (!resources) {
@@ -24,6 +30,7 @@ export function useWorkoutDraft<T>(key: string, schema: ZodType<T>, initial: T) 
             setValue(saved);
           }
           setReady(true);
+          setLoadedKey(scopeKey);
         }
       })
       .catch(() => {
@@ -36,7 +43,7 @@ export function useWorkoutDraft<T>(key: string, schema: ZodType<T>, initial: T) 
     };
   }, [identity, key]);
   useEffect(() => {
-    if (ready && resources) {
+    if (activeReady && resources) {
       let current = true;
       void resources.saveDraft(key, value).catch(() => {
         if (current) {
@@ -47,6 +54,12 @@ export function useWorkoutDraft<T>(key: string, schema: ZodType<T>, initial: T) 
         current = false;
       };
     }
-  }, [ready, value, identity, key]);
-  return { value, setValue, ready, error, resources };
+  }, [activeReady, value, identity, key]);
+  return {
+    value: loadedKey === scopeKey ? value : initial,
+    setValue,
+    ready: activeReady,
+    error,
+    resources,
+  };
 }

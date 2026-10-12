@@ -1,4 +1,5 @@
 node_modules/
+.eas-vendor/
 .expo/
 dist/
 web-build/

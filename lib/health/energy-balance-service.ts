@@ -1,3 +1,4 @@
+import { foodLoggingCoverage } from '@/lib/nutrition/logging-completeness'
 // Server-side assembly for "calories in vs calories out". The API route and the AI coach tool
 // both call this — a second copy would be a second answer to "how much should I eat today", and
 // the coach contradicting the widget is worse than either being slightly wrong.
@@ -176,9 +177,8 @@ export async function computeEnergyBalance(
     .catch(() => new Map<string, number>())
 
   const intakeByDate = new Map(foodSummary.map(r => [r.date, r.calories]))
-  const loggingCompleteByDate = new Set(
-    dayCheckins.filter(c => c.foodLoggingCompletedAt != null).map(c => c.logDate),
-  )
+  const { complete: loggingCompleteByDate, zeroIntake } = await foodLoggingCoverage(repo, userId, windowStart, date,
+    dayCheckins.filter(c => c.foodLoggingCompletedAt != null).map(c => c.logDate))
   const metricByDate = new Map(metrics.map(m => [m.date, m]))
 
   const byDateDesc = (a: { date: string }, b: { date: string }) => b.date.localeCompare(a.date)
@@ -336,7 +336,7 @@ export async function computeEnergyBalance(
   for (let d = windowStart; d < date; d = shiftDateStr(d, 1)) {
     windowDays.push({
       date: d,
-      intakeKcal: intakeByDate.get(d) ?? null,
+      intakeKcal: intakeByDate.get(d) ?? (zeroIntake.has(d) ? 0 : null),
       loggingComplete: loggingCompleteByDate.has(d),
       weightKg: metricByDate.get(d)?.weightKg ?? null,
     })

@@ -8,8 +8,10 @@ import { useTheme } from '../theme/ThemeProvider';
 export function BarChart({
   label,
   bars,
+  height,
 }: {
   label: string;
+  height?: number;
   bars: readonly {
     label: string;
     value: number;
@@ -33,7 +35,12 @@ export function BarChart({
             style={{ flex: 1, minWidth: 0 }}
             accessibilityLabel={`${bar.label}: ${Math.round(bar.value)} kg${bar.annotation ? ', ' + bar.annotation : ''}`}
           >
-            <Svg viewBox="0 0 40 64" width="100%" height={64}>
+            <Svg
+              viewBox="0 0 40 64"
+              width="100%"
+              height={height ?? 64}
+              preserveAspectRatio={height ? 'none' : 'xMidYMid meet'}
+            >
               <Defs>
                 <Pattern
                   id={`${id}-${index}`}

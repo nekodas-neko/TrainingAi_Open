@@ -13,6 +13,7 @@ import { useLocalStorage } from '../../../core/storage/StorageProvider';
 import { useWorkoutContext } from '../WorkoutProvider';
 import { useWorkoutResources } from './WorkoutDataProvider';
 import { HistoryOutbox, type HistoryQueueState } from './HistoryOutbox';
+import { healthReadPaths } from '../../../core/sync/health-invalidation';
 
 const Context = createContext<HistoryOutbox | null>(null);
 const empty: HistoryQueueState = { ready: false, operations: [], syncing: false, error: null };
@@ -41,6 +42,7 @@ export function HistoryQueueProvider({ children }: PropsWithChildren) {
                 '/api/strength-trend',
                 '/api/personal-records',
                 '/api/weekly-stats',
+                ...(!change ? healthReadPaths : []),
               ]);
               if (!change) {
                 void resources?.refreshVisible();

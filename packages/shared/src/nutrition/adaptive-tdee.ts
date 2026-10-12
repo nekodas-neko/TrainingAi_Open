@@ -152,7 +152,7 @@ export function estimateMaintenance(
   // half-logged day from a light one — inference from logging shape was considered and rejected as
   // uncorrectable by the person who knows the answer, and a "% below expected" threshold as
   // circular (the expectation derives from the number being estimated).
-  const logged = sorted.filter(d => d.intakeKcal != null && d.intakeKcal > 0 && d.loggingComplete === true)
+  const logged = sorted.filter(d => d.intakeKcal != null && d.intakeKcal >= 0 && d.loggingComplete === true)
   const weighed = sorted.filter(d => d.weightKg != null && d.weightKg > 0)
 
   const meanIntakeKcal = logged.length > 0

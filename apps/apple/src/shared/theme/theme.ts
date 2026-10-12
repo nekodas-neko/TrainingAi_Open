@@ -1,4 +1,8 @@
 import type { TextStyle } from 'react-native';
+import { healthArtColors, healthHeroGradients } from './health-heroes';
+import { STAGE_COLOR } from '@trainingai/shared/health/hypnogram';
+import { HR_ZONE_META } from '@trainingai/shared/health/hr-zones';
+import {MACRO_COLORS} from '@trainingai/shared/nutrition/macro-colors';
 import { palettes, type Brand } from './palettes.ts';
 import {
   spacing,
@@ -35,6 +39,9 @@ export type ThemeColors = {
   onSignal: string;
 };
 export type Theme = {
+  macros: Record<keyof typeof MACRO_COLORS,string>;
+  healthArtColors: Record<string, string>;
+  healthHeroGradients: typeof healthHeroGradients;
   mode: 'light' | 'dark';
   colors: ThemeColors;
   spacing: typeof spacing;
@@ -46,8 +53,13 @@ export type Theme = {
   anatomy: typeof anatomy;
   sessions: TonePalette[];
   effort: Record<number, string>;
+  sleepStages: typeof STAGE_COLOR;
+  hrZoneColors: string[];
 };
 export type ThemeOverrides = {
+  macros?: Partial<Record<keyof typeof MACRO_COLORS,string>>;
+  healthArtColors?: Record<string, string>;
+  healthHeroGradients?: Partial<typeof healthHeroGradients>;
   colors?: Partial<ThemeColors>;
   spacing?: Partial<typeof spacing>;
   radii?: Partial<typeof radii>;
@@ -58,6 +70,8 @@ export type ThemeOverrides = {
   anatomy?: Partial<typeof anatomy>;
   sessions?: TonePalette[];
   effort?: Record<number, string>;
+  sleepStages?: Partial<typeof STAGE_COLOR>;
+  hrZoneColors?: string[];
 };
 
 export function createTheme(
@@ -93,6 +107,9 @@ export function createTheme(
     textStyles[key] = { ...typography[key], ...overrides.typography?.[key] };
   }
   return {
+    macros: {...MACRO_COLORS,...overrides.macros},
+    healthArtColors: { ...healthArtColors, ...overrides.healthArtColors },
+    healthHeroGradients: { ...healthHeroGradients, ...overrides.healthHeroGradients },
     mode,
     colors,
     tones,
@@ -102,6 +119,8 @@ export function createTheme(
     icons: { ...icons, ...overrides.icons },
     anatomy: { ...anatomy, ...overrides.anatomy },
     effort: { ...effortColors, ...overrides.effort },
+    sleepStages: { ...STAGE_COLOR, ...overrides.sleepStages },
+    hrZoneColors: overrides.hrZoneColors ?? HR_ZONE_META.map((zone) => zone.color),
     sessions:
       overrides.sessions ??
       sessionTones[mode].map((foreground, index) => ({

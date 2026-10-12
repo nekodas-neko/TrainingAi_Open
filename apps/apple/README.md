@@ -15,7 +15,7 @@ Implementation scope and checklist: [Native App Implementation Plan](https://cha
 | `src/features/settings` | More shell, settings screen and account controls. |
 | `src/features/workouts`, `programs` | Cached program, session previews, local workout journal, history and program management. |
 | `src/features/activities`, `progress` | Reserved cardio/activity history; strength progress and personal records. |
-| `src/features/nutrition`, `meal-plans` | Nutrition overview shell and reserved meal planning. |
+| `src/features/nutrition`, `meal-plans` | Daily diary, food capture, recipes and labels, supplements, day review, targets and guided meal planning. |
 | `src/features/coach`, `social`, `devices` | Reserved for coaching, community/rewards and device integrations. |
 | `src/integrations/auth` | iOS keychain, browser callback and native Apple sign-in adapters. |
 | `src/integrations/apple-health` | iOS HealthKit queries and source inspection. |

@@ -1,6 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { View } from 'react-native';
-import { Carousel, HubCard, IconButton, Notice, PageLayout, StateCard } from '../../../shared/ui';
+import {
+  Carousel,
+  HubCard,
+  IconButton,
+  Notice,
+  PageLayout,
+  StateCard,
+} from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutContext } from '../WorkoutProvider';
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
@@ -27,36 +34,24 @@ export function WorkoutScreen({
   const sessions = catalog?.program?.sessions ?? [];
   const [selectedId, setSelectedId] = useState('');
   const active = journal.data.workouts.find((workout) => workout.status === 'active');
-  useEffect(() => {
-    if (sessions.length && !sessions.some((session) => session.id === selectedId)) {
-      setSelectedId(
-        sessions.find((session) => session.id === active?.sessionId)?.id ??
-          catalog?.recommendation.sessionId ??
-          sessions[0].id,
-      );
-    }
-  }, [sessions, selectedId, active?.sessionId, catalog?.recommendation.sessionId]);
+  const visibleSessionId =
+    sessions.find((session) => session.id === selectedId)?.id ??
+    sessions.find((session) => session.id === active?.sessionId)?.id ??
+    sessions.find((session) => session.id === catalog?.recommendation.sessionId)?.id ??
+    sessions[0]?.id ??
+    '';
   const inset = { marginHorizontal: theme.spacing.lg };
   return (
     <PageLayout
       title="Workout"
       subtitle="Choose a session to start"
-      actions={
-        <>
-          <IconButton icon="program" label="Program" onPress={openPrograms} />
-          <IconButton
-            icon="refresh"
-            label="Refresh"
-            onPress={workout.signedIn ? refresh : undefined}
-            busy={refreshingManually}
-          />
-        </>
-      }
+      actions={<IconButton icon="program" label="Program" onPress={openPrograms} />}
     >
       {catalog && sessions.length > 0 ? (
         <Carousel
           items={sessions}
-          selectedId={selectedId}
+          lazy
+          selectedId={visibleSessionId}
           onSelect={setSelectedId}
           label={(session) => `Session ${session.position + 1}: ${session.name}`}
           renderItem={(session) => (

@@ -1,7 +1,23 @@
 import { Card, Avatar, Stack, AppText, Section, FeatureRow } from '../../../shared/ui';
 import { useAccountContext } from '../../account/AccountProvider';
 
-export function MoreScreen({ openSettings, openPrograms, openLibrary, openHistory, openStrength }: { openSettings: () => void; openPrograms: () => void; openLibrary: () => void; openHistory: () => void; openStrength: () => void }) {
+export function MoreScreen({
+  openSettings,
+  openPrograms,
+  openLibrary,
+  openHistory,
+  openStrength,
+  openClinical,
+  openGoals,
+}: {
+  openSettings: () => void;
+  openPrograms: () => void;
+  openLibrary: () => void;
+  openHistory: () => void;
+  openStrength: () => void;
+  openClinical: () => void;
+  openGoals:()=>void;
+}) {
   const { state } = useAccountContext();
   return (
     <>
@@ -35,20 +51,45 @@ export function MoreScreen({ openSettings, openPrograms, openLibrary, openHistor
           onPress={openSettings}
         />
         <FeatureRow
+          onPress={openGoals}
           title="Profile & goals"
           subtitle="Your details, fitness goals and preferences"
         />
-        <FeatureRow title="Progress & reviews" subtitle="History, trends and weekly reviews" onPress={openStrength}/>
+        <FeatureRow
+          title="Progress & reviews"
+          subtitle="History, trends and weekly reviews"
+          onPress={openStrength}
+        />
+        <FeatureRow
+          title="DEXA & RMR"
+          subtitle="Body-composition scans and metabolic tests"
+          onPress={openClinical}
+        />
       </Section>
-      <Section title="Training"><FeatureRow title="Programs" subtitle="Sessions, schedules and progression" onPress={openPrograms}/><FeatureRow title="Exercise library" onPress={openLibrary}/><FeatureRow title="Workout history" onPress={openHistory}/></Section>
+      <Section title="Training">
+        <FeatureRow
+          title="Programs"
+          subtitle="Sessions, schedules and progression"
+          onPress={openPrograms}
+        />
+        <FeatureRow title="Exercise library" onPress={openLibrary} />
+        <FeatureRow title="Workout history" onPress={openHistory} />
+      </Section>
       <Section title="Coaching & community">
         <FeatureRow title="AI coach" subtitle="Conversations and personalised guidance" />
         <FeatureRow title="Friends & feed" subtitle="Connect and share your progress" />
         <FeatureRow title="Leaderboards" subtitle="See how your progress compares" />
-        <FeatureRow title="Achievements & rewards" subtitle="Milestones, levels and collections" />
+        <FeatureRow
+          title="Achievements & rewards"
+          subtitle="Milestones, levels and collections"
+        />
       </Section>
       <Section title="App preferences">
-        <FeatureRow title="Appearance" subtitle="Theme and accent colour" onPress={openSettings} />
+        <FeatureRow
+          title="Appearance"
+          subtitle="Theme and accent colour"
+          onPress={openSettings}
+        />
         <FeatureRow title="Notifications & reminders" />
         <FeatureRow title="Integrations & calendar" />
         <FeatureRow title="Data & sync" subtitle="Sync status, export and backup" />

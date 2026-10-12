@@ -135,12 +135,40 @@ test('shows saved data while refreshing; concurrent refreshes share requests', a
   }
   assert.equal(restored.getSnapshot().catalog?.program?.name, 'Strength plan');
   assert.equal(restored.getSnapshot().refreshing, true);
+  assert.equal(restored.getSnapshot().cacheReady, true);
   const refresh = restored.refresh();
   assert.equal(restored.refresh(), refresh);
   release();
   await Promise.all([loading, refresh]);
   assert.equal(requests, 5);
   assert.equal(restored.getSnapshot().source, 'server');
+});
+
+test('an empty local cache finishes startup without waiting for program downloads', async (t) => {
+  const db = sqliteFixture();
+  t.after(() => db.connection.close());
+  const storage = await createLocalStorage(db.database);
+  const f = workoutFixture();
+  let release!: () => void;
+  const waiting = new Promise<void>((resolve) => { release = resolve; });
+  let requests = 0;
+  const reader = {
+    ...f.reader,
+    get: async (path: string, query?: Record<string, string>) => {
+      requests++;
+      await waiting;
+      return f.reader.get(path, query);
+    },
+  };
+  const controller = new WorkoutCatalogStore(storage.account(reader.origin, reader.userId), reader);
+  assert.equal(controller.getSnapshot().cacheReady, false);
+  const loading = controller.initialize();
+  while (!requests) { await new Promise((resolve) => setImmediate(resolve)); }
+  assert.equal(controller.getSnapshot().cacheReady, true);
+  assert.equal(controller.getSnapshot().catalog, null);
+  assert.equal(controller.getSnapshot().status, 'loading');
+  release();
+  await loading;
 });
 
 test('a removed active program replaces the old cache without loading session details', async (t) => {

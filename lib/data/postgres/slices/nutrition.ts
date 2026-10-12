@@ -204,6 +204,10 @@ export async function reassignAndDeleteMealType(
         .where(and(eq(s.foodLogs.id, r.id), eq(s.foodLogs.userId, userId)))
     }
 
+    if (rows.length) await tx.update(s.mealLoggingStatuses)
+      .set({ retired: true, updatedAt: new Date() })
+      .where(and(eq(s.mealLoggingStatuses.userId, userId), eq(s.mealLoggingStatuses.mealTypeId, fromId), inArray(s.mealLoggingStatuses.logDate, [...new Set(rows.map(row => row.date))])))
+
     await tx.update(s.mealTypes)
       .set({ deletedAt: new Date() })
       .where(and(eq(s.mealTypes.id, fromId), eq(s.mealTypes.userId, userId), isNull(s.mealTypes.deletedAt)))
@@ -490,6 +494,8 @@ export async function createFoodLog(
       // UPDATE (CLAUDE.md, write-path ownership).
       set: {
         quantityMultiplier: rest.quantityMultiplier,
+        mealTypeId: rest.mealTypeId,
+        loggedAt: eatenAt,
         ...(rest.savedMealId !== undefined ? { savedMealId: rest.savedMealId } : {}),
         ...(rest.mealGroupId !== undefined ? { mealGroupId: rest.mealGroupId } : {}),
         ...(rest.mealGroupName !== undefined ? { mealGroupName: rest.mealGroupName } : {}),

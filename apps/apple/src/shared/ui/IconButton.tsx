@@ -7,13 +7,17 @@ export function IconButton({
   label,
   onPress,
   busy = false,
+  disabled = false,
   hint,
+  tone = 'muted',
 }: {
   icon: IconName;
   label: string;
   onPress?: () => void;
   busy?: boolean;
+  disabled?: boolean;
   hint?: string;
+  tone?: 'muted' | 'brand' | 'danger';
 }) {
   const { theme } = useTheme();
   return (
@@ -21,8 +25,8 @@ export function IconButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={hint}
-      accessibilityState={{ disabled: !onPress || busy, busy }}
-      disabled={!onPress || busy}
+      accessibilityState={{ disabled: disabled || !onPress || busy, busy }}
+      disabled={disabled || !onPress || busy}
       onPress={onPress}
       style={({ pressed }) => ({
         width: theme.sizes.touchTarget,
@@ -31,12 +35,13 @@ export function IconButton({
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: pressed ? theme.colors.raised : 'transparent',
+        opacity: disabled ? 0.4 : 1,
       })}
     >
       {busy ? (
         <ActivityIndicator color={theme.colors.muted} />
       ) : (
-        <Icon name={icon} tone="muted" size={theme.sizes.iconSmall} />
+        <Icon name={icon} tone={tone} size={theme.sizes.iconSmall} />
       )}
     </Pressable>
   );

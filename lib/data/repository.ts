@@ -1035,6 +1035,10 @@ export interface WorkoutRepository {
 
   // ── Nutrition ──────────────────────────────────────────────────────────────
   listMealTypes(userId: string): Promise<MealType[]>
+    listMealLoggingStatuses(userId: string, date: string): Promise<{ mealTypeId: string; skipped: boolean; decisionId: string }[]>
+    ensureMealLoggingDay(userId: string, date: string): Promise<void>
+    setMealLoggingStatus(userId: string, date: string, mealTypeId: string, skipped: boolean, decisionId: string): Promise<void>
+    listMealLoggingCompleteness?(userId: string, from: string, to: string): Promise<{ date: string; complete: boolean; zeroIntake?: boolean }[]>
   createMealType(userId: string, data: Omit<MealType, 'id' | 'userId' | 'createdAt'>): Promise<MealType>
   updateMealType(id: string, userId: string, data: Partial<Omit<MealType, 'id' | 'userId' | 'createdAt'>>): Promise<MealType>
   /** RV-45: false when nothing matched. Still throws MealTypeHasLogsError when logs reference it. */

@@ -483,7 +483,7 @@ export function AIProgramBuilder({ onBack, onSaved }: { onBack: () => void; onSa
               value={value.includeBaseline}
               onValueChange={(includeBaseline) => draft.setValue({ ...value, includeBaseline })}
             />
-          )}{' '}
+          )}
           {inputs.progressionMode === 'ai' && (
             <SwitchRow
               label="Auto-apply AI changes"

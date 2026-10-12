@@ -1,7 +1,17 @@
 import { View } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
 
-export function ProgressBar({ value, complete = false }: { value: number; complete?: boolean }) {
+export function ProgressBar({
+  value,
+  complete = false,
+  origin = 'left',
+  color,
+}: {
+  value: number;
+  complete?: boolean;
+  origin?: 'left' | 'right';
+  color?: string;
+}) {
   const { theme } = useTheme();
   return (
     <View
@@ -22,7 +32,8 @@ export function ProgressBar({ value, complete = false }: { value: number; comple
         style={{
           height: '100%',
           width: `${Math.min(1, Math.max(0, value)) * 100}%`,
-          backgroundColor: complete ? theme.anatomy.main : theme.colors.brand,
+          backgroundColor: color ?? (complete ? theme.anatomy.main : theme.colors.brand),
+          alignSelf: origin === 'right' ? 'flex-end' : 'flex-start',
         }}
       />
     </View>
