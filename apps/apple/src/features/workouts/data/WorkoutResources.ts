@@ -335,6 +335,50 @@ export class WorkoutResources {
       });
     }
   }
+  async replace<T>(spec: ResourceSpec<T>, value: T) {
+    const generation = this.generation,
+      entry = this.entry(spec),
+      data = spec.schema.parse(value);
+    entry.revision++;
+    entry.hydrated = true;
+    entry.policy.invalidate();
+    this.publish(entry, { data, loading: false, refreshing: false, saved: true, error: null });
+    if (entry.cache && !entry.cache(data)) {
+      return;
+    }
+    await this.invalidationWrites;
+    if (generation !== this.generation) {
+      return;
+    }
+    const cacheEpoch = Number(await this.storage.get('workout-resource-epoch.v1')) || 0;
+    if (generation !== this.generation) {
+      return;
+    }
+    await this.storage.set(
+      `workout-resource.v1:${resourceKey(spec)}`,
+      JSON.stringify({
+        origin: this.connection.origin,
+        userId: this.connection.userId,
+        savedAt: 0,
+        cacheEpoch,
+        data,
+      }),
+    );
+  }
+  async forget<T>(spec: ResourceSpec<T>) {
+    const entry = this.entry(spec);
+    entry.revision++;
+    entry.hydrated = true;
+    entry.policy.invalidate();
+    this.publish(entry, {
+      data: null,
+      loading: false,
+      refreshing: false,
+      saved: false,
+      error: null,
+    });
+    await this.storage.remove(`workout-resource.v1:${resourceKey(spec)}`);
+  }
   invalidate(paths: string[]) {
     if (!paths.length) {
       return;

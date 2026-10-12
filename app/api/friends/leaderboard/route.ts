@@ -3,19 +3,15 @@ import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
 import { getDb } from '@/lib/data/postgres/client'
 import * as s from '@/lib/data/postgres/schema'
-import { inArray, eq, and, gte, count, isNull } from 'drizzle-orm'
+import { inArray, eq, and, gte, countDistinct, isNull } from 'drizzle-orm'
 import { sql } from 'drizzle-orm'
 import type { LeaderboardEntry } from '@trainingai/shared/types/friends'
-import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ, todayInTz, dateStrMidnightInTz, weekStartForDay } from '@trainingai/shared/date-utils'
 import { computeDayStreak, streakRestGapFor } from '@trainingai/shared/workout/day-streak'
 import { longestWeeklyStreak } from '@trainingai/shared/workout/year-review'
-import { startOfWeek, format } from 'date-fns'
-import { toZonedTime } from 'date-fns-tz'
 
 function getMondayUtc(tz: string): Date {
-  const nowInTz = toZonedTime(new Date(), tz)
-  const monday = startOfWeek(nowInTz, { weekStartsOn: 1 })
-  return new Date(format(monday, "yyyy-MM-dd'T'00:00:00") + 'Z')
+  return dateStrMidnightInTz(weekStartForDay(todayInTz(tz)), tz)
 }
 
 export async function GET(_req: Request) {
@@ -41,7 +37,7 @@ export async function GET(_req: Request) {
 
     db.select({
       userId: s.workoutSessions.userId,
-      sessions: count(s.workoutSessions.id),
+      sessions: countDistinct(s.workoutSessions.id),
       volumeKg: sql<number>`coalesce(sum(${s.setLogs.weightKg} * ${s.setLogs.reps}), 0)`.as('volumeKg'),
     }).from(s.workoutSessions)
       .leftJoin(s.exerciseLogs, and(eq(s.exerciseLogs.workoutSessionId, s.workoutSessions.id), isNull(s.exerciseLogs.deletedAt)))
@@ -51,7 +47,7 @@ export async function GET(_req: Request) {
 
     db.select({
       userId: s.workoutSessions.userId,
-      sessions: count(s.workoutSessions.id),
+      sessions: countDistinct(s.workoutSessions.id),
       volumeKg: sql<number>`coalesce(sum(${s.setLogs.weightKg} * ${s.setLogs.reps}), 0)`.as('volumeKg'),
     }).from(s.workoutSessions)
       .leftJoin(s.exerciseLogs, and(eq(s.exerciseLogs.workoutSessionId, s.workoutSessions.id), isNull(s.exerciseLogs.deletedAt)))

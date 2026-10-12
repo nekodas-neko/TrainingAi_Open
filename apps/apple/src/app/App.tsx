@@ -1,3 +1,4 @@
+import { FriendProfileScreen } from '../features/social/screens/FriendProfileScreen';
 import { useState } from 'react';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -64,6 +65,7 @@ function AppShell() {
     count: 0,
   });
   const [sleepRequest, setSleepRequest] = useState({ scope: '', date: '', count: 0 });
+  const [friendId, setFriendId] = useState('');
   const [workoutId, setWorkoutId] = useState<string | null>(null);
   const [workoutReturn, setWorkoutReturn] = useState<{
     detail: DetailScreen | MoreDetail | null;
@@ -214,6 +216,10 @@ function AppShell() {
         active={!healthDetail && !detail && tab === 'More'}
       >
         <MoreScreen
+          openFriendProfile={(id) => {
+            setFriendId(id);
+            setDetail('friend-profile');
+          }}
           openSettings={() => setDetail('settings')}
           openPrograms={() => setDetail('programs')}
           openClinical={() => setDetail('clinical')}
@@ -224,7 +230,13 @@ function AppShell() {
           openYear={() => setDetail('year-review')}
         />
       </RetainedView>
-      {detail === 'running' ? (
+      {detail === 'friend-profile' ? (
+        <FriendProfileScreen
+          key={`${accountKey}:${friendId}`}
+          userId={friendId}
+          onBack={() => setDetail(null)}
+        />
+      ) : detail === 'running' ? (
         <RunningScreen
           key={accountKey}
           onBack={() => setDetail('cardio')}

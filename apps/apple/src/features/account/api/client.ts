@@ -97,6 +97,9 @@ export function createApiClient(
         }
         throw new ApiError(response.status, code);
       }
+      if (response.status === 204 && format === 'json') {
+        return undefined;
+      }
       if (format === 'ndjson') {
         if (!response.headers.get('content-type')?.includes('application/x-ndjson')) {
           throw new Error('Expected a data export from TrainingAi.');

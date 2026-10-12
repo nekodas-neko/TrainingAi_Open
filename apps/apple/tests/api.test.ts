@@ -77,3 +77,10 @@ test('exercise media uses the authenticated API alias and never leaks a token to
   await assert.rejects(client.media('https://user:password@cdn.example/press.gif'));
   await assert.rejects(client.media('/api/user/profile'));
 });
+
+test('empty successful friend mutations are acknowledged without requiring JSON',async t=>{
+  t.mock.method(globalThis,'fetch',async()=>new Response(null,{status:204}));
+  const client=createApiClient('https://example.com',async()=> 'test-session');
+  assert.equal(await client.delete('/api/friends/10000000-0000-4000-8000-000000000001',undefined),undefined);
+  assert.equal(await client.patch('/api/friends/10000000-0000-4000-8000-000000000001',{action:'decline'}),undefined);
+});

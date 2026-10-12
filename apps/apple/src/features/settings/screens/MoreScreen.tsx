@@ -1,3 +1,5 @@
+import { FriendsPanel } from '../../social/components/FriendsPanel';
+import { FriendCode } from '../../social/components/FriendCode';
 import { useState } from 'react';
 import { z } from 'zod';
 import {
@@ -44,6 +46,7 @@ export function MoreScreen({
   openData,
   openAbout,
   openYear,
+  openFriendProfile,
 }: {
   openSettings: () => void;
   openPrograms: () => void;
@@ -53,6 +56,7 @@ export function MoreScreen({
   openData: () => void;
   openAbout: () => void;
   openYear: () => void;
+  openFriendProfile: (id: string) => void;
 }) {
   const account = useAccountContext(),
     { theme } = useTheme();
@@ -113,13 +117,7 @@ export function MoreScreen({
       <TabPanel>
         <Stack style={{ paddingHorizontal: theme.spacing.lg }}>
           {tab === 'friends' ? (
-            <Card>
-              <AppText variant="heading">Friends</AppText>
-              <FeatureRow
-                title="Activity feed & leaderboards"
-                subtitle="Planned for the community module"
-              />
-            </Card>
+            <FriendsPanel openProfile={openFriendProfile} />
           ) : (
             <>
               <Stack align="center">
@@ -129,6 +127,9 @@ export function MoreScreen({
                   {account.state.profile?.email ?? 'Sign in to connect your account'}
                 </AppText>
               </Stack>
+              <FriendCode
+                code={typeof user?.friendCode === 'string' ? user.friendCode : null}
+              />
               <Grid columns={3}>
                 {[
                   ['Sessions', lifetime?.sessions, ''],

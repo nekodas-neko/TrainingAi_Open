@@ -16,6 +16,7 @@ export type DetailScreen =
   | 'running'
   | 'guided-walk'
   | 'fitness-baselines'
+  | 'friend-profile'
   | 'cardio'
   | 'activity-recording'
   | 'profile-goals';
