@@ -378,3 +378,5 @@ peer-reviewed validation was found for it.
 - [`2026-10-12-readiness-metric-evidence.md`](../reviews/2026-10-12-readiness-metric-evidence.md):
   the research behind the candidate metrics (#2823).
 - [`readiness-tree.md`](readiness-tree.md): the design of the shadow model.
+- [`2026-10-12-data-gaps-summary.md`](../reviews/2026-10-12-data-gaps-summary.md): what we collect,
+  what we use, the gaps, and new metrics built from data we already have.
