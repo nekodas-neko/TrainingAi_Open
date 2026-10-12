@@ -59,7 +59,7 @@ Legend: **OC** = **Oura-computed: do not feed our scores** (show for comparison 
 | `daily_readiness` | `score`; `contributors.{activity_balance, body_temperature, hrv_balance, previous_day_activity, previous_night, recovery_index, resting_heart_rate, sleep_balance, sleep_regularity}` | one per day | [1, 100] | Oura's readiness | — | — | **OC**. |
 | `daily_activity` (`PublicDailyActivity`) | `steps` | one per day (04:00–04:00) | count | Steps | `steps_per_day` | Activity: yesterday's steps 35 | The day boundary is 4 a.m., not midnight. Background sync. Scope `daily`. |
 | `daily_activity` | `met` (`PublicSample`) | series per day; interval **not in spec** | MET | Rate of energy spend | `met_per_min` (only if `met.interval` = 60) | Activity: training load 30, WHO zone minutes 20 | Required field. #2808's cardio load depends on its interval. |
-| `daily_activity` | `class_5_min` | string, 1 char per 5 min | `0` non-wear, `1` rest, `2` inactive, `3` low, `4` medium, `5` high | Activity class | NEW: `activity_class_5min`, NEW: `wear_min_per_day` | Activity: WHO zone minutes 20; wear gate for every pillar | The catalogue already needs wear time (scoring-layers doc §4). |
+| `daily_activity` | `class_5_min` | string, 1 char per 5 min | `0` non-wear, `1` rest, `2` inactive, `3` low, `4` medium, `5` high | Activity class | NEW: `activity_class_5min`, NEW: `wear_min_per_day` | Activity: WHO zone minutes 20; wear gate for every pillar | The catalogue already needs wear time (scoring-layers doc §5). |
 | `daily_activity` | `high_activity_time`, `medium_activity_time`, `low_activity_time`, `sedentary_time`, `resting_time`, `non_wear_time` | one per day | s | Time in each class | NEW: `zone_min_per_day`, `sedentary_min_per_day`, `wear_min_per_day` | Activity: WHO zone minutes 20 (medium = moderate, high = vigorous) | The MET thresholds for each class are not in spec. |
 | `daily_activity` | `high_/medium_/low_activity_met_minutes`, `sedentary_met_minutes`, `average_met_minutes` | one per day | MET-min | Activity volume | NEW: `met_min_per_day` | Activity: training load 30 (cardio side) | Fallback if `met` isn't per minute. |
 | `daily_activity` | `active_calories`, `total_calories` | one per day | kcal | Energy spent | NEW: `kcal_out_per_day` | Body: fuel 20 (spend side of the energy target) | `body_metrics.active_calories` already exists. |
@@ -147,6 +147,8 @@ age and VO₂max are not named by any scope description. `SKILL.md` puts them un
 is not in spec. Sleep time, rest mode, ring configuration and battery have no scope in the spec.
 
 ## 5. Where SKILL.md disagrees with the spec (worth fixing before #2808 builds on it)
+
+Filed as #2820.
 
 1. Heart rate: SKILL.md says "one sample per minute". The spec says 5-minute increments, `bpm` is an
    integer, the row also has `timestamp_unix`, and `source` also allows `live`.

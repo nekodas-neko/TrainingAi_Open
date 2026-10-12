@@ -52,12 +52,12 @@ the owner chooses final ones (#2809).
 | # | Layer | What you see there | Example: one night | What today's code calls it |
 |---|---|---|---|---|
 | 1 | **Source** | The device or app the data comes in from | Oura ring | source, route |
-| 2 | **Raw** | Values exactly as the source sends them: their shape and how often | HRV every 5 min while asleep: 58, 61, 70, 66 … ms | the raw tables (`oura_raw_*`, `rr_intervals`, Health Connect records) |
-| 3 | **Formatted** | Raw data put into our standard format, whatever the source | `hrv_per_night` = 64 ms | Input (the input cascade) |
-| 4 | **Scoring** | Each formatted value turned into 0–100, against research and the person's normal | Overnight HRV 75/100 | Unit |
+| 2 | **Raw** | Values exactly as the source sends them: their shape and how often | HRV every 5 min while asleep: 44, 52, 47, 50 … ms | the raw tables (`oura_raw_*`, `rr_intervals`, Health Connect records) |
+| 3 | **Formatted** | Raw data put into our standard format, whatever the source | `hrv_per_night` = 48 ms | Input (the input cascade) |
+| 4 | **Scoring** | Each formatted value turned into 0–100, against research and the person's normal | Overnight HRV 75/100 (a night at a 48 ms normal) | Unit |
 | 5 | **Weighting** | Each score's points possible, and the points it earns | 10.5 possible × 75% = 7.9 earned | the unit and pillar weights |
-| 6 | **Pillar** | A subtotal of the points in one area | Heart 76 → 22.8 of 30 points | Pillar |
-| 7 | **Readiness** | The sum of every score's points | 72 | Readiness |
+| 6 | **Pillar** | A subtotal of the points in one area | Heart 71 → 21.3 of 30 points | Pillar |
+| 7 | **Readiness** | The sum of every score's points | 75.5 | Readiness |
 
 **Rules that come with the layers:**
 
@@ -71,7 +71,8 @@ the owner chooses final ones (#2809).
    available wins (section 5).
 
 The 2026-10-11 version of this doc used five layers (root, score, unit, metric, source). Raw is new,
-"metric" became formatted, "unit" became scoring, and weighting is now its own layer. The code
+"metric" became formatted, "unit" became scoring, weighting is now its own layer, "score" became
+pillar and root became readiness. In this doc, "a score" means what the code calls a unit. The code
 still says Pillar, Unit and Input; nothing is renamed until the names are final.
 
 ![One night through every layer, with example numbers](scoring-sleep-example.svg)
@@ -93,7 +94,8 @@ the app is moving to. The design is in [`readiness-tree.md`](readiness-tree.md).
 | **Steady** | at the person's normal (or, for weight, the plan's pace) | it drifts either way | timing, deep + REM share, temperature, breathing, weight vs plan |
 | **Directional** | well past the normal in the good direction | it moves the bad way | efficiency, HRV, resting HR, settling, HR recovery, daytime stress |
 
-A steady or directional score is `clamp(Level + Day, 0, 100)`:
+A steady or directional score is `clamp(Level + Day, 0, 100)`. Weight vs plan is the one exception:
+it is scored on a fixed band around the plan's pace, with no Level.
 
 - **Level** is the person's *normal*, graded against a research yardstick. An HRV normal of 45 ms
   grades 74. Where there's no yardstick, Level is 70 for a directional score and 100 for a steady
@@ -103,14 +105,18 @@ A steady or directional score is `clamp(Level + Day, 0, 100)`:
 
 ### 2.2 How a person's normal is learned
 
-- **Normal:** the median of the last 30 valid days **from the same source**, with at least 7 needed.
+- **Normal:** the median of the valid days within the last 30 calendar days, with at least 7 needed.
 - **Step:** how much the value usually moves night to night, the interquartile range ÷ 1.349, never
   smaller than the smallest change that means anything (3 ms of HRV, 2 bpm of resting HR, 0.15 °C,
   2 points of efficiency, 20 min of timing).
 - **Maturity:** days 0–13 are learning (Level only, or the score drops out), 14–29 provisional, and
   30 on settled. A new score counts at half weight until it settles.
-- **A lasting change** (7 days in a row at least 1.5 steps off) rebuilds the normal.
-- **A new source restarts that score's normal**, so two devices' definitions never mix.
+- **A lasting change** rebuilds the normal: the last 7 valid days all sit on one side of the old
+  median, their own median is at least 1.5 steps away from it, and the window holds at least 14 days.
+- **Per-source normals are designed but not wired.** The scorer can restart a normal when the
+  source changes, but the model tags most series with the table they came from, not the device, so
+  today a ring night and a Health Connect night share one normal. Only HR recovery carries its device
+  (#2825).
 
 ### 2.3 Worked examples
 
@@ -128,16 +134,17 @@ score falls 40 points an hour, so 6 h scores 60 and 5 h scores 20.
 step is 4 points. A night at 85% is 5 below the normal, 1.25 steps, which costs 25: **85 − 25 = 60**.
 A very consistent sleeper has a small step, so a small dip costs a lot; that is a tuning lever.
 
-**Timing: steady.** Timing is mid-sleep, the halfway point between falling asleep and waking. It
-measures how regular the body clock is, not how long the night was. Asleep 00:30 → 08:30 puts
-mid-sleep at 04:30. Against a usual 03:45 that moves about 25 minutes night to night, 45 minutes
+**Timing: steady.** Timing is mid-sleep, the halfway point of the sleep window: from the window's
+start (going to bed, so it includes the time taken to fall asleep) to waking. It measures how
+regular the body clock is. In bed 00:30 → up 08:30 puts mid-sleep at 04:30. Against a usual 03:45 that moves about 25 minutes night to night, 45 minutes
 late is 1.8 steps: **100 − 36 = 64**.
 
-**Temperature: steady.** 100 at the person's normal, and 20 points off for every 0.15 °C step
-either way. A night 0.35 °C above normal is about 2.3 steps: **53**. Its weight is only 5 points of
-readiness, which is why a fever is a red flag (section 3.4) rather than a weight.
+**Temperature: steady.** 100 at the person's normal, and 20 points off for every step either way.
+For someone whose step is the 0.15 °C floor, a night 0.35 °C above normal is about 2.3 steps:
+**53**. Its weight is only 5 points of readiness, which is why a fever is handled as a red flag
+(section 3.4).
 
-**HRV: directional, not a sweet spot.** A normal of 48 ms grades 75 on the population range (HRV is
+**HRV: directional.** A normal of 48 ms grades 75 on the population range (HRV is
 largely genetic, so the range only spans 60–90). Each step above the normal adds 20, capped at +30,
 so an unusually high night can't run away with the score; each step below costs 20, down to −70.
 Making a very high night cost points too, as overreaching sometimes shows, would be a tuning
@@ -157,7 +164,7 @@ decision.
 A score's points possible is its weight inside its pillar times the pillar's share of readiness:
 duration is 30% of Sleep, and Sleep is 30 points, so duration is worth 9. The code stores the two
 numbers separately (`UNIT_DEFS[...].weight` and `PILLAR_WEIGHTS` in
-`shadow-readiness/model.ts`); points possible is their product.
+`shadow-readiness/model.ts`); points possible is their product ÷ 100 (30 × 30 ÷ 100 = 9).
 
 - **Points earned** = score × points possible ÷ 100.
 - **Points lost** = points possible − points earned.
@@ -167,18 +174,18 @@ numbers separately (`UNIT_DEFS[...].weight` and `PILLAR_WEIGHTS` in
 
 The Sleep pillar from the diagram above:
 
-| Score | Score | Points possible | Earned |
+| Metric | Score | Points possible | Earned |
 |---|---|---|---|
 | Duration | 87 | 9.0 | 7.8 |
-| Efficiency | 88 | 6.0 | 5.3 |
+| Efficiency | 90 | 6.0 | 5.4 |
 | 7-night balance | 93 | 4.5 | 4.2 |
 | Timing | 85 | 4.5 | 3.8 |
-| Deep + REM share | 64 | 3.0 | 1.9 |
+| Deep + REM share | 60 | 3.0 | 1.8 |
 | Latency | 85 | 3.0 | 2.6 |
 | **Sleep** | **85.3** | **30** | **25.6** |
 
 With Heart, Activity and Body earning 21.3, 13.0 and 15.6, readiness is 25.6 + 21.3 + 13.0 + 15.6
-= **75**. Every score shows what it adds and what it costs, which is where tuning happens.
+= **75.5** (the code keeps one decimal). Every score shows what it adds and what it costs, which is where tuning happens.
 
 ### 3.3 When a score has no data
 
@@ -186,8 +193,8 @@ A score with no data leaves the sum entirely: its points earned and its points p
 out, and **the other scores in the same pillar share its points**. The pillar keeps its share of
 readiness, so Sleep still counts for 30 points for someone whose device has no sleep stages.
 
-If deep + REM share had no data in the night above, Sleep would be (8,530 − 640) ÷ (100 − 10) =
-7,890 ÷ 90 = **87.7**. Dividing by 100 instead would count the missing score as zero and penalise
+If deep + REM share had no data in the night above, Sleep would be the points earned without it
+over the points possible without it: (25.6 − 1.8) ÷ (30 − 3) × 100 = **88.1**. Dividing by 100 instead would count the missing score as zero and penalise
 the person for their device; the model never does that. A pillar with no scores at all drops out,
 and the other pillars share its points.
 
@@ -212,8 +219,9 @@ every time a metric is added, and it can't guarantee how low readiness goes. A c
 depend on how many metrics there are. On 2026-10-12 the owner leaned towards the ceiling; its exact
 form and numbers are a tuning decision.
 
-**Proposed: graded, not a cliff.** For example, temperature +0.3 °C above normal sets a ceiling of
-80, +0.5 °C sets 60 and +0.7 °C sets 40, so 37.9 °C and 38.0 °C don't land 40 points apart. When
+**Proposed: graded.** For example, temperature +0.3 °C above normal sets a ceiling of 80, +0.5 °C
+sets 60 and +0.7 °C sets 40, with the ceiling interpolated between those points, so 37.9 °C and
+38.0 °C land a few points apart. When
 several flags fire, the lowest ceiling applies, and the proposal could lower it further when flags
 stack. The numbers below are today's proposal:
 
@@ -227,8 +235,8 @@ stack. The numbers below are today's proposal:
 | Training load | Overload | — | Load ratio 1.6 or more: 65 |
 
 The illness check weighs how far temperature (40%), breathing (25%), resting HR (20%) and HRV (15%)
-sit from normal, the bad way. In 72 days it fired "watch" twice and never reached "elevated" or
-"fever". Before any ceiling counts, the cycle-aware normals in section 9 matter: a luteal-phase rise
+sit from normal, the bad way. On the owner's history so far it has rarely fired, and only at
+its lowest level, "watch". Before any ceiling counts, the cycle-aware normals in section 9 matter: a luteal-phase rise
 in temperature and resting HR is as large as an illness flag.
 
 ### 3.5 The live model it replaces
@@ -238,8 +246,9 @@ contributors copied from Oura's layout, counts HRV and heart rate twice, and app
 penalty of −10 or −25. It reads about 20 fields straight from the Oura tables (`oura_daily`,
 `oura_daily_summary`, `oura_daily_derived`), which is exactly what the layers forbid.
 
-**The shadow model isn't fully device-blind either.** Only overnight HRV, overnight resting HR and
-HR recovery go through the input cascade (section 5). Settling, temperature and breathing read
+**The shadow model isn't fully device-blind either.** Only overnight HRV and overnight resting HR
+go through the input cascade in full; HR recovery uses its adapter but skips the cascade's
+plausibility check (section 5). Settling, temperature and breathing read
 `oura_daily_summary`, and daytime stress reads `oura_daily_derived`
 (`shadow-readiness/assemble.ts`). Those reads are what a connector has to replace before a second
 device brand can score.
@@ -251,7 +260,7 @@ device brand can score.
 | **Oura ring, direct** | Raw frames: beat-to-beat HR, HRV every 5 min, skin temperature about once a minute, motion, SpO₂ ratio | Native foreground service `OuraRingService.kt` drains the ring over BLE and POSTs to `/api/oura-ble/samples` | Phone: `oura_raw.db`. Server: `oura_raw_samples` (7-day hot window), packed into `oura_raw_packed` | On connect, then hourly (median gap 62 min) | **Owner only**: admin-only route, the owner's ring key |
 | **Polar H10 strap** | HR about once a second, plus RR intervals | Native `PolarStrapService.kt` → `/api/hr-ingest` | Server only: `oura_heartrate` (source `chest_strap`), `rr_intervals` | 1 Hz in workouts; one sample per 30 s all day | Anyone with a strap |
 | **Renpho scale** | Weight and impedance; body composition is our own estimate | Native `ScaleBleService.kt` → `/api/scale-ble/samples` | Server: `scale_raw_samples`, then accepted readings go to `body_metrics` | Each weigh-in | Anyone with the scale |
-| **Health Connect** | Whatever Samsung, Garmin, Fitbit and others write: sleep, HR, HRV, SpO₂, steps, weight, nutrition | JS plugin (`lib/health-connect-sync.ts`) when the app opens → `/api/sync-health` | Server: `body_metrics`, `sleep_sessions`, `activity_logs`, `oura_heartrate` | On app open: 30 days back the first time, 7 days after that | Any user in principle; never run on real data |
+| **Health Connect** | Whatever Samsung, Garmin, Fitbit and others write: sleep, HR, HRV, SpO₂, steps, weight, nutrition | JS plugin (`lib/health-connect-sync.ts`) when the app opens → `/api/sync-health` | Server: `body_metrics`, `sleep_sessions`, `activity_logs`, `oura_heartrate`, `health_connect_intervals` | On app open: 30 days back the first time, 7 days after that | Any user in principle; never run on real data |
 | **Colmi ring** | HR, SpO₂, temperature, sleep | WebView BLE (`lib/colmi-ble/`) → `/api/colmi/samples` | Server: isolated `colmi_*` tables | Every 30 min | Comparison only, never scored |
 | **Phone GPS** | Routes for walks and runs you start | Background-geolocation plugin | Phone: `activity_logs`, then the outbox | 5 m distance filter | Anyone |
 | **Your logs** | Sets and workouts, food, water, weight, check-ins, sleep entered by hand | App screens | Phone SQLite, then the outbox → `/api/sync/push` | As typed | Anyone |
@@ -283,10 +292,11 @@ For each one it:
   **estimated**;
 - returns `null` when nothing qualifies, never 0;
 - tags every value with its provenance: route, rung, source, and low-wear or capped flags;
-- drops implausible values instead of clamping them, and keeps baselines per source.
+- drops implausible values instead of clamping them, and can keep baselines per source
+  (`baselineValues`), which the shadow model doesn't call yet (#2825).
 
 **Where it's wired:** training stress reads `steps/min` and `MET/min`; the shadow model reads
-`HRV/night`, `RHR/night` and `HRR60`. **Where it isn't:** the live readiness, Sleep and Activity
+`HRV/night` and `RHR/night`, and takes `HRR60` from the adapter without `resolveSlots`. **Where it isn't:** the live readiness, Sleep and Activity
 scores. `HR/min` is defined but nothing resolves it in production; heart-rate merging happens at
 read time in `mergeHrSources`.
 
@@ -427,10 +437,12 @@ Research sets the starting point: every band and yardstick in the model cites a 
 The weights started as a judgement (#2356). To tune them, readiness needs something to be checked
 against:
 
-- **How the person feels.** A quick morning check-in (energy, soreness, mood, sleep quality) is the
+- **How the person feels.** A quick daily check-in (fatigue, soreness, mood, sleep quality) is the
   best candidate. In athlete-monitoring research, self-reported wellness tracks training stress more
-  consistently than most device measures (section 9). The readiness-prompt mockup in #2106 is this
-  check-in, waiting on the owner's decision.
+  consistently than most device measures (section 9). The app doesn't have one that works for this
+  yet. The morning check-in's answers are pre-filled and rarely changed. The readiness prompt in
+  #2106 (mockup in PR #2806) asks one question, only on unusual days, and isn't meant to validate
+  the score. A multi-item daily check-in is new work under #2823.
 - **How training went.** The workout engine already predicts each session's effort, and the person
   rates it (#2791). A readiness score that's right should line up with sessions that felt harder or
   easier than planned.
@@ -451,15 +463,17 @@ Every citation there was checked in PubMed. The five with the best evidence for 
    epochs it needs.
 2. **A morning check-in scored item by item**, fatigue first. Self-reported wellness tracks
    training stress more consistently than most device measures (Saw et al. 2016, 56 studies).
-   It is also the ground truth section 8 needs. The mockup is #2106.
+   It is also the ground truth section 8 needs. #2106's prompt (mockup in PR #2806) is a single
+   question on unusual days, so this is new work.
 3. **Session RPE for every session**, so training load counts cardio as well as lifting. The 7:28
    load ratio is contested in the research, so its weight should stay low.
 4. **Alcohol and caffeine as context tags** with no weight. Their effects already show in HRV,
    resting HR and sleep, so a weight would count them twice.
 5. **Cycle-aware normals** for anyone who menstruates. The luteal phase moves temperature, resting
-   HR, breathing and HRV as much as an illness flag does.
+   HR, breathing and HRV as much as an illness flag does. The scorer already keeps per-phase normals
+   (`score.ts`); what's missing is the cycle-phase input.
 
-**Context, not scores.** VO₂ max, body composition, breathing disturbances, protein and energy
+**Better as context.** VO₂ max, body composition, breathing disturbances, protein and energy
 availability are better as slow context than as daily scores. The evidence links them to long-term
 health more than to the next day.
 
@@ -491,8 +505,9 @@ health more than to the next day.
 ### How accurate it is
 
 - **Only the chest strap is ground truth** for heart rate: it is electrical, and the rings are
-  optical. Both rings report every 5 minutes at best. HRV can only be compared across devices as a
-  trend ([`multi-device-comparison.md`](../multi-device-comparison.md)).
+  optical. The Oura ring's raw frames carry beat-to-beat intervals, but its stored heart-rate
+  series is 5-minute bins (15-second bins around logged workouts, `lib/oura-ble/rollup/run.ts`); the
+  Colmi ring reports every 30 minutes. HRV can only be compared across devices as a trend ([`multi-device-comparison.md`](../multi-device-comparison.md)).
 - **Our own sleep stager under-reads REM**, at about half of Oura's figure on nights with sparse
   beats ([`sleep-system.md`](../sleep-system.md)).
 - **Our SpO₂ is uncalibrated**; Oura's API value is calibrated.
@@ -572,7 +587,7 @@ These are the rules that would lose data if broken. The background is in
      `Authorization: Bearer`, and the mobile token exchange returns a 7-day access token. Some of
      this came from your earlier PR #1607.
    - Refresh tokens are a table only (#2076); nothing issues them yet.
-7. **The API is unversioned.** There are 249 `route.ts` files, all `private, no-store`, most
+7. **The API is unversioned.** There are 252 `route.ts` files, all `private, no-store`, most
    rate-limited, and validated with Zod (strict, except push and native-client routes). The
    installed app depends on today's shapes, so changing a response shape breaks it.
 8. **Shared code is mostly portable.** `packages/shared/src` is about 52,000 lines with no Next.js or

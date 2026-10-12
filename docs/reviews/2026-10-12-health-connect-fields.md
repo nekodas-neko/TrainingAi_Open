@@ -167,7 +167,7 @@ None of these is read today.
 - **The owner:**
   - The manifest's comments say "Fitbit Air writes all of these" for the activity and vitals groups. That is the repo's own claim, not verified.
   - `docs/superpowers/plans/2026-08-02-health-connect-first-class-tier.md` says the owner has Health Connect switched off.
-  - `docs/architecture/scoring-layers-and-data-inputs.md` §5 says the Health Connect path has never run on real data.
+  - `docs/architecture/scoring-layers-and-data-inputs.md` §4 and §10 say the Health Connect path has never run on real data.
 
 ---
 
@@ -192,7 +192,7 @@ None of these is read today.
 
 ## 4. Defects and stale statements found (not fixed; this task was read-only)
 
-There is no matching GitHub issue for the distance permission. I searched issues for "Health Connect distance permission" and for the converter types.
+Items 1 and 2 are now filed as #2818, and items 6 and 7 as #2819.
 
 1. **Distance is never granted.**
    - `Distance` is not in `HC_SYNC_READ_TYPES`, and the distance totals are requested whenever `Steps` is granted (`lib/health-connect-sync.ts:316-322`, `:509-517`).
@@ -203,7 +203,7 @@ There is no matching GitHub issue for the distance permission. I searched issues
 3. **Health Connect cadence is stored but never read.** No code reads the `cadence_spm` rows back out of `health_connect_intervals`.
 4. **Health Connect nutrition never reaches fuel.** It lands in `body_metrics`, but the fuel unit reads the food log and the "fully logged" check-in.
 5. **Two docs are stale.**
-   - `docs/architecture/scoring-layers-and-data-inputs.md:207-210` and `docs/reviews/2026-09-16-health-connect-record-converter-gap.md` both say HRV, SpO₂ and the HR series come back as strings.
+   - `docs/reviews/2026-09-16-health-connect-record-converter-gap.md` says HRV, SpO₂ and the HR series come back as strings. The scoring spec said the same; it has since been corrected (§10).
    - LA-115 (#1877, `1ffe00a3fa`) added those converter branches.
 6. **A field comment is misleading.** `DailyMetric.restingHeartRate` (`:58`) says "overnight min BPM (midnight–8am)", but the code stores the writer's value unchanged.
 7. **HRV and SpO₂ use a fixed clock window.** The 00:00–08:00 window ignores the sleep session, so sleep before midnight and after 08:00 is missed.

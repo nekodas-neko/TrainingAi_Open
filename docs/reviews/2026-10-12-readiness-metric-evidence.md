@@ -54,7 +54,7 @@ What the app already has comes from a read of `docs/architecture/readiness-tree.
    [doi:10.4085/1062-6050-0528.19](https://doi.org/10.4085/1062-6050-0528.19)) found the
    associations mostly trivial to moderate in the largest studies. Treat these items as a
    personal-baseline signal, not an absolute one. An earlier review in this repo found
-   `perceived_recovery` stored as 3 on all 17 days, which is the pre-fill rather than an answer.
+   `perceived_recovery` stored as the pre-filled 3 rather than an answer.
    Without the person actually answering, this channel has no signal.
 2. **SRI.** The current "timing / consistency" unit is steady against usual bed and wake times.
    SRI is the published version of the same idea and has outcome data behind it. Windred's
@@ -198,5 +198,4 @@ Daylight cannot be measured well by a ring or phone. Body composition from BIA i
 `docs/architecture/component-references.md`, source 3, links Windred et al. 2024 to
 **PMC10782489**. That PMC record is the accompanying editorial (Zuraikat et al., "Consistency is
 key: sleep regularity predicts all-cause mortality"). The paper itself is **PMC10782501**,
-doi:10.1093/sleep/zsad253. Under CLAUDE.md this should become an issue. I did not file one,
-because this task was read-only.
+doi:10.1093/sleep/zsad253. Filed as #2822.

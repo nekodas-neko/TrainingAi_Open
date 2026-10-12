@@ -39,8 +39,8 @@ iPhone client (Expo / React Native) that jsboiss is building._
 
    Series 12 / Ultra 4 claim "as often as every five minutes". Nothing like Oura's 5-min rMSSD all
    night is available on older watches.
-4. **Apple's `restingHeartRate` is an awake figure.** It is built from still periods **outside**
-   sleep, and one value is published per day.
+4. **Apple's `restingHeartRate` is an awake figure** (#2821). It is built from still periods
+   **outside** sleep, and one value is published per day.
    - It fills our **daytime resting HR** unit, which is not built yet.
    - It does **not** fill overnight resting HR. That has to come from overnight `heartRate`
      samples, which the watch takes at most once per 5-min window.
