@@ -65,7 +65,14 @@ export type WorkoutCatalog = {
   userId: string;
   savedAt: number;
   program: WorkoutProgram | null;
-  recommendation: { sessionId: string | null; isRestDay: boolean; reason: string };
+  recommendation: {
+    sessionId: string | null;
+    isRestDay: boolean;
+    reason: string;
+    deloadOrRestRecommended?: boolean;
+    temperatureAlert?: boolean;
+    consecutiveTrainingDays?: number;
+  };
   recovery?: MuscleRecovery[] | null;
 };
 export type CatalogIdentity = { origin: string; userId: string };
@@ -249,6 +256,15 @@ export function buildCatalog(
     sessionId: next.session == null ? null : text(object(next.session).id),
     isRestDay: next.isRestDay,
     reason: text(next.reason),
+    ...(typeof next.deloadOrRestRecommended === 'boolean'
+      ? { deloadOrRestRecommended: next.deloadOrRestRecommended }
+      : {}),
+    ...(typeof next.temperatureAlert === 'boolean'
+      ? { temperatureAlert: next.temperatureAlert }
+      : {}),
+    ...(typeof next.consecutiveTrainingDays === 'number'
+      ? { consecutiveTrainingDays: count(next.consecutiveTrainingDays) }
+      : {}),
   };
   const base = {
     version: 2 as const,
@@ -259,7 +275,11 @@ export function buildCatalog(
     recovery: null,
   };
   if (!meta.program) {
-    if (array(meta.exercises).length || array(meta.sessions).length || recommendation.sessionId) {
+    if (
+      array(meta.exercises).length ||
+      array(meta.sessions).length ||
+      recommendation.sessionId
+    ) {
       throw new Error('Inconsistent program response.');
     }
     return { ...base, program: null };
@@ -270,7 +290,8 @@ export function buildCatalog(
   }
   const programId = text(program.id);
   const perSession = object(object(allValue).perSession);
-  const estimates = meta.estimatedMinBySession == null ? {} : object(meta.estimatedMinBySession);
+  const estimates =
+    meta.estimatedMinBySession == null ? {} : object(meta.estimatedMinBySession);
   const sessions = array(program.sessions)
     .map((value): SessionPreview => {
       const session = object(value);
@@ -386,6 +407,14 @@ export function readSavedCatalog(
       return null;
     }
     const sessionId = recommendation.sessionId === null ? null : text(recommendation.sessionId);
+    for (const key of ['deloadOrRestRecommended', 'temperatureAlert']) {
+      if (recommendation[key] !== undefined && typeof recommendation[key] !== 'boolean') {
+        return null;
+      }
+    }
+    if (recommendation.consecutiveTrainingDays !== undefined) {
+      count(recommendation.consecutiveTrainingDays);
+    }
     if (saved.program !== null) {
       const program = object(saved.program);
       text(program.id);
@@ -427,7 +456,10 @@ export function readSavedCatalog(
             row.estimated1rm = duration(row.estimated1rm);
             row.target80 = load(row.target80);
             row.latestWeight = load(row.latestWeight);
-            if (row.lastSetMode != null && !['amrap', 'plus1'].includes(String(row.lastSetMode))) {
+            if (
+              row.lastSetMode != null &&
+              !['amrap', 'plus1'].includes(String(row.lastSetMode))
+            ) {
               throw new Error('Invalid saved set mode.');
             }
             row.lastSetMode ??= null;

@@ -9,6 +9,8 @@ import {
   StateCard,
   TabPanel,
   StatusIndicator,
+  Sheet,
+  AppText,
 } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
@@ -19,6 +21,7 @@ import { ProgressPanel } from '../components/ProgressPanel';
 import type { HealthDetail } from './HealthDetailScreen';
 import { HealthViewReady } from '../components/HealthViewReady';
 import { HealthSyncNotice } from '../components/HealthSyncNotice';
+import { SleepNight } from '../components/SleepNight';
 
 const panels = [
   { id: 'body', label: 'Body' },
@@ -27,7 +30,6 @@ const panels = [
 ] as const;
 export type HealthPanel = (typeof panels)[number]['id'];
 export function HealthScreen({
-  openData,
   openDetail,
   openPrograms,
   openSettings,
@@ -35,8 +37,8 @@ export function HealthScreen({
   onPanelChange,
   openDay,
   openWeek,
+  sleepRequest,
 }: {
-  openData: () => void;
   openDetail: (detail: HealthDetail) => void;
   openPrograms: () => void;
   openSettings: () => void;
@@ -44,11 +46,18 @@ export function HealthScreen({
   onPanelChange?: (panel: HealthPanel) => void;
   openDay: (date: string) => void;
   openWeek: (week: string) => void;
+  sleepRequest?: { date: string; count: number };
 }) {
   const { theme } = useTheme();
   const health = useHealthData();
   const resources = useWorkoutResources();
   const [localTab, setTab] = useState<HealthPanel>('training');
+  const [sleepDate, setSleepDate] = useState<string | null>(null);
+  useEffect(() => {
+    if (sleepRequest) {
+      setSleepDate(sleepRequest.date);
+    }
+  }, [sleepRequest]);
   const tab = panel ?? localTab;
   const [visited, setVisited] = useState<Set<HealthPanel>>(() => new Set([tab]));
   function select(panel: HealthPanel) {
@@ -113,7 +122,7 @@ export function HealthScreen({
               {visited.has(panel.id) && (
                 <HealthViewReady view={panel.id}>
                   {panel.id === 'body' ? (
-                    <BodyPanel openDetail={openDetail} openData={openData} />
+                    <BodyPanel openDetail={openDetail} />
                   ) : panel.id === 'training' ? (
                     <TrainingPanel
                       openPrograms={openPrograms}
@@ -128,6 +137,15 @@ export function HealthScreen({
             </TabPanel>
           )}
         />
+      )}
+      {sleepDate && (
+        <Sheet visible fullHeight title="Sleep" onClose={() => setSleepDate(null)}>
+          {health.sleep.some((night) => night.date === sleepDate) ? (
+            <SleepNight night={health.sleep.find((night) => night.date === sleepDate)!} />
+          ) : (
+            <AppText tone="muted">No saved sleep reading for {sleepDate}.</AppText>
+          )}
+        </Sheet>
       )}
     </PageLayout>
   );

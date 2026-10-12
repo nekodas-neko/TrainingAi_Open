@@ -26,9 +26,14 @@ export const sizes = {
   contentWidth: 680,
   timerRing: 180,
   scoreRing: 128,
+  scoreChip: 114,
+  recommendationCard: 200,
+  weekDay: 32,
+  weightSparkline: 110,
+  stepsSparkline: 40,
   nutritionRing: 104,
   mealLabel: 189,
-  foodThumbnail:32,
+  foodThumbnail: 32,
   healthHero: 260,
   wheelRow: 44,
   demonstration: 64,
@@ -38,6 +43,7 @@ export const sizes = {
   weekVolumeChart: 128,
 };
 export const typography = {
+  score: { fontSize: 32, lineHeight: 38, fontWeight: '800', letterSpacing: -1 },
   title: { fontSize: 28, lineHeight: 34, fontWeight: '700' },
   hero: { fontSize: 24, lineHeight: 30, fontWeight: '700' },
   heading: { fontSize: 17, lineHeight: 24, fontWeight: '600' },
@@ -75,8 +81,27 @@ export const sessionTones = {
   dark: ['#fbbf24', '#4ade80', '#818cf8', '#60a5fa', '#c084fc', '#f87171'],
 };
 export const sessionFills = ['#f59e0b', '#22c55e', '#6366f1', '#3b82f6', '#a855f7', '#ef4444'];
+export const scoreColors = {
+  light: { readiness: '#2563eb', heart: '#dc2626', sleep: '#7c3aed', activity: '#c2410c' },
+  dark: { readiness: '#60a5fa', heart: '#f87171', sleep: '#a78bfa', activity: '#f97316' },
+};
+export const homeCardColors = {
+  weightSparkline: '#00d4ff',
+  nutritionDonut: '#bf5fff',
+  sleepWidget: '#8b5cf6',
+  stepsWidget: '#2dd4bf',
+  moodWidget: '#fbbf24',
+  streakLeft: '#f97316',
+  streakRight: '#22c55e',
+  recommendedToday: '#06b6d4',
+  acwrWidget: '#f59e0b',
+  muscleStatusWidget: '#22c55e',
+  hrChartWidget: 'transparent',
+  energyBalanceWidget: '#22c55e',
+};
 export const domainTones = {
   light: {
+    checkin: { foreground: '#a16207', background: '#fffbeb', border: '#fcd34d' },
     sleep: {
       foreground: '#7e54e0',
       background: '#f7f4fe',
@@ -104,6 +129,7 @@ export const domainTones = {
     },
   },
   dark: {
+    checkin: { foreground: '#fbbf24', background: '#282519', border: '#675520' },
     sleep: {
       foreground: '#9e76f7',
       background: '#252539',

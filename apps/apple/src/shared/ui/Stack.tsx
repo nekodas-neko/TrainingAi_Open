@@ -13,7 +13,7 @@ export function Stack({
 }: ViewProps & {
   gap?: Space;
   direction?: 'row' | 'column';
-  align?: 'center' | 'flex-start' | 'stretch' | 'baseline';
+  align?: 'center' | 'flex-start' | 'flex-end' | 'stretch' | 'baseline';
   justify?: 'center' | 'space-between';
   wrap?: boolean;
 }) {

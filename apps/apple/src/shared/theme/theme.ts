@@ -2,7 +2,7 @@ import type { TextStyle } from 'react-native';
 import { healthArtColors, healthHeroGradients } from './health-heroes';
 import { STAGE_COLOR } from '@trainingai/shared/health/hypnogram';
 import { HR_ZONE_META } from '@trainingai/shared/health/hr-zones';
-import {MACRO_COLORS} from '@trainingai/shared/nutrition/macro-colors';
+import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors';
 import { palettes, type Brand } from './palettes.ts';
 import {
   spacing,
@@ -14,6 +14,8 @@ import {
   anatomy,
   sessionTones,
   sessionFills,
+  scoreColors,
+  homeCardColors,
   effortColors,
   type TextVariant,
 } from './tokens.ts';
@@ -39,7 +41,9 @@ export type ThemeColors = {
   onSignal: string;
 };
 export type Theme = {
-  macros: Record<keyof typeof MACRO_COLORS,string>;
+  homeCards: typeof homeCardColors;
+  scores: typeof scoreColors.light;
+  macros: Record<keyof typeof MACRO_COLORS, string>;
   healthArtColors: Record<string, string>;
   healthHeroGradients: typeof healthHeroGradients;
   mode: 'light' | 'dark';
@@ -57,7 +61,9 @@ export type Theme = {
   hrZoneColors: string[];
 };
 export type ThemeOverrides = {
-  macros?: Partial<Record<keyof typeof MACRO_COLORS,string>>;
+  homeCards?: Partial<typeof homeCardColors>;
+  scores?: Partial<typeof scoreColors.light>;
+  macros?: Partial<Record<keyof typeof MACRO_COLORS, string>>;
   healthArtColors?: Record<string, string>;
   healthHeroGradients?: Partial<typeof healthHeroGradients>;
   colors?: Partial<ThemeColors>;
@@ -107,7 +113,9 @@ export function createTheme(
     textStyles[key] = { ...typography[key], ...overrides.typography?.[key] };
   }
   return {
-    macros: {...MACRO_COLORS,...overrides.macros},
+    homeCards: { ...homeCardColors, ...overrides.homeCards },
+    scores: { ...scoreColors[mode], ...overrides.scores },
+    macros: { ...MACRO_COLORS, ...overrides.macros },
     healthArtColors: { ...healthArtColors, ...overrides.healthArtColors },
     healthHeroGradients: { ...healthHeroGradients, ...overrides.healthHeroGradients },
     mode,

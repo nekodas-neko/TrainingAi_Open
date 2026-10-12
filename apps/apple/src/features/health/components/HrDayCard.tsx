@@ -8,7 +8,10 @@ import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { daySpec } from '../../workouts/data/models';
 import { useHealthData } from '../data/HealthDataProvider';
 import { hrSpec, stressSpec } from '../data/models';
-export function HrDayCard() {
+export function HrDayCard({
+  embedded = false,
+  color,
+}: { embedded?: boolean; color?: string } = {}) {
   const { today, timezone, sleep } = useHealthData();
   const { theme } = useTheme();
   const state = useWorkoutResource(hrSpec(today));
@@ -72,9 +75,19 @@ export function HrDayCard() {
     { x: minute(p.t) / 60000, value: p.level },
   ]);
   return (
-    <Card>
-      <HealthResourceHeader title="Heart Rate · Today" state={state} refresh={state.refresh} />
+    <Card
+      padded={!embedded}
+      style={embedded ? { borderWidth: 0, backgroundColor: 'transparent' } : undefined}
+    >
+      {!embedded && (
+        <HealthResourceHeader
+          title="Heart Rate · Today"
+          state={state}
+          refresh={state.refresh}
+        />
+      )}
       <LineChart
+        color={color === 'transparent' ? undefined : color}
         points={points}
         xDomain={[0, 1440]}
         axisLabels={['00:00', '12:00', '24:00']}

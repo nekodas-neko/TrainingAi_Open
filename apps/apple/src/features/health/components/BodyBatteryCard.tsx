@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { Pressable } from 'react-native';
 import { formatTimeOfDay } from '@trainingai/shared/date-utils';
 import {
@@ -11,47 +12,62 @@ import {
   MetricTile,
   ProgressBar,
   Stack,
+  StatusIndicator,
 } from '../../../shared/ui';
 import { useHealthData } from '../data/HealthDataProvider';
 import { batterySpec, metricValue } from '../data/models';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { StressDayCard } from './StressDayCard';
-import { HealthResourceHeader } from './HealthResourceHeader';
 
 export function BodyBatteryCard() {
+  const { theme } = useTheme();
   const health = useHealthData();
   const state = useWorkoutResource(batterySpec(health.today));
   const [expanded, setExpanded] = useState(false);
   const data = state.data;
   return (
-    <Card tone="brand">
-      <HealthResourceHeader title="Body Battery" state={state} refresh={state.refresh} />
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Body Battery"
-        accessibilityState={{ expanded }}
-        onPress={() => setExpanded((value) => !value)}
-      >
-        <Stack direction="row" align="center" justify="space-between">
-          <AppText variant="hero">{data?.hasData ? metricValue(data.current) : '—'}</AppText>
-          <Icon name={expanded ? 'down' : 'forward'} tone="muted" />
-        </Stack>
-        <Stack direction="row" wrap>
-          {data?.hasData ? (
-            <>
-              <Badge label={data.label} />
-              <Badge label={data.trend} />
-              {data.confidence && !data.confidence.sufficient && <Badge label="Limited data" />}
-            </>
-          ) : (
-            data && <Badge label="No data yet" />
-          )}
-        </Stack>
-      </Pressable>
-      <AppText variant="caption" tone="muted">
-        Energy left right now — opens at your readiness and drains as you use it.
-      </AppText>
-      {data?.hasData && <ProgressBar value={data.current / 100} origin="right" />}
+    <Card tone="brand" style={{ padding: theme.spacing.md, gap: theme.spacing.xs }}>
+      <Stack direction="row" align="center" gap="xs">
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Body Battery"
+          accessibilityState={{ expanded }}
+          onPress={() => setExpanded((value) => !value)}
+          style={{ flex: 1 }}
+        >
+          <Stack direction="row" align="center" gap="xs">
+            <Icon
+              name={data?.hasData ? 'battery' : 'info'}
+              size={theme.sizes.iconSmall}
+              tone={data?.hasData ? 'brand' : 'muted'}
+            />
+            <AppText variant="micro" tone="muted">
+              Body Battery
+            </AppText>
+            <AppText variant="label" numberOfLines={1} style={{ flexShrink: 1 }}>
+              {data?.hasData ? data.label : data ? 'No data yet' : '—'}
+            </AppText>
+            <AppText variant="micro" tone="muted">
+              {data?.hasData ? data.trend : ''}
+            </AppText>
+            <AppText variant="hero" style={{ flex: 1, textAlign: 'right' }}>
+              {data?.hasData ? metricValue(data.current) : '—'}
+            </AppText>
+            <Icon
+              name={expanded ? 'down' : 'forward'}
+              size={theme.sizes.iconSmall}
+              tone="muted"
+            />
+          </Stack>
+        </Pressable>
+        <StatusIndicator
+          label="Body Battery"
+          busy={state.loading && !data}
+          error={state.error}
+          onRetry={state.refresh}
+        />
+      </Stack>
+      <ProgressBar value={data?.hasData ? data.current / 100 : 0} origin="right" />
       {expanded && data && (
         <>
           {data.hasData ? (
@@ -68,7 +84,7 @@ export function BodyBatteryCard() {
               />
               <AppText variant="caption" tone="muted">
                 Started at {data.anchor} from {data.anchorSource}
-                {data.anchorProvisional ? ' · provisional until readiness arrives' : ''}
+                {data.anchorProvisional ? ' · provisional until energy arrives' : ''}
               </AppText>
               <Grid columns={2}>
                 <MetricTile label="Charged" value={`+${data.charged}`} />

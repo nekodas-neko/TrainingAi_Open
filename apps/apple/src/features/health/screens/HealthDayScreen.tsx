@@ -115,7 +115,7 @@ export function HealthDayScreen({
       <View style={{ paddingHorizontal: theme.spacing.lg }}>
         <Grid columns={4}>
           {[
-            { label: 'Ready', value: data?.scores?.readiness, color: theme.colors.brand },
+            { label: 'Energy', value: data?.scores?.readiness, color: theme.colors.brand },
             {
               label: 'HR',
               value: data?.bodyMeta?.restingHeartRate,

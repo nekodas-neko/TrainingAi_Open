@@ -10,6 +10,7 @@ export function IconButton({
   disabled = false,
   hint,
   tone = 'muted',
+  selected,
 }: {
   icon: IconName;
   label: string;
@@ -18,6 +19,7 @@ export function IconButton({
   disabled?: boolean;
   hint?: string;
   tone?: 'muted' | 'brand' | 'danger';
+  selected?: boolean;
 }) {
   const { theme } = useTheme();
   return (
@@ -25,7 +27,7 @@ export function IconButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={hint}
-      accessibilityState={{ disabled: disabled || !onPress || busy, busy }}
+      accessibilityState={{ disabled: disabled || !onPress || busy, busy, selected }}
       disabled={disabled || !onPress || busy}
       onPress={onPress}
       style={({ pressed }) => ({

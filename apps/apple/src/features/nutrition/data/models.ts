@@ -319,6 +319,7 @@ export const scanSchema = z
   .passthrough();
 export type Scan = z.infer<typeof scanSchema>;
 export const nutritionPaths = [
+  '/api/day-timeline',
   '/api/nutrition',
   '/api/body-metadata',
   '/api/progress-summary',

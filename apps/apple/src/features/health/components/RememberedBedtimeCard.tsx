@@ -31,6 +31,9 @@ export function RememberedBedtimeCard({ night }: { night: SleepRow }) {
       setBusy(false);
     }
   }
+  if (night.localOnly) {
+    return null;
+  }
   return (
     <Card>
       <AppText variant="eyebrow" tone="muted">

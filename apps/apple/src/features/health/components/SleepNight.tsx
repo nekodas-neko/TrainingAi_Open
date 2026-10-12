@@ -96,6 +96,14 @@ export function SleepNight({
         {night.manualEntry && <Badge label="Logged by hand" tone="sleep" />}
         {night.provisional && <Badge label="Still updating" tone="sleep" />}
       </Stack>
+      {night.sourceLabel && (
+        <AppText variant="caption" tone="muted">
+          {night.sourceLabel}
+          {night.sources?.length
+            ? ` · ${night.sources.map((source) => source.name).join(', ')}`
+            : ''}
+        </AppText>
+      )}
       <AppText variant="title">
         {night.durationHours === null ? '—' : formatHoursMinutes(night.durationHours * 60)}
       </AppText>

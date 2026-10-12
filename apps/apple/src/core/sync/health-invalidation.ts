@@ -1,4 +1,5 @@
 export const healthReadPaths = [
+  '/api/day-timeline',
   '/api/body-metadata',
   '/api/sleep-sessions',
   '/api/readiness-score',

@@ -1,5 +1,5 @@
 import { ACTIVITY_LEVELS } from '@trainingai/shared/types/user';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { z } from 'zod';
 import {
   AppButton,
@@ -44,20 +44,33 @@ const recSchema = z.object({
 export function GoalRecommendation({
   onClose,
   onApplied,
+  source,
+  onGenerated,
 }: {
   onClose: () => void;
   onApplied: (changes?: { goals: Record<string, number>; activityLevel?: string }) => void;
+  source?: 'scheduled';
+  onGenerated?: () => void;
 }) {
   const resources = useWorkoutResources();
   const n = useNutrition();
   const draft = useWorkoutDraft(
-    'nutrition-goal-recommendation',
+    source
+      ? `nutrition-goal-recommendation:${source}:${n.today}`
+      : 'nutrition-goal-recommendation',
     z.object({ rec: recSchema.nullable(), selected: z.array(z.string()) }),
     { rec: null, selected: ['steps', 'protein', 'carbs', 'fat', 'water', 'activity'] },
   );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const rec = draft.value.rec;
+  const requested = useRef(false);
+  useEffect(() => {
+    if (source && draft.ready && !requested.current) {
+      requested.current = true;
+      void generate();
+    }
+  }, [source, draft.ready]);
   async function generate() {
     if (!resources) {
       return;
@@ -65,13 +78,17 @@ export function GoalRecommendation({
     setBusy(true);
     try {
       const rec = recSchema.parse(
-        await resources.connection.post('/api/nutrition-goals/recommend', {}),
+        await resources.connection.post(
+          '/api/nutrition-goals/recommend',
+          source ? { source } : {},
+        ),
       );
       draft.setValue({
         rec,
         selected: ['steps', 'protein', 'carbs', 'fat', 'water', 'activity'],
       });
       setError(null);
+      onGenerated?.();
     } catch {
       setError(
         'Could not review goals. Check your height, weight, sex, date of birth and fitness goal in Profile.',
@@ -143,7 +160,11 @@ export function GoalRecommendation({
         '/api/body-metadata',
       ]);
       await n.store?.refresh('targets', n.today, true);
-      await resources.clearDraft('nutrition-goal-recommendation');
+      await resources.clearDraft(
+        source
+          ? `nutrition-goal-recommendation:${source}:${n.today}`
+          : 'nutrition-goal-recommendation',
+      );
       onApplied({
         goals,
         ...(selected.has('activity') && rec.recommended.activityLevel

@@ -9,6 +9,7 @@ export function MoreScreen({
   openStrength,
   openClinical,
   openGoals,
+  openAppleHealth,
 }: {
   openSettings: () => void;
   openPrograms: () => void;
@@ -16,7 +17,8 @@ export function MoreScreen({
   openHistory: () => void;
   openStrength: () => void;
   openClinical: () => void;
-  openGoals:()=>void;
+  openGoals: () => void;
+  openAppleHealth: () => void;
 }) {
   const { state } = useAccountContext();
   return (
@@ -54,6 +56,11 @@ export function MoreScreen({
           onPress={openGoals}
           title="Profile & goals"
           subtitle="Your details, fitness goals and preferences"
+        />
+        <FeatureRow
+          title="Apple Health"
+          subtitle="Connection, permissions and data sources"
+          onPress={openAppleHealth}
         />
         <FeatureRow
           title="Progress & reviews"

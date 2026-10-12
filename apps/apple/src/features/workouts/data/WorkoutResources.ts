@@ -414,11 +414,11 @@ export class WorkoutResources {
       });
     }
   }
-  refreshVisible() {
+  refreshVisible(manual = false) {
     return Promise.all(
       [...this.entries.values()]
         .filter((entry) => !entry.localOnly)
-        .map((entry) => this.load(entry.spec)),
+        .map((entry) => this.load(entry.spec, manual)),
     );
   }
   async draft<T>(key: string, schema: ZodType<T>): Promise<T | null> {

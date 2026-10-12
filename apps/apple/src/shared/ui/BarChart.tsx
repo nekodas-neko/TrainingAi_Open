@@ -9,9 +9,11 @@ export function BarChart({
   label,
   bars,
   height,
+  unit = 'kg',
 }: {
   label: string;
   height?: number;
+  unit?: string;
   bars: readonly {
     label: string;
     value: number;
@@ -27,13 +29,14 @@ export function BarChart({
   return (
     <Stack direction="row" gap="xs" align="flex-start" accessibilityLabel={label}>
       {bars.map((bar, index) => {
-        const height = bar.value > 0 ? Math.max(16, (bar.value / max) * 52) : 6;
+        const barHeight =
+          bar.value > 0 ? Math.max(theme.spacing.md, (bar.value / max) * (height ?? 52)) : 6;
         const colors = bar.colors.length ? bar.colors : [theme.colors.brand];
         return (
           <View
             key={index}
             style={{ flex: 1, minWidth: 0 }}
-            accessibilityLabel={`${bar.label}: ${Math.round(bar.value)} kg${bar.annotation ? ', ' + bar.annotation : ''}`}
+            accessibilityLabel={`${bar.label}: ${Math.round(bar.value)} ${unit}${bar.annotation ? ', ' + bar.annotation : ''}`}
           >
             <Svg
               viewBox="0 0 40 64"
@@ -57,9 +60,9 @@ export function BarChart({
                   <Rect
                     key={at}
                     x="0"
-                    y={64 - height + (at * height) / colors.length}
+                    y={64 - barHeight + (at * barHeight) / colors.length}
                     width="40"
-                    height={height / colors.length}
+                    height={barHeight / colors.length}
                     fill={color}
                   />
                 ))
@@ -69,9 +72,9 @@ export function BarChart({
               {bar.reduced && (
                 <Rect
                   x="0"
-                  y={64 - height}
+                  y={64 - barHeight}
                   width="40"
-                  height={height}
+                  height={barHeight}
                   fill={`url(#${id}-${index})`}
                 />
               )}

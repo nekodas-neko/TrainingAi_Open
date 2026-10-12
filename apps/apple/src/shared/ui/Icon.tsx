@@ -38,6 +38,10 @@ import Settings from 'lucide-react-native/icons/settings';
 import Info from 'lucide-react-native/icons/info';
 import Droplets from 'lucide-react-native/icons/droplets';
 import UtensilsCrossed from 'lucide-react-native/icons/utensils-crossed';
+import Moon from 'lucide-react-native/icons/moon';
+import LayoutGrid from 'lucide-react-native/icons/layout-grid';
+import BatteryMedium from 'lucide-react-native/icons/battery-medium';
+import Scale from 'lucide-react-native/icons/scale';
 import type { LucideProps } from 'lucide-react-native';
 import { Platform } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
@@ -83,6 +87,10 @@ const icons = {
   info: Info,
   water: Droplets,
   foods: UtensilsCrossed,
+  moon: Moon,
+  layout: LayoutGrid,
+  battery: BatteryMedium,
+  scale: Scale,
 };
 
 export type IconName = keyof typeof icons;

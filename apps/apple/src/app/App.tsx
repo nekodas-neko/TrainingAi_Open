@@ -22,7 +22,7 @@ import { SessionScreen } from '../features/workouts/screens/SessionScreen';
 import { WorkoutLogScreen } from '../features/workouts/screens/WorkoutLogScreen';
 import { useWorkoutContext } from '../features/workouts/WorkoutProvider';
 import { NutritionScreen } from '../features/nutrition/screens/NutritionScreen';
-import {ProfileGoalsScreen} from '../features/settings/screens/ProfileGoalsScreen';
+import { ProfileGoalsScreen } from '../features/settings/screens/ProfileGoalsScreen';
 import { MoreScreen } from '../features/settings/screens/MoreScreen';
 import { DataScreen } from '../features/health/screens/DataScreen';
 import { SettingsScreen } from '../features/settings/screens/SettingsScreen';
@@ -44,9 +44,17 @@ function AppShell() {
   const [tab, setTab] = useState<Tab>('Home');
   const [detail, setDetail] = useState<DetailScreen | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionFullOverride, setSessionFullOverride] = useState(false);
   const [healthDetail, setHealthDetail] = useState<HealthDetail | null>(null);
   const [healthDate, setHealthDate] = useState('');
   const [healthPanel, setHealthPanel] = useState<HealthPanel>('training');
+  const [nutritionReviewRequest, setNutritionReviewRequest] = useState({ scope: '', count: 0 });
+  const [nutritionDateRequest, setNutritionDateRequest] = useState({
+    scope: '',
+    date: '',
+    count: 0,
+  });
+  const [sleepRequest, setSleepRequest] = useState({ scope: '', date: '', count: 0 });
   const [workoutId, setWorkoutId] = useState<string | null>(null);
   const [workoutReturn, setWorkoutReturn] = useState<{
     detail: DetailScreen | null;
@@ -61,11 +69,12 @@ function AppShell() {
       workouts.refreshIfStale();
     }
   }
-  function openHealth() {
-    setTab('Health');
+  function openAppleHealth() {
+    selectTab('More');
     setDetail('health-data');
   }
-  function openSession(id: string) {
+  function openSession(id: string, fullOverride = false) {
+    setSessionFullOverride(fullOverride);
     setTab('Workout');
     setSessionId(id);
     setDetail('workout-session');
@@ -96,13 +105,62 @@ function AppShell() {
     >
       <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
       <RetainedView
+        key={`home:${accountKey}`}
+        active={!healthDetail && !detail && tab === 'Home'}
+      >
+        <HomeScreen
+          openHealthDetail={setHealthDetail}
+          openHealthBody={() => {
+            selectTab('Health');
+            setHealthPanel('body');
+          }}
+          openDay={(date) => {
+            setHealthDate(date);
+            setDetail('health-day');
+          }}
+          openWeek={(week) => {
+            setHealthDate(week);
+            setDetail('health-week');
+          }}
+          openNutrition={(review, date) => {
+            selectTab('Nutrition');
+            if (date) {
+              setNutritionDateRequest((value) => ({
+                scope: accountKey,
+                date,
+                count: value.count + 1,
+              }));
+            }
+            if (review) {
+              setNutritionReviewRequest((value) => ({
+                scope: accountKey,
+                count: value.count + 1,
+              }));
+            }
+          }}
+          openSleep={(date) => {
+            selectTab('Health');
+            setHealthPanel('body');
+            setSleepRequest((value) => ({ scope: accountKey, date, count: value.count + 1 }));
+          }}
+          openSession={openSession}
+          openWorkout={openWorkout}
+          openMore={() => selectTab('More')}
+          openPrograms={() => setDetail('programs')}
+          openStats={() => {
+            selectTab('Health');
+            setHealthPanel('training');
+          }}
+        />
+      </RetainedView>
+      <RetainedView
         key={`health:${accountKey}`}
         active={!healthDetail && !detail && tab === 'Health'}
       >
         <HealthScreen
+          sleepRequest={sleepRequest.scope === accountKey ? sleepRequest : undefined}
           panel={healthPanel}
           onPanelChange={setHealthPanel}
-          openData={openHealth}
           openDetail={setHealthDetail}
           openPrograms={() => setDetail('programs')}
           openSettings={openSettings}
@@ -127,8 +185,19 @@ function AppShell() {
           openPrograms={() => setDetail('programs')}
         />
       </RetainedView>
-      <RetainedView key={`nutrition:${accountKey}`} active={!healthDetail && !detail && tab==='Nutrition'}>
-        <NutritionScreen openSettings={openSettings} />
+      <RetainedView
+        key={`nutrition:${accountKey}`}
+        active={!healthDetail && !detail && tab === 'Nutrition'}
+      >
+        <NutritionScreen
+          openSettings={openSettings}
+          dateRequest={
+            nutritionDateRequest.scope === accountKey ? nutritionDateRequest : undefined
+          }
+          reviewRequest={
+            nutritionReviewRequest.scope === accountKey ? nutritionReviewRequest.count : 0
+          }
+        />
       </RetainedView>
       {healthDetail ? (
         <HealthDetailScreen
@@ -145,6 +214,7 @@ function AppShell() {
       ) : detail === 'workout-session' ? (
         <SessionScreen
           sessionId={sessionId}
+          initialFullOverride={sessionFullOverride}
           openSettings={openSettings}
           openWorkout={openWorkout}
           closeSession={() => setDetail(null)}
@@ -165,7 +235,9 @@ function AppShell() {
         <WorkoutHistoryScreen onBack={() => setDetail(null)} openWorkout={openWorkout} />
       ) : detail === 'strength-progress' ? (
         <StrengthScreen onBack={() => setDetail(null)} />
-      ) : detail === 'profile-goals' ? (<ProfileGoalsScreen onBack={()=>setDetail(null)}/>) : detail === 'clinical' ? (
+      ) : detail === 'profile-goals' ? (
+        <ProfileGoalsScreen onBack={() => setDetail(null)} />
+      ) : detail === 'clinical' ? (
         <ClinicalScreen key={accountKey} onBack={() => setDetail(null)} />
       ) : detail === 'health-day' ? (
         <HealthDayScreen
@@ -179,7 +251,11 @@ function AppShell() {
           week={healthDate}
           onBack={() => setDetail(null)}
         />
-      ) : !detail && (tab === 'Health' || tab === 'Workout' || tab === 'Nutrition') ? null : (
+      ) : !detail &&
+        (tab === 'Home' ||
+          tab === 'Health' ||
+          tab === 'Workout' ||
+          tab === 'Nutrition') ? null : (
         <Screen
           key={detail ?? tab}
           title={
@@ -192,22 +268,21 @@ function AppShell() {
             <DataScreen />
           ) : detail === 'settings' ? (
             <SettingsScreen />
-          ) : tab === 'Home' ? (
-            <HomeScreen openHealth={openHealth} />
           ) : tab === 'Nutrition' ? (
             <NutritionScreen openSettings={openSettings} />
           ) : (
             <MoreScreen
+              openAppleHealth={openAppleHealth}
               openSettings={() => setDetail('settings')}
               openPrograms={() => setDetail('programs')}
               openLibrary={() => setDetail('exercise-library')}
               openHistory={() => setDetail('workout-history')}
               openStrength={() => setDetail('strength-progress')}
               openClinical={() => setDetail('clinical')}
-              openGoals={()=>setDetail('profile-goals')}
+              openGoals={() => setDetail('profile-goals')}
             />
           )}
-          {health.error && (tab === 'Health' || tab === 'Home') && (
+          {health.error && detail === 'health-data' && (
             <Notice title="Unable to read Apple Health" message={health.error} error />
           )}
         </Screen>

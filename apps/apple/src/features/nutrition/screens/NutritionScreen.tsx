@@ -51,7 +51,15 @@ import {
   totals,
   weeklySpec,
 } from '../data/models';
-export function NutritionScreen({ openSettings }: { openSettings: () => void }) {
+export function NutritionScreen({
+  openSettings,
+  reviewRequest = 0,
+  dateRequest,
+}: {
+  openSettings: () => void;
+  reviewRequest?: number;
+  dateRequest?: { date: string; count: number };
+}) {
   const n0 = useNutrition();
   const [date, setDate] = useState(n0.today);
   const n = useNutrition(date);
@@ -62,6 +70,22 @@ export function NutritionScreen({ openSettings }: { openSettings: () => void }) 
   const [modal, setModal] = useState<
     'settings' | 'recipes' | 'plans' | 'review' | 'goals' | 'water' | null
   >(null);
+  const handledReview = useRef(0);
+  const handledDate = useRef(0);
+  useEffect(() => {
+    if (dateRequest && dateRequest.count > handledDate.current) {
+      handledDate.current = dateRequest.count;
+      setDate(dateRequest.date);
+      setModal(null);
+    }
+  }, [dateRequest]);
+  useEffect(() => {
+    if (reviewRequest > handledReview.current) {
+      handledReview.current = reviewRequest;
+      setDate(n0.today);
+      setModal('review');
+    }
+  }, [reviewRequest, n0.today]);
   const [logger, setLogger] = useState<string | null>(null);
   const [library, setLibrary] = useState(false);
   const [edit, setEdit] = useState<FoodLog | null>(null);

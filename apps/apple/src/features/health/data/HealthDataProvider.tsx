@@ -15,6 +15,8 @@ import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { useLocalStorage } from '../../../core/storage/StorageProvider';
 import { HealthStore, emptyHealthState, overlayBody, overlaySleep } from './HealthStore';
+import { useAppleSleep } from '../HealthProvider';
+import { mergeAppleSleep } from '../../../integrations/apple-health/sleep-data';
 
 const Context = createContext<{
   store: HealthStore | null;
@@ -44,6 +46,7 @@ export function HealthDataProvider({ children }: PropsWithChildren) {
                 '/api/progress-summary',
                 '/api/day-log',
                 '/api/day-checkin',
+                '/api/day-timeline',
                 '/api/sleep-verdict',
                 '/api/next-session/prescription',
                 '/api/workout-data',
@@ -116,6 +119,7 @@ export function HealthStoreProvider({
   return <Context.Provider value={context}>{children}</Context.Provider>;
 }
 export function useHealthData() {
+  const apple = useAppleSleep();
   const context = useContext(Context);
   if (!context) {
     throw new Error('Health records provider is missing.');
@@ -132,9 +136,12 @@ export function useHealthData() {
     timezone,
     today,
     connected: !!store,
-    hasSleepRecords: state.sleep !== null,
+    hasSleepRecords: state.sleep !== null || apple.ready,
+    appleSleep: apple,
     body: state.denied ? null : overlayBody(state.body, state.operations, today),
-    sleep: state.denied ? [] : overlaySleep(state.sleep ?? [], state.operations),
+    sleep: state.denied
+      ? []
+      : mergeAppleSleep(overlaySleep(state.sleep ?? [], state.operations), apple.nights),
     refresh: () => {
       void store?.refresh(true);
     },

@@ -19,6 +19,7 @@ export function useSessionPreparation(
   session: SessionPreview | undefined,
   programId: string | undefined,
   ai: boolean,
+  initialFullOverride = false,
 ) {
   const resources = useWorkoutResources();
   const [deload, setDeload] = useState(false);
@@ -26,7 +27,10 @@ export function useSessionPreparation(
   const [duration, setDuration] = useState<DurationPreset | undefined>();
   const [reverted, setReverted] = useState<string[]>([]);
   const action = useWorkoutAction();
-  const state = useWorkoutResource(periodizationSpec(session?.id ?? 'missing'), !!session && ai);
+  const state = useWorkoutResource(
+    periodizationSpec(session?.id ?? 'missing'),
+    !!session && ai,
+  );
   const spec = {
     path: '/api/workout-data',
     query: { tab: session?.id ?? 'missing', ...(deload ? { aiDeload: '1' } : {}) },
@@ -35,11 +39,11 @@ export function useSessionPreparation(
   };
   const current = useWorkoutResource(spec, !!session);
   useEffect(() => {
-    chosen.current = false;
+    chosen.current = initialFullOverride;
     setDeload(false);
     setDuration(undefined);
     setReverted([]);
-  }, [session?.id]);
+  }, [session?.id, initialFullOverride]);
   useEffect(() => {
     const prescribed = state.data?.state;
     if (
@@ -66,9 +70,10 @@ export function useSessionPreparation(
   const options: SessionStartOptions = {
     aiDeload: deload,
     fullOverride:
-      chosen.current &&
       !deload &&
-      !!(prescribed?.deload || prepared?.exercises.some((exercise) => exercise.deloaded)),
+      (initialFullOverride ||
+        (chosen.current &&
+          !!(prescribed?.deload || prepared?.exercises.some((exercise) => exercise.deloaded)))),
     revertedExerciseIds: reverted,
     durationPreset: duration,
   };

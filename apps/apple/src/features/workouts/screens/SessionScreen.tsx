@@ -29,11 +29,13 @@ export function SessionScreen({
   openSettings,
   openWorkout,
   closeSession,
+  initialFullOverride = false,
 }: {
   sessionId: string | null;
   openSettings: () => void;
   openWorkout: (id: string) => void;
   closeSession: () => void;
+  initialFullOverride?: boolean;
 }) {
   const workout = useWorkoutContext();
   const journal = useWorkoutJournal();
@@ -41,12 +43,15 @@ export function SessionScreen({
   const injuredMuscles = activeInjuredMuscles(injuries.data ?? []).map(normalizeMuscle);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [historyName, setHistoryName] = useState<string | null>(null);
-  const original = workout.catalog?.program?.sessions.find((session) => session.id === sessionId);
+  const original = workout.catalog?.program?.sessions.find(
+    (session) => session.id === sessionId,
+  );
   const program = workout.catalog?.program;
   const preparation = useSessionPreparation(
     original,
     program?.id,
     program?.phaseMode === 'ai_dynamic',
+    initialFullOverride,
   );
   const session = preparation.session;
   const selected = session?.exercises.find((exercise) => exercise.id === selectedId);

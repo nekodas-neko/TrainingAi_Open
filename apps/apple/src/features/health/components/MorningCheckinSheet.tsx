@@ -20,6 +20,7 @@ import { useHealthData } from '../data/HealthDataProvider';
 import { checkinSpec, verdictSpec } from '../data/checkin';
 import { verdictCopy, type StoredSleepVerdict } from '../data/sleep-verdict-copy';
 import { saveSleepValue } from '../data/save-sleep-value';
+import { formatHoursMinutes } from '@trainingai/shared/format/units';
 const draftSchema = z.object({
   correction: z.number().int().min(1).max(5).nullable(),
   acknowledged: z.boolean(),
@@ -76,7 +77,10 @@ export function MorningCheckinSheet({ onClose }: { onClose: () => void }) {
           },
     );
   }, [draft.ready, row]);
-  const verdict = opened ? snapshot : (announced.data?.verdict ?? null);
+  const localNight = health.sleep.find(
+    (night) => night.date === health.today && night.localOnly,
+  );
+  const verdict = localNight ? null : opened ? snapshot : (announced.data?.verdict ?? null);
   const copy = verdict ? verdictCopy(verdict) : null;
   async function save() {
     if (!health.store || saving || !draft.ready) {
@@ -152,12 +156,19 @@ export function MorningCheckinSheet({ onClose }: { onClose: () => void }) {
     >
       {opened || contentReady ? (
         <>
-          {copy && (
+          {(copy || localNight) && (
             <Card>
-              <AppText variant="caption">{copy.line}</AppText>
+              <AppText variant="caption">
+                {copy?.line ??
+                  `${formatHoursMinutes((localNight?.durationHours ?? 0) * 60)} sleep · Apple Health`}
+              </AppText>
               <ChipPicker
                 label={
-                  draft.value.correction == null ? 'Not right? Set it yourself' : 'You set this'
+                  draft.value.correction == null
+                    ? copy
+                      ? 'Not right? Set it yourself'
+                      : 'How did you sleep?'
+                    : 'You set this'
                 }
                 value={draft.value.correction}
                 options={storedOrderLabels('sleepQualityFeel').map((label, i) => ({
@@ -167,7 +178,7 @@ export function MorningCheckinSheet({ onClose }: { onClose: () => void }) {
                 disabled={!draft.ready}
                 onChange={(correction) => update({ correction, acknowledged: false })}
               />
-              {copy.prominent && draft.value.correction == null && (
+              {copy?.prominent && draft.value.correction == null && (
                 <AppButton
                   title={draft.value.acknowledged ? 'Marked as right' : 'That’s right'}
                   variant="ghost"

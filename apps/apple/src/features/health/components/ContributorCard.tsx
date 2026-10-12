@@ -113,7 +113,7 @@ export function ContributorDetails({
                 ))}
                 {f.weight != null && (
                   <AppText variant="micro" tone="muted">
-                    Weighted {Math.round(f.weight * 100)}% of your readiness score.
+                    Weighted {Math.round(f.weight * 100)}% of your energy score.
                   </AppText>
                 )}
               </Card>

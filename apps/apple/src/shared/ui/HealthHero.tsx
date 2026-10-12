@@ -89,7 +89,7 @@ export function HealthHero({
             borderRadius: theme.radii.pill,
           }}
         >
-          <IconButton icon="back" label="Back to Health" onPress={onBack} />
+          <IconButton icon="back" label="Back" onPress={onBack} />
         </View>
         <AppText variant="label" style={{ flex: 1 }}>
           {title}

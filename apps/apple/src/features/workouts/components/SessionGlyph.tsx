@@ -32,12 +32,23 @@ const storedIcons: Record<string, IconName> = {
 };
 const positions: IconName[] = ['workout', 'workout', 'legs', 'activity', 'mind', 'power'];
 
-export function SessionGlyph({ icon, position }: { icon?: string | null; position: number }) {
+export function SessionGlyph({
+  icon,
+  position,
+  size,
+  color,
+}: {
+  icon?: string | null;
+  position: number;
+  size?: number;
+  color?: string;
+}) {
   const { theme } = useTheme();
   return (
     <Icon
       name={(icon && storedIcons[icon]) || positions[position % positions.length] || 'workout'}
-      size={theme.spacing.xxxl}
+      size={size ?? theme.spacing.xxxl}
+      color={color}
     />
   );
 }

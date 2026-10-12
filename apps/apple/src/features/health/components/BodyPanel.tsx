@@ -15,7 +15,6 @@ import {
   Disclosure,
   FeatureRow,
   Grid,
-  ListRow,
   MetricTile,
   ProgressBar,
   Stack,
@@ -54,13 +53,7 @@ function GroupTitle({ children }: { children: string }) {
     </AppText>
   );
 }
-export function BodyPanel({
-  openDetail,
-  openData,
-}: {
-  openDetail: (detail: HealthDetail) => void;
-  openData: () => void;
-}) {
+export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) => void }) {
   const health = useHealthData();
   const goals = useWorkoutResource(goalsSpec);
   const profile = useWorkoutResource(profileSpec);
@@ -495,11 +488,6 @@ export function BodyPanel({
       <FeatureRow
         title="Devices & integrations"
         subtitle="Direct ring connections remain deferred"
-      />
-      <ListRow
-        title="Apple Health"
-        subtitle="Read data, sources and permissions"
-        onPress={openData}
       />
       {log && (
         <MetricLogSheet

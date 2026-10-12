@@ -94,6 +94,10 @@ export const sleepSchema = z
     sleepPhase5Min: text,
     manualEntry: z.boolean().optional(),
     provisional: z.boolean().optional(),
+    localOnly: z.boolean().optional(),
+    sourceLabel: text,
+    stageCoverage: n,
+    sources: z.array(z.object({ name: z.string(), bundleIdentifier: z.string() })).nullish(),
   })
   .passthrough();
 export type SleepRow = z.infer<typeof sleepSchema>;
@@ -152,6 +156,7 @@ export const readinessSpec = (date: string) => ({
         'baselineHrv',
         'recentHrv',
         'restingHr',
+        'restingHrLastNight',
         'restingHrBaseline',
         'hrCurrent',
         'hrMin',
@@ -178,9 +183,21 @@ export const readinessSpec = (date: string) => ({
         })
         .nullish(),
       limited: z.boolean().optional(),
+      isLowWearToday: z.boolean().optional(),
       inputsMissing: z.array(z.string()).optional(),
       daySummary: text,
       illnessAdvisory: text,
+      illnessFlag: text,
+      illnessSuppression: n,
+      earlyDeloadRecommended: z.boolean().optional(),
+      earlyDeload: z
+        .object({
+          score: z.number(),
+          acwr: z.number(),
+          scoreThreshold: z.number(),
+          acwrThreshold: z.number(),
+        })
+        .nullish(),
       ownResilienceBand: text,
       ownResilienceAsOf: text,
       ownResilienceConfidence: n,
@@ -447,7 +464,21 @@ export const hrProfileSpec = {
 export const profileSpec = {
   path: '/api/user/profile',
   ttl: 3_600_000,
-  schema: z.object({ user: z.object({ heightCm: n, sex: text }).passthrough() }).passthrough(),
+  schema: z
+    .object({
+      user: z
+        .object({
+          heightCm: n,
+          sex: text,
+          name: text,
+          avatar: text,
+          activityLevel: text,
+          fitnessGoal: text,
+          lastGoalReviewAt: text,
+        })
+        .passthrough(),
+    })
+    .passthrough(),
 };
 export const weightsSpec = {
   path: '/api/weights-summary',

@@ -20,6 +20,7 @@ export function LineChart({
   markers = [],
   interactive = false,
   axisLabels,
+  color: accent,
 }: {
   points: readonly { label: string; value: number | null; x?: number }[];
   label: string;
@@ -40,6 +41,7 @@ export function LineChart({
   markers?: readonly { x: number; label: string; color: string }[];
   interactive?: boolean;
   axisLabels?: readonly string[];
+  color?: string;
 }) {
   const { theme } = useTheme();
   const [selection, setSelection] = useState<number | null>(null);
@@ -95,7 +97,7 @@ export function LineChart({
       segments.push([]);
     }
   }
-  const color = theme.tones[tone].foreground;
+  const color = accent ?? theme.tones[tone].foreground;
   return (
     <View
       onStartShouldSetResponder={() => interactive}
