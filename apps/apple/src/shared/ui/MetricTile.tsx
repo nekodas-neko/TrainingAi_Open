@@ -6,11 +6,13 @@ export function MetricTile({
   label,
   value,
   caption,
+  unit,
   tone = 'brand',
 }: {
   label: string;
   value: string | null;
   caption?: string;
+  unit?: string;
   tone?: Tone;
 }) {
   return (
@@ -18,9 +20,19 @@ export function MetricTile({
       <AppText variant="caption" tone="muted">
         {label}
       </AppText>
-      <AppText variant="metric" tone={value === null ? 'muted' : 'text'}>
+      <AppText
+        variant="metric"
+        tone={value === null ? 'muted' : 'text'}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+      >
         {value ?? '—'}
       </AppText>
+      {unit && (
+        <AppText variant="micro" tone="muted">
+          {unit}
+        </AppText>
+      )}
       {caption && (
         <AppText variant="caption" tone="muted">
           {caption}

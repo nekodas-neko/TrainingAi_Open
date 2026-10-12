@@ -180,7 +180,7 @@ the code. Do not edit between the markers; CI compares this block with a fresh r
 | `health_connect_intervals` | SERVER-ONLY | — | — | exported | cascade | sensor ingest -> server (Health Connect, which is itself the device copy); writer: slices/health-connect-intervals.ts |
 | `injuries` | DEVICE-FIRST | `injuries` | yes | exported | cascade | local write + outbox push + delta pull |
 | `invited_emails` | SERVER-ONLY | — | — | excluded (third-party) | purged | auth / access list; writer: adapter.ts |
-| `meal_logging_statuses` | SERVER-ONLY | — | — | unclassified | cascade | per-day meal choices; Apple caches locally and queues authenticated API writes |
+| `meal_logging_statuses` | SERVER-ONLY | — | — | exported | cascade | per-day meal choices; Apple caches locally and queues authenticated API writes |
 | `meal_plan_meals` | SERVER-FIRST MIRROR | `meal_plan_meals` | — | exported | cascade | server writes (API); delta pull fills a read-only local mirror; no outbox domain |
 | `meal_plan_variants` | SERVER-FIRST MIRROR | `meal_plan_variants` | — | exported | cascade | server writes (API); delta pull fills a read-only local mirror; no outbox domain |
 | `meal_plans` | SERVER-FIRST MIRROR | `meal_plans` | yes | exported | cascade | server writes (API); delta pull fills a read-only local mirror; no outbox domain |

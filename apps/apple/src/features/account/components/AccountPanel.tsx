@@ -115,7 +115,7 @@ export function AccountPanel() {
             </>
           )}
           <AppText variant="caption" tone="muted">
-            Apple Health readings stay on this device. Signing in does not upload them.
+            Manage health-data syncing separately in More → Apple Health.
           </AppText>
         </>
       )}

@@ -1,3 +1,4 @@
+import * as appleHealth from './slices/apple-health'
 import * as authData from './slices/auth'
 import * as mealLogging from './slices/meal-logging-statuses'
 import type { AuthProvider } from '@/lib/auth/identity'
@@ -411,6 +412,9 @@ function rowToAnalyte(r: {
 }
 
 export class PostgresWorkoutRepository implements WorkoutRepository {
+  async applyAppleHealthBatch(userId:string,batch:import('@trainingai/shared/validation/apple-health-import').AppleImportBatch){return appleHealth.applyAppleHealthBatch(this.db,userId,batch)}
+  async rebuildAppleHealth(userId:string,timezone:string){return appleHealth.rebuildAppleHealth(this.db,userId,timezone)}
+
   /** Last daytime-HRV refit ATTEMPT per user (see maybeRefitDaytimeHrvModel). Static because the
    *  throttle must outlive any single repository instance within the process. */
   private static readonly lastHrvRefitAttemptMs = new Map<string, number>()

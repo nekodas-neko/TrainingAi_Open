@@ -7,13 +7,14 @@ import {
   SwitchRow,
   StatusIndicator,
 } from '../../../shared/ui';
-import { useHealthContext } from '../HealthProvider';
+import { useHealthContext, useAppleImport } from '../HealthProvider';
 import { useReportsContext } from '../../../development/diagnostics/ReportsProvider';
 import { isRunningInExpoGo } from 'expo';
 import { diagnosticsAvailable } from '../../../development/diagnostics/client';
 
 export function DataScreen() {
   const health = useHealthContext();
+  const imported = useAppleImport();
   const reports = useReportsContext();
   const { snapshot, busy, error } = health;
   const { report, reportBusy, reportStatus, reportAutomatically, setReportAutomatically } =
@@ -39,12 +40,50 @@ export function DataScreen() {
         ) : (
           <AppButton
             title={
-              snapshot?.mode === 'device' ? 'Refresh Apple Health' : 'Connect Apple Health'
+              snapshot?.mode === 'device'
+                ? 'Refresh Apple Health'
+                : imported.store
+                  ? 'Connect & sync Apple Health'
+                  : 'Connect Apple Health'
             }
             disabled={reportBusy}
             busy={busy}
             onPress={connect}
           />
+        )}
+      </Card>
+      <Card>
+        <Stack direction="row" align="center" justify="space-between">
+          <AppText variant="heading">Sync to your account</AppText>
+          <StatusIndicator
+            label="Apple Health sync"
+            busy={imported.busy}
+            error={imported.error}
+            onRetry={() => void imported.refresh()}
+          />
+        </Stack>
+        <SwitchRow
+          label="Sync Apple Health"
+          value={imported.enabled}
+          disabled={!imported.store || imported.busy}
+          onValueChange={(value) => void imported.store?.setEnabled(value)}
+        />
+        <AppText variant="caption" tone="muted">
+          Sync sends permitted health readings to your TrainingAi account for dashboard
+          calculations.
+        </AppText>
+        <AppText variant="caption" tone="muted">
+          {imported.completed
+            ? `Last synced ${new Date(imported.completed.completedAt).toLocaleString()} · ${imported.completed.nights} sleep nights`
+            : imported.store
+              ? 'Readings are saved before upload. Your dashboard updates after they sync.'
+              : 'Sign in to sync your health readings.'}
+        </AppText>
+        {imported.completed?.hrv && (
+          <AppText variant="caption">
+            HRV · SDNN: {imported.completed.hrv.value.toFixed(1)} ms ·{' '}
+            {imported.completed.hrv.source}
+          </AppText>
         )}
       </Card>
       {diagnosticsAvailable && (

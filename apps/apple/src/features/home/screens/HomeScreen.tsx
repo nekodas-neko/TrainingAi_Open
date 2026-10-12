@@ -42,6 +42,7 @@ import { ExerciseReadinessSheet } from '../components/ExerciseReadinessSheet';
 import { HomeLayoutSheet } from '../components/HomeLayoutSheet';
 import { HomeBanners } from '../components/HomeBanners';
 import { healthCopy } from '../../health/data/display-copy';
+import { useAppleImport } from '../../health/HealthProvider';
 
 export type HomeNavigation = {
   openHealthDetail: (detail: HealthDetail) => void;
@@ -60,6 +61,7 @@ export function HomeScreen(navigation: HomeNavigation) {
   const { theme } = useTheme();
   const home = useHome();
   const health = useHealthData();
+  const apple = useAppleImport();
   const workout = useWorkoutContext();
   const journal = useWorkoutJournal();
   const nutrition = useNutrition();
@@ -126,6 +128,7 @@ export function HomeScreen(navigation: HomeNavigation) {
     health.operations.length ||
     nutrition.operations.length ||
     nutrition.http.length;
+  const allPending = pending || apple.pending;
   const error =
     [
       home.error,
@@ -134,6 +137,7 @@ export function HomeScreen(navigation: HomeNavigation) {
       health.bodyError,
       health.sleepError,
       health.appleSleep.error,
+      apple.error,
       readiness.error,
       calendar.error,
       lastCalendar.error,
@@ -155,7 +159,7 @@ export function HomeScreen(navigation: HomeNavigation) {
           name={name}
           avatar={profile.data?.user.avatar}
           error={error}
-          pending={!!pending}
+          pending={!!allPending}
           refreshing={manual || workout.refreshingManually}
           onRefresh={() => void refresh()}
           onLayout={() => setEditing((value) => !value)}

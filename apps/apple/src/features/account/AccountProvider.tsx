@@ -6,6 +6,12 @@ export function AccountProvider({ children }: PropsWithChildren) {
   const value = useAccount();
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
+export function AccountStateProvider({
+  value,
+  children,
+}: PropsWithChildren<{ value: ReturnType<typeof useAccount> }>) {
+  return <Context.Provider value={value}>{children}</Context.Provider>;
+}
 export function useAccountContext() {
   const value = useContext(Context);
   if (!value) {

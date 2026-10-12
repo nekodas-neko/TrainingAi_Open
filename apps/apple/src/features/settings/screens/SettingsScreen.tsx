@@ -1,33 +1,52 @@
 import { AppearancePanel } from '../components/AppearancePanel';
 import { AppText, AppButton, Card } from '../../../shared/ui';
 import { useAccountContext } from '../../account/AccountProvider';
-import { useHealthContext } from '../../health/HealthProvider';
 import { useReportsContext } from '../../../development/diagnostics/ReportsProvider';
 import { diagnosticsAvailable } from '../../../development/diagnostics/client';
 import { AccountPanel } from '../../account/components/AccountPanel';
+import { useState } from 'react';
+import { HomeLayoutSheet } from '../../home/components/HomeLayoutSheet';
+import { FeatureRow } from '../../../shared/ui';
 
 export function SettingsScreen() {
   const account = useAccountContext();
-  const health = useHealthContext();
   const reports = useReportsContext();
-  const { busy } = health;
   const { report, reportBusy, reportStatus } = reports;
+  const [layout, setLayout] = useState(false);
   return (
     <>
       <AppearancePanel />
       <Card>
-        <AppText variant="heading">Apple Health</AppText>
-        <AppText tone="muted">
-          Read access only. An empty result can mean no data or no read permission; Apple does not
-          reveal which.
-        </AppText>
+        <AppText variant="heading">Home layout</AppText>
+        <AppButton
+          title="Widgets, metric tiles & score appearance"
+          variant="ghost"
+          onPress={() => setLayout(true)}
+        />
+      </Card>
+      <Card>
+        <AppText variant="heading">Preferences</AppText>
+        <FeatureRow
+          title="Day & week review reminders"
+          subtitle="Notification scheduling is deferred"
+        />
+        <FeatureRow
+          title="Health anomaly alerts"
+          subtitle="Notification scheduling is deferred"
+        />
+        <FeatureRow title="Google Calendar sync" subtitle="Calendar integration is deferred" />
+        <FeatureRow
+          title="Rest timer & run/walk status"
+          subtitle="Platform integrations are deferred"
+        />
       </Card>
       <AccountPanel />
       {diagnosticsAvailable && (
         <Card>
           <AppText variant="heading">Sign-in feedback</AppText>
           <AppText tone="muted">
-            Send sign-in progress to your PC. No passwords, tokens or health readings are included.
+            Send sign-in progress to your PC. No passwords, tokens or health readings are
+            included.
           </AppText>
           <AppButton
             title={reportBusy ? 'Sending report…' : 'Send sign-in report to PC'}
@@ -46,14 +65,7 @@ export function SettingsScreen() {
           )}
         </Card>
       )}
-      <AppButton
-        title="Clear loaded readings"
-        variant="secondary"
-        disabled={busy}
-        onPress={() => {
-          health.clear();
-        }}
-      />
+      {layout && <HomeLayoutSheet onClose={() => setLayout(false)} />}
     </>
   );
 }

@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { AppText } from './AppText';
 import { Stack } from './Stack';
+import { IconButton } from './IconButton';
 import { useTheme } from '../theme/ThemeProvider';
 
 export function PageLayout({
@@ -21,6 +22,7 @@ export function PageLayout({
   scroll = false,
   footer,
   contentStyle,
+  onBack,
 }: PropsWithChildren<{
   title: string;
   subtitle?: string;
@@ -30,6 +32,7 @@ export function PageLayout({
   scroll?: boolean;
   footer?: ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
+  onBack?: () => void;
 }>) {
   const { theme } = useTheme();
   return (
@@ -66,6 +69,7 @@ export function PageLayout({
             borderBottomColor: theme.colors.border,
           }}
         >
+          {onBack && <IconButton icon="back" label="Back" onPress={onBack} />}
           <View style={{ flex: 1 }}>
             <AppText variant="pageTitle" accessibilityRole="header">
               {title}
@@ -84,7 +88,12 @@ export function PageLayout({
         </Stack>
       )}
       <View
-        style={{ flex: 1, minHeight: 0, paddingVertical: theme.spacing.md, gap: theme.spacing.md }}
+        style={{
+          flex: 1,
+          minHeight: 0,
+          paddingVertical: theme.spacing.md,
+          gap: theme.spacing.md,
+        }}
       >
         {scroll ? (
           <ScrollView

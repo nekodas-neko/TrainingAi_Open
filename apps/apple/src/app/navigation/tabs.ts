@@ -14,3 +14,4 @@ export type DetailScreen =
   | 'health-day'
   | 'health-week'
   | 'profile-goals';
+export type MoreDetail = 'more-data' | 'more-about' | 'year-review';

@@ -4,9 +4,12 @@ import { useAppleSleepReadings, emptyAppleSleep } from './useAppleSleepReadings'
 import { useLocalStorage } from '../../core/storage/StorageProvider';
 import { useAccountContext } from '../account/AccountProvider';
 import { useWorkoutContext } from '../workouts/WorkoutProvider';
+import { useAppleHealthImport } from './useAppleHealthImport';
+import { emptyAppleImport } from './data/AppleHealthImportStore';
 
 const Context = createContext<ReturnType<typeof useHealthReadings> | null>(null);
 const SleepContext = createContext<ReturnType<typeof useAppleSleepReadings> | null>(null);
+const ImportContext = createContext<ReturnType<typeof useAppleHealthImport> | null>(null);
 export function HealthProvider({ children }: PropsWithChildren) {
   const value = useHealthReadings();
   const storage = useLocalStorage();
@@ -18,20 +21,33 @@ export function HealthProvider({ children }: PropsWithChildren) {
     [storage, dataReader],
   );
   const sleep = useAppleSleepReadings(scope, timezone);
+  const imported = useAppleHealthImport();
   return (
-    <SleepContext.Provider value={sleep}>
-      <Context.Provider
-        value={{
-          ...value,
-          connect: async (afterRead) => {
-            await value.connect(afterRead);
-            await sleep.refresh(true);
-          },
-        }}
-      >
-        {children}
-      </Context.Provider>
-    </SleepContext.Provider>
+    <ImportContext.Provider value={imported}>
+      <SleepContext.Provider value={sleep}>
+        <Context.Provider
+          value={{
+            ...value,
+            connect: async (afterRead) => {
+              const readings = await value.connect(afterRead);
+              await sleep.refresh(true);
+              if (readings) {
+                await imported.store?.setEnabled(true);
+                await imported.refresh();
+              }
+              return readings;
+            },
+          }}
+        >
+          {children}
+        </Context.Provider>
+      </SleepContext.Provider>
+    </ImportContext.Provider>
+  );
+}
+export function useAppleImport() {
+  return (
+    useContext(ImportContext) ?? { ...emptyAppleImport, store: null, refresh: async () => {} }
   );
 }
 export function useAppleSleep() {

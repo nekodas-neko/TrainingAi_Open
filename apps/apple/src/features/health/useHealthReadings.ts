@@ -14,10 +14,12 @@ export function useHealthReadings() {
       const readings = await readHealthSnapshot();
       setSnapshot(readings);
       await afterRead?.(readings, null);
+      return readings;
     } catch (error) {
       const failure = error instanceof Error ? error.message : 'Unable to read Apple Health.';
       setError(failure);
       await afterRead?.(null, failure);
+      return null;
     } finally {
       setBusy(false);
     }

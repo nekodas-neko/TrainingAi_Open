@@ -66,7 +66,7 @@ The Apple CI workflow runs these checks independently. Backend TypeScript, ESLin
 
 You can also double-click `src/development/Build iPhone.cmd`. It uses saved signing without prompts, waits for the build, opens the builds page and starts the development server. On a signing/setup error, choose S in the launcher to run with interactive prompts. Bookmark [iPhone builds](https://expo.dev/accounts/meowi/projects/trainingai-mobile/builds) on your phone and install the latest finished iOS development build from there. Apple still asks you to confirm installation. Regular UI/JavaScript edits use reload; only native library or configuration changes need a new build.
 
-`.env.local`, `.expo` reports/logs and signing credentials are ignored and excluded from EAS uploads. Development reports are opt-in and stay on the PC. Signing in does not upload health readings. Missing or denied health metrics remain unavailable and retain their source information.
+`.env.local`, `.expo` reports/logs and signing credentials are ignored and excluded from EAS uploads. Development reports are opt-in and stay on the PC. Apple Health upload is enabled explicitly from More > Apple Health. The anchored import persists batches before checkpointing, uploads through `/api/apple-health/sync`, and refreshes backend health views after projection. That backend endpoint must be deployed before account syncing can succeed. SDNN is stored separately and does not feed RMSSD baselines. Missing or denied health metrics remain unavailable and retain their source information.
 
 ## Reference baseline
 

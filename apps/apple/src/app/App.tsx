@@ -7,7 +7,7 @@ import { AppStartupGate } from './providers/AppStartupGate';
 import { useTheme } from '../shared/theme/ThemeProvider';
 import { Screen, Notice } from '../shared/ui';
 import { useHealthContext } from '../features/health/HealthProvider';
-import type { Tab, DetailScreen } from './navigation/tabs';
+import type { Tab, DetailScreen, MoreDetail } from './navigation/tabs';
 import { TabBar } from './navigation/TabBar';
 import { RetainedView } from '../shared/ui/RetainedView';
 import { AccountProvider, useAccountContext } from '../features/account/AccountProvider';
@@ -35,6 +35,9 @@ import { ActiveWorkoutBar } from '../features/workouts/components/ActiveWorkoutB
 import { ClinicalScreen } from '../features/health/screens/ClinicalScreen';
 import { HealthDayScreen } from '../features/health/screens/HealthDayScreen';
 import { HealthWeekScreen } from '../features/health/screens/HealthWeekScreen';
+import { DataSyncScreen } from '../features/settings/screens/DataSyncScreen';
+import { AboutScreen } from '../features/settings/screens/AboutScreen';
+import { YearReviewScreen } from '../features/settings/screens/YearReviewScreen';
 
 function AppShell() {
   const health = useHealthContext();
@@ -42,7 +45,7 @@ function AppShell() {
   const accountKey = JSON.stringify([dataReader?.origin, dataReader?.userId]);
   const { theme } = useTheme();
   const [tab, setTab] = useState<Tab>('Home');
-  const [detail, setDetail] = useState<DetailScreen | null>(null);
+  const [detail, setDetail] = useState<DetailScreen | MoreDetail | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionFullOverride, setSessionFullOverride] = useState(false);
   const [healthDetail, setHealthDetail] = useState<HealthDetail | null>(null);
@@ -57,7 +60,7 @@ function AppShell() {
   const [sleepRequest, setSleepRequest] = useState({ scope: '', date: '', count: 0 });
   const [workoutId, setWorkoutId] = useState<string | null>(null);
   const [workoutReturn, setWorkoutReturn] = useState<{
-    detail: DetailScreen | null;
+    detail: DetailScreen | MoreDetail | null;
     tab: Tab;
   } | null>(null);
   const workouts = useWorkoutContext();
@@ -199,7 +202,28 @@ function AppShell() {
           }
         />
       </RetainedView>
-      {healthDetail ? (
+      <RetainedView
+        key={`more:${accountKey}`}
+        active={!healthDetail && !detail && tab === 'More'}
+      >
+        <MoreScreen
+          openSettings={() => setDetail('settings')}
+          openPrograms={() => setDetail('programs')}
+          openClinical={() => setDetail('clinical')}
+          openGoals={() => setDetail('profile-goals')}
+          openAppleHealth={openAppleHealth}
+          openData={() => setDetail('more-data')}
+          openAbout={() => setDetail('more-about')}
+          openYear={() => setDetail('year-review')}
+        />
+      </RetainedView>
+      {detail === 'more-data' ? (
+        <DataSyncScreen onBack={() => setDetail(null)} />
+      ) : detail === 'more-about' ? (
+        <AboutScreen onBack={() => setDetail(null)} />
+      ) : detail === 'year-review' ? (
+        <YearReviewScreen onBack={() => setDetail(null)} />
+      ) : healthDetail ? (
         <HealthDetailScreen
           key={`${healthDetail}:${accountKey}`}
           detail={healthDetail}
@@ -255,7 +279,8 @@ function AppShell() {
         (tab === 'Home' ||
           tab === 'Health' ||
           tab === 'Workout' ||
-          tab === 'Nutrition') ? null : (
+          tab === 'Nutrition' ||
+          tab === 'More') ? null : (
         <Screen
           key={detail ?? tab}
           title={
@@ -270,18 +295,7 @@ function AppShell() {
             <SettingsScreen />
           ) : tab === 'Nutrition' ? (
             <NutritionScreen openSettings={openSettings} />
-          ) : (
-            <MoreScreen
-              openAppleHealth={openAppleHealth}
-              openSettings={() => setDetail('settings')}
-              openPrograms={() => setDetail('programs')}
-              openLibrary={() => setDetail('exercise-library')}
-              openHistory={() => setDetail('workout-history')}
-              openStrength={() => setDetail('strength-progress')}
-              openClinical={() => setDetail('clinical')}
-              openGoals={() => setDetail('profile-goals')}
-            />
-          )}
+          ) : null}
           {health.error && detail === 'health-data' && (
             <Notice title="Unable to read Apple Health" message={health.error} error />
           )}

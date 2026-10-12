@@ -1,33 +1,34 @@
-import { ACTIVITY_LEVELS,FITNESS_GOALS } from '@trainingai/shared/types/user';
+import { ACTIVITY_LEVELS, FITNESS_GOALS } from '@trainingai/shared/types/user';
 import { goalBoundSchema } from '@trainingai/shared/validation/goal-bounds';
 import { useState } from 'react';
 import { z } from 'zod';
 import {
-AppButton,
-AppText,
-Card,
-Disclosure,
-IconButton,
-ListRow,
-PageLayout,
-Picker,
-Sheet,
-Skeleton,
-Stack,
-StatusIndicator,
-SwitchRow,
-TabPanel,
-TextField,
+  AppButton,
+  AppText,
+  Card,
+  Disclosure,
+  IconButton,
+  ListRow,
+  PageLayout,
+  Picker,
+  Sheet,
+  Skeleton,
+  Stack,
+  StatusIndicator,
+  SwitchRow,
+  TabPanel,
+  TextField,
 } from '../../../shared/ui';
 import { energySpec } from '../../health/data/models';
 import { GoalRecommendation } from '../../nutrition/components/GoalRecommendation';
 import { NutritionTargets } from '../../nutrition/components/NutritionSettings';
 import { useNutrition } from '../../nutrition/data/NutritionProvider';
 import {
-useWorkoutResource,
-useWorkoutResources,
+  useWorkoutResource,
+  useWorkoutResources,
 } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
+import { ProfileOverview } from '../components/ProfileOverview';
 const profile = z
   .object({
     displayName: z.string().nullish(),
@@ -213,6 +214,7 @@ function ProfileGoalsForm({
   return (
     <>
       <TabPanel>
+        <ProfileOverview />
         <Card>
           <AppText variant="heading">{user.displayName ?? 'Your profile'}</AppText>
           <ListRow

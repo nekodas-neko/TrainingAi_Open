@@ -45,6 +45,8 @@ import {
   NutritionActivityTrends,
 } from './RecordedHealthCards';
 import { RingStatusCard } from './RecordedHealthCards';
+import { useAppleImport } from '../HealthProvider';
+import {toAestDay} from '@trainingai/shared/date-utils';
 
 function GroupTitle({ children }: { children: string }) {
   return (
@@ -55,6 +57,7 @@ function GroupTitle({ children }: { children: string }) {
 }
 export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) => void }) {
   const health = useHealthData();
+  const imported = useAppleImport();
   const goals = useWorkoutResource(goalsSpec);
   const profile = useWorkoutResource(profileSpec);
   const progress = useWorkoutResource(progressSpec);
@@ -351,6 +354,15 @@ export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) =
         />
       </HealthMetricCard>
       <GroupTitle>Heart & recovery</GroupTitle>
+      {imported.completed?.hrv && (
+        <HealthMetricCard
+          title="HRV · SDNN"
+          value={imported.completed.hrv.value}
+          unit="ms"
+          tone="recovery"
+          caption={`${toAestDay(new Date(imported.completed.hrv.at),health.timezone)} · ${imported.completed.hrv.source}`}
+        />
+      )}
       <Grid columns={3}>
         {(['restingHeartRate', 'hrvMs', 'spo2Pct'] as const).map((field) => {
           const row = latestMetric(rows, field);

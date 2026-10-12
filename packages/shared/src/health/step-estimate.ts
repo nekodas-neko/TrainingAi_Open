@@ -1,3 +1,4 @@
+import {selectNonOverlapping} from './interval-overlap'
 /**
  * Steps math, One-Formula-One-Place. Two things live here:
  *
@@ -152,11 +153,7 @@ export function isPlausibleStepWindow(steps: number, startMs: number, endMs: num
  * only ever lower a total, never raise one.
  */
 export function dedupeOverlappingWindows(windows: StepCountWindow[]): StepCountWindow[] {
-  const accepted: StepCountWindow[] = []
-  for (const w of [...windows].sort((a, b) => b.steps - a.steps || a.startMs - b.startMs)) {
-    if (!accepted.some((a) => w.startMs < a.endMs && w.endMs > a.startMs)) accepted.push(w)
-  }
-  return accepted
+  return selectNonOverlapping(windows,window=>window.steps)
 }
 
 export function mergeStepCounterWithLive(model: StepCountWindow[], live: StepCountWindow[]): number {

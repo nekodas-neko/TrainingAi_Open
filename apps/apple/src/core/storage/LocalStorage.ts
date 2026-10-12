@@ -37,6 +37,12 @@ export class LocalStorage {
   account(backendOrigin: string, accountId: string): ScopedStorage {
     return this.scope(accountScope(backendOrigin, accountId));
   }
+  clearAccount(origin: string, accountId: string) {
+    const scope = accountScope(origin, accountId);
+    return this.run(() =>
+      this.database.runAsync('DELETE FROM local_values WHERE scope = ?', scope),
+    );
+  }
 
   private run<T>(operation: () => Promise<T>): Promise<T> {
     const result = this.operations.then(operation);

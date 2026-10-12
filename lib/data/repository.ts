@@ -626,6 +626,9 @@ export interface StrapStatusRow extends StrapStatusWrite {
 }
 
 export interface WorkoutRepository {
+  applyAppleHealthBatch(userId:string,batch:import('@trainingai/shared/validation/apple-health-import').AppleImportBatch):Promise<{accepted:number;deleted:number}>;
+  rebuildAppleHealth(userId:string,timezone:string):Promise<{measurements:number;nights:number;days:number;heartRate:number;completedAt:string;hrv:{method:'SDNN';value:number;at:string;source:string}|null}>;
+
   // ── Users ──────────────────────────────────────────────────────────────────
   upsertUser(user: Omit<User, 'id' | 'createdAt' | 'isActive' | 'isAdmin'>, forceActive?: boolean): Promise<User>
   listUsers(limit?: number, offset?: number): Promise<User[]>
