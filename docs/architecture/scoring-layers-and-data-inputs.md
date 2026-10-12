@@ -388,7 +388,8 @@ These were found while reading the code for this section, and each is filed:
 ## 7. Adding a metric
 
 The owner's goal is as many metrics as the sources allow, all scored against research and the
-person's own normal. The layers make that cheap: a new metric needs a raw route, a formatted value,
+person's own normal. How metrics combine across pillars (derived values, shares, adjusts and the rest) is
+in [`metric-links.md`](metric-links.md). The layers make that cheap: a new metric needs a raw route, a formatted value,
 a 0–100 rule and a weight, and nothing above it changes. The weighted sum handles it whether its data
 is there or not.
 
@@ -638,6 +639,8 @@ and [`owner-manual.md`](../owner-manual.md).
 
 ## 15. Read next
 
+- [`metric-links.md`](metric-links.md) — how metrics combine across pillars: derived values, shares, adjusts,
+  explanations, flags and validation targets, with the gates every link passes and a researched catalogue.
 - [`readiness-tree.md`](readiness-tree.md) — the agreed scoring design, unit by unit.
 - Source research, 2026-10-12: [`2026-10-12-oura-api-fields.md`](../reviews/2026-10-12-oura-api-fields.md),
   [`2026-10-12-health-connect-fields.md`](../reviews/2026-10-12-health-connect-fields.md),
