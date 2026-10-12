@@ -1,8 +1,10 @@
 export const tabs = ['Home', 'Health', 'Workout', 'Nutrition', 'More'] as const;
 export type Tab = (typeof tabs)[number];
 export type DetailScreen =
+  | 'coach'
   | 'health-data'
   | 'settings'
+  | 'session-explain'
   | 'workout-session'
   | 'workout-log'
   | 'programs'
@@ -19,5 +21,6 @@ export type DetailScreen =
   | 'friend-profile'
   | 'cardio'
   | 'activity-recording'
+  | 'profile-details'
   | 'profile-goals';
 export type MoreDetail = 'more-data' | 'more-about' | 'year-review';

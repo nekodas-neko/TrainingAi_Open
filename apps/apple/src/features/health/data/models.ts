@@ -67,6 +67,11 @@ export const bodySpec = (date: string) => ({
   ttl: 300_000,
   partition: date,
 });
+export const bodyOverviewSpec = (date: string) => ({
+  ...bodySpec(date),
+  query: { overview: '1' },
+  schema: bodySpec(date).schema.extend({ measuredOverview: z.array(bodySchema).nullish() }),
+});
 export type BodyData = z.infer<ReturnType<typeof bodySpec>['schema']>;
 export const sleepSchema = z
   .object({

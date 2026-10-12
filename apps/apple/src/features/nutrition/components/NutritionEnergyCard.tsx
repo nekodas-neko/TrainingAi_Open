@@ -1,3 +1,4 @@
+import { useRecordedIntake } from '../data/useRecordedIntake';
 import {
   balanceZone,
   barProgress,
@@ -27,9 +28,13 @@ export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: 
   const [info, setInfo] = useState(false);
   const { theme } = useTheme();
   const state = useWorkoutResource(energySpec(date));
-  const total = n.view.totals;
   const data = state.data?.date === date ? state.data : null;
   const b = data?.balance;
+  const resolved = useRecordedIntake(date, b);
+  const total =
+    n.view.totals && resolved.intake != null
+      ? { ...n.view.totals, calories: resolved.intake }
+      : n.view.totals;
   const goal = b?.budgetKcal ?? n.view.targets.calories ?? null;
   const pending = n.operations.some((op) => op.date === date && op.domain === 'food_logs');
   const remaining = total && goal != null ? goal - total.calories : null;
@@ -107,6 +112,11 @@ export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: 
           </Grid>
         </Stack>
       </Stack>
+      <AppText variant="caption" tone="muted">
+        {n.view.loggingComplete
+          ? 'All meals recorded or skipped.'
+          : 'Recorded intake so far · unrecorded meals are excluded.'}
+      </AppText>
       {b && (
         <>
           <Stack direction="row" align="center" justify="space-between">

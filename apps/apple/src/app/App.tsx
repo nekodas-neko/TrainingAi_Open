@@ -1,3 +1,9 @@
+import { ProfileDetailsScreen } from '../features/settings/screens/ProfileDetailsScreen';
+import { SessionExplainScreen } from '../features/workouts/screens/SessionExplainScreen';
+import { CoachProvider } from '../features/coach/CoachProvider';
+import { CoachScreen } from '../features/coach/screens/CoachScreen';
+import type { CoachScope } from '../features/coach/data/models';
+import type { Destination } from '../features/coach/components/CoachWidget';
 import { FriendProfileScreen } from '../features/social/screens/FriendProfileScreen';
 import { useState } from 'react';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -65,7 +71,39 @@ function AppShell() {
     count: 0,
   });
   const [sleepRequest, setSleepRequest] = useState({ scope: '', date: '', count: 0 });
+  const [profileReturn, setProfileReturn] = useState(false);
   const [friendId, setFriendId] = useState('');
+  const [coachScope, setCoachScope] = useState<CoachScope>('general');
+  const [coachReturn, setCoachReturn] = useState<{
+    detail: DetailScreen | MoreDetail | null;
+    tab: Tab;
+  }>({ detail: null, tab: 'Workout' });
+  function openCoach(scope: CoachScope = 'general') {
+    setCoachHandoff(false);
+    setCoachReturn({ detail, tab });
+    setCoachScope(scope);
+    setDetail('coach');
+  }
+  const [coachHandoff, setCoachHandoff] = useState(false);
+  function closeDetail() {
+    if (coachHandoff) {
+      setCoachHandoff(false);
+      setDetail('coach');
+    } else {
+      setDetail(null);
+    }
+  }
+  function coachDestination(destination: Destination) {
+    setCoachHandoff(destination === 'program_builder' || destination === 'log_activity');
+    if (destination === 'program_builder') setDetail('programs');
+    if (destination === 'log_activity') setDetail('activity-recording');
+    if (destination === 'profile') {
+      selectTab('More');
+    }
+    if (destination === 'nutrition') {
+      selectTab('Nutrition');
+    }
+  }
   const [workoutId, setWorkoutId] = useState<string | null>(null);
   const [workoutReturn, setWorkoutReturn] = useState<{
     detail: DetailScreen | MoreDetail | null;
@@ -158,6 +196,10 @@ function AppShell() {
           openWorkout={openWorkout}
           openMore={() => selectTab('More')}
           openPrograms={() => setDetail('programs')}
+          openExplanation={(id) => {
+            setSessionId(id);
+            setDetail('session-explain');
+          }}
           openStats={() => {
             selectTab('Health');
             setHealthPanel('training');
@@ -190,6 +232,7 @@ function AppShell() {
         active={!healthDetail && !detail && tab === 'Workout'}
       >
         <WorkoutScreen
+          openCoach={() => openCoach()}
           openCardio={() => setDetail('cardio')}
           openSettings={openSettings}
           openWorkout={openWorkout}
@@ -202,6 +245,7 @@ function AppShell() {
         active={!healthDetail && !detail && tab === 'Nutrition'}
       >
         <NutritionScreen
+          openCoach={() => openCoach('nutrition')}
           openSettings={openSettings}
           dateRequest={
             nutritionDateRequest.scope === accountKey ? nutritionDateRequest : undefined
@@ -222,15 +266,34 @@ function AppShell() {
           }}
           openSettings={() => setDetail('settings')}
           openPrograms={() => setDetail('programs')}
-          openClinical={() => setDetail('clinical')}
+          openClinical={() => {
+            setProfileReturn(false);
+            setDetail('clinical');
+          }}
           openGoals={() => setDetail('profile-goals')}
+          openProfile={() => setDetail('profile-details')}
           openAppleHealth={openAppleHealth}
           openData={() => setDetail('more-data')}
           openAbout={() => setDetail('more-about')}
           openYear={() => setDetail('year-review')}
         />
       </RetainedView>
-      {detail === 'friend-profile' ? (
+      {(['general', 'nutrition'] as const).map((scope) => (
+        <RetainedView
+          key={`coach:${accountKey}:${scope}`}
+          active={detail === 'coach' && coachScope === scope}
+        >
+          <CoachScreen
+            scope={scope}
+            onBack={() => {
+              setDetail(coachReturn.detail);
+              setTab(coachReturn.tab);
+            }}
+            onNavigate={coachDestination}
+          />
+        </RetainedView>
+      ))}
+      {detail === 'coach' ? null : detail === 'friend-profile' ? (
         <FriendProfileScreen
           key={`${accountKey}:${friendId}`}
           userId={friendId}
@@ -251,7 +314,10 @@ function AppShell() {
       ) : detail === 'fitness-baselines' ? (
         <BaselinesScreen
           key={accountKey}
-          onBack={() => setDetail('cardio')}
+          onBack={() => {
+            setDetail(profileReturn ? 'profile-details' : 'cardio');
+            setProfileReturn(false);
+          }}
           openActivity={() => setDetail('activity-recording')}
         />
       ) : detail === 'cardio' ? (
@@ -260,15 +326,18 @@ function AppShell() {
           onBack={() => setDetail(null)}
           openRunning={() => setDetail('running')}
           openWalk={() => setDetail('guided-walk')}
-          openBaselines={() => setDetail('fitness-baselines')}
+          openBaselines={() => {
+            setProfileReturn(false);
+            setDetail('fitness-baselines');
+          }}
           openActivity={() => setDetail('activity-recording')}
           openSettings={openSettings}
         />
       ) : detail === 'activity-recording' ? (
         <ActivityScreen
           key={accountKey}
-          onBack={() => setDetail('cardio')}
-          onSaved={() => setDetail('cardio')}
+          onBack={coachHandoff ? closeDetail : () => setDetail('cardio')}
+          onSaved={coachHandoff ? closeDetail : () => setDetail('cardio')}
         />
       ) : detail === 'more-data' ? (
         <DataSyncScreen onBack={() => setDetail(null)} />
@@ -284,9 +353,16 @@ function AppShell() {
         />
       ) : detail === 'workout-log' ? (
         <WorkoutLogScreen
+          openCoach={() => openCoach()}
           workoutId={workoutId}
           openSettings={openSettings}
           closeWorkout={closeWorkout}
+        />
+      ) : detail === 'session-explain' ? (
+        <SessionExplainScreen
+          key={`${accountKey}:${sessionId}`}
+          sessionId={sessionId ?? ''}
+          onBack={() => setDetail(null)}
         />
       ) : detail === 'workout-session' ? (
         <SessionScreen
@@ -297,10 +373,7 @@ function AppShell() {
           closeSession={() => setDetail(null)}
         />
       ) : detail === 'programs' ? (
-        <ProgramsScreen
-          onBack={() => setDetail(null)}
-          openBuilder={() => setDetail('program-builder')}
-        />
+        <ProgramsScreen onBack={closeDetail} openBuilder={() => setDetail('program-builder')} />
       ) : detail === 'program-builder' ? (
         <AIProgramBuilder
           onBack={() => setDetail('programs')}
@@ -313,9 +386,30 @@ function AppShell() {
       ) : detail === 'strength-progress' ? (
         <StrengthScreen onBack={() => setDetail(null)} />
       ) : detail === 'profile-goals' ? (
-        <ProfileGoalsScreen onBack={() => setDetail(null)} />
+        <ProfileGoalsScreen
+          onBack={() => setDetail(null)}
+          openProfile={() => setDetail('profile-details')}
+        />
+      ) : detail === 'profile-details' ? (
+        <ProfileDetailsScreen
+          onBack={() => setDetail(null)}
+          openClinical={() => {
+            setProfileReturn(true);
+            setDetail('clinical');
+          }}
+          openBaselines={() => {
+            setProfileReturn(true);
+            setDetail('fitness-baselines');
+          }}
+        />
       ) : detail === 'clinical' ? (
-        <ClinicalScreen key={accountKey} onBack={() => setDetail(null)} />
+        <ClinicalScreen
+          key={accountKey}
+          onBack={() => {
+            setDetail(profileReturn ? 'profile-details' : null);
+            setProfileReturn(false);
+          }}
+        />
       ) : detail === 'health-day' ? (
         <HealthDayScreen
           key={`${accountKey}:${healthDate}`}
@@ -366,7 +460,9 @@ export default function App() {
         <LocalStorageProvider>
           <AppProvider>
             <AppStartupGate>
-              <AppShell />
+              <CoachProvider>
+                <AppShell />
+              </CoachProvider>
             </AppStartupGate>
           </AppProvider>
         </LocalStorageProvider>

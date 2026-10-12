@@ -21,10 +21,10 @@ describe('meal logging coverage', () => {
   it('replaces a legacy completion claim when meal-level data says a meal is unknown', async () => {
     const repo = {
       listMealLoggingCompleteness: async () => [
-        { date: '2026-10-10', complete: false },
-        { date: '2026-10-11', complete: true },
+        { date: '2026-10-10', complete: false, zeroIntake: false },
+        { date: '2026-10-11', complete: true, zeroIntake: false },
       ],
-    } as WorkoutRepository
+    } satisfies Pick<WorkoutRepository, 'listMealLoggingCompleteness'>
     const coverage = await foodLoggingCoverage(repo, 'user', '2026-10-01', '2026-10-12', [
       '2026-10-09',
       '2026-10-10',
@@ -37,7 +37,7 @@ describe('meal logging coverage', () => {
         { date: '2026-10-10', complete: false, zeroIntake: true },
         { date: '2026-10-11', complete: true, zeroIntake: true },
       ],
-    } as WorkoutRepository
+    } satisfies Pick<WorkoutRepository, 'listMealLoggingCompleteness'>
     expect([
       ...(await foodLoggingCoverage(repo, 'user', '2026-10-01', '2026-10-12', [])).zeroIntake,
     ]).toEqual(['2026-10-11'])
@@ -47,7 +47,7 @@ describe('meal logging coverage', () => {
       listMealLoggingCompleteness: async () => {
         throw new Error('offline')
       },
-    } as WorkoutRepository
+    } satisfies Pick<WorkoutRepository, 'listMealLoggingCompleteness'>
     expect(
       (await foodLoggingCoverage(repo, 'user', '2026-10-01', '2026-10-12', ['2026-10-10']))
         .complete.size,

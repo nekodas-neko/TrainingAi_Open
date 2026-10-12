@@ -57,6 +57,7 @@ export type HomeNavigation = {
   openMore: () => void;
   openPrograms: () => void;
   openStats: () => void;
+  openExplanation: (id: string) => void;
 };
 export function HomeScreen(navigation: HomeNavigation) {
   const { theme } = useTheme();
@@ -231,6 +232,7 @@ export function HomeScreen(navigation: HomeNavigation) {
                     onStart={navigation.openSession}
                     onResume={navigation.openWorkout}
                     openPrograms={navigation.openPrograms}
+                    openExplanation={navigation.openExplanation}
                   />
                 ) : key === 'streak' ? (
                   <HomeTrainingSummary

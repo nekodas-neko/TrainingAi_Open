@@ -190,7 +190,11 @@ test('prescribed loads, rated effort and accepted back-off survive reopening and
   assert.equal(await f.controller.rateSet(id, exerciseId, first.id, 10), true);
   await f.controller.recordSet(id, exerciseId, first.id);
   workout = f.controller.getSnapshot().data.workouts[0];
-  const suggestion = loadSuggestion(workout, workout.exercises[0], workout.exercises[0].sets[1]);
+  const suggestion = loadSuggestion(
+    workout,
+    workout.exercises[0],
+    workout.exercises[0].sets[1],
+  );
   assert.ok(suggestion && suggestion.weightKg < 72.5);
   assert.equal(await f.controller.resolveSuggestion(id, exerciseId, second.id, true), true);
   f.controller.cancel();
@@ -199,14 +203,17 @@ test('prescribed loads, rated effort and accepted back-off survive reopening and
   workout = restored.getSnapshot().data.workouts[0];
   assert.equal(workout.exercises[0].sets[0].rpeSource, 'rated');
   assert.equal(workout.exercises[0].sets[1].weight, String(suggestion.weightKg));
-  assert.equal(loadSuggestion(workout, workout.exercises[0], workout.exercises[0].sets[1]), null);
+  assert.equal(
+    loadSuggestion(workout, workout.exercises[0], workout.exercises[0].sets[1]),
+    null,
+  );
   await restored.recordSet(id, exerciseId, second.id);
   f.clock(15_000);
   const completed = finishWorkout(restored.getSnapshot().data.workouts[0], f.clock());
   const payload = mutationFor(completed, completed.pending[0]).payload;
   assert.deepEqual(payload.weights, [55, suggestion.weightKg]);
   assert.deepEqual(payload.plannedWeights, [67.5, 72.5]);
-  assert.deepEqual(payload.rpeValues, [10, 7]);
+  assert.deepEqual(payload.rpeValues, [10, 6]);
   assert.deepEqual(payload.rpeSources, ['rated', 'expected']);
   assert.equal(completed.exercises[0].sets[1].restAfterSec, 15);
 });
@@ -254,14 +261,22 @@ test('older recorded sets keep unknown effort and target loads instead of gainin
   const f = loggingFixture();
   const workout = createWorkout(f.session, programId, null, true, Date.now(), f.uuid);
   workout.exercises[0].sets[0].completedAt = workout.startedAt;
-  const raw = JSON.parse(JSON.stringify({ ...emptyJournal(f.connection), workouts: [workout] }));
+  const raw = JSON.parse(
+    JSON.stringify({ ...emptyJournal(f.connection), workouts: [workout] }),
+  );
   for (const set of raw.workouts[0].exercises[0].sets) {
     delete set.rpe;
     delete set.rpeSource;
     delete set.plannedWeight;
     delete set.suggestionHandled;
   }
-  for (const field of ['equipment', 'estimated1rm', 'target80', 'latestWeight', 'lastSetMode']) {
+  for (const field of [
+    'equipment',
+    'estimated1rm',
+    'target80',
+    'latestWeight',
+    'lastSetMode',
+  ]) {
     delete raw.workouts[0].exercises[0][field];
   }
   const restored = readJournal(JSON.stringify(raw), f.connection).workouts[0];
@@ -542,7 +557,8 @@ test('sign-out during an upload leaves the saved queue intact and does not send 
   await syncing;
   assert.equal(calls, 1);
   assert.equal(
-    readJournal(await f.scope.get('workout-journal.v1'), f.connection).workouts[0].pending.length,
+    readJournal(await f.scope.get('workout-journal.v1'), f.connection).workouts[0].pending
+      .length,
     2,
   );
 });
@@ -571,7 +587,8 @@ test('guided warm-up, rest, summary and next exercise persist without uploading 
   assert.equal(workoutFlow(active()).stage, 'warmup');
   await f.controller.showSession(id);
   assert.equal(
-    readJournal(await f.scope.get('workout-journal.v1'), f.connection).workouts[0].hubReturnStage,
+    readJournal(await f.scope.get('workout-journal.v1'), f.connection).workouts[0]
+      .hubReturnStage,
     'warmup',
   );
   await f.controller.continueSession(id);
@@ -585,7 +602,8 @@ test('guided warm-up, rest, summary and next exercise persist without uploading 
     f.controller.updateSet(id, exerciseId, set.id, 'weight', '60');
     await f.controller.startSet(id, exerciseId, set.id);
     await f.controller.showSession(id);
-    const savedHub = readJournal(await f.scope.get('workout-journal.v1'), f.connection).workouts[0];
+    const savedHub = readJournal(await f.scope.get('workout-journal.v1'), f.connection)
+      .workouts[0];
     assert.equal(savedHub.runningSet?.setId, set.id);
     assert.equal(savedHub.flow?.stage, 'review');
     await f.controller.continueSession(id);
@@ -596,7 +614,8 @@ test('guided warm-up, rest, summary and next exercise persist without uploading 
     assert.ok(active().rest);
   }
   assert.equal(workoutFlow(active()).stage, 'summary');
-  const restored = readJournal(await f.scope.get('workout-journal.v1'), f.connection).workouts[0];
+  const restored = readJournal(await f.scope.get('workout-journal.v1'), f.connection)
+    .workouts[0];
   assert.equal(workoutFlow(restored).stage, 'summary');
   assert.equal(restored.warmupEndedAt, warmupEnd);
   assert.equal(f.requests.length, 0);
@@ -614,7 +633,9 @@ test('guided warm-up, rest, summary and next exercise persist without uploading 
   await f.controller.chooseExercise(id, exerciseId);
   assert.equal(workoutFlow(active()).stage, 'summary');
   const complete = finishWorkout(active(), f.clock());
-  const payload = mutationFor(complete, complete.pending[0]).payload as { warmupEndedAtMs: number };
+  const payload = mutationFor(complete, complete.pending[0]).payload as {
+    warmupEndedAtMs: number;
+  };
   assert.equal(payload.warmupEndedAtMs, warmupEnd);
 });
 
@@ -634,7 +655,8 @@ test('a failed navigation save keeps the durable warm-up and exercise step uncha
   assert.equal(await controller.beginExercises(id), false);
   assert.equal(workoutFlow(controller.getSnapshot().data.workouts[0]).stage, 'warmup');
   assert.equal(
-    readJournal(await f.scope.get('workout-journal.v1'), f.connection).workouts[0].warmupEndedAt,
+    readJournal(await f.scope.get('workout-journal.v1'), f.connection).workouts[0]
+      .warmupEndedAt,
     null,
   );
 });
@@ -654,76 +676,123 @@ test('older workouts resume their unfinished set without requiring a new warm-up
     'warmupEndedAtMs' in (mutationFor(complete, complete.pending[0]).payload as object),
     false,
   );
-  raw.workouts[0].flow = { stage: 'exercise', exerciseId: '10000000-0000-4000-8000-000000000099' };
+  raw.workouts[0].flow = {
+    stage: 'exercise',
+    exerciseId: '10000000-0000-4000-8000-000000000099',
+  };
   assert.throws(
     () => readJournal(JSON.stringify(raw), f.connection),
     /Missing saved workout exercise/,
   );
 });
 
-
 test('unequal supersets alternate using the shared order and survive reopening between members', async (t) => {
- const f = await setup(t);
- const partnerId = '10000000-0000-4000-8000-000000000044';
- const session = { ...f.session, exercises: [{ ...f.session.exercises[0], supersetGroup: 7, setCount: 3 }, { ...f.session.exercises[0], id: partnerId, name: 'Seated row', supersetGroup: 7 }] };
- const id = (await f.controller.start(session, programId, true))!;
- await f.controller.beginExercises(id);
- const order: string[] = [];
- for (let count = 0; count < 5; count++) {
-  const current = f.controller.getSnapshot().data.workouts[0];
-  const flow = workoutFlow(current);
-  const exercise = current.exercises.find(exercise => exercise.id === flow.exerciseId)!;
-  const set = exercise.sets.find(set => set.completedAt === null)!;
-  order.push(exercise.name);
-  await f.controller.startSet(id, exercise.id, set.id);
-  f.clock(1000);
-  await f.controller.recordSet(id, exercise.id, set.id);
-  const saved = readJournal(await f.scope.get('workout-journal.v1'), f.connection).workouts[0];
-  assert.deepEqual(workoutFlow(saved), workoutFlow(f.controller.getSnapshot().data.workouts[0]));
- }
- assert.deepEqual(order, ['Bench press', 'Seated row', 'Bench press', 'Seated row', 'Bench press']);
- const finished = finishWorkout(f.controller.getSnapshot().data.workouts[0], f.clock());
- assert.equal(finished.pending.length, 3);
- assert.equal((mutationFor(finished, finished.pending[0]).payload as { sets: number }).sets, 3);
- assert.equal((mutationFor(finished, finished.pending[1]).payload as { sets: number }).sets, 2);
+  const f = await setup(t);
+  const partnerId = '10000000-0000-4000-8000-000000000044';
+  const session = {
+    ...f.session,
+    exercises: [
+      { ...f.session.exercises[0], supersetGroup: 7, setCount: 3 },
+      { ...f.session.exercises[0], id: partnerId, name: 'Seated row', supersetGroup: 7 },
+    ],
+  };
+  const id = (await f.controller.start(session, programId, true))!;
+  await f.controller.beginExercises(id);
+  const order: string[] = [];
+  for (let count = 0; count < 5; count++) {
+    const current = f.controller.getSnapshot().data.workouts[0];
+    const flow = workoutFlow(current);
+    const exercise = current.exercises.find((exercise) => exercise.id === flow.exerciseId)!;
+    const set = exercise.sets.find((set) => set.completedAt === null)!;
+    order.push(exercise.name);
+    await f.controller.startSet(id, exercise.id, set.id);
+    f.clock(1000);
+    await f.controller.recordSet(id, exercise.id, set.id);
+    const saved = readJournal(await f.scope.get('workout-journal.v1'), f.connection)
+      .workouts[0];
+    assert.deepEqual(
+      workoutFlow(saved),
+      workoutFlow(f.controller.getSnapshot().data.workouts[0]),
+    );
+  }
+  assert.deepEqual(order, [
+    'Bench press',
+    'Seated row',
+    'Bench press',
+    'Seated row',
+    'Bench press',
+  ]);
+  const finished = finishWorkout(f.controller.getSnapshot().data.workouts[0], f.clock());
+  assert.equal(finished.pending.length, 3);
+  assert.equal(
+    (mutationFor(finished, finished.pending[0]).payload as { sets: number }).sets,
+    3,
+  );
+  assert.equal(
+    (mutationFor(finished, finished.pending[1]).payload as { sets: number }).sets,
+    2,
+  );
 });
 
 test('re-logging preserves the earlier sets and queues distinct log and set identities', async (t) => {
- const f = await setup(t);
- const id = (await f.controller.start(f.session, programId))!;
- await f.controller.beginExercises(id);
- const first = f.controller.getSnapshot().data.workouts[0].exercises[0];
- for (const set of first.sets) { await f.controller.startSet(id, first.id, set.id); f.clock(1000); await f.controller.recordSet(id, first.id, set.id); }
- await f.controller.skipRest(id);
- const before = JSON.stringify(f.controller.getSnapshot().data.workouts[0].exercises[0]);
- await f.controller.redoExercise(id, first.id);
- const redo = f.controller.getSnapshot().data.workouts[0].exercises[1];
- assert.equal(redo.relogOf, first.id);
- assert.notEqual(redo.logId, first.logId);
- assert.ok(redo.sets.every(set => !first.sets.some(previous => previous.id === set.id)));
- f.controller.updateSet(id, redo.id, redo.sets[0].id, 'weight', '70');
- await f.controller.recordSet(id, redo.id, redo.sets[0].id);
- assert.equal(JSON.stringify(f.controller.getSnapshot().data.workouts[0].exercises[0]), before);
- const finished = finishWorkout(f.controller.getSnapshot().data.workouts[0], f.clock());
- const payloads = finished.pending.filter(item => item.domain === 'workout_log').map(item => mutationFor(finished, item).payload as { exerciseLogId: string });
- assert.equal(new Set(payloads.map(payload => payload.exerciseLogId)).size, 2);
+  const f = await setup(t);
+  const id = (await f.controller.start(f.session, programId))!;
+  await f.controller.beginExercises(id);
+  const first = f.controller.getSnapshot().data.workouts[0].exercises[0];
+  for (const set of first.sets) {
+    await f.controller.startSet(id, first.id, set.id);
+    f.clock(1000);
+    await f.controller.recordSet(id, first.id, set.id);
+  }
+  await f.controller.skipRest(id);
+  const before = JSON.stringify(f.controller.getSnapshot().data.workouts[0].exercises[0]);
+  await f.controller.redoExercise(id, first.id);
+  const redo = f.controller.getSnapshot().data.workouts[0].exercises[1];
+  assert.equal(redo.relogOf, first.id);
+  assert.notEqual(redo.logId, first.logId);
+  assert.ok(redo.sets.every((set) => !first.sets.some((previous) => previous.id === set.id)));
+  f.controller.updateSet(id, redo.id, redo.sets[0].id, 'weight', '70');
+  await f.controller.recordSet(id, redo.id, redo.sets[0].id);
+  assert.equal(
+    JSON.stringify(f.controller.getSnapshot().data.workouts[0].exercises[0]),
+    before,
+  );
+  const finished = finishWorkout(f.controller.getSnapshot().data.workouts[0], f.clock());
+  const payloads = finished.pending
+    .filter((item) => item.domain === 'workout_log')
+    .map((item) => mutationFor(finished, item).payload as { exerciseLogId: string });
+  assert.equal(new Set(payloads.map((payload) => payload.exerciseLogId)).size, 2);
 });
 
 test('an exercise swap preserves already-recorded loads under the original exercise name', async (t) => {
- const f = await setup(t);
- const { id } = await recordFirst(f);
- const previous = f.controller.getSnapshot().data.workouts[0].exercises[0];
- await f.controller.swapExercise(id, previous.id, { name: 'Push-up', exerciseType: 'bodyweight', muscles: ['chest'], mainMuscles: ['chest'], secondaryMuscles: ['triceps'], equipment: ['bodyweight'], instructions: null, estimated1rm: null, lastWeights: [], lastReps: [], lastDate: null });
- const changed = f.controller.getSnapshot().data.workouts[0];
- const replacement = changed.exercises.find(exercise => !exercise.retired)!;
- const archive = changed.exercises.find(exercise => exercise.retired)!;
- assert.equal(archive.name, 'Bench press');
- assert.equal(archive.sets[0].weight, '60');
- assert.equal(replacement.name, 'Push-up');
- assert.equal(replacement.sets[0].weight, '0');
- assert.notEqual(archive.logId, replacement.logId);
- await f.controller.recordSet(id, replacement.id, replacement.sets[0].id);
- const finished = finishWorkout(f.controller.getSnapshot().data.workouts[0], f.clock());
- const names = finished.pending.filter(item => item.domain === 'workout_log').map(item => (mutationFor(finished, item).payload as { exercise: string }).exercise);
- assert.deepEqual(new Set(names), new Set(['Bench press', 'Push-up']));
+  const f = await setup(t);
+  const { id } = await recordFirst(f);
+  const previous = f.controller.getSnapshot().data.workouts[0].exercises[0];
+  await f.controller.swapExercise(id, previous.id, {
+    name: 'Push-up',
+    exerciseType: 'bodyweight',
+    muscles: ['chest'],
+    mainMuscles: ['chest'],
+    secondaryMuscles: ['triceps'],
+    equipment: ['bodyweight'],
+    instructions: null,
+    estimated1rm: null,
+    lastWeights: [],
+    lastReps: [],
+    lastDate: null,
+  });
+  const changed = f.controller.getSnapshot().data.workouts[0];
+  const replacement = changed.exercises.find((exercise) => !exercise.retired)!;
+  const archive = changed.exercises.find((exercise) => exercise.retired)!;
+  assert.equal(archive.name, 'Bench press');
+  assert.equal(archive.sets[0].weight, '60');
+  assert.equal(replacement.name, 'Push-up');
+  assert.equal(replacement.sets[0].weight, '0');
+  assert.notEqual(archive.logId, replacement.logId);
+  await f.controller.recordSet(id, replacement.id, replacement.sets[0].id);
+  const finished = finishWorkout(f.controller.getSnapshot().data.workouts[0], f.clock());
+  const names = finished.pending
+    .filter((item) => item.domain === 'workout_log')
+    .map((item) => (mutationFor(finished, item).payload as { exercise: string }).exercise);
+  assert.deepEqual(new Set(names), new Set(['Bench press', 'Push-up']));
 });

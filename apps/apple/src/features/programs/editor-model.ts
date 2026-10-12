@@ -92,3 +92,27 @@ export function programPayload(draft: ProgramDraft) {
   };
   return { program: ProgramWriteSchema.parse(normalized) };
 }
+
+export function normalizeSupersets<T extends { supersetGroup?: number | null }>(
+  items: T[],
+): T[] {
+  const groups = new Map<number, number[]>();
+  items.forEach((item, index) => {
+    if (item.supersetGroup != null)
+      groups.set(item.supersetGroup, [...(groups.get(item.supersetGroup) ?? []), index]);
+  });
+  const broken = new Set(
+    [...groups]
+      .filter(
+        ([, positions]) =>
+          positions.length < 2 ||
+          positions.some((at, index) => index > 0 && at !== positions[index - 1] + 1),
+      )
+      .map(([group]) => group),
+  );
+  return items.map((item) =>
+    item.supersetGroup != null && broken.has(item.supersetGroup)
+      ? { ...item, supersetGroup: null }
+      : item,
+  );
+}

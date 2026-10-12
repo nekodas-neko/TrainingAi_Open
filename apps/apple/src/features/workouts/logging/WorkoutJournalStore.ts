@@ -64,7 +64,10 @@ function replaceSet(
     exercises: workout.exercises.map((exercise) =>
       exercise.id !== exerciseId
         ? exercise
-        : { ...exercise, sets: exercise.sets.map((set) => (set.id === setId ? update(set) : set)) },
+        : {
+            ...exercise,
+            sets: exercise.sets.map((set) => (set.id === setId ? update(set) : set)),
+          },
     ),
   };
 }
@@ -347,7 +350,9 @@ export class WorkoutJournalStore {
       }),
     );
 
-  private action = async (update: (data: WorkoutJournal) => WorkoutJournal): Promise<boolean> => {
+  private action = async (
+    update: (data: WorkoutJournal) => WorkoutJournal,
+  ): Promise<boolean> => {
     if (!this.current.ready || this.current.busy) {
       return false;
     }
@@ -457,7 +462,11 @@ export class WorkoutJournalStore {
     const now = this.now();
     return this.action((data) =>
       replaceWorkout(data, workoutId, (workout) => {
-        if (workout.status !== 'active' || workout.runningSet || workout.flow?.stage !== 'warmup') {
+        if (
+          workout.status !== 'active' ||
+          workout.runningSet ||
+          workout.flow?.stage !== 'warmup'
+        ) {
           throw new Error('This workout has already moved past its warm-up.');
         }
         return {
@@ -508,10 +517,14 @@ export class WorkoutJournalStore {
           warmupEndedAt: workout.warmupEndedAt ?? now,
           soloExerciseId: solo ? exerciseId : null,
           exercises: rested.exercises.map((item) =>
-            item.id === exerciseId ? { ...item, readyStartedAt: item.readyStartedAt ?? now } : item,
+            item.id === exerciseId
+              ? { ...item, readyStartedAt: item.readyStartedAt ?? now }
+              : item,
           ),
           flow: {
-            stage: exercise.sets.every((set) => set.completedAt !== null) ? 'summary' : 'exercise',
+            stage: exercise.sets.every((set) => set.completedAt !== null)
+              ? 'summary'
+              : 'exercise',
             exerciseId,
           },
         };
@@ -523,7 +536,12 @@ export class WorkoutJournalStore {
     return this.action((data) =>
       replaceWorkout(data, workoutId, (workout) => {
         const source = workout.exercises.find((exercise) => exercise.id === exerciseId);
-      if (!source || workout.status !== 'active' || workout.runningSet || source.sets.some(set => set.completedAt === null)) {
+        if (
+          !source ||
+          workout.status !== 'active' ||
+          workout.runningSet ||
+          source.sets.some((set) => set.completedAt === null)
+        ) {
           throw new Error('Finish the running set before re-logging.');
         }
         const clone = {
@@ -540,8 +558,11 @@ export class WorkoutJournalStore {
             completedAt: null,
             restAfterSec: null,
             suggestionHandled: false,
-          rpe: expectedRpe(source.exerciseType === 'bodyweight' ? undefined : set.planned?.percent),
-          rpeSource: 'expected' as const,
+            rpe: expectedRpe(
+              source.exerciseType === 'bodyweight' ? undefined : set.planned?.percent,
+              set.planned?.reps,
+            ),
+            rpeSource: 'expected' as const,
           })),
         };
         return {
@@ -651,7 +672,9 @@ export class WorkoutJournalStore {
           throw new Error('This workout is already finished.');
         }
         const exercise =
-          workout.exercises.find((exercise) => exercise.id === workout.runningSet?.exerciseId) ??
+          workout.exercises.find(
+            (exercise) => exercise.id === workout.runningSet?.exerciseId,
+          ) ??
           workout.exercises.find((exercise) =>
             exercise.sets.some((set) => set.completedAt === null),
           );
@@ -681,7 +704,9 @@ export class WorkoutJournalStore {
           ...rested,
           runningSet: null,
           soloExerciseId: null,
-          flow: workout.soloExerciseId ? { stage: 'review', exerciseId: flow.exerciseId } : next,
+          flow: workout.soloExerciseId
+            ? { stage: 'review', exerciseId: flow.exerciseId }
+            : next,
           exercises: rested.exercises.map((exercise) => ({
             ...exercise,
             readyStartedAt:

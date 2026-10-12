@@ -1,13 +1,14 @@
+import { plannedMealRecorded } from '../data/recorded-meals';
 import {
   daysBetweenDateStrs,
   secondsSinceLocalMidnight,
   toAestDay,
 } from '@trainingai/shared/date-utils';
-import { dueForEstimate, estimateSlotsFor } from '@trainingai/shared/nutrition/meal-estimate';
+import { planMealTypeId } from '@trainingai/shared/nutrition/meal-type-for-time';
 import { mealTypeForHour } from '@trainingai/shared/nutrition/meal-type-for-time';
 import type { MealType } from '@trainingai/shared/types/nutrition';
 import { randomUUID } from 'expo-crypto';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { z } from 'zod';
 import {
   AppButton,
@@ -124,7 +125,6 @@ export function ActiveMealPlan({
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const guard = useRef(false);
-  const estimateGuard = useRef(false);
   const plan = state.data?.plans.find((p) => p.id === state.data?.activePlanId);
   const knownTraining =
     date !== n.today || !rec.data
@@ -139,20 +139,29 @@ export function ActiveMealPlan({
     plan?.variants.find((v) => v.dayType === (knownTraining ? 'training' : 'rest')) ??
     plan?.variants[0];
   const hour = secondsSinceLocalMidnight(n.timezone) / 3600;
-  const names = new Set(n.view.logs.map((l) => l.foodItem.name.toLowerCase()));
   const logged = (m: Meal) =>
-    n.view.logs.some((l) => l.mealGroupName === m.name) ||
-    (m.ingredients.length > 0 && m.ingredients.every((i) => names.has(i.name.toLowerCase())));
+    plannedMealRecorded(m, n.view.logs, n.view.mealTypes as unknown as MealType[]);
   const answer = (m: Meal) => n.view.answers.find((a) => a.planMealId === m.id);
+  const skipped = (m: Meal) => {
+    const type = planMealTypeId(
+      { ...m, mealTypeId: m.mealTypeId ?? null, suggestedTime: m.suggestedTime ?? null },
+      n.view.mealTypes as unknown as MealType[],
+    );
+    return !!type && n.view.mealStatuses[type] === 'skipped';
+  };
   const declined = (m: Meal) => answer(m) != null && answer(m)?.answer !== 'estimated';
   const eligible = (variant?.meals ?? []).filter((m) => {
     const start = m.suggestedTime
       ? Number(m.suggestedTime.split(':')[0])
       : n.view.mealTypes.find((t) => t.id === m.mealTypeId)?.timeStartHour;
+    const type = planMealTypeId(m, n.view.mealTypes as unknown as MealType[]);
     return (
+      !!type &&
+      n.view.mealStatuses[type] !== 'recorded' &&
       m.ingredients.length &&
       !logged(m) &&
       !declined(m) &&
+      !skipped(m) &&
       (date < n.today || (date === n.today && start != null && start <= hour))
     );
   });
@@ -172,68 +181,6 @@ export function ActiveMealPlan({
       setBusy(false);
     }
   }
-  useEffect(() => {
-    if (
-      !n.store ||
-      !variant ||
-      date !== n.today ||
-      !n.loaded.includes('logs:' + date) ||
-      !n.loaded.includes('answers:' + date) ||
-      estimateGuard.current ||
-      (plan?.variants.some((v) => v.dayType !== 'all') && knownTraining === undefined)
-    ) {
-      return;
-    }
-    const slots = estimateSlotsFor(
-      variant.meals.flatMap((m) =>
-        m.id
-          ? [
-              {
-                ...m,
-                id: m.id,
-                mealTypeId: m.mealTypeId ?? null,
-                suggestedTime: m.suggestedTime ?? null,
-              },
-            ]
-          : [],
-      ),
-      n.view.mealTypes as unknown as MealType[],
-    );
-    const due = dueForEstimate({
-      slots,
-      loggedMealTypeIds: new Set(n.view.logs.map((l) => l.mealTypeId)),
-      answeredPlanMealIds: new Set(n.view.answers.map((a) => a.planMealId)),
-      localHour: hour,
-      biasKcal: 0,
-    });
-    if (!due.length) {
-      return;
-    }
-    estimateGuard.current = true;
-    void n.store
-      .enqueue(
-        due.map((e) => ({
-          domain: 'plan_meal_answers',
-          date,
-          payload: {
-            id: randomUUID(),
-            planMealId: e.planMealId,
-            logDate: date,
-            answer: 'estimated',
-            estCalories: e.calories,
-            estProteinG: e.proteinG,
-            estCarbsG: e.carbsG,
-            estFatG: e.fatG,
-            estBiasKcal: 0,
-            estBasis: 'planA',
-          },
-        })),
-      )
-      .catch(() => {})
-      .finally(() => {
-        estimateGuard.current = false;
-      });
-  }, [n.store, date, n.loaded, n.operations, variant, knownTraining]);
   const last = plan?.lastReviewedAt ?? plan?.generatedAt;
   const overdue = last
     ? daysBetweenDateStrs(toAestDay(new Date(last), n.timezone), n.today) >= 28
@@ -299,9 +246,13 @@ export function ActiveMealPlan({
                     : 'Rest-day plan'}
               </AppText>
             )}
+            <AppText variant="caption" tone="muted">
+              Planned meals count only when you confirm what you ate. Unrecorded and skipped
+              meals are excluded.
+            </AppText>
             {!!eligible.length && (
               <AppButton
-                title="Fill unlogged meals so far"
+                title="Log planned meals I ate"
                 variant="secondary"
                 busy={busy}
                 onPress={() =>
@@ -331,11 +282,13 @@ export function ActiveMealPlan({
                       label={
                         logged(m)
                           ? 'Logged'
-                          : declined(m)
-                            ? 'Didn’t have it'
-                            : answer(m)?.answer === 'estimated'
-                              ? 'Estimated · not a confirmed food log'
-                              : 'Planned'
+                          : skipped(m)
+                            ? 'Skipped'
+                            : declined(m)
+                              ? 'Not this meal'
+                              : answer(m)?.answer === 'estimated'
+                                ? 'Not recorded · estimate excluded'
+                                : 'Planned'
                       }
                     />
                     <Stack direction="row" wrap>
@@ -343,11 +296,11 @@ export function ActiveMealPlan({
                         title={logged(m) ? 'Logged' : 'I ate this'}
                         variant="secondary"
                         busy={busy}
-                        disabled={logged(m) || !m.ingredients.length}
+                        disabled={logged(m) || skipped(m) || !m.ingredients.length}
                         onPress={() => void action(() => logPlanMeal(n, m, date, plan))}
                       />
                       <AppButton
-                        title={declined(m) ? 'Undo decline' : 'Didn’t have it'}
+                        title={declined(m) ? 'Undo decline' : 'Not this meal'}
                         variant="ghost"
                         busy={busy}
                         disabled={logged(m) || !m.id}

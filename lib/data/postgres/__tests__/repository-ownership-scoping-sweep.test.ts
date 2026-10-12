@@ -279,6 +279,7 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['getSessionLoadsFrom', r => r.getSessionLoadsFrom(USER_A, FROM_TS)],
     ['getYearReviewTotals', r => r.getYearReviewTotals(USER_A, FROM_TS)],
     ['getYearReviewTopExercises', r => r.getYearReviewTopExercises(USER_A, FROM_TS, 10)],
+    ['getPrescriptionBasisBefore', r => r.getPrescriptionBasisBefore(USER_A, bVal('exercise_logs', 'exercise_name'), TO_TS)],
     ['getLastRealOneRmBatch', r => r.getLastRealOneRmBatch(USER_A, [bVal('exercise_logs', 'exercise_name')])],
     ['getLastExerciseLogsBatch', r => r.getLastExerciseLogsBatch(USER_A, [bVal('exercise_logs', 'exercise_name')])],
     ['getExerciseSummary', r => r.getExerciseSummary(USER_A)],

@@ -1,7 +1,7 @@
 import type { WorkoutRepository } from '@/lib/data/repository'
 
 export async function foodLoggingCoverage(
-  repo: WorkoutRepository,
+  repo: Pick<WorkoutRepository, 'listMealLoggingCompleteness'>,
   userId: string,
   from: string,
   to: string,

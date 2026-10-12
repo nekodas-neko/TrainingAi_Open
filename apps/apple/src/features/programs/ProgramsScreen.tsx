@@ -25,6 +25,7 @@ import {
 } from '../workouts/data/models';
 import { useWorkoutAction } from '../workouts/data/useWorkoutAction';
 import { useWorkoutContext } from '../workouts/WorkoutProvider';
+import { WorkoutReviewSheet } from './WorkoutReviewSheet';
 import { ProgramEditor } from './ProgramEditor';
 import { StyleEditor } from './StyleEditor';
 import { PhaseEditor } from './PhaseEditor';
@@ -43,6 +44,7 @@ export function ProgramsScreen({
   const action = useWorkoutAction();
   const workouts = useWorkoutContext();
   const sync = useTrainingSync();
+  const [reviewId, setReviewId] = useState<string | null>(null);
   const [editor, setEditor] = useState<{
     kind: 'program' | 'style' | 'phase';
     id: string | null;
@@ -78,7 +80,9 @@ export function ProgramsScreen({
         return;
       }
       const path =
-        deleting.kind === 'style' ? '/api/progression-styles' : `/api/phase-sets/${deleting.id}`;
+        deleting.kind === 'style'
+          ? '/api/progression-styles'
+          : `/api/phase-sets/${deleting.id}`;
       await resources.write('DELETE', path, { id: deleting.id }, [
         '/api/workout-templates',
         '/api/progression-styles',
@@ -190,6 +194,13 @@ export function ProgramsScreen({
                     <AppText variant="caption" tone="muted">
                       {session.exercises?.map((exercise) => exercise.exerciseName).join(', ')}
                     </AppText>
+                    {program.isActive && program.phaseMode === 'ai_dynamic' && (
+                      <AppButton
+                        title="Review"
+                        variant="ghost"
+                        onPress={() => setReviewId(session.id!)}
+                      />
+                    )}
                   </Stack>
                 ))}
               </Disclosure>
@@ -309,6 +320,13 @@ export function ProgramsScreen({
       <Disclosure title="Recorded injuries">
         <InjuryManager showSync={false} />
       </Disclosure>
+      {reviewId && (
+        <WorkoutReviewSheet
+          key={`${programs.resources?.connection.userId}:${reviewId}`}
+          sessionId={reviewId}
+          onClose={() => setReviewId(null)}
+        />
+      )}
       <Sheet visible={deleting !== null} title="Delete" onClose={() => setDeleting(null)}>
         {action.error && <Notice title="Program change" message={action.error} />}
         {deleting && (

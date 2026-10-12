@@ -1,3 +1,5 @@
+import { countedEstimateKcal } from '@trainingai/shared/nutrition/meal-estimate'
+import { unrecordedMealEstimatesAllowed } from '@trainingai/shared/nutrition/meal-logging-status'
 import { foodLoggingCoverage } from '@/lib/nutrition/logging-completeness'
 // Server-side assembly for "calories in vs calories out". The API route and the AI coach tool
 // both call this — a second copy would be a second answer to "how much should I eat today", and
@@ -31,6 +33,8 @@ export interface EnergyBalanceResult {
   date: string
   balance: {
     intakeKcal: number
+    loggedIntakeKcal: number
+    estimatedKcal: number
     expenditureKcal: number
     restingBaseKcal: number
     activeKcal: number
@@ -132,6 +136,27 @@ function localMidnightUtc(date: string, tz: string): Date {
   return fromZonedTime(zoned, tz)
 }
 
+async function estimatedKcalFor(repo: WorkoutRepository, userId: string, date: string): Promise<number> {
+  try {
+    const tracking = await repo.listMealLoggingStatuses(userId, date)
+    if (!unrecordedMealEstimatesAllowed(tracking)) return 0
+    const answers = await repo.listPlanMealAnswers(userId, date)
+    if (!answers.some(a => a.answer === 'estimated')) return 0
+    const [plan, mealTypes, logs] = await Promise.all([
+      repo.getActiveMealPlan(userId), repo.listMealTypes(userId), repo.listFoodLogs(userId, date),
+    ])
+    if (!plan) return 0
+    return countedEstimateKcal({
+      answers,
+      planMeals: plan.variants.flatMap(v => v.meals),
+      mealTypes,
+      loggedMealTypeIds: new Set(logs.map(l => l.mealTypeId)),
+    })
+  } catch {
+    return 0
+  }
+}
+
 export async function computeEnergyBalance(
   repo: WorkoutRepository,
   userId: string,
@@ -226,7 +251,9 @@ export async function computeEnergyBalance(
     workoutKcalBySession: activeEnergy.workoutKcalBySession,
   }
 
-  const intakeKcal = Math.round(intakeByDate.get(date) ?? 0)
+  const loggedIntakeKcal = Math.round(intakeByDate.get(date) ?? 0)
+  const estimatedKcal = await estimatedKcalFor(repo, userId, date)
+  const intakeKcal = loggedIntakeKcal + estimatedKcal
   // The RECOMMENDATION's offset (`target.recommendedKcal`, the TDEE nudge). Unchanged by #2071: it is
   // what turns the maintenance estimate into a suggested stored goal, and the maintenance estimate is
   // explicitly not this change's to move.
@@ -462,7 +489,7 @@ export async function computeEnergyBalance(
   return {
     date,
     balance: {
-      ...balance, intakeKcal, restingBaseKcal, activeKcal: activeEnergy.total,
+      ...balance, intakeKcal, loggedIntakeKcal, estimatedKcal, restingBaseKcal, activeKcal: activeEnergy.total,
       restingRateSource: measuredBmr != null ? 'measured' : 'formula',
       restingRateMeasuredOn: measuredBmr != null ? measuredRmr?.measuredOn ?? null : null,
       deficitWeightKg: deficitWeightKg == null ? null : Math.round(deficitWeightKg * 10) / 10,

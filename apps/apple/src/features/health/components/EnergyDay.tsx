@@ -1,3 +1,5 @@
+import { useRecordedIntake } from '../../nutrition/data/useRecordedIntake';
+import { useNutrition } from '../../nutrition/data/NutritionProvider';
 import { dateStrMidnightInTz, formatMinutesOfDay } from '@trainingai/shared/date-utils';
 import Svg, { Rect, Polyline } from 'react-native-svg';
 import type { z } from 'zod';
@@ -22,7 +24,12 @@ export function EnergyDay({
   const { theme } = useTheme();
   const food = useWorkoutResource(foodTimelineSpec(date));
   const profile = useWorkoutResource(hrProfileSpec);
-  const balance = energy?.balance;
+  const savedBalance = energy?.balance;
+  const resolved = useRecordedIntake(date, savedBalance);
+  const nutrition = useNutrition(date);
+  const balance = savedBalance
+    ? { ...savedBalance, intakeKcal: resolved.intake, netKcal: resolved.net }
+    : null;
   const active = energy?.activeBreakdown;
   if (
     !balance ||
@@ -43,7 +50,10 @@ export function EnergyDay({
     restingBaseKcal: balance.restingBaseKcal,
     activeKcal: balance.activeKcal,
     hr,
-    intake: (food.data ?? []).map((f) => ({ atMs: Date.parse(f.loggedAt), kcal: f.calories })),
+    intake: (nutrition.loaded.includes('logs:' + date)
+      ? nutrition.view.logs
+      : (food.data ?? [])
+    ).map((f) => ({ atMs: Date.parse(f.loggedAt), kcal: f.calories })),
   });
   const peak = Math.max(timeline.totals.intakeKcal, timeline.totals.burnKcal, 1);
   const barPeak = Math.max(...timeline.buckets.map((b) => b.intakeKcal), 1);

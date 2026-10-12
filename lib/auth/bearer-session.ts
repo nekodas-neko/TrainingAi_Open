@@ -1,11 +1,11 @@
 import type { Session } from 'next-auth'
-import { refreshIsActiveClaim } from './is-active-refresh'
+import { refreshIsActiveClaim, type ClaimUser } from './is-active-refresh'
 import { sessionTokenFrom } from './session-token'
 import { sessionFromToken } from './session'
 
 export async function bearerSession(
   headers: Headers,
-  lookup: (userId: string) => Promise<{ isActive: boolean; isAdmin?: boolean } | null>,
+  lookup: (userId: string) => Promise<ClaimUser | null>,
 ): Promise<Session | null> {
   const token = await sessionTokenFrom(headers)
   if (!token?.userId) {

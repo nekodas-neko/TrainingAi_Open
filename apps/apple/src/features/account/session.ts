@@ -17,6 +17,7 @@ export type AccountReader = {
   get(path: string, query?: Record<string, string>): Promise<unknown>;
 };
 export type AccountConnection = AccountReader & {
+  coachStream?(body: unknown, signal?: AbortSignal | null): Promise<Response>;
   streamExport?(write: (bytes: Uint8Array) => Promise<void>): Promise<void>;
   readonly timezone: string | null;
   post(path: string, body: unknown): Promise<unknown>;
@@ -154,6 +155,14 @@ export class AccountSession {
         if (this.session?.userId !== userId) {
           throw new Error('The account changed during the request.');
         }
+      },
+      coachStream: async (body, signal) => {
+        const response = await api.coachStream(body, signal);
+        if (this.session?.userId !== userId) {
+          await response.body?.cancel();
+          throw new Error('The account changed during the request.');
+        }
+        return response;
       },
       get: async (path, query) => {
         const value = await api.get(path, query);

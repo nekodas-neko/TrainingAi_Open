@@ -28,6 +28,7 @@ export const LogExercisePayloadSchema = z.object({
     restSec:   z.number(),
     useFor1rm: z.boolean().optional(),
   })).optional(),
+  prescriptionBasisKg: z.number().positive().max(1000).optional(),
   plannedWeights:       z.array(z.number().min(0).max(500).nullable()).max(20).optional(),
   styleName:            z.string().optional(),
   styleId:              z.string().optional(),

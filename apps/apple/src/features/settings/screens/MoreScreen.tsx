@@ -42,6 +42,7 @@ export function MoreScreen({
   openPrograms,
   openClinical,
   openGoals,
+  openProfile,
   openAppleHealth,
   openData,
   openAbout,
@@ -52,6 +53,7 @@ export function MoreScreen({
   openPrograms: () => void;
   openClinical: () => void;
   openGoals: () => void;
+  openProfile: () => void;
   openAppleHealth: () => void;
   openData: () => void;
   openAbout: () => void;
@@ -194,7 +196,7 @@ export function MoreScreen({
                   <ListRow
                     title="Profile details"
                     leading={<Icon name="info" />}
-                    onPress={openGoals}
+                    onPress={openProfile}
                   />
                   <ListRow
                     title="Sessions, progression & schedule"

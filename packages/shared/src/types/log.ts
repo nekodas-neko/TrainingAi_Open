@@ -59,7 +59,7 @@ export interface ExerciseHistoryLogRow {
   volume?: number
   isEarlyDeload: boolean
   phaseType?: ProgramPhaseType
-  sets: Pick<SetLog, 'weightKg' | 'reps' | 'intensityPct' | 'rpe'>[]
+  sets: Pick<SetLog, 'weightKg' | 'reps' | 'intensityPct' | 'rpe' | 'rpeSource'>[]
 }
 
 export interface WorkoutSession {

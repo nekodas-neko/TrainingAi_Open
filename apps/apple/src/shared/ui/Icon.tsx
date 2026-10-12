@@ -1,3 +1,6 @@
+import Sparkles from 'lucide-react-native/icons/sparkles';
+import ExternalLink from 'lucide-react-native/icons/external-link';
+import Clock from 'lucide-react-native/icons/clock';
 import ChevronLeft from 'lucide-react-native/icons/chevron-left';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import Dumbbell from 'lucide-react-native/icons/dumbbell';
@@ -47,6 +50,9 @@ import { Platform } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
 
 const icons = {
+  coach: Sparkles,
+  external: ExternalLink,
+  history: Clock,
   home: Home,
   health: Heart,
   workout: Dumbbell,

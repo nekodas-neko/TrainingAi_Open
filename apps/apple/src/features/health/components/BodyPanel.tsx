@@ -1,3 +1,4 @@
+import { useRecordedIntake } from '../../nutrition/data/useRecordedIntake';
 import { HealthResourceHeader } from './HealthResourceHeader';
 import { useState } from 'react';
 import { bodyComposition } from '@trainingai/shared/health/body-composition';
@@ -46,7 +47,7 @@ import {
 } from './RecordedHealthCards';
 import { RingStatusCard } from './RecordedHealthCards';
 import { useAppleImport } from '../HealthProvider';
-import {toAestDay} from '@trainingai/shared/date-utils';
+import { toAestDay } from '@trainingai/shared/date-utils';
 
 function GroupTitle({ children }: { children: string }) {
   return (
@@ -64,6 +65,7 @@ export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) =
   const readiness = useWorkoutResource(readinessSpec(health.today));
   const energy = useWorkoutResource(energySpec(health.today));
   const load = useWorkoutResource(loadSpec);
+  const intake = useRecordedIntake(health.today, energy.data?.balance);
   const [log, setLog] = useState<LogMetric | null>(null);
   const [metric, setMetric] = useState<MetricKind | null>(null);
   const rows = health.body?.recent ?? [];
@@ -360,7 +362,7 @@ export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) =
           value={imported.completed.hrv.value}
           unit="ms"
           tone="recovery"
-          caption={`${toAestDay(new Date(imported.completed.hrv.at),health.timezone)} · ${imported.completed.hrv.source}`}
+          caption={`${toAestDay(new Date(imported.completed.hrv.at), health.timezone)} · ${imported.completed.hrv.source}`}
         />
       )}
       <Grid columns={3}>
@@ -433,13 +435,11 @@ export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) =
 
         {energy.data?.balance ? (
           <>
-            <AppText variant="title">
-              {metricValue(energy.data.balance.remainingKcal, 'kcal')} remaining
-            </AppText>
+            <AppText variant="title">{metricValue(intake.remaining, 'kcal')} remaining</AppText>
             <Grid columns={2}>
               <MetricTile
                 label="Intake"
-                value={metricValue(energy.data.balance.intakeKcal, 'kcal')}
+                value={metricValue(intake.intake, 'kcal')}
                 tone="nutrition"
               />
               <MetricTile
@@ -449,7 +449,7 @@ export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) =
               />
             </Grid>
             <AppText variant="caption" tone="muted">
-              {energy.data.balance.zoneLabel}
+              {intake.zoneLabel}
             </AppText>
           </>
         ) : (

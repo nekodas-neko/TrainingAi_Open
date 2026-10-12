@@ -5,7 +5,15 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../data/WorkoutDataProvider';
 import { mediaSpec } from '../data/models';
 
-export function ExerciseMedia({ name, compact = false }: { name: string; compact?: boolean }) {
+export function ExerciseMedia({
+  name,
+  compact = false,
+  displaySize,
+}: {
+  name: string;
+  compact?: boolean;
+  displaySize?: number;
+}) {
   const { theme } = useTheme();
   const media = useWorkoutResource(mediaSpec(name));
   const [uri, setUri] = useState<string | null>(null);
@@ -35,7 +43,7 @@ export function ExerciseMedia({ name, compact = false }: { name: string; compact
       current = false;
     };
   }, [name, media.data?.gifUrl, media.data?.imageUrl, media.resources, retry]);
-  const size = compact ? theme.sizes.touchTarget : theme.sizes.demonstration;
+  const size = displaySize ?? (compact ? theme.sizes.touchTarget : theme.sizes.demonstration);
   const picture = uri ? (
     <Image
       source={{ uri }}
@@ -70,7 +78,11 @@ export function ExerciseMedia({ name, compact = false }: { name: string; compact
       >
         {picture}
       </Pressable>
-      <Sheet visible={expanded} title={`${name} demonstration`} onClose={() => setExpanded(false)}>
+      <Sheet
+        visible={expanded}
+        title={`${name} demonstration`}
+        onClose={() => setExpanded(false)}
+      >
         {uri && !failed ? (
           <Image
             source={{ uri }}

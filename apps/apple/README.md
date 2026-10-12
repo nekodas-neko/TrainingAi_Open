@@ -17,7 +17,8 @@ Implementation scope and checklist: [Native App Implementation Plan](https://cha
 | `src/features/activities`, `progress` | Cardio Hub, resumable activity recording and offline saves; strength progress and personal records. |
 | `src/features/nutrition`, `meal-plans` | Daily diary, food capture, recipes and labels, supplements, day review, targets and guided meal planning. |
 | `src/features/social` | Friend requests/codes, activity feed, leaderboards and read-only friend profiles. |
-| `src/features/coach`, `devices` | Reserved for coaching and device integrations; rewards/collection remain deferred. |
+| `src/features/coach` | Native streamed conversations, interactive cards, previews, confirmation, history and undo through the existing coach backend. |
+| `src/features/devices` | Direct device integrations remain deferred; rewards/collection remain a separate module. |
 | `src/integrations/auth` | iOS keychain, browser callback and native Apple sign-in adapters. |
 | `src/integrations/apple-health` | iOS HealthKit queries and source inspection. |
 | `src/core/storage` | SQLite initialization, migrations and device/account/backend storage scopes. |

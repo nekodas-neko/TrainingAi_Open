@@ -1625,6 +1625,25 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return map
   }
 
+  async getPrescriptionBasisBefore(userId: string, exerciseName: string, before: Date, excludeLogId?: string): Promise<number | null> {
+    const result = await this.db.execute<{ estimated_1rm: number }>(sql`
+      SELECT el.estimated_1rm
+      FROM exercise_logs el
+      JOIN workout_sessions ws ON ws.id = el.workout_session_id
+      WHERE ws.user_id = ${userId}
+        AND el.exercise_name = ${exerciseName}
+        AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
+        AND el.estimated_1rm > 0
+        AND el.exercise_deloaded = false
+        AND el.logged_at < ${before.toISOString()}
+        ${excludeLogId ? sql`AND el.id <> ${excludeLogId}` : sql``}
+      ORDER BY el.logged_at DESC
+      LIMIT 1
+    `)
+    const v = result.rows[0]?.estimated_1rm
+    return v != null && Number(v) > 0 ? Number(v) : null
+  }
+
   async getLastExerciseLogsBatch(userId: string, exerciseNames: string[], programId?: string): Promise<Map<string, ExerciseLog>> {
     if (!exerciseNames.length) return new Map()
 
@@ -1750,7 +1769,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const elIds = rows.map(r => r.id)
     const setRows = await this.db.select({
       exerciseLogId: s.setLogs.exerciseLogId, weightKg: s.setLogs.weightKg, reps: s.setLogs.reps,
-      intensityPct: s.setLogs.intensityPct, rpe: s.setLogs.rpe,
+      intensityPct: s.setLogs.intensityPct, rpe: s.setLogs.rpe, rpeSource: s.setLogs.rpeSource,
     })
       .from(s.setLogs)
       .where(and(inArray(s.setLogs.exerciseLogId, elIds), isNull(s.setLogs.deletedAt)))
@@ -1762,7 +1781,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       isEarlyDeload: r.is_early_deload, phaseType: (r.phase_type as ProgramPhaseType | null) ?? undefined,
       sets: setRows.filter(ss => ss.exerciseLogId === r.id).map(ss => ({
         weightKg: ss.weightKg, reps: ss.reps,
-        intensityPct: ss.intensityPct ?? undefined, rpe: ss.rpe ?? undefined,
+        intensityPct: ss.intensityPct ?? undefined, rpe: ss.rpe ?? undefined, rpeSource: ss.rpeSource ?? undefined,
       })),
     }))
   }
@@ -2281,6 +2300,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         eq(s.bodyMetrics.userId, userId),
         gte(s.bodyMetrics.date, from),
         lte(s.bodyMetrics.date, to),
+        isNull(s.bodyMetrics.deletedAt),
       ))
       .orderBy(desc(s.bodyMetrics.date))
     return rows.map(r => ({
@@ -2310,12 +2330,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const [weightRow] = await this.db
       .select({ weightKg: s.bodyMetrics.weightKg })
       .from(s.bodyMetrics)
-      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg)))
+      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg), isNull(s.bodyMetrics.deletedAt)))
       .orderBy(asc(s.bodyMetrics.date)).limit(1)
     const [bfRow] = await this.db
       .select({ bodyFatPct: s.bodyMetrics.bodyFatPct })
       .from(s.bodyMetrics)
-      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.bodyFatPct)))
+      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.bodyFatPct), isNull(s.bodyMetrics.deletedAt)))
       .orderBy(asc(s.bodyMetrics.date)).limit(1)
     return { weightKg: weightRow?.weightKg ?? null, bodyFatPct: bfRow?.bodyFatPct ?? null }
   }
@@ -2325,7 +2345,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const [row] = await this.db
       .select({ weightKg: s.bodyMetrics.weightKg })
       .from(s.bodyMetrics)
-      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg)))
+      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg), isNull(s.bodyMetrics.deletedAt)))
       .orderBy(desc(s.bodyMetrics.date)).limit(1)
     return row?.weightKg ?? null
   }
@@ -2472,7 +2492,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       this.getUserById(userId),
       this.db.select({ weightKg: s.bodyMetrics.weightKg })
         .from(s.bodyMetrics)
-        .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg)))
+        .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg), isNull(s.bodyMetrics.deletedAt)))
         .orderBy(desc(s.bodyMetrics.date)).limit(1),
     ])
     const ageYears = ageFromDob(user?.dateOfBirth ?? null, new Date())
@@ -4603,7 +4623,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         bmrKcal: s.bodyMetrics.bmrKcal,
       })
       .from(s.bodyMetrics)
-      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.bodyFatPct)))
+      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.bodyFatPct), isNull(s.bodyMetrics.deletedAt)))
 
     // RV-165. **Composition is computed once, at ingest, from the profile of that moment — so the
     // stored value is only comparable to a DEXA scan if the profile has not moved since.** The

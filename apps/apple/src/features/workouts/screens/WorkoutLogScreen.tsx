@@ -24,10 +24,12 @@ import { recapSpec } from '../data/models';
 import { WorkoutEnergy } from '../components/WorkoutEnergy';
 
 export function WorkoutLogScreen({
+  openCoach,
   workoutId,
   openSettings,
   closeWorkout,
 }: {
+  openCoach?: () => void;
   workoutId: string | null;
   openSettings: () => void;
   closeWorkout: () => void;
@@ -36,7 +38,9 @@ export function WorkoutLogScreen({
   const { theme } = useTheme();
   const workout = journal.data.workouts.find((workout) => workout.id === workoutId);
   if (journal.controller && journal.ready && workout?.status === 'active') {
-    return <GuidedWorkoutScreen key={workout.id} workout={workout} closeWorkout={closeWorkout} />;
+    return (
+      <GuidedWorkoutScreen key={workout.id} workout={workout} closeWorkout={closeWorkout} />
+    );
   }
   if (!journal.controller || !journal.ready || !workout || workout.status === 'discarded') {
     return (
@@ -85,7 +89,11 @@ export function WorkoutLogScreen({
       title="Workout complete"
       hideHeader
       scroll
-      contentStyle={{ alignItems: 'center', gap: theme.spacing.xl, paddingTop: theme.spacing.xxl }}
+      contentStyle={{
+        alignItems: 'center',
+        gap: theme.spacing.xl,
+        paddingTop: theme.spacing.xxl,
+      }}
     >
       <View
         style={{
@@ -164,6 +172,7 @@ export function WorkoutLogScreen({
         ))}
       </Card>
       <WorkoutEnergy workout={workout} />
+
       <ResourceCard
         title="Session recap"
         spec={recapSpec(workout.id)}
@@ -181,7 +190,9 @@ export function WorkoutLogScreen({
       </Card>
       <NextPrescription />
       <Stack style={{ width: '100%', maxWidth: theme.sizes.summaryWidth }}>
-        <AppButton title="Ask AI Coach · coming soon" disabled />
+        {openCoach && (
+          <AppButton title="Ask AI Coach" icon="coach" variant="primary" onPress={openCoach} />
+        )}
         <Stack direction="row">
           <AppButton
             title="Share"
@@ -194,7 +205,12 @@ export function WorkoutLogScreen({
             }}
             style={{ flex: 1 }}
           />
-          <AppButton title="Done" variant="surface" onPress={closeWorkout} style={{ flex: 1 }} />
+          <AppButton
+            title="Done"
+            variant="surface"
+            onPress={closeWorkout}
+            style={{ flex: 1 }}
+          />
         </Stack>
       </Stack>
     </PageLayout>

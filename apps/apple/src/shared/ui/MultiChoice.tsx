@@ -23,6 +23,7 @@ export function MultiChoice({
             key={option.value}
             accessibilityRole="checkbox"
             accessibilityState={{ checked: value.includes(option.value) }}
+            aria-checked={value.includes(option.value)}
             onPress={() =>
               onChange(
                 value.includes(option.value)

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { ApiError } from '../../account/api/client';
 
 export function useWorkoutAction() {
@@ -6,7 +6,7 @@ export function useWorkoutAction() {
   const running = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  async function run(action: () => Promise<unknown>, success?: string) {
+  const run = useCallback(async (action: () => Promise<unknown>, success?: string) => {
     if (running.current) {
       return false;
     }
@@ -37,7 +37,7 @@ export function useWorkoutAction() {
       running.current = false;
       setBusy(false);
     }
-  }
+  }, []);
   return {
     busy,
     error,

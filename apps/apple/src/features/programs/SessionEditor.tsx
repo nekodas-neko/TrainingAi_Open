@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { ExerciseChooser } from './ExerciseChooser';
 import { randomUUID } from 'expo-crypto';
 import {
   AppButton,
@@ -10,7 +12,12 @@ import {
   TextField,
 } from '../../shared/ui';
 import type { LibraryExercise, SavedStyle } from '../workouts/data/models';
-import { moveItem, selectExercise, type ProgramDraft } from './editor-model';
+import {
+  moveItem,
+  selectExercise,
+  normalizeSupersets,
+  type ProgramDraft,
+} from './editor-model';
 import { defaultStyleIdForSlot } from '@trainingai/shared/workout/default-style';
 
 export function SessionEditor({
@@ -19,13 +26,16 @@ export function SessionEditor({
   onChange,
   library,
   styles,
+  ownedEquipment,
 }: {
   draft: ProgramDraft;
   index: number;
   onChange: (draft: ProgramDraft) => void;
   library: LibraryExercise[];
   styles: SavedStyle[];
+  ownedEquipment?: string[];
 }) {
+  const [choosing, setChoosing] = useState<number | null>(null);
   const session = draft.sessions[index];
   function update(value: Partial<typeof session>) {
     onChange({
@@ -52,7 +62,9 @@ export function SessionEditor({
             accessibilityLabel="Move session up"
             variant="ghost"
             disabled={index === 0}
-            onPress={() => onChange({ ...draft, sessions: moveItem(draft.sessions, index, -1) })}
+            onPress={() =>
+              onChange({ ...draft, sessions: moveItem(draft.sessions, index, -1) })
+            }
           />
           <AppButton
             title="↓"
@@ -91,23 +103,10 @@ export function SessionEditor({
           title={`${at + 1}. ${item.exerciseName || 'Choose exercise'}${item.supersetGroup != null ? ' · Superset' : ''}`}
           defaultOpen={!item.exerciseName}
         >
-          <Picker
-            label="Exercise"
-            searchable
-            value={item.exerciseName}
-            options={library
-              .filter((exercise) => !exercise.mergedInto)
-              .map((exercise) => ({
-                value: exercise.name,
-                label: exercise.name,
-                subtitle: exercise.equipment.join(', '),
-              }))}
-            onChange={(name) => {
-              const selected = library.find((exercise) => exercise.name === name);
-              if (selected) {
-                onChange(selectExercise(draft, index, at, selected));
-              }
-            }}
+          <AppButton
+            title={item.exerciseName || 'Choose exercise'}
+            variant="surface"
+            onPress={() => setChoosing(at)}
           />
           <Picker
             label="Progression set"
@@ -151,10 +150,7 @@ export function SessionEditor({
               disabled={at === 0}
               onPress={() =>
                 update({
-                  exercises: moveItem(session.exercises, at, -1).map((exercise) => ({
-                    ...exercise,
-                    supersetGroup: null,
-                  })),
+                  exercises: normalizeSupersets(moveItem(session.exercises, at, -1)),
                 })
               }
             />
@@ -165,10 +161,7 @@ export function SessionEditor({
               disabled={at === session.exercises.length - 1}
               onPress={() =>
                 update({
-                  exercises: moveItem(session.exercises, at, 1).map((exercise) => ({
-                    ...exercise,
-                    supersetGroup: null,
-                  })),
+                  exercises: normalizeSupersets(moveItem(session.exercises, at, 1)),
                 })
               }
             />
@@ -176,7 +169,11 @@ export function SessionEditor({
               title="Remove"
               variant="danger"
               onPress={() =>
-                update({ exercises: session.exercises.filter((_, index) => index !== at) })
+                update({
+                  exercises: normalizeSupersets(
+                    session.exercises.filter((_, index) => index !== at),
+                  ),
+                })
               }
             />
           </Stack>
@@ -236,6 +233,16 @@ export function SessionEditor({
           })
         }
       />
+      {choosing !== null && (
+        <ExerciseChooser
+          library={library}
+          ownedEquipment={ownedEquipment}
+          role={session.exercises[choosing]?.exerciseRole}
+          current={library.find((x) => x.name === session.exercises[choosing]?.exerciseName)}
+          onClose={() => setChoosing(null)}
+          onSelect={(selected) => onChange(selectExercise(draft, index, choosing, selected))}
+        />
+      )}
     </Card>
   );
 }

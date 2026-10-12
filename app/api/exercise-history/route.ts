@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
     estimated1rm: row.estimated1rm ?? null,
     volume: row.volume ?? null,
     isDeload: isDeloadRow(row),
-    rpeDelta: rpeTrendFromSets(row.sets.map(s => ({ rpe: s.rpe ?? null, intensityPct: s.intensityPct ?? null, reps: s.reps })))?.delta ?? null,
+    rpeDelta: rpeTrendFromSets(row.sets.map(s => ({ rpe: s.rpe ?? null, rpeSource: s.rpeSource ?? null, intensityPct: s.intensityPct ?? null, reps: s.reps })))?.delta ?? null,
   }));
 
   return NextResponse.json(

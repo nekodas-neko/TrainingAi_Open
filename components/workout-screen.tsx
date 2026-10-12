@@ -16,16 +16,17 @@ import {
   DEFAULT_SETS,
   DEFAULT_REPS,
   mroundStep,
-  mroundStepUp,
-  prescribedBarWeights,
+  computeInitialWeights,
   plannedWeightsPayload,
+  prescriptionBasisPayload,
+  styleWithPrescribedBars,
   weightStepFor,
-  defaultRpeFromPct,
   applyDeloadReverts,
   deloadRevertNames,
   deloadOverrideBlocked,
   deloadOverrideOutcome, fullOverrideNeedsRebuild,
   exerciseSetCount,
+  rpePrefill,
   sessionContextLabel,
 } from "@/components/workout/utils";
 import { estimateOneRm, isDeloadedForEstimate } from "@trainingai/shared/1rm";
@@ -68,26 +69,6 @@ const DoneScreen = dynamic(() => import("@/components/workout/done-screen").then
 // falls back to the base-program numbers instead of blocking the workout forever.
 const PRESCRIPTION_POLL_INTERVAL_MS = 3000;
 const PRESCRIPTION_POLL_MAX = 10;
-
-// Shared per-set weight derivation — used at init (launchExercise, the per-set-weights
-// effect) and after an injury swap, so all three paths agree on how a set's target
-// weight is picked. One Formula, One Place.
-function computeInitialWeights(ex: WorkoutExercise | undefined, sets: number): number[] {
-  if (ex?.exerciseType === "bodyweight") {
-    return Array.from({ length: sets }, () => 0);
-  }
-  const step = weightStepFor(ex?.equipment);
-  const prescribed = prescribedBarWeights(ex, sets);
-  return Array.from({ length: sets }, (_, i) => {
-    const bar = prescribed[i];
-    if (bar != null) return bar;
-    if (ex?.target80 != null) return mroundStep(ex.target80, step);
-    // Fallback for old logs that predate the target_80 column: derive from 1RM or last weight
-    if (ex?.estimated1rm) return mroundStepUp(ex.estimated1rm * 0.8, step);
-    if (ex?.latestWeight != null) return mroundStep(ex.latestWeight, step);
-    return 60;
-  });
-}
 
 interface WorkoutScreenProps {
   sessionType: string;
@@ -848,7 +829,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       store.setReps(repsInit);
       store.initRpeValues(
         Array.from({ length: ds }, (_, i) =>
-          defaultRpeFromPct(ex?.exerciseType === "bodyweight" ? undefined : style?.[i]?.pct)
+          rpePrefill(ex, style, i)
         )
       );
       store.setCurrentIdx(idx);
@@ -890,7 +871,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
     store.setReps(repsInit);
     store.initRpeValues(
       Array.from({ length: ds }, (_, i) =>
-        defaultRpeFromPct(ex.exerciseType === "bodyweight" ? undefined : style?.[i]?.pct)
+        rpePrefill(ex, style, i)
       )
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -928,7 +909,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
         store.setReps(nextStyle ? nextStyle.map((s) => s.reps) : Array(ds).fill(DEFAULT_REPS));
         store.initRpeValues(
           Array.from({ length: ds }, (_, i) =>
-            defaultRpeFromPct(nextEx?.exerciseType === "bodyweight" ? undefined : nextStyle?.[i]?.pct)
+            rpePrefill(nextEx, nextStyle, i)
           )
         );
         store.setTimerStarted(false);
@@ -1076,7 +1057,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       s.setReps(repsInit);
       s.initRpeValues(
         Array.from({ length: ds }, (_, i) =>
-          defaultRpeFromPct(ex?.exerciseType === "bodyweight" ? undefined : style?.[i]?.pct)
+          rpePrefill(ex, style, i)
         )
       );
       s.setTimerStarted(false);
@@ -1213,7 +1194,9 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       snapWeights.map((w, i) => ({ weightKg: w, reps: snapReps[i] ?? 0 })),
       {
         exerciseType: ex.exerciseType === "bodyweight" ? "bodyweight" : "weighted",
-        style: ex.progressionStyle,
+        // Issue 2200: scored against the bars this screen put up, the same ones `plannedWeights`
+        // sends, so the stored estimate and the server's agree.
+        style: styleWithPrescribedBars(ex, snapWeights.length),
         isBaseline,
         deloaded: isDeloadedForEstimate({ exerciseDeloaded: ex.deloaded, isAnyDeload, isBaseline }),
       },
@@ -1264,6 +1247,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       prepTimeSec: ex.supersetGroup == null ? (prepSecRef.current ?? undefined) : undefined,
       progressionStyle: ex.progressionStyle ?? undefined,
       plannedWeights: plannedWeightsPayload(ex, snapWeights.length), // #2445
+      prescriptionBasisKg: prescriptionBasisPayload(ex, snapWeights.length), // issue 2200
       styleName: ex.styleName ?? undefined,
       styleId: ex.styleId,
       muscleGroups: ex.muscleGroups?.length ? ex.muscleGroups : undefined,

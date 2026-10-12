@@ -1,4 +1,4 @@
-import { ACTIVITY_LEVELS, FITNESS_GOALS } from '@trainingai/shared/types/user';
+import { FITNESS_GOALS } from '@trainingai/shared/types/user';
 import { goalBoundSchema } from '@trainingai/shared/validation/goal-bounds';
 import { useState } from 'react';
 import { z } from 'zod';
@@ -11,7 +11,6 @@ import {
   ListRow,
   PageLayout,
   Picker,
-  Sheet,
   Skeleton,
   Stack,
   StatusIndicator,
@@ -28,7 +27,6 @@ import {
   useWorkoutResources,
 } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
-import { ProfileOverview } from '../components/ProfileOverview';
 const profile = z
   .object({
     displayName: z.string().nullish(),
@@ -68,7 +66,13 @@ const goalsBody = z.object({
   calorieGoal: goalBoundSchema('calorieGoal').nullable(),
   calorieGoalType: z.enum(['daily', 'own']),
 });
-export function ProfileGoalsScreen({ onBack }: { onBack: () => void }) {
+export function ProfileGoalsScreen({
+  onBack,
+  openProfile,
+}: {
+  onBack: () => void;
+  openProfile: () => void;
+}) {
   const n = useNutrition();
   const p = useWorkoutResource({
     path: '/api/user/profile',
@@ -78,12 +82,12 @@ export function ProfileGoalsScreen({ onBack }: { onBack: () => void }) {
   const g = useWorkoutResource({ path: '/api/user/goals', ttl: 300000, schema: goals });
   return (
     <PageLayout
-      title="Profile & goals"
+      title="My goals"
       header={
         <Stack direction="row" align="center">
           <IconButton icon="back" label="Back to More" onPress={onBack} />
           <AppText variant="heading" style={{ flex: 1 }}>
-            Profile & goals
+            My goals
           </AppText>
           <StatusIndicator
             label="Profile and goals"
@@ -103,6 +107,7 @@ export function ProfileGoalsScreen({ onBack }: { onBack: () => void }) {
         <ProfileGoalsForm
           key={n.store?.connection.userId}
           user={p.data.user}
+          openProfile={openProfile}
           goals={g.data}
           onSaved={() => {
             p.refresh();
@@ -124,10 +129,12 @@ export function ProfileGoalsScreen({ onBack }: { onBack: () => void }) {
 }
 function ProfileGoalsForm({
   user,
+  openProfile,
   goals: stored,
   onSaved,
 }: {
   user: z.infer<typeof profile>;
+  openProfile: () => void;
   goals: z.infer<typeof goals>;
   onSaved: () => void;
 }) {
@@ -158,7 +165,6 @@ function ProfileGoalsForm({
     own: stored.calorieGoalType === 'own',
   });
   const f = draft.value;
-  const [edit, setEdit] = useState(false);
   const [targets, setTargets] = useState(false);
   const [review, setReview] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -214,13 +220,12 @@ function ProfileGoalsForm({
   return (
     <>
       <TabPanel>
-        <ProfileOverview />
         <Card>
           <AppText variant="heading">{user.displayName ?? 'Your profile'}</AppText>
           <ListRow
             title="Edit profile"
             subtitle="Height, date of birth, sex and activity level"
-            onPress={() => setEdit(true)}
+            onPress={openProfile}
           />
         </Card>
         <Card>
@@ -304,93 +309,6 @@ function ProfileGoalsForm({
           />
         </Card>
       </TabPanel>
-      <Sheet
-        visible={edit}
-        fullHeight
-        title="Edit profile"
-        onClose={() => setEdit(false)}
-        actions={
-          <StatusIndicator label="Profile editor" busy={busy} error={error ?? draft.error} />
-        }
-      >
-        <TextField
-          label="Display name"
-          value={f.profile.displayName}
-          onChangeText={(v) => setProfile('displayName', v)}
-        />
-        <TextField
-          label="Height (cm)"
-          value={f.profile.heightCm}
-          keyboardType="decimal-pad"
-          onChangeText={(v) => setProfile('heightCm', v)}
-        />
-        <TextField
-          label="Date of birth (YYYY-MM-DD)"
-          value={f.profile.dateOfBirth}
-          onChangeText={(v) => setProfile('dateOfBirth', v)}
-        />
-        <Picker
-          label="Sex"
-          value={f.profile.sex}
-          options={[
-            { value: '', label: 'Not set' },
-            { value: 'male', label: 'Male' },
-            { value: 'female', label: 'Female' },
-            { value: 'other', label: 'Other' },
-          ]}
-          onChange={(v) => setProfile('sex', v)}
-        />
-        <Picker
-          label="Activity level"
-          value={f.profile.activityLevel}
-          options={[
-            { value: '', label: 'Not set' },
-            ...ACTIVITY_LEVELS.map((v) => ({ value: v, label: v.replaceAll('_', ' ') })),
-          ]}
-          onChange={(v) => setProfile('activityLevel', v)}
-        />
-        <Picker
-          label="Food search region"
-          value={n.region}
-          options={[
-            { value: 'AU', label: 'Australia' },
-            { value: 'NZ', label: 'New Zealand' },
-            { value: 'US', label: 'United States' },
-            { value: 'GB', label: 'United Kingdom' },
-            { value: 'CA', label: 'Canada' },
-          ]}
-          onChange={n.setRegion}
-        />
-        <AppButton
-          title="Save profile"
-          busy={busy}
-          disabled={!draft.ready}
-          onPress={async () => {
-            setBusy(true);
-            try {
-              await resources!.write(
-                'PATCH',
-                '/api/user/profile',
-                {
-                  displayName: f.profile.displayName || null,
-                  heightCm: f.profile.heightCm.trim() ? Number(f.profile.heightCm) : null,
-                  dateOfBirth: f.profile.dateOfBirth || null,
-                  sex: f.profile.sex || null,
-                  activityLevel: f.profile.activityLevel || null,
-                },
-                ['/api/user/profile', '/api/nutrition'],
-              );
-              setEdit(false);
-              setError(null);
-              onSaved();
-            } catch {
-              setError('Check the profile fields and retry when connected.');
-            } finally {
-              setBusy(false);
-            }
-          }}
-        />
-      </Sheet>
       {targets && <NutritionTargets onClose={() => setTargets(false)} />}
       {review && (
         <GoalRecommendation

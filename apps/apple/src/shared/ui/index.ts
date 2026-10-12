@@ -1,4 +1,7 @@
 export { AppText } from './AppText';
+export { HoldButton } from './HoldButton';
+export { ChatComposer } from './ChatComposer';
+export { GroupedBarChart } from './GroupedBarChart';
 export { AppButton } from './AppButton';
 export { Avatar } from './Avatar';
 export { Badge } from './Badge';
@@ -63,9 +66,9 @@ export { ZoneGauge } from './ZoneGauge';
 
 export { SwipeDelete } from './SwipeDelete';
 export { MultiChoice } from './MultiChoice';
-export {SegmentRing} from './SegmentRing';
-export {QrCode} from './QrCode';
-export {GradientProgressBar} from './GradientProgressBar';
-export {ReadyContent} from './ReadyContent';
-export {Thumbnail} from './Thumbnail';
-export {TargetBars} from './TargetBars';
+export { SegmentRing } from './SegmentRing';
+export { QrCode } from './QrCode';
+export { GradientProgressBar } from './GradientProgressBar';
+export { ReadyContent } from './ReadyContent';
+export { Thumbnail } from './Thumbnail';
+export { TargetBars } from './TargetBars';

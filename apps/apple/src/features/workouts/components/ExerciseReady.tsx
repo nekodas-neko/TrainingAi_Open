@@ -1,3 +1,5 @@
+import { cappedTarget } from '../logging/targets';
+import { plateBreakdown } from '@trainingai/shared/workout/plate-loading';
 import { displayOneRm, oneRmLabel, barShareOfOneRm } from '@trainingai/shared/1rm';
 import { View } from 'react-native';
 import { AppText, Badge, Card, Disclosure, MuscleMap, Stack } from '../../../shared/ui';
@@ -23,11 +25,18 @@ export function ExerciseReady({
 }) {
   const { theme } = useTheme();
   const bodyweight = exercise.exerciseType === 'bodyweight';
+  const plates =
+    !bodyweight && exercise.equipment.includes('barbell')
+      ? plateBreakdown(Number(set.weight))
+      : null;
+  const cap = cappedTarget(exercise, set);
   const assignments = [
-    ...(exercise.mainMuscles.length ? exercise.mainMuscles : exercise.muscles).map((muscle) => ({
-      muscle,
-      role: 'main' as const,
-    })),
+    ...(exercise.mainMuscles.length ? exercise.mainMuscles : exercise.muscles).map(
+      (muscle) => ({
+        muscle,
+        role: 'main' as const,
+      }),
+    ),
     ...exercise.secondaryMuscles.map((muscle) => ({ muscle, role: 'secondary' as const })),
   ];
   return (
@@ -45,7 +54,9 @@ export function ExerciseReady({
                 <Badge
                   key={index}
                   label={formatSetLoad(exercise, {
-                    weight: String(exercise.lastWeights[index] ?? exercise.lastWeights.at(-1) ?? 0),
+                    weight: String(
+                      exercise.lastWeights[index] ?? exercise.lastWeights.at(-1) ?? 0,
+                    ),
                     reps: String(reps),
                   })}
                 />
@@ -69,11 +80,23 @@ export function ExerciseReady({
           </AppText>
           {set.planned && (
             <AppText variant="caption" tone="muted" style={{ textAlign: 'center' }}>
-              {barShareOfOneRm(Number(set.weight), exercise.estimated1rm) ?? set.planned.percent}%
-              of 1RM · {set.planned.reps} reps per set
+              {barShareOfOneRm(Number(set.weight), exercise.estimated1rm) ??
+                set.planned.percent}
+              % of 1RM · {set.planned.reps} reps per set
             </AppText>
           )}
         </Card>
+      )}
+      {cap !== null && (
+        <AppText variant="caption" tone="muted" style={{ textAlign: 'center' }}>
+          Automatic target capped at {cap} kg · the calculated load is above the loading limit.
+        </AppText>
+      )}
+      {plates && (
+        <AppText variant="caption" tone="muted" style={{ textAlign: 'center' }}>
+          {plates.perSide.length ? `${plates.perSide.join(' + ')} kg per side` : 'Empty bar'}
+          {plates.exact ? '' : ` · closest ${plates.achievableKg} kg`}
+        </AppText>
       )}
       <ReadyProgress
         exercise={exercise}
@@ -106,7 +129,8 @@ export function ExerciseReady({
               </AppText>
               <AppText variant="label" tone="brand">
                 {formatSetLoad(exercise, {
-                  weight: item.plannedWeight === null ? item.weight : String(item.plannedWeight),
+                  weight:
+                    item.plannedWeight === null ? item.weight : String(item.plannedWeight),
                   reps: String(item.planned?.reps ?? item.reps),
                 })}
               </AppText>
@@ -116,7 +140,9 @@ export function ExerciseReady({
       ) : null}
       {exercise.deloaded && <Badge label="Deload" />}
       {exercise.lastSetMode && (
-        <Badge label={exercise.lastSetMode === 'amrap' ? 'Last set AMRAP' : 'Last set +1 rep'} />
+        <Badge
+          label={exercise.lastSetMode === 'amrap' ? 'Last set AMRAP' : 'Last set +1 rep'}
+        />
       )}
       {assignments.length > 0 && (
         <View style={{ height: theme.sizes.timerRing * 2 }}>

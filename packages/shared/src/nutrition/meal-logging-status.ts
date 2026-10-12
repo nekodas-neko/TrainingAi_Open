@@ -21,3 +21,7 @@ export function mealLoggingComplete(
     )
   )
 }
+
+export function unrecordedMealEstimatesAllowed(tracking: readonly unknown[]): boolean {
+  return tracking.length === 0
+}

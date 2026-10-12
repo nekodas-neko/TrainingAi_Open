@@ -60,9 +60,12 @@ export function createApiClient(
       '/api/nutrition/scan',
       '/api/nutrition/meal-plans/generate',
       '/api/daily-digest',
+      '/api/session-explain/insight',
       '/api/nutrition-goals/recommend',
       '/api/generate-program',
       '/api/builder-chat',
+      '/api/exercises/generate',
+      '/api/workout-review/session/',
       '/api/ai-periodization/session/',
     ].some((prefix) => path.startsWith(prefix));
     const timeout = setTimeout(
@@ -80,7 +83,12 @@ export function createApiClient(
         cache: 'no-store',
         redirect: 'error',
         headers: {
-          Accept: format === 'ndjson' ? 'application/x-ndjson' : 'application/json',
+          Accept:
+            path === '/api/session-explain/insight'
+              ? 'text/plain'
+              : format === 'ndjson'
+                ? 'application/x-ndjson'
+                : 'application/json',
           ...(body ? { 'Content-Type': 'application/json' } : {}),
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
@@ -96,6 +104,14 @@ export function createApiClient(
           }
         }
         throw new ApiError(response.status, code);
+      }
+      if (path === '/api/session-explain/insight') {
+        if (!response.headers.get('content-type')?.includes('text/plain'))
+          throw new Error('The workout insight is unavailable.');
+        const text = await response.text();
+        if (text.includes('[[AI_STREAM_ERROR]]'))
+          throw new Error('The workout insight was cut short. Try again.');
+        return text;
       }
       if (response.status === 204 && format === 'json') {
         return undefined;
@@ -131,6 +147,34 @@ export function createApiClient(
     }
   }
   return {
+    async coachStream(body: unknown, signal?: AbortSignal | null): Promise<Response> {
+      const token = await getToken();
+      if (!token) {
+        throw new Error('Sign in before contacting TrainingAi.');
+      }
+      const response = await (fetcher ?? fetch)(new URL('/api/coach', base), {
+        method: 'POST',
+        credentials: 'omit',
+        redirect: 'error',
+        headers: {
+          Accept: 'text/event-stream',
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(body),
+        signal,
+      });
+      if (!response.ok) {
+        throw new ApiError(response.status);
+      }
+      if (
+        !response.headers.get('content-type')?.includes('text/event-stream') ||
+        !response.body
+      ) {
+        throw new Error('Coach could not start a reply. Please retry.');
+      }
+      return response;
+    },
     async streamExport(write: (bytes: Uint8Array) => Promise<void>) {
       await request('/api/export', 'GET', undefined, true, undefined, 'ndjson', write);
     },

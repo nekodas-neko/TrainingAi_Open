@@ -14,6 +14,7 @@ export function Sheet({
   actions,
   footer,
   fullHeight = false,
+  scroll = true,
 }: PropsWithChildren<{
   visible: boolean;
   title: string;
@@ -21,6 +22,7 @@ export function Sheet({
   actions?: ReactNode;
   footer?: ReactNode;
   fullHeight?: boolean;
+  scroll?: boolean;
 }>) {
   const { theme } = useTheme();
   return (
@@ -48,12 +50,21 @@ export function Sheet({
             {actions}
             <IconButton icon="close" label="Close dialog" onPress={onClose} />
           </Stack>
-          <ScrollView
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ gap: theme.spacing.md, paddingVertical: theme.spacing.md }}
-          >
-            {children}
-          </ScrollView>
+          {scroll ? (
+            <ScrollView
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{
+                gap: theme.spacing.md,
+                paddingVertical: theme.spacing.md,
+              }}
+            >
+              {children}
+            </ScrollView>
+          ) : (
+            <View style={{ flex: 1, gap: theme.spacing.md, paddingVertical: theme.spacing.md }}>
+              {children}
+            </View>
+          )}
           {footer}
         </SafeAreaView>
       </View>

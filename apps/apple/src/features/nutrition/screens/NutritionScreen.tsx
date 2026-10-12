@@ -52,10 +52,12 @@ import {
   weeklySpec,
 } from '../data/models';
 export function NutritionScreen({
+  openCoach,
   openSettings,
   reviewRequest = 0,
   dateRequest,
 }: {
+  openCoach?: () => void;
   openSettings: () => void;
   reviewRequest?: number;
   dateRequest?: { date: string; count: number };
@@ -291,6 +293,10 @@ export function NutritionScreen({
                     }}
                     onSetup={(plan) => {
                       setPlanSeed(plan ?? null);
+                      if (openCoach) {
+                        openCoach();
+                        return;
+                      }
                       setSetupPlan(true);
                       setModal('plans');
                     }}

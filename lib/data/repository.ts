@@ -949,6 +949,7 @@ export interface WorkoutRepository {
   // programId optionally scopes to sessions belonging to that program only — used by the
   // ai_dynamic baseline auto-heal so a shared exercise name from a *different* program's
   // history can't skip a fresh cycle's AMRAP baseline week.
+  getPrescriptionBasisBefore(userId: string, exerciseName: string, before: Date, excludeLogId?: string): Promise<number | null>
   getLastExerciseLogsBatch(userId: string, exerciseNames: string[], programId?: string): Promise<Map<string, ExerciseLog>>
   /** Last non-deload 1RM per exercise — the prescription basis (Q-202). Distinct from the
    *  method above, which still returns the genuinely most recent log for display. */

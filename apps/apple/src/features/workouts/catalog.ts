@@ -19,6 +19,7 @@ export type ExercisePreview = {
   style: string | null;
   instructions: string | null;
   exerciseType: 'weighted' | 'bodyweight';
+  exerciseRole?: 'primary' | 'secondary' | 'accessory' | null;
   deloaded: boolean;
   lastWeights: number[];
   equipment: string[];
@@ -187,6 +188,9 @@ function exercise(value: unknown, dataDate: string | null = null): ExercisePrevi
     instructions:
       typeof row.instructions === 'string' && row.instructions.trim() ? row.instructions : null,
     exerciseType: row.exerciseType === 'bodyweight' ? 'bodyweight' : 'weighted',
+    exerciseRole: ['primary', 'secondary', 'accessory'].includes(String(row.exerciseRole))
+      ? (row.exerciseRole as 'primary' | 'secondary' | 'accessory')
+      : null,
     deloaded: row.deloaded === true,
     equipment: row.equipment == null ? [] : array(row.equipment).map(text),
     estimated1rm: duration(row.estimated1rm),

@@ -36,6 +36,7 @@ const exerciseSchema = z.object({
   style: z.string().nullable(),
   instructions: z.string().nullable(),
   exerciseType: z.enum(['weighted', 'bodyweight']),
+  exerciseRole: z.enum(['primary', 'secondary', 'accessory']).nullable().default(null),
   deloaded: z.boolean(),
   lastWeights: z.array(z.number().min(-100).max(500)),
   equipment: z.array(z.string()).default([]),
@@ -243,14 +244,19 @@ export function createWorkout(
           restAfterSec: null,
           planned,
           plannedWeight: prescribedWeight(exercise, planned),
-          rpe: expectedRpe(exercise.exerciseType === 'weighted' ? planned?.percent : undefined),
+          rpe: expectedRpe(
+            exercise.exerciseType === 'weighted' ? planned?.percent : undefined,
+            planned?.reps,
+          ),
           rpeSource: 'expected',
         };
       }),
     })),
   });
   if (!parsed.success) {
-    throw new Error('This session cannot be logged yet. Refresh its prescription and try again.');
+    throw new Error(
+      'This session cannot be logged yet. Refresh its prescription and try again.',
+    );
   }
   return parsed.data;
 }
@@ -342,7 +348,14 @@ export function mutationFor(
     ...(rpeValues.length
       ? { rpeValues, rpeSources: sets.slice(0, rpeValues.length).map((set) => set.rpeSource) }
       : {}),
-    ...(plannedWeights.some((weight) => weight !== null) ? { plannedWeights } : {}),
+    ...(plannedWeights.some((weight) => weight !== null)
+      ? {
+          plannedWeights,
+          ...(exercise.estimated1rm && exercise.estimated1rm <= 1000
+            ? { prescriptionBasisKg: exercise.estimated1rm }
+            : {}),
+        }
+      : {}),
     ...(styles.length
       ? {
           progressionStyle: styles.map((set) => ({
@@ -415,7 +428,8 @@ export function endRest(workout: WorkoutRecord, now: number, measured = true): W
                 ? set
                 : {
                     ...set,
-                    restAfterSec: measured && elapsed >= 0 && elapsed <= 86_400 ? elapsed : null,
+                    restAfterSec:
+                      measured && elapsed >= 0 && elapsed <= 86_400 ? elapsed : null,
                   },
             ),
           },

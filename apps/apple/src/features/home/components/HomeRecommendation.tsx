@@ -6,7 +6,6 @@ import {
   Badge,
   Card,
   Icon,
-  Sheet,
   Skeleton,
   Stack,
   StatusIndicator,
@@ -27,19 +26,20 @@ export function HomeRecommendation({
   onStart,
   onResume,
   openPrograms,
+  openExplanation,
 }: {
   trained: string[];
   onReadiness: (session?: SessionPreview) => void;
   onStart: (id: string, fullOverride?: boolean) => void;
   onResume: (id: string) => void;
   openPrograms: () => void;
+  openExplanation: (id: string) => void;
 }) {
   const home = useHome();
   const { catalog, status, notice } = useWorkoutContext();
   const { today } = useHealthData();
   const journal = useWorkoutJournal();
   const { theme } = useTheme();
-  const [why, setWhy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sessions = catalog?.program?.sessions ?? [];
   const active = journal.data.workouts.find((workout) => workout.status === 'active');
@@ -163,7 +163,7 @@ export function HomeRecommendation({
               accessibilityRole="button"
               accessibilityLabel="Why this session?"
               hitSlop={theme.spacing.sm}
-              onPress={() => setWhy(true)}
+              onPress={() => openExplanation(session.id)}
               style={{ alignSelf: 'flex-start' }}
             >
               <AppText variant="caption" tone="muted">
@@ -221,11 +221,6 @@ export function HomeRecommendation({
         </>
       ) : (
         <AppButton title="Start Workout" onPress={() => onStart(session.id)} />
-      )}
-      {why && (
-        <Sheet visible title="Why this session?" onClose={() => setWhy(false)}>
-          <AppText>{healthCopy(rec?.reason ?? 'Your current program’s next session.')}</AppText>
-        </Sheet>
       )}
     </Card>
   );

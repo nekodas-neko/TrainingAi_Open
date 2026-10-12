@@ -1,3 +1,4 @@
+import { sessionFromToken } from '@/lib/auth/session'
 import NextAuth, { type Session } from 'next-auth'
 import { headers } from 'next/headers'
 import { authConfig } from './auth.config'
@@ -35,7 +36,7 @@ export async function auth(): Promise<Session | null> {
     }
     session.isActive = true
     session.user.isAdmin = claims.isAdmin
-    return session
+    return sessionFromToken(session, { ...session.user, ...claims })
   }
 
   let requestHeaders: Headers

@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { TextInput, type TextInputProps } from 'react-native';
+import { TextInput, type TextInputProps, type ViewStyle, type StyleProp } from 'react-native';
 import { AppText } from './AppText';
 import { Stack } from './Stack';
 import { useTheme } from '../theme/ThemeProvider';
@@ -9,12 +9,18 @@ export function TextField({
   hint,
   error,
   style,
+  containerStyle,
   ...props
-}: TextInputProps & { label: string; hint?: string; error?: string }) {
+}: TextInputProps & {
+  label: string;
+  hint?: string;
+  error?: string;
+  containerStyle?: StyleProp<ViewStyle>;
+}) {
   const { theme } = useTheme();
   const id = useId();
   return (
-    <Stack gap="xs" style={{ flex: 1 }}>
+    <Stack gap="xs" style={[{ flex: 1 }, containerStyle]}>
       <AppText nativeID={id} variant="caption" tone="muted">
         {label}
       </AppText>

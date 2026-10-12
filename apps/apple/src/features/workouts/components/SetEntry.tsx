@@ -1,3 +1,4 @@
+import { plateBreakdown } from '@trainingai/shared/workout/plate-loading';
 import { barShareOfOneRm } from '@trainingai/shared/1rm';
 import { View } from 'react-native';
 import {
@@ -12,7 +13,7 @@ import {
 } from '../../../shared/ui';
 import type { WorkoutExercise, WorkoutRecord, WorkoutSet } from '../logging/workout';
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
-import { isAmrap, weightStep } from '../logging/targets';
+import { isAmrap, weightStep, cappedTarget } from '../logging/targets';
 import { EffortPicker } from './EffortPicker';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 
@@ -30,6 +31,11 @@ export function SetEntry({
   const journal = useWorkoutJournal();
   const { theme } = useTheme();
   const bodyweight = exercise.exerciseType === 'bodyweight';
+  const plates =
+    !bodyweight && exercise.equipment.includes('barbell')
+      ? plateBreakdown(Number(set.weight))
+      : null;
+  const cap = cappedTarget(exercise, set);
   const amrap = isAmrap(workout, exercise, index);
   const percent =
     barShareOfOneRm(Number(set.weight), exercise.estimated1rm) ?? set.planned?.percent;
@@ -39,7 +45,9 @@ export function SetEntry({
     <Stack gap="md">
       <Stack direction="row" justify="space-between" align="center">
         <Badge label={amrap ? 'A' : String(index + 1)} tone="brand" />
-        {!bodyweight && percent !== undefined && <Badge label={`${percent}% 1RM`} tone="brand" />}
+        {!bodyweight && percent !== undefined && (
+          <Badge label={`${percent}% 1RM`} tone="brand" />
+        )}
       </Stack>
       <Stack direction="row" align="center" gap="md">
         {!bodyweight && (
@@ -66,6 +74,27 @@ export function SetEntry({
           )}
         </View>
       </Stack>
+      {cap !== null && (
+        <AppText variant="micro" tone="muted" style={{ textAlign: 'center' }}>
+          Automatic target capped at {cap} kg · the calculated load is above the loading limit.
+        </AppText>
+      )}
+      {plates && (
+        <AppText variant="micro" tone="muted" style={{ textAlign: 'center' }}>
+          {plates.perSide.length ? `${plates.perSide.join(' + ')} kg per side` : 'Empty bar'}
+          {plates.exact ? '' : ` · closest ${plates.achievableKg} kg`}
+        </AppText>
+      )}
+      {amrap &&
+        !workout.isBaseline &&
+        !bodyweight &&
+        set.planned &&
+        Number(set.weight) === set.plannedWeight && (
+          <AppText variant="micro" tone="brand" style={{ textAlign: 'center' }}>
+            {set.planned.reps} reps = maintain {bodyweight ? 'rep max' : '1RM'} ·{' '}
+            {set.planned.reps + 1}+ reps = beat it
+          </AppText>
+        )}
       {bodyweight && (
         <Disclosure
           title={

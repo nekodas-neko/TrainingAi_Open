@@ -1,3 +1,4 @@
+import { useRecordedIntake } from '../../nutrition/data/useRecordedIntake';
 import { HrDayCard } from '../../health/components/HrDayCard';
 import { verdictSpec } from '../../health/data/checkin';
 import { acwrBandByKey } from '@trainingai/shared/ai-periodization/acwr';
@@ -50,6 +51,8 @@ export function HomeMetricTiles({
   const n = useNutrition();
   const { theme } = useTheme();
   const today = health.body?.today?.date === health.today ? health.body.today : null;
+  const energy = useWorkoutResource(energySpec(health.today));
+  const resolved = useRecordedIntake(health.today, energy.data?.balance);
   const nutrition = n.view.totals;
   const values: Record<
     string,
@@ -69,7 +72,7 @@ export function HomeMetricTiles({
     },
     steps: { value: today?.steps ?? null, unit: '', icon: 'legs', field: 'steps' },
     calories: {
-      value: nutrition?.calories ?? today?.calories ?? null,
+      value: resolved.intake ?? today?.calories ?? null,
       unit: 'kcal',
       icon: 'flame',
       nutrition: true,
@@ -245,8 +248,12 @@ function HomeWidgetBody({
       {label}
     </AppText>
   );
+  const resolvedIntake = useRecordedIntake(health.today, energy?.data?.balance);
   if (id === 'nutritionDonut') {
-    const total = n.view.totals;
+    const total =
+      n.view.totals && resolvedIntake.intake != null
+        ? { ...n.view.totals, calories: resolvedIntake.intake }
+        : n.view.totals;
     const goal = energy?.data?.balance?.budgetKcal ?? null;
     const remaining = total && goal !== null ? goal - total.calories : null;
     return (
@@ -304,7 +311,7 @@ function HomeWidgetBody({
   }
   if (id === 'energyBalanceWidget') {
     const balance = energy?.data?.balance;
-    const intake = n.view.totals?.calories ?? balance?.intakeKcal;
+    const intake = resolvedIntake.intake;
     const remaining =
       intake != null && balance?.budgetKcal != null ? balance.budgetKcal - intake : null;
     return (
@@ -317,7 +324,7 @@ function HomeWidgetBody({
           <Stack direction="row" justify="space-between">
             {title('Energy Balance')}
             <AppText variant="micro" tone="muted">
-              {balance?.zoneLabel}
+              {resolvedIntake.zoneLabel}
             </AppText>
           </Stack>
           <AppText variant="hero">

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { rpeLoadSuggestion } from '../rpe-load-suggestion'
 import { BACKOFF_MAX_PCT } from '@trainingai/shared/ai-periodization/autoregulation'
+import { expectedRpe, expectedRpePrefill } from '@trainingai/shared/ai-periodization/expected-rpe'
 
 /**
  * BF-220 — he logged a set at RPE 10 that fell short of its prescribed reps, and the next set card
@@ -8,9 +9,9 @@ import { BACKOFF_MAX_PCT } from '@trainingai/shared/ai-periodization/autoregulat
  * heavy; its only two call sites run at prescription time, a week later.
  *
  * The owner's actual set, from the intake: `13.75 kg × 6` at **RPE 10** against a prescribed **7
- * reps** in a ~70% block, so the expected RPE is 7 and `rpeDelta` is +3.
+ * reps** in a ~70% block. He tapped the 10, so it is a rating (#2253).
  */
-const OWNER_SET = { loggedRpe: 10, repsDone: 6, prescribedReps: 7, pct: 70 }
+const OWNER_SET = { loggedRpe: 10, rated: true, repsDone: 6, prescribedReps: 7, pct: 70 }
 const DUMBBELL = { equipment: ['dumbbell'] }
 
 describe('BF-220 — the set he just logged can move the next one', () => {
@@ -36,12 +37,23 @@ describe('BF-220 — the set he just logged can move the next one', () => {
   })
 
   it('⛔ an untouched RPE picker suggests nothing — the app must not act on a number it invented', () => {
-    // `rpeValues` is seeded with `defaultRpeFromPct(pct)`, so a set he never rated reads back as
-    // exactly the expected RPE. Same class as the morning check-in's neutral `3`.
+    // The picker opens on `expectedRpePrefill`, and untouched means "went as planned" (#2253). Even
+    // with the reps short, a value he never chose is not a rating — the `rated` flag says so.
     for (const pct of [60, 70, 80, 90]) {
-      const seeded = Math.min(10, Math.max(6, Math.floor(pct / 10)))
-      expect(rpeLoadSuggestion({ loggedRpe: seeded, repsDone: 7, prescribedReps: 7, pct }, 50, DUMBBELL)).toBeNull()
+      const seeded = expectedRpePrefill(pct, 7)
+      expect(rpeLoadSuggestion({ loggedRpe: seeded, rated: false, repsDone: 5, prescribedReps: 7, pct }, 50, DUMBBELL)).toBeNull()
     }
+    // The owner's own set, had he not touched the picker.
+    expect(rpeLoadSuggestion({ ...OWNER_SET, rated: false }, 13.75, DUMBBELL)).toBeNull()
+  })
+
+  it('#2253 — the expectation is the shared expectedRpe(pct, reps done), not floor(pct/10)', () => {
+    // At 80% × 5 reps done the shared formula expects 7.1 (floor(pct/10) said 8). Against the 1.5
+    // dead band a tapped 8 is on plan and a tapped 9 is not; under the old 8 the 9 sat inside it.
+    const at = { prescribedReps: 6, repsDone: 5, pct: 80 }
+    expect(expectedRpe(80, 5)).toBeCloseTo(7.11, 2)
+    expect(rpeLoadSuggestion({ ...at, loggedRpe: 8, rated: true }, 100, DUMBBELL)).toBeNull()
+    expect(rpeLoadSuggestion({ ...at, loggedRpe: 9, rated: true }, 100, DUMBBELL)).not.toBeNull()
   })
 
   it('a hard set that still made its reps suggests nothing, because the trend is unknown in-session', () => {
@@ -51,7 +63,7 @@ describe('BF-220 — the set he just logged can move the next one', () => {
   })
 
   it('an easy set suggests nothing — this offers a cut, never a push', () => {
-    expect(rpeLoadSuggestion({ loggedRpe: 5, repsDone: 7, prescribedReps: 7, pct: 70 }, 50, DUMBBELL)).toBeNull()
+    expect(rpeLoadSuggestion({ loggedRpe: 5, rated: true, repsDone: 7, prescribedReps: 7, pct: 70 }, 50, DUMBBELL)).toBeNull()
   })
 
   it('a deload or baseline session is left alone, inheriting the engine’s decision', () => {

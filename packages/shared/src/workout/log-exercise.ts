@@ -2,7 +2,7 @@ import { isDeloadedForEstimate } from '../1rm';
 import { oneRmImplausible } from '@trainingai/shared/validation/plausibility'
 import { aestMidnight, todayInTz, normalizeDateParam, shiftDateStr } from '@trainingai/shared/date-utils';
 import { getCurrentPhase, isDeloadActive } from '@trainingai/shared/phase-engine';
-import { estimateOneRm, BW_REF } from '@trainingai/shared/1rm';
+import { estimateOneRm, BW_REF, withPrescribedBars } from '@trainingai/shared/1rm';
 import { computeSetAggregates, computeIntensityPct } from '@trainingai/shared/workout/set-aggregates';
 import { bodyweightSetLoadKg } from '@trainingai/shared/workout/bodyweight-load';
 import { defaultUseFor1rm } from '@trainingai/shared/workout/default-use-for-1rm';
@@ -49,7 +49,7 @@ export async function logExerciseFromPayload(
     exercise, weights, reps,
     localDate, timeToCompleteSet, setTimes, restTimes,
     setStartTimes, setEndTimes, interExerciseRestSec, prepTimeSec,
-    progressionStyle, plannedWeights, styleName, styleId, muscleGroups, workoutStartedAt, warmupEndedAtMs,
+    progressionStyle, plannedWeights, prescriptionBasisKg, styleName, styleId, muscleGroups, workoutStartedAt, warmupEndedAtMs,
     rpeValues, rpeSources, intensityMode, wasOverride, exerciseDeloaded,
   } = payload;
 
@@ -191,9 +191,15 @@ export async function logExerciseFromPayload(
   // (exerciseDeloaded) — must never feed the 1RM estimate itself, not just be excluded from
   // becoming a new PR (Q-115). Baseline is the same carve-out as the PR gate: a baseline test
   // is a genuine max-effort attempt even during an otherwise-active deload window.
+  const lastSetEndMs = setEndTimes?.filter((t): t is number => typeof t === 'number').at(-1);
+  const loggedAt = lastSetEndMs != null ? new Date(lastSetEndMs)
+    : workoutStartedAt != null ? new Date(workoutStartedAt)
+    : new Date();
+  const hasBars = exerciseType !== 'bodyweight' && !deloadedForEstimate && (plannedWeights?.some(w => w != null) ?? false);
+  const basisKg = !hasBars ? null : prescriptionBasisKg ?? await repo.getPrescriptionBasisBefore(userId, exercise, loggedAt, clientExerciseLogId);
   const { estimated1rm, target80 } = estimateOneRm(
     weights.map((w, i) => ({ weightKg: w, reps: reps[i] ?? 0 })),
-    { exerciseType, style: progressionStyle, isBaseline, deloaded: deloadedForEstimate },
+    { exerciseType, style: withPrescribedBars(progressionStyle, plannedWeights, basisKg), isBaseline, deloaded: deloadedForEstimate },
   );
 
   // Volume must be priced at what the lifter actually moved. A bodyweight set logs weight 0, so
@@ -247,10 +253,7 @@ export async function logExerciseFromPayload(
   // 1RM history/trend ordering (`ORDER BY loggedAt`) and PR tiebreaks. Prefer the
   // last set's end, then the workout start; fall back to now only when the payload
   // carries no timing at all (never true for a normal client submit).
-  const lastSetEndMs = setEndTimes?.filter((t): t is number => typeof t === 'number').at(-1);
-  const loggedAt = lastSetEndMs != null ? new Date(lastSetEndMs)
-    : workoutStartedAt != null ? new Date(workoutStartedAt)
-    : new Date();
+
 
   // RV-32: `exercise_logs.style_id` is a client-supplied FK into a strictly user-scoped table, and
   // it arrived here unchecked on both the web route and the outbox's `pushMutations` branch — this

@@ -104,3 +104,46 @@ export function dueForEstimate(input: {
     }
   })
 }
+
+/**
+ * #2122 step 8′(3): the calories a day's estimates add to that day's intake — the ONE rule for both
+ * places the calorie ring reads (the client's `totals` and `computeEnergyBalance`'s `intakeKcal`), so
+ * the centre number and the zone bar cannot disagree by the estimate.
+ *
+ * An estimate counts while its slot's meal type still has nothing logged. Logging a meal of that type
+ * later supersedes the assumption, so the real food is not counted twice — the materialiser only ever
+ * adds estimates, and nothing else clears one. A slot whose meal type can no longer be resolved (the
+ * plan changed) is not counted: an assumption the app cannot place is not food.
+ *
+ * Today's intake only. The adaptive-TDEE window is built from logged food (`intakeByDate`) and never
+ * sees this, so an assumption cannot calibrate the maintenance estimate.
+ */
+export interface CountedEstimateInput {
+  answers: readonly { planMealId: string; answer: string; estCalories?: number | null }[]
+  /** Every meal of the user's plan, across variants. */
+  planMeals: readonly { id: string; mealTypeId: string | null; suggestedTime: string | null }[]
+  mealTypes: readonly MealType[]
+  loggedMealTypeIds: ReadonlySet<string | null | undefined>
+}
+
+export function countedEstimateKcal(input: CountedEstimateInput): number {
+  return Math.round(countedEstimates(input).reduce((sum, e) => sum + e.kcal, 0))
+}
+
+/**
+ * #2072. The same rule as `countedEstimateKcal`, one row per counted estimate, so a surface can say
+ * WHICH meals were assumed ("incl. 480 estimated · lunch"). The sum of `kcal` is that function's
+ * answer before rounding; it is built on this, so the two cannot disagree.
+ */
+export function countedEstimates(input: CountedEstimateInput): { planMealId: string; mealTypeId: string; kcal: number }[] {
+  const mealById = new Map(input.planMeals.map(m => [m.id, m]))
+  const out: { planMealId: string; mealTypeId: string; kcal: number }[] = []
+  for (const a of input.answers) {
+    if (a.answer !== 'estimated' || a.estCalories == null || !(a.estCalories > 0)) continue
+    const meal = mealById.get(a.planMealId)
+    const type = meal ? planMealTypeId(meal, input.mealTypes as MealType[]) : null
+    if (!type || input.loggedMealTypeIds.has(type)) continue
+    out.push({ planMealId: a.planMealId, mealTypeId: type, kcal: a.estCalories })
+  }
+  return out
+}
