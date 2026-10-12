@@ -2536,6 +2536,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // natural-identity index so a same-minute collision merges instead of failing.
       const set = {
         title: values.title,
+        activityType: values.activityType,
         startTime: values.startTime, endTime: values.endTime,
         durationMin: values.durationMin, distanceKm: values.distanceKm,
         caloriesBurned: values.caloriesBurned,

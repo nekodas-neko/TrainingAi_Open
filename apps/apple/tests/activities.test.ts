@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ActivityStore,
+  confirmedActivity,
   elapsedMs,
   sessionPayload,
 } from '../src/features/activities/data/ActivityStore.ts';
@@ -362,4 +363,50 @@ test('an edit made while uploading is not acknowledged by the older write', asyn
   assert.equal(store.getSnapshot().rows[0].payload.title, 'Edited title');
   assert.equal(store.getSnapshot().rows[0].pending, false);
   assert.equal(f.requests.length, 2);
+});
+
+test('same-minute canonical IDs are accepted only after complete field readback', () => {
+  const payload = {
+    id,
+    date: '2026-10-12',
+    activityType: 'treadmill',
+    title: 'Walk',
+    startTime: '12:00',
+    durationMin: 20,
+  };
+  const canonical = { ...payload, id: '10000000-0000-4000-8000-000000000999' };
+  assert.equal(confirmedActivity(payload, [canonical])?.id, canonical.id);
+  assert.equal(confirmedActivity(payload, [{ ...canonical, activityType: 'run' }]), null);
+  assert.equal(confirmedActivity(payload, [{ ...canonical, startTime: '12:01' }]), null);
+});
+test('JSONB property ordering cannot strand a guided-walk upload', () => {
+  const payload = {
+    id,
+    date: '2026-10-12',
+    activityType: 'walk',
+    title: 'Interval walk',
+    startTime: '12:00',
+    segments: [
+      {
+        index: 0,
+        setNumber: 1,
+        kind: 'slow' as const,
+        startSec: 0,
+        endSec: 60,
+        avgHr: null,
+        maxHr: null,
+        hrAtStart: null,
+        avgPaceSecPerKm: null,
+        distanceKm: null,
+        avgCadenceSpm: null,
+      },
+    ],
+  };
+  const reversed = {
+    ...payload,
+    segments: payload.segments.map((segment) =>
+      Object.fromEntries(Object.entries(segment).reverse()),
+    ),
+  };
+  assert.equal(confirmedActivity(payload, [reversed])?.id, id);
 });

@@ -50,6 +50,15 @@ describe.skipIf(!canRun)('activity push at the minute of a deleted activity (DV-
     expect(await row()).toEqual([{ id: old, title: 'New walk', deleted: false }])
   })
 
+  it('an explicit same-minute save updates the type and returns the canonical ID',async()=>{
+    const old=randomUUID();
+    await repo.saveActivityLog(USER,walk(old,'Walk'),{overwrite:true});
+    const saved=await repo.saveActivityLog(USER,{...walk(randomUUID(),'Treadmill'),activityType:'treadmill'},{overwrite:true});
+    expect(saved.id).toBe(old);
+    expect(saved.activityType).toBe('treadmill');
+    expect(await row()).toHaveLength(1);
+  });
+
   it('a stale edit to the deleted activity itself does not bring it back', async () => {
     const id = randomUUID()
     await repo.saveActivityLog(USER, walk(id, 'Walk'), { overwrite: true })

@@ -105,6 +105,57 @@ export function sessionPayload(session: ActivitySession, timezone: string): Acti
     ...(session.notes.trim() ? { notes: session.notes.trim() } : {}),
   });
 }
+export function sameActivityField(a: unknown, b: unknown): boolean {
+  if (a === b) {
+    return true;
+  }
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return (
+      a.length === b.length && a.every((value, index) => sameActivityField(value, b[index]))
+    );
+  }
+  if (
+    a &&
+    b &&
+    typeof a === 'object' &&
+    typeof b === 'object' &&
+    !Array.isArray(a) &&
+    !Array.isArray(b)
+  ) {
+    const left = Object.entries(a)
+      .filter(([, value]) => value !== undefined)
+      .sort(([a], [b]) => a.localeCompare(b));
+    const right = Object.entries(b)
+      .filter(([, value]) => value !== undefined)
+      .sort(([a], [b]) => a.localeCompare(b));
+    return (
+      left.length === right.length &&
+      left.every(
+        ([key, value], index) =>
+          key === right[index][0] && sameActivityField(value, right[index][1]),
+      )
+    );
+  }
+  return false;
+}
+export function confirmedActivity(payload: ActivityPayload, rows: Record<string, unknown>[]) {
+  return (
+    rows.find(
+      (row) =>
+        z.uuid().safeParse(row.id).success &&
+        (row.id === payload.id ||
+          (!!payload.startTime && row.startTime === payload.startTime)) &&
+        Object.entries(payload).every(
+          ([field, value]) =>
+            field === 'id' ||
+            value === undefined ||
+            (field === 'date'
+              ? String(row.date).replace(/\//g, '-') === value
+              : sameActivityField(row[field], value)),
+        ),
+    ) ?? null
+  );
+}
 export class ActivityStore {
   private current: ActivityState = emptyActivity;
   private listeners = new Set<() => void>();
@@ -498,18 +549,19 @@ export class ActivityStore {
             fitnessTests: z.array(z.object({ id: z.string() }).passthrough()).optional(),
           })
           .parse(response);
-        const confirmed = (
-          domain === 'activity_logs' ? read.activityLogs : read.fitnessTests
-        )?.find((log) => log.id === row.payload.id);
+        const confirmed = activityRow
+          ? confirmedActivity(activityRow.payload, read.activityLogs ?? [])
+          : read.fitnessTests?.find((log) => log.id === row.payload.id);
         if (
           !confirmed ||
-          Object.entries(row.payload).some(
-            ([field, value]) =>
-              value !== undefined &&
-              (field === 'date'
-                ? String(confirmed.date).replace(/\//g, '-') !== value
-                : JSON.stringify(confirmed[field]) !== JSON.stringify(value)),
-          )
+          (!activityRow &&
+            Object.entries(row.payload).some(
+              ([field, value]) =>
+                value !== undefined &&
+                (field === 'date'
+                  ? String(confirmed.date).replace(/\//g, '-') !== value
+                  : !sameActivityField(confirmed[field], value)),
+            ))
         ) {
           throw new Error('Readback not confirmed.');
         }
@@ -519,9 +571,17 @@ export class ActivityStore {
             activityRow &&
             item.payload.id === row.payload.id &&
             JSON.stringify(item.payload) === JSON.stringify(row.payload)
-              ? { ...item, pending: false }
+              ? {
+                  ...item,
+                  payload: { ...item.payload, id: String(confirmed.id) },
+                  pending: false,
+                }
               : item,
           ),
+          session:
+            activityRow && data.session?.id === activityRow.payload.id
+              ? { ...data.session, id: String(confirmed.id) }
+              : data.session,
           tests: data.tests.map((item) =>
             !activityRow &&
             item.payload.id === row.payload.id &&
