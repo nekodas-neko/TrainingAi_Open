@@ -39,6 +39,12 @@ import { DataSyncScreen } from '../features/settings/screens/DataSyncScreen';
 import { AboutScreen } from '../features/settings/screens/AboutScreen';
 import { YearReviewScreen } from '../features/settings/screens/YearReviewScreen';
 
+import { RunningScreen } from '../features/activities/screens/RunningScreen';
+import { WalkScreen } from '../features/activities/screens/WalkScreen';
+import { BaselinesScreen } from '../features/activities/screens/BaselinesScreen';
+import { CardioScreen } from '../features/activities/screens/CardioScreen';
+import { ActivityScreen } from '../features/activities/screens/ActivityScreen';
+
 function AppShell() {
   const health = useHealthContext();
   const { dataReader } = useAccountContext();
@@ -182,6 +188,7 @@ function AppShell() {
         active={!healthDetail && !detail && tab === 'Workout'}
       >
         <WorkoutScreen
+          openCardio={() => setDetail('cardio')}
           openSettings={openSettings}
           openWorkout={openWorkout}
           openSession={openSession}
@@ -217,7 +224,41 @@ function AppShell() {
           openYear={() => setDetail('year-review')}
         />
       </RetainedView>
-      {detail === 'more-data' ? (
+      {detail === 'running' ? (
+        <RunningScreen
+          key={accountKey}
+          onBack={() => setDetail('cardio')}
+          openActivity={() => setDetail('activity-recording')}
+        />
+      ) : detail === 'guided-walk' ? (
+        <WalkScreen
+          key={accountKey}
+          onBack={() => setDetail('cardio')}
+          openActivity={() => setDetail('activity-recording')}
+        />
+      ) : detail === 'fitness-baselines' ? (
+        <BaselinesScreen
+          key={accountKey}
+          onBack={() => setDetail('cardio')}
+          openActivity={() => setDetail('activity-recording')}
+        />
+      ) : detail === 'cardio' ? (
+        <CardioScreen
+          key={accountKey}
+          onBack={() => setDetail(null)}
+          openRunning={() => setDetail('running')}
+          openWalk={() => setDetail('guided-walk')}
+          openBaselines={() => setDetail('fitness-baselines')}
+          openActivity={() => setDetail('activity-recording')}
+          openSettings={openSettings}
+        />
+      ) : detail === 'activity-recording' ? (
+        <ActivityScreen
+          key={accountKey}
+          onBack={() => setDetail('cardio')}
+          onSaved={() => setDetail('cardio')}
+        />
+      ) : detail === 'more-data' ? (
         <DataSyncScreen onBack={() => setDetail(null)} />
       ) : detail === 'more-about' ? (
         <AboutScreen onBack={() => setDetail(null)} />

@@ -20,11 +20,13 @@ export function WorkoutScreen({
   openWorkout,
   openSession,
   openPrograms,
+  openCardio,
 }: {
   openSettings: () => void;
   openWorkout: (id: string) => void;
   openSession: (id: string) => void;
   openPrograms: () => void;
+  openCardio: () => void;
 }) {
   const workout = useWorkoutContext();
   const journal = useWorkoutJournal();
@@ -126,6 +128,7 @@ export function WorkoutScreen({
           subtitle="Run · Walk · Log anything"
           icon="cardio"
           tone="recovery"
+          onPress={openCardio}
         />
       </View>
     </PageLayout>

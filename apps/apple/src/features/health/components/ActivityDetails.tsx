@@ -1,3 +1,6 @@
+import { useState } from 'react';
+import { ActivityEditor } from '../../activities/components/ActivityEditor';
+import { useActivities, useActivityLogs } from '../../activities/data/ActivityProvider';
 import { dayTimeInstant } from '../data/manual-night';
 import { z } from 'zod';
 import { computeHrZones } from '@trainingai/shared/health/hr-zones';
@@ -5,6 +8,7 @@ import { zoneBreakdownFromReadings } from '@trainingai/shared/health/zone-minute
 import { formatHoursMinutes } from '@trainingai/shared/format/units';
 import {
   AppText,
+  AppButton,
   Card,
   Grid,
   KeyValueGrid,
@@ -39,8 +43,17 @@ export function activityFacts(log: HealthActivity) {
 }
 const pace = (v: number) =>
   `${Math.floor(v / 60)}:${String(Math.round(v % 60)).padStart(2, '0')}/km`;
-export function ActivityDetails({ log }: { log: HealthActivity }) {
+export function ActivityDetails({ log: original }: { log: HealthActivity }) {
+  const history = useWorkoutResource(activityHistorySpec);
+  const entries = useActivityLogs(
+    history.data?.activityLogs ?? [],
+    original.date.replace(/\//g, '-'),
+    original.date.replace(/\//g, '-'),
+  );
+  const log = entries.find((row) => row.id === original.id) ?? original;
   const { timezone } = useHealthData();
+  const [editing, setEditing] = useState(false);
+  const activity = useActivities();
   const { theme } = useTheme();
   const enabled = !!log.startTime && !!log.endTime;
   const windowSpec = {
@@ -210,6 +223,16 @@ export function ActivityDetails({ log }: { log: HealthActivity }) {
         </Card>
       )}
       {log.notes && <AppText>{log.notes}</AppText>}
+      <AppButton
+        title="Edit activity"
+        variant="surface"
+        disabled={
+          !activity.ready ||
+          activity.rows.some((row) => row.pending && row.payload.id === log.id)
+        }
+        onPress={() => setEditing(true)}
+      />
+      {editing && <ActivityEditor log={log} onClose={() => setEditing(false)} />}
       {log.source && (
         <AppText variant="micro" tone="muted">
           Source: {log.source}

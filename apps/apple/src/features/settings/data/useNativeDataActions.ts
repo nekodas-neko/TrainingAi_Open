@@ -9,6 +9,8 @@ import { useAppleImport } from '../../health/HealthProvider';
 import { useLocalStorage } from '../../../core/storage/StorageProvider';
 import { useAccountContext } from '../../account/AccountProvider';
 import { profileSpec, goalsSpec } from '../../health/data/models';
+import { useActivities } from '../../activities/data/ActivityProvider';
+import { useHistoryQueue } from '../../workouts/data/HistoryQueueProvider';
 export function useNativeDataActions() {
   const health = useHealthData(),
     home = useHome(),
@@ -23,6 +25,8 @@ export function useNativeDataActions() {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null),
     [message, setMessage] = useState<string | null>(null);
+  const activities = useActivities(),
+    history = useHistoryQueue();
   const pending =
     health.operations.length +
     home.operations.length +
@@ -30,7 +34,9 @@ export function useNativeDataActions() {
     nutrition.http.length +
     training.operations.length +
     journal.data.workouts.reduce((sum, row) => sum + row.pending.length, 0) +
-    imported.pending;
+    imported.pending +
+    activities.pending +
+    history.operations.length;
   async function sync(restore = false) {
     if (busy || !resources) {
       return;
@@ -46,6 +52,8 @@ export function useNativeDataActions() {
         training.store?.sync(),
         journal.controller?.sync(),
         imported.refresh(),
+        activities.store?.sync(),
+        history.queue?.sync(),
       ]);
       await Promise.all([
         health.store?.refresh(true),
@@ -76,7 +84,9 @@ export function useNativeDataActions() {
         health.store?.getSnapshot().error ??
         home.store?.getSnapshot().error ??
         nutrition.store?.getSnapshot().error ??
-        imported.store?.getSnapshot().error;
+        imported.store?.getSnapshot().error ??
+        activities.store?.getSnapshot().error ??
+        history.queue?.getSnapshot().error;
       if (failure) {
         throw new Error(failure);
       }
@@ -104,6 +114,8 @@ export function useNativeDataActions() {
     training.store?.cancel();
     journal.controller?.cancel();
     imported.store?.cancel();
+    activities.store?.cancel();
+    history.queue?.cancel();
     resources?.cancel();
     await storage.clearAccount(connection.origin, connection.userId);
   }

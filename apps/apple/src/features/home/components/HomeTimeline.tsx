@@ -1,3 +1,4 @@
+import { useActivities } from '../../activities/data/ActivityProvider';
 import { Pressable, View } from 'react-native';
 import { formatHoursMinutes } from '@trainingai/shared/format/units';
 import { formatTimeOfDay, shiftDateStr } from '@trainingai/shared/date-utils';
@@ -21,6 +22,7 @@ export function HomeTimeline({
   const health = useHealthData();
   const journal = useWorkoutJournal();
   const n = useNutrition();
+  const activity = useActivities();
   const { theme } = useTheme();
   const today = health.today;
   const state = useWorkoutResource({
@@ -36,6 +38,38 @@ export function HomeTimeline({
     today,
     health.timezone,
   );
+  for (const row of activity.rows) {
+    const log = row.payload;
+    if (
+      !row.pending ||
+      !log.startTime ||
+      ![today, shiftDateStr(today, -1)].includes(log.date)
+    ) {
+      continue;
+    }
+    const timeMs = Date.parse(dayTimeInstant(log.date, log.startTime, health.timezone) ?? '');
+    if (!Number.isFinite(timeMs)) {
+      continue;
+    }
+    events = events.filter(
+      (event) =>
+        !(
+          ['activity', 'cardio', 'walk'].includes(event.type) &&
+          Math.abs(event.timeMs - timeMs) < 60000
+        ),
+    );
+    events.push({
+      type: 'activity',
+      timeMs,
+      time: formatTimeOfDay(timeMs, health.timezone),
+      date: log.date,
+      day: log.date === today ? 'today' : 'yesterday',
+      title: log.title,
+      durationMin: log.durationMin,
+      distanceKm: log.distanceKm,
+      subtitle: 'Saved on this phone',
+    });
+  }
   for (const date of [today, shiftDateStr(today, -1)]) {
     const operations = n.operations.filter(
       (op) => op.domain === 'food_logs' && op.date === date,

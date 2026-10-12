@@ -6,6 +6,7 @@ export { Card } from './Card';
 export { ColorChoice } from './ColorChoice';
 export { FeatureRow } from './FeatureRow';
 export { Grid } from './Grid';
+export { IconTileGrid } from './IconTileGrid';
 export { ListRow } from './ListRow';
 export { LoadingIndicator } from './LoadingIndicator';
 export { MetricTile } from './MetricTile';

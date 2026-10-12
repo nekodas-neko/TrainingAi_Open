@@ -13,5 +13,10 @@ export type DetailScreen =
   | 'clinical'
   | 'health-day'
   | 'health-week'
+  | 'running'
+  | 'guided-walk'
+  | 'fitness-baselines'
+  | 'cardio'
+  | 'activity-recording'
   | 'profile-goals';
 export type MoreDetail = 'more-data' | 'more-about' | 'year-review';

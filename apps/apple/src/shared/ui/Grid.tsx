@@ -7,7 +7,7 @@ export function Grid({
   columns = 2,
   gap = 'md',
   children,
-}: PropsWithChildren<{ columns?: 2 | 3 | 4; gap?: Space }>) {
+}: PropsWithChildren<{ columns?: 2 | 3 | 4 | 5; gap?: Space }>) {
   const { theme } = useTheme();
   const gutter = theme.spacing[gap] / 2;
   return (

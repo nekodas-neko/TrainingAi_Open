@@ -1,3 +1,4 @@
+import { useActivities } from '../../activities/data/ActivityProvider';
 import { HomeSection, HiddenHomeSections, type SectionBounds } from '../components/HomeSection';
 import { HomeHeader } from '../components/HomeHeader';
 import { HomeScores } from '../components/HomeScores';
@@ -64,6 +65,7 @@ export function HomeScreen(navigation: HomeNavigation) {
   const apple = useAppleImport();
   const workout = useWorkoutContext();
   const journal = useWorkoutJournal();
+  const activity = useActivities();
   const nutrition = useNutrition();
   const resources = useWorkoutResources();
   const readiness = useWorkoutResource(readinessSpec(health.today));
@@ -128,7 +130,7 @@ export function HomeScreen(navigation: HomeNavigation) {
     health.operations.length ||
     nutrition.operations.length ||
     nutrition.http.length;
-  const allPending = pending || apple.pending;
+  const allPending = pending || apple.pending || activity.pending;
   const error =
     [
       home.error,
@@ -138,6 +140,7 @@ export function HomeScreen(navigation: HomeNavigation) {
       health.sleepError,
       health.appleSleep.error,
       apple.error,
+      activity.error,
       readiness.error,
       calendar.error,
       lastCalendar.error,

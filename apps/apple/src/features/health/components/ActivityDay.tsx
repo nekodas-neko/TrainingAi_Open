@@ -19,15 +19,14 @@ import {
 import { activityHistorySpec, metricValue } from '../data/models';
 import { useHistoryQueue } from '../../workouts/data/HistoryQueueProvider';
 import { useWorkoutAction } from '../../workouts/data/useWorkoutAction';
-export function ActivityDay({ logs }: { logs: Activity[] }) {
+import { useActivities, useActivityLogs } from '../../activities/data/ActivityProvider';
+export function ActivityDay({ logs, date }: { logs: Activity[]; date: string }) {
   const queue = useHistoryQueue();
   const action = useWorkoutAction();
   const [selected, setSelected] = useState<Activity | null>(null);
   const [remove, setRemove] = useState<Activity | null>(null);
-  const visible = logs.filter(
-    (log) =>
-      !queue.operations.some((op) => op.domain === 'activity_logs' && op.payload.id === log.id),
-  );
+  const visible = useActivityLogs(logs, date, date);
+  const activity = useActivities();
   if (!visible.length && !remove && !selected) {
     return null;
   }
@@ -39,10 +38,15 @@ export function ActivityDay({ logs }: { logs: Activity[] }) {
         </AppText>
         <StatusIndicator
           label="Activity changes"
-          busy={queue.syncing}
-          error={action.error ?? queue.error}
-          message={queue.operations.length ? 'Changes saved on phone.' : null}
-          onRetry={() => void queue.queue?.sync()}
+          busy={queue.syncing || activity.syncing}
+          error={action.error ?? queue.error ?? activity.error}
+          message={
+            queue.operations.length || activity.pending ? 'Changes saved on phone.' : null
+          }
+          onRetry={() => {
+            void queue.queue?.sync();
+            void activity.store?.sync();
+          }}
         />
       </Stack>
       {visible.map((log) => (
@@ -65,7 +69,10 @@ export function ActivityDay({ logs }: { logs: Activity[] }) {
             <IconButton
               icon="delete"
               label={`Delete ${log.title ?? log.activityType}`}
-              disabled={!queue.ready}
+              disabled={
+                !queue.ready ||
+                activity.rows.some((row) => row.pending && row.payload.id === log.id)
+              }
               onPress={() => setRemove(log)}
             />
           </Stack>

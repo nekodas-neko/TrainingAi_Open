@@ -162,7 +162,13 @@ export function HealthDayScreen({
     </PageLayout>
   );
 }
-export function DayReadThrough({ date,readOnly=false }: { date: string;readOnly?:boolean }) {
+export function DayReadThrough({
+  date,
+  readOnly = false,
+}: {
+  date: string;
+  readOnly?: boolean;
+}) {
   const { today } = useHealthData();
   const state = useWorkoutResource(healthDaySpec(date));
   const energy = useWorkoutResource(energySpec(date));
@@ -171,9 +177,12 @@ export function DayReadThrough({ date,readOnly=false }: { date: string;readOnly?
   const body = data?.bodyMeta;
   if (!data) {
     return (
-      <AppText tone="muted">
-        The day’s records could not be loaded. Use the header to retry.
-      </AppText>
+      <>
+        <AppText tone="muted">
+          The day�s server records could not be loaded. Use the header to retry.
+        </AppText>
+        <ActivityDay logs={[]} date={date} />
+      </>
     );
   }
   const rows = body
@@ -225,7 +234,7 @@ export function DayReadThrough({ date,readOnly=false }: { date: string;readOnly?
           sessionEnergy={energy.data?.activeBreakdown?.workoutKcalBySession}
         />
       )}
-      <ActivityDay logs={data.activityLogs} />
+      <ActivityDay logs={data.activityLogs} date={date} />
       <EnergyDay date={date} energy={energy.data} hr={data.hr} />
       {data.sleep && <SleepNight compact night={{ ...data.sleep, date }} />}
       {data.bodyTemp?.meanC != null && (

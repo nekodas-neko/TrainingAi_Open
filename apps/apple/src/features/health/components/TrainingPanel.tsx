@@ -28,6 +28,8 @@ import {
 import { HealthMetricCard } from './HealthMetricCard';
 import { ActivityDetails, type HealthActivity } from './ActivityDetails';
 
+import { useActivities, useActivityLogs } from '../../activities/data/ActivityProvider';
+
 function CalendarCard({ openDay }: { openDay: (date: string) => void }) {
   const { today } = useHealthData();
   const [month, setMonth] = useState(today.slice(0, 7));
@@ -35,7 +37,13 @@ function CalendarCard({ openDay }: { openDay: (date: string) => void }) {
   const [year, number] = month.split('-').map(Number);
   const state = useWorkoutResource(calendarSpec(year, number));
   const journal = useWorkoutJournal();
+  const activities = useActivities();
   const markers: Record<string, string[]> = {};
+  for (const row of activities.rows) {
+    if (row.payload.date.startsWith(month)) {
+      markers[row.payload.date] = [row.payload.title];
+    }
+  }
   for (const source of [state.data?.trainedDays ?? {}, state.data?.activityDays ?? {}]) {
     for (const [date, names] of Object.entries(source)) {
       const day = date.replace(/\//g, '-');
@@ -123,6 +131,11 @@ export function TrainingPanel({
   const muscles = useWorkoutResource(muscleSetsSpec);
   const overview = useWorkoutResource(overviewSpec);
   const activity = useWorkoutResource(activityHistorySpec);
+  const activityLogs = useActivityLogs(
+    activity.data?.activityLogs ?? [],
+    shiftDateStr(today, -29),
+    today,
+  );
   const [selectedActivity, setSelectedActivity] = useState<HealthActivity | null>(null);
   const trends = useWorkoutResource(trendsSpec(today));
   return (
@@ -211,7 +224,7 @@ export function TrainingPanel({
           refresh={activity.refresh}
         />
 
-        {activity.data?.activityLogs.map((log) => (
+        {activityLogs.map((log) => (
           <ListRow
             key={log.id}
             title={log.title ?? log.activityType}
@@ -219,7 +232,7 @@ export function TrainingPanel({
             onPress={() => setSelectedActivity(log)}
           />
         ))}
-        {activity.data && !activity.data.activityLogs.length && (
+        {activity.data && !activityLogs.length && (
           <AppText variant="caption" tone="muted">
             No activities recorded in the last 30 days
           </AppText>
