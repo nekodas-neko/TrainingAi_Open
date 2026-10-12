@@ -109,7 +109,7 @@ export const runningPlanSpec = (today: string) => ({
             weeklyBaseMinutes: number,
             source: z.enum(['baseline', 'age-estimate']),
           })
-          .optional(),
+          .nullish(),
       })
       .passthrough()
       .nullable(),

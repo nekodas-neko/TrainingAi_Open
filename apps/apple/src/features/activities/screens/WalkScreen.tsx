@@ -131,7 +131,7 @@ export function WalkScreen({
           <AppText variant="eyebrow" tone="muted">
             Today’s walk · swipe to override
           </AppText>
-          <View style={{ height: theme.sizes.chartHeight }}>
+          <View style={{ height: theme.sizes.recommendationCard + theme.spacing.xl }}>
             <Carousel
               items={['Today', 'Long', 'Short', 'Custom'].map((id) => ({ id }))}
               selectedId={draft.value.selected}

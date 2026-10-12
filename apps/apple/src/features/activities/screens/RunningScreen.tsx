@@ -286,7 +286,7 @@ export function RunningScreen({
                         onPress={() => void override(type, Math.min(120, minutes + 10))}
                       />
                     </Stack>
-                    <View style={{ height: theme.sizes.chartHeight }}>
+                    <View style={{ height: theme.sizes.recommendationCard + theme.spacing.xl }}>
                       <Carousel
                         items={RUN_TYPES_FOR_STATS.map((id) => ({ id }))}
                         selectedId={type}
