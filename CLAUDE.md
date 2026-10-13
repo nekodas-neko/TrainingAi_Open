@@ -24,7 +24,10 @@ version is kept verbatim at [`docs/archive/CLAUDE-2026-10-05.md`](docs/archive/C
   and released on Tuesday. Never put a migration in a batch with anything else. The owner steers with
   the `next` label. `node scripts/queue.js` shows the queue and the next batch.
 - **Releases are weekly, on Tuesday** ("patch Tuesday"): everything merged that week ships together.
-  A hotfix ships off-schedule **only when production is actually broken**.
+  A hotfix ships off-schedule **only when production is actually broken**. **Suspended while the
+  native app lands (from 2026-10-13):** releases go out on demand, up to daily, each still with the
+  owner's "approve". The rules and the native testing loop are in
+  [`docs/native-testing.md`](docs/native-testing.md).
 - **A title says what the task is, in plain words** — for an issue, a PR and a one-off session
   alike. No entry IDs, lane letters or `[area]` tags: labels carry area and lane, and the issue
   number is the ID. **An issue title starts with its type** — `bug:`, `feature:`, `chore:`,
