@@ -26,7 +26,8 @@ version is kept verbatim at [`docs/archive/CLAUDE-2026-10-05.md`](docs/archive/C
 - **Releases are weekly, on Tuesday** ("patch Tuesday"): everything merged that week ships together.
   A hotfix ships off-schedule **only when production is actually broken**. **Suspended while the
   native app lands (from 2026-10-13):** releases go out on demand, up to daily, each still with the
-  owner's "approve". The rules and the native testing loop are in
+  owner's yes. Once the release issue shows that yes and a clean release test, jsboiss may run it
+  too. The rules and the native testing loop are in
   [`docs/native-testing.md`](docs/native-testing.md).
 - **A title says what the task is, in plain words** — for an issue, a PR and a one-off session
   alike. No entry IDs, lane letters or `[area]` tags: labels carry area and lane, and the issue
