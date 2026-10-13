@@ -13,7 +13,7 @@ import type { z } from 'zod';
 
 export function HeartHeroValue({ bpm }: { bpm: number | null }) {
   const profile = useWorkoutResource(hrProfileSpec).data;
-  const maxHr = profile?.workingMax ?? profile?.maxHr;
+  const maxHr = profile?.maxHr ?? profile?.workingMax;
   const restingHr = profile?.restingHr;
   const zones =
     maxHr != null && restingHr != null && maxHr > restingHr

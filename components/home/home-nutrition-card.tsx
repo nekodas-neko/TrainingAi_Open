@@ -8,6 +8,7 @@ import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 import { ColorSwatchPicker } from '@/components/ui/color-swatch-picker'
 import { HomeNutritionZoneBar } from '@/components/home/home-nutrition-zone-bar'
 import { useEnergyBalanceToday } from '@/app/health/hooks/use-health-calcs'
+import { EstimatedKcalLine, StripedRingArc } from '@/components/nutrition/estimated-kcal'
 
 interface Props {
   sectionEditMode: boolean
@@ -49,9 +50,16 @@ export function HomeNutritionCard({
   const dailyBudget = balance ? budgetProvenance(balance).total : null
   // Issue 2622. The Daily/Weekly switch is retired: the budget is a day's, so the header and the
   // ring both read today.
-  const overUnder = dailyBudget != null ? dailyBudget - (nutrCalories ?? 0) : null
+  // #2072. The server's intake counts assumed plan meals; `nutrCalories` is logged food. The ring and
+  // "left" add the same estimate the bar below already includes, so the card says one number.
+  const estimated = balance?.estimatedKcal ?? 0
+  const eatenKcal = (nutrCalories ?? 0) + estimated
+  const overUnder = dailyBudget != null ? dailyBudget - eatenKcal : null
   const eatenPct = dailyBudget != null && dailyBudget > 0
-    ? Math.min(100, Math.round(((nutrCalories ?? 0) / dailyBudget) * 100))
+    ? Math.min(100, Math.round((eatenKcal / dailyBudget) * 100))
+    : 0
+  const loggedPct = dailyBudget != null && dailyBudget > 0
+    ? Math.min(eatenPct, Math.round(((nutrCalories ?? 0) / dailyBudget) * 100))
     : 0
   // Over budget takes the zone's OWN colour from the payload rather than a local red: it is the
   // same colour the bar and the "Well over"/"Over" label use, so the ring cannot disagree with
@@ -86,12 +94,13 @@ export function HomeNutritionCard({
             style={{ background: 'currentColor', WebkitMask: ringMask, mask: ringMask }}
           />
           <div className="absolute inset-0 rounded-full" style={{
-            background: eatenPct > 0
-              ? `conic-gradient(${ringColor} ${eatenPct * 3.6}deg, transparent ${eatenPct * 3.6}deg)`
+            background: loggedPct > 0
+              ? `conic-gradient(${ringColor} ${loggedPct * 3.6}deg, transparent ${loggedPct * 3.6}deg)`
               : 'transparent',
             WebkitMask: ringMask,
             mask: ringMask,
           }} />
+          <StripedRingArc fromDeg={loggedPct * 3.6} toDeg={eatenPct * 3.6} ringMask={ringMask} />
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
             <span className="text-[9px] font-extrabold leading-none tabular-nums">
               {metaLoading || overUnder == null ? '…' : Math.abs(overUnder).toLocaleString()}
@@ -104,13 +113,14 @@ export function HomeNutritionCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline justify-between mb-1">
             <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Nutrition</p>
-            {dailyBudget && <p className="text-xs text-muted-foreground">{(nutrCalories ?? 0).toLocaleString()} / {dailyBudget.toLocaleString()} kcal</p>}
+            {dailyBudget && <p className="text-xs text-muted-foreground">{eatenKcal.toLocaleString()} / {dailyBudget.toLocaleString()} kcal</p>}
           </div>
           {/* Q-401: the gradient progress fill that used to be here measured "how full is the
               tank" against a fixed target. The zone bar measures "am I on target" against a
               budget that rises with what you burned, which is the number the rest of the app
               now uses. Same component as the Nutrition tab's, so the two cannot drift. */}
           <HomeNutritionZoneBar />
+          <EstimatedKcalLine estimatedKcal={estimated} className="mb-1 text-[10px]" />
           <div className="space-y-0.5">
             {[
               { color: MACRO_COLORS.protein, label: 'Protein', value: nutrProtein },

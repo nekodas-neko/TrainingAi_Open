@@ -274,8 +274,18 @@ export const trainingStressSpec = (date: string) => ({
   path: '/api/training-stress',
   query: { date },
   schema: z.discriminatedUnion('status', [
-    z.object({ status: z.literal('ok'), ots: finite, high: z.boolean() }),
-    z.object({ status: z.literal('gated'), reason: text }),
+    z.object({
+      status: z.literal('ok'),
+      ots: finite,
+      high: z.boolean(),
+      residualShare: finite.min(0).max(1).optional(),
+      rhrFromDay: text.optional(),
+    }),
+    z.object({
+      status: z.literal('gated'),
+      reason: text,
+      residualShare: finite.min(0).max(1).optional(),
+    }),
   ]),
   ttl: 300_000,
 });

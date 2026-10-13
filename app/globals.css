@@ -108,6 +108,9 @@ html, body {
      this pair at full opacity. 0.546 gives 4.52:1 there and 4.94:1 on white — a 0.01 lightness
      step, visually imperceptible. See scripts/check-contrast.js. */
   --muted-foreground: oklch(0.546 0 0);
+  /* #2072. The stripe that marks calories the app ASSUMED (an unlogged planned meal) on the calorie
+     ring and bars. Muted and brand-tinted so it reads as "part of the total, not food". */
+  --estimate: oklch(0.55 0.03 var(--brand-hue, 149));
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
@@ -177,6 +180,7 @@ html, body {
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.225 0.034 var(--brand-hue, 149));
   --muted-foreground: oklch(0.75 0 0);
+  --estimate: oklch(0.80 0.03 var(--brand-hue, 149));
   --accent: oklch(0.225 0.034 var(--brand-hue, 149));
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);

@@ -5,6 +5,7 @@ import { getTableConfig } from 'drizzle-orm/pg-core';
 import { readFileSync } from 'node:fs';
 import * as schema from '../../schema';
 import { applyHealthConnectBatch, rebuildHealthConnect } from '../health-connect';
+import { getNativeMovementIntervals } from '../native-movement';
 import type { HealthConnectRecord } from '@trainingai/shared/validation/health-connect-import';
 const user = '00000000-0000-4000-8000-000000000001',
   other = '00000000-0000-4000-8000-000000000002';
@@ -32,6 +33,7 @@ beforeAll(async () => {
     ),
   );
   for (const [table, unique] of [
+    [schema.appleHealthSamples, 'user_id,sample_id'],
     [schema.bodyMetrics, 'user_id,date'],
     [schema.sleepSessions, 'user_id,sleep_start'],
     [schema.ouraHeartrate, 'user_id,timestamp'],
@@ -135,5 +137,57 @@ describe('Health Connect ledger and projections', () => {
       { user_id: user, readiness_source: 'oura', readiness_score: 90 },
       { user_id: other, readiness_source: 'generic-derived', readiness_score: 80 },
     ]);
+  });
+  it('feeds native Apple/Android movement to the minute cascade with provenance and account/deletion guards', async () => {
+    const sampleId = '00000000-0000-4000-8000-000000000099';
+    await engine.query(
+      `INSERT INTO apple_health_samples(user_id,sample_id,sample_type,start_at,end_at,quantity_value,source_bundle_id) VALUES
+      ($1,$3,'HKQuantityTypeIdentifierStepCount','2026-10-12T01:00:00Z','2026-10-12T01:10:00Z',1000,'com.test.applewatch'),
+      ($2,$3,'HKQuantityTypeIdentifierStepCount','2026-10-12T01:00:00Z','2026-10-12T01:10:00Z',9999,'com.test.other')`,
+      [user, other, sampleId],
+    );
+    const steps: HealthConnectRecord = {
+      ...record,
+      id: 'movement-steps',
+      type: 'Steps',
+      value: 1200,
+      start: '2026-10-12T02:00:00Z',
+      end: '2026-10-12T02:10:00Z',
+    };
+    const calories: HealthConnectRecord = {
+      ...steps,
+      id: 'movement-energy',
+      type: 'ActiveCaloriesBurned',
+      value: 25,
+    };
+    await applyHealthConnectBatch(db, user, { records: [steps, calories], deleted: [] });
+    const from = new Date('2026-10-12T00:00:00Z'),
+      to = new Date('2026-10-13T00:00:00Z');
+    const values = await getNativeMovementIntervals(db, user, 'steps', from, to);
+    expect(values.map((row) => row.value)).toEqual([1000, 1200]);
+    expect(values.map((row) => row.dataOrigin)).toEqual([
+      'com.test.applewatch',
+      'com.test.scale',
+    ]);
+    expect(values.map((row) => row.recordId)).toEqual([
+      `apple_health:${sampleId}`,
+      'health_connect:movement-steps',
+    ]);
+    expect((await getNativeMovementIntervals(db, user, 'active_kcal', from, to))[0].value).toBe(
+      25,
+    );
+    await applyHealthConnectBatch(db, user, {
+      records: [{ ...steps, value: 1500, modifiedAt: '2026-10-12T09:00:00Z' }],
+      deleted: [],
+    });
+    expect((await getNativeMovementIntervals(db, user, 'steps', from, to))[1].value).toBe(1500);
+    await applyHealthConnectBatch(db, user, { records: [], deleted: [steps.id] });
+    await engine.query('UPDATE apple_health_samples SET deleted_at=now() WHERE user_id=$1', [
+      user,
+    ]);
+    expect(await getNativeMovementIntervals(db, user, 'steps', from, to)).toEqual([]);
+    expect((await getNativeMovementIntervals(db, other, 'steps', from, to))[0].value).toBe(
+      9999,
+    );
   });
 });

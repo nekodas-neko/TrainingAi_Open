@@ -41,6 +41,12 @@ export function ActivitySignalsCard() {
       <AppText variant="eyebrow" tone="muted">
         Today’s activity vs your goals
       </AppText>
+      {signals.zoneMinutes === null && signals.moveHours === null && (
+        <AppText variant="caption" tone="muted">
+          Zone minutes and hours moved need consistent heart-rate readings. Sparse readings are
+          treated as unmeasured time.
+        </AppText>
+      )}
       {rows.map((row, index) => (
         <Stack key={row.label}>
           {index === 4 && (

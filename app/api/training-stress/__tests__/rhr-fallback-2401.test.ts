@@ -15,7 +15,10 @@ vi.mock('@/lib/data', () => ({
     getOuraDailySummary: async () => [{ nHistory: 30 }],
     listBodyMetrics: (...a: unknown[]) => listBodyMetrics(...a),
     getUserById: async () => ({ dateOfBirth: '1990-01-01', sex: 'male' }),
-    getOuraDaytimeSignals: async () => ({ met: [], temp: [] }),
+    getOuraDaytimeSignals: async () => ({ met: [], temp: [], still: [], motion: [] }),
+    listSleepSessions: async () => [],
+    listActivityLogs: async () => [],
+    getHealthConnectIntervals: async () => [],
     upsertOuraDailyDerived: async () => undefined,
   }),
 }))
@@ -50,9 +53,16 @@ describe('/api/training-stress — resting heart rate borrowed from an earlier d
     expect(body.rhrFromDay).toBeUndefined()
   })
 
-  it('reads body metrics over the seven days ending on the asked day', async () => {
+  it('reads body metrics over the 30 days ending on the asked day (#2115 v4: the calorie rung\'s weight)', async () => {
     listBodyMetrics.mockResolvedValue([])
     await ask()
-    expect(listBodyMetrics).toHaveBeenCalledWith('u-1', shiftDateStr(DAY, -7), DAY)
+    expect(listBodyMetrics).toHaveBeenCalledWith('u-1', shiftDateStr(DAY, -30), DAY)
+  })
+
+  it('still borrows a resting rate from the last seven days only, though it reads thirty', async () => {
+    listBodyMetrics.mockResolvedValue([{ date: shiftDateStr(DAY, -10), restingHeartRate: 52 }, { date: DAY }])
+    const body = await ask()
+    expect(body.reason).toBe('no_profile')
+    expect(body.rhrFromDay).toBeUndefined()
   })
 })

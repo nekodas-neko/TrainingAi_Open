@@ -31,8 +31,8 @@ import {selectNonOverlapping} from './interval-overlap'
  * It never invents steps from desk activity. The accurate path is the live-accel counter
  * (`lib/oura-ble/accel.ts`), which replaces this per-window guess where it runs.
  */
-import type { PairedStepFeature } from '@/lib/oura-ble/step-features'
-import { GAIT_CADENCE_MAX_HZ } from '@/lib/oura-ble/gait-step-count'
+import { GAIT_CADENCE_MAX_HZ } from './gait-constants'
+type PairedStepFeature = { ds: number; columns: number[] }
 
 /** unpack27 column holding the walk-cadence feature. */
 export const WALK_CADENCE_COLUMN = 14

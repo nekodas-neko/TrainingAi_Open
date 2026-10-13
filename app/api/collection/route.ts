@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
+import { collectionTitles } from '@trainingai/shared/collection/titles'
 import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 import { maxCompliantRestGap } from '@trainingai/shared/schedule-utils'
@@ -138,12 +139,15 @@ export async function GET() {
       }),
     },
   }
+  // #2189. The scene titles, derived from the replays above (their `reached` high-water marks).
+  // Never stored; nothing on `/collection` reads them yet — the scene picker is the surface half.
+  const titles = collectionTitles(v2.collections)
 
   return NextResponse.json(
     // `rulesVersion` rides along so a cached collection and a live one cannot straddle a threshold
     // change unnoticed — the cache half of `ladder.ts`'s versioning note. `no-store` is the other
     // half: this route is replayed from history on every read and must never be served stale.
-    { collections, rulesVersion: COLLECTION_RULES_VERSION, today, v2 },
+    { collections, rulesVersion: COLLECTION_RULES_VERSION, today, v2: { ...v2, titles } },
     { headers: { 'Cache-Control': 'private, no-store' } },
   )
 }

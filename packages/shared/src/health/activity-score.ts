@@ -91,8 +91,8 @@ export interface ActivityScoreInput {
   steps: number | null
   /** Today's active calories (kcal). */
   activeCalories: number | null
-  /** Today's minutes in zone 2+ (moderate/vigorous). Vigorous minutes should be doubled by the
-   *  caller before passing. Omit/null when no HR series is available (renormalises out). */
+  /** Today's WHO active minutes: moderate (from 40% of HR reserve) once, vigorous (from 60%) double,
+   *  doubled by the caller (`activeMinutesFromReadings`) before passing. Omit/null when no HR series is available (renormalises out). */
   zoneMinutes?: number | null
   /** Daytime hours with detected movement, and the goal for that (waking hours less an allowance).
    *  Omit both when not computed (the "move every hour" lane renormalises out). */

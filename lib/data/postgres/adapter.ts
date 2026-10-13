@@ -13,7 +13,7 @@ import { getDb } from './client'
 import { estWorkoutKcal } from '@trainingai/shared/health/workout-energy'
 import { ouraIdForActivityType } from '@trainingai/shared/health/daily-energy'
 import { ageFromDob } from '@trainingai/shared/date-utils'
-import { recomputeStoredBodyFatPctAtHeight } from '@/lib/scale-ble/composition'
+import { buildBodyFatCalibration } from '@/lib/health/body-fat-calibration-build'
 import { mergePreferences, type UserPreferences } from '@trainingai/shared/user/preferences'
 import * as s from './schema'
 import { collapseOnConflict, keepLatestNonNull } from './collapse-conflicts'
@@ -25,7 +25,7 @@ import { inSequence } from './in-sequence'
 
 /** Q-481 — at most one `applied_mutations` prune per day per process. */
 const APPLIED_MUTATIONS_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
-import { measuredAtMs, cadenceSecFromDs, decodeEventBody, hexToBytes, eventName } from '@/lib/oura-ble/decode'
+import { measuredAtMs, cadenceSecFromDs, decodeEventBody, hexToBytes, eventName, motionLowIntensity } from '@/lib/oura-ble/decode'
 
 /** Hard cap on `getOuraRawSamplesForTags`' lookback — the scan is over the biggest table in the DB
  *  (812k rows). Exported so callers size their own lookback against it rather than asking for more
@@ -121,6 +121,7 @@ import * as accountDeletion from './slices/account-deletion'
 import type { AccountDeletionResult } from './slices/account-deletion'
 import * as colmi from './slices/colmi'
 import * as hcIntervals from './slices/health-connect-intervals'
+import { getNativeMovementIntervals } from './slices/native-movement'
 import * as hcHistory from './slices/health-connect-history-import'
 import * as shadowReadinessSlice from './slices/shadow-readiness'
 import * as nativeRefreshTokens from './slices/native-refresh-tokens'
@@ -161,7 +162,7 @@ import { resolveSelfReportedSick } from '@trainingai/shared/ai-periodization/sig
 import { mround } from '@trainingai/shared/1rm'
 import { computeSetAggregates, computeIntensityPct } from '@trainingai/shared/workout/set-aggregates'
 import {
-  deriveBodyFatCalibration, pairScansWithReadings, DEFAULT_CALIBRATED_SOURCE,
+  DEFAULT_CALIBRATED_SOURCE,
   type BodyFatCalibration,
 } from '@trainingai/shared/health/body-fat-calibration'
 // 1 lb = 0.45359237 kg exactly. Shared since BF-141, because the lb/kg toggle needs the same
@@ -4628,57 +4629,19 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .from(s.bodyMetrics)
       .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.bodyFatPct), isNull(s.bodyMetrics.deletedAt)))
 
-    // RV-165. **Composition is computed once, at ingest, from the profile of that moment — so the
-    // stored value is only comparable to a DEXA scan if the profile has not moved since.** The
-    // owner's height was corrected from 160 to 158 to match a DEXA printout, and the 08-27 pair
-    // that sets the whole offset is still a 160 cm number. Fitted against it the offset came out
-    // +3.2 where the corrected reading gives +2.3, so every body-fat value the app has shown since
-    // has been about a point high.
-    //
-    // Re-deriving needs nothing that is not already stored: `bmr_kcal` has no impedance term and is
-    // linear in height, so it gives back the height used; impedance then follows from the stored
-    // body-fat value.
-    //
-    // **A reading that cannot be re-derived is KEPT AS STORED, not dropped.** Without a BMR there is
-    // no evidence the reading is stale — only an inability to check — and dropping it throws away a
-    // pair over a question that was never answered. Keeping it is exactly today's behaviour, so this
-    // can substitute a better value but never produce a worse calibration than the one it replaces.
-    // Dropping was tried first and collapsed the calibration to null for every reading without a
-    // stored BMR, which `body-fat-correction-consumers` caught.
     const [profile] = await this.db
       .select({ heightCm: s.users.heightCm, dateOfBirth: s.users.dateOfBirth, sex: s.users.sex })
       .from(s.users).where(eq(s.users.id, userId)).limit(1)
 
-    const restated = readings.flatMap(r => {
-      const stored = r.bodyFatPct as number
-      // Without a profile there is nothing to restate to; the readings stand as stored, which is
-      // exactly today's behaviour.
-      if (profile?.heightCm == null || !profile.sex) return [{ ...r, bodyFatPct: stored }]
-      // Age AT THE READING, not today — a birthday between the weigh-in and now would otherwise
-      // shift the recovered height by 5/6.25 = 0.8 cm and quietly poison the inversion.
-      const ageYears = ageFromDob(profile.dateOfBirth ?? null, new Date(`${r.date}T12:00:00Z`))
-      if (ageYears == null) return [{ ...r, bodyFatPct: stored }]
-      const atCurrent = recomputeStoredBodyFatPctAtHeight({
-        storedBodyFatPct: stored,
-        storedBmrKcal: r.bmrKcal,
-        weightKg: r.weightKg as number,
-        ageYears,
-        sex: profile.sex,
-        heightCm: profile.heightCm,
-      })
-      return [{ ...r, bodyFatPct: atCurrent ?? stored }]
-    })
-
-    const pairs = pairScansWithReadings(
-      scans.map(r => ({ scannedOn: r.scannedOn, pctFat: r.pctFat as number })),
-      restated.map(r => ({
-        date: r.date,
-        bodyFatPct: r.bodyFatPct as number,
-        source: r.sourceMap?.body_fat_pct ?? null,
+    return buildBodyFatCalibration({
+      scans: scans.map(r => ({ scannedOn: r.scannedOn, pctFat: r.pctFat as number })),
+      readings: readings.map(r => ({
+        date: r.date, bodyFatPct: r.bodyFatPct as number, source: r.sourceMap?.body_fat_pct ?? null,
+        weightKg: r.weightKg, bmrKcal: r.bmrKcal,
       })),
+      profile: profile ?? null,
       source,
-    )
-    return deriveBodyFatCalibration(pairs, source)
+    })
   }
 
   async listDexaScans(userId: string): Promise<import('../repository').DexaScanRow[]> {
@@ -6692,6 +6655,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getOuraDaytimeSignals(userId: string, from: Date, to: Date): Promise<{
     temp: { tsMs: number; valueC: number }[]
     met: { tsMs: number; value: number }[]
+    still: number[]
+    motion: { tsMs: number; lowIntensity: number }[]
   }> {
     // LA-139: resolve against the WHOLE anchor series, not the newest one. `getOuraClockAnchor`
     // returns a single `(ring_ds ↔ utc)` pair; measured 2026-09-25 the table holds 12,545 of them
@@ -6703,27 +6668,33 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // the observation nearest that frame, not the newest". These four were the exceptions.
     const clock = await this.getOuraClockOffsets(userId)   // RV-182 ②
     const epoch = clock.epoch
-    if (epoch == null) return { temp: [], met: [] }
+    if (epoch == null) return { temp: [], met: [], still: [], motion: [] }
     const fromDs = msToDs(from.getTime(), clock, epoch)
     const toDs = msToDs(to.getTime(), clock, epoch)
-    if (fromDs == null || toDs == null) return { temp: [], met: [] }
+    if (fromDs == null || toDs == null) return { temp: [], met: [], still: [], motion: [] }
     const startDs = Math.floor(fromDs)
     const endDs = Math.ceil(toDs)
-    const rows = await readRawFrames(this.db, userId, { tags: [0x46, 0x69, 0x50], startDs, endDs, caller: 'oura-daytime-signals' })
+    const rows = await readRawFrames(this.db, userId, { tags: [0x46, 0x69, 0x50, 0x72, 0x47], startDs, endDs, caller: 'oura-daytime-signals' })
     const temp: { tsMs: number; valueC: number }[] = []
     const met: { tsMs: number; value: number }[] = []
+    const still: number[] = []
+    const motion: { tsMs: number; lowIntensity: number }[] = []
     for (const r of rows) {
-      const decoded = r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null)
-      if (!decoded) continue
       const tsMs = dsToMs(Number(r.ds), clock, epoch)
       if (tsMs == null) continue
+      // #2115 v4: a 0x72 frame marks a still minute; its presence is the signal, not its values.
+      if (r.tag === 0x72) { still.push(tsMs); continue }
+      // #2781: the motion map reads the low-intensity byte as fitted (see `motionLowIntensity`).
+      if (r.tag === 0x47) { if (r.bodyHex) motion.push({ tsMs, lowIntensity: motionLowIntensity(hexToBytes(r.bodyHex)) }); continue }
+      const decoded = r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null)
+      if (!decoded) continue
       if (r.tag === 0x50) {
         for (const v of numArr(decoded, 'met')) met.push({ tsMs, value: v })
       } else {
         for (const c of numArr(decoded, 'temps_c')) temp.push({ tsMs, valueC: c })
       }
     }
-    return { temp, met }
+    return { temp, met, still, motion }
   }
 
   async getOuraBatteryEvents(userId: string, from: Date, to: Date): Promise<Array<{
@@ -8044,6 +8015,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getHealthConnectHistoryOldest(userId: string) { return hcHistory.getHealthConnectHistoryOldest(this.db, userId) }
   async advanceHealthConnectHistoryOldest(userId: string, date: string) { return hcHistory.advanceHealthConnectHistoryOldest(this.db, userId, date) }
   async getHealthConnectIntervals(userId: string, kind: import('../repository').HealthConnectIntervalKind, from: Date, to: Date) { return hcIntervals.getHealthConnectIntervals(this.db, userId, kind, from, to) }
+  async getNativeMovementIntervals(userId: string, kind: 'steps' | 'active_kcal', from: Date, to: Date) { return getNativeMovementIntervals(this.db, userId, kind, from, to) }
   async upsertShadowReadiness(userId: string, record: import('@trainingai/shared/types').ShadowReadinessRecord) { return shadowReadinessSlice.upsertShadowReadiness(this.db, userId, record) }
   async getShadowReadiness(userId: string, from: string, to: string, modelVersion?: number) { return shadowReadinessSlice.getShadowReadiness(this.db, userId, from, to, modelVersion) }
   async getHrForWindow(userId: string, from: Date, to: Date) { return oura.getHrForWindow(this.db, userId, from, to) }
@@ -8064,7 +8036,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getSetHrStatsSince(userId: string, since: Date, limit?: number) { return oura.getSetHrStatsSince(this.db, userId, since, limit) }
   async listSessionsMissingSetHrStats(userId: string, since: Date, limit: number) { return oura.listSessionsMissingSetHrStats(this.db, userId, since, limit) }
   async listSetHrStatsForHrr1Backfill(userId: string) { return oura.listSetHrStatsForHrr1Backfill(this.db, userId) }
-  async writeSetHrr1(userId: string, updates: readonly { setLogId: string; hrr1Bpm: number | null; restAdequate: boolean | null }[]) { return oura.writeSetHrr1(this.db, userId, updates) }
+  async writeSetHrr1(userId: string, updates: readonly oura.SetHrr1Write[]) { return oura.writeSetHrr1(this.db, userId, updates) }
   async getOuraWorkouts(userId: string, opts: { unreviewed?: boolean; from?: string; to?: string; timezone?: string }) { return oura.getOuraWorkouts(this.db, userId, opts) }
   async markOuraWorkoutReviewed(userId: string, id: string) { return oura.markOuraWorkoutReviewed(this.db, userId, id) }
   async getSetTimestampsForSession(userId: string, workoutSessionId: string) { return oura.getSetTimestampsForSession(this.db, userId, workoutSessionId) }

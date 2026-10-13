@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeHrZones, moderateIntensityBpm, MODERATE_INTENSITY_FRAC } from '../hr-zones'
+import { computeHrZones, moderateIntensityBpm, vigorousIntensityBpm, MODERATE_INTENSITY_FRAC } from '../hr-zones'
 import { activeMinutesFromReadings } from '../zone-minutes'
 import { targetsForRunType } from '@trainingai/shared/running/hr-targets'
 import type { FitnessSnapshot } from '@trainingai/shared/running/types'
@@ -18,6 +18,9 @@ import type { FitnessSnapshot } from '@trainingai/shared/running/types'
 // maxHr 190, restingHr 50 → reserve 140. Light floor 50+0.6*140 = 134; moderate 50+0.4*140 = 106.
 const profile = { maxHr: 190, restingHr: 50 }
 const zones = computeHrZones(profile)
+// #2198: the readings roll-up takes both bpm edges; vigorous is 50+0.6*140 = 134.
+const floors = { moderateFloorBpm: moderateIntensityBpm(profile), vigorousFloorBpm: vigorousIntensityBpm(profile) }
+const at106 = { moderateFloorBpm: 106, vigorousFloorBpm: vigorousIntensityBpm(profile) }
 const t = (min: number) => new Date(Date.UTC(2026, 8, 27, 1, 0, 0) + min * 60_000).getTime()
 
 describe('the moderate-intensity floor (TN-78)', () => {
@@ -46,23 +49,23 @@ describe('the moderate-intensity floor (TN-78)', () => {
     // 120 bpm sits between the moderate floor (106) and the Light floor (134): the exact effort
     // the WHO goal is about, and worth nothing before.
     const walk = [{ timestamp: t(0), bpm: 120 }, { timestamp: t(10), bpm: 120 }]
-    expect(activeMinutesFromReadings(walk, zones, moderateIntensityBpm(profile), 600)).toBe(10)
+    expect(activeMinutesFromReadings(walk, floors, 600)).toBe(10)
   })
 
   it('credits moderate once and vigorous double', () => {
     const run = [{ timestamp: t(0), bpm: 150 }, { timestamp: t(10), bpm: 150 }]
-    expect(activeMinutesFromReadings(run, zones, moderateIntensityBpm(profile), 600)).toBe(20)
+    expect(activeMinutesFromReadings(run, floors, 600)).toBe(20)
   })
 
   it('is inclusive at the floor and excludes the bpm below it', () => {
     const at = [{ timestamp: t(0), bpm: 106 }, { timestamp: t(1), bpm: 106 }]
-    expect(activeMinutesFromReadings(at, zones, 106)).toBe(1)
+    expect(activeMinutesFromReadings(at, at106)).toBe(1)
     const below = [{ timestamp: t(0), bpm: 105 }, { timestamp: t(1), bpm: 105 }]
-    expect(activeMinutesFromReadings(below, zones, 106)).toBe(0)
+    expect(activeMinutesFromReadings(below, at106)).toBe(0)
   })
 
   it('caps a data gap like the zone accumulator does', () => {
     const sparse = [{ timestamp: t(0), bpm: 120 }, { timestamp: t(60), bpm: 120 }]
-    expect(activeMinutesFromReadings(sparse, zones, 106)).toBe(2) // 120s cap
+    expect(activeMinutesFromReadings(sparse, at106)).toBe(2) // 120s cap
   })
 })

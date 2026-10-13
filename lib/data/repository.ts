@@ -956,6 +956,11 @@ export interface WorkoutRepository {
   /** Last non-deload 1RM per exercise — the prescription basis (Q-202). Distinct from the
    *  method above, which still returns the genuinely most recent log for display. */
   getLastRealOneRmBatch(userId: string, exerciseNames: string[], programId?: string): Promise<Map<string, LastRealOneRm>>
+  /** Issue 2200: the same last non-deload 1RM, as it stood before `before` — the basis a past
+   *  log's prescribed bars were computed from, for the server paths that are not sent it (a
+   *  stranded replay, an edit). `excludeLogId` keeps a log from being its own basis. Null when
+   *  no earlier real log exists. */
+  getPrescriptionBasisBefore(userId: string, exerciseName: string, before: Date, excludeLogId?: string): Promise<number | null>
   getExerciseSummary(userId: string): Promise<ExerciseLog[]>
   // Exercise-history sheet: the last `limit` logs for one exercise, filtered in SQL
   // against idx_el_name_date_ws instead of hydrating N days of full session trees.
@@ -1234,6 +1239,10 @@ export interface WorkoutRepository {
   getOuraDaytimeSignals(userId: string, from: Date, to: Date): Promise<{
     temp: { tsMs: number; valueC: number }[]
     met: { tsMs: number; value: number }[]
+    /** #2115 v4: wall-clock instants of the ring's `0x72` sleep-motion frames (rung 2b of `MET/min`). */
+    still: number[]
+    /** #2781: the ring's `0x47` motion events, each with its low-intensity value (rung 2a of `MET/min`). */
+    motion: { tsMs: number; lowIntensity: number }[]
   }>
   /** Decoded 0x61 battery telemetry (level changes + charging-time) in a wall-clock window,
    *  anchored via the ring clock. Empty when the ring has no clock anchor. Read-only. */
@@ -1397,6 +1406,8 @@ export interface WorkoutRepository {
   getSetLogsForSessions(workoutSessionIds: string[]): Promise<Array<{
     workoutSessionId: string; exerciseName: string; setNumber: number;
     rpe: number | null; reps: number; intensityPct: number | null; setTimeSec: number | null
+    /** #2253: `rated` or the untouched pre-fill (`expected`); null before #2450 and with no RPE. */
+    rpeSource?: import('@trainingai/shared/workout/rpe-source').RpeSource | null
   }>>
   getSetTimingRows(userId: string, exerciseNames: string[]): Promise<import('@trainingai/shared/workout/time-profile').TimingRow[]>
   getExercise1rmHistory(userId: string, exerciseNames: string[], tz: string, windowDays?: number): Promise<Record<string, { date: string; rm: number }[]>>
@@ -1487,6 +1498,7 @@ export interface WorkoutRepository {
   upsertHealthConnectIntervals(userId: string, rows: readonly HealthConnectIntervalRow[]): Promise<number>
   /** #2462. One kind's rows starting in [from, to), oldest first, overlap NOT resolved. */
   getHealthConnectIntervals(userId: string, kind: HealthConnectIntervalKind, from: Date, to: Date): Promise<HealthConnectIntervalRow[]>
+  getNativeMovementIntervals?(userId: string, kind: 'steps' | 'active_kcal', from: Date, to: Date): Promise<HealthConnectIntervalRow[]>
   /** issue 2169. The oldest local calendar day the user's "Import more history" run has reached
    *  (YYYY-MM-DD), or null when they have never run it. */
   getHealthConnectHistoryOldest(userId: string): Promise<string | null>
@@ -1528,9 +1540,9 @@ export interface WorkoutRepository {
   getSetHrStatsSince(userId: string, since: Date, limit?: number): Promise<SetHrStatsRow[]>
   listSessionsMissingSetHrStats(userId: string, since: Date, limit: number): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>
   /** #2457 backfill work-list: every stored per-set row's HRR60 inputs, oldest first. */
-  listSetHrStatsForHrr1Backfill(userId: string): Promise<{ setLogId: string; workoutSessionId: string; loggedAt: Date | null; hrr1Bpm: number | null; restAdequate: boolean | null }[]>
+  listSetHrStatsForHrr1Backfill(userId: string): Promise<{ setLogId: string; workoutSessionId: string; loggedAt: Date | null; hrr1Bpm: number | null; restAdequate: boolean | null; drop30s: number | null; drop60s: number | null; drop90s: number | null; drop120s: number | null }[]>
   /** #2457: set `hrr1_bpm` / `rest_adequate` as given (null clears); all-or-nothing, throws on a count mismatch. */
-  writeSetHrr1(userId: string, updates: readonly { setLogId: string; hrr1Bpm: number | null; restAdequate: boolean | null }[]): Promise<number>
+  writeSetHrr1(userId: string, updates: readonly { setLogId: string; hrr1Bpm: number | null; restAdequate: boolean | null; drop30s: number | null; drop60s: number | null; drop90s: number | null; drop120s: number | null }[]): Promise<number>
   getOuraWorkouts(userId: string, opts: { unreviewed?: boolean; from?: string; to?: string; timezone?: string }): Promise<{
     id: string; day: string; activity: string; startDatetime: Date; endDatetime: Date;
     calories: number | null; distanceM: number | null; intensity: string | null;

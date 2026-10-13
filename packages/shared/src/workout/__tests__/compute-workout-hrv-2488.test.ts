@@ -28,6 +28,8 @@ function repoWith(rr: { at: Date; rrMs: number }[], sets: { setStartMs: number; 
     getSetTimestampsForSession: async () => sets.map(s => ({ ...s, loggedAt: new Date(s.setEndMs) })),
     getRrForWindow: async () => rr,
     getSetDetailsForSession: async () => [],
+    // The personal rest bar's 30-day read (#2299 step 2); none here, so the population 15 applies.
+    getSetHrStatsSince: async () => [],
   } as unknown as Parameters<typeof computeWorkoutHr>[0]
 }
 

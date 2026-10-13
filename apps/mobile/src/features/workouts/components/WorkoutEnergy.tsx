@@ -8,6 +8,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../data/WorkoutDataProvider';
 import { energySpec, trainingStressSpec } from '../data/models';
 import type { WorkoutRecord } from '../logging/workout';
+import { formatDayShort } from '@trainingai/shared/date-utils';
 
 export function WorkoutEnergy({ workout }: { workout: WorkoutRecord }) {
   const { theme } = useTheme();
@@ -38,6 +39,12 @@ export function WorkoutEnergy({ workout }: { workout: WorkoutRecord }) {
       {stress.data?.status === 'ok' && (
         <AppText variant="caption" tone="muted" style={{ textAlign: 'center' }}>
           {stress.data.ots.toFixed(1)} training stress{stress.data.high ? ' · high load' : ''}
+          {stress.data.residualShare != null && stress.data.residualShare >= 0.01
+            ? ` · ${Math.round(stress.data.residualShare * 100)}% of the last 12 h had no reading`
+            : ''}
+          {stress.data.rhrFromDay
+            ? ` · resting HR from ${formatDayShort(stress.data.rhrFromDay)}`
+            : ''}
         </AppText>
       )}
       {energy.error && <Notice title="Energy estimate unavailable" message={energy.error} />}

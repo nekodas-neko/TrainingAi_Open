@@ -1,12 +1,13 @@
-import type { HrZone } from '@trainingai/shared/health/hr-zones'
+import { whoMinuteWeightForZone, type HrZone } from '@trainingai/shared/health/hr-zones'
 
 // Weekly time-in-zone targets per framework — how many minutes of the week should
 // fall in each HR zone. Grounded in the 2026-07-20 training-science brief:
 //   • Polarized 80/20 (Seiler; Stöggl & Sperlich 2014): ~80% easy (Z1–2), ~20% hard
 //     (Z4–5), minimal Z3 "grey zone".
 //   • Public-health floor (WHO 2020 / AHA / ACSM): 150 min/wk moderate OR 75 min/wk
-//     vigorous; vigorous counts double (1 min vigorous ≈ 2 min moderate); Z1 is "light",
-//     below the moderate threshold.
+//     vigorous; vigorous counts double (1 min vigorous ≈ 2 min moderate). Vigorous starts at
+//     60% of reserve (ACSM, `VIGOROUS_INTENSITY_FRAC`, #2198), which is the Zone 2 floor; Z1 is
+//     excluded because a per-zone total cannot be split at the 40% moderate line.
 //   • Heart-health → Zone-2 emphasis; recovery → almost all easy, no grey-zone grind.
 
 export type IntensityModel = 'polarized' | 'zone2-base' | 'aerobic-recovery'
@@ -46,7 +47,8 @@ export interface WeeklyZoneTargets {
   easyShare: number          // fraction in Z1–2
   moderateShare: number      // fraction in Z3
   hardShare: number          // fraction in Z4–5
-  /** Moderate-equivalent minutes (Z2–3 + 2×Z4–5; Z1 excluded as "light"). */
+  /** Moderate-equivalent minutes: each zone weighted by `whoMinuteWeightForZone` (Z2 and above sit
+   *  at or over the 60%-of-reserve vigorous line and count double; Z1 excluded, #2198). */
   moderateEquivMinutes: number
   /** Meets the ACSM/WHO/AHA 150-min moderate-equivalent floor. */
   meetsActivityGuideline: boolean
@@ -68,8 +70,9 @@ export function weeklyZoneTargets(frameworkKey: string, weeklyMinutes: number): 
   const easy = min(1) + min(2)
   const moderate = min(3)
   const hard = min(4) + min(5)
-  // Vigorous (Z4–5) counts double; Z1 is light and excluded from the moderate tally.
-  const moderateEquiv = min(2) + min(3) + 2 * hard
+  // #2198: the same WHO weighting the Activity score's zone minutes use, so the two can't disagree
+  // on what counts as vigorous again. Zone 2 and up count double; Zone 1 is excluded.
+  const moderateEquiv = perZone.reduce((sum, z) => sum + z.minutes * whoMinuteWeightForZone(z.zoneId), 0)
   const meets = moderateEquiv >= GUIDELINE_MIN
   return {
     frameworkKey,

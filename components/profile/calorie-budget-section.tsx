@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CalorieProgressBar } from '@/components/nutrition/calorie-progress-bar'
+import { EstimatedKcalLine } from '@/components/nutrition/estimated-kcal'
 import { useEnergyBalanceToday } from '@/app/health/hooks/use-health-calcs'
 import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 import { GOAL_RATE_PCT_PER_WEEK } from '@trainingai/shared/nutrition/calorie-budget'
@@ -137,11 +138,13 @@ export function CalorieBudgetSection({ ownTargetKcal, onSetOwnTarget, onClearOwn
 
       {shownTotal != null && balance != null && (
         <div>
-          <CalorieProgressBar intakeKcal={balance.intakeKcal} budgetKcal={shownTotal} />
+          <CalorieProgressBar intakeKcal={balance.intakeKcal} budgetKcal={shownTotal} estimatedKcal={balance.estimatedKcal} />
           <div className="mt-1 flex justify-between text-xs tabular-nums text-muted-foreground">
             <span>Today {balance.intakeKcal.toLocaleString()} kcal</span>
             <span>of {shownTotal.toLocaleString()}</span>
           </div>
+          {/* #2072. "Today" includes assumed plan meals; say how much. */}
+          <EstimatedKcalLine estimatedKcal={balance.estimatedKcal} className="mt-1 text-xs" />
         </div>
       )}
 

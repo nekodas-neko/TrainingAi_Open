@@ -9,6 +9,7 @@ import {
   frameLabel,
   measuredAtMs,
   cadenceSecFromDs,
+  motionLowIntensity,
 } from '../oura-ble/decode'
 
 const body = (hex: string) => hexToBytes(hex)
@@ -260,5 +261,22 @@ describe('oura-ble decode — frame + history-event parsing', () => {
     expect(cadenceSecFromDs([5000])).toBeNull()
     // unsorted input is handled.
     expect(cadenceSecFromDs([9000, 0, 3000, 6000])).toBe(300)
+  })
+})
+
+// #2781: the training-load motion map was fitted on 0x47's low-intensity byte read on its own.
+// Vector from open_oura `decodes_motion_event` (crates/oura-protocol/src/events.rs).
+describe('motionLowIntensity (#2781)', () => {
+  it('reads body[4] & 0x3f, as open_oura does', () => {
+    expect(motionLowIntensity(Uint8Array.from([0x6f, 0x0c, 0x1d, 0x07, 0x0c, 0x07]))).toBe(12)
+  })
+  it('is 0 when the byte is flagged invalid (0x40) or absent', () => {
+    expect(motionLowIntensity(Uint8Array.from([0x6f, 0x0c, 0x1d, 0x07, 0x4c, 0x07]))).toBe(0)
+    expect(motionLowIntensity(Uint8Array.from([0x6f, 0x0c, 0x1d, 0x07]))).toBe(0)
+  })
+  it('keeps the low value when only the HIGH byte is flagged, where decodeEventBody drops the event', () => {
+    const body = Uint8Array.from([0x6f, 0x0c, 0x1d, 0x07, 0x0c, 0x47])
+    expect(decodeEventBody(0x47, body)).toBeNull()
+    expect(motionLowIntensity(body)).toBe(12)
   })
 })

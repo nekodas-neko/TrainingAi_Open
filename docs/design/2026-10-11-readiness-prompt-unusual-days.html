@@ -1,0 +1,92 @@
+<title>Readiness Prompt on Unusual Days</title>
+<style>/* Layout: one column of decision sections; each holds side-by-side 384 px phone panes that scroll inside their own row. */
+:root{
+  color-scheme: dark;
+  --page-bg:#0c1110; --page-panel:#131a18; --page-line:#22302c;
+  --page-fg:#e8efec; --page-dim:#93a49e; --page-accent:#00e07a; --page-warn:#ff8f6b;
+  --background: oklch(0.145 0.020 149);
+  --card: oklch(0.185 0.028 149);
+  --muted: oklch(0.21 0.02 149);
+  --foreground: oklch(0.985 0 0);
+  --muted-foreground: oklch(0.75 0 0);
+  --border: oklch(1 0 0 / 9%);
+  --brand: oklch(0.723 0.219 149.579);
+  --font-page:"IBM Plex Sans",-apple-system,BlinkMacSystemFont,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,monospace;
+  --font-app:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--page-bg);color:var(--page-fg);font-family:var(--font-page);line-height:1.55;padding-block:28px;padding-inline:16px}
+.wrap{max-width:1240px;margin:0 auto}
+h1{font-size:26px;line-height:1.2;margin:0 0 6px;font-weight:700;text-wrap:balance}
+.sub{color:var(--page-dim);margin:0 0 6px;max-width:72ch}
+.meta{font-family:var(--font-mono);font-size:11px;color:var(--page-dim);text-transform:uppercase;letter-spacing:.09em;margin:0 0 22px}
+.dec{border-top:1px solid var(--page-line);padding-block:24px 8px}
+h2{font-size:18px;margin:0 0 8px;font-weight:600;text-wrap:balance}
+.ask{margin:0 0 16px;max-width:72ch}
+.pair{display:flex;gap:18px;overflow-x:auto;padding-bottom:12px}
+.pane{flex:0 0 auto;display:flex;flex-direction:column;gap:8px}
+.cap{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.chip{font-family:var(--font-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:999px;font-weight:600}
+.chip.now{background:rgba(255,143,107,.14);color:var(--page-warn);border:1px solid rgba(255,143,107,.3)}
+.chip.rec{background:rgba(0,224,122,.13);color:var(--page-accent);border:1px solid rgba(0,224,122,.32)}
+.cap .w{font-family:var(--font-mono);font-size:10px;color:var(--page-dim)}
+.phone{width:384px;background:var(--background);border:1px solid var(--page-line);border-radius:22px;overflow:hidden;font-family:var(--font-app);color:var(--foreground);padding:10px 12px 14px;display:flex;flex-direction:column;gap:10px}
+.why{max-width:384px;font-size:13px;color:var(--page-dim);margin:0}
+.why b{color:var(--page-fg);font-weight:600}
+
+.home{display:flex;flex-direction:column;gap:10px}
+.rings{display:flex;justify-content:space-between;padding:2px 4px}
+.ring{width:72px;height:72px;border-radius:50%;border:3px solid oklch(1 0 0 / 14%);display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ring b{font-size:22px;line-height:1;font-variant-numeric:tabular-nums}
+.ring small{font-size:9.5px;color:var(--muted-foreground)}
+.ring.low{border-color:oklch(0.72 0.17 55)}
+.amber{border-radius:18px;border:1px solid oklch(0.75 0.15 85 / 45%);background:oklch(0.32 0.06 85 / 55%);padding:16px}
+.amber .ey{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:oklch(0.82 0.15 85);font-weight:700}
+.amber h4{margin:6px 0 4px;font-size:20px}
+.amber p{margin:0;font-size:13px;color:var(--muted-foreground)}
+.amber .cta{margin-top:12px;border-radius:999px;background:oklch(0.80 0.16 85);color:oklch(0.2 0.03 85);font-weight:700;text-align:center;padding:11px;font-size:14px}
+.quiet{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;border:1px solid var(--border);background:color-mix(in oklch,var(--muted) 50%,transparent)}
+.quiet p{margin:0;flex:1;min-width:0;font-size:12.5px;color:var(--muted-foreground);line-height:1.4}
+.quiet p b{color:var(--foreground);font-weight:600}
+.quiet .lk{flex:none;font-size:12px;font-weight:600;color:var(--foreground);padding:7px 10px;border-radius:999px;background:oklch(1 0 0 / 7%)}
+.askcard{border-radius:18px;border:1px solid oklch(0.72 0.17 55 / 45%);background:oklch(0.26 0.05 55 / 55%);padding:16px}
+.askcard .ey{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:oklch(0.80 0.14 55);font-weight:700}
+.askcard h4{margin:6px 0 4px;font-size:18px;line-height:1.25}
+.askcard p{margin:0;font-size:12.5px;color:var(--muted-foreground);line-height:1.45}
+.opts{display:flex;gap:6px;margin-top:12px}
+.opts span{flex:1;text-align:center;padding:10px 4px;border-radius:999px;border:1px solid var(--border);background:oklch(1 0 0 / 5%);font-size:12.5px;font-weight:600}
+.row2{display:flex;justify-content:space-between;margin-top:10px;font-size:12px;color:var(--muted-foreground)}
+.row2 b{color:var(--foreground)}
+.ghost{height:64px;border-radius:16px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted-foreground)}
+.note{max-width:72ch;font-size:14px;line-height:1.6;color:var(--page-fg)}
+.note li{margin-bottom:6px}
+.note b{font-weight:600}
+</style>
+<div class="wrap">
+<h1>Ask about readiness only when the day is unusual</h1>
+<p class="sub">#2106. You chose "maybe twice a week, on days the score is unusual" over asking daily (TN-67). The app now knows which days those are: a score outside your own usual band, signed off at 0.65. This is how the Home prompt would change.</p>
+<p class="meta">384 px · dark · 2026-10-11 · mockup for your yes</p>
+
+<section class="dec"><h2>The prompt on Home</h2>
+<div class="pair">
+<div class="pane"><div class="cap"><span class="chip now">Today</span><span class="w">the same big card every day</span></div><div class="phone"><div class="home"><div class="rings"><div class="ring"><b>72</b><small>Readiness</small></div><div class="ring"><b>58</b><small>Resting HR</small></div><div class="ring"><b>81</b><small>Sleep</small></div><div class="ring"><b>19</b><small>Activity</small></div></div><div class="amber"><div class="ey">Exercise readiness</div><h4>How are you feeling?</h4><p>Log soreness &amp; energy. The app lightens loads on sore muscles and can flag a deload or rest day.</p><div class="cta">Log Readiness · ~15 sec</div></div><div class="ghost">Body Battery, week strip, cards below…</div></div></div>
+<p class="why"><b>Today.</b> The full card asks every morning, whatever the score says.</p></div>
+<div class="pane"><div class="cap"><span class="chip rec">Recommended</span><span class="w">a usual day: one quiet line</span></div><div class="phone"><div class="home"><div class="rings"><div class="ring"><b>72</b><small>Readiness</small></div><div class="ring"><b>58</b><small>Resting HR</small></div><div class="ring"><b>81</b><small>Sleep</small></div><div class="ring"><b>19</b><small>Activity</small></div></div><div class="quiet"><p><b>Readiness 72</b> is a usual day for you (usual 61–80). Sore somewhere?</p><span class="lk">Log soreness</span></div><div class="ghost">Body Battery, week strip, cards below…</div></div></div>
+<p class="why"><b>A usual day.</b> The app says what it sees and asks nothing. Soreness stays one tap away, because it still lightens that day's loads.</p></div>
+<div class="pane"><div class="cap"><span class="chip rec">Recommended</span><span class="w">an unusual day: the question</span></div><div class="phone"><div class="home"><div class="rings"><div class="ring low"><b>47</b><small>Readiness</small></div><div class="ring"><b>58</b><small>Resting HR</small></div><div class="ring"><b>81</b><small>Sleep</small></div><div class="ring"><b>19</b><small>Activity</small></div></div><div class="askcard"><div class="ey">Readiness is low today</div><h4>47 is well under your usual 61–80. How do you feel?</h4><p>Lower HRV and a short night pulled it down. One tap tells the app whether that matches.</p><div class="opts"><span>Better</span><span>About the same</span><span>Worse</span></div><div class="row2"><span>Sore? <b>Log soreness</b></span><span>Not now</span></div></div><div class="ghost">Body Battery, week strip, cards below…</div></div></div>
+<p class="why"><b>An unusual day.</b> The card comes forward and asks one question with three answers. "Not now" is recorded as a skip, not as agreement.</p></div>
+<div class="pane"><div class="cap"><span class="chip alt">Alternative</span><span class="w">no card at all on a usual day</span></div><div class="phone"><div class="home"><div class="rings"><div class="ring"><b>72</b><small>Readiness</small></div><div class="ring"><b>58</b><small>Resting HR</small></div><div class="ring"><b>81</b><small>Sleep</small></div><div class="ring"><b>19</b><small>Activity</small></div></div><div class="ghost">(no readiness card on a usual day)</div><div class="ghost">Body Battery, week strip, cards below…</div></div></div>
+<p class="why"><b>Alternative.</b> Closest to "only ask on unusual days", but it also hides soreness logging, which feeds the session on ordinary days too.</p></div>
+</div></section>
+
+<section class="dec"><h2>How the two earlier decisions fit together</h2>
+<ul class="note">
+<li><b>They point different ways.</b> TN-67 says ask on unusual days. OR-171 and TN-82 say don't ask: state what the app filled in, and let you correct it. The sleep check-in works that way now, because every question on that sheet stopped being answered (0 touched answers in 102 check-ins).</li>
+<li><b>The recommendation uses both.</b> Usual days follow TN-82: a statement, no question. Unusual days follow TN-67: one question, on roughly the two days a week you agreed to. It reuses the sleep check-in's quiet and prominent shapes rather than adding a new one.</li>
+<li><b>What it can't show.</b> Asking only on unusual days never samples an ordinary-looking day you would have called bad. So the answers tell us whether the unusual days felt unusual, not whether the score is right overall. Nothing built on them will be described as validating the score.</li>
+</ul></section>
+
+<section class="dec"><h2>What to reply</h2>
+<p class="ask"><b>"Yes"</b> builds the recommended pair (quiet line, question on unusual days). <b>"Hide it"</b> builds the alternative. Or say what to change, on #2106.</p></section>
+</div>

@@ -55,6 +55,11 @@ export function TimeInZoneCard() {
         onChange={setWindow}
       />
 
+      {state.data?.profile.maxHrSource === 'cooper-blend' && (
+        <AppText variant="caption" tone="muted">
+          Zone boundaries use your Cooper test peak blended with your age estimate.
+        </AppText>
+      )}
       <StableContent loading={state.data === null && state.loading}>
         {state.data && state.data.hasHrSource !== false && (
           <StackedBarChart
@@ -187,7 +192,9 @@ export function ObservedHeartCard() {
           </Grid>
           <AppText variant="caption" tone="muted">
             Working max {metricValue(state.data.workingMax, 'bpm')} ·{' '}
-            {state.data.workingMaxSource.replace(/-/g, ' ')}
+            {state.data.workingMaxSource === 'cooper-blend'
+              ? 'from your Cooper test and age'
+              : state.data.workingMaxSource.replace(/-/g, ' ')}
           </AppText>
           {!state.data.observed.isReliable && (
             <AppText variant="caption" tone="muted">

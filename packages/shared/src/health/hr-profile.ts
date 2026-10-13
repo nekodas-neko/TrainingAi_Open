@@ -1,6 +1,6 @@
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { todayInTz, todayMidnightUtc, toAestDay, ageFromDob } from '@trainingai/shared/date-utils'
-import { hrMaxFromAge, DEFAULT_RESTING_HR } from '@trainingai/shared/health/hr-zones'
+import { hrMaxFromAge, zoneMaxFromTests, DEFAULT_RESTING_HR } from '@trainingai/shared/health/hr-zones'
 import { resolveMaxHr, EMPTY_OBSERVED_HR, type ObservedHrProfile } from '@trainingai/shared/health/observed-hr'
 
 /** Trailing window the observed max/min is corroborated over. */
@@ -39,7 +39,9 @@ export interface HrProfile {
    *  so it is `hrMaxFromAge(null)` — 190 — not this person's 220 − age. For the owner that moves
    *  every zone boundary by 6 bpm, and without its own value it would read exactly like an ordinary
    *  estimate. A provenance value rather than a separate flag, so there is one field to trust. */
-  maxHrSource: 'observed' | 'estimated' | 'estimated-age-unread'
+  maxHrSource: 'observed' | 'estimated' | 'estimated-age-unread' | 'cooper-blend'
+  /** #2182: the latest Cooper 12-minute run's peak, when the ceiling is blended from it. */
+  cooperPeak?: number | null
   /** The full spike-rejection detail, for surfaces that want to show their working. */
   observed: ObservedHrProfile
   /** The observed-HR read itself FAILED and `observed` is the empty profile standing in for it —
@@ -97,12 +99,17 @@ export async function resolveHrProfile(repo: WorkoutRepository, userId: string, 
     unread.add(what)
     return null
   }
-  const [user, bodyMetrics, observed] = await Promise.all([
+  const [user, bodyMetrics, observed, tests] = await Promise.all([
     repo.getUserById(userId).catch(failed('user')),
     repo.listBodyMetrics(userId, from28dIso, todayIso).catch(failed('restingHr')),
     repo.getObservedHrProfile(userId, observedFrom, observedTo).catch((err: unknown) => {
       failed('observed')(err)
       return EMPTY_OBSERVED_HR
+    }),
+    // #2182: a maximal test sets the ceiling. A failed read falls back to the age estimate, never 0.
+    Promise.resolve().then(() => repo.listFitnessTests(userId, '2000-01-01', todayIso)).catch((err: unknown) => {
+      console.error('[hr-profile] fitness-test read failed, using the age estimate:', err)
+      return []
     }),
   ])
 
@@ -112,7 +119,12 @@ export async function resolveHrProfile(repo: WorkoutRepository, userId: string, 
     : DEFAULT_RESTING_HR
 
   const estimatedMax = hrMaxFromAge(ageFromDob(user?.dateOfBirth, new Date()))
-  const resolved = resolveMaxHr(observed, estimatedMax)
+  // #2182: the zone ceiling is the owner's Cooper/age blend when a Cooper test exists (181 today); a
+  // reliable observed max above it still wins, as it wins over the age estimate. `targetAnchorMax`,
+  // the walk's and the fitness tests' anchor, is untouched: the walk band (TN-25) reads it, and
+  // moving it would raise the fast band from [105, 123] to [109, 127].
+  const zoneBase = zoneMaxFromTests(estimatedMax, tests ?? [])
+  const resolved = resolveMaxHr(observed, zoneBase.maxHr)
   const observedMax = observed.isReliable ? observed.max : null
 
   return {
@@ -122,7 +134,10 @@ export async function resolveHrProfile(repo: WorkoutRepository, userId: string, 
     restingHrSource: unread.has('restingHr') ? 'unavailable' : rhrRows.length ? 'measured' : 'default',
     estimatedMax,
     observedMax,
-    maxHrSource: resolved.source === 'estimated' && unread.has('user') ? 'estimated-age-unread' : resolved.source,
+    maxHrSource: resolved.source === 'observed' ? 'observed'
+      : zoneBase.cooperPeak != null ? 'cooper-blend'
+      : unread.has('user') ? 'estimated-age-unread' : 'estimated',
+    ...(zoneBase.cooperPeak != null ? { cooperPeak: zoneBase.cooperPeak } : {}),
     observed,
     ...(unread.has('observed') ? { observedUnread: true } : {}),
   }

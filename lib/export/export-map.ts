@@ -36,6 +36,7 @@ export interface Exclusion { category: ExclusionCategory; reason: string }
  *  explicit so a table that ever uses a different one needs no new shape. */
 export const SOFT_DELETED: Record<string, string> = {
   apple_health_samples: 'deleted_at',
+  health_connect_records: 'deleted_at',
   activity_logs: 'deleted_at',
   body_metrics: 'deleted_at',
   day_checkins: 'deleted_at',
@@ -62,6 +63,7 @@ export const SOFT_DELETED: Record<string, string> = {
 }
 
 export const EXPORTED: Record<string, ExportScope> = {
+  health_connect_records: { kind: 'user_id' },
   // ── The user's own row. `users.password_hash` and friends are stripped by WITHHELD_COLUMNS.
   users: { kind: 'own_row' },
 
@@ -186,6 +188,7 @@ export const WITHHELD_COLUMNS: Record<string, string[]> = {
 }
 
 export const EXCLUDED: Record<string, Exclusion> = {
+  health_connect_projection_state: { category: 'ops', reason: 'rebuild bookkeeping; source health records and resulting measurements are exported' },
   auth_identities: { category: 'credentials', reason: 'private provider authentication identifiers' },
   apple_auth_attempts: { category: 'credentials', reason: 'short-lived authentication challenges' },
   // ── Credentials. Exporting these hands the reader a working key. ────────────

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { HR_ZONE_META } from '@trainingai/shared/health/hr-zones';
+import { deviceHealthName } from '../../../integrations/device-health/platform';
 import {
   AppText,
   Card,
@@ -60,10 +61,15 @@ export function HeartProfileCard({
           Your age could not be read. Zones currently use a generic maximum of 190 bpm.
         </AppText>
       )}
+      {heart.maxHrSource === 'cooper-blend' && (
+        <AppText variant="micro" tone="muted">
+          Zone boundaries use a blend of your Cooper test peak and age estimate.
+        </AppText>
+      )}
       {!heart.isReliable && !assumedRest && heart.maxHrSource !== 'estimated-age-unread' && (
         <AppText variant="micro" tone="muted">
           {hasSource === false
-            ? 'No heart-rate data yet. Connect Apple Health to build your range.'
+            ? `No heart-rate data yet. Connect ${deviceHealthName} to build your range.`
             : 'Still learning your range — it sharpens with a few more days of heart-rate data.'}
         </AppText>
       )}
@@ -87,7 +93,7 @@ export function ZoneQuotaCard({ data }: { data: CardioWeek }) {
       />
       {data.quota.hasHrSource === false || data.dayQuota.hasHrSource === false ? (
         <AppText variant="caption" tone="muted">
-          No heart-rate data yet. Connect Apple Health, then record a workout.
+          No heart-rate data yet. Connect {deviceHealthName}, then record a workout.
         </AppText>
       ) : (
         <>

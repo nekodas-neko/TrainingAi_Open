@@ -1,4 +1,3 @@
-import { BAR_WEIGHT_KG, PLATE_PAIRS_KG } from '@trainingai/shared/workout/plate-loading';
 export { BAR_WEIGHT_KG, PLATE_PAIRS_KG, plateBreakdown } from '@trainingai/shared/workout/plate-loading';
 import { expectedRpePrefill } from "@trainingai/shared/ai-periodization/expected-rpe";
 import type { ExerciseType } from "@trainingai/shared/types/program";

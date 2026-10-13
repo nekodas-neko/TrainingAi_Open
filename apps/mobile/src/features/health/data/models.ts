@@ -434,7 +434,14 @@ export const zoneSpec = (from: string, to: string) => ({
   query: { from, to },
   ttl: 900_000,
   schema: z.object({
-    profile: z.object({ maxHr: z.number(), restingHr: z.number() }).passthrough(),
+    profile: z
+      .object({
+        maxHr: z.number(),
+        restingHr: z.number(),
+        maxHrSource: text.optional(),
+        restingHrSource: text.optional(),
+      })
+      .passthrough(),
     hasHrSource: z.boolean().nullish(),
     days: z.array(
       z.object({ day: z.string(), seconds: z.array(z.number().nonnegative()).length(5) }),

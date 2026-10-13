@@ -11,6 +11,14 @@ export const healthConnectTypes = [
 export type HealthConnectType = (typeof healthConnectTypes)[number];
 const at = z.string().datetime({ offset: true });
 const id = z.string().min(1).max(200);
+const maxima = {
+  Steps: 200000,
+  ActiveCaloriesBurned: 20000,
+  Weight: 500,
+  RestingHeartRate: 300,
+  HeartRateVariabilityRmssd: 1000,
+} as const;
+const MAX_RECORD_VALUE = Math.max(...Object.values(maxima));
 export const healthConnectRecord = z
   .object({
     id,
@@ -22,7 +30,7 @@ export const healthConnectRecord = z
     recordingMethod: z.number().int().min(0).max(3),
     deviceModel: z.string().max(200).optional(),
     deviceManufacturer: z.string().max(200).optional(),
-    value: z.number().finite().nonnegative().optional(),
+    value: z.number().finite().nonnegative().max(MAX_RECORD_VALUE).optional(),
     points: z
       .array(z.object({ at, bpm: z.number().finite().min(20).max(300) }).strict())
       .max(20000)
@@ -44,13 +52,6 @@ export const healthConnectRecord = z
   .superRefine((row, ctx) => {
     const start = Date.parse(row.start),
       end = Date.parse(row.end);
-    const maxima = {
-      Steps: 200000,
-      ActiveCaloriesBurned: 20000,
-      Weight: 500,
-      RestingHeartRate: 300,
-      HeartRateVariabilityRmssd: 1000,
-    };
     const max = maxima[row.type as keyof typeof maxima];
     if (
       end < start ||

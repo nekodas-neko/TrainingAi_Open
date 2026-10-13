@@ -20,8 +20,8 @@ export interface HourlyMovementInput {
   sleepHour?: number
 }
 
-const DEFAULT_WAKE_HOUR = 7
-const DEFAULT_SLEEP_HOUR = 22 // 10pm — matches a typical waking day; the goal, not a hard cutoff on data
+export const DEFAULT_WAKE_HOUR = 7
+export const DEFAULT_SLEEP_HOUR = 22 // 10pm — matches a typical waking day; the goal, not a hard cutoff on data
 
 /**
  * Distinct **waking** local hours today with at least one HR reading above the rest threshold.

@@ -18,9 +18,11 @@ import { movementSummary } from '@/components/nutrition/movement-breakdown'
  */
 export const CalorieZoneBar = memo(function CalorieZoneBar({
   intakeKcal, restingBaseKcal, activeKcal, targetNetKcal, restingRateKcal, deficitKcal, stepCreditKcal, ownTargetKcal,
-  workoutKcal, activityKcal, stepsKcal, compact,
+  workoutKcal, activityKcal, stepsKcal, compact, estimatedKcal,
 }: {
   intakeKcal: number
+  /** #2072. The assumed part of `intakeKcal` (payload `estimatedKcal`), striped on the bar. */
+  estimatedKcal?: number | null
   restingBaseKcal: number
   activeKcal: number
   targetNetKcal: number
@@ -69,7 +71,7 @@ export const CalorieZoneBar = memo(function CalorieZoneBar({
 
   return (
     <>
-      <CalorieProgressBar intakeKcal={intakeKcal} budgetKcal={total} height={compact ? 'h-1.5' : 'h-3'} />
+      <CalorieProgressBar intakeKcal={intakeKcal} budgetKcal={total} height={compact ? 'h-1.5' : 'h-3'} estimatedKcal={estimatedKcal} />
 
       {/* Q-401 point 4. A budget that grows during the day reads as a bug unless it says why —
           which is literally how this entry started ("why are these values different?"). */}

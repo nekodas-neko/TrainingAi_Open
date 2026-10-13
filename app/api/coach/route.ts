@@ -12,6 +12,7 @@ import { buildInjuryContext } from '@/lib/ai-chat/context'
 import { buildChatTools } from '@/lib/ai-chat/tools'
 import { buildWidgetTools } from '@/lib/coach/tools'
 import { coachScope, pickTools } from '@/lib/coach/scopes'
+import { COACH_MAX_STEPS, coachStepOverride } from '@/lib/coach/step-limit'
 import { resolveDanglingWidgetCalls } from '@/lib/coach/dangling-widgets'
 import { errorLog } from '@trainingai/shared/logger'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
@@ -160,6 +161,16 @@ actually has to tap.) One sentence is
 enough — "Here are the exercises in your Pull session." — and it must not describe what the widget
 is about to show in detail, or it becomes noise once the widget lands.
 
+**That includes a widget you call straight after the user answered another one** — step 3 of a
+swap above, the proposeChange that follows their pick: the sentence still comes first, in that turn.
+
+**A widget that came back answered is a decision already made — never introduce it afterwards.**
+When proposeChange returns "applied", confirm what changed in one short sentence ("Done — Push now
+has Dumbbell Bench Press.") and stop; when it returns "cancelled", say nothing was changed and stop.
+Never write "Here is the proposal…", "I have proposed…", or anything else that describes a widget the
+user has already answered: under the card they just tapped, it reads as explaining a choice after it
+was made.
+
 One or two sentences, then the widget. The widget carries the detail — restating what it already
 shows is noise. Write one clean sentence and stop; do not restate the same request three ways in
 one line. **Never name a tool, a function or an API in your reply, and never append a citation-like
@@ -231,15 +242,17 @@ export async function POST(req: Request) {
       resolveDanglingWidgetCalls(parsed.data.messages as UIMessage[]),
     )
 
+    const system = [
+      SYSTEM.replace('TODAY_ISO', todayIso),
+      scope.systemSection,
+      injuryLine,
+    ].filter(Boolean).join('\n\n')
+
     const result = loggedStreamText(
       { section: 'coach', userId, model: COACH_MODEL_ID },
       {
         model: coachModel(),
-        system: [
-          SYSTEM.replace('TODAY_ISO', todayIso),
-          scope.systemSection,
-          injuryLine,
-        ].filter(Boolean).join('\n\n'),
+        system,
         messages: modelMessages,
         tools: {
           // Scoped by WITHHOLDING, never by instructing (LA-47): a prompt saying "do not read
@@ -267,7 +280,12 @@ export async function POST(req: Request) {
         providerOptions: { google: { thinkingConfig: { thinkingLevel: 'minimal' } } },
         // The read-only tools may chain; a widget tool ends the turn by suspending, so this bounds
         // data gathering rather than widget rendering.
-        stopWhen: stepCountIs(6),
+        stopWhen: stepCountIs(COACH_MAX_STEPS),
+        // #2792: the last step answers. A question that chains read tools used to spend all six steps
+        // reading and end with no answer at all — "Which of my sessions has the most volume?" and a
+        // bench-vs-squat comparison did so in 5 of 6 runs on 2026-10-11. On the final step only the
+        // chart stays available and the model is told to answer from what it has read.
+        prepareStep: ({ stepNumber }) => coachStepOverride(stepNumber, system),
         // A mid-stream failure is delivered to the client as an error *part*, not an HTTP error,
         // and the SDK masks its text. Without this the server records nothing and the only symptom
         // is a chat that stops — log it here so a failure is diagnosable.

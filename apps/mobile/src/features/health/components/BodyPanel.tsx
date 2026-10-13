@@ -49,6 +49,7 @@ import {
 import { RingStatusCard } from './RecordedHealthCards';
 import { useAppleImport } from '../HealthProvider';
 import { toAestDay } from '@trainingai/shared/date-utils';
+import { TrainingStressLine } from './TrainingStressLine';
 
 function GroupTitle({ children }: { children: string }) {
   const { theme } = useTheme();
@@ -364,7 +365,7 @@ export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) =
       <GroupTitle>Heart & recovery</GroupTitle>
       {imported.completed?.hrv && (
         <HealthMetricCard
-          title="HRV · SDNN"
+          title={`HRV · ${imported.completed.hrv.method}`}
           value={imported.completed.hrv.value}
           unit="ms"
           tone="recovery"
@@ -428,6 +429,7 @@ export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) =
             <MetricTile label="Chronic load" value={metricValue(load.data.chronicLoad, 'kg')} />
           </Grid>
         )}
+        <TrainingStressLine />
       </HealthMetricCard>
       <TimeInZoneCard />
       <SleepPerformanceCard />
