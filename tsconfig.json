@@ -40,7 +40,7 @@
   ],
   "exclude": [
     "node_modules",
-    "apps/apple",
+    "apps/mobile",
     ".claude",
     "**/__tests__/**"
   ]

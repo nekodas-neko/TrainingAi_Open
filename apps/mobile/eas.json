@@ -1,0 +1,51 @@
+{
+  "cli": {
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://trainingai-production.up.railway.app"
+      },
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://trainingai-production.up.railway.app"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://trainingai-production.up.railway.app"
+      }
+    },
+    "android-development": {
+      "extends": "development",
+      "credentialsSource": "local"
+    },
+    "android-preview": {
+      "extends": "preview",
+      "credentialsSource": "local",
+      "autoIncrement": true
+    },
+    "android-production": {
+      "extends": "production",
+      "credentialsSource": "local"
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

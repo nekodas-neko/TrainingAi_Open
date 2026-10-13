@@ -626,6 +626,8 @@ export interface StrapStatusRow extends StrapStatusWrite {
 }
 
 export interface WorkoutRepository {
+  applyHealthConnectBatch(userId:string,batch:import('@trainingai/shared/validation/health-connect-import').HealthConnectBatch):Promise<{accepted:number;deleted:number}>;
+  rebuildHealthConnect(userId:string,timezone:string):Promise<{measurements:number;nights:number;days:number;heartRate:number;completedAt:string;hrv:{method:'RMSSD';value:number;at:string;source:string}|null}>;
   applyAppleHealthBatch(userId:string,batch:import('@trainingai/shared/validation/apple-health-import').AppleImportBatch):Promise<{accepted:number;deleted:number}>;
   rebuildAppleHealth(userId:string,timezone:string):Promise<{measurements:number;nights:number;days:number;heartRate:number;completedAt:string;hrv:{method:'SDNN';value:number;at:string;source:string}|null}>;
 

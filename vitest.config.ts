@@ -92,7 +92,7 @@ export default defineConfig({
           // `e2e/**` is Playwright's (`pnpm e2e`), not vitest's. Without this, vitest picks up the
           // browser specs, fails to run them, and reports "1 failed file / 0 failed tests" — the
           // shape that reads like a flaky hook and sends you looking in the wrong place (Q-249).
-          exclude: ['**/node_modules/**', '**/.git/**', 'apps/apple/**', 'e2e/**', ROLLUP_TESTS],
+          exclude: ['**/node_modules/**', '**/.git/**', 'apps/mobile/**', 'e2e/**', ROLLUP_TESTS],
         },
       },
     ],

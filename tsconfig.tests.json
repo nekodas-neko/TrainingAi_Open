@@ -1,4 +1,4 @@
 {
   "extends": "./tsconfig.json",
-  "exclude": ["node_modules", "apps/apple", ".claude"]
+  "exclude": ["node_modules", "apps/mobile", ".claude"]
 }

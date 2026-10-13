@@ -1,73 +1,36 @@
-import { SignJWT, jwtVerify } from 'jose'
-import { PKCE_CHALLENGE_RE } from './pkce'
-
-export const IOS_TRANSACTION_COOKIE = 'ta_mobile_ios'
-export const IOS_TRANSACTION_MAX_AGE = 10 * 60
-export const IOS_STATE_RE = /^[A-Za-z0-9_-]{43}$/
-const IOS_CALLBACK = 'com.fitnessai.training:/auth/callback'
-
-export type IosTransaction = { challenge: string; state: string }
-type CookieStore = { get(name: string): { value: string } | undefined }
-
-function signingKey() {
-  if (!process.env.AUTH_SECRET) {
-    throw new Error('Mobile authentication is not configured.')
-  }
-  return new TextEncoder().encode(process.env.AUTH_SECRET)
+import {
+  NATIVE_TRANSACTION_COOKIE,
+  NATIVE_TRANSACTION_MAX_AGE,
+  NATIVE_STATE_RE,
+  signNativeTransaction,
+  readNativeTransaction,
+  nativeBridgePath,
+  nativeReturnUrl,
+  nativeLoginContinuation,
+} from './native-transaction';
+export const IOS_TRANSACTION_COOKIE = NATIVE_TRANSACTION_COOKIE;
+export const IOS_TRANSACTION_MAX_AGE = NATIVE_TRANSACTION_MAX_AGE;
+export const IOS_STATE_RE = NATIVE_STATE_RE;
+export type IosTransaction = { challenge: string; state: string };
+export const signIosTransaction = (transaction: IosTransaction) =>
+  signNativeTransaction({ ...transaction, client: 'ios' });
+export async function readIosTransaction(store: Parameters<typeof readNativeTransaction>[0]) {
+  const transaction = await readNativeTransaction(store);
+  return transaction?.client === 'ios'
+    ? { challenge: transaction.challenge, state: transaction.state }
+    : null;
 }
-
-export async function signIosTransaction(transaction: IosTransaction) {
-  return new SignJWT(transaction)
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuer('trainingai-mobile-signin')
-    .setAudience('ios')
-    .setIssuedAt()
-    .setExpirationTime(`${IOS_TRANSACTION_MAX_AGE}s`)
-    .sign(signingKey())
-}
-
-export async function readIosTransaction(cookieStore: CookieStore): Promise<IosTransaction | null> {
-  const value = cookieStore.get(IOS_TRANSACTION_COOKIE)?.value
-  if (!value) {
-    return null
-  }
-  try {
-    const { payload } = await jwtVerify(value, signingKey(), {
-      algorithms: ['HS256'], issuer: 'trainingai-mobile-signin', audience: 'ios',
-      maxTokenAge: IOS_TRANSACTION_MAX_AGE,
-      requiredClaims: ['exp', 'iat'],
-    })
-    if (typeof payload.challenge !== 'string' || !PKCE_CHALLENGE_RE.test(payload.challenge)
-      || typeof payload.state !== 'string' || !IOS_STATE_RE.test(payload.state)) {
-      return null
-    }
-    return { challenge: payload.challenge, state: payload.state }
-  } catch {
-    return null
-  }
-}
-
-export function iosBridgePath(transaction: IosTransaction) {
-  return `/auth-mobile-bridge?${new URLSearchParams({ client: 'ios', ...transaction })}`
-}
-
-export function iosReturnUrl(transaction: IosTransaction, result: { token: string } | { error: 'account_pending' | 'authentication_failed' }) {
-  return `${IOS_CALLBACK}?${new URLSearchParams({ state: transaction.state, ...result })}`
-}
-
-export async function iosLoginContinuation(cookieStore: CookieStore) {
-  const transaction = await readIosTransaction(cookieStore)
-  const callback = cookieStore.get('__Secure-authjs.callback-url') ?? cookieStore.get('authjs.callback-url')
-  if (!transaction || !callback) {
-    return null
-  }
-  try {
-    const url = new URL(callback.value)
-    if (`${url.pathname}${url.search}` !== iosBridgePath(transaction) || url.hash) {
-      return null
-    }
-    return transaction
-  } catch {
-    return null
-  }
+export const iosBridgePath = (transaction: IosTransaction) =>
+  nativeBridgePath({ ...transaction, client: 'ios' });
+export const iosReturnUrl = (
+  transaction: IosTransaction,
+  result: Parameters<typeof nativeReturnUrl>[1],
+) => nativeReturnUrl({ ...transaction, client: 'ios' }, result);
+export async function iosLoginContinuation(
+  store: Parameters<typeof nativeLoginContinuation>[0],
+) {
+  const transaction = await nativeLoginContinuation(store);
+  return transaction?.client === 'ios'
+    ? { challenge: transaction.challenge, state: transaction.state }
+    : null;
 }

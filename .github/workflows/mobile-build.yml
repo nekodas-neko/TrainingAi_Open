@@ -1,0 +1,79 @@
+name: Native mobile build
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Native platform
+        required: true
+        default: android
+        type: choice
+        options: [ios, android]
+      profile:
+        description: Build profile
+        required: true
+        default: development
+        type: choice
+        options: [development, preview, production]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-build-${{ inputs.platform }}-${{ inputs.profile }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: apps/mobile
+    env:
+      CI: '1'
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      APP_PLATFORM: ${{ inputs.platform }}
+      APP_PROFILE: ${{ inputs.profile }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320
+        with:
+          version: 10.33.0
+          package_json_file: apps/mobile/package.json
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: apps/mobile/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - name: Prepare existing Android signing credentials
+        if: inputs.platform == 'android'
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          LEGACY_KEYSTORE_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFileSync } from 'node:fs';
+          import { resolveAndroidSigning } from './scripts/android-signing.mjs';
+          const signing = resolveAndroidSigning(process.env);
+          writeFileSync('android-signing.keystore', signing.bytes, { mode: 0o600 });
+          writeFileSync('credentials.json', JSON.stringify({ android: { keystore: {
+            keystorePath: 'android-signing.keystore', keystorePassword: signing.keystorePassword,
+            keyAlias: signing.keyAlias, keyPassword: signing.keyPassword,
+          } } }), { mode: 0o600 });
+          NODE
+      - name: Build and publish through the existing Expo project
+        run: node scripts/build-mobile.mjs --platform "$APP_PLATFORM" --profile "$APP_PROFILE" --no-open
+      - name: Remove signing files
+        if: always() && inputs.platform == 'android'
+        run: |
+          node --input-type=module <<'NODE'
+          import { rmSync } from 'node:fs';
+          for (const path of ['credentials.json', 'android-signing.keystore']) rmSync(path, { force: true });
+          NODE

@@ -1,3 +1,4 @@
+import * as healthConnect from './slices/health-connect'
 import * as appleHealth from './slices/apple-health'
 import * as authData from './slices/auth'
 import * as mealLogging from './slices/meal-logging-statuses'
@@ -412,6 +413,8 @@ function rowToAnalyte(r: {
 }
 
 export class PostgresWorkoutRepository implements WorkoutRepository {
+  async applyHealthConnectBatch(userId:string,batch:import('@trainingai/shared/validation/health-connect-import').HealthConnectBatch){return healthConnect.applyHealthConnectBatch(this.db,userId,batch)}
+  async rebuildHealthConnect(userId:string,timezone:string){return healthConnect.rebuildHealthConnect(this.db,userId,timezone)}
   async applyAppleHealthBatch(userId:string,batch:import('@trainingai/shared/validation/apple-health-import').AppleImportBatch){return appleHealth.applyAppleHealthBatch(this.db,userId,batch)}
   async rebuildAppleHealth(userId:string,timezone:string){return appleHealth.rebuildAppleHealth(this.db,userId,timezone)}
 
