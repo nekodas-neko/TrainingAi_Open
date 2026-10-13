@@ -86,10 +86,28 @@ describe('next batch by the Orchestrator\'s priority', () => {
   })
 
   it('lets a ready hotfix make a batch P0 and the owner\'s next make it at least P1', () => {
-    const milestones = [ms(10, 'P1 Opus.'), ms(20, 'P3 Sonnet.'), ms(30, 'P2 Sonnet.')]
-    const by = new Map([[10, [iss(1, ['type: bug'])]], [20, [iss(2, ['type: feature', 'hotfix'])]], [30, [iss(3, ['next'])]]])
+    const milestones = [ms(10, 'P1 Opus.'), ms(20, 'P3 Sonnet.'), ms(30, 'P2 Sonnet.'), ms(40, 'P3 Sonnet.')]
+    const by = new Map([[10, [iss(1, ['type: bug'])]], [20, [iss(2, ['type: feature', 'hotfix'])]], [40, [iss(4, ['type: feature'])]]])
     expect(pickBatch(milestones, by).milestone.number).toBe(20)
     by.delete(20)
+    expect(pickBatch(milestones, by).milestone.number).toBe(10)
+    by.delete(10)
+    by.set(30, [iss(3, ['next'])])
+    expect(pickBatch(milestones, by).milestone.number).toBe(30)
+  })
+
+  it('serves a batch the owner marked next ahead of older batches at the same priority', () => {
+    const milestones = [ms(10, 'P1 Opus.'), ms(20, 'P1 Sonnet.'), ms(30, 'P1 Opus.'), ms(40, 'P2 Sonnet.')]
+    const by = new Map([
+      [10, [iss(1, ['type: bug'])]],
+      [20, [iss(2, ['type: bug'])]],
+      [30, [iss(3, ['type: feature', 'next'])]],
+      [40, [iss(4, ['type: feature', 'next'])]],
+    ])
+    expect(pickBatch(milestones, by).milestone.number).toBe(30)
+    by.set(30, [iss(3, ['type: feature', 'next', 'needs: owner'])])
+    expect(pickBatch(milestones, by).milestone.number).toBe(40)
+    by.set(40, [iss(4, ['type: feature', 'next', 'blocked']), iss(5, ['type: feature'])])
     expect(pickBatch(milestones, by).milestone.number).toBe(10)
   })
 
