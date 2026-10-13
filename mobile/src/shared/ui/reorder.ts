@@ -47,11 +47,22 @@ export function displacedItems(
   return shifts;
 }
 
-export function preserveHiddenOrder(
-  all: readonly string[],
-  visible: readonly string[],
-): string[] {
+export function preserveHiddenOrder(all: readonly string[], visible: readonly string[]): string[] {
   const movable = new Set(visible);
   let index = 0;
   return all.map((id) => (movable.has(id) ? visible[index++] : id));
+}
+
+export function reorderBounds(
+  order: readonly string[],
+  next: readonly string[],
+  bounds: ReadonlyMap<string, ItemBounds>,
+  gap: number,
+): Map<string, ItemBounds> {
+  const settled = new Map(bounds);
+  for (const [id, shift] of displacedItems(order, next, bounds, gap)) {
+    const layout = bounds.get(id);
+    if (layout) settled.set(id, { ...layout, y: layout.y + shift });
+  }
+  return settled;
 }

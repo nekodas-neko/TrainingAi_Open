@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import {
   AppButton,
   AppText,
-  Badge,
   Card,
   ConfirmationCard,
   Disclosure,
@@ -29,6 +28,7 @@ import { WorkoutReviewSheet } from './WorkoutReviewSheet';
 import { ProgramEditor } from './ProgramEditor';
 import { StyleEditor } from './StyleEditor';
 import { PhaseEditor } from './PhaseEditor';
+import { ProgramCard } from './ProgramCard';
 import { InjuryManager } from '../workouts/components/InjuryManager';
 
 export function ProgramsScreen({
@@ -80,9 +80,7 @@ export function ProgramsScreen({
         return;
       }
       const path =
-        deleting.kind === 'style'
-          ? '/api/progression-styles'
-          : `/api/phase-sets/${deleting.id}`;
+        deleting.kind === 'style' ? '/api/progression-styles' : `/api/phase-sets/${deleting.id}`;
       await resources.write('DELETE', path, { id: deleting.id }, [
         '/api/workout-templates',
         '/api/progression-styles',
@@ -149,7 +147,7 @@ export function ProgramsScreen({
       <ResourceStatus state={programs} refresh={programs.refresh} />
       <TrainingSyncNotice />
       {action.error && <Notice title="Program" message={action.error} />}
-      <Disclosure title="Programs" defaultOpen>
+      <Disclosure compact title="Programs" defaultOpen>
         <Stack direction="row">
           <AppButton title="Create with AI" onPress={openBuilder} style={{ flex: 1 }} />
           <AppButton
@@ -166,76 +164,23 @@ export function ProgramsScreen({
           .slice()
           .sort((a, b) => Number(b.isActive) - Number(a.isActive))
           .map((program) => (
-            <Card key={program.id} tone={program.isActive ? 'brand' : 'neutral'}>
-              <Stack direction="row" align="center" justify="space-between">
-                <AppText variant="heading" style={{ flex: 1 }}>
-                  {program.name}
-                </AppText>
-                {program.isActive && <Badge label="Active" tone="brand" />}
-                {!!sync.store?.pendingFor(programSpec.path, program.id).length && (
-                  <Badge label="Upload pending" />
-                )}
-              </Stack>
-              <Badge
-                label={
-                  program.phaseMode === 'ai_dynamic'
-                    ? 'AI Training'
-                    : program.phaseMode === 'automatic'
-                      ? 'Phase Based'
-                      : 'Linear'
-                }
-              />
-              <Disclosure
-                title={`${program.sessions.length} ${program.sessions.length === 1 ? 'session' : 'sessions'}`}
-              >
-                {program.sessions.map((session) => (
-                  <Stack key={session.id} gap="xs">
-                    <AppText variant="label">{session.name}</AppText>
-                    <AppText variant="caption" tone="muted">
-                      {session.exercises?.map((exercise) => exercise.exerciseName).join(', ')}
-                    </AppText>
-                    {program.isActive && program.phaseMode === 'ai_dynamic' && (
-                      <AppButton
-                        title="Review"
-                        variant="ghost"
-                        onPress={() => setReviewId(session.id!)}
-                      />
-                    )}
-                  </Stack>
-                ))}
-              </Disclosure>
-              <Stack direction="row" wrap>
-                <AppButton
-                  title="Edit"
-                  variant="surface"
-                  onPress={() => setEditor({ kind: 'program', id: program.id })}
-                />
-                {!program.isActive && (
-                  <AppButton
-                    title="Set as active"
-                    busy={action.busy}
-                    onPress={() => {
-                      void action.run(async () => {
-                        await programs.resources?.changes.saveProgram({
-                          ...program,
-                          isActive: true,
-                        });
-                      });
-                    }}
-                  />
-                )}
-                <AppButton
-                  title="Delete"
-                  variant="danger"
-                  onPress={() =>
-                    setDeleting({ kind: 'program', id: program.id, name: program.name })
-                  }
-                />
-              </Stack>
-            </Card>
+            <ProgramCard
+              key={program.id}
+              program={program}
+              pending={!!sync.store?.pendingFor(programSpec.path, program.id).length}
+              busy={action.busy}
+              onEdit={() => setEditor({ kind: 'program', id: program.id })}
+              onActivate={() => {
+                void action.run(async () => {
+                  await programs.resources?.changes.saveProgram({ ...program, isActive: true });
+                });
+              }}
+              onDelete={() => setDeleting({ kind: 'program', id: program.id, name: program.name })}
+              onReview={setReviewId}
+            />
           ))}
       </Disclosure>
-      <Disclosure title="Progression Sets">
+      <Disclosure compact title="Progression Sets">
         <ResourceStatus state={styles} refresh={styles.refresh} />
         <AppButton
           title="New Progression Set"
@@ -265,7 +210,7 @@ export function ProgramsScreen({
           </Card>
         ))}
       </Disclosure>
-      <Disclosure title="Phase Sets">
+      <Disclosure compact title="Phase Sets">
         <ResourceStatus state={phases} refresh={phases.refresh} />
         <AppButton
           title="New Phase Set"
@@ -317,7 +262,7 @@ export function ProgramsScreen({
           </Card>
         ))}
       </Disclosure>
-      <Disclosure title="Recorded injuries">
+      <Disclosure compact title="Recorded injuries">
         <InjuryManager showSync={false} />
       </Disclosure>
       {reviewId && (

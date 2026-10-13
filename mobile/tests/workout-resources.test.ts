@@ -301,4 +301,15 @@ test('builder skips the same questions as the web and preserves exercise IDs acr
     second.program.sessions?.[0].exercises?.[0].id,
   );
   assert.equal(first.program.schedule?.restAfterN, 3);
+
+  const noLimit = generatedDraft(
+    { name: 'Untimed', phaseStructureName: '', phaseSetId: '', reasoning: '', phases: [], sessions: [
+      { name: 'Session', icon: '💪', exercises: [{ name: 'Squat', exerciseRole: 'primary', mainMuscles: ['quads'], secondaryMuscles: [] }] },
+    ] },
+    { ...inputs, timePerSessionMinutes: null },
+    () => `20000000-0000-4000-8000-${String(sequence++).padStart(12, '0')}`,
+  );
+  assert.equal(noLimit.sessions[0].timeBudgetMinutes, 0);
+  assert.equal(programPayload(noLimit).program.sessions?.[0].timeBudgetMinutes, 0);
+  assert.equal(draft.sessions[0].timeBudgetMinutes, 60);
 });

@@ -13,6 +13,17 @@
 export const SECONDS_PER_REP = 4
 export const SET_SETUP_SEC = 10
 
+// Persisted zero means no time limit; existing positive session budgets stay unchanged.
+export const NO_TIME_LIMIT = 0
+export function readDurationPreset(value: unknown): DurationPreset | undefined {
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) return value
+  if (value === 'short' || value === 'standard' || value === 'long') return value
+  return undefined
+}
+export function timeLimitLabel(minutes: number): string {
+  return minutes === NO_TIME_LIMIT ? 'No limit' : `${minutes} min`
+}
+
 // Warmup overhead as a fraction of the configured session budget (owner-set): it scales
 // with the session (a 30-min session doesn't need a 10-min warmup), so working time is the
 // remaining 85% — e.g. a 60-min budget buys ~51 min of working time after a ~9-min warmup.
@@ -76,6 +87,7 @@ export function workingBudgetMin(
   measuredWarmupMin?: number | null,
   standardBudgetMin?: number | null,
 ): number {
+  if (totalBudgetMin === NO_TIME_LIMIT) return NO_TIME_LIMIT
   if (measuredWarmupMin != null && measuredWarmupMin > 0) {
     return Math.max(15, totalBudgetMin - warmupBudgetMin(totalBudgetMin, measuredWarmupMin, standardBudgetMin))
   }
@@ -161,13 +173,20 @@ export function warmupGoalSecFor(
   preset: DurationPreset | undefined,
   measuredWarmupMin?: number | null,
 ): number | null {
-  if (sessionBudgetMin == null || !Number.isFinite(sessionBudgetMin) || sessionBudgetMin <= 0) return null
+  if (sessionBudgetMin == null || !Number.isFinite(sessionBudgetMin) || sessionBudgetMin < 0) return null
   const todaysBudget = budgetForPreset(sessionBudgetMin, preset)
+  if (todaysBudget === NO_TIME_LIMIT) return null
   return warmupBudgetMin(todaysBudget, measuredWarmupMin, sessionBudgetMin) * 60
 }
 
 export function budgetForPreset(sessionBudgetMin: number, preset: DurationPreset | undefined): number {
-  return Math.max(MIN_PRESET_BUDGET_MIN, requestedBudgetMin(sessionBudgetMin, preset))
+  if (timeLimitDisabled(sessionBudgetMin, preset)) return NO_TIME_LIMIT
+  const requested = requestedBudgetMin(sessionBudgetMin, preset)
+  return Math.max(MIN_PRESET_BUDGET_MIN, requested)
+}
+
+export function timeLimitDisabled(sessionBudgetMin: number, preset?: DurationPreset): boolean {
+  return preset === NO_TIME_LIMIT || (sessionBudgetMin === NO_TIME_LIMIT && (preset == null || preset === 'standard'))
 }
 
 /**
@@ -185,8 +204,9 @@ export function requestedBudgetMin(sessionBudgetMin: number, preset: DurationPre
   // against it, not because the request is expressed relative to it.
   if (typeof preset === 'number') return Number.isFinite(preset) ? preset : sessionBudgetMin
   if (preset == null || preset === 'standard') return sessionBudgetMin
-  if (preset === 'long') return sessionBudgetMin + DURATION_PRESET_DELTA_MIN
-  return sessionBudgetMin - DURATION_PRESET_DELTA_MIN
+  const anchor = sessionBudgetMin === NO_TIME_LIMIT ? 60 : sessionBudgetMin
+  if (preset === 'long') return anchor + DURATION_PRESET_DELTA_MIN
+  return anchor - DURATION_PRESET_DELTA_MIN
 }
 
 /** The lengths the picker offers around a session's own budget (owner 2026-08-23: "anchor to
@@ -201,7 +221,7 @@ export const SESSION_LENGTH_LADDER_MIN = [30, 45, 60, 90] as const
  */
 export function sessionLengthOptions(anchorMin: number): number[] {
   const ladder: number[] = [...SESSION_LENGTH_LADDER_MIN]
-  if (!Number.isFinite(anchorMin) || ladder.includes(anchorMin)) return ladder
+  if (!Number.isFinite(anchorMin) || anchorMin === NO_TIME_LIMIT || ladder.includes(anchorMin)) return ladder
   let nearest = 0
   for (let i = 1; i < ladder.length; i++) {
     if (Math.abs(ladder[i] - anchorMin) < Math.abs(ladder[nearest] - anchorMin)) nearest = i
@@ -214,6 +234,10 @@ export function sessionLengthOptions(anchorMin: number): number[] {
  *  Normal button made), anything else is the absolute number of minutes. */
 export function presetForLength(anchorMin: number, lengthMin: number): DurationPreset {
   return lengthMin === anchorMin ? 'standard' : lengthMin
+}
+
+export function sessionTimeLimitOptions(anchorMin: number): number[] {
+  return [NO_TIME_LIMIT, ...sessionLengthOptions(anchorMin)]
 }
 
 /**
@@ -239,6 +263,8 @@ export function durationDirection(
   preset: DurationPreset | undefined,
 ): -1 | 0 | 1 {
   const requested = requestedBudgetMin(sessionBudgetMin, preset)
+  if (timeLimitDisabled(sessionBudgetMin, preset)) return 0
+  if (sessionBudgetMin === NO_TIME_LIMIT) return -1
   return requested < sessionBudgetMin ? -1 : requested > sessionBudgetMin ? 1 : 0
 }
 

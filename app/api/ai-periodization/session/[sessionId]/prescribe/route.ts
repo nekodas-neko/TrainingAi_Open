@@ -33,10 +33,10 @@ export const maxDuration = 30
 //
 // The bounds are a request guard, not the model's floor. `MIN_PRESET_BUDGET_MIN` still clamps what
 // is achievable inside `budgetForPreset`; what these stop is a nonsense minute count reaching the
-// planner at all. The ceiling is a day, which no session is, and the floor is one minute rather
-// than the model's 20 so that an under-floor request is CLAMPED with its direction intact rather
+// planner at all. Zero disables the limit; positive requests below the model's 20 minutes
+// are CLAMPED with their direction intact rather
 // than 400'd — dropping it would tell a lifter at the floor that their choice was malformed.
-const MIN_REQUESTED_SESSION_MIN = 1
+const MIN_REQUESTED_SESSION_MIN = 0
 const MAX_REQUESTED_SESSION_MIN = 1440
 
 const PrescribeBodySchema = z.object({

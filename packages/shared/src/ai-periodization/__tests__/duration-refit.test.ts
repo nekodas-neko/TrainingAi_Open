@@ -336,3 +336,17 @@ describe('#2403 — a re-fit re-costs the session Full trains', () => {
     expect('fullSession' in res.prescription).toBe(false)
   })
 })
+
+it('turning the time limit off restores work and full rests from the saved baseline', async () => {
+  const shortened = await refit(30)
+  if (!shortened.ok) throw Error('did not refit')
+  getSessionPeriodization.mockResolvedValue(periodizationState({ prescription: shortened.prescription }))
+  const unlimited = await refit(0)
+  if (!unlimited.ok) throw Error('did not refit')
+  expect(aggregateSignals.mock.calls.at(-1)?.[5]).toBe(0)
+  expect(unlimited.prescription.droppedExerciseIds ?? []).toEqual([])
+  expect(unlimited.prescription.exercises.find(ex => ex.sessionExerciseId === CURL)?.sets).toBe(4)
+  expect(unlimited.prescription.exercises.every(ex => ex.restSec === 120)).toBe(true)
+  expect(unlimited.prescription.reasoning).not.toContain('0-min')
+  expect(unlimited.prescription.durationPreset).toBe(0)
+})

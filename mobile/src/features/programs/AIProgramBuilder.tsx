@@ -14,6 +14,7 @@ import {
   StepProgress,
   SwitchRow,
   TextField,
+  WeekdayPicker,
 } from '../../shared/ui';
 import { WorkoutLayout } from '../workouts/components/WorkoutLayout';
 import { useWorkoutResource } from '../workouts/data/WorkoutDataProvider';
@@ -28,7 +29,7 @@ import { useWorkoutDraft } from '../workouts/data/useWorkoutDraft';
 import { useWorkoutAction } from '../workouts/data/useWorkoutAction';
 import { ProgramDraftSchema, programPayload } from './editor-model';
 import { BuilderInputSchema, builderSteps, generatedDraft, reviewedProgram } from './builder-model';
-import { SessionEditor } from './SessionEditor';
+import { ProgramSessionList } from './ProgramSessionList';
 
 const schema = z.object({
   inputs: BuilderInputSchema,
@@ -82,7 +83,7 @@ export function AIProgramBuilder({ onBack, onSaved }: { onBack: () => void; onSa
       programName: '',
       equipment: [],
       sessionsPerWeek: 3,
-      timePerSessionMinutes: 60,
+      timePerSessionMinutes: null,
       musclesToFocus: [],
       goal: 'hypertrophy' as const,
       progressionMode: 'ai' as const,
@@ -241,6 +242,7 @@ export function AIProgramBuilder({ onBack, onSaved }: { onBack: () => void; onSa
   }
   return (
     <WorkoutLayout
+      reorderable
       contentDisabled={action.busy}
       title={value.step === 99 ? 'Review Program' : 'Create with AI'}
       onBack={
@@ -438,22 +440,11 @@ export function AIProgramBuilder({ onBack, onSaved }: { onBack: () => void; onSa
               onChange={(value) => input({ rotationRestAfterN: Number(value) })}
             />
           ) : (
-            <Stack direction="row" wrap>
-              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, index) => (
-                <AppButton
-                  key={day}
-                  title={day}
-                  variant={inputs.weeklyDays.includes(index) ? 'primary' : 'surface'}
-                  onPress={() =>
-                    input({
-                      weeklyDays: inputs.weeklyDays.includes(index)
-                        ? inputs.weeklyDays.filter((day) => day !== index)
-                        : [...inputs.weeklyDays, index],
-                    })
-                  }
-                />
-              ))}
-            </Stack>
+              <WeekdayPicker value={inputs.weeklyDays} onToggle={(day) => input({
+                weeklyDays: inputs.weeklyDays.includes(day)
+                  ? inputs.weeklyDays.filter((value) => value !== day)
+                  : [...inputs.weeklyDays, day],
+              })} />
           )}
         </>
       )}
@@ -516,16 +507,13 @@ export function AIProgramBuilder({ onBack, onSaved }: { onBack: () => void; onSa
               ))}
             </Card>
           ) : null}
-          {value.review.sessions.map((session, index) => (
-            <SessionEditor
-              key={session.id}
-              draft={value.review!}
-              index={index}
-              onChange={(review) => draft.setValue({ ...value, review })}
-              library={library.data?.exercises ?? []}
-              styles={styles.data?.styles ?? []}
-            />
-          ))}
+          <ProgramSessionList
+            draft={value.review}
+            onChange={(review) => draft.setValue({ ...value, review })}
+            library={library.data?.exercises ?? []}
+            styles={styles.data?.styles ?? []}
+            disabled={action.busy}
+          />
           <Card>
             <AppText variant="heading">Adjust with AI</AppText>
             {value.chat.map((entry, index) => (

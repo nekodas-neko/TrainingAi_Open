@@ -38,6 +38,7 @@ import ArrowDown from 'lucide-react-native/icons/arrow-down';
 import Pencil from 'lucide-react-native/icons/pencil';
 import Trash from 'lucide-react-native/icons/trash';
 import Plus from 'lucide-react-native/icons/plus';
+import Minus from 'lucide-react-native/icons/minus';
 import Settings from 'lucide-react-native/icons/settings';
 import Info from 'lucide-react-native/icons/info';
 import Droplets from 'lucide-react-native/icons/droplets';
@@ -106,6 +107,7 @@ const icons = {
   edit: Pencil,
   delete: Trash,
   plus: Plus,
+  minus: Minus,
   settings: Settings,
   info: Info,
   water: Droplets,

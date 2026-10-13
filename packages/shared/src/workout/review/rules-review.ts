@@ -76,10 +76,12 @@ export function buildRulesReview(params: {
     parts.push(`${names} ${dropCount === 1 ? 'is' : 'are'} dropped for today to fit the ${budgetMin}-min working budget: whole exercises go before any sets are cut.`)
   }
   if (adjusted > 0) {
-    parts.push(`${adjusted} ${adjusted === 1 ? 'exercise has its' : 'exercises have their'} set count trimmed to fit the ${budgetMin}-min working budget.`)
+    parts.push(budgetMin === 0
+      ? 'Set counts adjusted to match exercise roles; no time limit applied.'
+      : `${adjusted} ${adjusted === 1 ? 'exercise has its' : 'exercises have their'} set count trimmed to fit the ${budgetMin}-min working budget.`)
   }
   if (parts.length === 0) {
-    parts.push(`This session already fits its ${budgetMin}-min working budget, so nothing is changed.`)
+    parts.push(budgetMin === 0 ? 'No time limit is set; all exercises are kept.' : `This session already fits its ${budgetMin}-min working budget, so nothing is changed.`)
   }
 
   return { modelExercises, reasoning: parts.join(' ') }

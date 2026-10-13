@@ -16,6 +16,7 @@ export function WorkoutLayout({
   actions,
   footer,
   contentDisabled = false,
+  reorderable = false,
   children,
 }: PropsWithChildren<{
   title: string;
@@ -29,12 +30,14 @@ export function WorkoutLayout({
   actions?: ReactNode;
   footer?: ReactNode;
   contentDisabled?: boolean;
+  reorderable?: boolean;
 }>) {
   return (
     <PageLayout
       title={title}
       onBack={onBack}
       scroll
+      reorderable={reorderable}
       footer={footer}
       header={
         <Stack direction="row" align="center" gap="sm">

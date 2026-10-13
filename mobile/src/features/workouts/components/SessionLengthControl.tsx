@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  requestedBudgetMin,
+  budgetForPreset,
   presetForLength,
-  sessionLengthOptions,
+  sessionTimeLimitOptions,
+  timeLimitLabel,
   type DurationPreset,
 } from '@trainingai/shared/workout/duration-model';
 import { AppText, ChoiceTiles, Stack, StatusIndicator } from '../../../shared/ui';
@@ -21,10 +22,7 @@ export function SessionLengthControl({ session }: { session: SessionPreview }) {
     const saved = state.data?.state?.prescription?.durationPreset;
     if (
       !chosen.current &&
-      (typeof saved === 'number' ||
-        saved === 'standard' ||
-        saved === 'short' ||
-        saved === 'long')
+      (typeof saved === 'number' || saved === 'standard' || saved === 'short' || saved === 'long')
     ) {
       setPreset(saved);
     }
@@ -57,19 +55,18 @@ export function SessionLengthControl({ session }: { session: SessionPreview }) {
   return (
     <Stack>
       <ChoiceTiles
-        label="Time Constraints"
-        value={requestedBudgetMin(budget, preset)}
+        label="Time limit today"
+        value={budgetForPreset(budget, preset)}
         disabled={busy}
-        options={sessionLengthOptions(budget).map((value) => ({
+        options={sessionTimeLimitOptions(budget).map((value) => ({
           value,
-          label: `${value} min`,
+          label: timeLimitLabel(value),
           caption: value === budget ? 'usual' : ' ',
         }))}
         onChange={(value) => void change(value)}
       />
       <AppText variant="caption" tone="muted">
-        Changes today’s plan only — sets and exercises are rebalanced against your weekly
-        volume.
+        Changes today’s plan only — sets and exercises are rebalanced against your weekly volume.
       </AppText>
       <StatusIndicator label="Session length" busy={busy} error={error} />
     </Stack>

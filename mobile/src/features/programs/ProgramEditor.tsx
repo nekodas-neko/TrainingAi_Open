@@ -8,9 +8,9 @@ import {
   Notice,
   NumericStepper,
   Picker,
-  Stack,
   SwitchRow,
   TextField,
+  WeekdayPicker,
 } from '../../shared/ui';
 import { WorkoutLayout } from '../workouts/components/WorkoutLayout';
 import { useWorkoutResource } from '../workouts/data/WorkoutDataProvider';
@@ -19,7 +19,7 @@ import { useWorkoutDraft } from '../workouts/data/useWorkoutDraft';
 import { useWorkoutAction } from '../workouts/data/useWorkoutAction';
 import { useWorkoutContext } from '../workouts/WorkoutProvider';
 import { ProgramDraftSchema, programDraft, programPayload } from './editor-model';
-import { SessionEditor } from './SessionEditor';
+import { ProgramSessionList } from './ProgramSessionList';
 
 export function ProgramEditor({
   program,
@@ -61,6 +61,7 @@ export function ProgramEditor({
   }
   return (
     <WorkoutLayout
+      reorderable
       contentDisabled={action.busy}
       title={program ? 'Edit Program' : 'New Program'}
       onBack={action.busy ? undefined : onClose}
@@ -144,31 +145,19 @@ export function ProgramEditor({
               <AppText variant="caption" tone="muted">
                 Tap days you train. Unticked days are rest days.
               </AppText>
-              <Stack direction="row" wrap>
-                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label, day) => (
-                  <AppButton
-                    key={day}
-                    title={label}
-                    variant={
-                      value.schedule?.days?.some((item) => item.dayOfWeek === day)
-                        ? 'primary'
-                        : 'surface'
-                    }
-                    onPress={() =>
-                      draft.setValue({
-                        ...value,
-                        schedule: {
-                          ...value.schedule,
-                          type: 'weekly',
-                          days: value.schedule?.days?.some((item) => item.dayOfWeek === day)
-                            ? value.schedule.days.filter((item) => item.dayOfWeek !== day)
-                            : [...(value.schedule?.days ?? []), { dayOfWeek: day }],
-                        },
-                      })
-                    }
-                  />
-                ))}
-              </Stack>
+              <WeekdayPicker
+                value={value.schedule?.days?.map((day) => day.dayOfWeek) ?? []}
+                onToggle={(day) => draft.setValue({
+                  ...value,
+                  schedule: {
+                    ...value.schedule,
+                    type: 'weekly',
+                    days: value.schedule?.days?.some((item) => item.dayOfWeek === day)
+                      ? value.schedule.days.filter((item) => item.dayOfWeek !== day)
+                      : [...(value.schedule?.days ?? []), { dayOfWeek: day }],
+                  },
+                })}
+              />
             </Card>
           )}
           {mode === 'ai' ? (
@@ -254,27 +243,14 @@ export function ProgramEditor({
           <AppText variant="eyebrow" tone="muted">
             Sessions & exercises
           </AppText>
-          {value.sessions.map((session, index) => (
-            <Stack key={session.id ?? index}>
-              <SessionEditor
-                draft={value}
-                index={index}
-                onChange={draft.setValue}
-                library={library.data?.exercises ?? []}
-                styles={styles.data?.styles ?? []}
-              />
-              <AppButton
-                title="Remove session"
-                variant="danger"
-                onPress={() =>
-                  draft.setValue({
-                    ...value,
-                    sessions: value.sessions.filter((_, position) => position !== index),
-                  })
-                }
-              />
-            </Stack>
-          ))}
+          <ProgramSessionList
+            draft={value}
+            onChange={draft.setValue}
+            library={library.data?.exercises ?? []}
+            styles={styles.data?.styles ?? []}
+            removable
+            disabled={action.busy}
+          />
           <AppButton
             title="Add Session"
             variant="secondary"
@@ -287,7 +263,7 @@ export function ProgramEditor({
                     id: randomUUID(),
                     name: '',
                     position: value.sessions.length,
-                    timeBudgetMinutes: 60,
+                    timeBudgetMinutes: 0,
                     icon: '💪',
                     exercises: [],
                   },

@@ -10,24 +10,28 @@ export function TextField({
   error,
   style,
   containerStyle,
+  hideLabel = false,
   ...props
 }: TextInputProps & {
   label: string;
   hint?: string;
   error?: string;
   containerStyle?: StyleProp<ViewStyle>;
+  hideLabel?: boolean;
 }) {
   const { theme } = useTheme();
   const id = useId();
   return (
     <Stack gap="xs" style={[{ flex: 1 }, containerStyle]}>
-      <AppText nativeID={id} variant="caption" tone="muted">
-        {label}
-      </AppText>
+      {!hideLabel && (
+        <AppText nativeID={id} variant="caption" tone="muted">
+          {label}
+        </AppText>
+      )}
       <TextInput
         {...props}
         accessibilityLabel={props.accessibilityLabel ?? label}
-        accessibilityLabelledBy={props.accessibilityLabel ? undefined : id}
+        accessibilityLabelledBy={hideLabel || props.accessibilityLabel ? undefined : id}
         placeholderTextColor={theme.colors.muted}
         selectionColor={theme.colors.brand}
         style={[

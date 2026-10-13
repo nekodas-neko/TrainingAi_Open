@@ -4,7 +4,7 @@ import { ClockIcon } from "lucide-react";
 import { cn } from "@trainingai/shared/utils";
 import { useRovingRadioGroup } from "@/lib/hooks/use-roving-radio-group";
 import {
-  presetForLength, requestedBudgetMin, sessionLengthOptions, type DurationPreset,
+  presetForLength, budgetForPreset, sessionTimeLimitOptions, timeLimitLabel, type DurationPreset,
 } from "@trainingai/shared/workout/duration-model";
 
 interface SessionDurationPickerProps {
@@ -27,9 +27,9 @@ interface SessionDurationPickerProps {
 export function SessionDurationPicker({
   value, standardMin, estimatedMin, disabled = false, hideHeader = false, onChange,
 }: SessionDurationPickerProps) {
-  const lengths = sessionLengthOptions(standardMin);
+  const lengths = sessionTimeLimitOptions(standardMin);
   // The stored value may be a legacy label, so compare in minutes rather than by identity.
-  const selectedMin = requestedBudgetMin(standardMin, value);
+  const selectedMin = budgetForPreset(standardMin, value);
   const lengthGroup = useRovingRadioGroup(lengths.includes(selectedMin));
   return (
     <div className="mb-4">
@@ -47,7 +47,7 @@ export function SessionDurationPicker({
       <div
         {...lengthGroup.groupProps}
         aria-label="Session length for today"
-        className="grid grid-cols-4 gap-1 rounded-xl bg-muted/60 p-1"
+        className="grid grid-cols-5 gap-1 rounded-xl bg-muted/60 p-1"
       >
         {lengths.map((min, i) => {
           const active = min === selectedMin;
@@ -67,7 +67,7 @@ export function SessionDurationPicker({
                   : "text-muted-foreground hover:text-foreground",
               )}
             >
-              <span className="text-sm font-semibold leading-tight tabular-nums">{min} min</span>
+              <span className="text-sm font-semibold leading-tight tabular-nums">{timeLimitLabel(min)}</span>
               <span className="text-[10px] leading-tight opacity-70">
                 {min === standardMin ? "usual" : " "}
               </span>
