@@ -347,8 +347,8 @@ production is actually broken**; anything less waits for Tuesday.
 3. ☐ **Read it. Reply "approve"** — or ask about anything. **Look hardest at "⚠ Needs your eyes"**:
    that line is what used to be a separate "confirm before merging" PR for every risky change,
    now collected in one place once a week.
-4. 🤖 It takes a database snapshot if the release has a migration, runs the release workflow, and
-   tells you when production is serving it.
+4. 🤖 It runs the release workflow, which first takes an encrypted backup of the database and
+   checks it restores, then tells you when production is serving it.
 5. ☐ **Update the APK only if the summary says the native app changed.** Most releases don't — the
    app loads its code from Railway, so they reach your phone on their own. When it does: **Code**
    → **Releases** → the new `v…` → download `app-v….apk` → install **over** the existing app.

@@ -1,0 +1,95 @@
+name: Database backup
+
+# An encrypted, restore-checked copy of the production database (owner, 13 Oct 2026, #2867): before
+# every release (release.yml calls this) and once a week. Railway refuses manual backups on this
+# plan, so this is the restore point a migration relies on.
+#
+# The work is scripts/db-backup-verified.sh: dump, restore into the empty Postgres below as the
+# check, encrypt to the owner's age public key. Only the encrypted file is uploaded — this
+# repository is public, and anyone signed in to GitHub can download its artifacts. Setting it up
+# and restoring from it: docs/runbooks/db-backup-restore.md.
+
+on:
+  schedule:
+    # Sunday 16:17 UTC is Monday 02:17 in Brisbane, a quiet hour for the owner's data.
+    - cron: '17 16 * * 0'
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      label:
+        description: 'Names the file, e.g. the release version'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+env:
+  # pg_dump refuses a server newer than itself. When Railway moves Postgres to a new major version,
+  # this fails loudly with "server version mismatch": raise it to match.
+  PG_MAJOR: '18'
+
+jobs:
+  backup:
+    name: Take, check and encrypt a backup
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # The connection string sits on the `release` environment next to the Railway token, so only a
+    # job that names this environment can read it.
+    environment: release
+    services:
+      scratch:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: scratch
+          POSTGRES_DB: restore_check
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check backups are set up
+        env:
+          DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          RECIPIENTS: ${{ vars.BACKUP_AGE_RECIPIENT }}
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$RECIPIENTS" ]; then
+            echo "::error::Backups are not set up: Settings → Environments → release needs the secret BACKUP_DATABASE_URL and the variable BACKUP_AGE_RECIPIENT (docs/runbooks/db-backup-restore.md). To release before then, run Release with skip_backup ticked."
+            exit 1
+          fi
+
+      - name: Install the Postgres client and age
+        run: |
+          set -euo pipefail
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo "$VERSION_CODENAME")-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq "postgresql-client-$PG_MAJOR" age
+
+      - name: Take, check and encrypt the backup
+        id: backup
+        env:
+          DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          RECIPIENTS: ${{ vars.BACKUP_AGE_RECIPIENT }}
+          SCRATCH_URL: postgresql://postgres:scratch@localhost:5432/restore_check
+          OUT_DIR: ${{ runner.temp }}/backup
+          LABEL: ${{ inputs.label || (github.event_name == 'schedule' && 'weekly') || 'manual' }}
+        run: PG_BIN="/usr/lib/postgresql/$PG_MAJOR/bin" scripts/db-backup-verified.sh
+
+      - name: Keep the encrypted file for 90 days
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ steps.backup.outputs.name }}
+          path: ${{ runner.temp }}/backup/${{ steps.backup.outputs.name }}
+          retention-days: 90
+          # Already compressed by pg_dump and encrypted; zipping it again gains nothing.
+          compression-level: 0
+          if-no-files-found: error

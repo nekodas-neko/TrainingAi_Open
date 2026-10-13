@@ -132,9 +132,8 @@ are weekly, on Tuesday" in [`CLAUDE.md`](../CLAUDE.md) and [`owner-manual.md`](o
   Orchestrator says so plainly on each release issue, and checks production within the hour,
   whoever deployed.
 - **Keep each release small:** one hotfix PR or a few related changes. A migration still ships
-  alone, with a verified snapshot first. The release issue says when the snapshot is done. Until
-  #2867 settles how, that means the owner runs `scripts/db-backup.sh`: Railway refuses manual
-  backups on this plan.
+  alone. Every release takes an encrypted, restore-checked backup before it deploys
+  (`db-backup.yml`, #2867).
 - **Label native backend changes the app needs right away `hotfix`.** The Orchestrator ships them
   the same day they merge. #2773's Android sign-in fix goes in the first one.
 - **After each deploy**, the Orchestrator checks `/api/status`, `error_events` and Railway's 5xx

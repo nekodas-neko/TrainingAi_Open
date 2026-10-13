@@ -1,16 +1,53 @@
 # Runbook: Database Backup & Restore
 
 TrainingAI's only datastore is the Railway-hosted PostgreSQL instance
-(`DATABASE_URL`). There is no application-level backup job — this runbook
-covers manual backup/restore against the live Railway database.
+(`DATABASE_URL`).
+
+## Automatic encrypted backups (the normal path)
+
+`.github/workflows/db-backup.yml` takes a backup **before every release** (the Release workflow
+calls it) and **every Monday at 02:17 Brisbane time**. Each run:
+
+1. dumps production with `pg_dump`;
+2. restores the dump into an empty Postgres on the runner, and fails if anything doesn't come back;
+3. encrypts it to the owner's [age](https://age-encryption.org) public key;
+4. keeps the encrypted file as a workflow artifact for 90 days. Actions → the run → Artifacts.
+
+The repository is public and anyone signed in to GitHub can download its artifacts, so only the
+encrypted file is ever uploaded. **Without the private key, a backup can't be opened by anyone,
+the owner included.**
+
+The work is done by `scripts/db-backup-verified.sh`. Run it locally with a throwaway key and empty
+database to test a change to it.
+
+### One-off setup (owner, Windows)
+
+1. In PowerShell: `winget install FiloSottile.age`, then open a new PowerShell window.
+2. `age-keygen -o trainingai-backup.key`. It prints `Public key: age1…`.
+3. Put `trainingai-backup.key` in your password manager and delete the loose copy. It's the only
+   way to open a backup.
+4. In Railway → `prod_DB` → Variables, copy the value of `DATABASE_PUBLIC_URL`.
+5. In GitHub → Settings → Environments → `release`:
+   - add the **secret** `BACKUP_DATABASE_URL`, set to that value;
+   - add the **variable** `BACKUP_AGE_RECIPIENT`, set to the `age1…` public key. A public key isn't
+     secret. More than one key, one per line, lets either holder open a backup.
+6. Actions → Database backup → Run workflow, and check it goes green.
+
+Until steps 5 and 6 are done, a release fails at its backup step. Run Release with `skip_backup`
+ticked to deploy without one.
+
+### Restoring from one
+
+1. Download the artifact (a zip holding `trainingai-<label>-<time>.dump.age`) and unzip it.
+2. `age --decrypt -i trainingai-backup.key -o backup.dump trainingai-….dump.age`
+3. Restore `backup.dump` with `pg_restore`, as below. **Restoring over production is
+   confirm-first**, and the Orchestrator walks you through it.
 
 ## Railway's built-in backups
 
-⚠️ **Not verified from this environment** — check the Railway dashboard
-(Postgres service → Backups tab) for what's actually enabled on the
-project (automatic daily snapshots are a paid-plan feature on some Railway
-tiers, not guaranteed on every plan). Confirm this manually and update this
-note with the actual retention window once checked.
+**Not available on this plan** (checked 13 Oct 2026): Railway refuses manual backups and backup
+schedules with "only available for Pro workspaces". The two backups on the volume were made
+automatically when it was resized, in July and August 2026.
 
 ## Manual backup
 
@@ -30,10 +67,9 @@ Equivalent manual command (if not using the wrapper script):
 pg_dump --format=custom --file=trainingai-backup-$(date +%Y-%m-%d).dump "$DATABASE_URL"
 ```
 
-**Recommended cadence:** before any risky migration or bulk data operation,
-and periodically (e.g. weekly) for disaster recovery. This is a manual step
-today — there is no scheduled job (Batch E's cron layer, if built, would be
-the natural place to automate this).
+**When to take one by hand:** before a bulk data operation that doesn't go
+through a release. Releases and the weekly copy are covered by the automatic
+backups above.
 
 ## Restore to the same instance
 
