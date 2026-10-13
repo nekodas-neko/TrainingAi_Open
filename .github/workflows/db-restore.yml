@@ -1,0 +1,156 @@
+name: Database restore
+
+# Opens a backup made by db-backup.yml and restores it (owner, 13 Oct 2026: "I just need you to be
+# able to restore from backup if needed"). The work is scripts/db-restore.sh.
+#
+#   check       (the default) restores into a throwaway database on this runner and reports what
+#               came back. It touches nothing else, and is safe to run any time as a restore drill.
+#   production  replaces the live database with the backup. Everything written since that backup
+#               is lost, so this is confirm-first, every time, on the owner's say-so (CLAUDE.md),
+#               and needs `confirm` typed exactly. Production is backed up again first, so the
+#               restore itself can be undone. Restart the app afterwards (Release, rollback_to).
+#
+# Runbook: docs/runbooks/db-backup-restore.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      backup:
+        description: 'The backup file to restore (trainingai-….dump.gpg). Blank = the newest.'
+        type: string
+        required: false
+      target:
+        description: 'check = restore into a throwaway database only; production = replace the live data'
+        type: choice
+        options: [check, production]
+        default: check
+      confirm:
+        description: 'For production only: type exactly "restore production"'
+        type: string
+        required: false
+
+permissions:
+  contents: read
+  # To list and download the backup artifacts from other runs.
+  actions: read
+
+# Never while a release is deploying, and never two restores at once.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  # Must match production's major version: see db-backup.yml.
+  PG_MAJOR: '18'
+
+jobs:
+  restore:
+    name: Restore a backup (${{ inputs.target }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment: release
+    services:
+      scratch:
+        image: postgres:18
+        env:
+          POSTGRES_PASSWORD: scratch
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check the request
+        env:
+          TARGET: ${{ inputs.target }}
+          CONFIRM: ${{ inputs.confirm }}
+          PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+          DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+        # Fail before anything is downloaded or opened.
+        run: |
+          if [ -z "$PASSPHRASE" ]; then
+            echo "::error::BACKUP_PASSPHRASE is not set on the release environment, so no backup can be opened."
+            exit 1
+          fi
+          if [ "$TARGET" = production ]; then
+            if [ "$CONFIRM" != "restore production" ]; then
+              echo "::error::Replacing production needs confirm set to exactly: restore production"
+              exit 1
+            fi
+            if [ -z "$DATABASE_URL" ]; then
+              echo "::error::BACKUP_DATABASE_URL is not set on the release environment."
+              exit 1
+            fi
+          fi
+
+      - name: Install the Postgres client
+        run: scripts/install-pg-client.sh "$PG_MAJOR"
+
+      - name: Download the backup
+        id: fetch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WANTED: ${{ inputs.backup }}
+        run: |
+          set -euo pipefail
+          # Release runs and weekly runs both upload them, so search the whole repository.
+          gh api --paginate "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired | not) | select(.name | startswith("trainingai-")) | [.created_at, .id, .name] | @tsv' \
+            | sort -r > artifacts.tsv
+          if [ -n "$WANTED" ]; then
+            PICK="$(awk -F'\t' -v n="$WANTED" '$3 == n' artifacts.tsv | head -1)"
+          else
+            PICK="$(grep -v 'trainingai-pre-restore-' artifacts.tsv | head -1)"
+          fi
+          if [ -z "$PICK" ]; then
+            echo "::error::No unexpired backup${WANTED:+ named $WANTED}. Backups are kept for 90 days."
+            exit 1
+          fi
+          ID="$(cut -f2 <<< "$PICK")"; NAME="$(cut -f3 <<< "$PICK")"
+          echo "Restoring $NAME (taken $(cut -f1 <<< "$PICK"))."
+          mkdir -p "$RUNNER_TEMP/in"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ID/zip" > "$RUNNER_TEMP/in/artifact.zip"
+          unzip -q "$RUNNER_TEMP/in/artifact.zip" -d "$RUNNER_TEMP/in"
+          echo "file=$RUNNER_TEMP/in/$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Make the scratch databases
+        env:
+          PGPASSWORD: scratch
+        run: |
+          "/usr/lib/postgresql/$PG_MAJOR/bin/psql" -h localhost -U postgres -XAtq \
+            -c 'create database restore_check' -c 'create database pre_restore_check'
+
+      - name: Restore
+        env:
+          BACKUP_FILE: ${{ steps.fetch.outputs.file }}
+          PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+          TARGET: ${{ inputs.target }}
+          CONFIRM: ${{ inputs.confirm }}
+          DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          SCRATCH_URL: postgresql://postgres:scratch@localhost:5432/restore_check
+          PRE_SCRATCH_URL: postgresql://postgres:scratch@localhost:5432/pre_restore_check
+          OUT_DIR: ${{ runner.temp }}/pre-restore
+        run: PG_BIN="/usr/lib/postgresql/$PG_MAJOR/bin" scripts/db-restore.sh
+
+      # Named like every other backup, so undoing this restore is another run of this workflow with
+      # `backup` set to this name.
+      - name: Find the pre-restore backup
+        id: pre
+        if: ${{ inputs.target == 'production' && always() }}
+        run: |
+          FILE="$(find "$RUNNER_TEMP/pre-restore" -name '*.dump.gpg' 2> /dev/null | head -1 || true)"
+          if [ -n "$FILE" ]; then echo "name=$(basename "$FILE")" >> "$GITHUB_OUTPUT"; fi
+
+      - name: Keep the pre-restore backup for 90 days
+        if: ${{ steps.pre.outputs.name != '' && always() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ steps.pre.outputs.name }}
+          path: ${{ runner.temp }}/pre-restore/${{ steps.pre.outputs.name }}
+          retention-days: 90
+          compression-level: 0
+          if-no-files-found: error

@@ -10,38 +10,56 @@ calls it) and **every Monday at 02:17 Brisbane time**. Each run:
 
 1. dumps production with `pg_dump`;
 2. restores the dump into an empty Postgres on the runner, and fails if anything doesn't come back;
-3. encrypts it to the owner's [age](https://age-encryption.org) public key;
-4. keeps the encrypted file as a workflow artifact for 90 days. Actions → the run → Artifacts.
+3. locks it with the `BACKUP_PASSPHRASE` secret (gpg, AES-256);
+4. keeps the locked file as a workflow artifact for 90 days. Actions → the run → Artifacts.
 
 The repository is public and anyone signed in to GitHub can download its artifacts, so only the
-encrypted file is ever uploaded. **Without the private key, a backup can't be opened by anyone,
-the owner included.**
+locked file is ever uploaded. The passphrase lives in two places: the `release` environment, so the
+restore workflow can open backups unattended (owner, 13 Oct 2026: "I just need you to be able to
+restore from backup if needed"), and the owner's password manager, as the copy that outlives
+GitHub. That environment already holds the database's own address, so keeping the passphrase there
+exposes nothing new.
 
-The work is done by `scripts/db-backup-verified.sh`. Run it locally with a throwaway key and empty
-database to test a change to it.
+The scripts are `scripts/db-backup-verified.sh`, `scripts/db-restore.sh` and their shared
+`scripts/db-backup-lib.sh`. Run them locally against throwaway databases to test a change.
 
-### One-off setup (owner, Windows)
+### One-off setup (owner)
 
-1. In PowerShell: `winget install FiloSottile.age`, then open a new PowerShell window.
-2. `age-keygen -o trainingai-backup.key`. It prints `Public key: age1…`.
-3. Put `trainingai-backup.key` in your password manager and delete the loose copy. It's the only
-   way to open a backup.
-4. In Railway → `prod_DB` → Variables, copy the value of `DATABASE_PUBLIC_URL`.
-5. In GitHub → Settings → Environments → `release`:
-   - add the **secret** `BACKUP_DATABASE_URL`, set to that value;
-   - add the **variable** `BACKUP_AGE_RECIPIENT`, set to the `age1…` public key. A public key isn't
-     secret. More than one key, one per line, lets either holder open a backup.
-6. Actions → Database backup → Run workflow, and check it goes green.
+1. In your password manager, generate a long random password (30+ characters) and save it as
+   "TrainingAI backup passphrase".
+2. In Railway → `prod_DB` → Variables, copy the value of `DATABASE_PUBLIC_URL`.
+3. In GitHub → Settings → Environments → `release`, add two **secrets**:
+   - `BACKUP_PASSPHRASE`, set to the password from step 1;
+   - `BACKUP_DATABASE_URL`, set to the value from step 2.
+4. Tell the Orchestrator. It runs a backup and then a restore check to prove both work.
 
-Until steps 5 and 6 are done, a release fails at its backup step. Run Release with `skip_backup`
-ticked to deploy without one.
+Until then, a release fails at its backup step. Run Release with `skip_backup` ticked to deploy
+without one.
 
-### Restoring from one
+### Restoring (the Orchestrator does this)
 
-1. Download the artifact (a zip holding `trainingai-<label>-<time>.dump.age`) and unzip it.
-2. `age --decrypt -i trainingai-backup.key -o backup.dump trainingai-….dump.age`
-3. Restore `backup.dump` with `pg_restore`, as below. **Restoring over production is
-   confirm-first**, and the Orchestrator walks you through it.
+`.github/workflows/db-restore.yml`, run from Actions or with
+`gh api -X POST repos/<owner>/<repo>/actions/workflows/db-restore.yml/dispatches`:
+
+- **`target: check`** (the default) opens a backup and restores it into a throwaway database on
+  the runner, then reports tables, rows and the newest migration. It changes nothing, so it's safe
+  any time; run it after setup and whenever there's doubt that backups work.
+- **`target: production`** replaces the live database with the backup. Everything written since
+  that backup is lost, including ring data the ring won't send again. So it is **confirm-first,
+  every time, on the owner's say-so**, and needs `confirm` set to exactly `restore production`. It
+  first checks the backup restores, then backs up production as it is now
+  (`trainingai-pre-restore-…`, kept on the run). Then it restores in one transaction: on any error,
+  or if the job is cancelled, production is left as it was. It waits for the app's in-flight
+  queries, and the app's requests wait while it runs.
+- **After a production restore,** restart the app: Release with `rollback_to` set to the current
+  tag. Migrations newer than the backup re-run on that start.
+- **To undo a production restore,** run it again with `backup` set to that run's
+  `trainingai-pre-restore-…` name.
+- `backup` blank means the newest backup (pre-restore copies excluded). Otherwise give the exact
+  file name.
+
+By hand, without GitHub: download the artifact, run
+`gpg --decrypt -o backup.dump trainingai-….dump.gpg` with the passphrase, then `pg_restore` as below.
 
 ## Railway's built-in backups
 
