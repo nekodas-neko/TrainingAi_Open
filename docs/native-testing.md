@@ -125,9 +125,16 @@ These rules are temporary, from 13 Oct 2026 until the switch-over settles. They 
 are weekly, on Tuesday" in [`CLAUDE.md`](../CLAUDE.md) and [`owner-manual.md`](owner-manual.md).
 
 - **Server releases go out on demand**, up to once a day, on any weekday. Each one still needs the
-  owner's "approve".
+  owner's yes, recorded on its release issue.
+- **jsboiss may run the Release workflow too** (owner, 13 Oct: "Jsboiss can approve for now if we
+  said its all good"). He may run it once the release issue shows two things: the owner's yes, and
+  the Orchestrator's release test with nothing open against it. Until then, nobody runs it. The
+  Orchestrator says so plainly on each release issue, and checks production within the hour,
+  whoever deployed.
 - **Keep each release small:** one hotfix PR or a few related changes. A migration still ships
-  alone, with a verified snapshot first.
+  alone, with a verified snapshot first. The release issue says when the snapshot is done. Until
+  #2867 settles how, that means the owner runs `scripts/db-backup.sh`: Railway refuses manual
+  backups on this plan.
 - **Label native backend changes the app needs right away `hotfix`.** The Orchestrator ships them
   the same day they merge. #2773's Android sign-in fix goes in the first one.
 - **After each deploy**, the Orchestrator checks `/api/status`, `error_events` and Railway's 5xx
@@ -138,4 +145,5 @@ are weekly, on Tuesday" in [`CLAUDE.md`](../CLAUDE.md) and [`owner-manual.md`](o
   check still gates it.
 - **App builds don't need a release.** The side-by-side app is published on merge.
 - **The weekly Tuesday release returns** once the owner is on the native app and #2849 has no
-  blockers.
+  blockers. At the same point, merging to `main` moves to needing both approvers, the owner and
+  jsboiss (#2871).
