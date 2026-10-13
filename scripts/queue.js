@@ -67,8 +67,10 @@ function batchPriority(milestone) {
 
 /**
  * Pure: the batch to build next. The batch's own priority decides (`batchPriority`); a ready `hotfix`
- * issue makes it P0 and a ready `next` issue (the owner's steer) makes it at least P1. Ties go to the
- * oldest milestone. A batch someone has claimed (`in progress`), one outside `lane`, one needing Opus
+ * issue makes it P0 and a ready `next` issue (the owner's steer) makes it at least P1. Within one
+ * priority a batch holding a ready `next` issue goes first, then the oldest milestone: with several
+ * P1 batches open, "at least P1" alone left `next` steering nothing (13 Oct: the owner's Oura API
+ * batches sat behind nine older P1s). A batch someone has claimed (`in progress`), one outside `lane`, one needing Opus
  * under `sonnetOnly`, and one with nothing ready are skipped. `urgentOnly` (the Slow usage tier)
  * keeps only P0 and P1.
  */
@@ -88,9 +90,10 @@ function pickBatch(milestones, issuesByMilestone, { sonnetOnly = false, urgentOn
     if (readySets.some((l) => l.has('next'))) priority = Math.min(priority, 1);
     if (readySets.some((l) => l.has('hotfix'))) priority = 0;
     if (urgentOnly && priority > 1) continue; // the Slow tier takes only P0 and P1
-    candidates.push({ milestone: m, issues, blocked: issues.filter((_, k) => parked(labelSets[k])), priority });
+    const steered = readySets.some((l) => l.has('next')) ? 0 : 1;
+    candidates.push({ milestone: m, issues, blocked: issues.filter((_, k) => parked(labelSets[k])), priority, steered });
   }
-  candidates.sort((a, b) => a.priority - b.priority || a.milestone.number - b.milestone.number);
+  candidates.sort((a, b) => a.priority - b.priority || a.steered - b.steered || a.milestone.number - b.milestone.number);
   return candidates[0] || null;
 }
 
