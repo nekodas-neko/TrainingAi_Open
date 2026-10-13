@@ -12,38 +12,7 @@ import {
 import type { PrescriptionSignals } from '@trainingai/shared/ai-periodization/signals'
 import type { ReviewModelExercise } from '@trainingai/shared/workout/review/reconcile'
 
-/**
- * RV-204 — the Workout Review without a model call.
- *
- * The review asked Gemini which exercises to drop and which sets to change, and then handed the
- * answer to `reconcileReview`, which clamps every number, refuses unsafe drops, back-fills what
- * the model omitted and recomputes duration and weekly volume. What the model actually supplied
- * that survived was the *choice*, plus a sentence of prose per drop.
- *
- * That choice already exists deterministically, and the prescription path makes it on every
- * session: `applyRoleSetPlausibility` → `fitToBudget` → `dropToBudget`, ordered by
- * `trimPriority`, which weighs each cut against the muscle's weekly target. Running it here is
- * what makes a review and a prescription AGREE — before this, the review could propose a shape
- * the prescription would never generate, with no way to tell which was right.
- *
- * **#2787 (Orchestrator decision, 2026-10-11): the review drops before it trims, like the allocator.**
- * #2133 moved the prescription onto `allocateToBudget`, which drops whole exercises before flooring
- * any. A review that trimmed first could propose "everything at 2 sets" for a session a fresh
- * prescription would cut to fewer exercises at proper sets — the shape the owner called worse
- * training on 2026-09-24 — and put the two paths back in disagreement. So the review drops whole
- * exercises from the session the user has, at the sets they have, in the allocator's value order
- * (least behind the week first, never below MIN_KEPT_EXERCISES, the last drop keeping a pair that
- * fits), and trims sets toward the 2-set floor only if the two it keeps still overrun. It never adds
- * work: the allocator's fill (step 3) has no place in a review.
- *
- * **Each drop says why** on the sheet (`dropReason`): least behind this week, lowest priority when
- * no weekly target covers its muscles, or the pair rule.
- *
- * **And where it is deliberately stronger:** `dropToBudget` runs whenever the session overruns
- * after its sets are floored. `applyBudgetStage` declines to drop unless the user explicitly
- * asked for a SHORT session, because there the under-fill is the finish-early margin; a review
- * is the opposite situation — the user opened it to be told what does not fit.
- */
+
 export interface RulesReviewResult {
   modelExercises: ReviewModelExercise[]
   /** Deterministic prose for the sheet's summary line, in place of the model's `reasoning`. */
@@ -61,9 +30,6 @@ export function buildRulesReview(params: {
 
   const plausible = applyRoleSetPlausibility(buildTimedExercises(exercises, signals), muscleVolume)
 
-  // Drop first, at the user's own set counts: `refit` hands the survivors back unchanged, so the
-  // loop sheds whole exercises in value order while the session overruns. Only when the two it keeps
-  // still overrun are sets trimmed, toward the 2-set floor.
   const dropped = dropToBudget(plausible, budgetMin, new Set(), muscleVolume, { refit: subset => subset.map(e => ({ ...e })) })
   const kept = estimateSessionDurationSec(dropped.exercises) > budgetMin * 60
     ? fitToBudget(dropped.exercises, budgetMin, new Set(), muscleVolume)

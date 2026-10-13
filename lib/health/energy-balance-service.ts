@@ -2,6 +2,9 @@
 // both call this — a second copy would be a second answer to "how much should I eat today", and
 // the coach contradicting the widget is worse than either being slightly wrong.
 
+import { countedEstimateKcal } from '@trainingai/shared/nutrition/meal-estimate'
+import { unrecordedMealEstimatesAllowed } from '@trainingai/shared/nutrition/meal-logging-status'
+import { foodLoggingCoverage } from '@/lib/nutrition/logging-completeness'
 import { fromZonedTime, toZonedTime } from 'date-fns-tz'
 import { shiftDateStr, ageFromDob } from '@trainingai/shared/date-utils'
 import { stepEnergyKcal, SEDENTARY_MULTIPLIER, STEP_BASE_CREDIT } from '@trainingai/shared/health/daily-energy'
@@ -20,7 +23,6 @@ import {
 import {
   doseChangesInWindow, doseChangeCaveat, DOSE_HISTORY_LOOKBACK_DAYS,
 } from '@trainingai/shared/health/dose-change-caveat'
-import { countedEstimateKcal } from '@trainingai/shared/nutrition/meal-estimate'
 import type { FitnessGoal } from '@trainingai/shared/types/user'
 import type { RestingRateSource } from '@trainingai/shared/nutrition/resting-rate-source'
 import type { WorkoutRepository } from '@/lib/data/repository'
@@ -29,6 +31,8 @@ export interface EnergyBalanceResult {
   date: string
   balance: {
     intakeKcal: number
+    loggedIntakeKcal: number
+    estimatedKcal: number
     expenditureKcal: number
     restingBaseKcal: number
     activeKcal: number
@@ -50,10 +54,6 @@ export interface EnergyBalanceResult {
      *  Optional so a payload cached before it existed still types — `budgetProvenance` then returns
      *  the budget that payload's `remainingKcal` was computed against. */
     deficitKcal?: number | null
-    /** #2122 step 8′(3). The calories the app assumed for today's plan meals with nothing logged,
-     *  already inside `intakeKcal` (`countedEstimateKcal`). 0 when there are none; optional so a
-     *  payload cached before it existed still types. The ring marks this part as assumed. */
-    estimatedKcal?: number
     /** #2071. The step credit taken out of the 20% (see `calorieBudget`). Optional for old payloads. */
     stepCreditKcal?: number | null
     /** #2071. THE day's budget, `budgetProvenance(balance).total`, for server readers to quote. */
@@ -134,9 +134,10 @@ function localMidnightUtc(date: string, tz: string): Date {
   return fromZonedTime(zoned, tz)
 }
 
-/** #2122. Never fails the balance: an estimate that cannot be read is simply not counted. */
 async function estimatedKcalFor(repo: WorkoutRepository, userId: string, date: string): Promise<number> {
   try {
+    const tracking = await repo.listMealLoggingStatuses(userId, date)
+    if (!unrecordedMealEstimatesAllowed(tracking)) return 0
     const answers = await repo.listPlanMealAnswers(userId, date)
     if (!answers.some(a => a.answer === 'estimated')) return 0
     const [plan, mealTypes, logs] = await Promise.all([
@@ -198,9 +199,8 @@ export async function computeEnergyBalance(
     .catch(() => new Map<string, number>())
 
   const intakeByDate = new Map(foodSummary.map(r => [r.date, r.calories]))
-  const loggingCompleteByDate = new Set(
-    dayCheckins.filter(c => c.foodLoggingCompletedAt != null).map(c => c.logDate),
-  )
+  const { complete: loggingCompleteByDate, zeroIntake } = await foodLoggingCoverage(repo, userId, windowStart, date,
+    dayCheckins.filter(c => c.foodLoggingCompletedAt != null).map(c => c.logDate))
   const metricByDate = new Map(metrics.map(m => [m.date, m]))
 
   // Last known weight in the window, however old — a stale weight still beats having no BMR at all.
@@ -229,10 +229,9 @@ export async function computeEnergyBalance(
     workoutKcalBySession: activeEnergy.workoutKcalBySession,
   }
 
-  // #2122 step 8′(3): the day's assumed plan meals join today's intake, and ONLY today's intake —
-  // `intakeByDate` feeds the maintenance window, which must learn from logged food alone.
+  const loggedIntakeKcal = Math.round(intakeByDate.get(date) ?? 0)
   const estimatedKcal = await estimatedKcalFor(repo, userId, date)
-  const intakeKcal = Math.round(intakeByDate.get(date) ?? 0) + estimatedKcal
+  const intakeKcal = loggedIntakeKcal + estimatedKcal
   // The RECOMMENDATION's offset (`target.recommendedKcal`, the TDEE nudge). Unchanged by #2071: it is
   // what turns the maintenance estimate into a suggested stored goal, and the maintenance estimate is
   // explicitly not this change's to move.
@@ -312,8 +311,9 @@ export async function computeEnergyBalance(
   for (let d = windowStart; d < date; d = shiftDateStr(d, 1)) {
     windowDays.push({
       date: d,
-      intakeKcal: intakeByDate.get(d) ?? null,
+      intakeKcal: intakeByDate.get(d) ?? (zeroIntake.has(d) ? 0 : null),
       loggingComplete: loggingCompleteByDate.has(d),
+      zeroIntakeConfirmed: zeroIntake.has(d),
       weightKg: metricByDate.get(d)?.weightKg ?? null,
     })
   }
@@ -438,7 +438,7 @@ export async function computeEnergyBalance(
   return {
     date,
     balance: {
-      ...balance, intakeKcal, estimatedKcal, restingBaseKcal, activeKcal: activeEnergy.total,
+      ...balance, intakeKcal, loggedIntakeKcal, estimatedKcal, restingBaseKcal, activeKcal: activeEnergy.total,
       restingRateSource: measuredBmr != null ? 'measured' : 'formula',
       restingRateMeasuredOn: measuredBmr != null ? measuredRmr?.measuredOn ?? null : null,
       deficitWeightKg: deficitWeightKg == null ? null : Math.round(deficitWeightKg * 10) / 10,

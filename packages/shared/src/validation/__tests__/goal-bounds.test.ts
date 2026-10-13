@@ -61,7 +61,7 @@ describe('RV-41 — the Coach cannot write a goal the user routes refuse', () =>
   //
   // What must hold is that the Coach's schema declares no bounds of its own.
   it('lib/coach/patch.ts declares no numeric bounds for the goal fields', () => {
-    const src = readFileSync('lib/coach/patch.ts', 'utf8')
+    const src = readFileSync('packages/shared/src/coach/patch.ts', 'utf8')
     expect(src).toContain('goalBoundSchema')
     // Comments stripped: the file explains this history in prose and names the old ceiling while
     // doing so, which is documentation rather than a bound. Checking the raw text would fail on the

@@ -22,7 +22,7 @@ import {
   metGridCandidates, activeKcalMetCandidates, ringMotionMetCandidates, cadenceMetCandidates, ringStillMetCandidates,
   sleepSessionMetCandidates, compendiumMetCandidates,
 } from '@trainingai/shared/inputs/adapters'
-import type { MetMix } from '@trainingai/shared/health/training-stress'
+import type { MetMix } from './met-mix'
 
 export interface DayMetSources {
   /** The ring's 1-minute MET grid (`metGridFromDaytimeSamples`). */

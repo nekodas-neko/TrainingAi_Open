@@ -200,6 +200,10 @@ export async function seedEveryUserTable(
   const later: { table: string; column: string; parent: string; parentColumn: string }[] = []
   for (const table of order) {
     const values: Row = { ...(opts.overrides?.[table] ?? {}) }
+    if (table === 'health_connect_records') {
+      if (!('record_payload' in values)) values.record_payload = '{}'
+      if (!('modified_at' in values)) values.modified_at = opts.at ?? new Date()
+    }
     for (const fk of g.fks.filter(f => f.table === table && !(f.column in values))) {
       if (fk.parent === 'users') { values[fk.column] = userId; continue }
       if (fk.parent === table) continue

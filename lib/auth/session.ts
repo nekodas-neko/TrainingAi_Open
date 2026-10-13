@@ -1,4 +1,5 @@
 export const SESSION_MAX_AGE_SECONDS = 7 * 24 * 60 * 60
+export const NATIVE_SESSION_SALT = 'trainingai-native-session'
 
 import type { Session } from 'next-auth'
 import type { JWT } from 'next-auth/jwt'

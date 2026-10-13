@@ -201,4 +201,3 @@ describe('computeSetHrStats — the drop curve on a dense series (#2601)', () =>
     expect(g.drop60s).toBeNull()   // the gap lies between the end and +60 s too
   })
 })
-

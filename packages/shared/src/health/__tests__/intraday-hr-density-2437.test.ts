@@ -86,3 +86,8 @@ describe('intradayHrContributors', () => {
     expect(c.moveHoursGoal).toBe(moveHoursGoal())
   })
 })
+
+it('applies the same density rule to native Apple Health as Health Connect', () => {
+  expect(run(series('apple_health',7,22,10,130))).toEqual({zoneMinutes:null,moveHours:null,moveHoursGoal:null});
+  expect(run(series('apple_health',9,10,5,130))).toEqual(run(series('health_connect',9,10,5,130)));
+});

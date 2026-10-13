@@ -1,0 +1,86 @@
+import { RowGestureContext } from './RowGestureContext';
+import { useContext, type ReactNode } from 'react';
+import { Pressable, View, type ViewStyle } from 'react-native';
+import { useTheme } from '../theme/ThemeProvider';
+import { AppText } from './AppText';
+import { Stack } from './Stack';
+import { Icon } from './Icon';
+
+export function ListRow({
+  title,
+  subtitle,
+  trailing,
+  onPress,
+  onLongPress,
+  disabled = !onPress,
+  leading,
+  density = 'normal',
+  divider = true,
+}: {
+  title: string;
+  subtitle?: string;
+  trailing?: ReactNode;
+  onPress?: () => void;
+  onLongPress?: () => void;
+  disabled?: boolean;
+  leading?: ReactNode;
+  density?: 'normal' | 'compact';
+  divider?: boolean;
+}) {
+  const { theme } = useTheme();
+  const gesture = useContext(RowGestureContext);
+  const rowStyle: ViewStyle = {
+    minHeight: theme.sizes.touchTarget,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: density === 'compact' ? theme.spacing.sm : theme.spacing.lg,
+    paddingHorizontal: density === 'compact' ? theme.spacing.md : theme.spacing.lg,
+    gap: theme.spacing.md,
+    borderBottomWidth: divider ? 1 : 0,
+    borderColor: theme.colors.border,
+  };
+  const content = (
+    <>
+      {leading}
+      <Stack gap="xs" style={{ flex: 1 }}>
+        <AppText variant="label">{title}</AppText>
+        {subtitle && (
+          <AppText variant="caption" tone="muted">
+            {subtitle}
+          </AppText>
+        )}
+      </Stack>
+      {trailing ??
+        (!disabled && <Icon name="forward" tone="muted" size={theme.sizes.iconSmall} />)}
+    </>
+  );
+  if (!onPress) return <View style={rowStyle}>{content}</View>;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityHint={disabled ? 'Coming soon' : subtitle}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={() => {
+        if (!gesture?.suppressPress()) onPress();
+      }}
+      onLongPress={
+        onLongPress
+          ? () => {
+              if (!gesture?.suppressLongPress()) onLongPress();
+            }
+          : undefined
+      }
+      accessibilityActions={
+        onLongPress ? [{ name: 'longpress', label: 'More actions' }] : undefined
+      }
+      onAccessibilityAction={(event) => {
+        if (!disabled && event.nativeEvent.actionName === 'longpress') onLongPress?.();
+      }}
+      style={({ pressed }) => ({ ...rowStyle, opacity: pressed ? 0.75 : 1 })}
+    >
+      {content}
+    </Pressable>
+  );
+}

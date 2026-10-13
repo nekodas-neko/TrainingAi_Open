@@ -136,4 +136,3 @@ export function withHrr60Recovery<T extends { setEndMs?: number | null; loggedAt
     return { ...st, hrr1, adequate: restAdequateFromHrr60(hrr1, barBpm) }
   })
 }
-

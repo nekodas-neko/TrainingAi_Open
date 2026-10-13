@@ -109,8 +109,7 @@ export function applyBudgetStage(
   /** #2403: the full numbers (`preDeload`) of each row a deload cut, so the result can carry the
    *  figures for the session the `Full` override trains. Omitted or empty: no `fullSession`. */
   fullShapeById?: ReadonlyMap<string, { sets: number; reps: number; pct: number; restSec: number }>,
-  /** The prescription's phase (#2788): in intensification and realisation the fill stops at the
-   *  model's own set count. Omitted: no cap, as in accumulation. */
+
   phase?: string | null,
 ): BudgetStageResult {
   // Time-budget enforcement — the AI is asked to fit the budget, but trim deterministically
@@ -160,16 +159,7 @@ export function applyBudgetStage(
   // to repair a shape the model chose blind.
   const plausible = applyRoleSetPlausibility(timedExercises, muscleVolume)
 
-  // #2133 (owner direction 2026-09-24, proposal signed 2026-10-05): the session is SIZED to the
-  // budget rather than trimmed toward a floor. Every exercise starts at its minimum (main lift 3,
-  // the rest 2); if that does not fit, whole exercises go, least-behind muscles first, instead of
-  // flooring all of them; then the time left buys sets for the muscles furthest behind the week.
-  // It runs on every preset: a short day gets fewer exercises done properly and a long day more
-  // sets. The finish-early margin that used to justify never filling a standard session now lives
-  // in `fitMin` (the budget less the lifter's p75 overrun, #2132).
   //
-  // A deloaded row (one the caller can restore with `Full`) keeps its deload: never reset, grown or
-  // dropped. An earned set (RPE autoregulation) is kept and its exercise is dropped last.
   const mrvByMuscle = new Map<string, number>(
     [...new Set(timedExercises.flatMap(e => (e.muscleGroups ?? []).map(m => m.muscle)))]
       .map(muscle => [muscle, volumeLandmarks(signals.trainingGoal, muscle).mrv]),

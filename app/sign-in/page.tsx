@@ -6,13 +6,12 @@ import { GoogleSignIn } from "@/components/google-sign-in";
 import EmailSignIn from "./email-sign-in";
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { iosLoginContinuation } from '@/lib/auth/mobile/ios-transaction';
+import { nativeLoginContinuation, nativeSignInPath } from '@/lib/auth/mobile/native-transaction';
 
 export default async function SignInPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams;
-  if (error && await iosLoginContinuation(await cookies())) {
-    redirect('/mobile-signin/ios?error=authentication_failed');
-  }
+  const continuation = error ? await nativeLoginContinuation(await cookies()) : null;
+  if (continuation) redirect(`${nativeSignInPath(continuation)}?error=authentication_failed`);
   if (!error && await auth()) {
     redirect('/');
   }

@@ -1,18 +1,18 @@
 import type { Account, Profile, User } from 'next-auth'
 import { cookies } from 'next/headers'
 import { getRepositoryAsync } from '@/lib/data'
-import { iosLoginContinuation, readIosTransaction } from './mobile/ios-transaction'
+import { nativeLoginContinuation, readNativeTransaction, nativeSignInPath } from './mobile/native-transaction'
 import { userClaims } from './user'
 
 async function approvalRedirect(provider: 'google' | 'credentials', mobileState?: string) {
   const cookieStore = await cookies()
   const transaction = provider === 'google'
-    ? await iosLoginContinuation(cookieStore)
-    : await readIosTransaction(cookieStore)
+    ? await nativeLoginContinuation(cookieStore)
+    : await readNativeTransaction(cookieStore)
   if (!transaction || (provider === 'credentials' && transaction.state !== mobileState)) {
     return '/pending'
   }
-  return '/mobile-signin/ios?error=account_pending'
+  return `${nativeSignInPath(transaction)}?error=account_pending`
 }
 
 async function googleUser(email: string, name: string | null | undefined, oauthSub: string, authoritativeEmail: boolean) {

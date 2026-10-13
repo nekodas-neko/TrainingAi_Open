@@ -25,8 +25,8 @@ import { BASELINE_ALPHA, PEAK_RATIO, MIN_STEP_GAP_SEC, MIN_STEP_GAP_SAMPLES } fr
 import { bandAutocorrPeak } from '@trainingai/shared/health/cadence'
 
 /** Walking cadence band (steps/s) the rhythm gate searches. */
-export const GAIT_CADENCE_MIN_HZ = 1.4
-export const GAIT_CADENCE_MAX_HZ = 2.8
+import { GAIT_CADENCE_MIN_HZ, GAIT_CADENCE_MAX_HZ } from '@trainingai/shared/health/gait-constants'
+export { GAIT_CADENCE_MIN_HZ, GAIT_CADENCE_MAX_HZ } from '@trainingai/shared/health/gait-constants'
 /** Analysis window (~2.5 s @ 50 Hz) and hop (~0.5 s). Long enough to resolve a ~2 Hz
  *  rhythm, short enough to localise a bout's start/end. */
 export const GAIT_WINDOW_SAMPLES = 125

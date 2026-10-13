@@ -1,4 +1,7 @@
+import * as healthConnect from './slices/health-connect'
+import * as appleHealth from './slices/apple-health'
 import * as authData from './slices/auth'
+import * as mealLogging from './slices/meal-logging-statuses'
 import type { AuthProvider } from '@/lib/auth/identity'
 import { randomUUID } from 'crypto'
 import { rejectMealImage, mealImageRejectionMessage, FOOD_ITEM_IMAGE_MAX_BYTES } from '@trainingai/shared/nutrition/meal-image'
@@ -118,6 +121,7 @@ import * as accountDeletion from './slices/account-deletion'
 import type { AccountDeletionResult } from './slices/account-deletion'
 import * as colmi from './slices/colmi'
 import * as hcIntervals from './slices/health-connect-intervals'
+import { getNativeMovementIntervals } from './slices/native-movement'
 import * as hcHistory from './slices/health-connect-history-import'
 import * as shadowReadinessSlice from './slices/shadow-readiness'
 import * as nativeRefreshTokens from './slices/native-refresh-tokens'
@@ -410,6 +414,11 @@ function rowToAnalyte(r: {
 }
 
 export class PostgresWorkoutRepository implements WorkoutRepository {
+  async applyHealthConnectBatch(userId:string,batch:import('@trainingai/shared/validation/health-connect-import').HealthConnectBatch,timezone?:string){return healthConnect.applyHealthConnectBatch(this.db,userId,batch,timezone)}
+  async rebuildHealthConnect(userId:string,timezone:string){return healthConnect.rebuildHealthConnect(this.db,userId,timezone)}
+  async applyAppleHealthBatch(userId:string,batch:import('@trainingai/shared/validation/apple-health-import').AppleImportBatch,timezone?:string){return appleHealth.applyAppleHealthBatch(this.db,userId,batch,timezone)}
+  async rebuildAppleHealth(userId:string,timezone:string){return appleHealth.rebuildAppleHealth(this.db,userId,timezone)}
+
   /** Last daytime-HRV refit ATTEMPT per user (see maybeRefitDaytimeHrvModel). Static because the
    *  throttle must outlive any single repository instance within the process. */
   private static readonly lastHrvRefitAttemptMs = new Map<string, number>()
@@ -1620,9 +1629,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return map
   }
 
-  // Issue 2200. getLastRealOneRmBatch's two-marker gate, as of an earlier moment: the basis a past
-  // log's bars were prescribed from. Seeds and PRs are not consulted — they are reached only when no
-  // real log exists, and a PR read now includes everything logged since.
   async getPrescriptionBasisBefore(userId: string, exerciseName: string, before: Date, excludeLogId?: string): Promise<number | null> {
     const result = await this.db.execute<{ estimated_1rm: number }>(sql`
       SELECT el.estimated_1rm
@@ -2298,8 +2304,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         eq(s.bodyMetrics.userId, userId),
         gte(s.bodyMetrics.date, from),
         lte(s.bodyMetrics.date, to),
-        // #2802. A tombstoned row is a deletion, not a reading: every caller (energy budget, resting
-        // HR, trends, digests) reads these as measurements. Sync and export do not come through here.
         isNull(s.bodyMetrics.deletedAt),
       ))
       .orderBy(desc(s.bodyMetrics.date))
@@ -2556,6 +2560,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // natural-identity index so a same-minute collision merges instead of failing.
       const set = {
         title: values.title,
+        activityType: values.activityType,
         startTime: values.startTime, endTime: values.endTime,
         durationMin: values.durationMin, distanceKm: values.distanceKm,
         caloriesBurned: values.caloriesBurned,
@@ -4387,6 +4392,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   // ── Nutrition (delegated to slices/nutrition.ts) ───────────────────────────
 
   async listMealTypes(userId: string) { return n.listMealTypes(this.db, userId) }
+  listMealLoggingStatuses(userId: string, date: string) { return mealLogging.listMealLoggingStatuses(this.db, userId, date) }
+  ensureMealLoggingDay(userId: string, date: string) { return mealLogging.ensureMealLoggingDay(this.db, userId, date) }
+  setMealLoggingStatus(userId: string, date: string, mealTypeId: string, skipped: boolean, decisionId: string) { return mealLogging.setMealLoggingStatus(this.db, userId, date, mealTypeId, skipped, decisionId) }
+  listMealLoggingCompleteness(userId: string, from: string, to: string) { return mealLogging.listMealLoggingCompleteness(this.db, userId, from, to) }
   async createMealType(userId: string, data: Omit<MealType, 'id' | 'userId' | 'createdAt'>) { return n.createMealType(this.db, userId, data) }
   async updateMealType(id: string, userId: string, data: Partial<Omit<MealType, 'id' | 'userId' | 'createdAt'>>) { return n.updateMealType(this.db, id, userId, data) }
   async deleteMealType(id: string, userId: string) { return n.deleteMealType(this.db, id, userId) }
@@ -8006,6 +8015,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getHealthConnectHistoryOldest(userId: string) { return hcHistory.getHealthConnectHistoryOldest(this.db, userId) }
   async advanceHealthConnectHistoryOldest(userId: string, date: string) { return hcHistory.advanceHealthConnectHistoryOldest(this.db, userId, date) }
   async getHealthConnectIntervals(userId: string, kind: import('../repository').HealthConnectIntervalKind, from: Date, to: Date) { return hcIntervals.getHealthConnectIntervals(this.db, userId, kind, from, to) }
+  async getNativeMovementIntervals(userId: string, kind: 'steps' | 'active_kcal', from: Date, to: Date) { return getNativeMovementIntervals(this.db, userId, kind, from, to) }
   async upsertShadowReadiness(userId: string, record: import('@trainingai/shared/types').ShadowReadinessRecord) { return shadowReadinessSlice.upsertShadowReadiness(this.db, userId, record) }
   async getShadowReadiness(userId: string, from: string, to: string, modelVersion?: number) { return shadowReadinessSlice.getShadowReadiness(this.db, userId, from, to, modelVersion) }
   async getHrForWindow(userId: string, from: Date, to: Date) { return oura.getHrForWindow(this.db, userId, from, to) }

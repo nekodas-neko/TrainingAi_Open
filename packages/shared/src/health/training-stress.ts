@@ -1,6 +1,8 @@
 import { runTrainingStressScore } from '@/lib/oura-models/inference/ots'
 import { fillOtsGaps, otsFillConstants } from '@/lib/oura-models/inference/ots-gap-fill'
 import { deriveVo2Max, type Vo2MaxInputs } from '@trainingai/shared/health/vo2max'
+import type { MetMix } from './met-mix'
+export type { MetMix } from './met-mix'
 
 /**
  * LA-161: every result carries the two numbers the MET floors are evaluated against. They are
@@ -21,13 +23,6 @@ export interface MetGridDimensions {
 }
 
 /** Minutes per rung of `MET/min` (`provided`, `derived`, `estimated`) and minutes nothing filled. */
-export interface MetMix {
-  provided: number
-  derived: number
-  estimated: number
-  missing: number
-}
-
 export type TrainingStressResult =
   | ({ status: 'ok'; ots: number; high: boolean; vo2max: number | null; vo2maxMethod: string | null } & MetGridDimensions)
   | ({ status: 'gated'; reason: 'readiness_learning' | 'no_readiness' | 'insufficient_met' | 'no_profile' | 'scorer_no_output' } & MetGridDimensions)

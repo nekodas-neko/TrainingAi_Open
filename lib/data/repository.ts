@@ -626,6 +626,11 @@ export interface StrapStatusRow extends StrapStatusWrite {
 }
 
 export interface WorkoutRepository {
+  applyHealthConnectBatch(userId:string,batch:import('@trainingai/shared/validation/health-connect-import').HealthConnectBatch,timezone?:string):Promise<{accepted:number;deleted:number}>;
+  rebuildHealthConnect(userId:string,timezone:string):Promise<{measurements:number;nights:number;days:number;heartRate:number;completedAt:string;hrv:{method:'RMSSD';value:number;at:string;source:string}|null}>;
+  applyAppleHealthBatch(userId:string,batch:import('@trainingai/shared/validation/apple-health-import').AppleImportBatch,timezone?:string):Promise<{accepted:number;deleted:number}>;
+  rebuildAppleHealth(userId:string,timezone:string):Promise<{measurements:number;nights:number;days:number;heartRate:number;completedAt:string;hrv:{method:'SDNN';value:number;at:string;source:string}|null}>;
+
   // ── Users ──────────────────────────────────────────────────────────────────
   upsertUser(user: Omit<User, 'id' | 'createdAt' | 'isActive' | 'isAdmin'>, forceActive?: boolean): Promise<User>
   listUsers(limit?: number, offset?: number): Promise<User[]>
@@ -946,6 +951,7 @@ export interface WorkoutRepository {
   // programId optionally scopes to sessions belonging to that program only — used by the
   // ai_dynamic baseline auto-heal so a shared exercise name from a *different* program's
   // history can't skip a fresh cycle's AMRAP baseline week.
+  getPrescriptionBasisBefore(userId: string, exerciseName: string, before: Date, excludeLogId?: string): Promise<number | null>
   getLastExerciseLogsBatch(userId: string, exerciseNames: string[], programId?: string): Promise<Map<string, ExerciseLog>>
   /** Last non-deload 1RM per exercise — the prescription basis (Q-202). Distinct from the
    *  method above, which still returns the genuinely most recent log for display. */
@@ -1040,6 +1046,10 @@ export interface WorkoutRepository {
 
   // ── Nutrition ──────────────────────────────────────────────────────────────
   listMealTypes(userId: string): Promise<MealType[]>
+    listMealLoggingStatuses(userId: string, date: string): Promise<{ mealTypeId: string; skipped: boolean; decisionId: string; explicit?: boolean }[]>
+    ensureMealLoggingDay(userId: string, date: string): Promise<void>
+    setMealLoggingStatus(userId: string, date: string, mealTypeId: string, skipped: boolean, decisionId: string): Promise<void>
+    listMealLoggingCompleteness?(userId: string, from: string, to: string): Promise<{ date: string; complete: boolean; zeroIntake?: boolean; explicit?: boolean }[]>
   createMealType(userId: string, data: Omit<MealType, 'id' | 'userId' | 'createdAt'>): Promise<MealType>
   updateMealType(id: string, userId: string, data: Partial<Omit<MealType, 'id' | 'userId' | 'createdAt'>>): Promise<MealType>
   /** RV-45: false when nothing matched. Still throws MealTypeHasLogsError when logs reference it. */
@@ -1488,6 +1498,7 @@ export interface WorkoutRepository {
   upsertHealthConnectIntervals(userId: string, rows: readonly HealthConnectIntervalRow[]): Promise<number>
   /** #2462. One kind's rows starting in [from, to), oldest first, overlap NOT resolved. */
   getHealthConnectIntervals(userId: string, kind: HealthConnectIntervalKind, from: Date, to: Date): Promise<HealthConnectIntervalRow[]>
+  getNativeMovementIntervals?(userId: string, kind: 'steps' | 'active_kcal', from: Date, to: Date): Promise<HealthConnectIntervalRow[]>
   /** issue 2169. The oldest local calendar day the user's "Import more history" run has reached
    *  (YYYY-MM-DD), or null when they have never run it. */
   getHealthConnectHistoryOldest(userId: string): Promise<string | null>

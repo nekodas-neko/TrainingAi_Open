@@ -36,9 +36,10 @@ describe('yieldAggregatorToDevice / mergeHrSources', () => {
   const min = (m: number) => m * 60
 
   it('takes the aggregator tier from the source ladder, not a second list', () => {
-    expect([...AGGREGATOR_HR_SOURCES].sort()).toEqual(['apple_health', 'health_connect'])
+    expect([...AGGREGATOR_HR_SOURCES].sort()).toEqual(['apple_health', 'health_connect', 'health_connect_native'])
     expect(isAggregatorHrSource('health_connect')).toBe(true)
     expect(isAggregatorHrSource('apple_health')).toBe(true)
+    expect(isAggregatorHrSource('health_connect_native')).toBe(true)
     for (const device of ['ble', 'chest_strap', 'awake', null]) expect(isAggregatorHrSource(device)).toBe(false)
   })
 

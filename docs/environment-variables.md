@@ -15,6 +15,7 @@ Required in Railway:
 - `HEALTH_CONNECT_INGEST_SECRET` + `WEBHOOK_USER_ID` — Tasker auth for `app/api/health-connect/ingest/route.ts`
 
 Optional:
+- `NATIVE_AUTH_ALLOW_ANDROID_DEV=1` — explicitly allow the separate Android development callback on production for internal testing. Off by default; use a test account.
 - `CLAUDE_DB_READONLY_URL` + `CLAUDE_DB_QUERY_SECRET` — enables `POST /api/admin/db-query`, a read-only
   SQL endpoint over the curated `claude_ro` view schema (whole-history audits: counter drift,
   null-rates, orphans, blast-radius measurement). **Read-only is enforced by the `claude_readonly`
