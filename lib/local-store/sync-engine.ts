@@ -779,8 +779,53 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
   consecutivePullFailures = 0;
   pullBackoffUntil = 0;
   lastSyncMs = Date.now();
+  // #2752: once per install, after a pull that drained, clear the ring nights this device pulled
+  // before the rollup stopped re-minting ids. Best-effort: a failure leaves the flag unset and the
+  // next drained pull tries again.
+  if (!hasMore) {
+    const swept = await sweepGhostBleSleep(userId).catch(() => 0);
+    if (swept > 0) domains.biometrics = true;
+  }
   // hasMore stays true if we hit the 20-page cap with the server still reporting more.
   return { synced: total, domains, hasMore };
+}
+
+const GHOST_BLE_SLEEP_SWEEP_KEY = 'bleSleepGhostSweep2752';
+/** How far before the server's read a local row's `updated_at` must be to count. A rollup that
+ *  started before the id list was read and committed after it stamps its rows with its own start
+ *  time; an hour is far beyond any rollup transaction, and every real ghost predates #2749. */
+const GHOST_BLE_SLEEP_MARGIN_MS = 60 * 60 * 1000;
+
+/**
+ * #2752. Before #2749 the ring rollup hard-deleted every BLE night it re-rolled and reinserted it
+ * under a fresh id, so this device may still hold the old ids as synced rows the server no longer
+ * has. No tombstone will ever arrive for them, and Restore from cloud only upserts. This reads the
+ * server's full id list (`/api/sync/sleep-ids`, live and tombstoned) and deletes the local synced
+ * `ble:` rows missing from it. Device-only and local-only: nothing on the server changes.
+ *
+ * Runs once per install (a `sync_meta` flag), and again after every Restore from cloud (`force`).
+ * Returns the number of rows removed; 0 when skipped or when the read fails.
+ */
+export async function sweepGhostBleSleep(userId: string, opts: { force?: boolean } = {}): Promise<number> {
+  const store = getLocalStore(userId);
+  if (!store) return 0;
+  if (!opts.force && await store.getSyncMeta(GHOST_BLE_SLEEP_SWEEP_KEY)) return 0;
+  let body: { asOf?: unknown; ids?: unknown };
+  try {
+    const res = await fetch('/api/sync/sleep-ids');
+    if (!res.ok) return 0;
+    body = await res.json();
+  } catch {
+    return 0;
+  }
+  const asOf = typeof body.asOf === 'string' ? new Date(body.asOf) : null;
+  const ids = Array.isArray(body.ids) ? body.ids.filter((v): v is string => typeof v === 'string') : null;
+  // An empty list is never taken as "the server has no nights": read as an answer, it would empty
+  // the local ring history. Unset flag, so a later pull retries.
+  if (!asOf || Number.isNaN(asOf.getTime()) || !ids || ids.length === 0) return 0;
+  const removed = await store.deleteGhostBleSleepRows(new Set(ids), new Date(asOf.getTime() - GHOST_BLE_SLEEP_MARGIN_MS));
+  await store.setSyncMeta(GHOST_BLE_SLEEP_SWEEP_KEY, new Date().toISOString());
+  return removed;
 }
 
 /**
@@ -833,6 +878,9 @@ export async function restoreFromCloud(
     onProgress?.(total);
     if (!res.hasMore) break;
   }
+  // #2752: Restore from cloud upserts and never removes, so it is also where the ghost sweep reruns.
+  const swept = await sweepGhostBleSleep(userId, { force: true }).catch(() => 0);
+  if (swept > 0) domains.biometrics = true;
   return { synced: total, failed: false, domains };
 }
 

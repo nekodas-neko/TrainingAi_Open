@@ -57,6 +57,10 @@ function hits(): Hit[] {
  * statement's window, so an entry names one statement, not a whole file.
  */
 const ALLOWED: { file: string; marker: string; reason: string }[] = [
+  { file: 'lib/local-store/sqlite-backend.ts', marker: "WHERE sync_status = 'synced' AND oura_id LIKE 'ble:%' AND COALESCE(manual_entry, 0) = 0",
+    reason: 'issue 2752: the ghost sweep compares every synced ring row with the server id list, which includes tombstones; a tombstoned row the server still holds is never deleted' },
+  { file: 'lib/local-store/sqlite-backend.ts', marker: "DELETE FROM sleep_sessions WHERE sync_status = 'synced' AND id IN",
+    reason: 'issue 2752: deletes by id the ghosts chosen above, rows whose server copy no longer exists at all' },
   { file: 'lib/data/postgres/adapter.ts', marker: 'gt(s.sleepSessions.updatedAt, effectiveSince)',
     reason: 'the delta pull IS the tombstone channel: a device learns of a removal only because the removed row is sent' },
   { file: 'lib/data/postgres/adapter.ts', marker: 'NOT EXISTS (SELECT 1 FROM sleep_sessions d',

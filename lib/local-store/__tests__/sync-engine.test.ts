@@ -25,6 +25,8 @@ const { fakeStore } = vi.hoisted(() => ({
     queueMutation:          vi.fn().mockResolvedValue(undefined),
     getLastSyncAt:          vi.fn().mockResolvedValue(new Date('2026-07-01T00:00:00.000Z')),
     setLastSyncAt:          vi.fn().mockResolvedValue(undefined),
+    // #2752: the one-time ghost sweep has already run, so pulls here never reach it.
+    getSyncMeta:            vi.fn().mockResolvedValue('2026-10-11T00:00:00.000Z'),
     applyDelta:             vi.fn().mockResolvedValue(undefined),
     pruneProgramStructure:  vi.fn().mockResolvedValue(0),
     markSleepSessionSynced:     vi.fn().mockResolvedValue(undefined),
@@ -495,7 +497,11 @@ describe('restoreFromCloud', () => {
     // Seeded epoch once at loop entry (the resumable-restore fix).
     expect(fakeStore.setLastSyncAt).toHaveBeenCalledWith(new Date(0).toISOString())
     // Every pull in the restore drain carried mode=restore (full-history unclamp).
-    for (const call of fetchMock.mock.calls) expect(String(call[0])).toContain('mode=restore')
+    const pulls = fetchMock.mock.calls.map(c => String(c[0])).filter(u => u.startsWith('/api/sync/pull'))
+    expect(pulls.length).toBeGreaterThan(0)
+    for (const url of pulls) expect(url).toContain('mode=restore')
+    // #2752: a drained restore then reruns the ghost sweep, forced past its once-per-install flag.
+    expect(fetchMock.mock.calls.map(c => String(c[0]))).toContain('/api/sync/sleep-ids')
   })
 
   it('issue 2713: a span restore seeds the cursor at the given instant, not epoch, and still unclamps', async () => {
@@ -506,11 +512,13 @@ describe('restoreFromCloud', () => {
     expect(res?.failed).toBe(false)
     expect(fakeStore.setLastSyncAt).toHaveBeenCalledWith(since)
     expect(fakeStore.setLastSyncAt).not.toHaveBeenCalledWith(new Date(0).toISOString())
-    expect(String(fetchMock.mock.calls[0][0])).toContain(`since=${since}`)
-    expect(String(fetchMock.mock.calls[0][0])).toContain('mode=restore')
+    // #2752: the restore's forced ghost sweep reads /api/sync/sleep-ids too; only the pulls matter here.
+    const pulls = () => fetchMock.mock.calls.map(c => String(c[0])).filter(u => u.startsWith('/api/sync/pull'))
+    expect(pulls()[0]).toContain(`since=${since}`)
+    expect(pulls()[0]).toContain('mode=restore')
     // Idempotent: running the same span again makes the same request.
     await restoreFromCloud('u1', undefined, since)
-    expect(String(fetchMock.mock.calls[1][0])).toContain(`since=${since}`)
+    expect(pulls()[1]).toContain(`since=${since}`)
   })
 
   it('reports failed:true (not a bare zero) when a pull fails, without looping forever', async () => {

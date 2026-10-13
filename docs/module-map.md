@@ -253,7 +253,7 @@ a mirrored `pushMutations` branch.
 | Push-failure classification (Q-475) | `packages/shared/src/sync/retryable-error.ts` → `isRetryableWriteError`. Answers "was this the *server* failing to write, or the mutation being wrong?" — the two are indistinguishable at the wire because `pushMutations` catches per mutation and always returns HTTP 200. Walks the `cause` chain (Drizzle wraps the driver error); pg SQLSTATE classes 08/53 + named codes, plus `syscall === 'connect'` for socket/TCP unreachability. Used in `pushMutations`' catch to stamp `retryable` on a `PushResult` error; the client (`sync-engine.ts`) then leaves the row queued and backs the whole queue off instead of counting it towards `MAX_MUTATION_ATTEMPTS`. |
 | At-least-once replay ledger (Q-481) | `applied_mutations` table (migration 199) + `incrementWaterLogOnce` in `lib/data/postgres/adapter.ts`. The outbox delivers at-least-once; **one** push branch of nineteen is not idempotent under replay (`body_metrics` + `waterMlDelta`, which *adds* — correctly, or SYNC-P7 returns). That branch claims the mutation id with `ON CONFLICT DO NOTHING … RETURNING` inside the same transaction as the increment, so a replay is refused while distinct concurrent adds still sum. **Do not extend this to the other eighteen** — they upsert on `(user_id, date)` or a client row id and are naturally idempotent; a universal ledger would cost far more than it buys. Pruned opportunistically at 90 days off the write path. |
 | Sync helpers | `lib/local-store/sync-helpers.ts` |
-| Server sync routes | `app/api/sync/pull`, `app/api/sync/push`, `app/api/sync-health` |
+| Server sync routes | `app/api/sync/pull`, `app/api/sync/push`, `app/api/sync/sleep-ids` (the ghost-night sweep's id list, #2752), `app/api/sync-health` |
 | Client wiring | `components/sync-provider.tsx`, `components/pull-to-sync.tsx` |
 
 ---
@@ -738,7 +738,7 @@ Full list under `app/api/`. Groups:
 - **Nutrition:** `nutrition/*` (`food-items`, `food-logs`, `saved-meals`, `meal-types`, `scan`, `barcode`, `recent-for-meal`, `weekly-summary`, `adherence`, `targets`), `nutrition-goals/*`, `day-checkin`, `day-log`, `mood`, `water-log`, `supplements/*`
 - **Oura / Health Connect:** `oura/*`, `health-connect/ingest`
 - **Activity:** `activity-logs` (+`/[id]/metrics`), `activity-types`
-- **Sync:** `sync/pull`, `sync/push`, `sync-health`
+- **Sync:** `sync/pull`, `sync/push`, `sync/sleep-ids`, `sync-health`
 - **User / auth:** `auth/*`, `user/*` (`profile`, `avatar`, `password`, `goals`, `bedtime-estimate`, `equipped-title`), `profile/[userId]`, `friends/*`, `seasons`, `achievements`, `push/*`
 - **Admin:** `admin/*` (`users`, `errors`, `feedback`, `exercises`, `invites`, `time-audit`, `program-export` [read-only active-program dump — role + sets×reps@% + rest + est-vs-budget time; `lib/admin/program-export.ts` formatter, `components/admin/program-export-card.tsx` copy UI], `generate-exercise-media`, …)
 - **Platform:** `status`, `version`, `client-error`, `download-apk`, `feedback`
