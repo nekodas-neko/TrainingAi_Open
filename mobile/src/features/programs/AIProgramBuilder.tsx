@@ -28,7 +28,7 @@ import { useWorkoutDraft } from '../workouts/data/useWorkoutDraft';
 import { useWorkoutAction } from '../workouts/data/useWorkoutAction';
 import { ProgramDraftSchema, programPayload } from './editor-model';
 import { BuilderInputSchema, builderSteps, generatedDraft, reviewedProgram } from './builder-model';
-import { SessionEditor } from './SessionEditor';
+import { ProgramSessionList } from './ProgramSessionList';
 
 const schema = z.object({
   inputs: BuilderInputSchema,
@@ -241,6 +241,7 @@ export function AIProgramBuilder({ onBack, onSaved }: { onBack: () => void; onSa
   }
   return (
     <WorkoutLayout
+      reorderable
       contentDisabled={action.busy}
       title={value.step === 99 ? 'Review Program' : 'Create with AI'}
       onBack={
@@ -516,16 +517,13 @@ export function AIProgramBuilder({ onBack, onSaved }: { onBack: () => void; onSa
               ))}
             </Card>
           ) : null}
-          {value.review.sessions.map((session, index) => (
-            <SessionEditor
-              key={session.id}
-              draft={value.review!}
-              index={index}
-              onChange={(review) => draft.setValue({ ...value, review })}
-              library={library.data?.exercises ?? []}
-              styles={styles.data?.styles ?? []}
-            />
-          ))}
+          <ProgramSessionList
+            draft={value.review}
+            onChange={(review) => draft.setValue({ ...value, review })}
+            library={library.data?.exercises ?? []}
+            styles={styles.data?.styles ?? []}
+            disabled={action.busy}
+          />
           <Card>
             <AppText variant="heading">Adjust with AI</AppText>
             {value.chat.map((entry, index) => (

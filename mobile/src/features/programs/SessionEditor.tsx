@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { ExerciseChooser } from './ExerciseChooser';
 import { randomUUID } from 'expo-crypto';
 import {
@@ -9,15 +9,15 @@ import {
   NumericStepper,
   Picker,
   Stack,
+  SortableStack,
   TextField,
+  IconButton,
 } from '../../shared/ui';
+import { View } from 'react-native';
+import { useTheme } from '../../shared/theme/ThemeProvider';
 import type { LibraryExercise, SavedStyle } from '../workouts/data/models';
-import {
-  moveItem,
-  selectExercise,
-  normalizeSupersets,
-  type ProgramDraft,
-} from './editor-model';
+import { selectExercise, normalizeSupersets, type ProgramDraft } from './editor-model';
+import { exerciseBlocks, reorderExerciseBlocks, reorderSupersetMembers } from './reorder-model';
 import { defaultStyleIdForSlot } from '@trainingai/shared/workout/default-style';
 
 export function SessionEditor({
@@ -27,6 +27,9 @@ export function SessionEditor({
   library,
   styles,
   ownedEquipment,
+  handle,
+  disabled = false,
+  onRemove,
 }: {
   draft: ProgramDraft;
   index: number;
@@ -34,8 +37,12 @@ export function SessionEditor({
   library: LibraryExercise[];
   styles: SavedStyle[];
   ownedEquipment?: string[];
+  handle?: ReactNode;
+  disabled?: boolean;
+  onRemove?: () => void;
 }) {
-  const [choosing, setChoosing] = useState<number | null>(null);
+  const { theme } = useTheme();
+  const [choosing, setChoosing] = useState<string | null>(null);
   const session = draft.sessions[index];
   function update(value: Partial<typeof session>) {
     onChange({
@@ -52,195 +59,251 @@ export function SessionEditor({
       ),
     });
   }
-  return (
-    <Card>
-      <Stack direction="row" justify="space-between">
-        <AppText variant="heading">{session.name || `Session ${index + 1}`}</AppText>
+  const blocks = exerciseBlocks(session.exercises);
+  function renderExercise(item: (typeof session.exercises)[number], exerciseHandle?: ReactNode) {
+    const at = session.exercises.findIndex((exercise) => exercise.id === item.id);
+    return (
+      <Disclosure
+        key={item.id ?? at}
+        compact
+        title={item.exerciseName || 'Choose exercise'}
+        accessibilityLabel={`${at + 1}. ${item.exerciseName || 'Choose exercise'}`}
+        leading={
+          <Stack direction="row" align="center" gap="xs">
+            {exerciseHandle}
+            <AppText variant="caption" tone="muted" style={{ width: theme.sizes.iconSmall }}>
+              {at + 1}.
+            </AppText>
+          </Stack>
+        }
+        defaultOpen={!item.exerciseName}
+      >
+        <AppButton
+          title={item.exerciseName || 'Choose exercise'}
+          variant="surface"
+          onPress={() => setChoosing(item.id!)}
+        />
+        <Picker
+          label="Progression set"
+          value={item.styleId ?? ''}
+          options={[
+            { value: '', label: 'Default' },
+            ...styles.map((style) => ({ value: style.id, label: style.name })),
+          ]}
+          onChange={(styleId) => exercise(at, { styleId: styleId || null })}
+        />
+        <Picker
+          label="Exercise role"
+          value={item.exerciseRole ?? 'accessory'}
+          options={['primary', 'secondary', 'accessory'].map((role) => ({
+            value: role,
+            label: role[0].toUpperCase() + role.slice(1),
+          }))}
+          onChange={(role) =>
+            exercise(at, {
+              exerciseRole: role as 'primary' | 'secondary' | 'accessory',
+              styleId:
+                item.styleId ??
+                defaultStyleIdForSlot(
+                  draft.sessions,
+                  styles,
+                  role as 'primary' | 'secondary' | 'accessory',
+                ),
+            })
+          }
+        />
+        {item.muscleGroups?.length ? (
+          <AppText variant="caption" tone="muted">
+            {item.muscleGroups.join(', ')}
+          </AppText>
+        ) : null}
         <Stack direction="row">
           <AppButton
-            title="↑"
-            accessibilityLabel="Move session up"
-            variant="ghost"
-            disabled={index === 0}
+            title="Remove"
+            variant="danger"
             onPress={() =>
-              onChange({ ...draft, sessions: moveItem(draft.sessions, index, -1) })
-            }
-          />
-          <AppButton
-            title="↓"
-            accessibilityLabel="Move session down"
-            variant="ghost"
-            disabled={index === draft.sessions.length - 1}
-            onPress={() => onChange({ ...draft, sessions: moveItem(draft.sessions, index, 1) })}
-          />
-        </Stack>
-      </Stack>
-      <TextField
-        label="Session name"
-        value={session.name}
-        onChangeText={(name) => update({ name })}
-      />
-      <Picker
-        label="Session icon"
-        value={session.icon ?? '💪'}
-        options={['💪', '🏋️', '🦵', '🏃', '🤸', '⚡', '🔥', '🎯', '🧘'].map((icon) => ({
-          value: icon,
-          label: icon,
-        }))}
-        onChange={(icon) => update({ icon })}
-      />
-      <NumericStepper
-        label="Time budget (minutes)"
-        value={String(session.timeBudgetMinutes ?? 60)}
-        min={20}
-        max={180}
-        step={5}
-        onChange={(value) => update({ timeBudgetMinutes: Number(value) })}
-      />
-      {session.exercises.map((item, at) => (
-        <Disclosure
-          key={item.id ?? at}
-          title={`${at + 1}. ${item.exerciseName || 'Choose exercise'}${item.supersetGroup != null ? ' · Superset' : ''}`}
-          defaultOpen={!item.exerciseName}
-        >
-          <AppButton
-            title={item.exerciseName || 'Choose exercise'}
-            variant="surface"
-            onPress={() => setChoosing(at)}
-          />
-          <Picker
-            label="Progression set"
-            value={item.styleId ?? ''}
-            options={[
-              { value: '', label: 'Default' },
-              ...styles.map((style) => ({ value: style.id, label: style.name })),
-            ]}
-            onChange={(styleId) => exercise(at, { styleId: styleId || null })}
-          />
-          <Picker
-            label="Exercise role"
-            value={item.exerciseRole ?? 'accessory'}
-            options={['primary', 'secondary', 'accessory'].map((role) => ({
-              value: role,
-              label: role[0].toUpperCase() + role.slice(1),
-            }))}
-            onChange={(role) =>
-              exercise(at, {
-                exerciseRole: role as 'primary' | 'secondary' | 'accessory',
-                styleId:
-                  item.styleId ??
-                  defaultStyleIdForSlot(
-                    draft.sessions,
-                    styles,
-                    role as 'primary' | 'secondary' | 'accessory',
-                  ),
+              update({
+                exercises: normalizeSupersets(session.exercises.filter((_, index) => index !== at)),
               })
             }
           />
-          {item.muscleGroups?.length ? (
-            <AppText variant="caption" tone="muted">
-              {item.muscleGroups.join(', ')}
-            </AppText>
-          ) : null}
-          <Stack direction="row">
-            <AppButton
-              title="↑"
-              accessibilityLabel="Move exercise up"
-              variant="ghost"
-              disabled={at === 0}
-              onPress={() =>
-                update({
-                  exercises: normalizeSupersets(moveItem(session.exercises, at, -1)),
-                })
-              }
-            />
-            <AppButton
-              title="↓"
-              accessibilityLabel="Move exercise down"
-              variant="ghost"
-              disabled={at === session.exercises.length - 1}
-              onPress={() =>
-                update({
-                  exercises: normalizeSupersets(moveItem(session.exercises, at, 1)),
-                })
-              }
-            />
-            <AppButton
-              title="Remove"
-              variant="danger"
-              onPress={() =>
-                update({
-                  exercises: normalizeSupersets(
-                    session.exercises.filter((_, index) => index !== at),
-                  ),
-                })
-              }
+        </Stack>
+        {at < session.exercises.length - 1 && (
+          <AppButton
+            title={
+              item.supersetGroup != null &&
+              item.supersetGroup === session.exercises[at + 1].supersetGroup
+                ? 'Unlink superset'
+                : 'Link with next'
+            }
+            variant="secondary"
+            disabled={
+              session.exercises[at + 1].supersetGroup != null &&
+              session.exercises[at + 1].supersetGroup !== item.supersetGroup
+            }
+            onPress={() => {
+              const linked =
+                item.supersetGroup != null &&
+                item.supersetGroup === session.exercises[at + 1].supersetGroup;
+              const group =
+                item.supersetGroup ??
+                Math.max(-1, ...session.exercises.map((exercise) => exercise.supersetGroup ?? -1)) +
+                  1;
+              update({
+                exercises: session.exercises.map((exercise, index) =>
+                  linked
+                    ? exercise.supersetGroup === item.supersetGroup
+                      ? { ...exercise, supersetGroup: null }
+                      : exercise
+                    : index === at || index === at + 1
+                      ? { ...exercise, supersetGroup: linked ? null : group }
+                      : exercise,
+                ),
+              });
+            }}
+          />
+        )}
+      </Disclosure>
+    );
+  }
+  return (
+    <Card style={{ padding: theme.spacing.sm }}>
+      <Disclosure
+        compact
+        title={session.name || `Session ${index + 1}`}
+        subtitle={`${session.exercises.length} ${session.exercises.length === 1 ? 'exercise' : 'exercises'} · ${session.timeBudgetMinutes ?? 60} min`}
+        leading={handle}
+      >
+        <Stack
+          gap="md"
+          style={{ paddingHorizontal: theme.spacing.sm, paddingBottom: theme.spacing.sm }}
+        >
+          <TextField
+            containerStyle={{ flexGrow: 0, flexShrink: 0, flexBasis: 'auto' }}
+            label="Session name"
+            value={session.name}
+            onChangeText={(name) => update({ name })}
+          />
+          <Stack direction="row" align="flex-end" gap="md">
+            <View style={{ width: theme.sizes.touchTarget * 1.5 }}>
+              <Picker
+                compact
+                label="Icon"
+                value={session.icon ?? '💪'}
+                options={['💪', '🏋️', '🦵', '🏃', '🤸', '⚡', '🔥', '🎯', '🧘'].map((icon) => ({
+                  value: icon,
+                  label: icon,
+                }))}
+                onChange={(icon) => update({ icon })}
+              />
+            </View>
+            <NumericStepper
+              inline
+              label="Time budget (min)"
+              value={String(session.timeBudgetMinutes ?? 60)}
+              min={20}
+              max={180}
+              step={5}
+              onChange={(value) => update({ timeBudgetMinutes: Number(value) })}
             />
           </Stack>
-          {at < session.exercises.length - 1 && (
+          <SortableStack
+            order={blocks.map((block) => block.id)}
+            enabled={!disabled}
+            label={(id) => {
+              const block = blocks.find((item) => item.id === id)!;
+              return block.exercises
+                .map((item) => item.exerciseName || 'Choose exercise')
+                .join(' and ');
+            }}
+            onChange={(order) =>
+              update({ exercises: reorderExerciseBlocks(session.exercises, order) })
+            }
+            renderItem={(id, exerciseHandle) => {
+              const block = blocks.find((item) => item.id === id)!;
+              return block.exercises.length > 1 ? (
+                <Card tone="brand" style={{ padding: theme.spacing.sm, gap: theme.spacing.xs }}>
+                  <Stack direction="row" align="center" gap="xs">
+                    {exerciseHandle}
+                    <AppText variant="label">Superset · {block.exercises.length} exercises</AppText>
+                  </Stack>
+                  <SortableStack
+                    gap={theme.spacing.xs}
+                    order={block.exercises.map((item) => item.id!)}
+                    enabled={!disabled}
+                    label={(id) =>
+                      block.exercises.find((item) => item.id === id)?.exerciseName || 'Exercise'
+                    }
+                    onChange={(order) =>
+                      update({
+                        exercises: reorderSupersetMembers(
+                          session.exercises,
+                          block.exercises[0].supersetGroup!,
+                          order,
+                        ),
+                      })
+                    }
+                    renderItem={(id, memberHandle) =>
+                      renderExercise(block.exercises.find((item) => item.id === id)!, memberHandle)
+                    }
+                  />
+                </Card>
+              ) : (
+                renderExercise(block.exercises[0], exerciseHandle)
+              );
+            }}
+          />
+          <Stack direction="row" align="center">
             <AppButton
-              title={
-                item.supersetGroup != null &&
-                item.supersetGroup === session.exercises[at + 1].supersetGroup
-                  ? 'Unlink superset'
-                  : 'Link with next'
-              }
+              title="Add Exercise"
+              icon="plus"
+              style={{ flex: 1 }}
               variant="secondary"
-              disabled={
-                session.exercises[at + 1].supersetGroup != null &&
-                session.exercises[at + 1].supersetGroup !== item.supersetGroup
-              }
-              onPress={() => {
-                const linked =
-                  item.supersetGroup != null &&
-                  item.supersetGroup === session.exercises[at + 1].supersetGroup;
-                const group =
-                  item.supersetGroup ??
-                  Math.max(
-                    -1,
-                    ...session.exercises.map((exercise) => exercise.supersetGroup ?? -1),
-                  ) + 1;
+              onPress={() =>
                 update({
-                  exercises: session.exercises.map((exercise, index) =>
-                    linked
-                      ? exercise.supersetGroup === item.supersetGroup
-                        ? { ...exercise, supersetGroup: null }
-                        : exercise
-                      : index === at || index === at + 1
-                        ? { ...exercise, supersetGroup: linked ? null : group }
-                        : exercise,
-                  ),
-                });
-              }}
+                  exercises: [
+                    ...session.exercises,
+                    {
+                      id: randomUUID(),
+                      exerciseName: '',
+                      styleId: defaultStyleIdForSlot(draft.sessions, styles),
+                      position: session.exercises.length,
+                    },
+                  ],
+                })
+              }
             />
-          )}
-        </Disclosure>
-      ))}
-      <AppButton
-        title="Add Exercise"
-        variant="secondary"
-        onPress={() =>
-          update({
-            exercises: [
-              ...session.exercises,
-              {
-                id: randomUUID(),
-                exerciseName: '',
-                styleId: defaultStyleIdForSlot(draft.sessions, styles),
-                position: session.exercises.length,
-              },
-            ],
-          })
-        }
-      />
+            {onRemove && (
+              <IconButton
+                icon="delete"
+                label={`Remove ${session.name || 'session'}`}
+                tone="danger"
+                disabled={disabled}
+                onPress={onRemove}
+              />
+            )}
+          </Stack>
+        </Stack>
+      </Disclosure>
       {choosing !== null && (
         <ExerciseChooser
           library={library}
           ownedEquipment={ownedEquipment}
-          role={session.exercises[choosing]?.exerciseRole}
-          current={library.find((x) => x.name === session.exercises[choosing]?.exerciseName)}
+          role={session.exercises.find((item) => item.id === choosing)?.exerciseRole}
+          current={library.find(
+            (x) => x.name === session.exercises.find((item) => item.id === choosing)?.exerciseName,
+          )}
           onClose={() => setChoosing(null)}
-          onSelect={(selected) => onChange(selectExercise(draft, index, choosing, selected))}
+          onSelect={(selected) =>
+            onChange(
+              selectExercise(
+                draft,
+                index,
+                session.exercises.findIndex((item) => item.id === choosing),
+                selected,
+              ),
+            )
+          }
         />
       )}
     </Card>

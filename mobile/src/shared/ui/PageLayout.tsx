@@ -12,6 +12,7 @@ import { AppText } from './AppText';
 import { Stack } from './Stack';
 import { IconButton } from './IconButton';
 import { useTheme } from '../theme/ThemeProvider';
+import { ReorderScrollView } from './ReorderScrollView';
 
 export function PageLayout({
   title,
@@ -26,6 +27,7 @@ export function PageLayout({
   contentStyle,
   onBack,
   landing = false,
+  reorderable = false,
 }: PropsWithChildren<{
   title: string;
   subtitle?: string;
@@ -38,9 +40,11 @@ export function PageLayout({
   contentStyle?: StyleProp<ViewStyle>;
   onBack?: () => void;
   landing?: boolean;
+  reorderable?: boolean;
 }>) {
   const { theme } = useTheme();
   useAndroidBack(onBack);
+  const ContentScrollView = reorderable ? ReorderScrollView : ScrollView;
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -103,7 +107,7 @@ export function PageLayout({
         }}
       >
         {scroll ? (
-          <ScrollView
+          <ContentScrollView
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
@@ -118,7 +122,7 @@ export function PageLayout({
             ]}
           >
             {children}
-          </ScrollView>
+          </ContentScrollView>
         ) : (
           children
         )}

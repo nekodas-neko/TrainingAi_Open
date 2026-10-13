@@ -19,7 +19,7 @@ import { useWorkoutDraft } from '../workouts/data/useWorkoutDraft';
 import { useWorkoutAction } from '../workouts/data/useWorkoutAction';
 import { useWorkoutContext } from '../workouts/WorkoutProvider';
 import { ProgramDraftSchema, programDraft, programPayload } from './editor-model';
-import { SessionEditor } from './SessionEditor';
+import { ProgramSessionList } from './ProgramSessionList';
 
 export function ProgramEditor({
   program,
@@ -61,6 +61,7 @@ export function ProgramEditor({
   }
   return (
     <WorkoutLayout
+      reorderable
       contentDisabled={action.busy}
       title={program ? 'Edit Program' : 'New Program'}
       onBack={action.busy ? undefined : onClose}
@@ -254,27 +255,14 @@ export function ProgramEditor({
           <AppText variant="eyebrow" tone="muted">
             Sessions & exercises
           </AppText>
-          {value.sessions.map((session, index) => (
-            <Stack key={session.id ?? index}>
-              <SessionEditor
-                draft={value}
-                index={index}
-                onChange={draft.setValue}
-                library={library.data?.exercises ?? []}
-                styles={styles.data?.styles ?? []}
-              />
-              <AppButton
-                title="Remove session"
-                variant="danger"
-                onPress={() =>
-                  draft.setValue({
-                    ...value,
-                    sessions: value.sessions.filter((_, position) => position !== index),
-                  })
-                }
-              />
-            </Stack>
-          ))}
+          <ProgramSessionList
+            draft={value}
+            onChange={draft.setValue}
+            library={library.data?.exercises ?? []}
+            styles={styles.data?.styles ?? []}
+            removable
+            disabled={action.busy}
+          />
           <AppButton
             title="Add Session"
             variant="secondary"

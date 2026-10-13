@@ -10,8 +10,6 @@ Outstanding work following [PR #2836](https://github.com/nekodas-neko/TrainingAi
 
 ## Deferred UI work
 
-- [ ] Add drag reordering for programme sessions and exercises, preserving supersets. [#2838](https://github.com/nekodas-neko/TrainingAi_Open/issues/2838)
-
 - [ ] Expand the session icon picker to all 22 original fitness icons with readable labels. [#2838](https://github.com/nekodas-neko/TrainingAi_Open/issues/2838)
 
 - [ ] Add Markdown links, tables, italics, code and richer lists to Coach and generated explanations. [#2838](https://github.com/nekodas-neko/TrainingAi_Open/issues/2838)

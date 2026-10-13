@@ -12,7 +12,7 @@ import { feedback } from '../../integrations/feedback/haptics';
 import { Icon } from './Icon';
 import { useReducedMotion } from './useReducedMotion';
 import { useDragScroll } from './ReorderScrollView';
-import { dragOrder, displacedItems, moveItem, type ItemBounds } from './reorder';
+import { dragOrder, displacedItems, moveItem, reorderBounds, type ItemBounds } from './reorder';
 
 type DragState = {
   id: string;
@@ -110,6 +110,7 @@ export function SortableStack({
     const complete = () => {
       if (!mounted.current || token !== session.current) return;
       dropAnimation.current = null;
+      bounds.current = reorderBounds(current.start, next, current.bounds, spacing);
       setLocalOrder([...next]);
       setActive(null);
       if (!changed) {
@@ -228,6 +229,7 @@ export function SortableStack({
             const target = items[items.indexOf(id) + direction];
             if (!target) return;
             const next = moveItem(items, id, target);
+            bounds.current = reorderBounds(items, next, bounds.current, spacing);
             setLocalOrder(next);
             void commit(next);
             AccessibilityInfo.announceForAccessibility(
