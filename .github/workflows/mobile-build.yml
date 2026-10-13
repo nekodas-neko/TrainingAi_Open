@@ -29,7 +29,7 @@ jobs:
     timeout-minutes: 90
     defaults:
       run:
-        working-directory: apps/mobile
+        working-directory: mobile
     env:
       CI: '1'
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -40,12 +40,12 @@ jobs:
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320
         with:
           version: 10.33.0
-          package_json_file: apps/mobile/package.json
+          package_json_file: mobile/package.json
       - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: pnpm
-          cache-dependency-path: apps/mobile/pnpm-lock.yaml
+          cache-dependency-path: mobile/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test

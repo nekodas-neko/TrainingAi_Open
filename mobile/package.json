@@ -8,7 +8,7 @@
     "@ai-sdk/react": "3.0.216",
     "@expo/metro-runtime": "~57.0.16",
     "@kingstinct/react-native-healthkit": "^16.0.0",
-    "@trainingai/shared": "file:../../packages/shared",
+    "@trainingai/shared": "file:../packages/shared",
     "ai": "6.0.214",
     "expo": "~57.0.24",
     "expo-apple-authentication": "~57.0.2",

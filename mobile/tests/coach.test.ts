@@ -8,9 +8,9 @@ import { CoachConversation } from '../src/features/coach/data/CoachConversation.
 import { CoachActions } from '../src/features/coach/data/CoachActions.ts';
 import { coachError, stripToolCitations } from '../src/features/coach/data/models.ts';
 import { CoachPatchSchema } from '../src/features/coach/data/patch.ts';
-import { CoachPatchSchema as backendPatch } from '../../../lib/coach/patch.ts';
+import { CoachPatchSchema as backendPatch } from '../../lib/coach/patch.ts';
 import { CoachWidgetSchema } from '../src/features/coach/data/widgets.ts';
-import { CoachWidgetSchema as backendWidget } from '../../../lib/coach/widgets.ts';
+import { CoachWidgetSchema as backendWidget } from '../../lib/coach/widgets.ts';
 import type { AccountConnection } from '../src/features/account/session.ts';
 const id = (n: number) => `10000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 function response(text = 'Here is your answer.') {

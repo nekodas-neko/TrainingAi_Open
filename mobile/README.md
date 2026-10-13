@@ -1,6 +1,6 @@
 # Mobile client
 
-Standalone Expo / React Native iOS and Android client in `TrainingAi_Open/apps/mobile`. This project owns its dependencies, lockfile, app configuration, build scripts and tests. The repository root contains the Next.js backend and the existing Capacitor Android app during migration.
+Standalone Expo / React Native iOS and Android client in `TrainingAi_Open/mobile`. This project owns its dependencies, lockfile, app configuration, build scripts and tests. The repository root contains the Next.js backend and the existing Capacitor Android app during migration.
 
 Implementation scope and checklist: [Native App Implementation Plan](https://chatgpt.com/space/page_580c9ed4236881919f92daccfd908684).
 

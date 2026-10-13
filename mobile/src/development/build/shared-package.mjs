@@ -25,7 +25,7 @@ function validateShared(directory) {
   }
 }
 export function prepareSharedSnapshot(root) {
-  const source = resolve(root, '../../packages/shared');
+  const source = resolve(root, '../packages/shared');
   validateShared(source);
   const vendor = snapshotDirectory(root);
   if (existsSync(vendor)) {
@@ -54,7 +54,7 @@ export function prepareSharedSnapshot(root) {
   return target;
 }
 export function restoreSharedSnapshot(root) {
-  const target = resolve(root, '../../packages/shared');
+  const target = resolve(root, '../packages/shared');
   if (existsSync(target)) {
     validateShared(target);
     return target;
