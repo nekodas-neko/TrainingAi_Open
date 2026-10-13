@@ -5,9 +5,9 @@ name: Database backup
 # plan, so this is the restore point a migration relies on.
 #
 # The work is scripts/db-backup-verified.sh: dump, restore into the empty Postgres below as the
-# check, encrypt to the owner's age public key. Only the encrypted file is uploaded — this
-# repository is public, and anyone signed in to GitHub can download its artifacts. Setting it up
-# and restoring from it: docs/runbooks/db-backup-restore.md.
+# check, lock with the BACKUP_PASSPHRASE secret. Only the locked file is uploaded — this repository
+# is public, and anyone signed in to GitHub can download its artifacts. db-restore.yml opens one
+# with the same secret. Setting it up and restoring: docs/runbooks/db-backup-restore.md.
 
 on:
   schedule:
@@ -31,7 +31,7 @@ env:
 
 jobs:
   backup:
-    name: Take, check and encrypt a backup
+    name: Take, check and lock a backup
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     # The connection string sits on the `release` environment next to the Railway token, so only a
@@ -56,35 +56,27 @@ jobs:
       - name: Check backups are set up
         env:
           DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
-          RECIPIENTS: ${{ vars.BACKUP_AGE_RECIPIENT }}
+          PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
         run: |
-          if [ -z "$DATABASE_URL" ] || [ -z "$RECIPIENTS" ]; then
-            echo "::error::Backups are not set up: Settings → Environments → release needs the secret BACKUP_DATABASE_URL and the variable BACKUP_AGE_RECIPIENT (docs/runbooks/db-backup-restore.md). To release before then, run Release with skip_backup ticked."
+          if [ -z "$DATABASE_URL" ] || [ -z "$PASSPHRASE" ]; then
+            echo "::error::Backups are not set up: Settings → Environments → release needs the secrets BACKUP_DATABASE_URL and BACKUP_PASSPHRASE (docs/runbooks/db-backup-restore.md). To release before then, run Release with skip_backup ticked."
             exit 1
           fi
 
-      - name: Install the Postgres client and age
-        run: |
-          set -euo pipefail
-          sudo install -d /usr/share/postgresql-common/pgdg
-          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
-            https://www.postgresql.org/media/keys/ACCC4CF8.asc
-          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo "$VERSION_CODENAME")-pgdg main" \
-            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq "postgresql-client-$PG_MAJOR" age
+      - name: Install the Postgres client
+        run: scripts/install-pg-client.sh "$PG_MAJOR"
 
-      - name: Take, check and encrypt the backup
+      - name: Take, check and lock the backup
         id: backup
         env:
           DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
-          RECIPIENTS: ${{ vars.BACKUP_AGE_RECIPIENT }}
+          PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
           SCRATCH_URL: postgresql://postgres:scratch@localhost:5432/restore_check
           OUT_DIR: ${{ runner.temp }}/backup
           LABEL: ${{ inputs.label || (github.event_name == 'schedule' && 'weekly') || 'manual' }}
         run: PG_BIN="/usr/lib/postgresql/$PG_MAJOR/bin" scripts/db-backup-verified.sh
 
-      - name: Keep the encrypted file for 90 days
+      - name: Keep the locked file for 90 days
         uses: actions/upload-artifact@v6
         with:
           name: ${{ steps.backup.outputs.name }}
