@@ -6,6 +6,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.490.0",
+    date: "2026-10-13",
+    changes: [
+      "Plan meals you haven't logged yet now count in the day's calories as an estimate, drawn as a striped part of the calorie ring and every calorie bar with \"incl. N estimated\". Logging the meal replaces the estimate.",
+      "Calorie Crusher and Macro Master now judge each day against that day's own budget, so a few past awards may change.",
+      "Workouts fill the time you choose: more sets when there is room, and when time is short the plan drops whole exercises before it trims sets. The effort picker starts at the expected RPE, and only ratings you change move the plan.",
+      "1RMs are scored against the bar you actually loaded, with a smoother AMRAP discount, and editing a deload log no longer feeds your 1RM history. Each lift re-bases from its next logged set.",
+      "Heart-rate recovery is measured only where the heart-rate data is dense enough to see it, against your own bar. Heart-rate zones use your Cooper test blended with your age, and vigorous minutes start at 60% of heart-rate reserve everywhere.",
+      "Training load now produces a score, reading your movement from the best source available, including the ring's motion. Health Connect heart rate only counts in hours as dense as the ring's.",
+      "Walks the ring sees are offered afterwards (\"Looks like you walked… Save it?\"), and the ring no longer starts GPS by itself.",
+      "The Coach answers questions that need several lookups instead of going quiet, and no longer re-describes a swap you have already answered.",
+      "The friends leaderboard counts sessions, not sets, and its week starts at your local Monday midnight.",
+      "Behind the scenes: the server is ready for the new native app (its sign-in, Health Connect and Apple Health uploads, and meal tracking). Nothing changes in this app because of it.",
+    ],
+  },
+  {
     version: "1.489.0",
     date: "2026-10-09",
     changes: [
