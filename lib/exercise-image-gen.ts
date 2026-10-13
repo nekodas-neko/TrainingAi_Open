@@ -1,5 +1,6 @@
 import { GoogleGenAI, Modality } from '@google/genai';
 import sharp from 'sharp';
+import { takeDevAiCall } from '@/lib/ai/dev-call-budget';
 
 // Preview gives better consistency than stable release for now
 export const DEFAULT_MODEL = 'gemini-3.1-flash-image-preview';
@@ -321,6 +322,9 @@ async function callGeminiImage(
   let lastError = '';
   for (let attempt = 0; attempt < 3; attempt++) {
     if (attempt > 0) await new Promise(r => setTimeout(r, 2000 * attempt));
+    // #2816. This calls Gemini directly, outside instrument.ts, on the same key and balance —
+    // so each attempt takes from the dev budget itself. A no-op in production.
+    takeDevAiCall();
     const response = await ai.models.generateContent({
       model,
       contents,
@@ -336,6 +340,7 @@ async function callGeminiImage(
 
 async function callImagen(model: string, prompt: string): Promise<Buffer> {
   const ai = getAi();
+  takeDevAiCall();
   const response = await ai.models.generateImages({
     model,
     prompt,

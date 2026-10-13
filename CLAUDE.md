@@ -109,6 +109,9 @@ state, for any agent. Titles end 🟢 while live, 🔴 when wrapped.
   ownership-verify client-supplied ids. New ingest and AI routes get Zod and a rate limit at birth.
 - Read external field names from the pinned source and prove a non-null value lands in the DB.
 - Never hardcode session names or training structure; identity is the DB id.
+- Testing shares the live app's one Gemini key and prepaid balance: mocks for logic, real calls only
+  to measure model behaviour, and say how many a PR made. `lib/ai/dev-call-budget.ts` caps them off
+  production.
 
 **Mobile and runtime** → [`docs/rules/mobile-and-runtime.md`](docs/rules/mobile-and-runtime.md) and
 [`docs/mobile-ui-and-performance.md`](docs/mobile-ui-and-performance.md)
