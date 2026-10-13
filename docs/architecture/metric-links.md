@@ -362,12 +362,13 @@ peer-reviewed validation was found for it.
 - **Pillar totals with splits.** A split moves points between pillars. The recommendation is to let
   pillar totals float with their splits, so readiness stays out of 100 and each pillar shows what
   really sits in it. The alternative keeps 30/30/20/20 fixed and makes every split take points from
-  the receiving pillar's other scores, which is harder to follow.
-- **How large the shared HRV + resting HR budget is**, or whether they become one score.
-- **Whether yesterday's activity counts as load or as achievement.**
-- **Which outcome the weights are tuned against** until a daily check-in exists.
-- **How many points sleep gains in Activity** (S1).
-- **Whether overnight settling keeps its 4.5 points.**
+  the receiving pillar's other scores, which is harder to follow (#2833).
+- **How large the shared HRV + resting HR budget is**, or whether they become one score (#2826).
+- **Whether yesterday's activity counts as load or as achievement** (#2826).
+- **Which outcome the weights are tuned against** until a daily check-in exists (#2826).
+- **How many points sleep gains in Activity** (S1, #2826).
+- **Whether overnight settling keeps its 4.5 points** (#2826).
+- **The red-flag caps and their numbers** (#2832).
 
 ## 10. Read next
 

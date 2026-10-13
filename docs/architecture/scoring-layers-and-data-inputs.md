@@ -627,13 +627,16 @@ and [`owner-manual.md`](../owner-manual.md).
 
 - **Layer names:** the seven layers and their order are agreed; the words are working names until
   the owner chooses final ones (#2809).
-- **Red flags:** a graded ceiling on readiness (the owner's leaning, 2026-10-12), and its numbers.
-- **Source-quality and reliability factors** on weights: adopt them or not.
-- **Pillar weights:** keep Sleep 30 · Heart 30 · Activity 20 · Body 20?
-- **New pillars:** split Health and Nutrition out of Body, and whether the morning check-in becomes
-  its own wellness part of readiness (#2823).
+- **Red flags:** a graded ceiling on readiness (the owner's leaning, 2026-10-12), and its numbers
+  (#2832).
+- **Source-quality and reliability factors** on weights: adopt them or not (#2833).
+- **Pillar weights:** keep Sleep 30 · Heart 30 · Activity 20 · Body 20, or let totals float with
+  splits (#2833)?
+- **New pillars:** split Health and Nutrition out of Body (#2833), and whether the morning check-in
+  becomes its own wellness part of readiness (#2823).
 - **Training load:** count cardio and runs, through session RPE (#2823).
-- **Which candidate metrics to card first** (#2823).
+- **Which candidate metrics to card first**: the literature-led shortlist (#2823), and the metrics built
+  from data we already collect (#2834).
 - **The Oura API switch** (#2808): when the owner's ring moves, after the rehearsal.
 - **Native toolkit** (#2765) and **refresh tokens** (#2076).
 

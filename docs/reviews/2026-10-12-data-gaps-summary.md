@@ -93,9 +93,10 @@ filled, sparse or empty. Nothing ran on a device. How metrics are allowed to lin
 
 ## 2. New metrics from data we already have
 
-Ranked by value for the effort. Each one that would move a score is a `type: tuning` proposal and
-passes the five gates in [`metric-links.md`](../architecture/metric-links.md) §4. Evidence is in the
-linked audits; every citation there was checked in PubMed.
+Ranked by value for the effort. Which to card first is the owner's call in #2834. Each one that
+would move a score is a `type: tuning` proposal and passes the five gates in
+[`metric-links.md`](../architecture/metric-links.md) §4. Evidence is in the linked audits; every
+citation there was checked in PubMed.
 
 | # | Metric | Built from | Why it's new | Effort |
 |---|---|---|---|---|
