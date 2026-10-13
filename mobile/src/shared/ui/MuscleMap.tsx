@@ -36,9 +36,11 @@ const figures = {
 function MuscleFigure({
   side,
   colors,
+  fit,
 }: {
   side: keyof typeof figures;
   colors: Map<string, string>;
+  fit: 'width' | 'contain';
 }) {
   const { theme } = useTheme();
   const [width, setWidth] = useState(0);
@@ -53,9 +55,15 @@ function MuscleFigure({
     return () => cancelAnimationFrame(frame);
   }, [width, ready]);
   return (
-    <View style={{ flex: 1, minWidth: 0, justifyContent: 'center', overflow: 'hidden' }}>
+    <View
+      style={{ flex: 1, minWidth: 0, minHeight: 0, justifyContent: 'center', overflow: 'hidden' }}
+    >
       <View
-        style={{ width: '100%', aspectRatio: 0.5, flexShrink: 0 }}
+        style={
+          fit === 'contain'
+            ? { width: '100%', height: '100%' }
+            : { width: '100%', aspectRatio: 0.5, flexShrink: 0 }
+        }
         onLayout={(event) => {
           const next = event.nativeEvent.layout.width;
           if (next > 0) {
@@ -65,8 +73,8 @@ function MuscleFigure({
       >
         {width > 0 && (
           <Svg
-            width={width}
-            height={width * 2}
+            width="100%"
+            height="100%"
             viewBox={side === 'front' ? '0 0 724 1448' : '724 0 724 1448'}
             preserveAspectRatio="xMidYMid meet"
           >
@@ -105,7 +113,13 @@ function MuscleFigure({
 }
 
 export const MuscleMap = memo(
-  function MuscleMap({ assignments }: { assignments: readonly MuscleActivation[] }) {
+  function MuscleMap({
+    assignments,
+    fit = 'width',
+  }: {
+    assignments: readonly MuscleActivation[];
+    fit?: 'width' | 'contain';
+  }) {
     const { theme } = useTheme();
     const colors = new Map<string, string>();
     for (const assignment of assignments) {
@@ -121,12 +135,13 @@ export const MuscleMap = memo(
         style={{ flex: 1, minHeight: 0, flexDirection: 'row', gap: theme.spacing.lg }}
       >
         {(['front', 'back'] as const).map((side) => (
-          <MuscleFigure key={side} side={side} colors={colors} />
+          <MuscleFigure key={side} side={side} colors={colors} fit={fit} />
         ))}
       </View>
     );
   },
   (previous, next) =>
+    (previous.fit ?? 'width') === (next.fit ?? 'width') &&
     previous.assignments.length === next.assignments.length &&
     previous.assignments.every(
       (item, index) =>

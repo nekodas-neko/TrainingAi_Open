@@ -14,17 +14,14 @@ import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import { SessionSelectionCard } from '../components/SessionSelectionCard';
 import { TrainingSyncNotice } from '../components/TrainingSyncNotice';
 import { useTrainingSync } from '../data/WorkoutDataProvider';
-import { CoachFab } from '../../coach/components/CoachFab';
 
 export function WorkoutScreen({
-  openCoach,
   openSettings,
   openWorkout,
   openSession,
   openPrograms,
   openCardio,
 }: {
-  openCoach?: () => void;
   openSettings: () => void;
   openWorkout: (id: string) => void;
   openSession: (id: string) => void;
@@ -127,7 +124,7 @@ export function WorkoutScreen({
           <Notice title="Using saved data" message={notice} />
         </View>
       )}
-      <View style={inset}>
+      <View style={[inset, { paddingBottom: theme.sizes.workoutLift + theme.spacing.sm }]}>
         <HubCard
           title="Cardio Hub"
           subtitle="Run · Walk · Log anything"
@@ -136,17 +133,6 @@ export function WorkoutScreen({
           onPress={openCardio}
         />
       </View>
-      {openCoach && (
-        <View
-          style={{
-            alignItems: 'flex-end',
-            paddingHorizontal: theme.spacing.lg,
-            paddingBottom: theme.spacing.sm,
-          }}
-        >
-          <CoachFab onPress={openCoach} />
-        </View>
-      )}
     </PageLayout>
   );
 }

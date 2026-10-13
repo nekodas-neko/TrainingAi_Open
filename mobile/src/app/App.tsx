@@ -160,6 +160,7 @@ function AppShell() {
         active={!healthDetail && !detail && tab === 'Home'}
       >
         <HomeScreen
+          openCoach={() => openCoach()}
           openHealthDetail={setHealthDetail}
           openHealthBody={() => {
             selectTab('Health');
@@ -234,7 +235,6 @@ function AppShell() {
         active={!healthDetail && !detail && tab === 'Workout'}
       >
         <WorkoutScreen
-          openCoach={() => openCoach()}
           openCardio={() => setDetail('cardio')}
           openSettings={openSettings}
           openWorkout={openWorkout}

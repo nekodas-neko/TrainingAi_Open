@@ -23,6 +23,7 @@ function WorkoutBar({
       onPress={() => onResume(workout.id)}
       style={{
         padding: theme.spacing.md,
+        paddingBottom: theme.spacing.md + theme.sizes.workoutLift,
         backgroundColor: theme.colors.brandSurface,
         borderTopWidth: 1,
         borderTopColor: theme.colors.brandBorder,

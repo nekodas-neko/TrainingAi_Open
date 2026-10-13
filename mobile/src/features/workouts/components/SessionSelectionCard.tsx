@@ -75,7 +75,7 @@ export function SessionSelectionCard({
           <Badge label="Today" tone="brand" />
         )}
       </Stack>
-      <Stack direction="row" align="center" gap="lg" wrap>
+      <Stack direction="row" align="center" gap="sm" wrap>
         <Stack direction="row" align="center" gap="xs">
           <Icon name="workout" tone="muted" size={theme.sizes.iconSmall} />
           <AppText variant="caption" tone="muted">
@@ -90,14 +90,14 @@ export function SessionSelectionCard({
             </AppText>
           </Stack>
         )}
+        {!completed && (
+          <AppText variant="caption" tone="muted" style={{ flexShrink: 1 }}>
+            {lastTrained}
+          </AppText>
+        )}
       </Stack>
-      {!completed && (
-        <AppText variant="caption" tone="muted">
-          {lastTrained}
-        </AppText>
-      )}
       <View style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-        <MuscleMap assignments={assignments} />
+        <MuscleMap assignments={assignments} fit="contain" />
         {completed && <CompletionStamp />}
       </View>
       <RecoveryRow muscles={recovery} active={active} />

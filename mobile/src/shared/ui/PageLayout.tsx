@@ -22,6 +22,7 @@ export function PageLayout({
   hideHeader = false,
   scroll = false,
   footer,
+  floatingAction,
   contentStyle,
   onBack,
   landing = false,
@@ -33,6 +34,7 @@ export function PageLayout({
   hideHeader?: boolean;
   scroll?: boolean;
   footer?: ReactNode;
+  floatingAction?: ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
   onBack?: () => void;
   landing?: boolean;
@@ -95,7 +97,8 @@ export function PageLayout({
         style={{
           flex: 1,
           minHeight: 0,
-          paddingVertical: theme.spacing.md,
+          paddingTop: theme.spacing.md,
+          paddingBottom: landing ? 0 : theme.spacing.md,
           gap: theme.spacing.md,
         }}
       >
@@ -130,6 +133,18 @@ export function PageLayout({
         >
           {footer}
         </Stack>
+      )}
+      {floatingAction && (
+        <View
+          pointerEvents="box-none"
+          style={{
+            position: 'absolute',
+            right: theme.spacing.lg,
+            bottom: theme.spacing.md,
+          }}
+        >
+          {floatingAction}
+        </View>
       )}
     </KeyboardAvoidingView>
   );

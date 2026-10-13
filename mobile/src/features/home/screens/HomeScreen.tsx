@@ -46,8 +46,10 @@ import { HomeLayoutSheet } from '../components/HomeLayoutSheet';
 import { HomeBanners } from '../components/HomeBanners';
 import { healthCopy } from '../../health/data/display-copy';
 import { useAppleImport } from '../../health/HealthProvider';
+import { CoachFab } from '../../coach/components/CoachFab';
 
 export type HomeNavigation = {
+  openCoach: () => void;
   openHealthDetail: (detail: HealthDetail) => void;
   openHealthBody: () => void;
   openDay: (date: string) => void;
@@ -160,6 +162,7 @@ export function HomeScreen(navigation: HomeNavigation) {
     <PageLayout
       landing
       title="Home"
+      floatingAction={<CoachFab onPress={navigation.openCoach} />}
       header={
         <HomeHeader
           today={health.today}

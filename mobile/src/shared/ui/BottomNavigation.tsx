@@ -20,7 +20,7 @@ export function BottomNavigation<T extends string>({
 }) {
   const { theme } = useTheme();
   return (
-    <SafeAreaView edges={['bottom']}>
+    <SafeAreaView edges={['bottom']} style={{ marginTop: -theme.sizes.workoutLift }}>
       <View
         pointerEvents="none"
         style={{
