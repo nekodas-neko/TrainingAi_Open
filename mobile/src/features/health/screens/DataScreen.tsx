@@ -15,20 +15,37 @@ import {
 import { useHealthContext, useAppleImport } from '../HealthProvider';
 import { useReportsContext } from '../../../development/diagnostics/ReportsProvider';
 import { diagnosticsAvailable } from '../../../development/diagnostics/client';
+import { useAccountContext } from '../../account/AccountProvider';
+import { useNutrition } from '../../nutrition/data/NutritionProvider';
 
 export function DataScreen() {
   const health = useHealthContext();
   const imported = useAppleImport();
   const reports = useReportsContext();
+  const account = useAccountContext();
+  const nutrition = useNutrition();
   const { snapshot, busy, error } = health;
   const { report, reportBusy, reportStatus, reportAutomatically, setReportAutomatically } =
     reports;
   const healthPreviewOnly = !deviceHealthAvailable();
+  function sendReport(readings = snapshot, failure = error) {
+    return report(readings, 'Data', failure, account.diagnostics() ?? undefined, {
+      nutrition: nutrition.store?.diagnostics ?? null,
+      healthImport: {
+        enabled: imported.enabled,
+        busy: imported.busy,
+        pending: imported.store?.getSnapshot().pending ?? imported.pending,
+        error: imported.store?.getSnapshot().error ?? imported.error,
+        completedAt: imported.completed?.completedAt ?? null,
+        heartRate: imported.completed?.heartRate ?? null,
+      },
+    });
+  }
   function connect() {
     reports.setReportStatus(null);
     return health.connect(
       reportAutomatically && diagnosticsAvailable
-        ? (readings, failure) => report(readings, 'Data', failure)
+        ? (readings, failure) => sendReport(readings, failure)
         : undefined,
     );
   }
@@ -44,7 +61,7 @@ export function DataScreen() {
         ) : (
           <AppButton
             title={
-              snapshot?.mode === 'device'
+              snapshot?.mode === 'device' || imported.enabled
                 ? `Refresh ${deviceHealthName}`
                 : imported.store
                   ? `Connect & sync ${deviceHealthName}`
@@ -120,7 +137,7 @@ export function DataScreen() {
             busy={reportBusy}
             disabled={reportBusy || busy || (!snapshot && !error)}
             onPress={() => {
-              void report(snapshot, 'Data', error);
+              void sendReport();
             }}
           />
           <SwitchRow

@@ -25,6 +25,7 @@ import {
 } from '../src/features/nutrition/data/confirmed-create.ts';
 import { WorkoutResources } from '../src/features/workouts/data/WorkoutResources.ts';
 import { ApiError } from '../src/features/account/api/client.ts';
+import { sanitiseNutrition } from '@trainingai/shared/nutrition/scan-totals';
 const date = '2026-10-11';
 const id = (n: number) => `10000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 const mealType = mealTypeSchema.parse({
@@ -103,7 +104,7 @@ function fixture() {
                     }
                   : [];
     },
-    post: async (_path: string, body: unknown) => {
+    post: async (_path: string, body: unknown): Promise<unknown> => {
       if (!online) {
         throw new Error('offline');
       }
@@ -208,6 +209,75 @@ test('nutrition queues food before its log and survives reopening offline', asyn
     f.sent.map((x) => x.domain),
     ['food_items', 'food_logs'],
   );
+});
+
+test('server nutrition normalization confirms an uploaded food and releases its dependent log', async () => {
+  const f = fixture();
+  const post = f.connection.post;
+  f.connection.post = async (path, body) => {
+    const result = await post(path, body);
+    const op = (body as { mutations?: { domain: string; payload: { id: string } }[] }).mutations?.[0];
+    if (op?.domain === 'food_items') {
+      const saved = f.foods.find((x) => x.id === op.payload.id)!;
+      Object.assign(saved, sanitiseNutrition({
+        calories: saved.calories,
+        proteinG: saved.proteinG,
+        carbsG: saved.carbsG,
+        fatG: saved.fatG,
+        servingSizeG: saved.servingSizeG,
+      }));
+    }
+    return result;
+  };
+  const store = await ready(f);
+  await store.logFoods([
+    { ...food, id: undefined, name: 'Manual entry', calories: 50, proteinG: 0, carbsG: 0, fatG: 0, quantityMultiplier: 1 },
+  ], date, mealType.id);
+  await store.sync();
+  assert.equal(store.getSnapshot().error, null);
+  assert.equal(store.getSnapshot().operations.length, 0);
+  assert.equal(f.logs.length, 1);
+  assert.equal(store.view(date).logs[0].foodItem.calories, 0);
+});
+
+test('sync failures distinguish server status, rejection and readback while keeping queued food', async (t) => {
+  for (const kind of ['service', 'rejected', 'readback'] as const) {
+    await t.test(kind, async () => {
+      const f = fixture();
+      const store = await ready(f);
+      f.online(false);
+      await store.logFoods([{ ...food, quantityMultiplier: 1 }], date, mealType.id);
+      await store.sync();
+      const post = f.connection.post;
+      f.connection.post = async (path, body) => {
+        if (kind === 'service') throw new ApiError(502);
+        if (kind === 'rejected') return { processed: 0, errors: [{ retryable: false }] };
+        return post(path, body);
+      };
+      f.online(true);
+      if (kind === 'readback') f.failRead(true);
+      await store.sync();
+      assert.equal(store.view(date).logs.length, 1);
+      assert.equal(store.getSnapshot().operations.length, 1);
+      assert.equal(store.diagnostics.failure?.resource, 'food_logs');
+      assert.doesNotMatch(store.getSnapshot().error ?? '', /when connected/);
+      if (kind === 'service') {
+        assert.equal(store.diagnostics.failure?.status, 502);
+        assert.match(store.getSnapshot().error ?? '', /502/);
+      } else if (kind === 'rejected') {
+        assert.equal(store.diagnostics.failure?.reason, 'rejected');
+        assert.match(store.getSnapshot().error ?? '', /rejected/);
+      } else {
+        assert.equal(store.diagnostics.failure?.stage, 'readback');
+        assert.match(store.getSnapshot().error ?? '', /confirm/);
+      }
+      f.connection.post = post;
+      f.failRead(false);
+      await store.sync();
+      assert.equal(store.diagnostics.failure, null);
+      assert.equal(store.getSnapshot().operations.length, 0);
+    });
+  }
 });
 
 test('meal statuses default to unknown and skip choices survive reopening offline', async () => {

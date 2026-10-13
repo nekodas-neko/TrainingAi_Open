@@ -1,5 +1,6 @@
 import { dateStrMidnightInTz, toAestDay } from '@trainingai/shared/date-utils';
 import { resolveEatenAt } from '@trainingai/shared/nutrition/eaten-at';
+import { sanitiseNutrition } from '@trainingai/shared/nutrition/scan-totals';
 import {
   mealLoggingStatus,
   mealLoggingComplete,
@@ -241,11 +242,14 @@ function confirmedOperation(state: NutritionState, op: NutritionOperation) {
   const p = op.payload;
   if (op.domain === 'food_items') {
     const food = state.data.foods.find((x) => x.id === p.id);
+    const expected = FoodItemPushSchema.parse(p);
+    const normalized = sanitiseNutrition(expected);
+    const fields = ['calories', 'proteinG', 'carbsG', 'fatG', 'servingSizeG'] as const;
     return (
       food != null &&
-      ['name', 'calories', 'proteinG', 'carbsG', 'fatG', 'servingSizeG'].every(
-        (key) => p[key] == null || food[key] === p[key],
-      )
+      food.name === expected.name &&
+      (fields.every((key) => food[key] === expected[key]) ||
+        fields.every((key) => food[key] === normalized[key]))
     );
   }
   if (op.domain === 'saved_meals') {
@@ -377,6 +381,29 @@ function nutritionRefreshError(
 }
 export type { FoodEntry } from './food-values.ts';
 export class NutritionStore {
+  private syncFailure: {
+    resource: string;
+    stage: string;
+    reason: string;
+    status?: number;
+  } | null = null;
+  get diagnostics() {
+    return {
+      ready: this.current.ready,
+      denied: this.current.denied,
+      syncing: this.current.syncing,
+      pending: this.current.operations.length + this.current.http.length,
+      pendingKinds: [
+        ...new Set([
+          ...this.current.operations.map((x) => x.domain),
+          ...this.current.http.map((x) => x.kind),
+        ]),
+      ],
+      error: this.current.error,
+      refreshErrors: this.current.errors,
+      failure: this.syncFailure,
+    };
+  }
   private current = emptyNutrition;
   private listeners = new Set<() => void>();
   private writes: Promise<unknown> = Promise.resolve();
@@ -925,11 +952,17 @@ export class NutritionStore {
     }
     const generation = this.generation;
     this.publish({ syncing: true });
+    let resource = 'nutrition records';
+    let stage = 'upload';
+    let reason = 'request_failed';
     this.flushing = (async () => {
       try {
         await this.writes;
         while (generation === this.generation && this.current.operations.length) {
           const op = this.current.operations[0];
+          resource = op.domain;
+          stage = op.acknowledged ? 'readback' : 'upload';
+          reason = 'request_failed';
           if (!op.acknowledged) {
             const result = z
               .object({ processed: z.number(), errors: z.array(z.unknown()) })
@@ -941,6 +974,12 @@ export class NutritionStore {
                 }),
               );
             if (result.processed !== 1 || result.errors.length) {
+              reason = result.errors.some(
+                (x) =>
+                  typeof x === 'object' && x !== null && 'retryable' in x && x.retryable === false,
+              )
+                ? 'rejected'
+                : 'unconfirmed';
               throw new Error('Upload not confirmed.');
             }
             if (generation !== this.generation) {
@@ -952,6 +991,7 @@ export class NutritionStore {
               ),
             }));
           }
+          stage = 'readback';
           if (
             op.domain === 'supplement_logs' &&
             op.date !==
@@ -1037,6 +1077,9 @@ export class NutritionStore {
           this.current.http.some((op) => !deferredStatuses.has(op.id))
         ) {
           const op = this.current.http.find((op) => !deferredStatuses.has(op.id))!;
+          resource = op.kind;
+          stage = 'upload';
+          reason = 'request_failed';
           const path =
             op.kind === 'plan-link'
               ? `/api/nutrition/meal-plans/meals/${op.payload.planMealId}`
@@ -1079,6 +1122,7 @@ export class NutritionStore {
           if (generation !== this.generation) {
             return;
           }
+          stage = 'readback';
           if (op.kind === 'targets') {
             const refreshed = await this.refresh('targets', op.date, true);
             if (
@@ -1176,6 +1220,7 @@ export class NutritionStore {
           await this.write((state) => ({ http: state.http.filter((x) => x.id !== op.id) }));
           this.changed();
         }
+        this.syncFailure = null;
         this.publish({ error: null });
       } catch (cause) {
         if (generation === this.generation) {
@@ -1183,9 +1228,26 @@ export class NutritionStore {
           if (denied) {
             this.denialRevision++;
           }
+          this.syncFailure = {
+            resource,
+            stage,
+            reason,
+            ...(cause instanceof ApiError ? { status: cause.status } : {}),
+          };
+          const detail = denied
+            ? 'Sign in again to sync your nutrition records.'
+            : cause instanceof ApiError
+              ? `Nutrition sync failed (${cause.status}). Retry to upload your saved changes.`
+              : reason === 'rejected'
+                ? 'The server rejected a nutrition change. It is still saved on this phone.'
+                : stage === 'readback'
+                  ? 'Could not confirm your nutrition changes on the server. They are kept for retry.'
+                  : cause instanceof z.ZodError
+                    ? 'The server returned an unreadable sync response. Your changes are kept for retry.'
+                    : 'Could not upload your nutrition changes. Check your connection and retry.';
           this.publish({
             denied: this.current.denied || denied,
-            error: 'Saved on this phone. Nutrition changes will upload when connected.',
+            error: detail,
           });
         }
       }
