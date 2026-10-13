@@ -8,7 +8,7 @@ import { useWorkoutResources, useTrainingSync } from '../../workouts/data/Workou
 import { useAppleImport } from '../../health/HealthProvider';
 import { useLocalStorage } from '../../../core/storage/StorageProvider';
 import { useAccountContext } from '../../account/AccountProvider';
-import { profileSpec, goalsSpec } from '../../health/data/models';
+import { refreshAccountViews } from './refreshAccountViews';
 import { useActivities } from '../../activities/data/ActivityProvider';
 import { useHistoryQueue } from '../../workouts/data/HistoryQueueProvider';
 export function useNativeDataActions() {
@@ -59,8 +59,6 @@ export function useNativeDataActions() {
         health.store?.refresh(true),
         home.store?.refresh('preferences', health.today, true),
         home.store?.refresh('mood', health.today, true),
-        resources.load(profileSpec, true),
-        resources.load(goalsSpec, true),
       ]);
       if (restore) {
         await Promise.all(
@@ -68,18 +66,9 @@ export function useNativeDataActions() {
             (kind) => nutrition.store?.refresh(kind, health.today, true),
           ),
         );
-        resources.invalidate([
-          '/api/workout-data',
-          '/api/programs',
-          '/api/workout-history',
-          '/api/progress-summary',
-          '/api/nutrition',
-          '/api/measured-rmr',
-          '/api/dexa-scans',
-        ]);
       }
       workouts.refresh();
-      await resources.refreshVisible();
+      await refreshAccountViews(resources, restore);
       const failure =
         health.store?.getSnapshot().error ??
         home.store?.getSnapshot().error ??
