@@ -1,4 +1,7 @@
 import { AppearancePanel } from '../components/AppearancePanel';
+import { BackgroundSettings } from '../../weather/components/BackgroundSettings';
+import { WeatherSettings } from '../../weather/components/WeatherSettings';
+import { IntegrationSettings } from '../../platform/components/IntegrationSettings';
 import { AppText, AppButton, Card } from '../../../shared/ui';
 import { useAccountContext } from '../../account/AccountProvider';
 import { useReportsContext } from '../../../development/diagnostics/ReportsProvider';
@@ -16,6 +19,9 @@ export function SettingsScreen() {
   return (
     <>
       <AppearancePanel />
+      <BackgroundSettings />
+      <WeatherSettings />
+      <IntegrationSettings />
       <Card>
         <AppText variant="heading">Home layout</AppText>
         <AppButton
@@ -27,17 +33,12 @@ export function SettingsScreen() {
       <Card>
         <AppText variant="heading">Preferences</AppText>
         <FeatureRow
-          title="Day & week review reminders"
-          subtitle="Notification scheduling is deferred"
-        />
-        <FeatureRow
           title="Health anomaly alerts"
           subtitle="Notification scheduling is deferred"
         />
-        <FeatureRow title="Google Calendar sync" subtitle="Calendar integration is deferred" />
         <FeatureRow
-          title="Rest timer & run/walk status"
-          subtitle="Platform integrations are deferred"
+          title="Live workout & activity status"
+          subtitle="Lock-screen status remains deferred"
         />
       </Card>
       <AccountPanel />

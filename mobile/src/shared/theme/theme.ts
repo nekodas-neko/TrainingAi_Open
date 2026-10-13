@@ -1,5 +1,6 @@
 import type { TextStyle } from 'react-native';
 import { healthArtColors, healthHeroGradients } from './health-heroes';
+import { createBackgroundTheme, type BackgroundTheme } from './backgrounds';
 import { STAGE_COLOR } from '@trainingai/shared/health/hypnogram';
 import { HR_ZONE_META } from '@trainingai/shared/health/hr-zones';
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors';
@@ -15,6 +16,7 @@ import {
   sessionTones,
   sessionFills,
   scoreColors,
+  weatherColors,
   homeCardColors,
   effortColors,
   type TextVariant,
@@ -41,6 +43,8 @@ export type ThemeColors = {
   onSignal: string;
 };
 export type Theme = {
+  backgrounds: BackgroundTheme;
+  weatherColors: typeof weatherColors;
   homeCards: typeof homeCardColors;
   scores: typeof scoreColors.light;
   macros: Record<keyof typeof MACRO_COLORS, string>;
@@ -61,6 +65,8 @@ export type Theme = {
   hrZoneColors: string[];
 };
 export type ThemeOverrides = {
+  backgrounds?: Partial<BackgroundTheme>;
+  weatherColors?: Partial<typeof weatherColors>;
   homeCards?: Partial<typeof homeCardColors>;
   scores?: Partial<typeof scoreColors.light>;
   macros?: Partial<Record<keyof typeof MACRO_COLORS, string>>;
@@ -113,6 +119,8 @@ export function createTheme(
     textStyles[key] = { ...typography[key], ...overrides.typography?.[key] };
   }
   return {
+    backgrounds: { ...createBackgroundTheme(mode), ...overrides.backgrounds },
+    weatherColors: { ...weatherColors, ...overrides.weatherColors },
     homeCards: { ...homeCardColors, ...overrides.homeCards },
     scores: { ...scoreColors[mode], ...overrides.scores },
     macros: { ...MACRO_COLORS, ...overrides.macros },

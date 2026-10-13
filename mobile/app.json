@@ -25,6 +25,23 @@
         }
       ],
       "expo-web-browser",
+      "./src/integrations/notifications/local-only.cjs",
+      ["expo-notifications", { "enableBackgroundRemoteNotifications": false }],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "TrainingAi adds workout events to your selected calendar and manages events it created."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "TrainingAi uses your location to show local weather while the app is open.",
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
+        }
+      ],
       [
         "expo-secure-store",
         {

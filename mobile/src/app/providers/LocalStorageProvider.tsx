@@ -7,12 +7,17 @@ import { StorageUpgradeRequired } from '../../core/storage/migrations';
 import { StorageProvider } from '../../core/storage/StorageProvider';
 import { AppearancePreferences } from '../../features/settings/appearance';
 import { AppearanceProvider } from '../../features/settings/AppearanceProvider';
+import { WeatherProvider } from '../../features/weather/WeatherProvider';
+import { WeatherStore } from '../../features/weather/data/WeatherStore';
+import { fetchWeather } from '../../features/weather/data/open-meteo';
+import { weatherLocation } from '../../integrations/location/weather-location';
 import { ThemeProvider, useTheme } from '../../shared/theme/ThemeProvider';
 import { AppButton, AppText, LoadingIndicator, Notice, Screen } from '../../shared/ui';
 
 type ReadyStorage = {
   storage: LocalStorage;
   preferences: AppearancePreferences;
+  weather: WeatherStore;
 };
 
 export function StartupScreen({ error, retry }: { error: string | null; retry?: () => void }) {
@@ -47,8 +52,12 @@ export function LocalStorageProvider({ children }: PropsWithChildren) {
     void openLocalStorage()
       .then(async (storage) => {
         const preferences = new AppearancePreferences(storage.device());
-        await preferences.load();
-        return { storage, preferences };
+        const weather = new WeatherStore(storage.device(), {
+          locate: weatherLocation,
+          forecast: fetchWeather,
+        });
+        await Promise.all([preferences.load(), weather.initialize()]);
+        return { storage, preferences, weather };
       })
       .then(
         (value) => {
@@ -83,7 +92,9 @@ export function LocalStorageProvider({ children }: PropsWithChildren) {
   }
   return (
     <StorageProvider storage={ready.storage}>
-      <AppearanceProvider preferences={ready.preferences}>{children}</AppearanceProvider>
+      <AppearanceProvider preferences={ready.preferences}>
+        <WeatherProvider store={ready.weather}>{children}</WeatherProvider>
+      </AppearanceProvider>
     </StorageProvider>
   );
 }

@@ -2,6 +2,7 @@ import { Pressable, Image } from 'react-native';
 import { AppText, IconButton, Stack, StatusIndicator } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { greeting } from '../data/models';
+import { WeatherChip } from '../../weather/components/WeatherChip';
 export function HomeHeader({
   today,
   timezone,
@@ -37,7 +38,8 @@ export function HomeHeader({
   return (
     <Stack direction="row" align="center" justify="space-between">
       <Stack gap="xxs" style={{ flex: 1 }}>
-        <AppText variant="caption" tone="muted">
+        <WeatherChip />
+        <AppText variant="caption" tone="muted" numberOfLines={1}>
           {date}
         </AppText>
         <AppText variant="pageTitle" numberOfLines={2}>

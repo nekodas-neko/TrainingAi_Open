@@ -21,6 +21,7 @@ import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useNutrition } from '../data/NutritionProvider';
 import { SupplementCreateSchema, type Supplement } from '../data/models';
 import { VialSheet } from './VialSheet';
+import { NutritionReminders } from '../../platform/components/NutritionReminders';
 const formSchema = z.object({
   name: z.string(),
   dose: z.string(),
@@ -306,12 +307,8 @@ function SupplementManager({ date, onClose }: { date: string; onClose: () => voi
           }}
         />
       )}
-      <SwitchRow
-        label="Supplement reminders · Coming soon"
-        value={false}
-        disabled
-        onValueChange={() => {}}
-      />
+      <AppText variant="label">Supplement reminders</AppText>
+      <NutritionReminders kind="supplement" />
     </Sheet>
   );
 }

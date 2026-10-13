@@ -26,6 +26,7 @@ import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useNutrition } from '../data/NutritionProvider';
 import { mealTypeBody } from '../data/models';
 import { GoalRecommendation } from './GoalRecommendation';
+import { NutritionReminders } from '../../platform/components/NutritionReminders';
 const formSchema = z.object({
   name: z.string(),
   emoji: z.string(),
@@ -108,12 +109,7 @@ export function NutritionSettings({ onClose }: { onClose: () => void }) {
           <AppText variant="eyebrow" tone="muted">
             Meal Reminders
           </AppText>
-          <SwitchRow
-            label="Remind me to log meals · Coming soon"
-            value={false}
-            disabled
-            onValueChange={() => {}}
-          />
+          <NutritionReminders kind="meal" />
           <AppText variant="eyebrow" tone="muted">
             Meal Types
           </AppText>

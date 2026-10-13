@@ -24,6 +24,7 @@ import { activityIcon } from '../data/models';
 import { useHealthData } from '../../health/data/HealthDataProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { z } from 'zod';
+import { useTrainingKeepAwake } from '../../platform/useTrainingKeepAwake';
 
 function ManualActivityScreen({
   onBack,
@@ -272,6 +273,7 @@ function ManualActivityScreen({
 
 export function ActivityScreen(props: { onBack: () => void; onSaved: () => void }) {
   const { session } = useActivities();
+  useTrainingKeepAwake(session?.mode === 'active' && session.pauseStartMs === null);
   return session?.guidance ? (
     <GuidedActivityScreen {...props} />
   ) : (

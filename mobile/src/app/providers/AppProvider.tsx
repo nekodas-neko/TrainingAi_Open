@@ -9,6 +9,7 @@ import { HealthDataProvider } from '../../features/health/data/HealthDataProvide
 import { NutritionProvider } from '../../features/nutrition/data/NutritionProvider';
 import { ActivityProvider } from '../../features/activities/data/ActivityProvider';
 import { HomeProvider } from '../../features/home/data/HomeProvider';
+import { PlatformProvider } from '../../features/platform/PlatformProvider';
 
 export function AppProvider({ children }: PropsWithChildren) {
   return (
@@ -21,7 +22,9 @@ export function AppProvider({ children }: PropsWithChildren) {
                 <NutritionProvider>
                   <HomeProvider>
                     <ActivityProvider>
-                      <ReportsProvider>{children}</ReportsProvider>
+                      <PlatformProvider>
+                        <ReportsProvider>{children}</ReportsProvider>
+                      </PlatformProvider>
                     </ActivityProvider>
                   </HomeProvider>
                 </NutritionProvider>

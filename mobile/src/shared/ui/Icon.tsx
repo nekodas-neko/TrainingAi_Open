@@ -54,6 +54,12 @@ import Weight from 'lucide-react-native/icons/weight';
 import Undo2 from 'lucide-react-native/icons/undo-2';
 import GripVertical from 'lucide-react-native/icons/grip-vertical';
 import Sunrise from 'lucide-react-native/icons/sunrise';
+import Sun from 'lucide-react-native/icons/sun';
+import Cloud from 'lucide-react-native/icons/cloud';
+import CloudRain from 'lucide-react-native/icons/cloud-rain';
+import CloudFog from 'lucide-react-native/icons/cloud-fog';
+import CloudSnow from 'lucide-react-native/icons/cloud-snow';
+import CloudLightning from 'lucide-react-native/icons/cloud-lightning';
 import type { LucideProps } from 'lucide-react-native';
 import { Platform } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
@@ -115,6 +121,12 @@ const icons = {
   weight: Weight,
   undo: Undo2,
   sunrise: Sunrise,
+  sun: Sun,
+  cloud: Cloud,
+  rain: CloudRain,
+  fog: CloudFog,
+  snow: CloudSnow,
+  storm: CloudLightning,
 };
 
 export type IconName = keyof typeof icons;

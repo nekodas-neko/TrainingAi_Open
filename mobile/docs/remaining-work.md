@@ -55,9 +55,12 @@ Android checks belong to the Android developer; iPhone checks use the existing i
 | Health | Body/Training/Progress, history, clinical records, edits/deletes, imports, missing permissions and source separation. |
 | Nutrition | Camera/photos/barcodes/QR, portions, recipes, labels/printing/sharing, supplements, meal statuses, diary edits and plans. |
 | Home | Summaries, check-ins, dated navigation, reordering/colours, caching and stable loading layouts. |
+| Weather | City search, device location allow/deny/revoke, saved-city fallback, travel, units, UV/daylight and offline reopen on both platforms. |
+| Backgrounds | All weather conditions, daylight transitions, per-tab preferences, light/dark contrast, reduced motion and animation suspension/resume while backgrounding the app. |
 | Coach | Live streaming, stop/retry/history, widgets, confirmed changes, stale refusal, undo and dependent-screen refresh. |
 | Community | Invites, friendship decisions/removal, privacy, sharing, feed, leaderboards and profiles. |
 | Data | Exact upload readback, manual refresh, history downloads, exports and preservation of new native offline work. |
+| Alerts and calendar | Timer/guided cues while foregrounded/backgrounded, pause/finish cancellation, reminder days/time-zone changes, permission revocation, notification taps/account switching, keep-awake release and calendar create/update/delete/deduplication. |
 | Platform | Android Back, keyboards/sheets, existing module gestures, insets, accessibility and background/low-memory recovery. |
 
 ## Deferred rewards
@@ -79,6 +82,8 @@ Android checks belong to the Android developer; iPhone checks use the existing i
 - [ ] Post-workout XP, unlock feedback and reward-state refresh.
 
 ## Deferred health and device integrations
+
+- [ ] Health-anomaly alerts driven by changing health data, including server-triggered delivery.
 
 - [ ] Background health reading/import for Apple Health and Health Connect.
 
@@ -111,16 +116,6 @@ Android checks belong to the Android developer; iPhone checks use the existing i
 - [ ] Retrospective detected-activity review, confirm/edit/reject and Home notices.
 
 - [ ] Sustained recording and workout/activity status while locked or outside the app.
-
-- [ ] Guided cues and background rest/interval alerts.
-
-- [ ] Voice set logging.
-
-- [ ] Scheduled workout, meal, supplement, review and health notifications.
-
-- [ ] External calendar connection and event/reminder updates.
-
-- [ ] Dynamic backgrounds and weather.
 
 ## Later data projects
 

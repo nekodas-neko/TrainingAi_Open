@@ -674,6 +674,24 @@ SELECT
 FROM public.health_connect_intervals t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
+CREATE VIEW claude_ro.health_connect_projection_state AS
+SELECT
+  t.user_id,
+  t.payload
+FROM public.health_connect_projection_state t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
+CREATE VIEW claude_ro.health_connect_records AS
+SELECT
+  t.user_id,
+  t.record_id,
+  t.record_payload,
+  t.modified_at,
+  t.deleted_at,
+  t.updated_at
+FROM public.health_connect_records t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.injuries AS
 SELECT
   t.id,
@@ -697,9 +715,9 @@ SELECT
   t.log_date,
   t.skipped,
   t.decision_id,
-  t.updated_at,
   t.decided_at,
-  t.retired
+  t.retired,
+  t.updated_at
 FROM public.meal_logging_statuses t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 

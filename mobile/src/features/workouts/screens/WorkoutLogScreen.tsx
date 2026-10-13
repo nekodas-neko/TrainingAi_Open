@@ -24,6 +24,8 @@ import { ResourceCard } from '../components/ResourceCard';
 import { NextPrescription } from '../components/NextPrescription';
 import { recapSpec } from '../data/models';
 import { WorkoutEnergy } from '../components/WorkoutEnergy';
+import { useTrainingKeepAwake } from '../../platform/useTrainingKeepAwake';
+import { WorkoutCalendarAction } from '../../platform/components/WorkoutCalendarAction';
 
 export function WorkoutLogScreen({
   openCoach,
@@ -39,6 +41,7 @@ export function WorkoutLogScreen({
   const journal = useWorkoutJournal();
   const { theme } = useTheme();
   const workout = journal.data.workouts.find((workout) => workout.id === workoutId);
+  useTrainingKeepAwake(workout?.status === 'active');
   const previousStatus = useRef({ id: workoutId, status: workout?.status });
   useEffect(() => {
     if (
@@ -185,6 +188,9 @@ export function WorkoutLogScreen({
         ))}
       </Card>
       <WorkoutEnergy workout={workout} />
+      <View style={{ width: '100%', maxWidth: theme.sizes.summaryWidth }}>
+        <WorkoutCalendarAction workout={workout} />
+      </View>
 
       <ResourceCard
         title="Session recap"

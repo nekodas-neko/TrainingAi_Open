@@ -53,6 +53,9 @@ import { WalkScreen } from '../features/activities/screens/WalkScreen';
 import { BaselinesScreen } from '../features/activities/screens/BaselinesScreen';
 import { CardioScreen } from '../features/activities/screens/CardioScreen';
 import { ActivityScreen } from '../features/activities/screens/ActivityScreen';
+import { AlertNavigation } from '../features/platform/components/AlertNavigation';
+import { DynamicBackground } from '../features/weather/components/DynamicBackground';
+import type { BackgroundSection } from '../features/weather/data/background';
 
 function AppShell() {
   const health = useHealthContext();
@@ -155,6 +158,11 @@ function AppShell() {
       style={{ flex: 1, backgroundColor: theme.colors.background }}
     >
       <StatusBar style={theme.mode === 'dark' ? 'light' : 'dark'} />
+      <DynamicBackground
+        section={tab.toLowerCase() as BackgroundSection}
+        detail={detail}
+        healthDetail={healthDetail}
+      />
       <RetainedView
         key={`home:${accountKey}`}
         active={!healthDetail && !detail && tab === 'Home'}
@@ -433,7 +441,11 @@ function AppShell() {
         <Screen
           key={detail ?? tab}
           title={
-            detail === 'health-data' ? deviceHealthName : detail === 'settings' ? 'Settings' : tab
+            detail === 'health-data'
+              ? deviceHealthName
+              : detail === 'settings'
+                ? 'Settings'
+                : tab
           }
           backLabel={detail ? tab : undefined}
           onBack={detail ? () => setDetail(null) : undefined}
@@ -451,6 +463,20 @@ function AppShell() {
         </Screen>
       )}
       {!fullScreen && tab !== 'Workout' && <ActiveWorkoutBar onResume={openWorkout} />}
+      <AlertNavigation
+        onWorkout={openWorkout}
+        onWalk={() => setDetail('activity-recording')}
+        onTab={selectTab}
+        onReview={() => {
+          selectTab('Nutrition');
+          setNutritionReviewRequest((value) => ({ scope: accountKey, count: value.count + 1 }));
+        }}
+        onWeek={(week) => {
+          selectTab('Health');
+          setHealthDate(week);
+          setDetail('health-week');
+        }}
+      />
       {!fullScreen && <TabBar selected={tab} onSelect={selectTab} />}
     </SafeAreaView>
   );

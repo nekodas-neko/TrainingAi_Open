@@ -92,6 +92,13 @@ export const scoreColors = {
   light: { readiness: '#2563eb', heart: '#dc2626', sleep: '#7c3aed', activity: '#c2410c' },
   dark: { readiness: '#60a5fa', heart: '#f87171', sleep: '#a78bfa', activity: '#f97316' },
 };
+export const weatherColors = {
+  uvLow: '#22c55e',
+  uvModerate: '#eab308',
+  uvHigh: '#f97316',
+  uvVeryHigh: '#ef4444',
+  uvExtreme: '#8b5cf6',
+};
 export const homeCardColors = {
   weightSparkline: '#00d4ff',
   nutritionDonut: '#bf5fff',

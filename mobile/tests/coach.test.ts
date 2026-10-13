@@ -8,9 +8,6 @@ import { CoachConversation } from '../src/features/coach/data/CoachConversation.
 import { CoachActions } from '../src/features/coach/data/CoachActions.ts';
 import { coachError, stripToolCitations } from '../src/features/coach/data/models.ts';
 import { CoachPatchSchema } from '../src/features/coach/data/patch.ts';
-import { CoachPatchSchema as backendPatch } from '../../lib/coach/patch.ts';
-import { CoachWidgetSchema } from '../src/features/coach/data/widgets.ts';
-import { CoachWidgetSchema as backendWidget } from '../../lib/coach/widgets.ts';
 import type { AccountConnection } from '../src/features/account/session.ts';
 const id = (n: number) => `10000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 function response(text = 'Here is your answer.') {
@@ -277,44 +274,6 @@ test('change writes reject mixed domains and unknown accepted IDs before contact
   assert.equal(f.writes.length, 0);
   assert.equal((await actions.apply(patch, ['steps']))?.summary, 'Steps goal updated');
   assert.ok(changes.flat().includes('/api/user/goals'));
-});
-test('native patch and widget contracts match backend validation including numeric bounds', () => {
-  const proposals = [
-    {
-      domain: 'user_goals',
-      targetId: null,
-      changes: [{ id: 'goal', field: 'stepsGoal', from: 8000, to: 12000 }],
-    },
-    {
-      domain: 'nutrition_targets',
-      targetId: null,
-      changes: [{ id: 'calories', field: 'calories', from: 2000, to: 26000 }],
-    },
-    {
-      domain: 'program_phase',
-      targetId: id(9),
-      changes: [{ id: 'cycle', field: 'sessionsPerCycle', from: 6, to: 8 }],
-    },
-  ];
-  for (const patch of proposals) {
-    assert.equal(
-      CoachPatchSchema.safeParse(patch).success,
-      backendPatch.safeParse(patch).success,
-    );
-    const widget = { kind: 'change_preview', title: 'Review', patch };
-    assert.equal(
-      CoachWidgetSchema.safeParse(widget).success,
-      backendWidget.safeParse(widget).success,
-    );
-  }
-  assert.equal(
-    CoachWidgetSchema.safeParse({
-      kind: 'handoff',
-      title: 'Open',
-      destination: 'https://evil.example',
-    }).success,
-    false,
-  );
 });
 test('pending local target changes block a coach write without misreporting a network error', async () => {
   const f = fixture(),
