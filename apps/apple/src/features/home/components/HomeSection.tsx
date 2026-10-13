@@ -1,10 +1,14 @@
-import { useMemo, useState, type PropsWithChildren } from 'react';
-import { PanResponder, View } from 'react-native';
+import { useUndo } from '../../../shared/ui/undo/UndoProvider';
+import { useReducedMotion } from '../../../shared/ui/useReducedMotion';
+import { layoutMotion } from '../../../shared/ui/layoutMotion';
+import { feedback } from '../../../integrations/feedback/haptics';
+import { useCallback, useMemo, useState, type PropsWithChildren, type ReactNode } from 'react';
+import { Pressable, View } from 'react-native';
 import {
   AppButton,
+  ActionMenu,
   AppText,
   ColorSwatches,
-  Icon,
   IconButton,
   Stack,
   StatusIndicator,
@@ -12,68 +16,83 @@ import {
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useHome } from '../data/HomeProvider';
 import { homeSections, moveHomeSection, sectionLabels } from '../data/models';
-export type SectionBounds = { y: number; height: number };
 export function HomeSection({
   id,
   editing,
-  bounds,
-  onLayout,
+  dragHandle,
+  onEdit,
   children,
 }: {
   id: string;
   editing: boolean;
-  bounds: Map<string, SectionBounds>;
-  onLayout: (id: string, bounds: SectionBounds) => void;
+  dragHandle?: ReactNode;
+  onEdit?: () => void;
   children: PropsWithChildren['children'];
 }) {
   const { theme } = useTheme();
   const home = useHome();
+  const undo = useUndo();
+  const reduced = useReducedMotion();
+  const [menu, setMenu] = useState(false);
   const [colors, setColors] = useState(false);
-  const [dragging, setDragging] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const order = homeSections(home.preferences);
+  const order = useMemo(() => homeSections(home.preferences), [home.preferences]);
   const index = order.indexOf(id);
   async function save(patch: Partial<typeof home.preferences>) {
     try {
+      layoutMotion(reduced);
       await home.store?.savePreferences(patch);
       setError(null);
     } catch {
       setError('Could not save your layout on this phone.');
     }
   }
-  const drag = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => editing,
-        onPanResponderGrant: () => setDragging(true),
-        onPanResponderRelease: (_, gesture) => {
-          setDragging(false);
-          const start = bounds.get(id);
-          if (!start) {
-            return;
-          }
-          const position = start.y + start.height / 2 + gesture.dy;
-          const target = [...bounds]
-            .filter(
-              ([key]) =>
-                order.includes(key) && !home.preferences.homeHiddenSections?.includes(key),
-            )
-            .sort(
-              (a, b) =>
-                Math.abs(a[1].y + a[1].height / 2 - position) -
-                Math.abs(b[1].y + b[1].height / 2 - position),
-            )[0]?.[0];
-          if (target && target !== id) {
-            const next = [...order];
-            next.splice(index, 1);
-            next.splice(order.indexOf(target), 0, id);
-            void save({ homeSectionOrder: next });
-          }
+  const reorder = useCallback(
+    (next: string[]) => {
+      const store = home.store;
+      if (!store) return;
+      const previous = homeSections(store.getSnapshot().preferences);
+      void undo.perform({
+        key: 'home-order',
+        showNotice: false,
+        label: 'Dashboard reordered',
+        apply: async () => {
+          layoutMotion(reduced);
+          await store.savePreferences({ homeSectionOrder: next });
+          feedback();
         },
-        onPanResponderTerminate: () => setDragging(false),
-      }),
-    [editing, id, order.join('|'), home.preferences.homeHiddenSections?.join('|'), bounds],
+        revert: async () => {
+          layoutMotion(reduced);
+          await store.savePreferences({ homeSectionOrder: previous });
+        },
+      });
+    },
+    [home.store, undo, reduced],
   );
+  function hide() {
+    const store = home.store;
+    if (!store) return;
+    void undo.perform({
+      key: `home-hide:${id}`,
+      label: `${sectionLabels[id]} hidden`,
+      apply: async () => {
+        layoutMotion(reduced);
+        await store.savePreferences({
+          homeHiddenSections: [
+            ...new Set([...(store.getSnapshot().preferences.homeHiddenSections ?? []), id]),
+          ],
+        });
+      },
+      revert: async () => {
+        layoutMotion(reduced);
+        await store.savePreferences({
+          homeHiddenSections: (store.getSnapshot().preferences.homeHiddenSections ?? []).filter(
+            (key) => key !== id,
+          ),
+        });
+      },
+    });
+  }
   const keys =
     id === 'streak'
       ? ['streakLeft', 'streakRight']
@@ -85,81 +104,82 @@ export function HomeSection({
             ? (home.preferences.homeWidgets ?? ['weightKg', 'steps', 'calories'])
             : [];
   return (
-    <View
-      onLayout={(event) => onLayout(id, event.nativeEvent.layout)}
-      style={{ gap: theme.spacing.xs, opacity: dragging ? 0.6 : 1 }}
-    >
-      {editing && (
-        <Stack direction="row" align="center" gap="xs">
-          <View
-            {...drag.panHandlers}
-            accessibilityRole="button"
-            accessibilityLabel={`Drag ${sectionLabels[id]}`}
-            style={{
-              minWidth: theme.sizes.touchTarget,
-              minHeight: theme.sizes.touchTarget,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Icon name="layout" tone="muted" />
-          </View>
-          <AppText variant="caption" style={{ flex: 1 }}>
-            {sectionLabels[id]}
-          </AppText>
-          <IconButton
-            icon="up"
-            label={`Move ${sectionLabels[id]} up`}
-            disabled={index === 0}
-            onPress={() => void save({ homeSectionOrder: moveHomeSection(order, id, -1) })}
-          />
-          <IconButton
-            icon="down"
-            label={`Move ${sectionLabels[id]} down`}
-            disabled={index === order.length - 1}
-            onPress={() => void save({ homeSectionOrder: moveHomeSection(order, id, 1) })}
-          />
-          {keys.length > 0 && (
-            <IconButton
-              icon="settings"
-              label={`Colour ${sectionLabels[id]}`}
-              onPress={() => setColors(!colors)}
-            />
-          )}
-          <IconButton
-            icon="close"
-            label={`Hide ${sectionLabels[id]}`}
-            onPress={() =>
-              void save({
-                homeHiddenSections: [...(home.preferences.homeHiddenSections ?? []), id],
-              })
-            }
-          />
-        </Stack>
-      )}
-      {editing &&
-        colors &&
-        keys.map((key) => (
-          <ColorSwatches
-            key={key}
-            label={`${key === 'streakLeft' ? 'Streak' : key === 'streakRight' ? 'This Week' : sectionLabels[id]} colour`}
-            value={
-              id === 'metricTiles'
-                ? home.preferences.pillColors?.[key]
-                : home.preferences.cardColors?.[key]
-            }
-            onChange={(color) =>
-              void save(
+    <>
+      <View style={{ gap: theme.spacing.xs }}>
+        {editing && (
+          <Stack direction="row" align="center" gap="xs">
+            {dragHandle}
+            <AppText variant="caption" style={{ flex: 1 }}>
+              {sectionLabels[id]}
+            </AppText>
+            {keys.length > 0 && (
+              <IconButton
+                icon="settings"
+                label={`Colour ${sectionLabels[id]}`}
+                onPress={() => setColors(!colors)}
+              />
+            )}
+            <IconButton icon="close" label={`Hide ${sectionLabels[id]}`} onPress={hide} />
+          </Stack>
+        )}
+        {editing &&
+          colors &&
+          keys.map((key) => (
+            <ColorSwatches
+              key={key}
+              label={`${key === 'streakLeft' ? 'Streak' : key === 'streakRight' ? 'This Week' : sectionLabels[id]} colour`}
+              value={
                 id === 'metricTiles'
-                  ? { pillColors: { ...home.preferences.pillColors, [key]: color } }
-                  : { cardColors: { ...home.preferences.cardColors, [key]: color } },
-              )
+                  ? home.preferences.pillColors?.[key]
+                  : home.preferences.cardColors?.[key]
+              }
+              onChange={(color) =>
+                void save(
+                  id === 'metricTiles'
+                    ? { pillColors: { ...home.preferences.pillColors, [key]: color } }
+                    : { cardColors: { ...home.preferences.cardColors, [key]: color } },
+                )
+              }
+            />
+          ))}
+        <Pressable
+          accessible={false}
+          delayLongPress={350}
+          onLongPress={() => {
+            if (!editing) {
+              feedback('impact');
+              setMenu(true);
             }
-          />
-        ))}
-      <View pointerEvents={editing ? 'none' : 'auto'}>{children}</View>
-      {error && <StatusIndicator label="Home layout" error={error} />}
-    </View>
+          }}
+        >
+          <View pointerEvents={editing ? 'none' : 'auto'}>{children}</View>
+        </Pressable>
+        {error && <StatusIndicator label="Home layout" error={error} />}
+      </View>
+      {menu && (
+        <ActionMenu
+          visible
+          title={sectionLabels[id] ?? 'Widget'}
+          onClose={() => setMenu(false)}
+          actions={[
+            { title: 'Customize dashboard', icon: 'layout', run: () => onEdit?.() },
+            {
+              title: 'Move earlier',
+              icon: 'up',
+              disabled: index === 0,
+              run: () => reorder(moveHomeSection(order, id, -1)),
+            },
+            {
+              title: 'Move later',
+              icon: 'down',
+              disabled: index === order.length - 1,
+              run: () => reorder(moveHomeSection(order, id, 1)),
+            },
+            { title: 'Hide widget', icon: 'close', run: hide },
+          ]}
+        />
+      )}
+    </>
   );
 }
 export function HiddenHomeSections() {

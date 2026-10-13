@@ -12,6 +12,7 @@ import {
   AppText,
   Card,
   Grid,
+  MetricCard,
   Icon,
   LineChart,
   ProgressBar,
@@ -34,7 +35,6 @@ import { useNutrition } from '../../nutrition/data/NutritionProvider';
 import { useHome } from '../data/HomeProvider';
 import { metricLabels } from '../data/models';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
-import { formatHoursMinutes } from '@trainingai/shared/format/units';
 import { shiftDateStr, formatTimeOfDay } from '@trainingai/shared/date-utils';
 
 export function HomeMetricTiles({
@@ -113,44 +113,23 @@ export function HomeMetricTiles({
           return [];
         }
         return [
-          <Card key={key} accent={tileColor} style={{ padding: theme.spacing.md, flex: 1 }}>
-            <Pressable
-              onPress={value.nutrition ? openNutrition : openBody}
-              accessibilityRole="button"
-              accessibilityLabel={`View ${metricLabels[key as keyof typeof metricLabels]}`}
-              style={{ gap: theme.spacing.md, flex: 1, minWidth: 0 }}
-            >
-              <Icon
-                name={value.icon}
-                color={tileColor === 'transparent' ? theme.colors.brand : tileColor}
-              />
-              <AppText variant="heading">
-                {metricValue(
-                  value.value,
-                  '',
-                  key === 'weightKg' || key === 'distanceKm' ? 1 : 0,
-                )}
-              </AppText>
-              <AppText variant="micro" tone="muted">
-                {metricLabels[key as keyof typeof metricLabels]}
-                {value.unit ? ` · ${value.unit}` : ''}
-              </AppText>
-            </Pressable>
-            <View style={{ minHeight: theme.sizes.touchTarget, justifyContent: 'center' }}>
-              {value.field && (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={`Log ${metricLabels[key as keyof typeof metricLabels]}`}
-                  onPress={() => log(value.field!)}
-                  style={{ minHeight: theme.sizes.touchTarget, justifyContent: 'center' }}
-                >
-                  <AppText variant="micro" tone="brand">
-                    Log +
-                  </AppText>
-                </Pressable>
-              )}
-            </View>
-          </Card>,
+          <MetricCard
+            key={key}
+            dense
+            centered
+            label={metricLabels[key as keyof typeof metricLabels]}
+            value={metricValue(
+              value.value,
+              '',
+              key === 'weightKg' || key === 'distanceKm' ? 1 : 0,
+            )}
+            unit={value.unit}
+            icon={value.icon}
+            accent={tileColor}
+            openLabel={value.nutrition ? 'View Nutrition' : 'View Body measurements'}
+            onOpen={value.nutrition ? openNutrition : openBody}
+            onLog={value.field ? () => log(value.field!) : undefined}
+          />,
         ];
       })}
     </Grid>
@@ -225,14 +204,12 @@ function HomeWidgetBody({
   id,
   openBody,
   openNutrition,
-  openDetail,
   openReadiness,
   openTraining = openBody,
   openMorning,
   goals,
   load,
   recovery,
-  hr,
   energy,
 }: WidgetProps & Extra) {
   const { theme } = useTheme();

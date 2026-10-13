@@ -1,17 +1,13 @@
-import { useState } from 'react';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
-import { Pressable } from 'react-native';
 import { formatTimeOfDay } from '@trainingai/shared/date-utils';
 import {
   AppText,
-  Badge,
   Card,
+  ExpandableCard,
   Grid,
-  Icon,
   LineChart,
   MetricTile,
   ProgressBar,
-  Stack,
   StatusIndicator,
 } from '../../../shared/ui';
 import { useHealthData } from '../data/HealthDataProvider';
@@ -23,52 +19,35 @@ export function BodyBatteryCard() {
   const { theme } = useTheme();
   const health = useHealthData();
   const state = useWorkoutResource(batterySpec(health.today));
-  const [expanded, setExpanded] = useState(false);
   const data = state.data;
   return (
-    <Card tone="brand" style={{ padding: theme.spacing.md, gap: theme.spacing.xs }}>
-      <Stack direction="row" align="center" gap="xs">
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Body Battery"
-          accessibilityState={{ expanded }}
-          onPress={() => setExpanded((value) => !value)}
-          style={{ flex: 1 }}
-        >
-          <Stack direction="row" align="center" gap="xs">
-            <Icon
-              name={data?.hasData ? 'battery' : 'info'}
-              size={theme.sizes.iconSmall}
-              tone={data?.hasData ? 'brand' : 'muted'}
-            />
-            <AppText variant="micro" tone="muted">
-              Body Battery
-            </AppText>
-            <AppText variant="label" numberOfLines={1} style={{ flexShrink: 1 }}>
-              {data?.hasData ? data.label : data ? 'No data yet' : '—'}
-            </AppText>
-            <AppText variant="micro" tone="muted">
-              {data?.hasData ? data.trend : ''}
-            </AppText>
-            <AppText variant="hero" style={{ flex: 1, textAlign: 'right' }}>
-              {data?.hasData ? metricValue(data.current) : '—'}
-            </AppText>
-            <Icon
-              name={expanded ? 'down' : 'forward'}
-              size={theme.sizes.iconSmall}
-              tone="muted"
-            />
-          </Stack>
-        </Pressable>
-        <StatusIndicator
-          label="Body Battery"
-          busy={state.loading && !data}
-          error={state.error}
-          onRetry={state.refresh}
-        />
-      </Stack>
-      <ProgressBar value={data?.hasData ? data.current / 100 : 0} origin="right" />
-      {expanded && data && (
+    <ExpandableCard
+      title="Body Battery"
+      subtitle={
+        data?.hasData
+          ? `${data.label} · ${data.trend}`
+          : data
+            ? 'No data yet'
+            : 'Waiting for readings'
+      }
+      icon="battery"
+      tone="brand"
+      value={data?.hasData ? metricValue(data.current) : undefined}
+      status={
+        (state.loading && !data) || state.error ? (
+          <StatusIndicator
+            label="Body Battery"
+            busy={state.loading && !data}
+            error={state.error}
+            onRetry={state.refresh}
+          />
+        ) : undefined
+      }
+      summary={
+        data?.hasData ? <ProgressBar value={data.current / 100} origin="right" /> : undefined
+      }
+    >
+      {data ? (
         <>
           {data.hasData ? (
             <>
@@ -83,7 +62,8 @@ export function BodyBatteryCard() {
                 }))}
               />
               <AppText variant="caption" tone="muted">
-                Started at {data.anchor} from {data.anchorSource}
+                Started at {data.anchor} from{' '}
+                {data.anchorSource === 'readiness' ? 'energy' : data.anchorSource}
                 {data.anchorProvisional ? ' · provisional until energy arrives' : ''}
               </AppText>
               <Grid columns={2}>
@@ -108,17 +88,27 @@ export function BodyBatteryCard() {
             How it moves
           </AppText>
           <Grid columns={2}>
-            <Card tone="activity">
+            <Card
+              tone="activity"
+              style={{ flex: 1, gap: theme.spacing.xs, padding: theme.spacing.md }}
+            >
               <AppText variant="label">Charges</AppText>
               <AppText variant="caption">Rest and sleep</AppText>
             </Card>
-            <Card tone="heart">
+            <Card
+              tone="heart"
+              style={{ flex: 1, gap: theme.spacing.xs, padding: theme.spacing.md }}
+            >
               <AppText variant="label">Drains</AppText>
               <AppText variant="caption">Training and elevated heart rate</AppText>
             </Card>
           </Grid>
         </>
+      ) : (
+        <AppText variant="caption" tone="muted">
+          Your recorded readings will appear here when available.
+        </AppText>
       )}
-    </Card>
+    </ExpandableCard>
   );
 }

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { HomeStore } from '../src/features/home/data/HomeStore.ts';
+import { HomeStore, type HomeChange } from '../src/features/home/data/HomeStore.ts';
 import {
   greeting,
   homeSections,
@@ -18,10 +18,79 @@ import {
 } from '../src/features/home/data/banner-data.ts';
 import { HealthStore } from '../src/features/health/data/HealthStore.ts';
 import { localTimeline } from '../src/features/home/data/timeline.ts';
+import {
+  timelineDestinationDate,
+  timelineMetrics,
+  timelineSummary,
+  timelineTitle,
+} from '../src/features/home/data/timeline-presentation.ts';
+import { timelineEventSchema } from '../src/features/home/data/timeline.ts';
+import { sleepSchema } from '../src/features/health/data/models.ts';
 import { loggingFixture } from './logging-fixture.ts';
 import { createWorkout } from '../src/features/workouts/logging/workout.ts';
 
 const day = '2026-10-12';
+
+test('timeline keeps zero measurements and leaves absent values unknown', () => {
+  const event = timelineEventSchema.parse({
+    type: 'meal',
+    title: '🍳 Breakfast',
+    time: '8:00 am',
+    timeMs: 0,
+    day: 'today',
+    calories: 0,
+  });
+  assert.equal(timelineTitle(event), 'Breakfast');
+  assert.equal(event.title, '🍳 Breakfast');
+  assert.equal(timelineSummary(event), '0 kcal');
+  assert.equal(timelineSummary({ ...event, calories: undefined }), '');
+  assert.equal(timelineTitle({ ...event, type: 'workout' }), '🍳 Breakfast');
+});
+
+test('sleep duration appears once on the timeline but remains available in bedtime details', () => {
+  const event = timelineEventSchema.parse({
+    type: 'sleep',
+    title: 'Fell asleep',
+    time: '11:02 pm',
+    timeMs: 0,
+    day: 'yesterday',
+    sleepDurationH: 7 + 1 / 6,
+    subtitle: 'Apple Health',
+  });
+  assert.equal(timelineSummary(event), 'Apple Health');
+  assert.equal(timelineSummary({ ...event, durationMin: 435 }), 'Apple Health');
+  assert.equal(timelineSummary({ ...event, type: 'wakeup' }), '7h 10m · Apple Health');
+  assert.equal(
+    timelineMetrics(event).find((row) => row.label === 'Time asleep')?.value,
+    '7h 10m',
+  );
+});
+
+test('bedtime opens the overnight record while meal navigation retains its event day', () => {
+  const event = timelineEventSchema.parse({
+    type: 'sleep',
+    title: 'Fell asleep',
+    time: '11:02 pm',
+    timeMs: Date.parse('2026-10-12T23:02:00+10:00'),
+    day: 'yesterday',
+    date: '2026-10-12',
+  });
+  const night = sleepSchema.parse({
+    date: '2026-10-13',
+    sleepStart: '2026-10-12T23:02:00+10:00',
+    sleepEnd: '2026-10-13T06:17:00+10:00',
+  });
+  assert.equal(timelineDestinationDate(event, '2026-10-13', [night]), '2026-10-13');
+  assert.equal(
+    timelineDestinationDate({ ...event, type: 'meal' }, '2026-10-13', [night]),
+    '2026-10-12',
+  );
+  assert.equal(timelineDestinationDate(event, '2026-10-13', []), '2026-10-12');
+  assert.equal(
+    timelineDestinationDate({ ...event, sleepDate: '2026-10-11' }, '2026-10-13', [night]),
+    '2026-10-11',
+  );
+});
 function fixture() {
   const disk = new Map<string, string>();
   let sequence = 0;
@@ -35,6 +104,7 @@ function fixture() {
   const sent: { id: string; domain: string; date: string; payload: Record<string, unknown> }[] =
     [];
   const reads: string[] = [];
+  const changes: HomeChange[] = [];
   const storage = {
     get: async (key: string) => disk.get(key) ?? null,
     set: async (key: string, value: string) => {
@@ -107,7 +177,7 @@ function fixture() {
       storage,
       { ...connection, userId },
       () => `10000000-0000-4000-8000-${String(++sequence).padStart(12, '0')}`,
-      () => {},
+      (kind) => changes.push(kind),
       () => now,
     );
   return {
@@ -119,6 +189,7 @@ function fixture() {
     preferences,
     sent,
     reads,
+    changes,
     make,
     online: (value: boolean) => {
       online = value;
@@ -486,4 +557,58 @@ test('an unsynced completed workout enters Home timeline and a lost-reply server
   assert.equal(events.length, 1);
   assert.equal(events[0].durationMin, 30);
   assert.equal(localTimeline(events, [pending], [], day, 'Australia/Brisbane').length, 1);
+});
+
+test('dragging variable-height sections displaces neighbours and preserves hidden sections', async () => {
+  const { dragOrder, displacedItems, preserveHiddenOrder } =
+    await import('../src/shared/ui/reorder.ts');
+  const order = ['recommendation', 'streak', 'metricTiles'];
+  const bounds = new Map([
+    ['recommendation', { y: 0, height: 220 }],
+    ['streak', { y: 232, height: 100 }],
+    ['metricTiles', { y: 344, height: 140 }],
+  ]);
+  assert.deepEqual(dragOrder(order, bounds, 'recommendation', 20), order);
+  const next = dragOrder(order, bounds, 'recommendation', 310);
+  assert.deepEqual(next, ['streak', 'metricTiles', 'recommendation']);
+  const shifts = displacedItems(order, next, bounds, 12);
+  assert.equal(shifts.get('streak'), -232);
+  assert.equal(shifts.get('metricTiles'), -232);
+  assert.deepEqual(
+    preserveHiddenOrder(['recommendation', 'hidden', 'streak', 'metricTiles'], next),
+    ['streak', 'hidden', 'metricTiles', 'recommendation'],
+  );
+  assert.deepEqual(dragOrder(order, new Map(), 'recommendation', 400), order);
+  assert.deepEqual(dragOrder(order, bounds, 'metricTiles', -1000), [
+    'metricTiles',
+    'recommendation',
+    'streak',
+  ]);
+});
+
+test('layout sync reports a preference change while health writes retain data refresh notifications', async () => {
+  const f = fixture();
+  const store = f.make();
+  await store.initialize();
+  await store.savePreferences({
+    homeSectionOrder: ['metricTiles', 'streak', 'recommendation', 'weekStrip'],
+  });
+  await store.sync();
+  assert.deepEqual(f.changes, ['preferences']);
+  assert.deepEqual(
+    f.preferences.homeSectionOrder,
+    store.getSnapshot().preferences.homeSectionOrder,
+  );
+  assert.equal(store.getSnapshot().operations.length, 0);
+  await store.saveMood(day, {
+    energyLevel: 'good',
+    soreMuscles: [],
+    bodyState: [],
+    suggestedSoreMuscles: [],
+  });
+  await store.sync();
+  assert.deepEqual(f.changes, ['preferences', 'mood', 'mood']);
+  await store.chooseRestDay(day, true);
+  await store.sync();
+  assert.deepEqual(f.changes.slice(-2), ['rest', 'rest']);
 });

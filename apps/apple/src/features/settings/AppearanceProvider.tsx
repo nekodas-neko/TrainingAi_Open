@@ -21,6 +21,8 @@ export function AppearanceProvider({
       <ThemeProvider
         mode={state.mode}
         brand={state.brand}
+        customHue={state.customHue}
+        onCustomHueChange={preferences.setCustomHue}
         onModeChange={preferences.setMode}
         onBrandChange={preferences.setBrand}
       >

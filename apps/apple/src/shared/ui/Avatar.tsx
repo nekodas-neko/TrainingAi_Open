@@ -7,12 +7,23 @@ export function Avatar({
   name,
   uri,
   size,
+  emphasized = false,
 }: {
   name: string;
   uri?: string | null;
   size?: number;
+  emphasized?: boolean;
 }) {
   const { theme } = useTheme();
+  const initials =
+    name
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join('')
+      .toUpperCase() || '?';
   const [failed, setFailed] = useState<string | null>(null);
   const safe =
     !!uri &&
@@ -29,16 +40,26 @@ export function Avatar({
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: theme.colors.brandSurface,
-        borderWidth: 1,
-        borderColor: theme.colors.brandBorder,
+        borderWidth: emphasized ? 2 : 1,
+        borderColor: emphasized ? theme.colors.brand : theme.colors.brandBorder,
+        boxShadow: emphasized
+          ? `0 0 ${theme.spacing.xl}px ${theme.colors.brandBorder}`
+          : undefined,
         overflow: 'hidden',
       }}
     >
-      <AppText variant="hero" tone="brand">
-        {name.charAt(0).toUpperCase()}
+      <AppText
+        variant="hero"
+        tone="brand"
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        style={{ textAlign: 'center' }}
+      >
+        {initials}
       </AppText>
       {safe && (
         <Image
+          alt=""
           source={{ uri: uri!, cache: 'force-cache' }}
           onError={() => setFailed(uri!)}
           resizeMode="cover"

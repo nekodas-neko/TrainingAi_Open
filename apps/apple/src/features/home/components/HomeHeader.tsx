@@ -40,11 +40,7 @@ export function HomeHeader({
         <AppText variant="caption" tone="muted">
           {date}
         </AppText>
-        <AppText
-          variant="pageTitle"
-          numberOfLines={2}
-          style={{ minHeight: theme.typography.pageTitle.lineHeight! * 2 }}
-        >
+        <AppText variant="pageTitle" numberOfLines={2}>
           {greeting(name, timezone)}
         </AppText>
       </Stack>
@@ -89,6 +85,7 @@ export function HomeHeader({
         >
           {avatar ? (
             <Image
+              alt=""
               source={{ uri: avatar }}
               style={{
                 width: theme.sizes.touchTarget,

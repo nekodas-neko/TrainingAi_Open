@@ -78,6 +78,7 @@ function StrengthWorkingCard() {
     <Card tone="nutrition">
       <HealthResourceHeader title={'Strength Progress'} state={state} refresh={state.refresh} />
       <SegmentedControl
+        animated
         label="Strength comparison"
         options={[
           { label: 'Working', value: 'working' },
@@ -102,8 +103,19 @@ function StrengthWorkingCard() {
               return metric ? (
                 <Stack key={exercise.exercise}>
                   <Stack direction="row" justify="space-between">
-                    <AppText variant="caption">{exercise.exercise}</AppText>
-                    <AppText variant="label">{metric.label}</AppText>
+                    <AppText variant="caption" style={{ flex: 1 }}>
+                      {exercise.exercise}
+                    </AppText>
+                    <AppText
+                      variant="label"
+                      style={{
+                        textAlign: 'right',
+                        fontVariant: ['tabular-nums'],
+                        flexShrink: 1,
+                      }}
+                    >
+                      {metric.label}
+                    </AppText>
                   </Stack>
                   <ProgressBar value={metric.pct / 100} />
                   {metric.delta !== null && metric.trend !== 'same' && (
@@ -188,6 +200,7 @@ function GoalsCard() {
         }}
       />
       <SegmentedControl
+        animated
         label="Goal period"
         options={[
           { label: 'Today', value: 'today' },
@@ -200,7 +213,9 @@ function GoalsCard() {
       {visible.map((row) => (
         <Stack key={row.label}>
           <Stack direction="row" justify="space-between">
-            <AppText variant="caption">{row.label}</AppText>
+            <AppText variant="label" style={{ flex: 1 }}>
+              {row.label}
+            </AppText>
             <AppText variant="caption">
               {metricValue(row.value, '', 1)} / {metricValue(row.goal, '', 1)}
             </AppText>

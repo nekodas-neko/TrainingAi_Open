@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import Svg, { Circle, Path, Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import { AppText } from './AppText';
@@ -31,6 +31,7 @@ export function ScoreChip({
   first?: boolean;
 }) {
   const { theme } = useTheme();
+  const [compact, setCompact] = useState(false);
   const id = useId().replace(/:/g, '');
   const color = accent ?? theme.tones[tone].foreground;
   const text = display ?? (value === null ? '—' : String(Math.round(value)));
@@ -61,11 +62,21 @@ export function ScoreChip({
   const glyph = (
     <Icon
       name={icon}
-      size={pill || rail || minimal || band ? theme.sizes.iconSmall : theme.sizes.icon}
+      size={
+        pill || rail || minimal || band || compact ? theme.sizes.iconSmall : theme.sizes.icon
+      }
       color={color}
     />
   );
-  const number = <AppText variant={pill || rail ? 'heading' : 'score'}>{text}</AppText>;
+  const number = (
+    <AppText
+      variant={pill || rail ? 'heading' : compact ? 'hero' : 'score'}
+      numberOfLines={1}
+      adjustsFontSizeToFit
+    >
+      {text}
+    </AppText>
+  );
   return (
     <Pressable
       accessibilityRole="button"
@@ -88,6 +99,12 @@ export function ScoreChip({
       {circle || tile ? (
         <>
           <View
+            onLayout={(event) =>
+              setCompact(
+                event.nativeEvent.layout.width <
+                  theme.sizes.touchTarget + theme.sizes.icon + theme.spacing.sm,
+              )
+            }
             style={{
               width: '100%',
               aspectRatio: 1,

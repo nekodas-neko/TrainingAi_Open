@@ -1,5 +1,13 @@
 import { View } from 'react-native';
-import { AppText, Card, CompletionStamp, MuscleMap, Stack } from '../../../shared/ui';
+import {
+  AppText,
+  Card,
+  CompletionStamp,
+  MuscleMap,
+  Stack,
+  Badge,
+  Icon,
+} from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import type { SessionPreview, WorkoutCatalog } from '../catalog';
@@ -14,12 +22,14 @@ export function SessionSelectionCard({
   timezone,
   openWorkout,
   openSession,
+  active = true,
 }: {
   session: SessionPreview;
   catalog: WorkoutCatalog;
   timezone: string;
   openWorkout: (id: string) => void;
   openSession: (id: string) => void;
+  active?: boolean;
 }) {
   const { theme } = useTheme();
   const journal = useWorkoutJournal();
@@ -50,55 +60,47 @@ export function SessionSelectionCard({
       }}
     >
       <Stack direction="row" align="center" justify="space-between">
-        <Stack direction="row" align="center" style={{ flex: 1, minWidth: 0 }}>
-          <SessionGlyph icon={session.icon} position={session.position} />
-          <View style={{ flex: 1, gap: theme.spacing.xxs }}>
-            <AppText variant="pageTitle" numberOfLines={1} style={{ color: palette.foreground }}>
-              {session.name}
+        <SessionGlyph icon={session.icon} position={session.position} />
+        <Stack gap="xxs" style={{ flex: 1, minWidth: 0 }}>
+          <AppText variant="title" numberOfLines={2} style={{ color: palette.foreground }}>
+            {session.name}
+          </AppText>
+          {(session.phaseDetail ?? session.phase) && (
+            <AppText variant="caption" tone="muted">
+              {session.phaseDetail ?? session.phase}
             </AppText>
-            {session.id === catalog.recommendation.sessionId && (
-              <View
-                style={{
-                  alignSelf: 'flex-start',
-                  backgroundColor: theme.colors.brand,
-                  borderRadius: theme.radii.pill,
-                  paddingHorizontal: theme.spacing.sm,
-                  paddingVertical: theme.spacing.xxs,
-                }}
-              >
-                <AppText variant="micro" style={{ color: theme.colors.onBrand }}>
-                  Recommended today
-                </AppText>
-              </View>
-            )}
-            {!completed && (
-              <AppText variant="caption" tone="muted">
-                {lastTrained}
-              </AppText>
-            )}
-            {(session.phaseDetail ?? session.phase) && (
-              <AppText variant="caption" tone="muted">
-                {session.phaseDetail ?? session.phase}
-              </AppText>
-            )}
-          </View>
+          )}
         </Stack>
-        <View style={{ alignItems: 'flex-end' }}>
+        {session.id === catalog.recommendation.sessionId && (
+          <Badge label="Today" tone="brand" />
+        )}
+      </Stack>
+      <Stack direction="row" align="center" gap="lg" wrap>
+        <Stack direction="row" align="center" gap="xs">
+          <Icon name="workout" tone="muted" size={theme.sizes.iconSmall} />
           <AppText variant="caption" tone="muted">
             {session.exercises.length} exercises
           </AppText>
-          {session.durationMinutes !== null && (
+        </Stack>
+        {session.durationMinutes !== null && (
+          <Stack direction="row" align="center" gap="xs">
+            <Icon name="timer" tone="muted" size={theme.sizes.iconSmall} />
             <AppText variant="caption" tone="muted">
               ~{Math.round(session.durationMinutes)} min
             </AppText>
-          )}
-        </View>
+          </Stack>
+        )}
       </Stack>
+      {!completed && (
+        <AppText variant="caption" tone="muted">
+          {lastTrained}
+        </AppText>
+      )}
       <View style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
         <MuscleMap assignments={assignments} />
         {completed && <CompletionStamp />}
       </View>
-      <RecoveryRow muscles={recovery} />
+      <RecoveryRow muscles={recovery} active={active} />
       <StartWorkoutCard
         session={session}
         programId={catalog.program!.id}

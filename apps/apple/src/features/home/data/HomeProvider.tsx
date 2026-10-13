@@ -22,7 +22,7 @@ export function HomeProvider({ children }: PropsWithChildren) {
   const { dataReader } = useAccountContext();
   const storage = useLocalStorage();
   const resources = useWorkoutResources();
-  const workouts = useWorkoutContext();
+  const { invalidate: invalidateWorkouts } = useWorkoutContext();
   const store = useMemo(
     () =>
       dataReader
@@ -30,7 +30,11 @@ export function HomeProvider({ children }: PropsWithChildren) {
             storage.account(dataReader.origin, dataReader.userId),
             dataReader,
             randomUUID,
-            () => {
+            (kind) => {
+              if (kind === 'preferences') {
+                resources?.invalidate(['/api/user/preferences']);
+                return;
+              }
               resources?.invalidate([
                 '/api/user/preferences',
                 '/api/user/profile',
@@ -42,12 +46,12 @@ export function HomeProvider({ children }: PropsWithChildren) {
                 '/api/workout-data',
                 '/api/ai-periodization',
               ]);
-              workouts.invalidate();
+              invalidateWorkouts();
               void resources?.refreshVisible();
             },
           )
         : null,
-    [dataReader, storage, resources, workouts.invalidate],
+    [dataReader, storage, resources, invalidateWorkouts],
   );
   return <HomeStoreProvider store={store}>{children}</HomeStoreProvider>;
 }

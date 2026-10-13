@@ -62,21 +62,36 @@ export function StrengthScreen({
       )}
       {section !== 'records' && (
         <>
-          <ResourceStatus
-            inline={embedded}
-            label="Strength trend"
-            state={strength}
-            refresh={strength.refresh}
-          />
+          {!embedded && (
+            <ResourceStatus
+              inline={embedded}
+              label="Strength trend"
+              state={strength}
+              refresh={strength.refresh}
+            />
+          )}
           {exercise ? (
             <Card>
               <Stack direction="row" justify="space-between">
-                <AppText variant="eyebrow" tone="muted">
+                <AppText
+                  variant={embedded ? 'heading' : 'eyebrow'}
+                  tone={embedded ? 'text' : 'muted'}
+                >
                   Strength Trend
                 </AppText>
-                <AppText variant="micro" tone="muted">
-                  90 days
-                </AppText>
+                <Stack direction="row" align="center" gap="none">
+                  <AppText variant="micro" tone="muted">
+                    90 days
+                  </AppText>
+                  {embedded && (
+                    <ResourceStatus
+                      inline
+                      label="Strength trend"
+                      state={strength}
+                      refresh={strength.refresh}
+                    />
+                  )}
+                </Stack>
               </Stack>
               <Stack direction="row" align="center" justify="space-between">
                 <IconButton
@@ -161,6 +176,23 @@ export function StrengthScreen({
                   variant="horizontal"
                 />
               )}
+            </Card>
+          ) : embedded ? (
+            <Card>
+              <Stack direction="row" align="center" justify="space-between">
+                <AppText variant="heading">Strength Trend</AppText>
+                <ResourceStatus
+                  inline
+                  label="Strength trend"
+                  state={strength}
+                  refresh={strength.refresh}
+                />
+              </Stack>
+              <AppText variant="caption" tone="muted">
+                {strength.data
+                  ? 'Log a workout to see how your strength changes.'
+                  : 'Your strength history is unavailable.'}
+              </AppText>
             </Card>
           ) : (
             strength.data && <AppText tone="muted">No strength history recorded yet.</AppText>

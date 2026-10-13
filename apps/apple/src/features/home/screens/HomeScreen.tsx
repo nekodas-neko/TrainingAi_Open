@@ -1,25 +1,27 @@
+import { useUndo } from '../../../shared/ui/undo/UndoProvider';
+import { preserveHiddenOrder } from '../../../shared/ui/reorder';
 import { useActivities } from '../../activities/data/ActivityProvider';
-import { HomeSection, HiddenHomeSections, type SectionBounds } from '../components/HomeSection';
+import { HomeSection, HiddenHomeSections } from '../components/HomeSection';
 import { HomeHeader } from '../components/HomeHeader';
 import { HomeScores } from '../components/HomeScores';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { getScheduledSessionsPerWeek } from '@trainingai/shared/schedule-utils';
-import { shiftDateStr, weekStartForDay } from '@trainingai/shared/date-utils';
+import { shiftDateStr } from '@trainingai/shared/date-utils';
 import type { Program } from '@trainingai/shared/types/program';
 import {
   AppButton,
   AppText,
   Card,
-  Disclosure,
   PageLayout,
   Stack,
   StateCard,
   TabPanel,
+  SortableStack,
 } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useHome } from '../data/HomeProvider';
-import { homeSections, trainingDays } from '../data/models';
+import { homeSections, sectionLabels, trainingDays } from '../data/models';
 import { useHealthData } from '../../health/data/HealthDataProvider';
 import { readinessSpec, profileSpec } from '../../health/data/models';
 import type { HealthDetail } from '../../health/screens/HealthDetailScreen';
@@ -65,6 +67,7 @@ export function HomeScreen(navigation: HomeNavigation) {
   const health = useHealthData();
   const apple = useAppleImport();
   const workout = useWorkoutContext();
+  const { refreshIfStale } = workout;
   const journal = useWorkoutJournal();
   const activity = useActivities();
   const nutrition = useNutrition();
@@ -80,17 +83,17 @@ export function HomeScreen(navigation: HomeNavigation) {
   const lastCalendar = useWorkoutResource(calendarSpec(previous[0], previous[1]));
   const [manual, setManual] = useState(false);
   const [editing, setEditing] = useState(false);
-  const sectionBounds = useRef(new Map<string, SectionBounds>());
+  const undo = useUndo();
   const [modal, setModal] = useState<'morning' | 'layout' | 'readiness' | null>(null);
   const [selectedSession, setSelectedSession] = useState<SessionPreview>();
   const [metric, setMetric] = useState<LogMetric | null>(null);
   useEffect(() => {
     void health.store?.refresh();
-    workout.refreshIfStale();
+    refreshIfStale();
     for (const kind of ['logs', 'targets'] as const) {
       void nutrition.store?.refresh(kind, health.today);
     }
-  }, [health.store, health.today, workout.refreshIfStale, nutrition.store]);
+  }, [health.store, health.today, refreshIfStale, nutrition.store]);
   async function refresh() {
     if (manual) {
       return;
@@ -155,6 +158,7 @@ export function HomeScreen(navigation: HomeNavigation) {
   );
   return (
     <PageLayout
+      landing
       title="Home"
       header={
         <HomeHeader
@@ -216,71 +220,92 @@ export function HomeScreen(navigation: HomeNavigation) {
               openWeek={navigation.openWeek}
               openReview={() => navigation.openNutrition(true)}
             />
-            {sections.map((key) => (
-              <HomeSection
-                key={key}
-                id={key}
-                editing={editing}
-                bounds={sectionBounds.current}
-                onLayout={(id, bounds) => sectionBounds.current.set(id, bounds)}
-              >
-                {key === 'recommendation' ? (
-                  <HomeRecommendation
-                    key={key}
-                    trained={days[health.today] ?? []}
-                    onReadiness={openReadiness}
-                    onStart={navigation.openSession}
-                    onResume={navigation.openWorkout}
-                    openPrograms={navigation.openPrograms}
-                    openExplanation={navigation.openExplanation}
-                  />
-                ) : key === 'streak' ? (
-                  <HomeTrainingSummary
-                    key={key}
-                    days={days}
-                    today={health.today}
-                    loaded={loaded}
-                    schedule={schedule}
-                    target={target}
-                    ai={workout.catalog?.program?.phaseMode === 'ai_dynamic'}
-                    openStats={navigation.openStats}
-                  />
-                ) : key === 'weekStrip' ? (
-                  <HomeWeekStrip
-                    key={key}
-                    days={days}
-                    today={health.today}
-                    loaded={loaded}
-                    hasProgram={!!workout.catalog?.program}
-                    openDay={navigation.openDay}
-                  />
-                ) : key === 'metricTiles' ? (
-                  <HomeMetricTiles
-                    key={key}
-                    openBody={navigation.openHealthBody}
-                    openNutrition={() => navigation.openNutrition()}
-                    log={setMetric}
-                  />
-                ) : (
-                  <HomeWidget
-                    key={key}
-                    id={key.replace(/^card_/, '')}
-                    openBody={navigation.openHealthBody}
-                    openNutrition={() => navigation.openNutrition()}
-                    openDetail={navigation.openHealthDetail}
-                    openReadiness={() =>
-                      openReadiness(
-                        workout.catalog?.program?.sessions.find(
-                          (session) => session.id === workout.catalog?.recommendation.sessionId,
-                        ),
-                      )
-                    }
-                    openTraining={navigation.openStats}
-                    openMorning={() => setModal('morning')}
-                  />
-                )}
-              </HomeSection>
-            ))}
+            <SortableStack
+              order={sections}
+              enabled={editing}
+              label={(key) => sectionLabels[key]}
+              onChange={async (visible) => {
+                const store = home.store;
+                if (!store) return false;
+                const previous = homeSections(store.getSnapshot().preferences);
+                return undo.perform({
+                  key: 'home-order',
+                  showNotice: false,
+                  label: 'Dashboard reordered',
+                  apply: () =>
+                    store.savePreferences({
+                      homeSectionOrder: preserveHiddenOrder(previous, visible),
+                    }),
+                  revert: () => store.savePreferences({ homeSectionOrder: previous }),
+                });
+              }}
+              renderItem={(key, handle) => (
+                <HomeSection
+                  key={key}
+                  id={key}
+                  editing={editing}
+                  onEdit={() => setEditing(true)}
+                  dragHandle={handle}
+                >
+                  {key === 'recommendation' ? (
+                    <HomeRecommendation
+                      key={key}
+                      trained={days[health.today] ?? []}
+                      onReadiness={openReadiness}
+                      onStart={navigation.openSession}
+                      onResume={navigation.openWorkout}
+                      openPrograms={navigation.openPrograms}
+                      openExplanation={navigation.openExplanation}
+                    />
+                  ) : key === 'streak' ? (
+                    <HomeTrainingSummary
+                      key={key}
+                      days={days}
+                      today={health.today}
+                      loaded={loaded}
+                      schedule={schedule}
+                      target={target}
+                      ai={workout.catalog?.program?.phaseMode === 'ai_dynamic'}
+                      openStats={navigation.openStats}
+                    />
+                  ) : key === 'weekStrip' ? (
+                    <HomeWeekStrip
+                      key={key}
+                      days={days}
+                      today={health.today}
+                      loaded={loaded}
+                      hasProgram={!!workout.catalog?.program}
+                      openDay={navigation.openDay}
+                    />
+                  ) : key === 'metricTiles' ? (
+                    <HomeMetricTiles
+                      key={key}
+                      openBody={navigation.openHealthBody}
+                      openNutrition={() => navigation.openNutrition()}
+                      log={setMetric}
+                    />
+                  ) : (
+                    <HomeWidget
+                      key={key}
+                      id={key.replace(/^card_/, '')}
+                      openBody={navigation.openHealthBody}
+                      openNutrition={() => navigation.openNutrition()}
+                      openDetail={navigation.openHealthDetail}
+                      openReadiness={() =>
+                        openReadiness(
+                          workout.catalog?.program?.sessions.find(
+                            (session) =>
+                              session.id === workout.catalog?.recommendation.sessionId,
+                          ),
+                        )
+                      }
+                      openTraining={navigation.openStats}
+                      openMorning={() => setModal('morning')}
+                    />
+                  )}
+                </HomeSection>
+              )}
+            />
             {editing && <HiddenHomeSections />}
             <HomeTimeline
               openDay={navigation.openDay}

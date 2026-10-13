@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Pressable } from 'react-native';
+import { useUndo } from '../../../shared/ui/undo/UndoProvider';
+import { useReducedMotion } from '../../../shared/ui/useReducedMotion';
+import { layoutMotion } from '../../../shared/ui/layoutMotion';
 import { shiftDateStr, weekStartForDay } from '@trainingai/shared/date-utils';
 import {
   AppButton,
@@ -44,17 +47,21 @@ export function HomeBanners({
   const readiness = useWorkoutResource(readinessSpec(health.today));
   const week = shiftDateStr(weekStartForDay(health.today), -7);
   const recap = useWorkoutResource(digestSpec(week), !home.markers[`week:${week}`]);
-  const [expanded, setExpanded] = useState(false);
+  const undo = useUndo();
+  const reduced = useReducedMotion();
   const [goals, setGoals] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const attempted = useRef('');
+  const morningAction = useRef(openMorning);
+  morningAction.current = openMorning;
+  const morningDismissed = home.markers[`morning-prompt:${health.today}`];
   useEffect(() => {
     if (
       !home.ready ||
       !health.ready ||
       !health.store ||
-      home.markers[`morning-prompt:${health.today}`] ||
+      morningDismissed ||
       attempted.current === health.today
     ) {
       return;
@@ -70,7 +77,7 @@ export function HomeBanners({
         }
         settled = true;
         if (offer) {
-          openMorning();
+          morningAction.current();
         } else {
           await home.store!.mark(`morning-prompt:${health.today}`);
         }
@@ -82,7 +89,7 @@ export function HomeBanners({
         attempted.current = '';
       }
     };
-  }, [home.ready, health.ready, home.store, health.store, health.today]);
+  }, [home.ready, health.ready, home.store, health.store, health.today, morningDismissed]);
   async function mark(key: string) {
     try {
       await home.store?.mark(key);
@@ -94,14 +101,59 @@ export function HomeBanners({
   const showDay = localHour(health.timezone) >= 17 && !home.markers[`day:${health.today}`];
   const showGoals =
     goalsReviewDue(profile.data?.user) && !home.markers[`goals:${health.today}`];
-  const showWeek =
-    !home.markers[`week:${week}`] &&
-    ((recap.data?.digest && recapHasData(recap.data.metrics)) || recap.error);
+  const weekReady = !!recap.data?.digest && recapHasData(recap.data.metrics);
+  const showWeek = !home.markers[`week:${week}`] && (weekReady || !!recap.error);
   const entries = [
-    ...(showGoals ? [{ key: 'goals', icon: 'target' as const, label: 'Goals check-in' }] : []),
-    ...(showDay ? [{ key: 'day', icon: 'nutrition' as const, label: 'Day in review' }] : []),
-    ...(showWeek ? [{ key: 'week', icon: 'upper' as const, label: 'Week in review' }] : []),
+    ...(showGoals
+      ? [
+          {
+            key: `goals:${health.today}`,
+            icon: 'target' as const,
+            label: 'Goals check-in',
+            subtitle: 'Review your nutrition and activity goals',
+            open: () => setGoals(true),
+          },
+        ]
+      : []),
+    ...(showDay
+      ? [
+          {
+            key: `day:${health.today}`,
+            icon: 'nutrition' as const,
+            label: 'Day in review ready',
+            subtitle: 'Look back at today’s nutrition',
+            open: openReview,
+          },
+        ]
+      : []),
+    ...(showWeek
+      ? [
+          {
+            key: `week:${week}`,
+            icon: 'upper' as const,
+            label: weekReady ? 'Week in review ready' : 'Week in review couldn’t load',
+            subtitle: weekReady ? 'Training, recovery & records' : 'Tap to retry',
+            open: weekReady ? () => openWeek(week) : recap.refresh,
+          },
+        ]
+      : []),
   ];
+  function dismissReminder(key: string, label: string) {
+    const store = home.store;
+    if (!store) return;
+    void undo.perform({
+      key,
+      label: `${label.replace(' ready', '')} dismissed`,
+      apply: async () => {
+        layoutMotion(reduced);
+        await store.mark(key);
+      },
+      revert: async () => {
+        layoutMotion(reduced);
+        await store.mark(key, false);
+      },
+    });
+  }
   async function deload() {
     if (!resources || busy) {
       return;
@@ -131,8 +183,7 @@ export function HomeBanners({
             <StatusIndicator label="Fatigue advice" error={error} />
           </Stack>
           <AppText variant="caption" tone="muted">
-            Your energy is low and training load is elevated. Consider taking a deload week
-            now.
+            Your energy is low and training load is elevated. Consider taking a deload week now.
           </AppText>
           {readiness.data.earlyDeload && (
             <Disclosure title="Why this recommendation?">
@@ -164,113 +215,68 @@ export function HomeBanners({
               title="Dismiss"
               variant="ghost"
               disabled={busy}
-              onPress={() => void mark(`deload:${health.today}`)}
+              onPress={() => dismissReminder(`deload:${health.today}`, 'Fatigue advice')}
             />
           </Stack>
         </Card>
       )}
       {entries.length > 0 && (
-        <Stack>
-          <Pressable
-            onPress={() => setExpanded(!expanded)}
-            accessibilityRole="button"
-            accessibilityLabel={`${expanded ? 'Hide' : 'Show'} ${entries.map((entry) => entry.label).join(', ')}`}
-            accessibilityState={{ expanded }}
-            style={{
-              minHeight: theme.sizes.touchTarget,
-              borderRadius: theme.radii.card,
-              borderWidth: 1,
-              borderColor: theme.colors.border,
-              backgroundColor: theme.colors.raised,
-              padding: theme.spacing.md,
-            }}
-          >
-            <Stack direction="row" align="center">
-              <Stack direction="row" gap="xs">
-                {entries.map((entry) => (
-                  <Icon
-                    key={entry.key}
-                    name={entry.icon}
-                    size={theme.sizes.iconSmall}
-                    tone="brand"
-                  />
-                ))}
-              </Stack>
-              <AppText variant="label" style={{ flex: 1 }}>
-                {entries.length} ready
+        <Card padded={false}>
+          {entries.length > 1 && (
+            <Stack
+              direction="row"
+              align="center"
+              style={{ paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.md }}
+            >
+              <AppText variant="heading" style={{ flex: 1 }}>
+                Updates
               </AppText>
-              <Icon name={expanded ? 'down' : 'forward'} tone="muted" />
-            </Stack>
-          </Pressable>
-          {expanded && (
-            <Stack>
-              {showGoals && (
-                <Card>
-                  <AppText variant="heading">Time for a goals check-in</AppText>
-                  <AppText variant="caption" tone="muted">
-                    It’s been a couple of weeks — review your nutrition and activity goals based
-                    on your recent trends.
-                  </AppText>
-                  <Stack direction="row">
-                    <AppButton
-                      title="Review now"
-                      onPress={() => setGoals(true)}
-                      style={{ flex: 1 }}
-                    />
-                    <AppButton
-                      title="Remind me later"
-                      variant="ghost"
-                      onPress={() =>
-                        void home.store
-                          ?.postponeGoals(health.today)
-                          .catch(() => setError('Could not save your reminder choice.'))
-                      }
-                    />
-                  </Stack>
-                </Card>
-              )}
-              {showDay && (
-                <Card>
-                  <Stack direction="row" align="center">
-                    <AppButton
-                      title="Your day in review is ready"
-                      variant="ghost"
-                      onPress={openReview}
-                      style={{ flex: 1 }}
-                    />
-                    <IconButton
-                      icon="close"
-                      label="Dismiss day review"
-                      onPress={() => void mark(`day:${health.today}`)}
-                    />
-                  </Stack>
-                </Card>
-              )}
-              {showWeek && (
-                <Card>
-                  <Stack direction="row" align="center">
-                    <AppButton
-                      title={
-                        recap.error
-                          ? 'Your week in review didn’t load'
-                          : 'Your week in review is ready'
-                      }
-                      variant="ghost"
-                      onPress={recap.error ? recap.refresh : () => openWeek(week)}
-                      style={{ flex: 1 }}
-                    />
-                    <IconButton
-                      icon="close"
-                      label="Dismiss weekly recap"
-                      onPress={() => void mark(`week:${week}`)}
-                    />
-                  </Stack>
-                </Card>
-              )}
               <StatusIndicator label="Home reminders" error={error} />
             </Stack>
           )}
-        </Stack>
+          {entries.map((entry, index) => (
+            <Stack
+              key={entry.key}
+              direction="row"
+              align="center"
+              gap="none"
+              style={{
+                paddingHorizontal: theme.spacing.sm,
+                borderTopWidth: index > 0 ? 1 : 0,
+                borderColor: theme.colors.border,
+              }}
+            >
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={entry.label}
+                onPress={entry.open}
+                style={({ pressed }) => ({
+                  flex: 1,
+                  minHeight: theme.sizes.touchTarget,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: theme.spacing.md,
+                  padding: theme.spacing.md,
+                  opacity: pressed ? 0.65 : 1,
+                })}
+              >
+                <Icon name={entry.icon} tone="brand" />
+                <Stack gap="xxs" style={{ flex: 1 }}>
+                  <AppText variant="label">{entry.label}</AppText>
+                  <AppText variant="caption" tone="muted">
+                    {entry.subtitle}
+                  </AppText>
+                </Stack>
+                <Icon name="forward" tone="muted" size={theme.sizes.iconSmall} />
+              </Pressable>
+              <IconButton
+                icon="close"
+                label={`Dismiss ${entry.label}`}
+                onPress={() => dismissReminder(entry.key, entry.label)}
+              />
+            </Stack>
+          ))}
+        </Card>
       )}
       {goals && (
         <GoalRecommendation

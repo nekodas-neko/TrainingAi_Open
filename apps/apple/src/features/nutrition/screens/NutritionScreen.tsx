@@ -1,3 +1,8 @@
+import { randomUUID } from 'expo-crypto';
+import { useUndo } from '../../../shared/ui/undo/UndoProvider';
+import { useReducedMotion } from '../../../shared/ui/useReducedMotion';
+import { layoutMotion } from '../../../shared/ui/layoutMotion';
+import { feedback } from '../../../integrations/feedback/haptics';
 import {
   formatDateDisplay,
   secondsSinceLocalMidnight,
@@ -9,9 +14,10 @@ import { PanResponder, View } from 'react-native';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import {
   AppButton,
+  ActionTile,
+  ActionMenu,
   AppText,
   Card,
-  ConfirmationCard,
   Disclosure,
   Grid,
   IconButton,
@@ -34,7 +40,7 @@ import { ActiveMealPlan, MealPlansSheet } from '../../meal-plans/components/Meal
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { EndOfDaySheet } from '../components/EndOfDaySheet';
 import { FoodLogger } from '../components/FoodLogger';
-import { MealLoggingStatus } from '../components/MealLoggingStatus';
+import { MealSectionHeader } from '../components/MealSectionHeader';
 import { MacroLine, NutritionStatus, foodAmount } from '../components/NutritionElements';
 import { NutritionEnergyCard } from '../components/NutritionEnergyCard';
 import { NutritionSettings, NutritionTargets } from '../components/NutritionSettings';
@@ -65,6 +71,7 @@ export function NutritionScreen({
   const n0 = useNutrition();
   const [date, setDate] = useState(n0.today);
   const n = useNutrition(date);
+  const { refresh: refreshNutrition } = n;
   const health = useHealthData();
   const { theme } = useTheme();
   const [planSeed, setPlanSeed] = useState<MealPlan | null>(null);
@@ -93,7 +100,10 @@ export function NutritionScreen({
   const [edit, setEdit] = useState<FoodLog | null>(null);
   const [quantity, setQuantity] = useState('1');
   const [bucket, setBucket] = useState('');
-  const [remove, setRemove] = useState<FoodLog[] | null>(null);
+  const undo = useUndo();
+  const reduced = useReducedMotion();
+  const deleting = useRef(new Set<string>());
+  const [foodActions, setFoodActions] = useState<FoodLog | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [recipeSelected, setRecipeSelected] = useState<SavedMeal | null>(null);
   const [groupEdit, setGroupEdit] = useState<FoodLog[] | null>(null);
@@ -117,9 +127,9 @@ export function NutritionScreen({
     previousToday.current = n0.today;
   }, [n0.today]);
   useEffect(() => {
-    n.refresh();
+    void refreshNutrition();
     void health.store?.refresh();
-  }, [n.store, health.store, date]);
+  }, [refreshNutrition, health.store]);
   useEffect(() => {
     if (date === n.today) {
       void n.store
@@ -163,18 +173,53 @@ export function NutritionScreen({
       setActionError(cause instanceof Error ? cause.message : 'Could not save this change.');
     }
   }
+  function openFood(log: FoodLog) {
+    setEdit(log);
+    setQuantity(String(log.quantityMultiplier));
+    setBucket(log.mealTypeId);
+  }
+  async function removeFood(logs: FoodLog[]) {
+    const store = n.store;
+    if (!store || logs.some((log) => deleting.current.has(log.id))) return;
+    logs.forEach((log) => deleting.current.add(log.id));
+    const recovery = logs.map((log) => ({ ...log, id: randomUUID() }));
+    try {
+      await undo.perform({
+        key: `food:${logs
+          .map((log) => log.id)
+          .sort()
+          .join(',')}`,
+        label: logs.length > 1 ? 'Meal deleted' : `${logs[0].foodItem.name} deleted`,
+        apply: async () => {
+          layoutMotion(reduced);
+          await store.removeLogs(logs);
+        },
+        revert: async () => {
+          layoutMotion(reduced);
+          await store.restoreLogs(recovery);
+        },
+      });
+    } finally {
+      logs.forEach((log) => deleting.current.delete(log.id));
+    }
+  }
   function foodRow(log: FoodLog) {
     return (
-      <SwipeDelete key={log.id} label={log.foodItem.name} onDelete={() => setRemove([log])}>
+      <SwipeDelete
+        key={log.id}
+        label={log.foodItem.name}
+        onEdit={() => openFood(log)}
+        onDelete={() => void removeFood([log])}
+      >
         <ListRow
           density="compact"
           leading={<Thumbnail uri={log.foodItem.imageDataUri} label={log.foodItem.name} />}
           title={log.foodItem.name}
           subtitle={`${log.foodItem.brand ?? ''}${log.foodItem.brand ? ' · ' : ''}${foodAmount(log)}`}
-          onPress={() => {
-            setEdit(log);
-            setQuantity(String(log.quantityMultiplier));
-            setBucket(log.mealTypeId);
+          onPress={() => openFood(log)}
+          onLongPress={() => {
+            feedback('impact');
+            setFoodActions(log);
           }}
           trailing={<AppText variant="caption">{Math.round(log.calories)}</AppText>}
         />
@@ -183,6 +228,7 @@ export function NutritionScreen({
   }
   return (
     <PageLayout
+      landing
       title="Nutrition"
       actions={
         <>
@@ -201,13 +247,18 @@ export function NutritionScreen({
           label="Previous day"
           onPress={() => setDate(shiftDateStr(date, -1))}
         />
-        <AppText variant="heading" style={{ flex: 1, textAlign: 'center' }}>
-          {date === n.today
-            ? 'Today'
-            : date === shiftDateStr(n.today, -1)
-              ? 'Yesterday'
-              : formatDateDisplay(date, 'long')}
-        </AppText>
+        <View
+          style={{ flex: 1, minHeight: theme.sizes.touchTarget, justifyContent: 'center' }}
+          {...swipe.panHandlers}
+        >
+          <AppText variant="heading" style={{ textAlign: 'center' }}>
+            {date === n.today
+              ? 'Today'
+              : date === shiftDateStr(n.today, -1)
+                ? 'Yesterday'
+                : formatDateDisplay(date, 'long')}
+          </AppText>
+        </View>
         <IconButton
           icon="forward"
           label="Next day"
@@ -215,7 +266,7 @@ export function NutritionScreen({
           onPress={() => setDate(shiftDateStr(date, 1))}
         />
       </Stack>
-      <View style={{ flex: 1, paddingHorizontal: theme.spacing.lg }} {...swipe.panHandlers}>
+      <View style={{ flex: 1, paddingHorizontal: theme.spacing.lg }}>
         <TabPanel
           key={date}
           onRefresh={() => {
@@ -257,33 +308,35 @@ export function NutritionScreen({
               <NutritionEnergyCard date={date} onGoals={() => setModal('goals')} />
               {date === n.today && (
                 <>
-                  <Grid columns={2}>
-                    <AppButton
+                  <Grid columns={3}>
+                    <ActionTile
                       title="Log Food"
                       icon="plus"
-                      variant="surface"
                       disabled={!chosen}
                       onPress={() => {
                         setLibrary(false);
                         setLogger(chosen);
                       }}
                     />
-                    <AppButton
-                      title={`Water · ${health.body?.today?.waterMl == null ? '—' : (health.body.today.waterMl / 1000).toFixed(1) + ' L'}`}
+                    <ActionTile
+                      title="Water"
                       icon="water"
-                      variant="surface"
+                      caption={
+                        health.body?.today?.waterMl == null
+                          ? '—'
+                          : (health.body.today.waterMl / 1000).toFixed(1) + ' L'
+                      }
                       onPress={() => setModal('water')}
                     />
+                    <ActionTile
+                      title="My Foods"
+                      icon="foods"
+                      onPress={() => {
+                        setLibrary(true);
+                        setLogger(chosen);
+                      }}
+                    />
                   </Grid>
-                  <AppButton
-                    title="My Foods"
-                    icon="foods"
-                    variant="surface"
-                    onPress={() => {
-                      setLibrary(true);
-                      setLogger(chosen);
-                    }}
-                  />
                   <ActiveMealPlan
                     date={date}
                     onManage={(plan) => {
@@ -311,76 +364,79 @@ export function NutritionScreen({
                   grouped.set(key, [...(grouped.get(key) ?? []), row]);
                 }
                 return (
-                  <Stack key={mt.id}>
-                    <Stack direction="row" align="center" justify="space-between">
-                      <AppButton
-                        title={mt.name}
-                        variant="ghost"
-                        onPress={() =>
-                          setCollapsed(
-                            collapsed.includes(mt.id)
-                              ? collapsed.filter((id) => id !== mt.id)
-                              : [...collapsed, mt.id],
+                  <Card key={mt.id} padded={false}>
+                    <MealSectionHeader
+                      name={mt.name}
+                      status={n.view.mealStatuses[mt.id] ?? 'not_recorded'}
+                      calories={rows.length ? totals(rows).calories : undefined}
+                      expanded={!collapsed.includes(mt.id)}
+                      onToggle={
+                        rows.length
+                          ? () => {
+                              layoutMotion(reduced);
+                              setCollapsed((previous) =>
+                                previous.includes(mt.id)
+                                  ? previous.filter((id) => id !== mt.id)
+                                  : [...previous, mt.id],
+                              );
+                            }
+                          : undefined
+                      }
+                      onAdd={() => {
+                        layoutMotion(reduced);
+                        setCollapsed((previous) => previous.filter((id) => id !== mt.id));
+                        setLibrary(false);
+                        setLogger(mt.id);
+                      }}
+                      onSkip={(skipped) =>
+                        change(() => n.store!.setMealSkipped(mt.id, date, skipped))
+                      }
+                    />
+                    <Stack
+                      gap="none"
+                      style={{
+                        borderTopWidth: rows.length && !collapsed.includes(mt.id) ? 1 : 0,
+                        borderTopColor: theme.colors.border,
+                      }}
+                    >
+                      {!collapsed.includes(mt.id) && rows.length > 0
+                        ? [...grouped.entries()].map(([key, logs]) =>
+                            logs.length > 1 && logs[0].mealGroupId ? (
+                              <Disclosure
+                                key={key}
+                                title={
+                                  n.view.meals.find((m) => m.id === logs[0].savedMealId)
+                                    ?.name ??
+                                  logs[0].mealGroupName ??
+                                  'Meal'
+                                }
+                              >
+                                <Stack>
+                                  <AppButton
+                                    title="Edit meal portion"
+                                    variant="ghost"
+                                    onPress={() => {
+                                      setGroupEdit(logs);
+                                      setGroupScale('1');
+                                      setBucket(logs[0].mealTypeId);
+                                    }}
+                                  />
+                                  {logs.map(foodRow)}
+                                  <MacroLine value={totals(logs)} />
+                                </Stack>
+                              </Disclosure>
+                            ) : (
+                              foodRow(logs[0])
+                            ),
                           )
-                        }
-                      />
-                      <AppText variant="micro" tone="muted">
-                        {rows.length ? Math.round(totals(rows).calories) : ''}
-                      </AppText>
-                      <IconButton
-                        icon="plus"
-                        label={`Add food to ${mt.name}`}
-                        onPress={() => {
-                          setLibrary(false);
-                          setLogger(mt.id);
-                        }}
-                      />
+                        : null}
                     </Stack>
-                    <Card padded={false}>
-                      <MealLoggingStatus
-                        mealName={mt.name}
-                        status={n.view.mealStatuses[mt.id] ?? 'not_recorded'}
-                        onChange={(skipped) =>
-                          void change(() => n.store!.setMealSkipped(mt.id, date, skipped))
-                        }
-                      />
-                      {collapsed.includes(mt.id) ? (
-                        rows.length ? (
-                          <MacroLine value={totals(rows)} />
-                        ) : null
-                      ) : rows.length ? (
-                        [...grouped.entries()].map(([key, logs]) =>
-                          logs.length > 1 && logs[0].mealGroupId ? (
-                            <Disclosure
-                              key={key}
-                              title={
-                                n.view.meals.find((m) => m.id === logs[0].savedMealId)?.name ??
-                                logs[0].mealGroupName ??
-                                'Meal'
-                              }
-                            >
-                              <Stack>
-                                <AppButton
-                                  title="Edit meal portion"
-                                  variant="ghost"
-                                  onPress={() => {
-                                    setGroupEdit(logs);
-                                    setGroupScale('1');
-                                    setBucket(logs[0].mealTypeId);
-                                  }}
-                                />
-                                {logs.map(foodRow)}
-                                <MacroLine value={totals(logs)} />
-                              </Stack>
-                            </Disclosure>
-                          ) : (
-                            foodRow(logs[0])
-                          ),
-                        )
-                      ) : null}
-                    </Card>
-                    {rows.length > 1 && <MacroLine value={totals(rows)} />}
-                  </Stack>
+                    {rows.length > 1 && !collapsed.includes(mt.id) && (
+                      <Stack style={{ padding: theme.spacing.md }}>
+                        <MacroLine value={totals(rows)} />
+                      </Stack>
+                    )}
+                  </Card>
                 );
               })}
               <Card>
@@ -489,7 +545,7 @@ export function NutritionScreen({
                 title="Delete"
                 variant="danger"
                 onPress={() => {
-                  setRemove([edit]);
+                  void removeFood([edit]);
                   setEdit(null);
                 }}
               />
@@ -553,31 +609,51 @@ export function NutritionScreen({
               title="Delete meal"
               variant="danger"
               onPress={() => {
-                setRemove(groupEdit);
+                void removeFood(groupEdit);
                 setGroupEdit(null);
               }}
             />
           </>
         )}
       </Sheet>
-      <Sheet visible={remove !== null} title="Delete food" onClose={() => setRemove(null)}>
-        {remove && (
-          <ConfirmationCard
-            title={`Delete ${remove[0].foodItem.name}?`}
-            message="This removes the selected diary entry."
-            confirmLabel="Delete"
-            cancelLabel="Cancel"
-            danger
-            onConfirm={() =>
-              void change(async () => {
-                await n.store!.removeLogs(remove);
-                setRemove(null);
-              })
-            }
-            onCancel={() => setRemove(null)}
-          />
-        )}
-      </Sheet>
+      {foodActions && (
+        <ActionMenu
+          visible
+          title={foodActions?.foodItem.name ?? 'Food actions'}
+          onClose={() => setFoodActions(null)}
+          actions={
+            foodActions
+              ? [
+                  { title: 'Edit serving', icon: 'edit', run: () => openFood(foodActions) },
+                  {
+                    title: 'Duplicate',
+                    icon: 'plus',
+                    run: () =>
+                      void change(async () => {
+                        await n.store!.logFoods(
+                          [
+                            {
+                              ...foodActions.foodItem,
+                              quantityMultiplier: foodActions.quantityMultiplier,
+                            },
+                          ],
+                          foodActions.date,
+                          foodActions.mealTypeId,
+                        );
+                        feedback('success');
+                      }),
+                  },
+                  {
+                    title: 'Delete',
+                    icon: 'delete',
+                    danger: true,
+                    run: () => void removeFood([foodActions]),
+                  },
+                ]
+              : []
+          }
+        />
+      )}
       <Sheet
         visible={actionError !== null}
         title="Nutrition change"

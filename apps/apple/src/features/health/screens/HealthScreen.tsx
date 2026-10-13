@@ -1,3 +1,4 @@
+import { usePagerMotion } from '../../../shared/ui/usePagerMotion';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import {
@@ -49,6 +50,7 @@ export function HealthScreen({
   sleepRequest?: { date: string; count: number };
 }) {
   const { theme } = useTheme();
+  const motion = usePagerMotion();
   const health = useHealthData();
   const resources = useWorkoutResources();
   const [localTab, setTab] = useState<HealthPanel>('training');
@@ -61,10 +63,14 @@ export function HealthScreen({
   const tab = panel ?? localTab;
   const [visited, setVisited] = useState<Set<HealthPanel>>(() => new Set([tab]));
   function select(panel: HealthPanel) {
+    motion.moveTo(panels.findIndex((entry) => entry.id === panel));
     setTab(panel);
     onPanelChange?.(panel);
     setVisited((old) => new Set([...old, panel]));
   }
+  useEffect(() => {
+    setVisited((old) => (old.has(tab) ? old : new Set([...old, tab])));
+  }, [tab]);
   useEffect(() => {
     void health.store?.refresh();
   }, [health.store, health.today]);
@@ -74,6 +80,7 @@ export function HealthScreen({
   }
   return (
     <PageLayout
+      landing
       title="Health"
       subtitle="Body & training"
       actions={
@@ -96,6 +103,8 @@ export function HealthScreen({
     >
       <View style={{ paddingHorizontal: theme.spacing.lg }}>
         <SegmentedControl
+          animated
+          position={motion.width > 0 ? motion.position : undefined}
           label="Health views"
           options={panels.map((panel) => ({ value: panel.id, label: panel.label }))}
           value={tab}
@@ -113,8 +122,21 @@ export function HealthScreen({
       ) : (
         <Carousel
           items={panels}
+          lazy
+          motion={motion}
+          onApproach={(id) =>
+            setVisited((old) =>
+              old.has(id as HealthPanel) ? old : new Set([...old, id as HealthPanel]),
+            )
+          }
           selectedId={tab}
-          onSelect={(id) => select(id as HealthPanel)}
+          onSelect={(id) => {
+            setTab(id as HealthPanel);
+            onPanelChange?.(id as HealthPanel);
+            setVisited((old) =>
+              old.has(id as HealthPanel) ? old : new Set([...old, id as HealthPanel]),
+            );
+          }}
           showDots={false}
           label={(panel) => panel.label}
           renderItem={(panel) => (

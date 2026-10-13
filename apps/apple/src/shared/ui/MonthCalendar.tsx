@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { AppButton } from './AppButton';
 import { AppText } from './AppText';
 import { IconButton } from './IconButton';
@@ -14,6 +14,7 @@ export function MonthCalendar({
   onMonthChange,
   onSelect,
   status,
+  nativeStyle = false,
 }: {
   month: string;
   today: string;
@@ -22,6 +23,7 @@ export function MonthCalendar({
   onMonthChange: (month: string) => void;
   onSelect: (date: string) => void;
   status?: ReactNode;
+  nativeStyle?: boolean;
 }) {
   const { theme } = useTheme();
   const [year, number] = month.split('-').map(Number);
@@ -29,7 +31,9 @@ export function MonthCalendar({
   const count = new Date(Date.UTC(year, number, 0)).getUTCDate();
   function move(offset: number) {
     const date = new Date(Date.UTC(year, number - 1 + offset, 1));
-    onMonthChange(date.toISOString().slice(0, 7));
+    onMonthChange(
+      `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`,
+    );
   }
   return (
     <Stack>
@@ -79,19 +83,69 @@ export function MonthCalendar({
           const names = markers[date] ?? markers[date.replace(/-/g, '/')] ?? [];
           return (
             <View key={date} style={{ width: `${100 / 7}%`, height: theme.sizes.button }}>
-              <AppButton
-                title={String(day)}
-                accessibilityLabel={`${date}${names.length ? ', ' + names.join(', ') : ''}`}
-                variant={
-                  date === selected || date === today
-                    ? 'primary'
-                    : names.length
-                      ? 'secondary'
-                      : 'ghost'
-                }
-                onPress={() => onSelect(date)}
-                style={{ height: '100%', paddingHorizontal: 0, paddingVertical: 0 }}
-              />
+              {nativeStyle ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`${date}${names.length ? ', ' + names.join(', ') : ''}`}
+                  accessibilityState={{ selected: date === selected }}
+                  onPress={() => onSelect(date)}
+                  style={({ pressed }) => ({
+                    flex: 1,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: pressed ? 0.6 : 1,
+                  })}
+                >
+                  <View
+                    style={{
+                      width: theme.sizes.weekDay,
+                      height: theme.sizes.weekDay,
+                      borderRadius: theme.radii.pill,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor:
+                        date === selected
+                          ? theme.colors.brand
+                          : names.length
+                            ? theme.colors.brandSurface
+                            : 'transparent',
+                      borderWidth: date === today ? 1 : 0,
+                      borderColor: theme.colors.brand,
+                    }}
+                  >
+                    <AppText
+                      variant="label"
+                      style={{
+                        color:
+                          date === selected
+                            ? theme.colors.onBrand
+                            : date === today
+                              ? theme.colors.brandText
+                              : date > today
+                                ? theme.colors.muted
+                                : theme.colors.text,
+                        fontVariant: ['tabular-nums'],
+                      }}
+                    >
+                      {day}
+                    </AppText>
+                  </View>
+                </Pressable>
+              ) : (
+                <AppButton
+                  title={String(day)}
+                  accessibilityLabel={`${date}${names.length ? ', ' + names.join(', ') : ''}`}
+                  variant={
+                    date === selected || date === today
+                      ? 'primary'
+                      : names.length
+                        ? 'secondary'
+                        : 'ghost'
+                  }
+                  onPress={() => onSelect(date)}
+                  style={{ height: '100%', paddingHorizontal: 0, paddingVertical: 0 }}
+                />
+              )}
               {names.length > 0 && (
                 <View
                   pointerEvents="none"
@@ -103,7 +157,7 @@ export function MonthCalendar({
                     height: theme.spacing.xs,
                     borderRadius: theme.radii.pill,
                     backgroundColor:
-                      date === selected || date === today
+                      date === selected || (!nativeStyle && date === today)
                         ? theme.colors.onBrand
                         : theme.colors.brandText,
                   }}

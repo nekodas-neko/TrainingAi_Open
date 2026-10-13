@@ -1,6 +1,7 @@
 import { useRecordedIntake } from '../../nutrition/data/useRecordedIntake';
 import { HealthResourceHeader } from './HealthResourceHeader';
 import { useState } from 'react';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { bodyComposition } from '@trainingai/shared/health/body-composition';
 import {
   computeWeightRateKgPerWeek,
@@ -50,8 +51,13 @@ import { useAppleImport } from '../HealthProvider';
 import { toAestDay } from '@trainingai/shared/date-utils';
 
 function GroupTitle({ children }: { children: string }) {
+  const { theme } = useTheme();
   return (
-    <AppText variant="eyebrow" tone="muted">
+    <AppText
+      variant="heading"
+      accessibilityRole="header"
+      style={{ marginTop: theme.spacing.sm }}
+    >
       {children}
     </AppText>
   );
@@ -281,7 +287,7 @@ export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) =
         <HealthMetricCard
           compact
           title="Burned"
-          value={health.body?.activeEnergyKcalToday}
+          value={health.body?.activeEnergyKcalToday ?? null}
           unit="kcal"
           tone="activity"
           caption="Active energy · today"
@@ -474,7 +480,7 @@ export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) =
         />
         <HealthMetricCard
           compact
-          title="Dist"
+          title="Distance"
           value={today?.distanceKm ?? null}
           unit="km"
           decimals={1}

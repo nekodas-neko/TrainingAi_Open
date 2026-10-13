@@ -34,6 +34,7 @@ const diskSchema = z.object({
   markers: z.record(z.string(), z.boolean()).default({}),
 });
 type Operation = z.infer<typeof operationSchema>;
+export type HomeChange = Operation['kind'];
 export type HomeState = {
   ready: boolean;
   denied: boolean;
@@ -82,7 +83,7 @@ export class HomeStore {
     private storage: ScopedStorage,
     readonly connection: AccountConnection,
     private uuid: () => string,
-    private changed = () => {},
+    private changed: (kind: HomeChange) => void = () => {},
     private now = Date.now,
   ) {}
   getSnapshot = () => this.current;
@@ -173,7 +174,7 @@ export class HomeStore {
       error: null,
     }));
     this.revision++;
-    this.changed();
+    this.changed('mood');
     void this.sync();
   }
   async savePreferences(patch: HomePreferences) {
@@ -197,12 +198,12 @@ export class HomeStore {
       error: null,
     }));
     this.revision++;
-    this.changed();
+    this.changed('rest');
     void this.sync();
   }
-  async mark(key: string) {
+  async mark(key: string, marked = true) {
     this.guard();
-    await this.write((state) => ({ markers: { ...state.markers, [key]: true } }));
+    await this.write((state) => ({ markers: { ...state.markers, [key]: marked } }));
   }
   async postponeGoals(date: string) {
     this.guard();
@@ -394,7 +395,7 @@ export class HomeStore {
             operations: state.operations.filter((x) => x.id !== op.id),
             error: null,
           }));
-          this.changed();
+          this.changed(op.kind);
         }
         this.publish({ error: null });
       } catch (cause) {

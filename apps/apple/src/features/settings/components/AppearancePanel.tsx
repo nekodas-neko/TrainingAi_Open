@@ -4,6 +4,7 @@ import {
   Card,
   ColorChoice,
   Grid,
+  HueSlider,
   Notice,
   SegmentedControl,
 } from '../../../shared/ui';
@@ -12,7 +13,8 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { palettes, type Brand } from '../../../shared/theme/palettes';
 
 export function AppearancePanel() {
-  const { theme, mode, setMode, brand, setBrand } = useTheme();
+  const { theme, mode, setMode, brand, setBrand, customHue, setCustomHue, previewCustomHue } =
+    useTheme();
   const { saveStatus, retry } = useAppearancePreferences();
   return (
     <Card>
@@ -28,13 +30,19 @@ export function AppearancePanel() {
         ]}
       />
       <AppText variant="label">Accent colour</AppText>
+      <HueSlider
+        value={customHue}
+        onChange={previewCustomHue}
+        onComplete={setCustomHue}
+        onCancel={() => previewCustomHue(undefined)}
+      />
       <Grid columns={2}>
         {(Object.keys(palettes) as Brand[]).map((key) => (
           <ColorChoice
             key={key}
             label={palettes[key].label}
             color={palettes[key][theme.mode].brand}
-            selected={brand === key}
+            selected={customHue === null && brand === key}
             onPress={() => setBrand(key)}
           />
         ))}

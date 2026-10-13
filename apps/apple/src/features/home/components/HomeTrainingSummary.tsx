@@ -1,5 +1,13 @@
 import { Pressable, View } from 'react-native';
-import { AppText, Card, Grid, ProgressBar, Stack } from '../../../shared/ui';
+import {
+  AppText,
+  Card,
+  Grid,
+  Icon,
+  ProgressBar,
+  Stack,
+  TouchSurface,
+} from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { shiftDateStr, formatDateDisplay } from '@trainingai/shared/date-utils';
 import { homeStreak, trainingWeek } from '../data/models';
@@ -30,7 +38,8 @@ export function HomeTrainingSummary({
   const streak = homeStreak(days, today, schedule);
   return (
     <Grid columns={2}>
-      <Pressable
+      <TouchSurface
+        fill
         accessibilityRole="button"
         accessibilityLabel="View training streak and statistics"
         onPress={openStats}
@@ -38,18 +47,26 @@ export function HomeTrainingSummary({
       >
         <Card
           tone="brand"
+          style={{ flex: 1 }}
           accent={preferences.cardColors?.streakLeft ?? theme.homeCards.streakLeft}
         >
-          <AppText variant="eyebrow" tone="muted">
-            Streak
-          </AppText>
+          <Stack direction="row" align="center" justify="space-between">
+            <AppText variant="eyebrow" tone="muted">
+              Streak
+            </AppText>
+            <Icon name="forward" size={theme.sizes.iconSmall} tone="muted" />
+          </Stack>
           <AppText variant="hero" tone="brand">
             {loaded && streak > 0 ? streak : '—'}{' '}
             <AppText variant="caption" tone="muted">
               days
             </AppText>
           </AppText>
-          <Stack direction="row" gap="xxs">
+          <Stack
+            direction="row"
+            gap="xxs"
+            style={{ marginTop: 'auto', minHeight: theme.spacing.lg, alignItems: 'center' }}
+          >
             {Array.from({ length: 10 }, (_, i) => (
               <View
                 key={i}
@@ -66,17 +83,24 @@ export function HomeTrainingSummary({
             ))}
           </Stack>
         </Card>
-      </Pressable>
-      <Pressable
+      </TouchSurface>
+      <TouchSurface
+        fill
         accessibilityRole="button"
         accessibilityLabel="View this week’s training statistics"
         onPress={openStats}
         style={{ flex: 1 }}
       >
-        <Card accent={preferences.cardColors?.streakRight ?? theme.homeCards.streakRight}>
-          <AppText variant="eyebrow" tone="muted">
-            This Week
-          </AppText>
+        <Card
+          style={{ flex: 1 }}
+          accent={preferences.cardColors?.streakRight ?? theme.homeCards.streakRight}
+        >
+          <Stack direction="row" align="center" justify="space-between">
+            <AppText variant="eyebrow" tone="muted">
+              This Week
+            </AppText>
+            <Icon name="forward" size={theme.sizes.iconSmall} tone="muted" />
+          </Stack>
           <AppText variant="hero">
             {loaded ? count : '—'}
             {!ai && target !== null && (
@@ -91,10 +115,18 @@ export function HomeTrainingSummary({
               sessions this week
             </AppText>
           ) : (
-            <ProgressBar value={loaded && target ? count / target : 0} />
+            <Stack
+              style={{
+                marginTop: 'auto',
+                minHeight: theme.spacing.lg,
+                justifyContent: 'center',
+              }}
+            >
+              <ProgressBar value={loaded && target ? count / target : 0} />
+            </Stack>
           )}
         </Card>
-      </Pressable>
+      </TouchSurface>
     </Grid>
   );
 }

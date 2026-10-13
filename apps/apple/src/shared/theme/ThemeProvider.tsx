@@ -1,6 +1,7 @@
 import { createContext, useContext, useMemo, useState, type PropsWithChildren } from 'react';
 import { useColorScheme } from 'react-native';
 import { createTheme, type ThemeMode, type ThemeOverrides } from './theme';
+import { customAccent } from './custom-accent';
 import type { Brand } from './palettes';
 
 type ThemeOptions = {
@@ -9,6 +10,8 @@ type ThemeOptions = {
   overrides?: ThemeOverrides;
   mode?: ThemeMode;
   brand?: Brand;
+  customHue?: number | null;
+  onCustomHueChange?: (hue: number | null) => void;
   onModeChange?: (mode: ThemeMode) => void;
   onBrandChange?: (brand: Brand) => void;
 };
@@ -21,6 +24,8 @@ function useThemeController({
   brand: controlledBrand,
   onModeChange,
   onBrandChange,
+  customHue: controlledHue = null,
+  onCustomHueChange,
 }: ThemeOptions) {
   const system = useColorScheme();
   const [localMode, setLocalMode] = useState(initialMode);
@@ -28,13 +33,40 @@ function useThemeController({
   const mode = controlledMode ?? localMode;
   const brand = controlledBrand ?? localBrand;
   const setMode = onModeChange ?? setLocalMode;
-  const setBrand = onBrandChange ?? setLocalBrand;
+  const [localHue, setLocalHue] = useState<number | null>(null);
+  const [previewHue, setPreviewHue] = useState<number | undefined>();
+  const customHue = previewHue ?? (onCustomHueChange ? controlledHue : localHue);
+  const setCustomHue = (hue: number | null) => {
+    setPreviewHue(undefined);
+    (onCustomHueChange ?? setLocalHue)(hue);
+  };
+  const setBrand = (value: Brand) => {
+    setPreviewHue(undefined);
+    setLocalHue(null);
+    (onBrandChange ?? setLocalBrand)(value);
+  };
   const resolved = mode === 'system' ? (system === 'dark' ? 'dark' : 'light') : mode;
   const theme = useMemo(
-    () => createTheme(resolved, brand, overrides),
-    [resolved, brand, overrides],
+    () =>
+      createTheme(resolved, brand, {
+        ...overrides,
+        colors: {
+          ...(customHue !== null ? customAccent(customHue, resolved) : {}),
+          ...overrides?.colors,
+        },
+      }),
+    [resolved, brand, overrides, customHue],
   );
-  return { theme, mode, brand, setMode, setBrand };
+  return {
+    theme,
+    mode,
+    brand,
+    customHue,
+    setMode,
+    setBrand,
+    setCustomHue,
+    previewCustomHue: setPreviewHue,
+  };
 }
 const Context = createContext<ReturnType<typeof useThemeController> | null>(null);
 export function ThemeProvider({ children, ...options }: PropsWithChildren<ThemeOptions>) {

@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react';
+import { feedback } from '../../../integrations/feedback/haptics';
 import { Share, View } from 'react-native';
 import {
   AppButton,
@@ -37,6 +39,16 @@ export function WorkoutLogScreen({
   const journal = useWorkoutJournal();
   const { theme } = useTheme();
   const workout = journal.data.workouts.find((workout) => workout.id === workoutId);
+  const previousStatus = useRef({ id: workoutId, status: workout?.status });
+  useEffect(() => {
+    if (
+      previousStatus.current.id === workoutId &&
+      previousStatus.current.status === 'active' &&
+      workout?.status === 'completed'
+    )
+      feedback('success');
+    previousStatus.current = { id: workoutId, status: workout?.status };
+  }, [workoutId, workout?.status]);
   if (journal.controller && journal.ready && workout?.status === 'active') {
     return (
       <GuidedWorkoutScreen key={workout.id} workout={workout} closeWorkout={closeWorkout} />

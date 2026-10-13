@@ -833,6 +833,25 @@ export class NutritionStore {
       })),
     );
   }
+  async restoreLogs(logs: FoodLog[]) {
+    await this.enqueue(
+      logs.map((log) => ({
+        domain: 'food_logs' as const,
+        date: log.date,
+        payload: {
+          id: log.id,
+          mealTypeId: log.mealTypeId,
+          foodItemId: log.foodItemId,
+          quantityMultiplier: log.quantityMultiplier,
+          loggedAt: log.loggedAt,
+          savedMealId: log.savedMealId,
+          mealGroupId: log.mealGroupId,
+          mealGroupName: log.mealGroupName,
+        },
+      })),
+      logs.map((log) => log.foodItem),
+    );
+  }
   async saveMeal(
     payload: z.infer<typeof SavedMealSchema>,
     date: string,

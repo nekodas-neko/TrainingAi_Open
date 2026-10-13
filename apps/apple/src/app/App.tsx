@@ -1,3 +1,4 @@
+import { UndoProvider } from '../shared/ui/undo/UndoProvider';
 import { ProfileDetailsScreen } from '../features/settings/screens/ProfileDetailsScreen';
 import { SessionExplainScreen } from '../features/workouts/screens/SessionExplainScreen';
 import { CoachProvider } from '../features/coach/CoachProvider';
@@ -453,6 +454,17 @@ function AppShell() {
     </SafeAreaView>
   );
 }
+function NativeInteractions() {
+  const { dataReader } = useAccountContext();
+  const scope = JSON.stringify([dataReader?.origin, dataReader?.userId]);
+  return (
+    <UndoProvider key={scope}>
+      <CoachProvider>
+        <AppShell />
+      </CoachProvider>
+    </UndoProvider>
+  );
+}
 export default function App() {
   return (
     <SafeAreaProvider>
@@ -460,9 +472,7 @@ export default function App() {
         <LocalStorageProvider>
           <AppProvider>
             <AppStartupGate>
-              <CoachProvider>
-                <AppShell />
-              </CoachProvider>
+              <NativeInteractions />
             </AppStartupGate>
           </AppProvider>
         </LocalStorageProvider>

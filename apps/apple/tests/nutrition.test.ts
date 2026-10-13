@@ -662,3 +662,73 @@ test('an uncertain create cannot silently re-POST when no canonical row is visib
   await assert.rejects(save(), UnconfirmedCreate);
   assert.equal(posts, 1);
 });
+
+test('food undo preserves the serving, eaten-at time and group through offline reopening', async () => {
+  const f = fixture();
+  const store = await ready(f);
+  f.online(false);
+  await store.logFoods(
+    [
+      { ...food, quantityMultiplier: 1.5 },
+      { ...food, quantityMultiplier: 2 },
+    ],
+    date,
+    mealType.id,
+    { name: 'Rice meal' },
+  );
+  const original = store.view(date).logs;
+  const recovery = original.map((log, i) => ({ ...log, id: id(500 + i) }));
+  await store.removeLogs(original);
+  assert.equal(store.view(date).logs.length, 0);
+  await store.restoreLogs(recovery);
+  assert.equal(store.view(date).totals?.calories, 455);
+  assert.deepEqual(
+    store
+      .view(date)
+      .logs.map((log) => [
+        log.loggedAt,
+        log.quantityMultiplier,
+        log.mealGroupId,
+        log.mealGroupName,
+      ]),
+    original.map((log) => [
+      log.loggedAt,
+      log.quantityMultiplier,
+      log.mealGroupId,
+      log.mealGroupName,
+    ]),
+  );
+  store.cancel();
+  const reopened = f.make();
+  await reopened.initialize();
+  assert.equal(reopened.view(date).logs.length, 2);
+  f.online(true);
+  f.lost();
+  await reopened.sync();
+  await reopened.sync();
+  assert.equal(f.logs.length, 2);
+  assert.deepEqual(f.logs.map((log) => log.id).sort(), recovery.map((log) => log.id).sort());
+  assert.equal(reopened.getSnapshot().operations.length, 0);
+  reopened.cancel();
+});
+test('a failed restoring write keeps the deletion durable and retry uses the same recovery identity', async () => {
+  const f = fixture();
+  const store = await ready(f);
+  f.online(false);
+  await store.logFoods([{ ...food, quantityMultiplier: 1 }], date, mealType.id);
+  const original = store.view(date).logs;
+  const recovery = [{ ...original[0], id: id(600) }];
+  await store.removeLogs(original);
+  f.failDisk(true);
+  await assert.rejects(() => store.restoreLogs(recovery));
+  assert.equal(store.view(date).logs.length, 0);
+  f.failDisk(false);
+  await store.restoreLogs(recovery);
+  assert.equal(store.view(date).logs.length, 1);
+  assert.equal(store.view(date).logs[0].id, id(600));
+  store.cancel();
+  const reopened = f.make();
+  await reopened.initialize();
+  assert.equal(reopened.view(date).logs[0].id, id(600));
+  reopened.cancel();
+});

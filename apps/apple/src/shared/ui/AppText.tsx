@@ -11,6 +11,7 @@ export function AppText({
   const { theme } = useTheme();
   return (
     <Text
+      selectable={false}
       accessibilityRole={variant === 'title' || variant === 'heading' ? 'header' : undefined}
       {...props}
       style={[

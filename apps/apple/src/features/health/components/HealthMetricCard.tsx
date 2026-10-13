@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
-import { Pressable } from 'react-native';
-import { AppButton, AppText, Card, LineChart, Stack } from '../../../shared/ui';
+import { MetricCard, LineChart } from '../../../shared/ui';
 import type { Tone } from '../../../shared/theme/theme';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { metricValue } from '../data/models';
@@ -16,7 +15,6 @@ export function HealthMetricCard({
   onOpen,
   onLog,
   children,
-  compact = false,
   status,
   compactChart = false,
 }: {
@@ -36,34 +34,16 @@ export function HealthMetricCard({
 }) {
   const { theme } = useTheme();
   return (
-    <Card tone={tone}>
-      <Stack direction="row" align="center" justify="space-between">
-        <Pressable
-          disabled={!onOpen}
-          onPress={onOpen}
-          accessibilityRole={onOpen ? 'button' : undefined}
-          accessibilityLabel={onOpen ? `View ${title} history` : undefined}
-          style={{ flex: 1 }}
-        >
-          <AppText variant="eyebrow" style={{ color: theme.tones[tone].foreground }}>
-            {title}
-            {onOpen ? ' ↗' : ''}
-          </AppText>
-          {!compact && value !== undefined && (
-            <AppText variant="title">{metricValue(value, unit, decimals)}</AppText>
-          )}
-        </Pressable>
-        {onLog && <AppButton title="Log" variant="surface" onPress={onLog} />}
-        {status}
-      </Stack>
-      {compact && value !== undefined && (
-        <AppText variant="hero">{metricValue(value, '', decimals)}</AppText>
-      )}
-      {compact && unit && (
-        <AppText variant="micro" tone="muted">
-          {unit}
-        </AppText>
-      )}
+    <MetricCard
+      label={title}
+      value={value === undefined ? undefined : metricValue(value, '', decimals)}
+      unit={unit}
+      tone={tone}
+      caption={caption}
+      onOpen={onOpen}
+      onLog={onLog}
+      status={status}
+    >
       {points && (
         <LineChart
           points={points}
@@ -73,12 +53,7 @@ export function HealthMetricCard({
           showLabels={!compactChart}
         />
       )}
-      {caption && (
-        <AppText variant="micro" tone="muted">
-          {caption}
-        </AppText>
-      )}
       {children}
-    </Card>
+    </MetricCard>
   );
 }

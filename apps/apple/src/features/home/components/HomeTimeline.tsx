@@ -1,15 +1,31 @@
 import { useActivities } from '../../activities/data/ActivityProvider';
-import { Pressable, View } from 'react-native';
-import { formatHoursMinutes } from '@trainingai/shared/format/units';
+import { useRef, useState } from 'react';
 import { formatTimeOfDay, shiftDateStr } from '@trainingai/shared/date-utils';
 import { dayTimeInstant } from '../../health/data/manual-night';
-import { AppText, Card, Icon, Stack, StatusIndicator, type IconName } from '../../../shared/ui';
+import {
+  AppButton,
+  AppText,
+  Sheet,
+  Stack,
+  StatusIndicator,
+  TimelineRow,
+  type IconName,
+} from '../../../shared/ui';
+import type { Tone } from '../../../shared/theme/theme';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useHealthData } from '../../health/data/HealthDataProvider';
 import { useWorkoutJournal } from '../../workouts/logging/WorkoutJournalProvider';
 import { useNutrition } from '../../nutrition/data/NutritionProvider';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { localTimeline, timelineSchema, type TimelineEvent } from '../data/timeline';
+import {
+  isSleepEvent,
+  timelineDestinationDate,
+  timelineSleepNight,
+  timelineSummary,
+  timelineTitle,
+} from '../data/timeline-presentation';
+import { TimelineEventDetails } from './TimelineEventDetails';
 export function HomeTimeline({
   openDay,
   openNutrition,
@@ -25,6 +41,9 @@ export function HomeTimeline({
   const activity = useActivities();
   const { theme } = useTheme();
   const today = health.today;
+  const [selected, setSelected] = useState<TimelineEvent | null>(null);
+  const [closing, setClosing] = useState(false);
+  const pendingNavigation = useRef<(() => void) | null>(null);
   const state = useWorkoutResource({
     path: '/api/day-timeline',
     query: { date: today },
@@ -141,130 +160,116 @@ export function HomeTimeline({
     }
   }
   events.sort((a, b) => b.timeMs - a.timeMs);
-  if (!events.length && !state.loading && !state.error) {
+  if (!events.length && !state.loading && !state.error && !selected) {
     return null;
   }
-  const icons: Record<string, IconName> = {
-    wakeup: 'power',
-    sleep: 'moon',
-    bedtime: 'moon',
-    workout: 'workout',
-    meal: 'nutrition',
-    walk: 'legs',
-    tag: 'info',
-  };
+  function destination(event: TimelineEvent) {
+    const date = timelineDestinationDate(event, today, health.sleep);
+    if (event.type === 'meal') openNutrition(date);
+    else if (isSleepEvent(event)) openSleep(date);
+    else openDay(date);
+  }
+  function appearance(event: TimelineEvent): { icon: IconName; tone: Tone; color?: string } {
+    if (isSleepEvent(event))
+      return {
+        icon: event.type === 'wakeup' ? 'sunrise' : 'moon',
+        tone: 'sleep',
+        color: theme.scores.sleep,
+      };
+    if (event.type === 'meal')
+      return { icon: 'nutrition', tone: 'checkin', color: theme.scores.activity };
+    if (event.type === 'workout') return { icon: 'workout', tone: 'brand' };
+    if (event.type === 'walk') return { icon: 'legs', tone: 'activity' };
+    if (event.type === 'cardio') return { icon: 'cardio', tone: 'recovery' };
+    return { icon: event.type === 'tag' ? 'info' : 'activity', tone: 'neutral' };
+  }
   return (
-    <Stack>
+    <Stack gap="md">
       <Stack direction="row" align="center" justify="space-between">
-        <AppText variant="eyebrow" tone="muted">
-          Today’s Timeline
-        </AppText>
+        <AppText variant="heading">Timeline</AppText>
         <StatusIndicator
-          label="Today’s timeline"
+          label="Timeline"
           error={state.error}
           onRetry={state.refresh}
           busy={state.loading && !state.data}
         />
       </Stack>
-      {events.map((event, index) => (
-        <Stack key={`${event.type}:${event.timeMs}:${index}`}>
-          {event.day === 'yesterday' && events[index - 1]?.day !== 'yesterday' && (
+      {(['today', 'yesterday'] as const).map((day) => {
+        const rows = events.filter((event) => event.day === day);
+        if (!rows.length) return null;
+        return (
+          <Stack key={day} gap="xs">
             <AppText variant="eyebrow" tone="muted">
-              Yesterday
+              {day === 'today' ? 'Today' : 'Yesterday'}
             </AppText>
-          )}
-          <Stack direction="row" align="flex-start">
-            <Stack align="center" style={{ width: theme.sizes.touchTarget }}>
-              <AppText variant="micro" tone="muted">
-                {event.time}
-              </AppText>
-              <Icon name={icons[event.type] ?? 'activity'} tone="brand" />
-            </Stack>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={event.title}
-              onPress={
-                event.type === 'meal'
-                  ? () =>
-                      openNutrition(
+            <Stack gap="none">
+              {rows.map((event, index) => (
+                <TimelineRow
+                  key={event.type + ':' + event.timeMs + ':' + index}
+                  time={formatTimeOfDay(event.timeMs, health.timezone)}
+                  title={timelineTitle(event)}
+                  summary={timelineSummary(event)}
+                  savedLocally={event.subtitle === 'Saved on this phone'}
+                  {...appearance(event)}
+                  first={index === 0}
+                  last={index === rows.length - 1}
+                  onPress={() => {
+                    pendingNavigation.current = null;
+                    setClosing(false);
+                    setSelected({
+                      ...event,
+                      date:
                         event.date ?? (event.day === 'today' ? today : shiftDateStr(today, -1)),
-                      )
-                  : ['wakeup', 'sleep', 'bedtime'].includes(event.type)
-                    ? () =>
-                        openSleep(
-                          event.sleepDate ??
-                            health.sleep.find(
-                              (night) =>
-                                night.sleepStart &&
-                                night.sleepEnd &&
-                                event.timeMs >= Date.parse(night.sleepStart) &&
-                                event.timeMs <= Date.parse(night.sleepEnd),
-                            )?.date ??
-                            event.date ??
-                            (event.day === 'today' ? today : shiftDateStr(today, -1)),
-                        )
-                    : () =>
-                        openDay(
-                          event.date ??
-                            (event.day === 'today' ? today : shiftDateStr(today, -1)),
-                        )
-              }
-              style={{ flex: 1 }}
-            >
-              <Card>
-                <AppText variant="label">{event.title}</AppText>
-                <Stack direction="row" wrap>
-                  {event.durationMin != null && (
-                    <AppText variant="caption" tone="muted">
-                      {event.durationMin} min
-                    </AppText>
-                  )}
-                  {event.sets != null && (
-                    <AppText variant="caption" tone="muted">
-                      {event.sets} sets
-                    </AppText>
-                  )}
-                  {event.exerciseCount != null && (
-                    <AppText variant="caption" tone="muted">
-                      {event.exerciseCount} exercises
-                    </AppText>
-                  )}
-                  {event.distanceKm != null && (
-                    <AppText variant="caption" tone="muted">
-                      {event.distanceKm.toFixed(2)} km
-                    </AppText>
-                  )}
-                  {event.calories != null && (
-                    <AppText variant="caption" tone="muted">
-                      {event.calories} kcal
-                    </AppText>
-                  )}
-                  {event.sleepDurationH != null && (
-                    <AppText variant="caption" tone="muted">
-                      {formatHoursMinutes(event.sleepDurationH * 60)} sleep
-                    </AppText>
-                  )}
-                </Stack>
-                {(event.readinessScore != null || event.sleepScore != null) && (
-                  <Stack direction="row">
-                    {event.readinessScore != null && (
-                      <AppText variant="caption">Energy {event.readinessScore}</AppText>
-                    )}
-                    {event.sleepScore != null && (
-                      <AppText variant="caption">Sleep {event.sleepScore}</AppText>
-                    )}
-                  </Stack>
-                )}
-                {event.subtitle && (
-                  <AppText variant="micro" tone="muted">
-                    {event.subtitle}
-                  </AppText>
-                )}
-              </Card>
-            </Pressable>
+                    });
+                  }}
+                />
+              ))}
+            </Stack>
           </Stack>
-        </Stack>
-      ))}
+        );
+      })}
+      <Sheet
+        visible={selected !== null && !closing}
+        title={selected ? timelineTitle(selected) : 'Event details'}
+        onClose={() => {
+          pendingNavigation.current = null;
+          setSelected(null);
+          setClosing(false);
+        }}
+        onDismiss={() => {
+          const navigate = pendingNavigation.current;
+          pendingNavigation.current = null;
+          setSelected(null);
+          setClosing(false);
+          navigate?.();
+        }}
+        footer={
+          selected ? (
+            <AppButton
+              title={
+                selected.type === 'meal'
+                  ? 'View Nutrition'
+                  : isSleepEvent(selected)
+                    ? 'View sleep'
+                    : 'View day'
+              }
+              onPress={() => {
+                pendingNavigation.current = () => destination(selected);
+                setClosing(true);
+              }}
+            />
+          ) : undefined
+        }
+      >
+        {selected && (
+          <TimelineEventDetails
+            event={selected}
+            date={selected.date ?? (selected.day === 'today' ? today : shiftDateStr(today, -1))}
+            night={timelineSleepNight(selected, health.sleep)}
+            timezone={health.timezone}
+          />
+        )}
+      </Sheet>
     </Stack>
   );
 }

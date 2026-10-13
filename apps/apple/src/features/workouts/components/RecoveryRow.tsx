@@ -1,10 +1,16 @@
-import { ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { recoveryBand } from '@trainingai/shared/health/recovery-band';
-import { AppText, Stack } from '../../../shared/ui';
+import { AppText, AutoScrollRow, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import type { MuscleRecovery } from '../catalog';
 
-export function RecoveryRow({ muscles }: { muscles: MuscleRecovery[] }) {
+export function RecoveryRow({
+  muscles,
+  active = true,
+}: {
+  muscles: MuscleRecovery[];
+  active?: boolean;
+}) {
   const { theme } = useTheme();
   if (!muscles.length) {
     return null;
@@ -14,11 +20,10 @@ export function RecoveryRow({ muscles }: { muscles: MuscleRecovery[] }) {
       <AppText variant="micro" tone="muted">
         RECOVERY
       </AppText>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
+      <AutoScrollRow
+        label="Muscle recovery"
+        active={active}
         style={{ flex: 1, height: theme.spacing.xxl }}
-        contentContainerStyle={{ gap: theme.spacing.xs }}
       >
         {muscles.map(({ muscle, pct }) => {
           const band = recoveryBand(pct).key;
@@ -50,7 +55,7 @@ export function RecoveryRow({ muscles }: { muscles: MuscleRecovery[] }) {
             </View>
           );
         })}
-      </ScrollView>
+      </AutoScrollRow>
     </Stack>
   );
 }

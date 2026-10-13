@@ -13,7 +13,7 @@ export function HealthResourceHeader({
 }) {
   return (
     <Stack direction="row" justify="space-between" align="center">
-      <AppText variant="eyebrow" tone="muted" style={{ flex: 1 }}>
+      <AppText variant="heading" accessibilityRole="header" style={{ flex: 1 }}>
         {title}
       </AppText>
       <ResourceStatus inline label={title} state={state} refresh={refresh} />

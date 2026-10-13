@@ -1,3 +1,4 @@
+import { feedback } from '../../../integrations/feedback/haptics';
 import { plateBreakdown } from '@trainingai/shared/workout/plate-loading';
 import { barShareOfOneRm } from '@trainingai/shared/1rm';
 import { View } from 'react-native';
@@ -15,7 +16,6 @@ import type { WorkoutExercise, WorkoutRecord, WorkoutSet } from '../logging/work
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import { isAmrap, weightStep, cappedTarget } from '../logging/targets';
 import { EffortPicker } from './EffortPicker';
-import { useTheme } from '../../../shared/theme/ThemeProvider';
 
 export function SetEntry({
   workout,
@@ -29,7 +29,6 @@ export function SetEntry({
   index: number;
 }) {
   const journal = useWorkoutJournal();
-  const { theme } = useTheme();
   const bodyweight = exercise.exerciseType === 'bodyweight';
   const plates =
     !bodyweight && exercise.equipment.includes('barbell')
@@ -145,9 +144,13 @@ export function SetActions({
       title={running ? `Log Set ${index + 1}` : `Start Set ${index + 1}`}
       disabled={journal.busy || (!!workout.runningSet && !running)}
       onPress={() => {
-        void (running
-          ? journal.controller?.recordSet(workout.id, exercise.id, set.id)
-          : journal.controller?.startSet(workout.id, exercise.id, set.id));
+        void (
+          running
+            ? journal.controller?.recordSet(workout.id, exercise.id, set.id)
+            : journal.controller?.startSet(workout.id, exercise.id, set.id)
+        )?.then((saved) => {
+          if (saved && running) feedback('success');
+        });
       }}
     />
   );

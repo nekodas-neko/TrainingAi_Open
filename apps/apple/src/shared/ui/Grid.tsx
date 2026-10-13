@@ -14,7 +14,9 @@ export function Grid({
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', margin: -gutter }}>
       {Children.map(children, (child) =>
         child == null ? null : (
-          <View style={{ width: `${100 / columns}%`, padding: gutter }}>{child}</View>
+          <View style={{ width: `${100 / columns}%`, padding: gutter, minWidth: 0 }}>
+            {child}
+          </View>
         ),
       )}
     </View>

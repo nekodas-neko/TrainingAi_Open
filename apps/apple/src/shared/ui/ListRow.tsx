@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { RowGestureContext } from './RowGestureContext';
+import { useContext, type ReactNode } from 'react';
 import { Pressable, View, type ViewStyle } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
 import { AppText } from './AppText';
@@ -10,19 +11,24 @@ export function ListRow({
   subtitle,
   trailing,
   onPress,
+  onLongPress,
   disabled = !onPress,
   leading,
   density = 'normal',
+  divider = true,
 }: {
   title: string;
   subtitle?: string;
   trailing?: ReactNode;
   onPress?: () => void;
+  onLongPress?: () => void;
   disabled?: boolean;
   leading?: ReactNode;
   density?: 'normal' | 'compact';
+  divider?: boolean;
 }) {
   const { theme } = useTheme();
+  const gesture = useContext(RowGestureContext);
   const rowStyle: ViewStyle = {
     minHeight: theme.sizes.touchTarget,
     flexDirection: 'row',
@@ -30,7 +36,7 @@ export function ListRow({
     paddingVertical: density === 'compact' ? theme.spacing.sm : theme.spacing.lg,
     paddingHorizontal: density === 'compact' ? theme.spacing.md : theme.spacing.lg,
     gap: theme.spacing.md,
-    borderBottomWidth: 1,
+    borderBottomWidth: divider ? 1 : 0,
     borderColor: theme.colors.border,
   };
   const content = (
@@ -56,7 +62,22 @@ export function ListRow({
       accessibilityHint={disabled ? 'Coming soon' : subtitle}
       accessibilityState={{ disabled }}
       disabled={disabled}
-      onPress={onPress}
+      onPress={() => {
+        if (!gesture?.suppressPress()) onPress();
+      }}
+      onLongPress={
+        onLongPress
+          ? () => {
+              if (!gesture?.suppressLongPress()) onLongPress();
+            }
+          : undefined
+      }
+      accessibilityActions={
+        onLongPress ? [{ name: 'longpress', label: 'More actions' }] : undefined
+      }
+      onAccessibilityAction={(event) => {
+        if (!disabled && event.nativeEvent.actionName === 'longpress') onLongPress?.();
+      }}
       style={({ pressed }) => ({ ...rowStyle, opacity: pressed ? 0.75 : 1 })}
     >
       {content}

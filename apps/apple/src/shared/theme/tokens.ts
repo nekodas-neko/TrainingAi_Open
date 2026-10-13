@@ -20,6 +20,7 @@ export const sizes = {
   iconSmall: 20,
   emphasizedIcon: 28,
   avatar: 48,
+  profileAvatar: 96,
   navigation: 80,
   workoutButton: 56,
   workoutLift: 24,
@@ -40,7 +41,13 @@ export const sizes = {
   summaryWidth: 320,
   chartHeight: 96,
   miniChart: 48,
+  metricValue: 48,
+  compactMetricWidth: 104,
+  actionTile: 112,
   weekVolumeChart: 128,
+  timelineTime: 56,
+  timelineMarker: 28,
+  timelineRow: 72,
 };
 export const typography = {
   score: { fontSize: 32, lineHeight: 38, fontWeight: '800', letterSpacing: -1 },

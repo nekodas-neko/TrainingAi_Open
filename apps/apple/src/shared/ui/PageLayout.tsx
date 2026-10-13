@@ -23,6 +23,7 @@ export function PageLayout({
   footer,
   contentStyle,
   onBack,
+  landing = false,
 }: PropsWithChildren<{
   title: string;
   subtitle?: string;
@@ -33,6 +34,7 @@ export function PageLayout({
   footer?: ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
   onBack?: () => void;
+  landing?: boolean;
 }>) {
   const { theme } = useTheme();
   return (
@@ -51,7 +53,7 @@ export function PageLayout({
           style={{
             paddingHorizontal: theme.spacing.md,
             paddingVertical: theme.spacing.sm,
-            borderBottomWidth: 1,
+            borderBottomWidth: landing ? 0 : 1,
             borderBottomColor: theme.colors.border,
           }}
         >
@@ -64,14 +66,14 @@ export function PageLayout({
           justify="space-between"
           style={{
             paddingHorizontal: theme.spacing.lg,
-            paddingVertical: theme.spacing.md,
-            borderBottomWidth: 1,
+            paddingVertical: theme.spacing[landing ? 'lg' : 'md'],
+            borderBottomWidth: landing ? 0 : 1,
             borderBottomColor: theme.colors.border,
           }}
         >
           {onBack && <IconButton icon="back" label="Back" onPress={onBack} />}
           <View style={{ flex: 1 }}>
-            <AppText variant="pageTitle" accessibilityRole="header">
+            <AppText variant={landing ? 'title' : 'pageTitle'} accessibilityRole="header">
               {title}
             </AppText>
             {subtitle && (

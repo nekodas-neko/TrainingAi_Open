@@ -3,7 +3,7 @@ import {
   AppButton,
   AppText,
   Card,
-  IconButton,
+  SortableStack,
   MultiChoice,
   Picker,
   Sheet,
@@ -13,7 +13,6 @@ import {
 import { useHome } from '../data/HomeProvider';
 import {
   homeSections,
-  moveHomeSection,
   metricLabels,
   sectionLabels,
   widgetLabels,
@@ -29,14 +28,16 @@ export function HomeLayoutSheet({ onClose }: { onClose: () => void }) {
   const hidden = prefs.homeHiddenSections ?? [];
   async function save(patch: Partial<typeof prefs>) {
     if (!home.store || busy) {
-      return;
+      return false;
     }
     setBusy(true);
     setError(null);
     try {
       await home.store.savePreferences(patch);
+      return true;
     } catch {
       setError('Could not save your Home layout on this phone. Try again.');
+      return false;
     } finally {
       setBusy(false);
     }
@@ -51,42 +52,37 @@ export function HomeLayoutSheet({ onClose }: { onClose: () => void }) {
       footer={<AppButton title="Done" onPress={onClose} />}
     >
       <AppText variant="caption" tone="muted">
-        Choose your cards and move sections into the order you prefer.
+        Drag a handle to reorder sections. Choose which cards you want to see.
       </AppText>
-      {order.map((key, index) => (
-        <Card key={key}>
-          <Stack direction="row" align="center" justify="space-between">
-            <AppText variant="label" style={{ flex: 1 }}>
-              {sectionLabels[key]}
-            </AppText>
-            <IconButton
-              icon="up"
-              label={`Move ${sectionLabels[key]} up`}
-              disabled={busy || index === 0}
-              onPress={() => void save({ homeSectionOrder: moveHomeSection(order, key, -1) })}
-            />
-            <IconButton
-              icon="down"
-              label={`Move ${sectionLabels[key]} down`}
-              disabled={busy || index === order.length - 1}
-              onPress={() => void save({ homeSectionOrder: moveHomeSection(order, key, 1) })}
-            />
-            <AppButton
-              title={hidden.includes(key) ? 'Show' : 'Hide'}
-              variant="ghost"
-              disabled={busy}
-              accessibilityLabel={`${hidden.includes(key) ? 'Show' : 'Hide'} ${sectionLabels[key]}`}
-              onPress={() =>
-                void save({
-                  homeHiddenSections: hidden.includes(key)
-                    ? hidden.filter((x) => x !== key)
-                    : [...hidden, key],
-                })
-              }
-            />
-          </Stack>
-        </Card>
-      ))}
+      <SortableStack
+        order={order}
+        enabled={!busy}
+        label={(key) => sectionLabels[key]}
+        onChange={(homeSectionOrder) => save({ homeSectionOrder })}
+        renderItem={(key, handle) => (
+          <Card key={key} style={{ paddingVertical: 0 }}>
+            <Stack direction="row" align="center" justify="space-between" gap="sm">
+              {handle}
+              <AppText variant="label" style={{ flex: 1 }}>
+                {sectionLabels[key]}
+              </AppText>
+              <AppButton
+                title={hidden.includes(key) ? 'Show' : 'Hide'}
+                variant="ghost"
+                disabled={busy}
+                accessibilityLabel={`${hidden.includes(key) ? 'Show' : 'Hide'} ${sectionLabels[key]}`}
+                onPress={() =>
+                  void save({
+                    homeHiddenSections: hidden.includes(key)
+                      ? hidden.filter((x) => x !== key)
+                      : [...hidden, key],
+                  })
+                }
+              />
+            </Stack>
+          </Card>
+        )}
+      />
       <MultiChoice
         label="Cards"
         value={prefs.homeCards ?? []}

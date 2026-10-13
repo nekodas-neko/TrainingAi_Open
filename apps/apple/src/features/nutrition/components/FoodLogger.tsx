@@ -1,3 +1,4 @@
+import { feedback } from '../../../integrations/feedback/haptics';
 import { decodeMealLabelScan } from '@trainingai/shared/nutrition/label-payload';
 import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals';
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient';
@@ -106,10 +107,13 @@ export function FoodLogger({
     tab: library ? 'meals' : 'recent',
   });
   const d = draft.value;
+  const latestDraft = useRef({ value: d, setValue: draft.setValue });
+  latestDraft.current = { value: d, setValue: draft.setValue };
   const energy = useWorkoutResource(energySpec(date), d.step === 'assign');
   useEffect(() => {
-    if (draft.ready && mealTypeId && d.mealTypeId !== mealTypeId) {
-      draft.setValue({ ...d, mealTypeId });
+    const latest = latestDraft.current;
+    if (draft.ready && mealTypeId && latest.value.mealTypeId !== mealTypeId) {
+      latest.setValue({ ...latest.value, mealTypeId });
     }
   }, [draft.ready, mealTypeId]);
   const update = (patch: Partial<typeof d>) => draft.setValue({ ...d, ...patch });
@@ -163,7 +167,7 @@ export function FoodLogger({
     return () => {
       current = false;
     };
-  }, [photoScope]);
+  }, [photoScope, photoKey, resources]);
   const database = useWorkoutResource(
     {
       path: '/api/nutrition/food-search',
@@ -407,6 +411,7 @@ export function FoodLogger({
               },
             ];
       await n.store.logFoods(entries, date, d.mealTypeId, { name: food.name });
+      feedback('success');
       await resources?.clearDraft(photoKey);
       await resources?.clearDraft(loggerKey);
       onClose();
@@ -854,17 +859,13 @@ function NativeBarcodeScanner({ onCode }: { onCode: (code: string) => void }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let active = true;
-    try {
-      const module =
-        require('../../../integrations/nutrition/BarcodeScanner') as typeof import('../../../integrations/nutrition/BarcodeScanner');
-      if (active) {
-        setScanner(() => module.BarcodeScanner);
-      }
-    } catch {
-      if (active) {
-        setFailed(true);
-      }
-    }
+    void import('../../../integrations/nutrition/BarcodeScanner')
+      .then((scannerModule) => {
+        if (active) setScanner(() => scannerModule.BarcodeScanner);
+      })
+      .catch(() => {
+        if (active) setFailed(true);
+      });
     return () => {
       active = false;
     };

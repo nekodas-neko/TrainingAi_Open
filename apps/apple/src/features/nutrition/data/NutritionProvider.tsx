@@ -2,6 +2,7 @@ import { todayInTz } from '@trainingai/shared/date-utils';
 import { randomUUID } from 'expo-crypto';
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -82,7 +83,7 @@ export function NutritionStoreProvider({
       store?.cancel();
     };
   }, [store]);
-  const preferences = useWorkoutDraft(
+  const { value: preferences, setValue: setPreferences } = useWorkoutDraft(
     'nutrition-preferences',
     z.object({ region: z.string().max(10) }),
     { region: 'AU' },
@@ -92,10 +93,10 @@ export function NutritionStoreProvider({
       store,
       today,
       timezone,
-      region: preferences.value.region,
-      setRegion: (region: string) => preferences.setValue({ region }),
+      region: preferences.region,
+      setRegion: (region: string) => setPreferences({ region }),
     }),
-    [store, today, timezone, preferences.value],
+    [store, today, timezone, preferences.region, setPreferences],
   );
   return <Context.Provider value={context}>{children}</Context.Provider>;
 }
@@ -110,6 +111,23 @@ export function useNutrition(date?: string) {
     () => emptyNutrition,
   );
   const day = date ?? context.today;
+  const refresh = useCallback(
+    async (manual = false) => {
+      const kinds = [
+        'mealTypes',
+        'foods',
+        'meals',
+        'supplements',
+        'targets',
+        'logs',
+        'answers',
+        'checkin',
+        'mealStatuses',
+      ] as const;
+      await Promise.all(kinds.map((kind) => context.store?.refresh(kind, day, manual)));
+    },
+    [context.store, day],
+  );
   return {
     ...state,
     ...context,
@@ -132,19 +150,6 @@ export function useNutrition(date?: string) {
       answers: [],
       totals: null,
     },
-    refresh: async (manual = false) => {
-      const kinds = [
-        'mealTypes',
-        'foods',
-        'meals',
-        'supplements',
-        'targets',
-        'logs',
-        'answers',
-        'checkin',
-        'mealStatuses',
-      ] as const;
-      await Promise.all(kinds.map((kind) => context.store?.refresh(kind, day, manual)));
-    },
+    refresh,
   };
 }

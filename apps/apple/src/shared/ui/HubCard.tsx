@@ -1,4 +1,5 @@
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
+import { TouchSurface } from './TouchSurface';
 import { AppText } from './AppText';
 import { Card } from './Card';
 import { Icon, type IconName } from './Icon';
@@ -22,7 +23,7 @@ export function HubCard({
   const { theme } = useTheme();
   const palette = theme.tones[tone];
   return (
-    <Pressable
+    <TouchSurface
       accessibilityRole="button"
       accessibilityLabel={`${title}${onPress ? '' : ', coming soon'}`}
       accessibilityState={{ disabled: !onPress }}
@@ -59,6 +60,6 @@ export function HubCard({
           <Icon name="forward" tone="muted" size={theme.sizes.iconSmall} />
         </Stack>
       </Card>
-    </Pressable>
+    </TouchSurface>
   );
 }

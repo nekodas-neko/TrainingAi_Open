@@ -2,6 +2,7 @@ import { Card } from './Card';
 import { AppText } from './AppText';
 import type { Tone } from '../theme/theme';
 import { useTheme } from '../theme/ThemeProvider';
+import { Icon, type IconName } from './Icon';
 
 export function MetricTile({
   label,
@@ -10,6 +11,8 @@ export function MetricTile({
   unit,
   tone = 'brand',
   compact = false,
+  icon,
+  color,
 }: {
   label: string;
   value: string | null;
@@ -17,6 +20,8 @@ export function MetricTile({
   unit?: string;
   tone?: Tone;
   compact?: boolean;
+  icon?: IconName;
+  color?: string;
 }) {
   const { theme } = useTheme();
   if (compact) {
@@ -30,10 +35,26 @@ export function MetricTile({
           gap: theme.spacing.xxs,
         }}
       >
-        <AppText variant="heading" numberOfLines={1} adjustsFontSizeToFit>
+        {icon && (
+          <Icon
+            name={icon}
+            color={color ?? theme.tones[tone].foreground}
+            size={theme.sizes.iconSmall}
+          />
+        )}
+        <AppText
+          variant="heading"
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          style={{
+            color: color ?? theme.colors.text,
+            textAlign: 'center',
+            fontVariant: ['tabular-nums'],
+          }}
+        >
           {value ?? '—'}
         </AppText>
-        <AppText variant="micro" tone="muted">
+        <AppText variant="micro" tone="muted" style={{ textAlign: 'center' }}>
           {label}
           {unit ? ` · ${unit}` : ''}
         </AppText>

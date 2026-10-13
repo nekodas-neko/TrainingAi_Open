@@ -5,8 +5,9 @@ import { z } from 'zod';
 import {
   AppButton,
   AppText,
+  Badge,
   Card,
-  Disclosure,
+  ExpandableCard,
   FeatureRow,
   Grid,
   Icon,
@@ -24,6 +25,7 @@ import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { profileSpec, goalsSpec, metricValue } from '../../health/data/models';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { ProfilePhoto } from '../components/ProfilePhoto';
+import { ProfileStats } from '../components/ProfileStats';
 import { FeedbackSheet } from '../components/FeedbackSheet';
 import { DeleteAccountSheet } from '../components/DeleteAccountSheet';
 const stats = z
@@ -117,151 +119,152 @@ export function MoreScreen({
         />
       </Stack>
       <TabPanel>
-        <Stack style={{ paddingHorizontal: theme.spacing.lg }}>
+        <Stack style={{ paddingHorizontal: theme.spacing.lg }} gap="lg">
           {tab === 'friends' ? (
             <FriendsPanel openProfile={openFriendProfile} />
           ) : (
             <>
-              <Stack align="center">
+              <Stack
+                align="center"
+                gap="md"
+                style={{ paddingTop: theme.spacing.lg, paddingBottom: theme.spacing.sm }}
+              >
                 <ProfilePhoto name={name} uri={user?.avatar} onSaved={profile.refresh} />
-                <AppText variant="hero">{name}</AppText>
-                <AppText variant="caption" tone="muted">
-                  {account.state.profile?.email ?? 'Sign in to connect your account'}
-                </AppText>
+                <Stack align="center" gap="xs" style={{ width: '100%' }}>
+                  <AppText variant="pageTitle" style={{ textAlign: 'center' }}>
+                    {name}
+                  </AppText>
+                  <AppText
+                    variant="caption"
+                    tone="muted"
+                    selectable
+                    style={{ textAlign: 'center' }}
+                  >
+                    {account.state.profile?.email ?? 'Sign in to connect your account'}
+                  </AppText>
+                </Stack>
+                <FriendCode
+                  code={typeof user?.friendCode === 'string' ? user.friendCode : null}
+                />
               </Stack>
-              <FriendCode
-                code={typeof user?.friendCode === 'string' ? user.friendCode : null}
-              />
-              <Grid columns={3}>
-                {[
-                  ['Sessions', lifetime?.sessions, ''],
-                  ['Sets', lifetime?.totalSets, ''],
-                  ['Volume', lifetime?.totalVolumeKg, 'kg'],
-                  ['Best streak', lifetime?.bestStreak, 'days'],
-                  ['Distance', lifetime?.totalDistanceKm, 'km'],
-                  [
-                    program.data?.mode === 'cycle'
-                      ? (program.data.phaseName ?? 'Cycle')
-                      : 'Weeks running',
-                    program.data?.mode === 'cycle'
-                      ? `${program.data.cycleCurrent ?? '—'}/${program.data.cycleTotal ?? '—'}`
-                      : program.data?.weeksRunning,
-                    '',
-                  ],
-                ].map(([label, value, unit]) => (
-                  <MetricTile
-                    key={String(label)}
-                    label={String(label)}
-                    value={
-                      typeof value === 'number'
-                        ? value.toLocaleString()
-                        : typeof value === 'string'
-                          ? value
-                          : '—'
-                    }
-                    unit={String(unit)}
-                  />
-                ))}
-              </Grid>
+              <ProfileStats lifetime={lifetime} program={program.data} />
               <Card>
-                <FeatureRow
-                  title="Trophy case & achievements"
-                  subtitle="Deferred with rewards and collections"
+                <Stack direction="row" align="center">
+                  <Icon name="award" tone="brand" />
+                  <AppText variant="label" style={{ flex: 1 }}>
+                    Trophy case
+                  </AppText>
+                  <Badge label="Coming soon" style={{ alignSelf: 'center' }} />
+                </Stack>
+              </Card>
+              <Card padded={false}>
+                <ListRow
+                  title="Your Year"
+                  leading={<Icon name="award" />}
+                  onPress={openYear}
+                  divider={false}
                 />
               </Card>
-              <ListRow title="Your Year" leading={<Icon name="award" />} onPress={openYear} />
-              <Card>
-                <Disclosure title="My goals">
-                  <Grid columns={2}>
-                    {[
-                      ['Target weight', goals.data?.targetWeightKg, 'kg'],
-                      ['Target body fat', goals.data?.targetBfPct, '%'],
-                      ['Steps', goals.data?.stepsGoal, ''],
-                      ['Sleep', goals.data?.sleepGoalHours, 'h'],
-                      ['Water', goals.data?.waterGoalMl, 'ml'],
-                    ].map(([label, value, unit]) => (
-                      <MetricTile
-                        key={String(label)}
-                        label={String(label)}
-                        value={metricValue(typeof value === 'number' ? value : null)}
-                        unit={String(unit)}
-                      />
-                    ))}
-                  </Grid>
-                  <AppButton title="Edit goals" variant="ghost" onPress={openGoals} />
-                </Disclosure>
-              </Card>
+              <ExpandableCard
+                title="My goals"
+                icon="target"
+                subtitle="Training, health & nutrition targets"
+              >
+                <Grid columns={2}>
+                  {[
+                    ['Target weight', goals.data?.targetWeightKg, 'kg'],
+                    ['Target body fat', goals.data?.targetBfPct, '%'],
+                    ['Steps', goals.data?.stepsGoal, ''],
+                    ['Sleep', goals.data?.sleepGoalHours, 'h'],
+                    ['Water', goals.data?.waterGoalMl, 'ml'],
+                  ].map(([label, value, unit]) => (
+                    <MetricTile
+                      key={String(label)}
+                      label={String(label)}
+                      value={metricValue(typeof value === 'number' ? value : null)}
+                      unit={String(unit)}
+                    />
+                  ))}
+                </Grid>
+                <AppButton title="Edit goals" variant="ghost" onPress={openGoals} />
+              </ExpandableCard>
               <Section title="Your setup">
-                <Card padded={false}>
-                  <ListRow
-                    title="Profile details"
-                    leading={<Icon name="info" />}
-                    onPress={openProfile}
-                  />
-                  <ListRow
-                    title="Sessions, progression & schedule"
-                    leading={<Icon name="workout" />}
-                    onPress={openPrograms}
-                  />
-                  <ListRow
-                    title="DEXA & RMR results"
-                    leading={<Icon name="scale" />}
-                    onPress={openClinical}
-                  />
-                  <ListRow
-                    title="Apple Health"
-                    subtitle="Connection, permissions and data sources"
-                    leading={<Icon name="health" />}
-                    onPress={openAppleHealth}
-                  />
-                  <FeatureRow
-                    title="Ring, strap, scale & permissions"
-                    subtitle="Direct devices remain deferred"
-                  />
-                  <FeatureRow title="Collection" subtitle="Deferred with rewards" />
-                </Card>
+                <ListRow
+                  title="Profile details"
+                  leading={<Icon name="info" />}
+                  onPress={openProfile}
+                />
+                <ListRow
+                  title="Programs & schedule"
+                  leading={<Icon name="workout" />}
+                  onPress={openPrograms}
+                />
+                <ListRow
+                  title="DEXA & RMR results"
+                  leading={<Icon name="scale" />}
+                  onPress={openClinical}
+                />
+                <ListRow
+                  title="Apple Health"
+                  subtitle="Connection, permissions and data sources"
+                  leading={<Icon name="health" />}
+                  onPress={openAppleHealth}
+                />
+                <FeatureRow title="Devices & connections" leading={<Icon name="activity" />} />
+                <FeatureRow
+                  title="Collection"
+                  leading={<Icon name="award" />}
+                  divider={false}
+                />
               </Section>
               <Section title="App">
-                <Card padded={false}>
-                  <ListRow
-                    title="Notifications, appearance & home layout"
+                <ListRow
+                  title="Settings"
+                  subtitle="Appearance, notifications & Home layout"
+                  leading={<Icon name="settings" />}
+                  onPress={openSettings}
+                />
+                <ListRow
+                  title="Data & Sync"
+                  leading={<Icon name="refresh" />}
+                  onPress={openData}
+                />
+                <ListRow
+                  title="About TrainingAi"
+                  leading={<Icon name="info" />}
+                  onPress={openAbout}
+                  divider={user?.isAdmin === true}
+                />
+                {user?.isAdmin === true && (
+                  <FeatureRow
+                    title="Admin Console"
                     leading={<Icon name="settings" />}
-                    onPress={openSettings}
+                    divider={false}
                   />
-                  <ListRow
-                    title="Data & Sync"
-                    leading={<Icon name="refresh" />}
-                    onPress={openData}
-                  />
-                  <ListRow
-                    title="About TrainingAi"
-                    leading={<Icon name="info" />}
-                    onPress={openAbout}
-                  />
-                  {user?.isAdmin === true && (
-                    <FeatureRow
-                      title="Admin Console"
-                      subtitle="Native admin tools are not in this migration pass"
-                    />
-                  )}
-                </Card>
+                )}
               </Section>
               <Section title="Feedback">
-                <Card padded={false}>
-                  <ListRow title="Feedback & requests" onPress={() => setModal('feedback')} />
-                </Card>
+                <ListRow
+                  title="Feedback & requests"
+                  leading={<Icon name="coach" />}
+                  onPress={() => setModal('feedback')}
+                  divider={false}
+                />
               </Section>
-              <AppButton
-                title="Account & sign-in settings"
-                variant="ghost"
-                onPress={openSettings}
-              />
-              <AppButton
-                title="Delete account"
-                variant="ghost"
-                disabled={!account.dataReader}
-                onPress={() => setModal('delete')}
-              />
+              <Section title="Account">
+                <ListRow
+                  title="Account & sign-in settings"
+                  leading={<Icon name="users" />}
+                  onPress={openSettings}
+                />
+                <ListRow
+                  title="Delete account"
+                  leading={<Icon name="delete" tone="danger" />}
+                  disabled={!account.dataReader}
+                  onPress={() => setModal('delete')}
+                  divider={false}
+                />
+              </Section>
             </>
           )}
         </Stack>

@@ -3,6 +3,7 @@ import ExternalLink from 'lucide-react-native/icons/external-link';
 import Clock from 'lucide-react-native/icons/clock';
 import ChevronLeft from 'lucide-react-native/icons/chevron-left';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
+import ChevronDown from 'lucide-react-native/icons/chevron-down';
 import Dumbbell from 'lucide-react-native/icons/dumbbell';
 import Heart from 'lucide-react-native/icons/heart';
 import Home from 'lucide-react-native/icons/house';
@@ -45,11 +46,20 @@ import Moon from 'lucide-react-native/icons/moon';
 import LayoutGrid from 'lucide-react-native/icons/layout-grid';
 import BatteryMedium from 'lucide-react-native/icons/battery-medium';
 import Scale from 'lucide-react-native/icons/scale';
+import Camera from 'lucide-react-native/icons/camera';
+import ListChecks from 'lucide-react-native/icons/list-checks';
+import MapPin from 'lucide-react-native/icons/map-pin';
+import CalendarDays from 'lucide-react-native/icons/calendar-days';
+import Weight from 'lucide-react-native/icons/weight';
+import Undo2 from 'lucide-react-native/icons/undo-2';
+import GripVertical from 'lucide-react-native/icons/grip-vertical';
+import Sunrise from 'lucide-react-native/icons/sunrise';
 import type { LucideProps } from 'lucide-react-native';
 import { Platform } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
 
 const icons = {
+  grip: GripVertical,
   coach: Sparkles,
   external: ExternalLink,
   history: Clock,
@@ -60,6 +70,7 @@ const icons = {
   more: MoreHorizontal,
   back: ChevronLeft,
   forward: ChevronRight,
+  expand: ChevronDown,
   program: SlidersHorizontal,
   refresh: RefreshCw,
   cardio: HeartPulse,
@@ -97,6 +108,13 @@ const icons = {
   layout: LayoutGrid,
   battery: BatteryMedium,
   scale: Scale,
+  camera: Camera,
+  sets: ListChecks,
+  pin: MapPin,
+  calendar: CalendarDays,
+  weight: Weight,
+  undo: Undo2,
+  sunrise: Sunrise,
 };
 
 export type IconName = keyof typeof icons;

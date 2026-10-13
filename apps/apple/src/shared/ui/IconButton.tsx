@@ -1,6 +1,7 @@
 import { ActivityIndicator, Pressable } from 'react-native';
 import { Icon, type IconName } from './Icon';
 import { useTheme } from '../theme/ThemeProvider';
+import type { ReactNode } from 'react';
 
 export function IconButton({
   icon,
@@ -11,6 +12,8 @@ export function IconButton({
   hint,
   tone = 'muted',
   selected,
+  expanded,
+  children,
 }: {
   icon: IconName;
   label: string;
@@ -20,6 +23,8 @@ export function IconButton({
   hint?: string;
   tone?: 'muted' | 'brand' | 'danger';
   selected?: boolean;
+  expanded?: boolean;
+  children?: ReactNode;
 }) {
   const { theme } = useTheme();
   return (
@@ -27,7 +32,7 @@ export function IconButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityHint={hint}
-      accessibilityState={{ disabled: disabled || !onPress || busy, busy, selected }}
+      accessibilityState={{ disabled: disabled || !onPress || busy, busy, selected, expanded }}
       disabled={disabled || !onPress || busy}
       onPress={onPress}
       style={({ pressed }) => ({
@@ -43,7 +48,7 @@ export function IconButton({
       {busy ? (
         <ActivityIndicator color={theme.colors.muted} />
       ) : (
-        <Icon name={icon} tone={tone} size={theme.sizes.iconSmall} />
+        (children ?? <Icon name={icon} tone={tone} size={theme.sizes.iconSmall} />)
       )}
     </Pressable>
   );

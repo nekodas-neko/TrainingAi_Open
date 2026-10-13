@@ -48,6 +48,7 @@ export function WorkoutScreen({
   const inset = { marginHorizontal: theme.spacing.lg };
   return (
     <PageLayout
+      landing
       title="Workout"
       subtitle="Choose a session to start"
       actions={<IconButton icon="program" label="Program" onPress={openPrograms} />}
@@ -62,6 +63,7 @@ export function WorkoutScreen({
           renderItem={(session) => (
             <SessionSelectionCard
               session={session}
+              active={session.id === visibleSessionId}
               catalog={catalog}
               timezone={timezone}
               openWorkout={openWorkout}

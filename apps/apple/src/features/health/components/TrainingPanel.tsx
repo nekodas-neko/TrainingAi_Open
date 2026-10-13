@@ -6,6 +6,7 @@ import {
   AppText,
   Card,
   ListRow,
+  HubCard,
   MonthCalendar,
   ProgressBar,
   Sheet,
@@ -59,10 +60,11 @@ function CalendarCard({ openDay }: { openDay: (date: string) => void }) {
   }
   return (
     <Card>
-      <AppText variant="eyebrow" tone="muted">
+      <AppText variant="heading" accessibilityRole="header">
         Training Calendar
       </AppText>
       <MonthCalendar
+        nativeStyle
         status={
           <ResourceStatus
             inline
@@ -141,13 +143,13 @@ export function TrainingPanel({
   return (
     <>
       <CalendarCard openDay={openDay} />
-      <Card padded={false}>
-        <ListRow
-          title="Week in review"
-          subtitle="Last week’s training, recovery and records"
-          onPress={() => openWeek(shiftDateStr(weekStartForDay(today), -7))}
-        />
-      </Card>
+      <HubCard
+        title="Week in review"
+        subtitle="Training, recovery & records"
+        icon="activity"
+        tone="neutral"
+        onPress={() => openWeek(shiftDateStr(weekStartForDay(today), -7))}
+      />
       {weekly.data && (
         <WeeklyTrainingCard
           data={weekly.data}
@@ -200,7 +202,9 @@ export function TrainingPanel({
         {muscles.data?.muscles.map((row) => (
           <Stack key={row.muscle}>
             <Stack direction="row" justify="space-between">
-              <AppText variant="caption">{row.muscle}</AppText>
+              <AppText variant="label" style={{ flex: 1 }}>
+                {row.muscle}
+              </AppText>
               <AppText variant="caption">
                 {row.sets} sets{row.target !== null ? ` / ${row.target}` : ''}
               </AppText>

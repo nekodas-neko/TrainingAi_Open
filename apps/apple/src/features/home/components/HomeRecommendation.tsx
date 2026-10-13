@@ -68,7 +68,7 @@ export function HomeRecommendation({
   }
   if (!home.mood) {
     return (
-      <Card tone="checkin" style={{ minHeight: theme.sizes.recommendationCard }}>
+      <Card tone="checkin">
         <AppText variant="eyebrow" style={{ color: theme.tones.checkin.foreground }}>
           Exercise Energy
         </AppText>
@@ -77,8 +77,7 @@ export function HomeRecommendation({
           <Stack style={{ flex: 1 }} gap="xs">
             <AppText variant="hero">How are you feeling?</AppText>
             <AppText variant="caption" tone="muted">
-              Log soreness & energy — the app lightens loads on sore muscles and can flag a
-              deload or rest day. It tunes today’s session, not your whole plan.
+              Log energy and soreness to tailor today’s workout.
             </AppText>
           </Stack>
         </Stack>
@@ -116,7 +115,6 @@ export function HomeRecommendation({
     <Card
       tone={done ? 'activity' : 'brand'}
       accent={home.preferences.cardColors?.recommendedToday ?? theme.homeCards.recommendedToday}
-      style={{ minHeight: theme.sizes.recommendationCard }}
     >
       <Stack direction="row" align="center" justify="space-between">
         <AppText variant="eyebrow" tone="muted">
@@ -166,9 +164,12 @@ export function HomeRecommendation({
               onPress={() => openExplanation(session.id)}
               style={{ alignSelf: 'flex-start' }}
             >
-              <AppText variant="caption" tone="muted">
-                Why this? →
-              </AppText>
+              <Stack direction="row" align="center" gap="xs">
+                <AppText variant="caption" tone="muted">
+                  Why this?
+                </AppText>
+                <Icon name="forward" size={theme.sizes.iconSmall} tone="muted" />
+              </Stack>
             </Pressable>
           )}
         </Stack>

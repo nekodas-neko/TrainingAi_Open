@@ -1,5 +1,6 @@
+import { ReorderScrollView } from './ReorderScrollView';
 import type { PropsWithChildren } from 'react';
-import { RefreshControl, ScrollView } from 'react-native';
+import { RefreshControl } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
 
 export function TabPanel({
@@ -12,7 +13,7 @@ export function TabPanel({
 }>) {
   const { theme } = useTheme();
   return (
-    <ScrollView
+    <ReorderScrollView
       keyboardShouldPersistTaps="handled"
       showsVerticalScrollIndicator={false}
       refreshControl={
@@ -31,6 +32,6 @@ export function TabPanel({
       }}
     >
       {children}
-    </ScrollView>
+    </ReorderScrollView>
   );
 }
