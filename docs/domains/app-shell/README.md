@@ -19,6 +19,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
 
 ## Reference docs
 
+- [`docs/native-testing.md`](../../native-testing.md) — **testing the native app (`mobile/`, #2836) and releasing while it lands (owner, 2026-10-13).** Explains what changes when screens move from the server into the app, and which build carries which app ID. Covers running the native app next to the current one on the owner's phone, and the rules that keep shared data safe while both run. Also sets out the build → device check → compare → switch-over loop, the signing plan, and the temporary on-demand release cadence that suspends patch Tuesday until the switch-over settles.
 - [`docs/admin-control-inventory.md`](../../admin-control-inventory.md) — **every admin control, grouped by what it
   is for, with a keep/hide/delete recommendation per row (OR-115, 2026-09-29).** Three findings worth knowing before
   touching either screen. **"The admin section" is TWO screens** — `/admin` (admin-gated, six tabs) and
