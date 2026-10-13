@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ExerciseChooser } from './ExerciseChooser';
 import { randomUUID } from 'expo-crypto';
 import {
@@ -12,7 +12,9 @@ import {
   SortableStack,
   TextField,
   IconButton,
+  SwitchRow,
 } from '../../shared/ui';
+import { timeLimitLabel } from '@trainingai/shared/workout/duration-model';
 import { View } from 'react-native';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import type { LibraryExercise, SavedStyle } from '../workouts/data/models';
@@ -44,6 +46,12 @@ export function SessionEditor({
   const { theme } = useTheme();
   const [choosing, setChoosing] = useState<string | null>(null);
   const session = draft.sessions[index];
+  const budget = session.timeBudgetMinutes ?? 60;
+  const [lastLimit, setLastLimit] = useState(budget > 0 ? budget : 60);
+  const [limitInput, setLimitInput] = useState(String(budget > 0 ? budget : 60));
+  useEffect(() => {
+    if (budget > 0) setLimitInput(String(budget));
+  }, [budget]);
   function update(value: Partial<typeof session>) {
     onChange({
       ...draft,
@@ -171,20 +179,20 @@ export function SessionEditor({
       <Disclosure
         compact
         title={session.name || `Session ${index + 1}`}
-        subtitle={`${session.exercises.length} ${session.exercises.length === 1 ? 'exercise' : 'exercises'} · ${session.timeBudgetMinutes ?? 60} min`}
+        subtitle={`${session.exercises.length} ${session.exercises.length === 1 ? 'exercise' : 'exercises'} · ${timeLimitLabel(budget)}`}
         leading={handle}
       >
         <Stack
           gap="md"
           style={{ paddingHorizontal: theme.spacing.sm, paddingBottom: theme.spacing.sm }}
         >
-          <TextField
-            containerStyle={{ flexGrow: 0, flexShrink: 0, flexBasis: 'auto' }}
-            label="Session name"
-            value={session.name}
-            onChangeText={(name) => update({ name })}
-          />
           <Stack direction="row" align="flex-end" gap="md">
+            <TextField
+              containerStyle={{ flex: 1, minWidth: 0 }}
+              label="Session name"
+              value={session.name}
+              onChangeText={(name) => update({ name })}
+            />
             <View style={{ width: theme.sizes.touchTarget * 1.5 }}>
               <Picker
                 compact
@@ -197,15 +205,56 @@ export function SessionEditor({
                 onChange={(icon) => update({ icon })}
               />
             </View>
-            <NumericStepper
+          </Stack>
+          <Stack direction="row" align="center" gap="xs">
+            <SwitchRow
+              compact
               inline
-              label="Time budget (min)"
-              value={String(session.timeBudgetMinutes ?? 60)}
-              min={20}
-              max={180}
-              step={5}
-              onChange={(value) => update({ timeBudgetMinutes: Number(value) })}
+              label="Time limit"
+              value={budget > 0}
+              disabled={disabled}
+              onValueChange={(enabled) => {
+                if (!enabled) setLastLimit(budget);
+                update({ timeBudgetMinutes: enabled ? lastLimit : 0 });
+              }}
             />
+            {budget > 0 ? (
+              <NumericStepper
+                inline
+                hideLabel
+                label="Time limit (minutes)"
+                value={limitInput}
+                min={20}
+                max={180}
+                step={5}
+                onChange={(value) => {
+                  setLimitInput(value);
+                  const minutes = Number(value);
+                  if (
+                    value.trim() &&
+                    Number.isInteger(minutes) &&
+                    minutes >= 20 &&
+                    minutes <= 180
+                  ) {
+                    update({ timeBudgetMinutes: minutes });
+                  }
+                }}
+                onBlur={() => setLimitInput(String(budget))}
+              />
+            ) : (
+              <View
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  minHeight: theme.sizes.touchTarget,
+                  justifyContent: 'center',
+                }}
+              >
+                <AppText variant="caption" tone="muted">
+                  No limit
+                </AppText>
+              </View>
+            )}
           </Stack>
           <SortableStack
             order={blocks.map((block) => block.id)}

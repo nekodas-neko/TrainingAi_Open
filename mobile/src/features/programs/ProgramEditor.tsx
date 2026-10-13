@@ -8,9 +8,9 @@ import {
   Notice,
   NumericStepper,
   Picker,
-  Stack,
   SwitchRow,
   TextField,
+  WeekdayPicker,
 } from '../../shared/ui';
 import { WorkoutLayout } from '../workouts/components/WorkoutLayout';
 import { useWorkoutResource } from '../workouts/data/WorkoutDataProvider';
@@ -145,31 +145,19 @@ export function ProgramEditor({
               <AppText variant="caption" tone="muted">
                 Tap days you train. Unticked days are rest days.
               </AppText>
-              <Stack direction="row" wrap>
-                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((label, day) => (
-                  <AppButton
-                    key={day}
-                    title={label}
-                    variant={
-                      value.schedule?.days?.some((item) => item.dayOfWeek === day)
-                        ? 'primary'
-                        : 'surface'
-                    }
-                    onPress={() =>
-                      draft.setValue({
-                        ...value,
-                        schedule: {
-                          ...value.schedule,
-                          type: 'weekly',
-                          days: value.schedule?.days?.some((item) => item.dayOfWeek === day)
-                            ? value.schedule.days.filter((item) => item.dayOfWeek !== day)
-                            : [...(value.schedule?.days ?? []), { dayOfWeek: day }],
-                        },
-                      })
-                    }
-                  />
-                ))}
-              </Stack>
+              <WeekdayPicker
+                value={value.schedule?.days?.map((day) => day.dayOfWeek) ?? []}
+                onToggle={(day) => draft.setValue({
+                  ...value,
+                  schedule: {
+                    ...value.schedule,
+                    type: 'weekly',
+                    days: value.schedule?.days?.some((item) => item.dayOfWeek === day)
+                      ? value.schedule.days.filter((item) => item.dayOfWeek !== day)
+                      : [...(value.schedule?.days ?? []), { dayOfWeek: day }],
+                  },
+                })}
+              />
             </Card>
           )}
           {mode === 'ai' ? (
@@ -275,7 +263,7 @@ export function ProgramEditor({
                     id: randomUUID(),
                     name: '',
                     position: value.sessions.length,
-                    timeBudgetMinutes: 60,
+                    timeBudgetMinutes: 0,
                     icon: '💪',
                     exercises: [],
                   },

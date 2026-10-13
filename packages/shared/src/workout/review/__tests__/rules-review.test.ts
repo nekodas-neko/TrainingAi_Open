@@ -142,3 +142,10 @@ describe('buildRulesReview', () => {
     expect(dropped).toContain(CURL)
   })
 })
+
+it('untimed session reviews retain all work without showing an over-budget failure', () => {
+  const result = run(0)
+  expect(result.modelExercises).toEqual([])
+  expect(result.reasoning).toContain('No time limit')
+  expect(result.reasoning).not.toContain('0-min')
+})

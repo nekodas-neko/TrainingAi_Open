@@ -82,7 +82,7 @@ export function generatedDraft(
     name: session.name,
     icon: session.icon,
     position: index,
-    timeBudgetMinutes: inputs.timePerSessionMinutes ?? 60,
+    timeBudgetMinutes: inputs.timePerSessionMinutes ?? 0,
     exercises: session.exercises.map((exercise, index) => ({
       id: uuid(),
       exerciseName: exercise.name,

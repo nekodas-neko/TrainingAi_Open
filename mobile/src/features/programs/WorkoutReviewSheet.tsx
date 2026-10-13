@@ -56,9 +56,7 @@ export function WorkoutReviewSheet({
   const review = useCallback(async () => {
     await run(async () => {
       if (!resources || pending || !sync.ready)
-        throw new Error(
-          'Wait for your program changes to finish uploading, then review again.',
-        );
+        throw new Error('Wait for your program changes to finish uploading, then review again.');
       let result: Review;
       try {
         result = ReviewSchema.parse(
@@ -75,8 +73,7 @@ export function WorkoutReviewSheet({
           );
         throw error;
       }
-      if (result.sessionId !== sessionId)
-        throw new Error('The session changed. Review it again.');
+      if (result.sessionId !== sessionId) throw new Error('The session changed. Review it again.');
       setBasis(currentBasis);
       setData(result);
       setDecisions(
@@ -124,10 +121,7 @@ export function WorkoutReviewSheet({
               ],
             ),
           );
-        if (
-          ack.applied.adjustments + ack.applied.dropThisCycle + ack.applied.dropPermanent ===
-          0
-        )
+        if (ack.applied.adjustments + ack.applied.dropThisCycle + ack.applied.dropPermanent === 0)
           throw new Error('The session changed. Review it again before applying.');
         setApplied(true);
         workouts.invalidate();
@@ -187,12 +181,24 @@ export function WorkoutReviewSheet({
         <>
           <Card tone={data.proposal.fitsBudget ? 'activity' : 'checkin'}>
             <AppText variant="heading">
-              ≈{warmup + data.proposal.projectedDurationMin} of {data.totalBudgetMin} min —{' '}
-              {data.proposal.fitsBudget ? 'fits' : 'still over'}
+              {data.totalBudgetMin === 0 ? (
+                `≈${data.proposal.projectedDurationMin} min · No time limit`
+              ) : (
+                <>
+                  ≈{warmup + data.proposal.projectedDurationMin} of {data.totalBudgetMin} min —{' '}
+                  {data.proposal.fitsBudget ? 'fits' : 'still over'}
+                </>
+              )}
             </AppText>
             <AppText variant="caption" tone="muted">
-              ~{warmup} min warmup + {data.proposal.projectedDurationMin} min working (≤
-              {data.proposal.budgetMin} min target)
+              {data.totalBudgetMin === 0 ? (
+                'Estimated working time; no duration cap.'
+              ) : (
+                <>
+                  ~{warmup} min warmup + {data.proposal.projectedDurationMin} min working (≤
+                  {data.proposal.budgetMin} min target)
+                </>
+              )}
             </AppText>
           </Card>
           <AppText tone="muted">{data.reasoning}</AppText>
@@ -224,9 +230,7 @@ export function WorkoutReviewSheet({
                     value={decisions[x.sessionExerciseId] ?? 'reject'}
                     options={[
                       { value: 'cycle', label: 'This cycle' },
-                      ...(x.action === 'drop'
-                        ? [{ value: 'permanent', label: 'Permanent' }]
-                        : []),
+                      ...(x.action === 'drop' ? [{ value: 'permanent', label: 'Permanent' }] : []),
                       { value: 'reject', label: 'Skip' },
                     ]}
                     onChange={(value) =>
@@ -237,10 +241,7 @@ export function WorkoutReviewSheet({
               </Card>
             ))}
           <AppText variant="caption" tone="muted">
-            {
-              data.proposal.exercises.filter((x) => x.action === 'keep' && !x.guardAdjusted)
-                .length
-            }{' '}
+            {data.proposal.exercises.filter((x) => x.action === 'keep' && !x.guardAdjusted).length}{' '}
             exercises kept unchanged
           </AppText>
           {outdated && (

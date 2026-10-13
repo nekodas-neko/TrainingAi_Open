@@ -14,6 +14,7 @@ import {
   StepProgress,
   SwitchRow,
   TextField,
+  WeekdayPicker,
 } from '../../shared/ui';
 import { WorkoutLayout } from '../workouts/components/WorkoutLayout';
 import { useWorkoutResource } from '../workouts/data/WorkoutDataProvider';
@@ -82,7 +83,7 @@ export function AIProgramBuilder({ onBack, onSaved }: { onBack: () => void; onSa
       programName: '',
       equipment: [],
       sessionsPerWeek: 3,
-      timePerSessionMinutes: 60,
+      timePerSessionMinutes: null,
       musclesToFocus: [],
       goal: 'hypertrophy' as const,
       progressionMode: 'ai' as const,
@@ -439,22 +440,11 @@ export function AIProgramBuilder({ onBack, onSaved }: { onBack: () => void; onSa
               onChange={(value) => input({ rotationRestAfterN: Number(value) })}
             />
           ) : (
-            <Stack direction="row" wrap>
-              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, index) => (
-                <AppButton
-                  key={day}
-                  title={day}
-                  variant={inputs.weeklyDays.includes(index) ? 'primary' : 'surface'}
-                  onPress={() =>
-                    input({
-                      weeklyDays: inputs.weeklyDays.includes(index)
-                        ? inputs.weeklyDays.filter((day) => day !== index)
-                        : [...inputs.weeklyDays, index],
-                    })
-                  }
-                />
-              ))}
-            </Stack>
+              <WeekdayPicker value={inputs.weeklyDays} onToggle={(day) => input({
+                weeklyDays: inputs.weeklyDays.includes(day)
+                  ? inputs.weeklyDays.filter((value) => value !== day)
+                  : [...inputs.weeklyDays, day],
+              })} />
           )}
         </>
       )}

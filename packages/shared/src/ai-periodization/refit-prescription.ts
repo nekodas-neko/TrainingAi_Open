@@ -119,6 +119,7 @@ export async function refitPrescriptionToBudget(
     ...(budget.fullSession && { fullSession: budget.fullSession }),
     reasoning: `${baseline.reasoning}${budget.budgetNote}`,
     durationPreset,
+    sessionTimeBudgetMinutes: validSession.timeBudgetMinutes,
     ...(budget.droppedIds.size > 0 && { droppedExerciseIds: [...budget.droppedIds] }),
   }
 

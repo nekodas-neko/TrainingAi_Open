@@ -197,7 +197,7 @@ describe('POST …/session/[sessionId]/prescribe', () => {
   })
 
   it('rejects a minute count that is out of range or not whole', async () => {
-    for (const bad of [0, -30, 1441, 45.5]) {
+    for (const bad of [-30, 1441, 45.5]) {
       generatePrescriptionForSession.mockClear()
       freshUser()
       expect((await prescribePost({ durationPreset: bad })).status).toBe(400)
@@ -211,6 +211,13 @@ describe('POST …/session/[sessionId]/prescribe', () => {
   it('accepts an under-floor request rather than refusing it', async () => {
     await prescribePost({ durationPreset: 5 })
     expect(generatePrescriptionForSession.mock.calls[0][5]).toBe(5)
+  })
+
+  it('accepts zero as an explicit request to turn the time limit off', async () => {
+    const response = await prescribePost({ durationPreset: 0 })
+    expect(response.status).toBe(200)
+    expect(refitPrescriptionToBudget.mock.calls[0][4]).toBe(0)
+    expect(generatePrescriptionForSession.mock.calls[0][5]).toBe(0)
   })
 
   it('refuses an oversized body', async () => {

@@ -214,7 +214,7 @@ export function applyBudgetStage(
       .filter(ex => droppedIds.has(ex.sessionExerciseId)).map(ex => ex.name).join(', ')
     notes.push(`To fit the ${signals.effectiveTimeBudgetMin}-min working budget, ${names} ${droppedIds.size === 1 ? 'was' : 'were'} dropped for today — accessories go first, then whatever trains the muscles furthest ahead of their weekly target — so the remaining work keeps more of its sets rather than every exercise being cut to a token two.`)
   }
-  if (estimatedSessionDurationMin > signals.effectiveTimeBudgetMin) {
+  if (signals.effectiveTimeBudgetMin > 0 && estimatedSessionDurationMin > signals.effectiveTimeBudgetMin) {
     notes.push(droppedIds.size > 0
       ? `Even so, the ${activeExercises.length} exercises kept are estimated at ${estimatedSessionDurationMin} min — a session is never cut below ${activeExercises.length}, so expect to run over.`
       : `Note: even at minimum sets this session is estimated at ${estimatedSessionDurationMin} min against the ${signals.effectiveTimeBudgetMin}-min working budget — it has more exercises than the time budget fits. Consider removing an accessory from this session or raising its time budget.`)

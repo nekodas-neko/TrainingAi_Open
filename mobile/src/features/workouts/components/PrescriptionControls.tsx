@@ -1,5 +1,10 @@
 import { useState } from 'react';
-import { sessionLengthOptions } from '@trainingai/shared/workout/duration-model';
+import {
+  sessionTimeLimitOptions,
+  budgetForPreset,
+  timeLimitLabel,
+  readDurationPreset,
+} from '@trainingai/shared/workout/duration-model';
 import {
   AppButton,
   AppText,
@@ -54,11 +59,16 @@ export function PrescriptionControls({
         />
       </Stack>
       <Picker
-        label="Session length"
-        value={String(preparation.duration ?? preparation.budget)}
-        options={sessionLengthOptions(preparation.budget).map((value) => ({
+        label="Time limit today"
+        value={String(
+          budgetForPreset(
+            preparation.budget,
+            preparation.duration ?? readDurationPreset(prescription?.durationPreset),
+          ),
+        )}
+        options={sessionTimeLimitOptions(preparation.budget).map((value) => ({
           value: String(value),
-          label: `${value} min`,
+          label: timeLimitLabel(value),
         }))}
         disabled={action.busy}
         onChange={(value) => {

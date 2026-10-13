@@ -10,6 +10,7 @@ import {
   estimateSessionDurationMin,
   SECONDS_PER_REP,
   SET_SETUP_SEC,
+  NO_TIME_LIMIT,
 } from '@trainingai/shared/workout/duration-model'
 
 import { sessionAnchorRole, roleCeiling } from '@trainingai/shared/ai-periodization/role-plausibility'
@@ -265,6 +266,7 @@ export function expandToBudget<T extends TimedExercise>(
 
   opts: { frozenIds?: ReadonlySet<string>; sessionMuscleCap?: number; ceilingFor?: (e: T) => number } = {},
 ): T[] {
+  if (budgetMin === NO_TIME_LIMIT) return exercises.map(e => ({ ...e }))
   const budgetSec = Math.max(0, budgetMin) * 60
   const out = exercises.map(e => ({ ...e }))
   const ceiling = (e: T) => Math.min(roleCeiling(e.role), opts.ceilingFor?.(e) ?? Infinity)
@@ -336,6 +338,7 @@ export function dropToBudget<T extends TimedExercise>(
 
   opts: { refit?: (subset: T[]) => T[]; undroppable?: ReadonlySet<string> } = {},
 ): { exercises: T[]; droppedIds: string[];  pairFitIds: string[] } {
+  if (budgetMin === NO_TIME_LIMIT) return { exercises: exercises.map(e => ({ ...e })), droppedIds: [], pairFitIds: [] }
   const budgetSec = Math.max(0, budgetMin) * 60
   const refit = opts.refit ?? ((subset: T[]) => fitToBudget(subset, budgetMin, protectedIds, muscleVolume))
   let kept = refit(exercises)
@@ -407,6 +410,7 @@ export function fitToBudget<T extends TimedExercise>(
   protectedIds: Set<string> = new Set(),
   muscleVolume?: Map<string, MuscleVolumeState>,
 ): T[] {
+  if (budgetMin === NO_TIME_LIMIT) return exercises.map(e => ({ ...e }))
   const budgetSec = Math.max(0, budgetMin) * 60
   const out = exercises.map(e => ({ ...e }))
   // Upper bound on iterations = total removable sets; the +1 guards an empty list.
@@ -451,6 +455,7 @@ export function allocateToBudget<T extends TimedExercise>(
   budgetMin: number,
   opts: AllocateOptions = {},
 ): { exercises: T[]; droppedIds: string[] } {
+  if (budgetMin === NO_TIME_LIMIT) return { exercises: exercises.map(e => ({ ...e })), droppedIds: [] }
   const frozen = opts.frozenIds ?? new Set<string>()
   const protectedIds = new Set(opts.protectedIds ?? [])
   const start = exercises.map(e => {

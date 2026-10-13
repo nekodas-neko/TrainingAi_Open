@@ -176,6 +176,7 @@ export function buildRulesPrescription(
       // stored prescription is what the accept route flips the phase on.
       phaseAction: 'stay',
       confidence: asWritten.confidence,
+      sessionTimeBudgetMinutes: signals.sessionTimeBudgetMinutes,
       confidenceReasons: ['Your deload week as the program runs it \u2014 the AI coach could not be reached.'],
       source: 'rules',
     }
@@ -246,6 +247,7 @@ export function buildProgramAsWrittenPrescription(
     deload: false,
     reasoning,
     confidence: 0.3,
+    sessionTimeBudgetMinutes: signals.sessionTimeBudgetMinutes,
     confidenceReasons: ['Built from your program\u2019s own sets — the AI coach could not be reached.'],
     source: 'rules',
   }
@@ -278,13 +280,15 @@ export async function generatePrescriptionForSession(
   // durationPreset is in the key for the same reason — a 30-minute plan and a 90-minute
   // plan are different answers, and sharing a cached result would silently serve one for
   // the other within the 30s cooldown (the user switching presets is exactly that fast).
-  const key = `${userId}:${programSessionId}:${todayInTz(tz)}:${excludeSessionId ?? ''}:${durationPreset ?? 'standard'}`
+  const activeProgram = await repo.getActiveProgram(userId)
+  const configuredBudget = activeProgram?.sessions.find(s => s.id === programSessionId)?.timeBudgetMinutes
+  const key = `${userId}:${programSessionId}:${todayInTz(tz)}:${excludeSessionId ?? ''}:${durationPreset ?? 'standard'}:${configuredBudget}`
   return prescriptionDedup.run(
     key,
     // An explicit preset choice is a user action asking for a different plan — it must
     // never be answered from the read-through cooldown.
     { skipCooldown: Boolean(excludeSessionId) || durationPreset != null, cacheable: r => r.ok },
-    () => runPrescriptionGeneration(userId, programSessionId, repo, tz, excludeSessionId, durationPreset),
+    () => runPrescriptionGeneration(userId, programSessionId, repo, tz, activeProgram, excludeSessionId, durationPreset),
   )
 }
 
@@ -293,6 +297,7 @@ async function runPrescriptionGeneration(
   programSessionId: string,
   repo: WorkoutRepository,
   tz: string,
+  activeProgram: Awaited<ReturnType<WorkoutRepository['getActiveProgram']>>,
   // The workout session whose completion triggered this call (from complete-workout's
   // post-completion hook). Excluded from the hoursSinceLastSession gap only — it has
   // completedAt ≈ now by construction, which would otherwise spuriously satisfy the
@@ -306,7 +311,6 @@ async function runPrescriptionGeneration(
   // row — self-heal a valid-but-stateless session, matching the GET route (a valid session
   // with no state row previously 404'd here even though GET would create it). A genuinely
   // stale id (not in the active program) still 404s.
-  const activeProgram = await repo.getActiveProgram(userId)
   const validSession = activeProgram?.sessions.find(s => s.id === programSessionId)
   if (!validSession || !activeProgram) return { ok: false, error: 'Not found', status: 404 }
   let state = await repo.ensureSessionPeriodization(userId, programSessionId)
@@ -334,6 +338,9 @@ async function runPrescriptionGeneration(
   const fresh = state.prescription
   if (
     fresh && excludeSessionId == null && durationPreset == null &&
+    (fresh.sessionTimeBudgetMinutes != null
+      ? fresh.sessionTimeBudgetMinutes === validSession.timeBudgetMinutes
+      : validSession.timeBudgetMinutes > 0) &&
     (fresh.durationPreset == null || fresh.durationPreset === 'standard') &&
     (state.prescriptionStatus === 'pending' || state.prescriptionStatus === 'auto_applied') &&
     state.prescriptionGeneratedAt != null &&
@@ -728,6 +735,7 @@ async function runPrescriptionGeneration(
     confidence: signals.confidence,
     confidenceReasons: signals.confidenceReasons,
     durationPreset: durationPreset ?? 'standard',
+    sessionTimeBudgetMinutes: validSession.timeBudgetMinutes,
     refitBaseline,
     ...(droppedIdSet.size > 0 && { droppedExerciseIds: [...droppedIdSet] }),
   }

@@ -110,6 +110,7 @@ export interface AiPrescription {
   // WERE STORED — 10 of 10 production prescriptions carried one on 2026-09-21. `DurationPreset`
   // resolves both in one place (`requestedBudgetMin`), so nothing that reads this needs to care.
   durationPreset?: import('@trainingai/shared/workout/duration-model').DurationPreset
+  sessionTimeBudgetMinutes?: number
   // What a no-model duration re-fit starts from (RV-202 ②). Changing the time budget used to
   // re-run the whole model call for work that is pure arithmetic — the budget stage is
   // deterministic — but it cannot re-run against the STORED plan, because the budget passes

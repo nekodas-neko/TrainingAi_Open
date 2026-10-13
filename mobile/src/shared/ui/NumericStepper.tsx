@@ -17,6 +17,8 @@ export function NumericStepper({
   disabled = false,
   style,
   inline = false,
+  hideLabel = false,
+  onBlur,
 }: {
   label: string;
   accessibilityLabel?: string;
@@ -28,6 +30,8 @@ export function NumericStepper({
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
   inline?: boolean;
+  hideLabel?: boolean;
+  onBlur?: () => void;
 }) {
   const { theme } = useTheme();
   const number = Number(value.trim().replace(',', '.'));
@@ -40,10 +44,15 @@ export function NumericStepper({
   }
   if (inline)
     return (
-      <Stack gap="xs" style={[{ flex: 1 }, style]}>
-        <AppText variant="caption" tone="muted">
-          {label}
-        </AppText>
+      <Stack
+        gap="xs"
+        style={[{ flex: 1, minWidth: theme.sizes.touchTarget * 3 + theme.spacing.xs * 2 }, style]}
+      >
+        {!hideLabel && (
+          <AppText variant="caption" tone="muted">
+            {label}
+          </AppText>
+        )}
         <Stack direction="row" align="center" gap="xs">
           <IconButton
             icon="minus"
@@ -56,12 +65,14 @@ export function NumericStepper({
             label={label}
             accessibilityLabel={accessibilityLabel}
             hideLabel
+            containerStyle={{ flex: 1, minWidth: theme.sizes.touchTarget }}
             value={value}
             onChangeText={onChange}
+            onBlur={onBlur}
             editable={!disabled}
             keyboardType="number-pad"
             selectTextOnFocus
-            style={{ textAlign: 'center' }}
+            style={{ textAlign: 'center', paddingHorizontal: theme.spacing.sm }}
           />
           <IconButton
             icon="plus"
@@ -81,6 +92,7 @@ export function NumericStepper({
         accessibilityLabel={accessibilityLabel}
         value={value}
         onChangeText={onChange}
+        onBlur={onBlur}
         editable={!disabled}
         keyboardType={step === 1 && min === 0 ? 'number-pad' : 'numbers-and-punctuation'}
         returnKeyType="done"

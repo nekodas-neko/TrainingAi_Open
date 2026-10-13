@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
-import type { DurationPreset } from '@trainingai/shared/workout/duration-model';
+import { readDurationPreset, type DurationPreset } from '@trainingai/shared/workout/duration-model';
 import { readSessionResponse, type SessionPreview } from '../catalog';
 import { prepareSession, type SessionStartOptions } from '../logging/session-options';
 import { useWorkoutResource, useWorkoutResources } from './WorkoutDataProvider';
@@ -46,6 +46,7 @@ export function useSessionPreparation(
   }, [session?.id, initialFullOverride]);
   useEffect(() => {
     const prescribed = state.data?.state;
+    setDuration(readDurationPreset(prescribed?.prescription?.durationPreset));
     if (
       !chosen.current &&
       prescribed?.prescriptionStatus !== 'consumed' &&

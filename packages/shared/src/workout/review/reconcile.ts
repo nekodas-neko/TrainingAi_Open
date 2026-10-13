@@ -241,7 +241,7 @@ export function reconcileReview(params: {
     exercises: out,
     projectedDurationMin,
     budgetMin,
-    fitsBudget: projectedDurationMin <= budgetMin,
+    fitsBudget: budgetMin === 0 || projectedDurationMin <= budgetMin,
     weeklyImpact,
     droppedIds,
     adjustedIds,
