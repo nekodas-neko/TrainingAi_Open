@@ -33,12 +33,21 @@ Two consequences:
 
 | Build | App ID | Signed with | Gets its data from | Who uses it |
 |---|---|---|---|---|
-| Development (`development`, `android-development` profiles) | `com.trainingai.app.dev` | the dev key | a local or test server; code from a laptop's Metro | jsboiss, and the Implementer's device pass |
+| TrainingAi Dev, the current app's dev flavour (exists) | `com.trainingai.app.dev` | the stable key | the laptop's `pnpm dev` over `adb reverse` | the Implementer's device passes on the current app ([`canonical-runtime-android.md`](canonical-runtime-android.md)) |
+| Native development (`development`, `android-development` profiles; ID still to change, see below) | `com.trainingai.app.nativedev` | a dev key | a local or test server; code from a laptop's Metro | jsboiss, and the Implementer's device pass |
 | Side-by-side (still to add; asked on #2836) | `com.trainingai.app.preview` | the dev key | production, signed in as the owner | the owner, next to the current app |
 | Release (`android-preview`, `android-production`) | `com.trainingai.app` | the release key | production | everyone, but only from the switch-over |
 
-- **Separate app IDs** let Android treat each build as its own app. A `.dev` or `.preview` build
-  installs next to the current app and never touches it, its data or the ring key.
+- **Separate app IDs** let Android treat each build as its own app. A `.nativedev` or `.preview`
+  build installs next to the current app and never touches it, its data or the ring key. All four
+  can sit on one phone.
+- **⚠ The native development profiles still build `com.trainingai.app.dev` with the release key.**
+  That's the same ID and signature as TrainingAi Dev, so installing one quietly replaces the other.
+  Changing it has been asked for on #2836. Until it changes, don't install a native development
+  build on the owner's phone.
+- **Each native app ID needs its own sign-in callback** (`NATIVE_CALLBACKS` in
+  `lib/auth/mobile/native-transaction.ts`). The callback for a development ID is accepted only
+  outside production.
 - **⚠ The `preview` profile builds the real ID, `com.trainingai.app`.** Never install it on the
   owner's phone before the switch-over checklist below passes.
 - **A development build points at a local server or a test server, not production.** That is
@@ -74,8 +83,8 @@ what makes comparing them possible, and it is also why these rules exist:
      `pnpm dev` or a test server.
    - Cloud agents use `pnpm --dir mobile web` for a rough preview and `pnpm dev` for the API.
 2. **Device check (Implementer, on the owner's machine).** Install the development build on the
-   owner's phone and run it against the machine's local server. Use `.dev` and `.preview` builds
-   only. Results go on the device-check issue.
+   owner's phone and run it against the machine's local server. Use `.nativedev` and `.preview`
+   builds only. Results go on the device-check issue.
 3. **Merge.**
    - Server changes ship at the next release (cadence below).
    - App changes trigger CI to rebuild the side-by-side app and publish it. The owner installs it
