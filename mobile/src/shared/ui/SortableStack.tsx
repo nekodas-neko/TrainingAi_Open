@@ -16,6 +16,7 @@ import { dragOrder, displacedItems, moveItem, reorderBounds, type ItemBounds } f
 
 type DragState = {
   id: string;
+  source: string;
   start: string[];
   next: string[];
   dy: number;
@@ -49,9 +50,14 @@ export function SortableStack({
   const mounted = useRef(true);
   const committing = useRef(false);
   const [active, setActive] = useState<string | null>(null);
-  const [localOrder, setLocalOrder] = useState(order);
+  const signature = JSON.stringify(order);
+  const [local, setLocal] = useState(() => ({ signature, order }));
+  const localOrder = local.signature === signature ? local.order : order;
   const latest = useRef({ order: localOrder, saved: order, onChange, label });
   latest.current = { order: localOrder, saved: order, onChange, label };
+  function setLocalOrder(next: string[]) {
+    setLocal({ signature: JSON.stringify(latest.current.saved), order: next });
+  }
   function offset(id: string) {
     let value = offsets.current.get(id);
     if (!value) {
@@ -63,6 +69,10 @@ export function SortableStack({
   function update(dy: number) {
     const current = drag.current;
     if (!current) return;
+    if (current.source !== JSON.stringify(latest.current.saved)) {
+      methods.current.cancel();
+      return;
+    }
     current.dy = dy;
     const distance = dy + current.scroll;
     offset(current.id).setValue(distance);
@@ -101,6 +111,10 @@ export function SortableStack({
   function finish(cancelled = false) {
     const current = drag.current;
     if (!current) return;
+    if (current.source !== JSON.stringify(latest.current.saved)) {
+      methods.current.cancel();
+      return;
+    }
     const token = session.current;
     drag.current = null;
     scroll?.end();
@@ -109,6 +123,10 @@ export function SortableStack({
     const next = changed ? current.next : current.start;
     const complete = () => {
       if (!mounted.current || token !== session.current) return;
+      if (current.source !== JSON.stringify(latest.current.saved)) {
+        methods.current.cancel();
+        return;
+      }
       dropAnimation.current = null;
       bounds.current = reorderBounds(current.start, next, current.bounds, spacing);
       setLocalOrder([...next]);
@@ -155,7 +173,6 @@ export function SortableStack({
   }
   const methods = useRef({ update, finish, cancel });
   methods.current = { update, finish, cancel };
-  const signature = order.join('|');
   useEffect(() => {
     methods.current.cancel();
     setLocalOrder(latest.current.saved);
@@ -195,7 +212,7 @@ export function SortableStack({
             bounds.current.set(id, layout);
           }}
           onBegin={(pageY) => {
-            if (drag.current || saving.current) return;
+            if (drag.current || saving.current || !latest.current.order.includes(id)) return;
             session.current++;
             for (const value of offsets.current.values()) {
               value.stopAnimation();
@@ -204,6 +221,7 @@ export function SortableStack({
             const start = [...latest.current.order];
             drag.current = {
               id,
+              source: JSON.stringify(latest.current.saved),
               start,
               next: start,
               dy: 0,
@@ -226,6 +244,7 @@ export function SortableStack({
           onAccessibleMove={(direction) => {
             if (!enabled || saving.current) return;
             const items = latest.current.order;
+            if (!items.includes(id)) return;
             const target = items[items.indexOf(id) + direction];
             if (!target) return;
             const next = moveItem(items, id, target);
