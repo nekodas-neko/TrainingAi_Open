@@ -256,9 +256,10 @@ describe('estimateMaintenance — partial days (Q-387)', () => {
     expect(r.maintenanceKcal).toBe(2600)
   })
   it('includes a known zero-intake day without confusing it with missing intake', () => {
-    const days: MaintenanceDay[] = Array.from({ length: 14 }, (_, i) => ({ date: dayStr(i), intakeKcal: i === 0 ? 0 : 2600, loggingComplete: true, weightKg: 80 }))
+    const days: MaintenanceDay[] = Array.from({ length: 14 }, (_, i) => ({ date: dayStr(i), intakeKcal: i === 0 ? 0 : 2600, loggingComplete: true, zeroIntakeConfirmed: i === 0, weightKg: 80 }))
     expect(estimateMaintenance(days, 14).daysLogged).toBe(14)
     expect(estimateMaintenance(days, 14).meanIntakeKcal).toBe(2414)
+    expect(estimateMaintenance(days.map(day => ({...day,zeroIntakeConfirmed:false})), 14).meanIntakeKcal).toBe(2600)
     days[0] = { ...days[0], intakeKcal: null, loggingComplete: false }
     expect(estimateMaintenance(days, 14).meanIntakeKcal).toBe(2600)
   })

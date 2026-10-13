@@ -414,9 +414,9 @@ function rowToAnalyte(r: {
 }
 
 export class PostgresWorkoutRepository implements WorkoutRepository {
-  async applyHealthConnectBatch(userId:string,batch:import('@trainingai/shared/validation/health-connect-import').HealthConnectBatch){return healthConnect.applyHealthConnectBatch(this.db,userId,batch)}
+  async applyHealthConnectBatch(userId:string,batch:import('@trainingai/shared/validation/health-connect-import').HealthConnectBatch,timezone?:string){return healthConnect.applyHealthConnectBatch(this.db,userId,batch,timezone)}
   async rebuildHealthConnect(userId:string,timezone:string){return healthConnect.rebuildHealthConnect(this.db,userId,timezone)}
-  async applyAppleHealthBatch(userId:string,batch:import('@trainingai/shared/validation/apple-health-import').AppleImportBatch){return appleHealth.applyAppleHealthBatch(this.db,userId,batch)}
+  async applyAppleHealthBatch(userId:string,batch:import('@trainingai/shared/validation/apple-health-import').AppleImportBatch,timezone?:string){return appleHealth.applyAppleHealthBatch(this.db,userId,batch,timezone)}
   async rebuildAppleHealth(userId:string,timezone:string){return appleHealth.rebuildAppleHealth(this.db,userId,timezone)}
 
   /** Last daytime-HRV refit ATTEMPT per user (see maybeRefitDaytimeHrvModel). Static because the

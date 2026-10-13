@@ -24,15 +24,17 @@ Outstanding work following [PR #2836](https://github.com/nekodas-neko/TrainingAi
 
 ## Deployment and internal rollout
 
-- [ ] Review the PR, pass mobile checks and Android native compilation, and fix CI failures. [#2840](https://github.com/nekodas-neko/TrainingAi_Open/issues/2840)
+- [ ] Obtain approval and pass CI on the reviewed implementation before merging. [#2840](https://github.com/nekodas-neko/TrainingAi_Open/issues/2840)
 
 - [ ] Merge and release the backend changes for native sign-in, health imports, meal statuses, exercise media, profiles, activities and community. [#2839](https://github.com/nekodas-neko/TrainingAi_Open/issues/2839)
 
-- [ ] Verify all branch migrations applied successfully, including the Health Connect ledger and meal-status migrations. [#2839](https://github.com/nekodas-neko/TrainingAi_Open/issues/2839)
+- [ ] Verify this PR's Health Connect ledger, affected-date projection queue and meal-status migrations in the deployed database before connected device acceptance. [#2839](https://github.com/nekodas-neko/TrainingAi_Open/issues/2839)
+
+- [ ] Compare current-user nutrition, sleep/energy, training stress and permanent snapshots against an authorised database copy; record any historical calorie changes and obtain tuning approval where applicable. [#2839](https://github.com/nekodas-neko/TrainingAi_Open/issues/2839)
 
 - [ ] Confirm required historical 1RM/recovery backfills have been applied. [#2839](https://github.com/nekodas-neko/TrainingAi_Open/issues/2839)
 
-- [ ] Configure `EXPO_TOKEN` for signed EAS builds and reuse the existing Android signing key. [#2840](https://github.com/nekodas-neko/TrainingAi_Open/issues/2840)
+- [ ] Configure `EXPO_TOKEN`, separate development signing credentials, replacement-environment approval and the installed certificate fingerprint. [#2840](https://github.com/nekodas-neko/TrainingAi_Open/issues/2840)
 
 - [ ] Verify the replacement APK retains `com.trainingai.app` and the installed app’s signing certificate. [#2840](https://github.com/nekodas-neko/TrainingAi_Open/issues/2840)
 
@@ -93,7 +95,7 @@ Android checks belong to the Android developer; iPhone checks use the existing i
 
 - [ ] Additional Health Connect readings: body composition, oxygen, basal/total energy, nutrition, exercise/distance and cadence. [#2843](https://github.com/nekodas-neko/TrainingAi_Open/issues/2843)
 
-- [ ] Direct Oura Bluetooth pairing, persistent keys, capture, sync and reconnect. [#2844](https://github.com/nekodas-neko/TrainingAi_Open/issues/2844)
+- [ ] Direct Oura Bluetooth capture/sync/reconnect, carrying over the existing `oura_ble.xml` pairing key and history cursor before replacement. [#2844](https://github.com/nekodas-neko/TrainingAi_Open/issues/2844)
 
 - [ ] Polar/chest-strap pairing and live heart rate. [#2844](https://github.com/nekodas-neko/TrainingAi_Open/issues/2844)
 
@@ -116,6 +118,10 @@ Android checks belong to the Android developer; iPhone checks use the existing i
 - [ ] Retrospective detected-activity review, confirm/edit/reject and Home notices. [#2845](https://github.com/nekodas-neko/TrainingAi_Open/issues/2845)
 
 - [ ] Sustained recording and workout/activity status while locked or outside the app. [#2846](https://github.com/nekodas-neko/TrainingAi_Open/issues/2846)
+
+- [ ] Picture-in-picture, exact-alarm rest timers and Android Now Bar presentation. [#2846](https://github.com/nekodas-neko/TrainingAi_Open/issues/2846)
+
+- [ ] Native media-saving actions and photo-library permission handling. [#2838](https://github.com/nekodas-neko/TrainingAi_Open/issues/2838)
 
 ## Later data projects
 

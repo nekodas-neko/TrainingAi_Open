@@ -15,29 +15,29 @@
 // advice. So an un-gated number is never returned: `maintenanceKcal` is null unless the window
 // clears every threshold below, and `excludedReason` says which one failed.
 
-import { computeWeightRateFit } from '../health/long-term-goal-progress'
-import { KCAL_PER_KG } from './tdee-adaptation'
+import { computeWeightRateFit } from '../health/long-term-goal-progress';
+import { KCAL_PER_KG } from './tdee-adaptation';
 
 /** Days of history the estimator looks back over. Shorter windows are dominated by water-weight
  *  swings (a single salty meal moves scale weight ~1 kg, which is 7700 kcal of apparent error). */
-export const DEFAULT_WINDOW_DAYS = 14
+export const DEFAULT_WINDOW_DAYS = 14;
 
 /** Widest window used when the short one lacks coverage — more days, more noise cancellation. */
-export const MAX_WINDOW_DAYS = 28
+export const MAX_WINDOW_DAYS = 28;
 
 /** Minimum days in the window that must carry a food log. Below this the mean intake is not
  *  representative and the weight change gets attributed to calories that were simply never typed in. */
-export const MIN_LOGGED_DAYS = 10
+export const MIN_LOGGED_DAYS = 10;
 
 /** Minimum weigh-ins needed to fit a weight slope at all. */
-export const MIN_WEIGH_INS = 4
+export const MIN_WEIGH_INS = 4;
 
 /** The weigh-ins must span at least this many days, or the slope is fitted to noise. */
-export const MIN_WEIGHT_SPAN_DAYS = 10
+export const MIN_WEIGHT_SPAN_DAYS = 10;
 
 /** Fraction of window days that must be logged for the estimate to be trusted. Guards the case
  *  where a 28-day window clears MIN_LOGGED_DAYS on 10 days but 18 days are missing. */
-export const MIN_LOGGED_FRACTION = 0.7
+export const MIN_LOGGED_FRACTION = 0.7;
 
 /** Sanity clamp — a human maintenance outside this is an artefact of bad data, not a metabolism.
  *
@@ -46,8 +46,8 @@ export const MIN_LOGGED_FRACTION = 0.7
  *  worst artefact landed at **1052** and slipped between the two. Pass the user's own BMR as
  *  `minMaintenanceKcal` — a maintenance below BMR is impossible by definition, not implausible by
  *  taste — and this constant becomes the backstop for a caller that has no BMR to offer. */
-export const MIN_PLAUSIBLE_MAINTENANCE = 1000
-export const MAX_PLAUSIBLE_MAINTENANCE = 6000
+export const MIN_PLAUSIBLE_MAINTENANCE = 1000;
+export const MAX_PLAUSIBLE_MAINTENANCE = 6000;
 
 /**
  * How far above the MEASURED-MOVEMENT maintenance a calibrated estimate may land before it is
@@ -69,14 +69,15 @@ export const MAX_PLAUSIBLE_MAINTENANCE = 6000
  * than one owner-month.** At the owner's 1,895 it rejects at 2,179, so it rejects the 2,245 that
  * prompted the entry and accepts anything up to ~15% of unmeasured movement. Change it here, once.
  */
-export const MAX_MEASURED_MOVEMENT_RATIO = 1.15
+export const MAX_MEASURED_MOVEMENT_RATIO = 1.15;
 
 export interface MaintenanceDay {
-  date: string
-  /** kcal eaten that day; null when nothing was logged (NOT zero — a zero would poison the mean). */
-  intakeKcal: number | null
+  date: string;
+  /** Logged kcal; null for unknown intake, zero only for an explicitly completed fasting day. */
+  intakeKcal: number | null;
+  zeroIntakeConfirmed?: boolean;
   /** Body weight that day; null when not weighed. */
-  weightKg: number | null
+  weightKg: number | null;
   /**
    * Q-387 — did the user say this day's food log was finished?
    *
@@ -95,7 +96,7 @@ export interface MaintenanceDay {
    * on the recommended daily target with a cut's deficit on top — the app telling an under-logger to
    * eat hundreds of kcal below real maintenance.
    */
-  loggingComplete?: boolean
+  loggingComplete?: boolean;
 }
 
 export type MaintenanceExclusion =
@@ -110,21 +111,21 @@ export type MaintenanceExclusion =
   /** Above what the user's own measured movement can account for (TN-29). Separate from
    *  `implausible_result` because the number is perfectly plausible for *a* human — it is just not
    *  plausible for THIS one, whose movement the app has measured. */
-  | 'above_measured_movement'
+  | 'above_measured_movement';
 
 export interface MaintenanceEstimate {
   /** Calibrated maintenance kcal/day, or null when the window did not clear the gates. */
-  maintenanceKcal: number | null
+  maintenanceKcal: number | null;
   /** 'high' at full coverage over the long window, 'medium' at the short window, 'low' at the floor. */
-  confidence: 'low' | 'medium' | 'high' | null
-  daysInWindow: number
-  daysLogged: number
-  meanIntakeKcal: number | null
-  weightRateKgPerWeek: number | null
-  weighIns: number
-  weightSpanDays: number
+  confidence: 'low' | 'medium' | 'high' | null;
+  daysInWindow: number;
+  daysLogged: number;
+  meanIntakeKcal: number | null;
+  weightRateKgPerWeek: number | null;
+  weighIns: number;
+  weightSpanDays: number;
   /** Set exactly when maintenanceKcal is null — which gate failed. */
-  excludedReason: MaintenanceExclusion | null
+  excludedReason: MaintenanceExclusion | null;
 }
 
 /**
@@ -145,19 +146,22 @@ export function estimateMaintenance(
    *  it — see TN-29. Omitted, the estimate is bounded only by `MAX_PLAUSIBLE_MAINTENANCE`. */
   measuredMovementKcal?: number | null,
 ): MaintenanceEstimate {
-  const sorted = [...days].sort((a, b) => a.date.localeCompare(b.date)).slice(-windowDays)
+  const sorted = [...days].sort((a, b) => a.date.localeCompare(b.date)).slice(-windowDays);
 
   // Q-387: `intakeKcal > 0` alone counted a day carrying one 200 kcal apple as a logged day, at
   // 200 kcal. The user's own "I have finished logging today" is the only signal that separates a
   // half-logged day from a light one — inference from logging shape was considered and rejected as
   // uncorrectable by the person who knows the answer, and a "% below expected" threshold as
   // circular (the expectation derives from the number being estimated).
-  const logged = sorted.filter(d => d.intakeKcal != null && d.intakeKcal >= 0 && d.loggingComplete === true)
-  const weighed = sorted.filter(d => d.weightKg != null && d.weightKg > 0)
+  const logged = sorted.filter(
+    (d) => d.intakeKcal != null && (d.intakeKcal > 0 || (d.intakeKcal === 0 && d.zeroIntakeConfirmed === true)) && d.loggingComplete === true,
+  );
+  const weighed = sorted.filter((d) => d.weightKg != null && d.weightKg > 0);
 
-  const meanIntakeKcal = logged.length > 0
-    ? Math.round(logged.reduce((s, d) => s + d.intakeKcal!, 0) / logged.length)
-    : null
+  const meanIntakeKcal =
+    logged.length > 0
+      ? Math.round(logged.reduce((s, d) => s + d.intakeKcal!, 0) / logged.length)
+      : null;
 
   // Slope is fitted against the weigh-in's DAY, not its position in the weighed array — an unevenly
   // spaced series (weighed Mon, Tue, then Sunday) would otherwise report a slope per-reading and
@@ -168,13 +172,13 @@ export function estimateMaintenance(
   // The maintenance below multiplies the UNROUNDED kg/day. Measured, not assumed: rounding kg/week
   // to 2 dp first moves the estimate by ~5 kcal/day at most, and by 5 on the fixture the test
   // below pins. Small — but a display rounding has no business reaching the kcal arithmetic.
-  const fit = computeWeightRateFit(weighed.map(d => ({ date: d.date, weightKg: d.weightKg })))
-  const slopeKgPerDay = fit?.slopeKgPerDay ?? null
-  const weightRateKgPerWeek = fit != null
-    ? Math.round(fit.rateKgPerWeek * 100) / 100
-    : null
+  const fit = computeWeightRateFit(
+    weighed.map((d) => ({ date: d.date, weightKg: d.weightKg })),
+  );
+  const slopeKgPerDay = fit?.slopeKgPerDay ?? null;
+  const weightRateKgPerWeek = fit != null ? Math.round(fit.rateKgPerWeek * 100) / 100 : null;
 
-  const weightSpanDays = fit?.spanDays ?? 0
+  const weightSpanDays = fit?.spanDays ?? 0;
 
   const base: Omit<MaintenanceEstimate, 'maintenanceKcal' | 'confidence' | 'excludedReason'> = {
     daysInWindow: sorted.length,
@@ -183,39 +187,49 @@ export function estimateMaintenance(
     weightRateKgPerWeek,
     weighIns: weighed.length,
     weightSpanDays,
-  }
-  const fail = (excludedReason: MaintenanceExclusion): MaintenanceEstimate =>
-    ({ ...base, maintenanceKcal: null, confidence: null, excludedReason })
+  };
+  const fail = (excludedReason: MaintenanceExclusion): MaintenanceEstimate => ({
+    ...base,
+    maintenanceKcal: null,
+    confidence: null,
+    excludedReason,
+  });
 
-  if (logged.length < MIN_LOGGED_DAYS) return fail('not_enough_logged_days')
-  if (logged.length / sorted.length < MIN_LOGGED_FRACTION) return fail('logging_too_sparse')
-  if (weighed.length < MIN_WEIGH_INS) return fail('not_enough_weigh_ins')
-  if (weightSpanDays < MIN_WEIGHT_SPAN_DAYS) return fail('weight_span_too_short')
+  if (logged.length < MIN_LOGGED_DAYS) return fail('not_enough_logged_days');
+  if (logged.length / sorted.length < MIN_LOGGED_FRACTION) return fail('logging_too_sparse');
+  if (weighed.length < MIN_WEIGH_INS) return fail('not_enough_weigh_ins');
+  if (weightSpanDays < MIN_WEIGHT_SPAN_DAYS) return fail('weight_span_too_short');
 
   // Losing weight (negative slope) means expenditure exceeded intake — hence the minus.
-  const maintenanceKcal = Math.round(meanIntakeKcal! - (slopeKgPerDay! * KCAL_PER_KG))
+  const maintenanceKcal = Math.round(meanIntakeKcal! - slopeKgPerDay! * KCAL_PER_KG);
   // Never below the universal floor, and never below this user's own BMR when the caller supplies
   // one. Rejected rather than clamped up: `resolveMaintenance` then falls back to the formula
   // baseline, where clamping would report a number the data never supported (Q-517).
-  const floorKcal = Math.max(MIN_PLAUSIBLE_MAINTENANCE, Math.round(minMaintenanceKcal ?? 0))
-  if (maintenanceKcal > MAX_PLAUSIBLE_MAINTENANCE) return fail('implausible_result')
+  const floorKcal = Math.max(MIN_PLAUSIBLE_MAINTENANCE, Math.round(minMaintenanceKcal ?? 0));
+  if (maintenanceKcal > MAX_PLAUSIBLE_MAINTENANCE) return fail('implausible_result');
   if (maintenanceKcal < floorKcal) {
-    return fail(floorKcal > MIN_PLAUSIBLE_MAINTENANCE ? 'below_bmr' : 'implausible_result')
+    return fail(floorKcal > MIN_PLAUSIBLE_MAINTENANCE ? 'below_bmr' : 'implausible_result');
   }
   // TN-29 — the ceiling, and the same rejection-not-clamping rule as the floor above: clamping
   // would report a number the data never supported, so `resolveMaintenance` falls back to the
   // formula baseline instead.
-  if (measuredMovementKcal != null && measuredMovementKcal > 0
-      && maintenanceKcal > measuredMovementKcal * MAX_MEASURED_MOVEMENT_RATIO) {
-    return fail('above_measured_movement')
+  if (
+    measuredMovementKcal != null &&
+    measuredMovementKcal > 0 &&
+    maintenanceKcal > measuredMovementKcal * MAX_MEASURED_MOVEMENT_RATIO
+  ) {
+    return fail('above_measured_movement');
   }
 
-  const coverage = logged.length / sorted.length
-  const confidence = sorted.length >= MAX_WINDOW_DAYS && coverage >= 0.9 ? 'high'
-    : coverage >= 0.85 ? 'medium'
-    : 'low'
+  const coverage = logged.length / sorted.length;
+  const confidence =
+    sorted.length >= MAX_WINDOW_DAYS && coverage >= 0.9
+      ? 'high'
+      : coverage >= 0.85
+        ? 'medium'
+        : 'low';
 
-  return { ...base, maintenanceKcal, confidence, excludedReason: null }
+  return { ...base, maintenanceKcal, confidence, excludedReason: null };
 }
 
 /**
@@ -230,38 +244,52 @@ export function resolveMaintenance(
   minMaintenanceKcal?: number | null,
   /** The user's measured-movement maintenance — see `estimateMaintenance`. */
   measuredMovementKcal?: number | null,
-): { maintenanceKcal: number; source: 'calibrated' | 'formula'; estimate: MaintenanceEstimate } {
-  const long = estimateMaintenance(days, MAX_WINDOW_DAYS, minMaintenanceKcal, measuredMovementKcal)
+): {
+  maintenanceKcal: number;
+  source: 'calibrated' | 'formula';
+  estimate: MaintenanceEstimate;
+} {
+  const long = estimateMaintenance(
+    days,
+    MAX_WINDOW_DAYS,
+    minMaintenanceKcal,
+    measuredMovementKcal,
+  );
   if (long.maintenanceKcal != null) {
-    return { maintenanceKcal: long.maintenanceKcal, source: 'calibrated', estimate: long }
+    return { maintenanceKcal: long.maintenanceKcal, source: 'calibrated', estimate: long };
   }
-  const short = estimateMaintenance(days, DEFAULT_WINDOW_DAYS, minMaintenanceKcal, measuredMovementKcal)
+  const short = estimateMaintenance(
+    days,
+    DEFAULT_WINDOW_DAYS,
+    minMaintenanceKcal,
+    measuredMovementKcal,
+  );
   if (short.maintenanceKcal != null) {
-    return { maintenanceKcal: short.maintenanceKcal, source: 'calibrated', estimate: short }
+    return { maintenanceKcal: short.maintenanceKcal, source: 'calibrated', estimate: short };
   }
   // Report the window the user is closest to filling, so the UI can say "4 more days".
-  return { maintenanceKcal: formulaBaselineKcal, source: 'formula', estimate: short }
+  return { maintenanceKcal: formulaBaselineKcal, source: 'formula', estimate: short };
 }
 
 /** Human-readable reason the calibration isn't ready yet. */
 export function maintenanceGapMessage(e: MaintenanceEstimate): string {
   switch (e.excludedReason) {
     case 'not_enough_logged_days':
-      return `Log food on ${MIN_LOGGED_DAYS - e.daysLogged} more day${MIN_LOGGED_DAYS - e.daysLogged === 1 ? '' : 's'} to calibrate`
+      return `Log food on ${MIN_LOGGED_DAYS - e.daysLogged} more day${MIN_LOGGED_DAYS - e.daysLogged === 1 ? '' : 's'} to calibrate`;
     case 'logging_too_sparse':
-      return 'Too many unlogged days in the window to calibrate'
+      return 'Too many unlogged days in the window to calibrate';
     case 'not_enough_weigh_ins':
-      return `Weigh in on ${MIN_WEIGH_INS - e.weighIns} more day${MIN_WEIGH_INS - e.weighIns === 1 ? '' : 's'} to calibrate`
+      return `Weigh in on ${MIN_WEIGH_INS - e.weighIns} more day${MIN_WEIGH_INS - e.weighIns === 1 ? '' : 's'} to calibrate`;
     case 'weight_span_too_short':
-      return 'Weigh-ins need to span at least 10 days to calibrate'
+      return 'Weigh-ins need to span at least 10 days to calibrate';
     case 'implausible_result':
-      return 'Calibration produced an implausible number — check for unlogged days'
+      return 'Calibration produced an implausible number — check for unlogged days';
     case 'below_bmr':
-      return 'Calibration came out below your resting burn — some days are only part-logged'
+      return 'Calibration came out below your resting burn — some days are only part-logged';
     case 'above_measured_movement':
-      return 'Calibration came out higher than your measured movement supports — using the formula estimate'
+      return 'Calibration came out higher than your measured movement supports — using the formula estimate';
     default:
-      return 'Using the formula estimate'
+      return 'Using the formula estimate';
   }
 }
 
@@ -273,6 +301,6 @@ export function maintenanceGapMessage(e: MaintenanceEstimate): string {
  * a picker shows ("1.38×"). Null for a BMR that is not a positive number, rather than an Infinity.
  */
 export function activityFactor(totalKcal: number, bmrKcal: number): number | null {
-  if (!(bmrKcal > 0) || !Number.isFinite(totalKcal)) return null
-  return Math.round((totalKcal / bmrKcal) * 100) / 100
+  if (!(bmrKcal > 0) || !Number.isFinite(totalKcal)) return null;
+  return Math.round((totalKcal / bmrKcal) * 100) / 100;
 }

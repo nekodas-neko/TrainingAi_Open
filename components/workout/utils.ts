@@ -235,7 +235,6 @@ export function clampVoiceLogResult(weight?: number, reps?: number): { weight?: 
 }
 
 
-// One pair of each size — the plates available on the user's rack.
 
 
 // Reverts are a client-side overlay on the server prescription: the stored

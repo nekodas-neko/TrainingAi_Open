@@ -45,10 +45,12 @@
       [
         "expo-secure-store",
         {
-          "faceIDPermission": false
+          "faceIDPermission": false,
+          "configureAndroidBackup": false
         }
       ],
       "expo-apple-authentication",
+      "./src/integrations/auth/private-backups.cjs",
       "expo-sqlite",
       [
         "expo-camera",

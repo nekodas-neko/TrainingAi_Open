@@ -11,7 +11,6 @@ import {
   signNativeTransaction,
   nativeLoginContinuation,
 } from '../mobile/native-transaction';
-import { readIosTransaction } from '../mobile/ios-transaction';
 
 const challenge = 'C'.repeat(43);
 const state = 'S'.repeat(43);
@@ -28,6 +27,14 @@ beforeEach(() => vi.stubEnv('AUTH_SECRET', secret));
 afterEach(() => vi.unstubAllEnvs());
 
 describe('native client transactions', () => {
+  it('requires an explicit production opt-in for the Android development callback', async () => {
+    vi.stubEnv('NODE_ENV','production');
+    vi.stubEnv('NATIVE_AUTH_ALLOW_ANDROID_DEV','0');
+    const request = () => new NextRequest(`https://example.com/mobile-signin/begin?client=android-dev&challenge=${challenge}&state=${state}`);
+    expect((await GET(request())).status).toBe(400);
+    vi.stubEnv('NATIVE_AUTH_ALLOW_ANDROID_DEV','1');
+    expect((await GET(request())).status).toBe(307);
+  });
   for (const client of ['ios', 'android', 'android-dev'] as const) {
     it(`binds ${client} to its registered callback and PKCE transaction`, async () => {
       const transaction = { client, challenge, state };
@@ -70,7 +77,7 @@ describe('native client transactions', () => {
       .setIssuedAt()
       .setExpirationTime('10m')
       .sign(new TextEncoder().encode(secret));
-    expect(await readIosTransaction(cookie(token))).toEqual({ challenge, state });
+    expect(await readNativeTransaction(cookie(token))).toEqual({ client: 'ios', challenge, state });
   });
   it('rejects a signed client/audience mismatch and expires old attempts', async () => {
     for (const expiration of ['10m', '-1s']) {
@@ -85,7 +92,6 @@ describe('native client transactions', () => {
     }
     const token = await signNativeTransaction({ client: 'android', challenge, state });
     expect(await readNativeTransaction(cookie(token.slice(0, -5) + 'xxxxx'))).toBeNull();
-    expect(await readIosTransaction(cookie(token))).toBeNull();
   });
   it('rejects unknown clients, malformed states and duplicate parameters before setting cookies', async () => {
     for (const query of [

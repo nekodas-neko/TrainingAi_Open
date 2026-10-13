@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { HEALTH_IMPORT_MAX_INTERVAL_MS } from '../health/import-limits';
 
 export const appleTypes = {
   HKCategoryTypeIdentifierSleepAnalysis: { unit: null, max: 5 },
@@ -26,7 +27,7 @@ export const appleSample = z
     deviceModel: z.string().max(200).nullish(),
   })
   .strict()
-  .refine((row) => Date.parse(row.end) >= Date.parse(row.start), 'Invalid sample interval');
+  .refine((row) => Date.parse(row.end) >= Date.parse(row.start) && Date.parse(row.end) - Date.parse(row.start) <= HEALTH_IMPORT_MAX_INTERVAL_MS, 'Invalid sample interval');
 export const appleImportBatch = z
   .object({
     type: appleSampleType,

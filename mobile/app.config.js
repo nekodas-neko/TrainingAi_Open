@@ -1,7 +1,5 @@
 const mobileConfig = ({ config }) => {
-  const development = ['development', 'android-development'].includes(
-    process.env.EAS_BUILD_PROFILE,
-  );
+  const development = !process.env.EAS_BUILD_PROFILE || ['development', 'android-development'].includes(process.env.EAS_BUILD_PROFILE);
   const packageName = development ? 'com.trainingai.app.dev' : 'com.trainingai.app';
   return {
     ...config,

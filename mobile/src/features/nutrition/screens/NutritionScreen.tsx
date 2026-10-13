@@ -130,13 +130,6 @@ export function NutritionScreen({
     void refreshNutrition();
     void health.store?.refresh();
   }, [refreshNutrition, health.store]);
-  useEffect(() => {
-    if (date === n.today) {
-      void n.store
-        ?.ensureMealStatusTracking(date)
-        .catch(() => setActionError('Could not save meal tracking on this phone.'));
-    }
-  }, [n.store, date, n.today, n.loaded, n.data.mealStatuses, n.data.mealTypes]);
   const swipe = useMemo(
     () =>
       PanResponder.create({

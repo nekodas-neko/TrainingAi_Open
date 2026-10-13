@@ -189,6 +189,7 @@ export const WITHHELD_COLUMNS: Record<string, string[]> = {
 
 export const EXCLUDED: Record<string, Exclusion> = {
   health_connect_projection_state: { category: 'ops', reason: 'rebuild bookkeeping; source health records and resulting measurements are exported' },
+  native_health_projection_days: { category: 'ops', reason: 'pending import dates and per-day projection state; source records and measurements are exported' },
   auth_identities: { category: 'credentials', reason: 'private provider authentication identifiers' },
   apple_auth_attempts: { category: 'credentials', reason: 'short-lived authentication challenges' },
   // ── Credentials. Exporting these hands the reader a working key. ────────────

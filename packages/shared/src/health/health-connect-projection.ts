@@ -7,7 +7,7 @@ const kinds = {
   RestingHeartRate: 'restingHeartRate',
   HeartRateVariabilityRmssd: 'hrvRmssd',
 } as const;
-const stages = { asleep: 1, awake: 2, out_of_bed: 2, deep: 3, light: 4, rem: 5 } as const;
+const stages = { asleep: 1, awake: 2, out_of_bed: 2, deep: 4, light: 3, rem: 5 } as const;
 export function healthConnectIntervals(
   records: readonly HealthConnectRecord[],
 ): HealthInterval[] {

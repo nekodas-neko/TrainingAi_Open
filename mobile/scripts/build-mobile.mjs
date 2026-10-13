@@ -23,9 +23,10 @@ if (
   throw new Error('Use --platform ios|android and --profile development|preview|production.');
 }
 const easProfile = platform === 'android' ? `android-${profile}` : profile;
+const easVersion = '24.13.0';
 const interactive = process.argv.includes('--interactive');
 const command =
-  `npx.cmd --yes eas-cli@latest build --platform ${platform} --profile ${easProfile} --wait` +
+  `npx.cmd --yes eas-cli@${easVersion} build --platform ${platform} --profile ${easProfile} --wait` +
   (interactive ? '' : ' --non-interactive --freeze-credentials');
 
 function run(command, args, options = {}) {
@@ -66,7 +67,7 @@ async function build() {
   try {
     const args = [
       '--yes',
-      'eas-cli@latest',
+      `eas-cli@${easVersion}`,
       'build',
       '--platform',
       platform,

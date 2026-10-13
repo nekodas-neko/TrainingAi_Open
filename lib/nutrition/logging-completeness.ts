@@ -1,4 +1,4 @@
-import type { WorkoutRepository } from '@/lib/data/repository'
+import type { WorkoutRepository } from '@/lib/data/repository';
 
 export async function foodLoggingCoverage(
   repo: Pick<WorkoutRepository, 'listMealLoggingCompleteness'>,
@@ -7,17 +7,17 @@ export async function foodLoggingCoverage(
   to: string,
   legacyDates: string[],
 ) {
-  const complete = new Set(legacyDates)
-  const zeroIntake = new Set<string>()
-  if (!repo.listMealLoggingCompleteness) return { complete, zeroIntake }
+  const complete = new Set(legacyDates);
+  const zeroIntake = new Set<string>();
+  if (!repo.listMealLoggingCompleteness) return { complete, zeroIntake };
   try {
     for (const day of await repo.listMealLoggingCompleteness(userId, from, to)) {
-      if (day.complete) complete.add(day.date)
-      else complete.delete(day.date)
-      if (day.complete && day.zeroIntake) zeroIntake.add(day.date)
+      if (day.complete) complete.add(day.date);
+      else if (day.explicit) complete.delete(day.date);
+      if (day.complete && day.zeroIntake) zeroIntake.add(day.date);
     }
-    return { complete, zeroIntake }
+    return { complete, zeroIntake };
   } catch {
-    return { complete: new Set<string>(), zeroIntake: new Set<string>() }
+    return { complete: new Set(legacyDates), zeroIntake: new Set<string>() };
   }
 }

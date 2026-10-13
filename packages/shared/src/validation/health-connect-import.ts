@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { HEALTH_IMPORT_MAX_INTERVAL_MS } from '../health/import-limits';
 export const healthConnectTypes = [
   'SleepSession',
   'HeartRate',
@@ -54,7 +55,7 @@ export const healthConnectRecord = z
       end = Date.parse(row.end);
     const max = maxima[row.type as keyof typeof maxima];
     if (
-      end < start ||
+      end < start || end - start > HEALTH_IMPORT_MAX_INTERVAL_MS ||
       (max !== undefined && (row.value === undefined || row.value > max)) ||
       (row.type === 'Weight' && (row.value ?? 0) <= 0) ||
       (row.type === 'RestingHeartRate' && (row.value ?? 0) < 20) ||

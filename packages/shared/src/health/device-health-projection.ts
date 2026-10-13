@@ -148,8 +148,15 @@ export function projectDeviceHealth(
     .sort((a, b) => Date.parse(b.end) - Date.parse(a.end))[0];
   const rmssd = new Map<string, Map<string, number[]>>();
   for (const row of rows.filter((row) => row.kind === 'hrvRmssd' && row.value > 0)) {
-    if (Number(formatInTimeZone(new Date(row.end), timezone, 'H')) >= 8) continue;
-    const key = date(row.end);
+    const at = Date.parse(row.end);
+    const night = sleep.find(
+      (night) =>
+        at >= Date.parse(night.sleepStart) &&
+        at <= Date.parse(night.sleepEnd) &&
+        night.sources.some((source) => source.bundleIdentifier === row.sourceId),
+    );
+    if (!night) continue;
+    const key = night.date;
     if (!rmssd.has(key)) rmssd.set(key, new Map());
     const sources = rmssd.get(key)!;
     if (!sources.has(row.sourceId)) sources.set(row.sourceId, []);

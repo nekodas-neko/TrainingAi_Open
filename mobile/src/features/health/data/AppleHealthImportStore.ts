@@ -1,3 +1,4 @@
+import { acknowledgedUpload, isDeferredUpload } from './health-upload';
 import { z } from 'zod';
 import {
   appleImportBatch,
@@ -186,23 +187,46 @@ export class AppleHealthImportStore {
       this.publish({ busy: true, error: null });
       try {
         const flush = async () => {
-          while (this.disk.queue.length && !this.canceled) {
+          let remaining = this.disk.queue.length;
+          let rebuilds = 0;
+          while (remaining-- > 0 && this.disk.queue.length && !this.canceled) {
             const item = this.disk.queue[0];
-            const reply = await this.connection.post('/api/apple-health/sync', item);
-            if (this.canceled) {
-              return;
+            if (!('rebuild' in item) && isDeferredUpload(item, this.now())) {
+              await this.write({ ...this.disk, queue: [...this.disk.queue.slice(1), item] });
+              continue;
             }
-            const completed =
-              'rebuild' in item ? resultSchema.parse(reply) : this.disk.completed;
-            if (!('rebuild' in item)) {
-              const ack = z.object({ accepted: z.number(), deleted: z.number() }).parse(reply);
-              if (ack.accepted !== item.samples.length || ack.deleted !== item.deleted.length) {
-                throw new Error('Unconfirmed health records');
-              }
+
+            let reply;
+            try {
+              reply = await this.connection.post('/api/apple-health/sync', item);
+            } catch (error) {
+              if (!('rebuild' in item)) throw error;
+              await this.write({ ...this.disk, queue: [...this.disk.queue.slice(1), item] });
+              this.publish({ error: 'Health records are saved. Summaries need another sync.' });
+              continue;
             }
-            await this.write({ ...this.disk, queue: this.disk.queue.slice(1), completed });
+            if (this.canceled) return;
+            let completed = this.disk.completed;
+            const retry =
+              'rebuild' in item
+                ? (reply as { pending?: boolean }).pending
+                  ? item
+                  : null
+                : acknowledgedUpload(item, reply);
+            if ('rebuild' in item) completed = resultSchema.parse(reply);
+            await this.write({
+              ...this.disk,
+              queue: [...this.disk.queue.slice(1), ...(retry ? [retry] : [])],
+              completed,
+              needsRebuild:
+                this.disk.needsRebuild ||
+                (!('rebuild' in item) &&
+                  ((reply as { accepted: number; deleted: number }).accepted > 0 ||
+                    item.deleted.length > 0)),
+            });
             if ('rebuild' in item) {
               this.changed();
+              if (retry && ++rebuilds < 8) remaining++;
             }
           }
         };
@@ -257,7 +281,9 @@ export class AppleHealthImportStore {
         if (this.disk.needsRebuild && !this.canceled) {
           await this.write({
             ...this.disk,
-            queue: [...this.disk.queue, { rebuild: true }],
+            queue: this.disk.queue.some((item) => 'rebuild' in item)
+              ? this.disk.queue
+              : [...this.disk.queue, { rebuild: true }],
             needsRebuild: false,
           });
           await flush();

@@ -38,6 +38,14 @@ async function store() {
 export const authPlatform: AuthPlatform = {
   client,
   fetch: nativeFetch,
+  async revokeSession(origin, accessToken) {
+    await nativeFetch(`${origin}/api/auth/native-session/revoke`, {
+      method: 'POST',
+      credentials: 'omit',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(5000),
+    });
+  },
   async get(key) {
     return (await store()).getItemAsync(key);
   },

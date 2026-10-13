@@ -1,3 +1,4 @@
+import { acknowledgedUpload, isDeferredUpload } from './health-upload';
 import { z } from 'zod';
 import {
   healthConnectBatch,
@@ -244,24 +245,50 @@ export class HealthConnectImportStore {
     });
   }
   private async flush(types: HealthConnectType[]) {
-    while (this.disk.queue.length && !this.canceled) {
+    let remaining = this.disk.queue.length;
+    let rebuilds = 0;
+    while (remaining-- > 0 && this.disk.queue.length && !this.canceled) {
       const item = this.disk.queue[0];
+      if (!('rebuild' in item) && isDeferredUpload(item, this.now())) {
+        await this.write({ ...this.disk, queue: [...this.disk.queue.slice(1), item] });
+        continue;
+      }
       if ('records' in item && item.records.some((row) => !types.includes(row.type)))
         throw new Error(
           'Restore the relevant Health Connect permissions to upload saved records.',
         );
-      const reply = await this.connection.post('/api/health-connect/sync', item);
+      let reply;
+      try {
+        reply = await this.connection.post('/api/health-connect/sync', item);
+      } catch (error) {
+        if (!('rebuild' in item)) throw error;
+        await this.write({ ...this.disk, queue: [...this.disk.queue.slice(1), item] });
+        this.publish({ error: 'Health records are saved. Summaries need another sync.' });
+        continue;
+      }
       if (this.canceled) return;
       let completed = this.disk.completed;
+      const retry =
+        'rebuild' in item
+          ? (reply as { pending?: boolean }).pending
+            ? item
+            : null
+          : acknowledgedUpload(item, reply);
+      if ('rebuild' in item) completed = completedSchema.parse(reply);
+      await this.write({
+        ...this.disk,
+        queue: [...this.disk.queue.slice(1), ...(retry ? [retry] : [])],
+        completed,
+        needsRebuild:
+          this.disk.needsRebuild ||
+          (!('rebuild' in item) &&
+            ((reply as { accepted: number; deleted: number }).accepted > 0 ||
+              item.deleted.length > 0)),
+      });
       if ('rebuild' in item) {
-        completed = completedSchema.parse(reply);
-      } else {
-        const ack = z.object({ accepted: z.number(), deleted: z.number() }).parse(reply);
-        if (ack.accepted !== item.records.length || ack.deleted !== item.deleted.length)
-          throw new Error('Health records were not confirmed');
+        this.changed();
+        if (retry && ++rebuilds < 8) remaining++;
       }
-      await this.write({ ...this.disk, queue: this.disk.queue.slice(1), completed });
-      if ('rebuild' in item) this.changed();
     }
   }
   run(manual = false): Promise<void> {
@@ -365,7 +392,9 @@ export class HealthConnectImportStore {
         if (this.disk.needsRebuild && !this.canceled) {
           await this.write({
             ...this.disk,
-            queue: [...this.disk.queue, { rebuild: true }],
+            queue: this.disk.queue.some((item) => 'rebuild' in item)
+              ? this.disk.queue
+              : [...this.disk.queue, { rebuild: true }],
             needsRebuild: false,
           });
           await this.flush(types);

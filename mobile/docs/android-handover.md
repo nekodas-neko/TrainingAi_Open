@@ -49,11 +49,11 @@ This app needs its own **development build**, which includes SQLite, secure stor
 Request access to the existing Expo project `@meowi/trainingai-mobile` and its builds. Do not create a new Expo project.
 
 ```text
-npx eas-cli@latest login
+npx eas-cli@24.13.0 login
 pnpm build:android
 ```
 
-The build launcher uses `android-development`, prepares the local shared-package snapshot for upload and requires the existing Android key configured in ignored `credentials.json`. Obtain the key and passwords privately from the owner. The required shape is:
+The build launcher uses `android-development`, prepares the local shared-package snapshot for upload and requires a separate development key configured in ignored `credentials.json`. Keep the owner's replacement key for preview/production builds only. Obtain credentials privately. The required shape is:
 
 ```json
 {
@@ -115,11 +115,15 @@ Keep EAS project ID `60c9f273-9824-4a24-b987-7a2555b6232f`, owner `meowi`, and t
 
 Verify both Android identities: successful callback, cancellation, pending approval, inactive account, session expiry, sign-out, account switching and opening the app from a cold start. Keep session data isolated from display-cache freshness.
 
+Production rejects `android-dev` unless the backend explicitly sets `NATIVE_AUTH_ALLOW_ANDROID_DEV=1`. Use a test account when enabling this for internal development. Browser sign-in requires confirmation of the account before returning to the app. New native tokens use a separate encryption salt and the existing server token-family ledger; sign-out revokes the current family when online. Earlier tokens expire normally. Verify both a fresh browser and an already signed-in browser, cancellation/account changes and rejection after revocation.
+
 ## Health Connect and data flow
 
 The current reader covers sleep/stages, heart rate, resting heart rate, RMSSD, steps, active calories and weight. More exposes the platform-appropriate connection screen. On a supported phone, make sure Health Connect is available and another health app actually writes data into it; data visible only in that app is not necessarily available through Health Connect. Refer to [Android Health Connect setup](https://developer.android.com/health-and-fitness/health-connect/get-started).
 
 Read `src/integrations/health-connect/reader.android.ts`, `src/features/health/data/HealthConnectImportStore.ts` and `src/features/health/useDeviceHealthImport.android.ts`. The persisted queue uploads to `/api/health-connect/sync`. Backend code retains raw records/provenance and projects supported records into existing health views. Imports resume paged history, process corrections/deletions and recover expired cursors; foreground activity triggers uploads. Background delivery and additional record types remain deferred.
+
+Native Android projections use `health_connect_native`, below the existing Capacitor `health_connect` source while both coexist. Retire the legacy writer and agree its provenance transition before the replacement becomes the primary client. Movement records are deduplicated between the two clients. Rebuilds drain persistent affected-date work in bounded batches, preserve manual sleep and permanent snapshots, and keep future-dated records for retry without blocking other uploads. Compare deep/light stages, sleep-window HRV and rows outside the uploaded dates.
 
 Test allow/deny/revoke, no data, multiple sources, overnight sleep, paged history, history permission, corrections/deletions, interrupted upload and offline/reopen. Inspect server readback and refreshed Home/Health values, not just a successful permission prompt. Preserve source package/record IDs and timestamps. SDNN from Apple and RMSSD from Android remain distinct. Missing readings must stay unavailable rather than becoming zero.
 
@@ -127,7 +131,7 @@ The new native store is `fitnessai.sqlite`, scoped by backend and account. Durab
 
 ## Backend rollout dependencies
 
-Before connected acceptance, deploy this branch's native Android auth, Health Connect, meal-status, media, profile/activity and community changes. Confirm successful migration application in the deployed ledger/logs, including:
+The migrations remain in this app/backend PR. Its migrations, generated read views and schema/export/residency metadata must agree. Deploy native Android auth, Health Connect, meal-status, media, profile/activity and community changes together, then confirm successful migration application in the deployed ledger/logs before connected device acceptance, including:
 
 - `202610131300_health_connect_records.sql`
 - `202610112228_meal_logging_statuses.sql`
@@ -136,7 +140,7 @@ The existing backend invokes `ensureSchema`; a running service does not prove ev
 
 ## Signing and replacement verification
 
-The accepted migration starts a fresh native local store: sign in again and load existing synced server records. **Legacy unsynced data, unfinished sessions and phone settings will not be imported.** Leave the old `trainingai` database and Android preference files untouched. Direct Bluetooth integrations and reuse of pairing keys remain deferred.
+The accepted migration starts a fresh native local store: sign in again and load existing synced server records. **Legacy unsynced data, unfinished sessions and phone settings will not be imported.** Leave the old `trainingai` database and Android preference files untouched. This exclusion does not include ring credentials: before replacement, #2844 must carry over `shared_prefs/oura_ble.xml`'s `key_hex` and history cursor and resume the existing pairing. Do not initialise a new pairing, uninstall or reset those preferences. Confirm the owner's independent key backup through `/admin/oura-ble` without publishing the key.
 
 Obtain the actual installed APK and matching keystore. A replacement must retain `com.trainingai.app`, the installed APK's signer and a higher version code. Before building the replacement, read the installed code and seed EAS above it:
 
@@ -150,11 +154,15 @@ Supply `--apksigner` and `--apkanalyzer` paths (or `APKSIGNER` / `APKANALYZER`) 
 
 Install the verified preview APK over the existing app without uninstalling. Then sign in and check programmes, workout history, nutrition and health account records. If Android rejects the signer/version, resolve it rather than uninstalling to make the installation appear successful. Keep the Capacitor build path; rollback must also satisfy Android signing/version rules.
 
+Inspect the release APK's manifest and resolved backup XML with `apkanalyzer`: both cloud backup and device transfer must exclude `oura_ble.xml`, SecureStore and legacy `app_webview` cookies. The native config plugin supplies these rules. Drain the ring and existing outbox before switching, retain the installed `base.apk`, and prepare a same-signer Capacitor rollback with a higher version code; Android will not accept an ordinary downgrade.
+
 ## CI and acceptance
 
 `.github/workflows/mobile.yml` runs mobile TypeScript, tests, all-platform exports and an unpublished Android debug compilation without signing secrets. `mobile-build.yml` is the separate manual signed-build workflow. It needs `EXPO_TOKEN` and either complete `ANDROID_KEYSTORE_B64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` secrets, or the existing `ANDROID_DEBUG_KEYSTORE_B64` fallback. The fallback still needs comparison with the installed APK's signer.
 
-Latest local validation: 296 mobile tests, mobile/root TypeScript, focused lint and Android/iOS/web JS exports passed. The main-alignment run also passed 11,463 backend tests with 2,249 existing gated skips. These checks do not establish Android runtime or signed upgrade compatibility.
+Replacement builds use the `native-replacement` GitHub environment. The owner must configure its required reviewers, explicitly approve Expo custody with `NATIVE_ANDROID_EAS_SIGNING_APPROVED=true`, and set `ANDROID_EXPECTED_CERT_SHA256` from the actual installed APK. The workflow verifies the supplied key's certificate before handing it to pinned EAS CLI 24.13.0. Development builds use separate `ANDROID_DEV_KEYSTORE_B64`, `ANDROID_DEV_KEYSTORE_PASSWORD`, `ANDROID_DEV_KEY_ALIAS` and `ANDROID_DEV_KEY_PASSWORD` secrets in `native-development`; they never fall back to the owner's replacement key. An unconfigured local Android profile selects `.dev`.
+
+Review validation covers database-backed affected-date projections, manual/history preservation, sleep stages/HRV, duplicate movement and meal-status compatibility. Browser confirmation, native token exchange/revocation and read-only meal GET were exercised against a synthetic local account. Android backup rules were verified in generated native configuration; the signed APK and phone checks remain outstanding.
 
 Weather now uses `expo-location` for opt-in foreground location and Open-Meteo for forecasts/city search. Rebuild development/preview APKs to include the new module. Test Home's chip and More > Account & settings > Weather: city search, allow/deny/revoke location, saved-city fallback, travel, Celsius/Fahrenheit and offline reopening. No background-location permission or service is enabled. Dynamic backgrounds use existing SVG and native animation libraries, so they need only reload. Verify per-tab controls, light/dark contrast, all six weather conditions, daylight changes, Reduce Motion, animation suspension while backgrounded and preserved bespoke health-detail artwork. Palette and intensity tokens are in `src/shared/theme/backgrounds.ts`; shared daylight maths is in `packages/shared/src/background`.
 

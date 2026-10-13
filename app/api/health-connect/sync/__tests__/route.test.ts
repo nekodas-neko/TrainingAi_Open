@@ -40,7 +40,7 @@ it('requires authentication and never accepts an account ID supplied in the body
 it('dispatches validated records using the authenticated account and source type', async () => {
   const body = { records: [], deleted: [] };
   expect((await POST(request(body))).status).toBe(200);
-  expect(mocks.apply).toHaveBeenCalledWith(userId, body);
+  expect(mocks.apply).toHaveBeenCalledWith(userId, body, 'Australia/Brisbane');
   expect((await POST(request({ type: 'unknown', samples: [], deleted: [] }))).status).toBe(400);
 });
 it('projects with the account timezone and keeps database failure details out of responses', async () => {
@@ -53,7 +53,7 @@ it('projects with the account timezone and keeps database failure details out of
   expect(mocks.report).toHaveBeenCalledOnce();
 });
 
-it('rejects future records, duplicate IDs, and oversized bodies before repository writes', async () => {
+it('defers future records without losing valid uploads and rejects malformed batches', async () => {
   const row = {
     id: 'test',
     type: 'Weight',
@@ -64,7 +64,15 @@ it('rejects future records, duplicate IDs, and oversized bodies before repositor
     end: '2099-01-01T00:00:00Z',
     modifiedAt: '2099-01-01T00:00:00Z',
   };
-  expect((await POST(request({ records: [row], deleted: [] }))).status).toBe(400);
+  const response = await POST(request({ records: [row], deleted: [] }));
+  expect(response.status).toBe(200);
+  expect((await response.json()).deferred).toEqual([row.id]);
+  expect(mocks.apply).toHaveBeenCalledWith(
+    userId,
+    { records: [], deleted: [] },
+    'Australia/Brisbane',
+  );
+  mocks.apply.mockClear();
   const past = {
     ...row,
     start: '2026-01-01T00:00:00Z',

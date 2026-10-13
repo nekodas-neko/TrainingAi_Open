@@ -281,11 +281,15 @@ test('workout prose uses the authenticated backend and rejects partial stream er
 test('per-meal tracking disables legacy assumed intake for unknown and skipped meals', () => {
   assert.equal(unrecordedMealEstimatesAllowed([]), true);
   assert.equal(
-    unrecordedMealEstimatesAllowed([{ mealTypeId: 'breakfast', skipped: false }]),
+    unrecordedMealEstimatesAllowed([
+      { mealTypeId: 'breakfast', skipped: false, explicit: true },
+    ]),
     false,
   );
   assert.equal(
-    unrecordedMealEstimatesAllowed([{ mealTypeId: 'breakfast', skipped: true }]),
+    unrecordedMealEstimatesAllowed([
+      { mealTypeId: 'breakfast', skipped: true, explicit: true },
+    ]),
     false,
   );
 });

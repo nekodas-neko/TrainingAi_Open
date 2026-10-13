@@ -286,7 +286,7 @@ test('source overlap is not double counted and RMSSD never enters the SDNN lane'
     now,
   );
   assert.equal(result.daily.find((row) => row.date === '2026-10-12')?.steps, 1200);
-  assert.equal(result.daily.find((row) => row.date === '2026-10-13')?.hrvMs, 82);
+  assert.equal(result.daily.find((row) => row.date === '2026-10-13')?.hrvMs, undefined);
   assert.equal(result.hrv?.method, 'RMSSD');
   assert.equal(projectHealthConnect([], 'Australia/Brisbane', now).daily.length, 0);
 });

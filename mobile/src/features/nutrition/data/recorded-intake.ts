@@ -5,6 +5,7 @@ export type IntakeBalance = {
   estimatedKcal?: unknown;
   budgetKcal?: number | null;
   expenditureKcal?: number | null;
+  remainingKcal?: number | null;
   zoneLabel?: string | null;
 };
 export function recordedIntake(input: {
@@ -28,7 +29,12 @@ export function recordedIntake(input: {
     input.hasLogs || input.pending || input.allSkipped
       ? input.calories
       : (server ?? input.calories);
-  const remaining = intake != null && b?.budgetKcal != null ? b.budgetKcal - intake : null;
+  const remaining =
+    !input.pending && typeof b?.remainingKcal === 'number'
+      ? b.remainingKcal
+      : intake != null && b?.budgetKcal != null
+        ? b.budgetKcal - intake
+        : null;
   const net = intake != null && b?.expenditureKcal != null ? intake - b.expenditureKcal : null;
   return {
     intake,

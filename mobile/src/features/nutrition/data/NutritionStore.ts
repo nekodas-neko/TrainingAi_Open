@@ -383,7 +383,6 @@ export class NutritionStore {
   private initializing: Promise<void> | null = null;
   private flushing: Promise<void> | null = null;
   private requests = new Map<string, Promise<boolean | undefined>>();
-  private trackingDates = new Set<string>();
   private policies = new Map<string, RefreshPolicy>();
   private generation = 0;
   private revision = 0;
@@ -786,25 +785,6 @@ export class NutritionStore {
       throw new Error('This meal already has recorded food.');
     }
     await this.queueHttp('meal-status', date, { date, mealTypeId, skipped });
-  }
-  async ensureMealStatusTracking(date: string) {
-    if (this.trackingDates.has(date)) {
-      return;
-    }
-    if (
-      !this.current.loaded.includes('mealStatuses:' + date) ||
-      !this.current.data.mealTypes.length ||
-      this.current.data.mealStatuses[date]?.length ||
-      this.current.http.some((op) => op.kind === 'meal-status' && op.date === date)
-    ) {
-      return;
-    }
-    this.trackingDates.add(date);
-    try {
-      await this.setMealSkipped(this.current.data.mealTypes[0].id, date, false);
-    } finally {
-      this.trackingDates.delete(date);
-    }
   }
   async editLog(log: FoodLog, quantityMultiplier: number, mealTypeId = log.mealTypeId) {
     await this.enqueue([

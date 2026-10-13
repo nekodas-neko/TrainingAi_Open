@@ -1,3 +1,4 @@
+import { DEFAULT_TZ } from '@trainingai/shared/date-utils';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getRepository } from '@/lib/data';
@@ -25,21 +26,24 @@ export async function POST(request: NextRequest) {
   const batch = rebuild ? null : healthConnectBatch.safeParse(body.body);
   if (!rebuild && !batch?.success)
     return NextResponse.json({ error: 'Invalid health records' }, { status: 400 });
-  if (
-    batch?.success &&
-    batch.data.records.some(
-      (row) =>
-        Date.parse(row.end) > Date.now() + 300000 ||
-        Date.parse(row.modifiedAt) > Date.now() + 300000,
-    )
-  )
-    return NextResponse.json({ error: 'Future health record' }, { status: 400 });
+  const deferred = batch?.success
+    ? batch.data.records
+        .filter(
+          (row) =>
+            Date.parse(row.end) > Date.now() + 300000 ||
+            Date.parse(row.modifiedAt) > Date.now() + 300000,
+        )
+        .map((row) => row.id)
+    : [];
+  const valid = batch?.success
+    ? { ...batch.data, records: batch.data.records.filter((row) => !deferred.includes(row.id)) }
+    : null;
   try {
     const repo = await getRepository();
     const result = rebuild
-      ? await repo.rebuildHealthConnect(userId, session.user.timezone ?? 'Australia/Brisbane')
-      : await repo.applyHealthConnectBatch(userId, batch!.data!);
-    return NextResponse.json(result);
+      ? await repo.rebuildHealthConnect(userId, session.user.timezone ?? DEFAULT_TZ)
+      : await repo.applyHealthConnectBatch(userId, valid!, session.user.timezone ?? DEFAULT_TZ);
+    return NextResponse.json(rebuild ? result : { ...result, deferred });
   } catch (error) {
     reportServerError(error, { userId, url: '/api/health-connect/sync' });
     return NextResponse.json({ error: 'Could not sync health records' }, { status: 500 });

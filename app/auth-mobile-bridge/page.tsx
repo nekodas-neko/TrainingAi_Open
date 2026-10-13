@@ -3,7 +3,12 @@ import { auth } from '@/auth';
 import { cookies } from 'next/headers';
 import { mintMobileBridgeToken } from '@/lib/auth/mobile/bridge';
 import { MobileBridgeRedirect } from './redirect-client';
-import { nativeReturnUrl, readNativeTransaction } from '@/lib/auth/mobile/native-transaction';
+import {
+  nativeReturnUrl,
+  readNativeTransaction,
+  hasNativeConsent,
+  nativeSignInPath,
+} from '@/lib/auth/mobile/native-transaction';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +41,11 @@ export default async function AuthMobileBridgePage({
     redirect('/sign-in');
   }
 
+  if (transaction) {
+    if (!(await hasNativeConsent(cookieStore, transaction, session.user.id)))
+      redirect(nativeSignInPath(transaction));
+    redirect('/mobile-signin/complete');
+  }
   const token = mintMobileBridgeToken(challenge, cookieStore);
   if (!token) redirect('/sign-in');
   const returnUrl = transaction

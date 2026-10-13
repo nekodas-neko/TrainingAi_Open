@@ -1,4 +1,4 @@
-import { and, eq, gte, isNull, lt, sql } from 'drizzle-orm';
+import { and, eq, gte, isNull, lt } from 'drizzle-orm';
 import type { getDb } from '../client';
 import * as s from '../schema';
 import type { HealthConnectIntervalRow } from '../../repository';
@@ -39,9 +39,9 @@ export async function getNativeMovementIntervals(
         and(
           eq(android.userId, userId),
           isNull(android.deletedAt),
-          sql`${android.recordPayload}->>'type' = ${androidTypes[kind]}`,
-          sql`(${android.recordPayload}->>'start')::timestamptz >= ${from.toISOString()}::timestamptz`,
-          sql`(${android.recordPayload}->>'start')::timestamptz < ${to.toISOString()}::timestamptz`,
+          eq(android.recordType, androidTypes[kind]),
+          gte(android.startAt, from),
+          lt(android.startAt, to),
         ),
       ),
   ]);

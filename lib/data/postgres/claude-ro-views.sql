@@ -686,6 +686,11 @@ SELECT
   t.user_id,
   t.record_id,
   t.record_payload,
+  t.record_type,
+  t.start_at,
+  t.end_at,
+  t.value,
+  t.source_package,
   t.modified_at,
   t.deleted_at,
   t.updated_at
@@ -714,6 +719,7 @@ SELECT
   t.meal_type_id,
   t.log_date,
   t.skipped,
+  t.explicit,
   t.decision_id,
   t.decided_at,
   t.retired,
@@ -821,6 +827,16 @@ SELECT
   t.deleted_at,
   t.suggested_sore_muscles
 FROM public.mood_logs t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
+CREATE VIEW claude_ro.native_health_projection_days AS
+SELECT
+  t.user_id,
+  t.source,
+  t.day,
+  t.pending,
+  t.daily
+FROM public.native_health_projection_days t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
 -- native_refresh_tokens: withholding "token_hash"

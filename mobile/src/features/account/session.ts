@@ -43,6 +43,7 @@ export type AccountState = {
 export type AuthPlatform = {
   client?: MobileClient;
   fetch?: typeof fetch;
+  revokeSession?(origin: string, accessToken: string): Promise<void>;
   get(key: string): Promise<string | null>;
   set(key: string, value: string): Promise<void>;
   remove(key: string): Promise<void>;
@@ -619,6 +620,7 @@ export class AccountSession {
     }
   }
   async signOut(message: string | null = null) {
+    const previous = this.session;
     const generation = ++this.generation;
     this.session = null;
     this.pending = null;
@@ -637,6 +639,11 @@ export class AccountSession {
       });
       if (generation === this.generation) {
         this.publish(this.session ? 'signedIn' : 'signedOut', message, this.current.profile);
+      }
+      if (previous && message === null && this.platform.revokeSession) {
+        try {
+          await this.platform.revokeSession(previous.origin, previous.accessToken);
+        } catch {}
       }
     } catch {
       if (generation === this.generation) {

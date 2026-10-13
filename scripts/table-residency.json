@@ -43,6 +43,7 @@
     "goal_recommendations": {"class":"SERVER-ONLY","note":"derived / AI; writer: adapter.ts"},
     "health_connect_history_import": {"class":"SERVER-ONLY","note":"explicit Import more history progress (oldest imported day); writer: slices/health-connect-history-import.ts"},
     "health_connect_intervals": {"class":"SERVER-ONLY","note":"sensor ingest -> server (Health Connect, which is itself the device copy); writer: slices/health-connect-intervals.ts"},
+    "native_health_projection_days": {"class":"SERVER-ONLY","note":"Pending native import dates and per-day projection state; measurements and source records are exported"},
     "health_connect_projection_state": {"class":"SERVER-ONLY","note":"Native Health Connect projection bookkeeping; writer/reader: slices/health-connect.ts; source records and projected measurements are exported"},
     "health_connect_records": {"class":"SERVER-ONLY","note":"Native Health Connect source records and deletion tombstones; writer: slices/health-connect.ts; readers: health projection and native-movement.ts"},
     "injuries": {"class":"DEVICE-FIRST","note":"local write + outbox push + delta pull"},

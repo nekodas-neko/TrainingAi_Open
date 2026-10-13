@@ -495,7 +495,8 @@ export async function createFoodLog(
       set: {
         quantityMultiplier: rest.quantityMultiplier,
         mealTypeId: rest.mealTypeId,
-        loggedAt: eatenAt,
+        date: rest.date,
+        loggedAt: sql`CASE WHEN ${s.foodLogs.mealTypeId} IS DISTINCT FROM excluded.meal_type_id OR ${s.foodLogs.date} IS DISTINCT FROM excluded.date THEN excluded.logged_at ELSE ${s.foodLogs.loggedAt} END`,
         ...(rest.savedMealId !== undefined ? { savedMealId: rest.savedMealId } : {}),
         ...(rest.mealGroupId !== undefined ? { mealGroupId: rest.mealGroupId } : {}),
         ...(rest.mealGroupName !== undefined ? { mealGroupName: rest.mealGroupName } : {}),

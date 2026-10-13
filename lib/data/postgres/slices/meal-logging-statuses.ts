@@ -1,11 +1,11 @@
-import { and, eq, gte, lte, isNull, ne } from 'drizzle-orm'
-import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
-import { randomUUID } from 'node:crypto'
-import { mealLoggingComplete } from '@trainingai/shared/nutrition/meal-logging-status'
-import type { getDb } from '../client'
-import * as s from '../schema'
+import { and, eq, gte, lte, isNull, ne } from 'drizzle-orm';
+import { NotFoundError, UserFacingError } from '@trainingai/shared/errors';
+import { randomUUID } from 'node:crypto';
+import { mealLoggingComplete } from '@trainingai/shared/nutrition/meal-logging-status';
+import type { getDb } from '../client';
+import * as s from '../schema';
 
-type Db = ReturnType<typeof getDb>
+type Db = ReturnType<typeof getDb>;
 
 async function readWindow(db: Db, userId: string, from: string, to: string) {
   const [choices, logs, types] = await Promise.all([
@@ -38,8 +38,8 @@ async function readWindow(db: Db, userId: string, from: string, to: string) {
       .select({ id: s.mealTypes.id })
       .from(s.mealTypes)
       .where(and(eq(s.mealTypes.userId, userId), isNull(s.mealTypes.deletedAt))),
-  ])
-  return { choices, logs, types }
+  ]);
+  return { choices, logs, types };
 }
 
 function isSkipped(
@@ -54,7 +54,7 @@ function isSkipped(
         log.mealTypeId === choice.mealTypeId &&
         (!log.deletedAt || log.updatedAt >= choice.decidedAt),
     )
-  )
+  );
 }
 
 export async function ensureMealLoggingDay(db: Db, userId: string, date: string) {
@@ -62,7 +62,7 @@ export async function ensureMealLoggingDay(db: Db, userId: string, date: string)
     const types = await tx
       .select({ id: s.mealTypes.id })
       .from(s.mealTypes)
-      .where(and(eq(s.mealTypes.userId, userId), isNull(s.mealTypes.deletedAt)))
+      .where(and(eq(s.mealTypes.userId, userId), isNull(s.mealTypes.deletedAt)));
     if (types.length)
       await tx
         .insert(s.mealLoggingStatuses)
@@ -75,35 +75,36 @@ export async function ensureMealLoggingDay(db: Db, userId: string, date: string)
             decisionId: randomUUID(),
           })),
         )
-        .onConflictDoNothing()
+        .onConflictDoNothing();
     const existing = await tx
       .select()
       .from(s.mealLoggingStatuses)
       .where(
         and(eq(s.mealLoggingStatuses.userId, userId), eq(s.mealLoggingStatuses.logDate, date)),
-      )
+      );
     for (const choice of existing) {
       const retired =
         !types.some((type) => type.id === choice.mealTypeId) &&
-        (choice.retired || choice.skipped)
+        (choice.retired || choice.skipped);
       if (retired !== choice.retired)
         await tx
           .update(s.mealLoggingStatuses)
           .set({ retired, updatedAt: new Date() })
-          .where(eq(s.mealLoggingStatuses.id, choice.id))
+          .where(eq(s.mealLoggingStatuses.id, choice.id));
     }
-  })
+  });
 }
 
 export async function listMealLoggingStatuses(db: Db, userId: string, date: string) {
-  const { choices, logs, types } = await readWindow(db, userId, date, date)
+  const { choices, logs, types } = await readWindow(db, userId, date, date);
   return choices
     .filter((choice) => !choice.retired && types.some((type) => type.id === choice.mealTypeId))
     .map((choice) => ({
       mealTypeId: choice.mealTypeId,
       skipped: isSkipped(choice, logs),
+      explicit: choice.explicit,
       decisionId: choice.decisionId,
-    }))
+    }));
 }
 
 export async function listMealLoggingCompleteness(
@@ -112,11 +113,11 @@ export async function listMealLoggingCompleteness(
   from: string,
   to: string,
 ) {
-  const { choices, logs } = await readWindow(db, userId, from, to)
+  const { choices, logs } = await readWindow(db, userId, from, to);
   return [...new Set(choices.map((choice) => choice.logDate))].map((date) => {
     const recorded = logs
       .filter((log) => log.date === date && !log.deletedAt)
-      .map((log) => log.mealTypeId)
+      .map((log) => log.mealTypeId);
     const complete = mealLoggingComplete(
       [
         ...new Set([
@@ -130,9 +131,15 @@ export async function listMealLoggingCompleteness(
       choices
         .filter((choice) => choice.logDate === date && isSkipped(choice, logs))
         .map((choice) => choice.mealTypeId),
-    )
-    return { date, complete, zeroIntake: complete && recorded.length === 0 }
-  })
+    );
+    const explicit = choices.some((choice) => choice.logDate === date && choice.explicit);
+    return {
+      date,
+      complete: explicit && complete,
+      zeroIntake: explicit && complete && recorded.length === 0,
+      explicit,
+    };
+  });
 }
 
 export async function setMealLoggingStatus(
@@ -153,10 +160,10 @@ export async function setMealLoggingStatus(
         isNull(s.mealTypes.deletedAt),
       ),
     )
-    .limit(1)
-  if (!owned) throw new NotFoundError('Meal type')
-  const { choices } = await readWindow(db, userId, date, date)
-  if (!choices.length) await ensureMealLoggingDay(db, userId, date)
+    .limit(1);
+  if (!owned) throw new NotFoundError('Meal type');
+  const { choices } = await readWindow(db, userId, date, date);
+  if (!choices.length) await ensureMealLoggingDay(db, userId, date);
   await db.transaction(async (tx) => {
     const [type] = await tx
       .select({ id: s.mealTypes.id })
@@ -168,8 +175,8 @@ export async function setMealLoggingStatus(
           isNull(s.mealTypes.deletedAt),
         ),
       )
-      .limit(1)
-    if (!type) throw new NotFoundError('Meal type')
+      .limit(1);
+    if (!type) throw new NotFoundError('Meal type');
     if (skipped) {
       const [food] = await tx
         .select({ id: s.foodLogs.id })
@@ -182,16 +189,16 @@ export async function setMealLoggingStatus(
             isNull(s.foodLogs.deletedAt),
           ),
         )
-        .limit(1)
+        .limit(1);
       if (food)
         throw new UserFacingError(
           'This meal has recorded food. Remove or move its entries before marking it skipped.',
           409,
-        )
+        );
     }
     await tx
       .insert(s.mealLoggingStatuses)
-      .values({ userId, logDate: date, mealTypeId, skipped, decisionId })
+      .values({ userId, logDate: date, mealTypeId, skipped, decisionId, explicit: true })
       .onConflictDoUpdate({
         target: [
           s.mealLoggingStatuses.userId,
@@ -200,12 +207,13 @@ export async function setMealLoggingStatus(
         ],
         set: {
           skipped,
+          explicit: true,
           decisionId,
           decidedAt: new Date(),
           retired: false,
           updatedAt: new Date(),
         },
         setWhere: ne(s.mealLoggingStatuses.decisionId, decisionId),
-      })
-  })
+      });
+  });
 }

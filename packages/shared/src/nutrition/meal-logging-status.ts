@@ -1,12 +1,12 @@
-export type MealLoggingStatus = 'not_recorded' | 'recorded' | 'skipped'
+export type MealLoggingStatus = 'not_recorded' | 'recorded' | 'skipped';
 
 export function mealLoggingStatus(
   mealTypeId: string,
   recordedMealTypeIds: readonly string[],
   skippedMealTypeIds: readonly string[],
 ): MealLoggingStatus {
-  if (recordedMealTypeIds.includes(mealTypeId)) return 'recorded'
-  return skippedMealTypeIds.includes(mealTypeId) ? 'skipped' : 'not_recorded'
+  if (recordedMealTypeIds.includes(mealTypeId)) return 'recorded';
+  return skippedMealTypeIds.includes(mealTypeId) ? 'skipped' : 'not_recorded';
 }
 
 export function mealLoggingComplete(
@@ -19,9 +19,11 @@ export function mealLoggingComplete(
     mealTypeIds.every(
       (id) => mealLoggingStatus(id, recordedMealTypeIds, skippedMealTypeIds) !== 'not_recorded',
     )
-  )
+  );
 }
 
-export function unrecordedMealEstimatesAllowed(tracking: readonly unknown[]): boolean {
-  return tracking.length === 0
+export function unrecordedMealEstimatesAllowed(
+  tracking: readonly { mealTypeId?: string; skipped?: boolean; explicit?: boolean }[],
+): boolean {
+  return !tracking.some((choice) => choice.explicit);
 }

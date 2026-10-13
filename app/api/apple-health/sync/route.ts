@@ -1,3 +1,4 @@
+import { DEFAULT_TZ } from '@trainingai/shared/date-utils';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { getRepository } from '@/lib/data';
@@ -31,18 +32,20 @@ export async function POST(request: NextRequest) {
   if (!rebuild && !batch?.success) {
     return NextResponse.json({ error: 'Invalid health records' }, { status: 400 });
   }
-  if (
-    batch?.success &&
-    batch.data.samples.some((row) => Date.parse(row.end) > Date.now() + 5 * 60000)
-  ) {
-    return NextResponse.json({ error: 'Future health record' }, { status: 400 });
-  }
+  const deferred = batch?.success
+    ? batch.data.samples
+        .filter((row) => Date.parse(row.end) > Date.now() + 300000)
+        .map((row) => row.id)
+    : [];
+  const valid = batch?.success
+    ? { ...batch.data, samples: batch.data.samples.filter((row) => !deferred.includes(row.id)) }
+    : null;
   try {
     const repo = await getRepository();
     const result = rebuild
-      ? await repo.rebuildAppleHealth(userId, session.user.timezone ?? 'Australia/Brisbane')
-      : await repo.applyAppleHealthBatch(userId, batch!.data!);
-    return NextResponse.json(result);
+      ? await repo.rebuildAppleHealth(userId, session.user.timezone ?? DEFAULT_TZ)
+      : await repo.applyAppleHealthBatch(userId, valid!, session.user.timezone ?? DEFAULT_TZ);
+    return NextResponse.json(rebuild ? result : { ...result, deferred });
   } catch (error) {
     reportServerError(error, { userId, url: '/api/apple-health/sync' });
     return NextResponse.json({ error: 'Could not sync health records' }, { status: 500 });

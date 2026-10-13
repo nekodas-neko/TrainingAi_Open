@@ -1,10 +1,10 @@
-import { countedEstimateKcal } from '@trainingai/shared/nutrition/meal-estimate'
-import { unrecordedMealEstimatesAllowed } from '@trainingai/shared/nutrition/meal-logging-status'
-import { foodLoggingCoverage } from '@/lib/nutrition/logging-completeness'
 // Server-side assembly for "calories in vs calories out". The API route and the AI coach tool
 // both call this — a second copy would be a second answer to "how much should I eat today", and
 // the coach contradicting the widget is worse than either being slightly wrong.
 
+import { countedEstimateKcal } from '@trainingai/shared/nutrition/meal-estimate'
+import { unrecordedMealEstimatesAllowed } from '@trainingai/shared/nutrition/meal-logging-status'
+import { foodLoggingCoverage } from '@/lib/nutrition/logging-completeness'
 import { fromZonedTime, toZonedTime } from 'date-fns-tz'
 import { shiftDateStr, ageFromDob } from '@trainingai/shared/date-utils'
 import { stepEnergyKcal, SEDENTARY_MULTIPLIER, STEP_BASE_CREDIT } from '@trainingai/shared/health/daily-energy'
@@ -313,6 +313,7 @@ export async function computeEnergyBalance(
       date: d,
       intakeKcal: intakeByDate.get(d) ?? (zeroIntake.has(d) ? 0 : null),
       loggingComplete: loggingCompleteByDate.has(d),
+      zeroIntakeConfirmed: zeroIntake.has(d),
       weightKg: metricByDate.get(d)?.weightKg ?? null,
     })
   }

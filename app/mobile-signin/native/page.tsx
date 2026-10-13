@@ -1,5 +1,6 @@
+import { NativeConsentForm } from './consent-form';
 import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { auth } from '@/auth';
 import { NativeLoginForm } from './login-form';
 import { MobileBridgeRedirect } from '@/app/auth-mobile-bridge/redirect-client';
@@ -8,6 +9,8 @@ import {
   nativeReturnUrl,
   readNativeTransaction,
   nativeSignInPath,
+  signNativeConsent,
+  NATIVE_CONSENT_COOKIE,
 } from '@/lib/auth/mobile/native-transaction';
 
 export const dynamic = 'force-dynamic';
@@ -39,7 +42,50 @@ export default async function NativeSignInPage({
   const callbackUrl = nativeBridgePath(transaction);
   const session = await auth();
   if (session?.user?.id) {
-    redirect(callbackUrl);
+    async function continueSignIn() {
+      'use server';
+      const store = await cookies();
+      const current = await readNativeTransaction(store);
+      const account = await auth();
+      if (
+        !current ||
+        current.state !== transaction!.state ||
+        current.challenge !== transaction!.challenge ||
+        account?.user?.id !== session!.user.id
+      ) {
+        return null;
+      }
+      store.set(NATIVE_CONSENT_COOKIE, await signNativeConsent(current, account!.user.id), {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 300,
+      });
+      return nativeBridgePath(current);
+    }
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background p-8">
+        <div className="w-full max-w-md space-y-4">
+          <h1 className="text-2xl font-semibold">
+            Continue as {session.user.name || session.user.email}?
+          </h1>
+          <p>
+            Allow the TrainingAi{' '}
+            {transaction.client === 'android-dev'
+              ? 'Android development'
+              : transaction.client === 'ios'
+                ? 'iPhone'
+                : 'Android'}{' '}
+            app to use this account.
+          </p>
+          <NativeConsentForm action={continueSignIn} />
+          <Link className="block text-center underline" href="/">
+            Cancel
+          </Link>
+        </div>
+      </main>
+    );
   }
   return (
     <main className="flex min-h-screen items-center justify-center bg-background text-foreground">

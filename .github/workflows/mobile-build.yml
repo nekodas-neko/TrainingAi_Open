@@ -27,6 +27,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    environment: ${{ inputs.platform == 'android' && inputs.profile != 'development' && 'native-replacement' || 'native-development' }}
     defaults:
       run:
         working-directory: mobile
@@ -49,25 +50,36 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm test
-      - name: Prepare existing Android signing credentials
-        if: inputs.platform == 'android'
+      - name: Require approval for existing Android key custody
+        if: inputs.platform == 'android' && inputs.profile != 'development'
+        env:
+          APPROVED: ${{ vars.NATIVE_ANDROID_EAS_SIGNING_APPROVED }}
+          EXPECTED: ${{ vars.ANDROID_EXPECTED_CERT_SHA256 }}
+        run: |
+          test "$APPROVED" = "true" || { echo "Approve Expo custody of the existing signing key in the native-replacement environment before building."; exit 1; }
+          test -n "$EXPECTED" || { echo "Configure the installed signing certificate SHA-256."; exit 1; }
+      - name: Prepare isolated development signing credentials
+        if: inputs.platform == 'android' && inputs.profile == 'development'
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_DEV_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_DEV_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_DEV_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_DEV_KEY_PASSWORD }}
+        run: node scripts/prepare-android-signing.mjs
+      - name: Prepare approved replacement signing credentials
+        if: inputs.platform == 'android' && inputs.profile != 'development'
         env:
           KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
           LEGACY_KEYSTORE_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}
           KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          node --input-type=module <<'NODE'
-          import { writeFileSync } from 'node:fs';
-          import { resolveAndroidSigning } from './scripts/android-signing.mjs';
-          const signing = resolveAndroidSigning(process.env);
-          writeFileSync('android-signing.keystore', signing.bytes, { mode: 0o600 });
-          writeFileSync('credentials.json', JSON.stringify({ android: { keystore: {
-            keystorePath: 'android-signing.keystore', keystorePassword: signing.keystorePassword,
-            keyAlias: signing.keyAlias, keyPassword: signing.keyPassword,
-          } } }), { mode: 0o600 });
-          NODE
+        run: node scripts/prepare-android-signing.mjs
+      - name: Verify the existing Android signing certificate
+        if: inputs.platform == 'android' && inputs.profile != 'development'
+        env:
+          ANDROID_EXPECTED_CERT_SHA256: ${{ vars.ANDROID_EXPECTED_CERT_SHA256 }}
+        run: node scripts/check-android-signing.mjs
       - name: Build and publish through the existing Expo project
         run: node scripts/build-mobile.mjs --platform "$APP_PLATFORM" --profile "$APP_PROFILE" --no-open
       - name: Remove signing files
