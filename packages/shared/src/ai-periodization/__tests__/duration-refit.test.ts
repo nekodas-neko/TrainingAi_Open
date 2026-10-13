@@ -222,7 +222,11 @@ describe('a duration change re-fits the stored plan instead of re-asking the mod
 // re-fit cases above — the round trip's standard leg happens to sit ~2 min under its budget, so
 // an expansion would not have fitted and a drop would not have been needed. That is a property
 // of that fixture, not of the code, which is exactly why these are separate.
-describe('a standard session neither expands into its slack nor drops an exercise', () => {
+// #2133 (owner direction 2026-09-24, proposal 2026-10-05): this block pinned the opposite rule, that a
+// standard session neither fills its slack nor drops an exercise. The allocator replaces it: every
+// preset is sized to the budget, slack buys sets for the muscles behind the week, and an overrun at
+// the minimums drops whole exercises before any set is floored.
+describe('a standard session is sized to its budget (#2133)', () => {
   const stageSignals = (workingMin: number, count: number) => ({
     trainingGoal: 'hypertrophy',
     effectiveTimeBudgetMin: workingMin,
@@ -242,20 +246,31 @@ describe('a standard session neither expands into its slack nor drops an exercis
       sessionExerciseId: `ex-${i}`, name: `Exercise ${i}`, sets, reps: 10, pct: 70, restSec: 120,
     }))
 
-  it('leaves a short session\'s surplus alone — that under-fill IS the finish-early margin', () => {
-    // Two exercises at two sets against a 90-minute working budget: room for many more sets.
+  it('spends a standard session\'s surplus on sets, within each role\'s ceiling', () => {
+    // Two exercises at two sets against a 90-minute working budget: the time buys sets up to the
+    // ceilings (primary 6, accessory 4), and nothing is dropped.
     const res = applyBudgetStage(stageExercises(2, 2), stageSignals(90, 2) as never, 60, 'standard', new Set())
-    expect([...res.sets.values()]).toEqual([2, 2])
+    expect([...res.sets.values()]).toEqual([6, 4])
     expect(res.droppedIds.size).toBe(0)
+    expect(res.estimatedSessionDurationMin).toBeLessThanOrEqual(90)
   })
 
-  it('surfaces an overrun as a note instead of dropping work the lifter asked for', () => {
-    // Six exercises in 20 working minutes cannot fit even at the two-set role floor. Only an
-    // explicit SHORT request may drop an exercise; a standard session says so and keeps them.
+  it('passes the phase through: an intensity phase keeps the model\'s counts, accumulation fills (#2788)', () => {
+    // The model asked for 2 sets each; the main lift's minimum is 3.
+    const run = (phase: string) => [...applyBudgetStage(stageExercises(2, 2), stageSignals(90, 2) as never, 60, 'standard', new Set(), undefined, phase).sets.values()]
+    expect(run('intensification')).toEqual([3, 2])
+    expect(run('realisation')).toEqual([3, 2])
+    expect(run('accumulation')).toEqual([6, 4])
+  })
+
+  it('drops whole exercises when even the minimums overrun, keeping the main lift and at least two', () => {
+    // Six exercises in 20 working minutes cannot fit at their minimums. The least-behind accessories
+    // go whole instead of all six being floored to two sets.
     const res = applyBudgetStage(stageExercises(6, 3), stageSignals(20, 6) as never, 60, 'standard', new Set())
-    expect(res.droppedIds.size).toBe(0)
-    expect([...res.sets.values()]).toEqual([2, 2, 2, 2, 2, 2])
-    expect(res.budgetNote).toContain('more exercises than the time budget fits')
+    expect(res.droppedIds.size).toBeGreaterThan(0)
+    expect(res.droppedIds.has('ex-0')).toBe(false)
+    expect(6 - res.droppedIds.size).toBeGreaterThanOrEqual(2)
+    expect(res.budgetNote).toContain('dropped for today')
   })
 })
 

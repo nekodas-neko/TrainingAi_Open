@@ -15,6 +15,7 @@ Required in Railway:
 - `HEALTH_CONNECT_INGEST_SECRET` + `WEBHOOK_USER_ID` — Tasker auth for `app/api/health-connect/ingest/route.ts`
 
 Optional:
+- `NATIVE_AUTH_ALLOW_ANDROID_DEV=1` — explicitly allow the separate Android development callback on production for internal testing. Off by default; use a test account.
 - `CLAUDE_DB_READONLY_URL` + `CLAUDE_DB_QUERY_SECRET` — enables `POST /api/admin/db-query`, a read-only
   SQL endpoint over the curated `claude_ro` view schema (whole-history audits: counter drift,
   null-rates, orphans, blast-radius measurement). **Read-only is enforced by the `claude_readonly`
@@ -69,6 +70,17 @@ Optional:
   The route queries `/releases/tags/apk-latest` (not `/releases/latest`) because
   `.github/workflows/android.yml` publishes the rolling APK release with `--prerelease`, which the
   `/latest` endpoint excludes regardless of repo visibility.
+- `AI_DEV_DAILY_CALL_LIMIT` — **local and agent machines only; never set on Railway.** How many live
+  Gemini requests this machine may make in a rolling 24 hours before `lib/ai/dev-call-budget.ts`
+  refuses the next one with `DevAiBudgetError` (#2816). Unset, blank or not a non-negative integer
+  means the default, 100. `0` means no live calls at all — a mocks-only session. The cap exists
+  because every key draws on the one prepaid balance production uses; raising it needs the owner's
+  say-so ([rules](rules/ai-security-and-integrations.md#live-ai-calls-in-testing-one-key-one-balance)).
+  The cap is off whenever `NODE_ENV=production` or a Railway environment variable is present, so it
+  can never apply to the live app.
+- `AI_DEV_CALL_LOG_PATH` — **local and agent machines only; never set on Railway.** Where the cap
+  above keeps its request timestamps. Defaults to `trainingai-dev-ai-calls.json` in the OS temp
+  directory; deleting that file resets the count.
 - `APK_RELEASE_REPO` — which repo `lib/github-release.ts` reads releases from. Set to
   `nekodas-neko/TrainingAi_Open`. The code falls back to the pre-cut repo, which is archived, so
   leaving it unset means reading a release whose version never changes again.

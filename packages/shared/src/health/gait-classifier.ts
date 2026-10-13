@@ -37,8 +37,8 @@ const RUN_HZ_MAX = 3.6  // ~216 steps/min
  * Classify a single decoded gait window. `strideAmpFrac`/`totalAmplitudeMg` only gate out
  * clearly-degenerate readings (non-finite, zero, negative) — a precise amplitude motion floor is
  * itself pending the same on-device calibration as the Hz bands, so it is NOT hand-tuned here.
- * The real false-positive defense is the sustained-window requirement in gait-confirm.ts, not a
- * single-window amplitude threshold.
+ * The sustained-window confirm that used to sit on top of this (`gait-confirm.ts`) went with the
+ * ring's live walk trigger in #2471; the cadence tracker reads single windows for display only.
  */
 /**
  * Whether a window carries any locomotor motion at all, independent of WHICH cadence band it

@@ -16,7 +16,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
-const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8')
+const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8').replace(/\r\n/g, '\n')
 
 // The four fixed in this pass, plus test-result.tsx — which already had the shape and is the one
 // the others were copied from, so it belongs here as the reference rather than as an exception.

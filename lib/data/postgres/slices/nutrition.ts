@@ -204,6 +204,10 @@ export async function reassignAndDeleteMealType(
         .where(and(eq(s.foodLogs.id, r.id), eq(s.foodLogs.userId, userId)))
     }
 
+    if (rows.length) await tx.update(s.mealLoggingStatuses)
+      .set({ retired: true, updatedAt: new Date() })
+      .where(and(eq(s.mealLoggingStatuses.userId, userId), eq(s.mealLoggingStatuses.mealTypeId, fromId), inArray(s.mealLoggingStatuses.logDate, [...new Set(rows.map(row => row.date))])))
+
     await tx.update(s.mealTypes)
       .set({ deletedAt: new Date() })
       .where(and(eq(s.mealTypes.id, fromId), eq(s.mealTypes.userId, userId), isNull(s.mealTypes.deletedAt)))
@@ -490,6 +494,9 @@ export async function createFoodLog(
       // UPDATE (CLAUDE.md, write-path ownership).
       set: {
         quantityMultiplier: rest.quantityMultiplier,
+        mealTypeId: rest.mealTypeId,
+        date: rest.date,
+        loggedAt: sql`CASE WHEN ${s.foodLogs.mealTypeId} IS DISTINCT FROM excluded.meal_type_id OR ${s.foodLogs.date} IS DISTINCT FROM excluded.date THEN excluded.logged_at ELSE ${s.foodLogs.loggedAt} END`,
         ...(rest.savedMealId !== undefined ? { savedMealId: rest.savedMealId } : {}),
         ...(rest.mealGroupId !== undefined ? { mealGroupId: rest.mealGroupId } : {}),
         ...(rest.mealGroupName !== undefined ? { mealGroupName: rest.mealGroupName } : {}),

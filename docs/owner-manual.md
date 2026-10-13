@@ -322,6 +322,12 @@ every PR it carried. You can reorder, add to or split a batch yourself, or ask i
 
 ### Release day — every Tuesday
 
+> **Suspended while the native app lands (from 13 Oct 2026).** Releases go out on demand, up to
+> once a day. Each one still comes to you as a release summary and needs your "approve". Native
+> screens now ship as app builds rather than releases. The rules, how both apps run side by side on
+> your phone, and when Tuesdays come back are all in
+> [`native-testing.md`](native-testing.md#release-cadence-during-the-native-move).
+
 Everything merged during the week ships together. **A hotfix goes out off-schedule only when
 production is actually broken**; anything less waits for Tuesday.
 

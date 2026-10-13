@@ -31,6 +31,7 @@ export function HomeNutritionZoneBar() {
       <CalorieZoneBar
         compact
         intakeKcal={b.intakeKcal}
+        estimatedKcal={b.estimatedKcal}
         restingBaseKcal={b.restingBaseKcal}
         activeKcal={b.activeKcal}
         targetNetKcal={b.targetNetKcal}

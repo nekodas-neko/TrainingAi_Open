@@ -75,10 +75,26 @@ describe.skipIf(!canRun)('daytime signals resolve against the anchor series (LA-
     expect(met[0].value).toBeCloseTo(2.0, 5)
   })
 
+  // #2781 / #2115 v4: the same read returns the ring's 0x72 still frames and its 0x47 motion
+  // events, the latter with the low-intensity byte read as the motion map was fitted, so an event
+  // whose HIGH byte is flagged still contributes its low value.
+  it('also returns 0x72 still frames and 0x47 motion with the raw low-intensity byte', async () => {
+    for (let k = 0; k < 5; k++) await addAnchor(TRUE_DS + k * 600, TRUE_MS + k * 60_000, TRUE_MS + k * 60_000)
+    const add = (ds: number, tag: number, name: string, hex: string) => pool.query(
+      `INSERT INTO oura_raw_samples (user_id, ring_timestamp_ds, tag, event_name, body_hex) VALUES ($1, $2, $3, $4, $5)`,
+      [USER, ds, tag, name, hex])
+    await add(TRUE_DS, 0x72, 'sleep_acm_period', '000100010001000100010001')
+    await add(TRUE_DS + 300, 0x47, 'motion_event', '6f0c1d070c47') // high byte flagged
+    const out = await repo.getOuraDaytimeSignals(USER, new Date(TRUE_MS - 3600_000), new Date(TRUE_MS + 3600_000))
+    expect(out.still).toHaveLength(1)
+    expect(Math.abs(out.still[0] - TRUE_MS)).toBeLessThan(120_000)
+    expect(out.motion).toEqual([{ tsMs: expect.any(Number), lowIntensity: 12 }])
+  })
+
   it('with no anchors at all it returns empty rather than guessing', async () => {
     await addMetFrame(TRUE_DS)
     const out = await repo.getOuraDaytimeSignals(
       USER, new Date(TRUE_MS - 3600_000), new Date(TRUE_MS + 3600_000))
-    expect(out).toEqual({ temp: [], met: [] })
+    expect(out).toEqual({ temp: [], met: [], still: [], motion: [] })
   })
 })

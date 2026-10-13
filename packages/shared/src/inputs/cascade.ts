@@ -76,10 +76,16 @@ export const INPUTS: Record<InputName, InputDef> = {
   },
   'MET/min': {
     name: 'MET/min', slot: 'minute', unit: 'MET',
+    // #2115 v4 (owner, 2026-10-06): the device's own MET, then a watch's active calories with the
+    // user's weight, then the ring's motion, then step cadence, then a sleep record, then a logged
+    // workout. Heart rate is not a route: on the owner's strap it did worse than a constant.
     routes: [
       { id: 'device_met', rung: 'provided', label: 'reported by the ring' },
-      { id: 'accel_met', rung: 'derived', label: 'derived from raw accelerometer' },
-      { id: 'hr_reserve_met', rung: 'estimated', label: 'estimated from heart rate' },
+      { id: 'active_kcal_met', rung: 'provided', label: 'from active calories and your weight' },
+      { id: 'accel_met', rung: 'derived', label: 'derived from the ring\'s motion' },
+      { id: 'ring_still_met', rung: 'derived', label: 'resting, from the ring\'s sleep motion' },
+      { id: 'cadence_met', rung: 'derived', label: 'from your step rate' },
+      { id: 'sleep_session_met', rung: 'derived', label: 'asleep, from a sleep record' },
       { id: 'compendium_met', rung: 'estimated', label: 'estimated from the logged activity' },
     ],
     plausible: inRange(MIN_PLAUSIBLE_MET, MAX_PLAUSIBLE_MET),
@@ -100,7 +106,7 @@ export const INPUTS: Record<InputName, InputDef> = {
     name: 'HRR60', slot: 'event', unit: 'bpm',
     routes: [
       // No device reports it; it is always derived from dense HR around the set.
-      { id: 'dense_hr_drop60', rung: 'derived', label: 'from heart rate after the set' },
+      { id: 'dense_hr_hrr60', rung: 'derived', label: 'from heart rate after the set' },
     ],
     // A drop can be negative (HR still rising after the set), so only finiteness and a sane span.
     plausible: inRange(-MAX_PLAUSIBLE_BPM, MAX_PLAUSIBLE_BPM),
@@ -130,6 +136,8 @@ export interface Provenance {
   /** The device or store that supplied it: `oura_ble`, `chest_strap`, `health_connect`, `manual`, … */
   source: string
   lowWear?: boolean
+  /** The route held the value at the top of its calibrated range (cadence above 129 steps/min). */
+  capped?: boolean
 }
 
 /** One offered value for one slot. Adapters produce these; the resolver picks among them. */
@@ -139,6 +147,7 @@ export interface Candidate {
   route: string
   source: string
   lowWear?: boolean
+  capped?: boolean
 }
 
 export type Resolved =
@@ -175,7 +184,10 @@ export function resolveSlots(name: InputName, candidates: readonly Candidate[]):
     const route = def.routes.find((r) => r.id === c.route)!
     out.set(slot, {
       slot, missing: false, value: c.value,
-      provenance: { route: c.route, rung: route.rung, source: c.source, ...(c.lowWear ? { lowWear: true } : {}) },
+      provenance: {
+        route: c.route, rung: route.rung, source: c.source,
+        ...(c.lowWear ? { lowWear: true } : {}), ...(c.capped ? { capped: true } : {}),
+      },
     })
   }
   return out

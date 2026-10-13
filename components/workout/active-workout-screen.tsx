@@ -5,7 +5,7 @@ import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { CalculatorIcon, ChevronLeftIcon, DumbbellIcon, ListIcon, SkipForwardIcon, ZapIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { WorkoutExercise } from "@/app/api/workout-data/route";
-import { formatSheetDate, mroundStep, mroundStepUp, weightStepFor, plateBreakdown } from "./utils";
+import { formatSheetDate, mroundStep, mroundStepUp, weightStepFor, plateBreakdown, styleWithPrescribedBars, barIsCapped, MAX_BAR_KG } from "./utils";
 import { ActiveSetCard } from "./active-set-card";
 import { SetsGrid } from "./sets-grid";
 import { Live1rmReadout } from "./live-1rm-readout";
@@ -171,6 +171,7 @@ export function ActiveWorkoutScreen({
   // BF-220 — the set he JUST logged, read here rather than in the card because the card unmounts
   // during rest (see the pill's placement note below).
   const prevRpe = useWorkoutStore((s) => (currentSet > 0 ? s.rpeValues?.[currentSet - 1] : undefined));
+  const prevRated = useWorkoutStore((s) => (currentSet > 0 ? s.rpeRated[currentSet - 1] : undefined));
   const prevReps = useWorkoutStore((s) => (currentSet > 0 ? s.reps[currentSet - 1] : undefined));
   const currentWeight = useWorkoutStore((s) => s.perSetWeights[currentSet]);
   const [dismissedSuggestionSet, setDismissedSuggestionSet] = useState<number | null>(null);
@@ -178,6 +179,7 @@ export function ActiveWorkoutScreen({
     ? rpeLoadSuggestion(
         {
           loggedRpe: prevRpe,
+          rated: prevRated,
           repsDone: prevReps,
           prescribedReps: exercise?.progressionStyle?.[currentSet - 1]?.reps,
           pct: exercise?.progressionStyle?.[currentSet - 1]?.pct,
@@ -225,9 +227,10 @@ export function ActiveWorkoutScreen({
 
   const isBodyweight = exercise?.exerciseType === "bodyweight";
 
+  // Issue 2200: the same bars the saved estimate scores against, so the live number matches it.
   const live1rmStyle = useMemo(
-    () => exercise?.progressionStyle?.slice(0, currentSet) ?? null,
-    [exercise?.progressionStyle, currentSet],
+    () => styleWithPrescribedBars(exercise, exercise?.progressionStyle?.length ?? 0)?.slice(0, currentSet) ?? null,
+    [exercise, currentSet],
   );
 
   // Stable identity so the memoized MuscleHeatmap doesn't re-render on every
@@ -433,9 +436,14 @@ export function ActiveWorkoutScreen({
                 {exercise.estimated1rm != null && (() => {
                   const highPct = exercise.progressionStyle!.reduce((a, b) => b.pct > a.pct ? b : a);
                   return (
-                    <p className="flex items-center justify-center gap-1 text-2xs text-muted-foreground/70 text-center mt-2 pt-2 border-t border-brand/20">
-                      {highPct.reps} reps = maintain 1RM · {highPct.reps + 1}+ reps = beat it <ZapIcon className="w-2.5 h-2.5" />
-                    </p>
+                    <>
+                      {barIsCapped(exercise.estimated1rm! * highPct.pct / 100) && (
+                        <p className="text-2xs text-muted-foreground text-center mt-2">Capped at the app&apos;s {MAX_BAR_KG} kg limit</p>
+                      )}
+                      <p className="flex items-center justify-center gap-1 text-2xs text-muted-foreground/70 text-center mt-2 pt-2 border-t border-brand/20">
+                        {highPct.reps} reps = maintain 1RM · {highPct.reps + 1}+ reps = beat it <ZapIcon className="w-2.5 h-2.5" />
+                      </p>
+                    </>
                   );
                 })()}
               </div>
@@ -443,6 +451,9 @@ export function ActiveWorkoutScreen({
               <div className="rounded-2xl bg-brand/15 px-6 py-3 text-center">
                 <p className="text-xs font-medium text-brand uppercase tracking-wide mb-1">Target weight</p>
                 <p className="text-4xl font-bold text-brand">{mroundStepUp(exercise.target80, weightStep)} kg</p>
+                {barIsCapped(exercise.target80) && (
+                  <p className="text-2xs text-muted-foreground mt-1">Capped at the app&apos;s {MAX_BAR_KG} kg limit</p>
+                )}
               </div>
             ) : null}
 

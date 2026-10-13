@@ -24,7 +24,10 @@ version is kept verbatim at [`docs/archive/CLAUDE-2026-10-05.md`](docs/archive/C
   and released on Tuesday. Never put a migration in a batch with anything else. The owner steers with
   the `next` label. `node scripts/queue.js` shows the queue and the next batch.
 - **Releases are weekly, on Tuesday** ("patch Tuesday"): everything merged that week ships together.
-  A hotfix ships off-schedule **only when production is actually broken**.
+  A hotfix ships off-schedule **only when production is actually broken**. **Suspended while the
+  native app lands (from 2026-10-13):** releases go out on demand, up to daily, each still with the
+  owner's "approve". The rules and the native testing loop are in
+  [`docs/native-testing.md`](docs/native-testing.md).
 - **A title says what the task is, in plain words** — for an issue, a PR and a one-off session
   alike. No entry IDs, lane letters or `[area]` tags: labels carry area and lane, and the issue
   number is the ID. **An issue title starts with its type** — `bug:`, `feature:`, `chore:`,
@@ -109,6 +112,9 @@ state, for any agent. Titles end 🟢 while live, 🔴 when wrapped.
   ownership-verify client-supplied ids. New ingest and AI routes get Zod and a rate limit at birth.
 - Read external field names from the pinned source and prove a non-null value lands in the DB.
 - Never hardcode session names or training structure; identity is the DB id.
+- Testing shares the live app's one Gemini key and prepaid balance: mocks for logic, real calls only
+  to measure model behaviour, and say how many a PR made. `lib/ai/dev-call-budget.ts` caps them off
+  production.
 
 **Mobile and runtime** → [`docs/rules/mobile-and-runtime.md`](docs/rules/mobile-and-runtime.md) and
 [`docs/mobile-ui-and-performance.md`](docs/mobile-ui-and-performance.md)

@@ -47,36 +47,59 @@ describe('buildRulesReview', () => {
     expect(r.reasoning).toContain('120-min')
   })
 
-  // Sets are the cheap lever: trimming happens before anything is dropped, because losing a whole
-  // exercise is the answer of last resort.
-  // 15 minutes is inside the measured trim-only band for this fixture: 21 already fits, and 11
-  // is low enough to force a drop. Pinned to a band rather than a single value on purpose — a
-  // duration-model change that moves the boundary should show up here (#2132 moved it from 15–30).
-  it('trims sets before it drops anything', () => {
+  // #2787 (Orchestrator decision, 2026-10-11) reversed the old "trim sets before dropping anything"
+  // pin: the review now drops a whole exercise first, like the allocator, because "everything at 2
+  // sets" is the shape the owner called worse training. At 15 min the old answer trimmed all three;
+  // the new one drops the curl and leaves the squat and row at the sets the user has.
+  it('drops a whole exercise before it trims any set', () => {
     const r = run(15)
-    expect(r.modelExercises.length).toBeGreaterThan(0)
-    expect(r.modelExercises.every(m => m.action === 'adjust')).toBe(true)
-    expect(r.reasoning).toContain('trimmed')
-    expect(r.reasoning).not.toContain('dropped')
+    expect(r.modelExercises.map(m => [m.sessionExerciseId, m.action])).toEqual([[CURL, 'drop']])
+    expect(r.reasoning).toContain('dropped')
+    expect(r.reasoning).not.toContain('trimmed')
   })
 
-  // `applyBudgetStage` declines to drop unless the user explicitly asked for a SHORT session,
-  // because there the under-fill is the finish-early margin. A review is the opposite situation —
-  // the user opened it to be told what does not fit — so this path drops when trimming runs out.
-  it('drops once trimming has run out of room, keeping the main compound lift', () => {
+  // Was "drops once trimming has run out of room". The order flipped (#2787); what is unchanged is
+  // that it never goes below two exercises (#2078) and keeps the main lift, and that sets are cut
+  // only once the two it keeps still overrun.
+  it('trims only once the two exercises it keeps still overrun, keeping the main compound lift', () => {
     const r = run(1)
     const dropped = r.modelExercises.filter(m => m.action === 'drop').map(m => m.sessionExerciseId)
-    // Never below two exercises (#2078), so one of the three goes.
     expect(dropped).toEqual([CURL])
-    expect(r.reasoning).toContain('does not fit')
+    expect(r.modelExercises.filter(m => m.action === 'adjust').map(m => m.sessionExerciseId).sort()).toEqual([ROW, SQUAT].sort())
+    expect(r.reasoning).toContain('dropped')
+    expect(r.reasoning).toContain('trimmed')
   })
 
-  // The sentence per drop was the model's one irreplaceable output. It is not duplicated here —
-  // `reconcileReview` owns the fallback string, so `dropReason` is left unset on purpose.
-  it('leaves the drop reason to reconcileReview rather than writing a second copy', () => {
-    const dropped = run(1).modelExercises.filter(m => m.action === 'drop')
-    expect(dropped.length).toBeGreaterThan(0)
-    for (const d of dropped) expect(d.dropReason).toBeUndefined()
+  // Was "leaves the drop reason to reconcileReview". #2787 asks the sheet to say which exercise went
+  // and why, and reconcile's fallback ("Dropped to fit the time budget.") cannot say why, so the
+  // reason is written here now.
+  it('says why each exercise went: least behind this week', () => {
+    const r = run(15, { weeklyTargets: { quads: 10, back: 10, biceps: 10 }, weeklyLogged: { quads: 0, back: 0, biceps: 30 } })
+    const drops = r.modelExercises.filter(m => m.action === 'drop')
+    expect(drops.map(d => d.sessionExerciseId)).toEqual([CURL])
+    expect(drops[0].dropReason).toBe('Dropped to fit the 15-min budget: least behind this week.')
+  })
+
+  it('does not claim "least behind" when no weekly target covers the muscle', () => {
+    const drops = run(15).modelExercises.filter(m => m.action === 'drop')
+    expect(drops[0].dropReason).toContain('lowest priority in the session')
+  })
+
+  // The last drop keeps a pair that fits (#2078). Value order would drop the cheap curl and leave
+  // squat + row, which overrun 14 minutes; the row goes instead, and the sheet says why rather than
+  // claiming it was the least valuable. Pair-rule band for this fixture, measured: 11–18 min.
+  it('names the pair rule when it, not value order, chose the drop', () => {
+    const r = buildRulesReview({
+      exercises: [
+        { sessionExerciseId: SQUAT, name: 'Squat', sets: 3, reps: 5, pct: 80, restSec: 180 },
+        { sessionExerciseId: ROW, name: 'Row', sets: 3, reps: 10, pct: 72, restSec: 240 },
+        { sessionExerciseId: CURL, name: 'Curl', sets: 2, reps: 10, pct: 65, restSec: 60 },
+      ],
+      signals: signals({ effectiveTimeBudgetMin: 14 }),
+      budgetMin: 14,
+    })
+    expect(r.modelExercises.map(m => [m.sessionExerciseId, m.action])).toEqual([[ROW, 'drop']])
+    expect(r.modelExercises[0].dropReason).toContain('the two exercises left fit together')
   })
 
   // An unchanged exercise is omitted, not sent as an explicit `keep` — `reconcileReview` reads a

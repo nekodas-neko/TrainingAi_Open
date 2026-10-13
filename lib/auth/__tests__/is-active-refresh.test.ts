@@ -108,3 +108,13 @@ describe('the per-request read PS-24 depends on', () => {
     expect(token.isAdmin).toBe(false)
   })
 })
+
+it('preserves calculation claims on an outage and clears fields the user removed', async () => {
+  const token = {userId:'u1',isActive:true,isAdmin:false,timezone:'Australia/Brisbane',heightCm:180,sex:'male'}
+  await refreshIsActiveClaim(token,async () => {throw new Error('offline')})
+  expect(token.timezone).toBe('Australia/Brisbane')
+  expect(token.heightCm).toBe(180)
+  await refreshIsActiveClaim(token,async () => ({isActive:true,heightCm:undefined,sex:undefined}))
+  expect(token.heightCm).toBeNull()
+  expect(token.sex).toBeNull()
+})

@@ -1,11 +1,14 @@
 import { getDb } from '@/lib/data/postgres/client'
 import { sql } from 'drizzle-orm'
-import { formatInTimeZone } from 'date-fns-tz'
-import { shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
+import { todayInTz, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import type { AchievementResult } from '@/components/profile/achievements-grid'
-import { calorieDayHitsGoal } from '@trainingai/shared/achievements-calc'
+import { calorieDayHitsGoal, computeEntryStreak } from '@trainingai/shared/achievements-calc'
 import { computeDayStreak, streakRestGapFor } from '@trainingai/shared/workout/day-streak'
 import { reconcileUserStats } from '@/lib/data/postgres/slices/user-stats'
+import { getRepository } from '@/lib/data'
+import { calorieBudgetsByDay, budgetMetricsStart } from '@trainingai/shared/nutrition/day-budget'
+import { ownTargetFromGoals } from '@trainingai/shared/nutrition/calorie-budget'
+import type { FitnessGoal } from '@trainingai/shared/types/user'
 
 const LEVEL_THRESHOLDS = [0, 100, 250, 500, 900, 1400, 2100, 3000, 4200, 5800, 8000]
 
@@ -29,53 +32,9 @@ function computeLevel(xp: number): { level: number; levelLabel: string; currentL
   return { level, levelLabel: getLevelLabel(level), currentLevelXp, nextLevelXp }
 }
 
-/**
- * A streak of dated ENTRIES — one per day that has one, with `maxRestGap` days allowed between.
- *
- * RV-216 renamed this from `computeStreak`. It shared that name with Home's function while
- * counting a different quantity: this counts entries, Home counts the calendar days they span,
- * and on the owner's real history the two read 83 and 111 for the same input. Food, sleep and
- * calorie-goal streaks want THIS one — "log food 7 days in a row" means seven entries. The
- * training streak wants `computeDayStreak`, which is what the card and the achievements say.
- */
-export function computeEntryStreak(dates: string[], tz: string, maxRestGap = 0): { best: number; current: number } {
-  if (dates.length === 0) return { best: 0, current: 0 }
-
-  const sorted = [...dates].sort()
-
-  let best = 1, streak = 1
-  for (let i = 1; i < sorted.length; i++) {
-    const prev = new Date(sorted[i - 1])
-    const curr = new Date(sorted[i])
-    const diffDays = Math.round((curr.getTime() - prev.getTime()) / 86_400_000)
-    if (diffDays - 1 <= maxRestGap) {
-      streak++
-      if (streak > best) best = streak
-    } else {
-      streak = 1
-    }
-  }
-
-  // current streak: compare date strings in the user's timezone to avoid UTC-midnight drift
-  const todayStr     = formatInTimeZone(new Date(), tz, 'yyyy-MM-dd')
-  // Q-489: shifted on the string, not by 86,400,000 ms — on a DST fall-back day the ms offset
-  // resolves to today, and a streak whose last entry was yesterday reads as broken.
-  const yesterdayStr = shiftDateStr(todayStr, -1)
-  const mostRecentStr = sorted[sorted.length - 1]
-
-  if (mostRecentStr !== todayStr && mostRecentStr !== yesterdayStr) return { best, current: 0 }
-
-  let current = 1
-  for (let i = sorted.length - 2; i >= 0; i--) {
-    const a = new Date(sorted[i])
-    const b = new Date(sorted[i + 1])
-    const diff = Math.round((b.getTime() - a.getTime()) / 86_400_000)
-    if (diff - 1 <= maxRestGap) current++
-    else break
-  }
-
-  return { best, current }
-}
+// RV-216. `computeEntryStreak` lives beside `calorieDayHitsGoal` (#2690 moved it, so the calorie-award
+// replay can run the shipped function); re-exported here for the callers that import it from this file.
+export { computeEntryStreak }
 
 export interface AchievementsResult {
   level: number
@@ -97,6 +56,46 @@ export interface AchievementsResult {
 async function allNamed<T extends Record<string, Promise<unknown>>>(queries: T): Promise<{ [K in keyof T]: Awaited<T[K]> }> {
   const entries = await Promise.all(Object.entries(queries).map(async ([key, promise]) => [key, await promise] as const))
   return Object.fromEntries(entries) as { [K in keyof T]: Awaited<T[K]> }
+}
+
+/**
+ * #2690. The budget each food-logged day would have shown (`calorieBudgetsByDay`), read once for the
+ * whole span. Any failed read costs the budgets, never the achievements: an empty map sends every day
+ * back to the typed-target judgement below.
+ */
+export async function pastDayCalorieBudgets(userId: string, tz: string, days: string[]): Promise<Map<string, number | null>> {
+  if (days.length === 0) return new Map()
+  try {
+    const repo = await getRepository()
+    const sorted = [...days].sort()
+    const first = sorted[0]
+    const last = sorted[sorted.length - 1]
+    const [profile, goals, metrics, calibration, rmrs, workouts, activities] = await Promise.all([
+      repo.getUserById(userId),
+      repo.getUserGoals(userId),
+      repo.listBodyMetrics(userId, budgetMetricsStart(first), last),
+      repo.getBodyFatCalibration(userId).catch(() => null),
+      repo.listMeasuredRmr(userId).catch(() => []),
+      repo.getWorkoutSessionsFrom(userId, dateStrMidnightInTz(first, tz)),
+      repo.listActivityLogs(userId, first, last),
+    ])
+    const avgBpmBySession = await repo
+      .getAvgBpmBySession(userId, workouts.filter(w => w.completedAt != null).map(w => w.id))
+      .catch(() => new Map<string, number>())
+    return calorieBudgetsByDay({
+      days: sorted, tz, metrics, bodyFatCalibration: calibration,
+      measuredRmrs: rmrs,
+      heightCm: profile?.heightCm ?? null,
+      dateOfBirth: profile?.dateOfBirth ?? null,
+      sex: profile?.sex === 'male' || profile?.sex === 'female' ? profile.sex : null,
+      goal: (profile?.fitnessGoal ?? null) as FitnessGoal | null,
+      targetWeightKg: goals?.targetWeightKg ?? null,
+      ownTargetKcal: ownTargetFromGoals(goals),
+      workouts, avgBpmBySession, activities,
+    })
+  } catch {
+    return new Map()
+  }
 }
 
 export async function computeAchievements(userId: string, tz: string): Promise<AchievementsResult> {
@@ -272,11 +271,18 @@ export async function computeAchievements(userId: string, tz: string): Promise<A
   const sleepStreaks = computeEntryStreak(sleepDates, tz)
 
   const goalRow = goalDirRes.rows[0] as { target_weight: number | null; current_weight: number | null } | undefined
-  const calorieGoalDates = calorieTarget > 0
-    ? calorieDays
-        .filter(d => calorieDayHitsGoal(Number(d.total_cals), calorieTarget, goalRow?.target_weight ?? null, goalRow?.current_weight ?? null))
-        .map(d => String(d.day))
-    : []
+  // #2690 (owner, #2622): each day is judged against THAT day's budget — the number Nutrition and
+  // Home showed it — not the old typed goal. A day with no budget (no weigh-in in its window, or an
+  // incomplete profile) keeps the behaviour from before: the typed target when there is one, and
+  // otherwise it is not a hit.
+  const budgetByDay = await pastDayCalorieBudgets(userId, tz, calorieDays.map(d => String(d.day)))
+  const calorieGoalDates = calorieDays
+    .filter(d => {
+      const target = budgetByDay.get(String(d.day)) ?? (calorieTarget > 0 ? calorieTarget : null)
+      return target != null
+        && calorieDayHitsGoal(Number(d.total_cals), target, goalRow?.target_weight ?? null, goalRow?.current_weight ?? null)
+    })
+    .map(d => String(d.day))
   const calorieGoalStreaks = computeEntryStreak(calorieGoalDates, tz)
 
   const monthsActive = new Set(workoutDates.map(d => d.slice(0, 7))).size

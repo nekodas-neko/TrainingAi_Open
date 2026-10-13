@@ -55,7 +55,7 @@ export function ExerciseHistorySheet({ exerciseName, muscles = [], userId, onClo
               estimated1rm: el.estimated1rm,
               volume: el.volume,
               isDeload: false,
-              rpeDelta: rpeTrendFromSets(activeSets.map(s => ({ rpe: s.rpe, intensityPct: s.intensityPct, reps: s.reps })))?.delta ?? null,
+              rpeDelta: rpeTrendFromSets(activeSets.map(s => ({ rpe: s.rpe, rpeSource: s.rpeSource, intensityPct: s.intensityPct, reps: s.reps })))?.delta ?? null,
             });
           }
         }

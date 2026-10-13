@@ -2,7 +2,7 @@
 // "Session Load". Both the per-workout zone breakdown and the day/week/month time-in-zone stats
 // import from here (One Formula, One Place). Zones come only from `hr-zones.ts`; never re-band here.
 // "Session Load" is the per-workout HR number — distinct from whole-day "Training Stress (OTS)".
-import { zoneForBpm, type HrZone } from './hr-zones'
+import { zoneForBpm, whoMinuteWeightForZone, type HrZone } from './hr-zones'
 
 export interface HrReading {
   /** epoch ms */
@@ -72,42 +72,36 @@ export function zoneBreakdownFromReadings(
   }
 }
 
-/** WHO-style "active minutes" (Activity Score v2, 2026-07-23): Zone 2 "Light" (≥60% HR reserve, WHO
- *  "moderate") counts once; Zone 3+ ("Aerobic"/"Hard"/"Peak", WHO "vigorous") counts DOUBLE, per the
- *  WHO 2020 guideline that vigorous minutes count double toward the weekly moderate-equivalent target.
- *  Takes the same per-zone seconds `accumulateZoneSeconds` already produces — no second zone
- *  computation, just a different roll-up of the one canonical result. */
 /**
- * WHO active minutes computed from readings, with moderate starting at `MODERATE_INTENSITY_FRAC`
- * of reserve rather than at the Light band's floor (TN-78).
+ * WHO active minutes computed from readings: moderate from `MODERATE_INTENSITY_FRAC` of reserve
+ * (TN-78) counts once, vigorous from `VIGOROUS_INTENSITY_FRAC` (#2198) counts double.
  *
- * The zone map cannot answer this on its own: its Light band begins at 60% of reserve, where ACSM
- * puts vigorous, and it is shared with run prescriptions — so widening it to fix the accounting
- * would have dropped a recovery run's ceiling with it. This walks the readings once, with the same
- * gap cap `accumulateZoneSeconds` uses, and splits on two edges: the moderate floor, and the
- * Aerobic band's floor above which WHO counts a minute double.
+ * The zone map cannot answer this on its own: it is shared with run prescriptions, and its Zone 1
+ * spans both "light" and the moderate band. So this walks the readings once, with the same gap cap
+ * `accumulateZoneSeconds` uses, and splits on the two bpm edges `moderateIntensityBpm` and
+ * `vigorousIntensityBpm` give for the profile.
  */
 export function activeMinutesFromReadings(
   readings: HrReading[],
-  zones: { id: number; minBpm: number }[],
-  moderateFloorBpm: number,
+  floors: { moderateFloorBpm: number; vigorousFloorBpm: number },
   maxGapSec = DEFAULT_MAX_GAP_SEC,
 ): number {
-  const vigorousFloor = zones.find(z => z.id === 3)?.minBpm ?? Infinity
+  const { moderateFloorBpm, vigorousFloorBpm } = floors
   let moderateSec = 0
   let vigorousSec = 0
   for (let i = 0; i + 1 < readings.length; i++) {
     const dt = Math.min((readings[i + 1].timestamp - readings[i].timestamp) / 1000, maxGapSec)
     const bpm = readings[i].bpm
-    if (bpm >= vigorousFloor) vigorousSec += dt
+    if (bpm >= vigorousFloorBpm) vigorousSec += dt
     else if (bpm >= moderateFloorBpm) moderateSec += dt
   }
   return Math.round(moderateSec / 60 + (vigorousSec / 60) * 2)
 }
 
+/** WHO active minutes from per-zone seconds (index 0 = Zone 1), each zone weighted by
+ *  `whoMinuteWeightForZone`: Zone 2 and above sit at or over the 60%-of-reserve vigorous line and
+ *  count double (#2198); Zone 1 cannot be split at the moderate line and counts nothing. */
 export function activeMinutesFromZoneSeconds(zoneSeconds: number[]): number {
-  const [, lightSec, aerobicSec, hardSec, peakSec] = zoneSeconds
-  const moderateMin = lightSec / 60
-  const vigorousMin = (aerobicSec + hardSec + peakSec) / 60
-  return Math.round(moderateMin + vigorousMin * 2)
+  const min = zoneSeconds.reduce((sum, sec, i) => sum + (sec / 60) * whoMinuteWeightForZone((i + 1) as HrZone['id']), 0)
+  return Math.round(min)
 }

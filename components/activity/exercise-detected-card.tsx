@@ -23,7 +23,9 @@ interface Props {
  *
  * So what went is the Cloud plumbing the owner actually asked about — the unreviewed fetch, the ingest,
  * and the server-side mark-reviewed PATCH. Dismissal is now purely local, which is all a phone session
- * ever needed.
+ * ever needed. *
+ * #2471 gave it a second writer again: walks found after the fact in the ring's MET
+ * (`lib/activity/ring-walks.ts`), shown with the owner's wording and no route.
  */
 export function ExerciseDetectedCard({ onReview }: Props) {
   const tz = useUserTimezone()
@@ -47,11 +49,21 @@ export function ExerciseDetectedCard({ onReview }: Props) {
     <div className="mb-4 overflow-hidden rounded-2xl border border-brand/30 bg-brand/10">
       <div className="flex items-center justify-between px-4 py-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold capitalize">
-            {session.activityType === 'run' ? 'Run' : 'Walk'} detected
-          </p>
+          {session.source === 'ring' ? (
+            // #2471: the owner's wording (2026-10-06). The ring saw the walk after the fact, so there
+            // is no route or distance to show — only when it was.
+            <p className="text-sm font-bold">
+              Looks like you walked {formatTimeOfDay(session.startMs, tz)}–{formatTimeOfDay(session.endMs, tz)}. Save it?
+            </p>
+          ) : (
+            <p className="truncate text-sm font-bold capitalize">
+              {session.activityType === 'run' ? 'Run' : 'Walk'} detected
+            </p>
+          )}
           <p className="text-xs text-muted-foreground">
-            {formatTimeOfDay(session.startMs, tz)} · {Math.round(session.durationMin)} min{session.distanceKm > 0 ? ` · ${session.distanceKm.toFixed(2)} km` : ''}
+            {session.source === 'ring'
+              ? `${Math.round(session.durationMin)} min · from your ring`
+              : `${formatTimeOfDay(session.startMs, tz)} · ${Math.round(session.durationMin)} min${session.distanceKm > 0 ? ` · ${session.distanceKm.toFixed(2)} km` : ''}`}
             {extras > 0 && ` · +${extras} more`}
           </p>
         </div>

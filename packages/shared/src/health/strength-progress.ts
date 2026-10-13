@@ -1,5 +1,14 @@
-import type { ExerciseSummary } from '@/app/api/weights-summary/route'
 import { displayOneRm, displayOneRmDelta, oneRmUnit, type OneRmUnit } from '@trainingai/shared/1rm'
+
+export interface StrengthReading {
+  estimated1rm: number | null
+  previousEstimated1rm: number | null
+  personalRecord1rm: number | null
+  weight: number | null
+  exerciseType: 'weighted' | 'bodyweight'
+  lastReps: number | null
+  maxReps: number | null
+}
 
 export type StrengthMode = 'latest' | 'working'
 
@@ -37,11 +46,11 @@ function trendColor(trend: 'up' | 'down' | 'same' | null, pct: number): string {
  * because guarding the delta and not the bar leaves the empty bar, which is the half that was
  * reported. No exercise has a meaningful 1RM of zero, weighted or bodyweight.
  */
-function currentOneRm(ex: ExerciseSummary): number | null {
+function currentOneRm(ex: StrengthReading): number | null {
   return ex.estimated1rm != null && ex.estimated1rm > 0 ? ex.estimated1rm : null
 }
 
-function computeTrend(ex: ExerciseSummary): { trend: 'up' | 'down' | 'same' | null; delta: number | null } {
+function computeTrend(ex: StrengthReading): { trend: 'up' | 'down' | 'same' | null; delta: number | null } {
   const current = currentOneRm(ex)
   if (current == null) return { trend: null, delta: null }
   const d = displayOneRmDelta(current, ex.previousEstimated1rm, ex.exerciseType)
@@ -52,7 +61,7 @@ function computeTrend(ex: ExerciseSummary): { trend: 'up' | 'down' | 'same' | nu
   return { trend: 'same', delta: 0 }
 }
 
-export function computeBarMetric(ex: ExerciseSummary, mode: StrengthMode): BarMetric | null {
+export function computeBarMetric(ex: StrengthReading, mode: StrengthMode): BarMetric | null {
   const { trend, delta } = computeTrend(ex)
   const deltaUnit = oneRmUnit(ex.exerciseType)
 

@@ -1,3 +1,4 @@
+import {selectNonOverlapping} from './interval-overlap'
 /**
  * Steps math, One-Formula-One-Place. Two things live here:
  *
@@ -30,8 +31,8 @@
  * It never invents steps from desk activity. The accurate path is the live-accel counter
  * (`lib/oura-ble/accel.ts`), which replaces this per-window guess where it runs.
  */
-import type { PairedStepFeature } from '@/lib/oura-ble/step-features'
-import { GAIT_CADENCE_MAX_HZ } from '@/lib/oura-ble/gait-step-count'
+import { GAIT_CADENCE_MAX_HZ } from './gait-constants'
+type PairedStepFeature = { ds: number; columns: number[] }
 
 /** unpack27 column holding the walk-cadence feature. */
 export const WALK_CADENCE_COLUMN = 14
@@ -152,11 +153,7 @@ export function isPlausibleStepWindow(steps: number, startMs: number, endMs: num
  * only ever lower a total, never raise one.
  */
 export function dedupeOverlappingWindows(windows: StepCountWindow[]): StepCountWindow[] {
-  const accepted: StepCountWindow[] = []
-  for (const w of [...windows].sort((a, b) => b.steps - a.steps || a.startMs - b.startMs)) {
-    if (!accepted.some((a) => w.startMs < a.endMs && w.endMs > a.startMs)) accepted.push(w)
-  }
-  return accepted
+  return selectNonOverlapping(windows,window=>window.steps)
 }
 
 export function mergeStepCounterWithLive(model: StepCountWindow[], live: StepCountWindow[]): number {

@@ -1,11 +1,6 @@
-import { z } from 'zod'
-
-export const CompleteWorkoutPayloadSchema = z.object({
-  workoutSessionId: z.string().uuid(),
-  completedAtMs: z.number().optional(),
-})
-
-export type CompleteWorkoutPayload = z.infer<typeof CompleteWorkoutPayloadSchema>
+export { CompleteWorkoutPayloadSchema } from './complete-payload'
+import type { CompleteWorkoutPayload } from './complete-payload'
+export type { CompleteWorkoutPayload } from './complete-payload'
 
 /** How far ahead of server time a phone's clock may be before its timestamp is unusable. */
 export const COMPLETED_AT_FUTURE_TOLERANCE_MS = 60 * 60_000

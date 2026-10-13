@@ -3,6 +3,7 @@ import { generateText, generateObject, streamText } from 'ai'
 import { google } from '@ai-sdk/google'
 import { withAiRetry, isRetryableAiError, isRetryableObjectError } from './retry'
 import { AI_CALL_BUDGET_MS, runWithDeadline } from './deadline'
+import { assertDevAiBudget, recordDevAiCall } from './dev-call-budget'
 
 // ── Model — single source of truth ─────────────────────────────────────────────
 // Was inlined as `google('gemini-3.1-flash-lite')` at 14 call sites; centralised
@@ -183,13 +184,20 @@ export async function withAiLogging<T extends { usage?: unknown }>(
   shouldRetry: (err: unknown) => boolean = isRetryableAiError,
   budgetMs: number = AI_CALL_BUDGET_MS,
 ): Promise<T> {
+  // #2816. Off production only. Outside the try, so a refused call makes no request and is not
+  // logged to `ai_call_log` as a failure; thrown before the retry loop, so it is never retried.
+  assertDevAiBudget()
   const started = Date.now()
   const deadlineAt = started + budgetMs
   try {
     // RV-70. The budget is TOTAL, so each attempt gets whatever is left rather than a fresh
     // ceiling, and `deadlineAt` stops a retry starting that could not finish inside it.
     const result = await withAiRetry(
-      () => runWithDeadline(fn, Math.max(0, deadlineAt - Date.now())),
+      () => {
+        // Each attempt is a billed request, the retry included.
+        recordDevAiCall()
+        return runWithDeadline(fn, Math.max(0, deadlineAt - Date.now()))
+      },
       { shouldRetry, deadlineAt },
     )
     logAiCall(meta, { usage: result.usage, modelId: responseModelId(result), latencyMs: Date.now() - started, ok: true })
@@ -219,14 +227,23 @@ export function loggedGenerateText<T extends { usage?: unknown }>(
 
 // streamText chokepoint — streaming has no awaitable result, so usage is captured
 // from the SDK's onFinish callback (and onError for failures). The caller's own
-// onFinish/onError, if any, still run.
+// onFinish/onError/onStepFinish, if any, still run.
 type StreamTextParams = Parameters<typeof streamText>[0]
 export function loggedStreamText(meta: AiCallMeta, params: StreamTextParams): ReturnType<typeof streamText> {
+  // #2816. One Coach turn is up to COACH_MAX_STEPS model requests, each counted as its step
+  // finishes, so a turn started just under the limit can overshoot it by a few. Accepted: the
+  // alternative is refusing a turn halfway through its tool calls.
+  assertDevAiBudget()
   const started = Date.now()
   const callerOnFinish = params.onFinish
   const callerOnError = params.onError
+  const callerOnStepFinish = params.onStepFinish
   const merged = {
     ...params,
+    onStepFinish(ev: Parameters<NonNullable<StreamTextParams['onStepFinish']>>[0]) {
+      recordDevAiCall()
+      return callerOnStepFinish?.(ev)
+    },
     onFinish(ev: Parameters<NonNullable<StreamTextParams['onFinish']>>[0]) {
       logAiCall(meta, { usage: ev.totalUsage ?? ev.usage, modelId: responseModelId(ev), latencyMs: Date.now() - started, ok: true })
       return callerOnFinish?.(ev)

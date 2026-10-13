@@ -375,8 +375,8 @@ export function buildWorkoutExercises(
         // — a seed the user typed or an older program's PR has no reps to report, and attaching the
         // last log's would pair two numbers from different places. For a bodyweight exercise the
         // rep max IS this figure, so the card can read it instead of inverting the estimate: that
-        // inverse is lossy, and at 5 vs 6 reps it is impossible, since the rep-factor gain is
-        // exactly cancelled by `amrapScaleFactor`'s step and both store the same 1RM.
+        // inverse is lossy: under the stepped discount stored before issue 2193 (a), 5 and 6 reps
+        // stored the same 1RM, and some legacy values tie with a lower count's current value.
         prevRepMaxReps: workingBasis.source === 'last_real'
           ? (lastRealOneRm?.get(ex.exerciseName)?.avgReps ?? null)
           : null,

@@ -40,6 +40,7 @@ const EXEMPT_ENDPOINTS = new Map([
   ['/api/oura-ble/rollup-state', 'device rollup state during a sync; already passes cache: no-store'],
   ['/api/exercise-library', 'builder-review reads past the cache immediately after an edit; already passes cache: no-store'],
   ['/api/ai-periodization/session/', 'conditionally no-store right after a write, which is the case the cache cannot serve'],
+  ['/api/activity-detection/walks', 'a ring-walk offer is acted on, never painted (#2471): a cached copy has no reader, and a stale one would re-offer a walk the user just saved; already passes cache: no-store'],
 ]);
 
 // AUTHORITATIVE reads — the third population, and the one a conversion would BREAK rather than

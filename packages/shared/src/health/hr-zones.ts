@@ -10,6 +10,26 @@ export function hrMaxFromAge(age: number | null | undefined): number {
   return age != null ? 220 - age : 190
 }
 
+/**
+ * #2182 (owner, 2026-09-09 and 09-17): the ceiling the zones are built on, when a maximal test exists.
+ * The owner's own rule, used twice: blend the measured peak of the latest Cooper 12-minute run with
+ * the age-predicted max, 50/50 — "treat 175 as the floor and 187 as the top, and choose in between".
+ * For the owner today that is (175 + 187) / 2 = 181. With no Cooper test it is the age-predicted max.
+ *
+ * Derived, not stored (Orchestrator, 2026-10-11, the owner can reverse it): nothing has to be written,
+ * and a later Cooper test moves it by itself — say so in the release notes when one does.
+ */
+export function zoneMaxFromTests(
+  ageMax: number,
+  tests: readonly { testType: string; date: string; maxHr?: number | null }[],
+): { maxHr: number; cooperPeak: number | null; cooperDate: string | null } {
+  const latest = tests
+    .filter(t => t.testType === 'cooper12' && t.maxHr != null && Number.isFinite(t.maxHr) && t.maxHr > 0)
+    .reduce<(typeof tests)[number] | null>((best, t) => (best == null || t.date > best.date ? t : best), null)
+  if (!latest) return { maxHr: ageMax, cooperPeak: null, cooperDate: null }
+  return { maxHr: Math.round((latest.maxHr! + ageMax) / 2), cooperPeak: latest.maxHr!, cooperDate: latest.date }
+}
+
 /** The resting heart rate assumed when none has been measured — every resolver falls back to this one. */
 export const DEFAULT_RESTING_HR = 60
 
@@ -78,6 +98,39 @@ export const MODERATE_INTENSITY_FRAC = 0.4
 /** The bpm at which moderate activity begins for a profile (TN-78). */
 export function moderateIntensityBpm({ maxHr, restingHr }: { maxHr: number; restingHr: number }): number {
   return Math.round(restingHr + MODERATE_INTENSITY_FRAC * hrReserve(maxHr, restingHr))
+}
+
+/**
+ * Where VIGOROUS activity begins, as a fraction of heart-rate reserve: ACSM's vigorous floor
+ * (60-89% HRR), completing the definition `MODERATE_INTENSITY_FRAC` took (owner, 2026-10-05, #2198).
+ *
+ * WHO counts a vigorous minute double toward the weekly moderate-equivalent target. Before this,
+ * the two roll-ups each picked a different zone edge for "vigorous" and neither was ACSM's: the
+ * Activity score's zone minutes doubled from Zone 3 (70%) and the run plan's "meets 150 min"
+ * doubled from Zone 4 (80%). Like the moderate floor, it is a constant, not a zone edge, so run
+ * prescriptions (which read the bands) do not move.
+ */
+export const VIGOROUS_INTENSITY_FRAC = 0.6
+
+/** The bpm at which vigorous activity begins for a profile (#2198). */
+export function vigorousIntensityBpm({ maxHr, restingHr }: { maxHr: number; restingHr: number }): number {
+  return Math.round(restingHr + VIGOROUS_INTENSITY_FRAC * hrReserve(maxHr, restingHr))
+}
+
+/**
+ * What a minute in a zone is worth toward WHO's moderate-equivalent minutes, for the roll-ups that
+ * only have per-zone totals (zone seconds, the run plan's zone targets): 2 when the whole zone sits
+ * at or above `VIGOROUS_INTENSITY_FRAC`, 1 when it sits wholly in [moderate, vigorous), and 0
+ * otherwise. Zone 1 spans 0-60% of reserve, so a per-zone total cannot say how much of it was
+ * moderate; it scores 0, as it always has. The readings roll-up (`activeMinutesFromReadings`)
+ * has the bpm and credits that band.
+ */
+export function whoMinuteWeightForZone(zoneId: HrZone['id']): 0 | 1 | 2 {
+  const def = ZONE_DEFS.find(z => z.id === zoneId)
+  if (!def) return 0
+  if (def.lowerFrac >= VIGOROUS_INTENSITY_FRAC) return 2
+  if (def.lowerFrac >= MODERATE_INTENSITY_FRAC) return 1
+  return 0
 }
 
 /** Build the five HR zones as absolute bpm bands for a given profile. */

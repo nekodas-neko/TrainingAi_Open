@@ -1,4 +1,4 @@
-import type { Program, Schedule } from '@trainingai/shared/types'
+import type { Program, Schedule } from '@trainingai/shared/types/program'
 
 /**
  * Mirrors the home screen's "This Week X/Y" cadence (session-select-content.tsx's

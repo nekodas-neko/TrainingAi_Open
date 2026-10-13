@@ -1,3 +1,5 @@
+export { BAR_WEIGHT_KG, PLATE_PAIRS_KG, plateBreakdown } from '@trainingai/shared/workout/plate-loading';
+import { expectedRpePrefill } from "@trainingai/shared/ai-periodization/expected-rpe";
 import type { ExerciseType } from "@trainingai/shared/types/program";
 import type { PhaseStatus } from "@trainingai/shared/workout/session-data";
 import type { WorkoutExercise } from "@/app/api/workout-data/route";
@@ -6,6 +8,7 @@ import { rowUnderFull } from "@trainingai/shared/ai-periodization/prescription-f
 import { formatDateDisplay } from "@trainingai/shared/date-utils";
 import { categoricalColor } from "@trainingai/shared/chart-colors";
 import { prescriptionDrivesLoad } from "@trainingai/shared/ai-periodization/apply-prescription";
+import { withPrescribedBars, type RMStyleSet } from "@trainingai/shared/1rm";
 
 export const DEFAULT_SETS = 3;
 export const DEFAULT_REPS = 8;
@@ -64,12 +67,22 @@ export function weightStepFor(equipment?: string[] | null): number {
   return equipment?.includes("barbell") ? BARBELL_WEIGHT_STEP_KG : DEFAULT_WEIGHT_STEP_KG;
 }
 
+/** The bar range every plate-rounded weight is clamped to. */
+export const MIN_BAR_KG = 5;
+export const MAX_BAR_KG = 250;
+
 export function mroundStep(value: number, step: number): number {
-  return Math.max(5, Math.min(250, Math.round(value / step) * step));
+  return Math.max(MIN_BAR_KG, Math.min(MAX_BAR_KG, Math.round(value / step) * step));
 }
 
 export function mroundStepUp(value: number, step: number): number {
-  return Math.max(5, Math.min(250, Math.ceil(value / step) * step));
+  return Math.max(MIN_BAR_KG, Math.min(MAX_BAR_KG, Math.ceil(value / step) * step));
+}
+
+/** #2762: true when `mroundStepUp` would cut this prescription down to MAX_BAR_KG, so the screen
+ *  can say the bar is capped instead of showing 250 as if it were the real figure. */
+export function barIsCapped(value: number | null | undefined): boolean {
+  return value != null && value > MAX_BAR_KG;
 }
 
 type BarInputs = Pick<WorkoutExercise, "exerciseType" | "progressionStyle" | "estimated1rm" | "equipment">;
@@ -86,11 +99,47 @@ export function prescribedBarWeights(ex: BarInputs | undefined, sets: number): (
   return Array.from({ length: sets }, (_, i) => (style[i] ? mroundStepUp(basis * style[i].pct / 100, step) : null));
 }
 
+// Shared per-set weight derivation — used at init (launchExercise, the per-set-weights
+// effect) and after an injury swap, so all three paths agree on how a set's target
+// weight is picked. One Formula, One Place.
+export function computeInitialWeights(ex: WorkoutExercise | undefined, sets: number): number[] {
+  if (ex?.exerciseType === "bodyweight") {
+    return Array.from({ length: sets }, () => 0);
+  }
+  const step = weightStepFor(ex?.equipment);
+  const prescribed = prescribedBarWeights(ex, sets);
+  return Array.from({ length: sets }, (_, i) => {
+    const bar = prescribed[i];
+    if (bar != null) return bar;
+    // #2762: up, like the card's "Target weight" and every other prescription, so the field opens
+    // on the bar the lifter is shown.
+    if (ex?.target80 != null) return mroundStepUp(ex.target80, step);
+    // Fallback for old logs that predate the target_80 column: derive from 1RM or last weight
+    if (ex?.estimated1rm) return mroundStepUp(ex.estimated1rm * 0.8, step);
+    if (ex?.latestWeight != null) return mroundStep(ex.latestWeight, step);
+    return 60;
+  });
+}
+
 /** `plannedWeights` for the log payload: omitted when no set had a prescribed bar, so a freeform
  *  log stays bare. mroundStepUp's 5-250 clamp keeps every value inside the payload schema's bound. */
 export function plannedWeightsPayload(ex: BarInputs | undefined, sets: number): (number | null)[] | undefined {
   const bars = prescribedBarWeights(ex, sets);
   return bars.some((w) => w != null) ? bars : undefined;
+}
+
+/** Issue 2200: the style the 1RM estimate scores against. Each prescribed set carries the bar it was
+ *  given and the 1RM that bar came from, so hitting a rounded-up bar exactly leaves the 1RM where it
+ *  was. The device estimate, the live readout and the server (via `prescriptionBasisPayload`) all
+ *  read the same bars from `prescribedBarWeights`. */
+export function styleWithPrescribedBars(ex: BarInputs | undefined, sets: number): RMStyleSet[] | null {
+  return withPrescribedBars(ex?.progressionStyle ?? null, prescribedBarWeights(ex, sets), ex?.estimated1rm);
+}
+
+/** `prescriptionBasisKg` for the log payload: the 1RM the bars in `plannedWeights` were computed
+ *  from, sent only beside them. The server scores the set against the same bar the device did. */
+export function prescriptionBasisPayload(ex: BarInputs | undefined, sets: number): number | undefined {
+  return plannedWeightsPayload(ex, sets) && ex?.estimated1rm ? ex.estimated1rm : undefined;
 }
 
 // Same formula used everywhere sets/reps are initialized for an exercise —
@@ -99,9 +148,15 @@ export function exerciseSetCount(ex: { progressionStyle?: { reps: number }[] | n
   return ex.progressionStyle ? ex.progressionStyle.length : (ex.defaultSets ?? DEFAULT_SETS);
 }
 
-export function defaultRpeFromPct(pct: number | undefined): number {
-  if (pct === undefined) return 7
-  return Math.min(10, Math.max(6, Math.floor(pct / 10)))
+/** #2253: the value set `i`'s RPE picker opens on — the shared expectation for the set as planned
+ *  (`expectedRpePrefill`). Bodyweight work has no % to state an expectation from. */
+export function rpePrefill(
+  ex: { exerciseType?: string | null } | undefined,
+  style: readonly { reps: number; pct?: number | null }[] | null | undefined,
+  i: number,
+): number {
+  const set = ex?.exerciseType === 'bodyweight' ? undefined : style?.[i]
+  return expectedRpePrefill(set?.pct, set?.reps)
 }
 
 // The example phrasing shown under the Voice button and named in its failure message. One string,
@@ -179,9 +234,8 @@ export function clampVoiceLogResult(weight?: number, reps?: number): { weight?: 
   }
 }
 
-export const BAR_WEIGHT_KG = 20;
-// One pair of each size — the plates available on the user's rack.
-export const PLATE_PAIRS_KG = [25, 20, 15, 10, 5, 2.5, 1.25] as const;
+
+
 
 // Reverts are a client-side overlay on the server prescription: the stored
 // prescription stays deloaded, this swap only affects what the workout runs
@@ -403,28 +457,6 @@ export function avgReps(reps: (number | null)[], rounding: 'round' | 'floor' = '
   return rounding === 'floor' ? Math.floor(mean) : Math.round(mean);
 }
 
-export interface PlateBreakdown {
-  perSide: number[];    // plates on each side, heaviest first
-  achievableKg: number; // bar + 2 × sum(perSide); equals the target when exact
-  exact: boolean;
-}
-
-// Greedy per-side breakdown. Returns null when the target is below the empty bar.
-// Weights are 1.25 kg multiples but the per-side value can land on a 0.625 step,
-// so a breakdown may be inexact — achievableKg is then the closest load below.
-export function plateBreakdown(targetKg: number, barKg: number = BAR_WEIGHT_KG): PlateBreakdown | null {
-  if (targetKg < barKg) return null;
-  let remaining = (targetKg - barKg) / 2;
-  const perSide: number[] = [];
-  for (const plate of PLATE_PAIRS_KG) {
-    if (remaining >= plate - 1e-9) {
-      perSide.push(plate);
-      remaining -= plate;
-    }
-  }
-  const achievableKg = barKg + 2 * perSide.reduce((sum, p) => sum + p, 0);
-  return { perSide, achievableKg, exact: Math.abs(achievableKg - targetKg) < 1e-9 };
-}
 
 /**
  * The context line in the active workout's header — phase, position, and whether today is a deload.

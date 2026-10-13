@@ -2,6 +2,7 @@
 
 import { memo } from 'react'
 import { barProgress } from '@trainingai/shared/nutrition/calorie-balance'
+import { ESTIMATE_STRIPES } from './estimated-kcal'
 
 /**
  * The day's calories as a bar you walk to the end of (Q-323).
@@ -15,16 +16,23 @@ import { barProgress } from '@trainingai/shared/nutrition/calorie-balance'
  * switch, where an object literal would defeat it silently.
  */
 export const CalorieProgressBar = memo(function CalorieProgressBar({
-  intakeKcal, budgetKcal, height = 'h-2',
+  intakeKcal, budgetKcal, height = 'h-2', estimatedKcal = 0,
 }: {
   intakeKcal: number
   budgetKcal: number
+  /** #2072. The part of `intakeKcal` that is ASSUMED (unlogged planned meals). Drawn as the striped
+   *  tail of the fill rather than coloured, so the bar's length stays the honest total. */
+  estimatedKcal?: number | null
   /** Tailwind height class — Home's cards are denser than the Nutrition tab's. */
   height?: string
 }) {
   const { fillPct, notchPct, stops } = barProgress({ intakeKcal, budgetKcal })
   const gradient = `linear-gradient(to right, ${stops.map(s => `${s.color} ${(s.pct * 100).toFixed(2)}%`).join(', ')})`
   const fillWidth = fillPct * 100
+  // The logged part's own length on the SAME scale (one `barProgress`), so the stripe ends exactly
+  // where the fill used to.
+  const est = estimatedKcal != null && estimatedKcal > 0 ? Math.min(estimatedKcal, intakeKcal) : 0
+  const loggedWidth = est > 0 ? barProgress({ intakeKcal: intakeKcal - est, budgetKcal }).fillPct * 100 : fillWidth
 
   return (
     <div
@@ -33,6 +41,7 @@ export const CalorieProgressBar = memo(function CalorieProgressBar({
       // Geometry, not pixels: a spec can pin what the bar MEANS without pinning how it looks.
       data-calorie-bar
       data-fill-pct={fillWidth.toFixed(2)}
+      data-estimated-pct={(fillWidth - loggedWidth).toFixed(2)}
       data-notch-pct={(notchPct * 100).toFixed(2)}
     >
       {/* The road ahead: a neutral base so an empty bar reads as empty, with the ramp faint on top
@@ -49,15 +58,23 @@ export const CalorieProgressBar = memo(function CalorieProgressBar({
           so the leading edge shows the true colour for that position. `scaleX` would scale the
           background with the element, squashing the ramp horizontally and changing what the bar
           SAYS about the day rather than only how it moves. Do not "finish the sweep" here. */}
-      {fillWidth > 0 && (
+      {loggedWidth > 0 && (
         <div
           className="absolute inset-y-0 left-0 transition-[width] duration-500 ease-out motion-reduce:transition-none"
           style={{
-            width: `${fillWidth}%`,
+            width: `${loggedWidth}%`,
             backgroundImage: gradient,
-            backgroundSize: `${(100 / fillPct).toFixed(2)}% 100%`,
+            backgroundSize: `${(10000 / loggedWidth).toFixed(2)}% 100%`,
             backgroundRepeat: 'no-repeat',
           }}
+        />
+      )}
+      {/* #2072. The assumed tail: stripes on the track, from where the logged fill ends to where the
+          whole intake ends. */}
+      {fillWidth - loggedWidth > 0 && (
+        <div
+          className="absolute inset-y-0 opacity-85"
+          style={{ left: `${loggedWidth}%`, width: `${fillWidth - loggedWidth}%`, backgroundImage: ESTIMATE_STRIPES }}
         />
       )}
       {/* The goal. A notch rather than a label: the number it stands for is already printed above. */}

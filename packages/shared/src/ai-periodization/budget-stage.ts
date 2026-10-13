@@ -7,9 +7,7 @@
 // different budget cost ~30 s and a token spend for work that is pure arithmetic (RV-202 ②).
 
 import {
-  fitToBudget,
-  expandToBudget,
-  dropToBudget,
+  allocateToBudget,
   applyRoleSetPlausibility,
   shortSessionRestSec,
   SHORT_SESSION_REST_FLOOR_SEC,
@@ -111,6 +109,8 @@ export function applyBudgetStage(
   /** #2403: the full numbers (`preDeload`) of each row a deload cut, so the result can carry the
    *  figures for the session the `Full` override trains. Omitted or empty: no `fullSession`. */
   fullShapeById?: ReadonlyMap<string, { sets: number; reps: number; pct: number; restSec: number }>,
+
+  phase?: string | null,
 ): BudgetStageResult {
   // Time-budget enforcement — the AI is asked to fit the budget, but trim deterministically
   // so the session is guaranteed to fit the allocated time. Sets are cut by muscle-overage
@@ -159,37 +159,20 @@ export function applyBudgetStage(
   // to repair a shape the model chose blind.
   const plausible = applyRoleSetPlausibility(timedExercises, muscleVolume)
 
-  // A short session is the one case where trimming alone can't reach the budget — five
-  // exercises floored at two sets still overrun a 30-minute ask, and two token sets each is
-  // worse training than doing fewer exercises properly. dropToBudget drops whole exercises
-  // in trim-priority order; they ride out on the prescription's existing droppedExerciseIds,
-  // which every render path already honours.
-  const dropped = direction < 0
-    ? dropToBudget(plausible, fitMin, earnedSetIds, muscleVolume)
-    : null
-  const trimmed = dropped?.exercises ?? fitToBudget(
-    plausible,
-    fitMin,
-    earnedSetIds,
-    muscleVolume,
-  )
-  const droppedIds = new Set(dropped?.droppedIds ?? [])
-
-  // Filling the budget is the 'long' preset's whole point: fitToBudget only removes sets, so
-  // without this a 90-minute session returned the 60-minute plan and handed the surplus back.
   //
-  // Gated on an EXPLICIT long request, never run on a standard session. The duration model
-  // is deliberately conservative (duration-model.ts) and that under-fill IS the finish-early
-  // margin — the owner's sessions land on time because of it. Expanding by default would
-  // spend exactly that margin.
-  let sized = trimmed
-  if (direction > 0) {
-    const mrvByMuscle = new Map<string, number>(
-      [...new Set(timedExercises.flatMap(e => (e.muscleGroups ?? []).map(m => m.muscle)))]
-        .map(muscle => [muscle, volumeLandmarks(signals.trainingGoal, muscle).mrv]),
-    )
-    sized = expandToBudget(trimmed, fitMin, muscleVolume, mrvByMuscle)
-  }
+  const mrvByMuscle = new Map<string, number>(
+    [...new Set(timedExercises.flatMap(e => (e.muscleGroups ?? []).map(m => m.muscle)))]
+      .map(muscle => [muscle, volumeLandmarks(signals.trainingGoal, muscle).mrv]),
+  )
+  const allocated = allocateToBudget(plausible, fitMin, {
+    protectedIds: earnedSetIds,
+    frozenIds: new Set(fullShapeById?.keys() ?? []),
+    muscleVolume,
+    mrvByMuscle,
+    phase,
+  })
+  const sized = allocated.exercises
+  const droppedIds = new Set(allocated.droppedIds)
 
   const fittedSets = new Map(sized.map(f => [f.sessionExerciseId, f.sets]))
   // A DROPPED exercise is absent from `sized`, so falling back to the model's count would hand

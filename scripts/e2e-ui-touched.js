@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint @typescript-eslint/no-require-imports: "off" */
 'use strict';
 //
 // Does a changed-file list touch anything a browser reaches? (LB-108)
@@ -110,7 +111,7 @@ function clientReachable() {
       const spec = m[1];
       const base = spec.startsWith('@/lib/')
         ? `lib/${spec.slice('@/lib/'.length)}`
-        : path.normalize(path.join(path.dirname(file), spec));
+        : path.normalize(path.join(path.dirname(file), spec)).split(path.sep).join('/');
       if (!base.startsWith('lib/')) continue;
       for (const ext of ['.ts', '.tsx', '/index.ts', '/index.tsx', '']) {
         const cand = base + ext;

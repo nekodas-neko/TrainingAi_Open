@@ -9,6 +9,8 @@ import type { EnergyBalanceResponse } from '@/app/api/nutrition/energy-balance/r
 
 export interface EnergyDaySummary {
   intakeKcal: number
+  /** #2072. The part of `intakeKcal` assumed for unlogged planned meals; 0 on an ordinary day. */
+  estimatedKcal: number
   expenditureKcal: number
   netKcal: number
   /** "Surplus" or "Deficit" — the sign is spelled out rather than left to colour alone. */
@@ -27,6 +29,7 @@ export function energyDaySummary(energy: EnergyBalanceResponse | null): EnergyDa
   const netKcal = Math.round(balance.netKcal)
   return {
     intakeKcal: Math.round(balance.intakeKcal),
+    estimatedKcal: Math.round(balance.estimatedKcal ?? 0),
     expenditureKcal: Math.round(balance.expenditureKcal),
     netKcal,
     netLabel: netKcal > 0 ? 'Surplus' : 'Deficit',

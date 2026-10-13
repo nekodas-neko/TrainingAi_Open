@@ -178,7 +178,7 @@ describe('it is fitted to today\'s budget like any other plan', () => {
  */
 describe('the catch branch uses it, and does not persist what it returns', () => {
   const src = readFileSync(
-    join(process.cwd(), 'packages/shared/src/ai-periodization/generate-prescription.ts'), 'utf8')
+    join(process.cwd(), 'packages/shared/src/ai-periodization/generate-prescription.ts'), 'utf8').replace(/\r\n/g, '\n')
   const catchBranch = (() => {
     const i = src.indexOf("console.error('Gemini prescription generation failed:'")
     expect(i, 'the model-failure catch not found').toBeGreaterThan(-1)

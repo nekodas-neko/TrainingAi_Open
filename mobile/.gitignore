@@ -1,0 +1,17 @@
+node_modules/
+.eas-vendor/
+.expo/
+dist/
+web-build/
+ios/
+android/
+.env*
+!.env.example
+*.tsbuildinfo
+*.p8
+*.p12
+*.mobileprovision
+
+credentials.json
+*.keystore
+*.jks

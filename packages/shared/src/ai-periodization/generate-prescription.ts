@@ -683,6 +683,7 @@ async function runPrescriptionGeneration(
     // #2403: the same rows the prescription below records as `preDeload`, so the figures for the
     // session Full trains come out of the one stage that costs this one.
     new Map([...preDeloadById].filter(([id]) => deloadedIds.has(id))),
+    parsed.phase,
   )
   for (const ex of parsed.exercises) {
     ex.sets = budget.sets.get(ex.session_exercise_id) ?? ex.sets

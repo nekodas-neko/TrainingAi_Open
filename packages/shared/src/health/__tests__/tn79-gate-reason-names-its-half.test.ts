@@ -47,11 +47,12 @@ describe('the gate names which half failed (TN-79)', () => {
   })
 
   it('sparsity alone does not trip the MET floors — gaps are expected from this ring', () => {
-    // The radio sleeps when worn-idle, so the grid is ALWAYS gappy. 1073 of 1421 minutes is a
-    // normal day, not a degraded one, and the floors are written to tolerate exactly that.
+    // The radio sleeps when worn-idle, so the grid is ALWAYS gappy, and the floors are written to
+    // tolerate it. #2115 v4 adds a cap: at most 20% of the recency-weighted last 12 hours may be
+    // empty once every `MET/min` route has had its turn. One minute in six is under it.
     const samples: { tsMs: number; value: number }[] = []
     const t0 = Date.parse('2026-09-23T00:00:00Z')
-    for (let m = 0; m < 1421; m++) if (m % 4 !== 3) samples.push({ tsMs: t0 + m * 60_000, value: 1.2 })
+    for (let m = 0; m < 1421; m++) if (m % 6 !== 5) samples.push({ tsMs: t0 + m * 60_000, value: 1.2 })
     const { metsPerMinute, startTimestampMs } = metGridFromDaytimeSamples(samples)
     expect(metsPerMinute.length).toBeGreaterThanOrEqual(720)
     expect(metsPerMinute.filter(v => v != null && v >= 0.9).length).toBeGreaterThanOrEqual(360)
@@ -59,5 +60,17 @@ describe('the gate names which half failed (TN-79)', () => {
     // is that a normally-gappy day is not blamed on the MET stream, so the gate has to be asked.
     const r = computeTrainingStress({ ...base, startTimestampMs, metsPerMinute })
     if (r.status === 'gated') expect(r.reason).not.toBe('insufficient_met')
+  })
+
+  it('a day more than 20% empty after the cascade is insufficient_met, and says how empty (#2115 v4)', () => {
+    // One minute in four with nothing: past the owner's 20% cap, so the day is not scored rather
+    // than scored on a quarter of guesses. The reason is honest here, and it carries the share.
+    const metsPerMinute: (number | null)[] = Array.from({ length: 1421 }, (_, m) => (m % 4 === 3 ? null : 1.2))
+    const r = computeTrainingStress({ ...base, startTimestampMs: Date.parse('2026-09-23T00:00:00Z'), metsPerMinute })
+    expect(r.status).toBe('gated')
+    if (r.status === 'gated') {
+      expect(r.reason).toBe('insufficient_met')
+      expect(r.residualShare).toBeGreaterThan(0.2)
+    }
   })
 })

@@ -19,7 +19,10 @@ vi.mock('@/lib/data', () => ({
     getOuraDailySummary: async () => [],
     listBodyMetrics: async () => [],
     getUserById: async () => ({ dateOfBirth: '1990-01-01', sex: 'male' }),
-    getOuraDaytimeSignals: async () => ({ met: [], temp: [] }),
+    getOuraDaytimeSignals: async () => ({ met: [], temp: [], still: [], motion: [] }),
+    listSleepSessions: async () => [],
+    listActivityLogs: async () => [],
+    getHealthConnectIntervals: async () => [],
     upsertOuraDailyDerived: (...a: unknown[]) => upsertOuraDailyDerived(...a),
   }),
 }))

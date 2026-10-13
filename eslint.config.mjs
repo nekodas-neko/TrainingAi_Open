@@ -25,6 +25,7 @@ const eslintConfig = [
       // above (that pattern only matches at the repo root) — without this, a session that
       // runs a native Android build starts linting compiled Capacitor bridge JS as source.
       "android/**",
+      "mobile/**",
       "next-env.d.ts",
       ".agents/**",
       // Build/tooling scripts, not shipped product code — the timezone no-restricted-syntax
