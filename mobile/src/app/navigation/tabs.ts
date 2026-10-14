@@ -23,4 +23,4 @@ export type DetailScreen =
   | 'activity-recording'
   | 'profile-details'
   | 'profile-goals';
-export type MoreDetail = 'more-data' | 'more-about' | 'year-review';
+export type MoreDetail = 'more-data' | 'more-about' | 'more-devices' | 'year-review';
