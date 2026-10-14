@@ -110,6 +110,6 @@ test('the counter says how many days the calibration has, and how many it still 
   } else {
     // "N of 10 days marked" — the number the button moves, which is the whole reason it ships here.
     await expect(page.getByText(new RegExp(`${m.daysLogged} of \\d+`))).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByText(/more to calibrate/i)).toBeVisible()
+    await expect(page.getByText(/more days? to calibrate/i)).toBeVisible()
   }
 })

@@ -9,6 +9,7 @@ import { invalidateNutritionWrite } from '@/lib/cache-groups'
 import { TTL_SHORT } from '@trainingai/shared/cache-ttl'
 import { formatTimeOfDay } from '@trainingai/shared/date-utils'
 import type { DayCheckin } from '@trainingai/shared/types/day-checkin'
+import { calibrationProgress } from '@trainingai/shared/nutrition/calibration-progress'
 
 interface Props {
   date: string
@@ -74,7 +75,7 @@ export function FoodLoggingComplete({ date, isToday, daysLogged, minDays, calibr
     } finally { setBusy(false) }
   }, [date])
 
-  const remaining = daysLogged == null ? null : Math.max(0, minDays - daysLogged)
+  const progress = calibrationProgress(daysLogged, calibrated, minDays)
 
   return (
     <div className="rounded-2xl border border-border bg-muted/60 p-4">
@@ -119,11 +120,9 @@ export function FoodLoggingComplete({ date, isToday, daysLogged, minDays, calibr
 
       {/* The counter. Absent only when the profile cannot produce an estimate at all, in which case
           a "0 of 10" would be a target the user cannot move by logging. */}
-      {remaining != null && (
+      {progress && (
         <p className="mt-3 border-t border-border/60 pt-2.5 text-[11px] tabular-nums text-muted-foreground">
-          {calibrated
-            ? <><span className="font-semibold text-foreground">{daysLogged}</span> days marked · your maintenance is calibrated from them</>
-            : <><span className="font-semibold text-foreground">{daysLogged} of {minDays}</span> days marked · {remaining} more to calibrate your maintenance</>}
+          <span className="font-semibold text-foreground">{progress.count}</span> {progress.detail}
         </p>
       )}
     </div>

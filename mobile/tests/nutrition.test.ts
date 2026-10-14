@@ -19,6 +19,7 @@ import {
 } from '../src/features/nutrition/data/recipes.ts';
 import { mealLabelArtwork } from '../src/features/nutrition/data/meal-label.ts';
 import { decodeMealLabelScan } from '@trainingai/shared/nutrition/label-payload';
+import { calibrationProgress } from '@trainingai/shared/nutrition/calibration-progress';
 import {
   confirmedCreate,
   UnconfirmedCreate,
@@ -61,6 +62,8 @@ function fixture() {
     { date: string; mealTypeId: string; skipped: boolean; decisionId: string }
   >();
   const mealTypes = [mealType];
+  const supplements: ReturnType<typeof supplementSchema.parse>[] = [];
+  const completions = new Map<string, string>();
   const applied = new Set<string>();
   const sent: { id: string; domain: string; date: string; payload: Record<string, unknown> }[] =
     [];
@@ -92,6 +95,12 @@ function fixture() {
             ? logs.slice()
             : path.endsWith('targets')
               ? {}
+              : path.endsWith('day-checkin')
+                ? completions.has(query?.date ?? date)
+                  ? { foodLoggingCompletedAt: completions.get(query?.date ?? date) }
+                  : null
+              : path.endsWith('/api/supplements')
+                ? supplements.slice()
               : path.endsWith('plan-meal-answers')
                 ? { answers: [] }
                 : path.endsWith('meal-statuses')
@@ -117,10 +126,32 @@ function fixture() {
         mealChoices.set(`${choice.date}:${choice.mealTypeId}`, choice);
         return { success: true };
       }
+      if (_path.endsWith('food-logging-complete')) {
+        const mark = body as { date: string; complete: boolean };
+        if (mark.complete) {
+          completions.set(mark.date, '2026-10-11T09:30:00.000Z');
+        } else {
+          completions.delete(mark.date);
+        }
+        return { date: mark.date, complete: mark.complete };
+      }
       const op = (body as { mutations: typeof sent }).mutations[0];
       sent.push(op);
       if (!applied.has(op.id)) {
         applied.add(op.id);
+        if (op.domain === 'supplement_logs') {
+          const row = supplements.find((x) => x.id === op.payload.supplementId);
+          if (row) {
+            row.loggedToday = !op.payload.deleted;
+            row.loggedDose = op.payload.deleted
+              ? null
+              : {
+                  amount: op.payload.amount as number,
+                  unit: op.payload.unit as string,
+                  doseText: (op.payload.doseText as string | null) ?? null,
+                };
+          }
+        }
         if (op.domain === 'food_items') {
           foods.push(foodSchema.parse(op.payload));
         }
@@ -160,6 +191,8 @@ function fixture() {
     connection,
     foods,
     mealTypes,
+    supplements,
+    completions,
     logs,
     sent,
     make,
@@ -731,4 +764,77 @@ test('a failed restoring write keeps the deletion durable and retry uses the sam
   await reopened.initialize();
   assert.equal(reopened.view(date).logs[0].id, id(600));
   reopened.cancel();
+});
+
+test('marking a day finished shows at once, survives reopening offline and syncs its readback', async () => {
+  const f = fixture();
+  const store = await ready(f);
+  await store.refresh('checkin', date);
+  assert.equal(store.view(date).checkin, null);
+  f.online(false);
+  await store.queueHttp('complete', date, { date, complete: true });
+  const pending = store.view(date).checkin as { foodLoggingCompletedAt?: unknown };
+  assert.equal(pending.foodLoggingCompletedAt, 'pending');
+  store.cancel();
+  const reopened = f.make();
+  await reopened.initialize();
+  const restored = reopened.view(date).checkin as { foodLoggingCompletedAt?: unknown };
+  assert.equal(restored.foodLoggingCompletedAt, 'pending');
+  f.online(true);
+  await reopened.sync();
+  assert.equal(reopened.getSnapshot().http.length, 0, reopened.getSnapshot().error ?? '');
+  assert.equal(f.completions.has(date), true);
+  const synced = reopened.view(date).checkin as { foodLoggingCompletedAt?: unknown };
+  assert.equal(synced.foodLoggingCompletedAt, '2026-10-11T09:30:00.000Z');
+  await reopened.queueHttp('complete', date, { date, complete: false });
+  assert.equal(
+    (reopened.view(date).checkin as { foodLoggingCompletedAt?: unknown }).foodLoggingCompletedAt,
+    null,
+  );
+  await reopened.sync();
+  assert.equal(f.completions.has(date), false);
+});
+test('one tap ticks a supplement offline, keeps it on reopening and syncs it', async () => {
+  const f = fixture();
+  f.supplements.push(
+    supplementSchema.parse({
+      id: id(130),
+      name: 'Creatine',
+      dose: null,
+      defaultAmount: 5,
+      unit: 'g',
+      active: true,
+      sortOrder: 0,
+      reminderEnabled: false,
+      reminderTime: null,
+      loggedToday: false,
+    }),
+  );
+  const store = await ready(f);
+  await store.refresh('supplements', date);
+  const [creatine] = store.view(date).supplements;
+  assert.equal(creatine.loggedToday, false);
+  f.online(false);
+  await store.logSupplement(creatine, date);
+  assert.equal(store.view(date).supplements[0].loggedToday, true);
+  store.cancel();
+  const reopened = f.make();
+  await reopened.initialize();
+  assert.equal(reopened.view(date).supplements[0].loggedToday, true);
+  f.online(true);
+  await reopened.sync();
+  assert.equal(reopened.getSnapshot().operations.length, 0, reopened.getSnapshot().error ?? '');
+  assert.equal(f.supplements[0].loggedToday, true);
+  assert.equal(reopened.view(date).supplements[0].loggedToday, true);
+  const sentLog = f.sent.find((x) => x.domain === 'supplement_logs');
+  assert.equal(sentLog?.payload.amount, 5);
+});
+test('the calibration counter says "1 more day" and stops at zero', () => {
+  assert.equal(
+    calibrationProgress(9, false, 10)?.detail,
+    'days marked · 1 more day to calibrate your maintenance',
+  );
+  assert.equal(calibrationProgress(3, false, 10)?.count, '3 of 10');
+  assert.equal(calibrationProgress(12, false, 10)?.remaining, 0);
+  assert.equal(calibrationProgress(null, false), null);
 });
