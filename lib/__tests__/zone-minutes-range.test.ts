@@ -2,7 +2,7 @@
 // zone-cache correctness cluster (J-1/J-2/C-5/H-4): a rewritten HR day must invalidate its cache,
 // and a profile drift must recompute rather than serve stale zone bands. DB-backed — runs in CI
 // (DATABASE_URL provisioned) and in the local sandbox; skipped otherwise.
-import { describe, it, expect, beforeAll } from 'vitest'
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest'
 import { fromZonedTime } from 'date-fns-tz'
 
 const canRun = !!process.env.DATABASE_URL
@@ -79,8 +79,54 @@ describe.skipIf(!canRun)('getZoneMinutesRange — dash-form iteration + cache co
     const { getDb } = await import('@/lib/data/postgres/client')
     const before = await pool.query(`SELECT count(*)::int n FROM daily_zone_minutes WHERE user_id = $1`, [TEST_USER_ID])
     expect(before.rows[0].n).toBeGreaterThan(0)
-    await deleteZoneMinutesFrom(getDb(), TEST_USER_ID, from)
+    await deleteZoneMinutesFrom(getDb(), TEST_USER_ID, from, TZ)
     const after = await pool.query(`SELECT count(*)::int n FROM daily_zone_minutes WHERE user_id = $1`, [TEST_USER_ID])
     expect(after.rows[0].n).toBe(0)
+  })
+
+  // #2828 N1. A cached day past HR retention is the permanent record (its raw HR is pruned, so it
+  // can't be recomputed), and a history import can ask to drop the cache from 3,650 days back.
+  // Every day below is derived from the retention constant and the user's local today.
+  describe('retention guard (#2828 N1)', () => {
+    let cutoff: string, frozen: string[], live: string[]
+    const cachedDays = async () => (await pool.query(
+      `SELECT day::text AS day FROM daily_zone_minutes WHERE user_id = $1 ORDER BY day`, [TEST_USER_ID],
+    )).rows.map((r: { day: string }) => r.day)
+
+    beforeEach(async () => {
+      const { zoneRetentionCutoff } = await import('@/lib/data/postgres/slices/oura')
+      const { todayInTz, shiftDateStr } = await import('@trainingai/shared/date-utils')
+      cutoff = zoneRetentionCutoff(todayInTz(TZ))
+      frozen = [shiftDateStr(cutoff, -30), shiftDateStr(cutoff, -1)]
+      live = [cutoff, shiftDateStr(cutoff, 10), shiftDateStr(todayInTz(TZ), -2)]
+      await pool.query(`DELETE FROM daily_zone_minutes WHERE user_id = $1`, [TEST_USER_ID])
+      for (const d of [...frozen, ...live]) {
+        await pool.query(
+          `INSERT INTO daily_zone_minutes (user_id, day, zone2_sec, max_hr, resting_hr) VALUES ($1, $2, 600, 190, 60)`,
+          [TEST_USER_ID, d],
+        )
+      }
+    })
+
+    it('a delete from inside the window still deletes from that day on', async () => {
+      const { deleteZoneMinutesFrom } = await import('@/lib/data/postgres/slices/oura')
+      const { getDb } = await import('@/lib/data/postgres/client')
+      await deleteZoneMinutesFrom(getDb(), TEST_USER_ID, live[1], TZ)
+      expect(await cachedDays()).toEqual([...frozen, live[0]])
+    })
+
+    it('a delete from before the window keeps the frozen days and deletes only inside it', async () => {
+      const { deleteZoneMinutesFrom } = await import('@/lib/data/postgres/slices/oura')
+      const { getDb } = await import('@/lib/data/postgres/client')
+      const { shiftDateStr } = await import('@trainingai/shared/date-utils')
+      await deleteZoneMinutesFrom(getDb(), TEST_USER_ID, shiftDateStr(cutoff, -3650), TZ)
+      expect(await cachedDays()).toEqual(frozen)
+    })
+
+    it('the repository method used by the strap route has the same guard', async () => {
+      const { shiftDateStr } = await import('@trainingai/shared/date-utils')
+      await repo.dropZoneMinutesFrom(TEST_USER_ID, shiftDateStr(cutoff, -60), TZ)
+      expect(await cachedDays()).toEqual(frozen)
+    })
   })
 })

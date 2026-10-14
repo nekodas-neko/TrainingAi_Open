@@ -11,7 +11,7 @@ vi.mock('@/auth', () => ({ auth: vi.fn(async () => session) }))
 const calls: string[] = []
 const upsertOuraHeartrate = vi.fn(async () => { calls.push('upsert') })
 const insertRrIntervals = vi.fn(async () => {})
-const dropZoneMinutesFrom = vi.fn<(userId: string, fromDay: string) => Promise<void>>(async () => { calls.push('drop') })
+const dropZoneMinutesFrom = vi.fn<(userId: string, fromDay: string, tz: string) => Promise<void>>(async () => { calls.push('drop') })
 vi.mock('@/lib/data', () => ({
   getRepositoryAsync: vi.fn(async () => ({ upsertOuraHeartrate, insertRrIntervals, dropZoneMinutesFrom })),
 }))
@@ -41,7 +41,7 @@ describe('POST /api/hr-ingest drops the cached zone minutes its samples touch (#
     session.user.timezone = BRISBANE
     await post({ samples: [{ at: Date.now() - 60_000, bpm: 130 }, { at: earliest, bpm: 128 }, { at: earliest + 5_000, bpm: 129 }] })
     expect(dropZoneMinutesFrom).toHaveBeenCalledTimes(1)
-    expect(dropZoneMinutesFrom).toHaveBeenCalledWith('u1', dayIn(earliest, BRISBANE))
+    expect(dropZoneMinutesFrom).toHaveBeenCalledWith('u1', dayIn(earliest, BRISBANE), BRISBANE)
     // The cache is dropped AFTER the rows land: dropping first would let a read in between
     // recompute the day from the data that is about to be replaced.
     expect(calls).toEqual(['upsert', 'drop'])
@@ -55,7 +55,7 @@ describe('POST /api/hr-ingest drops the cached zone minutes its samples touch (#
     for (const tz of [BRISBANE, NEW_YORK]) {
       dropZoneMinutesFrom.mockClear(); session.user.timezone = tz
       await post({ samples: [{ at, bpm: 125 }] })
-      expect(dropZoneMinutesFrom).toHaveBeenCalledWith('u1', dayIn(at, tz))
+      expect(dropZoneMinutesFrom).toHaveBeenCalledWith('u1', dayIn(at, tz), tz)
     }
   })
 
@@ -66,7 +66,7 @@ describe('POST /api/hr-ingest drops the cached zone minutes its samples touch (#
       { at: Date.now() - 4 * 86_400_000, bpm: 0 },      // bpm out of band, dropped
       { at: stored, bpm: 126 },
     ] })
-    expect(dropZoneMinutesFrom).toHaveBeenCalledWith('u1', dayIn(stored, 'Australia/Brisbane'))
+    expect(dropZoneMinutesFrom).toHaveBeenCalledWith('u1', dayIn(stored, 'Australia/Brisbane'), 'Australia/Brisbane')
   })
 
   it('does nothing when nothing was stored', async () => {
@@ -79,6 +79,6 @@ describe('POST /api/hr-ingest drops the cached zone minutes its samples touch (#
     delete session.user.timezone
     const at = Date.now() - 2 * 86_400_000
     await post({ samples: [{ at, bpm: 126 }] })
-    expect(dropZoneMinutesFrom).toHaveBeenCalledWith('u1', dayIn(at, 'Australia/Brisbane'))
+    expect(dropZoneMinutesFrom).toHaveBeenCalledWith('u1', dayIn(at, 'Australia/Brisbane'), 'Australia/Brisbane')
   })
 })

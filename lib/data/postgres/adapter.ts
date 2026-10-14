@@ -8032,7 +8032,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getLatestOuraCloudHeartrateAt(userId: string, since: Date) { return oura.getLatestOuraCloudHeartrateAt(this.db, userId, since) }
   async upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]) { return oura.upsertOuraHeartrate(this.db, userId, rows) }
   async upsertAggregatorHeartrate(userId: string, rows: { timestamp: Date; bpm: number }[], source: HealthSource, tz: string) { return oura.upsertAggregatorHeartrate(this.db, userId, rows, source, tz) }
-  async dropZoneMinutesFrom(userId: string, fromDay: string) { return oura.deleteZoneMinutesFrom(this.db, userId, fromDay) }
+  async dropZoneMinutesFrom(userId: string, fromDay: string, tz: string) { return oura.deleteZoneMinutesFrom(this.db, userId, fromDay, tz) }
   async upsertHealthConnectIntervals(userId: string, rows: readonly import('../repository').HealthConnectIntervalRow[]) { return hcIntervals.upsertHealthConnectIntervals(this.db, userId, rows) }
   async getHealthConnectHistoryOldest(userId: string) { return hcHistory.getHealthConnectHistoryOldest(this.db, userId) }
   async advanceHealthConnectHistoryOldest(userId: string, date: string) { return hcHistory.advanceHealthConnectHistoryOldest(this.db, userId, date) }

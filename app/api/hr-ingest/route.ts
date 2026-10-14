@@ -94,7 +94,8 @@ export async function POST(req: Request) {
     // before, so a read in between cannot recompute from rows about to change. The day is the
     // user's, because that is how the cache is keyed.
     const earliest = hrSamples.reduce((min, r) => Math.min(min, r.timestamp.getTime()), Infinity)
-    await repo.dropZoneMinutesFrom(userId, toAestDay(new Date(earliest), session.user.timezone ?? DEFAULT_TZ))
+    const tz = session.user.timezone ?? DEFAULT_TZ
+    await repo.dropZoneMinutesFrom(userId, toAestDay(new Date(earliest), tz), tz)
   }
 
   // Reconstruct per-beat wall-clock times by walking BACKWARDS from the packet

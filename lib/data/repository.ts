@@ -1516,8 +1516,9 @@ export interface WorkoutRepository {
   /** Drops the cached `daily_zone_minutes` rows on or after `fromDay` ('YYYY-MM-DD', the user's day),
    *  so they are recomputed on the next read. A heart-rate writer that rewrites or adds rows for a
    *  PAST day calls this, because a day cached before that data arrived keeps its old split for good
-   *  (#2439). The rollup and the aggregator upsert do it inline; the chest-strap route uses this. */
-  dropZoneMinutesFrom(userId: string, fromDay: string): Promise<void>
+   *  (#2439). The rollup and the aggregator upsert do it inline; the chest-strap route uses this.
+   *  Never drops a day past HR retention in `tz`: it can't be recomputed (#2828 N1). */
+  dropZoneMinutesFrom(userId: string, fromDay: string, tz: string): Promise<void>
   /** #2462. Health Connect steps / active kcal per record and cadence per sample, upserted by
    *  `(kind, recordId, startAt)` so a re-read window is idempotent. Returns rows written after the
    *  in-batch collapse. Overlap between apps is kept and resolved by the reader. */

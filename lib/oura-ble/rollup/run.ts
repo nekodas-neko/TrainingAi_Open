@@ -923,7 +923,7 @@ export async function runOuraRollup(
       await io.deleteBleHeartrateNotIn(toDate(hrSeriesCutoffDs), hrSeriesRows.map(r => r.timestamp))
       // The zone-minutes cache is derived from these HR rows; drop the cached days we just
       // rewrote so they recompute on the next read (J-1/C-5 — owns-its-rows invalidation).
-      await io.deleteZoneMinutesFrom(dayForDs(hrSeriesCutoffDs))
+      await io.deleteZoneMinutesFrom(dayForDs(hrSeriesCutoffDs), timezone)
     })
   }
 
