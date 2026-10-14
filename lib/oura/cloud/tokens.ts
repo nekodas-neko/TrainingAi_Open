@@ -13,6 +13,7 @@ import type { OuraCloudTokenRow, SaveOuraCloudTokensInput } from '@/lib/data/pos
 import { exchangeAuthorizationCode, fetchOuraUserId, OuraGrantRejectedError, refreshAccessToken, revokeAccessToken } from './client'
 import type { OuraOAuthConfig } from './config'
 import { decryptOuraToken, encryptOuraToken, OuraTokenKeyMissingError } from './token-cipher'
+import { startOuraConnectBackfill } from './backfill'
 
 /** Refresh when less than this is left. Oura's access tokens last about a day. */
 export const REFRESH_MARGIN_MS = 10 * 60 * 1000
@@ -73,8 +74,15 @@ export async function exchangeOuraCode(config: OuraOAuthConfig, code: string): P
 /**
  * Stores a grant for `userId`. The caller must already have proved that the request committing it
  * is authenticated as `userId` (see the callback and `/api/oura/connect/complete`).
+ *
+ * Once stored, the history read starts in the background (#2859, `backfill.ts`): both connect legs,
+ * web and native, finish here, so this is the one place it hooks in. `afterConnect` is replaceable
+ * for tests.
  */
-export async function storeOuraGrant(store: OuraTokenStore, userId: string, grant: OuraGrant): Promise<void> {
+export async function storeOuraGrant(
+  store: OuraTokenStore, userId: string, grant: OuraGrant,
+  afterConnect: (userId: string) => void = startOuraConnectBackfill,
+): Promise<void> {
   try {
     await store.saveOuraCloudTokens(userId, {
       ...encrypted(userId, grant),
@@ -90,6 +98,7 @@ export async function storeOuraGrant(store: OuraTokenStore, userId: string, gran
     }
     throw err
   }
+  afterConnect(userId)
 }
 
 /** Refuses a grant: revokes it at Oura (best effort) and stores nothing. */

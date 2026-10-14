@@ -810,6 +810,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getOuraCloudTokens(userId: string) { return ouraCloudTokens.getOuraCloudTokens(this.db, userId) }
   async saveOuraCloudTokens(userId: string, input: ouraCloudTokens.SaveOuraCloudTokensInput) { return ouraCloudTokens.saveOuraCloudTokens(this.db, userId, input) }
   async deleteOuraCloudTokens(userId: string) { return ouraCloudTokens.deleteOuraCloudTokens(this.db, userId) }
+  async getUserIdByOuraUserId(ouraUserId: string) { return ouraCloudTokens.getUserIdByOuraUserId(this.db, ouraUserId) }
 
   async getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null> {
     // lower(), not eq: it matches a row stored before LA-61's backfill (or one a collision kept it
@@ -8024,6 +8025,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async upsertBodyBatteryDaily(userId: string, row: import('../repository').BodyBatteryDailyRow) { return bodyBattery.upsertBodyBatteryDaily(this.db, userId, row) }
   async getBodyBatteryHistory(userId: string, startDate: string, endDate: string) { return bodyBattery.getBodyBatteryHistory(this.db, userId, startDate, endDate) }
   async upsertOuraSleep(userId: string, sessions: import('../repository').OuraSleepUpsertRow[], source: HealthSource) { return oura.upsertOuraSleep(this.db, userId, sessions, source) }
+  async upsertOuraCloudSleep(userId: string, sessions: import('../repository').OuraSleepUpsertRow[]) { return oura.upsertOuraCloudSleep(this.db, userId, sessions) }
+  async tombstoneOuraCloudSleep(userId: string, ouraIds: string[]) { return oura.tombstoneOuraCloudSleep(this.db, userId, ouraIds) }
+  async upsertOuraWorkouts(userId: string, rows: oura.OuraWorkoutUpsertRow[]) { return oura.upsertOuraWorkouts(this.db, userId, rows) }
+  async upsertOuraCloudHeartrate(userId: string, rows: { timestamp: Date; bpm: number }[], tz: string) { return oura.upsertOuraCloudHeartrate(this.db, userId, rows, tz) }
   async upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]) { return oura.upsertOuraHeartrate(this.db, userId, rows) }
   async upsertAggregatorHeartrate(userId: string, rows: { timestamp: Date; bpm: number }[], source: HealthSource, tz: string) { return oura.upsertAggregatorHeartrate(this.db, userId, rows, source, tz) }
   async dropZoneMinutesFrom(userId: string, fromDay: string) { return oura.deleteZoneMinutesFrom(this.db, userId, fromDay) }

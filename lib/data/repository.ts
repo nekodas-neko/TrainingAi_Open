@@ -680,6 +680,8 @@ export interface WorkoutRepository {
   saveOuraCloudTokens(userId: string, input: SaveOuraCloudTokensInput): Promise<void>
   /** True when the caller's row existed and is deleted now. */
   deleteOuraCloudTokens(userId: string): Promise<boolean>
+  /** #2859: the user an Oura account is connected to, for routing a webhook event. Null if none. */
+  getUserIdByOuraUserId(ouraUserId: string): Promise<string | null>
   getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null>
   updateUserProfile(userId: string, profile: Partial<Pick<User, 'displayName' | 'heightCm' | 'dateOfBirth' | 'weightGoalKg' | 'timezone' | 'sex' | 'activityLevel' | 'fitnessGoal'>>): Promise<User>
   touchLastGoalReviewAt(userId: string): Promise<void>
@@ -1495,6 +1497,15 @@ export interface WorkoutRepository {
   upsertBodyBatteryDaily(userId: string, row: BodyBatteryDailyRow): Promise<boolean>
   getBodyBatteryHistory(userId: string, startDate: string, endDate: string): Promise<BodyBatteryDailyRow[]>
   upsertOuraSleep(userId: string, sessions: OuraSleepUpsertRow[], source: HealthSource): Promise<void>
+  /** #2859: Oura Cloud sleep periods (`oura_cloud`), keyed by Oura's id; a period another row already
+   *  covers is skipped, never duplicated. */
+  upsertOuraCloudSleep(userId: string, sessions: OuraSleepUpsertRow[]): Promise<{ written: number; skippedOverlap: number }>
+  /** #2859: tombstones Cloud sleep periods Oura reports deleted. Never a manual or ring night. */
+  tombstoneOuraCloudSleep(userId: string, ouraIds: string[]): Promise<number>
+  /** #2859: Oura Cloud workouts, keyed by Oura's id; `reviewed` is kept. Returns rows written. */
+  upsertOuraWorkouts(userId: string, rows: import('./postgres/slices/oura').OuraWorkoutUpsertRow[]): Promise<number>
+  /** #2859: Oura Cloud's HR series (`oura_cloud`). Never displaces or duplicates a ring or strap row. */
+  upsertOuraCloudHeartrate(userId: string, rows: { timestamp: Date; bpm: number }[], tz: string): Promise<number>
   upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]): Promise<void>
   /** A platform aggregator's (Health Connect's) HR series into the shared HR table. Never displaces
    *  a device row at the same timestamp; device rows win at read time (#2168). `tz` dates the

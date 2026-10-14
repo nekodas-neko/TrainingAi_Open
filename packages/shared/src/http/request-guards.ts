@@ -6,6 +6,24 @@ export type LimitedJsonResult =
 // a hard byte cap so an oversized body is cancelled instead of buffered —
 // unlike req.json(), which buffers everything before any check can run.
 export async function readJsonLimited(req: Request, maxBytes: number): Promise<LimitedJsonResult> {
+  const read = await readTextLimited(req, maxBytes)
+  if (!read.ok) return read
+  try {
+    return { ok: true, body: JSON.parse(read.text) }
+  } catch {
+    return { ok: false, reason: 'invalid_json' }
+  }
+}
+
+export type LimitedTextResult =
+  | { ok: true; text: string }
+  | { ok: false; reason: 'too_large' | 'no_body' | 'empty' | 'aborted' }
+
+/**
+ * The same size-guarded read, returning the body's exact text. For a route that has to check a
+ * signature over the bytes as sent before it parses anything (#2859, the Oura webhook).
+ */
+export async function readTextLimited(req: Request, maxBytes: number): Promise<LimitedTextResult> {
   const contentLength = req.headers.get('content-length')
   if (contentLength && Number(contentLength) > maxBytes) return { ok: false, reason: 'too_large' }
 
@@ -55,11 +73,7 @@ export async function readJsonLimited(req: Request, maxBytes: number): Promise<L
   // Additive for every existing caller: they branch on `too_large` and treat everything else as a
   // 400, which is what an empty body already produced through `invalid_json`.
   if (total === 0) return { ok: false, reason: 'empty' }
-  try {
-    return { ok: true, body: JSON.parse(Buffer.concat(chunks).toString('utf8')) }
-  } catch {
-    return { ok: false, reason: 'invalid_json' }
-  }
+  return { ok: true, text: Buffer.concat(chunks).toString('utf8') }
 }
 
 export const ALLOWED_IMAGE_MIME = ['image/jpeg', 'image/png', 'image/webp'] as const

@@ -24,9 +24,14 @@ Required in Railway:
     and nothing is stored. **Changing it orphans every stored token** (they read as not connected,
     and the user connects again); it is not rotated in place.
   - `OURA_WEBHOOK_CALLBACK_URL` — `https://trainingai-production.up.railway.app/api/oura/webhook`.
-    Part 2 (#2859); nothing reads it yet.
-  - `OURA_WEBHOOK_VERIFICATION_TOKEN` — answers Oura's webhook verification challenge. Part 2
-    (#2859); nothing reads it yet.
+    Part 2 (#2859): the `callback_url` every webhook subscription is created with
+    (`lib/oura/cloud/subscriptions.ts`). Subscriptions at any other URL are left alone.
+  - `OURA_WEBHOOK_VERIFICATION_TOKEN` — part 2 (#2859): sent with each new subscription, and checked
+    on Oura's verification `GET /api/oura/webhook?verification_token=…&challenge=…`. Event `POST`s
+    are checked with `OURA_CLIENT_SECRET` (`x-oura-signature`), not with this token.
+  - Without both webhook settings (or without the OAuth three or `OURA_TOKEN_KEY`), `/api/oura/webhook`
+    answers 503 and the 12-hour subscription renewal does not start. The renewal runs only when
+    `NODE_ENV` is `production`, so a dev server never reaches Oura.
   - Without the first three, or without `OURA_TOKEN_KEY`, the connect routes answer 503 and the rest
     of the app is unaffected. Local development never uses production's values: tests mock Oura.
 - ~~`GEMINI_API_KEY`~~ — **no longer used by any code (Q-189, 2026-08-12).** Its only consumer was the text-to-speech route, which was deleted with the unreachable legacy chat surface. Safe to remove from Railway; the app never reads it. The `@google/genai` package stays — `lib/exercise-image-gen.ts` still uses it, but on `GOOGLE_GENERATIVE_AI_API_KEY`, so nothing reads `GEMINI_API_KEY` any more.

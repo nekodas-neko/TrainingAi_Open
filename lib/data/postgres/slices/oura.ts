@@ -634,6 +634,101 @@ export async function upsertOuraSleep(
 }
 
 /**
+ * Oura Cloud sleep periods into `sleep_sessions` (#2859), source `oura_cloud`, keyed by Oura's own id.
+ *
+ * Two things the plain upsert does not do:
+ *  - **Oura may move a period's start** when it re-analyses a night, keeping the id. The row holding
+ *    the id is moved to the new start first (when that start is free), so the id's row is updated in
+ *    place instead of the insert failing on `sleep_sessions_user_oura_id_key`.
+ *  - **A period another row already covers is not written.** The ring's BLE rollup, a manual night or
+ *    Health Connect may already hold that night at a slightly different start; a second row would be
+ *    read as a second fragment of the same night (`sleep-night.ts`). The ladder ranks those sources
+ *    at or above the Cloud feed, so the stored night stays. Choosing per field is #2860.
+ */
+export async function upsertOuraCloudSleep(
+  db: Db, userId: string, rows: OuraSleepUpsertRow[],
+): Promise<{ written: number; skippedOverlap: number }> {
+  const kept: OuraSleepUpsertRow[] = []
+  let skippedOverlap = 0
+  for (const r of rows) {
+    if (!r.ouraId) continue
+    const start = r.sleepStart.toISOString()
+    const end = r.sleepEnd.toISOString()
+    await db.execute(sql`
+      UPDATE sleep_sessions h
+         SET sleep_start = ${start}::timestamptz, updated_at = NOW()
+       WHERE h.user_id = ${userId} AND h.oura_id = ${r.ouraId} AND NOT h.manual_entry
+         AND h.sleep_start <> ${start}::timestamptz
+         AND NOT EXISTS (SELECT 1 FROM sleep_sessions t WHERE t.user_id = ${userId} AND t.sleep_start = ${start}::timestamptz)`)
+    const overlap = await db.execute(sql`
+      SELECT 1 FROM sleep_sessions o
+       WHERE o.user_id = ${userId} AND o.deleted_at IS NULL
+         AND o.oura_id IS DISTINCT FROM ${r.ouraId}
+         AND o.sleep_start < ${end}::timestamptz AND o.sleep_end > ${start}::timestamptz
+       LIMIT 1`)
+    if (overlap.rows.length > 0) { skippedOverlap++; continue }
+    kept.push(r)
+  }
+  await upsertOuraSleep(db, userId, kept, 'oura_cloud')
+  return { written: kept.length, skippedOverlap }
+}
+
+/**
+ * Tombstones the Cloud sleep periods Oura now reports as deleted (#2859). Only rows with that Oura id
+ * for this user: never a manual night or a ring (`ble:`) night. `deleted_at` rides the delta pull, so
+ * a phone that already holds the night learns it is gone.
+ */
+export async function tombstoneOuraCloudSleep(db: Db, userId: string, ouraIds: string[]): Promise<number> {
+  if (ouraIds.length === 0) return 0
+  const rows = await db.update(s.sleepSessions)
+    .set({ deletedAt: sql`NOW()`, updatedAt: sql`NOW()` })
+    .where(and(
+      eq(s.sleepSessions.userId, userId),
+      inArray(s.sleepSessions.ouraId, ouraIds),
+      sql`${s.sleepSessions.ouraId} NOT LIKE 'ble:%'`,
+      eq(s.sleepSessions.manualEntry, false),
+      isNull(s.sleepSessions.deletedAt),
+    ))
+    .returning({ id: s.sleepSessions.id })
+  return rows.length
+}
+
+/**
+ * Oura Cloud workouts (#2859), keyed by Oura's id. A re-sent workout updates its measured fields and
+ * keeps `reviewed`. An id held by another user is left alone: the conflict arm is scoped to the
+ * caller, so the row count says how many were the caller's.
+ */
+export interface OuraWorkoutUpsertRow {
+  id: string
+  day: string
+  activity: string
+  startDatetime: Date
+  endDatetime: Date
+  calories: number | null
+  distanceM: number | null
+  intensity: string
+  source: string
+}
+
+export async function upsertOuraWorkouts(db: Db, userId: string, rows: OuraWorkoutUpsertRow[]): Promise<number> {
+  if (rows.length === 0) return 0
+  const values = collapseOnConflict(rows.map(r => ({ ...r, userId })), r => r.id)
+  const written = await db.insert(s.ouraWorkouts).values(values)
+    .onConflictDoUpdate({
+      target: s.ouraWorkouts.id,
+      set: {
+        day: sql`excluded.day`, activity: sql`excluded.activity`,
+        startDatetime: sql`excluded.start_datetime`, endDatetime: sql`excluded.end_datetime`,
+        calories: sql`excluded.calories`, distanceM: sql`excluded.distance_m`,
+        intensity: sql`excluded.intensity`, source: sql`excluded.source`,
+      },
+      setWhere: sql`${s.ouraWorkouts.userId} = excluded.user_id`,
+    })
+    .returning({ id: s.ouraWorkouts.id })
+  return written.length
+}
+
+/**
  * Issue 2546. Before the rollup upserts its nights, move each `ble:` id to the start it now has.
  *
  * `oura_id` is unique per user and the rollup derives it from the ring's counter (`ble:<startDs>`),
@@ -743,6 +838,53 @@ export async function upsertAggregatorHeartrate(
   )
   const earliest = rows.reduce((min, r) => Math.min(min, r.timestamp.getTime()), Infinity)
   await deleteZoneMinutesFrom(db, userId, formatInTimeZone(new Date(earliest), tz, 'yyyy-MM-dd'))
+}
+
+/**
+ * Oura Cloud's heart-rate series into the shared HR table (#2859), source `oura_cloud`.
+ *
+ * The ladder already ranks the ring's own BLE rows above the Cloud feed (`source-rank.ts`), and this
+ * write keeps to it rather than leaving the choice to read time: a Cloud point within
+ * `AGGREGATOR_COVER_MS` of a ring or strap row is not written, because both would be read as device
+ * rows and the same minutes would count twice. Choosing between the two per field is #2860.
+ * At an exact timestamp collision only a Cloud or aggregator row is replaced, never a device one.
+ * Returns how many points were offered to the insert (after the cover filter).
+ */
+export async function upsertOuraCloudHeartrate(
+  db: Db, userId: string, rows: { timestamp: Date; bpm: number }[], tz: string,
+): Promise<number> {
+  if (rows.length === 0) return 0
+  const times = rows.map(r => r.timestamp.getTime())
+  const from = new Date(Math.min(...times) - AGGREGATOR_COVER_MS)
+  const to = new Date(Math.max(...times) + AGGREGATOR_COVER_MS)
+  const notDevice = sql.join([...AGGREGATOR_HR_SOURCES, 'oura_cloud'].map(a => sql`${a}`), sql`, `)
+  const device = await db.select({ timestamp: s.ouraHeartrate.timestamp }).from(s.ouraHeartrate)
+    .where(and(
+      eq(s.ouraHeartrate.userId, userId),
+      gte(s.ouraHeartrate.timestamp, from),
+      lte(s.ouraHeartrate.timestamp, to),
+      sql`(${s.ouraHeartrate.source} IS NULL OR ${s.ouraHeartrate.source} NOT IN (${notDevice}))`,
+    ))
+  const deviceTimes = device.map(d => d.timestamp.getTime()).sort((a, b) => a - b)
+  const covered = (t: number) => {
+    let lo = 0
+    let hi = deviceTimes.length
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1
+      if (deviceTimes[mid] < t - AGGREGATOR_COVER_MS) lo = mid + 1
+      else hi = mid
+    }
+    return lo < deviceTimes.length && deviceTimes[lo] <= t + AGGREGATOR_COVER_MS
+  }
+  const kept = rows.filter(r => !covered(r.timestamp.getTime()))
+  if (kept.length === 0) return 0
+  await writeHeartrateRows(
+    db, userId, kept.map(r => ({ ...r, source: 'oura_cloud' })),
+    sql`${s.ouraHeartrate.source} IN (${notDevice}) AND (${s.ouraHeartrate.bpm} IS DISTINCT FROM excluded.bpm OR ${s.ouraHeartrate.source} IS DISTINCT FROM excluded.source)`,
+  )
+  const earliest = kept.reduce((min, r) => Math.min(min, r.timestamp.getTime()), Infinity)
+  await deleteZoneMinutesFrom(db, userId, formatInTimeZone(new Date(earliest), tz, 'yyyy-MM-dd'))
+  return kept.length
 }
 
 async function writeHeartrateRows(

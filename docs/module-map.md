@@ -323,7 +323,7 @@ Injuries, Supplements, AI Periodization, Oura Ring, Body Battery.
 | Reading a request body | Always `readJsonLimited`, **never bare `req.json()`**. A Zod schema after the read bounds what is *stored*, not what is transferred and parsed — measured 2026-08-18, a 20 MB body to `auth/register` was read, buffered and fully parsed before being answered 400. `scripts/check-bounded-request-body.js` ratchets the conversion, shrink-only per file, with the three session-less routes (`auth/register`, `auth/exchange-mobile-token`, `health-connect/ingest`) already at zero (Q-322 / Q-498) |
 | Fetching a user-supplied URL | `lib/net/safe-fetch.ts` → `fetchPublicUrl(url, opts)`, `isPublicAddress(addr)`. **The only sanctioned way to fetch a URL a user typed.** https-only, port 443, no embedded credentials, every resolved address checked against the private/loopback/link-local/CGNAT blocks, each redirect hop re-validated, response bounded by bytes/timeout/content-type. Failures return a `reason` code — the caller maps it to a message and never echoes it. Residual risk stated in the file: DNS rebinding is not closed out |
 | PKCE (OAuth) | `lib/auth/mobile/pkce.ts` → `computePkceChallenge`, `verifyPkce` |
-| Oura OAuth state | `lib/oura/cloud/connect-ticket.ts` (#2858); see §8. ~~Oura webhook signature~~ was deleted 2026-08-13 (Q-224) and returns with part 2 (#2859); the fail-closed-verification and enumeration-oracle rules it demonstrated still bind it. |
+| Oura OAuth state | `lib/oura/cloud/connect-ticket.ts` (#2858); see §8. The Oura webhook signature is `lib/oura/cloud/webhook.ts` → `verifyOuraSignature` (#2859): HMAC-SHA256 of `x-oura-timestamp` + body with the client secret, constant-time, stale timestamps refused, fail closed. |
 | Server error reporting | `lib/observability.ts` → `reportServerError(err, context)` → `POST /api/client-error` |
 | Client error boundary | `components/error-reporter.tsx`, `app/error.tsx` |
 | Structured logging | `packages/shared/src/logger.ts` → `errorLog`, `infoLog` |
@@ -535,7 +535,7 @@ Oura section in `CLAUDE.md`.
 **The Oura Cloud API is back as the ring's source (owner, 2026-10-11, #2808).** It was removed on
 2026-08-13 (Q-224), when the ring was on our own BLE key. Part 1 (#2858) is the connector in
 `lib/oura/cloud/`: the only module that may call Oura Cloud, held by
-`lib/oura/__tests__/cloud-calls-only-from-connector.test.ts`. Webhooks and backfill are part 2.
+`lib/oura/__tests__/cloud-calls-only-from-connector.test.ts`. Part 2 (#2859) adds webhooks and the history backfill (rows below).
 
 | Concern | Where |
 |---|---|
@@ -546,8 +546,14 @@ Oura section in `CLAUDE.md`.
 | Oura token encryption at rest | `lib/oura/cloud/token-cipher.ts` → `encryptOuraToken` / `decryptOuraToken` (AES-256-GCM, key = HKDF-SHA256 of `OURA_TOKEN_KEY`, AAD = user + column; a value that does not open reads as `null`; missing key throws `OuraTokenKeyMissingError`) |
 | Oura HTTP calls | `lib/oura/cloud/client.ts` → `exchangeAuthorizationCode`, `refreshAccessToken`, `revokeAccessToken`, `fetchOuraUserId`. Imported only inside `lib/oura/cloud/` |
 | An Oura access token for a user (refreshes first) | `lib/oura/cloud/tokens.ts` → `getOuraAccessToken(store, config, userId)`, refreshing inside `REFRESH_MARGIN_MS`, single-flight per user (Oura rotates refresh tokens); `connectOuraAccount`, `getOuraConnection`, `disconnectOuraAccount`. Storage: `lib/data/postgres/slices/oura-cloud-tokens.ts` (ciphertext only). Routes: `/api/oura/connect`, `/api/oura/callback`, `/api/oura/connect/complete`, `/api/oura/connection`. `exchangeOuraCode` / `storeOuraGrant` / `discardOuraGrant` are the steps the callback and complete route compose |
-| ~~Webhook signature / HR-sync / sync throttle~~ | **Deleted 2026-08-13.** Webhooks return in part 2 (#2859) |
-| Types | `lib/oura/types.ts` — `OuraWorkout` only; `oura_workouts` is read-only history (nothing writes it since the re-key) |
+| Oura Cloud documents → our rows (#2859) | `lib/oura/cloud/documents.ts` → one Zod schema per spec model (`OURA_DOCUMENT_TYPES`, keyed by the webhook's `data_type`; `vo2_max` reads `vO2_max`), `mapOuraDocuments` (one `oura_daily` + one `body_metrics` row per day, sleep periods, workouts, deleted-period ids), `mapHeartRateRows` |
+| Reading a user's Oura data | `lib/oura/cloud/data.ts` → `fetchOuraDocument` (one by id), `fetchOuraDocuments` (a date range, following `next_token`), `fetchOuraHeartRate` |
+| Writing Oura Cloud data | `lib/oura/cloud/ingest.ts` → `writeOuraCloudData`, all as `oura_cloud`. Per-field merge for `oura_daily` / `body_metrics` (BLE and manual outrank it); `upsertOuraCloudSleep` skips a period another row covers and follows a moved start; `upsertOuraCloudHeartrate` skips points within 5 min of a ring/strap row; `upsertOuraWorkouts` keeps `reviewed`; `tombstoneOuraCloudSleep`. Slice: `lib/data/postgres/slices/oura.ts`. Never touches `oura_raw_samples` / `oura_raw_packed` |
+| Oura webhook | `app/api/oura/webhook/route.ts` (verification `GET`, signed event `POST`; never 410, which would cancel the subscription) → `lib/oura/cloud/webhook.ts` → `handleOuraWebhookEvent` (routes by `oura_tokens.oura_user_id`, `getUserIdByOuraUserId`) |
+| Webhook subscriptions | `lib/oura/cloud/subscriptions.ts` → `ensureOuraWebhookSubscriptions` (client credentials; renews inside 7 days, creates missing); `lib/oura/cloud/renewal.ts` → `startOuraWebhookRenewal` (production, 5 min after boot then every 12 h, advisory-locked), agent job `oura-webhook-subscriptions` |
+| History backfill | `lib/oura/cloud/backfill.ts` → `backfillOuraCloud` (date range, dry run, idempotent), `startOuraConnectBackfill` (90 days, started by `storeOuraGrant` after every connect), agent job `oura-cloud-backfill` |
+| ~~HR-sync / sync throttle~~ | **Deleted 2026-08-13.** The Cloud feed is webhooks plus the backfill above |
+| Types | `lib/oura/types.ts` — `OuraWorkout` only; `oura_workouts` is written again by the Cloud ingest (#2859) |
 | Contributors mapping | `lib/oura/contributors.ts` |
 | BLE freshness | `lib/oura/ble-freshness.ts` → `isBleDataFresh(...)` |
 | Cloud re-key freshness | `lib/oura/cloud-freshness.ts` → `OURA_CLOUD_REKEY_DATE` (the single 2026-07-07 constant) + `isPreRekey(day)` (fail-closed). Gate for every "is this frozen Cloud data?" check — readiness route day-summary/bedtime gating, display honesty markers. One Formula, One Place. |

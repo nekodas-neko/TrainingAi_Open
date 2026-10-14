@@ -45,12 +45,16 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 const fetchMock = vi.fn<typeof fetch>()
+// The connect hook starts the history read (#2859); here it only has to be called, never run.
+const startBackfill = vi.hoisted(() => vi.fn())
+vi.mock('../backfill', () => ({ startOuraConnectBackfill: startBackfill }))
 
 describe('Oura tokens: connect, refresh before expiry, disconnect (#2858)', () => {
   const savedKey = process.env.OURA_TOKEN_KEY
   beforeEach(() => {
     process.env.OURA_TOKEN_KEY = 'k'.repeat(48)
     fetchMock.mockReset()
+    startBackfill.mockReset()
     vi.stubGlobal('fetch', fetchMock)
   })
   afterEach(() => {
@@ -81,6 +85,8 @@ describe('Oura tokens: connect, refresh before expiry, disconnect (#2858)', () =
     expect(row.ouraUserId).toBe('oura-u1')
     expect(row.scope).toBe('daily heartrate')
     expect(await getOuraConnection(store, USER)).toMatchObject({ connected: true, scope: 'daily heartrate' })
+    // #2859: a stored connection starts its history read, once.
+    expect(startBackfill).toHaveBeenCalledExactlyOnceWith(USER)
   })
 
   it('connect refuses an Oura account another user holds, and revokes the grant it just got', async () => {
@@ -92,6 +98,7 @@ describe('Oura tokens: connect, refresh before expiry, disconnect (#2858)', () =
     store.saveOuraCloudTokens = async () => { throw Object.assign(new Error('dup'), { cause: { code: '23505' } }) }
     await expect(connectOuraAccount(store, CONFIG, USER, 'c')).rejects.toBeInstanceOf(OuraAccountInUseError)
     expect(String(fetchMock.mock.calls[2][0])).toBe(`${OURA_REVOKE_URL}?access_token=acc-1`)
+    expect(startBackfill).not.toHaveBeenCalled()
   })
 
   it('connect stores nothing when the token response is malformed', async () => {

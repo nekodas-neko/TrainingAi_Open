@@ -344,27 +344,38 @@ Content-Type: application/json
 `tag`, `enhanced_tag`, `workout`, `session`, `sleep`, `daily_sleep`, `daily_readiness`, `daily_activity`, `daily_spo2`, `sleep_time`, `rest_mode_period`, `ring_configuration`, `daily_stress`, `daily_cardiovascular_age`, `daily_resilience`, `vo2_max`, `meal`
 
 ### Webhook event payload (POST to callback URL)
+From the spec's "Webhook Subscription Routes" description (it has no schema for the body):
 ```json
 {
-  "event_type": "create",
-  "data_type": "daily_readiness",
-  "user_id": "<oura_user_id>",
-  "id": "<document_id>",
-  "operation_type": "create"
+  "event_type": "update",
+  "data_type": "sleep",
+  "object_id": "12345abc",
+  "event_time": "2023-01-01T08:00:00+00:00",
+  "user_id": "user123"
 }
 ```
+`object_id` names the document; fetch it with `GET /v2/usercollection/{path}/{object_id}`
+(`vo2_max` → path `vO2_max`). `user_id` is Oura's user id → `oura_tokens.oura_user_id`.
 
 ### Verification (GET to callback URL)
-Oura sends `GET {callback_url}?verification_token={token}` → respond with the token as plaintext.
+Oura sends `GET {callback_url}?verification_token={token}&challenge={random}` when a subscription is
+created → answer **JSON** `{ "challenge": "<the challenge>" }` if the token is ours, 401 otherwise.
 
 ### HMAC signature
-Oura signs POST bodies with HMAC-SHA256 using the `signing_key` returned from subscription creation.
-Header: `x-oura-signature: sha256={hex_digest}`
-Verify: `timingSafeEqual(Buffer.from(sig, 'hex'), createHmac('sha256', signingKey).update(rawBody).digest())`
+Headers `x-oura-signature` and `x-oura-timestamp`. The signature is HMAC-SHA256 keyed with the app's
+**client secret** over `timestamp + JSON body`, as **upper-case hex**:
+`createHmac('sha256', CLIENT_SECRET).update(timestamp + body).digest('hex').toUpperCase()`.
+(An older version of this skill said a per-subscription `signing_key`; the spec says client secret.)
+Our check: `lib/oura/cloud/webhook.ts` → `verifyOuraSignature` (constant-time, stale timestamps refused).
+
+### Delivery
+Answer within 10 s with a 2xx. Oura retries a failed delivery (4xx, 5xx, timeout) about ten times
+over an hour. **A 410 cancels the subscription**, so never answer 410.
 
 ### App webhook setup
-Register once at deploy time via `POST /api/oura/webhooks` (admin-only route).
-Subscriptions may expire — renew via `PUT /v2/webhook/subscription/renew/{id}`.
+Subscriptions are created and renewed by `lib/oura/cloud/subscriptions.ts` (`ensureOuraWebhookSubscriptions`),
+run every 12 h in production (`lib/oura/cloud/renewal.ts`) and as the agent job `oura-webhook-subscriptions`.
+Renew with `PUT /v2/webhook/subscription/renew/{id}`; a 403 there means it no longer exists.
 
 ---
 
@@ -385,10 +396,10 @@ Subscriptions may expire — renew via `PUT /v2/webhook/subscription/renew/{id}`
 | sleep.lowest_heart_rate | `body_metrics` | resting_heart_rate |
 | daily_activity.active_calories | `body_metrics` | active_calories |
 
-All upserts use `COALESCE(EXCLUDED.col, table.col)` — Oura data does NOT overwrite existing non-null values.
+All upserts are written as source `oura_cloud` and merge per field by `source-rank.ts` (`lib/data/health-source.ts` → `mergeSet`): a null keeps the stored value, and the ring's BLE values and manual entries outrank `oura_cloud`. The writer is `lib/oura/cloud/ingest.ts` (#2859).
 
 ## oura_tokens table columns
-`user_id` (PK), `personal_access_token` (legacy, unused), `access_token`, `refresh_token` (both AES-256-GCM ciphertext since #2858, `lib/oura/cloud/token-cipher.ts`), `expires_at`, `scope`, `oura_user_id` (UNIQUE — used to route webhook events to DB user), `webhook_signing_key`
+`user_id` (PK), `personal_access_token` (legacy, unused), `access_token`, `refresh_token` (both AES-256-GCM ciphertext since #2858, `lib/oura/cloud/token-cipher.ts`), `expires_at`, `scope`, `oura_user_id` (UNIQUE — used to route webhook events to DB user), `webhook_signing_key` (legacy, unused: events are signed with the client secret)
 
 ---
 

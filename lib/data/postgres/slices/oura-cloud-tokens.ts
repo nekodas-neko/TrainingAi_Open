@@ -70,3 +70,13 @@ export async function deleteOuraCloudTokens(db: Db, userId: string): Promise<boo
   const deleted = await db.delete(t).where(eq(t.userId, userId)).returning({ userId: t.userId })
   return deleted.length > 0
 }
+
+/**
+ * The TrainingAI user an Oura account is connected to (#2859), for routing a webhook event by its
+ * `user_id`. `oura_user_id` is unique, so there is at most one. Null when nobody here holds it, e.g.
+ * after a disconnect.
+ */
+export async function getUserIdByOuraUserId(db: Db, ouraUserId: string): Promise<string | null> {
+  const [row] = await db.select({ userId: t.userId }).from(t).where(eq(t.ouraUserId, ouraUserId)).limit(1)
+  return row?.userId ?? null
+}

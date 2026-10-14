@@ -11,6 +11,10 @@ import { reencodeBodyweightOneRm } from '@/lib/workout/reencode-bodyweight-one-r
 import { recomputeHrr1Best } from '@/lib/workout/recompute-hrr1-best'
 import { backfillSetHrr1 } from '@/lib/workout/backfill-set-hrr1'
 import type { FinishAgentActionInput } from '@/lib/data/postgres/slices/agent-actions'
+import { ouraOAuthConfig } from '@/lib/oura/cloud/config'
+import { backfillOuraCloud, CONNECT_BACKFILL_DAYS } from '@/lib/oura/cloud/backfill'
+import { runOuraWebhookRenewal } from '@/lib/oura/cloud/renewal'
+import { shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 
 /**
  * The agent key's allow-list (issue 2381, part b). A job is reachable with the key only if it is
@@ -61,6 +65,13 @@ const RederiveBodyBatteryParams = z.object({
 }).strict()
 
 const DryRunOnly = z.object({ dryRun: z.boolean() }).strict()
+
+const OuraCloudBackfillParams = z.object({
+  from: DateParam.optional(),
+  to: DateParam.optional(),
+  heartRate: z.boolean().optional(),
+  dryRun: z.boolean(),
+}).strict()
 
 export const AGENT_JOBS = {
   /**
@@ -234,6 +245,59 @@ export const AGENT_JOBS = {
       }
     },
   } satisfies AgentJobDef<z.infer<typeof DryRunOnly>>,
+  /**
+   * #2859. Reads the owner's Oura Cloud history over `from`..`to` (default: the last 90 days, the
+   * connect backfill's range; at most 366 days) and writes it as `oura_cloud` through
+   * `backfillOuraCloud`, the code a new connection runs. Idempotent. A write can replace a stored
+   * value whose source ranks at or below `oura_cloud` (a legacy row with no source, Health Connect),
+   * so it needs an approval; the ring's BLE values and manual entries outrank it and never move.
+   */
+  'oura-cloud-backfill': {
+    params: OuraCloudBackfillParams,
+    losesData: p => !p.dryRun,
+    run: async (ctx, p) => {
+      const config = ouraOAuthConfig()
+      if (!config) return { status: 503, body: { error: 'Oura is not configured on this server' }, finish: { outcome: 'refused', error: 'oura not configured' } }
+      const to = p.to ? normalizeDateParamIso(p.to) : todayInTz(ctx.tz)
+      const from = p.from ? normalizeDateParamIso(p.from) : to && shiftDateStr(to, -(CONNECT_BACKFILL_DAYS - 1))
+      if (!from || !to) return { status: 400, body: { error: 'Invalid date' }, finish: { outcome: 'refused', error: 'invalid date' } }
+      const result = await backfillOuraCloud({ repo: ctx.repo, config }, ctx.userId, {
+        from, to, dryRun: p.dryRun, heartRate: p.heartRate ?? true, tz: ctx.tz,
+      })
+      if (!result.ok) {
+        const status = result.error === 'invalid_range' ? 400 : 409
+        return { status, body: { error: result.error }, finish: { outcome: 'refused', error: result.error } }
+      }
+      const { counts, stoppedEarly } = result.report
+      const written = p.dryRun ? 0 : counts.dailyRows + counts.bodyRows + counts.sleepWritten + counts.sleepTombstoned + counts.workouts + counts.heartRatePoints
+      return {
+        status: 200,
+        body: { report: result.report },
+        finish: { outcome: stoppedEarly ? 'failed' : 'succeeded', affectedRows: written, daysMoved: p.dryRun ? 0 : counts.dailyRows, error: stoppedEarly },
+      }
+    },
+  } satisfies AgentJobDef<z.infer<typeof OuraCloudBackfillParams>>,
+  /**
+   * #2859. Renews Oura's app-level webhook subscriptions and creates missing ones, the pass the
+   * server runs every 12 hours (`runOuraWebhookRenewal`). Touches no user data, only the
+   * subscriptions at Oura; a dry run lists what it would do.
+   */
+  'oura-webhook-subscriptions': {
+    params: DryRunOnly,
+    losesData: () => false,
+    run: async (_ctx, p) => {
+      const report = await runOuraWebhookRenewal(p.dryRun)
+      if (!report) {
+        return { status: 409, body: { error: 'Oura webhook settings are missing, or another pass is running' }, finish: { outcome: 'refused', error: 'not configured or locked' } }
+      }
+      return {
+        status: 200,
+        body: { report },
+        finish: { outcome: report.failed.length > 0 ? 'failed' : 'succeeded', affectedRows: p.dryRun ? 0 : report.created.length + report.renewed.length, daysMoved: 0,
+          error: report.failed.length > 0 ? `${report.failed.length} subscription(s) failed` : null },
+      }
+    },
+  } satisfies AgentJobDef<z.infer<typeof DryRunOnly>>,
 } as const
 
 export type AgentJobId = keyof typeof AGENT_JOBS
@@ -279,6 +343,8 @@ export const AgentActionRequest = z.discriminatedUnion('job', [
   requestSchema('reencode-bodyweight-one-rm'),
   requestSchema('backfill-set-hrr1'),
   requestSchema('recompute-hrr1-best'),
+  requestSchema('oura-cloud-backfill'),
+  requestSchema('oura-webhook-subscriptions'),
 ])
 export type AgentActionRequest = z.infer<typeof AgentActionRequest>
 
