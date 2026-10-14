@@ -100,11 +100,15 @@ state, for any agent. Titles end 🟢 while live, 🔴 when wrapped.
   migrations with `scripts/next-schema-number.js`.
 - Keep the pool's error handler and timeouts in `lib/data/postgres/client.ts`.
 
-**Oura BLE** → [`docs/rules/oura-ble.md`](docs/rules/oura-ble.md) and
+**Oura** → [`docs/rules/oura-ble.md`](docs/rules/oura-ble.md) and
 [`docs/oura-ble-operations.md`](docs/oura-ble-operations.md)
-- Byte layouts come from the `open_oura` source, never memory. Decoders never throw. The history
-  cursor advances only once a batch is committed to the phone's own `oura_raw.db`, and never skips
-  a gap (the server POST is a backup). Never prune or mutate the server raw archive. Never re-onboard the official Oura app. The Oura Cloud integration is gone for good.
+- The ring's source is moving to the Oura Cloud API (OAuth, per user; #2808). Only the connector
+  module `lib/oura/cloud/` calls Oura Cloud; its tokens are encrypted at rest with `OURA_TOKEN_KEY`.
+- Direct BLE until the switch: byte layouts come from the `open_oura` source, never memory.
+  Decoders never throw. The history cursor advances only once a batch is committed to the phone's
+  own `oura_raw.db`, and never skips a gap (the server POST is a backup). Never prune or mutate the
+  server raw BLE archive. Re-pairing the ring with the official Oura app is the owner's switch-over
+  step, never an agent's.
 
 **AI, security, integrations** → [`docs/rules/ai-security-and-integrations.md`](docs/rules/ai-security-and-integrations.md)
 - Structured LLM output uses a schema, never `JSON.parse` of text; no model-reported number gates

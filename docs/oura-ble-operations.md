@@ -294,6 +294,12 @@ since the last wrap is recoverable at any time by Full re-sync.
 
 ## 6. Oura Cloud retirement — what's gone, what's kept, and why (owner, 2026-08-13)
 
+> **Reversed 2026-10-11 (#2808).** The owner moved the ring's source to the Oura Cloud API, built
+> as a connector in `lib/oura/cloud/` (#2858 onwards). "Do not re-add a Cloud call" below is
+> history: Cloud calls are allowed again, from the connector only. What this section says is kept
+> (the historical data, the rank ladder, the local `app/api/oura/*` routes) is still kept, and the
+> server's raw BLE archive is still never pruned. Current rules: [`rules/oura-ble.md`](rules/oura-ble.md).
+
 The Oura *Cloud* integration was removed on 2026-08-13 at the owner's instruction (*"get rid of
 oura cloud references we dont use it"*): no OAuth/PAT flow, no
 `/api/oura/{connect,callback,sync,token,webhook}`, no Oura HTTP client, no webhook receiver, no
@@ -344,7 +350,7 @@ pre-re-key row still names it, and a live BLE write must out-rank those rows rat
 
 | Table | Purpose |
 |---|---|
-| `oura_tokens` | Dead Cloud credentials, kept rather than dropped (see above) |
+| `oura_tokens` | Oura Cloud OAuth tokens, AES-256-GCM encrypted (#2858); one row per connected user |
 | `oura_daily` | Daily readiness / sleep / activity scores and JSONB contributors |
 
 `sleep_sessions` has Oura columns: `oura_id` (UNIQUE, dedup key), `efficiency`, `onset_latency_sec`, `average_hrv_ms`, `avg_heart_rate`, `lowest_heart_rate`, `restless_periods`, `sleep_score`.

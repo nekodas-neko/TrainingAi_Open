@@ -24,6 +24,7 @@ import type {
   NativeRefreshToken, NativeRefreshTokenRevokedReason, CreateNativeRefreshTokenInput, RotateNativeRefreshTokenInput,
 } from './postgres/slices/native-refresh-tokens'
 import type { RefreshTokenHash } from '@/lib/auth/refresh-token-hash'
+import type { OuraCloudTokenRow, SaveOuraCloudTokensInput } from './postgres/slices/oura-cloud-tokens'
 import type {
   SessionPeriodization, PeriodizationPhase, AiPrescription,
   Baseline1rmEntry, PendingTransition, PrescriptionStatus, ProgramVolumeTarget,
@@ -670,6 +671,15 @@ export interface WorkoutRepository {
   revokeNativeRefreshTokenFamily(userId: string, familyId: string, reason: NativeRefreshTokenRevokedReason): Promise<number>
   /** The caller's live tokens (one per signed-in device), newest first. */
   listActiveNativeRefreshTokens(userId: string): Promise<NativeRefreshToken[]>
+
+  // ── Oura Cloud OAuth tokens (#2858) ───────────────────────────────────────
+  // `oura_tokens`. Tokens go in and come out encrypted; only `lib/oura/cloud/` opens them.
+  getOuraCloudTokens(userId: string): Promise<OuraCloudTokenRow | null>
+  /** Inserts or replaces the caller's tokens. Rejects with SQLSTATE 23505 when another user already
+   *  holds `ouraUserId`. */
+  saveOuraCloudTokens(userId: string, input: SaveOuraCloudTokensInput): Promise<void>
+  /** True when the caller's row existed and is deleted now. */
+  deleteOuraCloudTokens(userId: string): Promise<boolean>
   getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null>
   updateUserProfile(userId: string, profile: Partial<Pick<User, 'displayName' | 'heightCm' | 'dateOfBirth' | 'weightGoalKg' | 'timezone' | 'sex' | 'activityLevel' | 'fitnessGoal'>>): Promise<User>
   touchLastGoalReviewAt(userId: string): Promise<void>
