@@ -34,6 +34,9 @@ import Calculator from 'lucide-react-native/icons/calculator';
 import SkipForward from 'lucide-react-native/icons/skip-forward';
 import Check from 'lucide-react-native/icons/check';
 import Share from 'lucide-react-native/icons/share';
+import Copy from 'lucide-react-native/icons/copy';
+import LogOut from 'lucide-react-native/icons/log-out';
+import MessageSquarePlus from 'lucide-react-native/icons/message-square-plus';
 import ArrowUp from 'lucide-react-native/icons/arrow-up';
 import ArrowDown from 'lucide-react-native/icons/arrow-down';
 import Pencil from 'lucide-react-native/icons/pencil';
@@ -104,6 +107,9 @@ const icons = {
   skip: SkipForward,
   check: Check,
   share: Share,
+  copy: Copy,
+  signOut: LogOut,
+  report: MessageSquarePlus,
   up: ArrowUp,
   down: ArrowDown,
   edit: Pencil,

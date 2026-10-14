@@ -8,12 +8,14 @@ export function FeatureRow({
   onPress,
   leading,
   divider,
+  density,
 }: {
   title: string;
   subtitle?: string;
   onPress?: () => void;
   leading?: ReactNode;
   divider?: boolean;
+  density?: 'normal' | 'compact';
 }) {
   return (
     <ListRow
@@ -22,6 +24,7 @@ export function FeatureRow({
       onPress={onPress}
       leading={leading}
       divider={divider}
+      density={density}
       trailing={!onPress ? <Badge label="Coming soon" /> : undefined}
     />
   );

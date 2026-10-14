@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { useState } from 'react';
 import { z } from 'zod';
 import {
@@ -129,7 +130,7 @@ function Profile({ userId, onBack }: { userId: string; onBack: () => void }) {
                     ? `${(profile.lifetimeVolumeKg / 1000).toFixed(1)}T`
                     : `${Math.round(profile.lifetimeVolumeKg)}kg`,
                 ],
-                ['Best streak', `${profile.bestStreak} days`],
+                ['Best streak', plural(profile.bestStreak, 'day', 'days')],
                 ...(profile.totalDistanceKm > 0
                   ? [['Distance', `${profile.totalDistanceKm.toFixed(1)}km`]]
                   : []),

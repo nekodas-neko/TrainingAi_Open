@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { useState } from 'react';
 import {
   AppButton,
@@ -58,7 +59,7 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
             <AppText variant="heading">Saved on this phone</AppText>
             <AppText>
               {actions.pending
-                ? `${actions.pending} changes waiting to upload`
+                ? `${plural(actions.pending, 'change', 'changes')} waiting to upload`
                 : 'No changes waiting to upload'}
             </AppText>
             <AppButton

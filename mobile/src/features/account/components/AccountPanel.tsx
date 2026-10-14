@@ -6,10 +6,13 @@ import {
   LoadingIndicator,
   AppleSignInButton,
 } from '../../../shared/ui';
+import { useState } from 'react';
 import { useAccountContext } from '../AccountProvider';
+import { SignOutSheet } from '../../settings/components/SignOutSheet';
 
 export function AccountPanel() {
   const account = useAccountContext();
+  const [signingOut, setSigningOut] = useState(false);
   const accountStatus = {
     loading: 'Loading account…',
     signedOut: 'Not signed in',
@@ -117,9 +120,7 @@ export function AccountPanel() {
               <AppButton
                 title="Sign out"
                 variant="danger"
-                onPress={() => {
-                  void account.signOut();
-                }}
+                onPress={() => setSigningOut(true)}
               />
             </>
           )}
@@ -128,6 +129,7 @@ export function AccountPanel() {
           </AppText>
         </>
       )}
+      {signingOut && <SignOutSheet onClose={() => setSigningOut(false)} />}
     </Card>
   );
 }

@@ -23,12 +23,15 @@ import {
 } from '../../../shared/ui';
 import { useAccountContext } from '../../account/AccountProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
+import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 import { profileSpec, goalsSpec, metricValue } from '../../health/data/models';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { ProfilePhoto } from '../components/ProfilePhoto';
 import { ProfileStats } from '../components/ProfileStats';
 import { FeedbackSheet } from '../components/FeedbackSheet';
 import { DeleteAccountSheet } from '../components/DeleteAccountSheet';
+import { SignOutSheet } from '../components/SignOutSheet';
+import { memberSinceLabel } from '../data/profile';
 const stats = z
   .object({
     lifetimeStats: z.object({
@@ -66,9 +69,10 @@ export function MoreScreen({
   openFriendProfile: (id: string) => void;
 }) {
   const account = useAccountContext(),
-    { theme } = useTheme();
+    { theme } = useTheme(),
+    { timezone } = useWorkoutContext();
   const [tab, setTab] = useState('profile'),
-    [modal, setModal] = useState<'feedback' | 'delete' | null>(null);
+    [modal, setModal] = useState<'feedback' | 'delete' | 'signout' | null>(null);
   const profile = useWorkoutResource(profileSpec),
     goals = useWorkoutResource(goalsSpec),
     history = useWorkoutResource({ path: '/api/achievements', schema: stats, ttl: 300000 });
@@ -78,6 +82,7 @@ export function MoreScreen({
       ? user.displayName
       : (user?.name ?? account.state.profile?.name ?? 'Your profile');
   const lifetime = history.data?.lifetimeStats;
+  const memberSince = memberSinceLabel(user?.createdAt, timezone);
   const program = useWorkoutResource({
     path: '/api/program-week',
     ttl: 1800000,
@@ -150,7 +155,11 @@ export function MoreScreen({
                   code={typeof user?.friendCode === 'string' ? user.friendCode : null}
                 />
               </Stack>
-              <ProfileStats lifetime={lifetime} program={program.data} />
+              <ProfileStats
+                lifetime={lifetime}
+                program={program.data}
+                memberSince={memberSince}
+              />
               <Card>
                 <Stack direction="row" align="center">
                   <Icon name="award" tone="brand" />
@@ -193,33 +202,39 @@ export function MoreScreen({
               </ExpandableCard>
               <Section title="Your setup">
                 <ListRow
+                  density="compact"
                   title="Profile details"
                   leading={<Icon name="info" />}
                   onPress={openProfile}
                 />
                 <ListRow
-                  title="Programs & schedule"
+                  density="compact"
+                  title="Sessions, progression & schedule"
                   leading={<Icon name="workout" />}
                   onPress={openPrograms}
                 />
                 <ListRow
+                  density="compact"
                   title="DEXA & RMR results"
                   leading={<Icon name="scale" />}
                   onPress={openClinical}
                 />
                 <ListRow
+                  density="compact"
                   title={deviceHealthName}
                   subtitle="Connection, permissions and data sources"
                   leading={<Icon name="health" />}
                   onPress={openAppleHealth}
                 />
                 <ListRow
+                  density="compact"
                   title="Devices & connections"
                   subtitle="Oura account"
                   leading={<Icon name="activity" />}
                   onPress={openDevices}
                 />
                 <FeatureRow
+                  density="compact"
                   title="Collection"
                   leading={<Icon name="award" />}
                   divider={false}
@@ -227,17 +242,19 @@ export function MoreScreen({
               </Section>
               <Section title="App">
                 <ListRow
-                  title="Settings"
-                  subtitle="Appearance, notifications & Home layout"
+                  density="compact"
+                  title="Notifications, appearance & home layout"
                   leading={<Icon name="settings" />}
                   onPress={openSettings}
                 />
                 <ListRow
+                  density="compact"
                   title="Data & Sync"
                   leading={<Icon name="refresh" />}
                   onPress={openData}
                 />
                 <ListRow
+                  density="compact"
                   title="About TrainingAi"
                   leading={<Icon name="info" />}
                   onPress={openAbout}
@@ -245,14 +262,39 @@ export function MoreScreen({
                 />
                 {user?.isAdmin === true && (
                   <FeatureRow
+                    density="compact"
                     title="Admin Console"
                     leading={<Icon name="settings" />}
                     divider={false}
                   />
                 )}
               </Section>
+              {/* The current app's direct actions (#2902). */}
+              <Stack gap="sm">
+                <AppButton
+                  title="Report an issue"
+                  icon="report"
+                  variant="ghost"
+                  onPress={() => setModal('feedback')}
+                />
+                <AppButton
+                  title="Edit profile"
+                  icon="edit"
+                  variant="surface"
+                  onPress={openProfile}
+                />
+                {account.state.hasSession && (
+                  <AppButton
+                    title="Sign out"
+                    icon="signOut"
+                    variant="danger"
+                    onPress={() => setModal('signout')}
+                  />
+                )}
+              </Stack>
               <Section title="Feedback">
                 <ListRow
+                  density="compact"
                   title="Feedback & requests"
                   leading={<Icon name="coach" />}
                   onPress={() => setModal('feedback')}
@@ -261,11 +303,13 @@ export function MoreScreen({
               </Section>
               <Section title="Account">
                 <ListRow
+                  density="compact"
                   title="Account & sign-in settings"
                   leading={<Icon name="users" />}
                   onPress={openSettings}
                 />
                 <ListRow
+                  density="compact"
                   title="Delete account"
                   leading={<Icon name="delete" tone="danger" />}
                   disabled={!account.dataReader}
@@ -279,6 +323,7 @@ export function MoreScreen({
       </TabPanel>
       {modal === 'feedback' && <FeedbackSheet onClose={() => setModal(null)} />}
       {modal === 'delete' && <DeleteAccountSheet onClose={() => setModal(null)} />}
+      {modal === 'signout' && <SignOutSheet onClose={() => setModal(null)} />}
     </PageLayout>
   );
 }

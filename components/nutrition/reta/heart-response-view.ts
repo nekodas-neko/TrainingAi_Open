@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural'
 import {
   metricPattern,
   type DoseLevelRecovery,
@@ -44,8 +45,6 @@ export interface HeartCardView {
   sentence: string | null
   charts: HeartChart[]
 }
-
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 
 /** "1 mg", "0.5 mg", or the logged text; a dose with neither says so rather than inventing a number. */
 export function levelLabel(level: Pick<DoseLevelRecovery, 'amount' | 'unit' | 'doseText'>): string {

@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { Grid, MetricTile, type IconName } from '../../../shared/ui';
+import { programTile, type ProgramWeekSummary } from '../data/profile';
 
 function volume(kg: number | undefined) {
   if (kg == null) return '—';
@@ -12,6 +13,7 @@ function volume(kg: number | undefined) {
 export function ProfileStats({
   lifetime,
   program,
+  memberSince,
 }: {
   lifetime?: {
     sessions: number;
@@ -20,17 +22,13 @@ export function ProfileStats({
     bestStreak: number;
     totalDistanceKm: number;
   };
-  program?: {
-    mode: 'cycle' | 'tenure' | null;
-    weeksRunning?: number;
-    cycleCurrent?: number;
-    cycleTotal?: number;
-    phaseName?: string | null;
-    blockComplete?: boolean;
-  } | null;
+  program?: ProgramWeekSummary;
+  /** `memberSinceLabel(user.createdAt, tz)`; shown when there is no programme to count. */
+  memberSince: string | null;
 }) {
   const { theme } = useTheme();
   const distance = lifetime?.totalDistanceKm;
+  const sixth = programTile(program, memberSince);
   const items: { label: string; value: string; icon: IconName; color: string }[] = [
     {
       label: 'Sessions',
@@ -66,16 +64,7 @@ export function ProfileStats({
       color: theme.tones.recovery.foreground,
     },
     {
-      label:
-        program?.mode === 'cycle'
-          ? program.blockComplete
-            ? 'New block?'
-            : (program.phaseName ?? 'Cycle')
-          : 'Weeks running',
-      value:
-        program?.mode === 'cycle'
-          ? `${program.cycleCurrent ?? '—'}/${program.cycleTotal ?? '—'}`
-          : (program?.weeksRunning?.toLocaleString() ?? '—'),
+      ...sixth,
       icon: 'calendar',
       color: theme.colors.brandText,
     },
