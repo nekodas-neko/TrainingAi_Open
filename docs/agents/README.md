@@ -54,8 +54,36 @@ the job well and don't wake when there is nothing to do.
 | ↳ engine-lane threads, migrations, scoring changes | Opus 5.5 | high | formulas, schema and offline sync — a mistake costs a full review-and-fix cycle |
 | ↳ surface-lane threads, small batches | Sonnet 5.5 | high | UI built to an approved mockup |
 | ↳ release-test thread | Sonnet 5.5 | medium | a checklist |
+| ↳ Orchestrator cloud threads | by lane, as the Implementer's threads above | high | the same work in a different place; the issue and the brief carry the scoping |
 
 A subagent does not inherit a sensible model: set `model` on every thread or helper you start.
+
+## Threads (owner, 2026-10-15)
+
+The Orchestrator, BugFix and the Implementer stay as long-running sessions. The work they hand out
+runs in a **thread**: its own session or worktree for one issue or batch. You can see what's being
+worked on, and the role's own context stays small.
+
+- **Start a thread only when it saves something.** A build, a fix with tests or a multi-file
+  change gets one. A label, a comment, a one-line edit or a read-only check is done in the role's
+  own session.
+- **Name it after the work:** `<type>/issue<N> — <what it does>`, with the type from the issue:
+  `hotfix/`, `bugfix/` (`type: bug`), `feature/`, `chore/` or `tuning/`. Several issues read
+  `bugfix/issue2772+2828 — …`. The title ends 🟢 while live and 🔴 when wrapped.
+- **Set the model from the table above, every time.** Sonnet takes surface-lane work and small,
+  well-scoped fixes. Opus is only for the engine lane, migrations, scoring changes, auth and
+  security, and investigations. The role session does the scoping on Opus, in the issue and the
+  brief, so the thread can run on the cheaper model.
+- **Where it runs:**
+  - **The local Implementer** (the owner's machine, one worktree per thread) is the first choice
+    for screens and anything that needs the phone. It has no setup cost per thread. It runs only
+    while the owner has it started and the phone plugged in.
+  - **A cloud thread** (the Orchestrator's `create_session`) takes small server fixes, and any work
+    while the local Implementer is off. Each one clones and installs from scratch, which takes a
+    few minutes, so put small related fixes in one thread.
+- **Say it on the issue:** a comment naming the thread and what it covers.
+- **Close it out:** when its PR merges or the work stops, retitle it 🔴 and archive the cloud
+  session (or remove the worktree). A thread left open reads as work in progress.
 
 **Cadence.** The Implementer loops every **~30 minutes**, not 15. When the inbox has nothing new, no
 thread needs it and `node scripts/queue.js --next-batch` returns nothing, it ends the tick at once
