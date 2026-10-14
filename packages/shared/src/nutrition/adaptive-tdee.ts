@@ -29,6 +29,12 @@ export const MAX_WINDOW_DAYS = 28;
  *  representative and the weight change gets attributed to calories that were simply never typed in. */
 export const MIN_LOGGED_DAYS = 10;
 
+/** Marked days the calibration still needs. The one copy of this sum: the gap message and the
+ *  finished-logging counter (`calibration-progress.ts`) both read it (#2898). */
+export function loggedDaysRemaining(daysLogged: number, minDays: number = MIN_LOGGED_DAYS): number {
+  return Math.max(0, minDays - daysLogged);
+}
+
 /** Minimum weigh-ins needed to fit a weight slope at all. */
 export const MIN_WEIGH_INS = 4;
 
@@ -274,8 +280,10 @@ export function resolveMaintenance(
 /** Human-readable reason the calibration isn't ready yet. */
 export function maintenanceGapMessage(e: MaintenanceEstimate): string {
   switch (e.excludedReason) {
-    case 'not_enough_logged_days':
-      return `Log food on ${MIN_LOGGED_DAYS - e.daysLogged} more day${MIN_LOGGED_DAYS - e.daysLogged === 1 ? '' : 's'} to calibrate`;
+    case 'not_enough_logged_days': {
+      const remaining = loggedDaysRemaining(e.daysLogged);
+      return `Log food on ${remaining} more day${remaining === 1 ? '' : 's'} to calibrate`;
+    }
     case 'logging_too_sparse':
       return 'Too many unlogged days in the window to calibrate';
     case 'not_enough_weigh_ins':

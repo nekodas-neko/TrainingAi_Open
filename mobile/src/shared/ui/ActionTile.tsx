@@ -10,12 +10,14 @@ export function ActionTile({
   icon,
   onPress,
   disabled = false,
+  layout = 'tile',
 }: {
   title: string;
   caption?: string;
   icon: IconName;
   onPress: () => void;
   disabled?: boolean;
+  layout?: 'tile' | 'row';
 }) {
   const { theme } = useTheme();
   return (
@@ -28,27 +30,52 @@ export function ActionTile({
       onPress={onPress}
       style={{ flex: 1 }}
     >
-      <Card
-        style={{
-          flex: 1,
-          minHeight: theme.sizes.actionTile,
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: theme.spacing.md,
-          gap: theme.spacing.xs,
-          opacity: disabled ? 0.5 : 1,
-        }}
-      >
-        <Icon name={icon} tone="brand" />
-        <AppText variant="caption" style={{ textAlign: 'center' }}>
-          {title}
-        </AppText>
-        {caption && (
-          <AppText variant="micro" tone="muted" style={{ textAlign: 'center' }}>
-            {caption}
+      {layout === 'row' ? (
+        <Card
+          style={{
+            flex: 1,
+            minHeight: theme.sizes.button,
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingHorizontal: theme.spacing.md,
+            paddingVertical: theme.spacing.md,
+            gap: theme.spacing.sm,
+            opacity: disabled ? 0.5 : 1,
+          }}
+        >
+          <Icon name={icon} tone="muted" size={theme.sizes.iconSmall} />
+          <AppText variant="label" style={{ flex: 1 }} numberOfLines={1}>
+            {title}
           </AppText>
-        )}
-      </Card>
+          {caption && (
+            <AppText variant="label" tone="muted">
+              {caption}
+            </AppText>
+          )}
+        </Card>
+      ) : (
+        <Card
+          style={{
+            flex: 1,
+            minHeight: theme.sizes.actionTile,
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: theme.spacing.md,
+            gap: theme.spacing.xs,
+            opacity: disabled ? 0.5 : 1,
+          }}
+        >
+          <Icon name={icon} tone="brand" />
+          <AppText variant="caption" style={{ textAlign: 'center' }}>
+            {title}
+          </AppText>
+          {caption && (
+            <AppText variant="micro" tone="muted" style={{ textAlign: 'center' }}>
+              {caption}
+            </AppText>
+          )}
+        </Card>
+      )}
     </TouchSurface>
   );
 }

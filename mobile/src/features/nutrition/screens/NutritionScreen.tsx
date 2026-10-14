@@ -40,6 +40,7 @@ import { ActiveMealPlan, MealPlansSheet } from '../../meal-plans/components/Meal
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { EndOfDaySheet } from '../components/EndOfDaySheet';
 import { FoodLogger } from '../components/FoodLogger';
+import { FoodLoggingComplete } from '../components/FoodLoggingComplete';
 import { MealSectionHeader } from '../components/MealSectionHeader';
 import { MacroLine, NutritionStatus, foodAmount } from '../components/NutritionElements';
 import { NutritionEnergyCard } from '../components/NutritionEnergyCard';
@@ -301,8 +302,9 @@ export function NutritionScreen({
               <NutritionEnergyCard date={date} onGoals={() => setModal('goals')} />
               {date === n.today && (
                 <>
-                  <Grid columns={3}>
+                  <Grid columns={2}>
                     <ActionTile
+                      layout="row"
                       title="Log Food"
                       icon="plus"
                       disabled={!chosen}
@@ -312,6 +314,7 @@ export function NutritionScreen({
                       }}
                     />
                     <ActionTile
+                      layout="row"
                       title="Water"
                       icon="water"
                       caption={
@@ -321,15 +324,16 @@ export function NutritionScreen({
                       }
                       onPress={() => setModal('water')}
                     />
-                    <ActionTile
-                      title="My Foods"
-                      icon="foods"
-                      onPress={() => {
-                        setLibrary(true);
-                        setLogger(chosen);
-                      }}
-                    />
                   </Grid>
+                  <ActionTile
+                    layout="row"
+                    title="My Foods"
+                    icon="foods"
+                    onPress={() => {
+                      setLibrary(true);
+                      setLogger(chosen);
+                    }}
+                  />
                   <ActiveMealPlan
                     date={date}
                     onManage={(plan) => {
@@ -432,6 +436,13 @@ export function NutritionScreen({
                   </Card>
                 );
               })}
+              <FoodLoggingComplete
+                date={date}
+                isToday={date === n.today}
+                daysLogged={energy.data?.maintenance?.daysLogged ?? null}
+                calibrated={energy.data?.maintenance?.source === 'calibrated'}
+                gapMessage={energy.data?.maintenance?.gapMessage ?? null}
+              />
               <Card>
                 <WeeklyNutrition onDay={setDate} />
                 {date === n.today && <SupplementsSection date={date} />}

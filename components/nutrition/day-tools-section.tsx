@@ -26,6 +26,8 @@ interface Props {
   daysLogged: number | null
   minDays: number
   calibrated: boolean
+  /** The server's reason the estimate is still on the formula, for the counter (#2898). */
+  gapMessage: string | null
   tz: string
   weeklyData: WeeklyPoint[]
   calorieTarget: number | null
@@ -46,7 +48,7 @@ interface Props {
  * and phase 3 adds to it. The entry says *"extract before adding"* and this is that.
  */
 export function DayToolsSection({
-  selectedDate, isToday, daysLogged, minDays, calibrated, tz,
+  selectedDate, isToday, daysLogged, minDays, calibrated, gapMessage, tz,
   weeklyData, calorieTarget, adherence,
   supplements, supplementsLoading, onSupplementsChanged, userId, onEndOfDay,
 }: Props) {
@@ -63,6 +65,7 @@ export function DayToolsSection({
         daysLogged={daysLogged}
         minDays={minDays}
         calibrated={calibrated}
+        gapMessage={gapMessage}
         tz={tz}
       />
 
