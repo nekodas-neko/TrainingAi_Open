@@ -44,7 +44,7 @@ export interface ShadowRawHistory {
   /** The active program, for the ACWR baselining rule (OR-210). Null = no program to judge. */
   program: ProgramAgeInput | null
   /** Per-set HR rows (`set_hr_stats`), for HRR60. */
-  setHr: readonly { setLogId: string; drop60s: number | null; coverageOk: boolean; source: string | null; loggedAt: Date | null }[]
+  setHr: readonly { setLogId: string; hrr1Bpm: number | null; source: string | null; loggedAt: Date | null }[]
   /** Zone seconds per completed day, or null when nothing records this person's heart rate. */
   zoneSeconds: ReadonlyMap<string, readonly [number, number, number, number, number]> | null
   /** Days the person flagged themselves unwell. */

@@ -118,9 +118,13 @@ describe('the stored figures are what main stored (characterization, recorded be
       .toEqual({ estimatedSessionDurationMin: 19, weeklyVolumeContribution: { chest: 2, triceps: 3, back: 2, biceps: 3 } })
   })
 
+  // #2133 re-recorded the short and standard rows on 2026-10-11: the weekly-volume allocator sizes
+  // every preset to its budget, so the 51-minute session now fills to each role's ceiling on those
+  // days as it already did on the long one (main 34 / 37 before). The long row and the tight one did
+  // not move.
   it.each([
-    ['short', 34, { chest: 4, triceps: 5, back: 4, biceps: 6 }],
-    ['standard', 37, { chest: 4, triceps: 5, back: 4, biceps: 6 }],
+    ['short', 43, { chest: 6, triceps: 7, back: 5, biceps: 6.5 }],
+    ['standard', 47, { chest: 6, triceps: 7, back: 5, biceps: 6.5 }],
     ['long', 47, { chest: 6, triceps: 7, back: 5, biceps: 6.5 }],
   ] as const)('budget stage, %s day', (preset, min, volume) => {
     const res = applyBudgetStage(FIX.stage, FIX.signals.normal, 60, preset, new Set(['se-1']))

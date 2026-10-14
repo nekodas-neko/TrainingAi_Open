@@ -30,7 +30,7 @@
 //
 // Runs only against a real local dev Postgres — skips in CI, like its siblings here.
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest'
-import { todayInTz, shiftDateStr } from '@trainingai/shared/date-utils'
+import { todayInTz, shiftDateStr, weekStartForDay, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 
 const canRun = !!process.env.DATABASE_URL
 
@@ -124,6 +124,24 @@ describe.skipIf(!canRun)('friends leaderboard — who appears and what they are 
     expect(ids).toContain(FRIEND)
     expect(ids).not.toContain(STRANGER)
   })
+
+  it('counts one session once when it has several recorded sets', async () => {
+    await trained(ME, today());
+    await pool.query(`INSERT INTO set_logs (exercise_log_id,set_number,weight_kg,reps)
+      SELECT el.id,2,100,10 FROM exercise_logs el JOIN workout_sessions ws ON ws.id=el.workout_session_id WHERE ws.user_id=$1`,[ME]);
+    const entry=(await entryFor(ME))!;
+    expect(entry.weeklySessions).toBe(1);
+    expect(entry.allTimeSessions).toBe(1);
+    expect(entry.weeklyVolumeKg).toBe(2000);
+    expect(entry.allTimeVolumeKg).toBe(2000);
+  });
+  it('includes local Monday midnight and excludes the preceding instant',async()=>{
+    const monday=dateStrMidnightInTz(weekStartForDay(today()),TZ);
+    await pool.query(`INSERT INTO workout_sessions(user_id,session_name,started_at) VALUES ($1,'Before',$2),($1,'After',$3)`,[ME,new Date(monday.getTime()-1),new Date(monday.getTime()+1)]);
+    const entry=(await entryFor(ME))!;
+    expect(entry.weeklySessions).toBe(1);
+    expect(entry.allTimeSessions).toBe(2);
+  });
 
   it('marks only the caller as self', async () => {
     expect((await entryFor(ME))!.isSelf).toBe(true)

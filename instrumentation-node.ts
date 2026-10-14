@@ -168,6 +168,12 @@ void (async () => {
   const { bootstrapClaudeRoOwner } = await import('@/lib/data/postgres/claude-ro-owner')
   await bootstrapClaudeRoOwner()
 })()
+// Oura's webhook subscriptions (#2859): renewed every 12 hours, production only, and only when every
+// webhook setting is present. It never fails the boot.
+void (async () => {
+  const { startOuraWebhookRenewal } = await import('@/lib/oura/cloud/renewal')
+  startOuraWebhookRenewal()
+})().catch(err => console.error('[instrumentation] Oura webhook renewal did not start:', String(err).slice(0, 300)))
 
 // Marks this file as a module (it has no other imports/exports) so instrumentation.ts can
 // `await import('./instrumentation-node')` it for its side effect.

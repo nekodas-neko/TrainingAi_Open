@@ -22,6 +22,7 @@ export interface PrescriptionSignals {
   trainingGoal: string
   autoApplyPrescriptions: boolean
   effectiveTimeBudgetMin: number
+  sessionTimeBudgetMinutes?: number
   /** What a plan is FITTED against: the working budget less the lifter's p75 finish-early margin
    *  (#2132). Optional so a hand-built signal still fits against the working budget — read it
    *  through `fitBudgetMin`. Shown to nobody; `effectiveTimeBudgetMin` is the number he sees. */
@@ -599,6 +600,7 @@ export async function aggregateSignals(
     trainingGoal: program.trainingGoal,
     autoApplyPrescriptions: program.autoApplyPrescriptions,
     effectiveTimeBudgetMin: workingMin,
+    sessionTimeBudgetMinutes: programSession.timeBudgetMinutes,
     planningBudgetMin: planningBudgetMin(workingMin, measuredTimeBudget.planningMarginFactor),
     exercises: exercisesWithAutoreg,
     phase: state.phase,

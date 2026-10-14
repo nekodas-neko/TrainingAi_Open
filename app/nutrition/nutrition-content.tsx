@@ -42,6 +42,7 @@ import { getLocalStore } from "@/lib/local-store";
 import { pushThenRevalidate } from "@/lib/local-store/push-then-revalidate";
 import { EnergyCard } from "@/components/nutrition/energy-card";
 import { ActivePlanCard } from "@/components/nutrition/active-plan-card";
+import { useEstimatedMeals } from "./use-estimated-meals";
 import { MealPlanReviewCard } from "@/components/nutrition/meal-plan-review-card";
 import { MealPlanSheets } from "@/components/nutrition/meal-plan-sheets";
 import { NutritionSettingsSheet } from "@/components/nutrition/nutrition-settings-sheet";
@@ -457,6 +458,14 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   // a typed number shown as the day's budget. The budget is `calorieBudget`'s or nothing; null draws
   // "kcal" with no denominator rather than a figure the owner typed once.
   const effectiveCalorieGoal = budget?.total ?? null;
+  // #2072. The assumed plan meals the day's totals include, local-first through the same rule as the
+  // server's `intakeKcal`, so the ring's centre and its "left" are one total.
+  const estimatedMeals = useEstimatedMeals({
+    userId, date: selectedDate, mealPlan, mealTypes, logs,
+    serverEstimatedKcal: balanceForDate?.balance?.estimatedKcal,
+  });
+  const planCardRef = useRef<HTMLDivElement>(null);
+  const goToPlanCard = useCallback(() => planCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), []);
   const earnedForSelectedDate = budget?.earned ?? null;
   // Q-323's remaining half: `scaled` is already computed server-side by `scaleMacrosForEarnedKcal`
   // (carbs and fat absorb the earned kcal in their existing ratio; protein is dosed per kg of
@@ -585,6 +594,9 @@ export default function NutritionContent({ userId }: { userId?: string }) {
               balanceRefreshing={balanceRefreshing}
               onRetryBalance={retryBalance}
               targets={effectiveTargets}
+              estimatedKcal={estimatedMeals.kcal}
+              estimatedMeals={estimatedMeals.meals}
+              onConfirmEstimate={selectedDate === todayStr && mealPlan ? goToPlanCard : undefined}
             />
 
             {/* Actions sit here, directly under the ring, rather than being reached by scroll depth
@@ -619,6 +631,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
             )}
 
             {selectedDate === todayStr && (
+              <div ref={planCardRef} className="scroll-mt-4">
               <ActivePlanCard
                 plan={mealPlan}
                 onPlanChanged={setMealPlan}
@@ -636,6 +649,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
                 onStepByStep={openPlanSetup}
                 onViewPlan={openPlanManage}
               />
+              </div>
             )}
 
             {/* BF-24 ④: each meal is its own card with its name as a label above it — artboard 1

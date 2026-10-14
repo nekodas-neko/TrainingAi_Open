@@ -2,6 +2,38 @@
 
 > Moved verbatim from `CLAUDE.md` on 2026-10-05, when it was cut from 121 KB to the short form (release train, Phase 4). `CLAUDE.md` keeps each rule as one line pointing here; **this file keeps the reasons and the incidents behind them**, which is what makes a rule hold. Some passages describe the retired seven-agent process (lanes, batons, the backlog file) — where they do, the rule they carry still stands and the mechanism around it is history.
 
+## Live AI calls in testing: one key, one balance
+
+Every Gemini key we hold — production on Railway and every agent's machine — draws on **one prepaid
+Google balance**, and when it reaches $0 Google stops every key at once. On 2026-10-11 agents testing
+the Coach on `pnpm dev` against real Gemini ([#2793](https://github.com/nekodas-neko/TrainingAi_Open/pull/2793),
+[#2796](https://github.com/nekodas-neko/TrainingAi_Open/pull/2796)) made **about 460
+`gemini-3.6-flash` requests and about 3.8M input tokens**. That emptied the balance, and every AI
+feature in the live app failed ([#2815](https://github.com/nekodas-neko/TrainingAi_Open/issues/2815),
+[#2814](https://github.com/nekodas-neko/TrainingAi_Open/issues/2814)). The owner chose to keep the one
+key and make testing safer instead ([#2816](https://github.com/nekodas-neko/TrainingAi_Open/issues/2816)).
+
+- **Logic is tested with mocks.** A route's handling of a model reply — parsing, tool wiring, error
+  paths, what reaches the DB — never needs the real model. Mock `ai` or `@/lib/ai/instrument` as the
+  existing route tests do.
+- **Real Gemini only to measure model behaviour** — whether a prompt change moves what the model
+  does — and then with the fewest runs that answer the question. Decide the number before starting.
+- **Every PR that made live calls says roughly how many** under "How it was tested", and "none" when
+  it made none.
+- **The dev cap enforces it.** `lib/ai/dev-call-budget.ts` refuses a live request once a machine has
+  made **100 in a rolling 24 hours** (`DevAiBudgetError`, before anything is sent). It counts model
+  *requests*: a retry is one, and **one Coach turn is up to 6** (`COACH_MAX_STEPS`), so the default is
+  roughly 16 Coach turns a day. It is on for `pnpm dev`, plain node scripts and `RUN_LIVE_AI_TESTS=1`
+  runs; off in production (`NODE_ENV=production`, or any Railway environment variable) and in the
+  ordinary test suite. It covers every call through `lib/ai/instrument.ts` and the direct
+  `@google/genai` calls in `lib/exercise-image-gen.ts`.
+- **Raising `AI_DEV_DAILY_CALL_LIMIT` needs the owner's say-so**, asked as a `type: question` issue
+  stating how many requests and why. It is the owner's money and every user's AI.
+- **`AI_DEV_DAILY_CALL_LIMIT=0` gives a mocks-only session**: any code path that would call Gemini
+  fails fast with `DevAiBudgetError` instead.
+
+---
+
 ## AI & Security Defaults
 
 - Every LLM call returning structured data uses `generateObject`/a response schema — never `JSON.parse` of free text. Keep it that way: prose-only `generateText` routes must never grow a `JSON.parse` of model text, and every `generateText`/`streamText` call is wrapped in try-catch returning a JSON error (`health-insight` and `weekly-digest` once shipped without). Deterministic math lives in code: no LLM self-reported number (confidence, totals) may gate an automatic action **or be shown to the user as fact** — a model handed a score of 80 called it *"perfect"* twice (Q-292), which gates nothing and is read as true. Prose routes import `PROSE_GUARDS` (`lib/ai/prompt-guards.ts`): quote the given numbers, no superlatives, metric units only, and no diagnosis — describe a deviation, never name a condition or suggest infection (#2421, TN-46).

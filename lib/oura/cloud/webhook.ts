@@ -1,0 +1,230 @@
+// Oura's webhook (#2859): the verification challenge, the signature check, and what one event does.
+//
+// From the pinned spec (`tags` → "Webhook Subscription Routes"):
+//   - Verification: `GET <callback>?verification_token=…&challenge=…`, answered `{ "challenge": … }`
+//     when the token is ours, 401 otherwise.
+//   - Events: `POST <callback>` with `x-oura-signature` (HMAC-SHA256 of `x-oura-timestamp` followed by
+//     the JSON body, keyed with the app's client secret, upper-case hex) and a small body naming the
+//     document: `{ event_type, data_type, object_id, event_time, user_id }`.
+//   - Answer within 10 s. Oura retries a failed delivery about ten times over an hour, and a 410
+//     CANCELS the subscription, so this module never asks the route for a 410.
+//
+// The route is public and unauthenticated, so everything here fails closed: no settings, no
+// signature, a stale timestamp or a body that is not the spec's shape is refused before any lookup.
+import { createHmac, timingSafeEqual } from 'node:crypto'
+import { z } from 'zod'
+import { safeCompare } from '@/lib/security/constant-time'
+import type { OuraOAuthConfig } from './config'
+import { OuraUnavailableError } from './client'
+import type { WorkoutRepository } from '@/lib/data/repository'
+import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
+import { fetchOuraDocument, fetchOuraHeartRate, OuraForbiddenError, OuraUnauthorizedError } from './data'
+import { mapHeartRateRows, mapOuraDocuments, OURA_DOCUMENT_TYPES, type OuraDocumentType } from './documents'
+import { reportOuraCloudIssue } from './report'
+import { writeOuraCloudData, type OuraCloudWriteCounts, type OuraCloudWriter } from './ingest'
+import { getOuraAccessToken, OuraReauthRequiredError, type OuraTokenStore } from './tokens'
+
+/** The webhook settings, from the environment. `null` when any is missing: the route answers 503. */
+export interface OuraWebhookConfig {
+  oauth: OuraOAuthConfig
+  /** `OURA_WEBHOOK_CALLBACK_URL`: where Oura posts, registered with each subscription. */
+  callbackUrl: string
+  /** `OURA_WEBHOOK_VERIFICATION_TOKEN`: what Oura echoes back on the verification GET. */
+  verificationToken: string
+}
+
+export function ouraWebhookConfig(oauth: OuraOAuthConfig | null, env: NodeJS.ProcessEnv = process.env): OuraWebhookConfig | null {
+  const callbackUrl = env.OURA_WEBHOOK_CALLBACK_URL?.trim()
+  const verificationToken = env.OURA_WEBHOOK_VERIFICATION_TOKEN?.trim()
+  if (!oauth || !callbackUrl || !verificationToken) return null
+  try {
+    const { protocol } = new URL(callbackUrl)
+    if (protocol !== 'https:' && protocol !== 'http:') return null
+  } catch {
+    return null
+  }
+  return { oauth, callbackUrl, verificationToken }
+}
+
+/** True when the verification GET carries our token. Constant-time. */
+export function isOurVerificationToken(config: OuraWebhookConfig, token: string): boolean {
+  return safeCompare(token, config.verificationToken)
+}
+
+/**
+ * How far an event's `x-oura-timestamp` may sit from now. The past bound covers Oura's hour of
+ * retries with room to spare; the future bound is clock skew. A replay inside the window can only
+ * make us re-read a document we are allowed to read, and the write is idempotent.
+ */
+export const MAX_EVENT_AGE_MS = 2 * 60 * 60 * 1000
+export const MAX_EVENT_SKEW_MS = 5 * 60 * 1000
+
+/** Seconds or milliseconds since the epoch, as a number of ms; `null` when it is not one. */
+function timestampMs(raw: string): number | null {
+  if (!/^\d{9,14}$/.test(raw)) return null
+  const n = Number(raw)
+  return n < 1e12 ? n * 1000 : n
+}
+
+function hmacHex(secret: string, message: string): string {
+  return createHmac('sha256', secret).update(message, 'utf8').digest('hex').toUpperCase()
+}
+
+function sameHex(a: string, b: string): boolean {
+  const bufA = Buffer.from(a)
+  const bufB = Buffer.from(b)
+  if (bufA.length !== bufB.length) return false
+  return timingSafeEqual(bufA, bufB)
+}
+
+export type SignatureVerdict = 'ok' | 'missing' | 'stale' | 'mismatch'
+
+/**
+ * Checks an event's signature over the body exactly as received. The spec's sample signs
+ * `timestamp + JSON.stringify(body)` of the parsed body, which equals the raw text whenever Oura sends
+ * compact JSON; the re-serialised form is also accepted so a whitespace difference does not drop a
+ * genuine event. Both need the client secret, so accepting either does not widen who can sign.
+ */
+export function verifyOuraSignature(
+  secret: string, signature: string | null, timestamp: string | null, rawBody: string, now = Date.now(),
+): SignatureVerdict {
+  if (!signature || !timestamp) return 'missing'
+  const at = timestampMs(timestamp.trim())
+  if (at == null || at < now - MAX_EVENT_AGE_MS || at > now + MAX_EVENT_SKEW_MS) return 'stale'
+  const given = signature.trim().replace(/^sha256=/i, '').toUpperCase()
+  if (!/^[0-9A-F]{64}$/.test(given)) return 'mismatch'
+  if (sameHex(given, hmacHex(secret, timestamp.trim() + rawBody))) return 'ok'
+  let reserialised: string | null = null
+  try { reserialised = JSON.stringify(JSON.parse(rawBody)) } catch { /* not JSON: no second form */ }
+  if (reserialised !== null && reserialised !== rawBody && sameHex(given, hmacHex(secret, timestamp.trim() + reserialised))) return 'ok'
+  return 'mismatch'
+}
+
+/** The event body, per the spec's description. Unknown members are ignored, not refused. */
+export const OuraWebhookEvent = z.object({
+  event_type: z.enum(['create', 'update', 'delete']),
+  data_type: z.string().min(1).max(64),
+  object_id: z.string().min(1).max(256),
+  user_id: z.string().min(1).max(256),
+  event_time: z.string().max(64).optional(),
+})
+export type OuraWebhookEvent = z.infer<typeof OuraWebhookEvent>
+
+export type OuraWebhookOutcome =
+  /** The document was read and written. */
+  | { result: 'written'; counts: OuraCloudWriteCounts }
+  /** A Cloud sleep period was tombstoned (or there was nothing of ours to tombstone). */
+  | { result: 'deleted'; tombstoned: number }
+  /** Nothing to do: a data type we do not store, or a delete of a type we keep no tombstone for. */
+  | { result: 'ignored'; reason: string }
+  /** Nobody here is connected to that Oura account (any more), or their connection cannot be used. */
+  | { result: 'unknown_user' }
+  /** Oura no longer has the document, or it did not match the spec. */
+  | { result: 'not_found' }
+  /** The connection needs the user to connect again; retrying will not help. */
+  | { result: 'reauth' }
+  /** Oura refused this data type for the user (membership or consent). */
+  | { result: 'forbidden' }
+
+export type OuraWebhookDeps = {
+  repo: OuraCloudWriter & OuraTokenStore & OuraHeartRateReader & { getUserIdByOuraUserId(ouraUserId: string): Promise<string | null> }
+  config: OuraOAuthConfig
+  /** Starts the heart-rate catch-up for a user; replaceable for tests. Default: `startOuraCloudHeartRateCatchUp`. */
+  heartRate?: (userId: string) => void
+}
+
+function isStoredType(t: string): t is OuraDocumentType {
+  return Object.prototype.hasOwnProperty.call(OURA_DOCUMENT_TYPES, t)
+}
+
+/**
+ * Handles one verified event. Throws only the client's `OuraUnavailableError` (and database errors): those are
+ * worth Oura's retry, so the route answers 503 for them. Every other outcome is final and answered 200.
+ */
+export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraWebhookEvent): Promise<OuraWebhookOutcome> {
+  if (!isStoredType(event.data_type)) return { result: 'ignored', reason: `data_type ${event.data_type} is not stored` }
+  const userId = await deps.repo.getUserIdByOuraUserId(event.user_id)
+  if (!userId) return { result: 'unknown_user' }
+
+  if (event.event_type === 'delete') {
+    if (event.data_type !== 'sleep') return { result: 'ignored', reason: `delete of ${event.data_type} is not tracked` }
+    return { result: 'deleted', tombstoned: await deps.repo.tombstoneOuraCloudSleep(userId, [event.object_id]) }
+  }
+
+  try {
+    const token = await getOuraAccessToken(deps.repo, deps.config, userId)
+    if (!token) return { result: 'unknown_user' }
+    const doc = await fetchOuraDocument(token, event.data_type, event.object_id)
+    if (!doc) return { result: 'not_found' }
+    const counts = await writeOuraCloudData(deps.repo, userId, mapOuraDocuments([doc]))
+    if (HEART_RATE_TRIGGERS.has(event.data_type)) (deps.heartRate ?? (u => startOuraCloudHeartRateCatchUp(deps, u)))(userId)
+    return { result: 'written', counts }
+  } catch (err) {
+    if (err instanceof OuraReauthRequiredError || err instanceof OuraUnauthorizedError) return { result: 'reauth' }
+    if (err instanceof OuraForbiddenError) return { result: 'forbidden' }
+    throw err
+  }
+}
+
+/** True for a failure worth Oura's retry (Oura unreachable, slow or rate limiting us); the route answers 503. */
+export function isRetryableOuraError(err: unknown): boolean {
+  return err instanceof OuraUnavailableError
+}
+
+// ── Heart rate ────────────────────────────────────────────────────────────────────────────────
+//
+// Oura has no heart-rate webhook (spec `ExtApiV2DataType`), so without this `oura_heartrate` would
+// stop at the connect backfill. A sleep, daily activity or workout event means the ring has synced,
+// so each one also reads the series from the newest `oura_cloud` point to now. It runs after the
+// answer, never inside it: Oura wants the event answered within 10 s and a heart-rate read is
+// another request set. One sync fans out into several of these events, so a user's catch-up runs
+// at most once per `HEART_RATE_MIN_INTERVAL_MS` in this process.
+
+/** The events that start a heart-rate catch-up. */
+export const HEART_RATE_TRIGGERS: ReadonlySet<string> = new Set(['sleep', 'daily_activity', 'workout'])
+/** The furthest back one catch-up reads; the connect backfill and the agent job cover older gaps. */
+export const HEART_RATE_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000
+export const HEART_RATE_MIN_INTERVAL_MS = 5 * 60 * 1000
+
+export type OuraHeartRateReader = Pick<WorkoutRepository, 'getLatestOuraCloudHeartrateAt' | 'getUserById'>
+
+/**
+ * Reads the user's heart rate from the newest stored `oura_cloud` point (at most a week back) to now,
+ * and writes it through `upsertOuraCloudHeartrate` with the user's timezone. Returns points written,
+ * or `null` when the user has no usable connection.
+ */
+export async function catchUpOuraCloudHeartRate(
+  deps: Pick<OuraWebhookDeps, 'repo' | 'config'>, userId: string, now = Date.now(),
+): Promise<number | null> {
+  const token = await getOuraAccessToken(deps.repo, deps.config, userId)
+  if (!token) return null
+  const floor = new Date(now - HEART_RATE_LOOKBACK_MS)
+  const newest = await deps.repo.getLatestOuraCloudHeartrateAt(userId, floor)
+  const user = await deps.repo.getUserById(userId)
+  const tz = user?.timezone ?? DEFAULT_TZ
+  // From the newest point itself: re-reading it is an idempotent upsert, and a strictly-later start
+  // could drop a point Oura stamped at that same second.
+  const got = await fetchOuraHeartRate(token, newest ?? floor, new Date(now))
+  const points = mapHeartRateRows(got.rows)
+  return points.length === 0 ? 0 : deps.repo.upsertOuraCloudHeartrate(userId, points, tz)
+}
+
+const heartRateLastRun = new Map<string, number>()
+
+/** Starts `catchUpOuraCloudHeartRate` in the background, throttled per user. Never throws. */
+export function startOuraCloudHeartRateCatchUp(deps: Pick<OuraWebhookDeps, 'repo' | 'config'>, userId: string, now = Date.now()): void {
+  const last = heartRateLastRun.get(userId)
+  if (last !== undefined && now - last < HEART_RATE_MIN_INTERVAL_MS) return
+  heartRateLastRun.set(userId, now)
+  catchUpOuraCloudHeartRate(deps, userId, now).catch(err => {
+    if (err instanceof OuraReauthRequiredError || err instanceof OuraUnauthorizedError || err instanceof OuraForbiddenError) return
+    const message = err instanceof Error ? err.message : 'unknown'
+    console.warn(`[oura] heart-rate catch-up failed: ${message}`)
+    reportOuraCloudIssue('webhook-heartrate:failed', message, { userId })
+  })
+}
+
+/** Test seam: forget the per-user throttle. */
+export function resetOuraCloudHeartRateThrottle(): void {
+  heartRateLastRun.clear()
+}

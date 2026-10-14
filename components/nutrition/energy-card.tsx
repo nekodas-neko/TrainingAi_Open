@@ -8,6 +8,7 @@ import type { EnergyBalanceResponse } from '@/app/api/nutrition/energy-balance/r
 import { CalorieZoneBar } from './calorie-zone-bar'
 import { macroShares } from './macro-energy'
 import { EnergyExplainer } from './energy-explainer'
+import { EstimatedKcalLine, StripedRingArc } from './estimated-kcal'
 
 interface Props {
   data: EnergyBalanceResponse | null
@@ -36,6 +37,14 @@ interface Props {
    *  Q-323's earned-scaled macro grams. Passing the raw stored targets would report fat over on a
    *  day with 551 kcal earned when it was well under. */
   targets: NutritionTargets | null
+  /** #2072. Calories assumed for planned meals nobody logged (`useEstimatedMeals`). `calories` and the
+   *  macro grams stay LOGGED food; this is added on top, drawn striped, and counted in the centre
+   *  number, so it matches the payload's `intakeKcal` and "left". */
+  estimatedKcal?: number
+  /** Their meal types ("lunch"), for the line under the ring. */
+  estimatedMeals?: string | null
+  /** The design's Confirm tap: where the user logs or declines the assumed meal. */
+  onConfirmEstimate?: () => void
 }
 
 /** The ring's own hole, as a mask — a conic gradient with a transparent centre, not an SVG stroke.
@@ -67,7 +76,7 @@ const RING_MASK = 'radial-gradient(farthest-side, transparent 69%, black 70% 89%
  */
 export const EnergyCard = memo(function EnergyCard({
   data, isToday, loading, calories, proteinG, carbsG, fatG, goalCalories, earnedKcal,
-  targets, balanceStale, balanceRefreshing, onRetryBalance,
+  targets, balanceStale, balanceRefreshing, onRetryBalance, estimatedKcal = 0, estimatedMeals, onConfirmEstimate,
 }: Props) {
   const [showInfo, setShowInfo] = useState(false)
 
@@ -84,12 +93,20 @@ export const EnergyCard = memo(function EnergyCard({
   // shared, tested subtraction; where there is no balance the caller's goal is all there is, so the
   // arithmetic is done here rather than left blank.
   const goal = goalCalories
-  const remaining = b ? b.remainingKcal : goal != null ? Math.round(goal - calories) : null
+  // #2072. What the day counts as eaten: logged food plus the assumed plan meals — the same total the
+  // payload's `intakeKcal` (and so `remainingKcal`) is built on.
+  const estimate = estimatedKcal > 0 ? estimatedKcal : 0
+  const eaten = calories + estimate
+  const remaining = b ? b.remainingKcal : goal != null ? Math.round(goal - eaten) : null
   const overTarget = remaining != null && remaining < 0
 
   const shares = macroShares({ proteinG, carbsG, fatG })
-  const pct = goal != null && goal > 0 ? Math.min(100, (calories / goal) * 100) : 0
+  const totalPct = goal != null && goal > 0 ? Math.min(100, (eaten / goal) * 100) : 0
+  // The macro arcs cover what was LOGGED; the striped arc runs on from there to the whole total.
+  // Macros stay on logged food because the plan's macros are a guess (the design's own note).
+  const pct = goal != null && goal > 0 ? Math.min(totalPct, (calories / goal) * 100) : 0
   const sweep = pct * 3.6
+  const totalSweep = totalPct * 3.6
   const proteinEnd = shares.protein * sweep
   const carbsEnd = proteinEnd + shares.carbs * sweep
   // Degrees accumulate rather than each segment being placed independently, so rounding cannot open
@@ -122,9 +139,10 @@ export const EnergyCard = memo(function EnergyCard({
             className="absolute inset-0 rounded-full"
             style={{ background: arc, WebkitMask: RING_MASK, mask: RING_MASK }}
           />
+          <StripedRingArc fromDeg={sweep} toDeg={totalSweep} ringMask={RING_MASK} />
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-px">
             <span className="text-[22px] font-bold leading-none tracking-tight tabular-nums">
-              {Math.round(calories).toLocaleString()}
+              {Math.round(eaten).toLocaleString()}
             </span>
             <span className="text-[9.5px] uppercase tracking-wider text-muted-foreground">
               {goal != null ? `of ${Math.round(goal).toLocaleString()}` : 'kcal'}
@@ -169,6 +187,14 @@ export const EnergyCard = memo(function EnergyCard({
           </div>
         </div>
       </div>
+
+      {/* #2072. Says how much of the total is assumed, and the tap goes where the meal is confirmed. */}
+      <EstimatedKcalLine
+        estimatedKcal={estimate}
+        meals={estimatedMeals}
+        onConfirm={onConfirmEstimate}
+        className="mt-2.5 border-t border-border/50 pt-2.5"
+      />
 
       {/* RV-103. The figure above is the one fetched before the last entry, and nothing else on the
           screen would say so — the owner's recovery, both times he reported it, was to leave the
@@ -228,6 +254,7 @@ export const EnergyCard = memo(function EnergyCard({
               different calorie budgets on one screen. */}
           <CalorieZoneBar
             intakeKcal={b.intakeKcal}
+            estimatedKcal={b.estimatedKcal}
             restingBaseKcal={b.restingBaseKcal}
             activeKcal={b.activeKcal}
             targetNetKcal={b.targetNetKcal}

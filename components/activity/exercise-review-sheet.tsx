@@ -127,7 +127,8 @@ export function ExerciseReviewSheet({ sessionId, userId, onClose }: Props) {
           await store.upsertActivityLog({
             id: logId, date: dateStr, activityType, title,
             durationMin: session.durationMin,
-            distanceKm: session.distanceKm ?? null,
+            // A ring walk (#2471) has no distance, and 0 would read as a measured one.
+            distanceKm: session.source === 'ring' ? null : (session.distanceKm ?? null),
             steps: null,
             avgHr: hrData.avgHr,
             maxHr: hrData.maxHr,
@@ -154,7 +155,8 @@ export function ExerciseReviewSheet({ sessionId, userId, onClose }: Props) {
             payload: omitNullFields({
               id: logId, activityType, title,
               durationMin: session.durationMin,
-              distanceKm: session.distanceKm ?? null,
+              // A ring walk (#2471) has no distance, and 0 would read as a measured one.
+              distanceKm: session.source === 'ring' ? null : (session.distanceKm ?? null),
               avgHr: hrData.avgHr,
               maxHr: hrData.maxHr,
               // Derived server-side in saveActivityLog (Q-230).
@@ -182,7 +184,7 @@ export function ExerciseReviewSheet({ sessionId, userId, onClose }: Props) {
             startTime: msToHHMMInTz(session.startMs, userTz),
             endTime: msToHHMMInTz(session.endMs, userTz),
             durationMin: session.durationMin,
-            distanceKm: session.distanceKm,
+            distanceKm: session.source === 'ring' ? undefined : session.distanceKm,
             routePolyline: routePolyline ?? undefined,
             avgHr: hrData.avgHr ?? undefined,
             maxHr: hrData.maxHr ?? undefined,
@@ -326,7 +328,7 @@ function reportReviewOutcome(session: PendingSession, kind: 'saved' | 'dismissed
   recordDetectionEvent(session.detectionId, kind, 'user_review', {
     sessionStartAt: session.startMs,
     activityType,
-    distanceM: session.distanceKm * 1000,
+    distanceM: session.source === 'ring' ? null : session.distanceKm * 1000,
     elapsedSec: (session.endMs - session.startMs) / 1000,
   })
 }

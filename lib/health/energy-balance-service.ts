@@ -2,13 +2,16 @@
 // both call this — a second copy would be a second answer to "how much should I eat today", and
 // the coach contradicting the widget is worse than either being slightly wrong.
 
+import { countedEstimateKcal } from '@trainingai/shared/nutrition/meal-estimate'
+import { unrecordedMealEstimatesAllowed } from '@trainingai/shared/nutrition/meal-logging-status'
+import { foodLoggingCoverage } from '@/lib/nutrition/logging-completeness'
 import { fromZonedTime, toZonedTime } from 'date-fns-tz'
 import { shiftDateStr, ageFromDob } from '@trainingai/shared/date-utils'
-import { computeActiveEnergy, stepEnergyKcal, SEDENTARY_MULTIPLIER, STEP_BASE_CREDIT } from '@trainingai/shared/health/daily-energy'
+import { stepEnergyKcal, SEDENTARY_MULTIPLIER, STEP_BASE_CREDIT } from '@trainingai/shared/health/daily-energy'
 import { type Sex } from '@trainingai/shared/health/workout-energy'
-import { mifflinStJeorBmr } from '@trainingai/shared/nutrition/goal-recommendation'
-import { personalRmr, bodyComposition } from '@trainingai/shared/health/body-composition'
-import { correctBodyFatPct } from '@trainingai/shared/health/body-fat-calibration'
+import {
+  budgetMetricsStart, dayBody, missingBudgetProfileFields, restingRateFor, budgetDeficitFor, activeEnergyForDay,
+} from '@trainingai/shared/nutrition/day-budget'
 import {
   computeCalorieBalance, targetFromMaintenance, GOAL_DAILY_DELTA, scaleMacrosForEarnedKcal,
   macrosForKcal, budgetProvenance,
@@ -20,8 +23,6 @@ import {
 import {
   doseChangesInWindow, doseChangeCaveat, DOSE_HISTORY_LOOKBACK_DAYS,
 } from '@trainingai/shared/health/dose-change-caveat'
-import { goalDeficitKcal } from '@trainingai/shared/nutrition/calorie-budget'
-import { computeTrendWeightKg, weightTrendWindowStart } from '@trainingai/shared/health/long-term-goal-progress'
 import type { FitnessGoal } from '@trainingai/shared/types/user'
 import type { RestingRateSource } from '@trainingai/shared/nutrition/resting-rate-source'
 import type { WorkoutRepository } from '@/lib/data/repository'
@@ -30,6 +31,8 @@ export interface EnergyBalanceResult {
   date: string
   balance: {
     intakeKcal: number
+    loggedIntakeKcal: number
+    estimatedKcal: number
     expenditureKcal: number
     restingBaseKcal: number
     activeKcal: number
@@ -131,6 +134,27 @@ function localMidnightUtc(date: string, tz: string): Date {
   return fromZonedTime(zoned, tz)
 }
 
+async function estimatedKcalFor(repo: WorkoutRepository, userId: string, date: string): Promise<number> {
+  try {
+    const tracking = await repo.listMealLoggingStatuses(userId, date)
+    if (!unrecordedMealEstimatesAllowed(tracking)) return 0
+    const answers = await repo.listPlanMealAnswers(userId, date)
+    if (!answers.some(a => a.answer === 'estimated')) return 0
+    const [plan, mealTypes, logs] = await Promise.all([
+      repo.getActiveMealPlan(userId), repo.listMealTypes(userId), repo.listFoodLogs(userId, date),
+    ])
+    if (!plan) return 0
+    return countedEstimateKcal({
+      answers,
+      planMeals: plan.variants.flatMap(v => v.meals),
+      mealTypes,
+      loggedMealTypeIds: new Set(logs.map(l => l.mealTypeId)),
+    })
+  } catch {
+    return 0
+  }
+}
+
 export async function computeEnergyBalance(
   repo: WorkoutRepository,
   userId: string,
@@ -142,8 +166,7 @@ export async function computeEnergyBalance(
   const windowStart = shiftDateStr(date, -MAX_WINDOW_DAYS)
   // #2071 (b). The deficit reads the Body screen's 30-day Weight Trend, whose window starts a day or
   // two before the calibration window, so the weigh-ins are read from whichever starts first.
-  const trendStart = weightTrendWindowStart(date)
-  const metricsStart = trendStart < windowStart ? trendStart : windowStart
+  const metricsStart = budgetMetricsStart(date)
 
   // The whole window is fetched, not just the requested day: a calibrated maintenance needs the
   // window's average movement to separate resting burn from habitual movement (see below).
@@ -176,23 +199,14 @@ export async function computeEnergyBalance(
     .catch(() => new Map<string, number>())
 
   const intakeByDate = new Map(foodSummary.map(r => [r.date, r.calories]))
-  const loggingCompleteByDate = new Set(
-    dayCheckins.filter(c => c.foodLoggingCompletedAt != null).map(c => c.logDate),
-  )
+  const { complete: loggingCompleteByDate, zeroIntake } = await foodLoggingCoverage(repo, userId, windowStart, date,
+    dayCheckins.filter(c => c.foodLoggingCompletedAt != null).map(c => c.logDate))
   const metricByDate = new Map(metrics.map(m => [m.date, m]))
 
-  const byDateDesc = (a: { date: string }, b: { date: string }) => b.date.localeCompare(a.date)
-  // Last known weight, however old — a stale weight still beats having no BMR at all.
-  const latestWeightKg = metrics.filter(m => m.weightKg != null).sort(byDateDesc)[0]?.weightKg ?? null
-  // BF-2: the scale's BIA estimate is corrected against the DEXA before anything derives from it.
-  // The correction is per instrument, so the row's own provenance decides — a reading from an
-  // uncalibrated or unrecorded source is left alone rather than corrected on a guess.
-  const latestBodyFatRow = metrics.filter(m => m.bodyFatPct != null).sort(byDateDesc)[0] ?? null
-  const latestBodyFatPct = correctBodyFatPct(
-    latestBodyFatRow?.bodyFatPct ?? null,
-    latestBodyFatRow?.bodyFatSource ?? null,
-    bodyFatCalibration,
-  )?.pct ?? null
+  // Last known weight in the window, however old — a stale weight still beats having no BMR at all.
+  // #2690: assembled in `day-budget.ts`, which the achievements read for every past day too.
+  const body = dayBody(metrics, bodyFatCalibration)
+  const latestWeightKg = body.latestWeightKg
 
   const heightCm = profile?.heightCm ?? null
   const ageYears = ageFromDob(profile?.dateOfBirth ?? null, new Date())
@@ -200,24 +214,13 @@ export async function computeEnergyBalance(
   const goal = (profile?.fitnessGoal ?? null) as FitnessGoal | null
 
   const energyProfile = { ageYears, weightKg: latestWeightKg, sex }
-  const activeEnergyFor = (day: string) => {
-    const start = localMidnightUtc(day, tz)
-    const end = new Date(start.getTime() + 86_400_000)
-    return computeActiveEnergy({
-      profile: energyProfile,
-      strengthSessions: workouts
-        .filter(ws => ws.completedAt != null && ws.startedAt >= start && ws.startedAt < end)
-        // `id` threads through so `workoutKcalBySession` can come back keyed by the session (Q-391).
-        // `/api/day-log` already exposes `workoutSessionId` per exercise, so the day screen's
-        // Training card can join on it without keying by session NAME — which is not identity here
-        // and breaks outright for two same-named sessions in one day.
-        .map(ws => ({ id: ws.id, durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000, rpe: ws.sessionRpe ?? null, avgBpm: avgBpmBySession.get(ws.id) ?? null })),
-      activities: activityLogs
-        .filter(a => a.date === day)
-        .map(a => ({ activityType: a.activityType, durationMin: a.durationMin ?? null, distanceKm: a.distanceKm ?? null })),
-      pedometerSteps: metricByDate.get(day)?.steps ?? null,
-    })
-  }
+  // `/api/day-log` already exposes `workoutSessionId` per exercise, so the day screen's Training card
+  // joins `workoutKcalBySession` on it without keying by session NAME — which is not identity here
+  // and breaks outright for two same-named sessions in one day.
+  const activeEnergyFor = (day: string) => activeEnergyForDay({
+    day, dayStartUtc: localMidnightUtc(day, tz), profile: energyProfile,
+    workouts, avgBpmBySession, activities: activityLogs, steps: metricByDate.get(day)?.steps ?? null,
+  })
   const activeEnergy = activeEnergyFor(date)
   const activeBreakdown = {
     workoutKcal: activeEnergy.workoutKcal,
@@ -226,7 +229,9 @@ export async function computeEnergyBalance(
     workoutKcalBySession: activeEnergy.workoutKcalBySession,
   }
 
-  const intakeKcal = Math.round(intakeByDate.get(date) ?? 0)
+  const loggedIntakeKcal = Math.round(intakeByDate.get(date) ?? 0)
+  const estimatedKcal = await estimatedKcalFor(repo, userId, date)
+  const intakeKcal = loggedIntakeKcal + estimatedKcal
   // The RECOMMENDATION's offset (`target.recommendedKcal`, the TDEE nudge). Unchanged by #2071: it is
   // what turns the maintenance estimate into a suggested stored goal, and the maintenance estimate is
   // explicitly not this change's to move.
@@ -238,20 +243,11 @@ export async function computeEnergyBalance(
   // latest weigh-in (`computeTrendWeightKg`, the same fit as that card's rate, never a second
   // smoothing). Fallback, stated: with fewer than three weigh-ins in the window there is no trend, and
   // the latest weigh-in is used instead. The RMR keeps the latest weigh-in, as before.
-  const trendWeightKg = computeTrendWeightKg(metrics.filter(m => m.date >= trendStart && m.date <= date))
-  const deficitWeightKg = trendWeightKg ?? latestWeightKg
-  const deficitWeightSource: 'trend' | 'latest' | null =
-    trendWeightKg != null ? 'trend' : latestWeightKg != null ? 'latest' : null
-  const deficitKcal = Math.round(goalDeficitKcal({
-    goal, currentWeightKg: deficitWeightKg, targetWeightKg: userGoals?.targetWeightKg ?? null,
-  }))
+  const { deficitKcal, deficitWeightKg, deficitWeightSource } = budgetDeficitFor({
+    metrics, date, latestWeightKg, goal, targetWeightKg: userGoals?.targetWeightKg ?? null,
+  })
 
-  const missingProfileFields = [
-    latestWeightKg == null ? 'weight' : null,
-    heightCm == null ? 'height' : null,
-    ageYears == null ? 'date of birth' : null,
-    sex == null ? 'sex' : null,
-  ].filter((f): f is string => f != null)
+  const missingProfileFields = missingBudgetProfileFields(latestWeightKg, { heightCm, ageYears, sex })
 
   /**
    * Q-323. `earned` is today's measured movement — the same figure the budget on screen adds to the
@@ -291,30 +287,9 @@ export async function computeEnergyBalance(
     }
   }
 
-  // Katch-McArdle when body fat is known and plausible (it beats Mifflin away from average
-  // composition), Mifflin-St Jeor otherwise — matching calculateBaseline's choice.
-  //
-  // Routed through `bodyComposition` rather than re-deriving lean mass inline. That is the one
-  // place the body-fat plausibility band lives (Q-527), so an inline `weight × (1 − bf/100)`
-  // silently opts out of it — and this is a live surface: a floored 3% reading would put lean mass
-  // at 97% of bodyweight and hand the owner an energy budget ~24% too high.
-  const comp = bodyComposition(latestWeightKg, latestBodyFatPct)
-  // BF-42. A clinically measured resting rate outranks any prediction, and this was the third path
-  // that never read one: BF-33 wired the measurement into `calculateBaseline` (the goal wizard) and
-  // this live daily model kept predicting, so the two screens would have shown two resting rates
-  // for one person. `personalRmr` re-scales the measurement's Cunningham residual onto TODAY's
-  // fat-free mass, which is the same treatment the wizard gives it.
-  //
-  // `comp.ffmKg` is derived from the DEXA-corrected body fat (BF-2), and that matters here more
-  // than anywhere: `ffm_kg_at_test` came from the DEXA, so handing this the raw scale number would
-  // re-scale the residual across two different instruments.
-  const measuredBmr = personalRmr(
-    measuredRmr ? { rmrKcal: measuredRmr.rmrKcal, ffmKgAtTest: measuredRmr.ffmKgAtTest } : null,
-    comp?.ffmKg ?? null,
-  )
-  const bmr = measuredBmr ?? (comp != null
-    ? comp.bmrKcal
-    : mifflinStJeorBmr(latestWeightKg!, heightCm!, ageYears!, sex!))
+  // Katch-McArdle with a plausible body fat, Mifflin otherwise, and a measured RMR (BF-42) above
+  // both, re-scaled onto today's DEXA-corrected fat-free mass — `restingRateFor` carries the reasons.
+  const { measuredBmr, bmr } = restingRateFor(body, { heightCm, ageYears, sex }, measuredRmr)
   // Sedentary base only — measured movement is added explicitly, so a higher activity multiplier
   // here would double-count it. See daily-energy.ts.
   //
@@ -336,8 +311,9 @@ export async function computeEnergyBalance(
   for (let d = windowStart; d < date; d = shiftDateStr(d, 1)) {
     windowDays.push({
       date: d,
-      intakeKcal: intakeByDate.get(d) ?? null,
+      intakeKcal: intakeByDate.get(d) ?? (zeroIntake.has(d) ? 0 : null),
       loggingComplete: loggingCompleteByDate.has(d),
+      zeroIntakeConfirmed: zeroIntake.has(d),
       weightKg: metricByDate.get(d)?.weightKg ?? null,
     })
   }
@@ -462,7 +438,7 @@ export async function computeEnergyBalance(
   return {
     date,
     balance: {
-      ...balance, intakeKcal, restingBaseKcal, activeKcal: activeEnergy.total,
+      ...balance, intakeKcal, loggedIntakeKcal, estimatedKcal, restingBaseKcal, activeKcal: activeEnergy.total,
       restingRateSource: measuredBmr != null ? 'measured' : 'formula',
       restingRateMeasuredOn: measuredBmr != null ? measuredRmr?.measuredOn ?? null : null,
       deficitWeightKg: deficitWeightKg == null ? null : Math.round(deficitWeightKg * 10) / 10,

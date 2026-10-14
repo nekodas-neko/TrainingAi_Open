@@ -16,16 +16,17 @@ import {
   DEFAULT_SETS,
   DEFAULT_REPS,
   mroundStep,
-  mroundStepUp,
-  prescribedBarWeights,
+  computeInitialWeights,
   plannedWeightsPayload,
+  prescriptionBasisPayload,
+  styleWithPrescribedBars,
   weightStepFor,
-  defaultRpeFromPct,
   applyDeloadReverts,
   deloadRevertNames,
   deloadOverrideBlocked,
   deloadOverrideOutcome, fullOverrideNeedsRebuild,
   exerciseSetCount,
+  rpePrefill,
   sessionContextLabel,
 } from "@/components/workout/utils";
 import { estimateOneRm, isDeloadedForEstimate } from "@trainingai/shared/1rm";
@@ -47,6 +48,7 @@ import { useUserTimezone } from '@/components/shell/user-timezone-provider';
 import { calendarMonthInTz } from '@/lib/calendar-month';
 import { useDeloadChoice } from "@/components/workout/use-deload-choice";
 import { useDurationPreset } from "@/components/workout/use-duration-preset";
+import { startLocalSeed } from "@/components/workout/local-seed";
 import { WorkoutLoadError } from "@/components/workout/workout-load-error";
 import { TTL_SHORT, TTL_MEDIUM, TTL_LONG } from '@trainingai/shared/cache-ttl';
 import { invalidateWorkoutSummaries, invalidateExerciseLogged, invalidatePrescriptionChanged, invalidateWorkoutDataImmediate, invalidatePulledDomains } from "@/lib/cache-groups";
@@ -68,26 +70,6 @@ const DoneScreen = dynamic(() => import("@/components/workout/done-screen").then
 // falls back to the base-program numbers instead of blocking the workout forever.
 const PRESCRIPTION_POLL_INTERVAL_MS = 3000;
 const PRESCRIPTION_POLL_MAX = 10;
-
-// Shared per-set weight derivation — used at init (launchExercise, the per-set-weights
-// effect) and after an injury swap, so all three paths agree on how a set's target
-// weight is picked. One Formula, One Place.
-function computeInitialWeights(ex: WorkoutExercise | undefined, sets: number): number[] {
-  if (ex?.exerciseType === "bodyweight") {
-    return Array.from({ length: sets }, () => 0);
-  }
-  const step = weightStepFor(ex?.equipment);
-  const prescribed = prescribedBarWeights(ex, sets);
-  return Array.from({ length: sets }, (_, i) => {
-    const bar = prescribed[i];
-    if (bar != null) return bar;
-    if (ex?.target80 != null) return mroundStep(ex.target80, step);
-    // Fallback for old logs that predate the target_80 column: derive from 1RM or last weight
-    if (ex?.estimated1rm) return mroundStepUp(ex.estimated1rm * 0.8, step);
-    if (ex?.latestWeight != null) return mroundStep(ex.latestWeight, step);
-    return 60;
-  });
-}
 
 interface WorkoutScreenProps {
   sessionType: string;
@@ -222,6 +204,8 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
   // Monotonic id so an out-of-order periodization fetch response can't overwrite a newer one
   // (loadPeriodization is now callable imperatively, not just from a single effect).
   const periodizationReqRef = useRef(0);
+  // The `workout-data:` cache key whose exercises are on screen (set by every paint in fetchExercises).
+  const paintedKeyRef = useRef<string | null>(null);
   // Bar-load / prep seconds for the current exercise: time on the "get ready" screen before the
   // first Start (loading the bar / setting up). Captured at handleStart from the ready-screen
   // elapsed baseline, read into the log payload at completion. A ref (not store) — transient and
@@ -324,9 +308,11 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
     // Deload gets its own cache key — regular cached sets must never flash before AMRAP sets load
     const cacheKey = `workout-data:${tab}${deload ? ':deload' : ''}`;
     setLoadError(false);
-    // Tracks whether the on-device mirror painted anything, so a subsequent fetch
-    // failure only escalates to the K2 error screen when the screen is truly blank.
-    let localSeeded = false;
+    // A refresh (Accept, Dismiss, a duration switch) runs with the list already on screen, and
+    // blanking it to skeletons is the flash a repeat visit must never show (issue 2831). Keyed, so
+    // a different session or the deload view still starts from skeletons.
+    const alreadyPainted = paintedKeyRef.current === cacheKey;
+    let localSeed: ReturnType<typeof startLocalSeed> | null = null;
 
     const freshExercises = (data: WorkoutDataSeed) => freshExercisesFor(data, tz);
 
@@ -350,44 +336,43 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       if (seed.session?.timeBudgetMinutes) setSessionBudgetMin(seed.session.timeBudgetMinutes);
       if (seed.program?.phaseMode) setProgramPhaseMode(seed.program.phaseMode);
       setLoading(false);
+      paintedKeyRef.current = cacheKey;
     };
     if (synced) {
       paintSeed(synced);
     } else if (cardSeed) {
       paintSeed(cardSeed);
-    } else {
+    } else if (!alreadyPainted) {
       setLoading(true);
       // No cache yet — seed structure (sessions, exercises, per-set progression)
       // from the on-device SQLite mirror so the screen paints offline. The network
-      // response below overwrites this with the full, server-computed data.
+      // response below overwrites this with the full, server-computed data. Not awaited: the
+      // request below starts now, and whichever lands first paints.
       const localStore = userId ? getLocalStore(userId) : null;
-      if (localStore) {
-        try {
-          const local = await localStore.getActiveProgramLocal();
-          // E1-5/R-2: resolve strictly by id — mirror the server's id-only identity
-          // (c2bd70f/v1.171.0 removed exactly the name/sessions[0] fallback there).
-          // Painting sessions[0] for a stale nav id silently attributed logged sets
-          // to the wrong session.
-          const sess = local?.sessions.find(s => s.id === tab);
-          if (local && sess) {
-            setExercises(sess.exercises);
-            // The mirror holds the program's per-set style, never a prescription.
-            setNumbersSource({ kind: 'base' });
-            setSessionDisplayName(sess.name);
-            setProgramSessionId(sess.id);
-            setProgramPhaseMode(local.phaseMode);
-            setLoading(false);
-            localSeeded = true;
-          } else if (local && !sess && typeof navigator !== 'undefined' && !navigator.onLine) {
-            // Offline + id absent from the mirror: no network response will arrive to
-            // run the sessionNotFound guard below, so surface the reselect state here
-            // instead of painting another session. Online, we fall through and let the
-            // authoritative server fetch decide (it returns sessionNotFound).
-            setSessionStale(true);
-            setLoading(false);
-          }
-        } catch { /* fall through to network fetch */ }
-      }
+      if (localStore) localSeed = startLocalSeed(() => localStore.getActiveProgramLocal(), local => {
+        // E1-5/R-2: resolve strictly by id — mirror the server's id-only identity
+        // (c2bd70f/v1.171.0 removed exactly the name/sessions[0] fallback there).
+        // Painting sessions[0] for a stale nav id silently attributed logged sets
+        // to the wrong session.
+        const sess = local.sessions.find(s => s.id === tab);
+        if (sess) {
+          setExercises(sess.exercises);
+          // The mirror holds the program's per-set style, never a prescription.
+          setNumbersSource({ kind: 'base' });
+          setSessionDisplayName(sess.name);
+          setProgramSessionId(sess.id);
+          setProgramPhaseMode(local.phaseMode);
+          setLoading(false);
+          paintedKeyRef.current = cacheKey;
+        } else if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          // Offline + id absent from the mirror: no network response will arrive to
+          // run the sessionNotFound guard below, so surface the reselect state here
+          // instead of painting another session. Online, we fall through and let the
+          // authoritative server fetch decide (it returns sessionNotFound).
+          setSessionStale(true);
+          setLoading(false);
+        }
+      });
     }
 
     try {
@@ -404,6 +389,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
         `/api/workout-data?${wdParams}`,
         TTL_LONG,
         (data) => {
+          localSeed?.networkLanded();
           // Stale nav id: the server has no session with this id (offline mirror out of sync
           // after a program edit). Don't paint a wrong/empty session — force an id-based full
           // mirror re-sync so navigation ids become current, and flag for a reselect prompt.
@@ -438,25 +424,24 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
           // from the seed. Any non-pending payload clears a prior pending state.
           setAiPrescriptionPending(data.aiPrescriptionPending ?? false);
           setLoading(false);
+          paintedKeyRef.current = cacheKey;
         },
         {
           // K2: cachedFetch never rejects, so the old catch below was dead code and
           // a cold-cache 500 hung the screen on an infinite skeleton. Surface a
           // terminal error-with-retry only when nothing painted (no cache seed, no
-          // local mirror). navigator.onLine already gates this in cachedFetchCore,
-          // so offline stays the offline pill, not an error.
-          onError: () => {
-            if (!synced && !cardSeed && !localSeeded) {
-              setLoadError(true);
-              setLoading(false);
-            }
+          // local mirror, no earlier paint of this key). navigator.onLine already gates
+          // this in cachedFetchCore, so offline stays the offline pill, not an error.
+          onError: async () => {
+            await localSeed?.settled;
+            if (paintedKeyRef.current !== cacheKey) { setLoadError(true); setLoading(false); }
           },
         },
       );
     } catch {
       // Reachable only on a pathological synchronous throw; the onError channel
       // handles the normal HTTP/network failure path above.
-      if (!synced && !cardSeed && !localSeeded) { setLoadError(true); setLoading(false); }
+      if (paintedKeyRef.current !== cacheKey) { setLoadError(true); setLoading(false); }
     }
   }, [sessionType, deload, userId, tz]);
 
@@ -848,7 +833,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       store.setReps(repsInit);
       store.initRpeValues(
         Array.from({ length: ds }, (_, i) =>
-          defaultRpeFromPct(ex?.exerciseType === "bodyweight" ? undefined : style?.[i]?.pct)
+          rpePrefill(ex, style, i)
         )
       );
       store.setCurrentIdx(idx);
@@ -890,7 +875,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
     store.setReps(repsInit);
     store.initRpeValues(
       Array.from({ length: ds }, (_, i) =>
-        defaultRpeFromPct(ex.exerciseType === "bodyweight" ? undefined : style?.[i]?.pct)
+        rpePrefill(ex, style, i)
       )
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -928,7 +913,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
         store.setReps(nextStyle ? nextStyle.map((s) => s.reps) : Array(ds).fill(DEFAULT_REPS));
         store.initRpeValues(
           Array.from({ length: ds }, (_, i) =>
-            defaultRpeFromPct(nextEx?.exerciseType === "bodyweight" ? undefined : nextStyle?.[i]?.pct)
+            rpePrefill(nextEx, nextStyle, i)
           )
         );
         store.setTimerStarted(false);
@@ -1076,7 +1061,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       s.setReps(repsInit);
       s.initRpeValues(
         Array.from({ length: ds }, (_, i) =>
-          defaultRpeFromPct(ex?.exerciseType === "bodyweight" ? undefined : style?.[i]?.pct)
+          rpePrefill(ex, style, i)
         )
       );
       s.setTimerStarted(false);
@@ -1213,7 +1198,9 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       snapWeights.map((w, i) => ({ weightKg: w, reps: snapReps[i] ?? 0 })),
       {
         exerciseType: ex.exerciseType === "bodyweight" ? "bodyweight" : "weighted",
-        style: ex.progressionStyle,
+        // Issue 2200: scored against the bars this screen put up, the same ones `plannedWeights`
+        // sends, so the stored estimate and the server's agree.
+        style: styleWithPrescribedBars(ex, snapWeights.length),
         isBaseline,
         deloaded: isDeloadedForEstimate({ exerciseDeloaded: ex.deloaded, isAnyDeload, isBaseline }),
       },
@@ -1264,6 +1251,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       prepTimeSec: ex.supersetGroup == null ? (prepSecRef.current ?? undefined) : undefined,
       progressionStyle: ex.progressionStyle ?? undefined,
       plannedWeights: plannedWeightsPayload(ex, snapWeights.length), // #2445
+      prescriptionBasisKg: prescriptionBasisPayload(ex, snapWeights.length), // issue 2200
       styleName: ex.styleName ?? undefined,
       styleId: ex.styleId,
       muscleGroups: ex.muscleGroups?.length ? ex.muscleGroups : undefined,

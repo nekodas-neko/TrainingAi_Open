@@ -11,7 +11,7 @@
 // IMPORTANT framing: the rest-adequacy signal is CARDIOVASCULAR recovery only. It says nothing about
 // CNS / neuromuscular readiness — every surface that shows it must label it as such.
 import { analyseHrRecovery, nearestBpm, type HrReading, type SetMarker } from './hr-analysis'
-import { deriveHrr60, restAdequateFromHrr60 } from './hrr60'
+import { deriveHrr60, deriveHrrAt, restAdequateFromHrr60 } from './hrr60'
 
 /** A logged set with the identity + prescription dimensions needed to snapshot and later trend it. */
 export interface RichSetMarker {
@@ -141,6 +141,8 @@ export function computeSetHrStats(
   readings: (HrReading & { source?: string | null })[],
   sets: RichSetMarker[],
   baseline: HrBaseline,
+  /** #2299 step 2: the person's rest bar (`personalHrr60Bar`); the population 15 when absent. */
+  opts: { hrr60BarBpm?: number } = {},
 ): SetHrRow[] {
   // Legacy per-set recovery (peak proxy, bpmAtLog, hrr1, adequate) — the single implementation, reused.
   const markers: SetMarker[] = sets.map(s => ({
@@ -188,7 +190,7 @@ export function computeSetHrStats(
     const nextStart = nextStartByIndex.get(i) ?? null
     // HRR60 from dense HR only (#2457 / #2299 v2). The persisted verdict reads this, not the legacy
     // nearest-reading hrr1, so a ring-only set gets no verdict instead of a noisy one. The live recap
-    // (`analyseHrRecovery`) still uses the legacy rule until #2299 step 2 moves it.
+    // reads the same measurement and bar (`computeWorkoutHr`, #2299 step 2).
     const hrr1Bpm = deriveHrr60(readings, endMs)?.bpm ?? null
 
     // Empty defaults for a set we can't anchor a rest window on.
@@ -204,7 +206,7 @@ export function computeSetHrStats(
       secToResting: null as number | null, recoveredResting: null as boolean | null,
       pctHrrAtRestEnd: null as number | null, secToHrr50: null as number | null,
       hrr1Bpm,
-      restAdequate: restAdequateFromHrr60(hrr1Bpm),
+      restAdequate: restAdequateFromHrr60(hrr1Bpm, opts.hrr60BarBpm),
       readingsCount: 0, coverageOk: false,
       source: sourceOf(readings, startMs, endMs),
     }
@@ -223,14 +225,15 @@ export function computeSetHrStats(
     const readingsCount = readingsInWindow(readings, spanFrom, horizonEnd).length
     const coverageOk = bpmAtEnd != null && readingsCount >= MIN_COVERAGE_SAMPLES
 
-    // Drop curve — bpmAtEnd minus HR at +Ns, only if that point is still inside the rest window (a
-    // reading taken once the next set has begun is under load, not recovery, so it can't score a drop).
+    // Drop curve — HR at the set's end minus HR at +Ns, only if that point is still inside the rest
+    // window (a reading taken once the next set has begun is under load, not recovery, so it can't
+    // score a drop), and only where the series is dense enough to see it (#2601, owner 2026-10-07):
+    // the HRR60 rule at every offset, so `drop_60s` and `hrr1_bpm` are one measurement, and a
+    // ring-only set — 63 in production, median `drop_60s` 0 — has no drop curve rather than noise.
     const dropAt = (offsetSec: number): number | null => {
-      if (bpmAtEnd == null) return null
       const targetMs = endMs + offsetSec * 1000
       if (targetMs > horizonEnd) return null
-      const b = nearestBpm(readings, new Date(targetMs), NEAREST_TOL_MS)
-      return b != null ? bpmAtEnd - b : null
+      return deriveHrrAt(readings, endMs, offsetSec * 1000)?.bpm ?? null
     }
 
     const troughBpm = restReadings.length ? Math.min(...restReadings.map(r => r.bpm)) : null

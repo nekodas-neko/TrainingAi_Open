@@ -1,6 +1,6 @@
 {
   "name": "trainingai",
-  "version": "1.489.0",
+  "version": "1.490.1",
   "engines": {
     "node": ">=22.12"
   },
@@ -147,6 +147,7 @@
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^8.3.4",
+    "@electric-sql/pglite": "0.3.14",
     "@eslint/eslintrc": "^3",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",

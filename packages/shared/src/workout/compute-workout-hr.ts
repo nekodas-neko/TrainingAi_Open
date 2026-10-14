@@ -3,7 +3,8 @@ import { analyseHrRecovery, type SetHrStats } from './hr-analysis'
 import { summariseWorkoutHr, type WorkoutHrSummary } from './hr-summary'
 import { computeSetHrStats, type SetHrRow } from './set-hr-stats'
 import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
-import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, toAestDay } from '@trainingai/shared/date-utils'
+import { HRR60_BAR_WINDOW_DAYS, personalHrr60Bar, withHrr60Recovery } from './hrr60'
 import { rmssdFromRr } from '@trainingai/shared/health/rmssd'
 
 export interface WorkoutHrComputed {
@@ -30,16 +31,22 @@ export async function computeWorkoutHr(
   const from = new Date(ws.startedAt.getTime() - 10 * 60 * 1000)
   const to = new Date(ws.completedAt.getTime() + 10 * 60 * 1000)
 
-  const [readings, sets, rrRows, richSets, baseline] = await Promise.all([
+  // #2299 step 2: the rest bar is the person's own HRR60 over the 30 days before this session.
+  const barFrom = dateStrMidnightInTz(shiftDateStr(toAestDay(ws.startedAt, tz), -HRR60_BAR_WINDOW_DAYS), tz)
+  const [readings, sets, rrRows, richSets, baseline, recentSetHr] = await Promise.all([
     repo.getHrForWindow(userId, from, to),
     repo.getSetTimestampsForSession(userId, ws.id),
     repo.getRrForWindow(userId, ws.startedAt, ws.completedAt),
     repo.getSetDetailsForSession(userId, ws.id),
     resolveHrProfile(repo, userId, tz),
+    repo.getSetHrStatsSince(userId, barFrom, 10_000),
   ])
+  const hrr60BarBpm = personalHrr60Bar(recentSetHr
+    .filter(r => r.hrr1Bpm != null && r.loggedAt != null && r.loggedAt < ws.startedAt)
+    .map(r => r.hrr1Bpm as number))
 
-  const stats = analyseHrRecovery(readings, sets.map(s => ({ ...s, loggedAt: s.loggedAt })))
-  const setHrRows = computeSetHrStats(readings, richSets, baseline)
+  const stats = withHrr60Recovery(analyseHrRecovery(readings, sets.map(s => ({ ...s, loggedAt: s.loggedAt }))), readings, hrr60BarBpm)
+  const setHrRows = computeSetHrStats(readings, richSets, baseline, { hrr60BarBpm })
 
   // Rest-window HRV: beats OUTSIDE every working-set interval — RR under load is dominated by
   // mechanics, not autonomic tone. Null without strap RR data.

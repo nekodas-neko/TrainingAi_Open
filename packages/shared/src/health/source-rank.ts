@@ -13,20 +13,29 @@
  * `mergeSet` and the rest of the SQL-building half stay there and import this.
  */
 
-export const HEALTH_SOURCES = ['health_connect', 'apple_health', 'oura_cloud', 'oura_ble', 'scale_ble', 'manual'] as const
-export type HealthSource = (typeof HEALTH_SOURCES)[number]
+export const HEALTH_SOURCES = [
+  'health_connect',
+  'health_connect_native',
+  'apple_health',
+  'oura_cloud',
+  'oura_ble',
+  'scale_ble',
+  'manual',
+] as const;
+export type HealthSource = (typeof HEALTH_SOURCES)[number];
 
 /** Ascending precedence. Anything absent here — including `null` on a legacy row — ranks 0. */
 export const SOURCE_RANK: Record<HealthSource, number> = {
   health_connect: 1,
+  health_connect_native: 0.5,
   apple_health: 1,
   oura_cloud: 2,
   oura_ble: 3,
   scale_ble: 4,
   manual: 5,
-}
+};
 
 /** Precedence rank; null/unknown (legacy rows written before provenance existed) rank 0. */
 export function sourceRank(source: string | null | undefined): number {
-  return source && source in SOURCE_RANK ? SOURCE_RANK[source as HealthSource] : 0
+  return source && source in SOURCE_RANK ? SOURCE_RANK[source as HealthSource] : 0;
 }

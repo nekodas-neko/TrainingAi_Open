@@ -847,6 +847,19 @@ export const mealTypes = pgTable('meal_types', {
   deletedAt:     timestamp('deleted_at', { withTimezone: true }),
 })
 
+export const mealLoggingStatuses = pgTable('meal_logging_statuses', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  mealTypeId: uuid('meal_type_id').notNull().references(() => mealTypes.id, { onDelete: 'cascade' }),
+  logDate: date('log_date', { mode: 'string' }).notNull(),
+  skipped: boolean('skipped').notNull().default(false),
+  explicit: boolean('explicit').notNull().default(false),
+  decisionId: uuid('decision_id').notNull(),
+  decidedAt: timestamp('decided_at', { withTimezone: true }).notNull().defaultNow(),
+  retired: boolean('retired').notNull().default(false),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [unique().on(t.userId, t.logDate, t.mealTypeId)])
+
 export const foodItems = pgTable('food_items', {
   id:           uuid('id').primaryKey().defaultRandom(),
   userId:       uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
@@ -1557,9 +1570,9 @@ export const ouraDaily = pgTable('oura_daily', {
   lowActivityMetMinutes:        doublePrecision('low_activity_met_minutes'),
 
   // Daily stress (GET /v2/usercollection/daily_stress)
-  stressHigh:    integer('stress_high'),    // minutes in high stress
-  recoveryHigh:  integer('recovery_high'),  // minutes in high recovery
-  daySummary:    text('day_summary'),       // 'restored'|'restorative'|'stressful'|'very_stressful'|'passive'
+  stressHigh:    integer('stress_high'),    // seconds in high stress (spec `PublicDailyStress`)
+  recoveryHigh:  integer('recovery_high'),  // seconds in high recovery
+  daySummary:    text('day_summary'),       // 'restored'|'normal'|'stressful' (spec `PublicDailyStressSummary`)
 
   // VO2 Max (GET /v2/usercollection/vO2_max) — Ring 4+ / Ring 5
   vo2Max:        doublePrecision('vo2_max'),  // ml/kg/min
@@ -1569,7 +1582,7 @@ export const ouraDaily = pgTable('oura_daily', {
   pulseWaveVelocity:   doublePrecision('pulse_wave_velocity'), // m/s
 
   // Daily resilience (GET /v2/usercollection/daily_resilience)
-  resilienceLevel:        text('resilience_level'),       // 'exceptional'|'strong'|'adequate'|'limited'|'low'
+  resilienceLevel:        text('resilience_level'),       // 'limited'|'adequate'|'solid'|'strong'|'exceptional' (spec `LongTermResilienceLevel`)
   resilienceContributors: jsonb('resilience_contributors'), // { sleep_recovery, daytime_recovery, stress }
 
   // sleep_time endpoint (GET /v2/usercollection/sleep_time) — migration 090
@@ -2274,4 +2287,49 @@ export const appleHealthSamples = pgTable('apple_health_samples', {
   check('apple_health_samples_value', sql`${t.quantityValue} IS NULL OR (${t.quantityValue} > '-Infinity'::double precision AND ${t.quantityValue} < 'Infinity'::double precision)`),
   check('apple_health_samples_payload', sql`${t.deletedAt} IS NOT NULL OR (${t.startAt} IS NOT NULL AND ${t.endAt} IS NOT NULL AND ${t.sourceBundleId} IS NOT NULL AND length(trim(${t.sourceBundleId})) > 0 AND ((${t.quantityValue} IS NOT NULL AND ${t.quantityUnit} IS NOT NULL AND length(trim(${t.quantityUnit})) > 0 AND ${t.categoryValue} IS NULL) OR (${t.categoryValue} IS NOT NULL AND ${t.quantityValue} IS NULL AND ${t.quantityUnit} IS NULL)))`),
   index('apple_health_samples_history_idx').on(t.userId, t.sampleType, t.startAt).where(sql`${t.deletedAt} IS NULL`),
+  index('apple_health_samples_rebuild_idx').on(t.userId, t.startAt).where(sql`${t.deletedAt} IS NULL`),
 ])
+
+
+export const healthConnectRecords = pgTable('health_connect_records', {
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  recordId: text('record_id').notNull(),
+  recordPayload: jsonb('record_payload').$type<import('@trainingai/shared/validation/health-connect-import').HealthConnectRecord>(),
+  recordType: text('record_type'),
+  startAt: timestamp('start_at', { withTimezone: true }),
+  endAt: timestamp('end_at', { withTimezone: true }),
+  value: doublePrecision('value'),
+  sourcePackage: text('source_package'),
+  modifiedAt: timestamp('modified_at', { withTimezone: true }),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  primaryKey({ columns: [t.userId, t.recordId] }),
+  index('health_connect_records_range_idx').on(t.userId, t.recordType, t.startAt).where(sql`${t.deletedAt} IS NULL`),
+  index('health_connect_records_rebuild_idx').on(t.userId, t.startAt).where(sql`${t.deletedAt} IS NULL`),
+]);
+export const nativeHealthProjectionDays = pgTable(
+  'native_health_projection_days',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    source: text('source', { enum: ['apple_health', 'health_connect_native'] }).notNull(),
+    day: date('day', { mode: 'string' }).notNull(),
+    pending: boolean('pending').notNull().default(true),
+    daily: jsonb('daily').$type<Record<string, number | string>>(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.source, t.day] }),
+    index('native_health_projection_pending_idx')
+      .on(t.userId, t.source, t.day)
+      .where(sql`${t.pending}`),
+  ],
+);
+export const healthConnectProjectionState = pgTable('health_connect_projection_state', {
+  userId: uuid('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  payload: jsonb('payload').notNull().$type<{
+    daily: { date: string; weightKg?: number; restingHeartRate?: number; steps?: number; activeCalories?: number; hrvMs?: number }[];
+    heart: { timestamp: string; bpm: number }[];
+  }>(),
+});

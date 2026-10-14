@@ -333,7 +333,7 @@ const GUIDE: Record<string, ContributorGuide> = {
     ],
   },
   zoneMinutes: {
-    measures: 'Minutes spent in zone 2+ heart-rate effort today (moderate or vigorous; vigorous counts double).',
+    measures: 'Minutes of moderate or vigorous heart-rate effort today. Moderate starts at 40% of your heart-rate reserve; from 60%, vigorous, each minute counts double.',
     against: 'WHO’s ~22 min/day guideline (150 min/week of moderate activity).',
     high: 'You’ve hit a solid block of elevated-effort time today.',
     low: 'Little sustained elevated-effort time today.',

@@ -6,7 +6,15 @@ import { rederiveBodyBattery } from '@/lib/health/rederive-body-battery'
 import { startStressBackfillJob } from '@/lib/oura-ble/stress-backfill-job'
 import { redecodeJobKind } from '@/lib/oura-ble/redecode-job-kind'
 import { tagBaselineSessions } from '@/lib/admin/baseline-phase-tag.mjs'
+import { rederiveStylelessOneRm } from '@/lib/workout/rederive-styleless-one-rm'
+import { reencodeBodyweightOneRm } from '@/lib/workout/reencode-bodyweight-one-rm'
+import { recomputeHrr1Best } from '@/lib/workout/recompute-hrr1-best'
+import { backfillSetHrr1 } from '@/lib/workout/backfill-set-hrr1'
 import type { FinishAgentActionInput } from '@/lib/data/postgres/slices/agent-actions'
+import { ouraOAuthConfig } from '@/lib/oura/cloud/config'
+import { backfillOuraCloud, CONNECT_BACKFILL_DAYS, validBackfillRange, type OuraBackfillResult } from '@/lib/oura/cloud/backfill'
+import { runOuraWebhookRenewal } from '@/lib/oura/cloud/renewal'
+import { shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 
 /**
  * The agent key's allow-list (issue 2381, part b). A job is reachable with the key only if it is
@@ -57,6 +65,13 @@ const RederiveBodyBatteryParams = z.object({
 }).strict()
 
 const DryRunOnly = z.object({ dryRun: z.boolean() }).strict()
+
+const OuraCloudBackfillParams = z.object({
+  from: DateParam.optional(),
+  to: DateParam.optional(),
+  heartRate: z.boolean().optional(),
+  dryRun: z.boolean(),
+}).strict()
 
 export const AGENT_JOBS = {
   /**
@@ -154,6 +169,147 @@ export const AGENT_JOBS = {
       return { status: 202, body: { alreadyRunning: false, job, note: 'Started. Poll GET /api/agent-actions?job=stress-backfill&jobId=…' }, finish: { pending } }
     },
   } satisfies AgentJobDef<z.infer<typeof DryRunOnly>>,
+
+  /**
+   * Issue 2357. Re-derives the stored 1RMs of styleless working sets without the AMRAP discount,
+   * upward only, through `rederiveStylelessOneRm` (`POST /api/admin/rederive-styleless-one-rm`).
+   * A write overwrites stored 1RMs, so it needs an approval.
+   */
+  'rederive-styleless-one-rm': {
+    params: DryRunOnly,
+    losesData: p => !p.dryRun,
+    run: async (ctx, p) => {
+      const result = await rederiveStylelessOneRm({ repo: ctx.repo, userId: ctx.userId, tz: ctx.tz, dryRun: p.dryRun })
+      if (!result.ok) return { status: 409, body: { error: result.error }, finish: { outcome: 'failed', error: result.error } }
+      const { summary } = result.report
+      return {
+        status: 200,
+        body: { report: result.report },
+        finish: { outcome: 'succeeded', affectedRows: summary.written, daysMoved: p.dryRun ? 0 : summary.daysMoved },
+      }
+    },
+  } satisfies AgentJobDef<z.infer<typeof DryRunOnly>>,
+  /**
+   * #2760. Re-encodes the stored bodyweight 1RM estimates under the smooth AMRAP discount, upward
+   * only, through `reencodeBodyweightOneRm` (`POST /api/admin/reencode-bodyweight-one-rm`). A write
+   * overwrites stored 1RMs, so it needs an approval.
+   */
+  'reencode-bodyweight-one-rm': {
+    params: DryRunOnly,
+    losesData: p => !p.dryRun,
+    run: async (ctx, p) => {
+      const result = await reencodeBodyweightOneRm({ repo: ctx.repo, userId: ctx.userId, tz: ctx.tz, dryRun: p.dryRun })
+      if (!result.ok) return { status: 409, body: { error: result.error }, finish: { outcome: 'failed', error: result.error } }
+      const { summary } = result.report
+      return {
+        status: 200,
+        body: { report: result.report },
+        finish: { outcome: 'succeeded', affectedRows: summary.written, daysMoved: p.dryRun ? 0 : summary.daysMoved },
+      }
+    },
+  } satisfies AgentJobDef<z.infer<typeof DryRunOnly>>,
+  /**
+   * #2457 / #2601 / #2299 step 2. Re-measures every stored `set_hr_stats` row's HRR60, verdict (the
+   * person's bar) and drop curve from dense HR, through `backfillSetHrr1`
+   * (`POST /api/admin/backfill-set-hrr1`). A write clears ring-only drops and verdicts, so it needs an
+   * approval. Run before `recompute-hrr1-best`, which reads what this writes.
+   */
+  'backfill-set-hrr1': {
+    params: DryRunOnly,
+    losesData: p => !p.dryRun,
+    run: async (ctx, p) => {
+      const report = await backfillSetHrr1({ repo: ctx.repo, userId: ctx.userId, tz: ctx.tz, dryRun: p.dryRun })
+      return {
+        status: 200,
+        body: { report },
+        finish: { outcome: 'succeeded', affectedRows: report.summary.written, daysMoved: p.dryRun ? 0 : report.summary.daysChanged },
+      }
+    },
+  } satisfies AgentJobDef<z.infer<typeof DryRunOnly>>,
+  /**
+   * #2601 (owner approved 2026-10-07). Recomputes `workout_hr_stats.hrr1_best` as the max of each
+   * session's HRR60, through `recomputeHrr1Best` (`POST /api/admin/recompute-hrr1-best`). About 25
+   * ring-only sessions lose their value, so a write needs an approval. Run `backfill-set-hrr1` first.
+   */
+  'recompute-hrr1-best': {
+    params: DryRunOnly,
+    losesData: p => !p.dryRun,
+    run: async (ctx, p) => {
+      const result = await recomputeHrr1Best({ userId: ctx.userId, tz: ctx.tz, dryRun: p.dryRun })
+      if (!result.ok) return { status: 409, body: { error: result.error }, finish: { outcome: 'failed', error: result.error } }
+      const { summary } = result.report
+      return {
+        status: 200,
+        body: { report: result.report },
+        finish: { outcome: 'succeeded', affectedRows: summary.written, daysMoved: summary.daysMoved },
+      }
+    },
+  } satisfies AgentJobDef<z.infer<typeof DryRunOnly>>,
+  /**
+   * #2859. Reads the owner's Oura Cloud history over `from`..`to` (default: the last 90 days, the
+   * connect backfill's range; at most 366 days) and writes it as `oura_cloud` through
+   * `backfillOuraCloud`, the code a new connection runs. Idempotent. A write can replace a stored
+   * value whose source ranks at or below `oura_cloud` (a legacy row with no source, Health Connect),
+   * so it needs an approval; the ring's BLE values and manual entries outrank it and never move.
+   */
+  'oura-cloud-backfill': {
+    params: OuraCloudBackfillParams,
+    losesData: p => !p.dryRun,
+    run: async (ctx, p) => {
+      const config = ouraOAuthConfig()
+      if (!config) return { status: 503, body: { error: 'Oura is not configured on this server' }, finish: { outcome: 'refused', error: 'oura not configured' } }
+      const to = p.to ? normalizeDateParamIso(p.to) : todayInTz(ctx.tz)
+      const from = p.from ? normalizeDateParamIso(p.from) : to && shiftDateStr(to, -(CONNECT_BACKFILL_DAYS - 1))
+      if (!from || !to) return { status: 400, body: { error: 'Invalid date' }, finish: { outcome: 'refused', error: 'invalid date' } }
+      if (!validBackfillRange(from, to)) return { status: 400, body: { error: 'invalid_range' }, finish: { outcome: 'refused', error: 'invalid_range' } }
+      const run = backfillOuraCloud({ repo: ctx.repo, config }, ctx.userId, {
+        from, to, dryRun: p.dryRun, heartRate: p.heartRate ?? true, tz: ctx.tz,
+      })
+      const finish = (result: OuraBackfillResult): FinishAgentActionInput => {
+        if (!result.ok) return { outcome: 'refused', error: result.error }
+        const { counts, stoppedEarly } = result.report
+        const written = p.dryRun ? 0 : counts.dailyRows + counts.bodyRows + counts.sleepWritten + counts.sleepTombstoned + counts.workouts + counts.heartRatePoints
+        return { outcome: stoppedEarly ? 'failed' : 'succeeded', affectedRows: written, daysMoved: p.dryRun ? 0 : counts.dailyRows, error: stoppedEarly }
+      }
+      // A write can take tens of Oura requests (#2895 review, nit 10), so it runs after the answer
+      // and its log row is finished when it ends, as `stress-backfill`'s is. A dry run is answered
+      // in full: its report is what the caller reads before asking for the write.
+      if (!p.dryRun) {
+        return {
+          status: 202,
+          body: { from, to, note: 'Started. The outcome is written to this action\'s agent_action_log row when the run ends.' },
+          finish: { pending: run.then(finish) },
+        }
+      }
+      const result = await run
+      if (!result.ok) {
+        const status = result.error === 'invalid_range' ? 400 : 409
+        return { status, body: { error: result.error }, finish: finish(result) }
+      }
+      return { status: 200, body: { report: result.report }, finish: finish(result) }
+    },
+  } satisfies AgentJobDef<z.infer<typeof OuraCloudBackfillParams>>,
+  /**
+   * #2859. Renews Oura's app-level webhook subscriptions and creates missing ones, the pass the
+   * server runs every 12 hours (`runOuraWebhookRenewal`). Touches no user data, only the
+   * subscriptions at Oura; a dry run lists what it would do.
+   */
+  'oura-webhook-subscriptions': {
+    params: DryRunOnly,
+    losesData: () => false,
+    run: async (_ctx, p) => {
+      const report = await runOuraWebhookRenewal(p.dryRun)
+      if (!report) {
+        return { status: 409, body: { error: 'Oura webhook settings are missing, or another pass is running' }, finish: { outcome: 'refused', error: 'not configured or locked' } }
+      }
+      return {
+        status: 200,
+        body: { report },
+        finish: { outcome: report.failed.length > 0 ? 'failed' : 'succeeded', affectedRows: p.dryRun ? 0 : report.created.length + report.renewed.length, daysMoved: 0,
+          error: report.failed.length > 0 ? `${report.failed.length} subscription(s) failed` : null },
+      }
+    },
+  } satisfies AgentJobDef<z.infer<typeof DryRunOnly>>,
 } as const
 
 export type AgentJobId = keyof typeof AGENT_JOBS
@@ -195,6 +351,12 @@ export const AgentActionRequest = z.discriminatedUnion('job', [
   requestSchema('rederive-body-battery'),
   requestSchema('backfill-baseline-phase-tag'),
   requestSchema('stress-backfill'),
+  requestSchema('rederive-styleless-one-rm'),
+  requestSchema('reencode-bodyweight-one-rm'),
+  requestSchema('backfill-set-hrr1'),
+  requestSchema('recompute-hrr1-best'),
+  requestSchema('oura-cloud-backfill'),
+  requestSchema('oura-webhook-subscriptions'),
 ])
 export type AgentActionRequest = z.infer<typeof AgentActionRequest>
 

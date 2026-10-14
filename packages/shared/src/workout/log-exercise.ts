@@ -1,62 +1,17 @@
 import { isDeloadedForEstimate } from '../1rm';
-import { z } from 'zod';
 import { oneRmImplausible } from '@trainingai/shared/validation/plausibility'
 import { aestMidnight, todayInTz, normalizeDateParam, shiftDateStr } from '@trainingai/shared/date-utils';
 import { getCurrentPhase, isDeloadActive } from '@trainingai/shared/phase-engine';
-import { estimateOneRm, BW_REF } from '@trainingai/shared/1rm';
+import { estimateOneRm, BW_REF, withPrescribedBars } from '@trainingai/shared/1rm';
 import { computeSetAggregates, computeIntensityPct } from '@trainingai/shared/workout/set-aggregates';
 import { bodyweightSetLoadKg } from '@trainingai/shared/workout/bodyweight-load';
 import { defaultUseFor1rm } from '@trainingai/shared/workout/default-use-for-1rm';
 import type { ProgramPhaseType } from '@trainingai/shared/types/program';
-import { RPE_SOURCES } from '@trainingai/shared/workout/rpe-source';
 
-export const LogExercisePayloadSchema = z.object({
-  sessionName:          z.string().min(1).max(200),
-  sessionId:            z.string().uuid().optional(),
-  workoutSessionId:     z.string().uuid().optional(),
-  exerciseLogId:        z.string().uuid().optional(),
-  setLogIds:            z.array(z.string().uuid()).optional(),
-  exercise:             z.string().min(1).max(200),
-  weights:              z.array(z.number().min(-100).max(500)).min(1).max(20),
-  sets:                 z.number().int().min(1).max(20),
-  reps:                 z.array(z.number().int().min(0).max(100)).min(1).max(20),
-  localDate:            z.string().optional(),
-  timeToCompleteSet:    z.number().int().min(0).max(86_400).optional(),
-  setTimes:             z.array(z.number().int().min(0).max(86_400)).max(20).optional(),
-  restTimes:            z.array(z.number().int().min(0).max(86_400)).max(20).optional(),
-  setStartTimes:        z.array(z.number().int().min(1_600_000_000_000).max(4_100_000_000_000)).max(20).optional(),
-  setEndTimes:          z.array(z.number().int().min(1_600_000_000_000).max(4_100_000_000_000)).max(20).optional(),
-  interExerciseRestSec: z.number().int().min(0).max(86_400).optional(),
-  prepTimeSec:          z.number().int().min(0).max(86_400).optional(),
-  progressionStyle:     z.array(z.object({
-    id:        z.string().optional(),
-    styleId:   z.string().optional(),
-    setNumber: z.number().optional(),
-    pct:       z.number(),
-    reps:      z.number(),
-    restSec:   z.number(),
-    useFor1rm: z.boolean().optional(),
-  })).optional(),
-  // #2445: the bar the app put up for each set, after plate rounding — `null` where no style
-  // percentage set it. Stored as set_logs.planned_weight_kg; same bounds as `weights`.
-  plannedWeights:       z.array(z.number().min(0).max(500).nullable()).max(20).optional(),
-  styleName:            z.string().optional(),
-  styleId:              z.string().optional(),
-  muscleGroups:         z.array(z.string()).optional(),
-  workoutStartedAt:     z.number().optional(),
-  warmupEndedAtMs:      z.number().optional(),
-  rpeValues:            z.array(z.number().int().min(5).max(10)).optional(),
-  // #2450: per set, whether `rpeValues[i]` was tapped (`rated`) or left at the picker's pre-fill
-  // (`expected`); `null` where unknown. Stored as set_logs.rpe_source, only beside a stored RPE.
-  rpeSources:           z.array(z.enum(RPE_SOURCES).nullable()).max(20).optional(),
-  intensityMode:        z.enum(['full', 'deload']).optional(),
-  wasOverride:          z.boolean().optional(),
-  exerciseDeloaded:     z.boolean().optional(),
-  estimated1rm:         z.number().optional(),
-  target80:             z.number().optional(),
-});
+export { LogExercisePayloadSchema } from './log-payload';
+import type { LogExercisePayload } from './log-payload';
+export type { LogExercisePayload } from './log-payload';
 
-export type LogExercisePayload = z.infer<typeof LogExercisePayloadSchema>;
 // PR gate: deload work is deliberately submaximal, so its 1RM estimate must
 // never enter personal_records. Whole-session deloads were already excluded;
 // a per-exercise deload excludes just that exercise — and unlike the session
@@ -94,7 +49,7 @@ export async function logExerciseFromPayload(
     exercise, weights, reps,
     localDate, timeToCompleteSet, setTimes, restTimes,
     setStartTimes, setEndTimes, interExerciseRestSec, prepTimeSec,
-    progressionStyle, plannedWeights, styleName, styleId, muscleGroups, workoutStartedAt, warmupEndedAtMs,
+    progressionStyle, plannedWeights, prescriptionBasisKg, styleName, styleId, muscleGroups, workoutStartedAt, warmupEndedAtMs,
     rpeValues, rpeSources, intensityMode, wasOverride, exerciseDeloaded,
   } = payload;
 
@@ -236,9 +191,15 @@ export async function logExerciseFromPayload(
   // (exerciseDeloaded) — must never feed the 1RM estimate itself, not just be excluded from
   // becoming a new PR (Q-115). Baseline is the same carve-out as the PR gate: a baseline test
   // is a genuine max-effort attempt even during an otherwise-active deload window.
+  const lastSetEndMs = setEndTimes?.filter((t): t is number => typeof t === 'number').at(-1);
+  const loggedAt = lastSetEndMs != null ? new Date(lastSetEndMs)
+    : workoutStartedAt != null ? new Date(workoutStartedAt)
+    : new Date();
+  const hasBars = exerciseType !== 'bodyweight' && !deloadedForEstimate && (plannedWeights?.some(w => w != null) ?? false);
+  const basisKg = !hasBars ? null : prescriptionBasisKg ?? await repo.getPrescriptionBasisBefore(userId, exercise, loggedAt, clientExerciseLogId);
   const { estimated1rm, target80 } = estimateOneRm(
     weights.map((w, i) => ({ weightKg: w, reps: reps[i] ?? 0 })),
-    { exerciseType, style: progressionStyle, isBaseline, deloaded: deloadedForEstimate },
+    { exerciseType, style: withPrescribedBars(progressionStyle, plannedWeights, basisKg), isBaseline, deloaded: deloadedForEstimate },
   );
 
   // Volume must be priced at what the lifter actually moved. A bodyweight set logs weight 0, so
@@ -292,10 +253,7 @@ export async function logExerciseFromPayload(
   // 1RM history/trend ordering (`ORDER BY loggedAt`) and PR tiebreaks. Prefer the
   // last set's end, then the workout start; fall back to now only when the payload
   // carries no timing at all (never true for a normal client submit).
-  const lastSetEndMs = setEndTimes?.filter((t): t is number => typeof t === 'number').at(-1);
-  const loggedAt = lastSetEndMs != null ? new Date(lastSetEndMs)
-    : workoutStartedAt != null ? new Date(workoutStartedAt)
-    : new Date();
+
 
   // RV-32: `exercise_logs.style_id` is a client-supplied FK into a strictly user-scoped table, and
   // it arrived here unchecked on both the web route and the outbox's `pushMutations` branch — this

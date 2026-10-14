@@ -18,6 +18,14 @@ Implementer testing Tuesday's release instead of building.
 **Where a role runs is decided by hardware.** Anything needing the phone, Docker or the real APK runs
 on the owner's machine; everything else may run in the cloud.
 
+**A cloud build thread (owner, 2026-10-11: "Yes, one cloud thread").** While spare usage would
+otherwise go unused, the Orchestrator may start **one** cloud session in the Implementer role. It
+builds batches one PR at a time and **skips anything owner-first, any migration, and anything that
+needs the phone to build or verify**. Those stay with the owner's machine. It claims with
+`in progress` like any thread, follows the Implementer's thread brief, lists each PR's device checks
+for the owner's machine, and reads #2354 for "Orchestrator → cloud thread" instructions. Widening
+what it may take is the owner's call.
+
 ## Running several at once
 
 - **Every job is claimed before work starts** — the session adds the `in progress` label to the
@@ -78,7 +86,7 @@ owner can override the tier at any time ("pause", "slow", "full").
 | **Run the app** | Yes — the web build: `pnpm dev` on a local database, driven with the installed browser, to reproduce a report or check a PR. **Not the phone**; that is the Implementer's. |
 | **Read issues, triage, batch** | Yes — every issue, label and milestone. |
 | **Assign work** | Yes — `agent:` labels, and `Batch: …` milestones the Implementer's threads pick up. |
-| **Start agents** | BugFix in the cloud, yes. On the owner's machine, no — the owner starts the runner once and it keeps going. |
+| **Start agents** | BugFix in the cloud, yes, and the one cloud build thread described above. On the owner's machine, no — the owner starts the runner once and it keeps going. |
 | **Message running agents** | **Through GitHub.** Remote Control sessions on the owner's machine do not receive cross-session messages (measured 2026-10-05), so the Orchestrator comments on the **Implementer inbox** issue (#2354), which the Implementer reads on every loop. BugFix in the cloud: `SendMessage`, or its issues. |
 | **Read what agents did** | Yes — every agent writes its result on the issue and the PR. Headless runner sessions report there too; their local logs stay on the owner's machine. |
 | **Merge, release** | Merges agent PRs on green CI; runs the release on the owner's "approve". |

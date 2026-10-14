@@ -25,6 +25,14 @@ describe('bearerSession — the token is really verified', () => {
   })
 
 
+  it('uses edited account profile values without requiring a new sign-in token', async () => {
+    const { bearerSession } = await import('@/lib/auth/bearer-session')
+    const session = await bearerSession(bearer(await mint({userId:'u1',isActive:true,timezone:'Australia/Brisbane',heightCm:170,sex:'male'})),async () => ({isActive:true,isAdmin:false,timezone:'America/New_York',heightCm:180,sex:'female',dateOfBirth:'1990-01-01',activityLevel:'moderate'}))
+    expect(session?.user.timezone).toBe('America/New_York')
+    expect(session?.user.heightCm).toBe(180)
+    expect(session?.user.sex).toBe('female')
+  })
+
   it('reports isActive false when the ROW says so, whatever the token claims', async () => {
     const { bearerSession } = await import('@/lib/auth/bearer-session')
     const session = await bearerSession(bearer(await mint({

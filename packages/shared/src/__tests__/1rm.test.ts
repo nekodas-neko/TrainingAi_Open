@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calc1RM, calcAmrap1RM, calculate1RM, runningEstimate1RM, oneRmTrendStatus, BW_REF, repMaxFromOneRm, repMaxFromAmrapOneRm, rescaleBodyweightReps, resolveBodyweightStyle, estimateOneRm, repFactor, amrapScaleFactor, REP_CEILING, bestSetOneRm, mround, displayOneRm, displayOneRmDelta, displayOneRmSeries, oneRmLabel, oneRmUnit, describePersonalRecord, pickHeadlinePersonalRecord } from '../1rm'
+import { calc1RM, calcAmrap1RM, calculate1RM, runningEstimate1RM, oneRmTrendStatus, BW_REF, repMaxFromOneRm, repMaxFromAmrapOneRm, rescaleBodyweightReps, resolveBodyweightStyle, estimateOneRm, repFactor, REP_CEILING, bestSetOneRm, mround, displayOneRm, displayOneRmDelta, displayOneRmSeries, oneRmLabel, oneRmUnit, describePersonalRecord, pickHeadlinePersonalRecord } from '../1rm'
 
 describe('calcAmrap1RM', () => {
   it('matches calc1RM for ≤5 reps (scale factor 1.0)', () => {
@@ -16,13 +16,14 @@ describe('calcAmrap1RM', () => {
     expect(calcAmrap1RM(100, 12)).toBe(expected)
   })
 
-  it('applies 0.88 factor at 15 reps', () => {
-    const expected = Math.round(calc1RM(100, 15) * 0.88 * 4) / 4
+  // Issue 2193 (a): between anchors the factor is interpolated, and the product is rounded once.
+  it('interpolates between 0.93 (12) and 0.88 (20) at 15 reps', () => {
+    const expected = Math.round(100 * repFactor(15) * (0.93 - 0.05 * 3 / 8) * 4) / 4
     expect(calcAmrap1RM(100, 15)).toBe(expected)
   })
 
-  it('applies 0.82 factor at 25 reps', () => {
-    const expected = Math.round(calc1RM(100, 25) * 0.82 * 4) / 4
+  it('interpolates between 0.88 (20) and 0.82 (30) at 25 reps', () => {
+    const expected = Math.round(100 * repFactor(25) * 0.85 * 4) / 4
     expect(calcAmrap1RM(100, 25)).toBe(expected)
   })
 
@@ -65,28 +66,25 @@ describe('calculate1RM', () => {
     expect(short.estimated1rm).toBeLessThan(exact.estimated1rm)
   })
 
-  // A single mround at the end (calculate1RM's own path) vs calcAmrap1RM's two — calc1RM rounds
-  // to 0.25 internally, then calcAmrap1RM rounds the scaled result again — occasionally differ by
-  // 0.25 (measured at 13 reps: 129 vs 129.25), so the expectation here matches calculate1RM's own
-  // arithmetic rather than assuming the two helpers agree bit-for-bit.
-  const expectedAmrapScaled = (weight: number, reps: number) =>
-    Math.round((weight * repFactor(reps) * amrapScaleFactor(reps)) / 0.25) * 0.25
-
-  it('falls back to the AMRAP-scaled estimate when no style is provided (Q-304)', () => {
-    // No style means no prescription, so a set with no style is an AMRAP set by construction —
-    // it should get the same band discount an explicit AMRAP set would, not the raw un-discounted
-    // repFactor.
+  // Issue 2357 (owner-signed 2026-10-06) reverses Q-304: a styleless working set is a chosen
+  // working set, not an all-out one, so it takes the plain rep-factor estimate with no discount.
+  it('uses the plain rep-factor estimate when no style is provided (issue 2357)', () => {
     const { estimated1rm } = calculate1RM([100, 100, 100], [12, 12, 12])
-    expect(estimated1rm).toBe(expectedAmrapScaled(100, 12))
-    expect(estimated1rm).toBeLessThan(calc1RM(100, 12))
+    expect(estimated1rm).toBe(calc1RM(100, 12))
+    expect(estimated1rm).toBeGreaterThan(calcAmrap1RM(100, 12))
   })
 
-  it('applies the AMRAP band correction at 13+ reps with no prescription (Q-304)', () => {
-    for (const reps of [13, 20, 21]) {
-      const { estimated1rm } = calculate1RM([100], [reps])
-      expect(estimated1rm).toBe(expectedAmrapScaled(100, reps))
-      expect(estimated1rm).toBeLessThan(calc1RM(100, reps))
+  it('applies no AMRAP discount at any rep count with no prescription (issue 2357)', () => {
+    for (const reps of [6, 13, 20, 21]) {
+      expect(calculate1RM([100], [reps]).estimated1rm).toBe(calc1RM(100, reps))
     }
+  })
+
+  it('a set past the style length is a styleless slot too: undiscounted', () => {
+    const style = [{ pct: 60, reps: 12 }]
+    const twoSets = calculate1RM([20, 50], [12, 8], style).estimated1rm
+    const first = calculate1RM([20], [12], style).estimated1rm
+    expect(twoSets).toBe(Math.round(((first + calc1RM(50, 8)) / 2) * 4) / 4)
   })
 
   it('does NOT apply the AMRAP correction on top of a real prescription (no double-correction)', () => {
@@ -108,10 +106,11 @@ describe('calculate1RM', () => {
     expect(estimated1rm).toBe(expected)
   })
 
-  it('ignores sets with reps above 30', () => {
+  // Issue 2193 (c): above the ceiling a set counts at 30 reps, on this path as on every other.
+  it('counts a set above 30 reps at 30', () => {
     const { estimated1rm } = calculate1RM([20, 20], [12, 35], generalStyle)
-    expect(estimated1rm).toBeGreaterThan(0)
-    expect(estimated1rm).toBe(calculate1RM([20], [12], generalStyle).estimated1rm)
+    expect(estimated1rm).toBe(calculate1RM([20, 20], [12, 30], generalStyle).estimated1rm)
+    expect(estimated1rm).toBeGreaterThan(calculate1RM([20], [12], generalStyle).estimated1rm)
   })
 
   it('target80 is 80% of the estimated 1RM, rounded to the nearest 0.25', () => {
@@ -137,13 +136,15 @@ describe('runningEstimate1RM', () => {
   })
 
   it('falls back to all logged sets when the useFor1rm subset yields nothing', () => {
-    const weights = [100, 100]
-    const reps = [35, 6] // set 0 is >30 reps → excluded by the formula
+    // Set 0 has no load, so it cannot score. (It used to be a 35-rep set, which scored nothing
+    // before issue 2193 (c) counted it at 30.)
+    const weights = [0, 100]
+    const reps = [5, 6]
     const style = [
       { pct: 100, reps: 5, useFor1rm: true },
       { pct: 100, reps: 5, useFor1rm: false },
     ]
-    // Only the flagged set counts, but it is excluded (>30 reps) → primary is 0
+    // Only the flagged set counts, but it cannot score → primary is 0
     expect(calculate1RM(weights, reps, style).estimated1rm).toBe(0)
     // Fallback re-runs ignoring useFor1rm → set 1 counts
     const flat = calculate1RM(weights, reps, [
@@ -183,30 +184,32 @@ describe('repMaxFromAmrapOneRm (BF-149)', () => {
   // The owner's own numbers: 11 logged reps stored 128 and the summary card read 8 RM, because
   // the inverse used `calc1RM` while `estimateOneRm` writes `amrapAverage1Rm` values.
   it('recovers the reps a stored bodyweight estimate came from', () => {
+    // 128 under the stepped discount; 129.25 since issue 2193 (a) smoothed it (0.9425 at 11 reps).
     const stored = estimateOneRm([{ weightKg: 0, reps: 11 }], { exerciseType: 'bodyweight' }).estimated1rm
-    expect(stored).toBe(128)
+    expect(stored).toBe(129.25)
     expect(repMaxFromAmrapOneRm(stored)).toBe(11)
-    // What it used to report, kept so the regression is legible rather than just "not 8".
-    expect(repMaxFromOneRm(stored)).toBe(8)
+    // What the unscaled inverse reports, kept so the regression is legible rather than just "not 11".
+    expect(repMaxFromOneRm(stored)).toBeLessThan(11)
   })
 
-  // `amrapScaleFactor` steps at 5/8/12/20, so the forward map dips across each boundary and a
-  // "largest r that does not exceed" search overshoots — 20 reps used to read back as 28.
-  it('does not overshoot at the scale-factor step boundaries', () => {
+  // The stepped discount dipped across each boundary and a "largest r that does not exceed" search
+  // overshot — 20 reps used to read back as 28. The anchors are still worth checking.
+  it('does not overshoot at the discount anchors', () => {
     for (const reps of [5, 8, 12, 19, 20]) {
       expect(repMaxFromAmrapOneRm(calcAmrap1RM(BW_REF, reps))).toBe(reps)
     }
   })
 
-  it('round-trips every rep count except the one genuine collision', () => {
+  it('round-trips every rep count except the two collisions above 25 reps', () => {
     const mismatched: number[] = []
     for (let r = 1; r <= REP_CEILING; r++) {
       if (repMaxFromAmrapOneRm(calcAmrap1RM(BW_REF, r)) !== r) mismatched.push(r)
     }
-    // 5 and 6 both store 114.5 — the rep-factor gain is exactly cancelled by the 1.0 -> 0.97 step,
-    // so no inverse can separate them and the lower reading is the one the number supports.
-    expect(mismatched).toEqual([6])
-    expect(calcAmrap1RM(BW_REF, 5)).toBe(calcAmrap1RM(BW_REF, 6))
+    // Issue 2193 (a): with the smooth discount, 5 and 6 no longer share 114.5. Above 25 reps the
+    // discount and the rep factor nearly cancel, so 27 and 30 land within a quarter of their lower
+    // neighbour and read back as 26 and 29. The lower reading is the one the number supports.
+    expect(mismatched).toEqual([27, 30])
+    expect(calcAmrap1RM(BW_REF, 5)).not.toBe(calcAmrap1RM(BW_REF, 6))
   })
 
   it('inverts at the load the estimate was earned on', () => {
@@ -387,23 +390,25 @@ describe('estimateOneRm — deloaded gate (Q-115)', () => {
 
 describe('estimateOneRm — bodyweight/baseline AMRAP-scaled averaging (C3+C4)', () => {
   it('bodyweight averages per-set AMRAP-scaled estimates (was: max of best set)', () => {
-    // set 1: calcAmrap1RM(100,6)  = mround(calc1RM(100,6)=118.0 × 0.97, .25) = mround(114.46) = 114.5
-    // set 2: calcAmrap1RM(100,10) = mround(133.25 × 0.93, .25) = mround(123.9225) = 124.0
-    // mean(114.5, 124.0) = 119.25 (old best-set rule: 133.25)
+    // Issue 2193 (a), smooth discount, rounded once:
+    // set 1: calcAmrap1RM(100,6)  = mround(100 × repFactor(6) × 0.99) = 117.0
+    // set 2: calcAmrap1RM(100,10) = mround(100 × repFactor(10) × 0.95) = 126.75
+    // mean(117.0, 126.75) = 121.875 → 122.0 (old best-set rule: 133.25)
     const out = estimateOneRm([{ weightKg: 0, reps: 6 }, { weightKg: 0, reps: 10 }], { exerciseType: 'bodyweight' })
-    expect(out.estimated1rm).toBe(119.25)
+    expect(out.estimated1rm).toBe(122)
   })
 
   it('a 34-rep bodyweight AMRAP is capped and scaled, not exploded', () => {
-    // reps capped to 30: calc1RM(100,30) = 206 (Task 2) × amrapScaleFactor(30)=0.82 = 168.92 → mround → 169
+    // reps capped to 30: 100 × repFactor(30) (2.0588) × 0.82 = 168.82 → mround → 168.75 (169 when it
+    // rounded calc1RM first, before issue 2193 (a))
     // OLD (clamp 36 + live Brzycki): repFactor(34)=(2.1333+36/3=12)/2=7.0667 → ~706.75 ≈ 7×BW_REF
     const out = estimateOneRm([{ weightKg: 0, reps: 34 }], { exerciseType: 'bodyweight' })
-    expect(out.estimated1rm).toBe(169)
+    expect(out.estimated1rm).toBe(168.75)
   })
 
   it('weighted bodyweight sets score higher than unweighted', () => {
-    // calcAmrap1RM(120,6) = mround(calc1RM(120,6)=141.75 × 0.97, .25) = mround(137.4975) = 137.5
-    expect(estimateOneRm([{ weightKg: 20, reps: 6 }], { exerciseType: 'bodyweight' }).estimated1rm).toBe(137.5)
+    // calcAmrap1RM(120,6) = mround(120 × repFactor(6) × 0.99, .25) = 140.25
+    expect(estimateOneRm([{ weightKg: 20, reps: 6 }], { exerciseType: 'bodyweight' }).estimated1rm).toBe(140.25)
   })
 
   it('honours useFor1rm subset flags like the weighted path', () => {
@@ -411,19 +416,19 @@ describe('estimateOneRm — bodyweight/baseline AMRAP-scaled averaging (C3+C4)',
       { pct: 100, reps: 10, useFor1rm: true },
       { pct: 60, reps: 15, useFor1rm: false },
     ]
-    // only set 1 counts: calcAmrap1RM(100,10) = 124.0
+    // only set 1 counts: calcAmrap1RM(100,10) = 126.75
     const out = estimateOneRm([{ weightKg: 0, reps: 10 }, { weightKg: 0, reps: 15 }], { exerciseType: 'bodyweight', style })
-    expect(out.estimated1rm).toBe(124.0)
+    expect(out.estimated1rm).toBe(126.75)
   })
 
   it('baseline averages ALL sets (was: first set only)', () => {
-    // set 1: 133.25 × 0.93 = 123.9225 → 124.0 ; set 2: calc1RM(100,8)=125.5 × 0.97 = 121.735 → 121.75
-    // mean = 122.875 → mround 0.25 → 123.0 (old first-set-only rule: 124.0)
+    // set 1: calcAmrap1RM(100,10) = 126.75 ; set 2: calcAmrap1RM(100,8) = 121.75 (an anchor)
+    // mean = 124.25 (old first-set-only rule: the first set alone)
     const out = estimateOneRm(
       [{ weightKg: 100, reps: 10 }, { weightKg: 100, reps: 8 }],
       { exerciseType: 'weighted', isBaseline: true },
     )
-    expect(out.estimated1rm).toBe(123.0)
+    expect(out.estimated1rm).toBe(124.25)
   })
 })
 
@@ -432,15 +437,14 @@ describe('bestSetOneRm — display-only best-single-set estimate (C4 decision)',
     // bestSetOneRm is display-only and deliberately NEVER applies the AMRAP band correction (see
     // its own comment) — per-set calc1RM = 114.5 (100×5) and 133.25 (100×10) → best = 133.25
     expect(bestSetOneRm([{ weightKg: 100, reps: 5 }, { weightKg: 100, reps: 10 }], { exerciseType: 'weighted' })).toBe(133.25)
-    // the SAVED session estimate goes through calculate1RM, which DOES apply the correction
-    // (Q-304) to an unprescribed set: set 1 stays 114.5 (≤5 reps, scale 1.0), set 2 is now
-    // 100×repFactor(10)×0.93 → 124.0 (was 133.25 before the fix). mean(114.5, 124.0) = 119.25.
-    expect(estimateOneRm([{ weightKg: 100, reps: 5 }, { weightKg: 100, reps: 10 }], { exerciseType: 'weighted' }).estimated1rm).toBe(119.25)
+    // the SAVED session estimate AVERAGES the sets. Since issue 2357 an unprescribed working set
+    // takes no AMRAP discount: mean(114.5, 133.25) = 123.875 → 124.0.
+    expect(estimateOneRm([{ weightKg: 100, reps: 5 }, { weightKg: 100, reps: 10 }], { exerciseType: 'weighted' }).estimated1rm).toBe(124)
   })
 
   it('uses AMRAP-scaled per-set values for bodyweight', () => {
-    // per-set: 114.5 (6 reps) and 124.0 (10 reps) → best 124.0
-    expect(bestSetOneRm([{ weightKg: 0, reps: 6 }, { weightKg: 0, reps: 10 }], { exerciseType: 'bodyweight' })).toBe(124.0)
+    // per-set: 117.0 (6 reps) and 126.75 (10 reps) → best 126.75
+    expect(bestSetOneRm([{ weightKg: 0, reps: 6 }, { weightKg: 0, reps: 10 }], { exerciseType: 'bodyweight' })).toBe(126.75)
   })
 
   it('returns 0 with no valid sets', () => {
@@ -538,8 +542,8 @@ describe('bodyweight strength displays as reps, not kilograms (Q-12)', () => {
   })
 
   it('reports 0 reps when a bodyweight change is smaller than one rep', () => {
-    // 114.5 and 116 both invert to a 5 rep max — sub-rep movement is not a rep gained.
-    expect(displayOneRmDelta(116, 114.5, 'bodyweight')?.value).toBe(0)
+    // 114.5 and 115 both invert to a 5 rep max — sub-rep movement is not a rep gained.
+    expect(displayOneRmDelta(115, 114.5, 'bodyweight')?.value).toBe(0)
   })
 
   it('converts a whole series for charts, and leaves weighted series untouched', () => {
@@ -549,8 +553,10 @@ describe('bodyweight strength displays as reps, not kilograms (Q-12)', () => {
 
   // The owner's live report, as the assertion. His Hanging Leg Raise stored 128 from an 11-rep set
   // and every surface below printed "8 RM" four lines under "Last: 11 reps".
+  // 128 is what 11 reps stored before issue 2193 (a); the same set stores 129.25 now. Both read 11.
   it('reads a real stored estimate back as the reps it came from', () => {
-    expect(calcAmrap1RM(BW_REF, 11)).toBe(128)
+    expect(calcAmrap1RM(BW_REF, 11)).toBe(129.25)
+    expect(displayOneRm(129.25, 'bodyweight').text).toBe('11 RM')
     expect(displayOneRm(128, 'bodyweight').text).toBe('11 RM')
     expect(displayOneRmSeries([128], 'bodyweight')).toEqual([11])
   })
@@ -568,9 +574,11 @@ describe('bodyweight strength displays as reps, not kilograms (Q-12)', () => {
   })
 })
 
-// The values migration 148 writes are generated from THIS module, never restated in SQL.
-// If the formula ever changes, this test fails and the migration's constants are known stale.
-describe('migration 148 backfill values match the real estimator (Q-12)', () => {
+// The values migration 148 wrote were generated from this module as it stood (the stepped AMRAP
+// discount). Issue 2193 (a) smoothed the discount and did NOT rewrite stored rows, so these are now
+// the legacy encoding: they must still READ BACK as the reps they came from, which is what every
+// display and prescription does with them.
+describe('migration 148 backfill values still read back as their reps (Q-12, issue 2193)', () => {
   const cases: [number[], number, number][] = [
     [[5], 114.5, 91.5],
     [[4, 4, 3, 3], 109.75, 87.75],
@@ -580,9 +588,17 @@ describe('migration 148 backfill values match the real estimator (Q-12)', () => 
     [[10, 10, 10], 124, 99.25],
   ]
   it.each(cases)('reps %j → %s / target %s', (reps, expected1rm, expectedTarget) => {
-    const r = estimateOneRm(reps.map(x => ({ weightKg: 0, reps: x })), { exerciseType: 'bodyweight', bwRef: 100 })
-    expect(r.estimated1rm).toBe(expected1rm)
-    expect(r.target80).toBe(expectedTarget)
+    expect(expectedTarget).toBe(Math.round(expected1rm * 0.8 * 4) / 4)
+    // A set reads back within its range, never above it. One rep below is the documented legacy
+    // collision: the old 10-rep value (124) is exactly the current 9-rep value, and an inverse must
+    // read a current row right (see 1rm-ms44-arithmetic.test.ts, "legacy rows").
+    const back = displayOneRm(expected1rm, 'bodyweight').value
+    expect(back).toBeGreaterThanOrEqual(Math.min(...reps) - 1)
+    expect(back).toBeLessThanOrEqual(Math.max(...reps))
+    if (new Set(reps).size === 1) expect(back).toBe(reps[0] === 10 ? 9 : reps[0])
+    // And the current estimator never stores LESS for the same sets.
+    const now = estimateOneRm(reps.map(x => ({ weightKg: 0, reps: x })), { exerciseType: 'bodyweight', bwRef: 100 })
+    expect(now.estimated1rm).toBeGreaterThanOrEqual(expected1rm)
   })
 })
 

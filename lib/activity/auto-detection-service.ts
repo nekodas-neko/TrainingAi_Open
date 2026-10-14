@@ -1,7 +1,6 @@
 'use client'
 
 import type { RoutePoint } from './route-encoding'
-import { median } from '@trainingai/shared/stats'
 import { haversineDistanceKm, computeTotalDistanceKm } from './activity-metrics'
 import { startGpsWatcher, type GpsWatcher } from './gps-tracking'
 import { armMotionTrigger, disarmMotionTrigger, isMotionDetectionAvailable } from './motion-detection'
@@ -14,20 +13,9 @@ import {
 } from './motion-gate'
 import { useAutoDetectionStore } from '@/lib/stores/auto-detection-store'
 import { evaluateWatchdog } from './gps-watchdog'
-import { subscribeGateFeed } from '@/lib/oura-ble/gate-feed'
 import { notifyActivityDetected, clearActivityDetected } from '@/lib/notifications'
 import { App } from '@capacitor/app'
 import type { PluginListenerHandle } from '@capacitor/core'
-import {
-  runStepsMotionDecoder,
-  hasStepsDecoderConstants,
-  STRIDE_FREQUENCY_COLUMN,
-  STRIDE_AMPLITUDE_FRAC_COLUMN,
-  TOTAL_AMPLITUDE_MG_COLUMN,
-} from '@/lib/oura-models/steps-motion-decoder'
-import { ensureStepsDecoderConstants } from './steps-decoder-constants-client'
-import { classifyGait } from '@trainingai/shared/health/gait-classifier'
-import { initGaitConfirm, pushGaitWindow, type GaitConfirmContext } from './gait-confirm'
 import { useWorkoutStore } from '@/lib/stores/workout-store'
 import type { WorkoutMode } from '@/components/workout/types'
 import { useGuidedWalkStore, isGuidedWalkActive } from '@/lib/stores/guided-walk-store'
@@ -62,8 +50,7 @@ const NOTIFY_MIN_ELAPSED_SEC = 90
 // far stronger, zero-guesswork signal than any cadence or speed threshold, since the app knows
 // definitively (not probabilistically) when the user is mid-workout. Observed false positive:
 // a "Sumo Deadlift" rest period sustained ~90s of ring cadence in the walk band, confirming a
-// phantom walk via the AD-2 gait-confirm path (its Hz bands are still provisional/uncalibrated —
-// see gait-classifier.ts — so they alone can't be trusted to reject this). Covers 'warmup',
+// phantom walk via the AD-2 gait-confirm path, since removed (#2471). Covers 'warmup',
 // 'active', and 'exercise-summary' (still physically in the training space); 'pre' (not yet
 // started) and 'done' (finished) are unaffected. Pure predicate, extracted so it's
 // unit-testable without a device.
@@ -111,36 +98,6 @@ export function shouldNotifyActivity(args: {
   )
 }
 
-/**
- * The same gate for AD-2's ring-confirm path (Q-68).
- *
- * AD-1's sensor-fallback path has run behind `shouldNotifyActivity` for a while, but the
- * ring-confirm path — the one actually active whenever the ring is connected, so the common case —
- * fired the notification the instant cadence confirmed, with no distance corroboration at all. The
- * owner saw "Recording your walk or run" in the same minute as a scale weigh-in.
- *
- * GPS corroboration is a **veto, not a requirement**, and the distinction is the whole design. A
- * genuine indoor walk can have no GPS fix whatsoever, and that is precisely the case AD-2 exists to
- * handle better than GPS — so "no points" must keep trusting the ring, unchanged. Only when GPS is
- * present AND says you did not really move does it override the cadence confirmation.
- *
- * Two points is the floor for judging: one point is a position, not a distance.
- */
-export function shouldNotifyRingConfirmedActivity(args: {
-  pointCount: number
-  distanceM: number
-  elapsedSec: number
-  alreadyNotified: boolean
-}): boolean {
-  if (args.alreadyNotified) return false
-  if (args.pointCount < 2) return true
-  return shouldNotifyActivity({
-    distanceM: args.distanceM,
-    elapsedSec: args.elapsedSec,
-    alreadyNotified: args.alreadyNotified,
-  })
-}
-
 let watcher: GpsWatcher | null = null
 let stallTimer: ReturnType<typeof setTimeout> | null = null
 let gateTicker: ReturnType<typeof setInterval> | null = null
@@ -163,21 +120,12 @@ let gpsStartedMs: number | null = null
 let lastPointMs: number | null = null
 let resumeHandle: PluginListenerHandle | null = null
 
-// Which signal is currently arming GPS probing. The ring's paired gate windows
-// are walk-specific (vs the phone's any-motion sensor), so once a live window
-// arrives the sensor is disarmed and demoted to a fallback for when the ring
-// disconnects.
-let triggerSource: 'sensor' | 'ring' = 'sensor'
-let unsubGateFeed: (() => void) | null = null
-
-// AD-2: ring-cadence confirmation state (docs/superpowers/plans/2026-07-23-ring-cadence-activity-detection.md).
-// Sustained-window accumulator — reset whenever a fresh probe starts (see startGps()).
-let gaitConfirmCtx: GaitConfirmContext = initGaitConfirm()
-// Buffers GPS points seen while merely "probing" (before ring-cadence confirms) so a confirmation
-// landing ~90s after the true onset can backdate the session's route to the actual start instead
-// of clipping it to the confirm instant. Cleared on a fresh probe and once backfilled.
-const probeBuffer: RoutePoint[] = []
-const PROBE_BUFFER_CAP = 400 // generous vs. the ~3-min probe timeout at typical GPS point rates
+// #2471 (owner, 2026-10-06): the phone's motion sensor is the only live trigger. The ring's step-gate
+// windows used to start GPS and confirm sessions, but the ring delivers them in hourly drains
+// (median 33 min old), so every window was stamped "now" and a drain started GPS for a walk that
+// had already ended. Walks the ring saw are found after the fact from its MET instead
+// (`lib/activity/ring-walks.ts`).
+const triggerSource = 'sensor' as const
 
 // #2478: funnel telemetry (lib/activity/detection-events.ts). READ-ONLY — these record what the
 // gates above already decided and are never read back by detection. One detection = one GPS probe
@@ -198,24 +146,6 @@ function claimDetectionForSession(): string | null {
   return detectionId
 }
 
-/**
- * The decoded column's middle FINITE value, as a plain number for `classifyGait`.
- *
- * A thin adapter over the shared `median` rather than another implementation of it (LA-151).
- * Two things here are this file's own and are kept: it drops non-finite values before taking the
- * middle, and its empty contract is NaN rather than 0 — a 0 would be a plausible wrong cadence,
- * which is the failure Q-221 already cost this file once.
- *
- * **The sibling in `cadence-tracker.ts` does NOT filter, and that is not a bug to unify.**
- * `classifyGait` guards `Number.isFinite` on all three features itself and answers `idle`, so a
- * NaN or Infinity cannot reach a classification either way; the filter here is belt-and-braces.
- * Verified 2026-09-26 while consolidating (LA-151), because a mutation that removed it killed no
- * test — the behaviour it changes is unobservable through every caller.
- */
-function medianFinite(values: number[]): number {
-  return median(values.filter(Number.isFinite)) ?? NaN
-}
-
 // Publishes a diagnostics snapshot for the profile screen's background-location
 // card so battery-drain/orphaned-watcher reports are confirmable without adb.
 // Not persisted (see detectionDiag in auto-detection-store.ts) — always reflects
@@ -230,7 +160,7 @@ function publishDiag(): void {
 }
 
 // Evaluates the timer-independent off-switches. Called from every occasion code is
-// known to run: each GPS point, each gate tick, ring gate windows (Chunk 2), and app
+// known to run: each GPS point, each gate tick, and app
 // resume. In ungated (web fallback) mode GPS is always-on by design, so the watchdog
 // does not apply.
 function runWatchdog(now: number): void {
@@ -269,15 +199,12 @@ async function startGps(): Promise<void> {
   detectionConfirmed = false
   recordDetectionEvent(
     detectionId, 'candidate',
-    ungated ? 'always_on_gps' : triggerSource === 'ring' ? 'ring_gait_window' : 'phone_motion',
+    ungated ? 'always_on_gps' : 'phone_motion',
     { trigger: triggerSource },
   )
   recentPoints.length = 0
   lastPointMs = null
   activityNotified = false
-  // Fresh probe — a stale streak/buffer from a previous aborted probe must not carry over.
-  gaitConfirmCtx = initGaitConfirm()
-  probeBuffer.length = 0
   watcher = await startGpsWatcher(onPoint, onWatcherError)
   gpsStartedMs = Date.now()
   publishDiag()
@@ -340,10 +267,8 @@ function abortInFlightIfSessionOwned(): void {
 function dispatchGate(event: MotionGateEvent): void {
   if (ungated) return
   // Never let a workout in progress arm GPS probing (see isWorkoutInProgress) — this is the
-  // only event type that can transition idle -> probing, so blocking it here covers both
-  // trigger sources (phone sensor + ring gate window) and, as a side effect, also prevents the
-  // AD-2 gait-confirm block below from ever running (it's gated on gate.state !== 'idle', which
-  // now never leaves 'idle' during a workout). An already-probing/tracking session from before
+  // only event type that can transition idle -> probing, so blocking it here covers the phone
+  // sensor trigger. An already-probing/tracking session from before
   // the workout started is left alone rather than torn down — a narrow, low-risk edge case.
   // A Guided Walk or a manually-started "Other Activity" session is exactly the same case as a
   // lifting workout — incidental motion during a session the app already knows about is not a
@@ -370,10 +295,6 @@ function runCommand(cmd: MotionGateCommand): void {
       stopGps().catch(console.error)
       break
     case 'armMotion':
-      // Once the ring is live it's the strictly better trigger — no re-arm
-      // needed, disarmMotionTrigger already stopped the sensor when the ring
-      // took over (see the gate-feed subscription in startAutoDetection).
-      if (triggerSource === 'ring') break
       armMotionTrigger(onMotionTrigger)
       break
   }
@@ -405,14 +326,6 @@ function onPoint(point: RoutePoint) {
   recentPoints.push(point)
   if (recentPoints.length > SPEED_BUFFER_SIZE) recentPoints.shift()
 
-  // AD-2: buffer probe-phase points so a ring-cadence confirmation (which lands ~90s after the
-  // true onset) can backdate the session's route to the actual start. Only meaningful while
-  // genuinely probing — cleared on every fresh probe in startGps().
-  if (gate.state === 'probing') {
-    probeBuffer.push(point)
-    if (probeBuffer.length > PROBE_BUFFER_CAP) probeBuffer.shift()
-  }
-
   if (stallTimer) clearTimeout(stallTimer)
   stallTimer = setTimeout(() => {
     const s = useAutoDetectionStore.getState()
@@ -438,10 +351,7 @@ function onPoint(point: RoutePoint) {
   }
 
   if (speed >= MIN_MOVE_SPEED_MS) {
-    // AD-2: GPS speed only confirms (starts) the session in the ring-disconnected fallback path.
-    // When the ring is live, confirmation comes from the gait-confirm accumulator in the gate-feed
-    // subscription below — a single, real cadence signal, not a speed guess.
-    if (store.sessionStartMs === null && triggerSource === 'sensor') {
+    if (store.sessionStartMs === null) {
       const id = claimDetectionForSession()
       store.startSession(point.t, undefined, id)
       recordDetectionEvent(id, 'confirmed', 'gps_speed', { trigger: 'sensor', sessionStartAt: point.t, avgSpeedMs: speed })
@@ -450,8 +360,7 @@ function onPoint(point: RoutePoint) {
       // Dispatched unconditionally (not just on first confirm) so a session that
       // survived a mid-walk page reload (deploy) — whose gate never saw its own
       // sessionStarted — doesn't get probe-timed-out; the reducer already ignores
-      // this event unless it's in the probing state. Also covers a session started
-      // by the ring-confirm path below.
+      // this event unless it's in the probing state.
       dispatchGate({ type: 'sessionStarted' })
       store.addPoint(point)
     }
@@ -460,10 +369,7 @@ function onPoint(point: RoutePoint) {
     store.addPoint(point)
   }
 
-  // AD-1 fallback notification: ring-disconnected only. When the ring path is live, the
-  // notification fires from the gait-confirm accumulator instead (see the gate-feed subscription
-  // below) — one consistent "confirmed" moment rather than two gates racing each other.
-  if (triggerSource === 'sensor' && !activityNotified) {
+  if (!activityNotified) {
     const s = useAutoDetectionStore.getState()
     const pts = s.sessionPoints
     if (s.sessionStartMs !== null && pts.length >= 2) {
@@ -484,12 +390,6 @@ function onPoint(point: RoutePoint) {
 export async function startAutoDetection(): Promise<void> {
   if (running) return
   running = true
-
-  // Fetch the steps-decoder table once per launch (Q-221). Fire-and-forget: it must never delay
-  // detection starting, and until it lands the ring-cadence confirmation below simply does not run.
-  // It seeds from the client cache first, so an offline cold start after one online session injects
-  // without touching the network.
-  void ensureStepsDecoderConstants()
 
   const store = useAutoDetectionStore.getState()
   store.setDetecting(true)
@@ -525,80 +425,6 @@ export async function startAutoDetection(): Promise<void> {
   if (isMotionDetectionAvailable()) {
     ungated = false
     armMotionTrigger(onMotionTrigger)
-    unsubGateFeed = await subscribeGateFeed((ev) => {
-      const now = Date.now()
-      if (ev.type === 'disconnect') {
-        // Ring gone — fall back to the phone's any-motion sensor.
-        if (triggerSource === 'ring') {
-          triggerSource = 'sensor'
-          if (gate.state === 'idle') armMotionTrigger(onMotionTrigger)
-        }
-        return
-      }
-      // Any paired window proves the ring path is live: it is strictly the
-      // better trigger (walk-specific vs any-motion), so the sensor is
-      // disarmed to stop its false GPS probes.
-      if (triggerSource === 'sensor') {
-        triggerSource = 'ring'
-        disarmMotionTrigger()
-      }
-      // Repeated walking windows during probing/tracking are no-ops — the
-      // reducer only accepts motionTrigger when idle. Non-walking windows do
-      // NOT end a session: GPS itself (stall + motorised checks + the
-      // watchdog) owns ending, so a standing pause at a traffic light can't
-      // kill the walk. (A ring-idle early stop is a possible future battery
-      // lever — deliberately YAGNI'd here.)
-      if (ev.walking) dispatchGate({ type: 'motionTrigger', now })
-      runWatchdog(now)
-
-      // AD-2: ring-cadence confirmation (docs/superpowers/plans/2026-07-23-ring-cadence-activity-detection.md).
-      // Only meaningful once GPS is actually probing/tracking — no point classifying gait while
-      // fully idle (nothing to confirm into). Confirms via the sustained-window accumulator, not
-      // a single reading, so a stationary lifting set's occasional false reading can't confirm.
-      // Skip the gait confirmation until the decoder has its table (Q-221 — it is fetched from an
-      // authenticated route now, not bundled). Doing nothing is the correct degraded behaviour:
-      // auto-detection is already best-effort, and decoding on an absent table would produce
-      // plausible wrong cadence rather than no cadence. `ensureStepsDecoderConstants` returns
-      // synchronously true once injected, and seeds from cache so an offline cold start still works
-      // after one online session.
-      if (gate.state !== 'idle' && hasStepsDecoderConstants()) {
-        const decoded = runStepsMotionDecoder({ timestamps: [now], data: [ev.columns] })
-        const classification = classifyGait({
-          strideHz: medianFinite(decoded.data.map(row => row[STRIDE_FREQUENCY_COLUMN])),
-          strideAmpFrac: medianFinite(decoded.data.map(row => row[STRIDE_AMPLITUDE_FRAC_COLUMN])),
-          totalAmplitudeMg: medianFinite(decoded.data.map(row => row[TOTAL_AMPLITUDE_MG_COLUMN])),
-        })
-        const result = pushGaitWindow(gaitConfirmCtx, { state: classification.state, atMs: now })
-        gaitConfirmCtx = result.ctx
-        if (result.confirmed && triggerSource === 'ring' && useAutoDetectionStore.getState().sessionStartMs === null) {
-          const { activityType, startMs } = result.confirmed
-          const id = claimDetectionForSession()
-          useAutoDetectionStore.getState().startSession(startMs, activityType, id)
-          recordDetectionEvent(id, 'confirmed', 'ring_cadence', { trigger: 'ring', activityType, sessionStartAt: startMs })
-          // Backfill probe-phase points from the true (backdated) onset so the route isn't
-          // clipped to the ~90s-later confirm instant.
-          for (const p of probeBuffer) {
-            if (p.t >= startMs) useAutoDetectionStore.getState().addPoint(p)
-          }
-          probeBuffer.length = 0
-          dispatchGate({ type: 'sessionStarted' })
-          // Read AFTER the backfill above, so the window judged is the one the confirmation
-          // actually covers rather than the ~90s-later confirm instant.
-          const pts = useAutoDetectionStore.getState().sessionPoints
-          const distanceM = pts.length >= 2 ? computeTotalDistanceKm(pts) * 1000 : 0
-          const elapsedSec = pts.length >= 2 ? (pts[pts.length - 1].t - startMs) / 1000 : 0
-          if (shouldNotifyRingConfirmedActivity({
-            pointCount: pts.length, distanceM, elapsedSec, alreadyNotified: activityNotified,
-          })) {
-            activityNotified = true
-            void notifyActivityDetected()
-            recordDetectionEvent(id, 'notified', pts.length < 2 ? 'ring_cadence_no_fix' : 'ring_cadence_gps', {
-              trigger: 'ring', activityType, sessionStartAt: startMs, distanceM, elapsedSec, pointCount: pts.length,
-            })
-          }
-        }
-      }
-    })
   } else {
     ungated = true
     await startGps()
@@ -609,15 +435,11 @@ export async function stopAutoDetection(): Promise<void> {
   running = false
   if (gateTicker) { clearInterval(gateTicker); gateTicker = null }
   resumeHandle?.remove(); resumeHandle = null
-  unsubGateFeed?.(); unsubGateFeed = null
-  triggerSource = 'sensor'
   disarmMotionTrigger()
   probeEndGate = 'detection_stopped'
   dispatchGate({ type: 'stop' })
   gate = initGate()
   activityNotified = false
-  gaitConfirmCtx = initGaitConfirm()
-  probeBuffer.length = 0
   await stopGps()
   probeEndGate = null
 

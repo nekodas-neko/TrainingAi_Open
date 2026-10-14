@@ -1,3 +1,4 @@
+import { foodLoggingCoverage } from '@/lib/nutrition/logging-completeness'
 /**
  * #2377 — the shadow readiness step: read stored history, score the #2356 pillar model, write ONE
  * table (`shadow_readiness`). Shown nowhere.
@@ -137,7 +138,11 @@ async function loadHistory(repo: Repo, userId: string, tz: string, from: string,
   const foodByDate = new Map(food.map(f => [f.date, f]))
   const waterByDate = new Map<string, number>()
   for (const m of bodyMetrics) if (m.waterMl != null) waterByDate.set(m.date, m.waterMl)
-  const loggedComplete = new Set(evenings.filter(c => c.foodLoggingCompletedAt != null).map(c => c.logDate))
+  const { complete: loggedComplete, zeroIntake } = await foodLoggingCoverage(repo, userId, start, to,
+    evenings.filter(c => c.foodLoggingCompletedAt != null).map(c => c.logDate))
+  for (const date of zeroIntake) {
+    if (!foodByDate.has(date)) foodByDate.set(date, { date, calories: 0, proteinG: 0, carbsG: 0, fatG: 0 })
+  }
   const goalMl = goals?.waterGoalMl ?? DEFAULT_WATER_GOAL_ML
   const water = { goalMl: goals?.waterGoalType === 'weekly' ? goalMl / 7 : goalMl }
 

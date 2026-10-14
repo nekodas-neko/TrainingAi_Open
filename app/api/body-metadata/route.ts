@@ -129,7 +129,7 @@ function toRow(m: { date: string; weightKg?: number; bodyFatPct?: number; bodyFa
   };
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -143,7 +143,8 @@ export async function GET() {
   // Wider window purely to recover the LAST-KNOWN weight when nothing was logged in the last
   // 7 days — the card used to show "—" (7-day window) even though an older reading exists.
   // The same read supplies the Weight Trend slope's 30 days (#2480) — a subset, so no extra query.
-  const from180 = shiftDateStr(today, -180);
+  const includeOverview = req?.nextUrl.searchParams.get('overview') === '1';
+  const from180 = shiftDateStr(today, includeOverview ? -366 : -180);
 
   // Start of today in the user's timezone (UTC instant) — for today's completed workouts.
   const todayStartZoned = toZonedTime(now, tz);
@@ -280,6 +281,7 @@ export async function GET() {
     {
       today: todayRow, recent, weekToDate, calsBurnedToday, activeEnergyKcalToday,
       latestWeightKg, latestWeightDate, weightTrend,
+      ...(includeOverview ? { measuredOverview: weightHistoryFailed ? null : weightHistory.map(m => toRow(m, bodyFatCalibration)) } : {}),
       // The owner asked to be shown the offset, not just its effect. `pairCount` is what says how
       // much to trust it: at one pair an offset and a ratio are the same number, so the UI must not
       // present it as a settled calibration.

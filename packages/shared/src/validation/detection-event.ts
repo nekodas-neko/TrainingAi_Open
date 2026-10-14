@@ -13,10 +13,12 @@ export type DetectionEventKind = typeof DETECTION_EVENT_KINDS[number]
 
 /** Gates in use, by kind. Documentation for readers of `claude_ro.detection_events`. */
 export const DETECTION_GATES = {
-  candidate: ['ring_gait_window', 'phone_motion', 'always_on_gps', 'no_probe'],
+  // `ring_gait_window` is historical: #2471 removed the ring's live trigger. `ring_met` is a walk
+  // found after the fact in the ring's MET (`lib/activity/ring-walks.ts`).
+  candidate: ['ring_gait_window', 'phone_motion', 'always_on_gps', 'no_probe', 'ring_met'],
   confirmed: ['ring_cadence', 'gps_speed'],
   notified: ['ring_cadence_no_fix', 'ring_cadence_gps', 'gps_distance_elapsed'],
-  offered: ['quality_gates'],
+  offered: ['quality_gates', 'ring_met'],
   saved: ['user_review'],
   dismissed: [
     // Probe ended with no session.

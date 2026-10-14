@@ -1,0 +1,409 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import {
+  AccountSession,
+  MOBILE_CALLBACKS,
+  parseAuthCallback,
+} from '../src/features/account/session.ts';
+import type { AuthPlatform } from '../src/features/account/session.ts';
+
+const origin = 'https://example.com';
+const state = 'S'.repeat(43);
+const nonce = 'N'.repeat(43);
+const attemptId = '1aaad26d-22ef-4b26-98ba-d55d2d166f70';
+const expiresAt = Math.floor(Date.now() / 1000) + 3600;
+const profile = {
+  id: 'existing-user',
+  email: 'me@example.com',
+  name: 'Sam',
+  timezone: null,
+  isActive: true,
+};
+const json = (value: unknown, status = 200) =>
+  new Response(JSON.stringify(value), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  });
+
+function fixture(saved = false) {
+  const storage = new Map<string, string>();
+  if (saved) {
+    storage.set(
+      'fitnessai.session.v1',
+      JSON.stringify({
+        origin,
+        userId: profile.id,
+        accessToken: 'previous-session',
+        expiresAt,
+      }),
+    );
+  }
+  const platform: AuthPlatform = {
+    get: async (key) => storage.get(key) ?? null,
+    set: async (key, value) => {
+      storage.set(key, value);
+    },
+    remove: async (key) => {
+      storage.delete(key);
+    },
+    random: async () => state,
+    challenge: async () => state,
+    open: async () => ({ type: 'cancel' }),
+    dismiss() {},
+    appleSignIn: async (receivedNonce, receivedState) => {
+      assert.equal(receivedNonce, nonce);
+      assert.equal(receivedState, state);
+      return { identityToken: 'apple-proof', state, name: 'Sam' };
+    },
+  };
+  const calls: { path: string; authorization: string | null; body: Record<string, unknown> }[] =
+    [];
+  const fetcher = async (input: string | URL | Request, init?: RequestInit) => {
+    const path = new URL(String(input)).pathname;
+    calls.push({
+      path,
+      authorization: new Headers(init?.headers).get('authorization'),
+      body: init?.body ? JSON.parse(String(init.body)) : {},
+    });
+    if (path.endsWith('/begin')) {
+      return json({ attemptId, nonce });
+    }
+    if (path.endsWith('/complete')) {
+      return json({ ok: true, tokenType: 'Bearer', accessToken: 'apple-session', expiresAt });
+    }
+    return json({ user: profile, signInProviders: ['google', 'apple'] });
+  };
+  return {
+    controller: new AccountSession(origin, platform),
+    platform,
+    storage,
+    calls,
+    fetcher,
+  };
+}
+
+test('Apple login stores the app session and retrieves the existing account profile', async (t) => {
+  const f = fixture();
+  t.mock.method(globalThis, 'fetch', f.fetcher);
+  await f.controller.initialize(null);
+  await f.controller.signInWithApple();
+  assert.equal(f.controller.state.status, 'signedIn');
+  assert.deepEqual(f.controller.state.profile?.signInProviders, ['google', 'apple']);
+  assert.equal(f.calls[0].authorization, null);
+  assert.equal(f.calls[1].authorization, null);
+  assert.equal(f.calls[2].authorization, 'Bearer apple-session');
+  assert.equal(JSON.parse(f.storage.get('fitnessai.session.v1')!).userId, profile.id);
+});
+
+test('connecting Apple authenticates both calls and retains the account identity', async (t) => {
+  const f = fixture(true);
+  t.mock.method(globalThis, 'fetch', f.fetcher);
+  await f.controller.initialize(null);
+  await f.controller.signInWithApple();
+  const appleCalls = f.calls.filter((x) => x.path.includes('/apple/'));
+  assert.ok(appleCalls.every((x) => x.authorization === 'Bearer previous-session'));
+  assert.equal(appleCalls[0].body.link, true);
+  assert.equal(f.controller.state.profile?.id, profile.id);
+});
+
+test('cancelling Apple connection preserves the previous session and profile', async (t) => {
+  const f = fixture(true);
+  f.platform.appleSignIn = async () => {
+    throw Object.assign(new Error('cancelled'), { code: 'ERR_REQUEST_CANCELED' });
+  };
+  t.mock.method(globalThis, 'fetch', f.fetcher);
+  await f.controller.initialize(null);
+  await f.controller.signInWithApple();
+  assert.equal(f.controller.state.status, 'signedIn');
+  assert.equal(f.controller.state.profile?.id, profile.id);
+  assert.match(f.controller.state.message!, /cancelled/);
+  assert.equal(
+    JSON.parse(f.storage.get('fitnessai.session.v1')!).accessToken,
+    'previous-session',
+  );
+  assert.ok(!f.calls.some((x) => x.path.endsWith('/complete')));
+});
+
+test('mismatched native state never sends Apple proof to the backend', async (t) => {
+  const f = fixture();
+  f.platform.appleSignIn = async () => ({ identityToken: 'proof', state: 'wrong-state' });
+  t.mock.method(globalThis, 'fetch', f.fetcher);
+  await f.controller.initialize(null);
+  await f.controller.signInWithApple();
+  assert.equal(f.controller.state.status, 'signedOut');
+  assert.ok(!f.calls.some((x) => x.path.endsWith('/complete')));
+});
+
+test('approval and account-link errors explain the next step without saving a session', async (t) => {
+  for (const [status, error, message] of [
+    [403, 'account_pending', /awaiting approval/],
+    [409, 'account_link_required', /account you already use/],
+  ] as const) {
+    const f = fixture();
+    t.mock.method(
+      globalThis,
+      'fetch',
+      async (input: string | URL | Request, init?: RequestInit) =>
+        String(input).endsWith('/complete') ? json({ error }, status) : f.fetcher(input, init),
+    );
+    await f.controller.initialize(null);
+    await f.controller.signInWithApple();
+    assert.equal(f.controller.state.status, 'signedOut');
+    assert.match(f.controller.state.message!, message);
+    assert.ok(!f.storage.has('fitnessai.session.v1'));
+    t.mock.restoreAll();
+  }
+});
+
+test('sign-out during the native sheet prevents late proof from restoring a session', async (t) => {
+  const f = fixture();
+  let finish: ((value: { identityToken: string; state: string }) => void) | undefined;
+  f.platform.appleSignIn = () =>
+    new Promise((resolve) => {
+      finish = resolve;
+    });
+  t.mock.method(globalThis, 'fetch', f.fetcher);
+  await f.controller.initialize(null);
+  const login = f.controller.signInWithApple();
+  while (!finish) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  await f.controller.signOut();
+  finish({ identityToken: 'late-proof', state });
+  await login;
+  assert.equal(f.controller.state.status, 'signedOut');
+  assert.ok(!f.storage.has('fitnessai.session.v1'));
+  assert.ok(!f.calls.some((x) => x.path.endsWith('/complete')));
+});
+
+test('saved account identity remains available for scoped reads when profile refresh is offline', async (t) => {
+  const f = fixture(true);
+  t.mock.method(globalThis, 'fetch', async () => {
+    throw new Error('offline');
+  });
+  await f.controller.initialize(null);
+  assert.equal(f.controller.dataReader?.userId, profile.id);
+  assert.equal(f.controller.dataReader?.origin, origin);
+});
+
+test('saved identity is restored before a slow backend account check finishes', async (t) => {
+  const f = fixture(true);
+  let release!: (response: Response) => void;
+  t.mock.method(
+    globalThis,
+    'fetch',
+    () =>
+      new Promise<Response>((resolve) => {
+        release = resolve;
+      }),
+  );
+  const startup = f.controller.initialize(null);
+  while (!release) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  assert.equal(f.controller.state.status, 'checking');
+  assert.equal(f.controller.dataReader?.userId, profile.id);
+  release(json({ user: profile }));
+  await startup;
+});
+
+test('overlapping background checks share a request and retain the displayed profile on failure', async (t) => {
+  const f = fixture(true);
+  t.mock.method(globalThis, 'fetch', f.fetcher);
+  await f.controller.initialize(null);
+  const savedProfile = f.controller.state.profile;
+  let release!: (response: Response) => void;
+  let calls = 0;
+  t.mock.method(globalThis, 'fetch', () => {
+    calls++;
+    return new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+  });
+  const first = f.controller.refresh();
+  const second = f.controller.refresh();
+  while (!release) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  assert.equal(first, second);
+  assert.equal(calls, 1);
+  assert.equal(f.controller.state.profile, savedProfile);
+  release(json({ error: 'temporary_outage' }, 503));
+  await Promise.all([first, second]);
+  assert.equal(f.controller.state.profile, savedProfile);
+  assert.equal(f.controller.dataReader?.userId, profile.id);
+});
+
+test('a new account check cannot share or accept the previous account’s pending response', async (t) => {
+  const f = fixture(true);
+  t.mock.method(globalThis, 'fetch', f.fetcher);
+  await f.controller.initialize(null);
+  let release!: (response: Response) => void;
+  t.mock.method(
+    globalThis,
+    'fetch',
+    () =>
+      new Promise<Response>((resolve) => {
+        release = resolve;
+      }),
+  );
+  const previous = f.controller.refresh();
+  await f.controller.signOut();
+  t.mock.method(
+    globalThis,
+    'fetch',
+    async (input: string | URL | Request, init?: RequestInit) =>
+      new URL(String(input)).pathname === '/api/user/profile'
+        ? json({ user: { ...profile, id: 'other-user' } })
+        : f.fetcher(input, init),
+  );
+  await f.controller.signInWithApple();
+  release(json({ user: profile }));
+  await previous;
+  assert.equal(f.controller.state.profile?.id, 'other-user');
+  assert.equal(f.controller.dataReader?.userId, 'other-user');
+});
+
+test('expired saved sessions are cleared locally without waiting for the backend', async (t) => {
+  const f = fixture(true);
+  f.storage.set(
+    'fitnessai.session.v1',
+    JSON.stringify({
+      origin,
+      userId: profile.id,
+      accessToken: 'expired',
+      expiresAt: 1,
+    }),
+  );
+  t.mock.method(globalThis, 'fetch', () => {
+    throw new Error('Unexpected network request');
+  });
+  await f.controller.initialize(null);
+  assert.equal(f.controller.state.status, 'signedOut');
+  assert.equal(f.controller.dataReader, null);
+  assert.equal(f.storage.has('fitnessai.session.v1'), false);
+});
+
+test('session expiry still clears sign-in while a shared profile check is in flight', async (t) => {
+  const f = fixture(true);
+  t.mock.method(globalThis, 'fetch', f.fetcher);
+  await f.controller.initialize(null);
+  let release!: (response: Response) => void;
+  t.mock.method(
+    globalThis,
+    'fetch',
+    () =>
+      new Promise<Response>((resolve) => {
+        release = resolve;
+      }),
+  );
+  const pending = f.controller.refresh();
+  t.mock.method(Date, 'now', () => (expiresAt + 1) * 1000);
+  await f.controller.refresh();
+  assert.equal(f.controller.state.status, 'signedOut');
+  release(json({ user: profile }));
+  await pending;
+  assert.equal(f.controller.state.status, 'signedOut');
+  assert.equal(f.controller.dataReader, null);
+});
+
+test('a reader rejects late data after sign-out and cannot make further authenticated requests', async (t) => {
+  const f = fixture(true);
+  t.mock.method(globalThis, 'fetch', f.fetcher);
+  await f.controller.initialize(null);
+  const reader = f.controller.dataReader!;
+  let release!: (response: Response) => void;
+  t.mock.method(
+    globalThis,
+    'fetch',
+    () =>
+      new Promise<Response>((resolve) => {
+        release = resolve;
+      }),
+  );
+  const request = reader.get('/api/workout-data', { tab: 'meta' });
+  const rejected = assert.rejects(request, /account changed/);
+  while (!release) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  await f.controller.signOut();
+  release(json({ program: 'late-data' }));
+  await rejected;
+  assert.equal(f.controller.dataReader, null);
+  await assert.rejects(reader.get('/api/workout-data'), /Sign in/);
+});
+
+test('a previous account reader cannot use a different account’s new session', async (t) => {
+  const f = fixture(true);
+  t.mock.method(globalThis, 'fetch', f.fetcher);
+  await f.controller.initialize(null);
+  const previous = f.controller.dataReader!;
+  await f.controller.signOut();
+  t.mock.method(
+    globalThis,
+    'fetch',
+    async (input: string | URL | Request, init?: RequestInit) =>
+      new URL(String(input)).pathname === '/api/user/profile'
+        ? json({ user: { ...profile, id: 'other-user' } })
+        : f.fetcher(input, init),
+  );
+  await f.controller.signInWithApple();
+  assert.equal(f.controller.dataReader?.userId, 'other-user');
+  const calls = f.calls.length;
+  await assert.rejects(previous.get('/api/workout-data'), /Sign in/);
+  assert.equal(f.calls.length, calls);
+});
+
+test('Android production, development and preview callbacks cannot complete each other’s sign-in', () => {
+  const pending = { origin, verifier: state, state, createdAt: Date.now() };
+  const android = ['android', 'android-dev', 'android-preview'] as const;
+  for (const client of android) {
+    const callback = MOBILE_CALLBACKS[client];
+    const url = `${callback}?${new URLSearchParams({ state, token: attemptId })}`;
+    assert.deepEqual(parseAuthCallback(url, pending, callback), { token: attemptId });
+    for (const other of android.filter((candidate) => candidate !== client)) {
+      assert.throws(() => parseAuthCallback(url, pending, MOBILE_CALLBACKS[other]));
+    }
+    assert.throws(() => parseAuthCallback(url, pending));
+  }
+});
+
+test('each native browser client sends its own identity and retains PKCE exchange', async () => {
+  for (const client of ['ios', 'android', 'android-dev', 'android-preview'] as const) {
+    const f = fixture();
+    const platform: AuthPlatform = {
+      ...f.platform,
+      client,
+      fetch: async (input, init) => {
+        const path = new URL(String(input)).pathname;
+        if (path === '/api/auth/exchange-mobile-token') {
+          const body = JSON.parse(String(init?.body));
+          assert.equal(body.token, attemptId);
+          assert.equal(body.verifier, state);
+          return json({
+            ok: true,
+            tokenType: 'Bearer',
+            accessToken: 'mobile-session',
+            expiresAt,
+          });
+        }
+        return json({ user: profile, signInProviders: ['google'] });
+      },
+      open: async (raw) => {
+        const query = new URL(raw).searchParams;
+        assert.equal(query.get('client'), client);
+        assert.equal(query.get('challenge'), state);
+        assert.equal(query.get('state'), state);
+        return {
+          type: 'success',
+          url: `${MOBILE_CALLBACKS[client]}?${new URLSearchParams({ state, token: attemptId })}`,
+        };
+      },
+    };
+    const controller = new AccountSession(origin, platform);
+    await controller.initialize(null);
+    await controller.signIn();
+    assert.equal(controller.state.status, 'signedIn');
+    assert.equal(controller.state.profile?.id, profile.id);
+  }
+});

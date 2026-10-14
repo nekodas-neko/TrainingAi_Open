@@ -322,6 +322,13 @@ every PR it carried. You can reorder, add to or split a batch yourself, or ask i
 
 ### Release day — every Tuesday
 
+> **Suspended while the native app lands (from 13 Oct 2026).** Releases go out on demand, up to
+> once a day. Each one still comes to you as a release summary and needs your yes. Once the release
+> issue shows your yes and a clean release test, jsboiss may run the release too. Native
+> screens now ship as app builds rather than releases. The rules, how both apps run side by side on
+> your phone, and when Tuesdays come back are all in
+> [`native-testing.md`](native-testing.md#release-cadence-during-the-native-move).
+
 Everything merged during the week ships together. **A hotfix goes out off-schedule only when
 production is actually broken**; anything less waits for Tuesday.
 
@@ -340,8 +347,8 @@ production is actually broken**; anything less waits for Tuesday.
 3. ☐ **Read it. Reply "approve"** — or ask about anything. **Look hardest at "⚠ Needs your eyes"**:
    that line is what used to be a separate "confirm before merging" PR for every risky change,
    now collected in one place once a week.
-4. 🤖 It takes a database snapshot if the release has a migration, runs the release workflow, and
-   tells you when production is serving it.
+4. 🤖 It runs the release workflow, which first takes an encrypted backup of the database and
+   checks it restores, then tells you when production is serving it.
 5. ☐ **Update the APK only if the summary says the native app changed.** Most releases don't — the
    app loads its code from Railway, so they reach your phone on their own. When it does: **Code**
    → **Releases** → the new `v…` → download `app-v….apk` → install **over** the existing app.

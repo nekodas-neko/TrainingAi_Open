@@ -175,3 +175,14 @@ describe('reconcileReview', () => {
     expect(b.before).toEqual(shape(3, 10, 65, 90))
   })
 })
+
+it('a zero budget denotes no limit rather than an impossible review deadline', () => {
+  const result = reconcileReview({
+    signalExercises: [sig({ sessionExerciseId: 'a', role: 'primary', position: 0 })],
+    modelExercises: [], currentParams: new Map([['a', shape(3, 8, 70, 120)]]),
+    weeklyTargets: {}, weeklyLogged: {}, budgetMin: 0,
+  })
+  expect(result.projectedDurationMin).toBeGreaterThan(0)
+  expect(result.fitsBudget).toBe(true)
+  expect(result.droppedIds).toEqual([])
+})

@@ -12,6 +12,7 @@ vi.mock('@/lib/auth/mobile/tokens', () => ({ createMobileAuthToken: (c: string, 
 import { challengeMatchesCookie, MOBILE_CHALLENGE_COOKIE } from '@/lib/auth/mobile/challenge-cookie'
 import { GET as begin } from '@/app/mobile-signin/begin/route'
 import { mintMobileBridgeToken } from '@/lib/auth/mobile/bridge'
+import { NATIVE_TRANSACTION_COOKIE } from '@/lib/auth/mobile/native-transaction'
 
 const bridge = (challenge: string) => mintMobileBridgeToken(challenge, store)
 
@@ -51,6 +52,9 @@ describe('GET /mobile-signin/begin', () => {
     const res = await begin(new NextRequest(`https://localhost:8080/mobile-signin/begin?challenge=${CHALLENGE}`))
     expect(res.status).toBe(307)
     expect(res.headers.get('location')).toBe(`/mobile-signin?challenge=${CHALLENGE}`)
+    expect(res.cookies.get(MOBILE_CHALLENGE_COOKIE)?.value).toBe(CHALLENGE)
+    // The legacy Android tab still clears any native transaction a previous attempt left behind.
+    expect(res.headers.getSetCookie().some((c) => c.startsWith(`${NATIVE_TRANSACTION_COOKIE}=;`))).toBe(true)
     const bad = await begin(new NextRequest('https://localhost:8080/mobile-signin/begin?challenge=nope'))
     expect(bad.headers.get('location')).toBe('/sign-in')
   })

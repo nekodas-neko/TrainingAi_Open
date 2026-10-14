@@ -1,5 +1,5 @@
 // #2076 (PR a) — refresh tokens for the native app's own sign-in token (`native_refresh_tokens`,
-// migration 202610071636). Nothing calls these yet: issuing, rotating and revoking tokens is PR b.
+// migration 202610071636). Native sign-in uses this ledger for revocation; refresh rotation remains separate.
 //
 // Server-only: the device never reads this table, so there is no local-store domain and no outbox
 // (docs/rules/offline-first-and-storage.md). Not exported (credential material); claude_ro shows

@@ -6,6 +6,7 @@ import { generateObject } from 'ai'
 import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
 import { USER_TEXT_NOTE } from '@trainingai/shared/ai/untrusted-text'
 import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
+import { aiPausedResponse } from '@/lib/ai/provider-paused'
 import { z } from 'zod'
 import { GeneratedProgramSchema } from '@trainingai/shared/validation/generated-program'
 import type { GeneratedProgram, ChatMessage } from '@trainingai/shared/types/builder'
@@ -280,6 +281,6 @@ When responding, mention if a change improves or worsens weekly volume balance. 
   } catch (err) {
     reportServerError(err, { userId, url: '/api/builder-chat' })
     console.error('[builder-chat] Gemini error:', err)
-    return NextResponse.json({ error: 'Failed to process request. Please try again.' }, { status: 500 })
+    return aiPausedResponse(err) ?? NextResponse.json({ error: 'Failed to process request. Please try again.' }, { status: 500 })
   }
 }

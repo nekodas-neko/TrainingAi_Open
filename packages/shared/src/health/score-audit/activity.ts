@@ -12,9 +12,13 @@ export interface ActivityAuditInput {
   goalProfile: Record<string, unknown>
   steps: number | null
   activeCalories: number | null
-  /** Minutes in zone 2+ (vigorous double-counted), or null when no HR series was derivable. */
+  /** WHO active minutes (moderate from 40% of HR reserve; vigorous from 60%, double-counted), or null
+   *  when no HR series was derivable. */
   zoneMinutes: number | null
   moveHours: number | null
+  /** The move-every-hour goal the score used (`intradayHrContributors`): waking hours less those
+   *  whose HR was missing (#2437). Absent: the full waking-hours goal. */
+  moveHoursGoal?: number | null
   /** Whether a strength session was logged on this day — with zero zone minutes, that combination
    *  excludes the zone-minutes lane rather than scoring it 0 (Q-183). */
   strengthSessionToday?: boolean
@@ -36,7 +40,7 @@ export function buildActivityAudit(input: ActivityAuditInput): PillarAudit {
   const gaps: string[] = []
   const notes: string[] = []
 
-  const hoursGoal = moveHours != null ? moveHoursGoal() : null
+  const hoursGoal = moveHours != null ? (input.moveHoursGoal ?? moveHoursGoal()) : null
   const result = computeActivityScore({
     steps, activeCalories, zoneMinutes, moveHours, moveHoursGoal: hoursGoal, strengthSessionToday,
     sessions7d, volume7dKg, goals, acwr,

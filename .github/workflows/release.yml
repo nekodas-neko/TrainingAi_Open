@@ -39,6 +39,10 @@ on:
         description: 'Run the checks only — no deploy, no tag'
         type: boolean
         default: false
+      skip_backup:
+        description: 'Deploy without taking a database backup first. Only until backups are set up, or when one cannot wait.'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -125,10 +129,25 @@ jobs:
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           echo "$MODE of v$VERSION from $SHA"
 
+  backup:
+    name: Back up the database
+    needs: verify
+    # Every release that ships new code takes an encrypted, restore-checked backup first, so a
+    # migration that goes wrong has something to go back to (#2867). A rollback skips it: it
+    # redeploys code that already ran, and recovery should not wait on a dump.
+    if: ${{ !inputs.dry_run && !inputs.skip_backup && needs.verify.outputs.mode != 'rollback' }}
+    uses: ./.github/workflows/db-backup.yml
+    with:
+      label: v${{ inputs.version }}
+    secrets: inherit
+
   deploy:
     name: Deploy to production
-    needs: verify
-    if: ${{ !inputs.dry_run }}
+    needs: [verify, backup]
+    # A skipped backup (rollback, or skip_backup) lets the deploy go ahead; a failed one stops it.
+    if: >-
+      ${{ !inputs.dry_run && !cancelled() && needs.verify.result == 'success'
+      && (needs.backup.result == 'success' || needs.backup.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # The token lives on this environment and nowhere else, so no other job in any workflow can

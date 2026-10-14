@@ -1,15 +1,18 @@
 import { computeRpeAdjustment } from '@trainingai/shared/ai-periodization/autoregulation'
-import { defaultRpeFromPct, mroundStep, weightStepFor } from './utils'
+import { expectedRpe } from '@trainingai/shared/ai-periodization/expected-rpe'
+import { mroundStep, weightStepFor } from './utils'
 
 /** The set he just logged, as the card already holds it. */
 export interface LoggedSetOutcome {
   /** What he set the RPE picker to. `undefined` on an exercise with no picker. */
   loggedRpe: number | undefined
+  /** #2253: whether he touched the picker. An untouched pre-fill is "went as planned". */
+  rated: boolean | undefined
   /** Reps he actually did — the rep dial's value once the set is logged. */
   repsDone: number | undefined
   /** Reps the style prescribed for that set. */
   prescribedReps: number | undefined
-  /** The style's `pct` for that set, which is where the EXPECTED RPE comes from. */
+  /** The style's `pct` for that set, which with `repsDone` is where the EXPECTED RPE comes from. */
   pct: number | undefined
 }
 
@@ -42,11 +45,15 @@ export interface LoadSuggestion {
  * sliding, logged at high RPE with the reps met, gets nothing here), never invent one. The case the
  * owner reported — high RPE and short reps — does not need the trend.
  *
- * **② A suggestion needs a real deviation, and an untouched picker cannot produce one.** `rpeValues`
- * is initialised to `defaultRpeFromPct(pct)`, so a set he never rated reads back as exactly the
- * expected RPE, `rpeDelta` is 0, and the dead band is not crossed. That is the same class as the
- * morning check-in storing a neutral `3` for a scale nobody tapped — here the arithmetic makes the
- * invented value inert, and a test pins it.
+ * **② A suggestion needs a rating, and an untouched picker is not one.** The picker opens on the
+ * expected effort (`expectedRpePrefill`), and the owner's rule is that an untouched value means "went
+ * as planned" (#2253), so a set he never rated returns nothing here — by the `rated` flag, not by
+ * arithmetic. A test pins it.
+ *
+ * **③ One expected-effort formula (#2253).** The expectation is `expectedRpe(pct, repsDone)`, the
+ * same function next week's plan and the deload check use. It used to be `floor(pct/10)`, which sat
+ * below `expectedRpe` and made this fire on 20 of 21 hard-and-short sets where the shared formula
+ * fires on 11; the owner chose one formula everywhere over keeping that sensitivity.
  */
 export function rpeLoadSuggestion(
   prev: LoggedSetOutcome,
@@ -56,12 +63,13 @@ export function rpeLoadSuggestion(
   // Bodyweight work has no load to cut and no picker feeding a pct.
   if (ctx.exerciseType === 'bodyweight') return null
   if (prev.loggedRpe == null || prev.repsDone == null || prev.prescribedReps == null) return null
-  if (prev.prescribedReps <= 0 || currentWeightKg <= 0) return null
+  if (!prev.rated || prev.pct == null) return null
+  if (prev.prescribedReps <= 0 || prev.repsDone <= 0 || currentWeightKg <= 0) return null
 
   const adj = computeRpeAdjustment(
     {
       role: 'primary',
-      rpeDelta: prev.loggedRpe - defaultRpeFromPct(prev.pct),
+      rpeDelta: prev.loggedRpe - expectedRpe(prev.pct, prev.repsDone),
       rm1Trend: 'flat',
       repCompletionRate: prev.repsDone / prev.prescribedReps,
     },

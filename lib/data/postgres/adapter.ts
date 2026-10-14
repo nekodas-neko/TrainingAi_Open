@@ -1,4 +1,7 @@
+import * as healthConnect from './slices/health-connect'
+import * as appleHealth from './slices/apple-health'
 import * as authData from './slices/auth'
+import * as mealLogging from './slices/meal-logging-statuses'
 import type { AuthProvider } from '@/lib/auth/identity'
 import { randomUUID } from 'crypto'
 import { rejectMealImage, mealImageRejectionMessage, FOOD_ITEM_IMAGE_MAX_BYTES } from '@trainingai/shared/nutrition/meal-image'
@@ -10,7 +13,7 @@ import { getDb } from './client'
 import { estWorkoutKcal } from '@trainingai/shared/health/workout-energy'
 import { ouraIdForActivityType } from '@trainingai/shared/health/daily-energy'
 import { ageFromDob } from '@trainingai/shared/date-utils'
-import { recomputeStoredBodyFatPctAtHeight } from '@/lib/scale-ble/composition'
+import { buildBodyFatCalibration } from '@/lib/health/body-fat-calibration-build'
 import { mergePreferences, type UserPreferences } from '@trainingai/shared/user/preferences'
 import * as s from './schema'
 import { collapseOnConflict, keepLatestNonNull } from './collapse-conflicts'
@@ -22,7 +25,7 @@ import { inSequence } from './in-sequence'
 
 /** Q-481 — at most one `applied_mutations` prune per day per process. */
 const APPLIED_MUTATIONS_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
-import { measuredAtMs, cadenceSecFromDs, decodeEventBody, hexToBytes, eventName } from '@/lib/oura-ble/decode'
+import { measuredAtMs, cadenceSecFromDs, decodeEventBody, hexToBytes, eventName, motionLowIntensity } from '@/lib/oura-ble/decode'
 
 /** Hard cap on `getOuraRawSamplesForTags`' lookback — the scan is over the biggest table in the DB
  *  (812k rows). Exported so callers size their own lookback against it rather than asking for more
@@ -118,9 +121,11 @@ import * as accountDeletion from './slices/account-deletion'
 import type { AccountDeletionResult } from './slices/account-deletion'
 import * as colmi from './slices/colmi'
 import * as hcIntervals from './slices/health-connect-intervals'
+import { getNativeMovementIntervals } from './slices/native-movement'
 import * as hcHistory from './slices/health-connect-history-import'
 import * as shadowReadinessSlice from './slices/shadow-readiness'
 import * as nativeRefreshTokens from './slices/native-refresh-tokens'
+import * as ouraCloudTokens from './slices/oura-cloud-tokens'
 import { mergeSet, initialSourceMap, HEALTH_SOURCES, sourceRank, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
 import type {
   PeriodizationPhase,
@@ -158,7 +163,7 @@ import { resolveSelfReportedSick } from '@trainingai/shared/ai-periodization/sig
 import { mround } from '@trainingai/shared/1rm'
 import { computeSetAggregates, computeIntensityPct } from '@trainingai/shared/workout/set-aggregates'
 import {
-  deriveBodyFatCalibration, pairScansWithReadings, DEFAULT_CALIBRATED_SOURCE,
+  DEFAULT_CALIBRATED_SOURCE,
   type BodyFatCalibration,
 } from '@trainingai/shared/health/body-fat-calibration'
 // 1 lb = 0.45359237 kg exactly. Shared since BF-141, because the lb/kg toggle needs the same
@@ -410,6 +415,11 @@ function rowToAnalyte(r: {
 }
 
 export class PostgresWorkoutRepository implements WorkoutRepository {
+  async applyHealthConnectBatch(userId:string,batch:import('@trainingai/shared/validation/health-connect-import').HealthConnectBatch,timezone?:string){return healthConnect.applyHealthConnectBatch(this.db,userId,batch,timezone)}
+  async rebuildHealthConnect(userId:string,timezone:string){return healthConnect.rebuildHealthConnect(this.db,userId,timezone)}
+  async applyAppleHealthBatch(userId:string,batch:import('@trainingai/shared/validation/apple-health-import').AppleImportBatch,timezone?:string){return appleHealth.applyAppleHealthBatch(this.db,userId,batch,timezone)}
+  async rebuildAppleHealth(userId:string,timezone:string){return appleHealth.rebuildAppleHealth(this.db,userId,timezone)}
+
   /** Last daytime-HRV refit ATTEMPT per user (see maybeRefitDaytimeHrvModel). Static because the
    *  throttle must outlive any single repository instance within the process. */
   private static readonly lastHrvRefitAttemptMs = new Map<string, number>()
@@ -795,6 +805,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async revokeNativeRefreshToken(userId: string, id: string, reason: nativeRefreshTokens.NativeRefreshTokenRevokedReason) { return nativeRefreshTokens.revokeNativeRefreshToken(this.db, userId, id, reason) }
   async revokeNativeRefreshTokenFamily(userId: string, familyId: string, reason: nativeRefreshTokens.NativeRefreshTokenRevokedReason) { return nativeRefreshTokens.revokeNativeRefreshTokenFamily(this.db, userId, familyId, reason) }
   async listActiveNativeRefreshTokens(userId: string) { return nativeRefreshTokens.listActiveNativeRefreshTokens(this.db, userId) }
+
+  // #2858 — Oura Cloud OAuth tokens, stored encrypted.
+  async getOuraCloudTokens(userId: string) { return ouraCloudTokens.getOuraCloudTokens(this.db, userId) }
+  async saveOuraCloudTokens(userId: string, input: ouraCloudTokens.SaveOuraCloudTokensInput) { return ouraCloudTokens.saveOuraCloudTokens(this.db, userId, input) }
+  async deleteOuraCloudTokens(userId: string) { return ouraCloudTokens.deleteOuraCloudTokens(this.db, userId) }
+  async getUserIdByOuraUserId(ouraUserId: string) { return ouraCloudTokens.getUserIdByOuraUserId(this.db, ouraUserId) }
 
   async getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null> {
     // lower(), not eq: it matches a row stored before LA-61's backfill (or one a collision kept it
@@ -1620,6 +1636,25 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return map
   }
 
+  async getPrescriptionBasisBefore(userId: string, exerciseName: string, before: Date, excludeLogId?: string): Promise<number | null> {
+    const result = await this.db.execute<{ estimated_1rm: number }>(sql`
+      SELECT el.estimated_1rm
+      FROM exercise_logs el
+      JOIN workout_sessions ws ON ws.id = el.workout_session_id
+      WHERE ws.user_id = ${userId}
+        AND el.exercise_name = ${exerciseName}
+        AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
+        AND el.estimated_1rm > 0
+        AND el.exercise_deloaded = false
+        AND el.logged_at < ${before.toISOString()}
+        ${excludeLogId ? sql`AND el.id <> ${excludeLogId}` : sql``}
+      ORDER BY el.logged_at DESC
+      LIMIT 1
+    `)
+    const v = result.rows[0]?.estimated_1rm
+    return v != null && Number(v) > 0 ? Number(v) : null
+  }
+
   async getLastExerciseLogsBatch(userId: string, exerciseNames: string[], programId?: string): Promise<Map<string, ExerciseLog>> {
     if (!exerciseNames.length) return new Map()
 
@@ -1745,7 +1780,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const elIds = rows.map(r => r.id)
     const setRows = await this.db.select({
       exerciseLogId: s.setLogs.exerciseLogId, weightKg: s.setLogs.weightKg, reps: s.setLogs.reps,
-      intensityPct: s.setLogs.intensityPct, rpe: s.setLogs.rpe,
+      intensityPct: s.setLogs.intensityPct, rpe: s.setLogs.rpe, rpeSource: s.setLogs.rpeSource,
     })
       .from(s.setLogs)
       .where(and(inArray(s.setLogs.exerciseLogId, elIds), isNull(s.setLogs.deletedAt)))
@@ -1757,7 +1792,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       isEarlyDeload: r.is_early_deload, phaseType: (r.phase_type as ProgramPhaseType | null) ?? undefined,
       sets: setRows.filter(ss => ss.exerciseLogId === r.id).map(ss => ({
         weightKg: ss.weightKg, reps: ss.reps,
-        intensityPct: ss.intensityPct ?? undefined, rpe: ss.rpe ?? undefined,
+        intensityPct: ss.intensityPct ?? undefined, rpe: ss.rpe ?? undefined, rpeSource: ss.rpeSource ?? undefined,
       })),
     }))
   }
@@ -2276,6 +2311,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         eq(s.bodyMetrics.userId, userId),
         gte(s.bodyMetrics.date, from),
         lte(s.bodyMetrics.date, to),
+        isNull(s.bodyMetrics.deletedAt),
       ))
       .orderBy(desc(s.bodyMetrics.date))
     return rows.map(r => ({
@@ -2305,12 +2341,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const [weightRow] = await this.db
       .select({ weightKg: s.bodyMetrics.weightKg })
       .from(s.bodyMetrics)
-      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg)))
+      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg), isNull(s.bodyMetrics.deletedAt)))
       .orderBy(asc(s.bodyMetrics.date)).limit(1)
     const [bfRow] = await this.db
       .select({ bodyFatPct: s.bodyMetrics.bodyFatPct })
       .from(s.bodyMetrics)
-      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.bodyFatPct)))
+      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.bodyFatPct), isNull(s.bodyMetrics.deletedAt)))
       .orderBy(asc(s.bodyMetrics.date)).limit(1)
     return { weightKg: weightRow?.weightKg ?? null, bodyFatPct: bfRow?.bodyFatPct ?? null }
   }
@@ -2320,7 +2356,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const [row] = await this.db
       .select({ weightKg: s.bodyMetrics.weightKg })
       .from(s.bodyMetrics)
-      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg)))
+      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg), isNull(s.bodyMetrics.deletedAt)))
       .orderBy(desc(s.bodyMetrics.date)).limit(1)
     return row?.weightKg ?? null
   }
@@ -2467,7 +2503,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       this.getUserById(userId),
       this.db.select({ weightKg: s.bodyMetrics.weightKg })
         .from(s.bodyMetrics)
-        .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg)))
+        .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.weightKg), isNull(s.bodyMetrics.deletedAt)))
         .orderBy(desc(s.bodyMetrics.date)).limit(1),
     ])
     const ageYears = ageFromDob(user?.dateOfBirth ?? null, new Date())
@@ -2531,6 +2567,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // natural-identity index so a same-minute collision merges instead of failing.
       const set = {
         title: values.title,
+        activityType: values.activityType,
         startTime: values.startTime, endTime: values.endTime,
         durationMin: values.durationMin, distanceKm: values.distanceKm,
         caloriesBurned: values.caloriesBurned,
@@ -3180,6 +3217,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    * it neither shows nor shadows anything. For a user who never removed a night the predicate
    * filters nothing, and every consumer's input is exactly what it was.
    */
+  async listSleepSessionIds(userId: string): Promise<{ asOf: Date; ids: string[] }> {
+    // One statement, so `as_of` is the snapshot the ids were read at. Tombstoned rows are included:
+    // a tombstone reaches the device through the pull and is not a ghost.
+    const result = await this.db.execute<{ as_of: Date | string; ids: string[] | null }>(
+      sql`SELECT now() AS as_of, array_agg(id::text) AS ids FROM sleep_sessions WHERE user_id = ${userId}`,
+    )
+    const r = result.rows[0]
+    return { asOf: new Date(r.as_of), ids: r.ids ?? [] }
+  }
+
   async listSleepSessions(userId: string, from: string, to: string): Promise<SleepSession[]> {
     const rows = await this.db.select().from(s.sleepSessions)
       .where(and(
@@ -4362,6 +4409,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   // ── Nutrition (delegated to slices/nutrition.ts) ───────────────────────────
 
   async listMealTypes(userId: string) { return n.listMealTypes(this.db, userId) }
+  listMealLoggingStatuses(userId: string, date: string) { return mealLogging.listMealLoggingStatuses(this.db, userId, date) }
+  ensureMealLoggingDay(userId: string, date: string) { return mealLogging.ensureMealLoggingDay(this.db, userId, date) }
+  setMealLoggingStatus(userId: string, date: string, mealTypeId: string, skipped: boolean, decisionId: string) { return mealLogging.setMealLoggingStatus(this.db, userId, date, mealTypeId, skipped, decisionId) }
+  listMealLoggingCompleteness(userId: string, from: string, to: string) { return mealLogging.listMealLoggingCompleteness(this.db, userId, from, to) }
   async createMealType(userId: string, data: Omit<MealType, 'id' | 'userId' | 'createdAt'>) { return n.createMealType(this.db, userId, data) }
   async updateMealType(id: string, userId: string, data: Partial<Omit<MealType, 'id' | 'userId' | 'createdAt'>>) { return n.updateMealType(this.db, id, userId, data) }
   async deleteMealType(id: string, userId: string) { return n.deleteMealType(this.db, id, userId) }
@@ -4593,59 +4644,21 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         bmrKcal: s.bodyMetrics.bmrKcal,
       })
       .from(s.bodyMetrics)
-      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.bodyFatPct)))
+      .where(and(eq(s.bodyMetrics.userId, userId), isNotNull(s.bodyMetrics.bodyFatPct), isNull(s.bodyMetrics.deletedAt)))
 
-    // RV-165. **Composition is computed once, at ingest, from the profile of that moment — so the
-    // stored value is only comparable to a DEXA scan if the profile has not moved since.** The
-    // owner's height was corrected from 160 to 158 to match a DEXA printout, and the 08-27 pair
-    // that sets the whole offset is still a 160 cm number. Fitted against it the offset came out
-    // +3.2 where the corrected reading gives +2.3, so every body-fat value the app has shown since
-    // has been about a point high.
-    //
-    // Re-deriving needs nothing that is not already stored: `bmr_kcal` has no impedance term and is
-    // linear in height, so it gives back the height used; impedance then follows from the stored
-    // body-fat value.
-    //
-    // **A reading that cannot be re-derived is KEPT AS STORED, not dropped.** Without a BMR there is
-    // no evidence the reading is stale — only an inability to check — and dropping it throws away a
-    // pair over a question that was never answered. Keeping it is exactly today's behaviour, so this
-    // can substitute a better value but never produce a worse calibration than the one it replaces.
-    // Dropping was tried first and collapsed the calibration to null for every reading without a
-    // stored BMR, which `body-fat-correction-consumers` caught.
     const [profile] = await this.db
       .select({ heightCm: s.users.heightCm, dateOfBirth: s.users.dateOfBirth, sex: s.users.sex })
       .from(s.users).where(eq(s.users.id, userId)).limit(1)
 
-    const restated = readings.flatMap(r => {
-      const stored = r.bodyFatPct as number
-      // Without a profile there is nothing to restate to; the readings stand as stored, which is
-      // exactly today's behaviour.
-      if (profile?.heightCm == null || !profile.sex) return [{ ...r, bodyFatPct: stored }]
-      // Age AT THE READING, not today — a birthday between the weigh-in and now would otherwise
-      // shift the recovered height by 5/6.25 = 0.8 cm and quietly poison the inversion.
-      const ageYears = ageFromDob(profile.dateOfBirth ?? null, new Date(`${r.date}T12:00:00Z`))
-      if (ageYears == null) return [{ ...r, bodyFatPct: stored }]
-      const atCurrent = recomputeStoredBodyFatPctAtHeight({
-        storedBodyFatPct: stored,
-        storedBmrKcal: r.bmrKcal,
-        weightKg: r.weightKg as number,
-        ageYears,
-        sex: profile.sex,
-        heightCm: profile.heightCm,
-      })
-      return [{ ...r, bodyFatPct: atCurrent ?? stored }]
-    })
-
-    const pairs = pairScansWithReadings(
-      scans.map(r => ({ scannedOn: r.scannedOn, pctFat: r.pctFat as number })),
-      restated.map(r => ({
-        date: r.date,
-        bodyFatPct: r.bodyFatPct as number,
-        source: r.sourceMap?.body_fat_pct ?? null,
+    return buildBodyFatCalibration({
+      scans: scans.map(r => ({ scannedOn: r.scannedOn, pctFat: r.pctFat as number })),
+      readings: readings.map(r => ({
+        date: r.date, bodyFatPct: r.bodyFatPct as number, source: r.sourceMap?.body_fat_pct ?? null,
+        weightKg: r.weightKg, bmrKcal: r.bmrKcal,
       })),
+      profile: profile ?? null,
       source,
-    )
-    return deriveBodyFatCalibration(pairs, source)
+    })
   }
 
   async listDexaScans(userId: string): Promise<import('../repository').DexaScanRow[]> {
@@ -6659,6 +6672,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getOuraDaytimeSignals(userId: string, from: Date, to: Date): Promise<{
     temp: { tsMs: number; valueC: number }[]
     met: { tsMs: number; value: number }[]
+    still: number[]
+    motion: { tsMs: number; lowIntensity: number }[]
   }> {
     // LA-139: resolve against the WHOLE anchor series, not the newest one. `getOuraClockAnchor`
     // returns a single `(ring_ds ↔ utc)` pair; measured 2026-09-25 the table holds 12,545 of them
@@ -6670,27 +6685,33 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // the observation nearest that frame, not the newest". These four were the exceptions.
     const clock = await this.getOuraClockOffsets(userId)   // RV-182 ②
     const epoch = clock.epoch
-    if (epoch == null) return { temp: [], met: [] }
+    if (epoch == null) return { temp: [], met: [], still: [], motion: [] }
     const fromDs = msToDs(from.getTime(), clock, epoch)
     const toDs = msToDs(to.getTime(), clock, epoch)
-    if (fromDs == null || toDs == null) return { temp: [], met: [] }
+    if (fromDs == null || toDs == null) return { temp: [], met: [], still: [], motion: [] }
     const startDs = Math.floor(fromDs)
     const endDs = Math.ceil(toDs)
-    const rows = await readRawFrames(this.db, userId, { tags: [0x46, 0x69, 0x50], startDs, endDs, caller: 'oura-daytime-signals' })
+    const rows = await readRawFrames(this.db, userId, { tags: [0x46, 0x69, 0x50, 0x72, 0x47], startDs, endDs, caller: 'oura-daytime-signals' })
     const temp: { tsMs: number; valueC: number }[] = []
     const met: { tsMs: number; value: number }[] = []
+    const still: number[] = []
+    const motion: { tsMs: number; lowIntensity: number }[] = []
     for (const r of rows) {
-      const decoded = r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null)
-      if (!decoded) continue
       const tsMs = dsToMs(Number(r.ds), clock, epoch)
       if (tsMs == null) continue
+      // #2115 v4: a 0x72 frame marks a still minute; its presence is the signal, not its values.
+      if (r.tag === 0x72) { still.push(tsMs); continue }
+      // #2781: the motion map reads the low-intensity byte as fitted (see `motionLowIntensity`).
+      if (r.tag === 0x47) { if (r.bodyHex) motion.push({ tsMs, lowIntensity: motionLowIntensity(hexToBytes(r.bodyHex)) }); continue }
+      const decoded = r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null)
+      if (!decoded) continue
       if (r.tag === 0x50) {
         for (const v of numArr(decoded, 'met')) met.push({ tsMs, value: v })
       } else {
         for (const c of numArr(decoded, 'temps_c')) temp.push({ tsMs, valueC: c })
       }
     }
-    return { temp, met }
+    return { temp, met, still, motion }
   }
 
   async getOuraBatteryEvents(userId: string, from: Date, to: Date): Promise<Array<{
@@ -8004,6 +8025,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async upsertBodyBatteryDaily(userId: string, row: import('../repository').BodyBatteryDailyRow) { return bodyBattery.upsertBodyBatteryDaily(this.db, userId, row) }
   async getBodyBatteryHistory(userId: string, startDate: string, endDate: string) { return bodyBattery.getBodyBatteryHistory(this.db, userId, startDate, endDate) }
   async upsertOuraSleep(userId: string, sessions: import('../repository').OuraSleepUpsertRow[], source: HealthSource) { return oura.upsertOuraSleep(this.db, userId, sessions, source) }
+  async upsertOuraCloudSleep(userId: string, sessions: import('../repository').OuraSleepUpsertRow[]) { return oura.upsertOuraCloudSleep(this.db, userId, sessions) }
+  async tombstoneOuraCloudSleep(userId: string, ouraIds: string[]) { return oura.tombstoneOuraCloudSleep(this.db, userId, ouraIds) }
+  async upsertOuraWorkouts(userId: string, rows: oura.OuraWorkoutUpsertRow[]) { return oura.upsertOuraWorkouts(this.db, userId, rows) }
+  async upsertOuraCloudHeartrate(userId: string, rows: { timestamp: Date; bpm: number }[], tz: string) { return oura.upsertOuraCloudHeartrate(this.db, userId, rows, tz) }
+  async getLatestOuraCloudHeartrateAt(userId: string, since: Date) { return oura.getLatestOuraCloudHeartrateAt(this.db, userId, since) }
   async upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]) { return oura.upsertOuraHeartrate(this.db, userId, rows) }
   async upsertAggregatorHeartrate(userId: string, rows: { timestamp: Date; bpm: number }[], source: HealthSource, tz: string) { return oura.upsertAggregatorHeartrate(this.db, userId, rows, source, tz) }
   async dropZoneMinutesFrom(userId: string, fromDay: string) { return oura.deleteZoneMinutesFrom(this.db, userId, fromDay) }
@@ -8011,6 +8037,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getHealthConnectHistoryOldest(userId: string) { return hcHistory.getHealthConnectHistoryOldest(this.db, userId) }
   async advanceHealthConnectHistoryOldest(userId: string, date: string) { return hcHistory.advanceHealthConnectHistoryOldest(this.db, userId, date) }
   async getHealthConnectIntervals(userId: string, kind: import('../repository').HealthConnectIntervalKind, from: Date, to: Date) { return hcIntervals.getHealthConnectIntervals(this.db, userId, kind, from, to) }
+  async getNativeMovementIntervals(userId: string, kind: 'steps' | 'active_kcal', from: Date, to: Date) { return getNativeMovementIntervals(this.db, userId, kind, from, to) }
   async upsertShadowReadiness(userId: string, record: import('@trainingai/shared/types').ShadowReadinessRecord) { return shadowReadinessSlice.upsertShadowReadiness(this.db, userId, record) }
   async getShadowReadiness(userId: string, from: string, to: string, modelVersion?: number) { return shadowReadinessSlice.getShadowReadiness(this.db, userId, from, to, modelVersion) }
   async getHrForWindow(userId: string, from: Date, to: Date) { return oura.getHrForWindow(this.db, userId, from, to) }
@@ -8031,7 +8058,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getSetHrStatsSince(userId: string, since: Date, limit?: number) { return oura.getSetHrStatsSince(this.db, userId, since, limit) }
   async listSessionsMissingSetHrStats(userId: string, since: Date, limit: number) { return oura.listSessionsMissingSetHrStats(this.db, userId, since, limit) }
   async listSetHrStatsForHrr1Backfill(userId: string) { return oura.listSetHrStatsForHrr1Backfill(this.db, userId) }
-  async writeSetHrr1(userId: string, updates: readonly { setLogId: string; hrr1Bpm: number | null; restAdequate: boolean | null }[]) { return oura.writeSetHrr1(this.db, userId, updates) }
+  async writeSetHrr1(userId: string, updates: readonly oura.SetHrr1Write[]) { return oura.writeSetHrr1(this.db, userId, updates) }
   async getOuraWorkouts(userId: string, opts: { unreviewed?: boolean; from?: string; to?: string; timezone?: string }) { return oura.getOuraWorkouts(this.db, userId, opts) }
   async markOuraWorkoutReviewed(userId: string, id: string) { return oura.markOuraWorkoutReviewed(this.db, userId, id) }
   async getSetTimestampsForSession(userId: string, workoutSessionId: string) { return oura.getSetTimestampsForSession(this.db, userId, workoutSessionId) }

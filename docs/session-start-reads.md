@@ -40,6 +40,7 @@ them.
   *none of the owner's*, never *nobody has reported anything*. And **`screenshot_bytes` is a size,
   not an image** — the view withholds `screenshot_data`, so a UI bug arrives with its most
   informative half missing (`OR-137`).
+- **Also read the Gemini billing signal** — `SELECT max(created_at), left(message,160) FROM claude_ro.error_events WHERE message LIKE 'ai_provider_paused%' AND created_at > now() - interval '7 days' GROUP BY 2` through the same endpoint. A row means Google refused a call on billing or quota (credits depleted, quota exhausted), on **any** account: it is written under the owner's id so this view can see it (#2815). It is throttled to one an hour, so the count is not the number of failed calls. Topping up is the owner's call in AI Studio.
 - **Also at session start, read the database size** — one query, same endpoint, beside the `error_events` read:
   ```
   curl -sX POST https://trainingai-production.up.railway.app/api/admin/db-query \

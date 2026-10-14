@@ -1,0 +1,79 @@
+{
+  "expo": {
+    "name": "TrainingAi",
+    "slug": "trainingai-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "com.fitnessai.training",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.fitnessai.training",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "usesAppleSignIn": true
+    },
+    "plugins": [
+      "expo-dev-client",
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "TrainingAi reads your sleep, heart rate, resting heart rate, steps and active energy to show your health history.",
+          "NSHealthUpdateUsageDescription": false,
+          "background": false
+        }
+      ],
+      "expo-web-browser",
+      "./src/integrations/notifications/local-only.cjs",
+      ["expo-notifications", { "enableBackgroundRemoteNotifications": false }],
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "TrainingAi adds workout events to your selected calendar and manages events it created."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "TrainingAi uses your location to show local weather while the app is open.",
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
+        }
+      ],
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": false,
+          "configureAndroidBackup": false
+        }
+      ],
+      "expo-apple-authentication",
+      "./src/integrations/auth/private-backups.cjs",
+      "./src/integrations/oura/oura-package-visibility.cjs",
+      "expo-sqlite",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "TrainingAi uses the camera to scan food barcodes.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "TrainingAi uses photos you choose to identify food and save recipe thumbnails.",
+          "cameraPermission": "TrainingAi uses the camera to photograph food.",
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "60c9f273-9824-4a24-b987-7a2555b6232f"
+      }
+    },
+    "owner": "meowi"
+  }
+}

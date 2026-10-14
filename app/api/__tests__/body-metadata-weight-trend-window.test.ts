@@ -31,6 +31,7 @@ vi.mock('@/lib/data', () => ({
   }),
 }))
 
+import { NextRequest } from 'next/server'
 import { GET } from '@/app/api/body-metadata/route'
 import { todayInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 import { computeWeightRateKgPerWeek, WEIGHT_TREND_WINDOW_DAYS } from '@trainingai/shared/health/long-term-goal-progress'
@@ -39,7 +40,7 @@ const today = todayInTz(TZ)
 const day = (back: number) => shiftDateStr(today, -back)
 
 async function get() {
-  const res = await GET()
+  const res = await GET(new NextRequest('http://localhost/api/body-metadata'))
   expect(res.status).toBe(200)
   return res.json() as Promise<{
     recent: { date: string }[]
@@ -89,3 +90,20 @@ describe('body-metadata weightTrend (#2480)', () => {
     expect(body.weightTrend).toBeNull()
   })
 })
+
+describe('native profile body overview', () => {
+  it('returns older readings without widening the normal recent window or crossing the cutoff', async () => {
+    repo.historyFails = false;
+    repo.bodyMetrics = [{date:day(1),steps:100},{date:day(200),weightKg:81},{date:day(367),weightKg:82}];
+    const res = await GET(new NextRequest('http://localhost/api/body-metadata?overview=1'));
+    const body = await res.json();
+    expect(body.measuredOverview.map((x: {date:string}) => x.date)).toEqual([day(1),day(200)]);
+    expect(body.recent.map((x: {date:string}) => x.date)).toEqual([day(1)]);
+    expect(res.headers.get('cache-control')).toBe('private, no-store');
+  });
+  it('keeps unavailable history distinct from an empty history', async () => {
+    repo.historyFails = true;
+    const res = await GET(new NextRequest('http://localhost/api/body-metadata?overview=1'));
+    expect((await res.json()).measuredOverview).toBeNull();
+  });
+});

@@ -1,5 +1,12 @@
 # Health Connect reads three record types it cannot parse (TN-44's premise, corrected)
 
+> **Update 2026-10-14: §2's three types are converted now.** LA-115 (#1877, 2026-09-28) added
+> converter branches for `HeartRateVariabilityRmssd`, `OxygenSaturation` and `HeartRate` (the
+> series) to `patches/@devmaxime__capacitor-health-connect.patch`, and #2462 added active calories
+> and steps cadence. §2 and the `as any` tell describe the code as it was on 2026-09-16. **§1 still
+> holds**: the platform defines types such as `SkinTemperatureRecord` that the plugin has no branch
+> for, so each one is Kotlin and a new APK.
+
 **2026-09-16 · Lane A · source read against the pinned plugin, with a production cross-check.**
 
 TN-44 says Health Connect defines ten record types our pillars want and we do not read, and files the

@@ -6,6 +6,7 @@ import { ExercisePickerSheet } from "@/components/config/exercise-picker-sheet";
 import { ExercisePreviewSheet } from "@/components/config/exercise-preview-sheet";
 import type { ExerciseLibraryEntry } from "@trainingai/shared/types/program";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { SessionTimeLimit } from './session-time-limit';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@trainingai/shared/utils";
@@ -671,29 +672,8 @@ export function ProgramEditorSheet({
                       onRequestDelete={() => { setPendingSessionDelete(si); onEmojiPickerSessionChange(null); }}
                     />
 
-                    {/* Time budget */}
-                    <div className="flex items-center gap-2 pl-6">
-                      <span className="text-xs text-muted-foreground flex-1">Time budget</span>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const cur = sess.timeBudgetMinutes ?? 60;
-                            onProgramSessionsChange(programSessions.map((s, j) => j === si ? { ...s, timeBudgetMinutes: Math.max(20, cur - 5) } : s));
-                          }}
-                          className="tap-dense tap-target-44 h-6 w-6 rounded-md bg-background border flex items-center justify-center text-base font-bold hover:border-brand transition"
-                        >−</button>
-                        <span className="text-xs tabular-nums w-16 text-center font-medium">{sess.timeBudgetMinutes ?? 60} min</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const cur = sess.timeBudgetMinutes ?? 60;
-                            onProgramSessionsChange(programSessions.map((s, j) => j === si ? { ...s, timeBudgetMinutes: Math.min(180, cur + 5) } : s));
-                          }}
-                          className="tap-dense tap-target-44 h-6 w-6 rounded-md bg-background border flex items-center justify-center text-base font-bold hover:border-brand transition"
-                        >+</button>
-                      </div>
-                    </div>
+                    <SessionTimeLimit value={sess.timeBudgetMinutes ?? 60}
+                      onChange={timeBudgetMinutes => onProgramSessionsChange(programSessions.map((s,j) => j===si ? {...s,timeBudgetMinutes} : s))} />
 
                     {/* Exercises */}
                     <DragDropProvider sensors={[PointerSensor]} onDragOver={handleDragOver}>

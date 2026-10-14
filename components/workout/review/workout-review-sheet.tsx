@@ -188,10 +188,10 @@ export function WorkoutReviewSheet({ sessionId, open, onOpenChange, onApplied }:
               <div className={cn("rounded-xl px-3 py-2.5", proposal.fitsBudget ? "bg-green-500/10" : "bg-amber-500/10")}>
                 <div className={cn("flex items-center gap-2 text-sm font-semibold", proposal.fitsBudget ? "text-green-500" : "text-amber-500")}>
                   <Clock className="h-4 w-4 flex-none" />
-                  <span>≈{planTotalMin} of {data.totalBudgetMin} min{proposal.fitsBudget ? " — fits" : " — still over"}</span>
+                  <span>{data.totalBudgetMin === 0 ? `≈${proposal.projectedDurationMin} min · No time limit` : `≈${planTotalMin} of ${data.totalBudgetMin} min${proposal.fitsBudget ? " — fits" : " — still over"}`}</span>
                 </div>
                 <p className="text-[11px] text-muted-foreground mt-1 pl-6">
-                  ~{warmupMin} min warmup + {proposal.projectedDurationMin} min working (≤{proposal.budgetMin} min target — finishes earlier as your rest/sets beat the estimates)
+                  {data.totalBudgetMin === 0 ? "Estimated working time; no duration cap." : <>~{warmupMin} min warmup + {proposal.projectedDurationMin} min working (≤{proposal.budgetMin} min target — finishes earlier as your rest/sets beat the estimates)</>}
                 </p>
               </div>
 

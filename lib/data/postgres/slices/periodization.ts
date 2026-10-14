@@ -438,6 +438,7 @@ export async function getRecentSessionsOfType(db: Db, userId: string, programSes
 export async function getSetLogsForSessions(db: Db, workoutSessionIds: string[]): Promise<Array<{
   workoutSessionId: string; exerciseName: string; setNumber: number;
   rpe: number | null; reps: number; intensityPct: number | null; setTimeSec: number | null
+  rpeSource: import('@trainingai/shared/workout/rpe-source').RpeSource | null
 }>> {
   if (workoutSessionIds.length === 0) return []
   return db
@@ -446,6 +447,7 @@ export async function getSetLogsForSessions(db: Db, workoutSessionIds: string[])
       exerciseName: s.exerciseLogs.exerciseName,
       setNumber: s.setLogs.setNumber,
       rpe: s.setLogs.rpe,
+      rpeSource: s.setLogs.rpeSource,
       reps: s.setLogs.reps,
       intensityPct: s.setLogs.intensityPct,
       setTimeSec: s.setLogs.setTimeSec,

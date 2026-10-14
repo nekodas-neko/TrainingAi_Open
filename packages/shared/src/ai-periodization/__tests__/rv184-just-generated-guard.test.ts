@@ -13,9 +13,9 @@ import type { WorkoutRepository } from '@/lib/data/repository'
 const SESSION = 'ps-1'
 let n = 0
 
-function repoWith(state: Record<string, unknown>): WorkoutRepository {
+function repoWith(state: Record<string, unknown>, budget = 60): WorkoutRepository {
   const known: Record<string, unknown> = {
-    getActiveProgram: async () => ({ id: 'prog-1', sessions: [{ id: SESSION, timeBudgetMinutes: 60 }] }),
+    getActiveProgram: async () => ({ id: 'prog-1', sessions: [{ id: SESSION, timeBudgetMinutes: budget }] }),
     ensureSessionPeriodization: async () => state,
     reconcileSessionsInPhase: async () => undefined,
     getSessionPeriodization: async () => state,
@@ -71,4 +71,15 @@ describe('the just-generated guard (RV-184)', () => {
   it('generates when nothing is stored', async () => {
     await expect(call(stateFor({ prescription: null, prescriptionGeneratedAt: null }))).rejects.toThrow(/reached generation/)
   })
+})
+
+it('a programme budget change bypasses cached and persisted plans built for the old limit', async () => {
+  const user = `user-${++n}`
+  const state = stateFor({ prescription: plan({ sessionTimeBudgetMinutes: 60 }) })
+  const limitedRepo = repoWith(state)
+  expect((await generatePrescriptionForSession(user, SESSION, limitedRepo, 'Australia/Brisbane')).ok).toBe(true)
+  const untimedRepo = repoWith(state, 0)
+  await expect(generatePrescriptionForSession(user, SESSION, untimedRepo, 'Australia/Brisbane')).rejects.toThrow(/reached generation/)
+  const untimed = repoWith(stateFor({ prescription: plan({ sessionTimeBudgetMinutes: 0 }) }), 0)
+  expect((await generatePrescriptionForSession(user, SESSION, untimed, 'Australia/Brisbane')).ok).toBe(true)
 })

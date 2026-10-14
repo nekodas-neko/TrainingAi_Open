@@ -296,7 +296,7 @@ export function buildUserPrompt(
 
   return `Current date: ${today}
 Program goal: ${signals.trainingGoal}
-Time budget: ${Math.floor(fitBudgetMin(signals))} min
+Time budget: ${fitBudgetMin(signals) === 0 ? 'No time limit. Choose appropriate training volume; do not trim or add work to fit a duration.' : `${Math.floor(fitBudgetMin(signals))} min`}
 
 Phase: ${signals.phase} (${signals.sessionsInPhase} sessions in this phase)
 

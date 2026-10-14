@@ -24,7 +24,11 @@ version is kept verbatim at [`docs/archive/CLAUDE-2026-10-05.md`](docs/archive/C
   and released on Tuesday. Never put a migration in a batch with anything else. The owner steers with
   the `next` label. `node scripts/queue.js` shows the queue and the next batch.
 - **Releases are weekly, on Tuesday** ("patch Tuesday"): everything merged that week ships together.
-  A hotfix ships off-schedule **only when production is actually broken**.
+  A hotfix ships off-schedule **only when production is actually broken**. **Suspended while the
+  native app lands (from 2026-10-13):** releases go out on demand, up to daily, each still with the
+  owner's yes. Once the release issue shows that yes and a clean release test, jsboiss may run it
+  too. The rules and the native testing loop are in
+  [`docs/native-testing.md`](docs/native-testing.md).
 - **A title says what the task is, in plain words** — for an issue, a PR and a one-off session
   alike. No entry IDs, lane letters or `[area]` tags: labels carry area and lane, and the issue
   number is the ID. **An issue title starts with its type** — `bug:`, `feature:`, `chore:`,
@@ -96,11 +100,15 @@ state, for any agent. Titles end 🟢 while live, 🔴 when wrapped.
   migrations with `scripts/next-schema-number.js`.
 - Keep the pool's error handler and timeouts in `lib/data/postgres/client.ts`.
 
-**Oura BLE** → [`docs/rules/oura-ble.md`](docs/rules/oura-ble.md) and
+**Oura** → [`docs/rules/oura-ble.md`](docs/rules/oura-ble.md) and
 [`docs/oura-ble-operations.md`](docs/oura-ble-operations.md)
-- Byte layouts come from the `open_oura` source, never memory. Decoders never throw. The history
-  cursor advances only past server-acknowledged events. Never prune or mutate the server raw
-  archive. Never re-onboard the official Oura app. The Oura Cloud integration is gone for good.
+- The ring's source is moving to the Oura Cloud API (OAuth, per user; #2808). Only the connector
+  module `lib/oura/cloud/` calls Oura Cloud; its tokens are encrypted at rest with `OURA_TOKEN_KEY`.
+- Direct BLE until the switch: byte layouts come from the `open_oura` source, never memory.
+  Decoders never throw. The history cursor advances only once a batch is committed to the phone's
+  own `oura_raw.db`, and never skips a gap (the server POST is a backup). Never prune or mutate the
+  server raw BLE archive. Re-pairing the ring with the official Oura app is the owner's switch-over
+  step, never an agent's.
 
 **AI, security, integrations** → [`docs/rules/ai-security-and-integrations.md`](docs/rules/ai-security-and-integrations.md)
 - Structured LLM output uses a schema, never `JSON.parse` of text; no model-reported number gates
@@ -109,6 +117,9 @@ state, for any agent. Titles end 🟢 while live, 🔴 when wrapped.
   ownership-verify client-supplied ids. New ingest and AI routes get Zod and a rate limit at birth.
 - Read external field names from the pinned source and prove a non-null value lands in the DB.
 - Never hardcode session names or training structure; identity is the DB id.
+- Testing shares the live app's one Gemini key and prepaid balance: mocks for logic, real calls only
+  to measure model behaviour, and say how many a PR made. `lib/ai/dev-call-budget.ts` caps them off
+  production.
 
 **Mobile and runtime** → [`docs/rules/mobile-and-runtime.md`](docs/rules/mobile-and-runtime.md) and
 [`docs/mobile-ui-and-performance.md`](docs/mobile-ui-and-performance.md)

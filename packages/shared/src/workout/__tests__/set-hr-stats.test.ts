@@ -31,9 +31,14 @@ describe('computeSetHrStats — fully-worked single set', () => {
     expect(row.bpmAtEnd).toBe(165)
   })
 
-  it('drop curve — beats lost during rest at fixed offsets', () => {
-    expect(row.drop30s).toBe(60)  // 165 − bpm@70s(105)
-    expect(row.drop60s).toBe(85)  // 165 − bpm@100s(80); rest ≥ 60s so == classic HRR1
+  // #2601 changed this pin. These readings are 10 s apart, and the drop curve now takes the HRR60
+  // dense rule at every offset (no gap over 5 s), so a series this sparse has no drop curve — the
+  // ring's case. It used to read 60 and 85 off the nearest readings. The values are pinned on a
+  // 1 Hz series below.
+  it('drop curve — none from a series too sparse to see the offset', () => {
+    expect(row.drop30s).toBeNull()
+    expect(row.drop60s).toBeNull()
+    expect(row.drop60s).toBe(row.hrr1Bpm)
     expect(row.troughBpm).toBe(80)
   })
 
@@ -169,5 +174,30 @@ describe('computeSetHrStats — source', () => {
     const [row] = computeSetHrStats(
       withSource([[12, 120, 'oura_ble'], [38, 170, 'oura_ble']]), [noWindow], baseline)
     expect(row.source).toBe('oura_ble')
+  })
+})
+
+describe('computeSetHrStats — the drop curve on a dense series (#2601)', () => {
+  // A chest strap at 1 Hz: 165 at the set's end (40 s), falling 1 bpm a second for 70 s.
+  const dense = readings([
+    ...Array.from({ length: 30 }, (_, i): [number, number] => [10 + i, 136 + i]),
+    ...Array.from({ length: 71 }, (_, i): [number, number] => [40 + i, 165 - i]),
+  ])
+  const [row] = computeSetHrStats(dense, [SET1], baseline)
+
+  it('measures each offset the rest window reaches, and matches HRR60 at 60 s', () => {
+    expect(row.drop30s).toBe(30)
+    expect(row.drop60s).toBe(60)
+    expect(row.drop60s).toBe(row.hrr1Bpm)
+    // Rest is 60 s, so +90 and +120 are past the window.
+    expect(row.drop90s).toBeNull()
+    expect(row.drop120s).toBeNull()
+  })
+
+  it('a gap in the series at an offset removes only that offset', () => {
+    const gapped = dense.filter(r => { const t = r.timestamp.getTime() / 1000; return t < 66 || t > 74 })
+    const [g] = computeSetHrStats(gapped, [SET1], baseline)
+    expect(g.drop30s).toBeNull()
+    expect(g.drop60s).toBeNull()   // the gap lies between the end and +60 s too
   })
 })

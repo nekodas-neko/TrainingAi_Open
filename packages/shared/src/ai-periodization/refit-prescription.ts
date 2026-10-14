@@ -90,6 +90,7 @@ export async function refitPrescriptionToBudget(
     // #2403: re-cost the session Full trains too, or the re-fit leaves it describing the old budget.
     new Map(stored.exercises.flatMap(ex =>
       ex.deloaded && ex.preDeload ? [[ex.sessionExerciseId, ex.preDeload] as const] : [])),
+    stored.phase,
   )
 
   // The previous fit's drops are stripped rather than merged: an exercise dropped for a
@@ -118,6 +119,7 @@ export async function refitPrescriptionToBudget(
     ...(budget.fullSession && { fullSession: budget.fullSession }),
     reasoning: `${baseline.reasoning}${budget.budgetNote}`,
     durationPreset,
+    sessionTimeBudgetMinutes: validSession.timeBudgetMinutes,
     ...(budget.droppedIds.size > 0 && { droppedExerciseIds: [...budget.droppedIds] }),
   }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { generateObject } from 'ai'
 import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
+import { aiPausedResponse } from '@/lib/ai/provider-paused'
 import { rateLimit } from '@/lib/rate-limit'
 import { z } from 'zod'
 import { reportServerError } from '@/lib/observability'
@@ -65,6 +66,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(object)
   } catch (err) {
     reportServerError(err, { url: '/api/exercises/generate' })
-    return NextResponse.json({ error: 'Generation failed' }, { status: 500 })
+    return aiPausedResponse(err) ?? NextResponse.json({ error: 'Generation failed' }, { status: 500 })
   }
 }

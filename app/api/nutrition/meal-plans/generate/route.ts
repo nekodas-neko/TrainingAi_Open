@@ -6,6 +6,7 @@ import { userTextBlock, USER_TEXT_NOTE } from '@trainingai/shared/ai/untrusted-t
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { aiModel, loggedGenerateObject, contentKey } from '@/lib/ai/instrument'
+import { aiPausedResponse } from '@/lib/ai/provider-paused'
 import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 import { computeEnergyBalance } from '@/lib/health/energy-balance-service'
@@ -313,10 +314,10 @@ export async function POST(req: Request) {
   } else {
     try {
       draft = await askModel()
-    } catch {
+    } catch (err) {
       // Every generateText/generateObject call is wrapped and returns a JSON error, never a throw
       // that reaches the client as an opaque 500.
-      return NextResponse.json({ error: 'Could not generate a plan right now. Try again shortly.' }, { status: 502 })
+      return aiPausedResponse(err) ?? NextResponse.json({ error: 'Could not generate a plan right now. Try again shortly.' }, { status: 502 })
     }
   }
 

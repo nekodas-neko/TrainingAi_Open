@@ -23,6 +23,7 @@ documentation cluster in the repo (~45 known issues, ~38 plans, 300+ model files
 
 ## Reference docs — read in this order
 
+- [`docs/architecture/scoring-layers-and-data-inputs.md`](../../architecture/scoring-layers-and-data-inputs.md) — **2026-10-11: every source in one table, with its limits.** Ring, strap, scale, Health Connect, Colmi, GPS and logs: how each gets in, where it lands, how fresh and accurate it is, who can use it, and Oura direct against the planned Oura API (#2808). Also the device rules a native app must keep, and (2026-10-12, §6) what the Oura API, Health Connect and Apple Health can each provide, with the full field research in `docs/reviews/2026-10-12-*-fields.md`.
 - [`2026-09-02-tn1-chronic-stress-count`](../../overview/history-2026-09-10-folded-6.md#2026-09-02-tn1-chronic-stress-count) — **the chronic-stress refusal now leaves a number behind, 2026-09-02 (TN-1).** `chronic_stress_score` has been NULL on every row since the model shipped, and both gates countable from stored data pass (43 summary rows against a threshold of 21; 27 of 31 nights complete at the summary level), so the refusal is in the **granular** layer — which recomputes its intermediates in memory by design and records no reason. `chronic_stress_granular_nights` counts the nights in the model's own 31-night window carrying a non-empty hypnogram, rMSSD series **and** skin-temp run (migrations **258 + 259**, local SQLite **v36**). **The gate is untouched** — `CHRONIC_STRESS_MIN_DAYS` does not move and nothing consults the count. **⚠ Only a hand-triggered `fullHistory` pass reaches the model**, so the column stays NULL until the owner runs one; ≥ 21 with a null score then puts the fault inside the vendored model, < 21 names the granular stash.
 - [`2026-09-01-fix-device-console-ia`](../../overview/history-2026-09-10-folded-5.md#2026-09-01-fix-device-console-ia)
   — **where the device consoles live, and why they are ordered the way they are (Q-531, 2026-09-01).**
@@ -74,6 +75,11 @@ documentation cluster in the repo (~45 known issues, ~38 plans, 300+ model files
   Phase 0 is one `0x03` round trip proving transport, framing and mod-255 checksum, and it is a
   gate. Sleep is in no client (Gadgetbridge has it, from a separate dissection). **Do not flash the
   circulating raw-streaming mod firmware** — §8.
+0. **[`docs/oura-ble-reverse-engineering.md`](../../oura-ble-reverse-engineering.md)** — **how we
+   reverse engineered the ring, and how to do it again (2026-10-14).** Written as the ring moves to
+   the Oura API (#2808). It covers where the protocol came from, pairing and the key, the protocol
+   as built, the lessons, and where every file lives at tag `v1.490.1` once the Bluetooth code
+   leaves `main`. Start here if direct ring access is ever wanted back.
 1. **[`docs/oura-ble-operations.md`](../../oura-ble-operations.md)** — the operations manual:
    failure-point matrix, sync-cadence policy, protocol-maintenance playbook, data-integrity
    runbook. **Read this before touching the pipeline**, and add a §1 matrix row for any new failure
@@ -390,8 +396,10 @@ Live at the time of writing (2026-07-30):
   memory, never Oura's public docs.
 - **`oura_raw_samples.body_hex` is the archival source of truth.** Never prune or mutate it;
   protocol fixes ship as decoder changes plus a redecode pass.
-- **The history cursor may only advance past events that are durably ingested (server 2xx).**
-  Advancing on the ring's batch completion alone loses the drained span forever.
+- **The saved history cursor may only advance past events that are durably committed** — to the
+  phone's `oura_raw.db` (rows and cursor in one transaction); the server POST is a best-effort
+  backup, and 2xx gating is only the fallback when that database cannot open. Advancing on the
+  ring's batch completion alone loses the drained span forever.
 - **Decoders are infallible** — unknown bodies return `null` and the raw row still stores.
 - **Kotlin changes need an owner APK rebuild** (`npx cap sync android && ./gradlew assembleDebug`)
   and are compile-gated only in the sandbox. JS/server changes ship via Railway with no rebuild —
