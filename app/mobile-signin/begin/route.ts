@@ -12,6 +12,12 @@ import {
   isNativeClient,
 } from '@/lib/auth/mobile/native-transaction';
 
+// Relative Locations, never `new URL(path, req.url)`: behind Railway's proxy a route handler's
+// `req.url` is the container's own address, so production sent the Android sign-in tab to
+// https://localhost:8080/mobile-signin and a fresh Google sign-in could not start.
+const redirectTo = (path: string) =>
+  new NextResponse(null, { status: 307, headers: { Location: path } });
+
 export async function GET(req: NextRequest) {
   const challenge = req.nextUrl.searchParams.get('challenge') ?? '';
   const client = req.nextUrl.searchParams.get('client');
@@ -32,17 +38,15 @@ export async function GET(req: NextRequest) {
     if (client !== null) {
       return NextResponse.json({ error: 'Invalid mobile transaction' }, { status: 400 });
     }
-    return NextResponse.redirect(new URL('/sign-in', req.url));
+    return redirectTo('/sign-in');
   }
-  const res =
-    client !== null
-      ? new NextResponse(null, {
-          status: 307,
-          headers: {
-            Location: client === 'ios' ? '/mobile-signin/ios' : '/mobile-signin/native',
-          },
-        })
-      : NextResponse.redirect(new URL(`/mobile-signin?challenge=${challenge}`, req.url));
+  const res = redirectTo(
+    client === null
+      ? `/mobile-signin?challenge=${challenge}`
+      : client === 'ios'
+        ? '/mobile-signin/ios'
+        : '/mobile-signin/native',
+  );
   if (client !== null) {
     res.cookies.set(
       NATIVE_TRANSACTION_COOKIE,
