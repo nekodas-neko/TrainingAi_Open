@@ -10,8 +10,10 @@ import { z } from 'zod'
 import type { OuraDailyRow, OuraSleepUpsertRow } from '@/lib/data/repository'
 import type { BodyMetrics } from '@trainingai/shared/types/body'
 import { MAX_PLAUSIBLE_BPM, MIN_PLAUSIBLE_BPM } from '@trainingai/shared/validation/plausibility'
+import { isCalendarDate } from '@trainingai/shared/date-utils'
 
-const Day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
+/** Spec `ISODate`. A real calendar day; stored in the dash form our date columns and keys use. */
+const Day = z.string().refine(isCalendarDate, 'not a calendar day').transform(d => d.replace(/\//g, '-'))
 /** `LocalizedDateTime` / `UtcDateTime` in the spec: an ISO 8601 instant with its offset. */
 const Instant = z.string().min(1).refine(s => !Number.isNaN(Date.parse(s)), 'not an ISO 8601 date-time')
 const Int = z.number().int()

@@ -10,7 +10,7 @@
 //   - after a connect is stored (`tokens.ts` → `startOuraConnectBackfill`), in the background, over
 //     the last `CONNECT_BACKFILL_DAYS` days;
 //   - from the agent key's `oura-cloud-backfill` job, with a dry run first.
-import { dateStrMidnightInTz, daysBetweenDateStrs, shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
+import { dateStrMidnightInTz, daysBetweenDateStrs, isCalendarDate, shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { OuraUnavailableError } from './client'
 import { ouraOAuthConfig, type OuraOAuthConfig } from './config'
@@ -70,8 +70,9 @@ function chunks(from: string, to: string, size: number): [string, string][] {
   return out
 }
 
+/** `from` and `to` are dash-form calendar days (`normalizeDateParamIso`), in order, at most a year apart. */
 export function validBackfillRange(from: string, to: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return false
+  if (!isCalendarDate(from) || !isCalendarDate(to) || from.includes('/') || to.includes('/')) return false
   const span = daysBetweenDateStrs(from, to)
   return Number.isFinite(span) && span >= 0 && span < MAX_BACKFILL_DAYS
 }

@@ -92,6 +92,9 @@ describe('Oura Cloud document mapping (#2859)', () => {
     expect(parseOuraDocument('daily_activity', { id: 'x', day: DAY })).toBeNull()
     expect(parseOuraDocument('sleep', { ...sleepPeriod, bedtime_start: 'yesterday' })).toBeNull()
     expect(parseOuraDocument('daily_readiness', { ...FIXTURES.daily_readiness, day: '10/10/2026' })).toBeNull()
+    expect(parseOuraDocument('daily_readiness', { ...FIXTURES.daily_readiness, day: '2026-02-31' })).toBeNull()
+    // Either separator is a day; it is stored in the dash form.
+    expect(parseOuraDocument('daily_readiness', { ...FIXTURES.daily_readiness, day: '2026/10/10' })?.doc.day).toBe(DAY)
   })
 
   it('keeps a null the spec allows as null, so the merge keeps the stored value', () => {
