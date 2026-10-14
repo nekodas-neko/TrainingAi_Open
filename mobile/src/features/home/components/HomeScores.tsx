@@ -33,7 +33,7 @@ export function HomeScores({ onOpen }: { onOpen: (detail: HealthDetail) => void 
       }
     >
       <ScoreChip
-        label="Energy"
+        label="Readiness"
         first
         value={data?.readinessDisplayScore ?? null}
         icon="power"

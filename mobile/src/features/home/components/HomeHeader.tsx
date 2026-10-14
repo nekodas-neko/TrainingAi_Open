@@ -1,12 +1,12 @@
 import { Pressable, Image } from 'react-native';
 import { AppText, IconButton, Stack, StatusIndicator } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
-import { greeting } from '../data/models';
+import { homeGreeting, profileDisplayName } from '@trainingai/shared/greeting';
 import { WeatherChip } from '../../weather/components/WeatherChip';
 export function HomeHeader({
   today,
   timezone,
-  name,
+  user,
   error,
   pending,
   refreshing,
@@ -18,7 +18,7 @@ export function HomeHeader({
 }: {
   today: string;
   timezone: string;
-  name?: string | null;
+  user?: { displayName?: string | null; name?: string | null } | null;
   error: string | null;
   pending: boolean;
   refreshing: boolean;
@@ -43,7 +43,7 @@ export function HomeHeader({
           {date}
         </AppText>
         <AppText variant="pageTitle" numberOfLines={2}>
-          {greeting(name, timezone)}
+          {homeGreeting(user, timezone)}
         </AppText>
       </Stack>
       <Stack direction="row" gap="none" align="center">
@@ -97,7 +97,7 @@ export function HomeHeader({
             />
           ) : (
             <AppText variant="label" tone="brand">
-              {name
+              {profileDisplayName(user)
                 ?.trim()
                 .split(/\s+/)
                 .map((part) => part[0])

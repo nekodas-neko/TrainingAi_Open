@@ -11,7 +11,6 @@ import {
 } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useHealthData } from '../../health/data/HealthDataProvider';
-import { healthCopy } from '../../health/data/display-copy';
 import { WorkoutLayout } from '../components/WorkoutLayout';
 import { useWorkoutResource } from '../data/WorkoutDataProvider';
 import { explanationSpec, explanationData, insightSpec } from '../data/explanation';
@@ -47,9 +46,9 @@ export function SessionExplainScreen({
           <Card tone="checkin">
             <AppText variant="eyebrow">Why this session</AppText>
             {insight.data ? (
-              <AppText>{healthCopy(insight.data)}</AppText>
+              <AppText>{insight.data}</AppText>
             ) : (
-              <AppText tone="muted">{healthCopy(explanation.data!.reason)}</AppText>
+              <AppText tone="muted">{explanation.data!.reason}</AppText>
             )}
             <StatusIndicator
               label="Workout insight"
@@ -70,11 +69,11 @@ export function SessionExplainScreen({
           <Disclosure title="The signals behind this">
             {groupSignals(data).map((group) => (
               <Card key={group.heading}>
-                <AppText variant="heading">{healthCopy(group.heading)}</AppText>
+                <AppText variant="heading">{group.heading}</AppText>
                 {group.rows.map((row) => (
                   <Stack key={row.label} gap="xs">
                     <Stack direction="row" justify="space-between">
-                      <AppText variant="label">{healthCopy(row.label)}</AppText>
+                      <AppText variant="label">{row.label}</AppText>
                       <AppText
                         variant="caption"
                         tone="muted"
@@ -123,7 +122,7 @@ export function SessionExplainScreen({
       ) : (
         explanation.data && (
           <Card>
-            <AppText>{healthCopy(explanation.data.reason)}</AppText>
+            <AppText>{explanation.data.reason}</AppText>
             <AppText variant="caption" tone="muted">
               This schedule does not use the AI session-fit score.
             </AppText>

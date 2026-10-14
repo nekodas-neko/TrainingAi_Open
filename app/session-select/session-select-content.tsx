@@ -5,7 +5,7 @@ import { savePreference } from '@/lib/user/preferences-sync'
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { calendarMonthInTz, previousCalendarMonth } from "@/lib/calendar-month";
 import { useDayRolloverRefresh, useLocalDay } from '@/components/shell/local-day-provider';
-import { getGreeting } from './greeting';
+import { getGreeting, profileDisplayName } from '@trainingai/shared/greeting';
 import { isMorningCheckinPromptDone, markMorningCheckinPromptDone } from '@/app/session-select/morning-checkin-marker';
 import { warmPrescription } from '@/app/session-select/warm-prescription';
 import { useTransitionRouter } from "@/lib/view-transition";
@@ -740,7 +740,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   useEffect(() => {
     const u = userProfile?.user;
     if (!u) return;
-    setDisplayName(u.displayName ?? u.name ?? null);
+    setDisplayName(profileDisplayName(u));
     if (u.avatar) setUserAvatar(u.avatar);
     setGoalsProfile({ activityLevel: u.activityLevel ?? null, fitnessGoal: u.fitnessGoal ?? null, lastGoalReviewAt: u.lastGoalReviewAt ?? null });
   }, [userProfile]);

@@ -32,7 +32,6 @@ import { HealthViewReady } from '../components/HealthViewReady';
 import { HeartFactors, HeartProgress, HeartHeroValue } from '../components/HeartDetails';
 import { DoseVitalsCard } from '../components/DoseVitalsCard';
 import { resilienceAsOfLine, resilienceShortfallLine } from '../data/resilience-copy';
-import { healthCopy } from '../data/display-copy';
 
 export type HealthDetail = 'sleep' | 'readiness' | 'activity' | 'heart-rate';
 export function HealthDetailScreen({
@@ -50,7 +49,7 @@ export function HealthDetailScreen({
   }, [health.store, health.today]);
   const title = {
     sleep: 'Sleep',
-    readiness: 'Energy',
+    readiness: 'Readiness',
     activity: 'Activity',
     'heart-rate': 'Heart Rate',
   }[detail];
@@ -208,10 +207,7 @@ export function HealthDetailScreen({
               </>
             )}
             {detail === 'readiness' && state.data?.illnessAdvisory && (
-              <Notice
-                title="Energy advisory"
-                message={healthCopy(state.data.illnessAdvisory)}
-              />
+              <Notice title="Readiness advisory" message={state.data.illnessAdvisory} />
             )}
             {detail === 'readiness' &&
               state.data &&
@@ -277,7 +273,10 @@ export function HealthDetailScreen({
                     </AppText>
                     <KeyValueGrid
                       rows={[
-                        { label: 'Baseline', value: metricValue(state.data.ouraScore) },
+                        {
+                          label: 'Baseline',
+                          value: metricValue(state.data.ouraScore),
+                        },
                         {
                           label:
                             state.data.source === 'oura+acwr'
@@ -286,7 +285,7 @@ export function HealthDetailScreen({
                           value: metricValue(score - state.data.ouraScore),
                         },
                         {
-                          label: 'Final energy',
+                          label: 'Final readiness',
                           value: `${scoreBand(score).label} · ${score}`,
                         },
                       ]}
@@ -333,7 +332,7 @@ export function HealthDetailScreen({
             )}
             {detail === 'readiness' && state.data?.daySummary && (
               <Card>
-                <AppText>{healthCopy(state.data.daySummary)}</AppText>
+                <AppText>{state.data.daySummary}</AppText>
               </Card>
             )}
             {detail === 'readiness' && <DoseVitalsCard />}
@@ -358,7 +357,10 @@ export function HealthDetailScreen({
               }
               tone={tone}
               caption="Last 14 days · gaps mean not recorded"
-              points={trends.data!.trends.map((day) => ({ label: day.date, value: day[key] }))}
+              points={trends.data!.trends.map((day) => ({
+                label: day.date,
+                value: day[key],
+              }))}
             />
           ))}
         {detail === 'heart-rate' &&

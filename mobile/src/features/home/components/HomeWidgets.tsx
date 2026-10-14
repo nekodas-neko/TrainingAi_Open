@@ -1,6 +1,7 @@
 import { useRecordedIntake } from '../../nutrition/data/useRecordedIntake';
 import { HrDayCard } from '../../health/components/HrDayCard';
 import { verdictSpec } from '../../health/data/checkin';
+import { verdictCopy } from '../../health/data/sleep-verdict-copy';
 import { acwrBandByKey } from '@trainingai/shared/ai-periodization/acwr';
 import { recoveryBand } from '@trainingai/shared/health/recovery-band';
 import { nativeColor } from '../../../shared/ui';
@@ -72,7 +73,12 @@ export function HomeMetricTiles({
       icon: 'scale',
       field: 'weightKg',
     },
-    steps: { value: today?.steps ?? null, unit: '', icon: 'legs', field: 'steps' },
+    steps: {
+      value: today?.steps ?? null,
+      unit: '',
+      icon: 'legs',
+      field: 'steps',
+    },
     calories: {
       value: resolved.intake ?? today?.calories ?? null,
       unit: 'kcal',
@@ -98,7 +104,12 @@ export function HomeMetricTiles({
       icon: 'nutrition',
       nutrition: true,
     },
-    waterIntake: { value: today?.waterMl ?? null, unit: 'ml', icon: 'water', field: 'waterMl' },
+    waterIntake: {
+      value: today?.waterMl ?? null,
+      unit: 'ml',
+      icon: 'water',
+      field: 'waterMl',
+    },
   };
   return (
     <Grid columns={3}>
@@ -389,10 +400,26 @@ function HomeWidgetBody({
     const goal = goals?.data?.sleepGoalHours ?? null;
     const stages = night
       ? [
-          { label: 'Deep', hours: night.deepSleepHours, color: theme.sleepStages.deep },
-          { label: 'REM', hours: night.remSleepHours, color: theme.sleepStages.rem },
-          { label: 'Light', hours: night.lightSleepHours, color: theme.sleepStages.light },
-          { label: 'Awake', hours: night.awakHours, color: theme.sleepStages.awake },
+          {
+            label: 'Deep',
+            hours: night.deepSleepHours,
+            color: theme.sleepStages.deep,
+          },
+          {
+            label: 'REM',
+            hours: night.remSleepHours,
+            color: theme.sleepStages.rem,
+          },
+          {
+            label: 'Light',
+            hours: night.lightSleepHours,
+            color: theme.sleepStages.light,
+          },
+          {
+            label: 'Awake',
+            hours: night.awakHours,
+            color: theme.sleepStages.awake,
+          },
         ]
       : [];
     const known = stages.reduce((sum, row) => sum + (row.hours ?? 0), 0);
@@ -726,21 +753,16 @@ function HomeSleepFeedback({ onCorrect }: { onCorrect: () => void }) {
   const health = useHealthData();
   const state = useWorkoutResource(verdictSpec(health.today));
   const verdict = state.data?.verdict;
-  if (
-    health.sleep.some((night) => night.date === health.today && night.localOnly) ||
-    !verdict ||
-    verdict.verdict === 'normal' ||
-    verdict.responseState !== 'none'
-  ) {
+  if (health.sleep.some((night) => night.date === health.today && night.localOnly) || !verdict) {
     return null;
   }
+  const { line, prominent } = verdictCopy(verdict);
   return (
-    <Stack>
-      <AppText variant="micro" tone="muted">
-        Last night was {verdict.verdict === 'good' ? 'better' : 'below'} your usual sleep
-        baseline.
+    <Stack gap="xxs">
+      <AppText variant={prominent ? 'caption' : 'micro'} tone={prominent ? undefined : 'muted'}>
+        {line}
       </AppText>
-      <AppButton title="Doesn’t match how you slept?" variant="ghost" onPress={onCorrect} />
+      <AppButton title="That’s wrong" variant="ghost" onPress={onCorrect} />
     </Stack>
   );
 }
