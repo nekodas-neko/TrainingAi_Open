@@ -49,8 +49,11 @@ const STATUSES: Record<number, string> = {
   503: 'Oura connection is not set up on the server yet. Try again later.',
 };
 export function ouraMessage(error: unknown) {
-  if (typeof error === 'string') return REASONS[error] ?? REASONS.failed;
-  if (error instanceof ApiError) return STATUSES[error.status] ?? REASONS.failed;
+  // The reason comes from a URL, so `__proto__` or `constructor` must never reach the prototype.
+  if (typeof error === 'string')
+    return Object.hasOwn(REASONS, error) ? REASONS[error] : REASONS.failed;
+  if (error instanceof ApiError)
+    return Object.hasOwn(STATUSES, error.status) ? STATUSES[error.status] : REASONS.failed;
   return 'TrainingAi could not be reached. Check your connection and try again.';
 }
 
@@ -71,10 +74,65 @@ export async function finishOuraCallback(
     return { ok: false, message: ouraMessage(error) };
   }
 }
+/** How long after the consent browser closes a late return link is still accepted. On Android
+ *  the browser can report "closed" a moment before the link that closed it arrives. */
+export const RETURN_GRACE_MS = 15_000;
+/** A cold start may finish a connect only this soon after the phone started it: the server's
+ *  connect ticket and pending handle each last ten minutes. */
+export const COLD_START_MAX_AGE_MS = 20 * 60 * 1000;
+
+/**
+ * Finishes each Oura return URL exactly once. On Android the consent browser
+ * (`openAuthSessionAsync`) and the screen's own `Linking` listener both receive the same return,
+ * and the listener receives it first; both ask here and share one `/complete` call.
+ *
+ * A return is accepted only while a connect started on this phone is open (or just closed), so a
+ * link fired at the app by anything else is ignored. The one exception is a cold start: Android
+ * killed the app while Oura's page was open and the return relaunched it. The caller passes
+ * `coldStart` only after checking this phone recorded starting a connect within
+ * `COLD_START_MAX_AGE_MS`.
+ */
+export class OuraReturns {
+  private readonly finishing = new Map<string, Promise<OuraResult>>();
+  private open = 0;
+  private graceUntil = 0;
+  constructor(private readonly now: () => number = Date.now) {}
+  begin() {
+    this.open += 1;
+  }
+  end() {
+    this.open = Math.max(0, this.open - 1);
+    this.graceUntil = this.now() + RETURN_GRACE_MS;
+  }
+  /** A connect is waiting on the consent browser; it reports its own result. */
+  get connecting() {
+    return this.open > 0;
+  }
+  get expecting() {
+    return this.open > 0 || this.now() <= this.graceUntil;
+  }
+  /** The one shared result for `url`, or null when it is not an Oura return this phone is waiting for. */
+  finish(
+    url: string,
+    client: MobileClient,
+    connection: AccountConnection,
+    options: { coldStart?: boolean } = {},
+  ): Promise<OuraResult> | null {
+    const started = this.finishing.get(url);
+    if (started) return started;
+    const result = parseOuraCallback(url, client);
+    if (!result || !(this.expecting || options.coldStart)) return null;
+    const finishing = finishOuraCallback(connection, result);
+    this.finishing.set(url, finishing);
+    return finishing;
+  }
+}
+
 export async function connectOura(
   connection: AccountConnection,
   client: MobileClient,
   open: (url: string, redirect: string) => Promise<{ type: string; url?: string }>,
+  returns: OuraReturns = new OuraReturns(),
 ): Promise<OuraResult> {
   let url: string;
   try {
@@ -85,16 +143,30 @@ export async function connectOura(
   } catch (error) {
     return { ok: false, message: ouraMessage(error) };
   }
-  const opened = await open(url, ouraCallback(client)).catch(() => null);
-  const result =
-    opened?.type === 'success' && opened.url ? parseOuraCallback(opened.url, client) : null;
-  if (!result)
-    return {
-      ok: false,
-      cancelled: true,
-      message: 'Oura was closed before the connection finished.',
-    };
-  return finishOuraCallback(connection, result);
+  returns.begin();
+  try {
+    const opened = await open(url, ouraCallback(client)).catch(() => null);
+    const finishing =
+      opened?.type === 'success' && opened.url
+        ? returns.finish(opened.url, client, connection)
+        : null;
+    if (!finishing)
+      return {
+        ok: false,
+        cancelled: true,
+        message: 'Oura was closed before the connection finished.',
+      };
+    return await finishing;
+  } finally {
+    returns.end();
+  }
+}
+
+/** A connect this phone started, saved so a cold-start return can tell it apart from a stray link. */
+export const CONNECT_STARTED_KEY = 'trainingai.oura.connect_started';
+export function connectStartedRecently(saved: string | null, now = Date.now()) {
+  const at = saved === null ? NaN : Number(saved);
+  return Number.isSafeInteger(at) && at <= now && now - at <= COLD_START_MAX_AGE_MS;
 }
 export async function disconnectOura(connection: AccountConnection): Promise<OuraResult> {
   if (!connection.delete) return { ok: false, message: REASONS.failed };

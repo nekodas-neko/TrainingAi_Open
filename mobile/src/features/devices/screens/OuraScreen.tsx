@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Linking } from 'react-native';
 import {
   AppButton,
@@ -26,21 +26,24 @@ import {
   type OuraSettingsPage,
 } from '../../../integrations/oura/platform';
 import {
+  CONNECT_STARTED_KEY,
+  OuraReturns,
   connectOura,
+  connectStartedRecently,
   disconnectOura,
-  finishOuraCallback,
   ouraMessage,
   parseOuraCallback,
   readOuraStatus,
+  type OuraResult,
   type OuraStatus,
 } from '../data/oura';
 
 const CHECKLIST: { title: string; steps: string; page: OuraSettingsPage; button: string }[] = [
   {
     title: 'Battery: Unrestricted',
-    steps: 'Apps → Oura → Battery → Unrestricted, so Android never pauses its sync.',
-    page: 'apps',
-    button: 'Open apps',
+    steps: 'Oura’s App info → Battery → Unrestricted, so Android never pauses its sync.',
+    page: 'oura-app-info',
+    button: 'App info',
   },
   {
     title: 'Never sleeping apps',
@@ -50,31 +53,62 @@ const CHECKLIST: { title: string; steps: string; page: OuraSettingsPage; button:
   },
   {
     title: 'Nearby devices',
-    steps: 'Apps → Oura → Permissions → Nearby devices → Allow, so it can reach the ring.',
-    page: 'apps',
-    button: 'Open apps',
+    steps: 'Oura’s App info → Permissions → Nearby devices → Allow, so it can reach the ring.',
+    page: 'oura-app-info',
+    button: 'App info',
   },
 ];
 
-export function OuraScreen({ onBack }: { onBack: () => void }) {
+// One per app process, so a remount or a repeated effect never finishes a return twice.
+const returns = new OuraReturns();
+let initialReturnTaken = false;
+/**
+ * The link that launched the app, when it is this build's Oura return: Android killed the app
+ * while Oura's page was open, and the return started it again. Given out once per process, since
+ * `getInitialURL` keeps answering with the same link for as long as the app runs.
+ */
+export async function takeInitialOuraReturn(): Promise<string | null> {
+  const client = authPlatform.client;
+  if (!client || initialReturnTaken) return null;
+  initialReturnTaken = true;
+  const url = await Linking.getInitialURL().catch(() => null);
+  return url && parseOuraCallback(url, client) ? url : null;
+}
+
+type ActionError = { title: string; message: string };
+
+export function OuraScreen({
+  onBack,
+  initialReturn = null,
+}: {
+  onBack: () => void;
+  initialReturn?: string | null;
+}) {
   const { theme } = useTheme();
   const account = useAccountContext();
   const connection = account.dataReader;
   const client = authPlatform.client;
   const [status, setStatus] = useState<OuraStatus | null>(null);
-  const [busy, setBusy] = useState<'status' | 'connect' | 'disconnect' | null>('status');
-  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<'status' | 'connect' | 'disconnect' | null>(() =>
+    connection ? 'status' : null,
+  );
+  // Loading the status and the last action fail separately: a status reload must never wipe
+  // the reason a connect or disconnect was refused.
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<ActionError | null>(null);
   const [confirm, setConfirm] = useState(false);
-  const handled = useRef(new Set<string>());
 
   const refresh = useCallback(async () => {
-    if (!connection) return;
+    if (!connection) {
+      setBusy(null);
+      return;
+    }
     setBusy('status');
     try {
       setStatus(await readOuraStatus(connection));
-      setError(null);
+      setStatusError(null);
     } catch (cause) {
-      setError(ouraMessage(cause));
+      setStatusError(ouraMessage(cause));
     } finally {
       setBusy(null);
     }
@@ -83,40 +117,70 @@ export function OuraScreen({ onBack }: { onBack: () => void }) {
     void refresh();
   }, [refresh]);
 
-  // A return that reaches the app as a link (the browser was closed, or the app restarted).
+  const reportConnect = useCallback((done: OuraResult) => {
+    if (!done.ok && !done.cancelled)
+      setActionError({ title: 'Oura was not connected', message: done.message });
+  }, []);
+
+  // A return that reaches the app as a link while it is running. During connect() the consent
+  // browser hands back the same link and connect() reports it; `returns` makes both share one
+  // `/complete` call. A link that arrives just after the browser reported "closed" lands here.
   useEffect(() => {
     if (!connection || !client) return;
     const listener = Linking.addEventListener('url', ({ url }) => {
-      const result = parseOuraCallback(url, client);
-      if (!result || handled.current.has(url)) return;
-      handled.current.add(url);
+      const connecting = returns.connecting;
+      const finishing = returns.finish(url, client, connection);
+      if (!finishing || connecting) return;
       setBusy('connect');
-      void finishOuraCallback(connection, result).then(async (done) => {
-        setError(done.ok ? null : done.message);
+      void finishing.then(async (done) => {
+        reportConnect(done);
         await refresh();
       });
     });
     return () => listener.remove();
-  }, [client, connection, refresh]);
+  }, [client, connection, refresh, reportConnect]);
+
+  // A return that cold-started the app. It is the one return accepted without a connect open in
+  // this process, and only when this phone saved that it started a connect within the lifetime
+  // of the server's pending handle; anything else is a stray link and is ignored. The server
+  // still refuses a handle that another account started.
+  useEffect(() => {
+    if (!initialReturn || !connection || !client) return;
+    let active = true;
+    void (async () => {
+      const saved = await authPlatform.get(CONNECT_STARTED_KEY).catch(() => null);
+      if (!connectStartedRecently(saved)) return;
+      const finishing = returns.finish(initialReturn, client, connection, { coldStart: true });
+      await authPlatform.remove(CONNECT_STARTED_KEY).catch(() => undefined);
+      if (!finishing) return;
+      if (active) setBusy('connect');
+      const done = await finishing;
+      if (!active) return;
+      reportConnect(done);
+      await refresh();
+    })();
+    return () => {
+      active = false;
+    };
+  }, [client, connection, initialReturn, refresh, reportConnect]);
 
   async function connect() {
     if (!connection || !client) return;
+    setActionError(null);
     setBusy('connect');
-    setError(null);
-    const done = await connectOura(connection, client, async (url, redirect) => {
-      const opened = await openOuraConsent(url, redirect);
-      if (opened.type === 'success' && opened.url) handled.current.add(opened.url);
-      return opened;
-    });
-    if (!done.ok && !done.cancelled) setError(done.message);
+    await authPlatform.set(CONNECT_STARTED_KEY, String(Date.now())).catch(() => undefined);
+    const done = await connectOura(connection, client, openOuraConsent, returns);
+    await authPlatform.remove(CONNECT_STARTED_KEY).catch(() => undefined);
+    reportConnect(done);
     await refresh();
   }
   async function disconnect() {
     if (!connection) return;
     setConfirm(false);
+    setActionError(null);
     setBusy('disconnect');
     const done = await disconnectOura(connection);
-    setError(done.ok ? null : done.message);
+    if (!done.ok) setActionError({ title: 'Oura is still connected', message: done.message });
     await refresh();
   }
 
@@ -152,7 +216,8 @@ export function OuraScreen({ onBack }: { onBack: () => void }) {
                     : 'Oura status'
               }
               busy={busy !== null}
-              error={error}
+              error={statusError}
+              onRetry={() => void refresh()}
             />
             {!connection ? (
               <AppText tone="muted">Sign in to connect Oura.</AppText>
@@ -167,6 +232,8 @@ export function OuraScreen({ onBack }: { onBack: () => void }) {
                 disabled={busy !== null}
                 onPress={() => setConfirm(true)}
               />
+            ) : status === null && busy === null ? (
+              <AppButton title="Try again" variant="secondary" onPress={() => void refresh()} />
             ) : (
               <AppButton
                 title="Connect Oura"
@@ -176,6 +243,7 @@ export function OuraScreen({ onBack }: { onBack: () => void }) {
               />
             )}
           </Card>
+          {actionError && <Notice title={actionError.title} message={actionError.message} error />}
           {confirm && (
             <ConfirmationCard
               title="Disconnect Oura?"
@@ -194,7 +262,11 @@ export function OuraScreen({ onBack }: { onBack: () => void }) {
               leading={<Icon name="refresh" />}
               onPress={() => {
                 void openOuraApp().then((opened) => {
-                  if (!opened) setError('Open the Oura app to sync.');
+                  if (!opened)
+                    setActionError({
+                      title: 'Oura did not open',
+                      message: 'Open the Oura app to sync.',
+                    });
                 });
               }}
               divider={false}
@@ -224,15 +296,19 @@ export function OuraScreen({ onBack }: { onBack: () => void }) {
                   divider={index < CHECKLIST.length - 1}
                   onPress={() => {
                     void openOuraSettings(item.page).then((opened) => {
-                      if (!opened) setError('Open Settings on your phone to change this.');
+                      if (!opened)
+                        setActionError({
+                          title: 'Settings did not open',
+                          message: 'Open Settings on your phone to change this.',
+                        });
                     });
                   }}
                 />
               ))}
             </Section>
           )}
-          {error && status === null && busy === null && (
-            <Notice title="Oura status unavailable" message={error} error />
+          {statusError && status === null && busy === null && (
+            <Notice title="Oura status unavailable" message={statusError} error />
           )}
         </Stack>
       </TabPanel>

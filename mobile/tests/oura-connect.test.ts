@@ -2,8 +2,13 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { ApiError } from '../src/features/account/api/client.ts';
 import type { AccountConnection } from '../src/features/account/session.ts';
+import { createRequire } from 'node:module';
 import {
+  COLD_START_MAX_AGE_MS,
+  OuraReturns,
+  RETURN_GRACE_MS,
   connectOura,
+  connectStartedRecently,
   disconnectOura,
   finishOuraCallback,
   ouraCallback,
@@ -11,6 +16,15 @@ import {
   parseOuraCallback,
   readOuraStatus,
 } from '../src/features/devices/data/oura.ts';
+
+const require = createRequire(import.meta.url);
+const visibility = require('../src/integrations/oura/oura-package-visibility.cjs') as {
+  addPackageQuery: (manifest: Manifest, name: string) => Manifest;
+  OURA_PACKAGE: string;
+};
+type Manifest = {
+  manifest: { queries?: { package?: { $: Record<string, string> }[]; intent?: unknown[] }[] };
+};
 
 const BACK = 'com.trainingai.app.preview:/oura/callback';
 function connection(answers: Record<string, unknown>, calls: string[] = []): AccountConnection {
@@ -112,4 +126,107 @@ test('status is parsed strictly, and disconnect calls DELETE', async () => {
   assert.deepEqual(calls, ['GET /api/oura/connection', 'DELETE /api/oura/connection']);
   const refused = await disconnectOura(connection({ 'DELETE /api/oura/connection': new ApiError(503) }));
   assert.match(!refused.ok ? refused.message : '', /not set up on the server/);
+});
+
+const START = 'POST /api/oura/connect {"client":"android-preview"}';
+const COMPLETE = 'POST /api/oura/connect/complete {"handle":"h.1"}';
+const RETURN = `${BACK}?oura=pending&handle=h.1`;
+
+test('on Android the screen\'s link listener and the browser share one /complete call', async () => {
+  const calls: string[] = [];
+  const conn = connection({ [START]: { url: 'https://example.com/x' }, [COMPLETE]: { connected: true } }, calls);
+  const returns = new OuraReturns();
+  let fromListener: Promise<unknown> | null = null;
+  const result = await connectOura(conn, 'android-preview', async () => {
+    // The screen's listener was registered first, so it receives the return before the browser resolves.
+    fromListener = returns.finish(RETURN, 'android-preview', conn);
+    assert.ok(fromListener, 'the listener accepts a return while a connect is open');
+    return { type: 'success', url: RETURN };
+  }, returns);
+  assert.deepEqual(result, { ok: true });
+  assert.deepEqual(await fromListener, { ok: true });
+  // And a late duplicate of the same link still does not post again.
+  assert.deepEqual(await returns.finish(RETURN, 'android-preview', conn), { ok: true });
+  assert.deepEqual(calls.filter((call) => call === COMPLETE), [COMPLETE]);
+});
+
+test('a return the browser reported as closed is still finished if the link lands just after', async () => {
+  let now = 1_000_000;
+  const calls: string[] = [];
+  const conn = connection({ [START]: { url: 'https://example.com/x' }, [COMPLETE]: { connected: true } }, calls);
+  const returns = new OuraReturns(() => now);
+  const result = await connectOura(conn, 'android-preview', async () => ({ type: 'dismiss' }), returns);
+  assert.equal(!result.ok && result.cancelled, true);
+  now += RETURN_GRACE_MS - 1;
+  assert.deepEqual(await returns.finish(RETURN, 'android-preview', conn), { ok: true });
+  assert.deepEqual(calls, [START, COMPLETE]);
+});
+
+test('an Oura link is ignored unless this phone is waiting for one', async () => {
+  let now = 1_000_000;
+  const calls: string[] = [];
+  const conn = connection({ [COMPLETE]: { connected: true } }, calls);
+  const returns = new OuraReturns(() => now);
+  assert.equal(returns.finish(RETURN, 'android-preview', conn), null);
+  returns.begin();
+  returns.end();
+  now += RETURN_GRACE_MS + 1;
+  assert.equal(returns.finish(RETURN, 'android-preview', conn), null);
+  assert.equal(returns.finish('com.trainingai.app.preview:/auth/callback?x=1', 'android-preview', conn), null);
+  assert.deepEqual(calls, []);
+});
+
+test('a cold-start return is finished once, and only after a connect this phone started recently', async () => {
+  const calls: string[] = [];
+  const conn = connection({ [COMPLETE]: { connected: true } }, calls);
+  const returns = new OuraReturns();
+  const first = returns.finish(RETURN, 'android-preview', conn, { coldStart: true });
+  const second = returns.finish(RETURN, 'android-preview', conn, { coldStart: true });
+  assert.equal(first, second);
+  assert.deepEqual(await first, { ok: true });
+  assert.deepEqual(calls, [COMPLETE]);
+
+  const now = 50_000_000;
+  assert.equal(connectStartedRecently(String(now - 60_000), now), true);
+  assert.equal(connectStartedRecently(String(now - COLD_START_MAX_AGE_MS - 1), now), false);
+  assert.equal(connectStartedRecently(String(now + 60_000), now), false);
+  assert.equal(connectStartedRecently(null, now), false);
+  assert.equal(connectStartedRecently('soon', now), false);
+});
+
+test('a reason that names an Object.prototype key falls back to the generic message', async () => {
+  for (const reason of ['__proto__', 'constructor', 'hasOwnProperty', 'toString']) {
+    assert.match(ouraMessage(reason), /could not finish/);
+    const parsed = parseOuraCallback(`${BACK}?oura=error&reason=${reason}`, 'android-preview');
+    assert.ok(parsed);
+    const result = await finishOuraCallback(connection({}), parsed);
+    assert.match(!result.ok ? result.message : '', /could not finish/);
+  }
+  const unknown = new ApiError(418);
+  assert.match(ouraMessage(unknown), /could not finish/);
+});
+
+test('the Android manifest names Oura in <queries> exactly once, however often it is applied', () => {
+  const name = visibility.OURA_PACKAGE;
+  assert.equal(name, 'com.ouraring.oura');
+  const entries = (manifest: Manifest) =>
+    (manifest.manifest.queries ?? []).flatMap((query) => query.package ?? []).filter((entry) => entry.$['android:name'] === name);
+
+  const empty: Manifest = { manifest: {} };
+  visibility.addPackageQuery(empty, name);
+  visibility.addPackageQuery(empty, name);
+  assert.equal(entries(empty).length, 1);
+
+  const alreadyListed: Manifest = {
+    manifest: { queries: [{ intent: [{}] }, { package: [{ $: { 'android:name': name } }] }] },
+  };
+  visibility.addPackageQuery(alreadyListed, name);
+  assert.equal(entries(alreadyListed).length, 1);
+
+  const others: Manifest = {
+    manifest: { queries: [{ package: [{ $: { 'android:name': 'com.android.settings' } }] }] },
+  };
+  visibility.addPackageQuery(others, name);
+  assert.equal(entries(others).length, 1);
+  assert.equal(others.manifest.queries?.[0].package?.length, 2);
 });

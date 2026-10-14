@@ -8,7 +8,7 @@ export async function openOuraConsent(
 export async function openOuraApp() {
   return false;
 }
-export type OuraSettingsPage = 'apps' | 'battery' | 'device-care';
+export type OuraSettingsPage = 'oura-app-info' | 'device-care';
 export async function openOuraSettings(_page: OuraSettingsPage) {
   return false;
 }
