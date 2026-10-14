@@ -9,7 +9,14 @@
 //      to Oura with the ticket as `state`.
 //   3. Oura sends the same browser to /api/oura/callback?code=…&state=…. The callback accepts only a
 //      ticket this server signed, unexpired, whose nonce matches the cookie: the browser that comes
-//      back is the one that went out. Then it returns to the client the ticket names.
+//      back is the one that went out.
+//   4. The grant is committed only by a request authenticated as the ticket's user. The nonce proves
+//      the same browser came back, not whose browser it is (Orchestrator review on #2883): without
+//      this, anyone could send a victim their own connect link and collect the victim's Oura grant.
+//      - web: the callback itself must carry that user's session (the Auth.js cookie is Lax, so the
+//        top-level GET back from Oura sends it);
+//      - native: the system browser has no session, so the callback seals the grant into a handle
+//        (`pending-grant.ts`) and the app completes with its own bearer at /api/oura/connect/complete.
 //
 // Signed with `AUTH_SECRET` under its own issuer, as `lib/auth/mobile/native-transaction.ts` does,
 // so a mobile sign-in transaction can never be replayed as a ticket or the other way round.
@@ -80,7 +87,10 @@ export async function readConnectTicket(ticket: string): Promise<ConnectTicket |
 
 export type ConnectOutcome =
   | { status: 'connected' }
-  | { status: 'error'; error: 'denied' | 'expired' | 'in_use' | 'failed' | 'not_configured' }
+  /** Native only: the app finishes by posting `handle` to `/api/oura/connect/complete` with its bearer. */
+  | { status: 'pending'; handle: string }
+  /** `signed_out`: a web connect came back to a browser not signed in as the user who started it. */
+  | { status: 'error'; error: 'denied' | 'expired' | 'in_use' | 'failed' | 'signed_out' }
 
 /** The web page the user returns to. Part 4 builds the connect screen; Devices is where it goes. */
 export const WEB_RETURN_PATH = '/more/devices'
@@ -93,7 +103,9 @@ export const WEB_RETURN_PATH = '/more/devices'
  */
 export function connectReturnUrl(client: ConnectClient, origin: string, outcome: ConnectOutcome): string {
   const params = new URLSearchParams(
-    outcome.status === 'connected' ? { oura: 'connected' } : { oura: 'error', reason: outcome.error },
+    outcome.status === 'connected' ? { oura: 'connected' }
+      : outcome.status === 'pending' ? { oura: 'pending', handle: outcome.handle }
+      : { oura: 'error', reason: outcome.error },
   )
   if (client === 'web') return new URL(`${WEB_RETURN_PATH}?${params}`, origin).toString()
   const scheme = NATIVE_CALLBACKS[client].split(':')[0]

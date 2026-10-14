@@ -60,5 +60,7 @@ describe('the Oura connect ticket, which is the OAuth state (#2858)', () => {
     expect(connectReturnUrl('android', origin, { status: 'connected' })).toBe('com.trainingai.app:/oura/callback?oura=connected')
     expect(connectReturnUrl('android-preview', origin, { status: 'error', error: 'denied' }))
       .toBe('com.trainingai.app.preview:/oura/callback?oura=error&reason=denied')
+    expect(connectReturnUrl('android', origin, { status: 'pending', handle: 'p1.a.b.c' }))
+      .toBe('com.trainingai.app:/oura/callback?oura=pending&handle=p1.a.b.c')
   })
 })

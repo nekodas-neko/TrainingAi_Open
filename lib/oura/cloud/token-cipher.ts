@@ -31,15 +31,24 @@ export class OuraTokenKeyMissingError extends Error {
   }
 }
 
-let cached: { secret: string; key: Buffer } | null = null
+const cache = new Map<string, { secret: string; key: Buffer }>()
 
-function tokenKey(): Buffer {
+/**
+ * A 32-byte key derived from `OURA_TOKEN_KEY` for one purpose. Each purpose gets its own HKDF `info`,
+ * so a value sealed for one (a stored token, a pending grant) never opens as another.
+ */
+export function deriveOuraKey(info: string): Buffer {
   const secret = process.env.OURA_TOKEN_KEY
   if (!secret || secret.length < MIN_TOKEN_KEY_LENGTH) throw new OuraTokenKeyMissingError()
-  if (cached?.secret !== secret) {
-    cached = { secret, key: Buffer.from(hkdfSync('sha256', secret, HKDF_SALT, HKDF_INFO, 32)) }
-  }
-  return cached.key
+  const hit = cache.get(info)
+  if (hit?.secret === secret) return hit.key
+  const key = Buffer.from(hkdfSync('sha256', secret, HKDF_SALT, info, 32))
+  cache.set(info, { secret, key })
+  return key
+}
+
+function tokenKey(): Buffer {
+  return deriveOuraKey(HKDF_INFO)
 }
 
 /** True when a usable key is configured. Routes check it first to fail closed with a clear error. */

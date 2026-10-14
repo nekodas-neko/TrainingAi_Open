@@ -31,6 +31,8 @@ export interface ConnectorAccountRoutes {
   connect: string
   /** Where the provider sends the browser back. Must match the URI registered with the provider. */
   callback: string
+  /** POST: a native client finishes a connection with its own bearer (the browser leg has no session). */
+  complete: string
   /** GET reports whether an account is connected; DELETE revokes and forgets it. */
   connection: string
 }
@@ -73,6 +75,7 @@ export const OURA_CLOUD_CONNECTOR = {
   account: {
     connect: '/api/oura/connect',
     callback: '/api/oura/callback',
+    complete: '/api/oura/connect/complete',
     connection: '/api/oura/connection',
   },
 } as const satisfies DataSourceConnector

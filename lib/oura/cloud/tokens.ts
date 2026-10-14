@@ -54,16 +54,33 @@ function encrypted(userId: string, grant: { accessToken: string; refreshToken: s
   }
 }
 
-/** Finishes the OAuth leg: trades the code for tokens, learns the Oura user id, stores both. */
-export async function connectOuraAccount(store: OuraTokenStore, config: OuraOAuthConfig, userId: string, code: string): Promise<void> {
+/** A grant Oura issued for one consent, with the Oura account it belongs to. Not stored yet. */
+export interface OuraGrant {
+  accessToken: string
+  refreshToken: string
+  expiresAt: Date
+  scope: string | null
+  ouraUserId: string
+}
+
+/** Trades the code for tokens and learns which Oura account they belong to. Stores nothing. */
+export async function exchangeOuraCode(config: OuraOAuthConfig, code: string): Promise<OuraGrant> {
   const grant = await exchangeAuthorizationCode(config, code)
   const ouraUserId = await fetchOuraUserId(grant.accessToken)
+  return { ...grant, ouraUserId }
+}
+
+/**
+ * Stores a grant for `userId`. The caller must already have proved that the request committing it
+ * is authenticated as `userId` (see the callback and `/api/oura/connect/complete`).
+ */
+export async function storeOuraGrant(store: OuraTokenStore, userId: string, grant: OuraGrant): Promise<void> {
   try {
     await store.saveOuraCloudTokens(userId, {
       ...encrypted(userId, grant),
       expiresAt: grant.expiresAt,
       scope: grant.scope,
-      ouraUserId,
+      ouraUserId: grant.ouraUserId,
     })
   } catch (err) {
     if (isUniqueViolation(err)) {
@@ -73,6 +90,16 @@ export async function connectOuraAccount(store: OuraTokenStore, config: OuraOAut
     }
     throw err
   }
+}
+
+/** Refuses a grant: revokes it at Oura (best effort) and stores nothing. */
+export async function discardOuraGrant(grant: Pick<OuraGrant, 'accessToken'>): Promise<void> {
+  await revokeAccessToken(grant.accessToken)
+}
+
+/** Exchange and store in one step, for a request already authenticated as `userId`. */
+export async function connectOuraAccount(store: OuraTokenStore, config: OuraOAuthConfig, userId: string, code: string): Promise<void> {
+  await storeOuraGrant(store, userId, await exchangeOuraCode(config, code))
 }
 
 export interface OuraConnection {
