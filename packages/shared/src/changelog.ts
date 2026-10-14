@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.490.1",
+    date: "2026-10-14",
+    changes: [
+      "Behind the scenes: TrainingAi Preview, the native app's test build that installs beside this one, can now sign in. Nothing changes in this app.",
+    ],
+  },
+  {
     version: "1.490.0",
     date: "2026-10-13",
     changes: [
