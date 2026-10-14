@@ -23,6 +23,8 @@ export const sizes = {
   profileAvatar: 96,
   navigation: 80,
   workoutButton: 56,
+  loggingControl: 64,
+  setProgressCard: 144,
   workoutLift: 24,
   contentWidth: 680,
   timerRing: 180,
@@ -36,7 +38,7 @@ export const sizes = {
   mealLabel: 189,
   foodThumbnail: 32,
   healthHero: 260,
-  wheelRow: 44,
+  wheelRow: 64,
   demonstration: 64,
   summaryWidth: 320,
   chartHeight: 96,
@@ -87,9 +89,21 @@ export const sessionTones = {
   light: ['#b45309', '#15803d', '#4338ca', '#1d4ed8', '#7e22ce', '#b91c1c'],
   dark: ['#fbbf24', '#4ade80', '#818cf8', '#60a5fa', '#c084fc', '#f87171'],
 };
-export const sessionFills = ['#f59e0b', '#22c55e', '#6366f1', '#3b82f6', '#a855f7', '#ef4444'];
+export const sessionFills = [
+  '#f59e0b',
+  '#22c55e',
+  '#6366f1',
+  '#3b82f6',
+  '#a855f7',
+  '#ef4444',
+];
 export const scoreColors = {
-  light: { readiness: '#2563eb', heart: '#dc2626', sleep: '#7c3aed', activity: '#c2410c' },
+  light: {
+    readiness: '#2563eb',
+    heart: '#dc2626',
+    sleep: '#7c3aed',
+    activity: '#c2410c',
+  },
   dark: { readiness: '#60a5fa', heart: '#f87171', sleep: '#a78bfa', activity: '#f97316' },
 };
 export const weatherColors = {

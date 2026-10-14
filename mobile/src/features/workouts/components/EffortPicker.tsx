@@ -20,22 +20,19 @@ export function EffortPicker({
   disabled: boolean;
 }) {
   const { theme } = useTheme();
-  const description =
-    options.find((option) => option.value === set.rpe)?.description ?? 'Very light';
   return (
     <Stack gap="sm">
       <ChoiceScale
         label="RPE"
         options={options}
-        value={set.rpe}
+        value={set.rpeSource === 'rated' ? set.rpe : null}
         onChange={onChange}
         disabled={disabled}
         colorForValue={(value) => theme.effort[value]}
+        large
       />
       <AppText variant="caption" tone="muted" style={{ textAlign: 'center' }}>
-        {set.rpe === null
-          ? 'Rate your effort'
-          : `RPE ${set.rpe} · ${description}${set.rpeSource === 'expected' ? ' · expected' : ''}`}
+        RPE rating (difficulty)
       </AppText>
     </Stack>
   );

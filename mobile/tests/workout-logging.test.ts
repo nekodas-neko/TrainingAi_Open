@@ -1,3 +1,10 @@
+import {
+  defaultTimers,
+  displayLoad,
+  storedLoad,
+} from '../src/features/workouts/logging/preferences.ts';
+import { previousValueChanges } from '../src/features/workouts/logging/reuse.ts';
+import { workoutTiming } from '../src/features/workouts/logging/timing.ts';
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createLocalStorage } from '../src/core/storage/LocalStorage.ts';
@@ -17,7 +24,10 @@ import {
   prescribedWeight,
   isAmrap,
 } from '../src/features/workouts/logging/targets.ts';
-import { exerciseResult, workoutResult } from '../src/features/workouts/logging/summary.ts';
+import {
+  exerciseResult,
+  workoutResult,
+} from '../src/features/workouts/logging/summary.ts';
 import { LogExercisePayloadSchema } from '@trainingai/shared/workout/log-payload';
 import { CompleteWorkoutPayloadSchema } from '@trainingai/shared/workout/complete-payload';
 import { sqliteFixture } from './storage-fixture.ts';
@@ -69,8 +79,9 @@ test('finishing offline atomically saves logs and completion; reconnect pushes i
   const domains: string[] = [];
   const identities: string[] = [];
   f.connection.post = async (_path, body) => {
-    const mutation = (body as { mutations: { id: string; domain: string; payload: unknown }[] })
-      .mutations[0];
+    const mutation = (
+      body as { mutations: { id: string; domain: string; payload: unknown }[] }
+    ).mutations[0];
     identities.push(mutation.id);
     if (offline) {
       throw new Error('offline');
@@ -196,7 +207,10 @@ test('prescribed loads, rated effort and accepted back-off survive reopening and
     workout.exercises[0].sets[1],
   );
   assert.ok(suggestion && suggestion.weightKg < 72.5);
-  assert.equal(await f.controller.resolveSuggestion(id, exerciseId, second.id, true), true);
+  assert.equal(
+    await f.controller.resolveSuggestion(id, exerciseId, second.id, true),
+    true,
+  );
   f.controller.cancel();
   const restored = new WorkoutJournalStore(f.scope, f.connection, f.uuid, f.clock);
   await restored.initialize();
@@ -215,12 +229,15 @@ test('prescribed loads, rated effort and accepted back-off survive reopening and
   assert.deepEqual(payload.plannedWeights, [67.5, 72.5]);
   assert.deepEqual(payload.rpeValues, [10, 6]);
   assert.deepEqual(payload.rpeSources, ['rated', 'expected']);
-  assert.equal(completed.exercises[0].sets[1].restAfterSec, 15);
+  assert.equal(completed.exercises[0].sets[1].restAfterSec, null);
 });
 
 test('bodyweight and baseline logging keep rep targets, signed load and effort semantics', async (t) => {
   const f = await setup(t);
-  Object.assign(f.response.exercises[0], { exerciseType: 'bodyweight', lastSetMode: 'amrap' });
+  Object.assign(f.response.exercises[0], {
+    exerciseType: 'bodyweight',
+    lastSetMode: 'amrap',
+  });
   const id = (await f.controller.start(f.session, programId))!;
   const exercise = f.controller.getSnapshot().data.workouts[0].exercises[0];
   const [first, second] = exercise.sets;
@@ -367,9 +384,10 @@ test('lost responses replay stable row IDs and simultaneous sync calls share one
   assert.equal(calls, 1);
   const ids = f.controller.getSnapshot().data.workouts[0].pending.map((item) => item.id);
   assert.deepEqual(
-    readJournal(await f.scope.get('workout-journal.v1'), f.connection).workouts[0].pending.map(
-      (item) => item.id,
-    ),
+    readJournal(
+      await f.scope.get('workout-journal.v1'),
+      f.connection,
+    ).workouts[0].pending.map((item) => item.id),
     ids,
   );
 });
@@ -422,12 +440,17 @@ test('offline starts require an explicit saved plan; pending and unauthorized pr
   assert.equal(await f.controller.start(f.session, programId), null);
   assert.equal(f.controller.getSnapshot().savedFallbackFor, null);
   assert.equal(
-    await f.controller.start({ ...f.session, prescriptionPending: true }, programId, true),
+    await f.controller.start(
+      { ...f.session, prescriptionPending: true },
+      programId,
+      true,
+    ),
     null,
   );
   assert.equal(
-    f.controller.getSnapshot().data.workouts.filter((workout) => workout.status === 'active')
-      .length,
+    f.controller
+      .getSnapshot()
+      .data.workouts.filter((workout) => workout.status === 'active').length,
     0,
   );
 });
@@ -435,8 +458,22 @@ test('offline starts require an explicit saved plan; pending and unauthorized pr
 test('workout day is pinned to account timezone across midnight and an offline completion', () => {
   const f = loggingFixture();
   const at = new Date('2026-10-10T14:30:00Z').getTime();
-  const brisbane = createWorkout(f.session, programId, 'Australia/Brisbane', true, at, f.uuid);
-  const newYork = createWorkout(f.session, programId, 'America/New_York', true, at, f.uuid);
+  const brisbane = createWorkout(
+    f.session,
+    programId,
+    'Australia/Brisbane',
+    true,
+    at,
+    f.uuid,
+  );
+  const newYork = createWorkout(
+    f.session,
+    programId,
+    'America/New_York',
+    true,
+    at,
+    f.uuid,
+  );
   assert.equal(brisbane.date, '2026-10-11');
   assert.equal(newYork.date, '2026-10-10');
   assert.equal(
@@ -503,7 +540,11 @@ test('upload confirmation merges concurrent new-workout edits without losing loc
     ...f.scope,
     set: async (key: string, value: string) => {
       const data = JSON.parse(value);
-      if (!confirming && data.workouts.length === 2 && data.workouts[0].pending.length === 1) {
+      if (
+        !confirming &&
+        data.workouts.length === 2 &&
+        data.workouts[0].pending.length === 1
+      ) {
         confirming = true;
         await writeGate;
       }
@@ -565,7 +606,7 @@ test('sign-out during an upload leaves the saved queue intact and does not send 
 
 test('corrupt upload ordering is rejected without dropping the recorded sets', async (t) => {
   const f = await setup(t);
-  const { id } = await recordFirst(f);
+  await recordFirst(f);
   const completed = finishWorkout(f.controller.getSnapshot().data.workouts[0], f.clock());
   completed.pending.reverse();
   const raw = JSON.stringify({ ...emptyJournal(f.connection), workouts: [completed] });
@@ -611,7 +652,11 @@ test('guided warm-up, rest, summary and next exercise persist without uploading 
     assert.equal(await f.controller.chooseExercise(id, secondId), false);
     f.clock(20_000);
     await f.controller.recordSet(id, exerciseId, set.id);
-    assert.ok(active().rest);
+    if (set.id === active().exercises[0].sets.at(-1)!.id) {
+      assert.equal(active().rest, null);
+    } else {
+      assert.ok(active().rest);
+    }
   }
   assert.equal(workoutFlow(active()).stage, 'summary');
   const restored = readJournal(await f.scope.get('workout-journal.v1'), f.connection)
@@ -623,7 +668,7 @@ test('guided warm-up, rest, summary and next exercise persist without uploading 
   await f.controller.advanceExercise(id);
   assert.deepEqual(workoutFlow(active()), { stage: 'exercise', exerciseId: secondId });
   assert.equal(active().rest, null);
-  assert.equal(active().exercises[0].sets.at(-1)?.restAfterSec, 15);
+  assert.equal(active().exercises[0].sets.at(-1)?.restAfterSec, 0);
   await f.controller.startSet(id, secondId, active().exercises[1].sets[0].id);
   await f.controller.skipExercise(id);
   assert.equal(active().runningSet, null);
@@ -702,7 +747,9 @@ test('unequal supersets alternate using the shared order and survive reopening b
   for (let count = 0; count < 5; count++) {
     const current = f.controller.getSnapshot().data.workouts[0];
     const flow = workoutFlow(current);
-    const exercise = current.exercises.find((exercise) => exercise.id === flow.exerciseId)!;
+    const exercise = current.exercises.find(
+      (exercise) => exercise.id === flow.exerciseId,
+    )!;
     const set = exercise.sets.find((set) => set.completedAt === null)!;
     order.push(exercise.name);
     await f.controller.startSet(id, exercise.id, set.id);
@@ -747,10 +794,25 @@ test('re-logging preserves the earlier sets and queues distinct log and set iden
   await f.controller.skipRest(id);
   const before = JSON.stringify(f.controller.getSnapshot().data.workouts[0].exercises[0]);
   await f.controller.redoExercise(id, first.id);
+  assert.deepEqual(
+    readJournal(await f.scope.get('workout-journal.v1'), f.connection).workouts[0],
+    f.controller.getSnapshot().data.workouts[0],
+  );
   const redo = f.controller.getSnapshot().data.workouts[0].exercises[1];
   assert.equal(redo.relogOf, first.id);
+  assert.equal(redo.lastDate, f.controller.getSnapshot().data.workouts[0].date);
+  assert.deepEqual(
+    redo.lastWeights,
+    first.sets.map((x) => Number(x.weight)),
+  );
+  assert.deepEqual(
+    redo.lastReps,
+    first.sets.map((x) => Number(x.reps)),
+  );
   assert.notEqual(redo.logId, first.logId);
-  assert.ok(redo.sets.every((set) => !first.sets.some((previous) => previous.id === set.id)));
+  assert.ok(
+    redo.sets.every((set) => !first.sets.some((previous) => previous.id === set.id)),
+  );
   f.controller.updateSet(id, redo.id, redo.sets[0].id, 'weight', '70');
   await f.controller.recordSet(id, redo.id, redo.sets[0].id);
   assert.equal(
@@ -782,6 +844,10 @@ test('an exercise swap preserves already-recorded loads under the original exerc
     lastDate: null,
   });
   const changed = f.controller.getSnapshot().data.workouts[0];
+  assert.deepEqual(
+    readJournal(await f.scope.get('workout-journal.v1'), f.connection).workouts[0],
+    changed,
+  );
   const replacement = changed.exercises.find((exercise) => !exercise.retired)!;
   const archive = changed.exercises.find((exercise) => exercise.retired)!;
   assert.equal(archive.name, 'Bench press');
@@ -793,6 +859,202 @@ test('an exercise swap preserves already-recorded loads under the original exerc
   const finished = finishWorkout(f.controller.getSnapshot().data.workouts[0], f.clock());
   const names = finished.pending
     .filter((item) => item.domain === 'workout_log')
-    .map((item) => (mutationFor(finished, item).payload as { exercise: string }).exercise);
+    .map(
+      (item) => (mutationFor(finished, item).payload as { exercise: string }).exercise,
+    );
   assert.deepEqual(new Set(names), new Set(['Bench press', 'Push-up']));
+});
+
+test('timer choices persist per account and workout while hidden clocks still record actual durations', async (t) => {
+  const f = await setup(t);
+  const id = (await f.controller.start(f.session, programId, true))!;
+  assert.deepEqual(f.controller.getSnapshot().data.workouts[0].timers, defaultTimers());
+  assert.equal(
+    await f.controller.configureTimers(
+      id,
+      {
+        warmup: false,
+        setup: false,
+        setElapsed: false,
+        workoutElapsed: false,
+        warmupSeconds: 120,
+      },
+      true,
+    ),
+    true,
+  );
+  f.clock(40_000);
+  await f.controller.beginExercises(id);
+  f.clock(10_000);
+  const [first, second] = f.controller.getSnapshot().data.workouts[0].exercises[0].sets;
+  await f.controller.startSet(id, exerciseId, first.id);
+  f.clock(20_000);
+  await f.controller.recordSet(id, exerciseId, first.id);
+  f.clock(50_000);
+  await f.controller.startSet(id, exerciseId, second.id);
+  f.clock(25_000);
+  await f.controller.recordSet(id, exerciseId, second.id);
+  f.clock(90_000);
+  const active = f.controller.getSnapshot().data.workouts[0];
+  assert.equal(active.rest, null);
+  assert.equal(active.restAnchor, null);
+  assert.equal(active.exercises[0].sets[1].restAfterSec, 0);
+  const saved = readJournal(await f.scope.get('workout-journal.v1'), f.connection);
+  assert.deepEqual(saved.workouts[0], active);
+  assert.equal(saved.preferences.timers.warmup, false);
+  assert.equal(saved.workouts[0].warmupGoalSource, 'selected');
+  const finished = finishWorkout(active, f.clock());
+  const payload = mutationFor(finished, finished.pending[0]).payload;
+  assert.deepEqual(payload.setTimes, [20, 25]);
+  assert.deepEqual(payload.restTimes, [50, 0]);
+  assert.equal(payload.prepTimeSec, 10);
+  assert.equal(workoutTiming(finished)[0].workActualSec, 45);
+  await f.controller.discard(id);
+  const nextId = (await f.controller.start(f.session, programId, true))!;
+  const next = f.controller.getSnapshot().data.workouts.find((x) => x.id === nextId)!;
+  assert.equal(next.timers.setElapsed, false);
+  assert.equal(next.warmupGoalSeconds, 120);
+  assert.equal(
+    readJournal(null, { ...f.connection, userId: 'other' }).preferences.timers.warmup,
+    true,
+  );
+});
+
+test('unit changes preserve canonical kilograms and previous reuse changes only matching unstarted sets', async (t) => {
+  const f = await setup(t);
+  f.session.exercises[0].lastDate = '2026-10-10';
+  f.session.exercises[0].lastReps = [5, 4];
+  f.session.exercises[0].lastWeights = [10, 15];
+  const id = (await f.controller.start(f.session, programId, true))!;
+  const exercise = () => f.controller.getSnapshot().data.workouts[0].exercises[0];
+  const [first, second] = exercise().sets;
+  const targets = exercise().sets.map((x) => ({
+    planned: x.planned,
+    plannedWeight: x.plannedWeight,
+  }));
+  assert.equal(await f.controller.setWeightUnit(id, exerciseId, 'lb'), true);
+  assert.equal(exercise().sets[0].weight, first.weight);
+  assert.equal(exercise().weightUnit, 'lb');
+  for (const pounds of ['5', '-20', '2.5', '2.76', '14.88', '15', '17.5']) {
+    assert.equal(displayLoad(storedLoad(pounds, 'lb'), 'lb'), pounds);
+  }
+  assert.equal(displayLoad('-9', 'lb'), '-19.84');
+  await f.controller.startSet(id, exerciseId, first.id);
+  f.clock(20_000);
+  await f.controller.recordSet(id, exerciseId, first.id);
+  const changes = previousValueChanges(exercise());
+  assert.deepEqual(
+    changes.map((x) => x.setId),
+    [second.id],
+  );
+  assert.equal(await f.controller.reusePrevious(id, exerciseId, changes), true);
+  assert.equal(exercise().sets[0].weight, first.weight);
+  assert.equal(exercise().sets[1].weight, '15');
+  assert.equal(exercise().sets[1].reps, '4');
+  assert.equal(exercise().sets[1].completedAt, null);
+  assert.equal(exercise().sets[1].rpeSource, 'expected');
+  assert.deepEqual(
+    exercise().sets.map((x) => ({ planned: x.planned, plannedWeight: x.plannedWeight })),
+    targets,
+  );
+  assert.equal(await f.controller.reusePrevious(id, exerciseId, changes), false);
+  assert.deepEqual(previousValueChanges({ ...exercise(), lastWeights: [10] }), []);
+  const saved = readJournal(await f.scope.get('workout-journal.v1'), f.connection);
+  assert.equal(saved.preferences.units[exerciseId], 'lb');
+  assert.equal(saved.workouts[0].exercises[0].sets[1].weight, '15');
+});
+
+test('4, 10 and 20 sets keep stable IDs, original prescriptions and unmatched entries during copying', () => {
+  for (const count of [4, 10, 20]) {
+    const f = loggingFixture();
+    const source = f.session.exercises[0];
+    source.setCount = count;
+    source.sets = Array.from({ length: count }, (_, number) => ({
+      ...source.sets[0],
+      number,
+    }));
+    source.lastDate = '2026-10-10';
+    source.lastWeights = [10, 12.5, 15];
+    source.lastReps = [8, 6, 4];
+    const workout = createWorkout(f.session, programId, null, true, Date.now(), f.uuid);
+    const exercise = workout.exercises[0];
+    assert.equal(exercise.sets.length, count);
+    assert.equal(new Set(exercise.sets.map((x) => x.id)).size, count);
+    assert.equal(previousValueChanges(exercise).length, 3);
+    assert.equal(
+      readJournal(
+        JSON.stringify({ ...emptyJournal(f.connection), workouts: [workout] }),
+        f.connection,
+      ).workouts[0].exercises[0].sets.length,
+      count,
+    );
+  }
+});
+
+test('zero-rest handoffs remain untimed and summary waiting is recorded as next-exercise setup', async (t) => {
+  const f = await setup(t);
+  f.session.exercises[0].sets.forEach((x) => {
+    x.restSeconds = 0;
+  });
+  const secondExerciseId = f.uuid();
+  const session = {
+    ...f.session,
+    exercises: [
+      ...f.session.exercises,
+      { ...f.session.exercises[0], id: secondExerciseId, name: 'Row' },
+    ],
+  };
+  const id = (await f.controller.start(session, programId, true))!;
+  await f.controller.beginExercises(id);
+  const active = () => f.controller.getSnapshot().data.workouts[0];
+  const [first, second] = active().exercises[0].sets;
+  await f.controller.startSet(id, exerciseId, first.id);
+  f.clock(20_000);
+  await f.controller.recordSet(id, exerciseId, first.id);
+  assert.equal(active().rest, null);
+  assert.ok(active().restAnchor);
+  f.clock(15_000);
+  await f.controller.startSet(id, exerciseId, second.id);
+  f.clock(20_000);
+  await f.controller.recordSet(id, exerciseId, second.id);
+  f.clock(60_000);
+  await f.controller.advanceExercise(id);
+  f.clock(30_000);
+  await f.controller.startSet(id, secondExerciseId, active().exercises[1].sets[0].id);
+  f.clock(20_000);
+  await f.controller.recordSet(id, secondExerciseId, active().exercises[1].sets[0].id);
+  const completed = finishWorkout(active(), f.clock());
+  const firstPayload = mutationFor(completed, completed.pending[0]).payload;
+  const secondPayload = mutationFor(completed, completed.pending[1]).payload;
+  assert.deepEqual(firstPayload.restTimes, [15, 0]);
+  assert.equal(secondPayload.prepTimeSec, 30);
+  assert.equal(secondPayload.interExerciseRestSec, 90);
+  assert.equal(workoutTiming(completed)[1].setupActualSec, 90);
+});
+
+test('legacy snapshots gain optional timer defaults without fabricating effort, times or units', () => {
+  const f = loggingFixture();
+  const workout = createWorkout(f.session, programId, null, true, Date.now(), f.uuid);
+  const raw = JSON.parse(
+    JSON.stringify({ ...emptyJournal(f.connection), workouts: [workout] }),
+  );
+  delete raw.preferences;
+  delete raw.workouts[0].timers;
+  delete raw.workouts[0].restAnchor;
+  raw.workouts[0].exercises.forEach(
+    (x: { weightUnit?: string; sets: { startedAt: number | null }[] }) => {
+      delete x.weightUnit;
+    },
+  );
+  const restored = readJournal(JSON.stringify(raw), f.connection).workouts[0];
+  assert.deepEqual(restored.timers, defaultTimers());
+  assert.equal(restored.exercises[0].weightUnit, 'kg');
+  assert.equal(restored.exercises[0].sets[0].startedAt, null);
+  assert.equal(restored.warmupEndedAt, null);
+  restored.exercises[0].sets[0].planned = null;
+  restored.exercises[0].sets[0].completedAt = Date.now();
+  const timing = workoutTiming(restored)[0];
+  assert.equal(timing.workExpectedSec, null);
+  assert.equal(timing.restExpectedSec, null);
+  assert.equal(timing.workActualSec, null);
 });

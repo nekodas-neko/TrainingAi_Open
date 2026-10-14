@@ -4,11 +4,14 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type PropsWithChildren,
 } from 'react';
 import { AppState } from 'react-native';
+import { restFeedback } from '../../integrations/feedback/haptics';
+import { workoutFlow } from '../workouts/logging/flow';
 import { randomUUID } from 'expo-crypto';
 import { useAccountContext } from '../account/AccountProvider';
 import { useLocalStorage } from '../../core/storage/StorageProvider';
@@ -43,6 +46,15 @@ export function PlatformProvider({ children }: PropsWithChildren) {
     [permission, setPermission] = useState(false);
   const [alertError, setAlertError] = useState<string | null>(null);
   const [opened, setOpened] = useState<Record<string, unknown> | null>(null);
+  const [foreground, setForeground] = useState(AppState.currentState === 'active');
+  const requestedRestPermission = useRef<string | null>(null);
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
   const stores = useMemo(() => {
     if (!dataReader) return { settings: null, calendar: null };
     const accountStorage = storage.account(dataReader.origin, dataReader.userId);
@@ -77,6 +89,7 @@ export function PlatformProvider({ children }: PropsWithChildren) {
     }
     void check();
     const listener = AppState.addEventListener('change', (value) => {
+      setForeground(value === 'active');
       if (value === 'active') void check();
     });
     let unsubscribe: (() => void) | undefined;
@@ -94,9 +107,62 @@ export function PlatformProvider({ children }: PropsWithChildren) {
       unsubscribe?.();
     };
   }, []);
+  const restWorkout = journal.data.workouts.find(
+    (x) =>
+      x.status === 'active' &&
+      x.rest &&
+      x.timers.restCues &&
+      workoutFlow(x).stage !== 'summary',
+  );
+  const restDeadline = restWorkout?.rest?.endsAt;
+  const restCueId = restWorkout?.rest
+    ? `${restWorkout.id}:${restWorkout.rest.startedAt}:${restWorkout.rest.endsAt}`
+    : null;
+  const permissionScope = state?.settings.scope;
+  useEffect(() => {
+    if (
+      !foreground ||
+      !permissionScope ||
+      restDeadline === undefined ||
+      restDeadline <= Date.now() ||
+      permission ||
+      requestedRestPermission.current === permissionScope
+    )
+      return;
+    requestedRestPermission.current = permissionScope;
+    void alertPermission(true)
+      .then((allowed) => {
+        if (mounted.current) {
+          setPermission(allowed);
+          setTick((value) => value + 1);
+        }
+      })
+      .catch(() => {});
+  }, [foreground, permissionScope, restDeadline, permission]);
+  useEffect(() => {
+    if (
+      !foreground ||
+      !restCueId ||
+      restDeadline === undefined ||
+      restDeadline <= Date.now()
+    )
+      return;
+    const timer = setTimeout(() => {
+      if (AppState.currentState === 'active') restFeedback(restCueId);
+    }, restDeadline - Date.now());
+    return () => clearTimeout(timer);
+  }, [foreground, restCueId, restDeadline]);
   const serialized =
     state?.ready && permission
-      ? JSON.stringify(planAlerts(state.settings, journal.data.workouts, activity.session))
+      ? JSON.stringify(
+          planAlerts(
+            state.settings,
+            journal.data.workouts,
+            activity.session,
+            Date.now(),
+            foreground,
+          ),
+        )
       : '[]';
   useEffect(() => {
     let active = true;
@@ -105,7 +171,8 @@ export function PlatformProvider({ children }: PropsWithChildren) {
         if (active) setAlertError(null);
       },
       () => {
-        if (active) setAlertError('Could not update alerts. Retry from integration settings.');
+        if (active)
+          setAlertError('Could not update alerts. Retry from integration settings.');
       },
     );
     return () => {
@@ -127,7 +194,8 @@ export function PlatformProvider({ children }: PropsWithChildren) {
       if (!stores.settings) throw new Error('Sign in to enable alerts.');
       const allowed = await alertPermission(true);
       setPermission(allowed);
-      if (!allowed) throw new Error('Allow notifications in phone settings to receive alerts.');
+      if (!allowed)
+        throw new Error('Allow notifications in phone settings to receive alerts.');
       if (key) await stores.settings.configure({ [key]: true });
       setTick((value) => value + 1);
     },

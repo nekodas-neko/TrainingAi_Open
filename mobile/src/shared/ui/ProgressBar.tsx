@@ -8,11 +8,13 @@ export function ProgressBar({
   complete = false,
   origin = 'left',
   color,
+  target,
 }: {
   value: number;
   complete?: boolean;
   origin?: 'left' | 'right';
   color?: string;
+  target?: number;
 }) {
   const { theme } = useTheme();
   const reduced = useReducedMotion();
@@ -51,6 +53,19 @@ export function ProgressBar({
           alignSelf: origin === 'right' ? 'flex-end' : 'flex-start',
         }}
       />
+      {target !== undefined && (
+        <View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: 0,
+            bottom: 0,
+            width: theme.spacing.xxs,
+            left: `${Math.min(1, Math.max(0, target)) * 100}%`,
+            backgroundColor: theme.colors.muted,
+          }}
+        />
+      )}
     </View>
   );
 }

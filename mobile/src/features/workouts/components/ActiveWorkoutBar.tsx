@@ -43,9 +43,11 @@ function WorkoutBar({
               : ` · ${activity.timer} ${formatDuration(activity.seconds)}`}
           </AppText>
         </View>
-        <AppText variant="caption" tone="brand">
-          {formatDuration((now - workout.startedAt) / 1000)}
-        </AppText>
+        {workout.timers.workoutElapsed && (
+          <AppText variant="caption" tone="brand">
+            Total {formatDuration((now - workout.startedAt) / 1000)}
+          </AppText>
+        )}
         <Icon name="forward" tone="brand" />
       </Stack>
     </Pressable>

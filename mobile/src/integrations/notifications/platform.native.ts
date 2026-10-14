@@ -1,7 +1,11 @@
 import { requireOptionalNativeModule } from 'expo';
 import { AppState, Platform } from 'react-native';
-import { feedback } from '../feedback/haptics';
-import { ALERT_OWNER, alertSignature, type Alert } from '../../features/platform/data/models';
+import { feedback, restFeedback } from '../feedback/haptics';
+import {
+  ALERT_OWNER,
+  alertSignature,
+  type Alert,
+} from '../../features/platform/data/models';
 export function alertsAvailable() {
   return !!requireOptionalNativeModule('ExpoNotificationScheduler');
 }
@@ -25,20 +29,29 @@ async function sdk() {
       });
     }
     notifications.setNotificationHandler({
-      handleNotification: async (notification) => ({
-        shouldPlaySound: notification.request.content.data?.owner === ALERT_OWNER,
-        shouldSetBadge: false,
-        shouldShowBanner: true,
-        shouldShowList: true,
-      }),
+      handleNotification: async (notification) => {
+        const foregroundRest =
+          AppState.currentState === 'active' &&
+          notification.request.content.data?.owner === ALERT_OWNER &&
+          notification.request.identifier.includes(':rest:');
+        return {
+          shouldPlaySound: notification.request.content.data?.owner === ALERT_OWNER,
+          shouldSetBadge: false,
+          shouldShowBanner: !foregroundRest,
+          shouldShowList: !foregroundRest,
+        };
+      },
     });
     notifications.addNotificationReceivedListener((notification) => {
       if (
         AppState.currentState === 'active' &&
         notification.request.content.data?.owner === ALERT_OWNER &&
         ['workout', 'walk'].includes(String(notification.request.content.data?.target))
-      )
-        feedback('success');
+      ) {
+        const restCueId = notification.request.content.data?.restCueId;
+        if (typeof restCueId === 'string') restFeedback(restCueId);
+        else feedback('success', true);
+      }
     });
     return notifications;
   })());
@@ -70,7 +83,9 @@ export const nativeAlerts = {
     const pendingIds = new Set(pending.map((row) => row.identifier));
     return [
       ...pending,
-      ...presented.map((row) => row.request).filter((row) => !pendingIds.has(row.identifier)),
+      ...presented
+        .map((row) => row.request)
+        .filter((row) => !pendingIds.has(row.identifier)),
     ]
       .filter((row) => row.content.data?.owner === ALERT_OWNER)
       .map((row) => ({
@@ -122,6 +137,7 @@ export const nativeAlerts = {
           scope: alert.scope,
           target: alert.target,
           recordId: alert.recordId ?? null,
+          restCueId: alert.restCueId ?? null,
           signature: alertSignature(alert),
         },
       },

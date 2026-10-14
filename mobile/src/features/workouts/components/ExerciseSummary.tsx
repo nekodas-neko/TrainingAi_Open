@@ -1,29 +1,34 @@
 import { bodyweightRepMax, displayOneRm, oneRmLabel } from '@trainingai/shared/1rm';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { AppText, Card, Icon, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { formatDuration } from '../../../shared/hooks/useClock';
 import type { WorkoutExercise, WorkoutRecord } from '../logging/workout';
 import { exerciseResult } from '../logging/summary';
 import { formatSetLoad } from '../logging/targets';
-import { RestCard } from './WorkoutClocks';
 
 export function ExerciseSummary({
   workout,
   exercise,
   next,
+  onEdit,
 }: {
   workout: WorkoutRecord;
   exercise: WorkoutExercise;
   next?: WorkoutExercise;
+  onEdit?: (id: string) => void;
 }) {
   const result = exerciseResult(workout, exercise);
   const { theme } = useTheme();
   const previous =
     exercise.exerciseType === 'bodyweight'
-      ? bodyweightRepMax({ storedReps: exercise.prevRepMaxReps, oneRm: exercise.estimated1rm })
+      ? bodyweightRepMax({
+          storedReps: exercise.prevRepMaxReps,
+          oneRm: exercise.estimated1rm,
+        })
       : exercise.estimated1rm;
-  const current = exercise.exerciseType === 'bodyweight' ? result.repMax : result.estimate;
+  const current =
+    exercise.exerciseType === 'bodyweight' ? result.repMax : result.estimate;
   const difference =
     !workout.isBaseline && !exercise.deloaded && previous !== null && current !== null
       ? current - previous
@@ -39,7 +44,10 @@ export function ExerciseSummary({
   const compact = { padding: theme.spacing.md, gap: theme.spacing.sm };
   return (
     <>
-      <RestCard workout={workout} />
+      <AppText variant="caption" tone="muted">
+        Exercise complete. Continue when you are ready; the next exercise opens
+        preparation.
+      </AppText>
       {next && (
         <Card style={compact}>
           <AppText variant="eyebrow" tone="muted">
@@ -63,30 +71,39 @@ export function ExerciseSummary({
         </AppText>
         {exercise.sets.map((set, index) =>
           set.completedAt === null ? null : (
-            <Stack key={set.id} direction="row" align="center" justify="space-between">
-              <View
-                style={{
-                  width: theme.sizes.iconSmall,
-                  height: theme.sizes.iconSmall,
-                  backgroundColor: theme.colors.brandSurface,
-                  borderRadius: theme.radii.pill,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <AppText variant="micro" tone="brand">
-                  {index + 1}
+            <Pressable
+              key={set.id}
+              accessibilityRole="button"
+              accessibilityLabel={`Edit recorded set ${index + 1}`}
+              onPress={() => onEdit?.(set.id)}
+              disabled={!onEdit}
+              style={{ minHeight: theme.sizes.touchTarget, justifyContent: 'center' }}
+            >
+              <Stack direction="row" align="center" justify="space-between">
+                <View
+                  style={{
+                    width: theme.sizes.iconSmall,
+                    height: theme.sizes.iconSmall,
+                    backgroundColor: theme.colors.brandSurface,
+                    borderRadius: theme.radii.pill,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <AppText variant="micro" tone="brand">
+                    {index + 1}
+                  </AppText>
+                </View>
+                <AppText variant="label" style={{ flex: 1 }}>
+                  {formatSetLoad(exercise, set)}
                 </AppText>
-              </View>
-              <AppText variant="label" style={{ flex: 1 }}>
-                {formatSetLoad(exercise, set)}
-              </AppText>
-              {set.startedAt !== null && (
-                <AppText variant="caption" tone="muted">
-                  {formatDuration((set.completedAt - set.startedAt) / 1000)}
-                </AppText>
-              )}
-            </Stack>
+                {set.startedAt !== null && (
+                  <AppText variant="caption" tone="muted">
+                    {formatDuration((set.completedAt - set.startedAt) / 1000)}
+                  </AppText>
+                )}
+              </Stack>
+            </Pressable>
           ),
         )}
         {exercise.sets.some((set) => set.restAfterSec !== null) && (
@@ -95,7 +112,9 @@ export function ExerciseSummary({
               Total rest
             </AppText>
             <AppText variant="micro" tone="muted">
-              {formatDuration(exercise.sets.reduce((sum, set) => sum + (set.restAfterSec ?? 0), 0))}
+              {formatDuration(
+                exercise.sets.reduce((sum, set) => sum + (set.restAfterSec ?? 0), 0),
+              )}
             </AppText>
           </Stack>
         )}

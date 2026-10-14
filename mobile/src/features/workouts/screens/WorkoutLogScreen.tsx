@@ -23,6 +23,8 @@ import { WorkoutLayout } from '../components/WorkoutLayout';
 import { ResourceCard } from '../components/ResourceCard';
 import { NextPrescription } from '../components/NextPrescription';
 import { recapSpec } from '../data/models';
+import { WorkoutTiming } from '../components/WorkoutTiming';
+import { WorkoutHrRecovery } from '../components/WorkoutHrRecovery';
 import { WorkoutEnergy } from '../components/WorkoutEnergy';
 import { useTrainingKeepAwake } from '../../platform/useTrainingKeepAwake';
 import { WorkoutCalendarAction } from '../../platform/components/WorkoutCalendarAction';
@@ -32,11 +34,13 @@ export function WorkoutLogScreen({
   workoutId,
   openSettings,
   closeWorkout,
+  minimizeWorkout,
 }: {
   openCoach?: () => void;
   workoutId: string | null;
   openSettings: () => void;
   closeWorkout: () => void;
+  minimizeWorkout: () => void;
 }) {
   const journal = useWorkoutJournal();
   const { theme } = useTheme();
@@ -54,10 +58,31 @@ export function WorkoutLogScreen({
   }, [workoutId, workout?.status]);
   if (journal.controller && journal.ready && workout?.status === 'active') {
     return (
-      <GuidedWorkoutScreen key={workout.id} workout={workout} closeWorkout={closeWorkout} />
+      <GuidedWorkoutScreen
+        key={workout.id}
+        workout={workout}
+        closeWorkout={() => {
+          if (journal.busy) {
+            return;
+          }
+          void (async () => {
+            if (journal.saveStatus !== 'saved') {
+              await journal.controller?.retrySave();
+            }
+            if (journal.controller?.getSnapshot().saveStatus === 'saved') {
+              minimizeWorkout();
+            }
+          })();
+        }}
+      />
     );
   }
-  if (!journal.controller || !journal.ready || !workout || workout.status === 'discarded') {
+  if (
+    !journal.controller ||
+    !journal.ready ||
+    !workout ||
+    workout.status === 'discarded'
+  ) {
     return (
       <WorkoutLayout title="Workout" onBack={closeWorkout}>
         {!journal.controller ? (
@@ -168,25 +193,7 @@ export function WorkoutLogScreen({
           ))}
         </Grid>
       </View>
-      <Card style={{ width: '100%', maxWidth: theme.sizes.summaryWidth }}>
-        <AppText variant="eyebrow" tone="muted">
-          Time summary
-        </AppText>
-        {[
-          { label: 'Warm-up', seconds: result.warmupSeconds },
-          { label: 'Set work', seconds: result.timedSetSeconds },
-          { label: 'Rest', seconds: result.restSeconds },
-        ].map((item) => (
-          <Stack key={item.label} direction="row" justify="space-between">
-            <AppText variant="caption" tone="muted">
-              {item.label}
-            </AppText>
-            <AppText variant="label">
-              {item.seconds === null ? 'Not timed' : formatDuration(item.seconds)}
-            </AppText>
-          </Stack>
-        ))}
-      </Card>
+      <WorkoutTiming workout={workout} />
       <WorkoutEnergy workout={workout} />
       <View style={{ width: '100%', maxWidth: theme.sizes.summaryWidth }}>
         <WorkoutCalendarAction workout={workout} />
@@ -199,18 +206,16 @@ export function WorkoutLogScreen({
       >
         {(data) => <AppText>{data.recap ?? 'No recap is available yet.'}</AppText>}
       </ResourceCard>
-      <Card style={{ width: '100%', maxWidth: theme.sizes.summaryWidth }}>
-        <AppText variant="eyebrow" tone="muted">
-          HR recovery
-        </AppText>
-        <AppText variant="micro" tone="muted">
-          Device integration is not connected.
-        </AppText>
-      </Card>
+      <WorkoutHrRecovery workout={workout} />
       <NextPrescription />
       <Stack style={{ width: '100%', maxWidth: theme.sizes.summaryWidth }}>
         {openCoach && (
-          <AppButton title="Ask AI Coach" icon="coach" variant="primary" onPress={openCoach} />
+          <AppButton
+            title="Ask AI Coach"
+            icon="coach"
+            variant="primary"
+            onPress={openCoach}
+          />
         )}
         <Stack direction="row">
           <AppButton

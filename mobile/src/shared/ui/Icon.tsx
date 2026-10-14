@@ -5,6 +5,7 @@ import ChevronLeft from 'lucide-react-native/icons/chevron-left';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import ChevronDown from 'lucide-react-native/icons/chevron-down';
 import Dumbbell from 'lucide-react-native/icons/dumbbell';
+import BicepsFlexed from 'lucide-react-native/icons/biceps-flexed';
 import Heart from 'lucide-react-native/icons/heart';
 import Home from 'lucide-react-native/icons/house';
 import MoreHorizontal from 'lucide-react-native/icons/ellipsis';
@@ -73,6 +74,7 @@ const icons = {
   home: Home,
   health: Heart,
   workout: Dumbbell,
+  muscles: BicepsFlexed,
   nutrition: Utensils,
   more: MoreHorizontal,
   back: ChevronLeft,

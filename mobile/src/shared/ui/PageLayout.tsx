@@ -13,6 +13,7 @@ import { Stack } from './Stack';
 import { IconButton } from './IconButton';
 import { useTheme } from '../theme/ThemeProvider';
 import { ReorderScrollView } from './ReorderScrollView';
+import { NestedScrollGesture, useNestedScrollBoundary } from './NestedScrollGesture';
 
 export function PageLayout({
   title,
@@ -28,6 +29,7 @@ export function PageLayout({
   onBack,
   landing = false,
   reorderable = false,
+  fillBottom = false,
 }: PropsWithChildren<{
   title: string;
   subtitle?: string;
@@ -41,8 +43,10 @@ export function PageLayout({
   onBack?: () => void;
   landing?: boolean;
   reorderable?: boolean;
+  fillBottom?: boolean;
 }>) {
   const { theme } = useTheme();
+  const nestedScroll = useNestedScrollBoundary();
   useAndroidBack(onBack);
   const ContentScrollView = reorderable ? ReorderScrollView : ScrollView;
   return (
@@ -102,27 +106,30 @@ export function PageLayout({
           flex: 1,
           minHeight: 0,
           paddingTop: theme.spacing.md,
-          paddingBottom: landing ? 0 : theme.spacing.md,
+          paddingBottom: landing || fillBottom ? 0 : theme.spacing.md,
           gap: theme.spacing.md,
         }}
       >
         {scroll ? (
-          <ContentScrollView
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="on-drag"
-            contentContainerStyle={[
-              {
-                flexGrow: 1,
-                paddingHorizontal: theme.spacing.lg,
-                paddingBottom: theme.spacing.md,
-                gap: theme.spacing.md,
-              },
-              contentStyle,
-            ]}
-          >
-            {children}
-          </ContentScrollView>
+          <NestedScrollGesture.Provider value={nestedScroll.control}>
+            <ContentScrollView
+              scrollEnabled={!nestedScroll.locked}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
+              contentContainerStyle={[
+                {
+                  flexGrow: 1,
+                  paddingHorizontal: theme.spacing.lg,
+                  paddingBottom: fillBottom ? 0 : theme.spacing.md,
+                  gap: theme.spacing.md,
+                },
+                contentStyle,
+              ]}
+            >
+              {children}
+            </ContentScrollView>
+          </NestedScrollGesture.Provider>
         ) : (
           children
         )}

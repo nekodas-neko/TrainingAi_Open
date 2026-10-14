@@ -10,6 +10,7 @@ export function ChoiceScale({
   onChange,
   disabled = false,
   colorForValue,
+  large = false,
 }: {
   label: string;
   options: readonly { value: number; label: string; description: string }[];
@@ -17,10 +18,11 @@ export function ChoiceScale({
   onChange: (value: number) => void;
   disabled?: boolean;
   colorForValue?: (value: number) => string;
+  large?: boolean;
 }) {
   const { theme } = useTheme();
   return (
-    <Stack direction="row" gap="xs" accessibilityLabel={label}>
+    <Stack direction="row" gap={large ? 'sm' : 'xs'} accessibilityLabel={label}>
       {options.map((option) => (
         <Pressable
           key={option.value}
@@ -32,7 +34,7 @@ export function ChoiceScale({
           onPress={() => onChange(option.value)}
           style={{
             flex: 1,
-            minHeight: theme.sizes.touchTarget,
+            minHeight: large ? theme.sizes.loggingControl : theme.sizes.touchTarget,
             justifyContent: 'center',
             alignItems: 'center',
             borderRadius: theme.radii.small,
@@ -46,7 +48,8 @@ export function ChoiceScale({
           }}
         >
           <AppText
-            variant={colorForValue ? 'micro' : 'label'}
+            accessibilityRole="text"
+            variant={large ? 'heading' : colorForValue ? 'micro' : 'label'}
             style={{
               color: disabled
                 ? theme.colors.disabled

@@ -1,4 +1,5 @@
 import { ReorderScrollView } from './ReorderScrollView';
+import { NestedScrollGesture, useNestedScrollBoundary } from './NestedScrollGesture';
 import {
   useEffect,
   useMemo,
@@ -9,6 +10,7 @@ import {
 } from 'react';
 import {
   Animated,
+  Easing,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -48,9 +50,13 @@ export function Sheet({
   onDismiss?: () => void;
 }>) {
   const { theme } = useTheme();
+  const nestedScroll = useNestedScrollBoundary();
   const { height } = useWindowDimensions();
   const reduced = useReducedMotion();
   const [presented, setPresented] = useState(visible);
+  const [modalShown, setModalShown] = useState(false);
+  const [sheetHeight, setSheetHeight] = useState(0);
+  const openingStarted = useRef(false);
   const presentedRef = useRef(presented);
   presentedRef.current = presented;
   const progress = useRef(new Animated.Value(0)).current;
@@ -99,6 +105,7 @@ export function Sheet({
     const finish = () => {
       if (!alive.current) return;
       setPresented(false);
+      setModalShown(false);
       if (notify) closeAction.current();
       if (Platform.OS !== 'ios') dismissed.current?.();
     };
@@ -119,23 +126,43 @@ export function Sheet({
   const dismissRef = useRef(dismiss);
   dismissRef.current = dismiss;
   useEffect(() => {
+    if (!visible && closing.current) {
+      return;
+    }
     animation.current?.stop();
     if (visible) {
       closing.current = false;
+      openingStarted.current = false;
+      if (!presentedRef.current) progress.setValue(0);
       setPresented(true);
       dragY.setValue(0);
       scrollY.current = 0;
-      if (reduced) progress.setValue(1);
-      else {
-        animation.current = Animated.timing(progress, {
-          toValue: 1,
-          duration: 240,
-          useNativeDriver: Platform.OS !== 'web',
-        });
-        animation.current.start();
-      }
     } else if (presentedRef.current) dismissRef.current(false);
   }, [visible, reduced, progress, dragY]);
+  useEffect(() => {
+    if (
+      !visible ||
+      !presented ||
+      !modalShown ||
+      sheetHeight <= 0 ||
+      closing.current ||
+      openingStarted.current
+    ) {
+      return;
+    }
+    openingStarted.current = true;
+    if (reduced) {
+      progress.setValue(1);
+      return;
+    }
+    animation.current = Animated.timing(progress, {
+      toValue: 1,
+      duration: 240,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: Platform.OS !== 'web',
+    });
+    animation.current.start();
+  }, [visible, presented, modalShown, sheetHeight, reduced, progress]);
   const gestures = useMemo(() => {
     function create(header: boolean, ownStart = false) {
       const canDrag = (_: unknown, g: { dy: number; dx: number }) =>
@@ -143,7 +170,8 @@ export function Sheet({
         !dragging.current &&
         g.dy > 12 &&
         Math.abs(g.dy) > Math.abs(g.dx) * 1.5 &&
-        (header || (scroll && scrollY.current <= 0 && !keyboard.current));
+        (header ||
+          (scroll && !nestedScroll.locked && scrollY.current <= 0 && !keyboard.current));
       return PanResponder.create({
         onStartShouldSetPanResponder: () => ownStart && !dragging.current,
         onMoveShouldSetPanResponderCapture: canDrag,
@@ -180,121 +208,133 @@ export function Sheet({
       });
     }
     return { body: create(false), header: create(true), handle: create(true, true) };
-  }, [dragY, height, reduced, scroll]);
-  const translateY = Animated.add(
-    progress.interpolate({ inputRange: [0, 1], outputRange: [height, 0] }),
-    dragY,
+  }, [dragY, height, reduced, scroll, nestedScroll.locked]);
+  const translateY = useMemo(
+    () =>
+      Animated.add(
+        progress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [sheetHeight || height, 0],
+        }),
+        dragY,
+      ),
+    [progress, dragY, sheetHeight, height],
   );
   return (
-    <Modal
-      visible={presented}
-      transparent
-      animationType="none"
-      statusBarTranslucent
-      onRequestClose={() => dismiss()}
-      onDismiss={() => dismissed.current?.()}
-    >
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1, justifyContent: 'flex-end' }}
+    <NestedScrollGesture.Provider value={nestedScroll.control}>
+      <Modal
+        visible={presented}
+        transparent
+        animationType="none"
+        statusBarTranslucent
+        onRequestClose={() => dismiss()}
+        onShow={() => setModalShown(true)}
+        onDismiss={() => dismissed.current?.()}
       >
-        <Animated.View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: theme.colors.scrim,
-            opacity: Animated.multiply(
-              progress,
-              dragY.interpolate({
-                inputRange: [0, height / 2],
-                outputRange: [1, 0],
-                extrapolate: 'clamp',
-              }),
-            ),
-          }}
-        />
-        <Pressable accessible={false} onPress={() => dismiss()} style={{ flex: 1 }} />
-        <AnimatedSafeArea
-          edges={['bottom']}
-          accessibilityViewIsModal
-          onAccessibilityEscape={() => dismiss()}
-          {...(scroll ? gestures.body.panHandlers : {})}
-          style={{
-            maxHeight: '85%',
-            ...(fullHeight ? { height: '85%' as const } : {}),
-            backgroundColor: theme.colors.surface,
-            borderTopLeftRadius: theme.radii.card,
-            borderTopRightRadius: theme.radii.card,
-            paddingHorizontal: theme.spacing.lg,
-            paddingBottom: theme.spacing.lg,
-            transform: [{ translateY }],
-          }}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1, justifyContent: 'flex-end' }}
         >
-          <View
-            {...gestures.header.panHandlers}
+          <Animated.View
+            pointerEvents="none"
             style={{
-              minHeight: theme.spacing.xxl,
-              alignItems: 'center',
-              justifyContent: 'center',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: theme.colors.scrim,
+              opacity: Animated.multiply(
+                progress,
+                dragY.interpolate({
+                  inputRange: [0, height / 2],
+                  outputRange: [1, 0],
+                  extrapolate: 'clamp',
+                }),
+              ),
+            }}
+          />
+          <Pressable accessible={false} onPress={() => dismiss()} style={{ flex: 1 }} />
+          <AnimatedSafeArea
+            onLayout={(event) => setSheetHeight(event.nativeEvent.layout.height)}
+            edges={['bottom']}
+            accessibilityViewIsModal
+            onAccessibilityEscape={() => dismiss()}
+            {...(scroll ? gestures.body.panHandlers : {})}
+            style={{
+              maxHeight: '85%',
+              ...(fullHeight ? { height: '85%' as const } : {}),
+              backgroundColor: theme.colors.surface,
+              borderTopLeftRadius: theme.radii.card,
+              borderTopRightRadius: theme.radii.card,
+              paddingHorizontal: theme.spacing.lg,
+              paddingBottom: theme.spacing.lg,
+              transform: [{ translateY }],
             }}
           >
             <View
+              {...gestures.header.panHandlers}
               style={{
-                width: theme.sizes.touchTarget,
-                height: theme.spacing.xs,
-                borderRadius: theme.radii.pill,
-                backgroundColor: theme.colors.border,
-              }}
-            />
-          </View>
-          <Stack
-            {...gestures.header.panHandlers}
-            direction="row"
-            align="center"
-            justify="space-between"
-          >
-            <AppText variant="heading" style={{ flex: 1 }}>
-              {title}
-            </AppText>
-            {actions}
-            <IconButton icon="close" label="Close dialog" onPress={() => dismiss()} />
-          </Stack>
-          {scroll ? (
-            <ReorderScrollView
-              style={{ flexShrink: 1 }}
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              keyboardDismissMode="interactive"
-              scrollEventThrottle={16}
-              onScroll={(event) => {
-                scrollY.current = Math.max(0, event.nativeEvent.contentOffset.y);
-              }}
-              contentContainerStyle={{
-                gap: theme.spacing.md,
-                paddingVertical: theme.spacing.md,
+                minHeight: theme.spacing.xxl,
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
-              {children}
-            </ReorderScrollView>
-          ) : (
-            <View
-              style={{
-                flex: 1,
-                minHeight: 0,
-                gap: theme.spacing.md,
-                paddingVertical: theme.spacing.md,
-              }}
-            >
-              {children}
+              <View
+                style={{
+                  width: theme.sizes.touchTarget,
+                  height: theme.spacing.xs,
+                  borderRadius: theme.radii.pill,
+                  backgroundColor: theme.colors.border,
+                }}
+              />
             </View>
-          )}
-          {footer}
-        </AnimatedSafeArea>
-      </KeyboardAvoidingView>
-    </Modal>
+            <Stack
+              {...gestures.header.panHandlers}
+              direction="row"
+              align="center"
+              justify="space-between"
+            >
+              <AppText variant="heading" style={{ flex: 1 }}>
+                {title}
+              </AppText>
+              {actions}
+              <IconButton icon="close" label="Close dialog" onPress={() => dismiss()} />
+            </Stack>
+            {scroll ? (
+              <ReorderScrollView
+                scrollEnabled={!nestedScroll.locked}
+                style={{ flexShrink: 1 }}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="interactive"
+                scrollEventThrottle={16}
+                onScroll={(event) => {
+                  scrollY.current = Math.max(0, event.nativeEvent.contentOffset.y);
+                }}
+                contentContainerStyle={{
+                  gap: theme.spacing.md,
+                  paddingVertical: theme.spacing.md,
+                }}
+              >
+                {children}
+              </ReorderScrollView>
+            ) : (
+              <View
+                style={{
+                  flex: 1,
+                  minHeight: 0,
+                  gap: theme.spacing.md,
+                  paddingVertical: theme.spacing.md,
+                }}
+              >
+                {children}
+              </View>
+            )}
+            {footer}
+          </AnimatedSafeArea>
+        </KeyboardAvoidingView>
+      </Modal>
+    </NestedScrollGesture.Provider>
   );
 }

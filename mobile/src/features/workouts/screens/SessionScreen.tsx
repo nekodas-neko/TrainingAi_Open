@@ -97,7 +97,6 @@ export function SessionScreen({
             programId={program.id}
             openWorkout={openWorkout}
             inline
-            countdown
             options={preparation.options}
             disabled={preparation.action.busy || !!preparation.parseError}
           />
@@ -140,7 +139,7 @@ export function SessionScreen({
           )}
           <Stack direction="row" justify="space-between">
             <AppText variant="eyebrow" tone="muted">
-              Today's exercises
+              Today&apos;s exercises
             </AppText>
             {session.durationMinutes !== null && (
               <AppText variant="caption" tone="muted">

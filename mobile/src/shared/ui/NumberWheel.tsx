@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, View } from 'react-native';
 import { AppText } from './AppText';
 import { AppButton } from './AppButton';
 import { NumericStepper } from './NumericStepper';
 import { Sheet } from './Sheet';
 import { useTheme } from '../theme/ThemeProvider';
+import { useNestedScrollGesture } from './NestedScrollGesture';
 
-export function NumberWheel({
+export const NumberWheel = memo(function NumberWheel({
   label,
   value,
   onChange,
@@ -14,6 +15,9 @@ export function NumberWheel({
   max,
   step = 1,
   disabled = false,
+  rowHeight,
+  gesturePaddingStart = 0,
+  gesturePaddingEnd = 0,
 }: {
   label: string;
   value: string;
@@ -22,24 +26,32 @@ export function NumberWheel({
   max: number;
   step?: number;
   disabled?: boolean;
+  rowHeight?: number;
+  gesturePaddingStart?: number;
+  gesturePaddingEnd?: number;
 }) {
   const { theme } = useTheme();
+  const parentScroll = useNestedScrollGesture();
   const [editing, setEditing] = useState(false);
+  const [anchor, setAnchor] = useState(value);
   const scroller = useRef<ScrollView>(null);
   const moving = useRef(false);
   const interacting = useRef(false);
+  const touching = useRef(false);
   const settled = useRef<ReturnType<typeof setTimeout> | null>(null);
   const programmatic = useRef(false);
   const alignment = useRef<ReturnType<typeof setTimeout> | null>(null);
   const offset = useRef(0);
+  const tapped = useRef<number | null>(null);
   const selected = value.trim() === '' ? NaN : Number(value);
-  const fractionalIndex = (selected - min) / step;
+  const anchored = anchor.trim() === '' ? NaN : Number(anchor);
+  const fractionalIndex = (anchored - min) / step;
   const offGrid =
-    Number.isFinite(selected) &&
-    selected >= min &&
-    selected <= max &&
+    Number.isFinite(anchored) &&
+    anchored >= min &&
+    anchored <= max &&
     Math.abs(fractionalIndex - Math.round(fractionalIndex)) > 1e-8
-      ? selected
+      ? anchored
       : null;
   const last = useRef(value);
   last.current = value;
@@ -54,12 +66,18 @@ export function NumberWheel({
     }
     return values;
   }, [min, max, step, offGrid]);
-  const row = theme.sizes.wheelRow;
+  const row = rowHeight ?? theme.sizes.wheelRow;
   const index = Math.max(0, values.indexOf(selected));
   const initialOffset = useRef({ x: 0, y: index * row });
-  useEffect(() => {
-    if (!moving.current && !editing && Number.isFinite(selected)) {
+  const alignSelection = useCallback(() => {
+    if (
+      !moving.current &&
+      !interacting.current &&
+      !editing &&
+      Number.isFinite(selected)
+    ) {
       programmatic.current = true;
+      offset.current = index * row;
       scroller.current?.scrollTo({ y: index * row, animated: false });
       if (alignment.current) {
         clearTimeout(alignment.current);
@@ -69,6 +87,14 @@ export function NumberWheel({
       }, 100);
     }
   }, [index, row, editing, selected]);
+  useEffect(() => {
+    if (!moving.current && !interacting.current) {
+      setAnchor(value);
+    }
+  }, [value, editing]);
+  useEffect(() => {
+    alignSelection();
+  }, [alignSelection]);
   useEffect(
     () => () => {
       if (settled.current) {
@@ -84,34 +110,116 @@ export function NumberWheel({
     if (!interacting.current || disabled) {
       return;
     }
-    const value = values[Math.min(values.length - 1, Math.max(0, Math.round(offset / row)))];
+    const value =
+      values[Math.min(values.length - 1, Math.max(0, Math.round(offset / row)))];
     const text = String(value);
     if (text !== last.current) {
       last.current = text;
       onChange(text);
     }
   }
+  function finishInteraction(nextOffset: number) {
+    if (!interacting.current || programmatic.current || editing) {
+      return;
+    }
+    if (settled.current) {
+      clearTimeout(settled.current);
+      settled.current = null;
+    }
+    const target = tapped.current === null ? nextOffset : tapped.current * row;
+    choose(target);
+    tapped.current = null;
+    moving.current = false;
+    interacting.current = false;
+    parentScroll.end();
+    setAnchor(last.current);
+    scroller.current?.scrollTo({
+      y: Math.round(target / row) * row,
+      animated: false,
+    });
+  }
   function beginInteraction() {
     if (disabled) {
       return;
     }
     programmatic.current = false;
+    tapped.current = null;
     interacting.current = true;
     moving.current = true;
+    parentScroll.begin();
+  }
+  function startTouch() {
+    if (disabled) return;
+    touching.current = true;
+    programmatic.current = false;
+    interacting.current = true;
+    parentScroll.begin();
+  }
+  function endTouch() {
+    touching.current = false;
+    if (!moving.current) {
+      interacting.current = false;
+      parentScroll.end();
+    } else if (tapped.current === null) {
+      if (settled.current) clearTimeout(settled.current);
+      settled.current = setTimeout(() => finishInteraction(offset.current), 200);
+    }
+  }
+  function select(numberIndex: number) {
+    if (disabled) return;
+    if (settled.current) clearTimeout(settled.current);
+    beginInteraction();
+    tapped.current = numberIndex;
+    choose(numberIndex * row);
+    scroller.current?.scrollTo({ y: numberIndex * row, animated: true });
+    settled.current = setTimeout(() => finishInteraction(numberIndex * row), 350);
+  }
+  function openEditor() {
+    if (disabled) {
+      return;
+    }
+    interacting.current = false;
+    moving.current = false;
+    parentScroll.end();
+    if (settled.current) {
+      clearTimeout(settled.current);
+    }
+    setEditing(true);
   }
   return (
-    <View style={{ flex: 1, minWidth: 0 }}>
+    <View
+      style={{
+        flex: 1,
+        minWidth: 0,
+        marginLeft: -gesturePaddingStart,
+        marginRight: -gesturePaddingEnd,
+      }}
+    >
       <View
         accessibilityRole="adjustable"
         accessibilityLabel={label}
-        accessibilityValue={{ min, max, now: Number.isFinite(selected) ? selected : undefined }}
+        accessibilityHint="Scroll or tap a neighbouring weight to select it. Double tap the selected weight to enter a value."
+        onAccessibilityTap={openEditor}
+        accessibilityValue={{
+          min,
+          max,
+          now: Number.isFinite(selected) ? selected : undefined,
+        }}
         accessibilityState={{ disabled }}
         aria-valuemin={min}
         aria-valuemax={max}
         aria-valuenow={Number.isFinite(selected) ? selected : undefined}
-        accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+        accessibilityActions={[
+          { name: 'increment' },
+          { name: 'decrement' },
+          { name: 'activate', label: 'Enter weight' },
+        ]}
         onAccessibilityAction={(event) => {
           if (disabled) {
+            return;
+          }
+          if (event.nativeEvent.actionName === 'activate') {
+            openEditor();
             return;
           }
           onChange(
@@ -133,8 +241,8 @@ export function NumberWheel({
           pointerEvents="none"
           style={{
             position: 'absolute',
-            left: 0,
-            right: 0,
+            left: gesturePaddingStart,
+            right: gesturePaddingEnd,
             top: row,
             height: row,
             borderRadius: theme.radii.control,
@@ -146,26 +254,28 @@ export function NumberWheel({
         <ScrollView
           ref={scroller}
           nestedScrollEnabled
+          bounces={false}
           scrollEnabled={!disabled}
           snapToInterval={row}
           decelerationRate="fast"
           showsVerticalScrollIndicator={false}
           contentOffset={initialOffset.current}
           contentContainerStyle={{ paddingVertical: row }}
+          contentInsetAdjustmentBehavior="never"
+          automaticallyAdjustContentInsets={false}
+          onLayout={alignSelection}
+          onContentSizeChange={alignSelection}
           scrollEventThrottle={16}
-          onTouchStart={() => {
-            if (!disabled) {
-              programmatic.current = false;
-              interacting.current = true;
-            }
-          }}
-          onTouchEnd={() => {
-            if (!moving.current) {
-              interacting.current = false;
-            }
-          }}
+          onTouchStart={startTouch}
+          onTouchEnd={endTouch}
+          onTouchCancel={endTouch}
           {...(Platform.OS === 'web'
-            ? { onWheel: beginInteraction, onPointerDown: beginInteraction }
+            ? {
+                onWheel: beginInteraction,
+                onPointerDown: startTouch,
+                onPointerUp: endTouch,
+                onPointerCancel: endTouch,
+              }
             : {})}
           onScrollBeginDrag={beginInteraction}
           onScrollEndDrag={() => {
@@ -176,9 +286,7 @@ export function NumberWheel({
               clearTimeout(settled.current);
             }
             settled.current = setTimeout(() => {
-              moving.current = false;
-              choose(offset.current);
-              interacting.current = false;
+              finishInteraction(offset.current);
             }, 200);
           }}
           onMomentumScrollBegin={() => {
@@ -191,15 +299,7 @@ export function NumberWheel({
             moving.current = true;
           }}
           onMomentumScrollEnd={(event) => {
-            if (!interacting.current || programmatic.current) {
-              return;
-            }
-            if (settled.current) {
-              clearTimeout(settled.current);
-            }
-            moving.current = false;
-            choose(event.nativeEvent.contentOffset.y);
-            interacting.current = false;
+            finishInteraction(event.nativeEvent.contentOffset.y);
           }}
           onScroll={(event) => {
             const nextOffset = event.nativeEvent.contentOffset.y;
@@ -215,68 +315,65 @@ export function NumberWheel({
             if (!interacting.current || programmatic.current || editing) {
               return;
             }
+            if (tapped.current !== null) return;
             if (Platform.OS === 'web') {
               moving.current = true;
             }
             if (moving.current) {
               choose(nextOffset);
             }
-            if (Platform.OS === 'web') {
+            if (Platform.OS === 'web' || !touching.current) {
               if (settled.current) {
                 clearTimeout(settled.current);
               }
               settled.current = setTimeout(() => {
-                moving.current = false;
-                interacting.current = false;
-                scroller.current?.scrollTo({
-                  y: Math.round(nextOffset / row) * row,
-                  animated: false,
-                });
+                finishInteraction(nextOffset);
               }, 150);
             }
           }}
         >
-          {values.map((number) => (
-            <View
-              key={number}
-              aria-hidden={number !== selected}
-              accessibilityElementsHidden={number !== selected}
-              importantForAccessibility={number !== selected ? 'no-hide-descendants' : 'auto'}
-              style={{ height: row, justifyContent: 'center', alignItems: 'center' }}
-            >
-              <AppText
-                variant={number === selected ? 'wheelValue' : 'pageTitle'}
-                tone={number === selected ? 'brand' : 'muted'}
-                style={{ opacity: number === selected ? 1 : 0.35 }}
+          {values.map((number, numberIndex) => {
+            const current = numberIndex === index;
+            const visible = Math.abs(numberIndex - index) <= 1;
+            return (
+              <Pressable
+                key={number}
+                onPress={() => (current ? openEditor() : select(numberIndex))}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  current ? `Enter ${label}` : `Set ${label} to ${number}`
+                }
+                disabled={disabled}
+                aria-hidden={!visible}
+                accessibilityElementsHidden={!visible}
+                importantForAccessibility={!visible ? 'no-hide-descendants' : 'auto'}
+                style={{
+                  height: row,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  paddingLeft: gesturePaddingStart,
+                  paddingRight: gesturePaddingEnd,
+                }}
               >
-                {number}
-              </AppText>
-            </View>
-          ))}
+                <AppText
+                  variant={current ? 'display' : 'wheelValue'}
+                  tone={current ? 'brand' : 'muted'}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.6}
+                  style={{
+                    opacity: current ? 1 : 0.35,
+                    textAlign: 'center',
+                    includeFontPadding: false,
+                  }}
+                >
+                  {current && !Number.isFinite(selected) ? '—' : number}
+                </AppText>
+              </Pressable>
+            );
+          })}
         </ScrollView>
       </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Edit ${label}`}
-        disabled={disabled}
-        onPress={() => {
-          interacting.current = false;
-          moving.current = false;
-          if (settled.current) {
-            clearTimeout(settled.current);
-          }
-          setEditing(true);
-        }}
-        style={{
-          minHeight: theme.sizes.touchTarget,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <AppText variant="caption" tone="muted">
-          {label} · edit
-        </AppText>
-      </Pressable>
       <Sheet visible={editing} title={label} onClose={() => setEditing(false)}>
         <NumericStepper
           label={label}
@@ -291,4 +388,4 @@ export function NumberWheel({
       </Sheet>
     </View>
   );
-}
+});

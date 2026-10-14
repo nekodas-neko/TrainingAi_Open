@@ -1,20 +1,19 @@
 import { feedback } from '../../../integrations/feedback/haptics';
-import { plateBreakdown } from '@trainingai/shared/workout/plate-loading';
-import { barShareOfOneRm } from '@trainingai/shared/1rm';
-import { View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { View, useWindowDimensions } from 'react-native';
 import {
   AppButton,
-  AppText,
-  Badge,
   Disclosure,
   NumberWheel,
-  NumericStepper,
+  SegmentedControl,
   RepCounter,
   Stack,
 } from '../../../shared/ui';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
 import type { WorkoutExercise, WorkoutRecord, WorkoutSet } from '../logging/workout';
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
-import { isAmrap, weightStep, cappedTarget } from '../logging/targets';
+import { isAmrap, weightStep } from '../logging/targets';
+import { displayLoad, storedLoad } from '../logging/preferences';
 import { EffortPicker } from './EffortPicker';
 
 export function SetEntry({
@@ -22,100 +21,140 @@ export function SetEntry({
   exercise,
   set,
   index,
+  fill = false,
 }: {
   workout: WorkoutRecord;
   exercise: WorkoutExercise;
   set: WorkoutSet;
   index: number;
+  fill?: boolean;
 }) {
   const journal = useWorkoutJournal();
+  const { theme } = useTheme();
+  const { fontScale } = useWindowDimensions();
+  const [controlsLayout, setControlsLayout] = useState({ width: 0, height: 0 });
+  const [assistanceHeight, setAssistanceHeight] = useState(0);
+  const minimumRow = Math.max(
+    theme.sizes.wheelRow,
+    theme.typography.display.lineHeight! * fontScale + theme.spacing.sm,
+  );
   const bodyweight = exercise.exerciseType === 'bodyweight';
-  const plates =
-    !bodyweight && exercise.equipment.includes('barbell')
-      ? plateBreakdown(Number(set.weight))
-      : null;
-  const cap = cappedTarget(exercise, set);
+  const expanded = fill;
+  const rowHeight = expanded
+    ? Math.max(minimumRow, Math.floor((controlsLayout.height - theme.spacing.sm) / 3))
+    : minimumRow;
+  const columnWidth =
+    controlsLayout.width > 0
+      ? (controlsLayout.width - (bodyweight ? 0 : theme.spacing.md)) /
+        (bodyweight ? 1 : 2)
+      : undefined;
+  const minimumHeight =
+    minimumRow * 3 +
+    theme.spacing.sm +
+    (bodyweight ? assistanceHeight : theme.sizes.touchTarget + theme.spacing.xs * 2) +
+    theme.sizes.loggingControl +
+    theme.typography.caption.lineHeight! * fontScale +
+    theme.spacing.sm +
+    theme.spacing.md * 2;
+  const columnStyle =
+    columnWidth === undefined
+      ? { flex: 1, flexBasis: 0, minWidth: 0 }
+      : { width: columnWidth, flexShrink: 0, minWidth: 0 };
+
+  const unit = exercise.weightUnit;
   const amrap = isAmrap(workout, exercise, index);
-  const percent =
-    barShareOfOneRm(Number(set.weight), exercise.estimated1rm) ?? set.planned?.percent;
-  const update = (field: 'weight' | 'reps', value: string) =>
-    journal.controller?.updateSet(workout.id, exercise.id, set.id, field, value);
+  const controller = journal.controller;
+  const updateWeight = useCallback(
+    (value: string) =>
+      controller?.updateSet(
+        workout.id,
+        exercise.id,
+        set.id,
+        'weight',
+        storedLoad(value, unit),
+      ),
+    [controller, workout.id, exercise.id, set.id, unit],
+  );
+  const units = (
+    <SegmentedControl
+      label="Weight display unit"
+      options={[
+        { label: 'kg', value: 'kg' },
+        { label: 'lb', value: 'lb' },
+      ]}
+      value={unit}
+      onChange={(value) => {
+        if (!journal.busy) {
+          void journal.controller?.setWeightUnit(workout.id, exercise.id, value);
+        }
+      }}
+    />
+  );
+  const loadWheel = (label: string, min = 0) => (
+    <NumberWheel
+      key={unit}
+      label={label}
+      value={displayLoad(set.weight, unit)}
+      onChange={updateWeight}
+      step={unit === 'lb' ? 2.5 : weightStep(exercise.equipment)}
+      min={unit === 'lb' ? (min < 0 ? -220 : 0) : min}
+      max={unit === 'lb' ? 1102 : 500}
+      disabled={journal.busy}
+      rowHeight={rowHeight}
+      gesturePaddingStart={bodyweight ? 0 : theme.spacing.md}
+      gesturePaddingEnd={bodyweight ? 0 : theme.spacing.xs}
+    />
+  );
   return (
-    <Stack gap="md">
-      <Stack direction="row" justify="space-between" align="center">
-        <Badge label={amrap ? 'A' : String(index + 1)} tone="brand" />
-        {!bodyweight && percent !== undefined && (
-          <Badge label={`${percent}% 1RM`} tone="brand" />
-        )}
-      </Stack>
-      <Stack direction="row" align="center" gap="md">
-        {!bodyweight && (
-          <NumberWheel
-            label="kg"
-            value={set.weight}
-            onChange={(value) => update('weight', value)}
-            step={weightStep(exercise.equipment)}
-            max={500}
-            disabled={journal.busy}
-          />
-        )}
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <RepCounter
-            value={set.reps}
-            onChange={(value) => update('reps', value)}
-            label={`Reps for ${exercise.name}, set ${index + 1}`}
-            disabled={journal.busy}
-          />
-          {amrap && (
-            <AppText variant="micro" tone="brand" style={{ textAlign: 'center' }}>
-              AMRAP · beat it
-            </AppText>
+    <Stack gap="md" style={expanded ? { flex: 1, minHeight: minimumHeight } : undefined}>
+      {!bodyweight && units}
+      <View
+        style={
+          expanded ? { flex: 1, minHeight: minimumRow * 3 + theme.spacing.sm } : undefined
+        }
+        onLayout={(event) => {
+          const { width, height } = event.nativeEvent.layout;
+          setControlsLayout((current) =>
+            current.width === width && current.height === height
+              ? current
+              : { width, height },
+          );
+        }}
+      >
+        <Stack direction="row" align="flex-start" gap="md">
+          {!bodyweight && (
+            <View style={[columnStyle, { height: rowHeight * 3 }]}>
+              {loadWheel(`Weight (${unit})`)}
+            </View>
           )}
-        </View>
-      </Stack>
-      {cap !== null && (
-        <AppText variant="micro" tone="muted" style={{ textAlign: 'center' }}>
-          Automatic target capped at {cap} kg · the calculated load is above the loading limit.
-        </AppText>
-      )}
-      {plates && (
-        <AppText variant="micro" tone="muted" style={{ textAlign: 'center' }}>
-          {plates.perSide.length ? `${plates.perSide.join(' + ')} kg per side` : 'Empty bar'}
-          {plates.exact ? '' : ` · closest ${plates.achievableKg} kg`}
-        </AppText>
-      )}
-      {amrap &&
-        !workout.isBaseline &&
-        !bodyweight &&
-        set.planned &&
-        Number(set.weight) === set.plannedWeight && (
-          <AppText variant="micro" tone="brand" style={{ textAlign: 'center' }}>
-            {set.planned.reps} reps = maintain {bodyweight ? 'rep max' : '1RM'} ·{' '}
-            {set.planned.reps + 1}+ reps = beat it
-          </AppText>
-        )}
+          <View style={columnStyle}>
+            <RepCounter
+              value={set.reps}
+              onChange={(value) =>
+                controller?.updateSet(workout.id, exercise.id, set.id, 'reps', value)
+              }
+              label={`Reps for ${exercise.name}, set ${index + 1}${amrap ? ', AMRAP' : ''}`}
+              caption={amrap ? 'Reps (AMRAP)' : 'Reps'}
+              disabled={journal.busy}
+              rowHeight={rowHeight}
+            />
+          </View>
+        </Stack>
+      </View>
       {bodyweight && (
-        <Disclosure
-          title={
-            Number(set.weight) === 0
-              ? 'Add load / assistance'
-              : `${Number(set.weight) > 0 ? '+' : ''}${set.weight} kg load / assistance`
-          }
-        >
-          <NumericStepper
-            label="Added / assisted load (kg)"
-            value={set.weight}
-            onChange={(value) => update('weight', value)}
-            step={weightStep(exercise.equipment)}
-            min={-100}
-            max={500}
-            disabled={journal.busy}
-          />
-        </Disclosure>
+        <View onLayout={(event) => setAssistanceHeight(event.nativeEvent.layout.height)}>
+          <Disclosure
+            title={
+              Number(set.weight) === 0
+                ? 'Add load / assistance'
+                : `${Number(set.weight) > 0 ? '+' : ''}${displayLoad(set.weight, unit)} ${unit} load / assistance`
+            }
+          >
+            {units}
+            {loadWheel(`Added / assisted load (${unit})`, -100)}
+          </Disclosure>
+        </View>
       )}
-      <AppText variant="micro" tone="muted" style={{ textAlign: 'center' }}>
-        Voice logging · coming soon
-      </AppText>
       <EffortPicker
         set={set}
         disabled={journal.busy}

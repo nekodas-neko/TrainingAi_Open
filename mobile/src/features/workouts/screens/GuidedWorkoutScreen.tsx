@@ -1,6 +1,11 @@
-import { useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
-import { calc1RM, displayOneRm } from '@trainingai/shared/1rm';
+import {
+  barShareOfOneRm,
+  calc1RM,
+  displayOneRm,
+  oneRmLabel,
+} from '@trainingai/shared/1rm';
 import {
   AppButton,
   AppText,
@@ -8,6 +13,7 @@ import {
   Card,
   ConfirmationCard,
   IconButton,
+  MuscleMap,
   NumericStepper,
   Sheet,
   Stack,
@@ -17,7 +23,7 @@ import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import { workoutFlow } from '../logging/flow';
 import { recordedSets, type WorkoutRecord } from '../logging/workout';
 import { SetEntry, SetActions } from '../components/SetEntry';
-import { RestCard, SessionTimer, SetClock } from '../components/WorkoutClocks';
+import { RestCard } from '../components/WorkoutClocks';
 import { WorkoutSaveNotice } from '../components/WorkoutSaveNotice';
 import { ExerciseReady } from '../components/ExerciseReady';
 import { LoadSuggestion } from '../components/LoadSuggestion';
@@ -27,7 +33,21 @@ import { WarmupContent } from '../components/WarmupContent';
 import { WorkoutLayout } from '../components/WorkoutLayout';
 import { SetRecapGrid } from '../components/SetRecapGrid';
 import { WorkoutSessionHub } from '../components/WorkoutSessionHub';
+import { WorkoutTimerControls } from '../components/WorkoutTimerOptions';
+import { ExerciseDetails } from '../components/ExerciseDetails';
+import { ExerciseHistory } from '../components/ExerciseHistory';
 import { InjuryControls } from '../components/InjuryControls';
+
+type ConfirmationKind = 'finish' | 'discard' | 'leave' | 'skip';
+type WorkoutPanel =
+  | ConfirmationKind
+  | 'options'
+  | 'timers'
+  | 'calculator'
+  | 'edit'
+  | 'muscles'
+  | 'details'
+  | 'history';
 
 export function GuidedWorkoutScreen({
   workout,
@@ -39,16 +59,34 @@ export function GuidedWorkoutScreen({
   const journal = useWorkoutJournal();
   const controller = journal.controller!;
   const { theme } = useTheme();
-  const [confirmation, setConfirmation] = useState<'finish' | 'discard' | 'leave' | 'skip' | null>(
-    null,
-  );
-  const [options, setOptions] = useState(false);
+  const [panel, setPanel] = useState<WorkoutPanel | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
-  const [calculator, setCalculator] = useState(false);
+  const lastPanel = useRef<WorkoutPanel>('options');
+  const pendingNavigation = useRef<(() => void) | null>(null);
+  if (panel !== null) {
+    lastPanel.current = panel;
+  }
+  const shownPanel = panel ?? lastPanel.current;
+  const confirmation = ['finish', 'discard', 'leave', 'skip'].includes(shownPanel)
+    ? (shownPanel as ConfirmationKind)
+    : null;
+  function openEdit(id: string) {
+    setEditing(id);
+    setPanel('edit');
+  }
+  function afterDismiss(action: () => void) {
+    if (pendingNavigation.current) {
+      return;
+    }
+    pendingNavigation.current = action;
+    setPanel(null);
+  }
   const [calcWeight, setCalcWeight] = useState('60');
   const [calcReps, setCalcReps] = useState('8');
   const flow = workoutFlow(workout);
-  const index = workout.exercises.findIndex((exercise) => exercise.id === flow.exerciseId);
+  const index = workout.exercises.findIndex(
+    (exercise) => exercise.id === flow.exerciseId,
+  );
   const exercise = workout.exercises[index];
   const visibleExercises = workout.exercises.filter(
     (exercise) => !exercise.retired && !exercise.relogOf,
@@ -60,20 +98,37 @@ export function GuidedWorkoutScreen({
   const set = workout.runningSet
     ? exercise.sets.find((set) => set.id === workout.runningSet!.setId)
     : exercise.sets[setIndex];
-  const resting =
-    flow.stage === 'exercise' &&
-    !!workout.rest &&
-    !workout.runningSet &&
-    exercise.sets.some((set) => set.startedAt !== null || set.completedAt !== null);
+  const resting = flow.stage === 'exercise' && !!workout.rest && !workout.runningSet;
   const ready =
     flow.stage === 'exercise' &&
     setIndex === 0 &&
     !workout.runningSet &&
+    !workout.rest &&
     !exercise.sets.some((set) => set.startedAt !== null || set.completedAt !== null);
+  const muscleAssignments = useMemo(() => {
+    const sources =
+      flow.stage === 'review' || flow.stage === 'warmup'
+        ? workout.exercises.filter((x) => !x.retired && !x.relogOf)
+        : [exercise];
+    const roles = new Map<string, 'main' | 'secondary'>();
+    for (const source of sources) {
+      for (const muscle of source.secondaryMuscles) {
+        if (!roles.has(muscle)) {
+          roles.set(muscle, 'secondary');
+        }
+      }
+      for (const muscle of source.mainMuscles.length
+        ? source.mainMuscles
+        : source.muscles) {
+        roles.set(muscle, 'main');
+      }
+    }
+    return [...roles].map(([muscle, role]) => ({ muscle, role }));
+  }, [workout.exercises, exercise, flow.stage]);
   const count = recordedSets(workout).length;
   const nextExercise = workout.exercises
     .slice(index + 1)
-    .find((exercise) => !exercise.retired && !exercise.relogOf);
+    .find((exercise) => !exercise.retired && !exercise.relogOf && !exercise.skipped);
   const last = !nextExercise;
   const editSet = exercise.sets.find((set) => set.id === editing);
   async function next() {
@@ -85,16 +140,16 @@ export function GuidedWorkoutScreen({
       await controller.advanceExercise(workout.id);
     }
   }
-  async function confirm() {
+  async function confirm(decision: ConfirmationKind) {
     let saved = false;
-    if (confirmation === 'discard') {
+    if (decision === 'discard') {
       saved = await controller.discard(workout.id);
       if (saved) {
         closeWorkout();
       }
-    } else if (confirmation === 'finish') {
+    } else if (decision === 'finish') {
       saved = await controller.finish(workout.id);
-    } else if (confirmation === 'skip') {
+    } else if (decision === 'skip') {
       saved = await controller.skipExercise(workout.id);
       if (saved && last && !workout.soloExerciseId && count > 0) {
         saved = await controller.finish(workout.id);
@@ -105,14 +160,20 @@ export function GuidedWorkoutScreen({
     } else {
       saved = await controller.showSession(workout.id);
     }
-    if (saved) {
-      setConfirmation(null);
+    if (!saved) {
+      setPanel(decision);
     }
   }
   const action =
     flow.stage === 'summary' ? (
       <AppButton
-        title="Next Exercise →"
+        title={
+          workout.soloExerciseId
+            ? 'Back to session'
+            : last
+              ? 'Complete Workout'
+              : 'Next Exercise'
+        }
         busy={journal.busy}
         onPress={() => {
           void next();
@@ -126,7 +187,7 @@ export function GuidedWorkoutScreen({
           variant="surface"
           accessibilityLabel="Skip exercise"
           disabled={journal.busy}
-          onPress={() => setConfirmation('skip')}
+          onPress={() => setPanel('skip')}
         />
         <View style={{ flex: 1 }}>
           {set ? (
@@ -145,12 +206,13 @@ export function GuidedWorkoutScreen({
     screen = (
       <WorkoutSessionHub
         workout={workout}
-        onLeave={() => setConfirmation('leave')}
+        onLeave={() => setPanel('leave')}
         onFinish={() => {
           void controller.finish(workout.id);
         }}
-        onOptions={() => setOptions(true)}
+        onOptions={() => setPanel('options')}
         onMinimize={closeWorkout}
+        onMuscles={() => setPanel('muscles')}
       />
     );
   } else {
@@ -172,6 +234,7 @@ export function GuidedWorkoutScreen({
         }
         workout={workout}
         ring={flow.stage === 'exercise'}
+        fillBottom={flow.stage === 'exercise' && !ready && !resting}
         onBack={
           flow.stage === 'summary'
             ? () => {
@@ -181,24 +244,27 @@ export function GuidedWorkoutScreen({
               ? () => {
                   void controller.showSession(workout.id);
                 }
-              : () => setConfirmation('leave')
+              : () => setPanel('leave')
         }
         backIcon={flow.stage === 'summary' ? 'forward' : 'back'}
-        backLabel={flow.stage === 'summary' ? 'Continue to next exercise' : 'Back to session'}
+        backLabel={
+          flow.stage === 'summary' ? 'Continue to next exercise' : 'Back to session'
+        }
+        titleAction={
+          <IconButton
+            icon="muscles"
+            label="Muscles worked"
+            onPress={() => setPanel('muscles')}
+          />
+        }
         actions={
           <Stack direction="row" gap="xs">
+            <IconButton
+              icon="more"
+              label="Workout options"
+              onPress={() => setPanel('options')}
+            />
             <IconButton icon="down" label="Minimize workout" onPress={closeWorkout} />
-            {flow.stage === 'exercise' ? (
-              <IconButton
-                icon="calculator"
-                label="1RM calculator"
-                onPress={() => {
-                  setCalcWeight(set?.weight ?? '60');
-                  setCalcReps(set?.reps ?? '8');
-                  setCalculator(true);
-                }}
-              />
-            ) : null}
           </Stack>
         }
         footer={
@@ -221,48 +287,80 @@ export function GuidedWorkoutScreen({
         {flow.stage === 'warmup' ? (
           <WarmupContent workout={workout} />
         ) : flow.stage === 'summary' ? (
-          <ExerciseSummary workout={workout} exercise={exercise} next={nextExercise} />
+          <ExerciseSummary
+            workout={workout}
+            exercise={exercise}
+            next={nextExercise}
+            onEdit={openEdit}
+          />
         ) : ready && set ? (
           <>
             <Stack direction="row" justify="space-between">
               <AppText variant="eyebrow" tone="muted">
                 Exercise {visibleIndex + 1} of {visibleExercises.length}
               </AppText>
-              <SessionTimer workout={workout} />
             </Stack>
             <ExerciseReady
               workout={workout}
               exercise={exercise}
               set={set}
-              onSkip={() => setConfirmation('skip')}
+              onSkip={() => setPanel('skip')}
+              onDetails={() => setPanel('details')}
             />
           </>
         ) : (
           <>
-            <View>
-              <AppText variant="pageTitle">{exercise.name}</AppText>
-              {exercise.lastDate && (
-                <AppText variant="micro" tone="muted">
-                  Last: {exercise.lastReps.join(', ')} reps · {exercise.lastDate}
+            <Stack direction="row" align="center" gap="sm">
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <AppText variant="pageTitle">{exercise.name}</AppText>
+                {exercise.lastDate && (
+                  <AppText variant="micro" tone="muted">
+                    Last: {exercise.lastReps.join(', ')} reps · {exercise.lastDate}
+                  </AppText>
+                )}
+                <AppText variant="caption" tone="brand">
+                  {oneRmLabel(exercise.exerciseType)}:{' '}
+                  {exercise.estimated1rm === null
+                    ? 'Unavailable'
+                    : displayOneRm(exercise.estimated1rm, exercise.exerciseType).text}
+                  {exercise.exerciseType === 'weighted' &&
+                  set &&
+                  barShareOfOneRm(Number(set.weight), exercise.estimated1rm) !== null
+                    ? ` - Load ${barShareOfOneRm(Number(set.weight), exercise.estimated1rm)}%`
+                    : ''}
                 </AppText>
-              )}
-            </View>
+              </View>
+              <IconButton
+                icon="info"
+                label="Exercise details"
+                onPress={() => setPanel('details')}
+              />
+            </Stack>
             <InjuryControls
               workout={workout}
               exercise={exercise}
               compact
-              onSkip={() => setConfirmation('skip')}
+              onSkip={() => setPanel('skip')}
             />
             <SetRecapGrid
               exercise={exercise}
               currentId={set?.id}
               running={!!workout.runningSet}
-              onEdit={setEditing}
+              onEdit={openEdit}
             />
             {set && <LoadSuggestion workout={workout} exercise={exercise} set={set} />}
-            <View style={{ flex: 1, justifyContent: 'center', gap: theme.spacing.md }}>
+            <View
+              style={{
+                flex: 1,
+                justifyContent: resting ? 'center' : 'flex-start',
+                gap: theme.spacing.md,
+              }}
+            >
               {resting ? (
                 <>
+                  <AppText variant="label" style={{ textAlign: 'center' }}>
+                    Next: {exercise.name}, set {set ? exercise.sets.indexOf(set) + 1 : ''}
+                  </AppText>
                   <RestCard
                     workout={workout}
                     onStartSet={
@@ -275,7 +373,11 @@ export function GuidedWorkoutScreen({
                   />
                   {exercise.exerciseType !== 'bodyweight' &&
                     exerciseResult(workout, exercise).estimate !== null && (
-                      <AppText variant="caption" tone="brand" style={{ textAlign: 'center' }}>
+                      <AppText
+                        variant="caption"
+                        tone="brand"
+                        style={{ textAlign: 'center' }}
+                      >
                         Live 1RM ·{' '}
                         {
                           displayOneRm(
@@ -287,14 +389,14 @@ export function GuidedWorkoutScreen({
                     )}
                 </>
               ) : set ? (
-                <Card tone="brand">
+                <Card tone="brand" style={{ flex: 1, padding: theme.spacing.md }}>
                   <SetEntry
+                    fill
                     workout={workout}
                     exercise={exercise}
                     set={set}
                     index={exercise.sets.indexOf(set)}
                   />
-                  {set.startedAt !== null && <SetClock startedAt={set.startedAt} />}
                 </Card>
               ) : null}
             </View>
@@ -303,103 +405,189 @@ export function GuidedWorkoutScreen({
       </WorkoutLayout>
     );
   }
+  const sheetTitle = confirmation
+    ? confirmation === 'skip'
+      ? 'Skip this exercise?'
+      : confirmation === 'leave'
+        ? 'Leave this exercise?'
+        : confirmation === 'discard'
+          ? 'Discard workout?'
+          : 'Finish workout?'
+    : {
+        options: 'Workout options',
+        timers: 'Workout timers',
+        calculator: '1RM calculator',
+        edit: `Edit set ${exercise.sets.findIndex((x) => x.id === editing) + 1}`,
+        muscles: 'Muscles worked',
+        details: exercise.name,
+        history: `${exercise.name} history`,
+      }[shownPanel as Exclude<WorkoutPanel, ConfirmationKind>];
   return (
     <>
       {screen}
       <Sheet
-        visible={confirmation !== null}
-        title={
-          confirmation === 'skip'
-            ? 'Skip this exercise?'
-            : confirmation === 'leave'
-              ? 'Leave this exercise?'
-              : confirmation === 'discard'
-                ? 'Discard workout?'
-                : 'Finish workout?'
+        visible={panel !== null}
+        title={sheetTitle}
+        onClose={() => setPanel(null)}
+        onDismiss={() => {
+          const action = pendingNavigation.current;
+          pendingNavigation.current = null;
+          action?.();
+        }}
+        actions={
+          !confirmation && shownPanel !== 'options' ? (
+            <IconButton
+              icon="back"
+              label="Back to workout options"
+              onPress={() => setPanel('options')}
+            />
+          ) : undefined
         }
-        onClose={() => setConfirmation(null)}
       >
-        <ConfirmationCard
-          title={
-            confirmation === 'skip'
-              ? 'Skip this exercise?'
-              : confirmation === 'leave'
-                ? 'Return to session?'
-                : confirmation === 'discard'
-                  ? 'Discard this workout?'
-                  : 'Finish this workout?'
-          }
-          message={
-            confirmation === 'discard'
-              ? 'Discard this unfinished workout? It cannot be resumed and will not upload.'
-              : confirmation === 'finish'
-                ? `${count} sets recorded. Save these sets and finish?`
-                : 'Your recorded progress stays saved on this phone.'
-          }
-          confirmLabel={
-            confirmation === 'skip'
-              ? 'Skip'
-              : confirmation === 'leave'
-                ? 'Leave'
-                : confirmation === 'discard'
-                  ? 'Discard workout'
-                  : 'Save finished workout'
-          }
-          danger={confirmation === 'discard'}
-          busy={journal.busy}
-          onConfirm={() => {
-            void confirm();
-          }}
-          onCancel={() => setConfirmation(null)}
-        />
-      </Sheet>
-      <Sheet visible={options} title="Workout options" onClose={() => setOptions(false)}>
-        <AppButton
-          title="Finish early"
-          disabled={count === 0 || !!workout.runningSet}
-          onPress={() => {
-            setOptions(false);
-            setConfirmation('finish');
-          }}
-        />
-        <AppButton
-          title="Discard workout"
-          variant="danger"
-          onPress={() => {
-            setOptions(false);
-            setConfirmation('discard');
-          }}
-        />
-      </Sheet>
-      <Sheet
-        visible={!!editSet}
-        title={`Edit set ${exercise.sets.findIndex((set) => set.id === editing) + 1}`}
-        onClose={() => setEditing(null)}
-      >
-        {editSet && (
+        {confirmation ? (
+          <>
+            <WorkoutSaveNotice />
+            <ConfirmationCard
+              title={
+                confirmation === 'skip'
+                  ? 'Skip this exercise?'
+                  : confirmation === 'leave'
+                    ? 'Return to session?'
+                    : confirmation === 'discard'
+                      ? 'Discard this workout?'
+                      : 'Finish this workout?'
+              }
+              message={
+                confirmation === 'discard'
+                  ? 'Discard this unfinished workout? It cannot be resumed and will not upload.'
+                  : confirmation === 'finish'
+                    ? `${count} sets recorded. Save these sets and finish?`
+                    : 'Your recorded progress stays saved on this phone.'
+              }
+              confirmLabel={
+                confirmation === 'skip'
+                  ? 'Skip'
+                  : confirmation === 'leave'
+                    ? 'Leave'
+                    : confirmation === 'discard'
+                      ? 'Discard workout'
+                      : 'Save finished workout'
+              }
+              danger={confirmation === 'discard'}
+              busy={journal.busy}
+              onConfirm={() =>
+                afterDismiss(() => {
+                  void confirm(confirmation);
+                })
+              }
+              onCancel={() => setPanel(null)}
+            />
+          </>
+        ) : shownPanel === 'options' ? (
+          <>
+            {flow.stage !== 'review' && flow.stage !== 'warmup' && (
+              <AppButton
+                title="Exercise details"
+                icon="info"
+                variant="surface"
+                onPress={() => setPanel('details')}
+              />
+            )}
+            <AppButton
+              title="Timer preferences"
+              variant="surface"
+              onPress={() => setPanel('timers')}
+            />
+            <AppButton
+              title="Minimise workout"
+              variant="surface"
+              disabled={journal.saveStatus !== 'saved' || journal.busy}
+              onPress={() => afterDismiss(closeWorkout)}
+            />
+            <AppButton
+              title="Finish early"
+              disabled={count === 0 || !!workout.runningSet}
+              onPress={() => setPanel('finish')}
+            />
+            <AppButton
+              title="Discard workout"
+              variant="danger"
+              onPress={() => setPanel('discard')}
+            />
+          </>
+        ) : shownPanel === 'timers' ? (
+          <WorkoutTimerControls workout={workout} onClose={() => setPanel(null)} />
+        ) : shownPanel === 'details' ? (
+          <ExerciseDetails
+            workout={workout}
+            exercise={exercise}
+            set={set}
+            onAdjust={() => {
+              if (set) {
+                openEdit(set.id);
+              }
+            }}
+            onHistory={() => setPanel('history')}
+            onCalculator={() => {
+              setCalcWeight(set?.weight ?? '60');
+              setCalcReps(set?.reps ?? '8');
+              setPanel('calculator');
+            }}
+          />
+        ) : shownPanel === 'history' ? (
+          <ExerciseHistory name={exercise.name} />
+        ) : shownPanel === 'muscles' ? (
+          <>
+            <AppText variant="heading">
+              {flow.stage === 'review' || flow.stage === 'warmup'
+                ? workout.sessionName
+                : exercise.name}
+            </AppText>
+            <View style={{ height: theme.sizes.timerRing * 2 }}>
+              <MuscleMap assignments={muscleAssignments} />
+            </View>
+            <Stack direction="row" wrap gap="xs">
+              {muscleAssignments.map((x) => (
+                <Badge
+                  key={x.muscle}
+                  label={`${x.muscle} (${x.role === 'main' ? 'primary' : 'secondary'})`}
+                  tone={x.role === 'main' ? 'brand' : 'activity'}
+                />
+              ))}
+            </Stack>
+          </>
+        ) : shownPanel === 'edit' && editSet ? (
           <SetEntry
             workout={workout}
             exercise={exercise}
             set={editSet}
             index={exercise.sets.indexOf(editSet)}
           />
-        )}
-      </Sheet>
-      <Sheet visible={calculator} title="1RM calculator" onClose={() => setCalculator(false)}>
-        <NumericStepper
-          label="Weight (kg)"
-          value={calcWeight}
-          onChange={setCalcWeight}
-          max={500}
-          step={2.5}
-        />
-        <NumericStepper label="Reps" value={calcReps} onChange={setCalcReps} min={1} max={30} />
-        <AppText variant="heading" tone="brand">
-          Estimated 1RM ·{' '}
-          {Number(calcWeight) > 0 && Number(calcReps) > 0
-            ? displayOneRm(calc1RM(Number(calcWeight), Number(calcReps)), 'weighted').text
-            : '—'}
-        </AppText>
+        ) : shownPanel === 'calculator' ? (
+          <>
+            <NumericStepper
+              label="Weight (kg)"
+              value={calcWeight}
+              onChange={setCalcWeight}
+              max={500}
+              step={2.5}
+            />
+            <NumericStepper
+              label="Reps"
+              value={calcReps}
+              onChange={setCalcReps}
+              min={1}
+              max={30}
+            />
+            <AppText variant="heading" tone="brand">
+              Estimated 1RM �{' '}
+              {Number(calcWeight) > 0 && Number(calcReps) > 0
+                ? displayOneRm(calc1RM(Number(calcWeight), Number(calcReps)), 'weighted')
+                    .text
+                : '�'}
+            </AppText>
+          </>
+        ) : null}
       </Sheet>
     </>
   );

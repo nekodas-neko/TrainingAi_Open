@@ -5,6 +5,7 @@ import {
 import { computeRpeAdjustment } from '@trainingai/shared/ai-periodization/autoregulation';
 import type { ExercisePreview, SetPreview } from '../catalog';
 import type { WorkoutExercise, WorkoutRecord, WorkoutSet } from './workout';
+import { displayLoad } from './preferences';
 
 export function weightStep(equipment: string[] = []) {
   return equipment.includes('barbell') ? 2.5 : 1.25;
@@ -58,7 +59,11 @@ export function expectedRpe(percent?: number, reps?: number) {
   return expectedRpePrefill(percent, reps);
 }
 
-export function isAmrap(workout: WorkoutRecord, exercise: WorkoutExercise, index: number) {
+export function isAmrap(
+  workout: WorkoutRecord,
+  exercise: WorkoutExercise,
+  index: number,
+) {
   return (
     workout.isBaseline ||
     (exercise.lastSetMode === 'amrap' && index === exercise.sets.length - 1)
@@ -72,8 +77,9 @@ export function formatSetLoad(
   if (exercise.exerciseType === 'bodyweight' && Number(set.weight) === 0) {
     return `${set.reps} reps`;
   }
-  const prefix = exercise.exerciseType === 'bodyweight' && Number(set.weight) > 0 ? '+' : '';
-  return `${prefix}${set.weight} kg × ${set.reps} reps`;
+  const prefix =
+    exercise.exerciseType === 'bodyweight' && Number(set.weight) > 0 ? '+' : '';
+  return `${prefix}${displayLoad(set.weight, 'kg')} kg × ${set.reps} reps`;
 }
 
 export function loadSuggestion(
@@ -101,7 +107,8 @@ export function loadSuggestion(
   const adjustment = computeRpeAdjustment(
     {
       role: 'primary',
-      rpeDelta: previous.rpe - expectedSetRpe(previous.planned.percent, Number(previous.reps)),
+      rpeDelta:
+        previous.rpe - expectedSetRpe(previous.planned.percent, Number(previous.reps)),
       rm1Trend: 'flat',
       repCompletionRate: Number(previous.reps) / previous.planned.reps,
     },
@@ -111,7 +118,10 @@ export function loadSuggestion(
       band: { repMin: previous.planned.reps, repMax: previous.planned.reps },
     },
   );
-  const weightKg = roundLoad(weight * adjustment.pctMultiplier, weightStep(exercise.equipment));
+  const weightKg = roundLoad(
+    weight * adjustment.pctMultiplier,
+    weightStep(exercise.equipment),
+  );
   return adjustment.note && adjustment.pctMultiplier < 1 && weightKg < weight
     ? { weightKg, note: adjustment.note }
     : null;
@@ -126,4 +136,20 @@ export function cappedTarget(
   const target = (exercise.estimated1rm * set.planned.percent) / 100;
   const load = roundLoad(target, weightStep(exercise.equipment), true);
   return target > load ? load : null;
+}
+
+export function loadBasis(exercise: WorkoutExercise, set: WorkoutSet) {
+  if (exercise.exerciseType === 'bodyweight') {
+    return 'Bodyweight reps; positive load is added weight and negative load is assistance. Strength is a rep-max estimate.';
+  }
+  const step = weightStep(exercise.equipment);
+  const basis =
+    set.plannedWeight !== null && exercise.estimated1rm !== null && set.planned
+      ? `Suggested from the previous strength estimate (${exercise.estimated1rm} kg), prescribed ${set.planned.percent}%, rounded up to ${step} kg increments.`
+      : exercise.target80 !== null || exercise.estimated1rm !== null
+        ? `Suggested from the saved strength target, rounded to ${step} kg increments.`
+        : exercise.latestWeight !== null
+          ? `Starting suggestion from the last saved load (${exercise.latestWeight} kg), rounded to equipment increments.`
+          : 'Default starting load; no personalised strength or previous-load basis is available. Choose a suitable load.';
+  return `${basis} Your edits change this workout's entered load; the original prescription stays saved.`;
 }
