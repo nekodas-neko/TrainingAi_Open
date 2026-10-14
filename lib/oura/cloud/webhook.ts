@@ -16,8 +16,11 @@ import { z } from 'zod'
 import { safeCompare } from '@/lib/security/constant-time'
 import type { OuraOAuthConfig } from './config'
 import { OuraUnavailableError } from './client'
-import { fetchOuraDocument, OuraForbiddenError, OuraUnauthorizedError } from './data'
-import { mapOuraDocuments, OURA_DOCUMENT_TYPES, type OuraDocumentType } from './documents'
+import type { WorkoutRepository } from '@/lib/data/repository'
+import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
+import { fetchOuraDocument, fetchOuraHeartRate, OuraForbiddenError, OuraUnauthorizedError } from './data'
+import { mapHeartRateRows, mapOuraDocuments, OURA_DOCUMENT_TYPES, type OuraDocumentType } from './documents'
+import { reportOuraCloudIssue } from './report'
 import { writeOuraCloudData, type OuraCloudWriteCounts, type OuraCloudWriter } from './ingest'
 import { getOuraAccessToken, OuraReauthRequiredError, type OuraTokenStore } from './tokens'
 
@@ -124,8 +127,10 @@ export type OuraWebhookOutcome =
   | { result: 'forbidden' }
 
 export type OuraWebhookDeps = {
-  repo: OuraCloudWriter & OuraTokenStore & { getUserIdByOuraUserId(ouraUserId: string): Promise<string | null> }
+  repo: OuraCloudWriter & OuraTokenStore & OuraHeartRateReader & { getUserIdByOuraUserId(ouraUserId: string): Promise<string | null> }
   config: OuraOAuthConfig
+  /** Starts the heart-rate catch-up for a user; replaceable for tests. Default: `startOuraCloudHeartRateCatchUp`. */
+  heartRate?: (userId: string) => void
 }
 
 function isStoredType(t: string): t is OuraDocumentType {
@@ -152,6 +157,7 @@ export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraW
     const doc = await fetchOuraDocument(token, event.data_type, event.object_id)
     if (!doc) return { result: 'not_found' }
     const counts = await writeOuraCloudData(deps.repo, userId, mapOuraDocuments([doc]))
+    if (HEART_RATE_TRIGGERS.has(event.data_type)) (deps.heartRate ?? (u => startOuraCloudHeartRateCatchUp(deps, u)))(userId)
     return { result: 'written', counts }
   } catch (err) {
     if (err instanceof OuraReauthRequiredError || err instanceof OuraUnauthorizedError) return { result: 'reauth' }
@@ -163,4 +169,62 @@ export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraW
 /** True for a failure worth Oura's retry (Oura unreachable, slow or rate limiting us); the route answers 503. */
 export function isRetryableOuraError(err: unknown): boolean {
   return err instanceof OuraUnavailableError
+}
+
+// ── Heart rate ────────────────────────────────────────────────────────────────────────────────
+//
+// Oura has no heart-rate webhook (spec `ExtApiV2DataType`), so without this `oura_heartrate` would
+// stop at the connect backfill. A sleep, daily activity or workout event means the ring has synced,
+// so each one also reads the series from the newest `oura_cloud` point to now. It runs after the
+// answer, never inside it: Oura wants the event answered within 10 s and a heart-rate read is
+// another request set. One sync fans out into several of these events, so a user's catch-up runs
+// at most once per `HEART_RATE_MIN_INTERVAL_MS` in this process.
+
+/** The events that start a heart-rate catch-up. */
+export const HEART_RATE_TRIGGERS: ReadonlySet<string> = new Set(['sleep', 'daily_activity', 'workout'])
+/** The furthest back one catch-up reads; the connect backfill and the agent job cover older gaps. */
+export const HEART_RATE_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000
+export const HEART_RATE_MIN_INTERVAL_MS = 5 * 60 * 1000
+
+export type OuraHeartRateReader = Pick<WorkoutRepository, 'getLatestOuraCloudHeartrateAt' | 'getUserById'>
+
+/**
+ * Reads the user's heart rate from the newest stored `oura_cloud` point (at most a week back) to now,
+ * and writes it through `upsertOuraCloudHeartrate` with the user's timezone. Returns points written,
+ * or `null` when the user has no usable connection.
+ */
+export async function catchUpOuraCloudHeartRate(
+  deps: Pick<OuraWebhookDeps, 'repo' | 'config'>, userId: string, now = Date.now(),
+): Promise<number | null> {
+  const token = await getOuraAccessToken(deps.repo, deps.config, userId)
+  if (!token) return null
+  const floor = new Date(now - HEART_RATE_LOOKBACK_MS)
+  const newest = await deps.repo.getLatestOuraCloudHeartrateAt(userId, floor)
+  const user = await deps.repo.getUserById(userId)
+  const tz = user?.timezone ?? DEFAULT_TZ
+  // From the newest point itself: re-reading it is an idempotent upsert, and a strictly-later start
+  // could drop a point Oura stamped at that same second.
+  const got = await fetchOuraHeartRate(token, newest ?? floor, new Date(now))
+  const points = mapHeartRateRows(got.rows)
+  return points.length === 0 ? 0 : deps.repo.upsertOuraCloudHeartrate(userId, points, tz)
+}
+
+const heartRateLastRun = new Map<string, number>()
+
+/** Starts `catchUpOuraCloudHeartRate` in the background, throttled per user. Never throws. */
+export function startOuraCloudHeartRateCatchUp(deps: Pick<OuraWebhookDeps, 'repo' | 'config'>, userId: string, now = Date.now()): void {
+  const last = heartRateLastRun.get(userId)
+  if (last !== undefined && now - last < HEART_RATE_MIN_INTERVAL_MS) return
+  heartRateLastRun.set(userId, now)
+  catchUpOuraCloudHeartRate(deps, userId, now).catch(err => {
+    if (err instanceof OuraReauthRequiredError || err instanceof OuraUnauthorizedError || err instanceof OuraForbiddenError) return
+    const message = err instanceof Error ? err.message : 'unknown'
+    console.warn(`[oura] heart-rate catch-up failed: ${message}`)
+    reportOuraCloudIssue('webhook-heartrate:failed', message, { userId })
+  })
+}
+
+/** Test seam: forget the per-user throttle. */
+export function resetOuraCloudHeartRateThrottle(): void {
+  heartRateLastRun.clear()
 }

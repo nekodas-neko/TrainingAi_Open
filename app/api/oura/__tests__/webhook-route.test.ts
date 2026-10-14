@@ -11,6 +11,8 @@ const USER = '11111111-1111-4111-8111-111111111111'
 const ORIGIN = 'http://localhost:3000'
 const rateLimit = vi.fn(() => true)
 const reportServerError = vi.fn()
+/** `report.ts` loads `@/lib/observability` lazily, so a report lands a few ticks after the call. */
+const settle = () => new Promise(resolve => setTimeout(resolve, 20))
 let row: OuraCloudTokenRow | null = null
 const written: string[] = []
 const repo = {
@@ -31,6 +33,7 @@ vi.mock('@/lib/data', () => ({ getRepositoryAsync: async () => repo }))
 vi.mock('@/lib/observability', () => ({ reportServerError: (...a: unknown[]) => reportServerError(...a) }))
 
 import { GET, POST } from '../webhook/route'
+import { resetOuraCloudReportThrottle } from '@/lib/oura/cloud/report'
 
 const ENV = {
   OURA_CLIENT_ID: 'cid',
@@ -73,6 +76,7 @@ describe('/api/oura/webhook (#2859)', () => {
     written.length = 0
     rateLimit.mockReturnValue(true)
     reportServerError.mockReset()
+    resetOuraCloudReportThrottle()
     fetchMock.mockReset()
     vi.stubGlobal('fetch', fetchMock)
   })
@@ -92,9 +96,15 @@ describe('/api/oura/webhook (#2859)', () => {
       expect(res.status).toBe(401)
       expect(JSON.stringify(await res.json())).not.toContain('abc123')
     })
-    it('answers 400 without a challenge or with unknown parameters', async () => {
+    it('answers 400 without a challenge', async () => {
       expect((await GET(verifyReq({ verification_token: 'verify-me' }))).status).toBe(400)
-      expect((await GET(verifyReq({ verification_token: 'verify-me', challenge: 'c', extra: '1' }))).status).toBe(400)
+    })
+    // A parameter Oura adds later must not fail every subscription's verification (#2895 review).
+    it('ignores a parameter it does not know, and still checks the token', async () => {
+      const ok = await GET(verifyReq({ verification_token: 'verify-me', challenge: 'c', extra: '1' }))
+      expect(ok.status).toBe(200)
+      expect(await ok.json()).toEqual({ challenge: 'c' })
+      expect((await GET(verifyReq({ verification_token: 'guess', challenge: 'c', extra: '1' }))).status).toBe(401)
     })
     it('answers 503 when the webhook is not configured, and checks nothing', async () => {
       delete process.env.OURA_WEBHOOK_VERIFICATION_TOKEN
@@ -123,6 +133,25 @@ describe('/api/oura/webhook (#2859)', () => {
       }
       expect(repo.getUserIdByOuraUserId).not.toHaveBeenCalled()
       expect(fetchMock).not.toHaveBeenCalled()
+      // Each refusal is recorded once per kind, with which headers came and never their values.
+      await vi.waitFor(() => expect(reportServerError).toHaveBeenCalledTimes(3))
+      const messages = reportServerError.mock.calls.map(c => (c[0] as Error).message).sort()
+      expect(messages[0]).toMatch(/webhook-signature:mismatch.*x-oura-signature present/)
+      expect(messages[1]).toMatch(/webhook-signature:missing.*x-oura-signature absent, x-oura-timestamp present/)
+      expect(messages[2]).toMatch(/webhook-signature:stale/)
+      for (const m of messages) {
+        expect(m).not.toContain('csecret')
+        expect(m).not.toContain('rd-1')
+        expect(m).not.toMatch(/[0-9A-F]{64}/)
+      }
+    })
+
+    it('records a repeated refusal of the same kind at most once an hour', async () => {
+      await POST(eventReq(EVENT, { secret: 'not-the-secret' }))
+      await POST(eventReq(EVENT, { secret: 'not-the-secret' }))
+      await vi.waitFor(() => expect(reportServerError).toHaveBeenCalled())
+      await settle()
+      expect(reportServerError).toHaveBeenCalledOnce()
     })
 
     it('answers 400 for a signed body that is not the spec\'s event', async () => {

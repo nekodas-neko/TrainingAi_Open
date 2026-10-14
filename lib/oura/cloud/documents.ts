@@ -230,6 +230,13 @@ const SLEEP_TYPES = new Set(['sleep', 'long_sleep', 'late_nap'])
 const hours = (sec: number | null | undefined) => (sec == null ? null : sec / 3600)
 
 /**
+ * **Held back until #2860: Oura's readiness, sleep and activity contributors and the stress
+ * `day_summary`.** They are parsed (the spec requires them) but not written. Stored in `oura_daily`,
+ * they would win over our own on the Sleep and Activity screens: `readiness-payload.ts` prefers
+ * Oura's contributors when present, and the device's local store syncs the same columns and reads
+ * them directly. That is a visible change to a scoring surface, which needs the owner's yes.
+ * Choosing per field between Oura's and ours is #2860's job; it adds them back.
+ *
  * Turns documents into rows. Several documents for one day (readiness, sleep score, activity …)
  * become one `oura_daily` row and one `body_metrics` row, because the upsert cannot touch a row twice
  * in one statement. Only fields the spec provides are set; everything else stays absent so the
@@ -262,12 +269,11 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
           readinessScore: doc.score ?? null,
           temperatureDeviation: doc.temperature_deviation ?? null,
           temperatureTrendDeviation: doc.temperature_trend_deviation ?? null,
-          readinessContributors: doc.contributors,
         })
         break
       }
       case 'daily_sleep':
-        Object.assign(day(doc.day), { sleepScore: doc.score ?? null, sleepContributors: doc.contributors })
+        day(doc.day).sleepScore = doc.score ?? null
         break
       case 'daily_activity':
         Object.assign(day(doc.day), {
@@ -285,7 +291,6 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
           highActivityMetMinutes: doc.high_activity_met_minutes,
           mediumActivityMetMinutes: doc.medium_activity_met_minutes,
           lowActivityMetMinutes: doc.low_activity_met_minutes,
-          activityContributors: doc.contributors,
         })
         Object.assign(bodyDay(doc.day), { steps: doc.steps, activeCalories: doc.active_calories })
         break
@@ -297,7 +302,6 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
         Object.assign(day(doc.day), {
           stressHigh: doc.stress_high ?? null,
           recoveryHigh: doc.recovery_high ?? null,
-          daySummary: doc.day_summary ?? null,
         })
         break
       case 'daily_resilience':

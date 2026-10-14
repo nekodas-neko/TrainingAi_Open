@@ -4,7 +4,7 @@ import { getRepositoryAsync } from "@/lib/data";
 import { formatInTimeZone } from "date-fns-tz";
 import { DEFAULT_TZ } from "@trainingai/shared/date-utils";
 import { mergeByDate } from "@/lib/sleep/merge-sessions";
-import { isNightProvisional } from "@/lib/sleep/provisional";
+import { isNightProvisional, isRingRollupNight } from "@/lib/sleep/provisional";
 
 export async function GET() {
   const session = await auth();
@@ -62,12 +62,17 @@ export async function GET() {
   // stored flag is only as fresh as the last write to that row, and the thing it describes changes
   // without the row changing. It is also why a provisional night must be left out of the
   // recent-nights average it is compared against — that average moved too.
+  //
+  // Only a night the ring's rollup derived is measured against that watermark (#2895): an Oura Cloud,
+  // Health Connect or typed-in night is final as stored. The merged row keeps one fragment's id, so
+  // the date is judged by whether any of its rows is the rollup's.
   const coverageEndMs = coverageEnd?.getTime() ?? null;
+  const ringDates = new Set(rows.filter(r => isRingRollupNight(r.ouraId)).map(r => r.date));
   const withProvisional = merged.map(r => ({
     ...r,
     // A merged row without an end is not a night whose end can still move — `mergeByDate` only
     // drops the field when no cluster survived, and there is nothing to badge.
-    provisional: r.sleepEnd != null && isNightProvisional(new Date(r.sleepEnd).getTime(), coverageEndMs),
+    provisional: ringDates.has(r.date) && r.sleepEnd != null && isNightProvisional(new Date(r.sleepEnd).getTime(), coverageEndMs),
   }));
 
   return NextResponse.json(withProvisional, { headers: { "Cache-Control": "private, no-store" } });

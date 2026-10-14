@@ -7,8 +7,10 @@ import { encryptOuraToken } from '../token-cipher'
 import { OuraUnavailableError } from '../client'
 import { NO_WRITES } from '../ingest'
 import {
-  handleOuraWebhookEvent, MAX_EVENT_AGE_MS, ouraWebhookConfig, verifyOuraSignature, type OuraWebhookDeps,
+  catchUpOuraCloudHeartRate, handleOuraWebhookEvent, HEART_RATE_LOOKBACK_MS, MAX_EVENT_AGE_MS, ouraWebhookConfig,
+  resetOuraCloudHeartRateThrottle, startOuraCloudHeartRateCatchUp, verifyOuraSignature, type OuraWebhookDeps,
 } from '../webhook'
+import type { User } from '@trainingai/shared/types'
 import { FIXTURES, jsonResponse, OURA_USER } from './fixtures'
 
 const USER = '11111111-1111-4111-8111-111111111111'
@@ -73,10 +75,12 @@ describe('handleOuraWebhookEvent (#2859)', () => {
   const savedKey = process.env.OURA_TOKEN_KEY
   let row: OuraCloudTokenRow | null
   const writes = { daily: 0, sleep: 0, tombstoned: [] as string[] }
+  const heartRate = vi.fn()
 
   function deps(): OuraWebhookDeps {
     return {
       config: CONFIG,
+      heartRate,
       repo: {
         getUserIdByOuraUserId: async id => (id === OURA_USER && row ? USER : null),
         getOuraCloudTokens: async id => (row && id === row.userId ? row : null),
@@ -88,6 +92,8 @@ describe('handleOuraWebhookEvent (#2859)', () => {
         tombstoneOuraCloudSleep: async (_u, ids) => { writes.tombstoned.push(...ids); return ids.length },
         upsertOuraWorkouts: async (_u, rows) => rows.length,
         upsertOuraCloudHeartrate: async (_u, rows) => rows.length,
+        getLatestOuraCloudHeartrateAt: async () => null,
+        getUserById: async () => ({ id: USER, timezone: 'Australia/Brisbane' }) as User,
       },
     }
   }
@@ -101,6 +107,7 @@ describe('handleOuraWebhookEvent (#2859)', () => {
       expiresAt: new Date(Date.now() + 86_400_000), scope: 'daily', ouraUserId: OURA_USER, updatedAt: new Date(),
     }
     writes.daily = 0; writes.sleep = 0; writes.tombstoned = []
+    heartRate.mockReset()
     fetchMock.mockReset()
     vi.stubGlobal('fetch', fetchMock)
   })
@@ -175,5 +182,96 @@ describe('handleOuraWebhookEvent (#2859)', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ error: 'invalid_grant' }, 400))
     expect(await handleOuraWebhookEvent(deps(), event())).toEqual({ result: 'reauth' })
     expect(String(fetchMock.mock.calls[0][0])).toBe(OURA_TOKEN_URL)
+  })
+
+  // #2895 review, item 3: Oura has no heart-rate webhook, so these events start a catch-up.
+  it('starts a heart-rate catch-up after a sleep, daily_activity or workout event, and only then', async () => {
+    for (const [type, id] of [['sleep', 'sl-1'], ['daily_activity', 'da-1'], ['workout', 'wo-1']] as const) {
+      fetchMock.mockResolvedValueOnce(jsonResponse(FIXTURES[type]))
+      expect(await handleOuraWebhookEvent(deps(), event({ data_type: type, object_id: id }))).toMatchObject({ result: 'written' })
+    }
+    expect(heartRate.mock.calls).toEqual([[USER], [USER], [USER]])
+    fetchMock.mockResolvedValueOnce(jsonResponse(FIXTURES.daily_readiness))
+    await handleOuraWebhookEvent(deps(), event())
+    expect(heartRate).toHaveBeenCalledTimes(3)
+  })
+})
+
+describe('catchUpOuraCloudHeartRate (#2895)', () => {
+  const fetchMock = vi.fn<typeof fetch>()
+  const savedKey = process.env.OURA_TOKEN_KEY
+  const now = Date.parse('2026-10-14T02:00:00Z')
+  let newest: Date | null
+  let since: Date | null
+  const upserts: { points: number; tz: string }[] = []
+
+  const deps = (timezone: string | null = 'Australia/Brisbane'): Pick<OuraWebhookDeps, 'repo' | 'config'> => ({
+    config: CONFIG,
+    repo: {
+      getUserIdByOuraUserId: async () => USER,
+      getOuraCloudTokens: async () => ({
+        userId: USER,
+        accessToken: encryptOuraToken('acc', USER, 'access_token'),
+        refreshToken: encryptOuraToken('ref', USER, 'refresh_token'),
+        expiresAt: new Date(Date.now() + 86_400_000), scope: 'heartrate', ouraUserId: OURA_USER, updatedAt: new Date(),
+      }),
+      saveOuraCloudTokens: async () => {},
+      deleteOuraCloudTokens: async () => true,
+      upsertOuraDaily: async () => {},
+      upsertBodyMetrics: async () => {},
+      upsertOuraCloudSleep: async () => ({ written: 0, skippedOverlap: 0 }),
+      tombstoneOuraCloudSleep: async () => 0,
+      upsertOuraWorkouts: async () => 0,
+      upsertOuraCloudHeartrate: async (_u, rows, tz) => { upserts.push({ points: rows.length, tz }); return rows.length },
+      getLatestOuraCloudHeartrateAt: async (_u, from) => { since = from; return newest },
+      getUserById: async () => ({ id: USER, timezone }) as User,
+    },
+  })
+
+  beforeEach(() => {
+    process.env.OURA_TOKEN_KEY = 'k'.repeat(48)
+    newest = null; since = null; upserts.length = 0
+    resetOuraCloudHeartRateThrottle()
+    fetchMock.mockReset()
+    fetchMock.mockImplementation(async () => jsonResponse({
+      data: [
+        { timestamp: '2026-10-14T01:00:00+00:00', bpm: 61, source: 'awake' },
+        { timestamp: '2026-10-14T01:05:00+00:00', bpm: 400, source: 'awake' },
+      ],
+      next_token: null,
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+  })
+  afterEach(() => {
+    process.env.OURA_TOKEN_KEY = savedKey
+    vi.unstubAllGlobals()
+  })
+
+  it('reads from the newest oura_cloud point to now and writes in the user\'s timezone', async () => {
+    newest = new Date('2026-10-13T22:30:00Z')
+    expect(await catchUpOuraCloudHeartRate(deps(), USER, now)).toBe(1)
+    const url = new URL(String(fetchMock.mock.calls[0][0]))
+    expect(url.pathname).toBe('/v2/usercollection/heartrate')
+    expect(url.searchParams.get('start_datetime')).toBe('2026-10-13T22:30:00.000Z')
+    expect(url.searchParams.get('end_datetime')).toBe('2026-10-14T02:00:00.000Z')
+    expect(since?.getTime()).toBe(now - HEART_RATE_LOOKBACK_MS)
+    // The implausible 400 bpm is dropped, not clamped.
+    expect(upserts).toEqual([{ points: 1, tz: 'Australia/Brisbane' }])
+  })
+
+  it('reads at most a week back when there is no Cloud point yet, with the default timezone for a user without one', async () => {
+    await catchUpOuraCloudHeartRate(deps(null), USER, now)
+    const url = new URL(String(fetchMock.mock.calls[0][0]))
+    expect(Date.parse(url.searchParams.get('start_datetime')!)).toBe(now - HEART_RATE_LOOKBACK_MS)
+    expect(upserts[0].tz).toBe('Australia/Brisbane')
+  })
+
+  it('runs at most once per user in five minutes when one sync fans out into several events', async () => {
+    startOuraCloudHeartRateCatchUp(deps(), USER, now)
+    startOuraCloudHeartRateCatchUp(deps(), USER, now + 60_000)
+    await vi.waitFor(() => expect(upserts).toHaveLength(1))
+    startOuraCloudHeartRateCatchUp(deps(), USER, now + 6 * 60_000)
+    await vi.waitFor(() => expect(upserts).toHaveLength(2))
+    expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 })

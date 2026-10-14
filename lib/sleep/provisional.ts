@@ -46,3 +46,17 @@ export function isNightProvisional(sleepEndMs: number, coverageEndMs: number | n
   if (coverageEndMs == null) return false;
   return coverageEndMs - sleepEndMs < PROVISIONAL_COVERAGE_MARGIN_MS;
 }
+
+/**
+ * True for a night the ring's own rollup derived (`oura_ble`, `oura_id` `ble:…`): the only kind the
+ * rollup watermark says anything about.
+ *
+ * Every other night is final as stored. An Oura Cloud night (`oura_cloud`, #2859) arrives finished
+ * from Oura's own processing, and after the switch to the Cloud feed the BLE watermark stops moving:
+ * measured against it, every Cloud night would read provisional forever, the morning hand-off would
+ * wait for a night that never settles, and the Sleep screens would say "still updating" indefinitely.
+ * A Health Connect or typed-in night was never the rollup's either.
+ */
+export function isRingRollupNight(ouraId: string | null | undefined): boolean {
+  return ouraId?.startsWith('ble:') ?? false;
+}

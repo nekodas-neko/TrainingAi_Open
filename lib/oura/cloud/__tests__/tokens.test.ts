@@ -27,6 +27,7 @@ function fakeStore(initial: OuraCloudTokenRow | null = null) {
       }
     },
     async deleteOuraCloudTokens(userId) { const had = row?.userId === userId; row = null; return had },
+    async getUserIdByOuraUserId(ouraUserId) { return row && row.ouraUserId === ouraUserId ? row.userId : null },
   }
   return store
 }
@@ -96,9 +97,42 @@ describe('Oura tokens: connect, refresh before expiry, disconnect (#2858)', () =
       .mockResolvedValueOnce(new Response(null, { status: 200 }))
     const store = fakeStore()
     store.saveOuraCloudTokens = async () => { throw Object.assign(new Error('dup'), { cause: { code: '23505' } }) }
+    store.getUserIdByOuraUserId = async id => (id === 'oura-taken' ? 'someone-else' : null)
     await expect(connectOuraAccount(store, CONFIG, USER, 'c')).rejects.toBeInstanceOf(OuraAccountInUseError)
     expect(String(fetchMock.mock.calls[2][0])).toBe(`${OURA_REVOKE_URL}?access_token=acc-1`)
     expect(startBackfill).not.toHaveBeenCalled()
+  })
+
+  // #2911 review: the app finishing one return twice races two saves of the same grant for the same
+  // user. The loser hits the `oura_user_id` key; the row that won is this user's, so the connect
+  // succeeded and the token must not be revoked.
+  it('a unique violation on a row this same user holds is success, and revokes nothing', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ access_token: 'acc-1', refresh_token: 'ref-1', expires_in: 86400 }))
+      .mockResolvedValueOnce(jsonResponse({ id: 'oura-mine' }))
+    const store = fakeStore()
+    const realSave = store.saveOuraCloudTokens
+    // The racing finish lands first; this one then collides on `oura_user_id`.
+    store.saveOuraCloudTokens = async (userId, input) => {
+      await realSave(userId, input)
+      throw Object.assign(new Error('dup'), { cause: { code: '23505' } })
+    }
+    await expect(connectOuraAccount(store, CONFIG, USER, 'c')).resolves.toBeUndefined()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(fetchMock.mock.calls.some(c => String(c[0]).startsWith(OURA_REVOKE_URL))).toBe(false)
+    expect(store.row()?.userId).toBe(USER)
+    expect(startBackfill).toHaveBeenCalledExactlyOnceWith(USER)
+  })
+
+  it('a unique violation with no holder found is still refused and revoked', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ access_token: 'acc-1', refresh_token: 'ref-1', expires_in: 86400 }))
+      .mockResolvedValueOnce(jsonResponse({ id: 'oura-gone' }))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+    const store = fakeStore()
+    store.saveOuraCloudTokens = async () => { throw Object.assign(new Error('dup'), { cause: { code: '23505' } }) }
+    await expect(connectOuraAccount(store, CONFIG, USER, 'c')).rejects.toBeInstanceOf(OuraAccountInUseError)
+    expect(String(fetchMock.mock.calls[2][0])).toBe(`${OURA_REVOKE_URL}?access_token=acc-1`)
   })
 
   it('connect stores nothing when the token response is malformed', async () => {

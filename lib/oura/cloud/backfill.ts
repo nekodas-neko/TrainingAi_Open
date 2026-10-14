@@ -10,13 +10,14 @@
 //   - after a connect is stored (`tokens.ts` → `startOuraConnectBackfill`), in the background, over
 //     the last `CONNECT_BACKFILL_DAYS` days;
 //   - from the agent key's `oura-cloud-backfill` job, with a dry run first.
-import { dateStrMidnightInTz, daysBetweenDateStrs, isCalendarDate, shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
+import { dateStrMidnightInTz, daysBetweenDateStrs, DEFAULT_TZ, isCalendarDate, shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { OuraUnavailableError } from './client'
 import { ouraOAuthConfig, type OuraOAuthConfig } from './config'
-import { fetchOuraDocuments, fetchOuraHeartRate, OuraForbiddenError, OuraUnauthorizedError } from './data'
+import { fetchOuraDocuments, fetchOuraHeartRate, OuraForbiddenError, OuraRateLimitedError, OuraUnauthorizedError } from './data'
 import { mapHeartRateRows, mapOuraDocuments, OURA_DOCUMENT_TYPE_NAMES, type OuraDocument, type OuraDocumentType } from './documents'
 import { NO_WRITES, plannedCounts, writeOuraCloudData, type OuraCloudWriteCounts, type OuraCloudWriter } from './ingest'
+import { reportOuraCloudIssue } from './report'
 import { getOuraAccessToken, OuraReauthRequiredError, type OuraTokenStore } from './tokens'
 
 /** How far back a new connection reads. Inside the 180-day heart-rate retention. */
@@ -26,6 +27,9 @@ export const MAX_BACKFILL_DAYS = 366
 /** Documents are read 30 days a request, heart rate 7 days a request, to keep each page set small. */
 const DOC_CHUNK_DAYS = 30
 const HR_CHUNK_DAYS = 7
+/** A 429 whose Retry-After is at most this long is waited out, up to `MAX_RATE_LIMIT_WAITS` times a run. */
+export const MAX_RATE_LIMIT_WAIT_MS = 60 * 1000
+export const MAX_RATE_LIMIT_WAITS = 3
 
 export interface OuraBackfillOptions {
   /** Inclusive local days, `YYYY-MM-DD`. */
@@ -56,6 +60,8 @@ export interface OuraBackfillReport {
 export type OuraBackfillDeps = {
   repo: OuraCloudWriter & OuraTokenStore
   config: OuraOAuthConfig
+  /** How a Retry-After is waited out; replaceable for tests. */
+  wait?: (ms: number) => Promise<void>
 }
 
 export type OuraBackfillResult =
@@ -91,6 +97,22 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
   const report: OuraBackfillReport = {
     dryRun: opts.dryRun, from: opts.from, to: opts.to, documents: {}, dropped: 0, counts: NO_WRITES, forbidden: [], stoppedEarly: null,
   }
+  // Oura's 429 carries a Retry-After. A short one is waited out and the same request made again; a
+  // long or missing one stops the run, and the stop is reported (`startOuraConnectBackfill`).
+  const wait = deps.wait ?? ((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)))
+  let waits = 0
+  const withRetry = async <T>(call: () => Promise<T>): Promise<T> => {
+    for (;;) {
+      try {
+        return await call()
+      } catch (err) {
+        if (!(err instanceof OuraRateLimitedError) || err.retryAfterMs == null ||
+            err.retryAfterMs > MAX_RATE_LIMIT_WAIT_MS || waits >= MAX_RATE_LIMIT_WAITS) throw err
+        waits++
+        await wait(err.retryAfterMs)
+      }
+    }
+  }
   const stop = (err: unknown): boolean => {
     if (err instanceof OuraUnauthorizedError) { report.stoppedEarly = 'Oura refused the access token; the user has to connect again'; return true }
     if (err instanceof OuraUnavailableError) { report.stoppedEarly = err.message; return true }
@@ -103,7 +125,7 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
   read: for (const type of OURA_DOCUMENT_TYPE_NAMES) {
     for (const [from, to] of chunks(opts.from, opts.to, DOC_CHUNK_DAYS)) {
       try {
-        const got = await fetchOuraDocuments(token, type, from, to)
+        const got = await withRetry(() => fetchOuraDocuments(token, type, from, to))
         docs.push(...got.docs)
         report.documents[type] = (report.documents[type] ?? 0) + got.docs.length
         report.dropped += got.dropped
@@ -120,7 +142,7 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
   if (opts.heartRate && !report.stoppedEarly) {
     for (const [from, to] of chunks(opts.from, opts.to, HR_CHUNK_DAYS)) {
       try {
-        const got = await fetchOuraHeartRate(token, dateStrMidnightInTz(from, opts.tz), dateStrMidnightInTz(shiftDateStr(to, 1), opts.tz))
+        const got = await withRetry(() => fetchOuraHeartRate(token, dateStrMidnightInTz(from, opts.tz), dateStrMidnightInTz(shiftDateStr(to, 1), opts.tz)))
         const points = mapHeartRateRows(got.rows)
         report.documents.heartrate = (report.documents.heartrate ?? 0) + got.rows.length
         report.dropped += got.dropped
@@ -156,13 +178,19 @@ export function startOuraConnectBackfill(userId: string): void {
       const { getRepositoryAsync } = await import('@/lib/data')
       const repo: WorkoutRepository = await getRepositoryAsync()
       const user = await repo.getUserById(userId)
-      const tz = user?.timezone || 'UTC'
+      const tz = user?.timezone ?? DEFAULT_TZ
       const to = todayInTz(tz)
       const result = await backfillOuraCloud({ repo, config }, userId, {
         from: shiftDateStr(to, -(CONNECT_BACKFILL_DAYS - 1)), to, dryRun: false, heartRate: true, tz,
       })
-      if (!result.ok) console.warn(`[oura] connect backfill did not run: ${result.error}`)
-      else if (result.report.stoppedEarly) console.warn(`[oura] connect backfill stopped early: ${result.report.stoppedEarly}`)
+      // A connect whose history did not arrive is otherwise invisible: the account reads connected.
+      if (!result.ok) {
+        console.warn(`[oura] connect backfill did not run: ${result.error}`)
+        reportOuraCloudIssue(`connect-backfill:${result.error}`, 'the connect backfill did not run', { userId })
+      } else if (result.report.stoppedEarly) {
+        console.warn(`[oura] connect backfill stopped early: ${result.report.stoppedEarly}`)
+        reportOuraCloudIssue('connect-backfill:stopped-early', result.report.stoppedEarly, { userId })
+      }
     } catch (err) {
       const { reportServerError } = await import('@/lib/observability')
       reportServerError(err, { userId, url: 'oura:connect-backfill' })

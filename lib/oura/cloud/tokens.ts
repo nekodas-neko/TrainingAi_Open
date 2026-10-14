@@ -23,6 +23,7 @@ export interface OuraTokenStore {
   getOuraCloudTokens(userId: string): Promise<OuraCloudTokenRow | null>
   saveOuraCloudTokens(userId: string, input: SaveOuraCloudTokensInput): Promise<void>
   deleteOuraCloudTokens(userId: string): Promise<boolean>
+  getUserIdByOuraUserId(ouraUserId: string): Promise<string | null>
 }
 
 /** The Oura account is already linked to another user here (`oura_tokens.oura_user_id` is unique). */
@@ -91,12 +92,17 @@ export async function storeOuraGrant(
       ouraUserId: grant.ouraUserId,
     })
   } catch (err) {
-    if (isUniqueViolation(err)) {
+    if (!isUniqueViolation(err)) throw err
+    // The only other unique key is `oura_user_id`. Two finishes of the same connect racing each
+    // other (the app delivering one return twice) collide on it too: both insert for this user, and
+    // `ON CONFLICT (user_id)` covers only one key. Then the row that won is this user's, holding the
+    // same grant, and revoking would kill the token just stored (#2911 review).
+    const holder = await store.getUserIdByOuraUserId(grant.ouraUserId)
+    if (holder !== userId) {
       // Do not leave a live grant behind for an account we refused to store.
       await revokeAccessToken(grant.accessToken)
       throw new OuraAccountInUseError()
     }
-    throw err
   }
   afterConnect(userId)
 }

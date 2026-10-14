@@ -4,7 +4,9 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 
 const backfill = vi.hoisted(() => vi.fn())
 const renewal = vi.hoisted(() => vi.fn())
-vi.mock('@/lib/oura/cloud/backfill', () => ({ backfillOuraCloud: backfill, CONNECT_BACKFILL_DAYS: 90 }))
+vi.mock('@/lib/oura/cloud/backfill', async importActual => ({
+  ...(await importActual<typeof import('@/lib/oura/cloud/backfill')>()), backfillOuraCloud: backfill,
+}))
 vi.mock('@/lib/oura/cloud/renewal', () => ({ runOuraWebhookRenewal: renewal }))
 
 import { AgentActionRequest, agentJobLosesData, runAgentJob, type AgentJobContext } from '../jobs'
@@ -45,6 +47,24 @@ describe('oura-cloud-backfill (#2859)', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  // #2895 review, nit 10: a write runs after the answer; its log row is finished when it ends.
+  it('answers 202 for a write and finishes the log row when the run ends', async () => {
+    let release!: (v: unknown) => void
+    backfill.mockReturnValue(new Promise(r => { release = r }))
+    const out = await runAgentJob(ctx, AgentActionRequest.parse(req('oura-cloud-backfill', { dryRun: false, from: '2026-10-01', to: '2026-10-12' })))
+    expect(out.status).toBe(202)
+    expect('pending' in out.finish).toBe(true)
+    release({ ok: true, report: { ...report, dryRun: false } })
+    const finish = await (out.finish as { pending: Promise<unknown> }).pending
+    expect(finish).toEqual({ outcome: 'succeeded', affectedRows: 12 + 12 + 12 + 0 + 2 + 3000, daysMoved: 12, error: null })
+  })
+
+  it('refuses a backwards range before starting anything', async () => {
+    const out = await runAgentJob(ctx, AgentActionRequest.parse(req('oura-cloud-backfill', { dryRun: false, from: '2026-10-12', to: '2026-10-01' })))
+    expect(out.status).toBe(400)
+    expect(backfill).not.toHaveBeenCalled()
   })
 
   it('reports a not-connected owner as refused', async () => {

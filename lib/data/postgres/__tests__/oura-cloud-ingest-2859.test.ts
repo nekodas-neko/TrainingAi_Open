@@ -70,12 +70,16 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
   const rawArchiveCount = async () =>
     Number((await pool.query(`SELECT (SELECT count(*) FROM oura_raw_samples WHERE user_id = $1) + (SELECT count(*) FROM oura_raw_packed WHERE user_id = $1) AS n`, [USER])).rows[0].n)
 
-  async function webhookAll() {
+  /** Every fixture as a webhook event. Returns who a heart-rate catch-up was started for; the
+   *  catch-up itself is not started, so no background write races these tests' counts. */
+  async function webhookAll(): Promise<string[]> {
     const { handleOuraWebhookEvent } = await import('@/lib/oura/cloud/webhook')
+    const heartRateFor: string[] = []
     for (const [type, doc] of Object.entries(FIXTURES)) {
-      const out = await handleOuraWebhookEvent({ repo, config: CONFIG }, { event_type: 'update', data_type: type, object_id: doc.id, user_id: OURA_USER })
+      const out = await handleOuraWebhookEvent({ repo, config: CONFIG, heartRate: u => heartRateFor.push(u) }, { event_type: 'update', data_type: type, object_id: doc.id, user_id: OURA_USER })
       expect(out.result, type).toBe('written')
     }
+    return heartRateFor
   }
 
   it('routes the event to the user and lands every field with oura_cloud provenance', async () => {
@@ -84,16 +88,20 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
 
     const daily = await one(`SELECT * FROM oura_daily WHERE user_id = $1`)
     const dailyCols = [
-      'readiness_score', 'temperature_deviation', 'temperature_trend_deviation', 'readiness_contributors',
-      'sleep_score', 'sleep_contributors', 'activity_score', 'active_calories', 'total_calories', 'equivalent_walking_distance',
+      'readiness_score', 'temperature_deviation', 'temperature_trend_deviation',
+      'sleep_score', 'activity_score', 'active_calories', 'total_calories', 'equivalent_walking_distance',
       'high_activity_time_sec', 'medium_activity_time_sec', 'low_activity_time_sec', 'sedentary_time_sec', 'non_wear_time_sec',
-      'activity_contributors', 'resting_time_sec', 'avg_met_minutes', 'high_activity_met_minutes', 'medium_activity_met_minutes',
-      'low_activity_met_minutes', 'stress_high', 'recovery_high', 'day_summary', 'vo2_max', 'vascular_age', 'pulse_wave_velocity',
+      'resting_time_sec', 'avg_met_minutes', 'high_activity_met_minutes', 'medium_activity_met_minutes',
+      'low_activity_met_minutes', 'stress_high', 'recovery_high', 'vo2_max', 'vascular_age', 'pulse_wave_velocity',
       'resilience_level', 'resilience_contributors', 'breathing_disturbance_index',
     ]
     for (const c of dailyCols) {
       expect(daily[c], c).not.toBeNull()
       expect(daily.source_map[c], c).toBe('oura_cloud')
+    }
+    // Held back until #2860 (#2895 review): these would replace our own on the Sleep and Activity screens.
+    for (const c of ['readiness_contributors', 'sleep_contributors', 'activity_contributors', 'day_summary']) {
+      expect(daily[c], c).toBeNull()
     }
     expect(daily.date.toISOString?.() ?? daily.date).toContain('2026-10-')
     expect(daily.stress_high).toBe(5400)
@@ -162,14 +170,25 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
     const write = (doc: unknown) => repo.upsertOuraCloudSleep(USER, mapOuraDocuments([{ type: 'sleep', doc: SleepDoc.parse(doc) }]).sleep)
     await write(sleepPeriod)
     const [{ id }] = (await pool.query(`SELECT id FROM sleep_sessions WHERE user_id = $1`, [USER])).rows
-    await write({ ...sleepPeriod, bedtime_start: '2026-10-09T22:40:00+10:00', total_sleep_duration: 25500 })
-    const moved = (await pool.query(`SELECT id, sleep_start, duration_hours FROM sleep_sessions WHERE user_id = $1`, [USER])).rows
+    // Oura re-analyses the night: a later start, a later end, and (past midnight) the next day.
+    await write({ ...sleepPeriod, day: '2026-10-11', bedtime_start: '2026-10-09T22:40:00+10:00', bedtime_end: '2026-10-10T07:15:00+10:00', total_sleep_duration: 25500 })
+    const moved = (await pool.query(`SELECT id, date::text AS date, sleep_start, sleep_end, duration_hours FROM sleep_sessions WHERE user_id = $1`, [USER])).rows
     expect(moved).toHaveLength(1)
     expect(moved[0].id).toBe(id)
     expect(moved[0].sleep_start.toISOString()).toBe('2026-10-09T12:40:00.000Z')
+    expect(moved[0].sleep_end.toISOString()).toBe('2026-10-09T21:15:00.000Z')
+    expect(moved[0].date).toBe('2026-10-11')
+    expect(moved[0].duration_hours).toBeCloseTo(25500 / 3600, 5)
+
+    // Re-sent with only its end moved (same start): the end and day still follow.
+    await write({ ...sleepPeriod, day: '2026-10-10', bedtime_start: '2026-10-09T22:40:00+10:00', bedtime_end: '2026-10-10T06:50:00+10:00' })
+    const same = await one(`SELECT id, date::text AS date, sleep_end FROM sleep_sessions WHERE user_id = $1`)
+    expect(same.id).toBe(id)
+    expect(same.sleep_end.toISOString()).toBe('2026-10-09T20:50:00.000Z')
+    expect(same.date).toBe('2026-10-10')
 
     const { handleOuraWebhookEvent } = await import('@/lib/oura/cloud/webhook')
-    expect(await handleOuraWebhookEvent({ repo, config: CONFIG }, { event_type: 'delete', data_type: 'sleep', object_id: 'sl-1', user_id: OURA_USER }))
+    expect(await handleOuraWebhookEvent({ repo, config: CONFIG, heartRate: () => {} }, { event_type: 'delete', data_type: 'sleep', object_id: 'sl-1', user_id: OURA_USER }))
       .toEqual({ result: 'deleted', tombstoned: 1 })
     const gone = await one(`SELECT deleted_at FROM sleep_sessions WHERE user_id = $1`)
     expect(gone.deleted_at).not.toBeNull()
@@ -180,6 +199,19 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
     expect(await repo.markOuraWorkoutReviewed(USER, 'wo-1')).toBe(true)
     await webhookAll()
     expect((await one(`SELECT reviewed FROM oura_workouts WHERE user_id = $1`)).reviewed).toBe(true)
+  })
+
+  // #2895 review, item 3: Oura has no heart-rate webhook; sleep, activity and workout events start a
+  // catch-up from the newest Cloud point, which lands through the same cover-aware upsert.
+  it('catches heart rate up after the events that mean the ring synced', async () => {
+    expect(await webhookAll()).toEqual([USER, USER, USER])
+    const { catchUpOuraCloudHeartRate } = await import('@/lib/oura/cloud/webhook')
+    const now = Date.parse('2026-10-12T00:00:00Z')
+    expect(await catchUpOuraCloudHeartRate({ repo, config: CONFIG }, USER, now)).toBe(2)
+    const rows = (await pool.query(`SELECT bpm, source FROM oura_heartrate WHERE user_id = $1 ORDER BY timestamp`, [USER])).rows
+    expect(rows).toEqual([{ bpm: 61, source: 'oura_cloud' }, { bpm: 64, source: 'oura_cloud' }])
+    expect((await repo.getLatestOuraCloudHeartrateAt(USER, new Date(now - 7 * 86_400_000)))?.toISOString()).toBe('2026-10-10T00:05:00.000Z')
+    expect(await repo.getLatestOuraCloudHeartrateAt(USER, new Date('2026-10-11T00:00:00Z'))).toBeNull()
   })
 
   it('writes Cloud heart rate only where no ring or strap row covers it', async () => {

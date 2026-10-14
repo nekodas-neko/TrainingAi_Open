@@ -1506,6 +1506,8 @@ export interface WorkoutRepository {
   upsertOuraWorkouts(userId: string, rows: import('./postgres/slices/oura').OuraWorkoutUpsertRow[]): Promise<number>
   /** #2859: Oura Cloud's HR series (`oura_cloud`). Never displaces or duplicates a ring or strap row. */
   upsertOuraCloudHeartrate(userId: string, rows: { timestamp: Date; bpm: number }[], tz: string): Promise<number>
+  /** #2895: the newest `oura_cloud` HR point at or after `since`; where the next Cloud HR read starts. */
+  getLatestOuraCloudHeartrateAt(userId: string, since: Date): Promise<Date | null>
   upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]): Promise<void>
   /** A platform aggregator's (Health Connect's) HR series into the shared HR table. Never displaces
    *  a device row at the same timestamp; device rows win at read time (#2168). `tz` dates the

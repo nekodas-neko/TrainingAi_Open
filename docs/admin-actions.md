@@ -247,6 +247,10 @@ Authorization: Bearer $AGENT_ACTIONS_SECRET
 | `oura-cloud-backfill` | #2859 | `backfillOuraCloud` in `lib/oura/cloud/backfill.ts` (the read a new Oura connection starts; no admin route) | `from?`, `to?` (default the last 90 days; at most 366), `heartRate?` (default true), `dryRun` | when `dryRun` is false: writes `oura_cloud` values, which replace stored values only where their source ranks at or below `oura_cloud` (Health Connect, legacy rows with no source); ring BLE and manual values never move | yes: the upserts are idempotent |
 | `oura-webhook-subscriptions` | #2859 | `runOuraWebhookRenewal` in `lib/oura/cloud/renewal.ts` (what the server runs every 12 hours) | `dryRun` | no: it changes only Oura's app-level subscriptions, no user data | yes: a second run renews and creates 0 |
 
+`oura-cloud-backfill` with `dryRun: false` answers **202** and runs after the answer: read the
+outcome (`affected_rows`, `error`) from its `agent_action_log` row, which is finished when the run
+ends. A dry run answers 200 with the full report.
+
 `stress-backfill` answers **202** with a job id; poll `GET /api/agent-actions?job=stress-backfill&jobId=N`
 (same key). Its log row is finished when the job ends. The job slot rules hold: another kind
 running is a **409**, logged as `refused`.

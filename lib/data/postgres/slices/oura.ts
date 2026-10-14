@@ -544,6 +544,12 @@ export async function listOuraTags(db: Db, userId: string, startDay: string, end
 export interface UpsertOuraSleepOptions {
   /** Replace, rather than rank-merge into, a live row this rollup owns (`oura_id LIKE 'ble:%'`). */
   replaceOwnBle?: boolean
+  /**
+   * Replace, rather than rank-merge into, a live row holding the same Oura Cloud id (#2895 review).
+   * Oura re-analyses a night and re-sends it under its id; the rank merge never moves a device row's
+   * `date` or `sleep_end`, so a night Oura moved would keep its old end and day.
+   */
+  replaceOwnCloud?: boolean
 }
 
 export async function upsertOuraSleep(
@@ -618,9 +624,12 @@ export async function upsertOuraSleep(
   // removed row's. The rollup's `replaceOwnBle` does the same to the live BLE rows it re-rolls
   // (issue 2546). `manual_sleep_start` is not in the set, so a bedtime the user recorded survives.
   function replaceWhen(set: Record<string, SQL>): Record<string, SQL> {
-    const cond = sql.raw(opts.replaceOwnBle
-      ? `(sleep_sessions.deleted_at IS NOT NULL OR (sleep_sessions.oura_id LIKE 'ble:%' AND NOT sleep_sessions.manual_entry))`
-      : `(sleep_sessions.deleted_at IS NOT NULL)`)
+    const own: string[] = ['sleep_sessions.deleted_at IS NOT NULL']
+    if (opts.replaceOwnBle) own.push(`(sleep_sessions.oura_id LIKE 'ble:%' AND NOT sleep_sessions.manual_entry)`)
+    if (opts.replaceOwnCloud) {
+      own.push(`(sleep_sessions.oura_id = EXCLUDED.oura_id AND sleep_sessions.oura_id NOT LIKE 'ble:%' AND NOT sleep_sessions.manual_entry)`)
+    }
+    const cond = sql.raw(`(${own.join(' OR ')})`)
     const fresh: [string, string][] = [
       ['date', 'date'], ['sleepEnd', 'sleep_end'], ['sourceMap', 'source_map'],
       ...OURA_SLEEP_SOURCE_COLS.map(c => [c.prop, c.col] as [string, string]),
@@ -639,7 +648,8 @@ export async function upsertOuraSleep(
  * Two things the plain upsert does not do:
  *  - **Oura may move a period's start** when it re-analyses a night, keeping the id. The row holding
  *    the id is moved to the new start first (when that start is free), so the id's row is updated in
- *    place instead of the insert failing on `sleep_sessions_user_oura_id_key`.
+ *    place instead of the insert failing on `sleep_sessions_user_oura_id_key`; the upsert then
+ *    replaces that row (`replaceOwnCloud`), so its end and day follow too.
  *  - **A period another row already covers is not written.** The ring's BLE rollup, a manual night or
  *    Health Connect may already hold that night at a slightly different start; a second row would be
  *    read as a second fragment of the same night (`sleep-night.ts`). The ladder ranks those sources
@@ -669,7 +679,9 @@ export async function upsertOuraCloudSleep(
     if (overlap.rows.length > 0) { skippedOverlap++; continue }
     kept.push(r)
   }
-  await upsertOuraSleep(db, userId, kept, 'oura_cloud')
+  // The row now at this start is either new or this id's own (moved above, or never moved), so it
+  // takes Oura's latest version whole: end, day and every measured field.
+  await upsertOuraSleep(db, userId, kept, 'oura_cloud', { replaceOwnCloud: true })
   return { written: kept.length, skippedOverlap }
 }
 
@@ -885,6 +897,23 @@ export async function upsertOuraCloudHeartrate(
   const earliest = kept.reduce((min, r) => Math.min(min, r.timestamp.getTime()), Infinity)
   await deleteZoneMinutesFrom(db, userId, formatInTimeZone(new Date(earliest), tz, 'yyyy-MM-dd'))
   return kept.length
+}
+
+/**
+ * The newest `oura_cloud` heart-rate point at or after `since` (#2895 review, item 3): where the next
+ * Cloud heart-rate read starts. Bounded by `since` so the backward walk of the (user_id, timestamp)
+ * key stays short while the ring's own rows still dominate the table.
+ */
+export async function getLatestOuraCloudHeartrateAt(db: Db, userId: string, since: Date): Promise<Date | null> {
+  const [row] = await db.select({ timestamp: s.ouraHeartrate.timestamp }).from(s.ouraHeartrate)
+    .where(and(
+      eq(s.ouraHeartrate.userId, userId),
+      gte(s.ouraHeartrate.timestamp, since),
+      eq(s.ouraHeartrate.source, 'oura_cloud'),
+    ))
+    .orderBy(desc(s.ouraHeartrate.timestamp))
+    .limit(1)
+  return row?.timestamp ?? null
 }
 
 async function writeHeartrateRows(

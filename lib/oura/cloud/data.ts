@@ -29,6 +29,27 @@ export class OuraForbiddenError extends Error {
   }
 }
 
+/**
+ * 429: Oura is rate limiting this app. `retryAfterMs` is its `Retry-After` header (seconds or an
+ * HTTP date) as a wait from now, or `null` when it sent none we can read. Still an
+ * `OuraUnavailableError`, so the webhook answers 503 and Oura retries.
+ */
+export class OuraRateLimitedError extends OuraUnavailableError {
+  constructor(path: string, readonly retryAfterMs: number | null) {
+    super(`Oura's ${path} answered 429${retryAfterMs != null ? ` (retry after ${Math.ceil(retryAfterMs / 1000)} s)` : ''}`, 429)
+    this.name = 'OuraRateLimitedError'
+  }
+}
+
+/** A `Retry-After` value as milliseconds from `now`; `null` when absent or unreadable. */
+export function parseRetryAfter(raw: string | null, now = Date.now()): number | null {
+  if (!raw) return null
+  const v = raw.trim()
+  if (/^\d+$/.test(v)) return Number(v) * 1000
+  const at = Date.parse(v)
+  return Number.isNaN(at) ? null : Math.max(0, at - now)
+}
+
 /** No more than this many pages per collection read; at Oura's page sizes it is years of data. */
 export const MAX_PAGES = 50
 
@@ -49,7 +70,8 @@ async function getJson(path: string, accessToken: string, query?: Record<string,
   if (res.status === 401) throw new OuraUnauthorizedError()
   if (res.status === 403) throw new OuraForbiddenError(path.split('/')[0])
   if (res.status === 404) return { status: 404, body: null }
-  // 429 included: the webhook answers 503 and Oura retries; the backfill stops and reports it.
+  // The webhook answers 503 and Oura retries; the backfill waits out a short Retry-After, else stops.
+  if (res.status === 429) throw new OuraRateLimitedError(path.split('/')[0], parseRetryAfter(res.headers.get('retry-after')))
   if (!res.ok) throw new OuraUnavailableError(`Oura's ${path.split('/')[0]} answered ${res.status}`, res.status)
   const body: unknown = await res.json().catch(() => undefined)
   if (body === undefined) throw new OuraUnavailableError(`Oura's ${path.split('/')[0]} answered with a body that is not JSON`)

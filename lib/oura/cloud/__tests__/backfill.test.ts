@@ -5,7 +5,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OuraCloudTokenRow } from '@/lib/data/postgres/slices/oura-cloud-tokens'
 import { OURA_API_BASE, type OuraOAuthConfig } from '../config'
 import { encryptOuraToken } from '../token-cipher'
-import { backfillOuraCloud, validBackfillRange, type OuraBackfillDeps } from '../backfill'
+import { backfillOuraCloud, MAX_RATE_LIMIT_WAITS, startOuraConnectBackfill, validBackfillRange, type OuraBackfillDeps } from '../backfill'
+import { parseRetryAfter } from '../data'
+import { resetOuraCloudReportThrottle } from '../report'
+
+const reportServerError = vi.fn()
+vi.mock('@/lib/observability', () => ({ reportServerError: (...a: unknown[]) => reportServerError(...a) }))
+let dataRepo: unknown = null
+vi.mock('@/lib/data', () => ({ getRepositoryAsync: async () => dataRepo }))
 import { FIXTURES, heartRateRows, jsonResponse } from './fixtures'
 
 const USER = '11111111-1111-4111-8111-111111111111'
@@ -24,6 +31,7 @@ function fakeRepo(connected = true) {
     getOuraCloudTokens: async () => row,
     saveOuraCloudTokens: async () => {},
     deleteOuraCloudTokens: async () => true,
+    getUserIdByOuraUserId: async () => (connected ? USER : null),
     upsertOuraDaily: async (_u, rows) => { calls.push(`daily:${rows.length}`) },
     upsertBodyMetrics: async (_u, rows) => { calls.push(`body:${rows.length}`) },
     upsertOuraCloudSleep: async (_u, rows) => { calls.push(`sleep:${rows.length}`); return { written: rows.length, skippedOverlap: 0 } },
@@ -124,11 +132,84 @@ describe('backfillOuraCloud (#2859)', () => {
     expect(calls.some(c => c.startsWith('hr:'))).toBe(false)
   })
 
+  // #2895 review, nit 9: a short Retry-After is waited out and the same page read again.
+  it('waits out a short Retry-After and carries on', async () => {
+    let limited = true
+    oura(path => {
+      if (path === 'sleep' && limited) { limited = false; return new Response('', { status: 429, headers: { 'Retry-After': '2' } }) }
+      return null
+    })
+    const waited: number[] = []
+    const { repo } = fakeRepo()
+    const out = await backfillOuraCloud({ repo, config: CONFIG, wait: async ms => { waited.push(ms) } }, USER, { ...OPTS, dryRun: false })
+    expect(waited).toEqual([2000])
+    expect(out.ok && out.report.stoppedEarly).toBeNull()
+    expect(out.ok && out.report.documents.sleep).toBe(1)
+  })
+
+  it('stops on a long Retry-After, and after a few waits, saying how long Oura asked for', async () => {
+    oura(path => (path === 'sleep' ? new Response('', { status: 429, headers: { 'Retry-After': '600' } }) : null))
+    const waited: number[] = []
+    let out = await backfillOuraCloud({ repo: fakeRepo().repo, config: CONFIG, wait: async ms => { waited.push(ms) } }, USER, { ...OPTS, dryRun: true })
+    expect(waited).toEqual([])
+    expect(out.ok && out.report.stoppedEarly).toMatch(/429 \(retry after 600 s\)/)
+
+    oura(path => (path === 'sleep' ? new Response('', { status: 429, headers: { 'Retry-After': '1' } }) : null))
+    out = await backfillOuraCloud({ repo: fakeRepo().repo, config: CONFIG, wait: async ms => { waited.push(ms) } }, USER, { ...OPTS, dryRun: true })
+    expect(waited).toHaveLength(MAX_RATE_LIMIT_WAITS)
+    expect(out.ok && out.report.stoppedEarly).toMatch(/429/)
+  })
+
+  it('reads Retry-After as seconds or an HTTP date', () => {
+    const now = Date.parse('2026-10-14T02:00:00Z')
+    expect(parseRetryAfter('30', now)).toBe(30_000)
+    expect(parseRetryAfter('Wed, 14 Oct 2026 02:00:45 GMT', now)).toBe(45_000)
+    expect(parseRetryAfter('soon', now)).toBeNull()
+    expect(parseRetryAfter(null, now)).toBeNull()
+  })
+
   it('refuses without a connection, and a range that is backwards or too long', async () => {
     expect(await backfillOuraCloud({ repo: fakeRepo(false).repo, config: CONFIG }, USER, { ...OPTS, dryRun: true })).toEqual({ ok: false, error: 'not_connected' })
     expect(await backfillOuraCloud({ repo: fakeRepo().repo, config: CONFIG }, USER, { ...OPTS, from: '2026-10-12', to: '2026-10-01', dryRun: true })).toEqual({ ok: false, error: 'invalid_range' })
     expect(validBackfillRange('2025-01-01', '2026-10-12')).toBe(false)
     expect(validBackfillRange('2026-10-12', '2026-10-12')).toBe(true)
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+})
+
+// #2895 review, item 5: a connect whose history read did not finish is recorded, not just logged.
+describe('startOuraConnectBackfill reporting', () => {
+  const saved: Record<string, string | undefined> = {}
+  const ENV = { OURA_CLIENT_ID: 'cid', OURA_CLIENT_SECRET: 'cs', OURA_REDIRECT_URI: 'http://localhost:3000/api/oura/callback', OURA_TOKEN_KEY: 'k'.repeat(48) }
+  beforeEach(() => {
+    for (const [k, v] of Object.entries(ENV)) { saved[k] = process.env[k]; process.env[k] = v }
+    fetchMock.mockReset()
+    vi.stubGlobal('fetch', fetchMock)
+    reportServerError.mockReset()
+    resetOuraCloudReportThrottle()
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+  afterEach(() => {
+    for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v }
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('records a run that stopped early, with the reason and no token', async () => {
+    oura(path => (path === 'sleep' ? new Response('', { status: 503 }) : null))
+    dataRepo = { ...fakeRepo().repo, getUserById: async () => ({ id: USER, timezone: null }) }
+    startOuraConnectBackfill(USER)
+    await vi.waitFor(() => expect(reportServerError).toHaveBeenCalled())
+    const [err, ctx] = reportServerError.mock.calls[0] as [Error, { userId: string }]
+    expect(err.message).toMatch(/connect-backfill:stopped-early: Oura's sleep answered 503/)
+    expect(err.message).not.toContain('acc')
+    expect(ctx.userId).toBe(USER)
+  })
+
+  it('records a connect whose backfill could not run', async () => {
+    dataRepo = { ...fakeRepo(false).repo, getUserById: async () => ({ id: USER, timezone: 'Australia/Brisbane' }) }
+    startOuraConnectBackfill(USER)
+    await vi.waitFor(() => expect(reportServerError).toHaveBeenCalled())
+    expect((reportServerError.mock.calls[0][0] as Error).message).toMatch(/connect-backfill:not_connected/)
   })
 })

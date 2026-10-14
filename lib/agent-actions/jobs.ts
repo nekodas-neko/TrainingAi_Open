@@ -12,7 +12,7 @@ import { recomputeHrr1Best } from '@/lib/workout/recompute-hrr1-best'
 import { backfillSetHrr1 } from '@/lib/workout/backfill-set-hrr1'
 import type { FinishAgentActionInput } from '@/lib/data/postgres/slices/agent-actions'
 import { ouraOAuthConfig } from '@/lib/oura/cloud/config'
-import { backfillOuraCloud, CONNECT_BACKFILL_DAYS } from '@/lib/oura/cloud/backfill'
+import { backfillOuraCloud, CONNECT_BACKFILL_DAYS, validBackfillRange, type OuraBackfillResult } from '@/lib/oura/cloud/backfill'
 import { runOuraWebhookRenewal } from '@/lib/oura/cloud/renewal'
 import { shiftDateStr, todayInTz } from '@trainingai/shared/date-utils'
 
@@ -261,20 +261,32 @@ export const AGENT_JOBS = {
       const to = p.to ? normalizeDateParamIso(p.to) : todayInTz(ctx.tz)
       const from = p.from ? normalizeDateParamIso(p.from) : to && shiftDateStr(to, -(CONNECT_BACKFILL_DAYS - 1))
       if (!from || !to) return { status: 400, body: { error: 'Invalid date' }, finish: { outcome: 'refused', error: 'invalid date' } }
-      const result = await backfillOuraCloud({ repo: ctx.repo, config }, ctx.userId, {
+      if (!validBackfillRange(from, to)) return { status: 400, body: { error: 'invalid_range' }, finish: { outcome: 'refused', error: 'invalid_range' } }
+      const run = backfillOuraCloud({ repo: ctx.repo, config }, ctx.userId, {
         from, to, dryRun: p.dryRun, heartRate: p.heartRate ?? true, tz: ctx.tz,
       })
+      const finish = (result: OuraBackfillResult): FinishAgentActionInput => {
+        if (!result.ok) return { outcome: 'refused', error: result.error }
+        const { counts, stoppedEarly } = result.report
+        const written = p.dryRun ? 0 : counts.dailyRows + counts.bodyRows + counts.sleepWritten + counts.sleepTombstoned + counts.workouts + counts.heartRatePoints
+        return { outcome: stoppedEarly ? 'failed' : 'succeeded', affectedRows: written, daysMoved: p.dryRun ? 0 : counts.dailyRows, error: stoppedEarly }
+      }
+      // A write can take tens of Oura requests (#2895 review, nit 10), so it runs after the answer
+      // and its log row is finished when it ends, as `stress-backfill`'s is. A dry run is answered
+      // in full: its report is what the caller reads before asking for the write.
+      if (!p.dryRun) {
+        return {
+          status: 202,
+          body: { from, to, note: 'Started. The outcome is written to this action\'s agent_action_log row when the run ends.' },
+          finish: { pending: run.then(finish) },
+        }
+      }
+      const result = await run
       if (!result.ok) {
         const status = result.error === 'invalid_range' ? 400 : 409
-        return { status, body: { error: result.error }, finish: { outcome: 'refused', error: result.error } }
+        return { status, body: { error: result.error }, finish: finish(result) }
       }
-      const { counts, stoppedEarly } = result.report
-      const written = p.dryRun ? 0 : counts.dailyRows + counts.bodyRows + counts.sleepWritten + counts.sleepTombstoned + counts.workouts + counts.heartRatePoints
-      return {
-        status: 200,
-        body: { report: result.report },
-        finish: { outcome: stoppedEarly ? 'failed' : 'succeeded', affectedRows: written, daysMoved: p.dryRun ? 0 : counts.dailyRows, error: stoppedEarly },
-      }
+      return { status: 200, body: { report: result.report }, finish: finish(result) }
     },
   } satisfies AgentJobDef<z.infer<typeof OuraCloudBackfillParams>>,
   /**

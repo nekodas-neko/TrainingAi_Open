@@ -20,12 +20,12 @@ describe('Oura Cloud document mapping (#2859)', () => {
     const row = daily[0]
     expect(row.date).toBe(DAY)
     const expected = [
-      'readinessScore', 'temperatureDeviation', 'temperatureTrendDeviation', 'readinessContributors',
-      'sleepScore', 'sleepContributors',
+      'readinessScore', 'temperatureDeviation', 'temperatureTrendDeviation',
+      'sleepScore',
       'activityScore', 'activeCalories', 'totalCalories', 'equivalentWalkingDistance', 'highActivityTimeSec',
       'mediumActivityTimeSec', 'lowActivityTimeSec', 'sedentaryTimeSec', 'restingTimeSec', 'nonWearTimeSec',
-      'avgMetMinutes', 'highActivityMetMinutes', 'mediumActivityMetMinutes', 'lowActivityMetMinutes', 'activityContributors',
-      'breathingDisturbanceIndex', 'stressHigh', 'recoveryHigh', 'daySummary', 'resilienceLevel', 'resilienceContributors',
+      'avgMetMinutes', 'highActivityMetMinutes', 'mediumActivityMetMinutes', 'lowActivityMetMinutes',
+      'breathingDisturbanceIndex', 'stressHigh', 'recoveryHigh', 'resilienceLevel', 'resilienceContributors',
       'vascularAge', 'pulseWaveVelocity', 'vo2Max',
     ] as const
     for (const k of expected) expect(row[k], k).not.toBeNull()
@@ -35,6 +35,14 @@ describe('Oura Cloud document mapping (#2859)', () => {
     expect(row.highActivityTimeSec).toBe(1200)
     // sleep_time is not read in part 2, so its columns stay absent and the merge keeps what is stored.
     expect(row.recommendedBedtimeStart).toBeUndefined()
+  })
+
+  // #2895 review, item 7: until #2860 these would replace our own on the Sleep and Activity screens.
+  it('holds back Oura\'s readiness, sleep and activity contributors and the stress day summary', () => {
+    const [row] = mapOuraDocuments(all()).daily
+    for (const k of ['readinessContributors', 'sleepContributors', 'activityContributors', 'daySummary'] as const) {
+      expect(row[k], k).toBeUndefined()
+    }
   })
 
   it('writes body metrics from activity, SpO2 and the main sleep', () => {

@@ -7,6 +7,7 @@ import { clientIp } from '@trainingai/shared/http/client-ip'
 import { readTextLimited } from '@trainingai/shared/http/request-guards'
 import { ouraOAuthConfig } from '@/lib/oura/cloud/config'
 import { hasOuraTokenKey } from '@/lib/oura/cloud/token-cipher'
+import { reportOuraCloudIssue } from '@/lib/oura/cloud/report'
 import {
   OuraWebhookEvent, handleOuraWebhookEvent, isOurVerificationToken, isRetryableOuraError, ouraWebhookConfig, verifyOuraSignature,
 } from '@/lib/oura/cloud/webhook'
@@ -25,10 +26,12 @@ import {
 
 const MAX_BODY_BYTES = 4 * 1024
 
+// Not `.strict()`: a parameter Oura adds later must not fail every subscription's verification. The
+// token compare is the check that matters.
 const VerifyQuery = z.object({
   verification_token: z.string().min(1).max(512),
   challenge: z.string().min(1).max(512),
-}).strict()
+})
 
 function json(body: object, status = 200) {
   return NextResponse.json(body, { status, headers: { 'Cache-Control': 'private, no-store' } })
@@ -62,10 +65,16 @@ export async function POST(req: NextRequest) {
   const read = await readTextLimited(req, MAX_BODY_BYTES)
   if (!read.ok) return json({ error: read.reason === 'too_large' ? 'Request too large' : 'Invalid body' }, read.reason === 'too_large' ? 413 : 400)
 
-  const verdict = verifyOuraSignature(
-    config.oauth.clientSecret, req.headers.get('x-oura-signature'), req.headers.get('x-oura-timestamp'), read.text,
-  )
-  if (verdict !== 'ok') return json({ error: 'Invalid signature' }, 401)
+  const signature = req.headers.get('x-oura-signature')
+  const timestamp = req.headers.get('x-oura-timestamp')
+  const verdict = verifyOuraSignature(config.oauth.clientSecret, signature, timestamp, read.text)
+  if (verdict !== 'ok') {
+    // Which headers came, never their values: a signing format we got wrong would otherwise refuse
+    // every real event in silence.
+    reportOuraCloudIssue(`webhook-signature:${verdict}`,
+      `refused an event (x-oura-signature ${signature ? 'present' : 'absent'}, x-oura-timestamp ${timestamp ? 'present' : 'absent'}, ${read.text.length} bytes)`)
+    return json({ error: 'Invalid signature' }, 401)
+  }
 
   let raw: unknown
   try { raw = JSON.parse(read.text) } catch { return json({ error: 'Invalid body' }, 400) }
