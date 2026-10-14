@@ -35,7 +35,14 @@ describe('native client transactions', () => {
     vi.stubEnv('NATIVE_AUTH_ALLOW_ANDROID_DEV','1');
     expect((await GET(request())).status).toBe(307);
   });
-  for (const client of ['ios', 'android', 'android-dev'] as const) {
+  it('accepts the side-by-side preview app in production without the development opt-in', async () => {
+    vi.stubEnv('NODE_ENV','production');
+    vi.stubEnv('NATIVE_AUTH_ALLOW_ANDROID_DEV','0');
+    const response = await GET(new NextRequest(`https://example.com/mobile-signin/begin?client=android-preview&challenge=${challenge}&state=${state}`));
+    expect(response.status).toBe(307);
+    expect(response.headers.get('location')).toBe('/mobile-signin/native');
+  });
+  for (const client of ['ios', 'android', 'android-dev', 'android-preview'] as const) {
     it(`binds ${client} to its registered callback and PKCE transaction`, async () => {
       const transaction = { client, challenge, state };
       const response = await GET(

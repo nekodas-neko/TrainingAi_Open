@@ -1,11 +1,30 @@
+// Each Android build has its own application ID, so it installs beside the others instead of
+// replacing one (docs/native-testing.md):
+//   com.trainingai.app          the real app: only ever installed at the switch-over
+//   com.trainingai.app.dev      development builds
+//   com.trainingai.app.preview  the side-by-side build the owner runs next to the real app
+//                               (APP_VARIANT=side-by-side, built by native-side-by-side.yml)
 const mobileConfig = ({ config }) => {
-  const development = !process.env.EAS_BUILD_PROFILE || ['development', 'android-development'].includes(process.env.EAS_BUILD_PROFILE);
-  const packageName = development ? 'com.trainingai.app.dev' : 'com.trainingai.app';
+  const sideBySide = process.env.APP_VARIANT === 'side-by-side';
+  const development =
+    !sideBySide &&
+    (!process.env.EAS_BUILD_PROFILE ||
+      ['development', 'android-development'].includes(process.env.EAS_BUILD_PROFILE));
+  const packageName = sideBySide
+    ? 'com.trainingai.app.preview'
+    : development
+      ? 'com.trainingai.app.dev'
+      : 'com.trainingai.app';
+  // Android refuses to install an update with a lower version code, so the side-by-side build
+  // takes the CI run number: every build installs over the one before it.
+  const versionCode = sideBySide ? Number(process.env.ANDROID_VERSION_CODE) || undefined : undefined;
   return {
     ...config,
+    ...(sideBySide ? { name: 'TrainingAi Preview' } : {}),
     android: {
       ...config.android,
       package: packageName,
+      ...(versionCode ? { versionCode } : {}),
       permissions: [
         'android.permission.health.READ_SLEEP',
         'android.permission.health.READ_HEART_RATE',

@@ -1,0 +1,239 @@
+name: Native side-by-side build
+
+# Builds the native app (mobile/) as "TrainingAi Preview", com.trainingai.app.preview: the build the
+# owner installs NEXT TO the real app to try it (#2878, docs/native-testing.md). It cannot replace
+# the real app or TrainingAi Dev, because it has its own application ID and its own signing key.
+#
+# A release build (JavaScript embedded, no laptop needed), arm64 only (the S25 Ultra), talking to
+# production. On `main` it is published to the rolling `native-preview-latest` release, never to
+# `apk-latest`: lib/github-release.ts offers the first APK on that one to the real app as an update.
+#
+# Signing key: its own, never the real app's (owner, 13 Oct). The PKCS12 keystore lives on the
+# rolling release as `side-by-side-key.p12.gpg`, locked with the SIDE_BY_SIDE_KEY_PASSWORD secret,
+# the same idea as fastlane match. The first run on `main` with the secret set creates it, and
+# every later build signs with that key, so each one installs over the last. A pull request never
+# opens the real key: a workflow change could reach it there (RV-198). It signs with a throwaway
+# key and publishes nothing, which is still a full check of the build.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+      - 'packages/shared/**'
+      - '.github/workflows/native-side-by-side.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+      - 'packages/shared/**'
+      - '.github/workflows/native-side-by-side.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-side-by-side-${{ github.ref }}
+  # On main a run is never cut short: it may be part-way through publishing the key or the APK.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  RELEASE_TAG: native-preview-latest
+  KEY_ASSET: side-by-side-key.p12.gpg
+  APK_NAME: TrainingAi-Preview.apk
+  PACKAGE: com.trainingai.app.preview
+
+jobs:
+  build:
+    name: Build TrainingAi Preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      key_mode: ${{ steps.key.outputs.mode }}
+      version_code: ${{ steps.version.outputs.code }}
+      cert: ${{ steps.verify.outputs.cert }}
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      CI: '1'
+      APP_VARIANT: side-by-side
+      EXPO_NO_DOTENV: '1'
+      # Inlined into the bundle at build time, as eas.json does for its profiles.
+      EXPO_PUBLIC_API_URL: https://trainingai-production.up.railway.app
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320
+        with:
+          version: 10.33.0
+          package_json_file: mobile/package.json
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: mobile/pnpm-lock.yaml
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # Minutes since 2026-01-01: always rises, whichever run or workflow built the last one, and
+      # Android refuses an update whose version code is lower than the installed one.
+      - name: Choose the version code
+        id: version
+        run: |
+          CODE=$(( ($(date -u +%s) - 1767225600) / 60 ))
+          echo "code=$CODE" >> "$GITHUB_OUTPUT"
+          echo "ANDROID_VERSION_CODE=$CODE" >> "$GITHUB_ENV"
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec expo prebuild --platform android --no-install
+
+      # The one thing this workflow must never do is build the real app's ID.
+      - name: Check the build is the side-by-side app
+        run: |
+          set -euo pipefail
+          grep -q "applicationId '$PACKAGE'" android/app/build.gradle || {
+            echo "::error::The generated project is not $PACKAGE:"; grep -n applicationId android/app/build.gradle; exit 1; }
+
+      - name: Compile the release APK
+        run: ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a
+        working-directory: mobile/android
+
+      - name: Get the signing key
+        id: key
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Only a run on main opens the real key: a pull request, or a manual run from another
+          # branch, would sign and publish code nobody has merged.
+          PASSWORD: ${{ github.ref == 'refs/heads/main' && secrets.SIDE_BY_SIDE_KEY_PASSWORD || '' }}
+        run: |
+          set -euo pipefail
+          mkdir -m 700 "$RUNNER_TEMP/key"
+          export GNUPGHOME="$RUNNER_TEMP/key/gnupg"; mkdir -m 700 "$GNUPGHOME"
+          KS="$RUNNER_TEMP/key/key.p12"
+          new_key() {
+            keytool -genkeypair -storetype PKCS12 -keystore "$KS" -alias preview \
+              -keyalg RSA -keysize 4096 -validity 10000 -dname "CN=TrainingAi Preview" \
+              -storepass "$1" -keypass "$1" > /dev/null 2>&1
+          }
+          if [ -z "$PASSWORD" ]; then
+            # Not main, or the secret isn't set yet. A full build, published nowhere.
+            PASS="$(openssl rand -hex 24)"; new_key "$PASS"
+            echo "mode=throwaway" >> "$GITHUB_OUTPUT"
+            echo "::notice::Signed with a throwaway key; this APK is not published."
+          elif gh release download "$RELEASE_TAG" -p "$KEY_ASSET" -D "$RUNNER_TEMP/key" -R "$GITHUB_REPOSITORY" 2> /dev/null; then
+            printf '%s' "$PASSWORD" > "$RUNNER_TEMP/key/pass"
+            gpg --batch --quiet --pinentry-mode loopback --passphrase-file "$RUNNER_TEMP/key/pass" \
+              --output "$KS" --decrypt "$RUNNER_TEMP/key/$KEY_ASSET" || {
+                echo "::error::The side-by-side key could not be opened with SIDE_BY_SIDE_KEY_PASSWORD. If the password was changed, the key has to be recreated (docs/native-testing.md)."; exit 1; }
+            PASS="$PASSWORD"
+            echo "mode=existing" >> "$GITHUB_OUTPUT"
+          else
+            # First run with the secret: create the key and lock it for the publish job to store.
+            PASS="$PASSWORD"; new_key "$PASS"
+            printf '%s' "$PASSWORD" > "$RUNNER_TEMP/key/pass"
+            mkdir -p "$RUNNER_TEMP/new-key"
+            gpg --batch --yes --quiet --pinentry-mode loopback --passphrase-file "$RUNNER_TEMP/key/pass" \
+              --symmetric --cipher-algo AES256 --s2k-digest-algo SHA512 --s2k-count 65011712 \
+              --output "$RUNNER_TEMP/new-key/$KEY_ASSET" "$KS"
+            echo "mode=new" >> "$GITHUB_OUTPUT"
+            echo "::notice::Created the side-by-side signing key; the publish job stores it on the $RELEASE_TAG release."
+          fi
+          echo "::add-mask::$PASS"
+          echo "KS_PASS=$PASS" >> "$GITHUB_ENV"
+          echo "KS_FILE=$KS" >> "$GITHUB_ENV"
+
+      - name: Sign the APK with the side-by-side key
+        run: |
+          set -euo pipefail
+          BT="$ANDROID_HOME/build-tools/$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -printf '%f\n' | sort -V | tail -1)"
+          echo "BT=$BT" >> "$GITHUB_ENV"
+          # assembleRelease signs with the template's debug key; apksigner replaces that signature.
+          "$BT/apksigner" sign --ks "$KS_FILE" --ks-type PKCS12 --ks-pass env:KS_PASS \
+            --ks-key-alias preview --out "$RUNNER_TEMP/$APK_NAME" \
+            android/app/build/outputs/apk/release/app-release.apk
+          rm -f "$KS_FILE"
+          echo "KS_PASS=" >> "$GITHUB_ENV"
+
+      - name: Check the package, version and signature
+        id: verify
+        run: |
+          set -euo pipefail
+          APK="$RUNNER_TEMP/$APK_NAME"
+          BADGING="$("$BT/aapt2" dump badging "$APK")"
+          PKG="$(sed -nE "s/^package: name='([^']+)'.*/\1/p" <<< "$BADGING")"
+          CODE="$(sed -nE "s/^package: .*versionCode='([0-9]+)'.*/\1/p" <<< "$BADGING")"
+          LABEL="$(sed -nE "s/^application-label:'(.*)'/\1/p" <<< "$BADGING")"
+          CERT="$("$BT/apksigner" verify --print-certs "$APK" | sed -nE 's/.*certificate SHA-256 digest: ([0-9a-f]{64}).*/\1/p' | sort -u)"
+          [ "$PKG" = "$PACKAGE" ] || { echo "::error::The APK is $PKG, not $PACKAGE. Nothing is published."; exit 1; }
+          [ "$CODE" = "${{ steps.version.outputs.code }}" ] || { echo "::error::Version code $CODE, expected ${{ steps.version.outputs.code }}."; exit 1; }
+          # The real app's certificate (android.yml). Signing with it would let this build stand in
+          # for the real app's key, which the owner ruled out on 13 Oct.
+          [ "$CERT" != d390062e367da6eee52ee74ca18632eae7686e5edb9c0c25e2fc98a3744d893c ] || {
+            echo "::error::Signed with the real app's key. Nothing is published."; exit 1; }
+          echo "cert=$CERT" >> "$GITHUB_OUTPUT"
+          {
+            echo "**$LABEL** \`$PKG\`, version code $CODE, $(du -h "$APK" | cut -f1)."
+            echo "Signed by \`$CERT\` (${{ steps.key.outputs.mode }} key)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: side-by-side-apk
+          path: ${{ runner.temp }}/${{ env.APK_NAME }}
+          retention-days: 14
+          compression-level: 0
+      - uses: actions/upload-artifact@v6
+        if: steps.key.outputs.mode == 'new'
+        with:
+          name: side-by-side-new-key
+          path: ${{ runner.temp }}/new-key/${{ env.KEY_ASSET }}
+          retention-days: 1
+
+  # The only job with a write token. It never builds or signs anything, and never runs on a pull
+  # request or with a throwaway key.
+  publish:
+    name: Publish TrainingAi Preview
+    needs: build
+    if: github.ref == 'refs/heads/main' && needs.build.outputs.key_mode != 'throwaway'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          name: side-by-side-apk
+      - uses: actions/download-artifact@v6
+        if: needs.build.outputs.key_mode == 'new'
+        with:
+          name: side-by-side-new-key
+
+      - name: Publish to the rolling release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MODE: ${{ needs.build.outputs.key_mode }}
+          CODE: ${{ needs.build.outputs.version_code }}
+          CERT: ${{ needs.build.outputs.cert }}
+        run: |
+          set -euo pipefail
+          R=(-R "$GITHUB_REPOSITORY")
+          NOTES="$(printf '%s\n\n%s\n\n%s' \
+            "TrainingAi Preview: the native app, built from \`main\` @ ${GITHUB_SHA::7} on $(date -u +%Y-%m-%d), version code $CODE." \
+            "It installs NEXT TO the real TrainingAi app (\`$PACKAGE\`) and never replaces it. On the phone, download **$APK_NAME** below and open it. Each new build installs over the previous one." \
+            "Signing certificate SHA-256: \`$CERT\`. \`$KEY_ASSET\` is that key, locked; leave it here. How it all works: docs/native-testing.md.")"
+          if ! gh release view "$RELEASE_TAG" "${R[@]}" > /dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" "${R[@]}" --target "$GITHUB_SHA" --prerelease \
+              --title "TrainingAi Preview (native, side by side)" --notes "$NOTES"
+          fi
+          # The key goes up before the APK it signed, and is never overwritten: replacing it would
+          # stop every later build installing over the one on the phone.
+          if [ "$MODE" = new ]; then
+            gh release upload "$RELEASE_TAG" "$KEY_ASSET" "${R[@]}"
+          fi
+          gh release delete-asset "$RELEASE_TAG" "$APK_NAME" --yes "${R[@]}" 2> /dev/null || true
+          gh release upload "$RELEASE_TAG" "$APK_NAME" "${R[@]}"
+          gh release edit "$RELEASE_TAG" "${R[@]}" --notes "$NOTES"
+          echo "Published: https://github.com/$GITHUB_REPOSITORY/releases/tag/$RELEASE_TAG" >> "$GITHUB_STEP_SUMMARY"

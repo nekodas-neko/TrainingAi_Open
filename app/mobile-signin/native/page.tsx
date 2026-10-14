@@ -11,7 +11,15 @@ import {
   nativeSignInPath,
   signNativeConsent,
   NATIVE_CONSENT_COOKIE,
+  type NativeClient,
 } from '@/lib/auth/mobile/native-transaction';
+
+const CLIENT_LABELS: Record<NativeClient, string> = {
+  ios: 'iPhone',
+  android: 'Android',
+  'android-dev': 'Android development',
+  'android-preview': 'Android preview',
+};
 
 export const dynamic = 'force-dynamic';
 
@@ -71,13 +79,7 @@ export default async function NativeSignInPage({
             Continue as {session.user.name || session.user.email}?
           </h1>
           <p>
-            Allow the TrainingAi{' '}
-            {transaction.client === 'android-dev'
-              ? 'Android development'
-              : transaction.client === 'ios'
-                ? 'iPhone'
-                : 'Android'}{' '}
-            app to use this account.
+            Allow the TrainingAi {CLIENT_LABELS[transaction.client]} app to use this account.
           </p>
           <NativeConsentForm action={continueSignIn} />
           <Link className="block text-center underline" href="/">

@@ -354,25 +354,22 @@ test('a previous account reader cannot use a different account’s new session',
   assert.equal(f.calls.length, calls);
 });
 
-test('Android production and development callbacks cannot complete each other’s sign-in', () => {
+test('Android production, development and preview callbacks cannot complete each other’s sign-in', () => {
   const pending = { origin, verifier: state, state, createdAt: Date.now() };
-  for (const client of ['android', 'android-dev'] as const) {
+  const android = ['android', 'android-dev', 'android-preview'] as const;
+  for (const client of android) {
     const callback = MOBILE_CALLBACKS[client];
     const url = `${callback}?${new URLSearchParams({ state, token: attemptId })}`;
     assert.deepEqual(parseAuthCallback(url, pending, callback), { token: attemptId });
-    assert.throws(() =>
-      parseAuthCallback(
-        url,
-        pending,
-        MOBILE_CALLBACKS[client === 'android' ? 'android-dev' : 'android'],
-      ),
-    );
+    for (const other of android.filter((candidate) => candidate !== client)) {
+      assert.throws(() => parseAuthCallback(url, pending, MOBILE_CALLBACKS[other]));
+    }
     assert.throws(() => parseAuthCallback(url, pending));
   }
 });
 
 test('each native browser client sends its own identity and retains PKCE exchange', async () => {
-  for (const client of ['ios', 'android', 'android-dev'] as const) {
+  for (const client of ['ios', 'android', 'android-dev', 'android-preview'] as const) {
     const f = fixture();
     const platform: AuthPlatform = {
       ...f.platform,
