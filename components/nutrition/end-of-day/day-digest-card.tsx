@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { AlertTriangle, Sparkles } from 'lucide-react'
+import { readAiPausedMessage } from '@/lib/ai-paused-notice'
 
 const Response = dynamic(() => import('@/components/ai/response').then(m => m.Response), { ssr: false })
 
@@ -33,14 +34,19 @@ export function DayDigestCard({ active }: Props) {
   const [digest, setDigest] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [failed, setFailed] = useState(false)
+  const [paused, setPaused] = useState<string | null>(null)
 
   useEffect(() => {
     if (!active) return
     let cancelled = false
     setLoading(true)
     setFailed(false)
+    setPaused(null)
     fetch('/api/daily-digest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
-      .then(res => { if (!res.ok) throw new Error(String(res.status)); return res.json() as Promise<DailyDigestResponse> })
+      .then(async res => {
+        if (!res.ok) { const notice = await readAiPausedMessage(res); if (notice && !cancelled) setPaused(notice); throw new Error(String(res.status)) }
+        return res.json() as Promise<DailyDigestResponse>
+      })
       .then(data => { if (!cancelled) setDigest(data?.digest ?? null) })
       .catch(() => { if (!cancelled) setFailed(true) })
       .finally(() => { if (!cancelled) setLoading(false) })
@@ -56,7 +62,7 @@ export function DayDigestCard({ active }: Props) {
         style={{ color: 'var(--accent-amber)' }}
       >
         <AlertTriangle className="mt-px h-3 w-3 flex-none" />
-        <span>Today&rsquo;s summary could not be written. The rest of this review is unaffected.</span>
+        <span>{paused ?? 'Today\u2019s summary could not be written. The rest of this review is unaffected.'}</span>
       </p>
     )
   }

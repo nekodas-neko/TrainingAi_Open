@@ -48,6 +48,7 @@ import { useUserTimezone } from '@/components/shell/user-timezone-provider';
 import { calendarMonthInTz } from '@/lib/calendar-month';
 import { useDeloadChoice } from "@/components/workout/use-deload-choice";
 import { useDurationPreset } from "@/components/workout/use-duration-preset";
+import { startLocalSeed } from "@/components/workout/local-seed";
 import { WorkoutLoadError } from "@/components/workout/workout-load-error";
 import { TTL_SHORT, TTL_MEDIUM, TTL_LONG } from '@trainingai/shared/cache-ttl';
 import { invalidateWorkoutSummaries, invalidateExerciseLogged, invalidatePrescriptionChanged, invalidateWorkoutDataImmediate, invalidatePulledDomains } from "@/lib/cache-groups";
@@ -203,6 +204,8 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
   // Monotonic id so an out-of-order periodization fetch response can't overwrite a newer one
   // (loadPeriodization is now callable imperatively, not just from a single effect).
   const periodizationReqRef = useRef(0);
+  // The `workout-data:` cache key whose exercises are on screen (set by every paint in fetchExercises).
+  const paintedKeyRef = useRef<string | null>(null);
   // Bar-load / prep seconds for the current exercise: time on the "get ready" screen before the
   // first Start (loading the bar / setting up). Captured at handleStart from the ready-screen
   // elapsed baseline, read into the log payload at completion. A ref (not store) — transient and
@@ -305,9 +308,11 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
     // Deload gets its own cache key — regular cached sets must never flash before AMRAP sets load
     const cacheKey = `workout-data:${tab}${deload ? ':deload' : ''}`;
     setLoadError(false);
-    // Tracks whether the on-device mirror painted anything, so a subsequent fetch
-    // failure only escalates to the K2 error screen when the screen is truly blank.
-    let localSeeded = false;
+    // A refresh (Accept, Dismiss, a duration switch) runs with the list already on screen, and
+    // blanking it to skeletons is the flash a repeat visit must never show (issue 2831). Keyed, so
+    // a different session or the deload view still starts from skeletons.
+    const alreadyPainted = paintedKeyRef.current === cacheKey;
+    let localSeed: ReturnType<typeof startLocalSeed> | null = null;
 
     const freshExercises = (data: WorkoutDataSeed) => freshExercisesFor(data, tz);
 
@@ -331,44 +336,43 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       if (seed.session?.timeBudgetMinutes) setSessionBudgetMin(seed.session.timeBudgetMinutes);
       if (seed.program?.phaseMode) setProgramPhaseMode(seed.program.phaseMode);
       setLoading(false);
+      paintedKeyRef.current = cacheKey;
     };
     if (synced) {
       paintSeed(synced);
     } else if (cardSeed) {
       paintSeed(cardSeed);
-    } else {
+    } else if (!alreadyPainted) {
       setLoading(true);
       // No cache yet — seed structure (sessions, exercises, per-set progression)
       // from the on-device SQLite mirror so the screen paints offline. The network
-      // response below overwrites this with the full, server-computed data.
+      // response below overwrites this with the full, server-computed data. Not awaited: the
+      // request below starts now, and whichever lands first paints.
       const localStore = userId ? getLocalStore(userId) : null;
-      if (localStore) {
-        try {
-          const local = await localStore.getActiveProgramLocal();
-          // E1-5/R-2: resolve strictly by id — mirror the server's id-only identity
-          // (c2bd70f/v1.171.0 removed exactly the name/sessions[0] fallback there).
-          // Painting sessions[0] for a stale nav id silently attributed logged sets
-          // to the wrong session.
-          const sess = local?.sessions.find(s => s.id === tab);
-          if (local && sess) {
-            setExercises(sess.exercises);
-            // The mirror holds the program's per-set style, never a prescription.
-            setNumbersSource({ kind: 'base' });
-            setSessionDisplayName(sess.name);
-            setProgramSessionId(sess.id);
-            setProgramPhaseMode(local.phaseMode);
-            setLoading(false);
-            localSeeded = true;
-          } else if (local && !sess && typeof navigator !== 'undefined' && !navigator.onLine) {
-            // Offline + id absent from the mirror: no network response will arrive to
-            // run the sessionNotFound guard below, so surface the reselect state here
-            // instead of painting another session. Online, we fall through and let the
-            // authoritative server fetch decide (it returns sessionNotFound).
-            setSessionStale(true);
-            setLoading(false);
-          }
-        } catch { /* fall through to network fetch */ }
-      }
+      if (localStore) localSeed = startLocalSeed(() => localStore.getActiveProgramLocal(), local => {
+        // E1-5/R-2: resolve strictly by id — mirror the server's id-only identity
+        // (c2bd70f/v1.171.0 removed exactly the name/sessions[0] fallback there).
+        // Painting sessions[0] for a stale nav id silently attributed logged sets
+        // to the wrong session.
+        const sess = local.sessions.find(s => s.id === tab);
+        if (sess) {
+          setExercises(sess.exercises);
+          // The mirror holds the program's per-set style, never a prescription.
+          setNumbersSource({ kind: 'base' });
+          setSessionDisplayName(sess.name);
+          setProgramSessionId(sess.id);
+          setProgramPhaseMode(local.phaseMode);
+          setLoading(false);
+          paintedKeyRef.current = cacheKey;
+        } else if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          // Offline + id absent from the mirror: no network response will arrive to
+          // run the sessionNotFound guard below, so surface the reselect state here
+          // instead of painting another session. Online, we fall through and let the
+          // authoritative server fetch decide (it returns sessionNotFound).
+          setSessionStale(true);
+          setLoading(false);
+        }
+      });
     }
 
     try {
@@ -385,6 +389,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
         `/api/workout-data?${wdParams}`,
         TTL_LONG,
         (data) => {
+          localSeed?.networkLanded();
           // Stale nav id: the server has no session with this id (offline mirror out of sync
           // after a program edit). Don't paint a wrong/empty session — force an id-based full
           // mirror re-sync so navigation ids become current, and flag for a reselect prompt.
@@ -419,25 +424,24 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
           // from the seed. Any non-pending payload clears a prior pending state.
           setAiPrescriptionPending(data.aiPrescriptionPending ?? false);
           setLoading(false);
+          paintedKeyRef.current = cacheKey;
         },
         {
           // K2: cachedFetch never rejects, so the old catch below was dead code and
           // a cold-cache 500 hung the screen on an infinite skeleton. Surface a
           // terminal error-with-retry only when nothing painted (no cache seed, no
-          // local mirror). navigator.onLine already gates this in cachedFetchCore,
-          // so offline stays the offline pill, not an error.
-          onError: () => {
-            if (!synced && !cardSeed && !localSeeded) {
-              setLoadError(true);
-              setLoading(false);
-            }
+          // local mirror, no earlier paint of this key). navigator.onLine already gates
+          // this in cachedFetchCore, so offline stays the offline pill, not an error.
+          onError: async () => {
+            await localSeed?.settled;
+            if (paintedKeyRef.current !== cacheKey) { setLoadError(true); setLoading(false); }
           },
         },
       );
     } catch {
       // Reachable only on a pathological synchronous throw; the onError channel
       // handles the normal HTTP/network failure path above.
-      if (!synced && !cardSeed && !localSeeded) { setLoadError(true); setLoading(false); }
+      if (paintedKeyRef.current !== cacheKey) { setLoadError(true); setLoading(false); }
     }
   }, [sessionType, deload, userId, tz]);
 

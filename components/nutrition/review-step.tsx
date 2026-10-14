@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Loader2, Send } from 'lucide-react'
 import { toast } from 'sonner'
+import { readAiPausedMessage } from '@/lib/ai-paused-notice'
 import { Button } from '@/components/ui/button'
 import type { NutritionScanResult, NutritionIngredient } from '@trainingai/shared/types/nutrition'
 import { sumIngredientEntries } from '@trainingai/shared/nutrition/log-food'
@@ -155,7 +156,11 @@ export function ReviewStep({ result, value, ingredients, onIngredientsChange, on
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: `${context} User correction: "${correction.trim()}". Please recalculate with the updated information.`, region }),
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) {
+        const paused = await readAiPausedMessage(res)
+        if (paused) { toast.error(paused); return }
+        throw new Error()
+      }
       const refined: NutritionScanResult = await res.json()
       if ('error' in refined) throw new Error(String((refined as { error: string }).error))
       onRefine(refined)

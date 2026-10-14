@@ -1,6 +1,13 @@
 # Oura Ring v2 API — Data Reference
 
-> What the ring can provide, what we currently sync, and what's available to add.
+> **Historical — the Oura Cloud integration was removed on 2026-08-13.** `/api/oura/sync`,
+> `/api/oura/webhook` and `/api/oura/hr-sync` no longer exist, so the "Currently Synced Endpoints",
+> "Data Flow Summary" and "Webhook" sections below describe code that is gone, and nothing here is
+> "currently synced". What remains is a field-by-field reference for the Oura v2 API itself. The
+> ring's data now reaches the app over BLE (`docs/oura-ble-operations.md`). If the Cloud API comes
+> back (#2808), it needs a fresh reference rather than a patch of this one.
+
+> What the ring can provide, what we once synced, and what's available to add.
 
 **Base URL:** `https://api.ouraring.com`  
 **Auth:** `Authorization: Bearer {token}` (OAuth2 or PAT)  

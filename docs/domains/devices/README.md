@@ -75,6 +75,11 @@ documentation cluster in the repo (~45 known issues, ~38 plans, 300+ model files
   Phase 0 is one `0x03` round trip proving transport, framing and mod-255 checksum, and it is a
   gate. Sleep is in no client (Gadgetbridge has it, from a separate dissection). **Do not flash the
   circulating raw-streaming mod firmware** — §8.
+0. **[`docs/oura-ble-reverse-engineering.md`](../../oura-ble-reverse-engineering.md)** — **how we
+   reverse engineered the ring, and how to do it again (2026-10-14).** Written as the ring moves to
+   the Oura API (#2808). It covers where the protocol came from, pairing and the key, the protocol
+   as built, the lessons, and where every file lives at tag `v1.490.1` once the Bluetooth code
+   leaves `main`. Start here if direct ring access is ever wanted back.
 1. **[`docs/oura-ble-operations.md`](../../oura-ble-operations.md)** — the operations manual:
    failure-point matrix, sync-cadence policy, protocol-maintenance playbook, data-integrity
    runbook. **Read this before touching the pipeline**, and add a §1 matrix row for any new failure
@@ -391,8 +396,10 @@ Live at the time of writing (2026-07-30):
   memory, never Oura's public docs.
 - **`oura_raw_samples.body_hex` is the archival source of truth.** Never prune or mutate it;
   protocol fixes ship as decoder changes plus a redecode pass.
-- **The history cursor may only advance past events that are durably ingested (server 2xx).**
-  Advancing on the ring's batch completion alone loses the drained span forever.
+- **The saved history cursor may only advance past events that are durably committed** — to the
+  phone's `oura_raw.db` (rows and cursor in one transaction); the server POST is a best-effort
+  backup, and 2xx gating is only the fallback when that database cannot open. Advancing on the
+  ring's batch completion alone loses the drained span forever.
 - **Decoders are infallible** — unknown bodies return `null` and the raw row still stores.
 - **Kotlin changes need an owner APK rebuild** (`npx cap sync android && ./gradlew assembleDebug`)
   and are compile-gated only in the sandbox. JS/server changes ship via Railway with no rebuild —

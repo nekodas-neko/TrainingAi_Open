@@ -5,6 +5,7 @@ import { describePersonalRecord } from '@trainingai/shared/1rm'
 import { generateObject } from 'ai'
 import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
 import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
+import { aiPausedResponse } from '@/lib/ai/provider-paused'
 import { z } from 'zod'
 import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz, todayMidnightUtc, toAestDay, ageFromDob } from '@trainingai/shared/date-utils'
@@ -391,11 +392,11 @@ ${PROSE_FIELD_GUARDS}`,
       insights: ai.insights,
       dataQualityNote: clamped.dataQualityNote,
     })
-  } catch {
+  } catch (err) {
     // Covers NoObjectGeneratedError (Gemini output failed schema validation) and any
     // DB error from createGoalRecommendation — no row is persisted and the rate-limit
     // slot is still consumed, so report failure clearly rather than throwing a raw 500.
-    return NextResponse.json({ error: 'recommendation_failed' }, { status: 500 })
+    return aiPausedResponse(err) ?? NextResponse.json({ error: 'recommendation_failed' }, { status: 500 })
   }
 
   return NextResponse.json({

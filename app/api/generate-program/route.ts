@@ -6,6 +6,7 @@ import { generateObject } from 'ai'
 import { PROSE_FIELD_GUARDS } from '@/lib/ai/prompt-guards'
 import { USER_TEXT_NOTE } from '@trainingai/shared/ai/untrusted-text'
 import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
+import { aiPausedResponse } from '@/lib/ai/provider-paused'
 import { z } from 'zod'
 import type { GeneratedProgram, GeneratedExercise } from '@trainingai/shared/types/builder'
 import { KNOWN_STYLES, GOAL_STYLE_RULES } from '@trainingai/shared/workout/known-styles'
@@ -484,6 +485,6 @@ ${exerciseList}${injuryBlock}${referenceBlock}`
   } catch (err) {
     reportServerError(err, { userId, url: '/api/generate-program' })
     console.error('[generate-program] Gemini error:', err)
-    return NextResponse.json({ error: 'Failed to generate program. Please try again.' }, { status: 500 })
+    return aiPausedResponse(err) ?? NextResponse.json({ error: 'Failed to generate program. Please try again.' }, { status: 500 })
   }
 }
