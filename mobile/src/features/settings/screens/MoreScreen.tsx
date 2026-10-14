@@ -48,6 +48,7 @@ export function MoreScreen({
   openProfile,
   openAppleHealth,
   openData,
+  openDevices,
   openAbout,
   openYear,
   openFriendProfile,
@@ -59,6 +60,7 @@ export function MoreScreen({
   openProfile: () => void;
   openAppleHealth: () => void;
   openData: () => void;
+  openDevices: () => void;
   openAbout: () => void;
   openYear: () => void;
   openFriendProfile: (id: string) => void;
@@ -211,7 +213,12 @@ export function MoreScreen({
                   leading={<Icon name="health" />}
                   onPress={openAppleHealth}
                 />
-                <FeatureRow title="Devices & connections" leading={<Icon name="activity" />} />
+                <ListRow
+                  title="Devices & connections"
+                  subtitle="Oura account"
+                  leading={<Icon name="activity" />}
+                  onPress={openDevices}
+                />
                 <FeatureRow
                   title="Collection"
                   leading={<Icon name="award" />}

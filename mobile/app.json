@@ -51,6 +51,7 @@
       ],
       "expo-apple-authentication",
       "./src/integrations/auth/private-backups.cjs",
+      "./src/integrations/oura/oura-package-visibility.cjs",
       "expo-sqlite",
       [
         "expo-camera",

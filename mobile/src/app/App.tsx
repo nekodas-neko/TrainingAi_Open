@@ -7,7 +7,7 @@ import { CoachScreen } from '../features/coach/screens/CoachScreen';
 import type { CoachScope } from '../features/coach/data/models';
 import type { Destination } from '../features/coach/components/CoachWidget';
 import { FriendProfileScreen } from '../features/social/screens/FriendProfileScreen';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { AppProvider } from './providers/AppProvider';
@@ -46,6 +46,7 @@ import { HealthDayScreen } from '../features/health/screens/HealthDayScreen';
 import { HealthWeekScreen } from '../features/health/screens/HealthWeekScreen';
 import { DataSyncScreen } from '../features/settings/screens/DataSyncScreen';
 import { AboutScreen } from '../features/settings/screens/AboutScreen';
+import { OuraScreen, takeInitialOuraReturn } from '../features/devices/screens/OuraScreen';
 import { YearReviewScreen } from '../features/settings/screens/YearReviewScreen';
 
 import { RunningScreen } from '../features/activities/screens/RunningScreen';
@@ -130,6 +131,21 @@ function AppShell() {
     selectTab('More');
     setDetail('health-data');
   }
+  // An Oura return that cold-started the app goes to the Oura screen, which finishes the connect.
+  const [ouraReturn, setOuraReturn] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    void takeInitialOuraReturn().then((url) => {
+      if (!active || !url) return;
+      setOuraReturn(url);
+      selectTab('More');
+      setDetail('more-devices');
+    });
+    return () => {
+      active = false;
+    };
+    // Once, at launch: the link that started the app never changes.
+  }, []);
   function openSession(id: string, fullOverride = false) {
     setSessionFullOverride(fullOverride);
     setTab('Workout');
@@ -297,6 +313,7 @@ function AppShell() {
           openProfile={() => setDetail('profile-details')}
           openAppleHealth={openAppleHealth}
           openData={() => setDetail('more-data')}
+          openDevices={() => setDetail('more-devices')}
           openAbout={() => setDetail('more-about')}
           openYear={() => setDetail('year-review')}
         />
@@ -366,6 +383,8 @@ function AppShell() {
         <DataSyncScreen onBack={() => setDetail(null)} />
       ) : detail === 'more-about' ? (
         <AboutScreen onBack={() => setDetail(null)} />
+      ) : detail === 'more-devices' ? (
+        <OuraScreen initialReturn={ouraReturn} onBack={() => setDetail(null)} />
       ) : detail === 'year-review' ? (
         <YearReviewScreen onBack={() => setDetail(null)} />
       ) : healthDetail ? (
