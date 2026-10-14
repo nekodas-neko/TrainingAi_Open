@@ -63,18 +63,23 @@ export function timezoneOptions(current: string) {
     .sort()
     .map((value) => ({ value, label: value.replaceAll('_', ' ') }));
 }
-/** "Mar 26" for the More tab's "Member since" tile, in the user's timezone: the current app's
+/** "Mar 25" for the More tab's "Member since" tile, in the user's timezone: the current app's
  *  `formatInTimeZone(createdAt, tz, 'MMM yy')`, without pulling date-fns into the native app.
- *  `null` for a missing or unparseable timestamp, so the tile shows "—" rather than "Invalid". */
+ *  `null` for a missing or unparseable timestamp, or a zone Intl rejects, so the tile shows "—". */
 export function memberSinceLabel(createdAt: unknown, timeZone: string): string | null {
   if (typeof createdAt !== 'string' && typeof createdAt !== 'number') return null;
   const at = new Date(createdAt);
   if (Number.isNaN(at.getTime())) return null;
-  const parts = new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    year: '2-digit',
-    timeZone,
-  }).formatToParts(at);
+  let parts: Intl.DateTimeFormatPart[];
+  try {
+    parts = new Intl.DateTimeFormat('en-US', {
+      month: 'short',
+      year: '2-digit',
+      timeZone,
+    }).formatToParts(at);
+  } catch {
+    return null; // a stored zone Intl rejects ('', 'AEST') must not take the More tab down
+  }
   const part = (type: string) => parts.find((p) => p.type === type)?.value;
   return `${part('month')} ${part('year')}`;
 }

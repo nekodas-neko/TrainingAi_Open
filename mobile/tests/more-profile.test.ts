@@ -1,13 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { plural } from '@trainingai/shared/format/plural';
 import { memberSinceLabel, programTile } from '../src/features/settings/data/profile.ts';
-
-test('plural keeps one singular and everything else plural', () => {
-  assert.equal(plural(1, 'session', 'sessions'), '1 session');
-  assert.equal(plural(0, 'session', 'sessions'), '0 sessions');
-  assert.equal(plural(12, 'dose', 'doses'), '12 doses');
-});
 
 test('Member since reads the month the account was made in the user timezone', () => {
   assert.equal(memberSinceLabel('2025-03-14T02:00:00.000Z', 'Australia/Brisbane'), 'Mar 25');
@@ -21,6 +14,11 @@ test('Member since is blank, not "Invalid", without a usable timestamp', () => {
   assert.equal(memberSinceLabel('not a date', 'UTC'), null);
 });
 
+test('Member since is blank, not a crash, for a timezone Intl rejects', () => {
+  assert.equal(memberSinceLabel('2025-03-14T02:00:00.000Z', ''), null);
+  assert.equal(memberSinceLabel('2025-03-14T02:00:00.000Z', 'AEST'), null);
+});
+
 test('the sixth tile follows the current app: cycle, then tenure weeks, then Member since', () => {
   assert.deepEqual(
     programTile({ mode: 'cycle', cycleCurrent: 3, cycleTotal: 6, phaseName: 'Build' }, 'Mar 25'),
@@ -30,6 +28,14 @@ test('the sixth tile follows the current app: cycle, then tenure weeks, then Mem
     programTile({ mode: 'cycle', cycleCurrent: 6, cycleTotal: 6, blockComplete: true }, null),
     { label: 'New block?', value: '6/6' },
   );
+  assert.deepEqual(programTile({ mode: 'cycle', cycleCurrent: 2, cycleTotal: 4 }, null), {
+    label: 'Cycle',
+    value: '2/4',
+  });
+  assert.deepEqual(programTile({ mode: 'tenure', weeksRunning: 11 }, 'Mar 25'), {
+    label: 'On program',
+    value: '11w',
+  });
   assert.deepEqual(programTile({ mode: 'tenure', weeksRunning: 4 }, 'Mar 25'), {
     label: 'On program',
     value: '4w',

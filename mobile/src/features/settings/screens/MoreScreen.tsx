@@ -23,12 +23,14 @@ import {
 } from '../../../shared/ui';
 import { useAccountContext } from '../../account/AccountProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
+import { useWorkoutContext } from '../../workouts/WorkoutProvider';
 import { profileSpec, goalsSpec, metricValue } from '../../health/data/models';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { ProfilePhoto } from '../components/ProfilePhoto';
 import { ProfileStats } from '../components/ProfileStats';
 import { FeedbackSheet } from '../components/FeedbackSheet';
 import { DeleteAccountSheet } from '../components/DeleteAccountSheet';
+import { SignOutSheet } from '../components/SignOutSheet';
 import { memberSinceLabel } from '../data/profile';
 const stats = z
   .object({
@@ -67,9 +69,10 @@ export function MoreScreen({
   openFriendProfile: (id: string) => void;
 }) {
   const account = useAccountContext(),
-    { theme } = useTheme();
+    { theme } = useTheme(),
+    { timezone } = useWorkoutContext();
   const [tab, setTab] = useState('profile'),
-    [modal, setModal] = useState<'feedback' | 'delete' | null>(null);
+    [modal, setModal] = useState<'feedback' | 'delete' | 'signout' | null>(null);
   const profile = useWorkoutResource(profileSpec),
     goals = useWorkoutResource(goalsSpec),
     history = useWorkoutResource({ path: '/api/achievements', schema: stats, ttl: 300000 });
@@ -79,12 +82,7 @@ export function MoreScreen({
       ? user.displayName
       : (user?.name ?? account.state.profile?.name ?? 'Your profile');
   const lifetime = history.data?.lifetimeStats;
-  const memberSince = memberSinceLabel(
-    user?.createdAt,
-    (typeof user?.timezone === 'string' ? user.timezone : null) ??
-      account.dataReader?.timezone ??
-      Intl.DateTimeFormat().resolvedOptions().timeZone,
-  );
+  const memberSince = memberSinceLabel(user?.createdAt, timezone);
   const program = useWorkoutResource({
     path: '/api/program-week',
     ttl: 1800000,
@@ -264,17 +262,14 @@ export function MoreScreen({
                 />
                 {user?.isAdmin === true && (
                   <FeatureRow
-                  density="compact"
+                    density="compact"
                     title="Admin Console"
                     leading={<Icon name="settings" />}
                     divider={false}
                   />
                 )}
               </Section>
-              {/* The current app's direct actions (#2902): reporting a bug, editing the profile and
-                  signing out are each one tap from here. Edit profile opens Profile details, where
-                  the name and timezone are edited (the photo is the avatar above); Sign out is
-                  the Account panel's own call, not a second sign-out path. */}
+              {/* The current app's direct actions (#2902). */}
               <Stack gap="sm">
                 <AppButton
                   title="Report an issue"
@@ -293,9 +288,7 @@ export function MoreScreen({
                     title="Sign out"
                     icon="signOut"
                     variant="danger"
-                    onPress={() => {
-                      void account.signOut();
-                    }}
+                    onPress={() => setModal('signout')}
                   />
                 )}
               </Stack>
@@ -330,6 +323,7 @@ export function MoreScreen({
       </TabPanel>
       {modal === 'feedback' && <FeedbackSheet onClose={() => setModal(null)} />}
       {modal === 'delete' && <DeleteAccountSheet onClose={() => setModal(null)} />}
+      {modal === 'signout' && <SignOutSheet onClose={() => setModal(null)} />}
     </PageLayout>
   );
 }
