@@ -1,0 +1,11 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Bringing our own task back to the front after the hand-off (#2896). Normal permission. -->
+  <uses-permission android:name="android.permission.REORDER_TASKS" />
+  <!-- Android 11+ hides other apps unless they are named here. Clock and Settings are the
+       spike's stand-ins for testing without Oura installed. -->
+  <queries>
+    <package android:name="com.ouraring.oura" />
+    <package android:name="com.sec.android.app.clockpackage" />
+    <package android:name="com.android.settings" />
+  </queries>
+</manifest>

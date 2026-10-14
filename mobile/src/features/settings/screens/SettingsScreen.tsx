@@ -2,6 +2,7 @@ import { AppearancePanel } from '../components/AppearancePanel';
 import { BackgroundSettings } from '../../weather/components/BackgroundSettings';
 import { WeatherSettings } from '../../weather/components/WeatherSettings';
 import { IntegrationSettings } from '../../platform/components/IntegrationSettings';
+import { OuraMorningSyncSetting } from '../../health/components/OuraMorningSyncSetting';
 import { AppText, AppButton, Card } from '../../../shared/ui';
 import { useAccountContext } from '../../account/AccountProvider';
 import { useReportsContext } from '../../../development/diagnostics/ReportsProvider';
@@ -22,6 +23,7 @@ export function SettingsScreen() {
       <BackgroundSettings />
       <WeatherSettings />
       <IntegrationSettings />
+      <OuraMorningSyncSetting />
       <Card>
         <AppText variant="heading">Home layout</AppText>
         <AppButton

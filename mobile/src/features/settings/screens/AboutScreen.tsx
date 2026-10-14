@@ -15,6 +15,7 @@ import { DeleteAccountSheet } from '../components/DeleteAccountSheet';
 import { useAccountContext } from '../../account/AccountProvider';
 import { useNativeDataActions } from '../data/useNativeDataActions';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { AppHandoffDebugCard } from '../../health/components/AppHandoffDebugCard';
 export function AboutScreen({ onBack }: { onBack: () => void }) {
   const { theme } = useTheme(),
     account = useAccountContext(),
@@ -39,6 +40,7 @@ export function AboutScreen({ onBack }: { onBack: () => void }) {
               onPress={() => setModal('feedback')}
             />
           </Card>
+          <AppHandoffDebugCard />
           <Card>
             <AppText variant="heading">Account</AppText>
             <AppButton

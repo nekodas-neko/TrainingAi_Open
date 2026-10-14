@@ -35,6 +35,9 @@ export const platformSchema = z
     calendarTitle: z.string().nullable().default(null),
     calendarAuto: z.boolean().default(false),
     calendarSince: z.number().default(0),
+    // Morning hand-off to the Oura app (#2896): the setting, and the local day it last ran.
+    ouraMorningSync: z.boolean().default(true),
+    ouraHandoffDay: z.string().nullable().default(null),
   })
   .refine(
     (settings) =>

@@ -15,3 +15,6 @@ android/
 credentials.json
 *.keystore
 *.jks
+
+# Local Expo modules keep their Android sources in the repository.
+!/modules/*/android/

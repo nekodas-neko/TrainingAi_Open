@@ -22,6 +22,8 @@ import {
 } from '../../../shared/ui';
 import type { HealthDetail } from '../../health/screens/HealthDetailScreen';
 import { useHealthData } from '../../health/data/HealthDataProvider';
+import { useOuraHandoff } from '../../health/OuraHandoffProvider';
+import { hasLastNight } from '../../health/data/oura-handoff';
 import {
   energySpec,
   goalsSpec,
@@ -214,6 +216,7 @@ function HomeWidgetBody({
 }: WidgetProps & Extra) {
   const { theme } = useTheme();
   const health = useHealthData();
+  const handoff = useOuraHandoff();
   const home = useHome();
   const n = useNutrition();
   const today = health.body?.today?.date === health.today ? health.body.today : null;
@@ -385,6 +388,10 @@ function HomeWidgetBody({
         ]
       : [];
     const known = stages.reduce((sum, row) => sum + (row.hours ?? 0), 0);
+    const waiting =
+      handoff.status !== 'idle' && !hasLastNight(health.sleep, health.today)
+        ? handoff.status
+        : null;
     return (
       <Stack>
         <Pressable
@@ -456,13 +463,26 @@ function HomeWidgetBody({
                 </Stack>
               </>
             )}
-            {night?.sourceLabel && (
-              <AppText variant="micro" tone="muted">
-                {night.sourceLabel}
+            {waiting === 'syncing' ? (
+              <AppText variant="micro" tone="muted" accessibilityRole="alert">
+                Syncing last night’s sleep from Oura…
               </AppText>
+            ) : waiting === 'timeout' ? (
+              <AppText variant="micro" tone="muted" accessibilityRole="alert">
+                Last night’s sleep hasn’t arrived from Oura yet.
+              </AppText>
+            ) : (
+              night?.sourceLabel && (
+                <AppText variant="micro" tone="muted">
+                  {night.sourceLabel}
+                </AppText>
+              )
             )}
           </Card>
         </Pressable>
+        {waiting === 'timeout' && (
+          <AppButton title="Sync now" variant="ghost" onPress={handoff.syncNow} />
+        )}
         {openMorning && <HomeSleepFeedback onCorrect={openMorning} />}
       </Stack>
     );
