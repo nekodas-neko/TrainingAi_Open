@@ -637,7 +637,7 @@ describe.skipIf(!canRun)('repository ownership scoping — sweep survivors (#242
     ['storePrescription', r => r.storePrescription(USER_A, bId('program_sessions'), { phase: 'deload' } as never, AT)],
     ['updatePrescriptionExercisesCache', r => r.updatePrescriptionExercisesCache(USER_A, bId('program_sessions'), { phase: 'deload' } as never)],
     // ---- maintenance sweeps scoped to the caller ----
-    ['dropZoneMinutesFrom', r => r.dropZoneMinutesFrom(USER_A, FROM)],
+    ['dropZoneMinutesFrom', r => r.dropZoneMinutesFrom(USER_A, FROM, TZ)],
     ['insertOuraAccelChunk (its retention prune)', async r => {
       // FROM_TS, not AT: A's own session below spans AT and must see no chunk of A's either.
       const v = await r.insertOuraAccelChunk(USER_A, { startedAt: FROM_TS, sampleRate: 1, magnitudes: [1], steps: 0 })

@@ -99,8 +99,9 @@ export interface RollupIO {
    */
   deleteBleHeartrateNotIn(since: Date, keep: Date[]): Promise<void>
   upsertHeartrate(rows: { timestamp: Date; bpm: number; source: string | null }[]): Promise<void>
-  /** Drop the derived zone-minutes cache from `fromDay` forward — it owns rows we just rewrote. */
-  deleteZoneMinutesFrom(fromDay: string): Promise<void>
+  /** Drop the derived zone-minutes cache from `fromDay` forward — it owns rows we just rewrote.
+   *  `tz` dates the retention guard: days past HR retention are kept (#2828 N1). */
+  deleteZoneMinutesFrom(fromDay: string, tz: string): Promise<void>
 
   // ── daily rollups ────────────────────────────────────────────────────────────────────────────
   upsertOuraDaily(rows: OuraDailyRow[]): Promise<void>

@@ -849,7 +849,7 @@ export async function upsertAggregatorHeartrate(
     sql`${s.ouraHeartrate.source} IN (${aggregators}) AND (${s.ouraHeartrate.bpm} IS DISTINCT FROM excluded.bpm OR ${s.ouraHeartrate.source} IS DISTINCT FROM excluded.source)`,
   )
   const earliest = rows.reduce((min, r) => Math.min(min, r.timestamp.getTime()), Infinity)
-  await deleteZoneMinutesFrom(db, userId, formatInTimeZone(new Date(earliest), tz, 'yyyy-MM-dd'))
+  await deleteZoneMinutesFrom(db, userId, formatInTimeZone(new Date(earliest), tz, 'yyyy-MM-dd'), tz)
 }
 
 /**
@@ -895,7 +895,7 @@ export async function upsertOuraCloudHeartrate(
     sql`${s.ouraHeartrate.source} IN (${notDevice}) AND (${s.ouraHeartrate.bpm} IS DISTINCT FROM excluded.bpm OR ${s.ouraHeartrate.source} IS DISTINCT FROM excluded.source)`,
   )
   const earliest = kept.reduce((min, r) => Math.min(min, r.timestamp.getTime()), Infinity)
-  await deleteZoneMinutesFrom(db, userId, formatInTimeZone(new Date(earliest), tz, 'yyyy-MM-dd'))
+  await deleteZoneMinutesFrom(db, userId, formatInTimeZone(new Date(earliest), tz, 'yyyy-MM-dd'), tz)
   return kept.length
 }
 
@@ -1383,14 +1383,27 @@ function eachDay(fromDay: string, toDay: string): string[] {
 // mismatch: it is the permanent record once HR thins (review H-4, Design §2).
 const ZONE_HR_RETENTION_DAYS = HR_RETENTION_DAYS
 
+/** The first day whose zone split can still be recomputed from raw HR, given the user's local
+ *  `today`. A cached day before it is the permanent record. The read and the delete below both use
+ *  this, so they can't disagree about which days are frozen. */
+export function zoneRetentionCutoff(today: string): string {
+  return shiftDateStr(today, -ZONE_HR_RETENTION_DAYS)
+}
+
 /** Delete cached daily_zone_minutes rows for `userId` on/after `fromDay` (inclusive). Called by the
- *  BLE rollup after it delete-and-reinserts oura_heartrate across its window, so those days are
- *  recomputed on the next read instead of serving the pre-rewrite (often partial) split forever
- *  (review J-1/C-5 — the owns-its-rows analogue of a cache-group invalidation). */
-export async function deleteZoneMinutesFrom(db: Db, userId: string, fromDay: string): Promise<void> {
+ *  BLE rollup after it delete-and-reinserts oura_heartrate across its window, and by the Health
+ *  Connect and Oura Cloud HR writers, so those days are recomputed on the next read instead of
+ *  serving the pre-rewrite (often partial) split forever (review J-1/C-5 — the owns-its-rows
+ *  analogue of a cache-group invalidation).
+ *
+ *  Never reaches past HR retention (#2828 N1). A cached day older than `zoneRetentionCutoff` can't
+ *  be recomputed because its raw HR is already pruned, so deleting it would lose the day for good.
+ *  A history import can start 3,650 days back, so `fromDay` is clamped here for every caller. */
+export async function deleteZoneMinutesFrom(db: Db, userId: string, fromDay: string, tz: string): Promise<void> {
+  const cutoff = zoneRetentionCutoff(formatInTimeZone(new Date(), tz, 'yyyy-MM-dd'))
   await db.delete(s.dailyZoneMinutes).where(and(
     eq(s.dailyZoneMinutes.userId, userId),
-    gte(s.dailyZoneMinutes.day, fromDay),
+    gte(s.dailyZoneMinutes.day, fromDay > cutoff ? fromDay : cutoff),
   ))
 }
 
@@ -1403,7 +1416,7 @@ export async function getZoneMinutesRange(
   profile: { maxHr: number; restingHr: number },
 ): Promise<DayZoneSeconds[]> {
   const today = formatInTimeZone(new Date(), tz, 'yyyy-MM-dd')
-  const retentionCutoff = shiftDateStr(today, -ZONE_HR_RETENTION_DAYS)
+  const retentionCutoff = zoneRetentionCutoff(today)
   const cached = await db.select().from(s.dailyZoneMinutes).where(and(
     eq(s.dailyZoneMinutes.userId, userId),
     gte(s.dailyZoneMinutes.day, fromDay),

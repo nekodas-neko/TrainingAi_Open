@@ -85,7 +85,7 @@ export function createPostgresRollupIO(deps: PostgresRollupIODeps): RollupIO {
       ))
     },
     upsertHeartrate: async rows => { await oura.upsertOuraHeartrate(db, userId, rows) },
-    deleteZoneMinutesFrom: fromDay => oura.deleteZoneMinutesFrom(db, userId, fromDay),
+    deleteZoneMinutesFrom: (fromDay, tz) => oura.deleteZoneMinutesFrom(db, userId, fromDay, tz),
 
     upsertOuraDaily: rows => oura.upsertOuraDaily(db, userId, rows, 'oura_ble'),
     readLatestDailySummaryBefore: date => oura.getLatestOuraDailySummaryBefore(db, userId, date),
