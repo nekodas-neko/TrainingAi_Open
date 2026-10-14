@@ -79,7 +79,7 @@ describe.skipIf(!canRun)('getZoneMinutesRange — dash-form iteration + cache co
     const { getDb } = await import('@/lib/data/postgres/client')
     const before = await pool.query(`SELECT count(*)::int n FROM daily_zone_minutes WHERE user_id = $1`, [TEST_USER_ID])
     expect(before.rows[0].n).toBeGreaterThan(0)
-    await deleteZoneMinutesFrom(getDb(), TEST_USER_ID, from)
+    await deleteZoneMinutesFrom(getDb(), TEST_USER_ID, from, TZ)
     const after = await pool.query(`SELECT count(*)::int n FROM daily_zone_minutes WHERE user_id = $1`, [TEST_USER_ID])
     expect(after.rows[0].n).toBe(0)
   })
