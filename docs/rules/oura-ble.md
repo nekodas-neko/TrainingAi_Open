@@ -49,10 +49,14 @@ handles it. Consequences and rules:
   past Android Auto Backup's 25 MB quota so none of it is backed up. **Do not cite the device as a
   surviving copy of anything until that lands.** Local pruning is local-only and must never reach a
   server delete or a sync decision.
-- **The history cursor may only advance past events that are durably ingested (server 2xx).**
-  Advancing on the ring's batch completion alone silently loses the drained span forever
-  (found in review `docs/reviews/2026-07-07-oura-ble-system-review.md` BLE-1). Re-sends are
-  free — the table dedups on `(user_id, ring_timestamp_ds, tag, body_hex)`.
+- **The saved history cursor may only advance past events that are durably committed.** Since
+  2026-07-27 that means committed to the phone's own `oura_raw.db`, rows and cursor in one
+  transaction; the server POST is a best-effort backup that gates nothing
+  (`docs/oura-ble-operations.md`, "The cursor model"). Server 2xx gating survives only as the
+  fallback when `oura_raw.db` cannot be opened. Either way the cursor never skips a gap:
+  advancing on the ring's batch completion alone silently loses the drained span forever (found in
+  review `docs/reviews/2026-07-07-oura-ble-system-review.md` BLE-1). Re-sends are free — the table
+  dedups on `(user_id, ring_timestamp_ds, tag, body_hex)`.
 - **Decoders are infallible:** unknown/malformed bodies return `null` and the raw row still
   stores — never throw, never drop. `ring_timestamp_ds` is a monotonic deciseconds counter
   since the ring's own epoch (resets on re-key/dead battery), not UTC — wall-clock time

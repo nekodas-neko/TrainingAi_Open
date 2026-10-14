@@ -26,10 +26,12 @@ import java.util.ArrayDeque
 import java.util.concurrent.Executors
 
 /** Holds the persistent ring connection and owns the WHOLE sync pipeline: drain the
- *  ring's history, POST each batch to the server itself (native HTTP — no WebView in
- *  the data path), and advance the persisted resume cursor only after the server
- *  confirms storage. The cursor-ack invariant (CLAUDE.md "Oura Direct-BLE"): the
- *  resume cursor may only advance past events that are durably ingested (2xx).
+ *  ring's history, commit each batch to the device's own `oura_raw.db` (rows and the
+ *  persisted resume cursor in one transaction), and POST it to the server itself as a
+ *  best-effort backup (native HTTP — no WebView in the data path). The cursor invariant
+ *  (CLAUDE.md "Oura BLE"): the resume cursor never skips a gap, and advances only past
+ *  events that are durably committed. Server 2xx gates it only when `oura_raw.db` cannot
+ *  be opened (`postDrainBatchServerGated`).
  *
  *  Patient scan loop with backoff (RE4), hard cool-down after consecutive failures
  *  because a wedged radio only recovers by itself (RE6). All observations go to a

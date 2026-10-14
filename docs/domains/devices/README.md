@@ -396,8 +396,10 @@ Live at the time of writing (2026-07-30):
   memory, never Oura's public docs.
 - **`oura_raw_samples.body_hex` is the archival source of truth.** Never prune or mutate it;
   protocol fixes ship as decoder changes plus a redecode pass.
-- **The history cursor may only advance past events that are durably ingested (server 2xx).**
-  Advancing on the ring's batch completion alone loses the drained span forever.
+- **The saved history cursor may only advance past events that are durably committed** — to the
+  phone's `oura_raw.db` (rows and cursor in one transaction); the server POST is a best-effort
+  backup, and 2xx gating is only the fallback when that database cannot open. Advancing on the
+  ring's batch completion alone loses the drained span forever.
 - **Decoders are infallible** — unknown bodies return `null` and the raw row still stores.
 - **Kotlin changes need an owner APK rebuild** (`npx cap sync android && ./gradlew assembleDebug`)
   and are compile-gated only in the sandbox. JS/server changes ship via Railway with no rebuild —

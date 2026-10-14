@@ -103,8 +103,8 @@ state, for any agent. Titles end 🟢 while live, 🔴 when wrapped.
 **Oura BLE** → [`docs/rules/oura-ble.md`](docs/rules/oura-ble.md) and
 [`docs/oura-ble-operations.md`](docs/oura-ble-operations.md)
 - Byte layouts come from the `open_oura` source, never memory. Decoders never throw. The history
-  cursor advances only past server-acknowledged events. Never prune or mutate the server raw
-  archive. Never re-onboard the official Oura app. The Oura Cloud integration is gone for good.
+  cursor advances only once a batch is committed to the phone's own `oura_raw.db`, and never skips
+  a gap (the server POST is a backup). Never prune or mutate the server raw archive. Never re-onboard the official Oura app. The Oura Cloud integration is gone for good.
 
 **AI, security, integrations** → [`docs/rules/ai-security-and-integrations.md`](docs/rules/ai-security-and-integrations.md)
 - Structured LLM output uses a schema, never `JSON.parse` of text; no model-reported number gates
