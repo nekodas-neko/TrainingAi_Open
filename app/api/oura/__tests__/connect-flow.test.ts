@@ -26,6 +26,9 @@ const repo = {
 vi.mock('@/auth', () => ({ auth: () => authMock() }))
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: (...args: unknown[]) => rateLimit(...(args as [])) }))
 vi.mock('@/lib/data', () => ({ getRepositoryAsync: async () => repo }))
+// The history read a connect starts (#2859) is covered in its own tests; here it must only start.
+const startBackfill = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/oura/cloud/backfill', () => ({ startOuraConnectBackfill: startBackfill }))
 
 import { POST as startConnect, GET as openConnect } from '../connect/route'
 import { GET as callback } from '../callback/route'
@@ -76,6 +79,7 @@ describe('Oura connect routes (#2858)', () => {
   beforeEach(() => {
     for (const [k, v] of Object.entries(ENV)) { saved[k] = process.env[k]; process.env[k] = v }
     row = null
+    startBackfill.mockReset()
     fetchMock.mockReset()
     vi.stubGlobal('fetch', fetchMock)
     authMock.mockResolvedValue({ user: { id: USER } })
@@ -140,6 +144,7 @@ describe('Oura connect routes (#2858)', () => {
     expect(row!.accessToken).not.toContain('acc-1')
     expect(res.headers.get('set-cookie')).toMatch(/ta_oura_connect=;/)
     expect(await (await connection()).json()).toMatchObject({ connected: true, scope: 'daily' })
+    expect(startBackfill).toHaveBeenCalledExactlyOnceWith(USER)
   })
 
   it('native: the browser leg stores nothing; the app completes with its own bearer', async () => {
@@ -151,12 +156,14 @@ describe('Oura connect routes (#2858)', () => {
     expect(back.startsWith('com.trainingai.app.preview:/oura/callback?oura=pending&handle=')).toBe(true)
     expect(back).not.toContain('acc-1')
     expect(row).toBeNull()
+    expect(startBackfill).not.toHaveBeenCalled()
 
     authMock.mockResolvedValue({ user: { id: USER } }) // the app's bearer
     const handle = new URLSearchParams(back.split('?')[1]).get('handle')!
     const done = await complete(completeReq({ handle }))
     expect(await done.json()).toEqual({ connected: true })
     expect(decryptOuraToken(row!.accessToken, USER, 'access_token')).toBe('acc-1')
+    expect(startBackfill).toHaveBeenCalledExactlyOnceWith(USER)
   })
 
   it('attack: a native link sent to a victim cannot land the victim\'s grant on the sender\'s account', async () => {

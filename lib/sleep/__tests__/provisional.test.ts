@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   isNightProvisional,
+  isRingRollupNight,
   PROVISIONAL_COVERAGE_MARGIN_MS,
 } from '@/lib/sleep/provisional'
 import { DEFAULT_EPOCH_DS, DEFAULT_MAX_BRIDGE_GAP_EPOCHS } from '@/lib/sleep/sensing-span'
@@ -50,5 +51,15 @@ describe('isNightProvisional', () => {
   // would be a worse answer than saying nothing.
   it('no coverage at all resolves to final', () => {
     expect(isNightProvisional(WAKE, null)).toBe(false)
+  })
+})
+
+// #2895: only the ring rollup's own nights are measured against its watermark.
+describe('isRingRollupNight', () => {
+  it('is true only for a rollup night id', () => {
+    expect(isRingRollupNight('ble:2026-09-01T12:08:00.000Z')).toBe(true)
+    expect(isRingRollupNight('2f1c9a7e-oura-cloud-id')).toBe(false)
+    expect(isRingRollupNight(null)).toBe(false)
+    expect(isRingRollupNight(undefined)).toBe(false)
   })
 })

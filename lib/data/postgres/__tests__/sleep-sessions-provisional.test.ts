@@ -33,13 +33,13 @@ describe.skipIf(!canRun)('sleep-sessions marks a night the rollup has not derive
 
   const ANCHOR_DS = 49_700_000
 
-  async function seedNight(end: Date, hours: number, ouraId: string) {
+  async function seedNight(end: Date, hours: number, ouraId: string, source = 'oura_ble') {
     const start = new Date(end.getTime() - hours * HOUR)
     const { formatInTimeZone } = await import('date-fns-tz')
     await pool.query(
       `INSERT INTO sleep_sessions (user_id, date, sleep_start, sleep_end, duration_hours, oura_id, source_map)
-       VALUES ($1, $2, $3, $4, $5, $6, '{"duration_hours":"oura_ble"}'::jsonb)`,
-      [USER, formatInTimeZone(end, TZ, 'yyyy-MM-dd'), start, end, hours, ouraId],
+       VALUES ($1, $2, $3, $4, $5, $6, jsonb_build_object('duration_hours', $7::text))`,
+      [USER, formatInTimeZone(end, TZ, 'yyyy-MM-dd'), start, end, hours, ouraId, source],
     )
   }
 
@@ -64,8 +64,8 @@ describe.skipIf(!canRun)('sleep-sessions marks a night the rollup has not derive
       `INSERT INTO oura_rollup_state (user_id, last_rolled_ds, epoch) VALUES ($1, $2, 0)`,
       [USER, ANCHOR_DS],
     )
-    await seedNight(settledEnd, 7.5, 'ble-settled')
-    await seedNight(fillingEnd, 6.25, 'ble-filling')
+    await seedNight(settledEnd, 7.5, 'ble:settled')
+    await seedNight(fillingEnd, 6.25, 'ble:filling')
   })
 
   afterAll(async () => {
@@ -99,5 +99,15 @@ describe.skipIf(!canRun)('sleep-sessions marks a night the rollup has not derive
     )
     const rows = await payload()
     expect(rows.find(r => r.durationHours === 6.25)?.provisional).toBe(false)
+  })
+
+  // #2895: the watermark is the ring rollup's, and it stops moving once the ring's data comes from
+  // the Oura Cloud feed. A Cloud night measured against it would read provisional forever.
+  it('an Oura Cloud night at the same coverage edge is final', async () => {
+    await pool.query(`UPDATE oura_rollup_state SET last_rolled_ds = $2 WHERE user_id = $1`, [USER, ANCHOR_DS])
+    await pool.query(`DELETE FROM sleep_sessions WHERE user_id = $1 AND oura_id = 'ble:filling'`, [USER])
+    await seedNight(fillingEnd, 6.5, 'cloud-night-1', 'oura_cloud')
+    const rows = await payload()
+    expect(rows.find(r => r.durationHours === 6.5)?.provisional).toBe(false)
   })
 })

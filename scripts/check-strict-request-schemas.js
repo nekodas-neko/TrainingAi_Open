@@ -142,6 +142,10 @@ const BASELINE = {
   // number was 2 rather than 0. The route parses no request schema at all; it reads `body.text`,
   // `body.url` and `body.image` by hand with explicit type and size guards.
   'app/api/nutrition/scan/route.ts': 3,
+  // #2895 review, item 6: Oura's verification GET. Oura is the client and its query is not ours to
+  // fix; a parameter it adds later would 400 every subscription's verification, so the schema
+  // ignores unknown keys. The constant-time token compare is the check that matters.
+  'app/api/oura/webhook/route.ts': 1,
   'app/api/oura-ble/accel-chunks/route.ts': 1,
   'app/api/oura-ble/live-steps/route.ts': 2,
   'app/api/oura-ble/samples/route.ts': 1,

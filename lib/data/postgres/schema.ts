@@ -1570,9 +1570,9 @@ export const ouraDaily = pgTable('oura_daily', {
   lowActivityMetMinutes:        doublePrecision('low_activity_met_minutes'),
 
   // Daily stress (GET /v2/usercollection/daily_stress)
-  stressHigh:    integer('stress_high'),    // minutes in high stress
-  recoveryHigh:  integer('recovery_high'),  // minutes in high recovery
-  daySummary:    text('day_summary'),       // 'restored'|'restorative'|'stressful'|'very_stressful'|'passive'
+  stressHigh:    integer('stress_high'),    // seconds in high stress (spec `PublicDailyStress`)
+  recoveryHigh:  integer('recovery_high'),  // seconds in high recovery
+  daySummary:    text('day_summary'),       // 'restored'|'normal'|'stressful' (spec `PublicDailyStressSummary`)
 
   // VO2 Max (GET /v2/usercollection/vO2_max) — Ring 4+ / Ring 5
   vo2Max:        doublePrecision('vo2_max'),  // ml/kg/min
@@ -1582,7 +1582,7 @@ export const ouraDaily = pgTable('oura_daily', {
   pulseWaveVelocity:   doublePrecision('pulse_wave_velocity'), // m/s
 
   // Daily resilience (GET /v2/usercollection/daily_resilience)
-  resilienceLevel:        text('resilience_level'),       // 'exceptional'|'strong'|'adequate'|'limited'|'low'
+  resilienceLevel:        text('resilience_level'),       // 'limited'|'adequate'|'solid'|'strong'|'exceptional' (spec `LongTermResilienceLevel`)
   resilienceContributors: jsonb('resilience_contributors'), // { sleep_recovery, daytime_recovery, stress }
 
   // sleep_time endpoint (GET /v2/usercollection/sleep_time) — migration 090
