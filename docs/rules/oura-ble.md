@@ -15,11 +15,12 @@ policy, protocol-maintenance playbook, and the data-integrity runbook live in
 pipeline, and add a row to its §1 matrix for any new failure signature in the same PR that
 handles it. Consequences and rules:
 
-- **The Oura Cloud gets no new data from this ring, ever.** `/api/oura/sync` succeeding is
-  not freshness — its data ends at the re-key. Never "fix" staleness by re-onboarding the
-  official Oura app: it can force a firmware update that changes the BLE event encoding
-  (the frozen firmware is what keeps our reverse-engineered protocol stable). Treat any
-  re-onboard as a full protocol re-validation.
+- **Until the switch-over, the Oura Cloud gets no new data from this ring.** The ring is on our own
+  key, so the Cloud's data ends at the 2026-07-07 re-key. Re-pairing it with the official Oura app
+  re-keys it, ends the direct connection and may update the firmware (which changes the BLE event
+  encoding). That is the owner's switch-over step for the Oura API (#2808), done once and on
+  purpose; an agent never does it, and never does it to "fix" staleness. Going back afterwards
+  means a factory reset and a fresh `open_oura` pairing.
 - **Byte layouts come from the `open_oura` Rust source — never memory, never Oura's public
   docs** (they don't cover the BLE protocol). The `oura-native-ble` skill was the second source
   and is gone from this repo; where a code comment still cites it, the Rust source is the one to
@@ -71,13 +72,29 @@ handles it. Consequences and rules:
 
 ---
 
-## Oura Ring — the Cloud integration is GONE (owner, 2026-08-13)
+## Oura Ring — the Oura Cloud API is the ring's source (owner, 2026-10-11, #2808)
 
-The user wears an **Oura Ring 5**, read directly over BLE — see **Oura Direct-BLE** above, the live
-pipeline and the only one. The Oura *Cloud* integration was removed on 2026-08-13 and must never be
-re-added (it can't succeed — the ring is on our key — and re-onboarding the official app risks a
-firmware update that breaks the reverse-engineered protocol). What's deliberately kept (historical
-Cloud data, the ranked per-field health-write merge, the six still-local `app/api/oura/*` routes)
-and the full reasoning now live in
+**History.** The Cloud integration was removed on 2026-08-13, when the ring had moved to our own BLE
+key and every Cloud request could only 401. What was kept then (historical Cloud data, the ranked
+per-field health-write merge, the local `app/api/oura/*` routes) is still in
 [`docs/oura-ble-operations.md`](../oura-ble-operations.md#6-oura-cloud-retirement--whats-gone-whats-kept-and-why-owner-2026-08-13)
-§6, merged there with the rest of the Oura pipeline's standing rules.
+§6.
+
+**Decision.** On 2026-10-11 the owner reversed that: the ring's data source moves from direct BLE
+to the **Oura Cloud API**, per user over OAuth, because that is what most users will have. It is
+built as a pluggable `DataSourceConnector` (`packages/shared/src/health/source-connectors.ts`) in
+parts: #2858 connects an account and stores its tokens, #2859 adds webhooks and backfill, and later
+parts re-rank the sources and re-base features on API data.
+
+**Rules for the Cloud side:**
+
+- **Only the connector module calls Oura Cloud.** Every request to `api.ouraring.com` or
+  `cloud.ouraring.com` lives in `lib/oura/cloud/`. Routes and other code import it; they never build
+  an Oura URL themselves. `lib/oura/__tests__/cloud-calls-only-from-connector.test.ts` enforces it.
+- **Tokens are encrypted at rest.** `oura_tokens.access_token` and `refresh_token` hold AES-256-GCM
+  ciphertext (`lib/oura/cloud/token-cipher.ts`), keyed by HKDF-SHA256 from `OURA_TOKEN_KEY` and bound
+  to the user and the column. Without the key, connecting and reading tokens fail closed. A value
+  that does not decrypt is treated as no connection, never sent to Oura.
+- **Field names and scopes come from the pinned spec** (`.claude/skills/oura-api/`), never memory.
+- **The raw BLE archive on the server stays.** Never prune or mutate it, before or after the switch.
+  The rule above about the archive is unchanged by the move to the API.
