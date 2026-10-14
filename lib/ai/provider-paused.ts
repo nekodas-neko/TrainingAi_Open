@@ -1,4 +1,3 @@
-import { APICallError } from 'ai'
 import { NextResponse } from 'next/server'
 import { reportServerError } from '@/lib/observability'
 import { resolveClaudeRoOwner } from '@/lib/data/postgres/claude-ro-owner'
@@ -25,6 +24,18 @@ const BILLING_TEXT = /prepayment credits|credits? (?:are |is )?(?:depleted|exhau
 const CAUSE_DEPTH = 4
 
 /**
+ * Read by shape, not `APICallError.isInstance`: that needs the `ai` package's export, and the
+ * route tests that stub `ai` with only the functions they call would break on the import alone.
+ * A provider error is anything carrying a numeric `statusCode`.
+ */
+function providerError(e: unknown): { statusCode: number; message: string; responseBody: string } | null {
+  if (typeof e !== 'object' || e === null) return null
+  const { statusCode, message, responseBody } = e as { statusCode?: unknown; message?: unknown; responseBody?: unknown }
+  if (typeof statusCode !== 'number') return null
+  return { statusCode, message: typeof message === 'string' ? message : '', responseBody: typeof responseBody === 'string' ? responseBody : '' }
+}
+
+/**
  * True when the provider refused because of the account, not the request.
  *
  * 402 is always that. 400, 403 and 429 only count when the provider's own words say billing or
@@ -34,10 +45,11 @@ const CAUSE_DEPTH = 4
 export function isAiBillingError(err: unknown): boolean {
   let cur: unknown = err
   for (let i = 0; i < CAUSE_DEPTH && cur != null; i++) {
-    if (APICallError.isInstance(cur)) {
-      if (cur.statusCode === 402) return true
-      if (cur.statusCode === 400 || cur.statusCode === 403 || cur.statusCode === 429) {
-        if (BILLING_TEXT.test(`${cur.message} ${cur.responseBody ?? ''}`)) return true
+    const e = providerError(cur)
+    if (e) {
+      if (e.statusCode === 402) return true
+      if (e.statusCode === 400 || e.statusCode === 403 || e.statusCode === 429) {
+        if (BILLING_TEXT.test(`${e.message} ${e.responseBody}`)) return true
       }
     }
     cur = (cur as { cause?: unknown }).cause
@@ -73,7 +85,7 @@ export function noteAiBillingError(err: unknown, now: number = Date.now()): bool
   if (!isAiBillingError(err)) return false
   if (now - lastSignalAt < SIGNAL_EVERY_MS) return true
   lastSignalAt = now
-  const status = APICallError.isInstance(err) ? err.statusCode : null
+  const status = providerError(err)?.statusCode ?? null
   const detail = (err instanceof Error ? err.message : String(err)).replace(/\s+/g, ' ').slice(0, 300)
   reportServerError(
     new Error(`${AI_PAUSED_SIGNAL_PREFIX}: Gemini refused on billing${status ? ` (HTTP ${status})` : ''}: ${detail}`),
