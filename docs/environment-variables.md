@@ -11,6 +11,24 @@ Required in Railway:
 - `AUTH_SECRET` — NextAuth session-cookie signing (`auth.config.ts`'s `secret`); without it the credentials callback returns `?error=Configuration` and nobody can log in. **It was missing from this list until Q-311 (2026-08-30) while ~~`SESSION_SECRET`~~ — read by nothing — sat in it**: `SESSION_SECRET` was `auth.config.ts`'s fallback until that fallback was deleted, and it outlived the deletion here, in the README, and in two CI workflow env blocks, where it read as a credential in a public repo. Safe to remove from Railway; `grep -rn SESSION_SECRET` now finds only prose.
 - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_REDIRECT_URI` — OAuth
 - `GOOGLE_GENERATIVE_AI_API_KEY` — Gemini (used by every `@ai-sdk/google` route)
+- **Oura Cloud API** (#2858, part 1 of #2808). Read only by `lib/oura/cloud/`. The owner registers
+  the app at cloud.ouraring.com → OAuth applications and sets these in Railway; agents never set them.
+  - `OURA_CLIENT_ID` / `OURA_CLIENT_SECRET` — the registered app's credentials. The secret also
+    authenticates webhook management (part 2).
+  - `OURA_REDIRECT_URI` — the callback registered with Oura, exactly:
+    `https://trainingai-production.up.railway.app/api/oura/callback`. Its origin is also where the
+    connect link points, so the nonce cookie and the callback share a host.
+  - `OURA_TOKEN_KEY` — **new with #2858.** Any long random string (at least 32 characters; e.g.
+    `openssl rand -base64 48`). The AES-256-GCM key that encrypts `oura_tokens.access_token` and
+    `refresh_token` is derived from it with HKDF-SHA256. Missing or short: connecting answers 503
+    and nothing is stored. **Changing it orphans every stored token** (they read as not connected,
+    and the user connects again); it is not rotated in place.
+  - `OURA_WEBHOOK_CALLBACK_URL` — `https://trainingai-production.up.railway.app/api/oura/webhook`.
+    Part 2 (#2859); nothing reads it yet.
+  - `OURA_WEBHOOK_VERIFICATION_TOKEN` — answers Oura's webhook verification challenge. Part 2
+    (#2859); nothing reads it yet.
+  - Without the first three, or without `OURA_TOKEN_KEY`, the connect routes answer 503 and the rest
+    of the app is unaffected. Local development never uses production's values: tests mock Oura.
 - ~~`GEMINI_API_KEY`~~ — **no longer used by any code (Q-189, 2026-08-12).** Its only consumer was the text-to-speech route, which was deleted with the unreachable legacy chat surface. Safe to remove from Railway; the app never reads it. The `@google/genai` package stays — `lib/exercise-image-gen.ts` still uses it, but on `GOOGLE_GENERATIVE_AI_API_KEY`, so nothing reads `GEMINI_API_KEY` any more.
 - `HEALTH_CONNECT_INGEST_SECRET` + `WEBHOOK_USER_ID` — Tasker auth for `app/api/health-connect/ingest/route.ts`
 

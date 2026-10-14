@@ -39,11 +39,11 @@ export function buildCsp(isDev: boolean): string {
   // not the <img> itself. Listing it only in img-src reproduces the exact bug this comment
   // describes, one host later.
   // The two Oura Cloud hosts that used to sit between oauth2.googleapis.com and open-meteo were
-  // removed here on 2026-08-20. The integration itself went on 2026-08-13, and
-  // `lib/oura/__tests__/no-cloud-calls.test.ts` already proves no source file calls them — but that
-  // guard sweeps `app/`, `components/`, `lib/` and `packages/shared/src`, and the CSP was living in
-  // `next.config.ts` at the repo root, where nothing looked. So the header kept permitting outbound
-  // connections to an integration that no longer exists. Extracting this file is what surfaced it.
+  // removed here on 2026-08-20, a week after the Cloud integration went, because the guard of the
+  // day did not sweep `next.config.ts`, where the CSP lived. They stay out now the Oura API is back
+  // (#2858): only the server calls Oura, from `lib/oura/cloud/`, and the consent page is a top-level
+  // redirect, which `connect-src` does not govern. `lib/oura/__tests__/cloud-calls-only-from-connector.test.ts`
+  // fails if an Oura host appears here or anywhere else outside the connector.
   // `ws: wss:` is DEV-ONLY (RV-197). Those two schemes allowed a WebSocket to ANY host, and
   // `connect-src` is the directive that would otherwise stop injected script sending data
   // off-origin — so the one blanket in the list undid most of the rest. Nothing in `app/`,

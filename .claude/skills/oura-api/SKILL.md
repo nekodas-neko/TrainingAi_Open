@@ -29,7 +29,7 @@ Full spec: `.claude/skills/oura-api/references/openapi-v1.34.json`
 | `session` | Guided/unguided sessions |
 | `spo2Daily` | SpO2 average during sleep |
 
-Our app requests: `daily heartrate spo2 workout personal session`
+Our app requests: `personal daily heartrate workout session spo2Daily` (`lib/oura/cloud/config.ts` → `OURA_SCOPES`). The SpO2 scope is `spo2Daily`; `spo2` is not a scope in the spec.
 
 ## Base URL
 
@@ -388,7 +388,7 @@ Subscriptions may expire — renew via `PUT /v2/webhook/subscription/renew/{id}`
 All upserts use `COALESCE(EXCLUDED.col, table.col)` — Oura data does NOT overwrite existing non-null values.
 
 ## oura_tokens table columns
-`user_id` (PK), `personal_access_token` (legacy, unused), `access_token`, `refresh_token`, `expires_at`, `scope`, `oura_user_id` (UNIQUE — used to route webhook events to DB user), `webhook_signing_key`
+`user_id` (PK), `personal_access_token` (legacy, unused), `access_token`, `refresh_token` (both AES-256-GCM ciphertext since #2858, `lib/oura/cloud/token-cipher.ts`), `expires_at`, `scope`, `oura_user_id` (UNIQUE — used to route webhook events to DB user), `webhook_signing_key`
 
 ---
 

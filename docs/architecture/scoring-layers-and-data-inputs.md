@@ -546,9 +546,11 @@ but not started, and the owner's ring stays on the direct connection until the s
 the last 97 nights from the direct archive, score both copies, and measure how far each score moves
 before the ring changes.
 
-**Going ahead means reversing a written rule.** CLAUDE.md, [`oura-ble.md`](../rules/oura-ble.md) and
-the guard test `lib/oura/__tests__/no-cloud-calls.test.ts` all say the Oura Cloud integration is gone
-for good. The old `oura_tokens` table is still in the schema.
+**Going ahead meant reversing a written rule.** CLAUDE.md, [`oura-ble.md`](../rules/oura-ble.md) and
+the guard test `no-cloud-calls.test.ts` said the Oura Cloud integration was gone for good. The owner
+decided to go ahead on 2026-10-11 (#2808); #2858 rewrote the rules and replaced the guard with
+`lib/oura/__tests__/cloud-calls-only-from-connector.test.ts`, which allows Oura Cloud calls only from
+`lib/oura/cloud/`. Tokens live, encrypted, in the existing `oura_tokens` table.
 
 ## 12. What a native app has to keep
 

@@ -323,7 +323,7 @@ Injuries, Supplements, AI Periodization, Oura Ring, Body Battery.
 | Reading a request body | Always `readJsonLimited`, **never bare `req.json()`**. A Zod schema after the read bounds what is *stored*, not what is transferred and parsed — measured 2026-08-18, a 20 MB body to `auth/register` was read, buffered and fully parsed before being answered 400. `scripts/check-bounded-request-body.js` ratchets the conversion, shrink-only per file, with the three session-less routes (`auth/register`, `auth/exchange-mobile-token`, `health-connect/ingest`) already at zero (Q-322 / Q-498) |
 | Fetching a user-supplied URL | `lib/net/safe-fetch.ts` → `fetchPublicUrl(url, opts)`, `isPublicAddress(addr)`. **The only sanctioned way to fetch a URL a user typed.** https-only, port 443, no embedded credentials, every resolved address checked against the private/loopback/link-local/CGNAT blocks, each redirect hop re-validated, response bounded by bytes/timeout/content-type. Failures return a `reason` code — the caller maps it to a message and never echoes it. Residual risk stated in the file: DNS rebinding is not closed out |
 | PKCE (OAuth) | `lib/auth/mobile/pkce.ts` → `computePkceChallenge`, `verifyPkce` |
-| ~~Oura webhook signature / OAuth state~~ | **Deleted 2026-08-13 with the Cloud integration (Q-224).** The fail-closed-verification and enumeration-oracle rules they demonstrated are in `CLAUDE.md` and still bind any new webhook. |
+| Oura OAuth state | `lib/oura/cloud/connect-ticket.ts` (#2858); see §8. ~~Oura webhook signature~~ was deleted 2026-08-13 (Q-224) and returns with part 2 (#2859); the fail-closed-verification and enumeration-oracle rules it demonstrated still bind it. |
 | Server error reporting | `lib/observability.ts` → `reportServerError(err, context)` → `POST /api/client-error` |
 | Client error boundary | `components/error-reporter.tsx`, `app/error.tsx` |
 | Structured logging | `packages/shared/src/logger.ts` → `errorLog`, `infoLog` |
@@ -531,14 +531,20 @@ free text (`CLAUDE.md`).
 Full spec: `docs/oura-ring-data-reference.md` and the `oura-api` skill. See also the
 Oura section in `CLAUDE.md`.
 
-**The Oura Cloud integration was removed on 2026-08-13 (Q-224, owner-decided).** There is no HTTP
-client, no OAuth/PAT flow, no webhook receiver and no token storage — `lib/oura/` now holds four
-files, all local. Do not re-add a Cloud call; it can only 401, and the guard that says so is
-`lib/oura/__tests__/no-cloud-calls.test.ts`.
+**The Oura Cloud API is back as the ring's source (owner, 2026-10-11, #2808).** It was removed on
+2026-08-13 (Q-224), when the ring was on our own BLE key. Part 1 (#2858) is the connector in
+`lib/oura/cloud/`: the only module that may call Oura Cloud, held by
+`lib/oura/__tests__/cloud-calls-only-from-connector.test.ts`. Webhooks and backfill are part 2.
 
 | Concern | Where |
 |---|---|
-| ~~API client / token crypto / OAuth state / webhook signature / HR-sync / sync throttle~~ | **Deleted 2026-08-13.** |
+| `DataSourceConnector` shape + the Oura Cloud entry | `packages/shared/src/health/source-connectors.ts` → `DataSourceConnector`, `OURA_CLOUD_CONNECTOR`, `DATA_SOURCE_CONNECTORS`. Driver-free. The other sources get entries with PS-40's registry |
+| Oura Cloud settings, URLs and scopes | `lib/oura/cloud/config.ts` → `ouraOAuthConfig()` (`OURA_CLIENT_ID` / `OURA_CLIENT_SECRET` / `OURA_REDIRECT_URI`; `null` = switched off, answer 503), `buildAuthorizeUrl`, `OURA_SCOPES` (the pinned spec's names) |
+| Oura OAuth `state` / CSRF | `lib/oura/cloud/connect-ticket.ts` → `createConnectTicket` / `readConnectTicket` (JWT on `AUTH_SECRET`, own issuer, 10 min, nonce bound to the `ta_oura_connect` cookie), `connectReturnUrl` (web Devices page, or the native scheme from `NATIVE_CALLBACKS` + `/oura/callback`) |
+| Oura token encryption at rest | `lib/oura/cloud/token-cipher.ts` → `encryptOuraToken` / `decryptOuraToken` (AES-256-GCM, key = HKDF-SHA256 of `OURA_TOKEN_KEY`, AAD = user + column; a value that does not open reads as `null`; missing key throws `OuraTokenKeyMissingError`) |
+| Oura HTTP calls | `lib/oura/cloud/client.ts` → `exchangeAuthorizationCode`, `refreshAccessToken`, `revokeAccessToken`, `fetchOuraUserId`. Imported only inside `lib/oura/cloud/` |
+| An Oura access token for a user (refreshes first) | `lib/oura/cloud/tokens.ts` → `getOuraAccessToken(store, config, userId)`, refreshing inside `REFRESH_MARGIN_MS`, single-flight per user (Oura rotates refresh tokens); `connectOuraAccount`, `getOuraConnection`, `disconnectOuraAccount`. Storage: `lib/data/postgres/slices/oura-cloud-tokens.ts` (ciphertext only). Routes: `/api/oura/connect`, `/api/oura/callback`, `/api/oura/connection` |
+| ~~Webhook signature / HR-sync / sync throttle~~ | **Deleted 2026-08-13.** Webhooks return in part 2 (#2859) |
 | Types | `lib/oura/types.ts` — `OuraWorkout` only; `oura_workouts` is read-only history (nothing writes it since the re-key) |
 | Contributors mapping | `lib/oura/contributors.ts` |
 | BLE freshness | `lib/oura/ble-freshness.ts` → `isBleDataFresh(...)` |
