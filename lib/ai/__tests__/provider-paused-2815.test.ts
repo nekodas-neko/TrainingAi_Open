@@ -128,7 +128,7 @@ describe('the AI chokepoint raises the signal for every route', () => {
 describe('every AI route answers a billing failure with the paused notice', () => {
   const ROOT = path.resolve(__dirname, '../../..')
   const walk = (dir: string): string[] =>
-    readdirSync(dir).flatMap(n => {
+    readdirSync(dir).filter(n => n !== '__check_fixture__').flatMap(n => {
       const p = path.join(dir, n)
       return statSync(p).isDirectory() ? walk(p) : p.endsWith('route.ts') ? [p] : []
     })
