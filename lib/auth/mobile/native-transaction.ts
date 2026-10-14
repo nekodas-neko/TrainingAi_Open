@@ -9,6 +9,9 @@ export const NATIVE_CALLBACKS = {
   ios: 'com.fitnessai.training:/auth/callback',
   android: 'com.trainingai.app:/auth/callback',
   'android-dev': 'com.trainingai.app.dev:/auth/callback',
+  // The side-by-side build the owner runs next to the real app (#2878). It talks to production,
+  // so unlike `android-dev` it is accepted there.
+  'android-preview': 'com.trainingai.app.preview:/auth/callback',
 } as const;
 export type NativeClient = keyof typeof NATIVE_CALLBACKS;
 export type NativeTransaction = { client: NativeClient; challenge: string; state: string };
