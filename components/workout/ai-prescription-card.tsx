@@ -151,7 +151,10 @@ export function AiPrescriptionCard({
       });
       if (res.ok) {
         const data = await res.json();
-        await invalidatePrescriptionChanged(sessionId);
+        // Not awaited: the native SQLite deletes can queue for seconds, and the sync mirrors and the
+        // invalidation tick are already set before the call returns, so the refetch the status
+        // change starts cannot read the old prescription (issue 2831).
+        invalidatePrescriptionChanged(sessionId).catch(() => {});
         onStatusChange(data.prescriptionStatus);
       } else {
         toast.error("Couldn't save — try again");
