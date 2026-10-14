@@ -60,7 +60,7 @@ describe('verifyOuraSignature (#2859)', () => {
 
 describe('ouraWebhookConfig (#2859)', () => {
   it('is null unless the OAuth settings, callback URL and verification token are all present', () => {
-    const env = { OURA_WEBHOOK_CALLBACK_URL: 'https://x.example/api/oura/webhook', OURA_WEBHOOK_VERIFICATION_TOKEN: 'vt' }
+    const env = { NODE_ENV: 'test', OURA_WEBHOOK_CALLBACK_URL: 'https://x.example/api/oura/webhook', OURA_WEBHOOK_VERIFICATION_TOKEN: 'vt' }
     expect(ouraWebhookConfig(CONFIG, env as NodeJS.ProcessEnv)).toMatchObject({ callbackUrl: env.OURA_WEBHOOK_CALLBACK_URL, verificationToken: 'vt' })
     expect(ouraWebhookConfig(null, env as NodeJS.ProcessEnv)).toBeNull()
     expect(ouraWebhookConfig(CONFIG, { ...env, OURA_WEBHOOK_VERIFICATION_TOKEN: ' ' } as NodeJS.ProcessEnv)).toBeNull()
