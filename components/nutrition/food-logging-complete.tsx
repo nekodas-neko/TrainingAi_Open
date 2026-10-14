@@ -19,6 +19,8 @@ interface Props {
   minDays: number
   /** True once the estimate no longer needs more days. */
   calibrated: boolean
+  /** Why the estimate is still on the formula once enough days are marked. */
+  gapMessage?: string | null
   tz?: string
 }
 
@@ -39,7 +41,7 @@ interface Props {
  * window entirely, so a control that only ever marked today could never move the estimate on the day
  * you pressed it.
  */
-export function FoodLoggingComplete({ date, isToday, daysLogged, minDays, calibrated, tz }: Props) {
+export function FoodLoggingComplete({ date, isToday, daysLogged, minDays, calibrated, gapMessage = null, tz }: Props) {
   const checkin = useCachedValue<DayCheckin | null>(
     `day-checkin:${date}`, `/api/day-checkin?date=${encodeURIComponent(date)}&phase=evening`, TTL_SHORT,
   )
@@ -75,7 +77,7 @@ export function FoodLoggingComplete({ date, isToday, daysLogged, minDays, calibr
     } finally { setBusy(false) }
   }, [date])
 
-  const progress = calibrationProgress(daysLogged, calibrated, minDays)
+  const progress = calibrationProgress(daysLogged, calibrated, minDays, gapMessage)
 
   return (
     <div className="rounded-2xl border border-border bg-muted/60 p-4">

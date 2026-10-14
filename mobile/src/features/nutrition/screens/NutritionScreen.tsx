@@ -441,6 +441,7 @@ export function NutritionScreen({
                 isToday={date === n.today}
                 daysLogged={energy.data?.maintenance?.daysLogged ?? null}
                 calibrated={energy.data?.maintenance?.source === 'calibrated'}
+                gapMessage={energy.data?.maintenance?.gapMessage ?? null}
               />
               <Card>
                 <WeeklyNutrition onDay={setDate} />

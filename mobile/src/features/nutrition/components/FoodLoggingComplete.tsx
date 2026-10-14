@@ -19,23 +19,28 @@ export function FoodLoggingComplete({
   isToday,
   daysLogged,
   calibrated,
+  gapMessage,
 }: {
   date: string;
   isToday: boolean;
   daysLogged: number | null;
   calibrated: boolean;
+  gapMessage: string | null;
 }) {
   const n = useNutrition(date);
   const { theme } = useTheme();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Until the day's check-in arrives, an already-marked day would flash the button, and a tap
+  // would re-stamp the mark time.
+  const loaded = n.loaded.includes('checkin:' + date) || !!n.errors['checkin:' + date];
   const completedAt = markedAt(n.view.checkin);
   const complete = completedAt != null;
   const time =
     completedAt && completedAt !== 'pending' && Number.isFinite(Date.parse(completedAt))
       ? formatTimeOfDay(completedAt, n.timezone)
       : null;
-  const progress = calibrationProgress(daysLogged, calibrated);
+  const progress = calibrationProgress(daysLogged, calibrated, undefined, gapMessage);
   async function set(next: boolean) {
     setBusy(true);
     try {
@@ -76,7 +81,11 @@ export function FoodLoggingComplete({
               </AppText>
             </Stack>
           </Stack>
-          <AppButton title="I’ve finished logging" busy={busy} onPress={() => void set(true)} />
+          <AppButton
+            title={loaded ? 'I’ve finished logging' : ''}
+            busy={busy || !loaded}
+            onPress={() => void set(true)}
+          />
         </>
       )}
       {error && (

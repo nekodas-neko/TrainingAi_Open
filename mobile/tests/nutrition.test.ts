@@ -794,7 +794,7 @@ test('marking a day finished shows at once, survives reopening offline and syncs
   await reopened.sync();
   assert.equal(f.completions.has(date), false);
 });
-test('one tap ticks a supplement offline, keeps it on reopening and syncs it', async () => {
+test('one tap ticks a supplement offline, keeps it on reopening, syncs it and un-ticks it', async () => {
   const f = fixture();
   f.supplements.push(
     supplementSchema.parse({
@@ -828,6 +828,12 @@ test('one tap ticks a supplement offline, keeps it on reopening and syncs it', a
   assert.equal(reopened.view(date).supplements[0].loggedToday, true);
   const sentLog = f.sent.find((x) => x.domain === 'supplement_logs');
   assert.equal(sentLog?.payload.amount, 5);
+  await reopened.logSupplement(reopened.view(date).supplements[0], date);
+  assert.equal(reopened.view(date).supplements[0].loggedToday, false);
+  await reopened.sync();
+  assert.equal(reopened.getSnapshot().operations.length, 0, reopened.getSnapshot().error ?? '');
+  assert.equal(f.supplements[0].loggedToday, false);
+  assert.equal(f.sent.at(-1)?.payload.deleted, true);
 });
 test('the calibration counter says "1 more day" and stops at zero', () => {
   assert.equal(

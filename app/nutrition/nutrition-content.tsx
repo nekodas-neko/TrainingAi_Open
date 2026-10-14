@@ -688,6 +688,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
           daysLogged={balanceForDate?.maintenance?.daysLogged ?? null}
           minDays={MIN_LOGGED_DAYS}
           calibrated={balanceForDate?.maintenance?.source === 'calibrated'}
+          gapMessage={balanceForDate?.maintenance?.gapMessage ?? null}
           tz={tz}
           weeklyData={weeklyData}
           // #2071: the day's budget, not the typed goal. One number for the reference line, as it
