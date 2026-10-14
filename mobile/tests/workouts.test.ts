@@ -10,6 +10,8 @@ import {
 import { WorkoutCatalogStore } from '../src/features/workouts/WorkoutCatalogStore.ts';
 import { sqliteFixture } from './storage-fixture.ts';
 import { workoutFixture } from './workout-fixture.ts';
+import { exerciseId, programId, sessionId } from './logging-fixture.ts';
+import { createWorkout, emptyJournal, readJournal } from '../src/features/workouts/logging/workout.ts';
 
 test('parses the actual API set shape and preserves server recommendation and prescription', () => {
   const f = workoutFixture();
@@ -59,6 +61,34 @@ test('parses the actual API set shape and preserves server recommendation and pr
   const incomplete = JSON.parse(JSON.stringify(catalog));
   delete incomplete.program.sessions[0].durationMinutes;
   assert.equal(readSavedCatalog(JSON.stringify(incomplete), f.reader), null);
+});
+
+test('accepts the last session average reps, which the server sends to one decimal', () => {
+  // `prevRepMaxReps` is the last session's `avg_reps`, so 8, 8 and 9 reps arrive as 8.3. Treating it
+  // as a whole count failed the whole catalogue for any real history (Program unavailable, #2897).
+  const f = workoutFixture();
+  f.meta.program.id = programId;
+  f.meta.program.sessions[0].id = sessionId;
+  f.meta.program.sessions[0].programId = programId;
+  f.meta.program.sessions[0].exercises[0].id = exerciseId;
+  const response = f.all.perSession['session-one'];
+  Object.assign(response.exercises[0], { sessionExerciseId: exerciseId, prevRepMaxReps: 8.3 });
+  const catalog = buildCatalog(f.meta, f.next, { perSession: { [sessionId]: response } }, f.reader);
+  const session = catalog.program!.sessions[0];
+  assert.equal(session.exercises[0].prevRepMaxReps, 8.3);
+  assert.deepEqual(readSavedCatalog(JSON.stringify(catalog), f.reader), catalog);
+  let id = 0;
+  const workout = createWorkout(
+    session,
+    programId,
+    'Australia/Brisbane',
+    false,
+    Date.parse('2026-10-12T01:00:00Z'),
+    () => `20000000-0000-4000-8000-${String(id++).padStart(12, '0')}`,
+  );
+  const journal = { ...emptyJournal(f.reader), workouts: [workout] };
+  const saved = readJournal(JSON.stringify(journal), f.reader);
+  assert.equal(saved.workouts[0].exercises[0].prevRepMaxReps, 8.3);
 });
 
 test('rejects cross-account, inconsistent session and malformed prescription responses', () => {
