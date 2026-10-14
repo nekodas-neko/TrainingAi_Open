@@ -323,7 +323,8 @@ export class HealthStore {
     this.invalidate();
     void this.sync();
   }
-  refresh(manual = false) {
+  // `quiet` forces the read without showing the refreshing spinner, for background polling.
+  refresh(manual = false, { quiet = false }: { quiet?: boolean } = {}) {
     if (this.reading) {
       return this.reading;
     }
@@ -339,7 +340,7 @@ export class HealthStore {
       if (this.canceled || !this.current.ready || (!manual && !this.policy.shouldRefresh())) {
         return;
       }
-      this.publish({ refreshing: manual });
+      this.publish({ refreshing: manual && !quiet });
       const revision = this.revision;
       const results = await Promise.all([this.read('body_metrics'), this.read('manual_sleep')]);
       if (results.every(Boolean) && revision === this.revision) {

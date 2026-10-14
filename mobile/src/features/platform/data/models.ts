@@ -35,9 +35,12 @@ export const platformSchema = z
     calendarTitle: z.string().nullable().default(null),
     calendarAuto: z.boolean().default(false),
     calendarSince: z.number().default(0),
-    // Morning hand-off to the Oura app (#2896): the setting, and the local day it last ran.
-    ouraMorningSync: z.boolean().default(true),
+    // Morning hand-off to the Oura app (#2896): the setting, the local day it last ran, and the
+    // day TrainingAi could not come back from Oura (which turned the setting off). Off by default
+    // until the hand-off is proven on the phone and the ring has moved to the Oura API (#2808).
+    ouraMorningSync: z.boolean().default(false),
     ouraHandoffDay: z.string().nullable().default(null),
+    ouraHandoffStrandedDay: z.string().nullable().default(null),
   })
   .refine(
     (settings) =>

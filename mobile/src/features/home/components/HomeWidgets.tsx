@@ -22,7 +22,7 @@ import {
 } from '../../../shared/ui';
 import type { HealthDetail } from '../../health/screens/HealthDetailScreen';
 import { useHealthData } from '../../health/data/HealthDataProvider';
-import { useOuraHandoff } from '../../health/OuraHandoffProvider';
+import { useOuraHandoff, type OuraHandoffStatus } from '../../health/OuraHandoffProvider';
 import { hasLastNight } from '../../health/data/oura-handoff';
 import {
   energySpec,
@@ -202,6 +202,14 @@ export function HomeWidget(props: WidgetProps) {
     );
   return <HomeWidgetBody {...props} />;
 }
+const handoffMessages: Record<Exclude<OuraHandoffStatus, 'idle'>, string> = {
+  syncing: 'Syncing last night’s sleep from Oura…',
+  timeout: 'Last night’s sleep hasn’t arrived from Oura yet.',
+  not_opened: 'Oura didn’t open. Try again in a moment.',
+  not_connected: 'Oura isn’t connected, so there’s nothing to sync.',
+  not_installed: 'The Oura app isn’t installed on this phone.',
+};
+
 function HomeWidgetBody({
   id,
   openBody,
@@ -390,7 +398,7 @@ function HomeWidgetBody({
     const known = stages.reduce((sum, row) => sum + (row.hours ?? 0), 0);
     const waiting =
       handoff.status !== 'idle' && !hasLastNight(health.sleep, health.today)
-        ? handoff.status
+        ? (handoff.status as Exclude<OuraHandoffStatus, 'idle'>)
         : null;
     return (
       <Stack>
@@ -463,13 +471,9 @@ function HomeWidgetBody({
                 </Stack>
               </>
             )}
-            {waiting === 'syncing' ? (
+            {waiting ? (
               <AppText variant="micro" tone="muted" accessibilityRole="alert">
-                Syncing last night’s sleep from Oura…
-              </AppText>
-            ) : waiting === 'timeout' ? (
-              <AppText variant="micro" tone="muted" accessibilityRole="alert">
-                Last night’s sleep hasn’t arrived from Oura yet.
+                {handoffMessages[waiting]}
               </AppText>
             ) : (
               night?.sourceLabel && (
@@ -480,7 +484,7 @@ function HomeWidgetBody({
             )}
           </Card>
         </Pressable>
-        {waiting === 'timeout' && (
+        {(waiting === 'timeout' || waiting === 'not_opened') && (
           <AppButton title="Sync now" variant="ghost" onPress={handoff.syncNow} />
         )}
         {openMorning && <HomeSleepFeedback onCorrect={openMorning} />}

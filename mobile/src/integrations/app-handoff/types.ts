@@ -1,6 +1,8 @@
 export type HandoffOutcome =
   | 'returned'
   | 'stayed_behind'
+  // TrainingAi was no longer in front when the hand-off was asked for, so nothing opened.
+  | 'not_foreground'
   | 'never_left'
   | 'not_installed'
   | 'launch_failed'

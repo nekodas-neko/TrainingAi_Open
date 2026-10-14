@@ -17,13 +17,17 @@ import { useHealthData } from './data/HealthDataProvider';
 import { overlaySleep, type HealthStore } from './data/HealthStore';
 import {
   HAND_BACK_MS,
+  IDLE,
   OURA_PACKAGE,
+  createHandoffRunner,
+  currentHandoffState,
   hasLastNight,
-  morningHandoffDecision,
   waitForNight,
+  type HandoffState,
+  type HandoffStatus,
 } from './data/oura-handoff';
 
-export type OuraHandoffStatus = 'idle' | 'syncing' | 'timeout';
+export type OuraHandoffStatus = HandoffStatus;
 const Context = createContext<{ status: OuraHandoffStatus; syncNow: () => void }>({
   status: 'idle',
   syncNow: () => {},
@@ -32,82 +36,89 @@ const connectionSchema = z.object({ connected: z.boolean() });
 // A manual retry gives Oura longer in front than the automatic morning hand-off.
 const MANUAL_HAND_BACK_MS = 5_000;
 
+// Quiet, so the Health screen's spinner does not flicker on every check while waiting.
 async function nightIn(store: HealthStore, day: string) {
-  await store.refresh(true);
+  await store.refresh(true, { quiet: true });
   const state = store.getSnapshot();
   return hasLastNight(overlaySleep(state.sleep ?? [], state.operations), day);
 }
 
 // On a morning open with Oura connected and last night missing, opens the Oura app for a moment
-// so it syncs, then waits for the night to arrive (#2896). Runs at most once per local morning.
+// so it syncs, then waits for the night to arrive (#2896). Runs at most once per local morning;
+// the sequence itself is `createHandoffRunner`.
 export function OuraHandoffProvider({ children }: PropsWithChildren) {
   const { dataReader } = useAccountContext();
-  const { store: health, timezone } = useHealthData();
-  const { store: platform } = usePlatformIntegrations();
-  const [status, setStatus] = useState<OuraHandoffStatus>('idle');
-  const running = useRef(false);
+  const { store: health, timezone, today } = useHealthData();
+  const { store: platform, state: platformState } = usePlatformIntegrations();
+  const [state, setState] = useState<HandoffState>(IDLE);
   const mounted = useRef(true);
+  const timezoneRef = useRef(timezone);
+  useEffect(() => {
+    timezoneRef.current = timezone;
+  }, [timezone]);
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
     };
   }, []);
-  const handOff = useCallback(
-    async (manual: boolean) => {
-      if (running.current || !health || !platform || !dataReader || !appHandoff) return;
-      running.current = true;
-      try {
+  const runner = useMemo(() => {
+    if (!health || !platform || !dataReader || !appHandoff) return null;
+    const handoff = appHandoff;
+    return createHandoffRunner({
+      settings: async () => {
         await platform.initialize();
         const { ready, settings } = platform.getSnapshot();
-        if (!ready) return;
-        const now = Date.now();
-        const decision = await morningHandoffDecision({
-          manual,
-          enabled: settings.ouraMorningSync,
-          supported: true,
-          installed: () => appHandoff!.isInstalled(OURA_PACKAGE),
-          lastRunDay: settings.ouraHandoffDay,
-          now,
-          timezone,
-          lastNight: (day) => nightIn(health, day),
-          connected: async () =>
-            connectionSchema.safeParse(
-              await dataReader.get('/api/oura/connection').catch(() => null),
-            ).data?.connected === true,
-        });
-        if (!decision.run || (!manual && !mounted.current)) return;
-        // Recorded before Oura opens, so coming back to the front cannot start it again.
-        await platform.configure({ ouraHandoffDay: decision.day });
-        setStatus('syncing');
-        await appHandoff
-          .openAppBriefly(OURA_PACKAGE, manual ? MANUAL_HAND_BACK_MS : HAND_BACK_MS)
-          .catch(() => null);
-        const outcome = await waitForNight({
-          landed: () => nightIn(health, decision.day),
+        return ready
+          ? { enabled: settings.ouraMorningSync, lastRunDay: settings.ouraHandoffDay }
+          : null;
+      },
+      supported: true,
+      installed: () => handoff.isInstalled(OURA_PACKAGE),
+      now: Date.now,
+      timezone: () => timezoneRef.current,
+      connected: async () =>
+        connectionSchema.safeParse(await dataReader.get('/api/oura/connection').catch(() => null))
+          .data?.connected === true,
+      lastNight: (day) => nightIn(health, day),
+      active: () => mounted.current && AppState.currentState === 'active',
+      saveDay: (ouraHandoffDay) => platform.configure({ ouraHandoffDay }),
+      open: (manual) =>
+        handoff.openAppBriefly(OURA_PACKAGE, manual ? MANUAL_HAND_BACK_MS : HAND_BACK_MS),
+      stayedBehind: (day) =>
+        platform.configure({ ouraMorningSync: false, ouraHandoffStrandedDay: day }),
+      wait: (day) =>
+        waitForNight({
+          landed: () => nightIn(health, day),
           cancelled: () => !mounted.current,
           sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
           now: Date.now,
-        });
-        if (outcome !== 'cancelled') setStatus(outcome === 'landed' ? 'idle' : 'timeout');
-      } catch {
-        if (mounted.current) setStatus('idle');
-      } finally {
-        running.current = false;
-      }
+        }),
+      setState: (next) => {
+        if (mounted.current) setState(next);
+      },
+    });
+  }, [health, platform, dataReader]);
+  const handOff = useCallback(
+    (manual: boolean) => {
+      void runner?.run(manual).catch(() => {
+        if (mounted.current) setState(IDLE);
+      });
     },
-    [health, platform, dataReader, timezone],
+    [runner],
   );
   useEffect(() => {
-    void handOff(false);
-    const listener = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void handOff(false);
+    handOff(false);
+    const listener = AppState.addEventListener('change', (next) => {
+      if (next === 'active') handOff(false);
     });
     return () => listener.remove();
   }, [handOff]);
+  const enabled = platformState?.settings.ouraMorningSync ?? false;
+  const shown = currentHandoffState(state, today, enabled);
   const value = useMemo(
-    () => ({ status, syncNow: () => void handOff(true) }),
-    [status, handOff],
+    () => ({ status: shown.status, syncNow: () => handOff(true) }),
+    [shown.status, handOff],
   );
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }

@@ -29,6 +29,11 @@ class AppHandoffModule : Module() {
 
     OnActivityEntersForeground { foreground = true }
     OnActivityEntersBackground { foreground = false }
+    // Drops the pending hand-back steps so none runs against a torn-down module.
+    OnDestroy {
+      handler.removeCallbacksAndMessages(null)
+      running = false
+    }
 
     Function("isInstalled") { packageName: String ->
       context.packageManager.getLaunchIntentForPackage(packageName) != null
@@ -53,50 +58,59 @@ class AppHandoffModule : Module() {
 
   private fun start(packageName: String, handBackMs: Int, promise: Promise) {
     val begun = SystemClock.elapsedRealtime()
-    val overlay = Settings.canDrawOverlays(context)
+    val react = appContext.reactContext
+    val overlay = react?.let { Settings.canDrawOverlays(it) } ?: false
+    fun result(outcome: String, method: String?, error: String?) = mapOf(
+      "outcome" to outcome,
+      "method" to method,
+      "overlayGranted" to overlay,
+      "elapsedMs" to (SystemClock.elapsedRealtime() - begun).toDouble(),
+      "error" to error,
+    )
+    // Answers a call that never took the guard, so the hand-off already in flight keeps it.
+    fun refuse(outcome: String, error: String? = null) = promise.resolve(result(outcome, null, error))
+    if (running) return refuse("busy")
+    if (react == null) return refuse("launch_failed", "The app context is not available.")
+    // The decision to hand off waits on network checks; by then the user may have left the app.
+    // Starting Oura from behind would pull TrainingAi back over whatever they are doing.
+    val activity = appContext.currentActivity
+    if (!foreground || activity == null) return refuse("not_foreground")
+    val launch = react.packageManager.getLaunchIntentForPackage(packageName)
+      ?: return refuse("not_installed")
+    val taskId = activity.taskId
+    running = true
     fun finish(outcome: String, method: String? = null, error: String? = null) {
       running = false
-      promise.resolve(
-        mapOf(
-          "outcome" to outcome,
-          "method" to method,
-          "overlayGranted" to overlay,
-          "elapsedMs" to (SystemClock.elapsedRealtime() - begun).toDouble(),
-          "error" to error,
-        ),
-      )
+      promise.resolve(result(outcome, method, error))
     }
-    if (running) return finish("busy")
-    val launch = context.packageManager.getLaunchIntentForPackage(packageName)
-      ?: return finish("not_installed")
-    val activity = appContext.currentActivity
-    val taskId = activity?.taskId
-    running = true
     try {
       launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
-      (activity ?: context).startActivity(launch)
+      activity.startActivity(launch)
     } catch (cause: Exception) {
       return finish("launch_failed", error = cause.message)
     }
     handler.postDelayed({
       if (foreground) return@postDelayed finish("never_left")
+      // A dev reload can tear the React context down while Oura is in front.
+      val current = appContext.reactContext
+        ?: return@postDelayed finish("stayed_behind", error = "The app context went away.")
       val moved = try {
-        if (taskId == null) {
-          false
-        } else {
-          val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-          manager.moveTaskToFront(taskId, ActivityManager.MOVE_TASK_NO_USER_ACTION)
-          true
-        }
+        val manager = current.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        manager.moveTaskToFront(taskId, ActivityManager.MOVE_TASK_NO_USER_ACTION)
+        true
       } catch (cause: Exception) {
         false
       }
       handler.postDelayed({
         if (moved && foreground) return@postDelayed finish("returned", "moveTaskToFront")
-        val own = context.packageManager.getLaunchIntentForPackage(context.packageName)
         try {
-          own?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
-          own?.let { context.startActivity(it) }
+          val own = appContext.reactContext?.let { ctx ->
+            ctx.packageManager.getLaunchIntentForPackage(ctx.packageName)?.also {
+              it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION)
+              ctx.startActivity(it)
+            }
+          }
+          if (own == null) return@postDelayed finish("stayed_behind", error = "No launch intent.")
         } catch (cause: Exception) {
           return@postDelayed finish("stayed_behind", error = cause.message)
         }

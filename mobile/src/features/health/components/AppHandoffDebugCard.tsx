@@ -8,17 +8,19 @@ import {
 import type { HandoffResult } from '../../../integrations/app-handoff/types';
 import { OURA_PACKAGE } from '../data/oura-handoff';
 
+// Oura only after the #2808 switch: until the ring is on the Oura API it is paired to our own
+// Bluetooth key, and opening the official Oura app risks a re-pair prompt (docs/rules/oura-ble.md).
 const targets = [
-  { label: 'Oura', value: OURA_PACKAGE },
   { label: 'Clock', value: 'com.sec.android.app.clockpackage' },
   { label: 'Settings', value: 'com.android.settings' },
+  { label: 'Oura (only after the #2808 switch)', value: OURA_PACKAGE },
 ] as const;
 const delays = [1_000, 2_000, 5_000] as const;
 
 // Spike for #2896, shown only in development and side-by-side builds: does TrainingAi come back
 // to the front after opening another app, with and without "Display over other apps"?
 export function AppHandoffDebugCard() {
-  const [target, setTarget] = useState<string>(OURA_PACKAGE);
+  const [target, setTarget] = useState<string>(targets[0].value);
   const [busy, setBusy] = useState(false);
   const [overlay, setOverlay] = useState(() => appHandoff?.canDrawOverlays() ?? false);
   const [log, setLog] = useState<string[]>([]);
@@ -29,7 +31,7 @@ export function AppHandoffDebugCard() {
     try {
       const result: HandoffResult = await handoff.openAppBriefly(target, ms);
       const line = [
-        `${targets.find((row) => row.value === target)?.label} ${ms / 1000}s`,
+        `${targets.find((row) => row.value === target)?.label.split(' ')[0]} ${ms / 1000}s`,
         result.outcome,
         result.method,
         `overlay ${result.overlayGranted ? 'on' : 'off'}`,
@@ -52,6 +54,7 @@ export function AppHandoffDebugCard() {
       <AppText variant="heading">App hand-off test</AppText>
       <AppText variant="caption" tone="muted">
         Opens the chosen app, then tries to bring TrainingAi back. Not shown in the real app.
+        Don’t use Oura until the ring has moved to the Oura API (#2808).
       </AppText>
       <ChipPicker
         label="App"
