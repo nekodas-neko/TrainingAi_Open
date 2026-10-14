@@ -55,7 +55,7 @@ const exerciseSchema = z.object({
   secondaryMuscles: z.array(z.string()).default([]),
   lastReps: z.array(z.number().int().nonnegative()).default([]),
   lastDate: z.string().nullable().default(null),
-  prevRepMaxReps: z.number().int().nonnegative().nullable().default(null),
+  prevRepMaxReps: z.number().nonnegative().nullable().default(null),
   readyStartedAt: timestamp.nullable().default(null),
   weightUnit: z.enum(['kg', 'lb']).default('kg'),
   supersetGroup: z.number().int().nonnegative().nullable().default(null),

@@ -216,7 +216,8 @@ function exercise(value: unknown, dataDate: string | null = null): ExercisePrevi
     secondaryMuscles: row.secondaryMuscles == null ? [] : array(row.secondaryMuscles).map(text),
     lastReps: row.lastReps == null ? [] : array(row.lastReps).map(count),
     lastDate: optionalDate(row.lastDate),
-    prevRepMaxReps: row.prevRepMaxReps == null ? null : count(row.prevRepMaxReps),
+    // An average of the last session's reps (`avg_reps`, one decimal), so 8, 8, 9 arrives as 8.3.
+    prevRepMaxReps: row.prevRepMaxReps == null ? null : number(row.prevRepMaxReps),
     supersetGroup: row.supersetGroup == null ? null : count(row.supersetGroup),
     preDeload:
       row.preDeload == null
@@ -472,7 +473,7 @@ export function readSavedCatalog(
               row.secondaryMuscles == null ? [] : array(row.secondaryMuscles).map(text);
             row.lastReps = row.lastReps == null ? [] : array(row.lastReps).map(count);
             row.lastDate = optionalDate(row.lastDate);
-            row.prevRepMaxReps = row.prevRepMaxReps == null ? null : count(row.prevRepMaxReps);
+            row.prevRepMaxReps = row.prevRepMaxReps == null ? null : number(row.prevRepMaxReps);
             row.supersetGroup = row.supersetGroup == null ? null : count(row.supersetGroup);
             row.loggedDate = optionalDate(row.loggedDate);
             row.preDeloadSets = row.preDeloadSets == null ? null : count(row.preDeloadSets);
