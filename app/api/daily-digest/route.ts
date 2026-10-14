@@ -5,6 +5,7 @@ import { readSameDayInsights, SAME_DAY_GUIDANCE } from '@/lib/ai/same-day-contex
 import { describePersonalRecord } from '@trainingai/shared/1rm'
 import { generateText } from 'ai'
 import { aiModel, loggedGenerateText } from '@/lib/ai/instrument'
+import { aiPausedResponse } from '@/lib/ai/provider-paused'
 import { degradedFromFacts } from '@/lib/ai/degrade'
 import { hashInsightContext, readFreshInsight } from '@/lib/ai/insight-cache'
 import { formatInTimeZone } from 'date-fns-tz'
@@ -186,7 +187,7 @@ export async function POST(req: Request) {
     // digest for the day and block the next successful call from replacing it.
     const degraded = degradedFromFacts('here is the day as recorded', facts)
     if (degraded) return NextResponse.json({ digest: degraded, date: todayIso, cached: false, degraded: true })
-    return NextResponse.json({ error: 'AI generation failed' }, { status: 502 })
+    return aiPausedResponse(err) ?? NextResponse.json({ error: 'AI generation failed' }, { status: 502 })
   }
 
   const digest = text.trim()

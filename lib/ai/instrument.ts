@@ -4,6 +4,7 @@ import { google } from '@ai-sdk/google'
 import { withAiRetry, isRetryableAiError, isRetryableObjectError } from './retry'
 import { AI_CALL_BUDGET_MS, runWithDeadline } from './deadline'
 import { assertDevAiBudget, recordDevAiCall } from './dev-call-budget'
+import { noteAiBillingError } from './provider-paused'
 
 // ── Model — single source of truth ─────────────────────────────────────────────
 // Was inlined as `google('gemini-3.1-flash-lite')` at 14 call sites; centralised
@@ -204,6 +205,8 @@ export async function withAiLogging<T extends { usage?: unknown }>(
     return result
   } catch (err) {
     logAiCall(meta, { latencyMs: Date.now() - started, ok: false })
+    // Issue 2815. A billing refusal is not retried, so retry.ts never reports it.
+    noteAiBillingError(err)
     throw err
   }
 }
@@ -250,6 +253,7 @@ export function loggedStreamText(meta: AiCallMeta, params: StreamTextParams): Re
     },
     onError(ev: Parameters<NonNullable<StreamTextParams['onError']>>[0]) {
       logAiCall(meta, { latencyMs: Date.now() - started, ok: false })
+      noteAiBillingError(ev.error)
       return callerOnError?.(ev)
     },
   } as StreamTextParams
