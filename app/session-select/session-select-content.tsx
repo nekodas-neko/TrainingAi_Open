@@ -16,7 +16,7 @@ import { navigateToTab } from "@/lib/shell-nav";
 import { Meteors } from "@/components/ui/meteors";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScreenHeader } from "@/components/shell/screen-header";
-import { toast } from "sonner";
+import { toast } from "sonner"; import { aiPausedMessage } from "@/lib/ai-paused-notice";
 import { RefreshCwIcon, LayoutGridIcon, Eye } from "lucide-react";
 import { HomeSortableSection } from "@/components/home-sortable-section";
 import { DragDropProvider, PointerSensor } from "@dnd-kit/react";
@@ -895,7 +895,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         body: JSON.stringify({ source: 'scheduled' }),
       });
       const data = await res.json();
-      if (!res.ok) { toast.error('Failed to get recommendation'); return; }
+      if (!res.ok) { toast.error(aiPausedMessage(res.status, data) ?? 'Failed to get recommendation'); return; }
       setGoalsRecommendation(data);
       setGoalsSheetOpen(true);
       setGoalsCheckinDismissed(true);

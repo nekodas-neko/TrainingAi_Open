@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { readAiPausedMessage } from '@/lib/ai-paused-notice'
 import type { FoodItem, SavedMeal } from '@trainingai/shared/types/nutrition'
 import { createFoodItem } from '@trainingai/shared/nutrition/create-food-item'
 import { lookupBarcode } from '@trainingai/shared/nutrition/barcode-lookup'
@@ -261,6 +262,8 @@ export function IngredientPicker({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       })
+      const paused = res.ok ? null : await readAiPausedMessage(res)
+      if (paused) { toast.error(paused); return }
       const scan = res.ok ? await res.json() : null
       // Test that the scan RETURNED, not that its calories are nonzero (LA-30). Zero is what the
       // AI correctly reports for a supplement or a black coffee, and treating it as a failed scan

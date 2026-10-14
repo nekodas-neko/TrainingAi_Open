@@ -11,6 +11,7 @@ import { invalidateExerciseLibrary } from '@/lib/cache-groups'
 import { TTL_LONG } from '@trainingai/shared/cache-ttl'
 import type { ExerciseLibraryEntry, MuscleAssignment, ExerciseType } from '@trainingai/shared/types/program'
 import { fuzzyScore } from '@trainingai/shared/exercise-utils'
+import { readAiPausedMessage } from '@/lib/ai-paused-notice'
 import { MUSCLE_ROLE_LABEL } from '@trainingai/shared/workout/role-labels'
 
 export { fuzzyScore }
@@ -42,6 +43,7 @@ export function AddExerciseSheet({ open, onOpenChange, initialName = '', onAdded
   const [generating, setGenerating] = useState(false)
   const [generated, setGenerated] = useState<GeneratedExercise | null>(null)
   const [genError, setGenError] = useState(false)
+  const [pausedNotice, setPausedNotice] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [reviewName, setReviewName] = useState('')
   const [instructions, setInstructions] = useState('')
@@ -104,13 +106,14 @@ export function AddExerciseSheet({ open, onOpenChange, initialName = '', onAdded
     if (!name.trim()) return
     setGenerating(true)
     setGenError(false)
+    setPausedNotice(null)
     try {
       const res = await fetch('/api/exercises/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim() }),
       })
-      if (!res.ok) throw new Error()
+      if (!res.ok) { setPausedNotice(await readAiPausedMessage(res)); throw new Error() }
       const data: GeneratedExercise = await res.json()
       setGenerated(data)
       setReviewName(data.normalizedName)
@@ -255,8 +258,8 @@ export function AddExerciseSheet({ open, onOpenChange, initialName = '', onAdded
           {/* AI error */}
           {genError && (
             <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2.5 flex items-center justify-between gap-3">
-              <p className="text-sm text-destructive">Generation failed — fill in manually or retry</p>
-              <Button size="sm" variant="ghost" onClick={handleGenerate} disabled={generating}>Retry</Button>
+              <p className="text-sm text-destructive">{pausedNotice ?? 'Generation failed — fill in manually or retry'}</p>
+              {!pausedNotice && <Button size="sm" variant="ghost" onClick={handleGenerate} disabled={generating}>Retry</Button>}
             </div>
           )}
 

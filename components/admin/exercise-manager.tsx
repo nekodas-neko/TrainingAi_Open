@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { readAiPausedMessage } from "@/lib/ai-paused-notice";
 import {
   Plus, Pencil, Trash2, X, Check, Loader2, Search, Download, Play,
   RefreshCw, Square, Upload, ImageIcon, Sparkles, CheckCircle2, XCircle, ClipboardCheck,
@@ -151,7 +152,7 @@ function ExerciseForm({ initial, onSave, onCancel, saving }: {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name.trim() }),
       });
-      if (!res.ok) { toast.error("Generation failed"); return; }
+      if (!res.ok) { toast.error((await readAiPausedMessage(res)) ?? "Generation failed"); return; }
       const data = await res.json();
       if (data.normalizedName) setName(data.normalizedName);
       if (data.muscles?.length) setMuscles(data.muscles);

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
+import { aiPausedMessage } from '@/lib/ai-paused-notice'
 import { ArrowUpRight, ChevronDown, Loader2, Sparkles, Target } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { User } from '@trainingai/shared/types'
@@ -310,7 +311,7 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
         } else if (data.error === 'no_weight_data') {
           toast.error('Log a body weight entry first to get a recommendation')
         } else {
-          toast.error('Failed to get recommendation')
+          toast.error(aiPausedMessage(res.status, data) ?? 'Failed to get recommendation')
         }
         return
       }

@@ -4,6 +4,7 @@ import { SparklesIcon } from 'lucide-react'
 import { splitStreamError } from '@/lib/ai/stream'
 import { readCacheSync, setCached } from '@/lib/sqlite/cache'
 import { TTL_LONG } from '@trainingai/shared/cache-ttl'
+import { readAiPausedMessage } from '@/lib/ai-paused-notice'
 
 function cacheKey(sessionId: string) {
   return `session-explain-insight:${sessionId}`
@@ -26,7 +27,12 @@ export function AiInsightCard({ sessionId }: { sessionId: string }) {
     async function fetchInsight() {
       try {
         const res = await fetch(`/api/session-explain/insight?sessionId=${encodeURIComponent(sessionId)}`)
-        if (!res.ok || !res.body) { setLoading(false); return }
+        if (!res.ok || !res.body) {
+          const notice = res.ok ? null : await readAiPausedMessage(res)
+          if (notice && !cancelled) setText(notice)
+          setLoading(false)
+          return
+        }
         const reader = res.body.getReader()
         const decoder = new TextDecoder()
         let full = ''

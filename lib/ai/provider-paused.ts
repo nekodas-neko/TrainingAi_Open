@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { reportServerError } from '@/lib/observability'
 import { resolveClaudeRoOwner } from '@/lib/data/postgres/claude-ro-owner'
+import { AI_PAUSED_CODE, AI_PAUSED_MESSAGE } from '@/lib/ai-paused-notice'
 
 /**
  * Gemini billing and quota failures (issue 2815).
@@ -15,8 +16,8 @@ import { resolveClaudeRoOwner } from '@/lib/data/postgres/claude-ro-owner'
  * here, once, for every AI route.
  */
 
-export const AI_PAUSED_CODE = 'ai_paused'
-export const AI_PAUSED_MESSAGE = 'AI features are paused right now. Nothing you did caused this, and retrying will not help.'
+// The code and the sentence live in the client-safe module, so a screen can read the notice (issue 2890).
+export { AI_PAUSED_CODE, AI_PAUSED_MESSAGE }
 
 /** What a depleted balance or an exhausted quota says. Google words these several ways. */
 const BILLING_TEXT = /prepayment credits|credits? (?:are |is )?(?:depleted|exhausted)|billing|exceeded your current quota|quota (?:exceeded|exhausted)|insufficient (?:funds|quota)/i

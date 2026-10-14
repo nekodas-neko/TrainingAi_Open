@@ -15,6 +15,7 @@ import { CoachMessage } from "@/components/coach/coach-message";
 import { CoachHistory } from "@/components/coach/coach-history";
 import { invalidateCoachHistory } from "@/lib/cache-groups";
 import type { WidgetResult } from "@/lib/coach/widgets";
+import { aiPausedMessageFromError } from "@/lib/ai-paused-notice";
 
 const STARTERS = [
   "Change my workout",
@@ -226,7 +227,7 @@ export function CoachContent({ tz, userId, scope }: CoachContentProps) {
           {error && (
             <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3.5 py-2.5">
               <p className="text-[12.5px] text-destructive">
-                Something went wrong. Ask again and I&apos;ll pick up where we left off.
+                {aiPausedMessageFromError(error) ?? "Something went wrong. Ask again and I'll pick up where we left off."}
               </p>
             </div>
           )}
