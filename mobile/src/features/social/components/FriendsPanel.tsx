@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { useState } from 'react';
 import { Pressable } from 'react-native';
 import {
@@ -40,7 +41,7 @@ function relative(iso: string) {
       ? `${minutes} min ago`
       : minutes < 1440
         ? `${Math.floor(minutes / 60)} hr ago`
-        : `${Math.floor(minutes / 1440)} days ago`;
+        : `${plural(Math.floor(minutes / 1440), 'day', 'days')} ago`;
 }
 export function FriendsPanel({ openProfile }: { openProfile: (id: string) => void }) {
   const { theme } = useTheme();

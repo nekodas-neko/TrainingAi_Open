@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import { useState } from 'react';
 import appConfig from '../../../../app.json';
 import {
@@ -71,7 +72,7 @@ export function AboutScreen({ onBack }: { onBack: () => void }) {
         >
           <AppText>
             {actions.pending
-              ? `${actions.pending} changes are waiting to upload. They stay on this phone and can sync when you sign back into this account.`
+              ? `${plural(actions.pending, 'change', 'changes')} ${actions.pending === 1 ? 'is' : 'are'} waiting to upload. They stay on this phone and can sync when you sign back into this account.`
               : 'Your saved account data stays on this phone.'}
           </AppText>
           {actions.pending > 0 && (

@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import {
   metricPattern,
   type DoseLevelRecovery,
@@ -31,7 +32,6 @@ export interface HeartCardView {
   sentence: string | null;
   charts: HeartChart[];
 }
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 export function levelLabel(
   level: Pick<DoseLevelRecovery, 'amount' | 'unit' | 'doseText'>,
 ): string {

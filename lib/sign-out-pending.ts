@@ -7,6 +7,7 @@ import { flushDetectionEvents } from '@/lib/activity/detection-events'
 import { requestsCompleting } from '@/lib/sqlite/cache'
 import { useWorkoutStore, isWorkoutActive } from '@/lib/stores/workout-store'
 import { UPLOAD_QUEUE_STORAGE } from '@/lib/sign-out-storage'
+import { plural } from '@trainingai/shared/format/plural'
 
 /**
  * Issue 2532 — what a sign-out would throw away, and a sync to shrink that first (engine half).
@@ -131,10 +132,6 @@ export async function countUnsentChanges(userId: string): Promise<UnsentChanges>
   const queued = Object.values(out.uploadQueues).reduce((a, b) => a + b, 0)
   out.total = out.outbox.count + out.activeWorkout.loggedSets + out.prefsUnsynced + queued
   return out
-}
-
-function plural(n: number, one: string, many: string): string {
-  return `${n} ${n === 1 ? one : many}`
 }
 
 /** The "what would be lost" list in plain words, one line per non-empty kind. */
