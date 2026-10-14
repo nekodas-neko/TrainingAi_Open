@@ -4,7 +4,14 @@ import { ApiError } from '../../account/api/client.ts';
 import type { AccountConnection } from '../../account/session.ts';
 import { readSessionResponse, type SessionPreview } from '../catalog.ts';
 import { nextExerciseFlow, supersetNext, workoutFlow } from './flow.ts';
-import { expectedRpe, initialWeight, loadSuggestion, prescribedWeight } from './targets.ts';
+import {
+  expectedRpe,
+  initialWeight,
+  loadSuggestion,
+  prescribedWeight,
+} from './targets.ts';
+import { timerPreferencesSchema, type TimerPreferences } from './preferences.ts';
+import { previousValueChanges, reusePreviousValues } from './reuse.ts';
 import { prepareSession, type SessionStartOptions } from './session-options.ts';
 import {
   createWorkout,
@@ -40,7 +47,9 @@ function replaceWorkout(
   }
   return {
     ...data,
-    workouts: data.workouts.map((workout) => (workout.id === id ? update(workout) : workout)),
+    workouts: data.workouts.map((workout) =>
+      workout.id === id ? update(workout) : workout,
+    ),
   };
 }
 function replaceSet(
@@ -54,7 +63,8 @@ function replaceSet(
   }
   if (
     !workout.exercises.some(
-      (exercise) => exercise.id === exerciseId && exercise.sets.some((set) => set.id === setId),
+      (exercise) =>
+        exercise.id === exerciseId && exercise.sets.some((set) => set.id === setId),
     )
   ) {
     throw new Error('This set is unavailable.');
@@ -210,7 +220,9 @@ export class WorkoutJournalStore {
     if (!this.current.ready || this.current.busy) {
       return null;
     }
-    const active = this.current.data.workouts.find((workout) => workout.status === 'active');
+    const active = this.current.data.workouts.find(
+      (workout) => workout.status === 'active',
+    );
     if (active) {
       return active.id;
     }
@@ -265,8 +277,18 @@ export class WorkoutJournalStore {
         this.now(),
         this.uuid,
       );
+      workout.timers = { ...this.current.data.preferences.timers };
+      if (workout.timers.warmupSeconds !== null) {
+        workout.warmupGoalSeconds = workout.timers.warmupSeconds;
+        workout.warmupGoalSource = 'selected';
+      }
+      workout.exercises = workout.exercises.map((x) => ({
+        ...x,
+        weightUnit: this.current.data.preferences.units[x.id] ?? 'kg',
+      }));
       workout.intensityMode = options.aiDeload ? 'deload' : 'full';
-      workout.wasOverride = !!options.fullOverride || !!options.revertedExerciseIds?.length;
+      workout.wasOverride =
+        !!options.fullOverride || !!options.revertedExerciseIds?.length;
       await this.write((data) => ({ ...data, workouts: [...data.workouts, workout] }));
       if (generation !== this.generation) {
         return null;
@@ -299,30 +321,139 @@ export class WorkoutJournalStore {
     field: 'weight' | 'reps',
     value: string,
   ) => {
-    if (!this.current.ready || this.current.busy) {
-      return;
-    }
-    const data = replaceWorkout(this.current.data, workoutId, (workout) =>
-      replaceSet(workout, exerciseId, setId, (set) => ({
-        ...set,
-        [field]: value.slice(0, field === 'weight' ? 20 : 4),
-      })),
+    void this.edit((data) =>
+      replaceWorkout(data, workoutId, (workout) =>
+        replaceSet(workout, exerciseId, setId, (set) => ({
+          ...set,
+          [field]: value.slice(0, field === 'weight' ? 20 : 4),
+        })),
+      ),
     );
+  };
+
+  private async edit(update: (data: WorkoutJournal) => WorkoutJournal): Promise<boolean> {
+    if (!this.current.ready || this.current.busy) {
+      return false;
+    }
+    const generation = this.generation;
+    let data: WorkoutJournal;
+    try {
+      data = update(this.current.data);
+    } catch (error) {
+      this.publish({
+        message: error instanceof Error ? error.message : 'Could not update this set.',
+      });
+      return false;
+    }
     this.publish({ data, message: null });
     const saving = this.write();
     const issued = this.issued;
-    void saving.catch(() => {
-      if (issued !== this.issued) {
-        return;
+    try {
+      await saving;
+      return generation === this.generation;
+    } catch {
+      if (generation === this.generation && issued === this.issued) {
+        this.publish({
+          message:
+            'Your latest entries could not be saved. Keep the app open and retry saving.',
+        });
       }
-      this.publish({
-        message: 'Your latest entries could not be saved. Keep the app open and retry saving.',
+      return false;
+    }
+  }
+
+  configureTimers = (
+    workoutId: string,
+    patch: Partial<TimerPreferences>,
+    remember = false,
+  ) =>
+    this.action((data) => {
+      const next = replaceWorkout(data, workoutId, (workout) => {
+        if (workout.status !== 'active') {
+          throw new Error('This workout is finished.');
+        }
+        const timers = timerPreferencesSchema.parse({ ...workout.timers, ...patch });
+        return {
+          ...workout,
+          timers,
+          ...(patch.warmupSeconds != null
+            ? {
+                warmupGoalSeconds: patch.warmupSeconds,
+                warmupGoalSource: 'selected' as const,
+              }
+            : {}),
+        };
       });
+      return remember
+        ? {
+            ...next,
+            preferences: {
+              ...next.preferences,
+              timers: timerPreferencesSchema.parse({
+                ...next.preferences.timers,
+                ...patch,
+              }),
+            },
+          }
+        : next;
     });
-  };
+
+  setWeightUnit = (workoutId: string, exerciseId: string, unit: 'kg' | 'lb') =>
+    this.edit((data) => {
+      const exercise = data.workouts
+        .find((x) => x.id === workoutId)
+        ?.exercises.find((x) => x.id === exerciseId);
+      if (!exercise) {
+        throw new Error('This exercise is unavailable.');
+      }
+      return {
+        ...replaceWorkout(data, workoutId, (workout) => ({
+          ...workout,
+          exercises: workout.exercises.map((x) =>
+            x.id === exerciseId ? { ...x, weightUnit: unit } : x,
+          ),
+        })),
+        preferences: {
+          ...data.preferences,
+          units: { ...data.preferences.units, [exercise.relogOf ?? exerciseId]: unit },
+        },
+      };
+    });
+
+  reusePrevious = (
+    workoutId: string,
+    exerciseId: string,
+    expected: ReturnType<typeof previousValueChanges>,
+  ) =>
+    this.action((data) =>
+      replaceWorkout(data, workoutId, (workout) =>
+        reusePreviousValues(workout, exerciseId, expected),
+      ),
+    );
+
+  adjustRest = (workoutId: string, seconds: number) =>
+    this.action((data) =>
+      replaceWorkout(data, workoutId, (workout) => {
+        if (!workout.rest || workout.status !== 'active' || !Number.isInteger(seconds)) {
+          throw new Error('There is no timed rest to adjust.');
+        }
+        const endsAt = workout.rest.endsAt + seconds * 1000;
+        if (
+          endsAt < workout.rest.startedAt ||
+          endsAt - workout.rest.startedAt > 86_400_000
+        ) {
+          throw new Error('Rest must be between 0 and 24 hours.');
+        }
+        return {
+          ...workout,
+          rest: { ...workout.rest, endsAt },
+          restAdjustmentSeconds: workout.restAdjustmentSeconds + seconds,
+        };
+      }),
+    );
 
   rateSet = (workoutId: string, exerciseId: string, setId: string, rpe: number) =>
-    this.action((data) =>
+    this.edit((data) =>
       replaceWorkout(data, workoutId, (workout) =>
         replaceSet(workout, exerciseId, setId, (set) => {
           if (!Number.isInteger(rpe) || rpe < 5 || rpe > 10) {
@@ -333,7 +464,12 @@ export class WorkoutJournalStore {
       ),
     );
 
-  resolveSuggestion = (workoutId: string, exerciseId: string, setId: string, accept: boolean) =>
+  resolveSuggestion = (
+    workoutId: string,
+    exerciseId: string,
+    setId: string,
+    accept: boolean,
+  ) =>
     this.action((data) =>
       replaceWorkout(data, workoutId, (workout) => {
         const exercise = workout.exercises.find((exercise) => exercise.id === exerciseId);
@@ -410,30 +546,40 @@ export class WorkoutJournalStore {
       replaceWorkout(data, workoutId, (workout) => {
         if (
           workout.runningSet &&
-          (workout.runningSet.exerciseId !== exerciseId || workout.runningSet.setId !== setId)
+          (workout.runningSet.exerciseId !== exerciseId ||
+            workout.runningSet.setId !== setId)
         ) {
           throw new Error('Record the running set first.');
         }
         let restSeconds = 0;
-        const next = replaceSet(endRest(workout, now, false), exerciseId, setId, (set) => {
-          if (set.completedAt !== null) {
-            throw new Error('This set is already recorded.');
-          }
-          setValues(set);
-          restSeconds = set.planned?.restSeconds ?? 0;
-          return { ...set, completedAt: Math.max(now, set.startedAt ?? workout.startedAt) };
-        });
+        const next = replaceSet(
+          endRest(workout, now, false),
+          exerciseId,
+          setId,
+          (set) => {
+            if (set.completedAt !== null) {
+              throw new Error('This set is already recorded.');
+            }
+            setValues(set);
+            restSeconds = set.planned?.restSeconds ?? 0;
+            return {
+              ...set,
+              completedAt: Math.max(now, set.startedAt ?? workout.startedAt),
+            };
+          },
+        );
         const partner = supersetNext(next, exerciseId, setId);
+        const summary =
+          !partner &&
+          next.exercises
+            .find((x) => x.id === exerciseId)!
+            .sets.every((x) => x.completedAt !== null);
+        restSeconds =
+          restSeconds > 0 ? Math.max(0, restSeconds + workout.restAdjustmentSeconds) : 0;
         return {
           ...next,
           flow: {
-            stage:
-              !partner &&
-              next.exercises
-                .find((exercise) => exercise.id === exerciseId)!
-                .sets.every((set) => set.completedAt !== null)
-                ? 'summary'
-                : 'exercise',
+            stage: summary ? 'summary' : 'exercise',
             exerciseId: partner?.id ?? exerciseId,
           },
           runningSet: null,
@@ -443,9 +589,23 @@ export class WorkoutJournalStore {
                   ? { ...exercise, readyStartedAt: exercise.readyStartedAt ?? now }
                   : exercise,
               )
-            : next.exercises,
+            : summary
+              ? next.exercises.map((x) =>
+                  x.id !== exerciseId
+                    ? x
+                    : {
+                        ...x,
+                        sets: x.sets.map((y) =>
+                          y.id !== setId || y.startedAt === null
+                            ? y
+                            : { ...y, restAfterSec: 0 },
+                        ),
+                      },
+                )
+              : next.exercises,
+          restAnchor: summary ? null : { exerciseId, setId, startedAt: now },
           rest:
-            restSeconds > 0
+            !summary && restSeconds > 0
               ? { exerciseId, setId, startedAt: now, endsAt: now + restSeconds * 1000 }
               : null,
         };
@@ -518,7 +678,7 @@ export class WorkoutJournalStore {
           soloExerciseId: solo ? exerciseId : null,
           exercises: rested.exercises.map((item) =>
             item.id === exerciseId
-              ? { ...item, readyStartedAt: item.readyStartedAt ?? now }
+              ? { ...item, skipped: false, readyStartedAt: item.readyStartedAt ?? now }
               : item,
           ),
           flow: {
@@ -533,6 +693,13 @@ export class WorkoutJournalStore {
   };
   redoExercise = (workoutId: string, exerciseId: string) => {
     const now = this.now();
+    const cloneId = this.uuid();
+    const logId = this.uuid();
+    const sourceSets =
+      this.current.data.workouts
+        .find((x) => x.id === workoutId)
+        ?.exercises.find((x) => x.id === exerciseId)?.sets ?? [];
+    const setIds = new Map(sourceSets.map((x) => [x.id, this.uuid()]));
     return this.action((data) =>
       replaceWorkout(data, workoutId, (workout) => {
         const source = workout.exercises.find((exercise) => exercise.id === exerciseId);
@@ -546,14 +713,17 @@ export class WorkoutJournalStore {
         }
         const clone = {
           ...source,
-          id: this.uuid(),
-          logId: this.uuid(),
+          id: cloneId,
+          logId,
+          lastDate: workout.date,
+          lastWeights: source.sets.map((x) => setValues(x).weight),
+          lastReps: source.sets.map((x) => setValues(x).reps),
           relogOf: source.relogOf ?? source.id,
           supersetGroup: null,
           readyStartedAt: now,
           sets: source.sets.map((set) => ({
             ...set,
-            id: this.uuid(),
+            id: setIds.get(set.id)!,
             startedAt: null,
             completedAt: null,
             restAfterSec: null,
@@ -593,6 +763,13 @@ export class WorkoutJournalStore {
     >,
   ) => {
     const now = this.now();
+    const archiveId = this.uuid();
+    const replacementLogId = this.uuid();
+    const sourceSets =
+      this.current.data.workouts
+        .find((x) => x.id === workoutId)
+        ?.exercises.find((x) => x.id === exerciseId)?.sets ?? [];
+    const setIds = new Map(sourceSets.map((x) => [x.id, this.uuid()]));
     return this.action((data) =>
       replaceWorkout(data, workoutId, (workout) => {
         const source = workout.exercises.find((exercise) => exercise.id === exerciseId);
@@ -607,7 +784,7 @@ export class WorkoutJournalStore {
         const archive = recorded.length
           ? {
               ...source,
-              id: this.uuid(),
+              id: archiveId,
               relogOf: source.relogOf ?? source.id,
               retired: true,
               sets: recorded,
@@ -617,7 +794,7 @@ export class WorkoutJournalStore {
         const replacement = {
           ...source,
           ...alternative,
-          logId: archive ? this.uuid() : source.logId,
+          logId: archive ? replacementLogId : source.logId,
           mainMuscles: alternative.mainMuscles ?? alternative.muscles,
           secondaryMuscles: alternative.secondaryMuscles ?? [],
           lastReps: alternative.lastReps ?? [],
@@ -627,7 +804,7 @@ export class WorkoutJournalStore {
           readyStartedAt: now,
           sets: remaining.map((set) => ({
             ...set,
-            id: this.uuid(),
+            id: setIds.get(set.id)!,
             weight: String(initialWeight(basis, set.planned)),
             startedAt: null,
             plannedWeight: prescribedWeight(basis, set.planned),
@@ -675,8 +852,12 @@ export class WorkoutJournalStore {
           workout.exercises.find(
             (exercise) => exercise.id === workout.runningSet?.exerciseId,
           ) ??
-          workout.exercises.find((exercise) =>
-            exercise.sets.some((set) => set.completedAt === null),
+          workout.exercises.find(
+            (exercise) =>
+              !exercise.retired &&
+              !exercise.relogOf &&
+              !exercise.skipped &&
+              exercise.sets.some((set) => set.completedAt === null),
           );
         if (!exercise) {
           throw new Error('All exercises are complete. Finish the workout.');
@@ -709,6 +890,7 @@ export class WorkoutJournalStore {
             : next,
           exercises: rested.exercises.map((exercise) => ({
             ...exercise,
+            skipped: exercise.id === flow.exerciseId ? true : exercise.skipped,
             readyStartedAt:
               exercise.id === next.exerciseId
                 ? (exercise.readyStartedAt ?? now)
@@ -737,7 +919,13 @@ export class WorkoutJournalStore {
         if (workout.status !== 'active') {
           throw new Error('This workout is already finished.');
         }
-        return { ...workout, status: 'discarded', runningSet: null, rest: null };
+        return {
+          ...workout,
+          status: 'discarded',
+          runningSet: null,
+          rest: null,
+          restAnchor: null,
+        };
       }),
     );
   removeCompleted = (workoutId: string) =>
@@ -746,7 +934,10 @@ export class WorkoutJournalStore {
       if (workout && (workout.status !== 'completed' || workout.pending.length)) {
         throw new Error('Upload this workout before deleting its history.');
       }
-      return { ...data, workouts: data.workouts.filter((workout) => workout.id !== workoutId) };
+      return {
+        ...data,
+        workouts: data.workouts.filter((workout) => workout.id !== workoutId),
+      };
     });
 
   sync = (): Promise<void> => {
@@ -806,7 +997,10 @@ export class WorkoutJournalStore {
               ? 'Sign in again to upload this workout. It is saved on this phone.'
               : 'Workout saved on this phone. Upload is pending; retry when connected.';
           await this.write((data) =>
-            replaceWorkout(data, workout.id, (latest) => ({ ...latest, syncError: message })),
+            replaceWorkout(data, workout.id, (latest) => ({
+              ...latest,
+              syncError: message,
+            })),
           );
           return;
         }

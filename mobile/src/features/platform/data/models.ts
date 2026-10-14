@@ -54,6 +54,7 @@ export type Alert = {
   body: string;
   target: 'workout' | 'walk' | 'nutrition' | 'health' | 'review' | 'week';
   recordId?: string;
+  restCueId?: string;
   zone?: string;
   trigger: { at: number } | { hour: number; minute: number; weekday?: number };
 };

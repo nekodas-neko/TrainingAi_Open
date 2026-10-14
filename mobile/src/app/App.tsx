@@ -69,7 +69,10 @@ function AppShell() {
   const [healthDetail, setHealthDetail] = useState<HealthDetail | null>(null);
   const [healthDate, setHealthDate] = useState('');
   const [healthPanel, setHealthPanel] = useState<HealthPanel>('training');
-  const [nutritionReviewRequest, setNutritionReviewRequest] = useState({ scope: '', count: 0 });
+  const [nutritionReviewRequest, setNutritionReviewRequest] = useState({
+    scope: '',
+    count: 0,
+  });
   const [nutritionDateRequest, setNutritionDateRequest] = useState({
     scope: '',
     date: '',
@@ -143,6 +146,12 @@ function AppShell() {
     setWorkoutId(id);
     setDetail('workout-log');
   }
+  function minimizeWorkout() {
+    setWorkoutReturn(null);
+    setDetail(null);
+    setHealthDetail(null);
+    setTab('Home');
+  }
   const fullScreen =
     !!healthDetail || (detail !== null && !['health-data', 'settings'].includes(detail));
   function closeWorkout() {
@@ -201,7 +210,11 @@ function AppShell() {
           openSleep={(date) => {
             selectTab('Health');
             setHealthPanel('body');
-            setSleepRequest((value) => ({ scope: accountKey, date, count: value.count + 1 }));
+            setSleepRequest((value) => ({
+              scope: accountKey,
+              date,
+              count: value.count + 1,
+            }));
           }}
           openSession={openSession}
           openWorkout={openWorkout}
@@ -367,6 +380,7 @@ function AppShell() {
           workoutId={workoutId}
           openSettings={openSettings}
           closeWorkout={closeWorkout}
+          minimizeWorkout={minimizeWorkout}
         />
       ) : detail === 'session-explain' ? (
         <SessionExplainScreen
@@ -383,7 +397,10 @@ function AppShell() {
           closeSession={() => setDetail(null)}
         />
       ) : detail === 'programs' ? (
-        <ProgramsScreen onBack={closeDetail} openBuilder={() => setDetail('program-builder')} />
+        <ProgramsScreen
+          onBack={closeDetail}
+          openBuilder={() => setDetail('program-builder')}
+        />
       ) : detail === 'program-builder' ? (
         <AIProgramBuilder
           onBack={() => setDetail('programs')}
@@ -458,18 +475,25 @@ function AppShell() {
             <NutritionScreen openSettings={openSettings} />
           ) : null}
           {health.error && detail === 'health-data' && (
-            <Notice title={`Unable to read ${deviceHealthName}`} message={health.error} error />
+            <Notice
+              title={`Unable to read ${deviceHealthName}`}
+              message={health.error}
+              error
+            />
           )}
         </Screen>
       )}
-      {!fullScreen && tab !== 'Workout' && <ActiveWorkoutBar onResume={openWorkout} />}
+      {!fullScreen && <ActiveWorkoutBar onResume={openWorkout} />}
       <AlertNavigation
         onWorkout={openWorkout}
         onWalk={() => setDetail('activity-recording')}
         onTab={selectTab}
         onReview={() => {
           selectTab('Nutrition');
-          setNutritionReviewRequest((value) => ({ scope: accountKey, count: value.count + 1 }));
+          setNutritionReviewRequest((value) => ({
+            scope: accountKey,
+            count: value.count + 1,
+          }));
         }}
         onWeek={(week) => {
           selectTab('Health');

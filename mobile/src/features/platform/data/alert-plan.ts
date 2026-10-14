@@ -1,6 +1,7 @@
 import { walkPlan } from '../../activities/data/guidance.ts';
 import { getProtocol, phasesTotalSec } from '@trainingai/shared/fitness-tests/protocols';
 import type { ActivitySession } from '../../activities/data/ActivityStore.ts';
+import { workoutFlow } from '../../workouts/logging/flow.ts';
 import type { WorkoutRecord } from '../../workouts/logging/workout.ts';
 import type { Alert, PlatformSettings } from './models.ts';
 export function planAlerts(
@@ -8,17 +9,21 @@ export function planAlerts(
   workouts: WorkoutRecord[],
   activity: ActivitySession | null,
   now = Date.now(),
+  foreground = false,
 ): Alert[] {
   const scope = settings.scope;
   const result: Alert[] = [];
   for (const workout of workouts) {
     if (
-      settings.restAlerts &&
+      (foreground ? workout.timers.restCues : settings.restAlerts) &&
       workout.status === 'active' &&
+      workoutFlow(workout).stage !== 'summary' &&
       workout.rest &&
       workout.rest.endsAt > now
     ) {
-      const exercise = workout.exercises.find((row) => row.id === workout.rest!.exerciseId);
+      const exercise = workout.exercises.find(
+        (row) => row.id === workout.rest!.exerciseId,
+      );
       result.push({
         id: `${scope}:rest:${workout.id}`,
         scope,
@@ -26,6 +31,7 @@ export function planAlerts(
         body: exercise ? `Ready for ${exercise.name}.` : 'Ready for your next set.',
         target: 'workout',
         recordId: workout.id,
+        restCueId: `${workout.id}:${workout.rest.startedAt}:${workout.rest.endsAt}`,
         trigger: { at: workout.rest.endsAt },
       });
     }
@@ -81,7 +87,9 @@ export function planAlerts(
   ) {
     const base = activity.startMs + activity.pausedMs;
     const protocol =
-      activity.guidance?.kind === 'test' ? getProtocol(activity.guidance.protocol) : undefined;
+      activity.guidance?.kind === 'test'
+        ? getProtocol(activity.guidance.protocol)
+        : undefined;
     let elapsed = 0;
     for (const [index, phase] of (protocol?.phases ?? []).entries()) {
       const at = base + elapsed * 1000;

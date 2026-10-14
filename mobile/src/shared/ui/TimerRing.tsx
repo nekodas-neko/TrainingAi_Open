@@ -9,6 +9,7 @@ export function TimerRing({
   progress = 0,
   compact = false,
   overtime = false,
+  countdown = false,
   onPress,
 }: {
   value: string;
@@ -16,6 +17,7 @@ export function TimerRing({
   progress?: number;
   compact?: boolean;
   overtime?: boolean;
+  countdown?: boolean;
   onPress?: () => void;
 }) {
   const { theme } = useTheme();
@@ -24,15 +26,24 @@ export function TimerRing({
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
   const color = overtime ? theme.anatomy.injured : theme.colors.brandText;
+  const fraction = Math.min(1, Math.max(0, progress));
+  const rotation = -90 + (countdown && !overtime ? 360 * (1 - fraction) : 0);
   const ring = (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+    <View
+      style={{
+        width: size,
+        height: size,
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
       <Svg width={size} height={size} style={{ position: 'absolute' }}>
         <Circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke={theme.colors.border}
+          stroke={overtime ? color : theme.colors.border}
           strokeWidth={stroke}
         />
         <Circle
@@ -43,11 +54,16 @@ export function TimerRing({
           stroke={color}
           strokeWidth={stroke}
           strokeLinecap="round"
-          strokeDasharray={`${circumference * Math.min(1, Math.max(0, progress))} ${circumference}`}
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+          strokeDasharray={
+            overtime ? undefined : `${circumference * fraction} ${circumference}`
+          }
+          transform={`rotate(${rotation} ${size / 2} ${size / 2})`}
         />
       </Svg>
-      <AppText variant={compact ? 'micro' : 'display'} style={{ color, textAlign: 'center' }}>
+      <AppText
+        variant={compact ? 'micro' : 'display'}
+        style={{ color, textAlign: 'center' }}
+      >
         {value}
       </AppText>
       {!compact && caption && (

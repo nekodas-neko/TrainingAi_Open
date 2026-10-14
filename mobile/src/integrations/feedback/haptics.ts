@@ -2,8 +2,20 @@ import { Platform } from 'react-native';
 import { requireOptionalNativeModule } from 'expo';
 
 let lastFeedbackAt = 0;
-export function feedback(kind: 'selection' | 'success' | 'impact' = 'selection') {
-  if ((Platform.OS !== 'ios' && Platform.OS !== 'android') || Date.now() - lastFeedbackAt < 120)
+let lastRestCue: string | null = null;
+export function restFeedback(cueId: string) {
+  if (lastRestCue === cueId) return;
+  lastRestCue = cueId;
+  feedback('success', true);
+}
+export function feedback(
+  kind: 'selection' | 'success' | 'impact' = 'selection',
+  force = false,
+) {
+  if (
+    (Platform.OS !== 'ios' && Platform.OS !== 'android') ||
+    (!force && Date.now() - lastFeedbackAt < 120)
+  )
     return;
   try {
     if (!requireOptionalNativeModule('ExpoHaptics')) return;

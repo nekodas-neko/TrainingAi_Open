@@ -14,9 +14,11 @@ export function WorkoutLayout({
   workout,
   ring = false,
   actions,
+  titleAction,
   footer,
   contentDisabled = false,
   reorderable = false,
+  fillBottom = false,
   children,
 }: PropsWithChildren<{
   title: string;
@@ -28,9 +30,11 @@ export function WorkoutLayout({
   workout?: WorkoutRecord;
   ring?: boolean;
   actions?: ReactNode;
+  titleAction?: ReactNode;
   footer?: ReactNode;
   contentDisabled?: boolean;
   reorderable?: boolean;
+  fillBottom?: boolean;
 }>) {
   return (
     <PageLayout
@@ -38,6 +42,7 @@ export function WorkoutLayout({
       onBack={onBack}
       scroll
       reorderable={reorderable}
+      fillBottom={fillBottom}
       footer={footer}
       header={
         <Stack direction="row" align="center" gap="sm">
@@ -52,6 +57,7 @@ export function WorkoutLayout({
             </AppText>
             {subtitle && (
               <AppText
+                numberOfLines={1}
                 variant={ring ? 'micro' : 'caption'}
                 tone="muted"
                 style={{ textAlign: ring ? 'center' : 'left' }}
@@ -65,6 +71,7 @@ export function WorkoutLayout({
               </AppText>
             )}
           </View>
+          {titleAction}
           {actions}
           {workout && <SessionTimer workout={workout} ring={ring} />}
         </Stack>

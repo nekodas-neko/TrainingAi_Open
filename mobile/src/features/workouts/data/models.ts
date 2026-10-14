@@ -170,7 +170,9 @@ export const strengthSpec = {
 export const recordsSpec = {
   path: '/api/personal-records',
   schema: z.object({
-    records: z.array(z.object({ exerciseName: text, estimated1rm: finite, achievedAt: text })),
+    records: z.array(
+      z.object({ exerciseName: text, estimated1rm: finite, achievedAt: text }),
+    ),
   }),
   ttl: 300_000,
 };
@@ -238,6 +240,62 @@ export const recapSpec = (id: string) => ({
   schema: z.object({ recap: text.optional(), degraded: z.boolean().optional() }),
   ttl: 86_400_000,
   cache: (data: { degraded?: boolean }) => !data.degraded,
+});
+const timingValues = {
+  setupActualSec: finite.nullable(),
+  setupExpectedSec: finite,
+  workActualSec: finite.nullable(),
+  workExpectedSec: finite,
+  restActualSec: finite.nullable(),
+  restExpectedSec: finite,
+};
+export const timingSpec = (id: string) => ({
+  path: `/api/workout-sessions/${id}/timing`,
+  schema: z.object({
+    hasData: z.boolean(),
+    exercises: z.array(z.object({ name: text, ...timingValues })),
+    totals: z.object(timingValues),
+    sources: z.object({ setup: text, work: text, rest: text }),
+  }),
+  ttl: 86_400_000,
+});
+export const workoutHrSpec = (id: string) => ({
+  path: '/api/oura/hr-data',
+  query: { sessionId: id },
+  schema: z.object({
+    ready: z.boolean(),
+    hasData: z.boolean().optional(),
+    startedAt: text.optional(),
+    workoutHrvMs: finite.nullable().optional(),
+    summary: z
+      .object({
+        avgBpm: finite.nullable(),
+        peakBpm: finite.nullable(),
+        hrr1Best: finite.nullable(),
+        readingsCount: finite,
+        source: text.nullable(),
+        fromSnapshot: z.boolean(),
+      })
+      .nullable()
+      .optional(),
+    readings: z.array(z.object({ timestamp: text, bpm: finite })).default([]),
+    setStats: z
+      .array(
+        z.object({
+          exerciseName: text,
+          setNumber: finite,
+          loggedAt: text.nullable(),
+          setStartMs: finite.nullable(),
+          setEndMs: finite.nullable(),
+          peakBpm: finite.nullable(),
+          bpmAtLog: finite.nullable().optional(),
+          hrr1: finite.nullable(),
+          adequate: z.boolean().nullable(),
+        }),
+      )
+      .default([]),
+  }),
+  ttl: 30_000,
 });
 export const nextPrescriptionSpec = {
   path: '/api/next-session/prescription',

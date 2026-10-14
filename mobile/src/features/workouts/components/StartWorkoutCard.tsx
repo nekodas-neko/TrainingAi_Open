@@ -3,8 +3,6 @@ import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import type { SessionPreview } from '../catalog';
 import { WorkoutSaveNotice } from './WorkoutSaveNotice';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
-import { useState } from 'react';
-import { StartCountdown } from './StartCountdown';
 import type { SessionStartOptions } from '../logging/session-options';
 
 export function StartWorkoutCard({
@@ -14,7 +12,6 @@ export function StartWorkoutCard({
   inline = false,
   completed = false,
   onPrepare,
-  countdown = false,
   launchExerciseId,
   actionLabel,
   options,
@@ -26,7 +23,6 @@ export function StartWorkoutCard({
   inline?: boolean;
   completed?: boolean;
   onPrepare?: () => void;
-  countdown?: boolean;
   launchExerciseId?: string;
   actionLabel?: string;
   options?: SessionStartOptions;
@@ -34,13 +30,14 @@ export function StartWorkoutCard({
 }) {
   const journal = useWorkoutJournal();
   const { theme } = useTheme();
-  const [counting, setCounting] = useState(false);
   const active = journal.data.workouts.find((workout) => workout.status === 'active');
   async function start(useSaved = false) {
     const id = await journal.controller?.start(session, programId, useSaved, options);
     if (id) {
       if (launchExerciseId) {
-        await journal.controller?.chooseExercise(id, launchExerciseId, true);
+        if (!(await journal.controller?.chooseExercise(id, launchExerciseId, true))) {
+          return;
+        }
       }
       openWorkout(id);
     }
@@ -74,7 +71,9 @@ export function StartWorkoutCard({
           }
           variant={completed && !active ? 'surface' : 'primary'}
           style={
-            completed && !active ? { borderWidth: 1, borderColor: theme.anatomy.main } : undefined
+            completed && !active
+              ? { borderWidth: 1, borderColor: theme.anatomy.main }
+              : undefined
           }
           busy={journal.busy}
           disabled={disabled || (!active && session.exercises.length === 0)}
@@ -83,8 +82,6 @@ export function StartWorkoutCard({
               openWorkout(active.id);
             } else if (onPrepare) {
               onPrepare();
-            } else if (countdown) {
-              setCounting(true);
             } else {
               void start();
             }
@@ -102,15 +99,6 @@ export function StartWorkoutCard({
         )}
       </Wrapper>
       <WorkoutSaveNotice />
-      {counting && (
-        <StartCountdown
-          onCancel={() => setCounting(false)}
-          onComplete={() => {
-            setCounting(false);
-            void start();
-          }}
-        />
-      )}
     </>
   );
 }

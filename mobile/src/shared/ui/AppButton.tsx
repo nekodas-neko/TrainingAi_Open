@@ -3,13 +3,16 @@ import { AppText } from './AppText';
 import { Stack } from './Stack';
 import { Icon, type IconName } from './Icon';
 import { useTheme } from '../theme/ThemeProvider';
+import type { TextVariant } from '../theme/tokens';
 
 export function AppButton({
   title,
   variant = 'primary',
   busy = false,
   icon,
+  iconSize,
   disabled = false,
+  textVariant = 'label',
   style,
   ...props
 }: Omit<PressableProps, 'children'> & {
@@ -17,6 +20,8 @@ export function AppButton({
   variant?: 'primary' | 'secondary' | 'surface' | 'ghost' | 'danger';
   busy?: boolean;
   icon?: IconName;
+  iconSize?: number;
+  textVariant?: TextVariant;
 }) {
   const { theme } = useTheme();
   const blocked = disabled || busy || !props.onPress;
@@ -62,10 +67,17 @@ export function AppButton({
     >
       <Stack direction="row" align="center">
         {busy && <ActivityIndicator color={foreground} />}
-        {icon && !busy && <Icon name={icon} color={foreground} size={theme.sizes.iconSmall} />}
-        <AppText variant="label" style={{ color: foreground, textAlign: 'center' }}>
-          {title}
-        </AppText>
+        {icon && !busy && (
+          <Icon name={icon} color={foreground} size={iconSize ?? theme.sizes.iconSmall} />
+        )}
+        {title.length > 0 && (
+          <AppText
+            variant={textVariant}
+            style={{ color: foreground, textAlign: 'center' }}
+          >
+            {title}
+          </AppText>
+        )}
       </Stack>
     </Pressable>
   );

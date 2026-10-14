@@ -11,11 +11,19 @@ export function workoutActivity(workout: WorkoutRecord, now: number) {
     const set = exercise.sets[index];
     return {
       label: `${exercise.name} · Set ${index + 1}/${exercise.sets.length}`,
-      seconds: set?.startedAt == null ? null : Math.max(0, (now - set.startedAt) / 1000),
+      seconds:
+        !workout.timers.setElapsed || set?.startedAt == null
+          ? null
+          : Math.max(0, (now - set.startedAt) / 1000),
       timer: 'Set',
     };
   }
-  if (workout.rest && flow.stage !== 'warmup' && flow.stage !== 'review') {
+  if (
+    workout.rest &&
+    flow.stage !== 'warmup' &&
+    flow.stage !== 'review' &&
+    flow.stage !== 'summary'
+  ) {
     const remaining = Math.ceil((workout.rest.endsAt - now) / 1000);
     return {
       label: exercise?.name ?? workout.sessionName,

@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { createLocalStorage } from '../src/core/storage/LocalStorage.ts';
 import { sqliteFixture } from './storage-fixture.ts';
 import { loggingFixture, programId } from './logging-fixture.ts';
-import { createWorkout, finishWorkout } from '../src/features/workouts/logging/workout.ts';
+import {
+  createWorkout,
+  finishWorkout,
+} from '../src/features/workouts/logging/workout.ts';
 import {
   platformSchema,
   alertSignature,
@@ -89,6 +92,18 @@ test('rest deadlines reschedule one stable alert, and finished/skipped rests lea
     endsAt: now + 60000,
   };
   const first = planAlerts(settings(), [value], null, now);
+  assert.equal(
+    planAlerts(settings({ restAlerts: false }), [value], null, now, true).length,
+    1,
+  );
+  assert.deepEqual(
+    planAlerts(settings({ restAlerts: false }), [value], null, now, false),
+    [],
+  );
+  value.timers.restCues = false;
+  assert.deepEqual(planAlerts(settings(), [value], null, now, true), []);
+  assert.equal(planAlerts(settings(), [value], null, now, false).length, 1);
+  value.timers.restCues = true;
   value.rest.endsAt += 30000;
   const next = planAlerts(settings(), [value], null, now);
   assert.equal(first[0].id, next[0].id);
@@ -165,8 +180,10 @@ test('daily reminders collapse weekdays, weekly reminders retain exact weekdays 
     [],
   );
   assert.equal(
-    platformSchema.safeParse({ scope: 'one', reminders: [{ ...reminder, time: '25:00' }] })
-      .success,
+    platformSchema.safeParse({
+      scope: 'one',
+      reminders: [{ ...reminder, time: '25:00' }],
+    }).success,
     false,
   );
 });
@@ -186,7 +203,8 @@ test('notification budget refuses excess repeat days instead of silently losing 
     saved: false,
   };
   assert.ok(
-    planAlerts(settings({ reminders: reminders.slice(0, 5) }), [], active, now).length <= 60,
+    planAlerts(settings({ reminders: reminders.slice(0, 5) }), [], active, now).length <=
+      60,
   );
 });
 test('scheduler keeps unchanged alerts and cancels old-account and changed timers', async () => {

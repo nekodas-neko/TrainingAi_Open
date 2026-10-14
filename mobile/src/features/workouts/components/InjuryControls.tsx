@@ -1,10 +1,15 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { activeInjuredMuscles } from '@trainingai/shared/workout/injury-context';
 import { injurySafeAlternatives } from '@trainingai/shared/workout/injury-substitution';
 import { normalizeMuscle } from '@trainingai/shared/muscles';
 import { AppButton, AppText, Card, ListRow, Notice, Sheet } from '../../../shared/ui';
 import { useWorkoutResource } from '../data/WorkoutDataProvider';
-import { exerciseHistorySpec, injurySpec, librarySpec, type LibraryExercise } from '../data/models';
+import {
+  exerciseHistorySpec,
+  injurySpec,
+  librarySpec,
+  type LibraryExercise,
+} from '../data/models';
 import { useWorkoutJournal } from '../logging/WorkoutJournalProvider';
 import type { WorkoutExercise, WorkoutRecord } from '../logging/workout';
 import { useWorkoutAction } from '../data/useWorkoutAction';
@@ -25,6 +30,7 @@ export function InjuryControls({
   const journal = useWorkoutJournal();
   const action = useWorkoutAction();
   const [open, setOpen] = useState(false);
+  const pendingSkip = useRef(false);
   const injured = new Set(activeInjuredMuscles(injuries.data ?? []).map(normalizeMuscle));
   const muscles = [
     ...new Set(
@@ -37,9 +43,10 @@ export function InjuryControls({
   const alternatives = injurySafeAlternatives(
     {
       name: exercise.name,
-      mainMuscles: (exercise.mainMuscles.length ? exercise.mainMuscles : exercise.muscles).map(
-        normalizeMuscle,
-      ),
+      mainMuscles: (exercise.mainMuscles.length
+        ? exercise.mainMuscles
+        : exercise.muscles
+      ).map(normalizeMuscle),
     },
     [...injured],
     library.data?.exercises ?? [],
@@ -80,7 +87,9 @@ export function InjuryControls({
         lastDate,
       });
       if (!saved) {
-        throw new Error('Could not save the exercise swap. Your existing sets are unchanged.');
+        throw new Error(
+          'Could not save the exercise swap. Your existing sets are unchanged.',
+        );
       }
       setOpen(false);
     });
@@ -94,10 +103,12 @@ export function InjuryControls({
   return (
     <>
       <Card tone="heart">
-        <AppText variant={compact ? 'micro' : 'label'}>Injury: {muscles.join(', ')}</AppText>
+        <AppText variant={compact ? 'micro' : 'label'}>
+          Injury: {muscles.join(', ')}
+        </AppText>
         {!compact && (
           <AppText variant="caption" tone="muted">
-            Recorded injury involves this exercise's muscles.
+            Recorded injury involves this exercise&apos;s muscles.
           </AppText>
         )}
         <AppButton
@@ -107,7 +118,17 @@ export function InjuryControls({
           onPress={() => setOpen(true)}
         />
       </Card>
-      <Sheet visible={open} title="Swap Exercise" onClose={() => setOpen(false)}>
+      <Sheet
+        visible={open}
+        title="Swap Exercise"
+        onClose={() => setOpen(false)}
+        onDismiss={() => {
+          if (pendingSkip.current) {
+            pendingSkip.current = false;
+            onSkip();
+          }
+        }}
+      >
         {action.error && <Notice title="Swap not saved" message={action.error} />}
         {library.error && <Notice title="Exercise library" message={library.error} />}
         {alternatives.length ? (
@@ -128,14 +149,14 @@ export function InjuryControls({
         ) : (
           <>
             <AppText tone="muted">
-              No alternative avoids the recorded injured muscles. Consider skipping this exercise
-              today.
+              No alternative avoids the recorded injured muscles. Consider skipping this
+              exercise today.
             </AppText>
             <AppButton
               title="Skip exercise"
               onPress={() => {
+                pendingSkip.current = true;
                 setOpen(false);
-                onSkip();
               }}
             />
           </>

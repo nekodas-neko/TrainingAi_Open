@@ -1,9 +1,16 @@
+import type { ReactNode } from 'react';
 import { View } from 'react-native';
 import { AppText, Icon, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { ExerciseMedia } from './ExerciseMedia';
 
-export function ExerciseThumbnail({ compact = false, name }: { compact?: boolean; name?: string }) {
+export function ExerciseThumbnail({
+  compact = false,
+  name,
+}: {
+  compact?: boolean;
+  name?: string;
+}) {
   if (name) {
     return <ExerciseMedia name={name} compact={compact} />;
   }
@@ -27,13 +34,20 @@ function EmptyThumbnail({ compact }: { compact: boolean }) {
     </View>
   );
 }
-export function ExerciseHeading({ name }: { name: string }) {
+export function ExerciseHeading({
+  name,
+  actions,
+}: {
+  name: string;
+  actions?: ReactNode;
+}) {
   return (
     <Stack direction="row" align="center" gap="md">
       <ExerciseThumbnail name={name} />
       <AppText variant="title" style={{ flex: 1 }}>
         {name}
       </AppText>
+      {actions}
     </Stack>
   );
 }

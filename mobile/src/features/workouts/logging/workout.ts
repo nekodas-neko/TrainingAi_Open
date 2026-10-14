@@ -4,7 +4,14 @@ import { LogExercisePayloadSchema } from '@trainingai/shared/workout/log-payload
 import { CompleteWorkoutPayloadSchema } from '@trainingai/shared/workout/complete-payload';
 import type { PendingWrite } from '../../../core/sync/pushMutation.ts';
 import type { CatalogIdentity, SessionPreview } from '../catalog.ts';
+import { measuredExerciseTiming } from './timing.ts';
 import { expectedRpe, initialWeight, prescribedWeight } from './targets.ts';
+import {
+  defaultTimers,
+  defaultWorkoutPreferences,
+  timerPreferencesSchema,
+  workoutPreferencesSchema,
+} from './preferences.ts';
 import { warmupBudgetMin } from '@trainingai/shared/workout/duration-model';
 
 const timestamp = z.number().int().min(1_600_000_000_000).max(4_100_000_000_000);
@@ -50,9 +57,11 @@ const exerciseSchema = z.object({
   lastDate: z.string().nullable().default(null),
   prevRepMaxReps: z.number().int().nonnegative().nullable().default(null),
   readyStartedAt: timestamp.nullable().default(null),
+  weightUnit: z.enum(['kg', 'lb']).default('kg'),
   supersetGroup: z.number().int().nonnegative().nullable().default(null),
   relogOf: z.uuid().nullable().default(null),
   retired: z.boolean().default(false),
+  skipped: z.boolean().default(false),
   sets: z.array(setSchema).min(1).max(20),
 });
 const reference = z.object({ exerciseId: z.uuid(), setId: z.uuid() });
@@ -73,6 +82,10 @@ const workoutSchema = z.object({
   startedAt: timestamp,
   warmupEndedAt: timestamp.nullable().default(null),
   warmupGoalSeconds: z.number().int().positive().default(600),
+  warmupGoalSource: z.enum(['budget', 'default', 'selected']).default('default'),
+  timers: timerPreferencesSchema.default(defaultTimers),
+  restAnchor: reference.extend({ startedAt: timestamp }).nullable().default(null),
+  restAdjustmentSeconds: z.number().int().min(-86400).max(86400).default(0),
   soloExerciseId: z.uuid().nullable().default(null),
   hubReturnStage: z.enum(['warmup', 'exercise', 'summary']).nullable().default(null),
   intensityMode: z.enum(['full', 'deload']).default('full'),
@@ -103,6 +116,7 @@ const journalSchema = z.object({
   origin: z.string(),
   userId: z.string(),
   workouts: z.array(workoutSchema),
+  preferences: workoutPreferencesSchema.default(defaultWorkoutPreferences),
 });
 export type WorkoutRecord = z.infer<typeof workoutSchema>;
 export type WorkoutExercise = z.infer<typeof exerciseSchema>;
@@ -110,10 +124,19 @@ export type WorkoutSet = z.infer<typeof setSchema>;
 export type WorkoutJournal = z.infer<typeof journalSchema>;
 
 export function emptyJournal(identity: CatalogIdentity): WorkoutJournal {
-  return { version: 1, origin: identity.origin, userId: identity.userId, workouts: [] };
+  return {
+    version: 1,
+    origin: identity.origin,
+    userId: identity.userId,
+    workouts: [],
+    preferences: defaultWorkoutPreferences(),
+  };
 }
 
-export function readJournal(raw: string | null, identity: CatalogIdentity): WorkoutJournal {
+export function readJournal(
+  raw: string | null,
+  identity: CatalogIdentity,
+): WorkoutJournal {
   if (raw === null) {
     return emptyJournal(identity);
   }
@@ -175,12 +198,13 @@ export function readJournal(raw: string | null, identity: CatalogIdentity): Work
     } else if (workout.pending.length || workout.completedAt !== null) {
       throw new Error('Invalid pending workout writes.');
     }
-    for (const ref of [workout.runningSet, workout.rest]) {
+    for (const ref of [workout.runningSet, workout.rest, workout.restAnchor]) {
       if (
         ref &&
         !workout.exercises.some(
           (exercise) =>
-            exercise.id === ref.exerciseId && exercise.sets.some((set) => set.id === ref.setId),
+            exercise.id === ref.exerciseId &&
+            exercise.sets.some((set) => set.id === ref.setId),
         )
       ) {
         throw new Error('Missing saved workout set.');
@@ -199,7 +223,9 @@ export function createWorkout(
   uuid: () => string,
 ): WorkoutRecord {
   if (session.prescriptionPending) {
-    throw new Error('The session prescription is still being prepared. Check again shortly.');
+    throw new Error(
+      'The session prescription is still being prepared. Check again shortly.',
+    );
   }
   const tz = timezone ?? DEFAULT_TZ;
   const parsed = workoutSchema.safeParse({
@@ -219,11 +245,14 @@ export function createWorkout(
       session.budgetMinutes && session.budgetMinutes > 0
         ? Math.max(1, warmupBudgetMin(session.budgetMinutes)) * 60
         : 600,
+    warmupGoalSource:
+      session.budgetMinutes && session.budgetMinutes > 0 ? 'budget' : 'default',
     flow: { stage: 'warmup', exerciseId: session.exercises[0]?.id },
     completedAt: null,
     status: 'active',
     runningSet: null,
     rest: null,
+    restAnchor: null,
     pending: [],
     syncedAt: null,
     syncError: null,
@@ -328,7 +357,14 @@ export function mutationFor(
   const rests = prefix(sets, (set) => set.restAfterSec);
   const rpeValues = prefix(sets, (set) => set.rpe);
   const plannedWeights = sets.map((set) => set.plannedWeight);
+  const measured = measuredExerciseTiming(workout, exercise);
   const payload = LogExercisePayloadSchema.parse({
+    ...(exercise.supersetGroup == null
+      ? {
+          prepTimeSec: measured.prepTimeSec ?? undefined,
+          interExerciseRestSec: measured.interExerciseRestSec ?? undefined,
+        }
+      : {}),
     sessionName: workout.sessionName,
     sessionId: workout.sessionId,
     workoutSessionId: workout.id,
@@ -346,7 +382,10 @@ export function mutationFor(
     ...(times.length ? { setTimes: times } : {}),
     ...(rests.length ? { restTimes: rests } : {}),
     ...(rpeValues.length
-      ? { rpeValues, rpeSources: sets.slice(0, rpeValues.length).map((set) => set.rpeSource) }
+      ? {
+          rpeValues,
+          rpeSources: sets.slice(0, rpeValues.length).map((set) => set.rpeSource),
+        }
       : {}),
     ...(plannedWeights.some((weight) => weight !== null)
       ? {
@@ -394,6 +433,7 @@ export function finishWorkout(workout: WorkoutRecord, now: number): WorkoutRecor
       ...recordedSets(workout).map((set) => set.completedAt!),
     ),
     rest: null,
+    restAnchor: null,
     pending: [
       ...workout.exercises
         .filter((exercise) => exercise.sets.some((set) => set.completedAt !== null))
@@ -409,15 +449,20 @@ export function finishWorkout(workout: WorkoutRecord, now: number): WorkoutRecor
   return completed;
 }
 
-export function endRest(workout: WorkoutRecord, now: number, measured = true): WorkoutRecord {
-  if (!workout.rest) {
+export function endRest(
+  workout: WorkoutRecord,
+  now: number,
+  measured = true,
+): WorkoutRecord {
+  const rest = workout.rest ?? workout.restAnchor;
+  if (!rest) {
     return workout;
   }
-  const rest = workout.rest;
   const elapsed = Math.round((now - rest.startedAt) / 1000);
   return {
     ...workout,
     rest: null,
+    restAnchor: null,
     exercises: workout.exercises.map((exercise) =>
       exercise.id !== rest.exerciseId
         ? exercise
