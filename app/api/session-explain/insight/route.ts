@@ -1,4 +1,5 @@
 import { aiModel, loggedStreamText } from '@/lib/ai/instrument'
+import { aiPausedResponse } from '@/lib/ai/provider-paused'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { errorLog } from '@trainingai/shared/logger'
@@ -80,6 +81,6 @@ ${PROSE_GUARDS}`
     // malformed id, which reaches the driver as 22P02. The log line above keeps the full detail and
     // `reportServerError` already banked it, so redacting the response costs no diagnostics.
     errorLog(error, 'GET /api/session-explain/insight')
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    return aiPausedResponse(error) ?? NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
 }

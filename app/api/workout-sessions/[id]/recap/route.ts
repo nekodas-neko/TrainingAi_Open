@@ -1,5 +1,6 @@
 import { generateText } from 'ai'
 import { aiModel, loggedGenerateText } from '@/lib/ai/instrument'
+import { aiPausedResponse } from '@/lib/ai/provider-paused'
 import { degradedFromFacts } from '@/lib/ai/degrade'
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
@@ -128,6 +129,6 @@ In at most 3 sentences: say what stood out about this session, and give one thin
     // malformed id, which reaches the driver as 22P02. The log line above keeps the full detail and
     // `reportServerError` already banked it, so redacting the response costs no diagnostics.
     errorLog(error, 'GET /api/workout-sessions/[id]/recap')
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    return aiPausedResponse(error) ?? NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
 }

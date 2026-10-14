@@ -5,6 +5,7 @@ import { userTextBlock, sanitiseUserText, USER_TEXT_NOTE } from '@trainingai/sha
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { aiModel, loggedGenerateObject, contentKey } from '@/lib/ai/instrument'
+import { aiPausedResponse } from '@/lib/ai/provider-paused'
 import { rateLimit } from '@/lib/rate-limit'
 import { scaleWithTopUp } from '@/lib/nutrition/meal-top-up'
 import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals'
@@ -179,8 +180,8 @@ export async function POST(req: Request) {
         ].filter(Boolean).join('\n'),
       }))
     meal = result.object
-  } catch {
-    return NextResponse.json({
+  } catch (err) {
+    return aiPausedResponse(err) ?? NextResponse.json({
       // PS-37: the else branch said "Could not rewrite that meal" on a FRESH generation, which is
       // the one thing the user did not ask for. The rewriting branch was always correct.
       error: rewriting

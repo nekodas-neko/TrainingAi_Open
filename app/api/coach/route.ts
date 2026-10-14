@@ -3,6 +3,7 @@ import { google } from '@ai-sdk/google'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { COACH_MODEL_ID, coachModel, loggedStreamText } from '@/lib/ai/instrument'
+import { aiPausedResponse } from '@/lib/ai/provider-paused'
 import { PROSE_GUARDS } from '@/lib/ai/prompt-guards'
 import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
@@ -298,6 +299,6 @@ export async function POST(req: Request) {
     return result.toUIMessageStreamResponse()
   } catch (error) {
     errorLog(error, 'API /coach')
-    return NextResponse.json({ error: 'Coach failed' }, { status: 500 })
+    return aiPausedResponse(error) ?? NextResponse.json({ error: 'Coach failed' }, { status: 500 })
   }
 }
