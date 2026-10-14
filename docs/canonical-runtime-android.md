@@ -54,8 +54,9 @@ question is never re-litigated per change.
 Railway (`capacitor.config.ts` `server.url`), so **JS, TypeScript and server changes reach the
 device through a Railway deploy with no rebuild** — including everything under `lib/`, `app/`,
 `components/` and `packages/`. Only `android/**` (Kotlin), `capacitor.config.ts`, and dependency
-changes need a new APK. A session should say which half its PR touches; if it's the JS half,
-merging *is* the delivery.
+changes need a new APK. A session should say which half its PR touches; if it's the JS half, no
+APK is needed — but **a merge deploys nothing**: production changes only through a release, a `v*`
+tag deployed after the owner says "approve" (`docs/owner-manual.md`).
 
 **When one IS needed, download it — don't build it.** `.github/workflows/android.yml` compiles the
 Kotlin, runs the JVM protocol tests, and builds two debug APKs on every PR touching native paths:

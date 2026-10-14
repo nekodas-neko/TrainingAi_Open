@@ -271,5 +271,5 @@ The other local tables are the mirrors named in the "device copy" column above. 
 |---|---|---|---|---|
 | `clock_anchors` | NATIVE RAW STORE | `android/app/src/main/java/com/trainingai/app/oura/OuraRawDb.kt` | `oura_ble_clock_anchors` | oura_raw.db: ring clock anchors, uploaded to the server archive |
 | `raw` | NATIVE RAW STORE | `android/app/src/main/java/com/trainingai/app/oura/OuraRawDb.kt` | `oura_raw_samples` | oura_raw.db: ring frames, uploaded to the server archive, pruned once rolled up and synced |
-| `sync_state` | NATIVE DEVICE-ONLY | `android/app/src/main/java/com/trainingai/app/oura/OuraRawDb.kt` | — | oura_raw.db: the history cursor (advances only past server-acknowledged events) |
+| `sync_state` | NATIVE DEVICE-ONLY | `android/app/src/main/java/com/trainingai/app/oura/OuraRawDb.kt` | — | oura_raw.db: the history cursor (advances in the same transaction as the batch's rows; the server POST gates nothing) |
 <!-- residency:generated:end -->
