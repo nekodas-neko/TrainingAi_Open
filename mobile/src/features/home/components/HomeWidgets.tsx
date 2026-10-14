@@ -22,6 +22,8 @@ import {
 } from '../../../shared/ui';
 import type { HealthDetail } from '../../health/screens/HealthDetailScreen';
 import { useHealthData } from '../../health/data/HealthDataProvider';
+import { useOuraHandoff, type OuraHandoffStatus } from '../../health/OuraHandoffProvider';
+import { hasLastNight } from '../../health/data/oura-handoff';
 import {
   energySpec,
   goalsSpec,
@@ -200,6 +202,14 @@ export function HomeWidget(props: WidgetProps) {
     );
   return <HomeWidgetBody {...props} />;
 }
+const handoffMessages: Record<Exclude<OuraHandoffStatus, 'idle'>, string> = {
+  syncing: 'Syncing last night’s sleep from Oura…',
+  timeout: 'Last night’s sleep hasn’t arrived from Oura yet.',
+  not_opened: 'Oura didn’t open. Try again in a moment.',
+  not_connected: 'Oura isn’t connected, so there’s nothing to sync.',
+  not_installed: 'The Oura app isn’t installed on this phone.',
+};
+
 function HomeWidgetBody({
   id,
   openBody,
@@ -214,6 +224,7 @@ function HomeWidgetBody({
 }: WidgetProps & Extra) {
   const { theme } = useTheme();
   const health = useHealthData();
+  const handoff = useOuraHandoff();
   const home = useHome();
   const n = useNutrition();
   const today = health.body?.today?.date === health.today ? health.body.today : null;
@@ -385,6 +396,10 @@ function HomeWidgetBody({
         ]
       : [];
     const known = stages.reduce((sum, row) => sum + (row.hours ?? 0), 0);
+    const waiting =
+      handoff.status !== 'idle' && !hasLastNight(health.sleep, health.today)
+        ? (handoff.status as Exclude<OuraHandoffStatus, 'idle'>)
+        : null;
     return (
       <Stack>
         <Pressable
@@ -456,13 +471,22 @@ function HomeWidgetBody({
                 </Stack>
               </>
             )}
-            {night?.sourceLabel && (
-              <AppText variant="micro" tone="muted">
-                {night.sourceLabel}
+            {waiting ? (
+              <AppText variant="micro" tone="muted" accessibilityRole="alert">
+                {handoffMessages[waiting]}
               </AppText>
+            ) : (
+              night?.sourceLabel && (
+                <AppText variant="micro" tone="muted">
+                  {night.sourceLabel}
+                </AppText>
+              )
             )}
           </Card>
         </Pressable>
+        {(waiting === 'timeout' || waiting === 'not_opened') && (
+          <AppButton title="Sync now" variant="ghost" onPress={handoff.syncNow} />
+        )}
         {openMorning && <HomeSleepFeedback onCorrect={openMorning} />}
       </Stack>
     );
