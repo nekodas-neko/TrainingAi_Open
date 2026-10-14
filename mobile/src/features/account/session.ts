@@ -6,6 +6,7 @@ export const MOBILE_CALLBACKS = {
   ios: AUTH_CALLBACK,
   android: 'com.trainingai.app:/auth/callback',
   'android-dev': 'com.trainingai.app.dev:/auth/callback',
+  'android-preview': 'com.trainingai.app.preview:/auth/callback',
 } as const;
 export type MobileClient = keyof typeof MOBILE_CALLBACKS;
 const SESSION_KEY = 'fitnessai.session.v1';

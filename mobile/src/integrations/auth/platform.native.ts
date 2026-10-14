@@ -8,18 +8,20 @@ const applicationId =
   Platform.OS === 'android'
     ? requireOptionalNativeModule<{ applicationId: string }>('ExpoApplication')?.applicationId
     : null;
+// The application ID decides which sign-in callback the server sends this build back to.
+const ANDROID_CLIENTS: Record<string, MobileClient> = {
+  'com.trainingai.app': 'android',
+  'com.trainingai.app.dev': 'android-dev',
+  'com.trainingai.app.preview': 'android-preview',
+};
 const client: MobileClient =
-  Platform.OS === 'ios'
-    ? 'ios'
-    : applicationId === 'com.trainingai.app.dev'
-      ? 'android-dev'
-      : 'android';
+  Platform.OS === 'ios' ? 'ios' : (ANDROID_CLIENTS[applicationId ?? ''] ?? 'android');
 const callback = MOBILE_CALLBACKS[client];
 export function nativeAuthAvailable() {
   return (
     !isRunningInExpoGo() &&
     (Platform.OS !== 'android' ||
-      ['com.trainingai.app', 'com.trainingai.app.dev'].includes(applicationId ?? '')) &&
+      Object.hasOwn(ANDROID_CLIENTS, applicationId ?? '')) &&
     ['ExpoSecureStore', 'ExpoCrypto', 'ExpoWebBrowser'].every(
       (name) => !!requireOptionalNativeModule(name),
     )

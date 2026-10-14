@@ -35,7 +35,7 @@ Two consequences:
 |---|---|---|---|---|
 | TrainingAi Dev, the current app's dev flavour (exists) | `com.trainingai.app.dev` | the stable key | the laptop's `pnpm dev` over `adb reverse` | the Implementer's device passes on the current app ([`canonical-runtime-android.md`](canonical-runtime-android.md)) |
 | Native development (`development`, `android-development` profiles; ID still to change, see below) | `com.trainingai.app.nativedev` | a dev key | a local or test server; code from a laptop's Metro | jsboiss, and the Implementer's device pass |
-| Side-by-side (still to add; asked on #2836) | `com.trainingai.app.preview` | the dev key | production, signed in as the owner | the owner, next to the current app |
+| TrainingAi Preview, the side-by-side build (#2878; `native-side-by-side.yml`) | `com.trainingai.app.preview` | its own key (see *Installing TrainingAi Preview*) | production, signed in as the owner | the owner, next to the current app |
 | Release (`android-preview`, `android-production`) | `com.trainingai.app` | the release key | production | everyone, but only from the switch-over |
 
 - **Separate app IDs** let Android treat each build as its own app. A `.nativedev` or `.preview`
@@ -46,8 +46,10 @@ Two consequences:
   Changing it has been asked for on #2836. Until it changes, don't install a native development
   build on the owner's phone.
 - **Each native app ID needs its own sign-in callback** (`NATIVE_CALLBACKS` in
-  `lib/auth/mobile/native-transaction.ts`). The callback for a development ID is accepted only
-  outside production.
+  `lib/auth/mobile/native-transaction.ts`, `MOBILE_CALLBACKS` in
+  `mobile/src/features/account/session.ts`). The callback for a development ID is accepted only
+  outside production. `android-preview` is accepted in production, because the side-by-side
+  build signs in to production.
 - **⚠ The `preview` profile builds the real ID, `com.trainingai.app`.** Never install it on the
   owner's phone before the switch-over checklist below passes.
 - **A development build points at a local server or a test server, not production.** That is
@@ -59,9 +61,9 @@ Two consequences:
 Both apps are signed in as the owner against production, so they share the owner's data. That is
 what makes comparing them possible, and it is also why these rules exist:
 
-- **Don't give the new app Health Connect access** until #2836's blockers 1–3 are fixed and
-  released. As reviewed, its first sync deletes `body_battery_daily` and `daily_zone_minutes`
-  history.
+- **Health Connect access is fine.** #2836's blockers 1–3, including the first sync deleting
+  `body_battery_daily` and `daily_zone_minutes` history, were fixed before it merged and shipped
+  in 1.490.0.
 - **Log each workout in one app only.** Both write to the same account, so logging in both
   creates two copies.
 - **Expect plan-meal estimates to switch off in the old app** on days the new app records meal
@@ -69,8 +71,9 @@ what makes comparing them possible, and it is also why these rules exist:
 - **Turn reminders off in one of the two**, or they arrive twice.
 - **The ring stays with the current app** until the owner moves it to the Oura API (#2808). The
   native app gets no ring Bluetooth.
-- **The new app needs its server changes deployed first.** That means the native hotfix, including
-  native sign-in.
+- **The new app needs its server changes deployed first.** Native sign-in shipped in 1.490.0. The
+  `android-preview` callback (#2878) ships at the release after it merges. Until then, TrainingAi
+  Preview can't sign in.
 - **Never uninstall `com.trainingai.app`, and never `adb install` a `com.trainingai.app` build**
   before the switch-over. See [`canonical-runtime-android.md`](canonical-runtime-android.md).
 
@@ -87,8 +90,9 @@ what makes comparing them possible, and it is also why these rules exist:
    builds only. Results go on the device-check issue.
 3. **Merge.**
    - Server changes ship at the next release (cadence below).
-   - App changes trigger CI to rebuild the side-by-side app and publish it. The owner installs it
-     over the previous side-by-side build, which is the same ID and key, so its data is kept.
+   - App changes (`mobile/**`, `packages/shared/**`) rebuild TrainingAi Preview and publish it.
+     The owner installs it over the previous one, which has the same ID and key, so its data is
+     kept.
 4. **Compare (owner).** The owner uses both apps. Anything missing or wrong goes to BugFix, which
    files it as its own issue linked from #2849.
 5. **Switch-over.** Once #2849 has no blockers, `com.trainingai.app` is replaced. Do it only when
@@ -107,13 +111,42 @@ what makes comparing them possible, and it is also why these rules exist:
    - The minimum-version check (#2847).
    - An emulator smoke test in CI, so regressions are caught without a phone.
 
+## Installing TrainingAi Preview
+
+**On the phone:**
+1. Open https://github.com/nekodas-neko/TrainingAi_Open/releases/tag/native-preview-latest.
+2. Download `TrainingAi-Preview.apk` and open it.
+3. Allow "install unknown apps" for the browser the first time.
+4. It appears as **TrainingAi Preview**, next to TrainingAi. Sign in with the same account.
+
+A new build is the same three steps: it installs over the old one and keeps its data. The release
+notes give the commit and build date.
+
+**How it's built** (`.github/workflows/native-side-by-side.yml`):
+- It's `expo prebuild` then Gradle `assembleRelease`, with `APP_VARIANT=side-by-side`. That's the
+  same path as the CI compile check, so no Expo account or cloud build is involved.
+- It's arm64 only, with the JavaScript embedded, so no laptop is needed.
+- **Its own signing key, never the real app's.** The keystore is stored on that release as
+  `side-by-side-key.p12.gpg`, locked with the repository secret `SIDE_BY_SIDE_KEY_PASSWORD`. The
+  owner sets the secret once, in Settings → Secrets and variables → Actions. The first build on
+  `main` after that creates the key, and every later build reuses it.
+- The build refuses to publish an APK whose ID isn't `com.trainingai.app.preview`, or that is
+  signed with the real app's certificate.
+- Pull requests build it with a throwaway key and publish nothing.
+- **If the password or the key is ever lost:** delete `side-by-side-key.p12.gpg` from the
+  release, set a new password, and re-run the workflow. That makes a new key. The new build won't
+  install over the old one, so uninstall TrainingAi Preview first. That's safe: it's not the real
+  app and holds no ring key. Then sign in again.
+
 ## Builds and signing (owner, 13 Oct)
 
 - **Builds run on a GitHub runner**, using `eas build --local` with a pinned `eas-cli` version, so
   the signing key never leaves GitHub's secret store.
 - **Before publishing any release build**, check its signing certificate's SHA-256 against the
   installed app.
-- **Development and side-by-side builds use their own key**, never the release key.
+- **Development and side-by-side builds use their own key**, never the release key. TrainingAi
+  Preview's is described under *Installing TrainingAi Preview*. It's built with `expo prebuild`
+  and Gradle rather than `eas build --local`: that's the same result without an Expo login.
 - **Keep an offline copy of the release key** outside GitHub. GitHub never shows a stored secret
   again.
 - **At store release, enroll in Play App Signing.** Google then holds the app's key, and builds only
