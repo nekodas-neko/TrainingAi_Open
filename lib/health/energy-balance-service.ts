@@ -140,18 +140,48 @@ function localMidnightUtc(date: string, tz: string): Date {
 }
 
 /**
+ * Reads a caller doing several days in one request can share between them (`/api/body-metadata` does
+ * a week): the plan and meal types are the same for every day, so they are fetched once, lazily, and
+ * only if some day has an "estimated" answer. `logsFor` returns a day's food logs where the caller
+ * already holds them (today's), or undefined to read them.
+ */
+export interface SharedEstimateReads {
+  plan: () => Promise<Awaited<ReturnType<WorkoutRepository['getActiveMealPlan']>>>
+  mealTypes: () => Promise<Awaited<ReturnType<WorkoutRepository['listMealTypes']>>>
+  logsFor?: (date: string) => Promise<{ mealTypeId: string }[]> | undefined
+}
+
+export function sharedEstimateReads(
+  repo: WorkoutRepository, userId: string, logsFor?: SharedEstimateReads['logsFor'],
+): SharedEstimateReads {
+  let plan: ReturnType<SharedEstimateReads['plan']> | undefined
+  let mealTypes: ReturnType<SharedEstimateReads['mealTypes']> | undefined
+  return {
+    plan: () => (plan ??= repo.getActiveMealPlan(userId)),
+    mealTypes: () => (mealTypes ??= repo.listMealTypes(userId)),
+    logsFor,
+  }
+}
+
+/**
  * The day's counted plan-meal estimates (#2122 step 8′(3)), one row per meal. Exported for the other
  * server route that reports the day's intake (`/api/body-metadata`), so it adds the same estimates
  * rather than its own reading of them (#2863). A failed read is no estimate, never an error.
  */
-export async function countedEstimatesFor(repo: WorkoutRepository, userId: string, date: string): Promise<CountedEstimateRow[]> {
+export async function countedEstimatesFor(
+  repo: WorkoutRepository, userId: string, date: string, shared?: SharedEstimateReads,
+): Promise<CountedEstimateRow[]> {
   try {
-    const tracking = await repo.listMealLoggingStatuses(userId, date)
+    // The two per-day reads are independent, so a day with no estimate costs one round trip, not two.
+    const [tracking, answers] = await Promise.all([
+      repo.listMealLoggingStatuses(userId, date), repo.listPlanMealAnswers(userId, date),
+    ])
     if (!unrecordedMealEstimatesAllowed(tracking)) return []
-    const answers = await repo.listPlanMealAnswers(userId, date)
     if (!answers.some(a => a.answer === 'estimated')) return []
     const [plan, mealTypes, logs] = await Promise.all([
-      repo.getActiveMealPlan(userId), repo.listMealTypes(userId), repo.listFoodLogs(userId, date),
+      shared ? shared.plan() : repo.getActiveMealPlan(userId),
+      shared ? shared.mealTypes() : repo.listMealTypes(userId),
+      shared?.logsFor?.(date) ?? repo.listFoodLogs(userId, date),
     ])
     if (!plan) return []
     return countedEstimates({

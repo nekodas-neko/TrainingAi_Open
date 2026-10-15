@@ -35,13 +35,20 @@ const LOGS = [
 ]
 const RING = 1250
 
+// Per-test scenario knobs: a day with an estimate and no logs, with or without an imported figure.
+let todayLogs = LOGS as typeof LOGS
+let importedToday: number | null = null
+const reads = { plan: 0, mealTypes: 0, answers: 0 }
+
 const days = Array.from({ length: MAX_WINDOW_DAYS }, (_, i) => shiftDateStr(TODAY, -(i + 1)))
 const fakeRepo = {
-  listBodyMetrics: async () => [TODAY, ...days].map(date => ({ date, weightKg: 70, bodyFatPct: 25 })),
+  listBodyMetrics: async () => [TODAY, ...days].map(date => ({
+    date, weightKg: 70, bodyFatPct: 25, calories: date === TODAY ? importedToday : null,
+  })),
   listFoodLogsSummary: async (_u: string, from: string, to: string) =>
-    [...days.map(date => ({ date, calories: 1800 })), { date: TODAY, calories: 600 }]
+    [...days.map(date => ({ date, calories: 1800 })), ...(todayLogs.length > 0 ? [{ date: TODAY, calories: 600 }] : [])]
       .filter(r => r.date >= from && r.date <= to),
-  listFoodLogs: async (_u: string, date: string) => (date === TODAY ? LOGS : []),
+  listFoodLogs: async (_u: string, date: string) => (date === TODAY ? todayLogs : []),
   listActivityLogs: async () => [],
   getWorkoutSessionsFrom: async () => [],
   getNutritionTargets: async () => ({ calories: 1700, proteinG: 150, carbsG: 150, fatG: 55 }),
@@ -53,10 +60,12 @@ const fakeRepo = {
   getAvgBpmBySession: async () => new Map<string, number>(),
   listDoseHistory: async () => ({ logs: [], courses: [] }),
   listMealLoggingStatuses: async () => [],
-  listPlanMealAnswers: async (_u: string, date: string) =>
-    date === TODAY ? [{ planMealId: 'pm-d', answer: 'estimated', estCalories: 650 }] : [],
-  getActiveMealPlan: async () => ({ variants: [{ dayType: 'all', meals: PLAN_MEALS }] }),
-  listMealTypes: async () => TYPES,
+  listPlanMealAnswers: async (_u: string, date: string) => {
+    reads.answers++
+    return date === TODAY ? [{ planMealId: 'pm-d', answer: 'estimated', estCalories: 650 }] : []
+  },
+  getActiveMealPlan: async () => { reads.plan++; return { variants: [{ dayType: 'all', meals: PLAN_MEALS }] } },
+  listMealTypes: async () => { reads.mealTypes++; return TYPES },
 }
 
 vi.mock('@/auth', () => ({ auth: vi.fn(async () => ({ user: { id: 'u1', timezone: 'Australia/Brisbane' } })) }))
@@ -66,6 +75,7 @@ import { NextRequest } from 'next/server'
 import { computeEnergyBalance } from '@/lib/health/energy-balance-service'
 import { GET as bodyMetadata } from '@/app/api/body-metadata/route'
 import { buildEnergyTimeline } from '@/components/health/energy-timeline'
+import { homeCardCalories } from '@/components/home/home-nutrition-card'
 
 const repoArg = fakeRepo as unknown as Parameters<typeof computeEnergyBalance>[0]
 
@@ -106,6 +116,19 @@ describe('every calorie figure is the ring\'s (#2863)', () => {
     expect(body.weekToDate.calories).toBe(earlierDays * 1800 + RING)
   })
 
+  it("Home's nutrition card: eaten is the ring's 1,250 (not 1,900), with the logged-only share for the bar", async () => {
+    const r = await computeEnergyBalance(repoArg, 'u1', TZ, TODAY)
+    const res = await bodyMetadata(new NextRequest('http://localhost/api/body-metadata'))
+    const body = await res.json() as { today: { calories: number } }
+    // The card is handed body-metadata's `today.calories` (already counted) and the balance payload.
+    const card = homeCardCalories(r.balance!, body.today.calories)
+    expect(card.eatenKcal).toBe(RING)
+    expect(card.loggedKcal).toBe(600)
+    expect(card.estimated).toBe(650)
+    // Still the ring's figure while the balance is loading, and no estimate is added a second time.
+    expect(homeCardCalories(null, body.today.calories)).toEqual({ eatenKcal: RING, loggedKcal: RING, estimated: 0 })
+  })
+
   it("the day screen's energy caption: the timeline's intake total", async () => {
     const r = await computeEnergyBalance(repoArg, 'u1', TZ, TODAY)
     const t = buildEnergyTimeline({
@@ -131,11 +154,49 @@ describe('every calorie figure is the ring\'s (#2863)', () => {
   })
 })
 
+describe('/api/body-metadata with an estimate and no logs (#2863)', () => {
+  const today = async () => {
+    const res = await bodyMetadata(new NextRequest('http://localhost/api/body-metadata'))
+    return await res.json() as { today: { calories: number }; weekToDate: { calories: number } }
+  }
+  const weekStart = startOfWeekInTz(TZ)
+  const earlier = days.filter(d => d >= weekStart).length * 1800
+
+  it('counts the estimate alone when nothing is logged and nothing was imported', async () => {
+    todayLogs = []; importedToday = null
+    try {
+      const b = await today()
+      expect(b.today.calories).toBe(650)
+      expect(b.weekToDate.calories).toBe(earlier + 650)
+    } finally { todayLogs = LOGS; importedToday = null }
+  })
+
+  it('keeps an imported figure over an assumption: neither replaced nor added to', async () => {
+    todayLogs = []; importedToday = 900
+    try {
+      const b = await today()
+      expect(b.today.calories).toBe(900)
+      expect(b.weekToDate.calories).toBe(earlier + 900)
+    } finally { todayLogs = LOGS; importedToday = null }
+  })
+
+  it('reads the plan and meal types once for the whole week, not once per day', async () => {
+    reads.plan = 0; reads.mealTypes = 0; reads.answers = 0
+    await today()
+    expect(reads.plan).toBe(1)
+    expect(reads.mealTypes).toBe(1)
+    // One answers read per day of the week so far, never a second.
+    expect(reads.answers).toBe(Math.round((Date.parse(TODAY) - Date.parse(startOfWeekInTz(TZ))) / 86400000) + 1)
+  })
+})
+
 describe('the surfaces read the shared sum, not a sum of their own', () => {
   const ROOT = path.resolve(__dirname, '../..')
   const read = (rel: string) => stripComments(readFileSync(path.join(ROOT, rel), 'utf8'))
   it.each([
     'components/nutrition/assign-step.tsx',
+    'components/nutrition/energy-card.tsx',
+    'components/home/home-nutrition-card.tsx',
     'components/health/energy-timeline.ts',
     'app/api/body-metadata/route.ts',
     'lib/health/energy-balance-service.ts',
@@ -146,5 +207,18 @@ describe('the surfaces read the shared sum, not a sum of their own', () => {
   })
   it('the logger preview no longer adds the food to a logged-only total', () => {
     expect(read('components/nutrition/assign-step.tsx')).not.toMatch(/todayCalories\s*\+\s*effectiveCals/)
+  })
+  it('the native day caption prints the counted intake the tile above it prints, not the curve\'s logged total', () => {
+    const src = read('mobile/src/features/health/components/EnergyDay.tsx')
+    expect(src).toMatch(/Eaten \{metricValue\(balance\.intakeKcal/)
+    expect(src).not.toMatch(/Eaten \{metricValue\(timeline\.totals\.intakeKcal/)
+  })
+  it('the logger preview and the day screen read the estimates from the local rows the ring uses', () => {
+    for (const rel of ['components/nutrition/assign-step.tsx', 'components/health/day-detail/day-read-through.tsx']) {
+      expect(read(rel)).toMatch(/useCountedEstimateRows\(/)
+    }
+  })
+  it('a plan-meal answer write clears the nutrition cache group', () => {
+    expect(read('app/nutrition/use-plan-meal-logging.ts')).toMatch(/invalidateNutritionWrite\(\)/)
   })
 })

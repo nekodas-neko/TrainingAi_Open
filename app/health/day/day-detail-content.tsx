@@ -253,6 +253,7 @@ export function DayDetailContent({ initialDate, tz, userId }: { initialDate: str
               foodLogs={foodLogs}
               restingHr={hrProfile?.restingHr ?? null}
               tz={tz}
+              userId={userId}
               controls={readThroughControls}
             />
 

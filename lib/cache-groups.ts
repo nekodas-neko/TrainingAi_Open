@@ -615,8 +615,8 @@ export async function invalidateNutritionWrite(): Promise<void> {
     // than setting it, so no other path can make this key stale.
     invalidateCache('day-checkin:'),
     // LB-156 — a plan-meal answer (a decline, and BF-203's estimate once it exists) changes what the
-    // day counts. ⚠ Its writer, `app/nutrition/use-plan-meal-logging.ts`, calls no group yet; the
-    // LB-155 conversion must make it call this one, or registering the key here protects nothing.
+    // day counts. Its writer, `app/nutrition/use-plan-meal-logging.ts`, calls this group after every
+    // answer write (#2863), which is also what clears `body-metadata` and `energy-balance:`.
     invalidateCache('plan-meal-answers:'),
     // prefix-invalidate every `nutrition-food-logs-<date>` entry
     invalidateCache('nutrition-food-logs-'),

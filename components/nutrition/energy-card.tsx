@@ -9,6 +9,7 @@ import { CalorieZoneBar } from './calorie-zone-bar'
 import { macroShares } from './macro-energy'
 import { EnergyExplainer } from './energy-explainer'
 import { EstimatedKcalLine, StripedRingArc } from './estimated-kcal'
+import { countedIntakeKcal } from '@trainingai/shared/nutrition/counted-intake'
 
 interface Props {
   data: EnergyBalanceResponse | null
@@ -96,7 +97,9 @@ export const EnergyCard = memo(function EnergyCard({
   // #2072. What the day counts as eaten: logged food plus the assumed plan meals — the same total the
   // payload's `intakeKcal` (and so `remainingKcal`) is built on.
   const estimate = estimatedKcal > 0 ? estimatedKcal : 0
-  const eaten = calories + estimate
+  // #2863. Through the shared sum, as every other calorie figure; the caller hands over the estimate
+  // already resolved against today's logs, so it is one row with nothing to supersede it.
+  const eaten = countedIntakeKcal({ loggedKcal: calories, estimates: estimate > 0 ? [{ mealTypeId: 'estimated', kcal: estimate }] : [] })
   const remaining = b ? b.remainingKcal : goal != null ? Math.round(goal - eaten) : null
   const overTarget = remaining != null && remaining < 0
 

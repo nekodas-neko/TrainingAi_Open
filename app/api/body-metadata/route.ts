@@ -13,7 +13,7 @@ import { correctBodyFatPct, type BodyFatCalibration } from '@trainingai/shared/h
 import { invalidBodyResponse } from '@/lib/api/route-errors'
 import { bodyRecentFromDay, BODY_RECENT_DAYS } from '@trainingai/shared/health/body-recent-window'
 import { countedIntakeKcal, type CountedEstimateRow } from '@trainingai/shared/nutrition/counted-intake'
-import { countedEstimatesFor } from '@/lib/health/energy-balance-service'
+import { countedEstimatesFor, sharedEstimateReads } from '@/lib/health/energy-balance-service'
 
 // One day's body metadata.
 const MAX_BODY_BYTES = 16 * 1024
@@ -166,12 +166,14 @@ export async function GET(req: NextRequest) {
     repo.getBodyFatCalibration(userId).catch(() => null),
   ]);
   // #2863. The plan meals counted as estimated, per day of the week so far, so today's Calories and
-  // the week's total add the same estimates the Nutrition ring and the energy balance do. Two small
-  // reads a day, and only the days with an "estimated" answer go further (`countedEstimatesFor`).
+  // the week's total add the same estimates the Nutrition ring and the energy balance do. One
+  // round trip a day, in parallel; only a day with an "estimated" answer goes further, and those
+  // share one read of the plan and meal types, and today's already-fetched logs (`sharedEstimateReads`).
   const weekDates: string[] = [];
   for (let d = weekStartForFetch; d <= today; d = shiftDateStr(d, 1)) weekDates.push(d);
+  const shared = sharedEstimateReads(repo, userId, d => (d === today ? Promise.resolve(foodLogs) : undefined));
   const estimatesByDate = new Map<string, CountedEstimateRow[]>(await Promise.all(
-    weekDates.map(async d => [d, await countedEstimatesFor(repo, userId, d)] as const),
+    weekDates.map(async d => [d, await countedEstimatesFor(repo, userId, d, shared)] as const),
   ));
   const todayEstimates = estimatesByDate.get(today) ?? [];
 
@@ -230,9 +232,16 @@ export async function GET(req: NextRequest) {
 
   // Option 3: prefer food_logs totals for today if any entries exist,
   // otherwise fall back to body_metrics (Health Connect / MFP). A day with a counted plan-meal
-  // estimate is an in-app day too, even before anything is logged (#2863).
+  // estimate is an in-app day too, even before anything is logged (#2863) — unless an import already
+  // holds that day's calories: an estimate is the app ASSUMING a meal nobody recorded, and the import
+  // (MFP, Health Connect) is a measurement that may well include that very meal. Replacing the
+  // measurement with the assumption, or adding the two, would put an invented figure on top of a
+  // recorded one, so the import stands until something is actually logged. The ring reads logged food
+  // and estimates only and never body_metrics, so on such a day it and this field can differ; that
+  // is the pre-existing split between in-app and imported intake, not a new one.
   let todayRow: BodyMetaRow | null = todayMetric ? toRow(todayMetric, bodyFatCalibration) : null;
-  if (foodLogs.length > 0 || todayEstimates.length > 0) {
+  const todayImportedKcal = todayRow?.calories ?? 0;
+  if (foodLogs.length > 0 || (todayEstimates.length > 0 && !(todayImportedKcal > 0))) {
     const totals = foodLogs.reduce(
       (acc, l) => ({
         calories: acc.calories + l.calories,
@@ -279,7 +288,13 @@ export async function GET(req: NextRequest) {
   // For days without food_logs data, fall back to body_metrics (Health Connect).
   // #2863: each in-app day counts its plan-meal estimates as well, through the same shared sum.
   const loggedByDate = new Map(weekFoodSummary.map(r => [r.date, r.calories]));
-  const inAppDates = new Set([...loggedByDate.keys(), ...weekDates.filter(d => (estimatesByDate.get(d) ?? []).length > 0)]);
+  // An estimate-only day counts as in-app only where no import holds that day's calories (see the
+  // note on today's row above); a day with logs is in-app regardless.
+  const importedDates = new Set(weekRows.filter(r => (r.calories ?? 0) > 0).map(r => r.date));
+  const inAppDates = new Set([
+    ...loggedByDate.keys(),
+    ...weekDates.filter(d => (estimatesByDate.get(d) ?? []).length > 0 && !importedDates.has(d)),
+  ]);
   const foodLogCalories = [...inAppDates].reduce(
     (sum, d) => sum + countedIntakeKcal({ loggedKcal: loggedByDate.get(d) ?? 0, estimates: estimatesByDate.get(d) ?? [] }),
     0,
