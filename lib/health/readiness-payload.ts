@@ -842,7 +842,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // The Activity score is NOT persisted here (#2435). Q-7 stored it on every read keyed on today,
   // so each day's stored score was its in-progress value at the last app open (moveHours 0, 7, 0 on
   // three consecutive days). Today's value is live-only; a day is stored once it has ended, by
-  // `finaliseActivityDay` above, with the same contributor breakdown Q-526 added.
+  // `scoreFinishedActivityDay` and `storeFinishedActivityDay` above, with the same contributor breakdown Q-526 added.
 
   // Best-effort exactly as before: a persist failure must never fail the read, and each day's group
   // is independent of the others. The log names the pillars in the group rather than a single

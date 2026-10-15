@@ -6,6 +6,7 @@ import { isTemperatureBaselineCentred } from '@trainingai/shared/health/temperat
 import { toZonedTime } from "date-fns-tz";
 import type { ActivityLog } from "@trainingai/shared/types";
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { reportServerError } from '@/lib/observability'
 import { loadActivityDay } from '@trainingai/shared/health/activity-day-load'
 import { correctBodyFatPct } from '@trainingai/shared/health/body-fat-calibration'
 
@@ -306,7 +307,11 @@ export async function GET(req: NextRequest) {
   // today it is scored live, by the same function the Activity screen uses. Without this the Move
   // cell would be blank all day.
   const liveActivity = pgDate === todayInTz(tz)
-    ? await loadActivityDay(repo, userId, tz, pgDate).then(d => d.result?.score ?? null).catch(() => null)
+    ? await loadActivityDay(repo, userId, tz, pgDate).then(d => d.result?.score ?? null).catch(e => {
+        // A failed live score falls back to the stored value, but must leave an error_events row.
+        reportServerError(e, { userId, url: '/api/day-log' })
+        return null
+      })
     : null;
   const scores: DayScores | null = derived || liveActivity != null
     ? {

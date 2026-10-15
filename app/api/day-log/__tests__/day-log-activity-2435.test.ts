@@ -14,6 +14,9 @@ let repo: ReturnType<typeof dayLogRepo>
 vi.mock('@/auth', () => ({ auth: async () => ({ user: { id: 'u1', timezone: TZ } }) }))
 vi.mock('@/lib/data', () => ({ getRepository: async () => repo }))
 
+const reportServerError = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/observability', () => ({ reportServerError }))
+
 import { GET } from '../route'
 
 function dayLogRepo(stored: { day: string; activityScore: number | null }[]) {
@@ -33,6 +36,7 @@ function dayLogRepo(stored: { day: string; activityScore: number | null }[]) {
 
 const NOW = new Date('2026-10-08T05:00:00Z') // 15:00 Brisbane
 beforeEach(() => {
+  reportServerError.mockClear()
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(NOW)
 })
@@ -76,5 +80,6 @@ describe('/api/day-log Activity score (issue 2435)', () => {
     repo.getUserById.mockRejectedValue(new Error('down'))
     const body = await get(TODAY)
     expect(body.scores.activity).toBe(12)
+    expect(reportServerError).toHaveBeenCalledTimes(1)
   })
 })

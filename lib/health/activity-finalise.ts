@@ -66,7 +66,9 @@ export async function storeFinishedActivityDay(
   })
 }
 
-/** Scores a finished day and stores it as final. Returns the scored day. */
+/** Scores a finished day and stores it as final. Returns the scored day. Production callers use the
+ *  two halves separately (so a scoring and a storing failure are reported apart); this is the pair
+ *  in one call, for tests. */
 export async function finaliseActivityDay(
   repo: ActivityRepo,
   userId: string,
