@@ -2,6 +2,8 @@ import { DEFAULT_TZ, dateStrMidnightInTz, shiftDateStr, toAestDay, ageFromDob } 
 import { computeVolumeAcwr, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
+import { finalisedPreTaper } from '@trainingai/shared/health/activity-day'
+import { loadActivityDay } from '@trainingai/shared/health/activity-day-load'
 import { hrMaxFromAge } from '@trainingai/shared/health/hr-zones'
 import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
 import { intradayHrContributors } from '@trainingai/shared/health/intraday-hr-contributors'
@@ -164,7 +166,6 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
   })()
   if (sleep) pillars.push(sleep)
 
-  // Readiness reads the PRE-taper activity score, so compute the activity result first.
   const activityInput = {
     date, goals, goalProfile,
     steps: dayMetrics?.steps ?? null,
@@ -177,13 +178,6 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
     acwr, acwrExcludedReason,
     derived: derivedForDay,
   }
-  const preTaperActivity = computeActivityScore({
-    steps: activityInput.steps, activeCalories: activityInput.activeCalories,
-    zoneMinutes, moveHours, moveHoursGoal: moveGoal,
-    strengthSessionToday: activityInput.strengthSessionToday,
-    sessions7d: activityInput.sessions7d, volume7dKg,
-    goals, acwr,
-  })?.preTaperScore ?? null
 
   // TN-77(a): the audit shares readiness's defect, so it shares the fix — yesterday's contributor
   // is scored on yesterday's window, not the day being audited.
@@ -196,10 +190,20 @@ export async function buildDayAudit({ repo, userId, date, tz = DEFAULT_TZ }: Bui
       })?.preTaperScore ?? null
     : null
 
+  // #2435: readiness's activity balance is the previous COMPLETED day's score, as the live payload
+  // reads it: the stored final value when that day was finalised, else that day scored from its own
+  // inputs by the same loader the finalise stores from.
+  const prevCompletedDayActivity = finalisedPreTaper(derivedRows.find(r => r.day === yesterdayIso)?.activityContributors)
+    ?? (await loadActivityDay(repo, userId, tz, yesterdayIso).catch(err => {
+      warnings.push(`Previous day's activity could not be scored: ${err instanceof Error ? err.message : String(err)}`)
+      return null
+    }))?.result?.preTaperScore
+    ?? null
+
   safe('Readiness', () => buildReadinessAudit({
     date, summary, priorSummary,
     sleepScore: sleep?.score ?? null,
-    activityScore: preTaperActivity,
+    activityScore: prevCompletedDayActivity,
     prevDayActivityScore,
     ouraDaily: ouraToday,
     derived: derivedForDay,

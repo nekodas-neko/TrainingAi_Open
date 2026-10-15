@@ -223,6 +223,11 @@ export function HealthScoreDetail({
   const color = bandColor(score, scheme);
   const pageGradient = usePageGradient(theme);
   const avg = averageContext ? averageChip(trends?.trends, trendField) : null;
+  // #2435: today's Activity score is live-only (a day is stored once it has ended), so the trend has
+  // no stored point for today. Show the live score there, the number the hero above is showing.
+  const sparkTrends = trends?.trends && trendField === "activityScore" && score != null
+    ? trends.trends.map(t => (t.date === today && t.activityScore == null ? { ...t, activityScore: score } : t))
+    : trends?.trends;
   // Q-278: the reason behind the em dash. Keyed on `aiSection`, which already carries exactly the
   // three metric names the route reports availability for — no new prop for a value the component
   // is holding.
@@ -302,8 +307,8 @@ export function HealthScoreDetail({
 
         {data && extraCards?.(data, color, trends?.trends)}
 
-        {trends?.trends && (
-          <TrendSparkline trends={trends.trends} field={trendField} label={`${title} Score`} color={sparklineColor} unit="" emptyText={scoreTrendEmpty(title)} />
+        {sparkTrends && (
+          <TrendSparkline trends={sparkTrends} field={trendField} label={`${title} Score`} color={sparklineColor} unit="" emptyText={scoreTrendEmpty(title)} />
         )}
 
         {/* No score for this section means nothing measured today, and the model turns that into

@@ -50,7 +50,8 @@ export interface ReadinessCompositeInputs {
   previousNightScore: number | null
   /** Our own 0-100 activity score for the day before last night. */
   prevDayActivityScore: number | null
-  /** Our own 0-100 activity score for today. */
+  /** Our own 0-100 PRE-taper activity score for the previous completed day (#2435). It read today's
+   *  partial score until then, so a morning readiness saw a near-empty day. */
   activityBalanceScore: number | null
   /** Nights of baseline history accrued (oura_daily_summary.n_history). */
   nHistory: number
@@ -214,8 +215,10 @@ function plainScore(v: number | null): ReadinessContributor {
  *  which changes every z built from a young baseline. A mature ring baseline scores identically.
  *  v7: a temperature at baseline scores 100, not 90 (#2359) — the closer-better contributor no longer
  *  compresses its good end, which lifts every day with |tempZ| under 0.3 (raw above the 80 knee) by up to
- *  ~1.1 points on the 0-100 scale. */
-export const READINESS_MODEL_VERSION = 'v7:temp-100-at-baseline:2026-10-07'
+ *  ~1.1 points on the 0-100 scale.
+ *  v8: the activity-balance input is the previous completed day's finalised Activity score, not
+ *  today's partial one (#2435). The weights are unchanged; the input means something else. */
+export const READINESS_MODEL_VERSION = 'v8:activity-balance-prev-day:2026-10-15'
 
 /** Recovery Index hours at which this contributor scores 100. `hoursToSettle` is measured from the
  *  overnight HR minimum to wake, so MORE hours = the heart settled earlier = better.

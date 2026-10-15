@@ -5,7 +5,8 @@
 // were captured from the inline code BEFORE the extraction, on fixtures that exercise every lane
 // (HR-derived zone minutes and moved hours, the strength window, the over-exertion taper, a day
 // with no movement data). The extraction must reproduce them exactly: the live ring for the
-// in-progress day is not meant to change at all.
+// in-progress day is not meant to change at all. The one deliberate difference is that today's
+// value is no longer stored; the snapshots used to carry that persist and now assert there is none.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { appendFileSync } from 'fs'
 import { monthFixture, fixtureRepo, type ActivityFixture } from './fixtures/activity-day-fixtures'
@@ -22,12 +23,6 @@ const TODAY = '2026-10-08'
 const NOW = new Date('2026-10-08T05:00:00Z') // 15:00 in Brisbane
 
 function liveActivity(p: Awaited<ReturnType<typeof buildReadinessPayload>>) {
-  const persisted = repo.upsertOuraDailyDerived.mock.calls
-    .filter(c => c[1] === TODAY && (c[2] as Record<string, unknown>).activityScore !== undefined)
-    .map(c => {
-      const patch = c[2] as { activityScore: number; activityContributors: Record<string, unknown> }
-      return { activityScore: patch.activityScore, activityContributors: patch.activityContributors }
-    })
   return {
     activityScore: p.activityScore,
     activityBlend: p.activityBlend,
@@ -35,8 +30,15 @@ function liveActivity(p: Awaited<ReturnType<typeof buildReadinessPayload>>) {
     activityGoals: p.activityGoals,
     activitySignals: p.activitySignals,
     activityTaperApplied: p.activityTaperApplied,
-    persisted,
   }
+}
+
+/** Today's in-progress score is live-only now: nothing is stored for today's activity columns. */
+function persistedForToday() {
+  return repo.upsertOuraDailyDerived.mock.calls
+    .filter(c => c[1] === TODAY)
+    .map(c => c[2] as Record<string, unknown>)
+    .filter(patch => patch.activityScore !== undefined || patch.activityContributors !== undefined)
 }
 
 beforeEach(() => {
@@ -48,7 +50,9 @@ afterEach(() => vi.useRealTimers())
 async function run(f: ActivityFixture) {
   fx = f
   repo = fixtureRepo(fx)
-  return liveActivity(await buildReadinessPayload('u1', TZ))
+  const live = liveActivity(await buildReadinessPayload('u1', TZ))
+  expect(persistedForToday()).toEqual([])
+  return live
 }
 
 /** The captured value for a scenario. `CAPTURE_2435=<file>` appends the current outputs to a file instead, which is

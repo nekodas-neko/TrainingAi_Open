@@ -31,25 +31,7 @@
       "sessions7d": 3,
       "volume7dKg": 21900
     },
-    "activityTaperApplied": false,
-    "persisted": [
-      {
-        "activityScore": 67,
-        "activityContributors": {
-          "steps": 42,
-          "activeEnergy": 49,
-          "zoneMinutes": 100,
-          "moveHours": 53,
-          "strengthFreq": 74,
-          "strengthVolume": 84,
-          "preTaper": 67,
-          "acwr": 1.157142857142857,
-          "base": 67,
-          "adjustment": 0,
-          "trained": 1
-        }
-      }
-    ]
+    "activityTaperApplied": false
   },
   "heavyWeek": {
     "activityScore": 60,
@@ -83,25 +65,7 @@
       "sessions7d": 3,
       "volume7dKg": 60000
     },
-    "activityTaperApplied": true,
-    "persisted": [
-      {
-        "activityScore": 60,
-        "activityContributors": {
-          "steps": 42,
-          "activeEnergy": 49,
-          "zoneMinutes": 100,
-          "moveHours": 53,
-          "strengthFreq": 74,
-          "strengthVolume": 100,
-          "preTaper": 70,
-          "acwr": 2.083065449402083,
-          "base": 60,
-          "adjustment": 0,
-          "trained": 1
-        }
-      }
-    ]
+    "activityTaperApplied": true
   },
   "strengthOnly": {
     "activityScore": 78,
@@ -131,21 +95,7 @@
       "sessions7d": 3,
       "volume7dKg": 21900
     },
-    "activityTaperApplied": false,
-    "persisted": [
-      {
-        "activityScore": 78,
-        "activityContributors": {
-          "strengthFreq": 74,
-          "strengthVolume": 84,
-          "preTaper": 78,
-          "acwr": 1.157142857142857,
-          "base": 78,
-          "adjustment": 0,
-          "trained": 1
-        }
-      }
-    ]
+    "activityTaperApplied": false
   },
   "nothing": {
     "activityScore": null,
@@ -158,7 +108,6 @@
     "activityContributors": null,
     "activityGoals": null,
     "activitySignals": null,
-    "activityTaperApplied": false,
-    "persisted": []
+    "activityTaperApplied": false
   }
 }
