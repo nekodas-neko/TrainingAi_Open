@@ -2,7 +2,8 @@
 // both call this — a second copy would be a second answer to "how much should I eat today", and
 // the coach contradicting the widget is worse than either being slightly wrong.
 
-import { countedEstimateKcal } from '@trainingai/shared/nutrition/meal-estimate'
+import { countedEstimates } from '@trainingai/shared/nutrition/meal-estimate'
+import { countedIntakeKcal, countedEstimateTotal, type CountedEstimateRow } from '@trainingai/shared/nutrition/counted-intake'
 import { unrecordedMealEstimatesAllowed } from '@trainingai/shared/nutrition/meal-logging-status'
 import { foodLoggingCoverage } from '@/lib/nutrition/logging-completeness'
 import { fromZonedTime, toZonedTime } from 'date-fns-tz'
@@ -33,6 +34,10 @@ export interface EnergyBalanceResult {
     intakeKcal: number
     loggedIntakeKcal: number
     estimatedKcal: number
+    /** #2863. The estimates behind `estimatedKcal`, one per counted plan meal, so a client holding a
+     *  log the server has not seen yet can drop the one it supersedes (`countedIntakeKcal`). Optional
+     *  so a payload cached before it existed still types; absent reads as no estimate. */
+    estimatedMeals?: CountedEstimateRow[]
     expenditureKcal: number
     restingBaseKcal: number
     activeKcal: number
@@ -134,24 +139,29 @@ function localMidnightUtc(date: string, tz: string): Date {
   return fromZonedTime(zoned, tz)
 }
 
-async function estimatedKcalFor(repo: WorkoutRepository, userId: string, date: string): Promise<number> {
+/**
+ * The day's counted plan-meal estimates (#2122 step 8′(3)), one row per meal. Exported for the other
+ * server route that reports the day's intake (`/api/body-metadata`), so it adds the same estimates
+ * rather than its own reading of them (#2863). A failed read is no estimate, never an error.
+ */
+export async function countedEstimatesFor(repo: WorkoutRepository, userId: string, date: string): Promise<CountedEstimateRow[]> {
   try {
     const tracking = await repo.listMealLoggingStatuses(userId, date)
-    if (!unrecordedMealEstimatesAllowed(tracking)) return 0
+    if (!unrecordedMealEstimatesAllowed(tracking)) return []
     const answers = await repo.listPlanMealAnswers(userId, date)
-    if (!answers.some(a => a.answer === 'estimated')) return 0
+    if (!answers.some(a => a.answer === 'estimated')) return []
     const [plan, mealTypes, logs] = await Promise.all([
       repo.getActiveMealPlan(userId), repo.listMealTypes(userId), repo.listFoodLogs(userId, date),
     ])
-    if (!plan) return 0
-    return countedEstimateKcal({
+    if (!plan) return []
+    return countedEstimates({
       answers,
       planMeals: plan.variants.flatMap(v => v.meals),
       mealTypes,
       loggedMealTypeIds: new Set(logs.map(l => l.mealTypeId)),
-    })
+    }).map(e => ({ mealTypeId: e.mealTypeId, kcal: e.kcal }))
   } catch {
-    return 0
+    return []
   }
 }
 
@@ -230,8 +240,9 @@ export async function computeEnergyBalance(
   }
 
   const loggedIntakeKcal = Math.round(intakeByDate.get(date) ?? 0)
-  const estimatedKcal = await estimatedKcalFor(repo, userId, date)
-  const intakeKcal = loggedIntakeKcal + estimatedKcal
+  const estimatedMeals = await countedEstimatesFor(repo, userId, date)
+  const estimatedKcal = countedEstimateTotal(estimatedMeals)
+  const intakeKcal = countedIntakeKcal({ loggedKcal: loggedIntakeKcal, estimates: estimatedMeals })
   // The RECOMMENDATION's offset (`target.recommendedKcal`, the TDEE nudge). Unchanged by #2071: it is
   // what turns the maintenance estimate into a suggested stored goal, and the maintenance estimate is
   // explicitly not this change's to move.
@@ -438,7 +449,7 @@ export async function computeEnergyBalance(
   return {
     date,
     balance: {
-      ...balance, intakeKcal, loggedIntakeKcal, estimatedKcal, restingBaseKcal, activeKcal: activeEnergy.total,
+      ...balance, intakeKcal, loggedIntakeKcal, estimatedKcal, estimatedMeals, restingBaseKcal, activeKcal: activeEnergy.total,
       restingRateSource: measuredBmr != null ? 'measured' : 'formula',
       restingRateMeasuredOn: measuredBmr != null ? measuredRmr?.measuredOn ?? null : null,
       deficitWeightKg: deficitWeightKg == null ? null : Math.round(deficitWeightKg * 10) / 10,

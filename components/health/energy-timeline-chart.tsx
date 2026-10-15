@@ -2,6 +2,7 @@
 
 import { memo, useMemo } from 'react'
 import { buildEnergyTimeline, type HrBucket, type IntakeEvent } from './energy-timeline'
+import type { CountedEstimateRow } from '@trainingai/shared/nutrition/counted-intake'
 
 /**
  * Q-414 — energy in against energy out, across the day.
@@ -21,13 +22,16 @@ interface Props {
   activeKcal: number
   hr: HrBucket[]
   intake: IntakeEvent[]
+  /** #2863. `balance.estimatedMeals` and the logged food's meal types — see `buildEnergyTimeline`. */
+  estimates?: readonly CountedEstimateRow[]
+  intakeMealTypeIds?: readonly (string | null | undefined)[]
 }
 
 const W = 100
 const H = 46
 
 export const EnergyTimelineChart = memo(function EnergyTimelineChart(
-  { dayStartMs, restingHr, restingBaseKcal, activeKcal, hr, intake }: Props,
+  { dayStartMs, restingHr, restingBaseKcal, activeKcal, hr, intake, estimates, intakeMealTypeIds }: Props,
 ) {
   const timeline = useMemo(
     () => buildEnergyTimeline({
@@ -39,8 +43,10 @@ export const EnergyTimelineChart = memo(function EnergyTimelineChart(
       activeKcal,
       hr,
       intake,
+      estimates,
+      intakeMealTypeIds,
     }),
-    [dayStartMs, restingHr, restingBaseKcal, activeKcal, hr, intake],
+    [dayStartMs, restingHr, restingBaseKcal, activeKcal, hr, intake, estimates, intakeMealTypeIds],
   )
 
   const { buckets, totals, hrGapBuckets } = timeline
@@ -56,7 +62,9 @@ export const EnergyTimelineChart = memo(function EnergyTimelineChart(
   const barW = W / buckets.length
   const barPeak = Math.max(...buckets.map(b => b.intakeKcal), 1)
 
+  // #2863: the day's counted intake, logged plus estimated — the figure the ring above prints.
   const eaten = Math.round(totals.intakeKcal)
+  const estimated = totals.estimatedKcal
   const burned = Math.round(totals.burnKcal)
   const net = eaten - burned
 
@@ -88,7 +96,12 @@ export const EnergyTimelineChart = memo(function EnergyTimelineChart(
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
-        <Key colour="var(--accent-green)" label={`Eaten ${eaten.toLocaleString()}`} />
+        <Key
+          colour="var(--accent-green)"
+          label={estimated > 0
+            ? `Eaten ${eaten.toLocaleString()} (incl. ${estimated.toLocaleString()} est.)`
+            : `Eaten ${eaten.toLocaleString()}`}
+        />
         <Key colour="var(--accent-amber)" label={`Burned ${burned.toLocaleString()}`} />
         <span className="text-muted-foreground">
           {/* `Math.abs` on the deficit: `net` is negative there, so the raw value printed

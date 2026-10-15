@@ -12,6 +12,7 @@ import type { DayLogResult } from '@/app/api/day-log/route'
 import type { EnergyBalanceResponse } from '@/app/api/nutrition/energy-balance/route'
 import type { FoodLogWithItem } from '@trainingai/shared/types/nutrition'
 import type { ActivityLog } from '@trainingai/shared/types'
+import { readEstimateRows } from '@trainingai/shared/nutrition/counted-intake'
 
 /** Module-level so the empty fallback keeps one identity — it feeds a memoised chart. */
 const EMPTY_HR: DayLogResult['hr'] = []
@@ -63,6 +64,11 @@ export function DayReadThrough({
     [foodLogs],
   )
 
+  // #2863. The day's plan-meal estimates, so the chart's "Eaten" is the ring's figure. The device's
+  // logs can be newer than the payload, so their meal types go along to drop a superseded estimate.
+  const estimates = useMemo(() => readEstimateRows(energy?.balance?.estimatedMeals), [energy])
+  const intakeMealTypeIds = useMemo(() => (foodLogs ?? []).map(l => l.mealTypeId), [foodLogs])
+
   const hasAnything = !!data && (
     data.exercises.length > 0 || data.activityLogs.length > 0 || !!data.sleep || !!data.bodyMeta || data.hr.length > 0
   )
@@ -100,6 +106,8 @@ export function DayReadThrough({
             activeKcal={energy.balance.activeKcal}
             hr={data?.hr ?? EMPTY_HR}
             intake={intakeEvents}
+            estimates={estimates}
+            intakeMealTypeIds={intakeMealTypeIds}
           />
         </div>
       )}

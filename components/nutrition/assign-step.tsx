@@ -11,6 +11,8 @@ import { mealTypeForHour } from '@trainingai/shared/nutrition/log-plan-meal'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { TTL_LONG, NUTRITION_FOOD_LOGS_TTL } from '@trainingai/shared/cache-ttl'
 import { NUMBER_INPUT_RESET } from '@/components/ui/input'
+import { useEnergyBalanceToday } from '@/app/health/hooks/use-health-calcs'
+import { countedIntakeKcal, readEstimateRows } from '@trainingai/shared/nutrition/counted-intake'
 
 interface Props {
   nutrition: EditableNutrition
@@ -43,7 +45,10 @@ export function AssignStep({ nutrition, preselectedMealTypeId, onBack, onConfirm
   const [quantity, setQuantity] = useState(1)
   const [saving, setSaving] = useState(false)
   const [loadingTypes, setLoadingTypes] = useState(true)
-  const [todayCalories, setTodayCalories] = useState<number | null>(null)
+  const [dayLogs, setDayLogs] = useState<FoodLogWithItem[] | null>(null)
+  // #2863. The day's plan-meal estimates, so "Today after logging" is the ring's figure plus this
+  // food. Today only, which is the only day the line is shown.
+  const energy = useEnergyBalanceToday()
 
   useEffect(() => {
     // Was `new Date().getHours()` with the bucket search inlined twice — the device's hour, and a
@@ -65,7 +70,7 @@ export function AssignStep({ nutrition, preselectedMealTypeId, onBack, onConfirm
     const targetDate = logDate ?? todayInTz(tz)
     cachedFetch<FoodLogWithItem[]>(
       `nutrition-food-logs-${targetDate}`, `/api/nutrition/food-logs?date=${targetDate}`, NUTRITION_FOOD_LOGS_TTL,
-      logs => setTodayCalories(Array.isArray(logs) ? logs.reduce((sum, l) => sum + l.calories, 0) : 0),
+      logs => setDayLogs(Array.isArray(logs) ? logs : []),
     ).catch(() => {})
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logDate])
@@ -74,6 +79,14 @@ export function AssignStep({ nutrition, preselectedMealTypeId, onBack, onConfirm
   const effectiveProtein = Math.round(nutrition.proteinG * quantity * 10) / 10
   const effectiveCarbs = Math.round(nutrition.carbsG * quantity * 10) / 10
   const effectiveFat = Math.round(nutrition.fatG * quantity * 10) / 10
+
+  // #2863. Logged food, this food and the counted estimates, through the shared sum. The food about
+  // to be logged supersedes the estimate of the meal it is logged to, as logging it will.
+  const afterLoggingKcal = dayLogs === null ? null : countedIntakeKcal({
+    loggedKcal: dayLogs.reduce((sum, l) => sum + l.calories, 0) + effectiveCals,
+    estimates: readEstimateRows(energy?.balance?.estimatedMeals),
+    loggedMealTypeIds: [...dayLogs.map(l => l.mealTypeId), selectedId],
+  })
 
   async function handleConfirm() {
     if (!selectedId) return
@@ -158,20 +171,20 @@ export function AssignStep({ nutrition, preselectedMealTypeId, onBack, onConfirm
         </div>
       </div>
 
-      {todayCalories !== null && dayBudgetKcal !== null && (!logDate || logDate === todayInTz(tz)) && (
+      {afterLoggingKcal !== null && dayBudgetKcal !== null && (!logDate || logDate === todayInTz(tz)) && (
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Today after logging</span>
             <span className="tabular-nums font-medium">
-              {todayCalories + effectiveCals} <span className="text-muted-foreground">/ {dayBudgetKcal} kcal</span>
+              {afterLoggingKcal} <span className="text-muted-foreground">/ {dayBudgetKcal} kcal</span>
             </span>
           </div>
           <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
             <div
               className={`h-full w-full rounded-full origin-left transition-transform duration-300 motion-reduce:transition-none ${
-                (todayCalories + effectiveCals) > dayBudgetKcal ? 'bg-orange-500' : 'bg-green-500'
+                afterLoggingKcal > dayBudgetKcal ? 'bg-orange-500' : 'bg-green-500'
               }`}
-              style={{ transform: `scaleX(${Math.min(100, Math.round(((todayCalories + effectiveCals) / dayBudgetKcal) * 100)) / 100})` }}
+              style={{ transform: `scaleX(${Math.min(100, Math.round((afterLoggingKcal / dayBudgetKcal) * 100)) / 100})` }}
             />
           </div>
         </div>
