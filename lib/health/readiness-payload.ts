@@ -13,8 +13,9 @@
  * that happens at most once a day; every later read on either route hits the stored row.
  */
 import { getRepository } from '@/lib/data'
+import { reportServerError } from '@/lib/observability'
 import type { OuraDailyDerivedPatch } from '@/lib/data/repository'
-import { todayInTz, todayMidnightUtc, toAestDay, shiftDateStr } from '@trainingai/shared/date-utils'
+import { todayInTz, todayMidnightUtc, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { recentDoses, withDoseContext, DOSE_EFFECT_LOOKBACK_DAYS, type RecentDose } from '@trainingai/shared/health/dose-context'
 import { getCurrentPhase } from '@trainingai/shared/phase-engine'
 import { ACWR_THRESHOLDS } from '@trainingai/shared/ai-periodization/acwr'
@@ -24,7 +25,7 @@ import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/s
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { scoreActivityForDay, restingHrBaseline, activityFinalisedAt, finalisedPreTaper } from '@trainingai/shared/health/activity-day'
 import { staleFinishedDays } from '@trainingai/shared/health/finished-day-recheck'
-import { finaliseActivityDay, ACTIVITY_FINALISE_DAYS } from '@/lib/health/activity-finalise'
+import { scoreFinishedActivityDay, storeFinishedActivityDay, activityFinalGrace, ACTIVITY_FINALISE_DAYS } from '@/lib/health/activity-finalise'
 import { type DailyGoals } from '@trainingai/shared/health/daily-goals'
 import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
@@ -367,9 +368,12 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
 
   const todayIso    = todayInTz(tz)
   const todayMid    = todayMidnightUtc(tz)
-  const from28dDate = new Date(todayMid.getTime() - 28 * 86_400_000)
-  const from28dIso  = toAestDay(from28dDate, tz)
-  const from7dIso   = toAestDay(new Date(todayMid.getTime() - 7 * 86_400_000), tz)
+  // Calendar-day arithmetic, not `todayMid - N×86_400_000`: across a DST change a local day is 23 or
+  // 25 hours, and the millisecond form lands on the wrong date (#2435 finalises and reads these).
+  const from28dIso  = shiftDateStr(todayIso, -28)
+  const from28dDate = dateStrMidnightInTz(from28dIso, tz)
+  const from7dIso   = shiftDateStr(todayIso, -7)
+  const tomorrowMid = dateStrMidnightInTz(shiftDateStr(todayIso, 1), tz)
 
   // Issue 2613: a failed lookup leaves the field out (unknown), never false.
   const connectedSourcesP = (async () => {
@@ -388,7 +392,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     repo.getWorkoutSessionsFrom(userId, from28dDate),
     repo.getOuraDaily(userId, from28dIso, todayIso),
     repo.getActiveProgram(userId),
-    repo.getHrForWindow(userId, todayMid, new Date(todayMid.getTime() + 86_400_000)),
+    repo.getHrForWindow(userId, todayMid, tomorrowMid),
     repo.getOuraDailySummary(userId, from28dIso, todayIso),
     repo.getOuraDailyDerived(userId, from7dIso, todayIso),
     repo.getLatestOuraCloudVitals(userId),
@@ -497,11 +501,12 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   const activityDisplayScore = activityResult?.score ?? null      // tapered → the card / display
 
   // Yesterday's own activity score — feeds the A4 composite's "Prev-Day Activity" contributor.
-  const yesterdayIso = toAestDay(new Date(todayMid.getTime() - 86_400_000), tz)
+  const yesterdayIso = shiftDateStr(todayIso, -1)
+  const yesterdayMid = dateStrMidnightInTz(yesterdayIso, tz)
   const yesterdayMetrics = bodyMetrics.find(m => m.date === yesterdayIso) ?? null
   // TN-77(a): yesterday's contributor gets YESTERDAY's strength window. It used to be handed
   // today's, so on a training day the "previous day" score reacted to this morning's session.
-  const prevWindow = strengthWindowEndingAt(recentSessions, todayMid.getTime() - 86_400_000)
+  const prevWindow = strengthWindowEndingAt(recentSessions, yesterdayMid.getTime())
   const prevDayActivityScore = (yesterdayMetrics || prevWindow.sessions7d > 0) ? (computeActivityScore({
     steps: yesterdayMetrics?.steps ?? null,
     activeCalories: yesterdayMetrics?.activeCalories ?? null,
@@ -515,29 +520,34 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // morning readiness saw a near-empty day's movement. A finished day is scored once over the whole
   // day and stamped final; yesterday is finalised here first if no read has done it yet, and any
   // older day in the look-back still holding a partial value is finalised behind the read.
-  const staleActivityDays = staleFinishedDays(
-    todayIso,
-    tz,
-    new Map(derivedTodayRows.map(r => [r.day, activityFinalisedAt(r.activityContributors)])),
-    ACTIVITY_FINALISE_DAYS,
-  )
+  const nowDate = new Date()
+  const activityStamps = new Map(derivedTodayRows.map(r => [r.day, activityFinalisedAt(r.activityContributors)]))
+  const staleActivityDays = staleFinishedDays(todayIso, tz, activityStamps, ACTIVITY_FINALISE_DAYS, activityFinalGrace(nowDate))
+  const maxHrOption = { maxHr: hrProfile?.maxHr ?? null }
+  const reportFinalise = (day: string, stage: 'scoring' | 'storing') => (err: unknown) =>
+    reportServerError(new Error(`[readiness-score] ${stage} activity for ${day} failed — read still served`, { cause: err }), { userId })
+  // Yesterday with no stamp at all has no usable stored value (a pre-#2435 row is a partial day), so
+  // the read waits for it. Yesterday inside its grace has a stored value: the read uses it and the
+  // re-score runs behind it. Scoring and storing are separate steps, so a failed write still hands
+  // readiness the value that was scored.
   let prevCompletedDayActivityScore = finalisedPreTaper(derivedTodayRows.find(r => r.day === yesterdayIso)?.activityContributors)
-  if (staleActivityDays.includes(yesterdayIso)) {
-    prevCompletedDayActivityScore = await finaliseActivityDay(repo, userId, tz, yesterdayIso)
-      .then(d => d.result?.preTaperScore ?? null)
-      .catch(err => {
-        console.error(`[readiness-score] finalising activity for ${yesterdayIso} failed — read still served:`, err)
-        return null
-      })
+  let backgroundActivityDays = staleActivityDays
+  if (activityStamps.get(yesterdayIso) == null) {
+    backgroundActivityDays = staleActivityDays.filter(d => d !== yesterdayIso)
+    const scored = await scoreFinishedActivityDay(repo, userId, tz, yesterdayIso, nowDate, maxHrOption)
+      .catch(err => { reportFinalise(yesterdayIso, 'scoring')(err); return null })
+    if (scored) {
+      prevCompletedDayActivityScore = scored.result?.preTaperScore ?? null
+      await storeFinishedActivityDay(repo, userId, yesterdayIso, scored, nowDate).catch(reportFinalise(yesterdayIso, 'storing'))
+    }
   }
-  const olderStaleActivityDays = staleActivityDays.filter(d => d !== yesterdayIso)
-  if (olderStaleActivityDays.length > 0) {
+  if (backgroundActivityDays.length > 0) {
     // One at a time and fire-and-forget, like the training-load re-check (#2400): the read never
     // waits on it and a first visit after a week away does not open seven at once.
     void (async () => {
-      for (const day of olderStaleActivityDays) {
-        await finaliseActivityDay(repo, userId, tz, day).catch(err =>
-          console.error(`[readiness-score] finalising activity for ${day} failed:`, err))
+      for (const day of backgroundActivityDays) {
+        const scored = await scoreFinishedActivityDay(repo, userId, tz, day, nowDate, maxHrOption).catch(reportFinalise(day, 'scoring'))
+        if (scored) await storeFinishedActivityDay(repo, userId, day, scored, nowDate).catch(reportFinalise(day, 'storing'))
       }
     })()
   }

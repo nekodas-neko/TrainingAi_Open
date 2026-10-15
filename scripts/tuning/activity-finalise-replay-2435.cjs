@@ -34,6 +34,10 @@ async function main() {
 
   const lib = bundle()
   const repo = new lib.PostgresWorkoutRepository()
+  // Do not trust PGOPTIONS alone: ask the server what the session actually is, and stop if it is not
+  // read-only. A pooler that drops startup options would otherwise let a write through unnoticed.
+  const ro = await lib.readOnlyState()
+  if (ro !== 'on') throw new Error(`refusing to run: SHOW default_transaction_read_only is "${ro}", not "on"`)
   const user = await repo.getUserById(userId)
   if (!user) throw new Error(`no user ${userId}`)
   const tz = user.timezone || lib.DEFAULT_TZ

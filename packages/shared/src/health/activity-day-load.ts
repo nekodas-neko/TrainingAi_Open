@@ -16,8 +16,16 @@ type ActivityDayRepo = Pick<WorkoutRepository,
   'listBodyMetrics' | 'getOuraDaily' | 'getWorkoutSessionsFrom' | 'getHrForWindow' | 'getActiveProgram'
   | 'getUserById' | 'getUserGoals'>
 
+export interface LoadActivityDayOptions {
+  /** The HR profile's ceiling, when the caller has already resolved it (once, not per day). Null is a
+   *  resolved "none"; leave the option out to resolve it here. */
+  maxHr?: number | null
+}
+
 /** Scores one local day from its own inputs. Read-only. */
-export async function loadActivityDay(repo: ActivityDayRepo, userId: string, tz: string, date: string): Promise<ActivityDay> {
+export async function loadActivityDay(
+  repo: ActivityDayRepo, userId: string, tz: string, date: string, options: LoadActivityDayOptions = {},
+): Promise<ActivityDay> {
   const dayMid = dateStrMidnightInTz(date, tz)
   const nextMid = dateStrMidnightInTz(shiftDateStr(date, 1), tz)
   const fromIso = shiftDateStr(date, -HISTORY_DAYS)
@@ -30,7 +38,9 @@ export async function loadActivityDay(repo: ActivityDayRepo, userId: string, tz:
     repo.getUserById(userId),
     repo.getUserGoals(userId).catch(() => null),
     // #2182: the same zone ceiling the live score uses.
-    resolveHrProfile(repo as WorkoutRepository, userId, tz).catch(() => null),
+    options.maxHr !== undefined
+      ? Promise.resolve({ maxHr: options.maxHr })
+      : resolveHrProfile(repo as WorkoutRepository, userId, tz).catch(() => null),
   ])
   return scoreActivityForDay({
     date,

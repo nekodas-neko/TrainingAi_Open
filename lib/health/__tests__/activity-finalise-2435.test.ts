@@ -9,9 +9,11 @@ import { monthFixture, fixtureRepo, type ActivityFixture } from './fixtures/acti
 
 let repo: ReturnType<typeof fixtureRepo>
 vi.mock('@/lib/data', () => ({ getRepository: async () => repo, getRepositoryAsync: async () => repo }))
+const reportServerError = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/observability', () => ({ reportServerError }))
 
 import { buildReadinessPayload } from '@/lib/health/readiness-payload'
-import { finaliseActivityDay, ACTIVITY_FINALISE_DAYS } from '@/lib/health/activity-finalise'
+import { finaliseActivityDay, ACTIVITY_FINALISE_DAYS, ACTIVITY_FINAL_GRACE_HOURS } from '@/lib/health/activity-finalise'
 
 const TZ = 'Australia/Brisbane'
 const TODAY = '2026-10-08'
@@ -21,6 +23,7 @@ const YESTERDAY = shiftDateStr(TODAY, -1)
 const NOW = new Date('2026-10-08T05:00:00Z')
 
 beforeEach(() => {
+  reportServerError.mockClear()
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(NOW)
 })
@@ -123,11 +126,77 @@ describe('the readiness payload (issue 2435)', () => {
   it('uses a stored final value as it is, without re-scoring the day', async () => {
     const f = setup()
     const nextMid = dateStrMidnightInTz(TODAY, TZ).getTime()
-    f.derived.push({ day: YESTERDAY, activityScore: 41, activityContributors: { preTaper: 44, finalisedAt: nextMid + 3_600_000 } })
+    const twoBack = shiftDateStr(YESTERDAY, -1)
+    // Stamped 25 h after that day ended: past the grace, so final.
+    f.derived.push({ day: twoBack, activityScore: 41, activityContributors: { preTaper: 44, finalisedAt: nextMid - 86_400_000 + 25 * 3_600_000 } })
+    await buildReadinessPayload('u1', TZ)
+    await drain()
+    expect(activityWrites().some(w => w.day === twoBack)).toBe(false)
+  })
+
+  it("serves yesterday's stored value inside the grace without waiting on a re-score, and re-scores behind the read", async () => {
+    const f = setup()
+    const nextMid = dateStrMidnightInTz(TODAY, TZ).getTime()
+    // Stamped 2 h after yesterday ended: stored, but still inside the 24 h grace.
+    f.derived.push({ day: YESTERDAY, activityScore: 41, activityContributors: { preTaper: 44, finalisedAt: nextMid + 2 * 3_600_000 } })
+    // A finished day's HR read never answers: if the read waited on the re-score it would hang here.
+    const todayMs = dateStrMidnightInTz(TODAY, TZ).getTime()
+    const hr = repo.getHrForWindow.getMockImplementation()!
+    let release!: () => void
+    const gate = new Promise<void>(r => { release = r })
+    repo.getHrForWindow.mockImplementation(async (u, from, to) => {
+      if (from.getTime() < todayMs) await gate
+      return hr(u, from, to)
+    })
     const p = await buildReadinessPayload('u1', TZ)
     expect(p.readinessCompositeContributors!.activityBalance.score).toBe(44)
-    await drain()
     expect(activityWrites().some(w => w.day === YESTERDAY)).toBe(false)
+    release()
+    await drain()
+    expect(activityWrites().some(w => w.day === YESTERDAY)).toBe(true)
+  })
+
+  it('picks up heart rate that arrives after the first finalise', async () => {
+    const f = monthFixture(TODAY, TZ)
+    const evening = (r: { timestamp: Date }) => r.timestamp.getTime() >= dateStrMidnightInTz(YESTERDAY, TZ).getTime() + 18 * 3_600_000
+      && r.timestamp.getTime() < dateStrMidnightInTz(TODAY, TZ).getTime()
+    const lateRows = f.hr.filter(evening)
+    expect(lateRows.length).toBeGreaterThan(0)
+    f.hr = f.hr.filter(r => !evening(r))
+    repo = fixtureRepo(f)
+    // 06:30 local: the ring has not drained last evening yet.
+    vi.setSystemTime(new Date(dateStrMidnightInTz(TODAY, TZ).getTime() + 6.5 * 3_600_000))
+    await buildReadinessPayload('u1', TZ)
+    await drain()
+    const first = structuredClone(f.derived.find(r => r.day === YESTERDAY)!)
+    const firstScore = first.activityScore
+    const firstStamp = activityFinalisedAt(first.activityContributors)!
+    // The evening lands; three hours later the next read re-scores the day behind it.
+    f.hr.push(...lateRows)
+    vi.setSystemTime(new Date(firstStamp.getTime() + 3 * 3_600_000))
+    await buildReadinessPayload('u1', TZ)
+    await drain()
+    const second = f.derived.find(r => r.day === YESTERDAY)!
+    const full = await loadActivityDay(typedRepo(), 'u1', TZ, YESTERDAY)
+    expect(second.activityScore).toBe(full.result!.score)
+    expect(second.activityContributors).not.toEqual(first.activityContributors)
+    expect(second.activityScore).not.toBe(firstScore)
+  })
+
+  it('re-scores a day inside the grace at most once an hour, and not at all once past it', () => {
+    const dayEnd = dateStrMidnightInTz(TODAY, TZ).getTime()
+    const grace = (stampedAtMs: number, nowMs: number) => staleFinishedDays(
+      TODAY, TZ, new Map([[YESTERDAY, new Date(stampedAtMs)]]), 1,
+      { graceMs: ACTIVITY_FINAL_GRACE_HOURS * 3_600_000, minIntervalMs: 3_600_000, now: new Date(nowMs) })
+    expect(grace(dayEnd + 3_600_000, dayEnd + 3_600_000 + 30 * 60_000)).toEqual([])
+    expect(grace(dayEnd + 3_600_000, dayEnd + 3 * 3_600_000)).toEqual([YESTERDAY])
+    const past = dayEnd + (ACTIVITY_FINAL_GRACE_HOURS + 1) * 3_600_000
+    expect(grace(past, past + 5 * 3_600_000)).toEqual([])
+  })
+
+  it("keeps the training-load re-check's rule: final once stamped after the day ended", () => {
+    const dayEnd = dateStrMidnightInTz(TODAY, TZ).getTime()
+    expect(staleFinishedDays(TODAY, TZ, new Map([[YESTERDAY, new Date(dayEnd + 60_000)]]), 1)).toEqual([])
   })
 
   it('re-scores a day whose stored value was written before it ended', async () => {
@@ -150,5 +219,94 @@ describe('the readiness payload (issue 2435)', () => {
     const expected = Array.from({ length: ACTIVITY_FINALISE_DAYS }, (_, i) => shiftDateStr(TODAY, -(i + 1)))
     expect([...days].sort()).toEqual(expected.sort())
     expect(days.has(TODAY)).toBe(false)
+  })
+})
+
+describe('failures (issue 2435)', () => {
+  it('still reads the scored value when only the write fails, and reports the failure', async () => {
+    setup()
+    const ok = await buildReadinessPayload('u1', TZ)
+    const expected = ok.readinessCompositeContributors!.activityBalance.score
+    await drain()
+
+    setup()
+    const write = repo.upsertOuraDailyDerived.getMockImplementation()!
+    repo.upsertOuraDailyDerived.mockImplementation(async (u, day, patch) => {
+      if ((patch as Record<string, unknown>).activityScore !== undefined) throw new Error('db down')
+      return write(u, day, patch)
+    })
+    const p = await buildReadinessPayload('u1', TZ)
+    await drain()
+    expect(p.readinessCompositeContributors!.activityBalance.score).toBe(expected)
+    expect(reportServerError).toHaveBeenCalled()
+    expect(String(reportServerError.mock.calls[0][0].message)).toMatch(/storing activity/)
+  })
+
+  it('reports a scoring failure and serves the read with a neutral activity balance', async () => {
+    setup()
+    const hr = repo.getHrForWindow.getMockImplementation()!
+    // Today's own HR read succeeds; any finished day's fails.
+    repo.getHrForWindow.mockImplementation(async (u, from, to) => {
+      if (from.getTime() < dateStrMidnightInTz(TODAY, TZ).getTime()) throw new Error('hr down')
+      return hr(u, from, to)
+    })
+    const p = await buildReadinessPayload('u1', TZ)
+    await drain()
+    expect(p.readinessCompositeContributors).not.toBeNull()
+    expect(reportServerError).toHaveBeenCalled()
+    expect(String(reportServerError.mock.calls[0][0].message)).toMatch(/scoring activity/)
+  })
+})
+
+describe('a day with nothing to score (issue 2435)', () => {
+  it('is stamped final-but-empty once past the grace, and not scored again on later reads', async () => {
+    setup({ metrics: [], hr: [], sessions: [], derived: [], program: null })
+    await buildReadinessPayload('u1', TZ)
+    await drain()
+    const longAgo = shiftDateStr(TODAY, -3)
+    const row = repo.upsertOuraDailyDerived.mock.calls.find(c => c[1] === longAgo)
+    expect(row).toBeDefined()
+    expect((row![2] as { activityScore: number | null }).activityScore).toBeNull()
+    expect(activityFinalisedAt((row![2] as { activityContributors: unknown }).activityContributors)).not.toBeNull()
+
+    // Two hours later: only yesterday (still inside its grace) is looked at again.
+    repo.upsertOuraDailyDerived.mockClear()
+    vi.setSystemTime(new Date(NOW.getTime() + 2 * 3_600_000))
+    await buildReadinessPayload('u1', TZ)
+    await drain()
+    const redone = new Set(activityWrites().map(w => w.day))
+    expect(redone.has(longAgo)).toBe(false)
+    expect([...redone].every(d => d === YESTERDAY)).toBe(true)
+  })
+
+  it('resolves the HR profile once for a whole read, not once per scored day', async () => {
+    setup()
+    const observed = vi.fn(async () => null)
+    ;(repo as unknown as Record<string, unknown>).getObservedHrProfile = observed
+    ;(repo as unknown as Record<string, unknown>).listFitnessTests = vi.fn(async () => [])
+    await buildReadinessPayload('u1', TZ)
+    await drain()
+    expect(activityWrites().length).toBe(ACTIVITY_FINALISE_DAYS)
+    expect(observed).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('a zone that changes its clocks (issue 2435)', () => {
+  const NY = 'America/New_York'
+  const NY_TODAY = '2026-03-09' // the day after the spring-forward: 2026-03-08 was only 23 h long
+  const NY_YESTERDAY = '2026-03-08'
+
+  it("finalises and reads the previous calendar day, not the one before it", async () => {
+    repo = fixtureRepo(monthFixture(NY_TODAY, NY))
+    vi.setSystemTime(new Date(dateStrMidnightInTz(NY_TODAY, NY).getTime() + 15 * 3_600_000))
+    const p = await buildReadinessPayload('u1', NY)
+    await drain()
+    const days = activityWrites().map(w => w.day)
+    expect(days).toContain(NY_YESTERDAY)
+    const final = await loadActivityDay(typedRepo(), 'u1', NY, NY_YESTERDAY)
+    expect(p.readinessCompositeContributors!.activityBalance.score).toBe(Math.round(final.result!.preTaperScore))
+    // The day that ends at 00:00 on the 9th is 23 hours long, not 24.
+    const len = dateStrMidnightInTz(NY_TODAY, NY).getTime() - dateStrMidnightInTz(NY_YESTERDAY, NY).getTime()
+    expect(len).toBe(23 * 3_600_000)
   })
 })
