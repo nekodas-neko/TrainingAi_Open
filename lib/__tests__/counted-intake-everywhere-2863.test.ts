@@ -91,9 +91,9 @@ describe('countedIntakeKcal', () => {
 describe('every calorie figure is the ring\'s (#2863)', () => {
   it('the server balance: intake is the counted intake, with the rows that built it', async () => {
     const r = await computeEnergyBalance(repoArg, 'u1', TZ, TODAY)
-    expect(r.balance.intakeKcal).toBe(RING)
-    expect(r.balance.loggedIntakeKcal + r.balance.estimatedKcal).toBe(RING)
-    expect(r.balance.estimatedMeals).toEqual([{ mealTypeId: 'dinner', kcal: 650 }])
+    expect(r.balance!.intakeKcal).toBe(RING)
+    expect(r.balance!.loggedIntakeKcal + r.balance!.estimatedKcal).toBe(RING)
+    expect(r.balance!.estimatedMeals).toEqual([{ mealTypeId: 'dinner', kcal: 650 }])
   })
 
   it("Home's Calories tile and Goals: body-metadata's today and week-to-date calories", async () => {
@@ -112,7 +112,7 @@ describe('every calorie figure is the ring\'s (#2863)', () => {
       dayStartMs: new Date(`${TODAY}T00:00:00+10:00`).getTime(),
       restingHr: 60, restingBaseKcal: 1700, activeKcal: 300, hr: [],
       intake: LOGS.map(l => ({ atMs: new Date(l.loggedAt).getTime(), kcal: l.calories })),
-      estimates: readEstimateRows(r.balance.estimatedMeals),
+      estimates: readEstimateRows(r.balance!.estimatedMeals),
       intakeMealTypeIds: LOGS.map(l => l.mealTypeId),
     })
     expect(t.totals.intakeKcal).toBe(RING)
