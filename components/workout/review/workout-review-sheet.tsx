@@ -91,7 +91,7 @@ export function WorkoutReviewSheet({ sessionId, open, onOpenChange, onApplied }:
     if (open && sessionId) runReview(sessionId);
   }, [open, sessionId, runReview]);
 
-  // Actionable = drops/adjusts you decide on. Protected = exercises the AI wanted to drop but a
+  // Actionable = drops/adjusts you decide on. Protected = exercises the time budget would drop but a
   // training-rule guard kept (e.g. it's your only work for an under-target muscle) — shown so the
   // reasoning matches the diff, but with nothing to decide. Kept = genuinely untouched.
   const actionable = data?.proposal.exercises.filter(e => e.action !== "keep") ?? [];
@@ -258,7 +258,7 @@ export function WorkoutReviewSheet({ sessionId, open, onOpenChange, onApplied }:
                     );
                   })}
 
-                  {/* Guard-protected: the AI wanted to drop these, but a training rule kept them. */}
+                  {/* Guard-protected: the time budget would drop these, but a training rule kept them. */}
                   {protectedRows.map(ex => (
                     <div key={ex.sessionExerciseId} className="rounded-xl border border-amber-500/25 bg-amber-500/5 p-3">
                       <div className="flex items-start gap-2">
@@ -267,7 +267,7 @@ export function WorkoutReviewSheet({ sessionId, open, onOpenChange, onApplied }:
                         </span>
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-sm leading-tight truncate">{ex.name}</p>
-                          <p className="text-xs text-amber-500/90 mt-0.5">AI wanted to drop this — kept to protect your training</p>
+                          <p className="text-xs text-amber-500/90 mt-0.5">Cut for time, but kept to protect your training</p>
                           {ex.reason && <p className="text-xs text-muted-foreground/80 mt-1">{ex.reason}</p>}
                         </div>
                       </div>

@@ -6,7 +6,7 @@ import { aggregateSignals } from '@trainingai/shared/ai-periodization/signals'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
 import { prescriptionDrivesLoad } from '@trainingai/shared/ai-periodization/apply-prescription'
 import { rateLimit } from '@/lib/rate-limit'
-import { buildRulesReview } from '@trainingai/shared/workout/review/rules-review'
+import { buildRulesReview, summarizeReconciledReview } from '@trainingai/shared/workout/review/rules-review'
 import { reconcileReview, type ReviewSignalExercise, type SetShape } from '@trainingai/shared/workout/review/reconcile'
 import type { ProgressionStyle } from '@trainingai/shared/types/progression'
 import type { ExerciseRole } from '@trainingai/shared/types/program'
@@ -130,7 +130,8 @@ export async function POST(
     sessionId: programSessionId,
     sessionName: programSession.name,
     totalBudgetMin: programSession.timeBudgetMinutes,
-    reasoning: rules.reasoning,
+    // Written from the reconciled proposal: the guards may keep exercises the allocator dropped.
+    reasoning: summarizeReconciledReview(proposal, signals.effectiveTimeBudgetMin),
     // Deterministic arithmetic, not an estimate of its own reliability. A number here at all is
     // the shape the sheet already reads; CLAUDE.md forbids showing a MODEL's self-reported
     // confidence as fact, and this is the opposite of one — it is always exactly this.

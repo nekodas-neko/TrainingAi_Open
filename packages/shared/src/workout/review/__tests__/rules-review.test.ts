@@ -5,7 +5,8 @@
 // made by the same trim the prescription path uses, in the same order, so the two cannot propose
 // shapes that contradict each other.
 import { describe, it, expect } from 'vitest'
-import { buildRulesReview } from '../rules-review'
+import { buildRulesReview, summarizeReconciledReview } from '../rules-review'
+import { reconcileReview, type ReviewSignalExercise, type SetShape } from '../reconcile'
 import type { PrescriptionSignals } from '@trainingai/shared/ai-periodization/signals'
 
 const SQUAT = 'ex-squat', ROW = 'ex-row', CURL = 'ex-curl'
@@ -148,4 +149,54 @@ it('untimed session reviews retain all work without showing an over-budget failu
   expect(result.modelExercises).toEqual([])
   expect(result.reasoning).toContain('No time limit')
   expect(result.reasoning).not.toContain('0-min')
+})
+
+// #2864. The allocator drops the curl; `reconcileReview` then keeps it because it is the only
+// biceps work and biceps is under target. The summary used to be written before that, so it named
+// the curl as dropped while its row said kept.
+describe('summary after reconcile', () => {
+  const sigEx = (id: string, name: string, role: string, muscle: string, position: number): ReviewSignalExercise => ({
+    sessionExerciseId: id, name, role, position,
+    muscleContributions: [{ muscle, weight: 1 }], transitionSec: 30, timeProfile: null,
+  })
+  const signalExercises = [
+    sigEx(SQUAT, 'Squat', 'primary', 'quads', 0),
+    sigEx(ROW, 'Row', 'secondary', 'back', 1),
+    sigEx(CURL, 'Curl', 'accessory', 'biceps', 2),
+  ]
+  const currentParams = new Map<string, SetShape>(EXERCISES.map(e => [e.sessionExerciseId, { sets: e.sets, reps: e.reps, pct: e.pct, restSec: e.restSec }]))
+  const reviewed = (weeklyLogged: Record<string, number>) => {
+    const rules = run(15, { weeklyTargets: { quads: 10, back: 10, biceps: 10 }, weeklyLogged: { quads: 0, back: 0, ...weeklyLogged } })
+    const proposal = reconcileReview({
+      signalExercises, modelExercises: rules.modelExercises, currentParams,
+      weeklyTargets: { quads: 10, back: 10, biceps: 10 }, weeklyLogged: { quads: 0, back: 0, ...weeklyLogged }, budgetMin: 15,
+    })
+    return { rules, proposal }
+  }
+
+  it('does not list an exercise the guards kept as dropped', () => {
+    const { rules, proposal } = reviewed({ biceps: 0 })
+    const curl = proposal.exercises.find(e => e.sessionExerciseId === CURL)!
+    // Non-vacuous: the allocator did want it gone, and a guard did keep it.
+    expect(rules.modelExercises.some(m => m.sessionExerciseId === CURL && m.action === 'drop')).toBe(true)
+    expect(curl.action).toBe('keep')
+    expect(curl.guardAdjusted).toBe(true)
+    const summary = summarizeReconciledReview(proposal, 15)
+    expect(summary).not.toMatch(/Curl (is|are) dropped/)
+    expect(summary).not.toMatch(/, Curl|Curl,/)
+    expect(summary).toContain('Curl stays in')
+  })
+
+  it('names exactly the rows whose action is drop', () => {
+    const { proposal } = reviewed({ biceps: 30 })
+    const dropped = proposal.exercises.filter(e => e.action === 'drop').map(e => e.name)
+    expect(dropped).toEqual(['Curl'])
+    expect(summarizeReconciledReview(proposal, 15)).toContain('Curl is dropped')
+  })
+
+  it('says nothing is dropped when every drop was refused', () => {
+    const { proposal } = reviewed({ biceps: 0 })
+    expect(proposal.droppedIds).toEqual([])
+    expect(summarizeReconciledReview(proposal, 15)).not.toContain('dropped')
+  })
 })
