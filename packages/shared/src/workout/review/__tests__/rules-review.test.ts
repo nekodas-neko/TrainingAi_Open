@@ -181,7 +181,7 @@ describe('summary after reconcile', () => {
     expect(rules.modelExercises.some(m => m.sessionExerciseId === CURL && m.action === 'drop')).toBe(true)
     expect(curl.action).toBe('keep')
     expect(curl.guardAdjusted).toBe(true)
-    const summary = summarizeReconciledReview(proposal, 15)
+    const summary = summarizeReconciledReview(proposal)
     expect(summary).not.toMatch(/Curl (is|are) dropped/)
     expect(summary).not.toMatch(/, Curl|Curl,/)
     expect(summary).toContain('Curl stays in')
@@ -191,12 +191,12 @@ describe('summary after reconcile', () => {
     const { proposal } = reviewed({ biceps: 30 })
     const dropped = proposal.exercises.filter(e => e.action === 'drop').map(e => e.name)
     expect(dropped).toEqual(['Curl'])
-    expect(summarizeReconciledReview(proposal, 15)).toContain('Curl is dropped')
+    expect(summarizeReconciledReview(proposal)).toContain('Curl is dropped')
   })
 
   it('says nothing is dropped when every drop was refused', () => {
     const { proposal } = reviewed({ biceps: 0 })
     expect(proposal.droppedIds).toEqual([])
-    expect(summarizeReconciledReview(proposal, 15)).not.toContain('dropped')
+    expect(summarizeReconciledReview(proposal)).not.toContain('dropped')
   })
 })

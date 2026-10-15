@@ -245,6 +245,27 @@ describe('POST /api/workout-review/session/[sessionId]', () => {
     expect(body.reasoning).toContain('already fits')
   })
 
+  // #2864. The allocator drops the curl for time; `reconcileReview` keeps it because it is the only
+  // biceps work and biceps is under target. The summary the route returns must follow the rows the
+  // user is shown, not the allocator's draft (`rules.reasoning`), which still lists the curl as dropped.
+  it('writes the summary from the reconciled rows, so a guard-kept exercise is not called dropped', async () => {
+    aggregateSignals.mockResolvedValue(signals({
+      effectiveTimeBudgetMin: 15,
+      weeklyTargets: { quads: 10, back: 10, biceps: 10 },
+      weeklyLogged: { quads: 0, back: 0, biceps: 0 },
+    }))
+    const body = await (await reviewPost()).json()
+    const rows = body.proposal.exercises as Row[]
+    const kept = rows.filter(e => e.action === 'keep' && e.guardAdjusted)
+    // Non-vacuous: a guard really did refuse a drop the budget wanted.
+    expect(kept.map(e => e.name)).toContain('Curl')
+    for (const k of kept) {
+      expect(body.reasoning).toContain(`${k.name} stays in`)
+      expect(body.reasoning).not.toMatch(new RegExp(`${k.name} (is|are) dropped|, ${k.name}\\b|\\b${k.name},`))
+    }
+    for (const d of rows.filter(e => e.action === 'drop')) expect(body.reasoning).toContain(d.name as string)
+  })
+
   it('reports the session name and budget from the program, not the model', async () => {
     const body = await (await reviewPost()).json()
     expect(body.sessionName).toBe('Upper')

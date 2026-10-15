@@ -8,7 +8,7 @@ const source = readFileSync(join(__dirname, '..', 'review', 'workout-review-shee
 
 describe('workout review sheet: protected row label', () => {
   it('names the time budget, not an AI', () => {
-    expect(source).toContain('Cut for time, but kept to protect your training')
+    expect(source).toContain('Over your time budget, but kept to protect your training')
     expect(source).not.toMatch(/AI wanted/)
   })
 })

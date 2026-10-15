@@ -48,10 +48,10 @@ function summarizeReview(params: {
  * allocator wanted; `reconcileReview` may keep some of those drops (last primary, last cover of an
  * under-target muscle). Written from the reconciled proposal, the line and the rows agree.
  */
-export function summarizeReconciledReview(proposal: ReviewProposal, budgetMin: number): string {
+export function summarizeReconciledReview(proposal: ReviewProposal): string {
   const names = (pick: (e: ReviewProposalExercise) => boolean) => proposal.exercises.filter(pick).map(e => e.name)
   return summarizeReview({
-    budgetMin,
+    budgetMin: proposal.budgetMin,
     droppedNames: names(e => e.action === 'drop'),
     adjustedCount: proposal.exercises.filter(e => e.action === 'adjust').length,
     protectedNames: names(e => e.action === 'keep' && e.guardAdjusted),

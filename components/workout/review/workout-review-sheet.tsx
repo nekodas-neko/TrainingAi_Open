@@ -267,7 +267,7 @@ export function WorkoutReviewSheet({ sessionId, open, onOpenChange, onApplied }:
                         </span>
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-sm leading-tight truncate">{ex.name}</p>
-                          <p className="text-xs text-amber-500/90 mt-0.5">Cut for time, but kept to protect your training</p>
+                          <p className="text-xs text-amber-500/90 mt-0.5">Over your time budget, but kept to protect your training</p>
                           {ex.reason && <p className="text-xs text-muted-foreground/80 mt-1">{ex.reason}</p>}
                         </div>
                       </div>

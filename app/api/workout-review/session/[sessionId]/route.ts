@@ -131,7 +131,7 @@ export async function POST(
     sessionName: programSession.name,
     totalBudgetMin: programSession.timeBudgetMinutes,
     // Written from the reconciled proposal: the guards may keep exercises the allocator dropped.
-    reasoning: summarizeReconciledReview(proposal, signals.effectiveTimeBudgetMin),
+    reasoning: summarizeReconciledReview(proposal),
     // Deterministic arithmetic, not an estimate of its own reliability. A number here at all is
     // the shape the sheet already reads; CLAUDE.md forbids showing a MODEL's self-reported
     // confidence as fact, and this is the opposite of one — it is always exactly this.
