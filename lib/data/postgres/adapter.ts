@@ -4422,6 +4422,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async seedDefaultMealTypes(userId: string) { return n.seedDefaultMealTypes(this.db, userId) }
   async createFoodItem(userId: string, data: Omit<FoodItem, 'id' | 'userId' | 'createdAt'> & { id?: string }, opts?: { reuseExisting?: boolean }) { return n.createFoodItem(this.db, userId, data, opts) }
   async searchFoodItems(userId: string, query: string) { return n.searchFoodItems(this.db, userId, query) }
+  async getFoodItemById(userId: string, id: string) { return n.getFoodItemById(this.db, userId, id) }
+  async getSupplementDayLog(userId: string, supplementId: string, date: string) { return n.getSupplementDayLog(this.db, userId, supplementId, date) }
   async listFoodLogs(userId: string, date: string) { return n.listFoodLogs(this.db, userId, date) }
   async createFoodLog(userId: string, data: Pick<FoodLog, 'date' | 'mealTypeId' | 'foodItemId' | 'quantityMultiplier'>
     & { id?: string; loggedAt?: Date; savedMealId?: string | null; mealGroupId?: string | null; mealGroupName?: string | null }) { return n.createFoodLog(this.db, userId, data) }

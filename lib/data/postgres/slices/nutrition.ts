@@ -3,6 +3,8 @@ import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { resolveEatenAt } from '@trainingai/shared/nutrition/eaten-at'
 import { findDuplicateFoodItem, identityCalories } from '@trainingai/shared/nutrition/food-item-identity'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
+import { summariseSupplementDay } from '@trainingai/shared/nutrition/supplement-day-totals'
+import type { SupplementDayLog, SupplementDayContributionRow } from '@trainingai/shared/types/supplement'
 import { randomUUID } from 'node:crypto'
 import type { getDb } from '../client'
 import * as s from '../schema'
@@ -377,6 +379,58 @@ export async function searchFoodItems(db: Db, userId: string, query: string): Pr
     .orderBy(desc(s.foodItems.createdAt))
     .limit(20)
   return rows.map(rowToFoodItem)
+}
+
+/**
+ * One food item by id, for the native client to read back what it uploaded under a client-minted
+ * id. Scoped on `userId` in the WHERE, so another user's id and an unknown id are the same empty
+ * result — the caller answers both 404 and ownership does not leak. `food_items` has no
+ * `deleted_at` (a food is hard-deleted), so there is no tombstone to report.
+ */
+export async function getFoodItemById(db: Db, userId: string, id: string): Promise<FoodItem | null> {
+  const [row] = await db.select().from(s.foodItems)
+    .where(and(eq(s.foodItems.id, id), eq(s.foodItems.userId, userId)))
+    .limit(1)
+  return row ? rowToFoodItem(row) : null
+}
+
+/**
+ * One supplement's live contributions on one local date (`date` is `YYYY-MM-DD`, already the user's
+ * local day — no timezone arithmetic happens here). Throws `NotFoundError` for a supplement that is
+ * not the user's or does not exist; a tombstoned definition IS returned, flagged, because an
+ * offline dose can be uploaded and read back after the definition is deleted.
+ */
+export async function getSupplementDayLog(
+  db: Db, userId: string, supplementId: string, date: string,
+): Promise<SupplementDayLog> {
+  const [sup] = await db.select({ id: s.supplements.id, deletedAt: s.supplements.deletedAt })
+    .from(s.supplements)
+    .where(and(eq(s.supplements.id, supplementId), eq(s.supplements.userId, userId)))
+    .limit(1)
+  if (!sup) throw new NotFoundError('Supplement')
+  const rows = await db.select().from(s.supplementLogs)
+    .where(and(
+      eq(s.supplementLogs.supplementId, supplementId),
+      eq(s.supplementLogs.userId, userId),
+      eq(s.supplementLogs.logDate, date),
+      isNull(s.supplementLogs.deletedAt),
+    ))
+    .orderBy(asc(s.supplementLogs.createdAt), asc(s.supplementLogs.id))
+  const toRow = (r: typeof rows[number]): SupplementDayContributionRow => ({
+    id: r.id, amount: r.amount, unit: r.unit, doseText: r.doseText,
+    takenAt: r.takenAt, sourceRef: r.source === 'manual' ? null : r.sourceRef,
+  })
+  // An absent source reads as manual everywhere else (`summariseSupplementDay`), so the split uses
+  // the same test rather than `=== 'meal'`.
+  const manualRows = rows.filter(r => (r.source ?? 'manual') === 'manual')
+  return {
+    supplementId, date,
+    supplementDeleted: sup.deletedAt != null,
+    // The partial unique index allows one live manual row; take the first if that ever slipped.
+    manual: manualRows[0] ? toRow(manualRows[0]) : null,
+    foodDerived: rows.filter(r => (r.source ?? 'manual') !== 'manual').map(toRow),
+    total: summariseSupplementDay(rows).get(supplementId)?.loggedAmount ?? null,
+  }
 }
 
 // ── Food Logs ──────────────────────────────────────────────────────────────────

@@ -1,13 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils'
+import { z } from 'zod'
+import { todayInTz, normalizeDateParamIso, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { withRouteErrors, invalidUuidResponse } from '@/lib/api/route-errors'
 import { SupplementLogSchema } from '@trainingai/shared/validation/supplement'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { rateLimit } from '@/lib/rate-limit'
 
 /** One dose. */
 const MAX_BODY_BYTES = 4 * 1024
+
+// Both separators: the client fills date params from `localDateString()`, which emits `YYYY/MM/DD`.
+// The regex bounds the shape; `normalizeDateParamIso` rejects `2026-02-31` and answers the dash form
+// `supplement_logs.log_date` is keyed by.
+const DayQuerySchema = z.object({ date: z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/) }).strict()
+
+/**
+ * #2813 — one supplement's log for one LOCAL date, manual tick apart from food-derived doses.
+ * `?date=` is the user's local day as the client sees it; it is never converted through UTC, so a
+ * dose logged just after local midnight reads back on the date it was logged for. A supplement that
+ * is not the caller's answers 404, same as an unknown one.
+ */
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id
+  if (!rateLimit(`supplement-day-read:${userId}`, 120, 60_000)) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+  const { id } = await params
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
+  const parsed = DayQuerySchema.safeParse({ date: req.nextUrl.searchParams.get('date') ?? '' })
+  const date = parsed.success ? normalizeDateParamIso(parsed.data.date) : null
+  if (!date) return NextResponse.json({ error: 'Invalid date' }, { status: 400 })
+  const repo = await getRepository()
+  return withRouteErrors(async () => {
+    const day = await repo.getSupplementDayLog(userId, id, date)
+    return NextResponse.json(day, { headers: { 'Cache-Control': 'private, no-store' } })
+  })
+}
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
