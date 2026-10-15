@@ -1083,6 +1083,8 @@ export interface WorkoutRepository {
    *  client-minted id is already referenced by a queued food_log — see the slice. */
   createFoodItem(userId: string, data: Omit<FoodItem, 'id' | 'userId' | 'createdAt'> & { id?: string }, opts?: { reuseExisting?: boolean }): Promise<FoodItem>
   searchFoodItems(userId: string, query: string): Promise<FoodItem[]>
+  /** One owned food item, or null for an unknown id and another user's id alike. */
+  getFoodItemById(userId: string, id: string): Promise<FoodItem | null>
 
   listFoodLogs(userId: string, date: string): Promise<FoodLogWithItem[]>
   listFoodLogsSummary(userId: string, from: string, to: string): Promise<{ date: string; calories: number; proteinG: number; carbsG: number; fatG: number }[]>
@@ -1370,6 +1372,9 @@ export interface WorkoutRepository {
   updateSupplementVial(id: string, userId: string, patch: Partial<Omit<import('@trainingai/shared/types/supplement').SupplementVial, 'id' | 'userId' | 'supplementId' | 'createdAt'>>): Promise<import('@trainingai/shared/types/supplement').SupplementVial>
   /** True when a vial was removed. Editing or deleting a vial never touches logs stamped from it. */
   deleteSupplementVial(id: string, userId: string): Promise<boolean>
+  /** One supplement's live contributions on one local date, manual split from food-derived.
+   *  Throws NotFoundError when the supplement is not the user's. */
+  getSupplementDayLog(userId: string, supplementId: string, date: string): Promise<import('@trainingai/shared/types/supplement').SupplementDayLog>
   /** RV-45: false when nothing matched. */
   unlogSupplement(supplementId: string, userId: string, date: string): Promise<boolean>
   /** TN-46: administered doses of VIAL-DOSED supplements in [from, to]. The dose is the log's own
