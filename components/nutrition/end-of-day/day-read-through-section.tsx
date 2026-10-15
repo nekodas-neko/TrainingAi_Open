@@ -10,6 +10,7 @@ import type { FoodLogWithItem } from '@trainingai/shared/types/nutrition'
 interface Props {
   date: string
   tz?: string
+  userId?: string
   /** The day's meals, already fetched by the Nutrition screen that hosts this sheet. */
   logs: FoodLogWithItem[]
 }
@@ -31,7 +32,7 @@ interface Props {
  * responses against a swipe that has already moved on — a guard this surface, being one day, has no
  * way to exercise.
  */
-export function DayReadThroughSection({ date, tz, logs }: Props) {
+export function DayReadThroughSection({ date, tz, userId, logs }: Props) {
   const dayLog = useCachedValue<DayLogResult>(`day-log:${date}`, `/api/day-log?date=${date}`, DAY_LOG_TTL)
   const energy = useCachedValue<EnergyBalanceResponse>(
     `energy-balance:${date}`, `/api/nutrition/energy-balance?date=${date}`, ENERGY_BALANCE_TTL,
@@ -52,6 +53,7 @@ export function DayReadThroughSection({ date, tz, logs }: Props) {
       foodLogs={logs}
       restingHr={hrProfile?.restingHr ?? null}
       tz={tz}
+      userId={userId}
       emptyLabel="Nothing logged today yet."
     />
   )

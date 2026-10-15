@@ -12,6 +12,7 @@ import type { DayLogResult } from '@/app/api/day-log/route'
 import type { EnergyBalanceResponse } from '@/app/api/nutrition/energy-balance/route'
 import type { FoodLogWithItem } from '@trainingai/shared/types/nutrition'
 import type { ActivityLog } from '@trainingai/shared/types'
+import { useCountedEstimateRows } from '@/app/nutrition/use-estimated-meals'
 
 /** Module-level so the empty fallback keeps one identity — it feeds a memoised chart. */
 const EMPTY_HR: DayLogResult['hr'] = []
@@ -23,6 +24,8 @@ interface Props {
   foodLogs: FoodLogWithItem[] | null
   restingHr: number | null
   tz?: string
+  /** For the local-first read of the day's plan-meal estimates (#2863). */
+  userId?: string
   /** LB-1's edit/delete affordances. Every one is optional and every section already documents
    *  absent as read-only (`DayEntryControls`), which is what lets the evening wrap-up host the same
    *  markup without growing a second set of write paths. */
@@ -49,7 +52,7 @@ interface Props {
  * cannot exercise.
  */
 export function DayReadThrough({
-  date, data, energy, foodLogs, restingHr, tz, controls, emptyLabel = 'Nothing logged on this day.',
+  date, data, energy, foodLogs, restingHr, tz, userId, controls, emptyLabel = 'Nothing logged on this day.',
 }: Props) {
   // Q-391: the per-session addends of the Energy section's "Workouts" row, so a session card and the
   // day total on the same screen cannot disagree — they are the same numbers.
@@ -62,6 +65,11 @@ export function DayReadThrough({
     () => (foodLogs ?? []).map(l => ({ atMs: new Date(l.loggedAt).getTime(), kcal: l.calories })),
     [foodLogs],
   )
+
+  // #2863. The day's plan-meal estimates, so the chart's "Eaten" is the ring's figure. The device's
+  // logs can be newer than the payload, so their meal types go along to drop a superseded estimate.
+  const estimates = useCountedEstimateRows({ userId, date, serverRows: energy?.balance?.estimatedMeals })
+  const intakeMealTypeIds = useMemo(() => (foodLogs ?? []).map(l => l.mealTypeId), [foodLogs])
 
   const hasAnything = !!data && (
     data.exercises.length > 0 || data.activityLogs.length > 0 || !!data.sleep || !!data.bodyMeta || data.hr.length > 0
@@ -100,6 +108,8 @@ export function DayReadThrough({
             activeKcal={energy.balance.activeKcal}
             hr={data?.hr ?? EMPTY_HR}
             intake={intakeEvents}
+            estimates={estimates}
+            intakeMealTypeIds={intakeMealTypeIds}
           />
         </div>
       )}

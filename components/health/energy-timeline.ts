@@ -32,6 +32,8 @@
  * energy went, not a measurement of it.
  */
 
+import { countedIntakeKcal, countedEstimateTotal, type CountedEstimateRow } from '@trainingai/shared/nutrition/counted-intake'
+
 /**
  * One bucket of the day's HR trace — `minute` from local midnight, `bpm` the bucket's MEAN.
  * This is `/api/day-log`'s `hr` payload verbatim (15-minute buckets, mean bpm), so the screen
@@ -59,6 +61,14 @@ export interface EnergyTimelineInput {
   activeKcal: number
   hr: HrBucket[]
   intake: IntakeEvent[]
+  /**
+   * #2863. The day's counted plan-meal estimates (`balance.estimatedMeals`). They count toward the
+   * intake TOTAL, so "Eaten" is the ring's figure, but they are not drawn: an assumed meal has no
+   * time it was eaten. One whose meal type appears in `intakeMealTypeIds` is superseded.
+   */
+  estimates?: readonly CountedEstimateRow[]
+  /** Meal types of the logged food in `intake`, for the supersede rule above. */
+  intakeMealTypeIds?: Iterable<string | null | undefined>
   /** Bucket width. 60 keeps every bucket comfortably above the ring's sample rate. */
   bucketMinutes?: number
 }
@@ -80,8 +90,12 @@ export interface EnergyBucket {
 
 export interface EnergyTimeline {
   buckets: EnergyBucket[]
-  /** Reconciliation handles, so a caller can assert the curve ends where the day's figures do. */
-  totals: { intakeKcal: number; burnKcal: number }
+  /**
+   * Reconciliation handles, so a caller can assert the curve ends where the day's figures do.
+   * `intakeKcal` is the day's counted intake (`countedIntakeKcal`): the drawn intake curve plus
+   * `estimatedKcal`, which is 0 on a day without estimates, where the two are the same number.
+   */
+  totals: { intakeKcal: number; burnKcal: number; estimatedKcal: number }
   /** Buckets with no HR reading. All-24 means the day has no HR at all and the shape is flat. */
   hrGapBuckets: number
 }
@@ -107,7 +121,7 @@ const MINUTES_PER_DAY = 24 * 60
  * dropped — dropping it would break the reconciliation the whole design rests on.
  */
 export function buildEnergyTimeline(
-  { dayStartMs, restingHr, restingBaseKcal, activeKcal, hr, intake, bucketMinutes = 60 }: EnergyTimelineInput,
+  { dayStartMs, restingHr, restingBaseKcal, activeKcal, hr, intake, estimates = [], intakeMealTypeIds, bucketMinutes = 60 }: EnergyTimelineInput,
 ): EnergyTimeline {
   const width = bucketMinutes > 0 ? bucketMinutes : 60
   const count = Math.ceil(MINUTES_PER_DAY / width)
@@ -163,7 +177,11 @@ export function buildEnergyTimeline(
 
   return {
     buckets,
-    totals: { intakeKcal: intakeCum, burnKcal: burnCum },
+    totals: {
+      intakeKcal: countedIntakeKcal({ loggedKcal: intakeCum, estimates, loggedMealTypeIds: intakeMealTypeIds }),
+      burnKcal: burnCum,
+      estimatedKcal: countedEstimateTotal(estimates, intakeMealTypeIds),
+    },
     hrGapBuckets: buckets.filter(b => b.hrGap).length,
   }
 }

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { FoodItemFieldsSchema } from '@trainingai/shared/validation/food-item'
 import { rejectMealImage, mealImageRejectionMessage, FOOD_ITEM_IMAGE_MAX_BYTES } from '@trainingai/shared/nutrition/meal-image'
-import { sanitiseNutrition } from '@trainingai/shared/nutrition/scan-totals'
+import { sanitiseFoodItemNutrition } from '@trainingai/shared/nutrition/scan-totals'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
@@ -50,15 +50,14 @@ export async function POST(req: Request) {
     return invalidBodyResponse(parsed.error)
   }
   const body = parsed.data
-  // Same Atwater cross-check the AI-scan path already applies before the user ever sees it
-  // (lib/nutrition/scan-totals.ts) — this route was the one entry point that bypassed it, so a
-  // wildly hallucinated or fat-fingered calorie/macro combo landed uncorrected. Bounds are
-  // generous (40% deviation) so a real, unusual meal is never touched.
-  const sanitised = sanitiseNutrition({
+  // A scanned or looked-up food gets the same Atwater repair the scan path applies before the user
+  // sees it. A hand-entered one keeps its values (#2876): the repair read untouched macro fields as
+  // 0 g and saved a 50 kcal food at 0 kcal. The offline push branch makes the same call.
+  const sanitised = sanitiseFoodItemNutrition({
     calories: body.calories, proteinG: body.proteinG, carbsG: body.carbsG, fatG: body.fatG,
     servingSizeG: body.servingSizeG, fiberG: body.fiberG, sugarG: body.sugarG,
     sodiumMg: body.sodiumMg, satFatG: body.satFatG,
-  })
+  }, body.source)
   // BF-35. Server-side, always — a client-side cap is not a cap, and this one is a SYNC budget:
   // `food_items` rides the outbox and the device's SQLite copy, so an oversized image is paid on
   // every device forever. Interactive caller, so it is refused with a message; the offline push

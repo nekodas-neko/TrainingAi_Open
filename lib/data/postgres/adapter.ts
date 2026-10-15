@@ -44,7 +44,7 @@ import { DayCheckinScalesSchema, DayCheckinExtrasSchema, dayCheckinHasAnswers, r
 import { answeredMorningScales } from '@trainingai/shared/health/self-report'
 import { MoodFieldsSchema } from '@trainingai/shared/validation/mood-log'
 import { FoodItemPushSchema } from '@trainingai/shared/validation/food-item'
-import { sanitiseNutrition } from '@trainingai/shared/nutrition/scan-totals'
+import { sanitiseFoodItemNutrition } from '@trainingai/shared/nutrition/scan-totals'
 import { normalizeMealGroupName } from '@trainingai/shared/nutrition/meal-group-name'
 import { summariseSupplementDay } from '@trainingai/shared/nutrition/supplement-day-totals'
 import { resolveLoggedDose } from '@trainingai/shared/nutrition/supplement-dose-freeze'
@@ -5462,14 +5462,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             continue
           }
           const p = parsed.data
-          // Same Atwater cross-check the web route applies (sibling-surface parity) — a
-          // hallucinated/mistyped calorie-macro combo queued offline gets the same correction
-          // it would get online, not a second, weaker path.
-          const sanitised = sanitiseNutrition({
+          // The same call the web route makes (sibling-surface parity): a scanned food queued
+          // offline gets the Atwater repair it would get online, and a hand-entered one keeps its
+          // values (#2876), not a second, different rule.
+          const sanitised = sanitiseFoodItemNutrition({
             calories: p.calories, proteinG: p.proteinG, carbsG: p.carbsG, fatG: p.fatG,
             servingSizeG: p.servingSizeG, fiberG: p.fiberG, sugarG: p.sugarG,
             sodiumMg: p.sodiumMg, satFatG: p.satFatG,
-          })
+          }, p.source)
           // BF-35. The web route REFUSES a bad image; this branch drops it and keeps the food.
           // That asymmetry is the RV-32 precedent and it is deliberate: a 4xx here is a poison pill
           // the outbox quarantines, so refusing would cost the user a whole food item over a

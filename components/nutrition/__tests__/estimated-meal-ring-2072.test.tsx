@@ -12,7 +12,8 @@ import { describe, it, expect, afterEach, vi } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { barProgress } from '@trainingai/shared/nutrition/calorie-balance'
-import { countedEstimates, countedEstimateKcal } from '@trainingai/shared/nutrition/meal-estimate'
+import { countedEstimates } from '@trainingai/shared/nutrition/meal-estimate'
+import { countedEstimateTotal } from '@trainingai/shared/nutrition/counted-intake'
 import { CalorieProgressBar } from '../calorie-progress-bar'
 import { EnergyCard } from '../energy-card'
 import { EstimatedKcalLine } from '../estimated-kcal'
@@ -94,7 +95,7 @@ describe('the estimate line and day detail (issue 2072)', () => {
 })
 
 describe('countedEstimates (issue 2072)', () => {
-  it('lists each counted estimate with its slot, and sums to countedEstimateKcal', () => {
+  it('lists each counted estimate with its slot, and sums to countedEstimateTotal', () => {
     const mealTypes = [
       { id: 'mt-l', name: 'Lunch', startHour: 11, endHour: 14 },
       { id: 'mt-s', name: 'Snack', startHour: 15, endHour: 17 },
@@ -114,6 +115,6 @@ describe('countedEstimates (issue 2072)', () => {
       loggedMealTypeIds: new Set<string>(['mt-s']),
     }
     expect(countedEstimates(input)).toEqual([{ planMealId: 'pm-1', mealTypeId: 'mt-l', kcal: 480 }])
-    expect(countedEstimateKcal(input)).toBe(480)
+    expect(countedEstimateTotal(countedEstimates(input))).toBe(480)
   })
 })

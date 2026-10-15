@@ -115,6 +115,29 @@ describe.skipIf(!canRun)('pushMutations <-> web route parity', () => {
     await pool.query(`DELETE FROM food_items WHERE id = $1`, [id])
   })
 
+  it('food_items: a hand-entered 50 kcal food with no macros keeps its 50 kcal on both paths (#2876)', async () => {
+    // Both paths ran the scan's hallucination repair, which reads untouched macros as 0 g and saved
+    // a typed 50 kcal at 0. Reverting either call to the unconditional repair fails here.
+    const { POST } = await import('@/app/api/nutrition/food-items/route')
+    const res = await POST(jsonReq('http://localhost/api/nutrition/food-items', {
+      name: 'Parity Manual Web', servingSizeG: 30, calories: 50, proteinG: 0, carbsG: 0, fatG: 0, source: 'manual',
+    }) as never)
+    expect(res.status).toBe(201)
+    const web = await pool.query(`SELECT calories FROM food_items WHERE user_id = $1 AND name = 'Parity Manual Web'`, [TEST_USER_ID])
+    expect(Number(web.rows[0].calories)).toBe(50)
+    await pool.query(`DELETE FROM food_items WHERE user_id = $1 AND name = 'Parity Manual Web'`, [TEST_USER_ID])
+
+    const id = crypto.randomUUID()
+    const result = await repo.pushMutations(TEST_USER_ID, [{
+      id: 'mut-item-manual-50', domain: 'food_items', date: '2026-01-01',
+      payload: { id, name: 'Parity Manual Push', servingSizeG: 30, calories: 50, proteinG: 0, carbsG: 0, fatG: 0, source: 'manual' },
+    }])
+    expect(result.processed).toBe(1)
+    const push = await pool.query(`SELECT calories FROM food_items WHERE id = $1`, [id])
+    expect(Number(push.rows[0].calories)).toBe(50)
+    await pool.query(`DELETE FROM food_items WHERE id = $1`, [id])
+  })
+
   it('day_checkins: both paths reject an invalid phase value', async () => {
     const { POST } = await import('@/app/api/day-checkin/route')
     const res = await POST(jsonReq('http://localhost/api/day-checkin', { phase: 'noon' }) as never)

@@ -1,4 +1,4 @@
-import { sanitiseNutrition } from '@trainingai/shared/nutrition/scan-totals';
+import { sanitiseFoodItemNutrition } from '@trainingai/shared/nutrition/scan-totals';
 import { FoodItemPushSchema, type Food } from './models.ts';
 import { z } from 'zod';
 
@@ -39,30 +39,26 @@ export type FoodEntry = Pick<
 > & { id?: string; quantityMultiplier: number };
 export function normaliseFood(input: FoodEntry, id: string) {
   const { quantityMultiplier, ...food } = input;
-  if (!food.source || food.source === 'manual') {
-    return FoodItemPushSchema.parse({
-      ...food,
-      id,
-      brand: food.brand ?? undefined,
-      barcode: food.barcode ?? undefined,
-    });
-  }
+  // #2876: the server's rule, shared. A hand-entered food keeps its values; a scan gets the repair.
   return FoodItemPushSchema.parse({
     ...food,
     id,
     brand: food.brand ?? undefined,
     barcode: food.barcode ?? undefined,
-    ...sanitiseNutrition({
-      name: food.name,
-      servingSizeG: food.servingSizeG,
-      calories: food.calories,
-      proteinG: food.proteinG,
-      carbsG: food.carbsG,
-      fatG: food.fatG,
-      fiberG: food.fiberG ?? undefined,
-      sugarG: food.sugarG ?? undefined,
-      sodiumMg: food.sodiumMg ?? undefined,
-      satFatG: food.satFatG ?? undefined,
-    }),
+    ...sanitiseFoodItemNutrition(
+      {
+        name: food.name,
+        servingSizeG: food.servingSizeG,
+        calories: food.calories,
+        proteinG: food.proteinG,
+        carbsG: food.carbsG,
+        fatG: food.fatG,
+        fiberG: food.fiberG ?? undefined,
+        sugarG: food.sugarG ?? undefined,
+        sodiumMg: food.sodiumMg ?? undefined,
+        satFatG: food.satFatG ?? undefined,
+      },
+      food.source,
+    ),
   });
 }

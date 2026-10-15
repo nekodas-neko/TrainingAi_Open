@@ -135,7 +135,7 @@ test('profile summaries find each metric independently and distinguish daily est
     0,
   );
 });
-test('calorie displays ignore assumed meals, reflect pending edits and preserve genuinely imported intake', () => {
+test('a payload without estimate rows counts logged food only, reflects pending edits and preserves imported intake', () => {
   const balance = {
     intakeKcal: 900,
     estimatedKcal: 500,
@@ -181,6 +181,51 @@ test('calorie displays ignore assumed meals, reflect pending edits and preserve 
       allSkipped: false,
     }).intake,
     900,
+  );
+});
+test('calorie displays count plan-meal estimates through the shared rule, superseded by local logs (#2863)', () => {
+  const balance = {
+    intakeKcal: 1250,
+    loggedIntakeKcal: 600,
+    estimatedKcal: 650,
+    estimatedMeals: [{ mealTypeId: 'dinner', kcal: 650 }],
+    expenditureKcal: 2200,
+    budgetKcal: 2600,
+  };
+  // The server's figure: logged plus the counted estimate, the same as the current app's ring.
+  assert.equal(
+    recordedIntake({ balance, calories: null, hasLogs: false, pending: false, allSkipped: false })
+      .intake,
+    1250,
+  );
+  // Logged on the device, not yet synced: the device's food plus the estimate it has not superseded.
+  const lunch = recordedIntake({
+    balance,
+    calories: 700,
+    hasLogs: true,
+    pending: true,
+    allSkipped: false,
+    loggedMealTypeIds: ['breakfast', 'lunch'],
+  });
+  assert.equal(lunch.intake, 1350);
+  assert.equal(lunch.remaining, 1250);
+  // Dinner logged on the device supersedes the dinner estimate before the server knows.
+  assert.equal(
+    recordedIntake({
+      balance,
+      calories: 1300,
+      hasLogs: true,
+      pending: true,
+      allSkipped: false,
+      loggedMealTypeIds: ['lunch', 'dinner'],
+    }).intake,
+    1300,
+  );
+  // Every meal skipped: nothing is assumed.
+  assert.equal(
+    recordedIntake({ balance, calories: 0, hasLogs: false, pending: false, allSkipped: true })
+      .intake,
+    0,
   );
 });
 test('rounded prescribed bars preserve the same basis in local summaries and queued payloads', () => {

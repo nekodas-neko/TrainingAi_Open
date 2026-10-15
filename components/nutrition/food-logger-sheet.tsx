@@ -384,6 +384,7 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
                 onBack={() => popStep()}
                 onConfirm={handleConfirm}
                 logDate={logDate}
+                userId={userId}
               />
             )}
           </div>

@@ -11,6 +11,7 @@ export function useRecordedIntake(date: string, balance: IntakeBalance | null | 
   return recordedIntake({
     calories: n.view.totals?.calories ?? null,
     hasLogs: n.view.logs.length > 0,
+    loggedMealTypeIds: n.view.logs.map((x) => x.mealTypeId),
     pending: n.operations.some((x) => x.date === date && x.domain === 'food_logs'),
     allSkipped:
       n.view.mealTypes.length > 0 &&

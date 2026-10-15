@@ -246,7 +246,7 @@ export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, t
               <DayDigestCard active={open} />
               <DaySummaryCard totals={totals} targets={targets} dayBudgetKcal={dayBudgetKcal} battery={measured} />
               <DayTrendsSection date={date} />
-              <DayReadThroughSection date={date} tz={tz} logs={logs} />
+              <DayReadThroughSection date={date} tz={tz} userId={userId} logs={logs} />
             </>
           )}
           {step === 'meals' && (

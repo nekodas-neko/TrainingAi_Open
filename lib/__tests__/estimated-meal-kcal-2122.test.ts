@@ -5,7 +5,8 @@
  */
 import { describe, it, expect } from 'vitest';
 import { computeEnergyBalance } from '@/lib/health/energy-balance-service';
-import { countedEstimateKcal } from '@trainingai/shared/nutrition/meal-estimate';
+import { countedEstimates, type CountedEstimateInput } from '@trainingai/shared/nutrition/meal-estimate';
+import { countedEstimateTotal } from '@trainingai/shared/nutrition/counted-intake';
 import { MAX_WINDOW_DAYS } from '@trainingai/shared/nutrition/adaptive-tdee';
 import { shiftDateStr } from '@trainingai/shared/date-utils';
 import type { MealType } from '@trainingai/shared/types/nutrition';
@@ -26,7 +27,9 @@ const est = (planMealId: string, estCalories: number) => ({
   estCalories,
 });
 
-describe('countedEstimateKcal', () => {
+const countedEstimateKcal = (input: CountedEstimateInput) => countedEstimateTotal(countedEstimates(input));
+
+describe('countedEstimates summed', () => {
   it('counts an estimate while its slot has nothing logged', () => {
     expect(
       countedEstimateKcal({
