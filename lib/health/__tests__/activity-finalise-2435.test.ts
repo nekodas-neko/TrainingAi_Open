@@ -26,6 +26,9 @@ beforeEach(() => {
 })
 afterEach(() => vi.useRealTimers())
 
+/** The fixture answers every read the finalise makes; it is not a full repository, so it is cast. */
+const typedRepo = () => repo as unknown as Parameters<typeof finaliseActivityDay>[0]
+
 function setup(f: ActivityFixture = monthFixture(TODAY, TZ)) {
   repo = fixtureRepo(f)
   return f
@@ -39,7 +42,7 @@ const drain = () => new Promise(r => setTimeout(r, 0))
 describe('finaliseActivityDay', () => {
   it('scores the whole finished day, including its HR lanes, and stamps it final', async () => {
     const fx = setup()
-    const day = await finaliseActivityDay(repo, 'u1', TZ, YESTERDAY)
+    const day = await finaliseActivityDay(typedRepo(), 'u1', TZ, YESTERDAY)
     expect(day.signals.moveHours).not.toBeNull()
     expect(day.signals.zoneMinutes).not.toBeNull()
 
@@ -57,16 +60,16 @@ describe('finaliseActivityDay', () => {
     vi.setSystemTime(new Date(dateStrMidnightInTz(TODAY, TZ).getTime() - 60_000))
     const live = await buildReadinessPayload('u1', TZ)
     vi.setSystemTime(NOW)
-    const final = await loadActivityDay(repo, 'u1', TZ, YESTERDAY)
+    const final = await loadActivityDay(typedRepo(), 'u1', TZ, YESTERDAY)
     expect(final.result!.score).toBe(live.activityScore)
     expect(final.signals.moveHours).toBe(live.activitySignals!.moveHours)
   })
 
   it('ignores a session logged after the day ended', async () => {
     const f = monthFixture(TODAY, TZ)
-    const before = await (setup(f), loadActivityDay(repo, 'u1', TZ, YESTERDAY))
+    const before = await (setup(f), loadActivityDay(typedRepo(), 'u1', TZ, YESTERDAY))
     f.sessions.push({ id: 'later', startedAt: new Date(dateStrMidnightInTz(TODAY, TZ).getTime() + 8 * 3_600_000), exercises: [{ volume: 30_000 }] })
-    const after = await loadActivityDay(repo, 'u1', TZ, YESTERDAY)
+    const after = await loadActivityDay(typedRepo(), 'u1', TZ, YESTERDAY)
     expect(after.signals.sessions7d).toBe(before.signals.sessions7d)
     expect(after.result).toEqual(before.result)
   })
@@ -74,8 +77,8 @@ describe('finaliseActivityDay', () => {
   it('refuses a day that has not ended, at 23:59 local, and accepts it at 00:01', async () => {
     setup()
     const nextMid = dateStrMidnightInTz(TODAY, TZ).getTime()
-    await expect(finaliseActivityDay(repo, 'u1', TZ, YESTERDAY, new Date(nextMid - 60_000))).rejects.toThrow(/has not ended/)
-    await expect(finaliseActivityDay(repo, 'u1', TZ, YESTERDAY, new Date(nextMid + 60_000))).resolves.toBeTruthy()
+    await expect(finaliseActivityDay(typedRepo(), 'u1', TZ, YESTERDAY, new Date(nextMid - 60_000))).rejects.toThrow(/has not ended/)
+    await expect(finaliseActivityDay(typedRepo(), 'u1', TZ, YESTERDAY, new Date(nextMid + 60_000))).resolves.toBeTruthy()
   })
 })
 
@@ -100,7 +103,7 @@ describe('the readiness payload (issue 2435)', () => {
   it("reads yesterday's finalised pre-taper score for activity balance, finalising it first", async () => {
     const fx = setup()
     const p = await buildReadinessPayload('u1', TZ)
-    const final = await loadActivityDay(repo, 'u1', TZ, YESTERDAY)
+    const final = await loadActivityDay(typedRepo(), 'u1', TZ, YESTERDAY)
     expect(p.readinessCompositeContributors).not.toBeNull()
     expect(p.readinessCompositeContributors!.activityBalance.score).toBe(Math.round(final.result!.preTaperScore))
     // Yesterday was finalised on this read, before readiness used it.
