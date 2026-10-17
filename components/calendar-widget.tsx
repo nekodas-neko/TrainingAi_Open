@@ -62,12 +62,6 @@ export function CalendarWidget({ onDayClick, userId }: CalendarWidgetProps) {
 
   const merged = useMemo(() => mergeCalendarOverlay(data, overlay), [data, overlay]);
 
-  // name (lowercase) → position from the active program
-  const nameToPos = useMemo(
-    () => new Map(programSessions.map((s) => [s.name.toLowerCase(), s.position])),
-    [programSessions],
-  );
-
   function getDotClass(sessionName: string): string {
     return getPaletteEntry(sessionPaletteIndex(sessionName, programSessions)).dotClass;
   }
