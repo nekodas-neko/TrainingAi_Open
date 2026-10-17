@@ -16,6 +16,7 @@ export function ListRow({
   leading,
   density = 'normal',
   divider = true,
+  checked,
 }: {
   title: string;
   subtitle?: string;
@@ -26,6 +27,7 @@ export function ListRow({
   leading?: ReactNode;
   density?: 'normal' | 'compact';
   divider?: boolean;
+  checked?: boolean;
 }) {
   const { theme } = useTheme();
   const gesture = useContext(RowGestureContext);
@@ -57,10 +59,10 @@ export function ListRow({
   if (!onPress) return <View style={rowStyle}>{content}</View>;
   return (
     <Pressable
-      accessibilityRole="button"
+      accessibilityRole={checked === undefined ? 'button' : 'checkbox'}
       accessibilityLabel={title}
       accessibilityHint={disabled ? 'Coming soon' : subtitle}
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled, checked }}
       disabled={disabled}
       onPress={() => {
         if (!gesture?.suppressPress()) onPress();

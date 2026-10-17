@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { FoodLogWithItem, MealPlan, MealType } from '@trainingai/shared/types/nutrition'
 import { countedEstimates } from '@trainingai/shared/nutrition/meal-estimate'
+import { readEstimateRows, type CountedEstimateRow } from '@trainingai/shared/nutrition/counted-intake'
 import { getLocalStore } from '@/lib/local-store'
 
 /** Fired after a plan-meal answer is written on this device, so the ring re-reads the estimate. */
@@ -10,6 +11,50 @@ export const PLAN_MEAL_ANSWERS_CHANGED = 'plan-meal-answers-changed'
 
 export function notifyPlanMealAnswersChanged() {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(PLAN_MEAL_ANSWERS_CHANGED))
+}
+
+/**
+ * #2863. The day's counted estimates as rows (`{ mealTypeId, kcal }`), read LOCAL-FIRST from the same
+ * `plan_meal_answers` the ring reads, for the surfaces that add them to logged food through
+ * `countedIntakeKcal` (the logger's "Today after logging", the day screen's "Eaten"). Offline, or
+ * before an answer has synced, the ring and these now start from the same rows.
+ *
+ * The rows are NOT filtered by the day's logs: the caller passes its own log meal types to
+ * `countedIntakeKcal`, which drops a superseded estimate (and the logger adds the meal type of the
+ * food it is about to log). With no local store the server's `balance.estimatedMeals` stand in.
+ */
+export function useCountedEstimateRows({ userId, date, serverRows }: {
+  userId?: string
+  date: string
+  serverRows: unknown
+}): CountedEstimateRow[] {
+  const [local, setLocal] = useState<CountedEstimateRow[] | null>(null)
+  const store = userId ? getLocalStore(userId) : null
+
+  useEffect(() => {
+    if (!store) { setLocal(null); return }
+    let cancelled = false
+    const read = () => {
+      Promise.all([store.getPlanMealAnswers(date), store.getActiveMealPlan(), store.getMealTypes()]).then(([answers, plan, types]) => {
+        if (cancelled) return
+        if (!plan) { setLocal([]); return }
+        const rows = countedEstimates({
+          answers: answers.filter(a => a.deletedAt == null),
+          planMeals: plan.variants.flatMap(v => v.meals),
+          mealTypes: types.map(t => ({ ...t, userId: userId!, createdAt: new Date(0) })) as MealType[],
+          loggedMealTypeIds: new Set(),
+        })
+        setLocal(rows.map(r => ({ mealTypeId: r.mealTypeId, kcal: r.kcal })))
+      }).catch(() => { if (!cancelled) setLocal([]) })
+    }
+    read()
+    window.addEventListener(PLAN_MEAL_ANSWERS_CHANGED, read)
+    return () => { cancelled = true; window.removeEventListener(PLAN_MEAL_ANSWERS_CHANGED, read) }
+  }, [store, date, userId])
+
+  const serverEstimates = useMemo(() => readEstimateRows(serverRows), [serverRows])
+  // Until the first local read lands, the server's rows hold the place rather than flashing 0.
+  return store ? local ?? serverEstimates : serverEstimates
 }
 
 export interface EstimatedMeals {

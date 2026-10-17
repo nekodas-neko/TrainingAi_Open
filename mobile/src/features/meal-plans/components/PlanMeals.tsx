@@ -287,7 +287,7 @@ export function ActiveMealPlan({
                             : declined(m)
                               ? 'Not this meal'
                               : answer(m)?.answer === 'estimated'
-                                ? 'Not recorded · estimate excluded'
+                                ? 'Not recorded · estimated'
                                 : 'Planned'
                       }
                     />

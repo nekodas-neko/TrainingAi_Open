@@ -131,8 +131,10 @@ export function EnergyDay({
                 </AppText>
               ))}
             </Stack>
+            {/* #2863. The counted intake, the tile's figure above. `timeline.totals.intakeKcal` is the
+                logged food the curve is drawn from, so printing it said 600 under a tile saying 1,250. */}
             <AppText variant="micro" style={{ color: theme.tones.activity.foreground }}>
-              Eaten {metricValue(timeline.totals.intakeKcal, 'kcal')}
+              Eaten {metricValue(balance.intakeKcal, 'kcal')}
             </AppText>
             <AppText variant="micro" style={{ color: theme.tones.nutrition.foreground }}>
               Burned {metricValue(timeline.totals.burnKcal, 'kcal')}

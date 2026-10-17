@@ -9,7 +9,8 @@ import { pickPlanVariant, variantForEstimates } from '@trainingai/shared/nutriti
 import { dueForEstimate, estimateSlotsFor } from '@trainingai/shared/nutrition/meal-estimate'
 import { todayInTz, nowDatetimeInTz } from '@trainingai/shared/date-utils'
 import { getLocalStore } from '@/lib/local-store'
-import { pushMutations } from '@/lib/local-store/sync-engine'
+import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
+import { invalidateNutritionWrite } from '@/lib/cache-groups'
 import { notifyPlanMealAnswersChanged } from './use-estimated-meals'
 
 interface Options {
@@ -228,9 +229,11 @@ export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef,
         payload: { id, planMealId: e.planMealId, logDate: date, answer: 'estimated', ...est },
       })
     }
-    // #2072: the Nutrition ring counts these; tell it to re-read.
+    // #2072: the Nutrition ring counts these; tell it to re-read. #2863: body-metadata and
+    // energy-balance carry them too, so the group clears Home's tile, Goals and the logger preview.
     notifyPlanMealAnswersChanged()
-    pushMutations(userId).catch(() => {})
+    await invalidateNutritionWrite()
+    pushThenRevalidate(userId, invalidateNutritionWrite)
   }, [userId, mealPlan, mealTypes, isTrainingDay, tz])
 
   const loadAnswers = useCallback(async (date: string) => {
@@ -286,7 +289,7 @@ export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef,
         })
         queued = true
         notifyPlanMealAnswersChanged()
-        pushMutations(userId).catch(() => {})
+        pushThenRevalidate(userId, invalidateNutritionWrite)
       } catch { /* dead local store — fall through to the API */ }
     }
     if (!queued) {
@@ -300,6 +303,9 @@ export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef,
         toast.error('Saved on this device only — it will sync when you are back online')
       }
     }
+    // #2863. Whichever path wrote the answer, the cached totals that count it are stale. Outside the
+    // try above so a failing invalidation cannot send a queued write down the API fallback too.
+    await invalidateNutritionWrite()
   }, [userId, dateRef])
 
   return { logMeal, logMeals, bulkLogging, loggingPosition, loggedPositions, declinedMealIds, setDeclined }

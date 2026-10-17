@@ -80,7 +80,7 @@ test('native imported movement supplies MET while unmeasured minutes remain abse
   assert.equal(result.metsPerMinute[19], null);
 });
 
-test('main estimated meals cannot overwrite native recorded-only nutrition totals', () => {
+test('an estimate total without per-meal rows is never added on top of native logged totals', () => {
   const result = recordedIntake({
     calories: 500,
     hasLogs: true,
