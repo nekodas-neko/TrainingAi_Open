@@ -2,8 +2,10 @@ import { feedback } from '../../../integrations/feedback/haptics';
 import { decodeMealLabelScan } from '@trainingai/shared/nutrition/label-payload';
 import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals';
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient';
+import { plural } from '@trainingai/shared/format/plural';
 import { randomUUID } from 'expo-crypto';
 import { useEffect, useRef, useState } from 'react';
+import { View } from 'react-native';
 import { z } from 'zod';
 import { pickNutritionImage } from '../../../integrations/nutrition/photo';
 import { PhotoPreparationError } from '../../../integrations/nutrition/image-encoding';
@@ -25,6 +27,7 @@ import {
   TextField,
   Thumbnail,
 } from '../../../shared/ui';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { energySpec } from '../../health/data/models';
 import {
   useWorkoutResource,
@@ -82,6 +85,12 @@ const initial: z.infer<typeof draftSchema> = {
   tab: 'recent',
   scanCandidates: [],
 };
+// A food with no brand has no leading dot: "125 g · 80 kcal", not " · 125 g · 80 kcal".
+function foodLine(brand: string | null | undefined, servingSizeG: number, calories: number) {
+  return [brand?.trim(), `${servingSizeG} g`, `${Math.round(calories)} kcal`]
+    .filter(Boolean)
+    .join(' · ');
+}
 export function FoodLogger({
   date,
   mealTypeId,
@@ -131,6 +140,15 @@ export function FoodLogger({
     setFailure(message ? { message, retryPhoto } : null);
   }
   const [query, setQuery] = useState('');
+  const [mealQuery, setMealQuery] = useState('');
+  const { theme } = useTheme();
+  const mealNeedle = mealQuery.trim().toLowerCase();
+  const meals = n.view.meals.filter(
+    (meal) =>
+      !mealNeedle ||
+      meal.name.toLowerCase().includes(mealNeedle) ||
+      meal.items.some((item) => item.foodItem.name.toLowerCase().includes(mealNeedle)),
+  );
   const term = useSearchTerm(query);
   const [unit, setUnit] = useState<QtyUnit>('serving');
   const recent = useWorkoutResource(
@@ -581,17 +599,71 @@ export function FoodLogger({
                   variant="secondary"
                   onPress={() => onRecipes()}
                 />
-                {n.view.meals.map((meal) => (
-                  <Card key={meal.id}>
-                    <ListRow
-                      leading={<Thumbnail uri={meal.imageDataUri} label={meal.name} />}
-                      density="compact"
-                      title={meal.name}
-                      subtitle={`${meal.servings} portions · ${Math.round(meal.totals.calories / meal.servings)} kcal per portion`}
-                      onPress={() => onRecipes(meal)}
-                    />
+                {n.view.meals.length > 0 && (
+                  <TextField
+                    label="Filter your meals"
+                    hideLabel
+                    placeholder="Filter your meals"
+                    leadingIcon="search"
+                    value={mealQuery}
+                    onChangeText={setMealQuery}
+                  />
+                )}
+                {meals.length > 0 && (
+                  <AppText variant="eyebrow" tone="muted">
+                    {plural(meals.length, 'item', 'items')}
+                  </AppText>
+                )}
+                {n.view.meals.length > 0 && meals.length === 0 && (
+                  <AppText tone="muted">Nothing matches “{mealQuery.trim()}”.</AppText>
+                )}
+                {meals.length > 0 && (
+                  <Card padded={false}>
+                    {meals.map((meal, index) => {
+                      const tags = n.view.mealTypes.filter((mt) =>
+                        meal.mealTypeIds.includes(mt.id),
+                      );
+                      return (
+                        <View
+                          key={meal.id}
+                          style={{
+                            borderTopWidth: index === 0 ? 0 : 1,
+                            borderTopColor: theme.colors.border,
+                          }}
+                        >
+                          <ListRow
+                            leading={<Thumbnail uri={meal.imageDataUri} label={meal.name} />}
+                            density="compact"
+                            title={meal.name}
+                            subtitle={`${plural(meal.servings, 'portion', 'portions')} · ${Math.round(meal.totals.calories / meal.servings)} kcal per portion`}
+                            onPress={() => onRecipes(meal)}
+                          />
+                          {tags.length > 0 && (
+                            <Stack
+                              direction="row"
+                              wrap
+                              gap="xs"
+                              style={{
+                                paddingHorizontal: theme.spacing.lg,
+                                paddingBottom: theme.spacing.sm,
+                              }}
+                            >
+                              {tags.slice(0, 4).map((mt) => (
+                                <Badge key={mt.id} label={mt.name} />
+                              ))}
+                              {tags.length > 4 && <Badge label={`+${tags.length - 4}`} />}
+                            </Stack>
+                          )}
+                        </View>
+                      );
+                    })}
                   </Card>
-                ))}
+                )}
+                {n.view.meals.length > 0 && (
+                  <AppText variant="caption" tone="muted">
+                    Meal calories are per portion.
+                  </AppText>
+                )}
               </>
             ) : (
               <>
@@ -599,6 +671,11 @@ export function FoodLogger({
                   label={
                     d.tab === 'search' ? 'Search the food database' : 'Search recent foods'
                   }
+                  hideLabel
+                  placeholder={
+                    d.tab === 'search' ? 'Search the food database…' : 'Search recent foods'
+                  }
+                  leadingIcon="search"
                   value={query}
                   onChangeText={setQuery}
                 />
@@ -614,7 +691,7 @@ export function FoodLogger({
                       leading={<Thumbnail uri={food.imageDataUri} label={food.name} />}
                       density="compact"
                       title={food.name}
-                      subtitle={`${food.brand ?? ''} · ${food.servingSizeG} g · ${Math.round(food.calories)} kcal`}
+                      subtitle={foodLine(food.brand, food.servingSizeG, food.calories)}
                       onPress={() => pick(food)}
                     />
                   ))}
@@ -635,7 +712,7 @@ export function FoodLogger({
                       <ListRow
                         key={scan.barcode ?? index}
                         title={scan.name}
-                        subtitle={`${scan.brand ?? ''} · ${scan.servingSizeG} g · ${Math.round(scan.calories)} kcal`}
+                        subtitle={foodLine(scan.brand, scan.servingSizeG, scan.calories)}
                         onPress={() => review(scan)}
                       />
                     ))}

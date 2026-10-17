@@ -70,7 +70,7 @@ export function EnergyDay({
           <MetricTile label="Burned" value={metricValue(balance.expenditureKcal, 'kcal')} />
           <MetricTile
             label={balance.netKcal > 0 ? 'Surplus' : 'Deficit'}
-            value={metricValue(Math.abs(balance.netKcal), 'kcal')}
+            value={`${balance.netKcal > 0 ? '+' : balance.netKcal < 0 ? '−' : ''}${metricValue(Math.abs(balance.netKcal), 'kcal')}`}
           />
         </Grid>
         <KeyValueGrid

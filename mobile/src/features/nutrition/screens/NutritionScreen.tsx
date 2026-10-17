@@ -341,6 +341,11 @@ export function NutritionScreen({
                       setSetupPlan(false);
                       setModal('plans');
                     }}
+                    onStepByStep={() => {
+                      setPlanSeed(null);
+                      setSetupPlan(true);
+                      setModal('plans');
+                    }}
                     onSetup={(plan) => {
                       setPlanSeed(plan ?? null);
                       if (openCoach) {
@@ -444,7 +449,10 @@ export function NutritionScreen({
                 gapMessage={energy.data?.maintenance?.gapMessage ?? null}
               />
               <Card>
-                <WeeklyNutrition onDay={setDate} />
+                <WeeklyNutrition
+                  onDay={setDate}
+                  calorieTarget={energy.data?.balance?.budgetKcal ?? n.view.targets.calories ?? null}
+                />
                 {date === n.today && <SupplementsSection date={date} />}
               </Card>
               <AppButton

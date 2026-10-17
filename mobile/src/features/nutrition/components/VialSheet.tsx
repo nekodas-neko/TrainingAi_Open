@@ -74,6 +74,7 @@ export function VialSheet({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unconfirmed, setUnconfirmed] = useState(false);
+  const [confirmNew, setConfirmNew] = useState(false);
   const draft = useWorkoutDraft(
     'vial:' + supplement.id + ':' + (edit?.id ?? 'new'),
     formSchema,
@@ -174,7 +175,12 @@ export function VialSheet({
             }
             busy={busy}
             disabled={!draft.ready || !concentrationWorking(mixture) || !!problem}
-            onPress={() => void save()}
+            onPress={() => {
+              // A new vial restarts the response window, so it asks first. Retrying a save that
+              // may already have gone through (`unconfirmed`) has its own check.
+              if (current && !edit && !unconfirmed) setConfirmNew(true);
+              else void save();
+            }}
           />
         }
       >
@@ -288,6 +294,19 @@ export function VialSheet({
             }}
           />
         )}
+      </Sheet>
+      <Sheet visible={confirmNew} title="Save as a new vial" onClose={() => setConfirmNew(false)}>
+        <ConfirmationCard
+          title="Save as a new vial?"
+          message="A new vial restarts the response window. To correct the vial you are using, cancel and choose Change on it instead."
+          confirmLabel="Save as a new vial"
+          cancelLabel="Cancel"
+          onCancel={() => setConfirmNew(false)}
+          onConfirm={() => {
+            setConfirmNew(false);
+            void save();
+          }}
+        />
       </Sheet>
       <Sheet visible={remove !== null} title="Delete vial" onClose={() => setRemove(null)}>
         {remove && (

@@ -132,7 +132,7 @@ export function SleepNight({
             .filter(([field]) => night[field] != null)
             .map(([field, label, unit]) => ({
               label,
-              value: metricValue(night[field], unit, 1),
+              value: stageValue(night[field], unit),
             }))}
         />
       ) : (
@@ -155,7 +155,7 @@ export function SleepNight({
               <MetricTile
                 key={field}
                 label={label}
-                value={metricValue(night[field], unit, 1)}
+                value={stageValue(night[field], unit)}
                 tone="sleep"
               />
             ))}
@@ -173,4 +173,10 @@ export function SleepNight({
       )}
     </Card>
   );
+}
+// Sleep stages are stored in hours but read as "1h 05m", as in the current app.
+function stageValue(value: unknown, unit: string) {
+  return unit === 'h' && typeof value === 'number' && Number.isFinite(value)
+    ? formatHoursMinutes(value * 60)
+    : metricValue(value, unit, 1);
 }

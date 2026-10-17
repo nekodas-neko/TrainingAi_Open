@@ -10,9 +10,7 @@ import {
   AppText,
   Card,
   ChoiceScale,
-  Grid,
   MarkdownText,
-  MetricTile,
   MultiChoice,
   Sheet,
   Stack,
@@ -39,7 +37,7 @@ import { useNutrition } from '../data/NutritionProvider';
 import { STEP_TITLES, visibleReviewSteps } from '../data/review-steps';
 import { DayReviewTrends, MealBackfill } from './DayReviewDetails';
 import { FoodLogger } from './FoodLogger';
-import { MacroLine } from './NutritionElements';
+import { DayTotals } from './DayTotals';
 const scalesSchema = z.object({
   physicalTiredness: z.number().min(1).max(5),
   mentalDrain: z.number().min(1).max(5),
@@ -226,6 +224,7 @@ export function EndOfDaySheet({ date, onClose }: { date: string; onClose: () => 
               />
             )}
             <AppButton
+              style={{ flex: 1 }}
               title={position === steps.length - 1 ? 'Save' : 'Next'}
               disabled={!draft.ready}
               busy={busy}
@@ -260,21 +259,18 @@ export function EndOfDaySheet({ date, onClose }: { date: string; onClose: () => 
             </Card>
             <Card>
               <AppText variant="heading">Today’s totals</AppText>
-              {n.view.totals ? (
-                <MacroLine value={n.view.totals} />
-              ) : (
-                <AppText tone="muted">Food records are unavailable.</AppText>
-              )}
-              <Grid columns={2}>
-                <MetricTile
-                  label="Body Battery"
-                  value={battery.data?.hasData ? String(battery.data.current) : null}
-                />
-                <MetricTile
-                  label="Energy used"
-                  value={battery.data?.hasData ? String(battery.data.drained) : null}
-                />
-              </Grid>
+              <DayTotals
+                date={date}
+                battery={
+                  battery.data?.hasData
+                    ? {
+                        current: battery.data.current,
+                        label: battery.data.label,
+                        drained: battery.data.drained,
+                      }
+                    : null
+                }
+              />
             </Card>
             <DayReviewTrends date={date} />
             <HealthViewReady

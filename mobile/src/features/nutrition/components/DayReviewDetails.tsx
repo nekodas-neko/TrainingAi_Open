@@ -1,4 +1,6 @@
+import { trendRows, deltaSentence } from '@trainingai/shared/nutrition/day-trends';
 import { useState } from 'react';
+import { View } from 'react-native';
 import { z } from 'zod';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import {
@@ -19,18 +21,13 @@ import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useNutrition } from '../data/NutritionProvider';
 import { scanSchema } from '../data/models';
 import { MealLoggingStatus } from './MealLoggingStatus';
-const metrics = {
-  restingHeartRate: { label: 'Resting heart rate', unit: 'bpm' },
-  steps: { label: 'Steps', unit: '' },
-  sessionVolumeKg: { label: 'Training volume', unit: 'kg' },
-  weightKg: { label: 'Weight', unit: 'kg' },
-};
 const values = z.object({
   restingHeartRate: z.number().nullable(),
   steps: z.number().nullable(),
   sessionVolumeKg: z.number().nullable(),
   weightKg: z.number().nullable(),
 });
+const ARROW = { up: '↑', down: '↓', level: '→' } as const;
 export function DayReviewTrends({ date }: { date: string }) {
   const state = useWorkoutResource({
     path: '/api/day-review/week-window',
@@ -44,10 +41,12 @@ export function DayReviewTrends({ date }: { date: string }) {
   });
   const { theme } = useTheme();
   const data = state.data?.date === date ? state.data : null;
+  // The same rows, colours and wording as the current app: the maths is the shared `trendRows`.
+  const rows = data ? trendRows(data) : [];
   return (
     <Card>
       <Stack direction="row" justify="space-between">
-        <AppText variant="heading">Compared with last week</AppText>
+        <AppText variant="heading">Against the last week</AppText>
         <StatusIndicator
           label="Day comparisons"
           busy={state.loading}
@@ -55,34 +54,49 @@ export function DayReviewTrends({ date }: { date: string }) {
           onRetry={state.refresh}
         />
       </Stack>
-      {(Object.keys(metrics) as (keyof typeof metrics)[]).map((key) => {
-        const item = metrics[key];
-        const today = data?.days.at(-1)?.[key];
-        const prior = data?.sevenDayAverages[key];
-        return (
-          <Stack key={key}>
-            <Stack direction="row" justify="space-between">
-              <AppText variant="caption">{item.label}</AppText>
+      {rows.map(({ spec, today, delta, series }) => (
+        <Card key={spec.key} style={{ padding: theme.spacing.md }}>
+          <Stack direction="row" justify="space-between" align="center">
+            <Stack gap="xxs" style={{ flex: 1, minWidth: 0 }}>
               <AppText variant="caption" tone="muted">
-                {today == null
-                  ? 'No reading today'
-                  : `${today.toFixed(key === 'weightKg' ? 1 : 0)} ${item.unit}`}
+                {spec.label}
               </AppText>
+              {today == null ? (
+                <AppText variant="caption" tone="muted">
+                  No reading today
+                </AppText>
+              ) : (
+                <AppText variant="label" style={{ color: spec.color }}>
+                  {spec.format(today)}
+                </AppText>
+              )}
             </Stack>
-            <LineChart
-              label={item.label + ' over eight days'}
-              height={theme.sizes.miniChart}
-              showLabels={false}
-              points={(data?.days ?? []).map((d) => ({ label: d.date, value: d[key] }))}
-            />
-            <AppText variant="micro" tone="muted">
-              {today == null || prior == null
-                ? 'No comparison available'
-                : `${today > prior ? '↑' : today < prior ? '↓' : '→'} ${Math.abs(today - prior).toFixed(key === 'weightKg' ? 1 : 0)} ${item.unit} ${today >= prior ? 'above' : 'below'} your previous 7-day average`}
-            </AppText>
+            {series && (
+              <View style={{ width: theme.sizes.weightSparkline }}>
+                {/* Only the days with a reading are drawn, joined, at their own position in the
+                    eight-day window, so a stat recorded on three days is one line, not dots. */}
+                <LineChart
+                  label={spec.label + ' over eight days'}
+                  height={theme.sizes.miniChart}
+                  showLabels={false}
+                  color={spec.color}
+                  xDomain={[0, 7]}
+                  points={series.times.map((time, i) => ({
+                    label: String(time),
+                    x: time,
+                    value: series.values[i],
+                  }))}
+                />
+              </View>
+            )}
           </Stack>
-        );
-      })}
+          {delta && (
+            <AppText variant="micro" tone="muted">
+              {ARROW[delta.direction]} {deltaSentence(spec, delta)}
+            </AppText>
+          )}
+        </Card>
+      ))}
     </Card>
   );
 }
