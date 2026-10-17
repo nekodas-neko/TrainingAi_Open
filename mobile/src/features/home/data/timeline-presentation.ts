@@ -1,5 +1,5 @@
 import { formatHoursMinutes } from '@trainingai/shared/format/units';
-import { shiftDateStr } from '@trainingai/shared/date-utils';
+import { formatTimeOfDay, shiftDateStr } from '@trainingai/shared/date-utils';
 import type { SleepRow } from '../../health/data/models.ts';
 import type { TimelineEvent } from './timeline.ts';
 
@@ -42,6 +42,12 @@ export function timelineMetrics(event: TimelineEvent, compact = false) {
   return values;
 }
 
+/** The line above a row, as the current app prints it: "7:00 am – 8:00 am" for a span, else the start. */
+export function timelineTimeLabel(event: TimelineEvent, timezone: string) {
+  const start = formatTimeOfDay(event.timeMs, timezone);
+  return event.endTime && event.type !== 'wakeup' ? `${start} – ${event.endTime}` : start;
+}
+
 export function timelineSummary(event: TimelineEvent) {
   const values = timelineMetrics(event, true).map((metric) =>
     metric.label === 'Readiness'
@@ -54,7 +60,6 @@ export function timelineSummary(event: TimelineEvent) {
             ? `${metric.value} exercises`
             : metric.value,
   );
-  if (event.endTime && event.type !== 'wakeup') values.unshift(`until ${event.endTime}`);
   if (event.subtitle && event.subtitle !== 'Saved on this phone') values.push(event.subtitle);
   return values.join(' · ');
 }

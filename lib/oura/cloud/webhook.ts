@@ -19,10 +19,10 @@ import { OuraUnavailableError } from './client'
 import type { WorkoutRepository } from '@/lib/data/repository'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { fetchOuraDocument, fetchOuraHeartRate, OuraForbiddenError, OuraUnauthorizedError } from './data'
-import { mapHeartRateRows, mapOuraDocuments, OURA_DOCUMENT_TYPES, type OuraDocumentType } from './documents'
+import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, OURA_DOCUMENT_TYPES, type OuraDocumentType } from './documents'
 import { reportOuraCloudIssue } from './report'
 import { writeOuraCloudData, type OuraCloudWriteCounts, type OuraCloudWriter } from './ingest'
-import { getOuraAccessToken, OuraReauthRequiredError, type OuraTokenStore } from './tokens'
+import { getOuraAccessToken, getOuraGrantedScopes, OuraReauthRequiredError, type OuraTokenStore } from './tokens'
 
 /** The webhook settings, from the environment. `null` when any is missing: the route answers 503. */
 export interface OuraWebhookConfig {
@@ -151,13 +151,17 @@ export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraW
     return { result: 'deleted', tombstoned: await deps.repo.tombstoneOuraCloudSleep(userId, [event.object_id]) }
   }
 
+  // Oura answers 401 for a type the user did not share, which would read as `reauth` (#2974).
+  const granted = await getOuraGrantedScopes(deps.repo, userId)
+  if (!isOuraTypeShared(granted, event.data_type)) return { result: 'ignored', reason: `${event.data_type} is not shared` }
+
   try {
     const token = await getOuraAccessToken(deps.repo, deps.config, userId)
     if (!token) return { result: 'unknown_user' }
     const doc = await fetchOuraDocument(token, event.data_type, event.object_id)
     if (!doc) return { result: 'not_found' }
     const counts = await writeOuraCloudData(deps.repo, userId, mapOuraDocuments([doc]))
-    if (HEART_RATE_TRIGGERS.has(event.data_type)) (deps.heartRate ?? (u => startOuraCloudHeartRateCatchUp(deps, u)))(userId)
+    if (HEART_RATE_TRIGGERS.has(event.data_type) && isOuraTypeShared(granted, 'heartrate')) (deps.heartRate ?? (u => startOuraCloudHeartRateCatchUp(deps, u)))(userId)
     return { result: 'written', counts }
   } catch (err) {
     if (err instanceof OuraReauthRequiredError || err instanceof OuraUnauthorizedError) return { result: 'reauth' }

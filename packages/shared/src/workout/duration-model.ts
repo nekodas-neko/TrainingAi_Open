@@ -237,7 +237,7 @@ export function presetForLength(anchorMin: number, lengthMin: number): DurationP
 }
 
 export function sessionTimeLimitOptions(anchorMin: number): number[] {
-  return [NO_TIME_LIMIT, ...sessionLengthOptions(anchorMin)]
+  return [...sessionLengthOptions(anchorMin), NO_TIME_LIMIT]
 }
 
 /**
