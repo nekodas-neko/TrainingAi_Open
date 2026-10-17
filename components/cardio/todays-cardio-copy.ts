@@ -1,4 +1,4 @@
-import type { HeartHealthDayOutcome } from '@trainingai/shared/running/heart-health-copy'
+import type { HeartHealthDayOutcome } from '@trainingai/shared/running/heart-health'
 
 // The wording moved to packages/shared so the native app reads the same sentences.
 export * from '@trainingai/shared/running/heart-health-copy'
