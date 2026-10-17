@@ -1,3 +1,4 @@
+import { capitalize } from '@trainingai/shared/format/capitalize';
 import { z } from 'zod';
 import { PhaseSetWriteBody, PHASE_TYPES } from '@trainingai/shared/validation/phase-set';
 import {
@@ -106,7 +107,7 @@ export function PhaseEditor({ phase, onClose }: { phase?: SavedPhaseSet; onClose
             value={item.phaseType}
             options={PHASE_TYPES.map((type) => ({
               value: type,
-              label: type[0].toUpperCase() + type.slice(1),
+              label: capitalize(type),
             }))}
             onChange={(phaseType) =>
               update(index, { phaseType: phaseType as typeof item.phaseType })

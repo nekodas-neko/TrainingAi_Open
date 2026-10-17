@@ -1,3 +1,4 @@
+import { capitalize } from '@trainingai/shared/format/capitalize';
 import { memo } from "react";
 import { ShieldCheck } from "lucide-react";
 import { todayInTz } from "@trainingai/shared/date-utils";
@@ -47,7 +48,7 @@ function ResilienceTileImpl({ level, band, confidence, asOf, unavailable, gapTex
   const gap = hasLevel || shortfall != null ? null : gapText;
   if (!hasLevel && shortfall == null && gap == null) return null;
 
-  const bandLabel = band ? band.charAt(0).toUpperCase() + band.slice(1) : null;
+  const bandLabel = band ? capitalize(band) : null;
   const learning = hasLevel && confidence != null && confidence < 1;
   const staleness = hasLevel ? resilienceAsOfLine(asOf, todayInTz(tz)) : null;
 

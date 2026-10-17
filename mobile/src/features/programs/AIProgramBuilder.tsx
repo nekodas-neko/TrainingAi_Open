@@ -1,3 +1,4 @@
+import { capitalize } from '@trainingai/shared/format/capitalize';
 import { useState } from 'react';
 import { randomUUID } from 'expo-crypto';
 import { z } from 'zod';
@@ -326,7 +327,7 @@ export function AIProgramBuilder({ onBack, onSaved }: { onBack: () => void; onSa
           {equipment.map((value) => (
             <AppButton
               key={value}
-              title={value === 'full_gym' ? 'Full Gym' : value[0].toUpperCase() + value.slice(1)}
+              title={value === 'full_gym' ? 'Full Gym' : capitalize(value)}
               variant={inputs.equipment.includes(value) ? 'primary' : 'surface'}
               onPress={() => input({ equipment: toggle(inputs.equipment, value) })}
             />

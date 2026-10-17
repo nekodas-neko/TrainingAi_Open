@@ -1,3 +1,4 @@
+import { capitalize } from '@trainingai/shared/format/capitalize'
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
@@ -287,7 +288,7 @@ export async function GET(req: Request) {
       time: fmtTime(new Date(startMs), tz),
       endTime: t.endTime ? fmtTime(t.endTime, tz) : undefined,
       timeMs: startMs,
-      title: label.charAt(0).toUpperCase() + label.slice(1),
+      title: capitalize(label),
       subtitle: t.comment ?? (t.mood ? `mood: ${t.mood}` : undefined),
       icon: 'Tag',
       day: 'today',  // recomputed below from timeMs

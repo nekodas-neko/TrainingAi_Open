@@ -1,3 +1,4 @@
+import { capitalize } from '@trainingai/shared/format/capitalize';
 import { groupSignals } from '@trainingai/shared/session-explain/group-signals';
 import {
   AppText,
@@ -96,7 +97,7 @@ export function SessionExplainScreen({
               <AppText variant="heading">Score components</AppText>
               {Object.entries(data.weightedComponents).map(([name, value]) => (
                 <AppText key={name} variant="caption" tone="muted">
-                  {name[0].toUpperCase() + name.slice(1)} · {Math.round(value.score)} ·{' '}
+                  {capitalize(name)} · {Math.round(value.score)} ·{' '}
                   {Math.round(value.weight * 100)}% weight
                 </AppText>
               ))}

@@ -1,3 +1,4 @@
+import { capitalize } from '@trainingai/shared/format/capitalize';
 import { View } from 'react-native';
 import { recoveryBand } from '@trainingai/shared/health/recovery-band';
 import { AppText, AutoScrollRow, Stack } from '../../../shared/ui';
@@ -50,7 +51,7 @@ export function RecoveryRow({
                 {Math.round(pct)}%
               </AppText>
               <AppText variant="micro" tone="muted">
-                {muscle.charAt(0).toUpperCase() + muscle.slice(1)}
+                {capitalize(muscle)}
               </AppText>
             </View>
           );

@@ -1,3 +1,4 @@
+import { capitalize } from '@trainingai/shared/format/capitalize';
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
@@ -285,7 +286,7 @@ async function handleWorkoutData(req: NextRequest) {
       const aiDrivesLoad = aiPrescription != null && aiPeriodizationState != null
         && prescriptionDrivesLoad(aiPrescription.phaseAction, aiPeriodizationState.prescriptionStatus)
 
-      const aiPhaseLabel = aiPrescription ? aiPrescription.phase.charAt(0).toUpperCase() + aiPrescription.phase.slice(1) : ''
+      const aiPhaseLabel = aiPrescription ? capitalize(aiPrescription.phase) : ''
       const aiPrescriptionPending = isAiPrescriptionPending(aiPeriodizationState, { isAiDynamic, isBaselinePhase })
       const droppedThisCycle = new Set(aiDrivesLoad ? (aiPrescription!.droppedExerciseIds ?? []) : [])
 
@@ -598,7 +599,7 @@ async function handleWorkoutData(req: NextRequest) {
   if (aiPrescriptionPending && !isPoll) {
     regeneratePrescriptionInBackground(userId, programSession.id, repo, tz)
   }
-  const aiPhaseLabel = aiPrescription ? aiPrescription.phase.charAt(0).toUpperCase() + aiPrescription.phase.slice(1) : ''
+  const aiPhaseLabel = aiPrescription ? capitalize(aiPrescription.phase) : ''
 
   // Workout Review "drop this cycle": while the overlay drives load, exercises it dropped
   // for this cycle are omitted from the session. The exercise stays in the program and

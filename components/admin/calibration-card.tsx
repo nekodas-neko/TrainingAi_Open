@@ -1,5 +1,6 @@
 'use client'
 
+import { capitalize } from '@trainingai/shared/format/capitalize'
 import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Loader2, ChevronDown, ChevronRight } from 'lucide-react'
@@ -102,7 +103,7 @@ export default function CalibrationCard({
       {data && !loading && (
         <div className="space-y-3">
           <div className="grid grid-cols-3 gap-2 text-center">
-            <Stat label={`${cap(unit.many)} paired`} value={String(data.paired)} />
+            <Stat label={`${capitalize(unit.many)} paired`} value={String(data.paired)} />
             <Stat
               label="Agreement"
               value={data.spearman == null ? '—' : (data.spearman > 0 ? '+' : '') + data.spearman.toFixed(2)}
@@ -199,7 +200,6 @@ export default function CalibrationCard({
   )
 }
 
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (

@@ -16,6 +16,7 @@
 //    of the composite), never as an extra weighted contributor — the biomarkers are
 //    already readiness contributors, so re-adding them would double-count (§5.5).
 
+import { capitalize } from '@trainingai/shared/format/capitalize'
 import { BASELINE_MIN_NIGHTS } from './readiness-composite'
 import { baselineZ, type Baseline } from './personal-baseline'
 
@@ -212,7 +213,7 @@ function topContributors(biomarkers: IllnessResult['biomarkers']): IllnessBiomar
 function subjectAndVerb(keys: IllnessBiomarkerKey[]): string {
   const names = keys.map(k => BIOMARKER_LABEL[k])
   const subject = names.length === 2 ? `${names[0]} and ${names[1]}` : names[0]
-  return `${subject[0].toUpperCase()}${subject.slice(1)} ${names.length === 2 ? 'are' : 'is'}`
+  return `${capitalize(subject)} ${names.length === 2 ? 'are' : 'is'}`
 }
 
 /**

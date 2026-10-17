@@ -1,3 +1,4 @@
+import { capitalize } from '@trainingai/shared/format/capitalize'
 import { isBodyweightType } from '@trainingai/shared/1rm'
 import { knownExerciseRoleLabel } from '@trainingai/shared/workout/role-labels'
 // Plain-English rationale for why an exercise got its prescribed sets/reps/load.
@@ -24,7 +25,7 @@ export interface ExerciseChoiceInput {
 
 export function explainExerciseChoice(i: ExerciseChoiceInput): string[] {
   const out: string[] = []
-  const phaseLabel = i.phase.charAt(0).toUpperCase() + i.phase.slice(1)
+  const phaseLabel = capitalize(i.phase)
   out.push(`${phaseLabel} phase — ${PHASE_INTENT[i.phase] ?? 'progressing load'} (sets the rep/intensity range)`)
 
   // Named with the shared role words (#2240) — this used to call both primary and secondary a

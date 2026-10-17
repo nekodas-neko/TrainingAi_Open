@@ -1,5 +1,6 @@
 'use client'
 
+import { capitalize } from '@trainingai/shared/format/capitalize'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import {
   Activity, Battery, Bluetooth, BluetoothOff, Cloud, Droplet, Footprints,
@@ -494,7 +495,7 @@ export function OuraBleDebug() {
         <div className="flex items-center justify-between">
           <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${statusTone(state)}`}>
             <Bluetooth className="h-3.5 w-3.5" />
-            {connected ? 'Connected' : state === 'stopped' ? 'Stopped' : state[0].toUpperCase() + state.slice(1)}
+            {connected ? 'Connected' : state === 'stopped' ? 'Stopped' : capitalize(state)}
           </span>
           <span className="flex items-center gap-1 text-sm text-muted-foreground">
             <Battery className="h-4 w-4" />{status?.battery != null ? `${status.battery}%` : '—'}

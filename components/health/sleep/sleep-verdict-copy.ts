@@ -1,3 +1,4 @@
+import { capitalize } from '@trainingai/shared/format/capitalize'
 import type { SleepComponent, SleepVerdict } from '@trainingai/shared/health/sleep-verdict'
 import { formatMinutesOfDay } from '@trainingai/shared/date-utils'
 
@@ -115,7 +116,6 @@ export interface VerdictCopy {
   prominent: boolean
 }
 
-const CAPITALISE = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 /**
  * What the app says about last night (TN-82's copy, TN-84's wording).
@@ -146,7 +146,7 @@ export function verdictCopy(v: StoredSleepVerdict): VerdictCopy {
     // usual" names no quantity a reader can place without the percentage in front of it.
     : parts.map((p, i) => (i === 0 || p.component === 'efficiency' ? `${p.value}${i === 0 ? '' : `, ${p.delta}`}` : p.delta!))
   const word = v.verdict === 'poor' ? 'poor' : 'good'
-  const evidence = clauses.length > 0 ? `${CAPITALISE(clauses.join(', '))}. ` : ''
+  const evidence = clauses.length > 0 ? `${capitalize(clauses.join(', '))}. ` : ''
   return { line: `${evidence}Marked this a ${word} night.`, prominent: true }
 }
 

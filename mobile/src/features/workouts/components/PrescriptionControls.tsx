@@ -1,3 +1,4 @@
+import { capitalize } from '@trainingai/shared/format/capitalize';
 import { useState } from 'react';
 import {
   sessionTimeLimitOptions,
@@ -160,7 +161,7 @@ export function PrescriptionControls({
             label="Advance phase"
             value=""
             options={['baseline', 'accumulation', 'intensification', 'realisation', 'deload'].map(
-              (value) => ({ value, label: value[0].toUpperCase() + value.slice(1) }),
+              (value) => ({ value, label: capitalize(value) }),
             )}
             disabled={action.busy}
             onChange={setConfirm}
