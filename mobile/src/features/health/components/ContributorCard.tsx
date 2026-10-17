@@ -1,12 +1,11 @@
 import { useRef } from 'react';
 import { Pressable, View } from 'react-native';
 import { guideFor } from '@trainingai/shared/health/contributor-guide';
-import { capitalize } from '@trainingai/shared/format/capitalize';
-import { labelFor as sharedLabel } from '@trainingai/shared/health/contributor-labels';
 import { scoreBand } from '@trainingai/shared/health/score-band';
 import { AppText, Badge, Card, Icon, Legend, ProgressBar, Stack, ZoneGauge } from '../../../shared/ui';
 import { useHealthAnchor } from '../../../shared/ui/HealthDetailLayout';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { labelFor } from '../data/factor-label';
 import { weakestFactor } from '../data/week-view';
 type Factor = {
   key: string;
@@ -17,12 +16,6 @@ type Factor = {
   weight?: number;
   gauge?: number;
 };
-// The current app's wording, from the shared label map ("REM sleep", not "Rem sleep"). A key the map
-// does not know falls back to its words with a capital.
-function labelFor(key: string) {
-  const label = sharedLabel(key);
-  return capitalize(label === key ? key.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase() : label);
-}
 export function ContributorDetails({
   factors,
   title = 'What each factor means',
@@ -64,7 +57,7 @@ export function ContributorDetails({
                 {f.gauge != null ? (
                   <ZoneGauge centered value={f.gauge} />
                 ) : band ? (
-                  <ZoneGauge value={f.score!} lowLabel="Needs work" highLabel="Optimal" />
+                  <ZoneGauge value={f.score!} />
                 ) : null}
                 <AppText variant="micro" tone="muted">
                   What it measures
@@ -169,7 +162,7 @@ export function ContributorCard({
   }
   const weakest = weights ? null : weakestFactor(factors);
   const anyLearning = !!weights && factors.some((f) => f.provisional);
-  const bandColors = {
+  const bandColors: Record<string, string> = {
     High: theme.anatomy.main,
     Moderate: theme.anatomy.secondary,
     Low: theme.anatomy.injured,
@@ -178,7 +171,7 @@ export function ContributorCard({
     <>
       <Card>
         <Stack direction="row" justify="space-between" align="center">
-          <AppText variant="eyebrow" tone="muted">
+          <AppText variant="eyebrow" tone="muted" style={{ flexShrink: 1 }}>
             {title}
           </AppText>
           {weakest && (
@@ -232,11 +225,7 @@ export function ContributorCard({
               color={
                 f.provisional
                   ? undefined
-                  : scoreBand(f.score!).label === 'High'
-                    ? theme.anatomy.main
-                    : scoreBand(f.score!).label === 'Moderate'
-                      ? theme.anatomy.secondary
-                      : theme.anatomy.injured
+                  : bandColors[scoreBand(f.score!).label]
               }
             />
           </Pressable>

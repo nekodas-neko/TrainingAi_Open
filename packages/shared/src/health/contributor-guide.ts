@@ -2,7 +2,7 @@
 // against, what a high vs low score means, and how to move it. Powers the tap-to-expand deep-dive
 // on the Readiness / Sleep / Activity / Heart-Rate detail screens so a bar is never just a number.
 //
-// Keyed by the canonical Oura snake_case contributor keys (see lib/oura/contributors.ts). The
+// Keyed by the canonical Oura snake_case contributor keys (see contributor-labels.ts). The
 // app's own readiness composite uses camelCase keys — `guideFor` resolves both.
 
 export interface ContributorGuide {

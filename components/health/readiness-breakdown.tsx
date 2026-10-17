@@ -1,6 +1,7 @@
 'use client'
 
 import { CircleDotIcon, ZapIcon, ThermometerIcon, HistoryIcon, InfoIcon } from 'lucide-react'
+import { labelFor } from '@trainingai/shared/health/contributor-labels'
 import { limitedInputsNote } from '@trainingai/shared/health/readiness-input-labels'
 import { cn } from '@trainingai/shared/utils'
 import { scoreBand } from '@trainingai/shared/health/score-band'
@@ -8,18 +9,6 @@ import { READINESS_WEIGHTS } from '@trainingai/shared/health/readiness-composite
 import { FactorBar } from '@/components/health/contributor-chart'
 import { ContributorDetails } from '@/components/health/contributor-details'
 import type { ReadinessScoreResponse } from '@/app/api/readiness-score/route'
-
-// Human labels for the composite weight keys (camelCase, distinct from Oura's snake_case).
-const WEIGHT_LABELS: Record<keyof typeof READINESS_WEIGHTS, string> = {
-  restingHeartRate: 'Resting heart rate',
-  previousNight: 'Previous night',
-  hrvBalance: 'HRV balance',
-  temperature: 'Body temperature',
-  sleepBalance: 'Sleep balance',
-  prevDayActivity: 'Previous day activity',
-  recoveryIndex: 'Recovery index',
-  activityBalance: 'Activity balance',
-}
 
 /**
  * "What the score is built on." Two shapes:
@@ -154,7 +143,7 @@ function CompositeBreakdown({ readiness }: { readiness: ReadinessScoreResponse }
               <FactorBar
                 key={key}
                 contributorKey={key}
-                label={WEIGHT_LABELS[key]}
+                label={labelFor(key)}
                 value={scored ? score : weightPct}
                 valueLabel={scored ? undefined : `${weightPct}%`}
                 muted={!scored}
@@ -176,7 +165,7 @@ function CompositeBreakdown({ readiness }: { readiness: ReadinessScoreResponse }
           const c = contributors?.[key] ?? null
           return {
             key,
-            label: WEIGHT_LABELS[key],
+            label: labelFor(key),
             score: c?.score ?? null,
             provisional: c?.provisional ?? false,
             extra: extraFor(key, readiness),

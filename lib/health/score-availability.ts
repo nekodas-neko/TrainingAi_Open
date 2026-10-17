@@ -12,13 +12,9 @@
 import { seedOrUpdateBaseline, baselineZ, type Baseline } from '@trainingai/shared/health/personal-baseline'
 import type { ContributorGap } from '@trainingai/shared/health/readiness-composite'
 import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite'
+import type { ReadinessInputKey } from '@trainingai/shared/health/readiness-input-labels'
 
-export type ReadinessInputKey =
-  | 'sleep'
-  | 'hrv'
-  | 'restingHeartRate'
-  | 'temperature'
-  | 'activity'
+export type { ReadinessInputKey }
 
 /** The baseline-relative recovery signals. Confidence is judged on these four alone — activity
  *  shifts the score but says nothing about how well the body recovered. The morning check-in is

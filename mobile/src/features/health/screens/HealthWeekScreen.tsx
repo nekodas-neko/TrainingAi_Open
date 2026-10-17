@@ -1,4 +1,5 @@
 import { plural } from '@trainingai/shared/format/plural';
+import { weekDelta } from '@trainingai/shared/health/week-delta';
 import {
   AppText,
   Card,
@@ -16,11 +17,10 @@ import { HealthViewReady } from '../components/HealthViewReady';
 import { HealthMetricCard } from '../components/HealthMetricCard';
 import { HealthResourceHeader } from '../components/HealthResourceHeader';
 import { MuscleVolumeFigure } from '../components/MuscleVolumeFigure';
-import { useCueColor } from '../components/RangeBar';
 import {
   fixedValue,
-  weekDelta,
   weekdayInitial,
+  weekdayName,
   weekMuscleRows,
   weekRangeLabel,
 } from '../data/week-view';
@@ -28,7 +28,6 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
   const { theme } = useTheme();
   const state = useWorkoutResource(digestSpec(week));
   const m = state.data?.metrics;
-  const cueColor = useCueColor();
   return (
     <WorkoutLayout
       title="Week in review"
@@ -75,6 +74,7 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
                 yAxis
                 bars={m.training.byDay.map((d) => ({
                   label: weekdayInitial(d.date),
+                  accessibleLabel: weekdayName(d.date),
                   value: d.volumeKg,
                   colors: [theme.colors.brand],
                 }))}
@@ -96,7 +96,7 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
                         : '';
                 const decimals = key === 'sleepHours' ? 1 : 0;
                 const delta = weekDelta(metric.week, metric.priorWeek, {
-                  unit,
+                  unit: key === 'stressHighMinutes' ? 'm' : unit,
                   decimals,
                   higherIsBetter: key !== 'stressHighMinutes',
                 });
@@ -123,9 +123,11 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
                       variant="caption"
                       tone={delta.cue === 'good' || delta.cue === 'bad' ? undefined : 'muted'}
                       style={
-                        delta.cue === 'good' || delta.cue === 'bad'
-                          ? { color: cueColor(delta.cue) }
-                          : undefined
+                        delta.cue === 'good'
+                          ? { color: theme.progress.trendUp }
+                          : delta.cue === 'bad'
+                            ? { color: theme.tones.checkin.foreground }
+                            : undefined
                       }
                     >
                       {delta.text}

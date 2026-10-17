@@ -3,7 +3,7 @@ import Svg, { Rect, Line } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeProvider';
 import { AppText } from './AppText';
 import { Stack } from './Stack';
-// The end labels default to Low / High (Below / Baseline / Elevated when centred); a screen whose
+// The end labels default to Needs work / Optimal (Below / Baseline / Elevated when centred), as the web gauge does; a screen whose
 // scale has its own words passes them.
 export function ZoneGauge({
   value,
@@ -41,7 +41,7 @@ export function ZoneGauge({
       </Svg>
       <Stack direction="row" justify="space-between">
         <AppText variant="micro" tone="muted">
-          {lowLabel ?? (centered ? 'Below' : 'Low')}
+          {lowLabel ?? (centered ? 'Below' : 'Needs work')}
         </AppText>
         {centered && (
           <AppText variant="micro" tone="muted">
@@ -49,7 +49,7 @@ export function ZoneGauge({
           </AppText>
         )}
         <AppText variant="micro" tone="muted">
-          {highLabel ?? (centered ? 'Elevated' : 'High')}
+          {highLabel ?? (centered ? 'Elevated' : 'Optimal')}
         </AppText>
       </Stack>
     </View>

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { scoreBand } from '@trainingai/shared/health/score-band';
-import { limitedInputsNote } from '@trainingai/shared/health/readiness-input-labels';
+import { knownInputKeys, limitedInputsNote } from '@trainingai/shared/health/readiness-input-labels';
 import { READINESS_WEIGHTS } from '@trainingai/shared/health/readiness-composite';
 import {
   AppText,
@@ -258,7 +258,7 @@ export function HealthDetailScreen({
                       }
                     : {}),
                 }}
-                note={state.data.limited ? limitedInputsNote(state.data.inputsMissing ?? []) : null}
+                note={state.data.limited ? limitedInputsNote(knownInputKeys(state.data.inputsMissing ?? [])) : null}
                 contributors={Object.fromEntries(
                   Object.entries(state.data.readinessCompositeContributors).map(
                     ([key, value]) => [key, value.score],
