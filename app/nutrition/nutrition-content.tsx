@@ -42,7 +42,7 @@ import { getLocalStore } from "@/lib/local-store";
 import { pushThenRevalidate } from "@/lib/local-store/push-then-revalidate";
 import { EnergyCard } from "@/components/nutrition/energy-card";
 import { ActivePlanCard } from "@/components/nutrition/active-plan-card";
-import { useEstimatedMeals } from "./use-estimated-meals";
+import { useEstimatedMeals, useCountedEstimateRows } from "./use-estimated-meals";
 import { MealPlanReviewCard } from "@/components/nutrition/meal-plan-review-card";
 import { MealPlanSheets } from "@/components/nutrition/meal-plan-sheets";
 import { NutritionSettingsSheet } from "@/components/nutrition/nutrition-settings-sheet";
@@ -464,6 +464,10 @@ export default function NutritionContent({ userId }: { userId?: string }) {
     userId, date: selectedDate, mealPlan, mealTypes, logs,
     serverEstimatedKcal: balanceForDate?.balance?.estimatedKcal,
   });
+  // #2921. The same rows as rows, for the Active Plan card's calories.
+  const countedEstimates = useCountedEstimateRows({
+    userId, date: selectedDate, serverRows: balanceForDate?.balance?.estimatedMeals,
+  });
   const planCardRef = useRef<HTMLDivElement>(null);
   const goToPlanCard = useCallback(() => planCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), []);
   const earnedForSelectedDate = budget?.earned ?? null;
@@ -644,6 +648,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
                 today={todayStr}
                 dateRef={selectedDateRef}
                 eaten={logs.length > 0 ? totals : undefined}
+                estimates={countedEstimates}
                 onLogged={handleFoodLogged}
                 onCreate={openPlanCoach}
                 onStepByStep={openPlanSetup}
