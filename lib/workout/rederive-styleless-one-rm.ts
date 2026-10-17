@@ -186,7 +186,8 @@ export async function applyOneRmRewrite(
       // Conditional on the value this change was planned from: a log edited since the read is
       // left alone, and the count check below then rolls the whole run back.
       const res = await client.query(
-        `UPDATE exercise_logs SET estimated_1rm = $1, target_80 = $2, updated_at = now()
+        // Issue 2939: stamped like every server-decided write, so a stale phone replay cannot undo it.
+        `UPDATE exercise_logs SET estimated_1rm = $1, target_80 = $2, updated_at = now(), client_edited_at = now()
          WHERE id = $3 AND estimated_1rm = $4 AND deleted_at IS NULL`,
         [c.after.estimated1rm, c.after.target80, c.exerciseLogId, c.before.estimated1rm],
       )

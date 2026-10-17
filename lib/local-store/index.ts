@@ -236,6 +236,9 @@ export interface LocalStore {
    * programs and styles it removed, so the caller can tell whether anything changed.
    */
   pruneProgramStructure(programIds?: string[], styleIds?: string[]): Promise<number>;
+  /** Issue 2763: drop synced bests whose exercise is not in `keep` (the server's whole set). A best
+   *  the device has not pushed (`sync_status` other than 'synced') is never dropped. */
+  prunePersonalRecords(keep: string[]): Promise<number>;
 
   // Outbox
   queueMutation(m: Omit<PendingMutation, 'id' | 'createdAt' | 'attempts' | 'lastError' | 'status' | 'nextRetryAt'>): Promise<void>;

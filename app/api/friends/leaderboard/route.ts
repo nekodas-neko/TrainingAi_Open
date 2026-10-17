@@ -9,6 +9,7 @@ import type { LeaderboardEntry } from '@trainingai/shared/types/friends'
 import { DEFAULT_TZ, todayInTz, dateStrMidnightInTz, weekStartForDay } from '@trainingai/shared/date-utils'
 import { computeDayStreak, streakRestGapFor } from '@trainingai/shared/workout/day-streak'
 import { longestWeeklyStreak } from '@trainingai/shared/workout/year-review'
+import { profileDisplayName } from '@trainingai/shared/greeting'
 
 function getMondayUtc(tz: string): Date {
   return dateStrMidnightInTz(weekStartForDay(todayInTz(tz)), tz)
@@ -121,7 +122,7 @@ export async function GET(_req: Request) {
     const days = daysByUser.get(u.id) ?? []
     return {
       userId: u.id,
-      displayName: u.displayName ?? u.name ?? 'Unknown',
+      displayName: profileDisplayName(u) ?? 'Unknown',
       avatar: u.avatar,
       equippedTitle: u.equippedTitle,
       isSelf: u.id === session.user.id,

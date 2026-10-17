@@ -65,7 +65,8 @@ export type EditStamp =
 /**
  * A stamp further ahead of the server than ordinary clock skew is capped at server now plus that
  * tolerance. Stored as it came, a far-future stamp (a phone set to 2090) would supersede every later
- * honest edit to the row, and the row would never recover.
+ * honest edit to the row, and the row would never recover. A phone that is ahead by less than the
+ * tolerance is not clamped: its stamp is kept as sent.
  */
 export function editStampFromPayload(payload: { editedAt?: number | null }, now: number = Date.now()): EditStamp {
   if (!EditedAtSchema.safeParse(payload.editedAt).success) return { kind: 'unstamped' }

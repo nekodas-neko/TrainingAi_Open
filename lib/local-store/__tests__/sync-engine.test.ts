@@ -29,6 +29,8 @@ const { fakeStore } = vi.hoisted(() => ({
     getSyncMeta:            vi.fn().mockResolvedValue('2026-10-11T00:00:00.000Z'),
     applyDelta:             vi.fn().mockResolvedValue(undefined),
     pruneProgramStructure:  vi.fn().mockResolvedValue(0),
+    getPersonalRecords:     vi.fn().mockResolvedValue([]),
+    prunePersonalRecords:   vi.fn().mockResolvedValue(0),
     markSleepSessionSynced:     vi.fn().mockResolvedValue(undefined),
     markOuraDailySummarySynced: vi.fn().mockResolvedValue(undefined),
     markOuraDailyDerivedSynced: vi.fn().mockResolvedValue(undefined),

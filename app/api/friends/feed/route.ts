@@ -5,6 +5,7 @@ import { getDb } from '@/lib/data/postgres/client'
 import * as s from '@/lib/data/postgres/schema'
 import { inArray, desc, and, isNull } from 'drizzle-orm'
 import type { FeedEvent } from '@trainingai/shared/types/friends'
+import { profileDisplayName } from '@trainingai/shared/greeting'
 
 export async function GET() {
   const session = await auth()
@@ -56,7 +57,7 @@ export async function GET() {
     events.push({
       type: 'pr',
       userId: pr.userId,
-      displayName: user.displayName ?? user.name ?? 'Unknown',
+      displayName: profileDisplayName(user) ?? 'Unknown',
       avatar: user.avatar,
       equippedTitle: user.equippedTitle,
       payload: { exerciseName: pr.exerciseName, weightKg: pr.estimated1rm },
@@ -70,7 +71,7 @@ export async function GET() {
     events.push({
       type: 'achievement',
       userId: ws.userId,
-      displayName: user.displayName ?? user.name ?? 'Unknown',
+      displayName: profileDisplayName(user) ?? 'Unknown',
       avatar: user.avatar,
       equippedTitle: user.equippedTitle,
       payload: { achievementName: 'Workout completed' },

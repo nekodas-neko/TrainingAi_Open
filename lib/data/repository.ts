@@ -285,6 +285,10 @@ export interface SyncDelta {
   exerciseLogs:       unknown[];
   setLogs:            unknown[];
   personalRecords:    unknown[];
+  // Issue 2763: `personal_records` has no `updated_at`, so the delta cannot say which bests changed.
+  // True means `personalRecords` is the user's whole set on every page, and the device replaces its
+  // synced copy with it (dropping a best the server no longer has). Absent: a window, prune nothing.
+  personalRecordsComplete?: boolean;
   ouraDaily:          unknown[];
   ouraDailySummary?:  unknown[];
   ouraDailyDerived?:  unknown[];

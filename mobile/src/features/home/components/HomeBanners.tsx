@@ -23,6 +23,7 @@ import {
 } from '../../workouts/data/WorkoutDataProvider';
 import { digestSpec, readinessSpec, profileSpec } from '../../health/data/models';
 import {
+  bannerTone,
   goalsReviewDue,
   localHour,
   recapHasData,
@@ -109,6 +110,7 @@ export function HomeBanners({
       ? [
           {
             key: `goals:${health.today}`,
+            type: 'goals' as const,
             icon: 'target' as const,
             label: 'Goals check-in',
             subtitle: 'Review your nutrition and activity goals',
@@ -120,6 +122,7 @@ export function HomeBanners({
       ? [
           {
             key: `day:${health.today}`,
+            type: 'day' as const,
             icon: 'nutrition' as const,
             label: 'Day in review ready',
             subtitle: 'Look back at today’s nutrition',
@@ -131,6 +134,7 @@ export function HomeBanners({
       ? [
           {
             key: `week:${week}`,
+            type: 'week' as const,
             icon: 'upper' as const,
             label: weekReady ? 'Week in review ready' : 'Week in review couldn’t load',
             subtitle: weekReady ? 'Training, recovery & records' : 'Tap to retry',
@@ -223,36 +227,46 @@ export function HomeBanners({
       )}
       {entries.length > 0 && (
         <Card padded={false}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ expanded }}
-            accessibilityLabel={`${expanded ? 'Hide' : 'Show'} updates: ${entries.map((entry) => entry.label).join(', ')}`}
-            onPress={() => {
-              layoutMotion(reduced);
-              setExpanded((value) => !value);
-            }}
-            style={({ pressed }) => ({
-              minHeight: theme.sizes.touchTarget,
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: theme.spacing.sm,
-              padding: theme.spacing.md,
-              opacity: pressed ? 0.65 : 1,
-            })}
-          >
-            {entries.map((entry) => (
-              <Icon key={entry.key} name={entry.icon} tone="brand" />
-            ))}
-            <AppText variant="label" style={{ flex: 1 }}>
-              {entries.length} ready
-            </AppText>
-            <StatusIndicator label="Home reminders" error={error} />
-            <Icon
-              name={expanded ? 'expand' : 'forward'}
-              tone="muted"
-              size={theme.sizes.iconSmall}
-            />
-          </Pressable>
+          <Stack direction="row" align="center" gap="none">
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ expanded }}
+              accessibilityLabel={`${expanded ? 'Hide' : 'Show'} updates: ${entries.map((entry) => entry.label).join(', ')}`}
+              onPress={() => {
+                layoutMotion(reduced);
+                setExpanded((value) => !value);
+              }}
+              style={({ pressed }) => ({
+                flex: 1,
+                minHeight: theme.sizes.touchTarget,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: theme.spacing.sm,
+                padding: theme.spacing.md,
+                opacity: pressed ? 0.65 : 1,
+              })}
+            >
+              {entries.map((entry) => (
+                <Icon
+                  key={entry.key}
+                  name={entry.icon}
+                  color={theme.tones[bannerTone[entry.type]].foreground}
+                />
+              ))}
+              <AppText variant="label" style={{ flex: 1 }}>
+                {entries.length} ready
+              </AppText>
+              <Icon
+                name={expanded ? 'expand' : 'forward'}
+                tone="muted"
+                size={theme.sizes.iconSmall}
+              />
+            </Pressable>
+            {/* A sibling of the toggle, and only while there is something to say: inside it the
+                indicator's own button nests a button in a button, and its 44 px box was reserved
+                beside the count even when idle. */}
+            {error && <StatusIndicator label="Home reminders" error={error} />}
+          </Stack>
           {expanded &&
             entries.map((entry) => (
               <Stack
@@ -280,7 +294,7 @@ export function HomeBanners({
                     opacity: pressed ? 0.65 : 1,
                   })}
                 >
-                  <Icon name={entry.icon} tone="brand" />
+                  <Icon name={entry.icon} color={theme.tones[bannerTone[entry.type]].foreground} />
                   <Stack gap="xxs" style={{ flex: 1 }}>
                     <AppText variant="label">{entry.label}</AppText>
                     <AppText variant="caption" tone="muted">
