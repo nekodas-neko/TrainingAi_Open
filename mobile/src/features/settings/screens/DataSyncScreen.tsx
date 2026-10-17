@@ -17,8 +17,8 @@ import { useAppleImport } from '../../health/HealthProvider';
 import { shareAccountExport } from '../../../integrations/sharing/account-export';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { deviceHealthName } from '../../../integrations/device-health/platform';
-// The current app imports older history 30 days at a time (`HISTORY_WINDOW_DAYS` in
-// `lib/health-connect-history-import.ts`); the shortest choice here is the same span.
+// The shortest "how far back" choice is the current app's 30-day import window
+// (`HISTORY_WINDOW_DAYS` in `lib/health-connect-history-import.ts`).
 const HISTORY_WINDOW_DAYS = 30;
 export function DataSyncScreen({ onBack }: { onBack: () => void }) {
   const actions = useNativeDataActions(),
@@ -78,8 +78,8 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
           <Card>
             <AppText variant="heading">Restore from cloud</AppText>
             <AppText variant="caption" tone="muted">
-              Rebuild full history after a wipe / on a new device. Your unsent changes and
-              unfinished workouts are kept.
+              Older history loads when opened. Your unsent changes and unfinished workouts
+              are kept.
             </AppText>
             <AppButton
               title="Restore from cloud"
@@ -104,7 +104,7 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
           <Card>
             <AppText variant="heading">Import more history</AppText>
             <AppText variant="caption" tone="muted">
-              Pull older {deviceHealthName} data, {HISTORY_WINDOW_DAYS} days at a time
+              Pull older {deviceHealthName} data. Choose how far back to read
             </AppText>
             <Picker
               label="How far back to read"

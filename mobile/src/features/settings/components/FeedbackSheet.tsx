@@ -82,7 +82,7 @@ export function FeedbackSheet({ onClose }: { onClose: () => void }) {
       setScreenshot(null);
       onClose();
     } catch {
-      setError('Could not send feedback. Your draft is saved; retry when connected.');
+      setError('Could not send feedback. Your text is saved; re-attach the screenshot and retry when connected.');
     } finally {
       setBusy(false);
     }

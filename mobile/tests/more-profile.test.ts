@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import {
   birthYearOf,
   dateOfBirthForYear,
+  fillFromServer,
   memberSinceLabel,
   profilePatch,
   programTile,
@@ -80,4 +81,40 @@ test('Saving the birth year patches dateOfBirth and nothing else', () => {
     dateOfBirth: '1991-05-17',
   });
   assert.deepEqual(profilePatch({ heightCm: '180' }, ['heightCm']), { heightCm: 180 });
+});
+
+test('An old Profile details draft with a full date of birth fills Birth year and never clears it', () => {
+  const user = {
+    displayName: 'Sam',
+    heightCm: 180,
+    dateOfBirth: '1990-05-17',
+    sex: 'male',
+    activityLevel: 'moderate',
+    fitnessGoal: 'build_muscle',
+    timezone: 'Australia/Brisbane',
+  };
+  // Saved before Birth year existed: `dateOfBirth` is in it, `birthYear` is not.
+  const old = {
+    fields: {
+      displayName: 'Sam',
+      heightCm: '180',
+      dateOfBirth: '1990-05-17',
+      sex: 'male',
+      activityLevel: 'moderate',
+      fitnessGoal: 'build_muscle',
+      timezone: 'Australia/Brisbane',
+    },
+    dirty: [] as string[],
+  };
+  const keys = ['displayName', 'heightCm', 'birthYear', 'sex', 'timezone'];
+  const filled = fillFromServer(old.fields, old.dirty, user, keys);
+  assert.equal(filled.birthYear, '1990');
+  // Blur on an untouched Birth year saves nothing; even if it were asked for, a draft with no
+  // `birthYear` key patches no dateOfBirth at all, so the stored date cannot be nulled.
+  assert.deepEqual(profilePatch(old.fields, ['birthYear'], user.dateOfBirth), {});
+  assert.ok(!('dateOfBirth' in profilePatch(old.fields, keys, user.dateOfBirth)));
+  // A key the user edited is left alone by the refill.
+  assert.equal(fillFromServer({ ...old.fields, birthYear: '1991' }, ['birthYear'], user, keys).birthYear, '1991');
+  // Clearing the field on purpose still clears it.
+  assert.deepEqual(profilePatch({ birthYear: '' }, ['birthYear'], user.dateOfBirth), { dateOfBirth: null });
 });

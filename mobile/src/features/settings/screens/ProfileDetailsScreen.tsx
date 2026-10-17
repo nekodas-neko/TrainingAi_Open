@@ -20,14 +20,10 @@ import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { profileSpec, metricValue, bodyOverviewSpec } from '../../health/data/models';
 import { useHealthData } from '../../health/data/HealthDataProvider';
 import { ProfileOverview } from '../components/ProfileOverview';
-import { birthYearOf, profilePatch, timezoneOptions } from '../data/profile';
+import { fillFromServer, profileFieldValue, profilePatch, timezoneOptions } from '../data/profile';
 // Name, birth year, height, sex and timezone are what the current app's Edit profile sheet and
 // Profile details hold. Activity level and Fitness goal are on the Goals screen there, and here.
 const FIELD_KEYS = ['displayName', 'heightCm', 'birthYear', 'sex', 'timezone'];
-function fieldValue(user: Record<string, unknown>, key: string) {
-  if (key === 'birthYear') return birthYearOf(user.dateOfBirth);
-  return user[key] == null ? '' : String(user[key]);
-}
 const schema = z.object({
   fields: z.record(z.string(), z.string()),
   dirty: z.array(z.string()),
@@ -90,7 +86,7 @@ function ProfileDetailsForm({
     account = useAccountContext();
   const draft = useWorkoutDraft('profile-details', schema, {
     fields: Object.fromEntries(
-      FIELD_KEYS.map((key) => [key, fieldValue(user, key)]),
+      FIELD_KEYS.map((key) => [key, profileFieldValue(user, key)]),
     ),
     dirty: [],
   });
@@ -104,10 +100,7 @@ function ProfileDetailsForm({
   useEffect(() => {
     if (!ready) return;
     setDraft((value) => {
-      const fields = { ...value.fields };
-      for (const key of Object.keys(fields))
-        if (!value.dirty.includes(key))
-          fields[key] = fieldValue(user, key);
+      const fields = fillFromServer(value.fields, value.dirty, user, FIELD_KEYS);
       return JSON.stringify(fields) === JSON.stringify(value.fields)
         ? value
         : { ...value, fields };
@@ -123,6 +116,10 @@ function ProfileDetailsForm({
     draft.setValue(next);
     setSaved(false);
     if (immediate) void save([key], next.fields);
+  }
+  /** Blur saves only a field that was edited; tapping in and out of one changes nothing. */
+  function saveIfDirty(key: string) {
+    if (current.current.dirty.includes(key)) void save([key]);
   }
   async function save(keys = current.current.dirty, fields = current.current.fields) {
     if (!draft.ready || !draft.resources || !keys.length) return;
@@ -200,7 +197,7 @@ function ProfileDetailsForm({
           value={f.displayName}
           maxLength={100}
           onChangeText={(value) => change('displayName', value)}
-          onBlur={() => void save(['displayName'])}
+          onBlur={() => saveIfDirty('displayName')}
         />
         <Picker
           label="Biological sex"
@@ -221,12 +218,12 @@ function ProfileDetailsForm({
         <TextField
           label="Birth year"
           editable={draft.ready}
-          value={f.birthYear}
+          value={f.birthYear ?? ''}
           placeholder="1990"
           keyboardType="number-pad"
           maxLength={4}
           onChangeText={(value) => change('birthYear', value)}
-          onBlur={() => void save(['birthYear'])}
+          onBlur={() => saveIfDirty('birthYear')}
         />
         <TextField
           label="Height (cm)"
@@ -235,7 +232,7 @@ function ProfileDetailsForm({
           placeholder="175"
           keyboardType="decimal-pad"
           onChangeText={(value) => change('heightCm', value)}
-          onBlur={() => void save(['heightCm'])}
+          onBlur={() => saveIfDirty('heightCm')}
         />
         <MeasurementRow
           label="Weight"

@@ -205,12 +205,20 @@ function ProfileGoalsForm({
         '/api/user/profile',
         {
           fitnessGoal: f.profile.fitnessGoal || null,
-          // Only when it was edited here, so a stale draft cannot overwrite a newer value.
+          // Sent only when it differs from the server's current value, so an unchanged field is
+          // not re-sent. A draft that differs from a newer server value is still sent.
           ...((f.profile.activityLevel ?? '') !== (user.activityLevel ?? '')
             ? { activityLevel: f.profile.activityLevel || null }
             : {}),
         },
-        ['/api/user/profile', '/api/nutrition'],
+        [
+          '/api/user/profile',
+          '/api/nutrition',
+          // Activity level feeds the readiness payload's daily goals, as on Profile details.
+          ...((f.profile.activityLevel ?? '') !== (user.activityLevel ?? '')
+            ? ['/api/hr-profile', '/api/readiness', '/api/body-battery']
+            : []),
+        ],
       );
       await resources!.clearDraft('profile-goals');
       setError(null);

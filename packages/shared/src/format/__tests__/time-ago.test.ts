@@ -23,6 +23,11 @@ describe('timeAgo', () => {
     }
   })
 
+  it('reads a time ahead of the clock as under a minute, not "in 5 minutes"', () => {
+    expect(timeAgo(new Date(NOW.getTime() + 5 * MIN), NOW)).toBe('less than a minute ago')
+    expect(timeAgo(NOW, NOW)).toBe('less than a minute ago')
+  })
+
   it('returns null for a value that is not a date', () => {
     expect(timeAgo('not a date', NOW)).toBeNull()
   })

@@ -29,10 +29,6 @@ import {
   type Period,
 } from '../data/models';
 import { ManageFriendsSheet } from './ManageFriendsSheet';
-// The current app's colours for these two glyphs: a gold trophy, a purple trending arrow (Tailwind
-// yellow-400 and purple-400, which `components/more/friend-feed.tsx` and the leaderboard medal use).
-const GOLD = '#facc15';
-const PURPLE = '#c084fc';
 function relative(iso: string) {
   return timeAgo(iso) ?? 'Date unavailable';
 }
@@ -160,7 +156,7 @@ export function FriendsPanel({ openProfile }: { openProfile: (id: string) => voi
                         <Stack direction="row" align="center">
                           <Icon
                             name={event.type === 'pr' ? 'upper' : 'award'}
-                            color={event.type === 'pr' ? PURPLE : GOLD}
+                            color={event.type === 'pr' ? theme.friends.purple : theme.friends.gold}
                           />
                           <AppText variant="caption" style={{ flex: 1 }}>
                             {feedText(event)}
@@ -219,7 +215,7 @@ export function FriendsPanel({ openProfile }: { openProfile: (id: string) => voi
                           )}
                         </Stack>
                         <AppText variant="caption">{rankLabel(value, period, metric)}</AppText>
-                        {index === 0 && <Icon name="award" color={GOLD} />}
+                        {index === 0 && <Icon name="award" color={theme.friends.gold} />}
                       </Stack>
                     </Card>
                   </Pressable>

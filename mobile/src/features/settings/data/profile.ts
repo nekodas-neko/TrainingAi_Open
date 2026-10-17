@@ -52,6 +52,28 @@ export function dateOfBirthForYear(
   return kept && isCalendarDate(kept) ? kept : `${text}-01-01`;
 }
 
+/** The profile screen's text value for one field of the stored user. */
+export function profileFieldValue(user: Record<string, unknown>, key: string): string {
+  if (key === 'birthYear') return birthYearOf(user.dateOfBirth);
+  return user[key] == null ? '' : String(user[key]);
+}
+
+/**
+ * The draft's fields with every key that was not edited here refilled from the server. Walks
+ * `keys`, not the draft's own keys: a draft saved before a field existed (Birth year, replacing
+ * the full date of birth) has no entry for it, and it must fill rather than stay missing.
+ */
+export function fillFromServer(
+  fields: Record<string, string>,
+  dirty: string[],
+  user: Record<string, unknown>,
+  keys: string[],
+): Record<string, string> {
+  const next = { ...fields };
+  for (const key of keys) if (!dirty.includes(key)) next[key] = profileFieldValue(user, key);
+  return next;
+}
+
 export function profilePatch(
   fields: Record<string, string>,
   keys: string[],
@@ -59,7 +81,10 @@ export function profilePatch(
 ) {
   return profileFields.partial().parse(
     Object.fromEntries(
-      keys.map((key) =>
+      // A draft with no `birthYear` key never touched it: leave the stored date of birth alone.
+      keys
+        .filter((key) => key !== 'birthYear' || 'birthYear' in fields)
+        .map((key) =>
         key === 'birthYear'
           ? ['dateOfBirth', dateOfBirthForYear(fields.birthYear ?? '', existingDateOfBirth)]
           : [

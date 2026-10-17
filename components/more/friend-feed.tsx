@@ -5,7 +5,7 @@ import { useTransitionRouter } from "@/lib/view-transition";
 import Image from "next/image";
 import type { FeedEvent } from "@trainingai/shared/types/friends";
 import { TITLES } from "@trainingai/shared/types/friends";
-import { formatDistanceToNow } from "date-fns";
+import { timeAgo } from "@trainingai/shared/format/time-ago";
 import { Dumbbell, Trophy, TrendingUp, UserCircle } from "lucide-react";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
 import { TTL_SHORT } from '@trainingai/shared/cache-ttl';
@@ -49,7 +49,7 @@ function FeedItem({ event }: { event: FeedEvent }) {
           <p className="text-xs text-muted-foreground truncate">{text}</p>
         </div>
         <p className="text-[10px] text-muted-foreground/70 mt-0.5">
-          {formatDistanceToNow(new Date(event.occurredAt), { addSuffix: true })}
+          {timeAgo(event.occurredAt) ?? ''}
         </p>
       </div>
     </div>

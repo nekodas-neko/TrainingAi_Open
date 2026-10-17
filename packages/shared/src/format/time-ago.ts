@@ -11,5 +11,7 @@ import { formatDistance } from 'date-fns'
 export function timeAgo(at: string | number | Date, now: Date = new Date()): string | null {
   const date = at instanceof Date ? at : new Date(at)
   if (Number.isNaN(date.getTime())) return null
+  // Friend times are device-stamped, so one slightly ahead of this clock reads as just now.
+  if (date.getTime() >= now.getTime()) return 'less than a minute ago'
   return formatDistance(date, now, { addSuffix: true })
 }
