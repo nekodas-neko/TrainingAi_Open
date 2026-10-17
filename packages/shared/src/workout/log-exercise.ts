@@ -7,6 +7,7 @@ import { computeSetAggregates, computeIntensityPct } from '@trainingai/shared/wo
 import { bodyweightSetLoadKg } from '@trainingai/shared/workout/bodyweight-load';
 import { defaultUseFor1rm } from '@trainingai/shared/workout/default-use-for-1rm';
 import type { ProgramPhaseType } from '@trainingai/shared/types/program';
+import type { EditStamp } from '@trainingai/shared/sync/edited-at';
 
 export { LogExercisePayloadSchema } from './log-payload';
 import type { LogExercisePayload } from './log-payload';
@@ -36,12 +37,17 @@ export async function logExerciseFromPayload(
   userId: string,
   payload: LogExercisePayload,
   tz: string,
+  // Issue 2721: the route omits it (a live write, stamped with server time); the outbox push passes
+  // the payload's `editedAt`, and a copy older than the row's last decided edit is skipped.
+  stamp: EditStamp = { kind: 'server' },
 ): Promise<{
   workoutSessionId: string;
   exerciseLogId: string;
   estimated1rm: number;
   target80: number;
   isPR: boolean;
+  /** Issue 2721: the server already holds a newer copy, so nothing was written. */
+  superseded: boolean;
 }> {
   const {
     sessionName, sessionId, workoutSessionId,
@@ -268,7 +274,7 @@ export async function logExerciseFromPayload(
     ? null
     : styleId
 
-  const { exerciseLog } = await repo.logExerciseAndSets(userId, {
+  const logged = await repo.logExerciseAndSets(userId, {
     workoutSessionId: wsId,
     exerciseLogId: clientExerciseLogId,
     exerciseName: exercise,
@@ -294,10 +300,13 @@ export async function logExerciseFromPayload(
     // takes `isAnyDeload` separately and already gates on it. This changes what is STORED, not what
     // is decided, so no PR behaviour moves.
     exerciseDeloaded: deloadedForEstimate,
-  }, setData.map((s, i) => ({ ...s, id: clientSetLogIds?.[i] })));
+  }, setData.map((s, i) => ({ ...s, id: clientSetLogIds?.[i] })), stamp);
+  const superseded = logged.superseded === true;
 
   let isPR = false;
-  if (shouldCountTowardPr({
+  // A superseded copy was not written, so its estimate must not reach personal_records either: a
+  // stale lbs-as-kg log would otherwise re-mint the record the fix just corrected.
+  if (!superseded && shouldCountTowardPr({
     estimated1rm,
     isAnyDeload,
     isBaseline,
@@ -308,9 +317,10 @@ export async function logExerciseFromPayload(
 
   return {
     workoutSessionId: wsId,
-    exerciseLogId: exerciseLog.id,
+    exerciseLogId: logged.exerciseLog.id,
     estimated1rm,
     target80,
     isPR,
+    superseded,
   };
 }

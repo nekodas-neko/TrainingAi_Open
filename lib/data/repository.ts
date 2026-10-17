@@ -1,5 +1,6 @@
 import type { AuthProvider, AppleAuthAttempt } from '@/lib/auth/identity'
 import type { SyncedMutationDomain } from '@trainingai/shared/sync/mutation-schema'
+import type { EditStamp } from '@trainingai/shared/sync/edited-at'
 import type { UserPreferences } from '@trainingai/shared/user/preferences'
 import type {
   User, Program, ProgressionStyle,
@@ -756,7 +757,9 @@ export interface WorkoutRepository {
     userId: string,
     log: Omit<ExerciseLog, 'id' | 'sets'> & { exerciseLogId?: string },
     sets: (Omit<SetLog, 'id' | 'exerciseLogId'> & { id?: string })[],
-  ): Promise<{ exerciseLog: ExerciseLog; setLogs: SetLog[] }>
+    /** Issue 2721: how this write records when the row was decided; omitted means a live server write. */
+    stamp?: EditStamp,
+  ): Promise<{ exerciseLog: ExerciseLog; setLogs: SetLog[]; superseded?: true }>
 
   // ── Body & Activity ────────────────────────────────────────────────────────
   upsertBodyMetrics(userId: string, metrics: Omit<BodyMetrics, 'id' | 'userId' | 'createdAt'>[], source: HealthSource): Promise<void>

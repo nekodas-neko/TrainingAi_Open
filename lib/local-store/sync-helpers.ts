@@ -2,6 +2,13 @@
 // run in the node environment.
 
 import type { LocalWorkoutSession, LocalExerciseLog, LocalSetLog } from './types'
+import { EditedAtSchema } from '@trainingai/shared/sync/edited-at'
+
+/** `{ editedAt }` from a local ISO timestamp, or nothing when it is missing or out of range. */
+function localEditedAt(iso: string | null | undefined): { editedAt?: number } {
+  const ms = iso ? Date.parse(iso) : NaN
+  return EditedAtSchema.safeParse(ms).success ? { editedAt: ms } : {}
+}
 
 export interface PushErrorRecord {
   id?:    string;
@@ -131,6 +138,10 @@ export function buildWorkoutLogPayload(
       ...(session.intensityMode ? { intensityMode: session.intensityMode } : {}),
       ...(session.wasOverride ? { wasOverride: true } : {}),
       ...(el.exerciseDeloaded ? { exerciseDeloaded: true } : {}),
+      // Issue 2721: a stranded log is replayed long after it was made, so it is stamped with the
+      // local row's own last write rather than the re-queue time `queueMutation` would give it —
+      // otherwise a replay could beat a server-side fix made while it sat stranded.
+      ...localEditedAt(el.updatedAt),
     },
   }
 }

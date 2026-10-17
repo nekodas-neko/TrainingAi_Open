@@ -191,6 +191,7 @@ test('offline history edits replay ordered stable identities and preserve pendin
     connection,
     () => `20000000-0000-4000-8000-${String(sequence++).padStart(12, '0')}`,
     () => {},
+    () => 1_760_000_000_000,
   );
   await queue.initialize();
   const id = '10000000-0000-4000-8000-000000000003';
@@ -211,6 +212,7 @@ test('offline history edits replay ordered stable identities and preserve pendin
   await restored.initialize();
   await restored.sync();
   const pending = restored.getSnapshot().operations;
+  assert.equal(pending[0].payload.editedAt, 1_760_000_000_000);
   assert.deepEqual(
     overlayHistory(
       [{ exerciseLogId: id, workoutSessionId: 'session', setWeights: [60], reps: [6] }],

@@ -108,6 +108,7 @@ test('finishing offline atomically saves logs and completion; reconnect pushes i
   assert.deepEqual(payload.payload.progressionStyle, [
     { pct: 70, reps: 8, restSec: 90, useFor1rm: true },
   ]);
+  assert.equal(payload.payload.editedAt, completed.completedAt);
   const saved = readJournal(await f.scope.get('workout-journal.v1'), f.connection);
   assert.equal(saved.workouts[0].pending.length, 2);
   offline = false;

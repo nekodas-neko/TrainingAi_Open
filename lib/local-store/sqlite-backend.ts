@@ -17,6 +17,7 @@ import { asRpeSource } from '@trainingai/shared/workout/rpe-source';
 import { assembleLocalActiveProgram, type LocalActiveProgram } from './program-assembler';
 import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role';
 import { preferDeviceNights } from '@trainingai/shared/health/sleep-night';
+import { withEditedAt } from '@trainingai/shared/sync/edited-at';
 
 /**
  * The local `ingredients` column is a TEXT mirror of the server's JSONB. A row written by an older
@@ -3451,10 +3452,15 @@ export class SQLiteLocalStore implements LocalStore {
   }
 
   async queueMutation(m: Omit<PendingMutation, 'id' | 'createdAt' | 'attempts' | 'lastError' | 'status' | 'nextRetryAt'>): Promise<void> {
+    // Issue 2721: a workout write says when it was made, on this phone's clock, so the server can
+    // keep a newer copy (a fix applied while this sat in the outbox) instead of being overwritten
+    // by it. Stamped here, the one door every queued write goes through; a payload that already
+    // carries a stamp keeps it.
+    const payload = withEditedAt(m.domain, m.payload, Date.now());
     await runSQL(
       `INSERT OR REPLACE INTO mutations_outbox (id, user_id, domain, date, payload, created_at, attempts, last_error, status, next_retry_at)
        VALUES (?,?,?,?,?,strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),0,NULL,'pending',NULL)`,
-      [crypto.randomUUID(), m.userId, m.domain, m.date, JSON.stringify(m.payload)],
+      [crypto.randomUUID(), m.userId, m.domain, m.date, JSON.stringify(payload)],
     );
   }
 

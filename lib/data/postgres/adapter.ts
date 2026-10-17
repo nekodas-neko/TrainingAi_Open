@@ -20,6 +20,7 @@ import { collapseOnConflict, keepLatestNonNull } from './collapse-conflicts'
 import { invitedEmails } from './schema'
 import { resolveSyncCursor } from '@trainingai/shared/sync/cursor'
 import { isRetryableWriteError } from '@trainingai/shared/sync/retryable-error'
+import { isSupersededEdit, editStampFromPayload, SUPERSEDED_WARNING, UNSTAMPED_WARNING, type EditStamp } from '@trainingai/shared/sync/edited-at'
 import { shouldPrune } from './retention-throttle'
 import { inSequence } from './in-sequence'
 
@@ -224,6 +225,20 @@ interface LbsToKgFix {
   exercises: LbsToKgFixExercise[]
   /** In-range logs left alone because an earlier Apply already converted them (issue 2383). */
   alreadyConverted: number
+}
+
+/**
+ * Issue 2721: move `updated_at` on a log and every one of its sets without changing their content,
+ * so the delta pull (which cursors `exercise_logs` and `set_logs` separately, each on its own
+ * `updated_at`) carries the server's copy back to a device whose stale push was just skipped.
+ * `lib/workout/exercise-log-edits.ts` runs the same two statements on its own pg client.
+ */
+async function touchExerciseLogTree(
+  tx: { execute: (query: ReturnType<typeof sql>) => Promise<unknown> },
+  exerciseLogId: string,
+): Promise<void> {
+  await tx.execute(sql`UPDATE exercise_logs SET updated_at = now() WHERE id = ${exerciseLogId}`)
+  await tx.execute(sql`UPDATE set_logs SET updated_at = now() WHERE exercise_log_id = ${exerciseLogId}`)
 }
 
 // Pure computation shared by preview and apply — converts each affected set's
@@ -1074,7 +1089,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     userId: string,
     log: Omit<ExerciseLog, 'id' | 'sets'> & { exerciseLogId?: string },
     sets: (Omit<SetLog, 'id' | 'exerciseLogId'> & { id?: string })[],
-  ): Promise<{ exerciseLog: ExerciseLog; setLogs: SetLog[] }> {
+    stamp: EditStamp = { kind: 'server' },
+  ): Promise<{ exerciseLog: ExerciseLog; setLogs: SetLog[]; superseded?: true }> {
     return this.db.transaction(async tx => {
       // Resolve exercise_id from library (best-effort; NULL for custom exercises)
       const [libRow] = await tx.select({ id: s.exerciseLibrary.id })
@@ -1097,6 +1113,23 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         throw new Error('exercise log not owned by user')
       }
       const isReplay = !!existing
+
+      // Issue 2721: a push stamped older than the row's last decided edit is a stale copy — a phone
+      // that edited offline before a server-side fix. Skip the write, and touch the row and its sets
+      // so `updated_at` moves: the phone's pull cursor may already be past the fix (its local row was
+      // pending and refused it), and without the touch the newer copy would never come back down.
+      // Locked so a fix landing between this read and the upsert cannot be overwritten either.
+      if (isReplay && stamp.kind === 'client') {
+        const locked = await tx.execute(sql`
+          SELECT client_edited_at FROM exercise_logs WHERE id = ${clientExerciseLogId} FOR UPDATE
+        `)
+        const rowStamp = (locked.rows[0] as { client_edited_at: Date | string | null } | undefined)?.client_edited_at
+        if (isSupersededEdit(rowStamp == null ? null : new Date(rowStamp), stamp)) {
+          await touchExerciseLogTree(tx, clientExerciseLogId)
+          return { exerciseLog: { ...log, id: clientExerciseLogId, sets: [] }, setLogs: [], superseded: true as const }
+        }
+      }
+      const clientEditedAt = stamp.kind === 'client' ? stamp.at : stamp.kind === 'server' ? new Date() : null
 
       // Same guard for client-supplied set ids: reject any that already exist under
       // another user's exercise log.
@@ -1129,10 +1162,12 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           interExerciseRestSec: log.interExerciseRestSec ?? null,
           prepTimeSec: log.prepTimeSec ?? null,
           exerciseDeloaded: log.exerciseDeloaded ?? false,
+          clientEditedAt,
         })
         .onConflictDoUpdate({
           target: s.exerciseLogs.id,
           set: {
+            clientEditedAt: sql`EXCLUDED.client_edited_at`,
             workoutSessionId: sql`EXCLUDED.workout_session_id`,
             exerciseName: sql`EXCLUDED.exercise_name`,
             exerciseId: sql`EXCLUDED.exercise_id`,
@@ -4373,7 +4408,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       const converted: LbsToKgFixLog[] = []
       for (const log of fix.logs) {
         const claimed = await tx.update(s.exerciseLogs)
-          .set({ estimated1rm: log.newEstimated1rm, target80: log.newTarget80, volume: log.newVolume, unitFixAppliedAt: now, updatedAt: now })
+          // Issue 2721: `clientEditedAt` marks the fix as the newest decided copy, so a phone that
+          // edited this log offline before the fix cannot push the lbs-as-kg weights back over it.
+          .set({ estimated1rm: log.newEstimated1rm, target80: log.newTarget80, volume: log.newVolume, unitFixAppliedAt: now, updatedAt: now, clientEditedAt: now })
           .where(and(eq(s.exerciseLogs.id, log.exerciseLogId), isNull(s.exerciseLogs.unitFixAppliedAt)))
           .returning({ id: s.exerciseLogs.id })
         if (claimed.length === 0) continue
@@ -5764,7 +5801,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid workout_log payload' })
             continue
           }
-          await logExerciseFromPayload(userId, parsed.data, userTz)
+          const stamp = editStampFromPayload(parsed.data)
+          const logged = await logExerciseFromPayload(userId, parsed.data, userTz, stamp)
+          // Issue 2721: a superseded write is still `processed`, so the client confirms and drops it —
+          // an `errors` entry would retry it and then dead-letter a copy that was never wanted.
+          // Both warnings are added only once the write has gone through, so a failed mutation never
+          // carries a warning that says it was applied.
+          if (stamp.kind === 'unstamped') warnings.push({ id: mut.id, domain: mut.domain, date: mut.date, warning: UNSTAMPED_WARNING })
+          if (logged.superseded) warnings.push({ id: mut.id, domain: mut.domain, date: mut.date, warning: SUPERSEDED_WARNING })
           processed++
         } else if (mut.domain === 'exercise_log_edit') {
           // RV-175. The same function PATCH /api/workout-entry calls. Lazy import for the reason
@@ -5778,10 +5822,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           // A miss goes to `errors`, not `processed`: the commonest cause is the log itself still
           // being in the outbox behind a failed push, which a later attempt resolves. The client's
           // bounded retries then dead-letter a genuinely orphaned edit (see session_rpe below).
-          if (!await editExerciseLog(userId, parsed.data)) {
+          const stamp = editStampFromPayload(parsed.data)
+          const edited = await editExerciseLog(userId, parsed.data, stamp)
+          if (!edited.found) {
             errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'No matching exercise log for exercise_log_edit' })
             continue
           }
+          if (stamp.kind === 'unstamped') warnings.push({ id: mut.id, domain: mut.domain, date: mut.date, warning: UNSTAMPED_WARNING })
+          if (edited.superseded) warnings.push({ id: mut.id, domain: mut.domain, date: mut.date, warning: SUPERSEDED_WARNING })
           processed++
         } else if (mut.domain === 'exercise_log_delete') {
           const { ExerciseLogDeleteSchema, deleteExerciseLog } = await import('@/lib/workout/exercise-log-edits')
@@ -5792,7 +5840,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           }
           // A miss is NOT an error, as with activity_logs (Q-328): a delete re-sent because its
           // confirmation never landed finds nothing, and the row is gone either way.
+          // Issue 2721: a delete is never superseded — see `deleteExerciseLog`. It is still counted
+          // when it arrives unstamped, so the old-client tally covers all three domains.
           await deleteExerciseLog(userId, parsed.data.exerciseLogId)
+          if (editStampFromPayload(parsed.data).kind === 'unstamped') warnings.push({ id: mut.id, domain: mut.domain, date: mut.date, warning: UNSTAMPED_WARNING })
           processed++
         } else if (mut.domain === 'workout_session_delete') {
           const { WorkoutSessionDeleteSchema, deleteWorkoutSessionAndReconcile } = await import('@/lib/workout/delete-session-reconcile')
