@@ -12,6 +12,7 @@ import { ExerciseSummaryScreen } from "@/components/workout/exercise-summary-scr
 import { PipView } from "@/components/workout/pip-view";
 import { usePipMode } from "@/hooks/use-pip-mode";
 import { usePipActions } from "@/hooks/use-pip-actions";
+import { pipPhaseFor, sendPipPhase } from "@/lib/workout/pip-phase";
 import {
   DEFAULT_SETS,
   DEFAULT_REPS,
@@ -1367,28 +1368,12 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
 
   // Tell the native layer which phase we're in so it shows the right buttons.
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const bridge = (window as any).AndroidPip as { updatePhase: (p: string) => void } | undefined
-    if (!bridge) return
-    let phase: string
-    if (store.mode === 'exercise-summary') {
-      phase = 'summary'
-    } else if (store.mode === 'active') {
-      if (store.workoutPhase === 'set') {
-        phase = 'set'
-      } else if (store.currentSet >= store.sets) {
-        phase = 'complete'
-      } else {
-        phase = 'rest'
-      }
-    } else if (store.mode === 'done') {
-      phase = 'done'
-    } else {
-      // 'pre' and any other non-active mode — PiP should not open
-      phase = 'pre'
-    }
-    bridge.updatePhase(phase)
+    sendPipPhase(pipPhaseFor(store))
   }, [store.mode, store.workoutPhase, store.currentSet, store.sets])
+
+  // Leaving this screen (navigation, discard) ends the workout as far as the shell is concerned,
+  // so a later Home press on another screen never opens PiP.
+  useEffect(() => () => sendPipPhase('idle'), [])
 
   usePipActions({
     onWeightUp: () => {

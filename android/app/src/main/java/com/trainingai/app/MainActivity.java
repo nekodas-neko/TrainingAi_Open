@@ -41,7 +41,7 @@ public class MainActivity extends BridgeActivity {
 
     // Current workout phase — kept up to date by the JS bridge so the right
     // buttons are shown when the user presses home to enter PiP.
-    private volatile String pipPhase = "rest";
+    private volatile String pipPhase = PipPolicy.IDLE;
 
     private final BroadcastReceiver pipReceiver = new BroadcastReceiver() {
         @Override
@@ -631,9 +631,7 @@ public class MainActivity extends BridgeActivity {
             // show instead. PiP still opens for the active-set view.
             if (restChipActive) return;
             String url = getBridge().getWebView().getUrl();
-            boolean activePhase = "rest".equals(pipPhase) || "set".equals(pipPhase)
-                || "complete".equals(pipPhase) || "summary".equals(pipPhase);
-            if (url != null && url.contains("/workout") && activePhase) {
+            if (PipPolicy.shouldEnterPip(url, pipPhase)) {
                 enterPictureInPictureMode(buildPipParams(pipPhase));
             }
         }
