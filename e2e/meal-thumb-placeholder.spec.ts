@@ -20,6 +20,10 @@ const WITH_PHOTO = 'bf32bf32-bf32-4bf3-8bf3-aaaaaaaaaaaa'
 const NO_PHOTO = 'bf32bf32-bf32-4bf3-8bf3-bbbbbbbbbbbb'
 const FOOD = 'bf32bf32-bf32-4bf3-8bf3-cccccccccccc'
 const LOG = 'bf32bf32-bf32-4bf3-8bf3-dddddddddddd'
+// Owned, not borrowed: the app creates the default meal types lazily on the first nutrition read, so
+// on a fresh CI database `(SELECT … LIMIT 1)` is NULL unless an earlier spec in the shard visited
+// Nutrition (LA-176, #2930).
+const MEAL_TYPE = 'bf32bf32-bf32-4bf3-8bf3-eeeeeeeeeeee'
 const NAME_WITH = 'BF32 Has Photo'
 const NAME_WITHOUT = 'BF32 No Photo'
 
@@ -54,12 +58,15 @@ test.beforeAll(async () => {
     // The day screen has no diary rows unless something is logged, and a spec that asserts on an
     // empty list passes for the wrong reason. Dated in the USER's zone, not the runner's.
     await db.query('DELETE FROM food_logs WHERE id = $1', [LOG])
+    await db.query('DELETE FROM meal_types WHERE id = $1', [MEAL_TYPE])
+    await db.query(
+      `INSERT INTO meal_types (id, user_id, name, sort_order) VALUES ($1, $2, 'Spec Meal', 0)`,
+      [MEAL_TYPE, userId])
     await db.query(
       `INSERT INTO food_logs (id, user_id, date, meal_type_id, food_item_id, quantity_multiplier, logged_at)
        SELECT $1, $2, to_char((now() AT TIME ZONE 'Australia/Brisbane')::date, 'YYYY-MM-DD'),
-              (SELECT id FROM meal_types WHERE user_id = $2 AND deleted_at IS NULL LIMIT 1),
-              $3, 1, now() - interval '3 hours'`,
-      [LOG, userId, FOOD])
+              $4, $3, 1, now() - interval '3 hours'`,
+      [LOG, userId, FOOD, MEAL_TYPE])
   })
 })
 
@@ -68,6 +75,7 @@ test.afterAll(async () => {
     await db.query('DELETE FROM saved_meal_items WHERE saved_meal_id = ANY($1)', [[WITH_PHOTO, NO_PHOTO]])
     await db.query('DELETE FROM saved_meals WHERE id = ANY($1)', [[WITH_PHOTO, NO_PHOTO]])
     await db.query('DELETE FROM food_logs WHERE id = $1', [LOG])
+    await db.query('DELETE FROM meal_types WHERE id = $1', [MEAL_TYPE])
     await db.query('DELETE FROM food_items WHERE id = $1', [FOOD])
   })
 })
