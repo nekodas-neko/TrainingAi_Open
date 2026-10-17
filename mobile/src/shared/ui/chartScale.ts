@@ -1,4 +1,4 @@
-import { seriesShape } from '@trainingai/shared/health/series-gaps';
+import { standaloneOrLatest } from '@trainingai/shared/health/series-gaps';
 
 // Pure geometry for the chart components' opt-in axes, gridlines and target line. Kept free of
 // React so it can be unit-tested. `niceTicks` used to live in the nutrition feature; it is here
@@ -106,9 +106,6 @@ export function pointCentreX(
  * all), as the current app's sparklines do.
  */
 export function dotMask(values: readonly (number | null)[], mode: 'all' | 'isolated'): boolean[] {
-  const { isolated } = seriesShape([...values]);
-  return values.map(
-    (value, index) =>
-      value !== null && (mode === 'all' || index === values.length - 1 || isolated[index]),
-  );
+  const standalone = standaloneOrLatest([...values]);
+  return values.map((value, index) => value !== null && (mode === 'all' || standalone[index]));
 }

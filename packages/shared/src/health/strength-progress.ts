@@ -111,3 +111,22 @@ export function computeBarMetric(ex: StrengthReading, mode: StrengthMode): BarMe
   const label = max1rm > 0 ? `${Math.round(max1rm)} kg` : `${ex.weight} kg`
   return { pct, label, color: trendColor(trend, pct), trend, delta, deltaUnit }
 }
+
+/**
+ * Strength rows grouped by session in order of first appearance: only exercises with a 1RM, and a
+ * session with no row left under `mode` is dropped rather than shown as a bare header. The web card
+ * and the native Progress panel both group through this.
+ */
+export function strengthGroups<T extends StrengthReading & { sessionName: string }>(
+  exercises: readonly T[],
+  mode: StrengthMode,
+): { session: string; rows: { exercise: T; metric: BarMetric }[] }[] {
+  const groups = new Map<string, { exercise: T; metric: BarMetric }[]>()
+  for (const exercise of exercises) {
+    if (exercise.estimated1rm == null) continue
+    const metric = computeBarMetric(exercise, mode)
+    if (!metric) continue
+    groups.set(exercise.sessionName, [...(groups.get(exercise.sessionName) ?? []), { exercise, metric }])
+  }
+  return [...groups].map(([session, rows]) => ({ session, rows }))
+}

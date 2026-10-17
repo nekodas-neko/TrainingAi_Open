@@ -5,7 +5,7 @@ import { Dumbbell, TriangleAlert } from 'lucide-react'
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { accentCardStyle } from '@trainingai/shared/utils'
-import { computeBarMetric, strengthDeltaText, TREND_COLOR, type BarMetric, type StrengthMode } from '@trainingai/shared/health/strength-progress'
+import { strengthDeltaText, strengthGroups, TREND_COLOR, type StrengthMode } from '@trainingai/shared/health/strength-progress'
 import type { ExerciseSummary } from '@/app/api/weights-summary/route'
 
 interface SummaryData {
@@ -45,15 +45,7 @@ export const StrengthProgressCard = memo(function StrengthProgressCard() {
     }
   }
 
-  const sessionOrder: string[] = []
-  const bySession = new Map<string, ExerciseSummary[]>()
-  for (const ex of withData) {
-    if (!bySession.has(ex.sessionName)) {
-      bySession.set(ex.sessionName, [])
-      sessionOrder.push(ex.sessionName)
-    }
-    bySession.get(ex.sessionName)!.push(ex)
-  }
+  const groups = strengthGroups(withData, mode)
 
   return (
     <div className="rounded-2xl p-4" style={accentCardStyle('#bf5fff')}>
@@ -99,21 +91,14 @@ export const StrengthProgressCard = memo(function StrengthProgressCard() {
       </div>
 
       <div className="space-y-5">
-        {sessionOrder.map(sessionName => {
-          const rows: { ex: ExerciseSummary; metric: BarMetric }[] = []
-          for (const ex of bySession.get(sessionName)!) {
-            const metric = computeBarMetric(ex, mode)
-            if (metric) rows.push({ ex, metric })
-          }
-          if (rows.length === 0) return null
-
+        {groups.map(({ session: sessionName, rows }) => {
           return (
             <div key={sessionName}>
               <h3 className="text-[10px] font-semibold uppercase tracking-wide mb-3" style={{ color: '#bf5fff' }}>
                 {sessionName}
               </h3>
               <div className="space-y-4">
-                {rows.map(({ ex, metric }) => {
+                {rows.map(({ exercise: ex, metric }) => {
                   const delta = strengthDeltaText(metric)
                   return (
                   <div key={ex.exercise} className="flex items-center gap-3">

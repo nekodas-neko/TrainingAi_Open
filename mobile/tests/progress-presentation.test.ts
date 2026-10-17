@@ -97,8 +97,8 @@ test('goal counts group digits and tick when met', () => {
   assert.equal(goalCountText(2, 4, true), 'This week: 2 / 4');
 });
 
-test('a goal that prints as met carries its tick', () => {
-  assert.equal(goalCountText(7.96, 8, false), '8 / 8 ✓');
+test('a goal ticks only when the raw value reaches it, as the current app does', () => {
+  assert.equal(goalCountText(7.96, 8, false), '8 / 8');
   assert.equal(goalCountText(7.9, 8, false), '7.9 / 8');
 });
 
@@ -109,6 +109,13 @@ function luminance(hex: string) {
     return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
   });
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+/** `#rrggbbaa` painted over an opaque `#rrggbb`. */
+function over(fg: string, bg: string) {
+  const alpha = parseInt(fg.slice(7, 9), 16) / 255;
+  const mix = (shift: number) =>
+    Math.round(((parseInt(fg.slice(1, 7), 16) >> shift) & 255) * alpha + ((parseInt(bg.slice(1), 16) >> shift) & 255) * (1 - alpha));
+  return `#${[16, 8, 0].map((s) => mix(s).toString(16).padStart(2, '0')).join('')}`;
 }
 function contrast(a: string, b: string) {
   const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
@@ -129,6 +136,11 @@ test('progress and training colours stay readable on the card in both themes', (
     ];
     for (const color of texts) {
       assert.ok(contrast(color, theme.colors.surface) >= 4.5, `${mode} ${color}`);
+    }
+    // The Strength card tints itself `${accent}18` over the screen, which is darker than the surface.
+    const tinted = over(`${theme.progress.strength}18`, theme.colors.surface);
+    for (const color of [theme.progress.trendUp, theme.progress.trendDown, theme.progress.strength]) {
+      assert.ok(contrast(color, tinted) >= 4.5, `${mode} ${color} on the tinted Strength card`);
     }
   }
 });

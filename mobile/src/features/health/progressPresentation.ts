@@ -1,9 +1,7 @@
 import {
-  computeBarMetric,
   strengthDeltaText,
+  strengthGroups,
   type BarMetric,
-  type StrengthMode,
-  type StrengthReading,
 } from '@trainingai/shared/health/strength-progress';
 
 // Colours and wording for Health > Progress, matching the current app's Strength Progress and
@@ -22,6 +20,9 @@ export function strengthFillPct(pct: number): number {
   return Math.max(pct, STRENGTH_BAR_MIN_PCT);
 }
 
+// The session grouping is shared with the web card: re-exported here for the Progress panel.
+export { strengthGroups };
+
 /** The delta text beside a bar (shared with the current app) in the theme's better / worse colour. */
 export function strengthDelta(
   metric: BarMetric,
@@ -30,27 +31,6 @@ export function strengthDelta(
   const text = strengthDeltaText(metric);
   if (text === null) return null;
   return { text, color: metric.trend === 'up' ? colors.trendUp : colors.trendDown };
-}
-
-type StrengthExercise = StrengthReading & { exercise: string; sessionName: string };
-
-/**
- * The Strength Progress rows grouped by session, as the current app draws them: only exercises with
- * a 1RM, and a session with no row left under the chosen mode is dropped rather than shown as a bare
- * header.
- */
-export function strengthGroups<T extends StrengthExercise>(
-  exercises: readonly T[],
-  mode: StrengthMode,
-): { session: string; rows: { exercise: T; metric: BarMetric }[] }[] {
-  const groups = new Map<string, { exercise: T; metric: BarMetric }[]>();
-  for (const exercise of exercises) {
-    if (exercise.estimated1rm == null) continue;
-    const metric = computeBarMetric(exercise, mode);
-    if (!metric) continue;
-    groups.set(exercise.sessionName, [...(groups.get(exercise.sessionName) ?? []), { exercise, metric }]);
-  }
-  return [...groups].map(([session, rows]) => ({ session, rows }));
 }
 
 /** The session of the most recently trained exercise that has a reading, as the current app marks it. */
@@ -76,7 +56,7 @@ const formatCount = (n: number) => roundCount(n).toLocaleString('en-US');
 
 /** "3,200 / 8,000", "This week: 3 / 4", with a tick once the goal is met. */
 export function goalCountText(value: number, goal: number, weekly: boolean): string {
-  // Compared as printed, so "8 / 8" always carries its tick (7.96 prints as 8).
-  const done = goal > 0 && roundCount(value) >= roundCount(goal);
+  // The raw values, as the current app's GoalProgressBar does: 7.96 of 8 prints "8 / 8" without a tick.
+  const done = goal > 0 && value >= goal;
   return `${weekly ? 'This week: ' : ''}${formatCount(value)} / ${formatCount(goal)}${done ? ' ✓' : ''}`;
 }

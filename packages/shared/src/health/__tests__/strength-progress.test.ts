@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeBarMetric, strengthDeltaText, TREND_COLOR } from '../strength-progress'
+import { computeBarMetric, strengthDeltaText, strengthGroups, TREND_COLOR } from '../strength-progress'
 import type { ExerciseSummary } from '@/app/api/weights-summary/route'
 
 function makeExercise(overrides: Partial<ExerciseSummary> = {}): ExerciseSummary {
@@ -170,5 +170,51 @@ describe('strengthDeltaText', () => {
 
   it('keeps the two trend colours the web card used', () => {
     expect(TREND_COLOR).toEqual({ up: '#22c55e', down: '#f87171' })
+  })
+})
+
+describe('strengthGroups', () => {
+  const lift = (exercise: string, sessionName: string, extra = {}) => ({
+    exercise,
+    sessionName,
+    estimated1rm: 100 as number | null,
+    previousEstimated1rm: 90 as number | null,
+    personalRecord1rm: 100 as number | null,
+    weight: 80 as number | null,
+    exerciseType: 'weighted' as const,
+    lastReps: null,
+    maxReps: null,
+    ...extra,
+  })
+  const exercises = [
+    lift('Squat', 'Legs', { estimated1rm: null }),
+    lift('Bench', 'Push'),
+    lift('Press', 'Push', { weight: null }),
+    lift('Row', 'Pull', { weight: null }),
+  ]
+
+  it('drops rows without a 1RM and sessions left with no row', () => {
+    const names = (mode: 'working' | 'latest') =>
+      strengthGroups(exercises, mode).map(g => [g.session, g.rows.map(r => r.exercise.exercise)])
+    expect(names('working')).toEqual([['Push', ['Bench']]])
+    expect(names('latest')).toEqual([['Push', ['Bench', 'Press']], ['Pull', ['Row']]])
+  })
+
+  // The web card used to group inline; this is that loop, kept to show its output is unchanged.
+  it('matches the web card\'s former inline grouping', () => {
+    for (const mode of ['working', 'latest'] as const) {
+      const withData = exercises.filter(e => e.estimated1rm != null)
+      const order: string[] = []
+      const by = new Map<string, typeof withData>()
+      for (const e of withData) {
+        if (!by.has(e.sessionName)) { by.set(e.sessionName, []); order.push(e.sessionName) }
+        by.get(e.sessionName)!.push(e)
+      }
+      const old = order
+        .map(s => [s, by.get(s)!.flatMap(e => { const m = computeBarMetric(e, mode); return m ? [{ exercise: e, metric: m }] : [] })] as const)
+        .filter(([, rows]) => rows.length > 0)
+        .map(([session, rows]) => ({ session, rows }))
+      expect(strengthGroups(withData, mode)).toEqual(old)
+    }
   })
 })

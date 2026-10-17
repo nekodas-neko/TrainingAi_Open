@@ -191,7 +191,7 @@ export const domainTones = {
 export const progressColors = {
   light: {
     strength: '#7e22ce',
-    trendUp: '#15803d',
+    trendUp: '#166534',
     trendDown: '#b91c1c',
     goals: {
       Steps: '#15803d',

@@ -46,8 +46,11 @@ export const GENERIC_HIGH = 15
 /** The top of the generic band's printed range, and the least a muscle bar's scale reaches. */
 export const MAX_TARGET = 20
 
-/** Sets from which `targetBand` calls a week "approaching" the generic target (60%, rounded up). */
-const GENERIC_APPROACHING = Math.ceil((GENERIC_TARGET * 3) / 5)
+/** Sets from which `targetBand` calls a week "approaching" the generic target; read off the rule
+ *  itself so the legend cannot drift from it. */
+const GENERIC_APPROACHING = Array.from({ length: GENERIC_TARGET }, (_, sets) => sets).find(
+  sets => targetBand(sets, GENERIC_TARGET) === 'approaching',
+) as number
 
 /**
  * The generic band's legend, top to bottom, in words. Derived from the same constants the colours

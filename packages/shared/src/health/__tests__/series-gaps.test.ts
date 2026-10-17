@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { trimLeadingGaps } from '@trainingai/shared/health/series-gaps'
+import { standaloneOrLatest, trimLeadingGaps } from '@trainingai/shared/health/series-gaps'
 
 const read = (row: { v: number | null | undefined }) => row.v
 
@@ -16,5 +16,12 @@ describe('trimLeadingGaps', () => {
   it('is null when no day has a reading, and for no days at all', () => {
     expect(trimLeadingGaps([{ v: null }, { v: undefined }], read)).toBeNull()
     expect(trimLeadingGaps([], read)).toBeNull()
+  })
+})
+
+describe('standaloneOrLatest', () => {
+  it('marks the latest point and any reading with no neighbour', () => {
+    expect(standaloneOrLatest([1, null, 2, 3, null, 4, null, 5])).toEqual([true, false, false, false, false, true, false, true])
+    expect(standaloneOrLatest([1, 2, 3])).toEqual([false, false, true])
   })
 })

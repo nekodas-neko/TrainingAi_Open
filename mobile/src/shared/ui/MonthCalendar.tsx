@@ -18,6 +18,7 @@ export function MonthCalendar({
   status,
   nativeStyle = false,
   restLabel = false,
+  topAligned = false,
 }: {
   month: string;
   today: string;
@@ -33,6 +34,9 @@ export function MonthCalendar({
   // Name a past day with nothing on it "rest" where its dots would be (native style only), so a
   // rest day reads differently from a day that was never recorded. Pass it once the month has loaded.
   restLabel?: boolean;
+  /** Date at the top of its cell, leaving the bottom for the "rest" label. Fixed for the host's
+   *  lifetime (not tied to loading) so dates never move when data lands. */
+  topAligned?: boolean;
 }) {
   const { theme } = useTheme();
   const [year, number] = month.split('-').map(Number);
@@ -102,8 +106,8 @@ export function MonthCalendar({
                     flex: 1,
                     alignItems: 'center',
                     // The rest label sits under the date, so the date moves up to make room.
-                    justifyContent: restLabel ? 'flex-start' : 'center',
-                    paddingTop: restLabel ? theme.spacing.xxs : 0,
+                    justifyContent: topAligned ? 'flex-start' : 'center',
+                    paddingTop: topAligned ? theme.spacing.xxs : 0,
                     opacity: pressed ? 0.6 : 1,
                   })}
                 >
@@ -162,7 +166,7 @@ export function MonthCalendar({
                   pointerEvents="none"
                   style={{ position: 'absolute', bottom: 0, alignSelf: 'center' }}
                 >
-                  <AppText variant="micro" tone="muted">
+                  <AppText variant="micro" tone="muted" style={{ textTransform: 'uppercase' }}>
                     rest
                   </AppText>
                 </View>
