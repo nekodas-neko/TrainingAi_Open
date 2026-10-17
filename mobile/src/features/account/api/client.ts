@@ -1,11 +1,32 @@
+import { AI_PAUSED_CODE, AI_PAUSED_MESSAGE, aiPausedMessage } from '@trainingai/shared/ai-paused-notice';
+
 export class ApiError extends Error {
   status: number;
   code?: string;
-  constructor(status: number, code?: string) {
+  /** Set only for the AI-paused 503: the fixed sentence a screen may show as it is. */
+  notice?: string;
+  constructor(status: number, code?: string, notice?: string) {
     super(`TrainingAi request failed (${status}).`);
     this.status = status;
     this.code = code;
+    this.notice = notice;
   }
+}
+/**
+ * The error for a failed response whose body (already parsed, or null) may be the paused notice.
+ * Only the fixed sentence is kept, never the body's own text.
+ */
+function failedRequest(status: number, body: unknown, code?: string) {
+  return aiPausedMessage(status, body) === null
+    ? new ApiError(status, code)
+    : new ApiError(status, AI_PAUSED_CODE, AI_PAUSED_MESSAGE);
+}
+/** The paused sentence for an AI failure, else the caller's own line. Never any other server text. */
+export function aiFailureText(error: unknown, fallback: string): string {
+  if (error instanceof ApiError && error.notice) return error.notice;
+  // A Coach reply that fails after the stream opened arrives as an error part holding the sentence.
+  if (error instanceof Error && error.message === AI_PAUSED_MESSAGE) return AI_PAUSED_MESSAGE;
+  return fallback;
 }
 export function backendOrigin(baseUrl: string): string {
   const base = new URL(baseUrl);
@@ -97,13 +118,14 @@ export function createApiClient(
       });
       if (!response.ok) {
         let code: string | undefined;
+        let value: { error?: unknown } | null = null;
         if (response.headers.get('content-type')?.includes('application/json')) {
-          const value = (await response.json().catch(() => null)) as { error?: unknown } | null;
+          value = (await response.json().catch(() => null)) as { error?: unknown } | null;
           if (typeof value?.error === 'string' && /^[a-z_]{1,64}$/.test(value.error)) {
             code = value.error;
           }
         }
-        throw new ApiError(response.status, code);
+        throw failedRequest(response.status, value, code);
       }
       if (path === '/api/session-explain/insight') {
         if (!response.headers.get('content-type')?.includes('text/plain'))
@@ -165,7 +187,7 @@ export function createApiClient(
         signal,
       });
       if (!response.ok) {
-        throw new ApiError(response.status);
+        throw failedRequest(response.status, await response.json().catch(() => null));
       }
       if (
         !response.headers.get('content-type')?.includes('text/event-stream') ||

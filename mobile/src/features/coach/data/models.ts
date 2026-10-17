@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { UIMessage } from 'ai';
 import type { ResourceSpec } from '../../workouts/data/WorkoutResources.ts';
+import { aiFailureText } from '../../account/api/client.ts';
 
 export const scopes = ['general', 'nutrition'] as const;
 export type CoachScope = (typeof scopes)[number];
@@ -98,7 +99,7 @@ export function coachError(error: unknown, action = 'get a reply') {
     return 'Check your sign-in and account access to use Coach.';
   if (status === 429) return 'Coach is busy. Wait a moment, then retry.';
   if (status === 400) return 'Coach could not use this suggestion. Ask for a fresh one.';
-  return `Could not ${action}. Check your connection and retry.`;
+  return aiFailureText(error, `Could not ${action}. Check your connection and retry.`);
 }
 export function when(iso: string, timezone: string) {
   try {

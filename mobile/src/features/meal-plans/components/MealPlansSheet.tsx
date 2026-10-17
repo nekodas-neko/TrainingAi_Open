@@ -53,6 +53,7 @@ import {
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { logPlanMeal, savePlanMeal } from './PlanMeals';
 import { PlanStructure } from './PlanStructure';
+import { aiFailureText } from '../../account/api/client';
 const configSchema = z.object({
   typedMeals: z
     .array(
@@ -205,7 +206,10 @@ export function MealPlansSheet({
       setError(
         cause instanceof UnconfirmedCreate
           ? cause.message
-          : 'Could not complete this action. Your edits are still here; retry when connected.',
+          : aiFailureText(
+              cause,
+              'Could not complete this action. Your edits are still here; retry when connected.',
+            ),
       );
     } finally {
       setBusy(false);

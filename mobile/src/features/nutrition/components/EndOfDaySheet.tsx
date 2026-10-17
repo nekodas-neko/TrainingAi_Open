@@ -38,6 +38,7 @@ import { STEP_TITLES, visibleReviewSteps } from '../data/review-steps';
 import { DayReviewTrends, MealBackfill } from './DayReviewDetails';
 import { FoodLogger } from './FoodLogger';
 import { DayTotals } from './DayTotals';
+import { aiFailureText } from '../../account/api/client';
 const scalesSchema = z.object({
   physicalTiredness: z.number().min(1).max(5),
   mentalDrain: z.number().min(1).max(5),
@@ -157,9 +158,9 @@ export function EndOfDaySheet({ date, onClose }: { date: string; onClose: () => 
         if (active) {
           setDigest(response.digest);
         }
-      } catch {
+      } catch (cause) {
         if (active) {
-          setDigestError('Could not load the day’s summary.');
+          setDigestError(aiFailureText(cause, 'Could not load the day’s summary.'));
         }
       }
     })();

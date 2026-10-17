@@ -31,6 +31,7 @@ import { IngredientPicker } from './IngredientPicker';
 import { MealLabelSheet } from './MealLabelSheet';
 import { recipeCountLine } from '../data/display';
 import { MacroLine } from './NutritionElements';
+import { aiFailureText } from '../../account/api/client';
 const editorSchema = z.object({
   name: z.string(),
   servings: z.string(),
@@ -177,8 +178,8 @@ export function RecipesSheet({
           setError('Recipe yield was not stated. Review the portions before saving.');
         }
       }
-    } catch {
-      setError('Could not import this recipe. Your draft is preserved.');
+    } catch (cause) {
+      setError(aiFailureText(cause, 'Could not import this recipe. Your draft is preserved.'));
     } finally {
       setBusy(false);
     }

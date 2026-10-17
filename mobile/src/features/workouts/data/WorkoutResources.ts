@@ -2,7 +2,7 @@ import type { ZodType } from 'zod';
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import { RefreshPolicy } from '../../../core/sync/RefreshPolicy.ts';
 import type { AccountConnection } from '../../account/session.ts';
-import { ApiError } from '../../account/api/client.ts';
+import { ApiError, aiFailureText } from '../../account/api/client.ts';
 import { overlayHistory, type HistoryOperation } from './HistoryOutbox.ts';
 import { TrainingStore } from './TrainingStore.ts';
 
@@ -329,9 +329,12 @@ export class WorkoutResources {
         saved: entry.state.data !== null,
         error: denied
           ? 'Check your account to access this view.'
-          : entry.state.data
-            ? 'Could not update this view. Showing saved data.'
-            : 'Could not load this view. Check your connection and retry.',
+          : aiFailureText(
+              error,
+              entry.state.data
+                ? 'Could not update this view. Showing saved data.'
+                : 'Could not load this view. Check your connection and retry.',
+            ),
       });
     }
   }
