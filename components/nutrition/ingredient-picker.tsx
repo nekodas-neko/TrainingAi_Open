@@ -241,6 +241,7 @@ export function IngredientPicker({
     try {
       const outcome = await runRecipeImport(payload, fallbackName, userId)
       if (outcome.kind === 'empty') { toast.error(offlineHint() ?? emptyMessage); return }
+      if (outcome.kind === 'paused') { toast.error(outcome.message); return }
       if (outcome.kind === 'error') { toast.error(offlineHint() ?? 'Could not read that recipe'); return }
       if (outcome.kind === 'candidates') { onRecipeCandidates(outcome.candidates) }
       else { onImportRecipe(outcome.recipe) }

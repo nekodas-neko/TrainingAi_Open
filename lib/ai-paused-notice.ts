@@ -31,10 +31,13 @@ export async function readAiPausedMessage(res: Response): Promise<string | null>
 
 /**
  * For a library that throws on a non-ok response with the body text as the message (`useChat`
- * does), so the notice arrives as a JSON string inside an Error.
+ * does), so the notice arrives as a JSON string inside an Error, or as the bare sentence when it
+ * came as a stream error part.
  */
 export function aiPausedMessageFromError(err: unknown): string | null {
   const text = err instanceof Error ? err.message : typeof err === 'string' ? err : ''
+  // A mid-stream failure (Coach) arrives as the bare sentence, not a JSON body.
+  if (text === AI_PAUSED_MESSAGE) return text
   if (!text.includes(AI_PAUSED_CODE)) return null
   try { return aiPausedMessage(503, JSON.parse(text)) } catch { return null }
 }

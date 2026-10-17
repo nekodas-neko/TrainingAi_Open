@@ -92,12 +92,6 @@ describe('every client caller of an AI route handles the paused notice', () => {
     'components/nutrition/meal-plan-review-step.tsx',
     'components/nutrition/meal-plan-edit-sheet.tsx',
   ])
-  /** Per-row or per-outcome failure states with no sentence to put the notice in; tracked in issue 2890. */
-  const KNOWN_GAPS = new Set([
-    'components/nutrition/my-meals-picker.tsx',
-    'components/nutrition/recipe-import-run.ts',
-  ])
-
   it('Coach, which goes through useChat rather than fetch, reads the notice from the thrown error', () => {
     expect(readFileSync(path.join(ROOT, 'app/coach/coach-content.tsx'), 'utf8')).toMatch(/aiPausedMessageFromError\(error\)/)
   })
@@ -111,8 +105,6 @@ describe('every client caller of an AI route handles the paused notice', () => {
     const reads = /@\/lib\/ai-paused-notice/.test(src)
     if (SHOWS_SERVER_TEXT.has(rel)) {
       expect(src, 'must still show the server error text').toMatch(/\.error\b/)
-    } else if (KNOWN_GAPS.has(rel)) {
-      expect(reads, 'now handled — remove it from KNOWN_GAPS').toBe(false)
     } else {
       expect(reads, 'import and use the paused-notice helpers, or add this file to SHOWS_SERVER_TEXT with the reason').toBe(true)
     }

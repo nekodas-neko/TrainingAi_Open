@@ -1,6 +1,7 @@
 import type { FoodItem, NutritionIngredient } from '@trainingai/shared/types/nutrition'
 import { ingredientToEntry } from '@trainingai/shared/nutrition/log-plan-meal'
 import { createFoodItem } from '@trainingai/shared/nutrition/create-food-item'
+import { readAiPausedMessage } from '@/lib/ai-paused-notice'
 import type { RecipeCandidate } from './recipe-candidates'
 
 export interface ImportedRecipe {
@@ -15,6 +16,8 @@ export type RecipeImportOutcome =
   | { kind: 'candidates'; candidates: RecipeCandidate[] }
   | { kind: 'empty' }
   | { kind: 'error' }
+  /** The AI balance is empty (issue 2890): `message` is the server's sentence, to show as is. */
+  | { kind: 'paused'; message: string }
 
 /**
  * Turning one `/api/nutrition/scan` response into a meal's ingredients (BF-52).
@@ -47,6 +50,8 @@ export async function runRecipeImport(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
+    const paused = res.ok ? null : await readAiPausedMessage(res)
+    if (paused) return { kind: 'paused', message: paused }
     const body = res.ok ? await res.json() : null
     const ingredients: NutritionIngredient[] = Array.isArray(body?.ingredients) ? body.ingredients : []
     if (ingredients.length === 0) return { kind: 'empty' }
