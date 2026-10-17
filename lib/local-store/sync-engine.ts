@@ -258,7 +258,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     syncStatus:    'synced' as const,
   } satisfies LocalSetLog));
 
-  const personalRecords = ((raw.personalRecords ?? []) as Record<string, unknown>[]).map(r => ({
+  const serverBests = ((raw.personalRecords ?? []) as Record<string, unknown>[]).map(r => ({
     exerciseName: String(r.exerciseName),
     exerciseId:   r.exerciseId ? String(r.exerciseId) : null,
     estimated1rm: Number(r.estimated1rm),
@@ -266,6 +266,19 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
     updatedAt:    r.updatedAt ? toIso(r.updatedAt) : toIso(r.achievedAt),
     syncStatus:   'synced' as const,
   } satisfies LocalPersonalRecord));
+
+  // Issue 2763: the server sends every best (the table has no `updated_at` to cursor on), so only
+  // the ones that differ from the local copy count as changes, or every pull would read as news.
+  // `personalRecordsComplete` also means a best missing from the set is gone on the server.
+  const bestsComplete = raw.personalRecordsComplete === true;
+  let personalRecords = serverBests;
+  if (bestsComplete) {
+    const local = new Map((await store!.getPersonalRecords()).map(b => [b.exerciseName, b]));
+    personalRecords = serverBests.filter(b => {
+      const have = local.get(b.exerciseName);
+      return !have || have.estimated1rm !== b.estimated1rm || have.achievedAt !== b.achievedAt || have.exerciseId !== b.exerciseId;
+    });
+  }
 
   const ouraDaily = ((raw.ouraDaily ?? []) as Record<string, unknown>[]).map(r => ({
     day:                  String(r.day),
@@ -699,12 +712,14 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
   const count = Object.values(delta).reduce((n, rows) => n + rows.length, 0);
 
   let prunedPrograms = 0;
+  let prunedBests = 0;
   try {
     await store!.applyDelta(delta);
     // RV-174: a deleted program or style leaves no row in any delta, so the mirror is pruned to the
     // server's roster. Only when the server sent one — an absent roster must never read as "none".
     const asIds = (v: unknown) => (Array.isArray(v) ? v.map(String) : undefined);
     prunedPrograms = await store!.pruneProgramStructure(asIds(raw.programRoster), asIds(raw.progressionStyleRoster));
+    if (bestsComplete) prunedBests = await store!.prunePersonalRecords(serverBests.map(b => b.exerciseName));
     await store!.setLastSyncAt(raw.syncedAt);
   } catch (err) {
     // A broken local schema throws here, not at the fetch — and this used to propagate straight
@@ -716,7 +731,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
   }
 
   return {
-    count: count + prunedPrograms,
+    count: count + prunedPrograms + prunedBests,
     domains: {
       biometrics:  bodyMetrics.length > 0 || moodLogs.length > 0 || sleepSessions.length > 0,
       programs:    prunedPrograms > 0 || programs.length > 0 || progressionStyles.length > 0 ||
@@ -725,7 +740,7 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
       // set_logs are cursored on their own `updated_at`, so a set edited on its own arrives without
       // its exercise log — and every workout summary is derived from sets.
       workouts:    workoutSessions.length > 0 || exerciseLogs.length > 0 || setLogs.length > 0 ||
-                   personalRecords.length > 0,
+                   personalRecords.length > 0 || prunedBests > 0,
       nutrition:   foodItems.length > 0 || foodLogs.length > 0,
       supplements: supplements.length > 0 || supplementLogs.length > 0,
       activity:    activityLogs.length > 0,
@@ -1221,7 +1236,9 @@ async function pushMutationsOnce(userId: string): Promise<PushResult> {
       const wsId = m.payload.workoutSessionId as string | undefined;
       const exerciseLogId = m.payload.exerciseLogId as string | undefined;
       if (wsId && exerciseLogId) await store.markWorkoutSynced(wsId, exerciseLogId);
-      if (exerciseLogId && superseded.has(m.id)) await store.dropUnpulledSetsOfSupersededLog(exerciseLogId);
+      // A superseded `workout_log` needs no sweep (issue 2721 note): its replay reuses the server's
+      // set ids and adds no phantom sets, while its local sets stay unsynced until the next pull, so
+      // dropping them here would blank the log until then.
     } else if (m.domain === 'session_rpe' || m.domain === 'complete_workout') {
       const wsId = m.payload.workoutSessionId as string | undefined;
       if (wsId) await store.markSessionSynced(wsId, batchIds);

@@ -2823,7 +2823,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       if (existing.createdBy !== userId) throw new UserFacingError('Not authorized to rename this exercise', 403)
       const oldName = existing.name
       await tx.update(s.sessionExercises).set({ exerciseName: newName }).where(eq(s.sessionExercises.exerciseName, oldName))
-      await tx.update(s.exerciseLogs).set({ exerciseName: newName }).where(eq(s.exerciseLogs.exerciseName, oldName))
+      // Issue 2939: a rename is a server-decided edit of the log, so it stamps like the lbs-to-kg fix does;
+      // without it a stale phone replay puts the old name back, and without `updatedAt` phones never pull the new one.
+      await tx.update(s.exerciseLogs).set({ exerciseName: newName, updatedAt: sql`now()`, clientEditedAt: sql`now()` }).where(eq(s.exerciseLogs.exerciseName, oldName))
       await tx.update(s.personalRecords).set({ exerciseName: newName }).where(eq(s.personalRecords.exerciseName, oldName))
       const [row] = await tx.update(s.exerciseLibrary).set({ name: newName }).where(eq(s.exerciseLibrary.id, id)).returning()
       return { id: row.id, name: row.name, muscles: row.muscles as MuscleAssignment[], equipment: row.equipment ?? [], instructions: row.instructions ?? undefined, createdBy: row.createdBy ?? undefined, exerciseType: (row.exerciseType as ExerciseType) ?? 'weighted' }
@@ -2844,7 +2846,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         if (conflict) throw new UserFacingError(`An exercise named "${newName}" already exists`, 409)
 
         await tx.update(s.sessionExercises).set({ exerciseName: newName }).where(eq(s.sessionExercises.exerciseName, oldName))
-        await tx.update(s.exerciseLogs).set({ exerciseName: newName }).where(eq(s.exerciseLogs.exerciseName, oldName))
+        // Issue 2939: a rename is a server-decided edit of the log, so it stamps like the lbs-to-kg fix does;
+      // without it a stale phone replay puts the old name back, and without `updatedAt` phones never pull the new one.
+      await tx.update(s.exerciseLogs).set({ exerciseName: newName, updatedAt: sql`now()`, clientEditedAt: sql`now()` }).where(eq(s.exerciseLogs.exerciseName, oldName))
         await tx.update(s.personalRecords).set({ exerciseName: newName }).where(eq(s.personalRecords.exerciseName, oldName))
         // Old name's cached GIF is now orphaned — the route re-sets or clears the cache for
         // the new name based on the submitted gifUrl.
@@ -5048,10 +5052,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         estimated1rm: s.personalRecords.estimated1rm,
         achievedAt:   s.personalRecords.achievedAt,
       }).from(s.personalRecords)
-        .where(and(
-          eq(s.personalRecords.userId, userId),
-          or(isNull(s.personalRecords.achievedAt), gt(s.personalRecords.achievedAt, effectiveSince)),
-        )),
+        // Every best, on every page (issue 2763): the table has no `updated_at`, so `achieved_at >
+        // since` cannot see a best re-dated into the past, and the device would keep the old one.
+        // One row per exercise, so re-reading the set is cheap; the device diffs it and prunes
+        // against it (`personalRecordsComplete`).
+        .where(eq(s.personalRecords.userId, userId)),
       this.db.select({
         day:                  s.ouraDaily.date,
         readinessScore:       s.ouraDaily.readinessScore,
@@ -5287,6 +5292,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
                ...r,
                updatedAt: r.achievedAt ?? new Date(0),
              })),
+             personalRecordsComplete: true,
              ouraDaily: ouraDaily.map(r => ({
                ...r,
                contributors: r.contributors != null ? JSON.stringify(r.contributors) : null,
