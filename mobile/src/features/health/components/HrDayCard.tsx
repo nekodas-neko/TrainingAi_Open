@@ -1,3 +1,4 @@
+import { View } from 'react-native';
 import { bucketAverage, hrChartDomain } from '@trainingai/shared/health/hr-smoothing';
 import { dateStrMidnightInTz, formatMinutesOfDay } from '@trainingai/shared/date-utils';
 import { bedtimeToMinuteWindow } from '@trainingai/shared/health/hr-sleep-band';
@@ -74,6 +75,20 @@ export function HrDayCard({
       : []),
     { x: minute(p.t) / 60000, value: p.level },
   ]);
+  // Home's card shows a box as tall as the chart when there is nothing to draw, so the card does
+  // not jump when readings arrive.
+  if (embedded && readings.length < 2) {
+    const waiting = state.loading && !state.data;
+    return (
+      <View style={{ minHeight: theme.sizes.chartHeight, justifyContent: 'center' }}>
+        {!waiting && (
+          <AppText variant="caption" tone="muted">
+            {state.error && !state.data ? 'Couldn’t load heart rate' : 'No heart-rate data today'}
+          </AppText>
+        )}
+      </View>
+    );
+  }
   const lineColor = color === 'transparent' ? undefined : color;
   const hrColor = lineColor ?? theme.tones.heart.foreground;
   const hasWorkout = bands.some((b) => b.label === 'Workout');
@@ -113,7 +128,7 @@ export function HrDayCard({
         label="24h heart rate in bpm"
         tone="heart"
         bands={bands}
-        interactive
+        interactive={!embedded}
         series={
           stressPoints.length
             ? [

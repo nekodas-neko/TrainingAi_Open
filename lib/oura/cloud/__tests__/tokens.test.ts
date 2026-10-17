@@ -161,6 +161,19 @@ describe('Oura tokens: connect, refresh before expiry, disconnect (#2858)', () =
     expect(row.ouraUserId).toBe('oura-u1')
   })
 
+  // #2975 review: a refresh answer without `scope` must not wipe the stored grant's list.
+  it('keeps the stored scope when the refresh answer has none, and takes a new one when it has', async () => {
+    const store = fakeStore({ ...storedRow('acc-1', 'ref-1', NOW - 1), scope: 'extapi:personal extapi:daily' })
+    fetchMock.mockResolvedValueOnce(jsonResponse({ access_token: 'acc-2', refresh_token: 'ref-2', expires_in: 86400 }))
+    await getOuraAccessToken(store, CONFIG, USER, () => NOW)
+    expect(store.row()!.scope).toBe('extapi:personal extapi:daily')
+
+    await store.saveOuraCloudTokens(USER, { ...store.saves[0], expiresAt: new Date(NOW - 1), scope: store.row()!.scope })
+    fetchMock.mockResolvedValueOnce(jsonResponse({ access_token: 'acc-3', refresh_token: 'ref-3', expires_in: 86400, scope: 'extapi:daily extapi:heartrate' }))
+    await getOuraAccessToken(store, CONFIG, USER, () => NOW)
+    expect(store.row()!.scope).toBe('extapi:daily extapi:heartrate')
+  })
+
   it('runs one refresh for concurrent callers, because Oura rotates the refresh token', async () => {
     const store = fakeStore(storedRow('acc-1', 'ref-1', NOW - 1))
     let release!: (r: Response) => void

@@ -1,4 +1,4 @@
-import { Pressable, Image } from 'react-native';
+import { Pressable, Image, View } from 'react-native';
 import { AppText, IconButton, Stack, StatusIndicator } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { homeGreeting, profileDisplayName } from '@trainingai/shared/greeting';
@@ -15,6 +15,7 @@ export function HomeHeader({
   onProfile,
   editing = false,
   avatar,
+  badge = 0,
 }: {
   today: string;
   timezone: string;
@@ -27,6 +28,8 @@ export function HomeHeader({
   onProfile: () => void;
   editing?: boolean;
   avatar?: string | null;
+  /** Pending signups and feedback for an admin; nothing is drawn at 0. */
+  badge?: number;
 }) {
   const { theme } = useTheme();
   const date = new Intl.DateTimeFormat('en-AU', {
@@ -70,43 +73,66 @@ export function HomeHeader({
             onPress={onRefresh}
           />
         )}
-        <Pressable
-          onPress={onProfile}
-          accessibilityRole="button"
-          accessibilityLabel="Profile"
-          style={{
-            width: theme.sizes.touchTarget,
-            height: theme.sizes.touchTarget,
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: theme.radii.pill,
-            borderWidth: 1,
-            borderColor: theme.colors.brandBorder,
-            backgroundColor: theme.colors.brandSurface,
-          }}
-        >
-          {avatar ? (
-            <Image
-              alt=""
-              source={{ uri: avatar }}
+        <View>
+          <Pressable
+            onPress={onProfile}
+            accessibilityRole="button"
+            accessibilityLabel={badge > 0 ? `Profile, ${badge} waiting` : 'Profile'}
+            style={{
+              width: theme.sizes.touchTarget,
+              height: theme.sizes.touchTarget,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: theme.radii.pill,
+              borderWidth: 1,
+              borderColor: theme.colors.brandBorder,
+              backgroundColor: theme.colors.brandSurface,
+            }}
+          >
+            {avatar ? (
+              <Image
+                alt=""
+                source={{ uri: avatar }}
+                style={{
+                  width: theme.sizes.touchTarget,
+                  height: theme.sizes.touchTarget,
+                  borderRadius: theme.radii.pill,
+                }}
+              />
+            ) : (
+              <AppText variant="label" tone="brand">
+                {profileDisplayName(user)
+                  ?.trim()
+                  .split(/\s+/)
+                  .map((part) => part[0])
+                  .slice(0, 2)
+                  .join('')
+                  .toUpperCase() || 'TA'}
+              </AppText>
+            )}
+          </Pressable>
+          {badge > 0 && (
+            <View
+              pointerEvents="none"
               style={{
-                width: theme.sizes.touchTarget,
-                height: theme.sizes.touchTarget,
+                position: 'absolute',
+                top: -theme.spacing.xxs,
+                right: -theme.spacing.xxs,
+                minWidth: theme.spacing.lg,
+                height: theme.spacing.lg,
+                paddingHorizontal: theme.spacing.xxs,
                 borderRadius: theme.radii.pill,
+                backgroundColor: theme.colors.danger,
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
-            />
-          ) : (
-            <AppText variant="label" tone="brand">
-              {profileDisplayName(user)
-                ?.trim()
-                .split(/\s+/)
-                .map((part) => part[0])
-                .slice(0, 2)
-                .join('')
-                .toUpperCase() || 'TA'}
-            </AppText>
+            >
+              <AppText variant="micro" style={{ color: theme.colors.background }}>
+                {badge}
+              </AppText>
+            </View>
           )}
-        </Pressable>
+        </View>
       </Stack>
     </Stack>
   );
