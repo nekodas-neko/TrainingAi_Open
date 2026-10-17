@@ -753,6 +753,17 @@ export interface WorkoutRepository {
    *  an error here (unlike `setWorkoutSessionWarmupEnd`, where zero rows means "already set"). */
   setSessionRpe(userId: string, workoutSessionId: string, rpe: number): Promise<boolean>
   setWorkoutSessionWarmupEnd(userId: string, workoutSessionId: string, warmupEndedAt: Date): Promise<void>
+  /**
+   * Issue 2721: when `stamp` is a phone's edit time older than the log's last decided edit, touch the
+   * log and its sets so the pull brings the newer copy down, and return what the server holds. `null`
+   * means the push should be written (not superseded, not stamped, or no such log of this user's yet).
+   * Run before anything else the push writes, so a superseded push leaves the session alone too.
+   */
+  skipSupersededExerciseLogPush(
+    userId: string,
+    exerciseLogId: string,
+    stamp: EditStamp,
+  ): Promise<{ workoutSessionId: string; estimated1rm: number; target80: number } | null>
   logExerciseAndSets(
     userId: string,
     log: Omit<ExerciseLog, 'id' | 'sets'> & { exerciseLogId?: string },

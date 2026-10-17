@@ -227,18 +227,49 @@ interface LbsToKgFix {
   alreadyConverted: number
 }
 
+type SqlTx = { execute: (query: ReturnType<typeof sql>) => Promise<{ rows: unknown[]; rowCount?: number | null }> }
+
+/**
+ * Issue 2721: lock a log this user owns and read its stamp. `null` when the log is absent or not
+ * this user's. exercise_logs has no user_id, so ownership is through the session, as everywhere.
+ */
+async function lockOwnedExerciseLogStamp(
+  tx: SqlTx,
+  userId: string,
+  exerciseLogId: string,
+): Promise<{ clientEditedAt: Date | null } | null> {
+  const locked = await tx.execute(sql`
+    SELECT client_edited_at FROM exercise_logs
+    WHERE id = ${exerciseLogId}
+      AND workout_session_id IN (SELECT id FROM workout_sessions WHERE user_id = ${userId})
+    FOR UPDATE
+  `)
+  const row = locked.rows[0] as { client_edited_at: Date | string | null } | undefined
+  if (!row) return null
+  return { clientEditedAt: row.client_edited_at == null ? null : new Date(row.client_edited_at) }
+}
+
 /**
  * Issue 2721: move `updated_at` on a log and every one of its sets without changing their content,
  * so the delta pull (which cursors `exercise_logs` and `set_logs` separately, each on its own
  * `updated_at`) carries the server's copy back to a device whose stale push was just skipped.
+ * Scoped to the user's own log, which the caller has already locked.
  * `lib/workout/exercise-log-edits.ts` runs the same two statements on its own pg client.
  */
-async function touchExerciseLogTree(
-  tx: { execute: (query: ReturnType<typeof sql>) => Promise<unknown> },
-  exerciseLogId: string,
-): Promise<void> {
-  await tx.execute(sql`UPDATE exercise_logs SET updated_at = now() WHERE id = ${exerciseLogId}`)
-  await tx.execute(sql`UPDATE set_logs SET updated_at = now() WHERE exercise_log_id = ${exerciseLogId}`)
+async function touchExerciseLogTree(tx: SqlTx, userId: string, exerciseLogId: string): Promise<void> {
+  const touched = await tx.execute(sql`
+    UPDATE exercise_logs SET updated_at = now()
+    WHERE id = ${exerciseLogId}
+      AND workout_session_id IN (SELECT id FROM workout_sessions WHERE user_id = ${userId})
+  `)
+  if (touched.rowCount !== 1) throw new Error('exercise log not owned by user')
+  await tx.execute(sql`
+    UPDATE set_logs SET updated_at = now()
+    WHERE exercise_log_id IN (
+      SELECT el.id FROM exercise_logs el JOIN workout_sessions ws ON ws.id = el.workout_session_id
+      WHERE el.id = ${exerciseLogId} AND ws.user_id = ${userId}
+    )
+  `)
 }
 
 // Pure computation shared by preview and apply — converts each affected set's
@@ -1085,6 +1116,25 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       ))
   }
 
+  async skipSupersededExerciseLogPush(
+    userId: string,
+    exerciseLogId: string,
+    stamp: EditStamp,
+  ): Promise<{ workoutSessionId: string; estimated1rm: number; target80: number } | null> {
+    if (stamp.kind !== 'client') return null
+    return this.db.transaction(async tx => {
+      const locked = await lockOwnedExerciseLogStamp(tx, userId, exerciseLogId)
+      if (!locked || !isSupersededEdit(locked.clientEditedAt, stamp)) return null
+      await touchExerciseLogTree(tx, userId, exerciseLogId)
+      const [row] = await tx.select({
+        workoutSessionId: s.exerciseLogs.workoutSessionId,
+        estimated1rm: s.exerciseLogs.estimated1rm,
+        target80: s.exerciseLogs.target80,
+      }).from(s.exerciseLogs).where(eq(s.exerciseLogs.id, exerciseLogId))
+      return { workoutSessionId: row.workoutSessionId, estimated1rm: row.estimated1rm ?? 0, target80: row.target80 ?? 0 }
+    })
+  }
+
   async logExerciseAndSets(
     userId: string,
     log: Omit<ExerciseLog, 'id' | 'sets'> & { exerciseLogId?: string },
@@ -1120,12 +1170,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // pending and refused it), and without the touch the newer copy would never come back down.
       // Locked so a fix landing between this read and the upsert cannot be overwritten either.
       if (isReplay && stamp.kind === 'client') {
-        const locked = await tx.execute(sql`
-          SELECT client_edited_at FROM exercise_logs WHERE id = ${clientExerciseLogId} FOR UPDATE
-        `)
-        const rowStamp = (locked.rows[0] as { client_edited_at: Date | string | null } | undefined)?.client_edited_at
-        if (isSupersededEdit(rowStamp == null ? null : new Date(rowStamp), stamp)) {
-          await touchExerciseLogTree(tx, clientExerciseLogId)
+        const locked = await lockOwnedExerciseLogStamp(tx, userId, clientExerciseLogId)
+        if (!locked) throw new Error('exercise log not owned by user')
+        if (isSupersededEdit(locked.clientEditedAt, stamp)) {
+          await touchExerciseLogTree(tx, userId, clientExerciseLogId)
           return { exerciseLog: { ...log, id: clientExerciseLogId, sets: [] }, setLogs: [], superseded: true as const }
         }
       }

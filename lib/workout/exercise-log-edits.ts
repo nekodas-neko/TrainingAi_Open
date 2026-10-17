@@ -3,7 +3,7 @@ import { getPool } from '@/lib/data/postgres/client'
 import { getRepository } from '@/lib/data'
 import { estimateOneRm, isDeloadedForEstimate, BW_REF, withPrescribedBars, type OneRmSetInput } from '@trainingai/shared/1rm'
 import { computeSetAggregates, computeIntensityPct } from '@trainingai/shared/workout/set-aggregates'
-import { EditedAtSchema, isSupersededEdit, type EditStamp } from '@trainingai/shared/sync/edited-at'
+import { PushedEditedAtSchema, isSupersededEdit, type EditStamp } from '@trainingai/shared/sync/edited-at'
 
 /**
  * Editing and deleting a logged exercise — the ONE implementation both write paths call (RV-175).
@@ -20,16 +20,16 @@ export const ExerciseLogEditSchema = z.object({
   exerciseLogId: z.string().uuid(),
   weights:       z.array(z.number().min(-100).max(500)).min(1).max(20),
   reps:          z.array(z.number().int().min(0).max(100)).min(1).max(20),
-  // Issue 2721: when the phone made this edit (epoch ms). Optional: a client that predates it is
-  // applied as before. The web PATCH never sends it; a live write is stamped with server time.
-  editedAt:      EditedAtSchema.optional(),
+  // Issue 2721: when the phone made this edit (epoch ms). Optional: a client that predates it, or a
+  // stamp from a broken clock, is applied as before. The web PATCH never sends it; a live write is stamped with server time.
+  editedAt:      PushedEditedAtSchema,
 }).strict()
 export type ExerciseLogEdit = z.infer<typeof ExerciseLogEditSchema>
 
 export const ExerciseLogDeleteSchema = z.object({
   exerciseLogId: z.string().uuid(),
   // Issue 2721: accepted so a stamped client is not rejected by `.strict()`; a delete always applies.
-  editedAt:      EditedAtSchema.optional(),
+  editedAt:      PushedEditedAtSchema,
 }).strict()
 
 async function ownsExerciseLog(userId: string, exerciseLogId: string): Promise<boolean> {
@@ -110,15 +110,33 @@ export async function editExerciseLog(
     await client.query('BEGIN')
 
     // Issue 2721: read the row's stamp under a lock, so a fix landing between this check and the
-    // writes below cannot be overwritten either.
+    // writes below cannot be overwritten either. Scoped to this user's log on this connection, not
+    // left to `ownsExerciseLog`'s read on another one.
     const { rows: stampRows } = await client.query<{ client_edited_at: Date | null }>(
-      'SELECT client_edited_at FROM exercise_logs WHERE id = $1 FOR UPDATE',
-      [exerciseLogId],
+      `SELECT client_edited_at FROM exercise_logs
+       WHERE id = $1 AND workout_session_id IN (SELECT id FROM workout_sessions WHERE user_id = $2)
+       FOR UPDATE`,
+      [exerciseLogId, userId],
     )
-    if (isSupersededEdit(stampRows[0]?.client_edited_at ?? null, stamp)) {
+    if (stampRows.length === 0) {
+      await client.query('ROLLBACK')
+      return { found: false, superseded: false }
+    }
+    if (isSupersededEdit(stampRows[0].client_edited_at, stamp)) {
       // The same two statements as `touchExerciseLogTree` in the Postgres adapter.
-      await client.query('UPDATE exercise_logs SET updated_at = now() WHERE id = $1', [exerciseLogId])
-      await client.query('UPDATE set_logs SET updated_at = now() WHERE exercise_log_id = $1', [exerciseLogId])
+      await client.query(
+        `UPDATE exercise_logs SET updated_at = now()
+         WHERE id = $1 AND workout_session_id IN (SELECT id FROM workout_sessions WHERE user_id = $2)`,
+        [exerciseLogId, userId],
+      )
+      await client.query(
+        `UPDATE set_logs SET updated_at = now()
+         WHERE exercise_log_id IN (
+           SELECT el.id FROM exercise_logs el JOIN workout_sessions ws ON ws.id = el.workout_session_id
+           WHERE el.id = $1 AND ws.user_id = $2
+         )`,
+        [exerciseLogId, userId],
+      )
       await client.query('COMMIT')
       return { found: true, superseded: true }
     }

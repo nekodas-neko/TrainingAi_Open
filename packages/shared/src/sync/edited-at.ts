@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { INGEST_FUTURE_TOLERANCE_MS } from '../validation/ingest-clock'
 
 /**
  * Issue 2721 — a stale phone cannot overwrite a newer workout log.
@@ -23,6 +24,17 @@ export function isEditStampedDomain(domain: string): domain is EditStampedDomain
 
 /** Epoch ms, same bounds the workout payload already uses for set timestamps (2020 to 2099). */
 export const EditedAtSchema = z.number().int().min(1_600_000_000_000).max(4_100_000_000_000)
+
+/**
+ * `editedAt` as the server reads it from a push. A stamp that is missing, out of range or not a
+ * number reads as absent, so the push is applied as `unstamped` rather than rejected: a phone with a
+ * broken clock still has a real edit to deliver, and an `errors` entry would retry it until it
+ * dead-lettered.
+ */
+export const PushedEditedAtSchema = z
+  .unknown()
+  .transform((value): number | undefined => (EditedAtSchema.safeParse(value).success ? (value as number) : undefined))
+  .optional()
 
 /**
  * Add `editedAt: now` to a payload for one of the stamped domains. A payload that already carries
@@ -50,10 +62,14 @@ export type EditStamp =
   | { kind: 'server' }
   | { kind: 'unstamped' }
 
-export function editStampFromPayload(payload: { editedAt?: number | null }): EditStamp {
-  return typeof payload.editedAt === 'number'
-    ? { kind: 'client', at: new Date(payload.editedAt) }
-    : { kind: 'unstamped' }
+/**
+ * A stamp further ahead of the server than ordinary clock skew is capped at server now plus that
+ * tolerance. Stored as it came, a far-future stamp (a phone set to 2090) would supersede every later
+ * honest edit to the row, and the row would never recover.
+ */
+export function editStampFromPayload(payload: { editedAt?: number | null }, now: number = Date.now()): EditStamp {
+  if (!EditedAtSchema.safeParse(payload.editedAt).success) return { kind: 'unstamped' }
+  return { kind: 'client', at: new Date(Math.min(payload.editedAt!, now + INGEST_FUTURE_TOLERANCE_MS)) }
 }
 
 /**

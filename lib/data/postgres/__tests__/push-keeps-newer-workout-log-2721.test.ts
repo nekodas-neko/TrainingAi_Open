@@ -9,13 +9,15 @@
 // DB-backed and driven through `pushMutations`, because the rule is a read-then-write in SQL and the
 // interesting failures (server write time vs phone time, the touch reaching `updated_at`) are only
 // visible against the real trigger and columns.
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { randomUUID } from 'crypto'
 import { SUPERSEDED_WARNING, UNSTAMPED_WARNING } from '@trainingai/shared/sync/edited-at'
+import { INGEST_FUTURE_TOLERANCE_MS } from '@trainingai/shared/validation/ingest-clock'
 import { LBS_TO_KG } from '@trainingai/shared/workout/units'
 
 const canRun = !!process.env.DATABASE_URL
 const USER = '00000000-0000-4000-8000-000000002721'
+const OTHER = '00000000-0000-4000-8000-000000012721'
 const BEFORE = '2026-03-31'
 // Local midday in Brisbane on a day well before the fix cutoff, so the log is in the fix's range.
 const LOGGED_AT_MS = Date.parse('2026-01-10T12:00:00+10:00')
@@ -89,6 +91,10 @@ describe.skipIf(!canRun)('pushMutations keeps the newer copy of a workout log (i
       `INSERT INTO users (id, email, password_hash, timezone) VALUES ($1, $2, 'x', 'Australia/Brisbane') ON CONFLICT (id) DO NOTHING`,
       [USER, `push-2721-${USER}@example.com`],
     )
+    await pool.query(
+      `INSERT INTO users (id, email, password_hash, timezone) VALUES ($1, $2, 'x', 'Australia/Brisbane') ON CONFLICT (id) DO NOTHING`,
+      [OTHER, `push-2721-${OTHER}@example.com`],
+    )
   })
 
   afterAll(async () => {
@@ -96,7 +102,7 @@ describe.skipIf(!canRun)('pushMutations keeps the newer copy of a workout log (i
     await pool.query(`DELETE FROM personal_records WHERE user_id = $1`, [USER])
     await pool.query(`DELETE FROM user_stats WHERE user_id = $1`, [USER])
     await pool.query(`DELETE FROM workout_sessions WHERE user_id = $1`, [USER]) // cascades to logs and sets
-    await pool.query(`DELETE FROM users WHERE id = $1`, [USER])
+    await pool.query(`DELETE FROM users WHERE id = ANY($1)`, [[USER, OTHER]])
   })
 
   it('a stale workout_log replayed after a server fix keeps the fix, is processed as superseded, and moves updated_at', async () => {
@@ -141,16 +147,18 @@ describe.skipIf(!canRun)('pushMutations keeps the newer copy of a workout log (i
     expect(stale.warnings?.map(w => w.warning)).toEqual([SUPERSEDED_WARNING])
     expect(await weightsOf(ids.el)).toEqual([fixed, fixed])
 
-    // Made on the phone after the fix landed: the user's newer decision.
-    const fresh = await push([{ domain: 'exercise_log_edit', payload: { exerciseLogId: ids.el, weights: [47.5, 47.5], reps: [5, 5], editedAt: now + MIN } }])
+    // Made on the phone after the fix landed: the user's newer decision. A real post-fix time, not
+    // one in the future, which the server would clamp.
+    const afterFix = Date.now()
+    const fresh = await push([{ domain: 'exercise_log_edit', payload: { exerciseLogId: ids.el, weights: [47.5, 47.5], reps: [5, 5], editedAt: afterFix } }])
     expect(fresh.processed).toBe(1)
     expect(fresh.errors).toEqual([])
     expect(fresh.warnings).toBeUndefined()
     expect(await weightsOf(ids.el)).toEqual([47.5, 47.5])
-    expect((await logRow(ids.el)).client_edited_at!.getTime()).toBe(now + MIN)
+    expect((await logRow(ids.el)).client_edited_at!.getTime()).toBe(afterFix)
 
     // And a workout_log stamped later still: it replaces the row as before.
-    const later = await push([{ domain: 'workout_log', payload: logPayload(ids, lift, [50, 50], now + 2 * MIN) }])
+    const later = await push([{ domain: 'workout_log', payload: logPayload(ids, lift, [50, 50], Date.now()) }])
     expect(later.warnings).toBeUndefined()
     expect(await weightsOf(ids.el)).toEqual([50, 50])
   })
@@ -199,5 +207,79 @@ describe.skipIf(!canRun)('pushMutations keeps the newer copy of a workout log (i
     expect(result.errors).toEqual([])
     expect(result.warnings).toBeUndefined()
     expect((await logRow(ids.el)).deleted_at).not.toBeNull()
+  })
+  it('a 2090 stamp is clamped to the server clock, and a later honest edit still applies', async () => {
+    const lift = 'Push 2721 Future Stamp Lift'
+    const ids = freshIds()
+    const first = await push([{ domain: 'workout_log', payload: logPayload(ids, lift, [80, 80], Date.now() - 10 * MIN) }])
+    expect(first.errors).toEqual([])
+
+    const sentAt = Date.now()
+    const y2090 = Date.parse('2090-01-01T00:00:00Z')
+    const broken = await push([{ domain: 'exercise_log_edit', payload: { exerciseLogId: ids.el, weights: [82.5, 82.5], reps: [5, 5], editedAt: y2090 } }])
+    expect(broken.errors).toEqual([])
+    expect(broken.warnings).toBeUndefined()
+    const stored = (await logRow(ids.el)).client_edited_at!.getTime()
+    expect(stored).toBeGreaterThanOrEqual(sentAt)
+    expect(stored).toBeLessThanOrEqual(Date.now() + INGEST_FUTURE_TOLERANCE_MS)
+
+    // Two minutes on, past the tolerance, the phone (clock corrected) makes an honest edit.
+    vi.useFakeTimers({ toFake: ['Date'], now: Date.now() + 2 * MIN })
+    try {
+      const honest = await push([{ domain: 'exercise_log_edit', payload: { exerciseLogId: ids.el, weights: [85, 85], reps: [5, 5], editedAt: Date.now() } }])
+      expect(honest.errors).toEqual([])
+      expect(honest.warnings).toBeUndefined()
+      expect(await weightsOf(ids.el)).toEqual([85, 85])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('an out-of-range editedAt is applied as unstamped, not rejected', async () => {
+    const lift = 'Push 2721 Bad Stamp Lift'
+    const { ids } = await loggedThenFixed(lift, Date.now() - 120 * MIN)
+    const result = await push([{ domain: 'exercise_log_edit', payload: { exerciseLogId: ids.el, weights: [90, 90], reps: [5, 5], editedAt: 0 } }])
+    expect(result.processed).toBe(1)
+    expect(result.errors).toEqual([])
+    expect(result.warnings?.map(w => w.warning)).toEqual([UNSTAMPED_WARNING])
+    expect(await weightsOf(ids.el)).toEqual([90, 90])
+    expect((await logRow(ids.el)).client_edited_at).toBeNull()
+
+    const log = await push([{ domain: 'workout_log', payload: logPayload(ids, lift, [92.5, 92.5], 99_999_999_999_999) }])
+    expect(log.errors).toEqual([])
+    expect(log.warnings?.map(w => w.warning)).toEqual([UNSTAMPED_WARNING])
+    expect(await weightsOf(ids.el)).toEqual([92.5, 92.5])
+  })
+
+  it('a superseded workout_log leaves its workout session untouched', async () => {
+    const lift = 'Push 2721 Session Untouched Lift'
+    const now = Date.now()
+    const { ids } = await loggedThenFixed(lift, now - 120 * MIN)
+    const sessionRow = async () => (await pool.query(
+      `SELECT warmup_ended_at, updated_at FROM workout_sessions WHERE id = $1`, [ids.ws],
+    )).rows[0] as { warmup_ended_at: Date | null; updated_at: Date }
+    const before = await sessionRow()
+    expect(before.warmup_ended_at).toBeNull()
+
+    const result = await push([{ domain: 'workout_log', payload: { ...logPayload(ids, lift, [100, 100], now - 60 * MIN), warmupEndedAtMs: LOGGED_AT_MS - 20 * MIN } }])
+    expect(result.warnings?.map(w => w.warning)).toEqual([SUPERSEDED_WARNING])
+    const after = await sessionRow()
+    expect(after.warmup_ended_at).toBeNull()
+    expect(after.updated_at.getTime()).toBe(before.updated_at.getTime())
+  })
+
+  it('a stamped edit naming another user\'s log is refused and touches nothing', async () => {
+    const lift = 'Push 2721 Other User Lift'
+    const { ids } = await loggedThenFixed(lift, Date.now() - 120 * MIN)
+    const before = await logRow(ids.el)
+    const result = await repo.pushMutations(OTHER, [{
+      id: randomUUID(), domain: 'exercise_log_edit', date: '2026-01-10',
+      payload: { exerciseLogId: ids.el, weights: [1, 1], reps: [5, 5], editedAt: Date.now() - 60 * MIN },
+    }] as never)
+    expect(result.processed).toBe(0)
+    expect(result.errors).toHaveLength(1)
+    const after = await logRow(ids.el)
+    expect(after.updated_at.getTime()).toBe(before.updated_at.getTime())
+    expect(await weightsOf(ids.el)).not.toEqual([1, 1])
   })
 })

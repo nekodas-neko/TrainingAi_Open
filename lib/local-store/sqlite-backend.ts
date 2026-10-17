@@ -1715,6 +1715,10 @@ export class SQLiteLocalStore implements LocalStore {
       if (r.deletedAt) {
         await runSQL(`DELETE FROM set_logs WHERE id = ? AND sync_status='synced'`, [r.id]);
       } else {
+        // A live server set clears a synced local tombstone (issue 2721): an offline edit that
+        // removed this set was superseded on the server, which kept the set. The tombstone is
+        // already confirmed, so without this the set would stay hidden here for good. A pending
+        // tombstone is still on its way up and the guard below keeps it.
         // LA-165: a set added by an offline edit is inserted locally under a local id, and the
         // server mints its own when it upserts by (exercise_log_id, set_number). Without this, the
         // pull would leave both rows — one set shown twice. Only a SYNCED local row gives way; a
@@ -1739,7 +1743,7 @@ export class SQLiteLocalStore implements LocalStore {
              rpe=excluded.rpe, planned_pct=excluded.planned_pct,
              planned_reps=excluded.planned_reps, planned_rest_sec=excluded.planned_rest_sec,
              planned_weight_kg=excluded.planned_weight_kg, rpe_source=excluded.rpe_source,
-             updated_at=excluded.updated_at, synced=1, sync_status='synced'
+             updated_at=excluded.updated_at, deleted_at=NULL, synced=1, sync_status='synced'
            WHERE set_logs.sync_status='synced'`,
           [
             r.id, r.exerciseLogId, r.setNumber, r.weightKg, r.reps,
@@ -2448,6 +2452,20 @@ export class SQLiteLocalStore implements LocalStore {
     await runSQL(
       `UPDATE set_logs SET deleted_at=?, sync_status=? WHERE exercise_log_id=? AND set_number>? AND deleted_at IS NULL`,
       [now, status, exerciseLogId, maxSetNumber],
+    );
+  }
+
+  // Issue 2721: after a superseded push is confirmed, drop the log's sets that never came from the
+  // server (`synced=0`). An offline edit that added a set inserted it under a local id, and the
+  // server kept its own copy without it, so no pull would ever replace or remove it. The server
+  // touched every set it does hold, so the next pull brings back any real set this removes. Only
+  // once the confirm has actually unguarded the log: another queued edit still owns it otherwise.
+  async dropUnpulledSetsOfSupersededLog(exerciseLogId: string): Promise<void> {
+    await runSQL(
+      `DELETE FROM set_logs
+       WHERE exercise_log_id=? AND synced=0 AND sync_status='synced'
+         AND EXISTS (SELECT 1 FROM exercise_logs WHERE id=? AND sync_status='synced')`,
+      [exerciseLogId, exerciseLogId],
     );
   }
 

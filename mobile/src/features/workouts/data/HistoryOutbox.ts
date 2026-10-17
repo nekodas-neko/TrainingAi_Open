@@ -131,12 +131,14 @@ export class HistoryOutbox {
     if (!this.current.ready) {
       throw new Error('Open saved history changes before editing.');
     }
-    // Edit time lets the server keep a newer copy over this one (issue 2721).
+    // Edit time lets the server keep a newer copy over this one (issue 2721). A phone clock outside
+    // the stamp's range sends no stamp: the edit still goes up, applied as an unstamped push.
+    const now = this.now();
     const change = operation.parse({
       id: this.uuid(),
       domain,
       date,
-      payload: withEditedAt(domain, payload, this.now()),
+      payload: EditedAtSchema.safeParse(now).success ? withEditedAt(domain, payload, now) : payload,
     });
     await this.write((operations) => [...operations, change]);
     this.invalidate(change);

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { RPE_SOURCES } from './rpe-source';
-import { EditedAtSchema } from '../sync/edited-at';
+import { PushedEditedAtSchema } from '../sync/edited-at';
 
 export const LogExercisePayloadSchema = z.object({
   sessionName:          z.string().min(1).max(200),
@@ -44,9 +44,9 @@ export const LogExercisePayloadSchema = z.object({
   estimated1rm:         z.number().optional(),
   target80:             z.number().optional(),
   // Issue 2721: when the phone made this log (epoch ms), for the outbox push. A stale copy older than
-  // the server's last decided edit is skipped. Optional: an old client is applied as before, and the
-  // direct POST route ignores it and stamps server time.
-  editedAt:             EditedAtSchema.optional(),
+  // the server's last decided edit is skipped. Optional: an old client, or a stamp from a broken
+  // clock, is applied as before, and the direct POST route ignores it and stamps server time.
+  editedAt:             PushedEditedAtSchema,
 });
 
 export type LogExercisePayload = z.infer<typeof LogExercisePayloadSchema>;

@@ -69,6 +69,16 @@ export async function logExerciseFromPayload(
   const { getRepository } = await import('@/lib/data');
   const repo = await getRepository();
 
+  // Issue 2721: a stale copy is decided before anything is written, so a superseded push leaves the
+  // workout session (and its warm-up end) untouched as well as the log. `logExerciseAndSets` checks
+  // again under its own lock, which covers a fix landing between this check and that write.
+  if (stamp.kind === 'client' && clientExerciseLogId) {
+    const kept = await repo.skipSupersededExerciseLogPush(userId, clientExerciseLogId, stamp);
+    if (kept) {
+      return { ...kept, exerciseLogId: clientExerciseLogId, isPR: false, superseded: true };
+    }
+  }
+
   // Resolve phase context for automatic-mode programs
   let currentPhaseId: string | undefined;
   let currentPhaseType: ProgramPhaseType | undefined;

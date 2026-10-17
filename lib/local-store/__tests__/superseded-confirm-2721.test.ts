@@ -6,6 +6,8 @@
 //    `processed`, so the push-confirm flips the local log and sets back to 'synced' and drops the
 //    outbox entry. That is what lets the next pull overwrite the stale local copy: `applyDelta`
 //    only ever writes over 'synced' rows, so a row left 'pending' would show the old weights forever.
+// ③ A stale edit that changed the set count converges too: a set it removed comes back live from
+//    the pull, and a set it added (local id, never on the server) is dropped at the confirm.
 //
 // Real SQLite (node:sqlite, in memory) for the store, the real sync engine around it; only the
 // network and the stranded-row sweeps (which need tables this test does not build) are stubbed.
@@ -65,8 +67,8 @@ beforeEach(() => {
       updated_at TEXT, synced INTEGER NOT NULL DEFAULT 0, sync_status TEXT, deleted_at TEXT);
     INSERT INTO workout_sessions VALUES ('ws-1', 'synced', '2026-10-17T00:00:00Z', NULL);
     INSERT INTO exercise_logs VALUES ('el-1', 'ws-1', 'synced', '2026-10-17T00:00:00Z', NULL);
-    INSERT INTO set_logs (id, exercise_log_id, set_number, weight_kg, reps, sync_status)
-      VALUES ('s-1', 'el-1', 1, 100, 5, 'synced'), ('s-2', 'el-1', 2, 100, 5, 'synced');
+    INSERT INTO set_logs (id, exercise_log_id, set_number, weight_kg, reps, synced, sync_status)
+      VALUES ('s-1', 'el-1', 1, 100, 5, 1, 'synced'), ('s-2', 'el-1', 2, 100, 5, 1, 'synced');
   `)
   wire(new SQLiteLocalStore())
 })
@@ -131,5 +133,49 @@ describe('a superseded push confirms, so the next pull can overwrite the stale c
     // The server touched the row, so the next pull carries it; now it lands.
     await store.applyDelta({ setLogs: [serverSet(1, 45.5), serverSet(2, 45.5)] } as never)
     expect(all(`SELECT weight_kg FROM set_logs WHERE deleted_at IS NULL ORDER BY set_number`).map(r => r.weight_kg)).toEqual([45.5, 45.5])
+  })
+})
+
+describe('a superseded edit that changed the set count converges to the server\'s sets (③)', () => {
+  function answerSuperseded() {
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init: { body: string }) => {
+      const m = JSON.parse(init.body).mutations[0]
+      return { ok: true, status: 200, json: async () => ({
+        processed: 1, errors: [], warnings: [{ id: m.id, domain: m.domain, date: m.date, warning: SUPERSEDED_WARNING }],
+      }) }
+    }))
+  }
+  const liveSets = () => all(`SELECT id, set_number, weight_kg FROM set_logs WHERE deleted_at IS NULL ORDER BY set_number`)
+    .map(r => [r.id, r.set_number, r.weight_kg])
+
+  it('a set the stale edit removed is live again after the confirm and the pull', async () => {
+    db.current!.exec(`INSERT INTO set_logs (id, exercise_log_id, set_number, weight_kg, reps, synced, sync_status) VALUES ('s-3', 'el-1', 3, 100, 5, 1, 'synced')`)
+    const store = new SQLiteLocalStore()
+    // Offline: three sets cut to two. Set 3 is tombstoned locally.
+    await store.updateExerciseLogLocally('el-1', [{ setNumber: 1, weightKg: 100, reps: 5 }, { setNumber: 2, weightKg: 100, reps: 5 }], { pending: true })
+    await store.queueMutation({ userId: USER, domain: 'exercise_log_edit', date: '2026-10-17', payload: { exerciseLogId: 'el-1', weights: [100, 100], reps: [5, 5] } })
+    expect(liveSets()).toHaveLength(2)
+
+    answerSuperseded()
+    expect(await pushMutations(USER)).toEqual({ pushed: 1 })
+
+    // The server kept all three sets (fixed) and touched them, so the pull carries each one.
+    await store.applyDelta({ setLogs: [serverSet(1, 45.5), serverSet(2, 45.5), serverSet(3, 45.5)] } as never)
+    expect(liveSets()).toEqual([['s-1', 1, 45.5], ['s-2', 2, 45.5], ['s-3', 3, 45.5]])
+  })
+
+  it('a set the stale edit added under a local id is gone after the confirm and the pull', async () => {
+    const store = new SQLiteLocalStore()
+    // Offline: two sets grown to three. Set 3 exists only here, under a local id.
+    await store.updateExerciseLogLocally('el-1', [1, 2, 3].map(n => ({ setNumber: n, weightKg: 100, reps: 5 })), { pending: true })
+    await store.queueMutation({ userId: USER, domain: 'exercise_log_edit', date: '2026-10-17', payload: { exerciseLogId: 'el-1', weights: [100, 100, 100], reps: [5, 5, 5] } })
+    expect(liveSets()).toHaveLength(3)
+
+    answerSuperseded()
+    expect(await pushMutations(USER)).toEqual({ pushed: 1 })
+
+    await store.applyDelta({ setLogs: [serverSet(1, 45.5), serverSet(2, 45.5)] } as never)
+    expect(liveSets()).toEqual([['s-1', 1, 45.5], ['s-2', 2, 45.5]])
+    expect(all(`SELECT COUNT(*) AS n FROM set_logs`)[0].n).toBe(2)
   })
 })
