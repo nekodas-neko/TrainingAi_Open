@@ -76,7 +76,13 @@ test('cached Apple sleep fills missing nights without adding its duration to ser
   const merged = mergeAppleSleep([server], [night]);
   assert.equal(merged.length, 1);
   assert.equal(merged[0].id, 'server');
-  assert.equal(mergeAppleSleep([{ ...server, manualEntry: true }], [night])[0].id, night.id);
+  // Server precedence holds even for a row with no duration or one entered by hand.
+  assert.equal(mergeAppleSleep([{ ...server, manualEntry: true }], [night])[0].id, 'server');
+  assert.equal(mergeAppleSleep([{ ...server, durationHours: null }], [night])[0].id, 'server');
+  // A different date the server has not received is still filled in.
+  const earlier = { ...night, id: 'earlier', date: '2000-01-01' };
+  const both = mergeAppleSleep([server], [night, earlier]);
+  assert.deepEqual(both.map((n) => n.id), ['server', 'earlier']);
 });
 test('invalid or future records and an evening fragment cannot replace last night', () => {
   const nights = appleSleepNights(

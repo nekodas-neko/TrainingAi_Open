@@ -20,13 +20,13 @@ import type { StressDayResponse } from '@/app/api/body-battery/stress-day/route'
  * Without it a consumer cannot tell "no stress recorded" from "the request failed", and the
  * standing rule is that it must say so rather than render nothing.
  */
-export function useStressDay(day: string): { data: StressDayResponse | null; failed: boolean } {
+export function useStressDay(day: string, reloadToken?: number): { data: StressDayResponse | null; failed: boolean } {
   const [failed, setFailed] = useState(false)
   const data = useCachedValue<StressDayResponse>(
     `stress-day:${day}`,
     `/api/body-battery/stress-day?date=${day}`,
     BODY_BATTERY_TTL,
-    { onError: () => setFailed(true) },
+    { onError: () => setFailed(true), reloadToken },
   )
   return { data: data ?? null, failed }
 }

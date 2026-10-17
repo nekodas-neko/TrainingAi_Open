@@ -41,6 +41,8 @@ import { formatInTimeZone } from "date-fns-tz";
 import { cachedFetch, readCacheSync, setCached, cachedFetchToday, readTodayCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { useInvalidationRefetch } from "@/lib/hooks/use-invalidation-refetch";
+import { useRevalidateOnReturn } from "@/lib/hooks/use-revalidate-on-return";
+import { readLocalWorkoutSessionsDay } from "./local-workout-sessions-day";
 import { invalidateWorkoutSummaries, invalidateReadinessInputs, invalidateOuraSync, invalidateWorkoutMetaRefresh, invalidatePrescriptionChanged, invalidateUserProfile, invalidatePulledDomains } from "@/lib/cache-groups";
 import { mergeCalendarOverlay, readLocalCalendarOverlay } from "@/lib/calendar/local-overlay";
 import { syncOuraRing } from "@/lib/oura-ble/sync";
@@ -110,6 +112,8 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   // body-battery, training-load, muscle-recovery, oura-hr-day) instead of refetchAll
   // duplicating their fetch logic inline — one fetch call site per key, not two.
   const [refreshTick, setRefreshTick] = useState(0);
+  // Bumps on app resume / tab return so the heart-rate widget refetches (issue 2906); 0 at mount.
+  const returnToken = useRevalidateOnReturn();
   const [weightLookback, setWeightLookback] = useState<7 | 30>(7);
   const [logWidget, setLogWidget]           = useState<WidgetDef | null>(null);
   const [recommendation, setRecommendation] = useState<NextSessionRecommendation | null>(null);
@@ -842,20 +846,12 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     // Local-first seed (SYN-10) before the cachedFetch revalidates — same shape
     // as fetchMeta's body-metric fast-path above.
     if (userId) {
-      const store = getLocalStore(userId);
-      if (store) {
-        store.getWorkoutSessions(today).then(sessions => {
-          const rows = sessions
-            .filter(s => !s.deletedAt && s.startedAt.slice(0, 10) === today)
-            .map(s => ({ sessionName: s.sessionName, startedAt: s.startedAt, completedAt: s.completedAt }));
-          if (rows.length > 0) setOuraWorkoutSessions(rows);
-        }).catch(() => {});
-      }
+      readLocalWorkoutSessionsDay(userId, today).then(rows => { if (rows.length > 0) setOuraWorkoutSessions(rows); }).catch(() => {});
     }
     cachedFetch<{ sessions: { sessionName: string; startedAt: string; completedAt: string | null }[] }>(
       `workout-sessions-day:${today}`, `/api/workout-sessions/day?date=${today}`, TTL_MEDIUM,
       d => { if (d?.sessions?.length) setOuraWorkoutSessions(d.sessions) }).catch(() => {});
-  }, [activeCardWidgets, refreshTick, userId, tz]);
+  }, [activeCardWidgets, refreshTick, userId, tz, returnToken]);
 
   useEffect(() => {
     let cancelled = false;

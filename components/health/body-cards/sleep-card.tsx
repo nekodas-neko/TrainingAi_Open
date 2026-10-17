@@ -14,6 +14,8 @@ import { sleepCoverageNote } from "@trainingai/shared/health/sleep-coverage-note
 interface Props {
   recentSleep: SleepRow | null;
   lastSleep: SleepRow | null;
+  /** Which night the card shows (`pickSleepCardNight` label), so the date is never a guess. */
+  nightLabel: string;
   /** Today's computed sleep score from /api/readiness-score — the same number the
    *  Home chip shows. The stored sleep_sessions.sleep_score is Cloud-only (NULL on
    *  BLE nights) and is kept only as a fallback. */
@@ -26,7 +28,7 @@ interface Props {
 
 // The Body tab's Sleep card — extracted from health-sections.tsx (Task 4.4) as a
 // pure move, no behaviour change.
-export function SleepCard({ recentSleep, lastSleep, computedSleepScore, sleepScoreCoverage, metaLoading, onOpenSheet }: Props) {
+export function SleepCard({ recentSleep, lastSleep, nightLabel, computedSleepScore, sleepScoreCoverage, metaLoading, onOpenSheet }: Props) {
   const userTz = useUserTimezone();
   const router = useTransitionRouter();
   // Warm the detail route before it's tapped — see oura-score-chip-row.
@@ -46,6 +48,7 @@ export function SleepCard({ recentSleep, lastSleep, computedSleepScore, sleepSco
       <div className="flex items-start justify-between mb-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#8b5cf6" }}>Sleep</p>
+          {!metaLoading && <p className="text-[10px] text-muted-foreground" data-testid="sleep-night-label">{nightLabel}</p>}
           <div className="flex items-baseline gap-2 mt-0.5">
             {metaLoading ? (
               <div className="h-8 w-20 animate-pulse rounded-lg bg-muted" />
@@ -108,8 +111,6 @@ export function SleepCard({ recentSleep, lastSleep, computedSleepScore, sleepSco
             {recentSleep.respiratoryRate != null && <span className="text-[9px] rounded bg-sky-500/20 text-sky-400 px-1.5 py-0.5">{recentSleep.respiratoryRate.toFixed(1)} br/m</span>}
           </div>
         </div>
-      ) : lastSleep ? (
-        <p className="text-[9px] text-muted-foreground opacity-60">Last: {lastSleep.date}</p>
       ) : null}
       <button
         onClick={e => { e.stopPropagation(); router.push('/health/sleep'); }}

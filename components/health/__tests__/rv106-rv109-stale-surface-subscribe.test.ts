@@ -44,9 +44,15 @@ describe('stale-surface-subscribe — each surface subscribes the key it reads',
   for (const c of CASES) {
     it(`${c.id}: ${c.why}`, () => {
       const file = src(c.file);
-      expect(file, `${c.file} does not subscribe to anything`).toMatch(/useInvalidationRefetch\(/);
+      // `useCachedValue` carries its own invalidation subscription; the HR card moved to it in #2906,
+      // so its key must be the hook's first argument, not merely a string somewhere in the file.
+      const viaHook = /useCachedValue<[^>]*(?:>[^>(]*)*>\(/.test(file);
+      expect(file, `${c.file} does not subscribe to anything`).toMatch(/useInvalidationRefetch\(|useCachedValue</);
       for (const key of c.keys) {
-        expect(file, `${c.id} reads ${key} but does not name it in its subscription`).toContain(`'${key}'`);
+        const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const asHookKey = new RegExp(`useCachedValue<[^]*?>\\(\\s*[\'\`]${escaped}`);
+        if (viaHook) expect(file, `${c.id} reads ${key} but does not pass it to useCachedValue`).toMatch(asHookKey);
+        else expect(file, `${c.id} reads ${key} but does not name it in its subscription`).toContain(`'${key}'`);
         // A subscription to a key no write clears is a no-op dressed as a fix.
         expect(groups, `${key} is subscribed but no cache group clears it`)
           .toMatch(new RegExp(`invalidateCache\\('${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'\\)`));
@@ -59,7 +65,7 @@ describe('stale-surface-subscribe — each surface subscribes the key it reads',
     // for error handling — the same shape RV-103 found behind a silent failure. Asserted as
     // "every cachedFetch is voided" rather than "no empty catch anywhere": the local-store promise
     // in the activity card keeps its catch, because `store.getActivityLogs` genuinely can reject.
-    for (const rel of ['components/health/hr-day-card.tsx', 'components/health/activity-history-card.tsx']) {
+    for (const rel of ['components/health/activity-history-card.tsx']) {
       const calls = src(rel).match(/^.*\bcachedFetch</gm) ?? [];
       expect(calls.length, `no cachedFetch found in ${rel} — has it moved?`).toBeGreaterThan(0);
       for (const line of calls) {

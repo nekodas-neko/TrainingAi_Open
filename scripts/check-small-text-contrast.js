@@ -233,7 +233,7 @@ const BASELINE = {
   'components/config/phase-editor.tsx': 1,
   'components/health-metric-sheet.tsx': 1,
   'components/health/body-cards/rhr-hrv-spo2-card.tsx': 1,
-  'components/health/body-cards/sleep-card.tsx': 3,
+  'components/health/body-cards/sleep-card.tsx': 2,
   'components/health/oura-section.tsx': 2,
   'components/health/readiness-breakdown.tsx': 3,
   'components/more/friend-feed.tsx': 1,
