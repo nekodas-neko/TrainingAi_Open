@@ -19,13 +19,16 @@ const USER = '11111111-1111-4111-8111-111111111111'
 const CONFIG: OuraOAuthConfig = { clientId: 'cid', clientSecret: 'cs', redirectUri: 'http://localhost:3000/api/oura/callback' }
 const fetchMock = vi.fn<typeof fetch>()
 
-function fakeRepo(connected = true) {
+/** Everything we ask for, as Oura spells it in the token answer. */
+const FULL_SCOPE = 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2Daily'
+
+function fakeRepo(connected = true, scope: string | null = FULL_SCOPE) {
   const calls: string[] = []
   const row: OuraCloudTokenRow | null = connected ? {
     userId: USER,
     accessToken: encryptOuraToken('acc', USER, 'access_token'),
     refreshToken: encryptOuraToken('ref', USER, 'refresh_token'),
-    expiresAt: new Date(Date.now() + 86_400_000), scope: 'daily', ouraUserId: 'o', updatedAt: new Date(),
+    expiresAt: new Date(Date.now() + 86_400_000), scope, ouraUserId: 'o', updatedAt: new Date(),
   } : null
   const repo: OuraBackfillDeps['repo'] = {
     getOuraCloudTokens: async () => row,
@@ -120,6 +123,50 @@ describe('backfillOuraCloud (#2859)', () => {
     const out = await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...OPTS, dryRun: false })
     expect(out.ok && out.report.forbidden).toEqual(['daily_spo2'])
     expect(out.ok && out.report.documents.workout).toBe(1)
+  })
+
+  // #2974: the owner's grant came back without spo2Daily; Oura's 401 for it stopped the whole read.
+  it('skips a type the grant does not cover, reads the rest and heart rate, and reports it as not shared', async () => {
+    oura(path => (path === 'daily_spo2' ? new Response('', { status: 401 }) : null))
+    const { repo, calls } = fakeRepo(true, 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session')
+    const out = await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...OPTS, dryRun: false })
+    expect(out.ok).toBe(true)
+    if (!out.ok) return
+    expect(out.report.notShared).toEqual(['daily_spo2'])
+    expect(out.report.stoppedEarly).toBeNull()
+    expect(out.report.documents).toMatchObject({
+      daily_readiness: 1, daily_stress: 1, daily_resilience: 1, daily_cardiovascular_age: 1, vo2_max: 1, sleep: 1, workout: 1, heartrate: 4,
+    })
+    expect(out.report.documents.daily_spo2).toBeUndefined()
+    expect(fetchMock.mock.calls.some(c => String(c[0]).includes('/daily_spo2'))).toBe(false)
+    expect(calls).toContain('hr:2')
+  })
+
+  it('skips the heart-rate pass when heartrate is not shared', async () => {
+    oura()
+    const { repo, calls } = fakeRepo(true, 'extapi:daily extapi:workout extapi:spo2Daily')
+    const out = await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...OPTS, dryRun: false })
+    expect(out.ok && out.report.notShared).toEqual(['heartrate'])
+    expect(fetchMock.mock.calls.some(c => String(c[0]).includes('/heartrate'))).toBe(false)
+    expect(calls.some(c => c.startsWith('hr:'))).toBe(false)
+  })
+
+  it('still stops on a 401 for a type the grant covers', async () => {
+    oura(path => (path === 'sleep' ? new Response('', { status: 401 }) : null))
+    const { repo, calls } = fakeRepo()
+    const out = await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...OPTS, dryRun: false })
+    expect(out.ok && out.report.stoppedEarly).toMatch(/connect again/)
+    expect(out.ok && out.report.notShared).toEqual([])
+    expect(out.ok && out.report.documents.workout).toBeUndefined()
+    expect(calls.some(c => c.startsWith('hr:'))).toBe(false)
+  })
+
+  it('tries every type when the grant has no scope string (a legacy row)', async () => {
+    oura()
+    const { repo } = fakeRepo(true, null)
+    const out = await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...OPTS, dryRun: true })
+    expect(out.ok && out.report.notShared).toEqual([])
+    expect(out.ok && out.report.documents).toMatchObject({ daily_spo2: 1, workout: 1, heartrate: 4 })
   })
 
   it('stops on a 429, writes what it read, and says why', async () => {

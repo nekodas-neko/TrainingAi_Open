@@ -11,7 +11,7 @@
 // `invalid_grant`, reads the winner's row, and uses it.
 import type { OuraCloudTokenRow, SaveOuraCloudTokensInput } from '@/lib/data/postgres/slices/oura-cloud-tokens'
 import { exchangeAuthorizationCode, fetchOuraUserId, OuraGrantRejectedError, refreshAccessToken, revokeAccessToken } from './client'
-import type { OuraOAuthConfig } from './config'
+import { grantedOuraScopes, type OuraOAuthConfig } from './config'
 import { decryptOuraToken, encryptOuraToken, OuraTokenKeyMissingError } from './token-cipher'
 import { startOuraConnectBackfill } from './backfill'
 
@@ -134,6 +134,15 @@ export async function getOuraConnection(store: OuraTokenStore, userId: string): 
     scope: usable ? row.scope : null,
     expiresAt: usable ? row.expiresAt?.toISOString() ?? null : null,
   }
+}
+
+/**
+ * The scopes the user's stored grant covers (`grantedOuraScopes`), or `null` when there is no row or
+ * it carries no scope string. Read it after `getOuraAccessToken`, so a refresh's answer counts.
+ */
+export async function getOuraGrantedScopes(store: Pick<OuraTokenStore, 'getOuraCloudTokens'>, userId: string): Promise<ReadonlySet<string> | null> {
+  const row = await store.getOuraCloudTokens(userId)
+  return grantedOuraScopes(row?.scope)
 }
 
 const inFlight = new Map<string, Promise<string>>()

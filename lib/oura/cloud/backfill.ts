@@ -15,10 +15,10 @@ import type { WorkoutRepository } from '@/lib/data/repository'
 import { OuraUnavailableError } from './client'
 import { ouraOAuthConfig, type OuraOAuthConfig } from './config'
 import { fetchOuraDocuments, fetchOuraHeartRate, OuraForbiddenError, OuraRateLimitedError, OuraUnauthorizedError } from './data'
-import { mapHeartRateRows, mapOuraDocuments, OURA_DOCUMENT_TYPE_NAMES, type OuraDocument, type OuraDocumentType } from './documents'
+import { isOuraTypeShared, mapHeartRateRows, mapOuraDocuments, OURA_DOCUMENT_TYPE_NAMES, type OuraDocument, type OuraDocumentType } from './documents'
 import { NO_WRITES, plannedCounts, writeOuraCloudData, type OuraCloudWriteCounts, type OuraCloudWriter } from './ingest'
 import { reportOuraCloudIssue } from './report'
-import { getOuraAccessToken, OuraReauthRequiredError, type OuraTokenStore } from './tokens'
+import { getOuraAccessToken, getOuraGrantedScopes, OuraReauthRequiredError, type OuraTokenStore } from './tokens'
 
 /** How far back a new connection reads. Inside the 180-day heart-rate retention. */
 export const CONNECT_BACKFILL_DAYS = 90
@@ -54,6 +54,11 @@ export interface OuraBackfillReport {
   counts: OuraCloudWriteCounts
   /** Types Oura refused (403: membership or consent), and why the run stopped early, if it did. */
   forbidden: string[]
+  /**
+   * Types the user did not share on Oura's consent page, so never asked for (#2974). Oura answers 401
+   * for those, which would otherwise read as a dead token and stop the run.
+   */
+  notShared: string[]
   stoppedEarly: string | null
 }
 
@@ -93,9 +98,10 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
     throw err
   }
   if (!token) return { ok: false, error: 'not_connected' }
+  const granted = await getOuraGrantedScopes(deps.repo, userId)
 
   const report: OuraBackfillReport = {
-    dryRun: opts.dryRun, from: opts.from, to: opts.to, documents: {}, dropped: 0, counts: NO_WRITES, forbidden: [], stoppedEarly: null,
+    dryRun: opts.dryRun, from: opts.from, to: opts.to, documents: {}, dropped: 0, counts: NO_WRITES, forbidden: [], notShared: [], stoppedEarly: null,
   }
   // Oura's 429 carries a Retry-After. A short one is waited out and the same request made again; a
   // long or missing one stops the run, and the stop is reported (`startOuraConnectBackfill`).
@@ -113,6 +119,7 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
       }
     }
   }
+  // A 401 here is on a type the grant covers (unshared ones are never asked for), so the token itself is dead.
   const stop = (err: unknown): boolean => {
     if (err instanceof OuraUnauthorizedError) { report.stoppedEarly = 'Oura refused the access token; the user has to connect again'; return true }
     if (err instanceof OuraUnavailableError) { report.stoppedEarly = err.message; return true }
@@ -123,6 +130,7 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
   // one `oura_daily` row.
   const docs: OuraDocument[] = []
   read: for (const type of OURA_DOCUMENT_TYPE_NAMES) {
+    if (!isOuraTypeShared(granted, type)) { report.notShared.push(type); continue }
     for (const [from, to] of chunks(opts.from, opts.to, DOC_CHUNK_DAYS)) {
       try {
         const got = await withRetry(() => fetchOuraDocuments(token, type, from, to))
@@ -139,7 +147,8 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
   const writes = mapOuraDocuments(docs)
   report.counts = opts.dryRun ? plannedCounts(writes) : await writeOuraCloudData(deps.repo, userId, writes)
 
-  if (opts.heartRate && !report.stoppedEarly) {
+  if (opts.heartRate && !report.stoppedEarly && !isOuraTypeShared(granted, 'heartrate')) report.notShared.push('heartrate')
+  else if (opts.heartRate && !report.stoppedEarly) {
     for (const [from, to] of chunks(opts.from, opts.to, HR_CHUNK_DAYS)) {
       try {
         const got = await withRetry(() => fetchOuraHeartRate(token, dateStrMidnightInTz(from, opts.tz), dateStrMidnightInTz(shiftDateStr(to, 1), opts.tz)))
@@ -190,6 +199,10 @@ export function startOuraConnectBackfill(userId: string): void {
       } else if (result.report.stoppedEarly) {
         console.warn(`[oura] connect backfill stopped early: ${result.report.stoppedEarly}`)
         reportOuraCloudIssue('connect-backfill:stopped-early', result.report.stoppedEarly, { userId })
+      }
+      // The user's choice on Oura's consent page, not a failure: logged, never reported.
+      if (result.ok && result.report.notShared.length > 0) {
+        console.info(`[oura] connect backfill skipped what the user did not share with us: ${result.report.notShared.join(', ')}`)
       }
     } catch (err) {
       const { reportServerError } = await import('@/lib/observability')
