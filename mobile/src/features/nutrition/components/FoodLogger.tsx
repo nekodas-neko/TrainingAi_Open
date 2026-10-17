@@ -3,6 +3,7 @@ import { decodeMealLabelScan } from '@trainingai/shared/nutrition/label-payload'
 import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals';
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient';
 import { plural } from '@trainingai/shared/format/plural';
+import { foodLine, portionKcalLine } from '../data/display';
 import { randomUUID } from 'expo-crypto';
 import { useEffect, useRef, useState } from 'react';
 import { View } from 'react-native';
@@ -85,12 +86,6 @@ const initial: z.infer<typeof draftSchema> = {
   tab: 'recent',
   scanCandidates: [],
 };
-// A food with no brand has no leading dot: "125 g · 80 kcal", not " · 125 g · 80 kcal".
-function foodLine(brand: string | null | undefined, servingSizeG: number, calories: number) {
-  return [brand?.trim(), `${servingSizeG} g`, `${Math.round(calories)} kcal`]
-    .filter(Boolean)
-    .join(' · ');
-}
 export function FoodLogger({
   date,
   mealTypeId,
@@ -635,7 +630,7 @@ export function FoodLogger({
                             leading={<Thumbnail uri={meal.imageDataUri} label={meal.name} />}
                             density="compact"
                             title={meal.name}
-                            subtitle={`${plural(meal.servings, 'portion', 'portions')} · ${Math.round(meal.totals.calories / meal.servings)} kcal per portion`}
+                            subtitle={portionKcalLine(meal.servings, meal.totals.calories)}
                             onPress={() => onRecipes(meal)}
                           />
                           {tags.length > 0 && (

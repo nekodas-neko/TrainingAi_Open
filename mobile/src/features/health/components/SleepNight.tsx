@@ -1,6 +1,7 @@
 import Svg, { Rect } from 'react-native-svg';
 import { formatTimeOfDay } from '@trainingai/shared/date-utils';
 import { formatHoursMinutes } from '@trainingai/shared/format/units';
+import { stageValue } from '../data/stage-value';
 import {
   hypnogramSegments,
   STAGE_LEVEL,
@@ -173,10 +174,4 @@ export function SleepNight({
       )}
     </Card>
   );
-}
-// Sleep stages are stored in hours but read as "1h 05m", as in the current app.
-function stageValue(value: unknown, unit: string) {
-  return unit === 'h' && typeof value === 'number' && Number.isFinite(value)
-    ? formatHoursMinutes(value * 60)
-    : metricValue(value, unit, 1);
 }

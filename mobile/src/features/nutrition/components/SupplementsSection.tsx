@@ -23,6 +23,7 @@ import {
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
+import { deleteSupplement } from '../data/supplement-delete';
 import { useNutrition } from '../data/NutritionProvider';
 import { SupplementCreateSchema, type Supplement } from '../data/models';
 import { VialSheet } from './VialSheet';
@@ -449,9 +450,15 @@ function SupplementManager({ date, onClose }: { date: string; onClose: () => voi
           onCancel={() => setRemove(null)}
           onConfirm={async () => {
             try {
-              await n.store!.enqueue([
-                { domain: 'supplements', date, payload: { id: remove.id, deleted: true } },
-              ]);
+              await deleteSupplement(
+                {
+                  enqueue: (ops) => n.store!.enqueue(ops),
+                  clearDraft: async (key) => resources?.clearDraft(key),
+                },
+                date,
+                remove.id,
+              );
+              setEdit(null);
               setRemove(null);
             } catch {
               setError('Could not delete this supplement.');

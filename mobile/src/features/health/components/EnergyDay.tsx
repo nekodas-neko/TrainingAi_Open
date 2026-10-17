@@ -6,6 +6,7 @@ import type { z } from 'zod';
 import { AppText, Card, Grid, KeyValueGrid, MetricTile, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { energySpec, foodTimelineSpec, hrProfileSpec, metricValue } from '../data/models';
+import { signedKcal } from '../../nutrition/data/display';
 import { buildEnergyTimeline } from '../data/energy-timeline';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useHealthData } from '../data/HealthDataProvider';
@@ -70,7 +71,7 @@ export function EnergyDay({
           <MetricTile label="Burned" value={metricValue(balance.expenditureKcal, 'kcal')} />
           <MetricTile
             label={balance.netKcal > 0 ? 'Surplus' : 'Deficit'}
-            value={`${balance.netKcal > 0 ? '+' : balance.netKcal < 0 ? '−' : ''}${metricValue(Math.abs(balance.netKcal), 'kcal')}`}
+            value={`${signedKcal(balance.netKcal)} kcal`}
           />
         </Grid>
         <KeyValueGrid

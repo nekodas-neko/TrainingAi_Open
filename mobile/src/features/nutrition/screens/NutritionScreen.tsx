@@ -451,7 +451,9 @@ export function NutritionScreen({
               <Card>
                 <WeeklyNutrition
                   onDay={setDate}
-                  calorieTarget={energy.data?.balance?.budgetKcal ?? n.view.targets.calories ?? null}
+                  calorieTarget={
+                    energy.data?.date === date ? (energy.data.balance?.budgetKcal ?? null) : null
+                  }
                 />
                 {date === n.today && <SupplementsSection date={date} />}
               </Card>
