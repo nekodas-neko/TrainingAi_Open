@@ -21,7 +21,8 @@ const eveningBout = (date: string, id = `eve-${date}`) => ({
   id, date, sleepStart: at(date, '21:30'), sleepEnd: at(date, '22:30'), durationHours: 1,
 })
 
-const pick = (rows: Parameters<typeof pickSleepCardNight>[0], today = '2026-10-18') =>
+interface TestRow { id: string; date: string; sleepStart: string | null; sleepEnd: string | null; durationHours: number }
+const pick = (rows: TestRow[], today = '2026-10-18') =>
   pickSleepCardNight(rows, today, TZ)
 
 describe('pickSleepCardNight', () => {

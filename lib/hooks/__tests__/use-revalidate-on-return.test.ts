@@ -64,8 +64,10 @@ describe('the real heart-rate card revalidates on return (issue 2906)', () => {
   const WS = 'workout-sessions-day:2026-10-18'
   const STRESS = 'stress-day:2026-10-18'
 
-  const card = (epoch: number) =>
-    createElement(TabVisibilityProvider, { visible: true, epoch }, createElement(HrDayCard))
+  // The provider types `children` as a prop; pass it there so the type checks without JSX.
+  // eslint-disable-next-line react/no-children-prop
+  const shell = (visible: boolean, epoch: number) => createElement(TabVisibilityProvider, { visible, epoch, children: createElement(HrDayCard) })
+  const card = (epoch: number) => shell(true, epoch)
   async function mount(epoch = 0) {
     host = document.createElement('div')
     document.body.appendChild(host)
@@ -116,7 +118,7 @@ describe('the real heart-rate card revalidates on return (issue 2906)', () => {
     host = document.createElement('div')
     document.body.appendChild(host)
     root = createRoot(host)
-    const away = createElement(TabVisibilityProvider, { visible: false, epoch: 0 }, createElement(HrDayCard))
+    const away = shell(false, 0)
     await act(async () => { root!.render(away) })
     await setVisibility('visible')
     expect(count(HR)).toBe(1)
