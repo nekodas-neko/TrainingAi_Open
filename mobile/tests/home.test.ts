@@ -10,7 +10,8 @@ import {
 } from '../src/features/home/data/models.ts';
 import { shiftDateStr } from '@trainingai/shared/date-utils';
 import { ApiError } from '../src/features/account/api/client.ts';
-import { homeGreeting } from '@trainingai/shared/greeting';
+import { homeGreeting, profileDisplayName } from '@trainingai/shared/greeting';
+import { bannerTone } from '../src/features/home/data/banner-data.ts';
 import {
   goalsReviewDue,
   localHour,
@@ -46,6 +47,32 @@ test('timeline keeps zero measurements and leaves absent values unknown', () => 
   assert.equal(timelineSummary(event), '0 kcal');
   assert.equal(timelineSummary({ ...event, calories: undefined }), '');
   assert.equal(timelineTitle({ ...event, type: 'workout' }), '🍳 Breakfast');
+});
+
+test('the timeline summary does not repeat the start time the row already shows', () => {
+  const event = timelineEventSchema.parse({
+    type: 'workout',
+    title: 'Push',
+    time: '6:30 am',
+    endTime: '7:25 am',
+    timeMs: 0,
+    day: 'today',
+  });
+  assert.equal(timelineSummary(event), 'until 7:25 am');
+  assert.ok(!timelineSummary(event).includes(event.time));
+  assert.equal(timelineSummary({ ...event, endTime: undefined }), '');
+});
+
+test('each updates-strip icon is tinted by its type, not its position', () => {
+  assert.deepEqual(bannerTone, { goals: 'activity', day: 'checkin', week: 'sleep' });
+  assert.equal(new Set(Object.values(bannerTone)).size, 3);
+});
+
+test('a whitespace-only display name falls back to the sign-in name', () => {
+  assert.equal(profileDisplayName({ displayName: '   ', name: ' Dasa ' }), 'Dasa');
+  assert.equal(profileDisplayName({ displayName: '  Dee ', name: 'Dasa' }), 'Dee');
+  assert.equal(profileDisplayName({ displayName: ' ', name: ' ' }), null);
+  assert.equal(profileDisplayName(null), null);
 });
 
 test('sleep duration appears once on the timeline but remains available in bedtime details', () => {
@@ -655,5 +682,5 @@ test('wake-up rows carry both scores and activities carry their time range', () 
     day: 'today',
     durationMin: 38,
   });
-  assert.equal(timelineSummary(walk), '12:27pm – 1:05pm · 38m');
+  assert.equal(timelineSummary(walk), 'until 1:05pm · 38m');
 });

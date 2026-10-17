@@ -10,6 +10,7 @@ import type { Friendship } from "@trainingai/shared/types/friends";
 import { UserCircle, Check, X, UserMinus } from "lucide-react";
 import { invalidateFriends } from "@/lib/cache-groups";
 import { splitPendingRequests } from "@/components/more/pending-friend-requests";
+import { profileDisplayName } from "@trainingai/shared/greeting";
 
 interface ManageFriendsSheetProps {
   open: boolean
@@ -111,7 +112,7 @@ export function ManageFriendsSheet({ open, onOpenChange, friendships, onRefresh 
                   <div key={f.id} className="flex items-center gap-3 rounded-xl bg-muted/30 p-3">
                     <UserCircle className="w-8 h-8 text-muted-foreground flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold truncate">{f.otherUser.displayName ?? f.otherUser.name ?? 'Unknown'}</p>
+                      <p className="text-sm font-semibold truncate">{profileDisplayName(f.otherUser) ?? 'Unknown'}</p>
                       <p className="text-xs text-muted-foreground font-mono">{f.otherUser.friendCode}</p>
                     </div>
                     <div className="flex gap-1">
@@ -170,7 +171,7 @@ export function ManageFriendsSheet({ open, onOpenChange, friendships, onRefresh 
                       <UserCircle className="w-8 h-8 text-muted-foreground flex-shrink-0" />
                     )}
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold truncate">{f.otherUser.displayName ?? f.otherUser.name ?? 'Unknown'}</p>
+                      <p className="text-sm font-semibold truncate">{profileDisplayName(f.otherUser) ?? 'Unknown'}</p>
                       <p className="text-xs text-muted-foreground font-mono">{f.otherUser.friendCode}</p>
                     </div>
                     <Button size="sm" variant="ghost" aria-label={`Remove ${f.otherUser.displayName ?? f.otherUser.name ?? 'friend'}`} onClick={() => handleRemove(f.id)}>

@@ -53,6 +53,7 @@ function fixture() {
   let loseReply = false;
   const applied = new Set<string>();
   const mutations: { id: string; payload: Record<string, number> }[] = [];
+  const verdicts: unknown[] = [];
   const connection = {
     origin: 'https://example.com',
     userId: 'one',
@@ -63,9 +64,13 @@ function fixture() {
       }
       return path === '/api/body-metadata' ? body : [];
     },
-    post: async (_path: string, envelope: unknown) => {
+    post: async (path: string, envelope: unknown) => {
       if (!online) {
         throw new Error('offline');
+      }
+      if (path === '/api/sleep-verdict') {
+        verdicts.push(envelope);
+        return { ok: true };
       }
       const mutation = (
         envelope as { mutations: { id: string; payload: Record<string, number> }[] }
@@ -110,6 +115,7 @@ function fixture() {
     connection,
     storage,
     mutations,
+    verdicts,
     setOnline: (value: boolean) => {
       online = value;
     },
@@ -331,4 +337,42 @@ test('manual sleep clock entry uses the account timezone across midnight and DST
   const dst = manualNightWindow('2026-10-04', '23:00', '07:00', 'Australia/Sydney')!;
   assert.equal((Date.parse(dst.sleepEnd) - Date.parse(dst.sleepStart)) / 3_600_000, 7);
   assert.equal(manualNightWindow(date, '99:00', '07:00', 'Australia/Brisbane'), null);
+});
+
+test('"That\'s wrong" is kept while offline and posted once when the phone reconnects', async () => {
+  const f = fixture();
+  const store = f.store();
+  await store.refresh();
+  f.setOnline(false);
+  await store.respondToVerdict(date, 'corrected');
+  assert.deepEqual(store.getSnapshot().verdictResponses, [{ date, state: 'corrected' }]);
+  assert.equal(f.verdicts.length, 0);
+  const reopened = f.store();
+  await reopened.refresh();
+  assert.equal(reopened.getSnapshot().verdictResponses.length, 1);
+  f.setOnline(true);
+  await reopened.sync();
+  assert.deepEqual(f.verdicts, [{ date, state: 'corrected' }]);
+  assert.equal(reopened.getSnapshot().verdictResponses.length, 0);
+});
+
+test('a second tap on the same night replaces the first rather than queueing twice', async () => {
+  const f = fixture();
+  const store = f.store();
+  await store.refresh();
+  f.setOnline(false);
+  await store.respondToVerdict(date, 'acknowledged');
+  await store.respondToVerdict(date, 'corrected');
+  assert.deepEqual(store.getSnapshot().verdictResponses, [{ date, state: 'corrected' }]);
+});
+
+test('a denied account cannot respond to a sleep verdict', async () => {
+  const f = fixture();
+  const store = f.store();
+  await store.refresh();
+  f.connection.get = async () => {
+    throw new ApiError(403);
+  };
+  await store.refresh(true);
+  await assert.rejects(store.respondToVerdict(date, 'corrected'));
 });

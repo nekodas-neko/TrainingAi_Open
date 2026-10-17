@@ -261,6 +261,23 @@ export class HealthStore {
     }
     await this.enqueue('day_checkins', date, parsed, response);
   }
+  /**
+   * Records that the owner disagreed with (or accepted) a sleep verdict, without a check-in.
+   * Queued like the response that rides on a check-in save, so a tap made offline is sent later
+   * rather than lost; the value itself is still written by the check-in.
+   */
+  async respondToVerdict(date: string, state: 'acknowledged' | 'corrected') {
+    if (this.canceled || !this.current.ready || this.current.denied) {
+      throw new Error('Check your account before responding to a sleep verdict.');
+    }
+    await this.write((current) => ({
+      verdictResponses: [
+        ...current.verdictResponses.filter((r) => r.date !== date),
+        { date, state },
+      ],
+    }));
+    void this.sync();
+  }
   async readCheckin(date: string) {
     const generation = this.generation;
     const revision = this.revision;

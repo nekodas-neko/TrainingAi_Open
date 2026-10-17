@@ -10,6 +10,7 @@ import { TrophyCase } from '@/components/more/trophy-case'
 import { useTransitionRouter } from "@/lib/view-transition";
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
+import { profileDisplayName } from '@trainingai/shared/greeting'
 
 function formatVolume(kg: number): string {
   const tons = kg / 1000
@@ -97,7 +98,7 @@ export default function PublicProfilePage() {
               </div>
 
               <div className="text-center">
-                <p className="text-xl font-bold">{profile.displayName ?? profile.name}</p>
+                <p className="text-xl font-bold">{profileDisplayName(profile)}</p>
                 {titleDef && TitleIcon && (
                   <div className="flex items-center justify-center gap-1 mt-1">
                     <TitleIcon className="h-3.5 w-3.5 text-shadow-bg" style={{ color: 'var(--color-brand)' }} />
