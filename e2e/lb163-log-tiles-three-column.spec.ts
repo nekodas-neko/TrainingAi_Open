@@ -52,40 +52,46 @@ test('the row fills the width, and Log clears the icon at every tile count', asy
   // skeleton — the first run measured zero tiles against a screen of grey placeholder blocks, which
   // the failure screenshot showed plainly.
   await expect(tiles.first(), 'the metric tiles never painted').toBeVisible({ timeout: 60_000 })
-  const count = await tiles.count()
-  // Not a vacuous pass: with no metric widgets enabled the component returns null and there is
-  // nothing to measure, so say so rather than reporting green.
+  // Content above the tiles (readiness chips, Body Battery) lands after first paint and pushes the row
+  // down, so a measurement spread over several awaits sees tile 3 on a different y from tile 1 and
+  // counts a two-tile "row" (CI run 38672389846 retry: 232 px against 352). Wait until the count and
+  // every rect are identical across two animation frames, then read everything from that one snapshot.
+  const snapshot = () => page.evaluate(sel => {
+    const els = [...document.querySelectorAll(sel)]
+    const parent = els[0]?.parentElement
+    return {
+      rects: els.map(e => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width } }),
+      parent: parent ? parent.getBoundingClientRect().width : 0,
+      cols: parent ? getComputedStyle(parent).gridTemplateColumns : '',
+    }
+  }, TILES)
+  await expect.poll(async () => {
+    const a = JSON.stringify(await snapshot())
+    await page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))))
+    return a === JSON.stringify(await snapshot())
+  }, { message: 'the tiles never held still across two frames', timeout: 30_000 }).toBe(true)
+
+  const snap = await snapshot()
+  const count = snap.rects.length
   // NOT a skip. The tiles are pinned on above, so zero of them is a failure of this spec's premise
   // and must be reported as one — a skip here is how the first run measured nothing and passed.
   expect(count, 'no metric tiles rendered despite being pinned on — the spec cannot measure anything')
     .toBeGreaterThan(0)
 
-  const first = await tiles.first().boundingBox()
-  expect(first, 'the first tile has no box').not.toBeNull()
-
   // ── The row fills the width ────────────────────────────────────────────────────────────────────
   // Measured as the union of the tiles in the first row against the container, rather than against
   // 384 directly: the card carries `px-4`, so the row is 352 px wide and comparing to the viewport
   // would fail on correct layout.
-  const rowWidth = await tiles.first().evaluate(el => {
-    const parent = el.parentElement!
-    return { parent: parent.getBoundingClientRect().width, cols: getComputedStyle(parent).gridTemplateColumns }
-  })
   // Three columns, which is what "fills the row" means here — a flex row of content-sized tiles is
   // what left the right third empty.
-  expect(rowWidth.cols.split(' ').length, `expected a 3-column grid, got "${rowWidth.cols}"`).toBe(3)
+  expect(snap.cols.split(' ').length, `expected a 3-column grid, got "${snap.cols}"`).toBe(3)
 
-  const firstRow = [] as { x: number; w: number }[]
-  for (let i = 0; i < count; i++) {
-    const box = await tiles.nth(i).boundingBox()
-    if (!box) continue
-    if (Math.abs(box.y - first!.y) < 4) firstRow.push({ x: box.x, w: box.width })
-  }
+  const firstRow = snap.rects.filter(r => Math.abs(r.y - snap.rects[0].y) < 4)
   const spanned = firstRow.reduce((a, t) => a + t.w, 0)
   // Gaps are `gap-2` = 8 px between columns. With three columns the tiles plus two gaps should
   // account for essentially the whole container.
   expect(spanned + (firstRow.length - 1) * 8, 'the tiles do not fill their row')
-    .toBeGreaterThan(rowWidth.parent - 2)
+    .toBeGreaterThan(snap.parent - 2)
 
   // ── Log clears the icon, on every tile ────────────────────────────────────────────────────────
   for (let i = 0; i < count; i++) {

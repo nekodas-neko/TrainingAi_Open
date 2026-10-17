@@ -4,9 +4,9 @@ import React from "react";
 import dynamic from "next/dynamic";
 import { InfoIcon } from "lucide-react";
 import { accentCardStyle } from "@trainingai/shared/utils";
-import { evaluateWeightRateVsGoalBand } from "@trainingai/shared/health/long-term-goal-progress";
-import { scoreBand } from "@trainingai/shared/health/score-band";
+import { evaluateWeightRateVsGoalBand, goalRemaining } from "@trainingai/shared/health/long-term-goal-progress";
 import { bodyComposition } from "@trainingai/shared/health/body-composition";
+import { hrvBaselineBand, hrvBaselineDeviationPct } from "@trainingai/shared/health/hrv-baseline";
 import { displayBodyFat, type BodyFatCalibrationMeta } from "@/components/health/body-fat-display";
 import { BodyFatCard } from "@/components/health/body-fat-card";
 import { Sparkline } from "@/components/ui/sparkline";
@@ -230,10 +230,10 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
             {latestWeightIsStale && latestWeightDate ? `Last logged ${latestWeightDate}` : "Last 7 days"}
           </p>
           {targetWeightKg != null && latestWeight != null && (() => {
-            const diff = parseFloat((latestWeight - targetWeightKg).toFixed(1))
+            const { diff, reached } = goalRemaining(latestWeight, targetWeightKg)
             return (
-              <p className="text-xs font-semibold mt-1" style={{ color: diff <= 0 ? 'var(--accent-green)' : '#f97316' }}>
-                {diff <= 0 ? '✓ Goal reached' : `↓ ${diff} kg to go`}
+              <p className="text-xs font-semibold mt-1" style={{ color: reached ? 'var(--accent-green)' : '#f97316' }}>
+                {reached ? '✓ Goal reached' : `↓ ${diff} kg to go`}
               </p>
             )
           })()}
@@ -576,12 +576,8 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
       case "hrvBaseline": {
         const { baselineHrv, recentHrv } = readiness ?? {};
         if (baselineHrv == null || recentHrv == null) return null;
-        const deviationPct = Math.round(((recentHrv - baselineHrv) / baselineHrv) * 100);
-        // scoreBand() is the one place High/Moderate/Low thresholds live — reuse it by
-        // mapping this deviation onto its 0-100 scale so 0% deviation lands exactly on
-        // the High cutoff (70) and -10% lands exactly on the Moderate cutoff (50),
-        // preserving this card's original break points.
-        const { label: hrvBandLabel, color } = scoreBand(70 + 2 * deviationPct);
+        const deviationPct = hrvBaselineDeviationPct(recentHrv, baselineHrv);
+        const { label: hrvBandLabel, color } = hrvBaselineBand(deviationPct);
         return (
           <div key="hrvBaseline" className="rounded-2xl p-4" style={accentCardStyle(color)}>
             <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground mb-2">HRV · 7d vs 28d baseline</h3>

@@ -1,6 +1,6 @@
 import { HealthResourceHeader } from './HealthResourceHeader';
 import { useState } from 'react';
-import { shiftDateStr } from '@trainingai/shared/date-utils';
+import { formatDateDisplay, shiftDateStr } from '@trainingai/shared/date-utils';
 import { computeHrZones } from '@trainingai/shared/health/hr-zones';
 import {
   AppText,
@@ -20,7 +20,6 @@ import { useHealthData } from '../data/HealthDataProvider';
 import {
   zoneSpec,
   sleepCorrelationSpec,
-  trendsSpec,
   hrProfileSpec,
   metricValue,
 } from '../data/models';
@@ -65,8 +64,18 @@ export function TimeInZoneCard() {
           <StackedBarChart
             label="Recorded heart-rate zone minutes"
             unit="min"
-            bars={state.data.days.map((day) => ({
-              label: day.day,
+            readable
+            gridlines
+            yAxis
+            bars={state.data.days.map((day, index) => ({
+              // Weekday names read at a glance; a month of bars would collide, so every
+              // seventh bar carries its date and the rest stay blank.
+              label:
+                window === 'month'
+                  ? index % 7 === 0
+                    ? formatDateDisplay(day.day, 'short')
+                    : ''
+                  : formatDateDisplay(day.day, 'weekday'),
               segments: zones.map((zone, index) => ({
                 label: zone.name,
                 value: day.seconds[index] / 60,
@@ -127,47 +136,6 @@ export function SleepPerformanceCard() {
     </HealthMetricCard>
   );
 }
-export function NutritionActivityTrends() {
-  const { today } = useHealthData();
-  const state = useWorkoutResource(trendsSpec(today));
-  return (
-    <>
-      <StableContent loading={state.data === null && state.loading}>
-        {state.data &&
-          (['proteinPerKg', 'steps', 'waterMl'] as const)
-            .filter((key) => state.data!.trends.some((day) => day[key] !== null))
-            .map((key) => (
-              <HealthMetricCard
-                key={key}
-                title={
-                  key === 'proteinPerKg'
-                    ? 'Protein per kg Bodyweight'
-                    : key === 'steps'
-                      ? 'Steps'
-                      : 'Water'
-                }
-                caption={
-                  key === 'proteinPerKg'
-                    ? 'g/kg · last 14 days'
-                    : key === 'waterMl'
-                      ? 'ml · last 14 days'
-                      : 'Last 14 days'
-                }
-                points={state.data!.trends.map((day) => ({ label: day.date, value: day[key] }))}
-                status={
-                  <ResourceStatus
-                    inline
-                    label="Activity trends"
-                    state={state}
-                    refresh={state.refresh}
-                  />
-                }
-              />
-            ))}
-      </StableContent>
-    </>
-  );
-}
 export function ObservedHeartCard() {
   const state = useWorkoutResource(hrProfileSpec);
   return (
@@ -204,20 +172,5 @@ export function ObservedHeartCard() {
         </>
       )}
     </Card>
-  );
-}
-export function RingStatusCard() {
-  const { today } = useHealthData();
-  const state = useWorkoutResource(trendsSpec(today));
-  const days = state.data?.trends ?? [];
-  if (!days.some((day) => day.wornHours !== null)) {
-    return null;
-  }
-  return (
-    <HealthMetricCard
-      title="Ring Status"
-      caption="Recorded wear time · hours"
-      points={days.map((day) => ({ label: day.date, value: day.wornHours }))}
-    />
   );
 }

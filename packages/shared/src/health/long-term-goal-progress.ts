@@ -8,6 +8,16 @@ export function goalProgressPct(starting: number, current: number, target: numbe
 }
 
 /**
+ * The "to go" line on the weight and body-fat cards: how far the latest reading is above the
+ * target, to one decimal. The cards treat a target at or below the reading as a loss goal, so
+ * `reached` is true once the reading is at or under it. One copy for both apps.
+ */
+export function goalRemaining(current: number, target: number): { diff: number; reached: boolean } {
+  const diff = parseFloat((current - target).toFixed(1))
+  return { diff, reached: diff <= 0 }
+}
+
+/**
  * One weigh-in. `weightKg` is optional AND nullable because the two row shapes that reach here
  * disagree: `BodyMetrics` (server) omits the field, `BodyMetaRow` (client) carries an explicit
  * null. Both mean "this day has a metric row but no weight", and the filter below treats them

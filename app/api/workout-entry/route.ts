@@ -30,7 +30,8 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
-    if (!(await editExerciseLog(userId, parsed.data))) {
+    // A live edit: no stamp, so the row takes server time (issue 2721).
+    if (!(await editExerciseLog(userId, parsed.data)).found) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     return NextResponse.json({ success: true });

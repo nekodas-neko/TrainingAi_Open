@@ -176,23 +176,59 @@ export async function countedEstimatesFor(
     const [tracking, answers] = await Promise.all([
       repo.listMealLoggingStatuses(userId, date), repo.listPlanMealAnswers(userId, date),
     ])
-    if (!unrecordedMealEstimatesAllowed(tracking)) return []
-    if (!answers.some(a => a.answer === 'estimated')) return []
-    const [plan, mealTypes, logs] = await Promise.all([
-      shared ? shared.plan() : repo.getActiveMealPlan(userId),
-      shared ? shared.mealTypes() : repo.listMealTypes(userId),
-      shared?.logsFor?.(date) ?? repo.listFoodLogs(userId, date),
-    ])
-    if (!plan) return []
-    return countedEstimates({
-      answers,
-      planMeals: plan.variants.flatMap(v => v.meals),
-      mealTypes,
-      loggedMealTypeIds: new Set(logs.map(l => l.mealTypeId)),
-    }).map(e => ({ mealTypeId: e.mealTypeId, kcal: e.kcal }))
+    return await estimatesForDay(repo, userId, date, tracking, answers, shared)
   } catch {
     return []
   }
+}
+
+/**
+ * `countedEstimatesFor` for the days `from`..`to` at once: the answers and the tracking rows are one
+ * range read each, so a Sunday costs the same two reads as a Monday. Only a day that holds an
+ * "estimated" answer reads further (the plan and meal types once, through `shared`; that day's logs).
+ * A failed read is no estimate for the days it covered, as in the single-day version.
+ */
+export async function countedEstimatesForRange(
+  repo: WorkoutRepository, userId: string, dates: readonly string[], shared?: SharedEstimateReads,
+): Promise<Map<string, CountedEstimateRow[]>> {
+  const out = new Map<string, CountedEstimateRow[]>(dates.map(d => [d, []]))
+  if (dates.length === 0) return out
+  try {
+    const from = dates[0], to = dates[dates.length - 1]
+    const [tracking, answers] = await Promise.all([
+      repo.listMealLoggingStatusesRange(userId, from, to), repo.listPlanMealAnswersRange(userId, from, to),
+    ])
+    await Promise.all(dates.map(async d => {
+      const dayAnswers = answers.filter(a => a.logDate === d)
+      if (!dayAnswers.some(a => a.answer === 'estimated')) return
+      try {
+        out.set(d, await estimatesForDay(repo, userId, d, tracking.filter(t => t.date === d), dayAnswers, shared))
+      } catch { /* this day counts no estimate */ }
+    }))
+  } catch { /* no estimates for the window */ }
+  return out
+}
+
+async function estimatesForDay(
+  repo: WorkoutRepository, userId: string, date: string,
+  tracking: readonly { explicit?: boolean }[],
+  answers: Awaited<ReturnType<WorkoutRepository['listPlanMealAnswers']>>,
+  shared?: SharedEstimateReads,
+): Promise<CountedEstimateRow[]> {
+  if (!unrecordedMealEstimatesAllowed(tracking)) return []
+  if (!answers.some(a => a.answer === 'estimated')) return []
+  const [plan, mealTypes, logs] = await Promise.all([
+    shared ? shared.plan() : repo.getActiveMealPlan(userId),
+    shared ? shared.mealTypes() : repo.listMealTypes(userId),
+    shared?.logsFor?.(date) ?? repo.listFoodLogs(userId, date),
+  ])
+  if (!plan) return []
+  return countedEstimates({
+    answers,
+    planMeals: plan.variants.flatMap(v => v.meals),
+    mealTypes,
+    loggedMealTypeIds: new Set(logs.map(l => l.mealTypeId)),
+  }).map(e => ({ mealTypeId: e.mealTypeId, kcal: e.kcal }))
 }
 
 export async function computeEnergyBalance(

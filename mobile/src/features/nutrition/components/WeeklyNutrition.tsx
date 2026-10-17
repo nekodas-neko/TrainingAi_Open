@@ -1,13 +1,12 @@
 import { formatDateDisplay } from '@trainingai/shared/date-utils';
+import { plural } from '@trainingai/shared/format/plural';
 import { useState } from 'react';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import {
-  AppButton,
   AppText,
   Disclosure,
   ListRow,
   SegmentedControl,
-  Sheet,
   Skeleton,
   Stack,
   StackedBarChart,
@@ -15,13 +14,28 @@ import {
 } from '../../../shared/ui';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { adherenceSpec, weeklySpec } from '../data/models';
-export function WeeklyNutrition({ onDay }: { onDay: (date: string) => void }) {
+const percent = (value: number | null | undefined) =>
+  value == null ? '—' : Math.round(value * 100) + '%';
+export function WeeklyNutrition({
+  onDay,
+  calorieTarget,
+}: {
+  onDay: (date: string) => void;
+  /** The day's calorie budget as the energy card shows it, so the chart's line agrees with it. */
+  calorieTarget?: number | null;
+}) {
   const { theme } = useTheme();
   const state = useWorkoutResource(weeklySpec);
   const adherence = useWorkoutResource(adherenceSpec);
   const [metric, setMetric] = useState<'calories' | 'proteinG' | 'carbsG' | 'fatG'>('calories');
-  const [info, setInfo] = useState(false);
   const logged = state.data?.filter((d) => d.logged !== false) ?? [];
+  const average = logged.length
+    ? Math.round(logged.reduce((sum, d) => sum + d.calories, 0) / logged.length)
+    : null;
+  const target =
+    metric === 'calories' && calorieTarget != null && calorieTarget > 0
+      ? { value: calorieTarget, label: `Target: ${Math.round(calorieTarget).toLocaleString()} kcal/day` }
+      : undefined;
   const color = {
     calories: theme.colors.brand,
     proteinG: theme.macros.protein,
@@ -56,6 +70,10 @@ export function WeeklyNutrition({ onDay }: { onDay: (date: string) => void }) {
         <StackedBarChart
           label="Seven days of nutrition"
           unit={metric === 'calories' ? 'kcal' : 'g'}
+          readable
+          gridlines
+          yAxis
+          target={target}
           bars={state.data.map((d) => ({
             label: formatDateDisplay(d.date, 'weekday'),
             segments:
@@ -74,15 +92,41 @@ export function WeeklyNutrition({ onDay }: { onDay: (date: string) => void }) {
         <Skeleton style={{ height: theme.sizes.chartHeight + theme.spacing.xxl }} />
       )}
       <AppText variant="caption" tone="muted">
-        {logged.length
-          ? `${Math.round(logged.reduce((sum, d) => sum + d.calories, 0) / logged.length)} kcal average · ${logged.length} logged days`
-          : 'No food logged this week yet.'}
+        {average == null
+          ? 'No food logged this week yet.'
+          : `${target ? `Target: ${Math.round(calorieTarget!).toLocaleString()} kcal/day · ` : ''}avg of ${plural(logged.length, 'logged day', 'logged days')}: ${average.toLocaleString()} kcal`}
       </AppText>
-      <AppButton
-        title={`Meal adherence · ${adherence.data?.adherence7d == null ? '—' : Math.round(adherence.data.adherence7d * 100) + '%'}`}
-        variant="ghost"
-        onPress={() => setInfo(true)}
-      />
+      {adherence.data && adherence.data.requiredMealTypeCount > 0 && (
+        <Stack gap="xs">
+          <Stack direction="row" justify="space-between" align="center">
+            <AppText variant="caption" tone="muted">
+              Adherence · last 7 days
+            </AppText>
+            <AppText variant="label" style={{ fontVariant: ['tabular-nums'] }}>
+              {percent(adherence.data.adherence7d)}
+            </AppText>
+          </Stack>
+          <Stack direction="row" justify="space-between" align="center">
+            <AppText variant="caption" tone="muted">
+              Adherence · last 28 days
+            </AppText>
+            <AppText variant="label" style={{ fontVariant: ['tabular-nums'] }}>
+              {percent(adherence.data.adherence28d)}
+            </AppText>
+          </Stack>
+          <AppText variant="micro" tone="muted">
+            % of days every required meal ({adherence.data.requiredMealTypeCount}) was logged
+          </AppText>
+        </Stack>
+      )}
+      {adherence.error && (
+        <StatusIndicator
+          label="Meal adherence"
+          busy={adherence.loading}
+          error={adherence.error}
+          onRetry={adherence.refresh}
+        />
+      )}
       <Disclosure title="View daily totals">
         {state.data?.map((d) => (
           <ListRow
@@ -97,41 +141,6 @@ export function WeeklyNutrition({ onDay }: { onDay: (date: string) => void }) {
           />
         ))}
       </Disclosure>
-      <Sheet
-        visible={info}
-        title="Meal adherence"
-        onClose={() => setInfo(false)}
-        actions={
-          <StatusIndicator
-            label="Meal adherence"
-            busy={adherence.loading}
-            error={adherence.error}
-            onRetry={adherence.refresh}
-          />
-        }
-      >
-        <AppText>
-          How consistently you log your required meal groups. Missing days are unlogged, rather
-          than days with no food.
-        </AppText>
-        <ListRow
-          title="Last 7 days"
-          subtitle={
-            adherence.data?.adherence7d == null
-              ? 'Unavailable'
-              : Math.round(adherence.data.adherence7d * 100) + '%'
-          }
-        />
-        <ListRow
-          title="Last 28 days"
-          subtitle={
-            adherence.data?.adherence28d == null
-              ? 'Unavailable'
-              : Math.round(adherence.data.adherence28d * 100) + '%'
-          }
-        />
-        <AppText tone="muted">Required groups are configured in Nutrition Settings.</AppText>
-      </Sheet>
     </>
   );
 }

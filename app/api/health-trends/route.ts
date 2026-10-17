@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
-import { formatInTimeZone } from 'date-fns-tz'
-import { DEFAULT_TZ, toAestDay, todayInTz, todayMidnightUtc } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ, toAestDay, todayInTz, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { bucketize, correlationInsight, buildExercise1rmBaseline, sessionMean1RmPct, type BucketDef, type CorrelationBucket, type CorrelationStats, type WithheldReason } from '@trainingai/shared/health/correlation'
 import { restAdherencePct, restAdherenceSets } from '@trainingai/shared/workout/rest-adherence'
 import { energyBalanceByDay } from '@trainingai/shared/health/energy-balance'
@@ -113,10 +112,9 @@ export async function GET(req: Request) {
   const repo = await getRepository()
   const tz = session.user?.timezone ?? DEFAULT_TZ
   const todayIso    = todayInTz(tz)
-  const todayMid    = todayMidnightUtc(tz)
-  const from90dDate = new Date(todayMid.getTime() - 90 * 86_400_000)
-  const from90dIso  = formatInTimeZone(from90dDate, tz, 'yyyy-MM-dd')
-  const from28dIso  = formatInTimeZone(new Date(todayMid.getTime() - 28 * 86_400_000), tz, 'yyyy-MM-dd')
+  const from90dIso  = shiftDateStr(todayIso, -90)
+  const from90dDate = dateStrMidnightInTz(from90dIso, tz)
+  const from28dIso  = shiftDateStr(todayIso, -28)
   // Day index for the confounder control (Q-75). Overnight HRV correlates with the calendar at
   // r = 0.79 in this user's data, so anything else drifting with date correlates with HRV for free
   // — every pair here is a candidate, not just the HRV ones.
@@ -370,7 +368,7 @@ export async function GET(req: Request) {
     // sleep" gradient out of nothing.
     for (const sleep of nightSessions(sleepSessions, tz)) {
       if (sleep.efficiency == null) continue
-      const prevDate = toAestDay(new Date(sleep.sleepStart.getTime() - 86_400_000), tz)
+      const prevDate = shiftDateStr(toAestDay(sleep.sleepStart, tz), -1)
       const candidates = [mealByDate.get(sleep.date), mealByDate.get(prevDate)].filter((d): d is Date => d != null)
       const lastMeal = candidates
         .filter(d => d.getTime() <= sleep.sleepStart.getTime())

@@ -99,10 +99,13 @@ export function ActiveMealPlan({
   date,
   onManage,
   onSetup,
+  onStepByStep,
 }: {
   date: string;
   onManage: (plan?: MealPlan) => void;
   onSetup: (plan?: MealPlan) => void;
+  /** The stepper, offered beside the coach conversation when there is no plan yet. */
+  onStepByStep?: () => void;
 }) {
   const n = useNutrition(date);
   const resources = useWorkoutResources();
@@ -359,12 +362,24 @@ export function ActiveMealPlan({
             <AppButton title="Manage plan" variant="surface" onPress={() => onManage(plan)} />
           </>
         ) : (
-          <AppButton
-            title="Create a meal plan"
-            icon="foods"
-            variant="surface"
-            onPress={() => onSetup()}
-          />
+          <>
+            <AppButton
+              title="Build a meal plan"
+              icon="foods"
+              variant="surface"
+              onPress={() => onSetup()}
+            />
+            <AppText variant="caption" tone="muted">
+              Talk it through with your coach. It already knows your target and when you train.
+            </AppText>
+            {onStepByStep && (
+              <AppButton
+                title="Prefer the step-by-step setup?"
+                variant="ghost"
+                onPress={onStepByStep}
+              />
+            )}
+          </>
         )}
       </Card>
     </>

@@ -265,6 +265,9 @@ export const exerciseLogs = pgTable('exercise_logs', {
   deletedAt:            timestamp('deleted_at', { withTimezone: true }),
   // Issue 2383: set once by the admin lbs-to-kg fix; the fix skips a log that carries it.
   unitFixAppliedAt:     timestamp('unit_fix_applied_at', { withTimezone: true }),
+  // Issue 2721: when this row's content was last decided — the phone's clock for a stamped push, the
+  // server's for a web route or a fix. A push stamped older than it is skipped (`isSupersededEdit`).
+  clientEditedAt:       timestamp('client_edited_at', { withTimezone: true }),
 })
 
 export const setLogs = pgTable('set_logs', {

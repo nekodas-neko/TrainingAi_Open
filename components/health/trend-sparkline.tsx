@@ -13,6 +13,7 @@ import { resolveColor } from "@trainingai/shared/chart-colors";
 import { gapDataset } from "./trend-sparkline-gaps";
 import { trendSparklinePropsEqual } from "./trend-sparkline-equal";
 import { EmptyState } from "@/components/ui/empty-state";
+import { weekOverWeekChange } from "@trainingai/shared/health/trend-delta";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
@@ -42,17 +43,12 @@ function fillColor(color: string): string {
 }
 
 function deltaChip(trends: HealthTrendDay[], field: Field) {
-  const values = trends.map(t => t[field] as number | null);
-  const today = values[values.length - 1];
-  const weekAgo = values.slice(0, 7).filter((v): v is number => v != null);
-  if (today == null || weekAgo.length === 0) return null;
-  const weekAvg = weekAgo.reduce((s, v) => s + v, 0) / weekAgo.length;
-  const diff = Math.round(today - weekAvg);
-  if (diff === 0) return { text: "— same as last week", colorClass: "text-muted-foreground" };
-  const sign = diff > 0 ? "▲" : "▼";
+  const change = weekOverWeekChange(trends.map(t => t[field] as number | null));
+  if (!change) return null;
+  if (change.direction === "same") return { text: change.text, colorClass: "text-muted-foreground" };
   // A-9: paired with ▲/▼ so state survives, but the -400 shade washed out in light theme.
-  const colorClass = diff > 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
-  return { text: `${sign} ${Math.abs(diff)} vs last week`, colorClass };
+  const colorClass = change.direction === "up" ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
+  return { text: change.text, colorClass };
 }
 
 function TrendSparklineBase({ trends, field, label, color, unit, emptyText }: TrendSparklineProps) {

@@ -1,64 +1,31 @@
-import { useRecordedIntake } from '../../nutrition/data/useRecordedIntake';
-import { HealthResourceHeader } from './HealthResourceHeader';
 import { useState } from 'react';
+import { latestDisplayedBodyFat } from '@trainingai/shared/health/body-fat-display';
+import { bmiClassification } from '@trainingai/shared/health/bmi';
+import { computeWeightRateKgPerWeek } from '@trainingai/shared/health/long-term-goal-progress';
+import { toAestDay } from '@trainingai/shared/date-utils';
+import { AppText, Card, Disclosure, FeatureRow, Grid } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
-import { bodyComposition } from '@trainingai/shared/health/body-composition';
-import {
-  computeWeightRateKgPerWeek,
-  goalProgressPct,
-} from '@trainingai/shared/health/long-term-goal-progress';
-import { scoreBand } from '@trainingai/shared/health/score-band';
-import { formatHoursMinutes } from '@trainingai/shared/format/units';
-import {
-  AppButton,
-  AppText,
-  Badge,
-  Card,
-  Disclosure,
-  FeatureRow,
-  Grid,
-  MetricTile,
-  ProgressBar,
-  Stack,
-} from '../../../shared/ui';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
-import { ResourceStatus } from '../../workouts/components/ResourceStatus';
 import { useHealthData } from '../data/HealthDataProvider';
-import {
-  displayFat,
-  energySpec,
-  goalsSpec,
-  latestMetric,
-  loadSpec,
-  metricValue,
-  readinessSpec,
-  profileSpec,
-  progressSpec,
-} from '../data/models';
+import { goalsSpec, latestMetric, profileSpec, progressSpec } from '../data/models';
 import { HealthMetricCard } from './HealthMetricCard';
 import { MuscleStatusCard } from './MuscleStatusCard';
 import { MetricLogSheet, type LogMetric } from './MetricLogSheet';
 import { MetricHistorySheet, type MetricKind } from './MetricHistorySheet';
 import { HrDayCard } from './HrDayCard';
 import type { HealthDetail } from '../screens/HealthDetailScreen';
-import {
-  TimeInZoneCard,
-  SleepPerformanceCard,
-  NutritionActivityTrends,
-} from './RecordedHealthCards';
-import { RingStatusCard } from './RecordedHealthCards';
+import { TimeInZoneCard, SleepPerformanceCard } from './RecordedHealthCards';
 import { useAppleImport } from '../HealthProvider';
-import { toAestDay } from '@trainingai/shared/date-utils';
-import { TrainingStressLine } from './TrainingStressLine';
+import { BodySleepCard } from './BodySleepCard';
+import { BodyFatCard, BodyWeightCard, WeightTrendCard } from './BodyWeightCards';
+import { LeanMassCard, ScaleCompositionCard } from './BodyCompositionCards';
+import { HeartTiles, HrvBaselineCard, TrainingLoadCard } from './BodyHeartCards';
+import { ActivityTrendCharts, EnergyBalanceCard, RingCards, WaterCard } from './BodyActivityCards';
 
 function GroupTitle({ children }: { children: string }) {
   const { theme } = useTheme();
   return (
-    <AppText
-      variant="heading"
-      accessibilityRole="header"
-      style={{ marginTop: theme.spacing.sm }}
-    >
+    <AppText variant="heading" accessibilityRole="header" style={{ marginTop: theme.spacing.sm }}>
       {children}
     </AppText>
   );
@@ -69,299 +36,90 @@ export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) =
   const goals = useWorkoutResource(goalsSpec);
   const profile = useWorkoutResource(profileSpec);
   const progress = useWorkoutResource(progressSpec);
-  const readiness = useWorkoutResource(readinessSpec(health.today));
-  const energy = useWorkoutResource(energySpec(health.today));
-  const load = useWorkoutResource(loadSpec);
-  const intake = useRecordedIntake(health.today, energy.data?.balance);
   const [log, setLog] = useState<LogMetric | null>(null);
   const [metric, setMetric] = useState<MetricKind | null>(null);
   const rows = health.body?.recent ?? [];
   const today = health.body?.today;
-  const weight =
-    health.body?.latestWeightKg ?? latestMetric(rows, 'weightKg')?.weightKg ?? null;
+  const weight = health.body?.latestWeightKg ?? latestMetric(rows, 'weightKg')?.weightKg ?? null;
   const weightDate = health.body?.latestWeightDate ?? latestMetric(rows, 'weightKg')?.date;
-  const fatRow = rows.find((row) => displayFat(row) !== null);
-  const fat = displayFat(fatRow);
-  const pairedRows = rows.filter((row) => row.weightKg !== null && displayFat(row) !== null);
-  const paired = pairedRows[0];
-  const composition = bodyComposition(paired?.weightKg, displayFat(paired));
-  const height = profile.data?.user.heightCm;
-  const bmi =
-    weight !== null && height != null && height > 0 ? weight / (height / 100) ** 2 : null;
-  const bmiLabel =
-    bmi === null
-      ? null
-      : fat != null
-        ? profile.data?.user.sex === 'female'
-          ? fat < 14
-            ? 'Essential fat'
-            : fat < 21
-              ? 'Athletic'
-              : fat < 25
-                ? 'Fitness'
-                : fat < 32
-                  ? 'Average'
-                  : 'High fat'
-          : fat < 6
-            ? 'Essential fat'
-            : fat < 14
-              ? 'Athletic'
-              : fat < 18
-                ? 'Fitness'
-                : fat < 25
-                  ? 'Average'
-                  : 'High fat'
-        : bmi < 18.5
-          ? 'Underweight'
-          : bmi < 25
-            ? 'Normal'
-            : bmi < 30
-              ? 'Overweight'
-              : 'Obese';
-  const hrvDeviation =
-    readiness.data?.baselineHrv != null &&
-    readiness.data.baselineHrv > 0 &&
-    readiness.data.recentHrv != null
-      ? Math.round(
-          ((readiness.data.recentHrv - readiness.data.baselineHrv) /
-            readiness.data.baselineHrv) *
-            100,
-        )
-      : null;
+  const { value: fat, corrected: fatCorrected } = latestDisplayedBodyFat(rows);
+  const { bmi, bmiLabel } = bmiClassification({
+    weightKg: weight,
+    heightCm: profile.data?.user.heightCm,
+    bodyFatPct: fat,
+    sex: profile.data?.user.sex,
+  });
   const slope = computeWeightRateKgPerWeek(health.body?.weightTrend ?? rows);
-  const lastNight = health.sleep.find((row) => row.date === health.today);
   const rawInitial =
     log === 'bodyFat' ? today?.bodyFat : log && log !== 'waterMl' ? today?.[log] : null;
+  const targetWeightKg = goals.data?.targetWeightKg ?? null;
+  const targetBfPct = goals.data?.targetBfPct ?? null;
   return (
     <>
       <MuscleStatusCard />
       <GroupTitle>Body</GroupTitle>
-      <HealthMetricCard
-        title="Body Weight"
-        value={weight}
-        unit="kg"
-        decimals={1}
-        tone="recovery"
-        caption={
-          weightDate !== health.today && weightDate
-            ? `Last logged ${weightDate}`
-            : 'Last 7 days'
-        }
+      <BodyWeightCard
+        rows={rows}
+        today={health.today}
+        weight={weight}
+        weightDate={weightDate ?? undefined}
+        targetWeightKg={targetWeightKg}
+        weightRateKgPerWeek={progress.data?.weightRateKgPerWeek ?? null}
         onLog={() => setLog('weightKg')}
         onOpen={() => setMetric('weightKg')}
-        points={[...rows]
-          .reverse()
-          .map((row) => ({ label: row.date, value: row.weightKg, x: Date.parse(row.date) }))}
-      >
-        {goals.data?.targetWeightKg !== null && goals.data?.targetWeightKg !== undefined && (
-          <AppText variant="caption" tone="muted">
-            Goal {metricValue(goals.data.targetWeightKg, 'kg', 1)}
-          </AppText>
-        )}
-      </HealthMetricCard>
-      <HealthMetricCard
-        title="Weight Trend"
-        value={slope}
-        unit="kg/wk"
-        decimals={2}
-        caption="Last 30 days"
-      >
-        <Disclosure title="About this trend">
-          <AppText variant="caption" tone="muted">
-            Change across your dated weight readings. At least three readings are needed.
-          </AppText>
-        </Disclosure>
-        {weight !== null &&
-          progress.data?.bodyBaseline.weightKg != null &&
-          goals.data?.targetWeightKg != null && (
-            <>
-              <AppText variant="caption">
-                Weight {weight} → {goals.data.targetWeightKg} kg
-              </AppText>
-              <ProgressBar
-                value={
-                  goalProgressPct(
-                    progress.data.bodyBaseline.weightKg,
-                    weight,
-                    goals.data.targetWeightKg,
-                  ) / 100
-                }
-              />
-            </>
-          )}
-        {fat !== null &&
-          progress.data?.bodyBaseline.bodyFatPct != null &&
-          goals.data?.targetBfPct != null && (
-            <>
-              <AppText variant="caption">
-                Body fat {fat} → {goals.data.targetBfPct}%
-              </AppText>
-              <ProgressBar
-                value={
-                  goalProgressPct(
-                    progress.data.bodyBaseline.bodyFatPct,
-                    fat,
-                    goals.data.targetBfPct,
-                  ) / 100
-                }
-              />
-            </>
-          )}
-      </HealthMetricCard>
-      {fat !== null && (
-        <HealthMetricCard
-          title="Body Fat"
-          value={fat}
-          unit="%"
-          decimals={1}
-          tone="nutrition"
-          onOpen={() => setMetric('bodyFat')}
-          onLog={() => setLog('bodyFat')}
-          points={[...rows].reverse().map((row) => ({
-            label: row.date,
-            value: displayFat(row),
-            x: Date.parse(row.date),
-          }))}
-        >
-          {fatRow?.bodyFatIsCorrected && <Badge label="DEXA corrected" />}
-          {health.body?.bodyFatCalibration?.offsetPct != null && (
-            <AppText variant="micro" tone="muted">
-              DEXA-corrected {health.body.bodyFatCalibration.offsetPct >= 0 ? '+' : ''}
-              {health.body.bodyFatCalibration.offsetPct.toFixed(1)}% ·{' '}
-              {health.body.bodyFatCalibration.pairCount ?? '—'} scans compared
-            </AppText>
-          )}
-          {rows.some((row) => row.bodyFatIsCorrected) &&
-            rows.some((row) => row.bodyFat != null && !row.bodyFatIsCorrected) && (
-              <AppText variant="micro" tone="muted">
-                Earlier readings are on another instrument; only calibrated readings are
-                corrected.
-              </AppText>
-            )}
-        </HealthMetricCard>
-      )}
-      {composition && pairedRows.length >= 2 && (
-        <Card>
-          <AppText variant="eyebrow" tone="muted">
-            Body Composition
-          </AppText>
-          <Grid columns={2}>
-            <MetricTile label="Fat mass" value={metricValue(composition.fatMassKg, 'kg', 1)} />
-            <MetricTile label="Lean mass" value={metricValue(composition.ffmKg, 'kg', 1)} />
-          </Grid>
-          <AppText variant="caption" tone="muted">
-            Derived from weight and body fat on {paired.date} · estimated BMR{' '}
-            {metricValue(composition.bmrKcal, 'kcal')}
-          </AppText>
-        </Card>
-      )}
-      {rows.some((row) => row.skeletalMusclePct !== null) && (
-        <Card>
-          <AppText variant="eyebrow" tone="muted">
-            Body Composition
-          </AppText>
-          <Grid columns={2}>
-            {(
-              [
-                ['skeletalMusclePct', 'Skeletal muscle', '%'],
-                ['bodyWaterPct', 'Body water', '%'],
-                ['muscleMassKg', 'Muscle mass', 'kg'],
-                ['boneMassKg', 'Bone mass', 'kg'],
-                ['visceralFatIndex', 'Visceral fat', ''],
-                ['metabolicAge', 'Metabolic age', ''],
-              ] as const
-            ).map(([field, label, unit]) => {
-              const row = latestMetric(rows, field);
-              return (
-                <MetricTile
-                  key={field}
-                  label={label}
-                  value={metricValue(row?.[field], unit, 1)}
-                  caption={row?.date}
-                />
-              );
-            })}
-          </Grid>
-        </Card>
-      )}
+      />
+      <WeightTrendCard
+        rows={rows}
+        slope={slope}
+        weight={weight}
+        fat={fat}
+        baselineWeightKg={progress.data?.bodyBaseline.weightKg ?? null}
+        baselineBodyFatPct={progress.data?.bodyBaseline.bodyFatPct ?? null}
+        targetWeightKg={targetWeightKg}
+        targetBfPct={targetBfPct}
+      />
+      <BodyFatCard
+        rows={rows}
+        targetBfPct={targetBfPct}
+        calibration={health.body?.bodyFatCalibration}
+        onOpen={() => setMetric('bodyFat')}
+        onLog={() => setLog('bodyFat')}
+      />
+      <LeanMassCard rows={rows} />
+      <ScaleCompositionCard rows={rows} />
       <Grid columns={2}>
         <HealthMetricCard
           compact
           title="Burned"
-          value={health.body?.activeEnergyKcalToday ?? null}
+          value={
+            health.body?.activeEnergyKcalToday == null
+              ? null
+              : Math.round(health.body.activeEnergyKcalToday)
+          }
           unit="kcal"
           tone="activity"
-          caption="Active energy · today"
+          caption="From cardio today"
         />
         <HealthMetricCard compact title="BMI" value={bmi} decimals={1} tone="nutrition">
           {bmiLabel && (
             <AppText variant="caption" tone="muted">
               {bmiLabel}
               {fat != null
-                ? ` · via body fat %${fatRow?.bodyFatIsCorrected ? ' (DEXA-calibrated)' : ''}`
+                ? ` · via body fat %${fatCorrected ? ' (DEXA-calibrated)' : ''}`
                 : ''}
             </AppText>
           )}
           <Disclosure title="About BMI">
             <AppText variant="caption" tone="muted">
               {fat != null
-                ? 'Category is based on your body fat %, which accounts for muscular builds. Standard BMI categories assume average body composition and classify muscle as excess weight.'
-                : 'Weight ÷ height². Standard categories assume average body composition.'}
+                ? `Category is based on your body fat %, which is more accurate for muscular builds. Standard BMI categories assume average body composition and classify muscle as excess weight.${fatCorrected ? ' That reading is your scale’s, corrected to your DEXA scan before the category is chosen.' : ''}`
+                : 'Weight ÷ height². Standard categories assume average body composition. Log body fat % to get a category adjusted for muscle mass.'}
             </AppText>
           </Disclosure>
         </HealthMetricCard>
       </Grid>
       <GroupTitle>Sleep</GroupTitle>
-      <HealthMetricCard
-        title="Sleep"
-        tone="sleep"
-        onOpen={() => openDetail('sleep')}
-        caption={
-          lastNight
-            ? lastNight.date
-            : health.sleep[0]
-              ? `Last recorded ${health.sleep[0].date}`
-              : 'No night recorded today'
-        }
-      >
-        <AppText variant="title">
-          {lastNight?.durationHours != null
-            ? formatHoursMinutes(lastNight.durationHours * 60)
-            : '—'}
-        </AppText>
-        {lastNight?.provisional && <Badge label="Still updating" tone="sleep" />}
-        {lastNight?.manualEntry && <Badge label="Logged by hand" tone="sleep" />}
-        {lastNight && (
-          <Stack direction="row" wrap>
-            {(
-              [
-                ['deepSleepHours', 'Deep'],
-                ['remSleepHours', 'REM'],
-                ['lightSleepHours', 'Light'],
-                ['awakHours', 'Awake'],
-              ] as const
-            )
-              .filter(([field]) => lastNight[field] !== null)
-              .map(([field, title]) => (
-                <Badge
-                  key={field}
-                  tone="sleep"
-                  label={`${title} ${formatHoursMinutes(lastNight[field]! * 60)}`}
-                />
-              ))}
-          </Stack>
-        )}
-        {health.sleepError && (
-          <AppText tone="muted" variant="caption">
-            {health.sleepError}
-          </AppText>
-        )}
-        <AppButton
-          title="Sleep details →"
-          variant="ghost"
-          onPress={() => openDetail('sleep')}
-        />
-      </HealthMetricCard>
+      <BodySleepCard openDetail={openDetail} />
       <GroupTitle>Heart & recovery</GroupTitle>
       {imported.completed?.hrv && (
         <HealthMetricCard
@@ -372,30 +130,7 @@ export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) =
           caption={`${toAestDay(new Date(imported.completed.hrv.at), health.timezone)} · ${imported.completed.hrv.source}`}
         />
       )}
-      <Grid columns={3}>
-        {(['restingHeartRate', 'hrvMs', 'spo2Pct'] as const).map((field) => {
-          const row = latestMetric(rows, field);
-          const title =
-            field === 'restingHeartRate' ? 'Resting HR' : field === 'hrvMs' ? 'HRV' : 'SpO₂';
-          return (
-            <HealthMetricCard
-              key={field}
-              compact
-              title={title}
-              value={row?.[field] ?? null}
-              unit={field === 'hrvMs' ? 'ms' : field === 'spo2Pct' ? '%' : 'bpm'}
-              tone={field === 'spo2Pct' ? 'recovery' : 'heart'}
-              caption={row?.date}
-              onOpen={() => setMetric(field)}
-            />
-          );
-        })}
-      </Grid>
-      <AppButton
-        title="Heart rate details →"
-        variant="ghost"
-        onPress={() => openDetail('heart-rate')}
-      />
+      <HeartTiles rows={rows} onOpen={setMetric} onDetails={() => openDetail('heart-rate')} />
       <Card>
         <AppText variant="eyebrow" tone="muted">
           Measure heart rate
@@ -405,32 +140,8 @@ export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) =
         </AppText>
       </Card>
       <HrDayCard />
-      {hrvDeviation !== null && (
-        <HealthMetricCard
-          title="HRV · 7d vs 28d baseline"
-          value={hrvDeviation}
-          unit="%"
-          tone="heart"
-          caption={`${scoreBand(70 + 2 * hrvDeviation).label} · ${metricValue(readiness.data?.recentHrv, 'ms')} recent vs ${metricValue(readiness.data?.baselineHrv, 'ms')} baseline`}
-        />
-      )}
-      <HealthMetricCard
-        title="Training Load"
-        value={load.data?.acwr}
-        decimals={2}
-        caption={load.data?.interpretation.replace(/_/g, ' ')}
-        status={
-          <ResourceStatus inline label="Training Load" state={load} refresh={load.refresh} />
-        }
-      >
-        {load.data && (
-          <Grid columns={2}>
-            <MetricTile label="Acute load" value={metricValue(load.data.acuteLoad, 'kg')} />
-            <MetricTile label="Chronic load" value={metricValue(load.data.chronicLoad, 'kg')} />
-          </Grid>
-        )}
-        <TrainingStressLine />
-      </HealthMetricCard>
+      <HrvBaselineCard />
+      <TrainingLoadCard />
       <TimeInZoneCard />
       <SleepPerformanceCard />
       <FeatureRow
@@ -438,38 +149,7 @@ export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) =
         subtitle="Deferred with workout heart-rate integration"
       />
       <GroupTitle>Activity & intake</GroupTitle>
-      <Card>
-        <HealthResourceHeader title={'Energy Budget'} state={energy} refresh={energy.refresh} />
-
-        {energy.data?.balance ? (
-          <>
-            <AppText variant="title">{metricValue(intake.remaining, 'kcal')} remaining</AppText>
-            <Grid columns={2}>
-              <MetricTile
-                label="Intake"
-                value={metricValue(intake.intake, 'kcal')}
-                tone="nutrition"
-              />
-              <MetricTile
-                label="Expenditure"
-                value={metricValue(energy.data.balance.expenditureKcal, 'kcal')}
-                tone="activity"
-              />
-            </Grid>
-            <AppText variant="caption" tone="muted">
-              {intake.zoneLabel}
-            </AppText>
-          </>
-        ) : (
-          energy.data && (
-            <AppText variant="caption" tone="muted">
-              {energy.data.missingProfileFields.length
-                ? `Needed in profile: ${energy.data.missingProfileFields.join(', ')}`
-                : 'No energy budget available yet'}
-            </AppText>
-          )
-        )}
-      </Card>
+      <EnergyBalanceCard />
       <Grid columns={2}>
         <HealthMetricCard
           compact
@@ -490,21 +170,14 @@ export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) =
           caption="Today"
         />
       </Grid>
-      <HealthMetricCard
-        title="Water Intake"
-        value={today?.waterMl ?? null}
-        unit="ml"
-        tone="recovery"
+      <WaterCard
+        waterMl={today?.waterMl ?? null}
+        goalMl={goals.data?.waterGoalMl ?? null}
         onOpen={() => setMetric('waterMl')}
         onLog={() => setLog('waterMl')}
-      >
-        {goals.data?.waterGoalMl != null && today?.waterMl != null && (
-          <ProgressBar value={today.waterMl / goals.data.waterGoalMl} />
-        )}
-      </HealthMetricCard>
-      <NutritionActivityTrends />
-      <GroupTitle>Ring</GroupTitle>
-      <RingStatusCard />
+      />
+      <ActivityTrendCharts />
+      <RingCards openDetail={openDetail} />
       <FeatureRow
         title="Devices & integrations"
         subtitle="Direct ring connections remain deferred"
@@ -517,9 +190,7 @@ export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) =
           onClose={() => setLog(null)}
         />
       )}
-      {metric && (
-        <MetricHistorySheet key={metric} field={metric} onClose={() => setMetric(null)} />
-      )}
+      {metric && <MetricHistorySheet key={metric} field={metric} onClose={() => setMetric(null)} />}
     </>
   );
 }

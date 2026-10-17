@@ -8,7 +8,9 @@ import {
   drawableTarget,
   guideSummary,
   includeTarget,
+  isPointAlignedAxis,
   meetBox,
+  pointCentreX,
   niceTicks,
   tickLabels,
   type ChartTarget,
@@ -21,7 +23,9 @@ import type { Tone } from '../theme/theme';
 //   gridlines  faint horizontal lines at round values of the plotted range
 //   yAxis      value labels in a column left of the plot (implies gridlines)
 //   target     { value, label } dashed goal line; widens the range, also when `domain` is passed
-// Weekday labels: pass `axisLabels` with one label per day, e.g. formatDateDisplay(date, 'weekday').
+// Weekday labels: pass `axisLabels` with one label per point and '' for the ones to skip; each
+// non-blank label is centred under its own point. Any other length is spread across the row.
+const AXIS_LABEL_WIDTH = 40;
 export function LineChart({
   points,
   label,
@@ -282,19 +286,43 @@ export function LineChart({
           </AppText>
         </View>
       )}
-      {showLabels && (
-        <Stack
-          direction="row"
-          justify="space-between"
-          style={leftInset ? { paddingLeft: leftInset } : undefined}
-        >
-          {(axisLabels ?? [valid[0].label, valid.at(-1)!.label]).map((label, index) => (
-            <AppText key={index} variant={labelVariant} tone={labelTone}>
-              {label}
-            </AppText>
-          ))}
-        </Stack>
-      )}
+      {showLabels &&
+        (axisLabels && isPointAlignedAxis(axisLabels.length, points.length, axisLabels) ? (
+          <View style={{ height: theme.typography[labelVariant].lineHeight, width: '100%' }}>
+            {axisLabels.map((text, index) =>
+              text === '' ? null : (
+                <View
+                  key={index}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    width: AXIS_LABEL_WIDTH,
+                    alignItems: 'center',
+                    left:
+                      pointCentreX(xs[index], xMin, xMax, plotWidth, plotHeight, leftInset) -
+                      AXIS_LABEL_WIDTH / 2,
+                  }}
+                >
+                  <AppText variant={labelVariant} tone={labelTone} numberOfLines={1}>
+                    {text}
+                  </AppText>
+                </View>
+              ),
+            )}
+          </View>
+        ) : (
+          <Stack
+            direction="row"
+            justify="space-between"
+            style={leftInset ? { paddingLeft: leftInset } : undefined}
+          >
+            {(axisLabels ?? [valid[0].label, valid.at(-1)!.label]).map((label, index) => (
+              <AppText key={index} variant={labelVariant} tone={labelTone}>
+                {label}
+              </AppText>
+            ))}
+          </Stack>
+        ))}
     </View>
   );
 }

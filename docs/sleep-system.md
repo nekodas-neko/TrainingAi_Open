@@ -127,7 +127,7 @@ across all seven; a bare duration-only night scores on the subset. Related score
 |---|---|
 | `lib/sleep/primary-sleep.ts` | `pickPrimarySleep` — choose the main night from multiple rows (`MIN_MAIN_SLEEP_H = 3`). |
 | `lib/sleep/merge-sessions.ts` | `mergeByDate` — drop distant nap/rest fragments so a night isn't inflated by an evening rest (read-time). |
-| `lib/sleep/actual-window.ts` | `actualSleepWindow` — the displayed asleep→woke window (start trims to onset; end is the raw window's natural end). |
+| `packages/shared/src/health/actual-sleep-window.ts` | `actualSleepWindow` — the displayed asleep→woke window (start trims to onset; end is the raw window's natural end). |
 | `lib/health/hypnogram.ts` | `SleepStage` type, `STAGE_COLOR` palette (defined once — don't fork it), phase-string helpers. |
 | `lib/health/breathing-rate.ts` | `breathingFromIbi` — RSA tachogram → breathing-rate irregularity (a REM signal). **The even-grid resampler here is the base for the LF/HF lever.** |
 | `lib/health/sleep-consistency.ts` | `computeSleepStartConsistency` — bedtime regularity. |
@@ -214,7 +214,7 @@ forbidden, a second tracker is fine). A handful of labelled nights is what would
 | `lib/health/breathing-rate.ts` | breathing-rate irregularity + the tachogram resampler |
 | `lib/health/sleep-score.ts` | 0–100 Sleep Score (Oura combiner weights) |
 | `lib/health/hypnogram.ts` | `SleepStage`, stage palette, phase-string helpers |
-| `lib/sleep/primary-sleep.ts` · `merge-sessions.ts` · `actual-window.ts` | night selection / merge / displayed window |
+| `lib/sleep/primary-sleep.ts` · `merge-sessions.ts` (in `lib/sleep/`) · `packages/shared/src/health/actual-sleep-window.ts` | night selection / merge / displayed window |
 | `lib/health/sleep-consistency.ts` · `hr-sleep-band.ts` | bedtime regularity, HR-band helpers |
 | `lib/data/postgres/adapter.ts` → `aggregateOuraRawSamples` | windowing, epoch binning, calls the stager, writes `sleep_sessions`, captures the debug dump |
 | `components/hypnogram.tsx` | banded ribbon UI |

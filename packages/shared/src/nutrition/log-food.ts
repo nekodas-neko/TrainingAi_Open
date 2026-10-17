@@ -29,6 +29,42 @@ export function scanOriginToSource(origin: ScanOrigin | undefined): NewFoodEntry
   return 'manual'
 }
 
+/**
+ * #2925. The `source` a scanned entry is stored under, after the user has had the form in front of
+ * them. `sanitiseFoodItemNutrition` repairs anything that is not 'manual', and that repair reads a
+ * number as a model's invention. A calorie or macro figure the person changed is theirs, so any
+ * edit away from what the scan returned makes the entry hand-entered; an untouched scan keeps its
+ * origin and its repair.
+ */
+export function sourceAfterEdit(
+  scanned: NewFoodEntry['source'],
+  scan: { calories: number; proteinG: number; carbsG: number; fatG: number; servingSizeG: number } | null,
+  form: { calories: number; proteinG: number; carbsG: number; fatG: number; servingSizeG: number },
+): NewFoodEntry['source'] {
+  if (scanned === 'manual' || !scan) return scanned
+  const same = scan.calories === form.calories && scan.proteinG === form.proteinG
+    && scan.carbsG === form.carbsG && scan.fatG === form.fatG && scan.servingSizeG === form.servingSizeG
+  return same ? scanned : 'manual'
+}
+
+/**
+ * #2925. The `source` for a food picked off a name search. A hit that carries calories but no macros
+ * (Open Food Facts often has the energy and nothing else) is stored with its macros defaulted to 0,
+ * and `sanitiseNutrition` reads "calories with no macros behind them" as a model hallucination and
+ * zeroes the calories. The numbers came from a database, not a model, so that hit is stored as
+ * 'manual', which keeps them: the column has no value for "database, partial", and a kept figure
+ * matters more than telling this row apart. A hit with its macros stays 'text' and is repaired as before.
+ */
+export function lookupHitSource(food: {
+  calories: number
+  proteinG?: number | null
+  carbsG?: number | null
+  fatG?: number | null
+}): NewFoodEntry['source'] {
+  const noMacros = !(food.proteinG ?? 0) && !(food.carbsG ?? 0) && !(food.fatG ?? 0)
+  return food.calories > 0 && noMacros ? 'manual' : 'text'
+}
+
 export interface NewFoodEntry {
   foodItemId?: string
   name: string
