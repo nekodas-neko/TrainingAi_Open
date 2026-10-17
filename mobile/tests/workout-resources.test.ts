@@ -11,6 +11,10 @@ import { workoutFixture } from './workout-fixture.ts';
 import { buildCatalog } from '../src/features/workouts/catalog.ts';
 import { builderSteps, generatedDraft } from '../src/features/programs/builder-model.ts';
 import { programPayload } from '../src/features/programs/editor-model.ts';
+import { daySpec, streakDataSpec } from '../src/features/workouts/data/models.ts';
+import { homeStreak, trainingDays } from '../src/features/home/data/models.ts';
+import { streakRestGapFor } from '@trainingai/shared/workout/day-streak';
+import { shiftDateStr } from '@trainingai/shared/date-utils';
 
 test('a successful write expires persisted views even if they were not opened in that app session', async (t) => {
   const db = sqliteFixture();
@@ -312,4 +316,63 @@ test('builder skips the same questions as the web and preserves exercise IDs acr
   assert.equal(noLimit.sessions[0].timeBudgetMinutes, 0);
   assert.equal(programPayload(noLimit).program.sessions?.[0].timeBudgetMinutes, 0);
   assert.equal(draft.sessions[0].timeBudgetMinutes, 60);
+});
+
+test('deleting a session removes its day from the long streak window and the streak', async (t) => {
+  const db = sqliteFixture();
+  t.after(() => db.connection.close());
+  const storage = await createLocalStorage(db.database);
+  const scope = storage.account('https://example.com', 'one');
+  const today = '2026-10-17';
+  const gap = streakRestGapFor(null);
+  const deleted = shiftDateStr(today, -gap);
+  const sessionId = '10000000-0000-4000-8000-000000000001';
+  const trainedDays: Record<string, string[]> = {};
+  // One session every `gap` days: each day is the only bridge to the one before it.
+  for (let back = 0; back < 60 * gap; back += gap) {
+    trainedDays[shiftDateStr(today, -back).replace(/-/g, '/')] = ['Push'];
+  }
+  const connection = {
+    origin: 'https://example.com',
+    userId: 'one',
+    timezone: null,
+    get: async (path: string) =>
+      path === '/api/streak-data'
+        ? { trainedDays }
+        : {
+            date: deleted,
+            exercises: [
+              {
+                name: 'Bench',
+                sessionName: 'Push',
+                exerciseType: null,
+                weightKg: 60,
+                setWeights: [60],
+                sets: 1,
+                reps: [8],
+                timeToCompleteSet: null,
+                loggedAt: null,
+                exerciseLogId: '10000000-0000-4000-8000-000000000002',
+                workoutSessionId: sessionId,
+              },
+            ],
+          },
+    post: async () => ({}),
+  };
+  const resources = new WorkoutResources(scope, connection);
+  await resources.load(daySpec(deleted));
+  await resources.load(streakDataSpec);
+  const before = trainingDays([resources.state(streakDataSpec).data?.trainedDays], []);
+  assert.ok(before[deleted]);
+  const streakBefore = homeStreak(before, today, null);
+  resources.applyHistory({
+    id: '10000000-0000-4000-8000-000000000003',
+    domain: 'workout_session_delete',
+    date: deleted,
+    payload: { workoutSessionId: sessionId },
+  });
+  const after = trainingDays([resources.state(streakDataSpec).data?.trainedDays], []);
+  assert.equal(after[deleted], undefined);
+  assert.ok(after[today]);
+  assert.ok(streakBefore > homeStreak(after, today, null));
 });

@@ -207,6 +207,13 @@ export const calendarSpec = (year: number, month: number) => ({
   }),
   ttl: 300_000,
 });
+// The streak walks STREAK_LOOKBACK_DAYS back; two calendar months cannot feed it, and a shorter
+// feed makes the count describe the window edge (BF-176). Same route the web Home reads.
+export const streakDataSpec = {
+  path: '/api/streak-data',
+  schema: z.object({ trainedDays: z.record(text, z.array(text)) }),
+  ttl: 300_000,
+};
 export const dayExerciseSchema = z.object({
   name: text,
   sessionName: text,
