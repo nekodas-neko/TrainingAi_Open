@@ -15,6 +15,7 @@ import { BODY_BATTERY_TTL, TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { prefillEveningScales } from '@trainingai/shared/nutrition/day-checkin-prefill'
 import { buildTodayInsight } from '@trainingai/shared/nutrition/day-insight'
 import type { EveningScaleKey } from '@trainingai/shared/types/day-checkin'
+import { useCountedEstimateRows } from '@/app/nutrition/use-estimated-meals'
 import type { FoodLogWithItem, MealType, NutritionTargets } from '@trainingai/shared/types/nutrition'
 import { DaySummaryCard } from './day-summary-card'
 import { MealBackfillSection } from './meal-backfill-section'
@@ -40,6 +41,9 @@ interface Props {
   /** #2071. The day's calorie budget (`budgetProvenance(...).total`), or null when there is none. The
    *  summary prints this, never `targets.calories`, which is the typed goal. */
   dayBudgetKcal: number | null
+  /** #2925. `balance.estimatedMeals` for this date: stands in for the estimates until the device's own
+   *  `plan_meal_answers` are read, and where there is no local store. */
+  serverEstimateRows?: unknown
   onLogged: (log?: FoodLogWithItem) => void
 }
 
@@ -51,8 +55,9 @@ const DEFAULT_SCALES: Record<EveningScaleKey, number> = {
   lateHeavyMeal: 3,
 }
 
-export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, targets, dayBudgetKcal, onLogged }: Props) {
+export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, targets, dayBudgetKcal, serverEstimateRows, onLogged }: Props) {
   const tz = useUserTimezone()
+  const estimates = useCountedEstimateRows({ userId, date, serverRows: serverEstimateRows })
   const pageGradient = usePageGradient('sleep')
   const isLight = useHeroColorScheme() === 'light'
   const [scales, setScales] = useState<Record<EveningScaleKey, number>>({ ...DEFAULT_SCALES })
@@ -244,7 +249,7 @@ export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, t
               {/* The narrative opener, above the numbers it is talking about (Q-112a), then the
                   day's totals, then the read-through those totals came out of (Q-112b). */}
               <DayDigestCard active={open} />
-              <DaySummaryCard totals={totals} targets={targets} dayBudgetKcal={dayBudgetKcal} battery={measured} />
+              <DaySummaryCard totals={totals} estimates={estimates} loggedMealTypeIds={logs.map(l => l.mealTypeId)} targets={targets} dayBudgetKcal={dayBudgetKcal} battery={measured} />
               <DayTrendsSection date={date} />
               <DayReadThroughSection date={date} tz={tz} userId={userId} logs={logs} />
             </>

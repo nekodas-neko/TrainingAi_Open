@@ -768,6 +768,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
         // takes this value.
         targets={effectiveTargets}
         dayBudgetKcal={effectiveCalorieGoal}
+        serverEstimateRows={balanceForDate?.balance?.estimatedMeals}
         onLogged={handleFoodLogged}
       />
     </div>

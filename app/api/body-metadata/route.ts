@@ -12,8 +12,8 @@ import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { correctBodyFatPct, type BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
 import { invalidBodyResponse } from '@/lib/api/route-errors'
 import { bodyRecentFromDay, BODY_RECENT_DAYS } from '@trainingai/shared/health/body-recent-window'
-import { countedIntakeKcal, type CountedEstimateRow } from '@trainingai/shared/nutrition/counted-intake'
-import { countedEstimatesFor, sharedEstimateReads } from '@/lib/health/energy-balance-service'
+import { countedIntakeKcal } from '@trainingai/shared/nutrition/counted-intake';
+import { countedEstimatesForRange, sharedEstimateReads } from '@/lib/health/energy-balance-service'
 
 // One day's body metadata.
 const MAX_BODY_BYTES = 16 * 1024
@@ -172,9 +172,7 @@ export async function GET(req: NextRequest) {
   const weekDates: string[] = [];
   for (let d = weekStartForFetch; d <= today; d = shiftDateStr(d, 1)) weekDates.push(d);
   const shared = sharedEstimateReads(repo, userId, d => (d === today ? Promise.resolve(foodLogs) : undefined));
-  const estimatesByDate = new Map<string, CountedEstimateRow[]>(await Promise.all(
-    weekDates.map(async d => [d, await countedEstimatesFor(repo, userId, d, shared)] as const),
-  ));
+  const estimatesByDate = await countedEstimatesForRange(repo, userId, weekDates, shared);
   const todayEstimates = estimatesByDate.get(today) ?? [];
 
   // Newest row (by date) that actually carries a weight — the last-known value, however old.

@@ -13,6 +13,7 @@ import { hostOf } from './recipe-url'
 import type { RecipeCandidate } from './recipe-candidates'
 import { runRecipeImport, offlineHint } from './recipe-import-run'
 import { useFoodDatabaseSearch, type ExternalFood } from '@/lib/hooks/use-food-database-search'
+import { lookupHitSource } from '@trainingai/shared/nutrition/log-food'
 import { BarcodeScanner } from './barcode-scanner'
 import { useSheetBackDismiss } from '@/lib/hooks/use-sheet-back-dismiss'
 import { decodeMealLabelScan } from '@trainingai/shared/nutrition/label-payload'
@@ -124,7 +125,7 @@ export function IngredientPicker({
         // Found by searching the food database by name, NOT scanned. A barcode identifies one exact
         // product; a name search returns a plausible near-match the user picked off a list, and the
         // two deserve to be told apart in the data.
-        source: 'text',
+        source: lookupHitSource(food),
       }, userId))
     } catch {
       toast.error(offlineHint() ?? `Could not add "${food.name}"`)

@@ -12,6 +12,7 @@ import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { getLocalStore } from '@/lib/local-store'
 import { createFoodItem } from '@trainingai/shared/nutrition/create-food-item'
 import { useFoodDatabaseSearch, type ExternalFood } from '@/lib/hooks/use-food-database-search'
+import { lookupHitSource } from '@trainingai/shared/nutrition/log-food'
 import type { FoodItem, MealType, SavedMeal } from '@trainingai/shared/types/nutrition'
 import { foodSecondaryLine } from './food-name-line'
 
@@ -147,7 +148,7 @@ export function FoodList({
         fatG: food.fatG ?? 0,
         // Picked off a name search, not scanned. A barcode identifies one exact product; this is a
         // plausible near-match the user chose, and the two deserve telling apart in the data.
-        source: 'text',
+        source: lookupHitSource(food),
       }, userId))
     } catch {
       toast.error(`Could not add "${food.name}"`)

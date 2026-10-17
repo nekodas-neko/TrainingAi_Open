@@ -96,10 +96,17 @@ export async function ensureMealLoggingDay(db: Db, userId: string, date: string)
 }
 
 export async function listMealLoggingStatuses(db: Db, userId: string, date: string) {
-  const { choices, logs, types } = await readWindow(db, userId, date, date);
+  const rows = await listMealLoggingStatusesRange(db, userId, date, date);
+  return rows.map(({ date: _date, ...row }) => row);
+}
+
+/** The same rows for `from`..`to` in one read, each tagged with its `date`. */
+export async function listMealLoggingStatusesRange(db: Db, userId: string, from: string, to: string) {
+  const { choices, logs, types } = await readWindow(db, userId, from, to);
   return choices
     .filter((choice) => !choice.retired && types.some((type) => type.id === choice.mealTypeId))
     .map((choice) => ({
+      date: choice.logDate,
       mealTypeId: choice.mealTypeId,
       skipped: isSkipped(choice, logs),
       explicit: choice.explicit,

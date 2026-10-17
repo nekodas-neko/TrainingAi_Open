@@ -13,7 +13,7 @@
 // the owner deleting their own saved meal silently nulled a stranger's plan meal. Every path now
 // goes through `assertOwnedMealRefs`.
 
-import { eq, and, asc, desc, inArray, isNull, sql } from 'drizzle-orm'
+import { eq, and, asc, desc, gte, lte, inArray, isNull, sql } from 'drizzle-orm'
 import { UserFacingError } from '@trainingai/shared/errors'
 import { planMealTypeId } from '@trainingai/shared/nutrition/meal-type-for-time'
 import { listMealTypes } from './nutrition'
@@ -735,6 +735,20 @@ export async function listPlanMealAnswers(
     .where(and(
       eq(s.planMealAnswers.userId, userId),
       eq(s.planMealAnswers.logDate, logDate),
+      isNull(s.planMealAnswers.deletedAt),
+    ))
+  return rows.map(rowToAnswer)
+}
+
+/** The live answers for `from`..`to` (inclusive local dates) in one query; each carries its `logDate`. */
+export async function listPlanMealAnswersRange(
+  db: Db, userId: string, from: string, to: string,
+): Promise<PlanMealAnswer[]> {
+  const rows = await db.select().from(s.planMealAnswers)
+    .where(and(
+      eq(s.planMealAnswers.userId, userId),
+      gte(s.planMealAnswers.logDate, from),
+      lte(s.planMealAnswers.logDate, to),
       isNull(s.planMealAnswers.deletedAt),
     ))
   return rows.map(rowToAnswer)
