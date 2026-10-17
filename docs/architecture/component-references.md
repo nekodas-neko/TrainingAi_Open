@@ -113,7 +113,7 @@ neutral 50, so a day without a check-in can never score above about 95
    from the paper's tables; the full text was not readable here, so treat 2b as secondary.
 3. Windred DP et al. *Sleep regularity is a stronger predictor of mortality risk than sleep
    duration: a prospective cohort study.* Sleep, 2024;47(1). 60,977 UK Biobank participants.
-   [PMC10782489](https://pmc.ncbi.nlm.nih.gov/articles/PMC10782489/)
+   [PMC10782501](https://pmc.ncbi.nlm.nih.gov/articles/PMC10782501/) (doi:10.1093/sleep/zsad253)
 4. Nunan D et al. *A quantitative systematic review of normal values for short-term heart rate
    variability in healthy adults.* Pacing Clin Electrophysiol, 2010. 44 studies, 21,438 adults.
    [Semantic Scholar](https://www.semanticscholar.org/paper/A-Quantitative-Systematic-Review-of-Normal-Values-Nunan-Sandercock/a6af3a00bc11938a8883ed1a1e78b8e32d97ab86)
