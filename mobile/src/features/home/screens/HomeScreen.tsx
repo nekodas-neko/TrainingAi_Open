@@ -33,7 +33,7 @@ import {
   useWorkoutResource,
   useWorkoutResources,
 } from '../../workouts/data/WorkoutDataProvider';
-import { calendarSpec, programSpec } from '../../workouts/data/models';
+import { calendarSpec, programSpec, streakDataSpec } from '../../workouts/data/models';
 import { useWorkoutJournal } from '../../workouts/logging/WorkoutJournalProvider';
 import type { SessionPreview } from '../../workouts/catalog';
 import { useNutrition } from '../../nutrition/data/NutritionProvider';
@@ -82,6 +82,7 @@ export function HomeScreen(navigation: HomeNavigation) {
     .map(Number);
   const calendar = useWorkoutResource(calendarSpec(year, month));
   const lastCalendar = useWorkoutResource(calendarSpec(previous[0], previous[1]));
+  const streakData = useWorkoutResource(streakDataSpec);
   const [manual, setManual] = useState(false);
   const [editing, setEditing] = useState(false);
   const undo = useUndo();
@@ -123,7 +124,7 @@ export function HomeScreen(navigation: HomeNavigation) {
     setModal('readiness');
   }
   const days = trainingDays(
-    [lastCalendar.data?.trainedDays, calendar.data?.trainedDays],
+    [streakData.data?.trainedDays, lastCalendar.data?.trainedDays, calendar.data?.trainedDays],
     journal.data.workouts,
   );
   const program = programs.data?.programs.find((p) => p.id === workout.catalog?.program?.id);
@@ -153,6 +154,9 @@ export function HomeScreen(navigation: HomeNavigation) {
       .filter(Boolean)
       .join('\n\n') || null;
   const loaded = !!calendar.data && !!lastCalendar.data;
+  // The streak count waits for the long window (or its failure) so it never shows the two-month
+  // number first; the dots, week strip and week count do not wait.
+  const streakLoaded = loaded && (!!streakData.data || !!streakData.error);
   const sections = homeSections(home.preferences).filter(
     (key) => !home.preferences.homeHiddenSections?.includes(key),
   );
@@ -271,6 +275,7 @@ export function HomeScreen(navigation: HomeNavigation) {
                       days={days}
                       today={health.today}
                       loaded={loaded}
+                      streakLoaded={streakLoaded}
                       schedule={schedule}
                       target={target}
                       ai={workout.catalog?.program?.phaseMode === 'ai_dynamic'}

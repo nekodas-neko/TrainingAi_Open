@@ -17,6 +17,7 @@ export function HomeTrainingSummary({
   days,
   today,
   loaded,
+  streakLoaded,
   schedule,
   target,
   ai,
@@ -25,6 +26,7 @@ export function HomeTrainingSummary({
   days: Record<string, string[]>;
   today: string;
   loaded: boolean;
+  streakLoaded: boolean;
   schedule: HomeSchedule | null;
   target: number | null;
   ai: boolean;
@@ -57,7 +59,7 @@ export function HomeTrainingSummary({
             <Icon name="forward" size={theme.sizes.iconSmall} tone="muted" />
           </Stack>
           <AppText variant="hero" tone="brand">
-            {loaded && streak > 0 ? streak : '—'}{' '}
+            {streakLoaded && streak > 0 ? streak : '—'}{' '}
             <AppText variant="caption" tone="muted">
               days
             </AppText>

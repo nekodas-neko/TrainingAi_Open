@@ -8,6 +8,7 @@ import {
   trainingDays,
   trainingWeek,
 } from '../src/features/home/data/models.ts';
+import { shiftDateStr } from '@trainingai/shared/date-utils';
 import { ApiError } from '../src/features/account/api/client.ts';
 import { homeGreeting } from '@trainingai/shared/greeting';
 import {
@@ -398,6 +399,22 @@ test('Home calendar normalizes separators and adds local completed workouts with
       ],
     }) > 0,
   );
+});
+
+test('Home streak counts past the two-month calendar window once the long window is merged in', () => {
+  const today = '2026-10-17';
+  const schedule = { type: 'weekly' as const, days: [{ dayOfWeek: 1, sessionId: 'a' }] };
+  const long: Record<string, string[]> = {};
+  for (let i = 0; i < 150; i++) long[shiftDateStr(today, -i)] = ['Upper A'];
+  const twoMonths = Object.fromEntries(Object.entries(long).slice(0, 62));
+  const before = trainingDays([twoMonths], []);
+  const after = trainingDays([long, twoMonths], []);
+  assert.equal(homeStreak(before, today, schedule), 62);
+  assert.equal(homeStreak(after, today, schedule), 150);
+  for (let i = 0; i < 10; i++) {
+    const date = shiftDateStr(today, i - 9);
+    assert.deepEqual(after[date], before[date]);
+  }
 });
 
 test('layout moves stored keys across hidden slots, and greetings follow the account timezone', () => {

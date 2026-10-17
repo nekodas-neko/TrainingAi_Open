@@ -439,7 +439,10 @@ export class WorkoutResources {
       ]);
     }
     for (const entry of this.entries.values()) {
-      if (entry.spec.path !== '/api/calendar-data' || !entry.state.data) {
+      if (
+        (entry.spec.path !== '/api/calendar-data' && entry.spec.path !== '/api/streak-data') ||
+        !entry.state.data
+      ) {
         continue;
       }
       const data = entry.state.data as { trainedDays: Record<string, string[]> };

@@ -39,6 +39,7 @@ export function ActivityProvider({ children }: PropsWithChildren) {
                 ...healthReadPaths,
                 '/api/day-log',
                 '/api/calendar-data',
+                '/api/streak-data',
                 '/api/cardio-week',
                 '/api/cardio-trends',
                 '/api/running-plan',
