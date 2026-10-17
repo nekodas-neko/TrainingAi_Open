@@ -1,6 +1,19 @@
 import { Platform } from 'react-native';
 import type { HealthSnapshot } from '../../features/health/types';
 import type { AccountSession, AccountState } from '../../features/account/session';
+import type { NutritionStore } from '../../features/nutrition/data/NutritionStore';
+
+type SyncDiagnostics = {
+  nutrition: NutritionStore['diagnostics'] | null;
+  healthImport: {
+    enabled: boolean;
+    busy: boolean;
+    pending: number;
+    error: string | null;
+    completedAt: string | null;
+    heartRate: number | null;
+  };
+};
 
 const reportUrl = process.env.EXPO_PUBLIC_DEV_REPORT_URL;
 const reportKey = process.env.EXPO_PUBLIC_DEV_REPORT_KEY;
@@ -40,7 +53,10 @@ export async function sendDiagnosticReport(
   snapshot: HealthSnapshot | null,
   screen: string,
   error: string | null,
-  account?: AccountSession['diagnostics'] & { displayedStatus: AccountState['status'] },
+  account?: AccountSession['diagnostics'] & {
+    displayedStatus: AccountState['status'];
+  },
+  sync?: SyncDiagnostics,
 ): Promise<void> {
   if (!diagnosticsAvailable || !reportUrl) {
     throw new Error('Local development reporting is unavailable.');
@@ -59,6 +75,7 @@ export async function sendDiagnosticReport(
         snapshot,
         error,
         ...(account ? { account } : {}),
+        ...(sync ? { sync } : {}),
       }),
       signal: controller.signal,
     });
