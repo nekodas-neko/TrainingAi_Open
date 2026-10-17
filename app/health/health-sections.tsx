@@ -5,7 +5,6 @@ import dynamic from "next/dynamic";
 import { InfoIcon } from "lucide-react";
 import { accentCardStyle } from "@trainingai/shared/utils";
 import { evaluateWeightRateVsGoalBand, goalRemaining } from "@trainingai/shared/health/long-term-goal-progress";
-import { scoreBand } from "@trainingai/shared/health/score-band";
 import { bodyComposition } from "@trainingai/shared/health/body-composition";
 import { hrvBaselineBand, hrvBaselineDeviationPct } from "@trainingai/shared/health/hrv-baseline";
 import { displayBodyFat, type BodyFatCalibrationMeta } from "@/components/health/body-fat-display";
