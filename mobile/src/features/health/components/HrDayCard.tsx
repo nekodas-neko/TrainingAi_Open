@@ -1,3 +1,4 @@
+import { View } from 'react-native';
 import { bucketAverage } from '@trainingai/shared/health/hr-smoothing';
 import { dateStrMidnightInTz, formatMinutesOfDay } from '@trainingai/shared/date-utils';
 import { bedtimeToMinuteWindow } from '@trainingai/shared/health/hr-sleep-band';
@@ -75,11 +76,17 @@ export function HrDayCard({
     { x: minute(p.t) / 60000, value: p.level },
   ]);
   // Home's card matches the current app: no source badges or caption, and a legend of what is drawn.
+  // The box is as tall as the chart so the card does not jump when readings arrive.
   if (embedded && readings.length < 2) {
+    const waiting = state.loading && !state.data;
     return (
-      <AppText variant="caption" tone="muted">
-        No heart-rate data today
-      </AppText>
+      <View style={{ minHeight: theme.sizes.chartHeight, justifyContent: 'center' }}>
+        {!waiting && (
+          <AppText variant="caption" tone="muted">
+            {state.error && !state.data ? 'Couldn’t load heart rate' : 'No heart-rate data today'}
+          </AppText>
+        )}
+      </View>
     );
   }
   const legend = [
@@ -109,7 +116,9 @@ export function HrDayCard({
         color={color === 'transparent' ? undefined : color}
         points={points}
         xDomain={[0, 1440]}
-        axisLabels={embedded ? ['00:00', '06:00', '12:00', '18:00', '24:00'] : ['00:00', '12:00', '24:00']}
+        axisLabels={
+          embedded ? ['12am', '6am', '12pm', '6pm', '12am'] : ['00:00', '12:00', '24:00']
+        }
         readable={embedded}
         gridlines={embedded}
         yAxis={embedded}

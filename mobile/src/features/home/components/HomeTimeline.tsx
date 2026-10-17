@@ -208,7 +208,7 @@ export function HomeTimeline({
                 <TimelineRow
                   key={event.type + ':' + event.timeMs + ':' + index}
                   time={timelineTimeLabel(event, health.timezone)}
-                  showTime={event.type !== 'wakeup'}
+                  timeInline={event.type === 'wakeup'}
                   title={timelineTitle(event)}
                   summary={timelineSummary(event)}
                   savedLocally={event.subtitle === 'Saved on this phone'}

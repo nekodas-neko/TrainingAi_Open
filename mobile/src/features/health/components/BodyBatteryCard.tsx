@@ -116,7 +116,7 @@ export function BodyBatteryCard() {
               {data.confidence && !data.confidence.sufficient && (
                 <AppText variant="caption" tone="muted">
                   Your ring recorded only {metricValue(data.confidence.sampleCount)} heart-rate
-                  readings since you woke — about {metricValue(data.confidence.samplesPerHour)} an
+                  readings since you woke — about {metricValue(data.confidence.samplesPerHour, '', 1)} an
                   hour. The ring stops sampling when you are still, so today’s line is mostly gaps
                   held flat rather than a measured calm. Treat the number as a rough guide.
                 </AppText>

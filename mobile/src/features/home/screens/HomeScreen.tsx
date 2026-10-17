@@ -162,7 +162,7 @@ export function HomeScreen(navigation: HomeNavigation) {
     (key) => !home.preferences.homeHiddenSections?.includes(key),
   );
   const showHome = workout.signedIn && !health.denied && !home.denied;
-  const adminPending = useAdminPending();
+  const { signups: adminSignups } = useAdminPending();
   return (
     <PageLayout
       landing
@@ -200,7 +200,7 @@ export function HomeScreen(navigation: HomeNavigation) {
               onLayout={() => setEditing((value) => !value)}
               editing={editing}
               onProfile={navigation.openMore}
-              badge={adminPending}
+              badge={adminSignups}
             />
             <HomeScores onOpen={navigation.openHealthDetail} />
             {scores?.illnessAdvisory && scores.illnessFlag === 'watch' && (

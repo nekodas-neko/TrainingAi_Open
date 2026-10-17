@@ -8,6 +8,10 @@ import {
   trainingDays,
   trainingWeek,
 } from '../src/features/home/data/models.ts';
+import {
+  adminPendingTotal,
+  adminSignupCount,
+} from '../src/features/home/data/admin-pending-counts.ts';
 import { shiftDateStr } from '@trainingai/shared/date-utils';
 import { ApiError } from '../src/features/account/api/client.ts';
 import { homeGreeting, profileDisplayName } from '@trainingai/shared/greeting';
@@ -697,4 +701,14 @@ test('wake-up rows carry both scores and activities carry their time range', () 
     durationMin: 38,
   });
   assert.equal(timelineSummary(walk), '38m');
+});
+
+test('the avatar badge counts signups only, the More-tab dot signups plus feedback', () => {
+  const data = { count: 2, feedbackCount: 3 };
+  assert.equal(adminSignupCount(data), 2);
+  assert.equal(adminPendingTotal(data), 5);
+  assert.equal(adminSignupCount({ feedbackCount: 4 }), 0);
+  assert.equal(adminPendingTotal({ feedbackCount: 4 }), 4);
+  assert.equal(adminSignupCount(null), 0);
+  assert.equal(adminPendingTotal(undefined), 0);
 });

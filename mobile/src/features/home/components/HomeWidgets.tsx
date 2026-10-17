@@ -402,7 +402,8 @@ function HomeWidgetBody({
       (row) => row.date === health.today || row.date === shiftDateStr(health.today, -1),
     );
     // The current app starts at 8 h until a goal is saved, so the goal text and bar are always there.
-    const goal = goals?.data?.sleepGoalHours ?? DEFAULT_SLEEP_GOAL_HOURS;
+    const savedGoal = goals?.data?.sleepGoalHours;
+    const goal = savedGoal != null && savedGoal > 0 ? savedGoal : DEFAULT_SLEEP_GOAL_HOURS;
     const stages = night
       ? [
           { label: 'Deep', hours: night.deepSleepHours, color: theme.sleepStages.deep },

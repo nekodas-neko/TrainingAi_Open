@@ -7,7 +7,7 @@ import { Stack } from './Stack';
 
 export function TimelineRow({
   time,
-  showTime = true,
+  timeInline = false,
   title,
   summary,
   icon,
@@ -19,8 +19,8 @@ export function TimelineRow({
   onPress,
 }: {
   time: string;
-  /** The current app prints no time on a wake-up row; the time still reaches screen readers. */
-  showTime?: boolean;
+  /** The current app's wake-up row prints the time bold beside the title, not on a line above it. */
+  timeInline?: boolean;
   title: string;
   summary?: string;
   icon: IconName;
@@ -97,7 +97,7 @@ export function TimelineRow({
         </View>
       </View>
       <Stack gap="xxs" style={{ flex: 1, minWidth: 0, paddingVertical: theme.spacing.sm }}>
-        {showTime && (
+        {!timeInline && (
           <AppText variant="micro" tone="muted" style={{ fontVariant: ['tabular-nums'] }}>
             {time}
           </AppText>
@@ -106,6 +106,11 @@ export function TimelineRow({
           <AppText variant="label" numberOfLines={2} style={{ flexShrink: 1 }}>
             {title}
           </AppText>
+          {timeInline && (
+            <AppText variant="label" style={{ fontVariant: ['tabular-nums'] }}>
+              {time}
+            </AppText>
+          )}
           {savedLocally && (
             <Icon
               name="history"

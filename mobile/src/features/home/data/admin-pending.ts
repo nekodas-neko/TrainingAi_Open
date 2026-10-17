@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { profileSpec } from '../../health/data/models';
+import { adminPendingTotal, adminSignupCount } from './admin-pending-counts';
 
 export const adminPendingSpec = {
   path: '/api/admin/pending-count',
@@ -10,17 +11,13 @@ export const adminPendingSpec = {
     .passthrough(),
 };
 
-/** Signups waiting to be let in plus unread feedback, as the current app's avatar badge counts them. */
-export function adminPendingTotal(
-  data: { count?: number; feedbackCount?: number } | null | undefined,
-) {
-  return Math.max(0, (data?.count ?? 0) + (data?.feedbackCount ?? 0));
-}
-
-/** Zero for anyone who is not an admin, and no request is made for them. */
+/** Zeros for anyone who is not an admin, and no request is made for them. */
 export function useAdminPending() {
   const profile = useWorkoutResource(profileSpec);
   const admin = profile.data?.user.isAdmin === true;
   const pending = useWorkoutResource(adminPendingSpec, admin);
-  return admin ? adminPendingTotal(pending.data) : 0;
+  return {
+    signups: admin ? adminSignupCount(pending.data) : 0,
+    total: admin ? adminPendingTotal(pending.data) : 0,
+  };
 }

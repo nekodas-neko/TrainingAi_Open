@@ -18,7 +18,7 @@ export function TabBar({
   selected: Tab;
   onSelect: (tab: Tab) => void;
 }) {
-  const adminPending = useAdminPending();
+  const { total: adminPending } = useAdminPending();
   return (
     <BottomNavigation
       selected={selected}
