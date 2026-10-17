@@ -44,7 +44,6 @@ import { HomeTimeline } from '../components/HomeTimeline';
 import { ExerciseReadinessSheet } from '../components/ExerciseReadinessSheet';
 import { HomeLayoutSheet } from '../components/HomeLayoutSheet';
 import { HomeBanners } from '../components/HomeBanners';
-import { healthCopy } from '../../health/data/display-copy';
 import { useAppleImport } from '../../health/HealthProvider';
 import { CoachFab } from '../../coach/components/CoachFab';
 
@@ -154,7 +153,6 @@ export function HomeScreen(navigation: HomeNavigation) {
     ]
       .filter(Boolean)
       .join('\n\n') || null;
-  const name = profile.data?.user.name;
   const loaded = !!calendar.data && !!lastCalendar.data;
   // The streak count waits for the long window (or its failure) so it never shows the two-month
   // number first; the dots, week strip and week count do not wait.
@@ -171,7 +169,7 @@ export function HomeScreen(navigation: HomeNavigation) {
         <HomeHeader
           today={health.today}
           timezone={health.timezone}
-          name={name}
+          user={profile.data?.user}
           avatar={profile.data?.user.avatar}
           error={error}
           pending={!!allPending}
@@ -193,11 +191,18 @@ export function HomeScreen(navigation: HomeNavigation) {
         </View>
       ) : (
         <TabPanel refreshing={manual} onRefresh={() => void refresh()}>
-          <Stack style={{ paddingHorizontal: theme.spacing.lg }} gap="md">
+          <Stack
+            style={{
+              paddingHorizontal: theme.spacing.lg,
+              // Clear the floating coach button, which otherwise sits over the last timeline row.
+              paddingBottom: theme.sizes.touchTarget + theme.spacing.sm + theme.spacing.md,
+            }}
+            gap="md"
+          >
             <HomeScores onOpen={navigation.openHealthDetail} />
             {scores?.illnessAdvisory && scores.illnessFlag === 'watch' && (
               <AppText variant="micro" tone="muted">
-                {healthCopy(scores.illnessAdvisory)}
+                {scores.illnessAdvisory}
               </AppText>
             )}
             {scores?.illnessAdvisory &&
@@ -206,11 +211,11 @@ export function HomeScreen(navigation: HomeNavigation) {
                   <AppText variant="label">
                     {scores.illnessFlag === 'fever' ? 'Fever' : 'Elevated'}
                     {(scores.illnessSuppression ?? 0) > 0
-                      ? ` · energy −${scores.illnessSuppression}`
+                      ? ` · readiness −${scores.illnessSuppression}`
                       : ''}
                   </AppText>
                   <AppText variant="caption" tone="muted">
-                    {healthCopy(scores.illnessAdvisory)}
+                    {scores.illnessAdvisory}
                   </AppText>
                 </Card>
               )}

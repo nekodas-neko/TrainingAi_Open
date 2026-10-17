@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { HomeStore, type HomeChange } from '../src/features/home/data/HomeStore.ts';
 import {
-  greeting,
   homeSections,
   homeStreak,
   moveHomeSection,
@@ -11,6 +10,7 @@ import {
 } from '../src/features/home/data/models.ts';
 import { shiftDateStr } from '@trainingai/shared/date-utils';
 import { ApiError } from '../src/features/account/api/client.ts';
+import { homeGreeting } from '@trainingai/shared/greeting';
 import {
   goalsReviewDue,
   localHour,
@@ -438,20 +438,24 @@ test('layout moves stored keys across hidden slots, and greetings follow the acc
   ]);
   assert.equal(moveHomeSection(order, 'unknown', 1), order);
   assert.equal(
-    greeting('Alex', 'Australia/Brisbane', new Date('2026-10-11T22:00:00Z')),
+    homeGreeting({ name: 'Alex' }, 'Australia/Brisbane', new Date('2026-10-11T22:00:00Z')),
     'Good morning, Alex.',
   );
   assert.equal(
-    greeting('Alex', 'America/Los_Angeles', new Date('2026-10-11T22:00:00Z')),
+    homeGreeting({ name: 'Alex' }, 'America/Los_Angeles', new Date('2026-10-11T22:00:00Z')),
     'Good afternoon, Alex.',
   );
   assert.equal(
-    greeting(
-      '  Joshua Boissevain-Giuliany  ',
+    homeGreeting(
+      { displayName: '  Josh B  ', name: 'Joshua Boissevain-Giuliany' },
       'Australia/Brisbane',
       new Date('2026-10-12T04:00:00Z'),
     ),
-    'Good afternoon, Joshua.',
+    'Good afternoon, Josh B.',
+  );
+  assert.equal(
+    homeGreeting({ displayName: '   ', name: 'Alex' }, 'Australia/Brisbane', new Date('2026-10-11T22:00:00Z')),
+    'Good morning, Alex.',
   );
 });
 test('dismissals survive reopening per day/week and offline goal postponement retains its upload', async () => {
@@ -628,4 +632,28 @@ test('layout sync reports a preference change while health writes retain data re
   await store.chooseRestDay(day, true);
   await store.sync();
   assert.deepEqual(f.changes.slice(-2), ['rest', 'rest']);
+});
+
+test('wake-up rows carry both scores and activities carry their time range', () => {
+  const wake = timelineEventSchema.parse({
+    type: 'wakeup',
+    title: 'Woke up',
+    time: '6:30am',
+    timeMs: 0,
+    day: 'today',
+    sleepDurationH: 7.5,
+    readinessScore: 82,
+    sleepScore: 77,
+  });
+  assert.equal(timelineSummary(wake), '7h 30m · Readiness 82 · Sleep 77');
+  const walk = timelineEventSchema.parse({
+    type: 'walk',
+    title: 'Walk',
+    time: '12:27pm',
+    endTime: '1:05pm',
+    timeMs: 0,
+    day: 'today',
+    durationMin: 38,
+  });
+  assert.equal(timelineSummary(walk), '12:27pm – 1:05pm · 38m');
 });

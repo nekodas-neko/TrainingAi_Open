@@ -3,17 +3,43 @@ import { View } from 'react-native';
 import Svg, { Defs, Pattern, Rect } from 'react-native-svg';
 import { AppText } from './AppText';
 import { Stack } from './Stack';
+import { ChartGuides, YAxisLabels } from './ChartGuides';
+import {
+  drawableTarget,
+  guideSummary,
+  includeTarget,
+  niceTicks,
+  tickLabels,
+  yPixel,
+  type ChartTarget,
+} from './chartScale';
 import { useTheme } from '../theme/ThemeProvider';
 
+// Opt-in readability props (all off by default, so existing screens do not change):
+//   readable   12 px full-contrast bar labels instead of 10 px muted ones
+//   gridlines  faint horizontal lines at round values
+//   yAxis      value labels in a column left of the bars (implies gridlines)
+//   target     { value, label } dashed goal line; the bar scale grows to include it
+// Any of gridlines / yAxis / target also switches the bars to one exact linear scale (bar height
+// is value / top of scale * `height`, default 64) so the lines sit true against the bars.
+// Weekday labels: set each bar's `label`, e.g. formatDateDisplay(date, 'weekday').
 export function BarChart({
   label,
   bars,
   height,
   unit = 'kg',
+  readable = false,
+  gridlines = false,
+  yAxis = false,
+  target: targetProp,
 }: {
   label: string;
   height?: number;
   unit?: string;
+  readable?: boolean;
+  gridlines?: boolean;
+  yAxis?: boolean;
+  target?: ChartTarget;
   bars: readonly {
     label: string;
     value: number;
@@ -25,12 +51,31 @@ export function BarChart({
 }) {
   const { theme } = useTheme();
   const id = useId().replace(/:/g, '');
+  const target = drawableTarget(targetProp);
+  const guides = gridlines || yAxis || target !== undefined;
+  const plotHeight = height ?? 64;
   const max = Math.max(1, ...bars.map((bar) => bar.value));
-  return (
-    <Stack direction="row" gap="xs" align="flex-start" accessibilityLabel={label}>
+  const top = guides ? includeTarget(0, max, target)[1] : max;
+  const ticks = gridlines || yAxis ? niceTicks(0, top) : [];
+  const tickTexts = tickLabels(ticks);
+  const toY = (v: number) => yPixel(v, 0, top, plotHeight);
+  const row = (
+    <Stack
+      direction="row"
+      gap="xs"
+      align="flex-start"
+      accessibilityLabel={guides ? label + guideSummary(0, top, target) : label}
+      style={guides ? { flex: 1 } : undefined}
+    >
       {bars.map((bar, index) => {
-        const barHeight =
-          bar.value > 0 ? Math.max(theme.spacing.md, (bar.value / max) * (height ?? 52)) : 6;
+        const barHeight = guides
+          ? bar.value > 0
+            ? Math.max(theme.spacing.xs, (bar.value / top) * plotHeight)
+            : 6
+          : bar.value > 0
+            ? Math.max(theme.spacing.md, (bar.value / max) * (height ?? 52))
+            : 6;
+        const drawn = guides ? plotHeight : 64;
         const colors = bar.colors.length ? bar.colors : [theme.colors.brand];
         return (
           <View
@@ -39,10 +84,10 @@ export function BarChart({
             accessibilityLabel={`${bar.label}: ${Math.round(bar.value)} ${unit}${bar.annotation ? ', ' + bar.annotation : ''}`}
           >
             <Svg
-              viewBox="0 0 40 64"
+              viewBox={`0 0 40 ${drawn}`}
               width="100%"
               height={height ?? 64}
-              preserveAspectRatio={height ? 'none' : 'xMidYMid meet'}
+              preserveAspectRatio={height || guides ? 'none' : 'xMidYMid meet'}
             >
               <Defs>
                 <Pattern
@@ -60,19 +105,19 @@ export function BarChart({
                   <Rect
                     key={at}
                     x="0"
-                    y={64 - barHeight + (at * barHeight) / colors.length}
+                    y={drawn - barHeight + (at * barHeight) / colors.length}
                     width="40"
                     height={barHeight / colors.length}
                     fill={color}
                   />
                 ))
               ) : (
-                <Rect x="0" y="58" width="40" height="6" fill={theme.colors.border} />
+                <Rect x="0" y={drawn - 6} width="40" height="6" fill={theme.colors.border} />
               )}
               {bar.reduced && (
                 <Rect
                   x="0"
-                  y={64 - barHeight}
+                  y={drawn - barHeight}
                   width="40"
                   height={barHeight}
                   fill={`url(#${id}-${index})`}
@@ -80,8 +125,8 @@ export function BarChart({
               )}
             </Svg>
             <AppText
-              variant="micro"
-              tone={bar.selected ? 'brand' : 'muted'}
+              variant={readable ? 'caption' : 'micro'}
+              tone={bar.selected ? 'brand' : readable ? 'text' : 'muted'}
               style={{ textAlign: 'center' }}
             >
               {bar.label}
@@ -91,5 +136,24 @@ export function BarChart({
         );
       })}
     </Stack>
+  );
+  if (!guides) return row;
+  return (
+    <View style={{ flexDirection: 'row' }}>
+      {yAxis && (
+        <YAxisLabels
+          height={plotHeight}
+          items={ticks.map((t, i) => ({ y: toY(t), text: tickTexts[i] }))}
+        />
+      )}
+      <View style={{ flex: 1 }}>
+        {row}
+        <ChartGuides
+          height={plotHeight}
+          gridYs={gridlines || yAxis ? ticks.map(toY) : []}
+          target={target ? { y: toY(target.value), label: target.label } : undefined}
+        />
+      </View>
+    </View>
   );
 }

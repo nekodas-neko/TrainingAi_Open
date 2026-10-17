@@ -115,12 +115,12 @@ export function ExerciseReadinessSheet({
     <Sheet
       visible
       fullHeight
-      title="Exercise Energy"
+      title="Exercise Readiness"
       onClose={onClose}
-      actions={<StatusIndicator label="Exercise energy" error={error} />}
+      actions={<StatusIndicator label="Exercise readiness" error={error} />}
       footer={
         <AppButton
-          title="Save Energy"
+          title="Save Readiness"
           disabled={!energy || !home.ready || home.denied}
           busy={busy}
           onPress={() => void save()}
@@ -128,7 +128,7 @@ export function ExerciseReadinessSheet({
       }
     >
       <AppText tone="muted">
-        Log today’s energy and any muscle soreness so the app can tune your session.
+        Log today’s energy and any muscle soreness so the AI can calibrate your session.
       </AppText>
       <ChoiceTiles
         label="Energy Level"
