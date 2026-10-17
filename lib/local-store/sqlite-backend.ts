@@ -1403,6 +1403,22 @@ export class SQLiteLocalStore implements LocalStore {
     );
   }
 
+  // Issue 2763 — see the interface. Only 'synced' rows go: a best logged on the phone and not yet pushed
+  // is absent from the server's set by definition.
+  async prunePersonalRecords(keep: string[]): Promise<number> {
+    const have = new Set(keep)
+    const stale = (await querySQL<{ exercise_name: string }>(
+      `SELECT exercise_name FROM personal_records WHERE sync_status = 'synced'`))
+      .map(r => r.exercise_name).filter(n => !have.has(n))
+    for (let i = 0; i < stale.length; i += 200) {
+      const chunk = stale.slice(i, i + 200)
+      await runSQL(
+        `DELETE FROM personal_records WHERE sync_status = 'synced' AND exercise_name IN (${chunk.map(() => '?').join(',')})`,
+        chunk)
+    }
+    return stale.length
+  }
+
   // RV-174 — see the interface. The mirror is read-only (nothing on the device creates a program or a
   // style), so there is no pending local row a prune could destroy.
   async pruneProgramStructure(programIds?: string[], styleIds?: string[]): Promise<number> {
@@ -1744,7 +1760,9 @@ export class SQLiteLocalStore implements LocalStore {
              planned_reps=excluded.planned_reps, planned_rest_sec=excluded.planned_rest_sec,
              planned_weight_kg=excluded.planned_weight_kg, rpe_source=excluded.rpe_source,
              updated_at=excluded.updated_at, deleted_at=NULL, synced=1, sync_status='synced'
-           WHERE set_logs.sync_status='synced'`,
+           WHERE set_logs.sync_status='synced'
+             AND (set_logs.deleted_at IS NULL OR set_logs.updated_at IS NULL
+                  OR excluded.updated_at > set_logs.updated_at)`,
           [
             r.id, r.exerciseLogId, r.setNumber, r.weightKg, r.reps,
             r.setTimeSec, r.restTimeSec, r.intensityPct, r.useFor1rm ? 1 : 0,
@@ -1768,7 +1786,8 @@ export class SQLiteLocalStore implements LocalStore {
            estimated_1rm=excluded.estimated_1rm,
            achieved_at=excluded.achieved_at,
            updated_at=excluded.updated_at,
-           sync_status='synced'`,
+           sync_status='synced'
+         WHERE personal_records.sync_status='synced'`,
         [r.exerciseName, r.exerciseId, r.estimated1rm, r.achievedAt, r.updatedAt],
       );
     }
