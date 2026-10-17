@@ -58,6 +58,11 @@ export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: 
           ownTargetKcal: typeof b.ownTargetKcal === 'number' ? b.ownTargetKcal : null,
         })
       : null;
+  // The band's own colour, always with its label beside it (colour is never the only signal).
+  const zone =
+    total && goal != null
+      ? balanceZone(Math.round(total.calories) - Math.round(goal))
+      : { label: b?.zoneLabel ?? 'Calorie balance', color: typeof b?.zoneColor === 'string' ? b.zoneColor : theme.colors.muted };
   return (
     <Card>
       <Stack direction="row" align="center" gap="lg">
@@ -110,6 +115,7 @@ export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: 
           >
             <AppText variant="caption" style={{ color: colors[i] }}>
               {['Protein', 'Carbs', 'Fat'][i]}
+              {total ? ` · ${Math.round(Object.values(shares)[i] * 100)}%` : ''}
             </AppText>
             <AppText variant="heading" style={{ fontVariant: ['tabular-nums'] }}>
               {total ? Math.round(total[key]) : '—'}
@@ -121,9 +127,7 @@ export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: 
             <AppText variant="micro" tone="muted">
               {targets[key] != null
                 ? `of ${Math.round(targets[key]!)} g`
-                : total
-                  ? `${Math.round(Object.values(shares)[i] * 100)}% of energy`
-                  : 'No target'}
+                : 'No target'}
             </AppText>
             <ProgressBar
               value={total && targets[key] ? total[key] / targets[key]! : 0}
@@ -140,12 +144,12 @@ export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: 
       {b && (
         <>
           <Stack direction="row" align="center" justify="space-between">
-            <AppText variant="caption" tone="muted">
-              {pending
-                ? 'Budget awaiting upload'
-                : total && goal != null
-                  ? balanceZone(Math.round(total.calories) - Math.round(goal)).label
-                  : (b.zoneLabel ?? 'Calorie balance')}
+            <AppText
+              variant="caption"
+              tone={pending ? 'muted' : undefined}
+              style={pending ? undefined : { color: zone.color, fontWeight: '600' }}
+            >
+              {pending ? 'Budget awaiting upload' : zone.label}
               {date === n.today ? ' so far' : ''}
             </AppText>
             <IconButton
@@ -158,12 +162,12 @@ export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: 
           {provenance && (
             <AppText variant="micro" tone="muted">
               {provenance.ownTarget
-                ? `Your own target: ${provenance.total} kcal`
+                ? `Your own target: ${provenance.total.toLocaleString()} kcal`
                 : provenance.chain
                   ? provenance.chain.totalFloored
-                    ? `${provenance.total} minimum budget · never below your resting rate`
-                    : `${provenance.chain.rmr} resting rate − ${provenance.chain.deficit} goal + ${provenance.chain.dailyLiving} daily living + ${provenance.chain.movement} movement = ${provenance.total} kcal`
-                  : `${provenance.base} base + ${provenance.earned} movement = ${provenance.total} kcal`}
+                    ? `${provenance.total.toLocaleString()} minimum budget · never below your resting rate`
+                    : `${provenance.chain.rmr.toLocaleString()} resting rate − ${provenance.chain.deficit.toLocaleString()} goal + ${provenance.chain.dailyLiving.toLocaleString()} daily living + ${provenance.chain.movement.toLocaleString()} movement = ${provenance.total.toLocaleString()} kcal`
+                  : `${provenance.base.toLocaleString()} base + ${provenance.earned.toLocaleString()} movement = ${provenance.total.toLocaleString()} kcal`}
             </AppText>
           )}
           {info && (

@@ -82,7 +82,7 @@ export function GroupedBarChart({
       >
         {guides ? (
           <View style={{ flexDirection: 'row' }}>
-            {yAxis && (
+            {yAxis && boxWidth > 1 && (
               <YAxisLabels
                 height={theme.sizes.weekVolumeChart}
                 items={ticks.map((t, i) => ({ y: toY(t), text: tickTexts[i] }))}

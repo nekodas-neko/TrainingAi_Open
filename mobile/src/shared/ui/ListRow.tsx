@@ -9,6 +9,7 @@ import { Icon } from './Icon';
 export function ListRow({
   title,
   subtitle,
+  subtitleColor,
   trailing,
   onPress,
   onLongPress,
@@ -20,6 +21,7 @@ export function ListRow({
 }: {
   title: string;
   subtitle?: string;
+  subtitleColor?: string;
   trailing?: ReactNode;
   onPress?: () => void;
   onLongPress?: () => void;
@@ -47,13 +49,16 @@ export function ListRow({
       <Stack gap="xs" style={{ flex: 1 }}>
         <AppText variant="label">{title}</AppText>
         {subtitle && (
-          <AppText variant="caption" tone="muted">
+          <AppText
+            variant="caption"
+            tone="muted"
+            style={subtitleColor ? { color: subtitleColor } : undefined}
+          >
             {subtitle}
           </AppText>
         )}
       </Stack>
-      {trailing ??
-        (!disabled && <Icon name="forward" tone="muted" size={theme.sizes.iconSmall} />)}
+      {trailing ?? (!disabled && <Icon name="forward" tone="muted" size={theme.sizes.iconSmall} />)}
     </>
   );
   if (!onPress) return <View style={rowStyle}>{content}</View>;

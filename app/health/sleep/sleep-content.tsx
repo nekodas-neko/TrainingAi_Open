@@ -5,7 +5,7 @@ import { HealthScoreDetail } from "@/components/health/health-score-detail";
 import { ManualBedtimeCard } from "@/components/health/sleep/manual-bedtime-card";
 import { ManualNightCard } from "@/components/health/sleep/manual-night-card";
 import { ProvisionalBadge } from "@/components/health/provisional-badge";
-import { sleepCoverageNote } from "@/components/health/body-cards/sleep-coverage-note";
+import { sleepCoverageNote } from "@trainingai/shared/health/sleep-coverage-note";
 import { Hypnogram } from "@/components/health/hypnogram";
 import { TrendSparkline } from "@/components/health/trend-sparkline-lazy";
 import { TREND_EMPTY } from "@/components/health/trend-empty-copy";

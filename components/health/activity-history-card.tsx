@@ -10,6 +10,7 @@ import { formatDateDisplay, formatTime12h, startOfWeekInTz } from '@trainingai/s
 import { getLocalStore } from '@/lib/local-store'
 import type { LocalActivityLog } from '@/lib/local-store/types'
 import type { ActivityLog, ActivityType } from '@trainingai/shared/types'
+import { formatActivityTitle } from '@trainingai/shared/format/activity-title'
 
 // Dynamic, matching how health-content.tsx imports the same sheet. The static import here was
 // the chain Q-127 identified as defeating that wrapper. No `loading:` skeleton — the sheet
@@ -45,19 +46,6 @@ function localToActivityLog(l: LocalActivityLog): ActivityLog {
     segments: l.segments ?? undefined,
     createdAt: new Date(),
   }
-}
-
-function formatActivityTitle(title: string): string {
-  if (!title.startsWith('EXERCISE_TYPE_')) return title
-  return title
-    .replace('EXERCISE_TYPE_', '')
-    .split('_')
-    .map(w => w.charAt(0) + w.slice(1).toLowerCase())
-    .join(' ')
-    .replace('Treadmill', '(Treadmill)')
-    .replace('Pool', '(Pool)')
-    .replace('Open Water', '(Open Water)')
-    .replace('Stationary', '(Stationary)')
 }
 
 const ACTIVITY_KEYS = ['activity-logs', 'activity-types'] as const

@@ -8,7 +8,9 @@ import {
   drawableTarget,
   guideSummary,
   includeTarget,
+  isPointAlignedAxis,
   meetBox,
+  pointCentreX,
   niceTicks,
   tickLabels,
   type ChartTarget,
@@ -21,7 +23,9 @@ import type { Tone } from '../theme/theme';
 //   gridlines  faint horizontal lines at round values of the plotted range
 //   yAxis      value labels in a column left of the plot (implies gridlines)
 //   target     { value, label } dashed goal line; widens the range, also when `domain` is passed
-// Weekday labels: pass `axisLabels` with one label per day, e.g. formatDateDisplay(date, 'weekday').
+// Weekday labels: pass `axisLabels` with one label per point and '' for the ones to skip; each
+// non-blank label is centred under its own point. Any other length is spread across the row.
+const AXIS_LABEL_WIDTH = 40;
 export function LineChart({
   points,
   label,
@@ -37,6 +41,7 @@ export function LineChart({
   interactive = false,
   axisLabels,
   color: accent,
+  fillColor,
   readable = false,
   gridlines = false,
   yAxis = false,
@@ -62,6 +67,7 @@ export function LineChart({
   interactive?: boolean;
   axisLabels?: readonly string[];
   color?: string;
+  fillColor?: string;
   readable?: boolean;
   gridlines?: boolean;
   yAxis?: boolean;
@@ -164,84 +170,89 @@ export function LineChart({
       onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
       accessibilityLabel={`${label}: ${valid.map((point) => `${point.label}: ${point.value}`).join('; ')}${guides ? guideSummary(min, max, target) : ''}`}
     >
-      <Svg
-        viewBox="0 0 320 90"
-        width={yAxis ? plotWidth : '100%'}
-        height={plotHeight}
-        style={leftInset ? { marginLeft: leftInset } : undefined}
-        pointerEvents="none"
-      >
-        {bands.map((band, index) => (
-          <Rect
-            key={`band${index}`}
-            x={xx(Math.max(xMin, band.from))}
-            y={0}
-            width={Math.max(0, xx(Math.min(xMax, band.to)) - xx(Math.max(xMin, band.from)))}
-            height={90}
-            fill={band.color}
-            opacity={0.15}
-          />
-        ))}
-        {markers.map((marker, index) => (
-          <Line
-            key={`marker${index}`}
-            x1={xx(marker.x)}
-            x2={xx(marker.x)}
-            y1={0}
-            y2={90}
-            stroke={marker.color}
-            strokeDasharray="3 3"
-          />
-        ))}
-        {series.flatMap((s, index) => {
-          const segments: { x: number; y: number }[][] = [[]];
-          for (const p of s.points) {
-            if (p.value != null && Number.isFinite(p.value)) {
-              segments.at(-1)!.push({ x: xx(p.x), y: yy(p.value, s.domain) });
-            } else if (segments.at(-1)!.length) {
-              segments.push([]);
-            }
-          }
-          return segments
-            .filter((segment) => segment.length > 1)
-            .map((segment, j) => (
-              <Polyline
-                key={`series${index}-${j}`}
-                points={segment.map((p) => `${p.x},${p.y}`).join(' ')}
-                fill="none"
-                stroke={s.color}
-                strokeWidth={1.5}
-                strokeDasharray={s.dashed ? '4 3' : undefined}
-              />
-            ));
-        })}
-        {segments
-          .filter((segment) => segment.length > 1)
-          .map((segment, index) =>
-            fill ? (
-              <Polygon
-                key={'fill' + index}
-                points={`${segment[0].x},90 ${segment.map((point) => `${point.x},${point.y}`).join(' ')} ${segment.at(-1)!.x},90`}
-                fill={theme.tones[tone].background}
-              />
-            ) : null,
-          )}
-        {segments
-          .filter((segment) => segment.length > 1)
-          .map((segment, index) => (
-            <Polyline
-              key={index}
-              points={segment.map((point) => `${point.x},${point.y}`).join(' ')}
-              fill="none"
-              stroke={color}
-              strokeWidth={2}
+      {yAxis && width <= 1 ? (
+        // Held until measured: before layout the plot would be 1 px wide.
+        <View style={{ height: plotHeight }} />
+      ) : (
+        <Svg
+          viewBox="0 0 320 90"
+          width={yAxis ? plotWidth : '100%'}
+          height={plotHeight}
+          style={leftInset ? { marginLeft: leftInset } : undefined}
+          pointerEvents="none"
+        >
+          {bands.map((band, index) => (
+            <Rect
+              key={`band${index}`}
+              x={xx(Math.max(xMin, band.from))}
+              y={0}
+              width={Math.max(0, xx(Math.min(xMax, band.to)) - xx(Math.max(xMin, band.from)))}
+              height={90}
+              fill={band.color}
+              opacity={0.15}
             />
           ))}
-        {coords.map(
-          (point, index) =>
-            point && <Circle key={index} cx={point.x} cy={point.y} r={3} fill={color} />,
-        )}
-      </Svg>
+          {markers.map((marker, index) => (
+            <Line
+              key={`marker${index}`}
+              x1={xx(marker.x)}
+              x2={xx(marker.x)}
+              y1={0}
+              y2={90}
+              stroke={marker.color}
+              strokeDasharray="3 3"
+            />
+          ))}
+          {series.flatMap((s, index) => {
+            const segments: { x: number; y: number }[][] = [[]];
+            for (const p of s.points) {
+              if (p.value != null && Number.isFinite(p.value)) {
+                segments.at(-1)!.push({ x: xx(p.x), y: yy(p.value, s.domain) });
+              } else if (segments.at(-1)!.length) {
+                segments.push([]);
+              }
+            }
+            return segments
+              .filter((segment) => segment.length > 1)
+              .map((segment, j) => (
+                <Polyline
+                  key={`series${index}-${j}`}
+                  points={segment.map((p) => `${p.x},${p.y}`).join(' ')}
+                  fill="none"
+                  stroke={s.color}
+                  strokeWidth={1.5}
+                  strokeDasharray={s.dashed ? '4 3' : undefined}
+                />
+              ));
+          })}
+          {segments
+            .filter((segment) => segment.length > 1)
+            .map((segment, index) =>
+              fill ? (
+                <Polygon
+                  key={'fill' + index}
+                  points={`${segment[0].x},90 ${segment.map((point) => `${point.x},${point.y}`).join(' ')} ${segment.at(-1)!.x},90`}
+                  fill={fillColor ?? theme.tones[tone].background}
+                />
+              ) : null,
+            )}
+          {segments
+            .filter((segment) => segment.length > 1)
+            .map((segment, index) => (
+              <Polyline
+                key={index}
+                points={segment.map((point) => `${point.x},${point.y}`).join(' ')}
+                fill="none"
+                stroke={color}
+                strokeWidth={2}
+              />
+            ))}
+          {coords.map(
+            (point, index) =>
+              point && <Circle key={index} cx={point.x} cy={point.y} r={3} fill={color} />,
+          )}
+        </Svg>
+      )}
       {guides && width > 1 && (
         <>
           <ChartGuides
@@ -266,8 +277,7 @@ export function LineChart({
             {selection === null
               ? 'Tap the chart to inspect a reading'
               : (() => {
-                  const p =
-                    valid.find((p) => (p.x ?? points.indexOf(p)) === selection) ?? valid[0];
+                  const p = valid.find((p) => (p.x ?? points.indexOf(p)) === selection) ?? valid[0];
                   return `${p.label}: ${p.value} · ${bands
                     .filter((b) => selection >= b.from && selection <= b.to)
                     .map((b) => b.label)
@@ -276,19 +286,43 @@ export function LineChart({
           </AppText>
         </View>
       )}
-      {showLabels && (
-        <Stack
-          direction="row"
-          justify="space-between"
-          style={leftInset ? { paddingLeft: leftInset } : undefined}
-        >
-          {(axisLabels ?? [valid[0].label, valid.at(-1)!.label]).map((label, index) => (
-            <AppText key={index} variant={labelVariant} tone={labelTone}>
-              {label}
-            </AppText>
-          ))}
-        </Stack>
-      )}
+      {showLabels &&
+        (axisLabels && isPointAlignedAxis(axisLabels.length, points.length, axisLabels) ? (
+          <View style={{ height: theme.typography[labelVariant].lineHeight, width: '100%' }}>
+            {axisLabels.map((text, index) =>
+              text === '' ? null : (
+                <View
+                  key={index}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    width: AXIS_LABEL_WIDTH,
+                    alignItems: 'center',
+                    left:
+                      pointCentreX(xs[index], xMin, xMax, plotWidth, plotHeight, leftInset) -
+                      AXIS_LABEL_WIDTH / 2,
+                  }}
+                >
+                  <AppText variant={labelVariant} tone={labelTone} numberOfLines={1}>
+                    {text}
+                  </AppText>
+                </View>
+              ),
+            )}
+          </View>
+        ) : (
+          <Stack
+            direction="row"
+            justify="space-between"
+            style={leftInset ? { paddingLeft: leftInset } : undefined}
+          >
+            {(axisLabels ?? [valid[0].label, valid.at(-1)!.label]).map((label, index) => (
+              <AppText key={index} variant={labelVariant} tone={labelTone}>
+                {label}
+              </AppText>
+            ))}
+          </Stack>
+        ))}
     </View>
   );
 }

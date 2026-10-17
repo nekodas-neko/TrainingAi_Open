@@ -1,6 +1,7 @@
+import { definitionDose, hasFreeTextBesideAmount } from '@trainingai/shared/nutrition/definition-dose';
 import { randomUUID } from 'expo-crypto';
 import { useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Switch, View } from 'react-native';
 import { z } from 'zod';
 import {
   AppButton,
@@ -13,6 +14,7 @@ import {
   ListRow,
   NumericStepper,
   Sheet,
+  SortableStack,
   Stack,
   StatusIndicator,
   SwitchRow,
@@ -21,6 +23,7 @@ import {
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
+import { deleteSupplement } from '../data/supplement-delete';
 import { useNutrition } from '../data/NutritionProvider';
 import { SupplementCreateSchema, type Supplement } from '../data/models';
 import { VialSheet } from './VialSheet';
@@ -53,7 +56,7 @@ export function SupplementsSection({ date }: { date: string }) {
   const [amount, setAmount] = useState('');
   const [vial, setVial] = useState<Supplement | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const active = n.view.supplements.filter(
+  const active = bySortOrder(n.view.supplements).filter(
     (s) =>
       s.active &&
       (!s.startedOn || s.startedOn <= date) &&
@@ -180,6 +183,30 @@ function Tick({ done, busy }: { done: boolean; busy: boolean }) {
     </View>
   );
 }
+// The view appends an edited row after the rest, so the stored order is applied here.
+function bySortOrder(list: readonly Supplement[]) {
+  return list.slice().sort((a, b) => a.sortOrder - b.sortOrder);
+}
+// One supplement's full write, so a toggle or a reorder never blanks the fields it did not touch.
+function supplementPayload(s: Supplement, patch: Partial<Pick<Supplement, 'active' | 'sortOrder'>>) {
+  const next = { ...s, ...patch };
+  return {
+    ...SupplementCreateSchema.parse({
+      name: next.name,
+      dose: next.dose ?? null,
+      defaultAmount: next.defaultAmount ?? null,
+      unit: next.unit ?? null,
+      startedOn: next.startedOn ?? null,
+      stoppedOn: next.stoppedOn ?? null,
+      dosePrompt: next.dosePrompt,
+      active: next.active,
+      reminderEnabled: next.reminderEnabled,
+      reminderTime: next.reminderTime ?? null,
+      sortOrder: next.sortOrder,
+    }),
+    id: s.id,
+  };
+}
 function SupplementManager({ date, onClose }: { date: string; onClose: () => void }) {
   const n = useNutrition(date);
   const resources = useWorkoutResources();
@@ -190,6 +217,57 @@ function SupplementManager({ date, onClose }: { date: string; onClose: () => voi
   const [remove, setRemove] = useState<Supplement | null>(null);
   const draft = useWorkoutDraft(`supplement-editor:${edit ?? 'closed'}`, formSchema, seed);
   const f = draft.value;
+  const { theme } = useTheme();
+  const ordered = bySortOrder(n.view.supplements);
+  function open(s: Supplement) {
+    setEdit(s.id);
+    setSeed({
+      name: s.name,
+      dose: s.dose ?? '',
+      defaultAmount: s.defaultAmount == null ? '' : String(s.defaultAmount),
+      unit: s.unit ?? '',
+      startedOn: s.startedOn ?? '',
+      stoppedOn: s.stoppedOn ?? '',
+      dosePrompt: s.dosePrompt,
+      active: s.active,
+    });
+  }
+  async function toggleActive(s: Supplement) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await n.store?.enqueue([
+        { domain: 'supplements', date, payload: supplementPayload(s, { active: !s.active }) },
+      ]);
+      setError(null);
+    } catch {
+      setError('Could not change this supplement.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function reorder(ids: string[]) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const changed = ids.flatMap((id, index) => {
+        const s = ordered.find((x) => x.id === id);
+        return s && s.sortOrder !== index ? [{ s, index }] : [];
+      });
+      await n.store?.enqueue(
+        changed.map(({ s, index }) => ({
+          domain: 'supplements' as const,
+          date,
+          payload: supplementPayload(s, { sortOrder: index }),
+        })),
+      );
+      setError(null);
+    } catch {
+      setError('Could not save the new order.');
+    } finally {
+      setBusy(false);
+    }
+  }
   async function save() {
     if (busy) {
       return;
@@ -235,6 +313,18 @@ function SupplementManager({ date, onClose }: { date: string; onClose: () => voi
       fullHeight
       title="Manage supplements"
       onClose={onClose}
+      footer={
+        edit ? undefined : (
+          <AppButton
+            title="Add supplement"
+            icon="plus"
+            onPress={() => {
+              setSeed(blank);
+              setEdit('new');
+            }}
+          />
+        )
+      }
       actions={
         <StatusIndicator
           label="Supplement editor"
@@ -294,39 +384,60 @@ function SupplementManager({ date, onClose }: { date: string; onClose: () => voi
             disabled={!draft.ready}
             onPress={() => void save()}
           />
+          {edit !== 'new' && (
+            <AppButton
+              title="Delete"
+              variant="danger"
+              onPress={() => setRemove(n.view.supplements.find((x) => x.id === edit) ?? null)}
+            />
+          )}
           <AppButton title="Back" variant="ghost" onPress={() => setEdit(null)} />
         </>
       ) : (
         <>
-          <AppButton
-            title="Add supplement"
-            onPress={() => {
-              setSeed(blank);
-              setEdit('new');
+          {ordered.length === 0 && (
+            <AppText tone="muted">No supplements yet. Add one below.</AppText>
+          )}
+          <SortableStack
+            order={ordered.map((x) => x.id)}
+            enabled={!busy}
+            label={(id) => ordered.find((x) => x.id === id)?.name ?? 'Supplement'}
+            onChange={(ids) => void reorder(ids)}
+            renderItem={(id, handle) => {
+              const s = ordered.find((x) => x.id === id);
+              if (!s) return null;
+              const dose = definitionDose(s);
+              return (
+                <Card key={id} style={{ paddingVertical: 0 }}>
+                  <Stack direction="row" align="center" gap="sm">
+                    {handle}
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <ListRow
+                        title={s.name}
+                        subtitle={
+                          [
+                            dose,
+                            hasFreeTextBesideAmount(s) ? `Note: ${s.dose}` : null,
+                            s.reminderEnabled && s.reminderTime ? s.reminderTime : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ') || undefined
+                        }
+                        onPress={() => open(s)}
+                      />
+                    </View>
+                    <Switch
+                      accessibilityLabel={`${s.name} active`}
+                      value={s.active}
+                      disabled={busy}
+                      onValueChange={() => void toggleActive(s)}
+                      trackColor={{ false: theme.colors.raised, true: theme.colors.brand }}
+                    />
+                  </Stack>
+                </Card>
+              );
             }}
           />
-          {n.view.supplements.map((s) => (
-            <Card key={s.id}>
-              <ListRow
-                title={s.name}
-                subtitle={`${s.dose ?? ''} · ${s.active ? 'Active' : 'Inactive'}`}
-                onPress={() => {
-                  setEdit(s.id);
-                  setSeed({
-                    name: s.name,
-                    dose: s.dose ?? '',
-                    defaultAmount: s.defaultAmount == null ? '' : String(s.defaultAmount),
-                    unit: s.unit ?? '',
-                    startedOn: s.startedOn ?? '',
-                    stoppedOn: s.stoppedOn ?? '',
-                    dosePrompt: s.dosePrompt,
-                    active: s.active,
-                  });
-                }}
-              />
-              <AppButton title="Delete" variant="danger" onPress={() => setRemove(s)} />
-            </Card>
-          ))}
         </>
       )}
       {remove && (
@@ -339,9 +450,15 @@ function SupplementManager({ date, onClose }: { date: string; onClose: () => voi
           onCancel={() => setRemove(null)}
           onConfirm={async () => {
             try {
-              await n.store!.enqueue([
-                { domain: 'supplements', date, payload: { id: remove.id, deleted: true } },
-              ]);
+              await deleteSupplement(
+                {
+                  enqueue: (ops) => n.store!.enqueue(ops),
+                  clearDraft: async (key) => resources?.clearDraft(key),
+                },
+                date,
+                remove.id,
+              );
+              setEdit(null);
               setRemove(null);
             } catch {
               setError('Could not delete this supplement.');

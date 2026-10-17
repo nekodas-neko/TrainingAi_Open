@@ -29,6 +29,7 @@ import { ingredientAmountLabel, qtyFromInput } from '../data/quantities';
 import { recipeDuplicate, recipeTotals, scanRecipe } from '../data/recipes';
 import { IngredientPicker } from './IngredientPicker';
 import { MealLabelSheet } from './MealLabelSheet';
+import { recipeCountLine } from '../data/display';
 import { MacroLine } from './NutritionElements';
 const editorSchema = z.object({
   name: z.string(),
@@ -259,7 +260,7 @@ export function RecipesSheet({
                     density="compact"
                     leading={<Thumbnail uri={meal.imageDataUri} label={meal.name} />}
                     title={meal.name}
-                    subtitle={`${meal.items.length} ingredients · ${meal.servings} portions`}
+                    subtitle={recipeCountLine(meal.items.length, meal.servings)}
                     onPress={() => {
                       setSelected(meal);
                       setPortions('1');

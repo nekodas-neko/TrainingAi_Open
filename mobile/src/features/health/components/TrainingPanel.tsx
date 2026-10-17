@@ -1,20 +1,21 @@
 import { HealthResourceHeader } from './HealthResourceHeader';
-import { useState } from 'react';
-import { shiftDateStr, weekStartForDay } from '@trainingai/shared/date-utils';
-import { movementPattern } from '@trainingai/shared/muscles';
+import { useState, type ReactNode } from 'react';
+import { shiftDateStr, startOfWeekInTz, weekStartForDay } from '@trainingai/shared/date-utils';
+import { plural } from '@trainingai/shared/format/plural';
 import {
   AppText,
   Card,
+  Icon,
+  LineChart,
   ListRow,
   HubCard,
-  MonthCalendar,
   ProgressBar,
   Sheet,
   Stack,
 } from '../../../shared/ui';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
-import { calendarSpec, weeklySpec } from '../../workouts/data/models';
-import { useWorkoutJournal } from '../../workouts/logging/WorkoutJournalProvider';
+import { weeklySpec } from '../../workouts/data/models';
 import { WeeklyTrainingCard } from '../../progress/WeeklyTrainingCard';
 import { ResourceStatus } from '../../workouts/components/ResourceStatus';
 import { useHealthData } from '../data/HealthDataProvider';
@@ -24,78 +25,25 @@ import {
   muscleSetsSpec,
   overviewSpec,
   trendsSpec,
-  metricValue,
 } from '../data/models';
-import { HealthMetricCard } from './HealthMetricCard';
+import {
+  activityRow,
+  movementRows,
+  periodizationRow,
+  trendSeries,
+  weekActivities,
+} from '../data/training-view';
 import { ActivityDetails, type HealthActivity } from './ActivityDetails';
+import { MuscleVolumeFigure } from './MuscleVolumeFigure';
+import { TrainingCalendarCard } from './TrainingCalendarCard';
+import { activityIcon, activityTypesSpec } from '../../activities/data/models';
+import { useActivityLogs } from '../../activities/data/ActivityProvider';
 
-import { useActivities, useActivityLogs } from '../../activities/data/ActivityProvider';
-
-function CalendarCard({ openDay }: { openDay: (date: string) => void }) {
-  const { today } = useHealthData();
-  const [month, setMonth] = useState(today.slice(0, 7));
-  const [selected, setSelected] = useState<string | null>(null);
-  const [year, number] = month.split('-').map(Number);
-  const state = useWorkoutResource(calendarSpec(year, number));
-  const journal = useWorkoutJournal();
-  const activities = useActivities();
-  const markers: Record<string, string[]> = {};
-  for (const row of activities.rows) {
-    if (row.payload.date.startsWith(month)) {
-      markers[row.payload.date] = [row.payload.title];
-    }
-  }
-  for (const source of [state.data?.trainedDays ?? {}, state.data?.activityDays ?? {}]) {
-    for (const [date, names] of Object.entries(source)) {
-      const day = date.replace(/\//g, '-');
-      markers[day] = [...(markers[day] ?? []), ...names];
-    }
-  }
-  for (const workout of journal.data.workouts.filter(
-    (workout) => workout.status === 'completed' && workout.date.startsWith(month),
-  )) {
-    markers[workout.date] = [
-      ...new Set([...(markers[workout.date] ?? []), workout.sessionName]),
-    ];
-  }
-  return (
-    <Card>
-      <AppText variant="heading" accessibilityRole="header">
-        Training Calendar
-      </AppText>
-      <MonthCalendar
-        nativeStyle
-        status={
-          <ResourceStatus
-            inline
-            label="Calendar records"
-            state={state}
-            refresh={state.refresh}
-          />
-        }
-        today={today}
-        month={month}
-        markers={markers}
-        selected={selected ?? undefined}
-        onMonthChange={setMonth}
-        onSelect={(date) => {
-          setSelected(date);
-          openDay(date);
-        }}
-      />
-    </Card>
-  );
-}
 function MovementCard() {
   const { today } = useHealthData();
   const state = useWorkoutResource(movementSpec(shiftDateStr(today, -59), today));
-  const totals = { push: 0, pull: 0, legs: 0, other: 0 };
-  for (const row of state.data?.muscles ?? []) {
-    if (row.sets > 0) {
-      totals[movementPattern(row.muscle)] += row.sets;
-    }
-  }
-  const total = Object.values(totals).reduce((sum, value) => sum + value, 0);
+  const { theme } = useTheme();
+  const balance = movementRows(state.data?.muscles ?? []);
   return (
     <Card>
       <HealthResourceHeader title={'Movement Balance'} state={state} refresh={state.refresh} />
@@ -104,21 +52,69 @@ function MovementCard() {
       </AppText>
 
       {state.data &&
-        Object.entries(totals).map(([key, value]) => (
-          <Stack key={key}>
-            <Stack direction="row" justify="space-between">
-              <AppText variant="caption">{key === 'other' ? 'Core & other' : key}</AppText>
-              <AppText variant="caption">
-                {metricValue(value, 'sets', 1)} ·{' '}
-                {total ? Math.round((value / total) * 100) : 0}%
-              </AppText>
+        balance.rows.map((row) => {
+          // One accent for the three patterns (they are categories, not a scale); "other" stays muted.
+          const color = row.key === 'other' ? theme.colors.muted : theme.tones.recovery.foreground;
+          return (
+            <Stack key={row.key} gap="xs">
+              <Stack direction="row" justify="space-between">
+                <AppText variant="label">{row.label}</AppText>
+                <AppText variant="caption" tone="muted">
+                  {row.percent}
+                  <AppText variant="caption" style={{ color, fontWeight: '600' }}>
+                    {' '}
+                    {row.sets}
+                  </AppText>
+                </AppText>
+              </Stack>
+              <ProgressBar value={row.fraction} color={color} />
             </Stack>
-            <ProgressBar value={total ? value / total : 0} />
-          </Stack>
-        ))}
+          );
+        })}
     </Card>
   );
 }
+
+// Duration and density over the last 14 days. The value axis, weekday letters and the "N days
+// missing" note are on, so a gap reads as a gap and the line reads against round values.
+function TrendChartCard({
+  title,
+  unit,
+  series,
+  color,
+  status,
+}: {
+  title: string;
+  unit: string;
+  series: NonNullable<ReturnType<typeof trendSeries>>;
+  color: string;
+  status?: ReactNode;
+}) {
+  return (
+    <Card>
+      <Stack direction="row" justify="space-between" align="center">
+        <AppText variant="heading" accessibilityRole="header" style={{ flex: 1 }}>
+          {title}
+        </AppText>
+        {status}
+      </Stack>
+      <AppText variant="caption" tone="muted">
+        {['Last 14 days', unit, series.missing].filter(Boolean).join(' · ')}
+      </AppText>
+      <LineChart
+        label={title}
+        points={series.points}
+        axisLabels={series.axisLabels}
+        color={color}
+        fillColor={`${color}33`}
+        fill
+        readable
+        yAxis
+      />
+    </Card>
+  );
+}
+
 export function TrainingPanel({
   openPrograms,
   openDay,
@@ -128,38 +124,50 @@ export function TrainingPanel({
   openDay: (date: string) => void;
   openWeek: (week: string) => void;
 }) {
-  const { today } = useHealthData();
+  const { today, timezone } = useHealthData();
+  const { theme } = useTheme();
   const weekly = useWorkoutResource(weeklySpec);
   const muscles = useWorkoutResource(muscleSetsSpec);
   const overview = useWorkoutResource(overviewSpec);
   const activity = useWorkoutResource(activityHistorySpec);
+  const activityTypes = useWorkoutResource(activityTypesSpec);
   const activityLogs = useActivityLogs(
     activity.data?.activityLogs ?? [],
     shiftDateStr(today, -29),
     today,
   );
+  const thisWeek = weekActivities(activityLogs, startOfWeekInTz(timezone));
   const [selectedActivity, setSelectedActivity] = useState<HealthActivity | null>(null);
   const trends = useWorkoutResource(trendsSpec(today));
+  const duration = trendSeries(trends.data?.trends, (day) => day.sessionDurationMin);
+  const density = trendSeries(trends.data?.trends, (day) => day.workoutDensity);
+  // A phase is a category, not a state: a cool ramp, never the green, amber or red of a status.
+  const phaseColors: Record<string, string> = {
+    baseline: theme.colors.muted,
+    accumulation: theme.sessions[3].foreground,
+    intensification: theme.sessions[2].foreground,
+    realisation: theme.sessions[4].foreground,
+    deload: theme.tones.recovery.foreground,
+  };
+  const trendStatus = (
+    <ResourceStatus inline label="Workout trends" state={trends} refresh={trends.refresh} />
+  );
   return (
     <>
-      <CalendarCard openDay={openDay} />
+      <TrainingCalendarCard openDay={openDay} />
       <HubCard
         title="Week in review"
-        subtitle="Training, recovery & records"
-        icon="activity"
+        subtitle="Last week's training, recovery and records"
+        icon="calendar"
         tone="neutral"
         onPress={() => openWeek(shiftDateStr(weekStartForDay(today), -7))}
       />
       {weekly.data && (
         <WeeklyTrainingCard
+          readable
           data={weekly.data}
           status={
-            <ResourceStatus
-              inline
-              label="Training load"
-              state={weekly}
-              refresh={weekly.refresh}
-            />
+            <ResourceStatus inline label="Training load" state={weekly} refresh={weekly.refresh} />
           }
         />
       )}
@@ -173,14 +181,25 @@ export function TrainingPanel({
           refresh={overview.refresh}
         />
 
-        {overview.data?.sessions.map((session) => (
-          <ListRow
-            key={session.sessionId}
-            title={session.sessionName}
-            subtitle={`${session.state?.phase ?? session.state?.currentPhase ?? 'Baseline'} · ${session.lastTrainedDaysAgo === null ? 'Never trained' : `${session.lastTrainedDaysAgo} days ago`}`}
-            onPress={openPrograms}
-          />
-        ))}
+        {overview.data?.sessions.map((session) => {
+          const row = periodizationRow(session);
+          return (
+            <ListRow
+              key={session.sessionId}
+              title={session.sessionName}
+              subtitle={row.label}
+              subtitleColor={phaseColors[row.phase]}
+              trailing={
+                row.recency ? (
+                  <AppText variant="caption" tone="muted">
+                    {row.recency}
+                  </AppText>
+                ) : undefined
+              }
+              onPress={openPrograms}
+            />
+          );
+        })}
         {overview.data && !overview.data.sessions.length && (
           <AppText variant="caption" tone="muted">
             No AI dynamic program active
@@ -199,21 +218,7 @@ export function TrainingPanel({
             {muscles.data.phase.dominant} · target scale {muscles.data.phase.scale}
           </AppText>
         )}
-        {muscles.data?.muscles.map((row) => (
-          <Stack key={row.muscle}>
-            <Stack direction="row" justify="space-between">
-              <AppText variant="label" style={{ flex: 1 }}>
-                {row.muscle}
-              </AppText>
-              <AppText variant="caption">
-                {row.sets} sets{row.target !== null ? ` / ${row.target}` : ''}
-              </AppText>
-            </Stack>
-            {row.target !== null && row.target > 0 && (
-              <ProgressBar value={row.sets / row.target} />
-            )}
-          </Stack>
-        ))}
+        {!!muscles.data?.muscles.length && <MuscleVolumeFigure muscles={muscles.data.muscles} />}
         {muscles.data && !muscles.data.muscles.length && (
           <AppText variant="caption" tone="muted">
             No muscle volume recorded this week
@@ -223,22 +228,44 @@ export function TrainingPanel({
       <MovementCard />
       <Card>
         <HealthResourceHeader
-          title={'Activity History'}
+          title={'Activities This Week'}
           state={activity}
           refresh={activity.refresh}
         />
-
-        {activityLogs.map((log) => (
-          <ListRow
-            key={log.id}
-            title={log.title ?? log.activityType}
-            subtitle={`${log.date} · ${metricValue(log.durationMin, 'min')} · ${metricValue(log.distanceKm, 'km', 1)}`}
-            onPress={() => setSelectedActivity(log)}
-          />
-        ))}
-        {activity.data && !activityLogs.length && (
+        {thisWeek.length > 0 && (
           <AppText variant="caption" tone="muted">
-            No activities recorded in the last 30 days
+            {plural(thisWeek.length, 'session', 'sessions')}
+          </AppText>
+        )}
+        {thisWeek.map((log) => {
+          const row = activityRow(log);
+          const icon = activityTypes.data?.activityTypes.find(
+            (type) => type.id === log.activityType,
+          )?.icon;
+          return (
+            <ListRow
+              key={log.id}
+              title={row.title}
+              subtitle={row.subtitle}
+              leading={<Icon name={activityIcon(icon ?? '')} tone="muted" />}
+              trailing={
+                row.facts.length ? (
+                  <Stack gap="none" align="flex-end">
+                    {row.facts.map((fact) => (
+                      <AppText key={fact} variant="caption" tone="muted">
+                        {fact}
+                      </AppText>
+                    ))}
+                  </Stack>
+                ) : undefined
+              }
+              onPress={() => setSelectedActivity(log)}
+            />
+          );
+        })}
+        {activity.data && !thisWeek.length && (
+          <AppText variant="caption" tone="muted">
+            No activities this week
           </AppText>
         )}
       </Card>
@@ -250,22 +277,34 @@ export function TrainingPanel({
       >
         {selectedActivity && <ActivityDetails log={selectedActivity} />}
       </Sheet>
-      <HealthMetricCard
-        title="Workout Density"
-        caption="kg lifted per active minute · last 14 days"
-        points={trends.data?.trends.map((day) => ({
-          label: day.date,
-          value: day.workoutDensity,
-        }))}
-        status={
-          <ResourceStatus
-            inline
-            label="Workout Density"
-            state={trends}
-            refresh={trends.refresh}
-          />
-        }
-      ></HealthMetricCard>
+      {duration && (
+        <TrendChartCard
+          title="Session Duration"
+          unit="min"
+          series={duration}
+          color={theme.colors.brand}
+          status={trendStatus}
+        />
+      )}
+      {density && (
+        <TrendChartCard
+          title="Workout Density"
+          unit="kg lifted per active minute"
+          series={density}
+          color={theme.scores.activity}
+          status={duration ? undefined : trendStatus}
+        />
+      )}
+      {!duration && !density && (
+        <Card>
+          <HealthResourceHeader title="Workout Density" state={trends} refresh={trends.refresh} />
+          {trends.data && (
+            <AppText variant="caption" tone="muted">
+              No workout density trends yet.
+            </AppText>
+          )}
+        </Card>
+      )}
     </>
   );
 }

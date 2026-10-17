@@ -22,6 +22,9 @@ import { ensureEnergyBalanceProfile, enableHomeCards, settleRouteBoundary } from
 const SESSION_ID = '9a9a9a9a-9a9a-4a9a-8a9a-9a9a9a9a9a9a'
 const ITEM_ID = '7e7e7e7e-7e7e-4e7e-8e7e-7e7e7e7e7e7e'
 const LOG_ID = '8f8f8f8f-8f8f-4f8f-8f8f-8f8f8f8f8f8f'
+// Owned, not borrowed: the default meal types are created lazily by the app, so on a fresh CI
+// database `(SELECT … LIMIT 1)` is NULL unless an earlier spec in the shard visited Nutrition (LA-176).
+const MEAL_TYPE_ID = '8f8f8f8f-8f8f-4f8f-8f8f-8f8f8f8f8f90'
 /** Mirrors OUTER_KCAL — the tail past the goal is exactly the far-over threshold. */
 const OUTER_KCAL = 400
 
@@ -33,6 +36,7 @@ async function withDb<T>(fn: (db: Client) => Promise<T>): Promise<T> {
 
 async function cleanup(db: Client) {
   await db.query('DELETE FROM food_logs WHERE id = $1', [LOG_ID])
+  await db.query('DELETE FROM meal_types WHERE id = $1', [MEAL_TYPE_ID])
   await db.query('DELETE FROM food_items WHERE id = $1', [ITEM_ID])
   await db.query('DELETE FROM workout_hr_stats WHERE workout_session_id = $1', [SESSION_ID])
   await db.query('DELETE FROM workout_sessions WHERE id = $1', [SESSION_ID])
@@ -94,11 +98,14 @@ test.beforeAll(async () => {
       [ITEM_ID, userId],
     )
     await db.query(
+      `INSERT INTO meal_types (id, user_id, name, sort_order) VALUES ($1, $2, 'Spec Meal', 0)`,
+      [MEAL_TYPE_ID, userId],
+    )
+    await db.query(
       `INSERT INTO food_logs (id, user_id, date, meal_type_id, food_item_id, quantity_multiplier, logged_at)
        SELECT $1, $2, to_char((now() AT TIME ZONE 'Australia/Brisbane')::date, 'YYYY-MM-DD'),
-              (SELECT id FROM meal_types WHERE user_id = $2 AND deleted_at IS NULL LIMIT 1),
-              $3, 1, now() - interval '3 hours'`,
-      [LOG_ID, userId, ITEM_ID],
+              $4, $3, 1, now() - interval '3 hours'`,
+      [LOG_ID, userId, ITEM_ID, MEAL_TYPE_ID],
     )
   })
 })

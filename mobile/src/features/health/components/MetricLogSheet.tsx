@@ -77,7 +77,7 @@ export function MetricLogSheet({
           {[150, 250, 330, 500, 750, 1000].map((ml) => (
             <AppButton
               key={ml}
-              title={`${ml} ml`}
+              title={`+${ml} ml`}
               variant="surface"
               disabled={busy || !health.ready || !health.store}
               onPress={() => {
@@ -96,7 +96,7 @@ export function MetricLogSheet({
       {error && <Notice title="Could not save" message={error} error />}
       <AppButton
         title="Save"
-        disabled={!health.ready || !health.store}
+        disabled={!health.ready || !health.store || !value.trim()}
         busy={busy}
         onPress={() => {
           void save();
