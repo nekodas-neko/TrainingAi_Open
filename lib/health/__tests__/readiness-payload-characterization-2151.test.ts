@@ -42,6 +42,13 @@ vi.mock('@/lib/data', () => ({
 import { buildReadinessPayload } from '@/lib/health/readiness-payload'
 import { todayInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 
+// #2237: the Sleep Score's calibration is chosen by the night's wake date, and these nights are dated
+// back from today. Today is pinned (Date only, local midday) before the V2 cutover, so the snapshots
+// never cross it as the calendar moves.
+vi.useFakeTimers({ toFake: ['Date'] })
+vi.setSystemTime(new Date('2026-10-01T02:00:00.000Z'))
+afterAll(() => { vi.useRealTimers() })
+
 const dayIso = (daysAgo: number) => shiftDateStr(todayInTz(TZ), -daysAgo)
 
 const bodyHistory = (days: number, opts: { hrv?: boolean; rhr?: boolean } = {}) =>

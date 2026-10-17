@@ -86,11 +86,23 @@ export function mergeDerivedPersists(entries: DerivedPersist[]): { day: string; 
   for (const e of entries) {
     const group = byDay.get(e.day) ?? { day: e.day, pillars: [], patch: {} }
     for (const key of Object.keys(e.patch)) {
+      // `modelVersions` is a map of pillar → version that the database merges per key (Q-273), so two
+      // pillars each stamping their own key is one write, not a clash (#2237: sleep stamps beside
+      // readiness). The same pillar key twice still is.
+      if (key === 'modelVersions') continue
       if (key in group.patch) {
         throw new Error(`mergeDerivedPersists: '${key}' written by both '${group.pillars.join("'/'")}' and '${e.pillar}' on ${e.day}`)
       }
     }
-    Object.assign(group.patch, e.patch)
+    const { modelVersions, ...rest } = e.patch as Record<string, unknown> & { modelVersions?: Record<string, unknown> }
+    if (modelVersions) {
+      const prev = (group.patch.modelVersions ?? {}) as Record<string, unknown>
+      for (const k of Object.keys(modelVersions)) {
+        if (k in prev) throw new Error(`mergeDerivedPersists: modelVersions.${k} written twice on ${e.day}`)
+      }
+      group.patch.modelVersions = { ...prev, ...modelVersions }
+    }
+    Object.assign(group.patch, rest)
     group.pillars.push(e.pillar)
     byDay.set(e.day, group)
   }
@@ -829,14 +841,15 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // Same compute-and-persist posture as the readiness block above; the Sleep detail's
   // contributor bars stop depending on the frozen Cloud JSONB. Separate gate/day key: it needs
   // only a scored session (not the A4 summary), and lastSleep.date is the actual wake day of the
-  // scored night (latestSummary.date can lag it before the rollup runs). Writes only the sleep_*
-  // columns — never the shared source/model_versions (same clobber hazard as the readiness
-  // persist). COALESCE means a later recompute with richer inputs overwrites with the better value.
-  // Best-effort: a persist failure must never fail the read.
+  // scored night (latestSummary.date can lag it before the rollup runs). Writes the sleep_* columns
+  // and its own `model_versions.sleep` key (#2237), never `source`; Q-273 made `model_versions` merge
+  // per pillar, so the stamp cannot clobber readiness's. COALESCE means a later recompute with richer
+  // inputs overwrites with the better value. Best-effort: a persist failure must never fail the read.
   if (sleepScoreResult && lastSleep) {
     derivedPersists.push({ day: lastSleep.date, pillar: 'sleep', patch: {
       sleepScore: sleepScoreResult.score,
       sleepContributors: ownSleepContributors,
+      modelVersions: { sleep: sleepScoreResult.modelVersion },
     } })
   }
 

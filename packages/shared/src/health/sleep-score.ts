@@ -153,7 +153,51 @@ const AWAKE_FRAGMENTATION_CAP = [[0, 100], [1, 100], [1.5, 88], [2, 72], [2.5, 5
 // The 93 anchor keeps a genuinely perfect night able to reach a true 100 (the session-245 intent,
 // guarded by tests). The owner's best real night blends to 91, so 100 stays reserved rather than
 // reachable by a merely-excellent one.
-const SCORE_CALIBRATION = [[0, 0], [20, 18], [34.6, 33], [50, 41], [65.4, 48], [74, 58], [78, 70], [81, 82], [85.6, 91], [88.7, 97], [91, 99], [93, 100]] as const
+const SCORE_CALIBRATION_V1 = [[0, 0], [20, 18], [34.6, 33], [50, 41], [65.4, 48], [74, 58], [78, 70], [81, 82], [85.6, 91], [88.7, 97], [91, 99], [93, 100]] as const
+
+// TN-5 / #2237 (owner sign-off 2026-08-24): the same endpoints, with the gain made even above 65.4.
+//
+// V1's slope swung 8-fold: a one-point gain in the blend showed as 4 displayed points at blend 79 and
+// 0.5 at blend 92, and six of twelve nights in August landed on the steep 3x/4x segments. This curve
+// keeps 0, the [93, 100] ceiling anchor and everything up to 65.4, and spreads the rest at about 1.9
+// points per blend point (every segment within 1.02x of the others, the pass test asks for 1.2x).
+//
+// What it is NOT: a fix for the volatility that prompted it. The curve must climb 0 to 100 across the
+// blend's range, so flattening one segment steepens another; measured night-to-night |delta| went
+// 13.53 -> 13.75. The owner's sleep really does vary that much (the raw blend moves ~9 points a night).
+// Measured on the 41 nights then stored: displayed mean 87.0 -> 85.5, and LOW_SLEEP_SCORE (42) fires
+// on 2 of 41 either way.
+//
+// History policy (owner, 2026-08-24): stored days keep the numbers the owner saw. So the curve is
+// chosen by the night's WAKE date (`SLEEP_SCORE_V2_FROM`), not swapped, and every path that recomputes
+// an old night (the weekly digest, the day audit, a backfill) still scores it on V1.
+const SCORE_CALIBRATION_V2 = [[0, 0], [20, 18], [34.6, 33], [50, 41], [65.4, 48], [74, 64.2], [78, 71.7], [81, 77.4], [85.6, 86.0], [88.7, 91.9], [91, 96.2], [93, 100]] as const
+
+/**
+ * The first wake date scored on `SCORE_CALIBRATION_V2`: the first night after the release that
+ * carries it (Tuesday 2026-10-13). If that release moves, move this to its first wake date at release
+ * prep, so no night scored live on V1 is re-scored on V2 when it is recomputed.
+ */
+export const SLEEP_SCORE_V2_FROM = '2026-10-14'
+
+/** Stamped into `oura_daily_derived.model_versions.sleep` beside every persisted Sleep Score. */
+export const SLEEP_SCORE_MODEL_VERSIONS = {
+  v1: 'v1:owner-percentiles:2026-08-17',
+  v2: 'v2:even-gain:2026-10-14',
+} as const
+
+/** Which calibration scores the night that woke on `date` (`YYYY-MM-DD`), and its version stamp. */
+export function sleepScoreCalibrationFor(date: string): {
+  calibration: typeof SCORE_CALIBRATION_V1 | typeof SCORE_CALIBRATION_V2
+  modelVersion: string
+} {
+  // Compared as ISO text, so a "YYYY/MM/DD" key is normalised first ('/' sorts above '-', which would
+  // put every slash date on V2). A night with no date is a new one.
+  const iso = (date ?? '').replace(/\//g, '-')
+  return !iso || iso >= SLEEP_SCORE_V2_FROM
+    ? { calibration: SCORE_CALIBRATION_V2, modelVersion: SLEEP_SCORE_MODEL_VERSIONS.v2 }
+    : { calibration: SCORE_CALIBRATION_V1, modelVersion: SLEEP_SCORE_MODEL_VERSIONS.v1 }
+}
 
 const clamp100 = (n: number) => Math.max(0, Math.min(100, n))
 
@@ -233,7 +277,11 @@ export const SLEEP_MODEL = {
     scheduleWorstEndpointDeviationHours: SCHEDULE_DEV,
     awakeFractionPenalty: AWAKE_PENALTY,
     awakeFractionFragmentationCapByPersonalSd: AWAKE_FRAGMENTATION_CAP,
-    scoreCalibration: SCORE_CALIBRATION,
+    /** The current curve (#2237). Nights that woke before `scoreCalibrationFrom` are scored on
+     *  `scoreCalibrationBefore`; `sleepScoreCalibrationFor(date)` picks. */
+    scoreCalibration: SCORE_CALIBRATION_V2,
+    scoreCalibrationFrom: SLEEP_SCORE_V2_FROM,
+    scoreCalibrationBefore: SCORE_CALIBRATION_V1,
   },
   hrBaselineMinNights: SLEEP_HR_BASELINE_MIN_NIGHTS,
   scheduleMinNights: SLEEP_SCHEDULE_MIN_NIGHTS,
@@ -302,6 +350,8 @@ export function sleepScoreCoverage(components: Record<string, number>): SleepSco
 
 export interface SleepScoreResult {
   score: number
+  /** Which calibration scored it (`SLEEP_SCORE_MODEL_VERSIONS`), by the night's wake date (#2237). */
+  modelVersion: string
   /** OR-204: how complete the model's inputs were for this night. */
   coverage: SleepScoreCoverage
   /** Each available contributor's 0–100 sub-score (missing contributors are absent). */
@@ -483,7 +533,8 @@ export function computeSleepScore(
   const blend = parts.reduce((s, p) => s + p.weight * p.sub, 0) / totalWeight
   // Calibration runs BEFORE the fragmentation cap: that cap's anchors (100/88/72/52/32/15) are
   // written on the displayed 0–100 scale, so it has to compare against a calibrated value.
-  const preCapScore = clamp100(Math.round(interp(blend, SCORE_CALIBRATION)))
+  const { calibration, modelVersion } = sleepScoreCalibrationFor(session.date)
+  const preCapScore = clamp100(Math.round(interp(blend, calibration)))
 
   const components: Record<string, number> = {}
   for (const p of parts) components[p.key] = Math.round(p.sub)
@@ -512,7 +563,7 @@ export function computeSleepScore(
     }
   }
 
-  return { score: clamp100(score), preCapScore, components, fragmentationCap, coverage: sleepScoreCoverage(components) }
+  return { score: clamp100(score), preCapScore, components, fragmentationCap, coverage: sleepScoreCoverage(components), modelVersion }
 }
 
 /** Signed hours from `ref` to `h` on a 24-hour clock, in [−12, 12). Positive = later than `ref`.
