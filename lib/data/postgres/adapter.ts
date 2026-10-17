@@ -4410,6 +4410,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   async listMealTypes(userId: string) { return n.listMealTypes(this.db, userId) }
   listMealLoggingStatuses(userId: string, date: string) { return mealLogging.listMealLoggingStatuses(this.db, userId, date) }
+  listMealLoggingStatusesRange(userId: string, from: string, to: string) { return mealLogging.listMealLoggingStatusesRange(this.db, userId, from, to) }
   ensureMealLoggingDay(userId: string, date: string) { return mealLogging.ensureMealLoggingDay(this.db, userId, date) }
   setMealLoggingStatus(userId: string, date: string, mealTypeId: string, skipped: boolean, decisionId: string) { return mealLogging.setMealLoggingStatus(this.db, userId, date, mealTypeId, skipped, decisionId) }
   listMealLoggingCompleteness(userId: string, from: string, to: string) { return mealLogging.listMealLoggingCompleteness(this.db, userId, from, to) }
@@ -4458,6 +4459,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async savePlanMealAnswer(userId: string, input: { id?: string; planMealId: string; logDate: string }) { return mp.savePlanMealAnswer(this.db, userId, input) }
   async deletePlanMealAnswer(userId: string, planMealId: string, logDate: string) { return mp.deletePlanMealAnswer(this.db, userId, planMealId, logDate) }
   async listPlanMealAnswers(userId: string, logDate: string) { return mp.listPlanMealAnswers(this.db, userId, logDate) }
+  async listPlanMealAnswersRange(userId: string, from: string, to: string) { return mp.listPlanMealAnswersRange(this.db, userId, from, to) }
   async upsertEstimatedAnswers(userId: string, logDate: string, estimates: readonly mp.EstimateToStore[], basis: string) { return mp.upsertEstimatedAnswers(this.db, userId, logDate, estimates, basis) }
   async listDietaryRestrictions() { return mp.listDietaryRestrictions(this.db) }
   async listUserDietaryRestrictions(userId: string) { return mp.listUserDietaryRestrictions(this.db, userId) }

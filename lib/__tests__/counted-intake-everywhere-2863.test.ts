@@ -38,7 +38,7 @@ const RING = 1250
 // Per-test scenario knobs: a day with an estimate and no logs, with or without an imported figure.
 let todayLogs = LOGS as typeof LOGS
 let importedToday: number | null = null
-const reads = { plan: 0, mealTypes: 0, answers: 0 }
+const reads = { plan: 0, mealTypes: 0, answers: 0, statuses: 0 }
 
 const days = Array.from({ length: MAX_WINDOW_DAYS }, (_, i) => shiftDateStr(TODAY, -(i + 1)))
 const fakeRepo = {
@@ -60,9 +60,14 @@ const fakeRepo = {
   getAvgBpmBySession: async () => new Map<string, number>(),
   listDoseHistory: async () => ({ logs: [], courses: [] }),
   listMealLoggingStatuses: async () => [],
+  listMealLoggingStatusesRange: async () => { reads.statuses++; return [] },
   listPlanMealAnswers: async (_u: string, date: string) => {
     reads.answers++
     return date === TODAY ? [{ planMealId: 'pm-d', answer: 'estimated', estCalories: 650 }] : []
+  },
+  listPlanMealAnswersRange: async (_u: string, from: string, to: string) => {
+    reads.answers++
+    return TODAY >= from && TODAY <= to ? [{ planMealId: 'pm-d', logDate: TODAY, answer: 'estimated', estCalories: 650 }] : []
   },
   getActiveMealPlan: async () => { reads.plan++; return { variants: [{ dayType: 'all', meals: PLAN_MEALS }] } },
   listMealTypes: async () => { reads.mealTypes++; return TYPES },
@@ -181,12 +186,14 @@ describe('/api/body-metadata with an estimate and no logs (#2863)', () => {
   })
 
   it('reads the plan and meal types once for the whole week, not once per day', async () => {
-    reads.plan = 0; reads.mealTypes = 0; reads.answers = 0
+    reads.plan = 0; reads.mealTypes = 0; reads.answers = 0; reads.statuses = 0
     await today()
     expect(reads.plan).toBe(1)
     expect(reads.mealTypes).toBe(1)
-    // One answers read per day of the week so far, never a second.
-    expect(reads.answers).toBe(Math.round((Date.parse(TODAY) - Date.parse(startOfWeekInTz(TZ))) / 86400000) + 1)
+    // #2928. One range read each for the week's answers and tracking rows, whatever the weekday:
+    // the count does not grow with the days so far (it was two reads a day, 14 on a Sunday).
+    expect(reads.answers).toBe(1)
+    expect(reads.statuses).toBe(1)
   })
 })
 
@@ -218,7 +225,14 @@ describe('the surfaces read the shared sum, not a sum of their own', () => {
       expect(read(rel)).toMatch(/useCountedEstimateRows\(/)
     }
   })
-  it('a plan-meal answer write clears the nutrition cache group', () => {
-    expect(read('app/nutrition/use-plan-meal-logging.ts')).toMatch(/invalidateNutritionWrite\(\)/)
+  it('both plan-meal answer writes clear the nutrition cache group', () => {
+    // Two writers (answering, and undoing an answer). A bare match passes with either one, so count.
+    expect(read('app/nutrition/use-plan-meal-logging.ts').match(/invalidateNutritionWrite\(\)/g)?.length).toBeGreaterThanOrEqual(2)
+  })
+  it("Home's nutrition card takes its total from homeCardCalories and never adds the estimate itself (#2928)", () => {
+    const src = read('components/home/home-nutrition-card.tsx')
+    expect(src).toMatch(/=\s*homeCardCalories\(balance,\s*nutrCalories\)/)
+    // `nutrCalories` is already counted; adding `balance.estimatedKcal` again showed 1,900 for 1,250.
+    expect(src).not.toMatch(/balance\??\.estimatedKcal/)
   })
 })
