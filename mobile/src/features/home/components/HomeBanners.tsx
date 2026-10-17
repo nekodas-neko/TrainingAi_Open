@@ -50,6 +50,7 @@ export function HomeBanners({
   const undo = useUndo();
   const reduced = useReducedMotion();
   const [goals, setGoals] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const attempted = useRef('');
@@ -183,13 +184,13 @@ export function HomeBanners({
             <StatusIndicator label="Fatigue advice" error={error} />
           </Stack>
           <AppText variant="caption" tone="muted">
-            Your energy is low and training load is elevated. Consider taking a deload week now.
+            Your readiness is low and training load is elevated. Consider taking a deload week now.
           </AppText>
           {readiness.data.earlyDeload && (
             <Disclosure title="Why this recommendation?">
               <AppText variant="caption">Both of these had to be true at once.</AppText>
               <AppText variant="caption" tone="muted">
-                Energy {Math.round(readiness.data.earlyDeload.score)} — under{' '}
+                Readiness {Math.round(readiness.data.earlyDeload.score)} — under{' '}
                 {readiness.data.earlyDeload.scoreThreshold}, where recovery is not keeping up.
               </AppText>
               <AppText variant="caption" tone="muted">
@@ -222,60 +223,79 @@ export function HomeBanners({
       )}
       {entries.length > 0 && (
         <Card padded={false}>
-          {entries.length > 1 && (
-            <Stack
-              direction="row"
-              align="center"
-              style={{ paddingHorizontal: theme.spacing.lg, paddingTop: theme.spacing.md }}
-            >
-              <AppText variant="heading" style={{ flex: 1 }}>
-                Updates
-              </AppText>
-              <StatusIndicator label="Home reminders" error={error} />
-            </Stack>
-          )}
-          {entries.map((entry, index) => (
-            <Stack
-              key={entry.key}
-              direction="row"
-              align="center"
-              gap="none"
-              style={{
-                paddingHorizontal: theme.spacing.sm,
-                borderTopWidth: index > 0 ? 1 : 0,
-                borderColor: theme.colors.border,
-              }}
-            >
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={entry.label}
-                onPress={entry.open}
-                style={({ pressed }) => ({
-                  flex: 1,
-                  minHeight: theme.sizes.touchTarget,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: theme.spacing.md,
-                  padding: theme.spacing.md,
-                  opacity: pressed ? 0.65 : 1,
-                })}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded }}
+            accessibilityLabel={`${expanded ? 'Hide' : 'Show'} updates: ${entries.map((entry) => entry.label).join(', ')}`}
+            onPress={() => {
+              layoutMotion(reduced);
+              setExpanded((value) => !value);
+            }}
+            style={({ pressed }) => ({
+              minHeight: theme.sizes.touchTarget,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: theme.spacing.sm,
+              padding: theme.spacing.md,
+              opacity: pressed ? 0.65 : 1,
+            })}
+          >
+            {entries.map((entry) => (
+              <Icon key={entry.key} name={entry.icon} tone="brand" />
+            ))}
+            <AppText variant="label" style={{ flex: 1 }}>
+              {entries.length} ready
+            </AppText>
+            <StatusIndicator label="Home reminders" error={error} />
+            <Icon
+              name={expanded ? 'expand' : 'forward'}
+              tone="muted"
+              size={theme.sizes.iconSmall}
+            />
+          </Pressable>
+          {expanded &&
+            entries.map((entry) => (
+              <Stack
+                key={entry.key}
+                direction="row"
+                align="center"
+                gap="none"
+                style={{
+                  paddingHorizontal: theme.spacing.sm,
+                  borderTopWidth: 1,
+                  borderColor: theme.colors.border,
+                }}
               >
-                <Icon name={entry.icon} tone="brand" />
-                <Stack gap="xxs" style={{ flex: 1 }}>
-                  <AppText variant="label">{entry.label}</AppText>
-                  <AppText variant="caption" tone="muted">
-                    {entry.subtitle}
-                  </AppText>
-                </Stack>
-                <Icon name="forward" tone="muted" size={theme.sizes.iconSmall} />
-              </Pressable>
-              <IconButton
-                icon="close"
-                label={`Dismiss ${entry.label}`}
-                onPress={() => dismissReminder(entry.key, entry.label)}
-              />
-            </Stack>
-          ))}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={entry.label}
+                  onPress={entry.open}
+                  style={({ pressed }) => ({
+                    flex: 1,
+                    minHeight: theme.sizes.touchTarget,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: theme.spacing.md,
+                    padding: theme.spacing.md,
+                    opacity: pressed ? 0.65 : 1,
+                  })}
+                >
+                  <Icon name={entry.icon} tone="brand" />
+                  <Stack gap="xxs" style={{ flex: 1 }}>
+                    <AppText variant="label">{entry.label}</AppText>
+                    <AppText variant="caption" tone="muted">
+                      {entry.subtitle}
+                    </AppText>
+                  </Stack>
+                  <Icon name="forward" tone="muted" size={theme.sizes.iconSmall} />
+                </Pressable>
+                <IconButton
+                  icon="close"
+                  label={`Dismiss ${entry.label}`}
+                  onPress={() => dismissReminder(entry.key, entry.label)}
+                />
+              </Stack>
+            ))}
         </Card>
       )}
       {goals && (

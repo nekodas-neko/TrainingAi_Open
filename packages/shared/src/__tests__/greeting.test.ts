@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getGreeting } from '../greeting';
+import { getGreeting, homeGreeting } from '../greeting';
 
 const TZ = 'Australia/Brisbane';
 
@@ -32,5 +32,20 @@ describe('getGreeting', () => {
     const utcMorning = new Date(Date.UTC(2026, 8, 4, 9, 30));
     expect(getGreeting('Sam', TZ, utcMorning)).toBe('Good evening, Sam.');
     expect(getGreeting('Sam', 'UTC', utcMorning)).toBe('Good morning, Sam.');
+  });
+});
+
+describe('homeGreeting', () => {
+  const now = at(19);
+  it('prefers the display name over the sign-in name, whole', () => {
+    expect(homeGreeting({ displayName: 'Del Dasa', name: 'Delan Dasanayake' }, TZ, now)).toBe(
+      'Good evening, Del Dasa.',
+    );
+  });
+  it('falls back to the sign-in name, then to the app name', () => {
+    expect(homeGreeting({ displayName: null, name: 'Delan' }, TZ, now)).toBe('Good evening, Delan.');
+    expect(homeGreeting({ name: '  ' }, TZ, now)).toBe('TrainingAI');
+    expect(homeGreeting({ displayName: '   ', name: 'Delan' }, TZ, now)).toBe('Good evening, Delan.');
+    expect(homeGreeting(undefined, TZ, now)).toBe('TrainingAI');
   });
 });

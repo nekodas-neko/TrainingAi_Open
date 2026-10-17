@@ -14,7 +14,6 @@ import { digestSpec, monthWindowSpec, metricValue } from '../data/models';
 import { HealthViewReady } from '../components/HealthViewReady';
 import { HealthMetricCard } from '../components/HealthMetricCard';
 import { HealthResourceHeader } from '../components/HealthResourceHeader';
-import { healthCopy } from '../data/display-copy';
 export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () => void }) {
   const { theme } = useTheme();
   const state = useWorkoutResource(digestSpec(week));
@@ -42,7 +41,7 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
             <AppText variant="eyebrow" tone="brand">
               Your week
             </AppText>
-            <MarkdownText>{healthCopy(state.data.digest)}</MarkdownText>
+            <MarkdownText>{state.data.digest}</MarkdownText>
           </Card>
         )}
         {m && (
@@ -95,7 +94,7 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
                     compactChart
                     title={
                       {
-                        readiness: 'Energy',
+                        readiness: 'Readiness',
                         sleepScore: 'Sleep score',
                         sleepHours: 'Sleep',
                         hrv: 'HRV',

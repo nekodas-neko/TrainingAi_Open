@@ -3,9 +3,25 @@ import { View } from 'react-native';
 import Svg, { Circle, Polygon, Polyline, Rect, Line } from 'react-native-svg';
 import { AppText } from './AppText';
 import { Stack } from './Stack';
+import { ChartGuides, YAxisLabels, yAxisColumnWidth } from './ChartGuides';
+import {
+  drawableTarget,
+  guideSummary,
+  includeTarget,
+  meetBox,
+  niceTicks,
+  tickLabels,
+  type ChartTarget,
+} from './chartScale';
 import { useTheme } from '../theme/ThemeProvider';
 import type { Tone } from '../theme/theme';
 
+// Opt-in readability props (all off by default, so existing screens do not change):
+//   readable   12 px full-contrast labels instead of 10 px muted ones
+//   gridlines  faint horizontal lines at round values of the plotted range
+//   yAxis      value labels in a column left of the plot (implies gridlines)
+//   target     { value, label } dashed goal line; widens the range, also when `domain` is passed
+// Weekday labels: pass `axisLabels` with one label per day, e.g. formatDateDisplay(date, 'weekday').
 export function LineChart({
   points,
   label,
@@ -21,6 +37,10 @@ export function LineChart({
   interactive = false,
   axisLabels,
   color: accent,
+  readable = false,
+  gridlines = false,
+  yAxis = false,
+  target: targetProp,
 }: {
   points: readonly { label: string; value: number | null; x?: number }[];
   label: string;
@@ -42,10 +62,19 @@ export function LineChart({
   interactive?: boolean;
   axisLabels?: readonly string[];
   color?: string;
+  readable?: boolean;
+  gridlines?: boolean;
+  yAxis?: boolean;
+  target?: ChartTarget;
 }) {
   const { theme } = useTheme();
   const [selection, setSelection] = useState<number | null>(null);
   const [width, setWidth] = useState(1);
+  const labelVariant = readable ? 'caption' : 'micro';
+  const labelTone = readable ? 'text' : 'muted';
+  const plotHeight = height ?? theme.sizes.chartHeight;
+  const target = drawableTarget(targetProp);
+  const guides = gridlines || yAxis || target !== undefined;
   const valid = points.filter(
     (point): point is typeof point & { value: number } =>
       point.value !== null && Number.isFinite(point.value),
@@ -56,7 +85,7 @@ export function LineChart({
         style={{
           height:
             (height ?? theme.sizes.chartHeight) +
-            (showLabels ? theme.typography.micro.lineHeight! : 0) +
+            (showLabels ? theme.typography[labelVariant].lineHeight! : 0) +
             (interactive ? theme.sizes.touchTarget : 0),
           justifyContent: 'center',
         }}
@@ -73,8 +102,11 @@ export function LineChart({
       .filter((s) => !s.domain)
       .flatMap((s) => s.points.flatMap((p) => (p.value != null ? [p.value] : []))),
   ];
-  const min = domain?.[0] ?? Math.min(...all);
-  const max = domain?.[1] ?? Math.max(...all);
+  const [min, max] = includeTarget(
+    domain?.[0] ?? Math.min(...all),
+    domain?.[1] ?? Math.max(...all),
+    target,
+  );
   const xs = points.map((point, index) => point.x ?? index);
   const xMin = xDomain?.[0] ?? Math.min(...xs);
   const xMax = xDomain?.[1] ?? Math.max(...xs);
@@ -98,13 +130,25 @@ export function LineChart({
     }
   }
   const color = accent ?? theme.tones[tone].foreground;
+  const ticks = gridlines || yAxis ? niceTicks(min, max) : [];
+  const tickTexts = tickLabels(ticks);
+  // The plot sits right of the y-axis column; overlays are absolute so the Svg and the touch
+  // responder below keep their existing layout (locationX is relative to the root View).
+  const leftInset = yAxis ? yAxisColumnWidth(tickTexts) : 0;
+  const plotWidth = Math.max(1, width - leftInset);
+  // Pixel y of a value on the main scale, matching how the Svg is fitted into its box.
+  const box = meetBox(plotWidth, plotHeight, 320, 90);
+  const toY = (v: number) => box.offsetY + box.scale * yy(v);
   return (
     <View
       onStartShouldSetResponder={() => interactive}
       onResponderGrant={(event) => {
         const x =
           xMin +
-          Math.max(0, Math.min(1, ((event.nativeEvent.locationX / width) * 320 - 12) / 296)) *
+          Math.max(
+            0,
+            Math.min(1, (((event.nativeEvent.locationX - leftInset) / plotWidth) * 320 - 12) / 296),
+          ) *
             (xMax - xMin);
         setSelection(
           valid.reduce(
@@ -118,12 +162,13 @@ export function LineChart({
         );
       }}
       onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
-      accessibilityLabel={`${label}: ${valid.map((point) => `${point.label}: ${point.value}`).join('; ')}`}
+      accessibilityLabel={`${label}: ${valid.map((point) => `${point.label}: ${point.value}`).join('; ')}${guides ? guideSummary(min, max, target) : ''}`}
     >
       <Svg
         viewBox="0 0 320 90"
-        width="100%"
-        height={height ?? theme.sizes.chartHeight}
+        width={yAxis ? plotWidth : '100%'}
+        height={plotHeight}
+        style={leftInset ? { marginLeft: leftInset } : undefined}
         pointerEvents="none"
       >
         {bands.map((band, index) => (
@@ -197,9 +242,27 @@ export function LineChart({
             point && <Circle key={index} cx={point.x} cy={point.y} r={3} fill={color} />,
         )}
       </Svg>
+      {guides && width > 1 && (
+        <>
+          <ChartGuides
+            height={plotHeight}
+            left={leftInset}
+            gridYs={ticks.map(toY)}
+            target={target ? { y: toY(target.value), label: target.label } : undefined}
+          />
+          {yAxis && (
+            <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0 }}>
+              <YAxisLabels
+                height={plotHeight}
+                items={ticks.map((t, i) => ({ y: toY(t), text: tickTexts[i] }))}
+              />
+            </View>
+          )}
+        </>
+      )}
       {interactive && (
         <View style={{ height: theme.sizes.touchTarget, justifyContent: 'center' }}>
-          <AppText variant="micro" tone="muted">
+          <AppText variant={labelVariant} tone={labelTone}>
             {selection === null
               ? 'Tap the chart to inspect a reading'
               : (() => {
@@ -214,9 +277,13 @@ export function LineChart({
         </View>
       )}
       {showLabels && (
-        <Stack direction="row" justify="space-between">
+        <Stack
+          direction="row"
+          justify="space-between"
+          style={leftInset ? { paddingLeft: leftInset } : undefined}
+        >
           {(axisLabels ?? [valid[0].label, valid.at(-1)!.label]).map((label, index) => (
-            <AppText key={index} variant="micro" tone="muted">
+            <AppText key={index} variant={labelVariant} tone={labelTone}>
               {label}
             </AppText>
           ))}

@@ -18,7 +18,6 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import type { SessionPreview } from '../../workouts/catalog';
 import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import { SessionGlyph } from '../../workouts/components/SessionGlyph';
-import { healthCopy } from '../../health/data/display-copy';
 
 export function HomeRecommendation({
   trained,
@@ -70,18 +69,19 @@ export function HomeRecommendation({
     return (
       <Card tone="checkin">
         <AppText variant="eyebrow" style={{ color: theme.tones.checkin.foreground }}>
-          Exercise Energy
+          Exercise Readiness
         </AppText>
         <Stack direction="row" align="center">
           <Icon name="mind" size={theme.sizes.avatar} color={theme.tones.checkin.foreground} />
           <Stack style={{ flex: 1 }} gap="xs">
             <AppText variant="hero">How are you feeling?</AppText>
             <AppText variant="caption" tone="muted">
-              Log energy and soreness to tailor today’s workout.
+              Log soreness & energy — the app lightens loads on sore muscles and can flag a deload
+              or rest day. It tunes today’s session, not your whole plan.
             </AppText>
           </Stack>
         </Stack>
-        <AppButton title="Log Energy · ~15 sec" onPress={() => onReadiness(session)} />
+        <AppButton title="Log Readiness · ~15 sec" onPress={() => onReadiness(session)} />
       </Card>
     );
   }
@@ -93,7 +93,7 @@ export function HomeRecommendation({
           <AppText variant="heading">Rest Day</AppText>
         </Stack>
         <AppText variant="caption" tone="muted">
-          {healthCopy(rec?.reason ?? 'A day to recover.')}
+          {rec?.reason ?? 'A day to recover.'}
         </AppText>
         <AppButton title="Train instead" variant="ghost" onPress={() => void rest(false)} />
         <StatusIndicator label="Rest day" error={error} />
@@ -129,7 +129,7 @@ export function HomeRecommendation({
         )}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Edit exercise energy"
+          accessibilityLabel="Edit exercise readiness"
           onPress={() => onReadiness(session)}
           style={{
             minWidth: theme.sizes.touchTarget,
@@ -204,7 +204,7 @@ export function HomeRecommendation({
       ) : rec?.deloadOrRestRecommended ? (
         <>
           <AppText variant="caption" tone="muted">
-            {healthCopy(rec.reason)}
+            {rec.reason}
           </AppText>
           <Stack direction="row">
             <AppButton

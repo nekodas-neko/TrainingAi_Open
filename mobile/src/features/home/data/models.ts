@@ -33,7 +33,7 @@ export const widgetLabels = {
   nutritionDonut: 'Nutrition',
   sleepWidget: 'Sleep',
   stepsWidget: 'Steps',
-  moodWidget: 'Exercise Energy',
+  moodWidget: 'Exercise Readiness',
   acwrWidget: 'ACWR',
   muscleStatusWidget: 'Muscle Status',
   hrChartWidget: 'Heart Rate',
@@ -143,19 +143,4 @@ export function homeStreak(
     today,
     streakRestGapFor(schedule as Parameters<typeof streakRestGapFor>[0]),
   ).current;
-}
-export function greeting(name: string | null | undefined, timezone: string, now = new Date()) {
-  if (!name?.trim()) {
-    return 'TrainingAI';
-  }
-  const hour = Number(
-    new Intl.DateTimeFormat('en-AU', {
-      timeZone: timezone,
-      hour: 'numeric',
-      hourCycle: 'h23',
-    }).format(now),
-  );
-  const period =
-    hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : hour < 21 ? 'evening' : 'night';
-  return `Good ${period}, ${name.trim().split(/\s+/)[0]}.`;
 }

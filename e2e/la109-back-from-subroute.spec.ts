@@ -142,7 +142,7 @@ test('back from a push off Home returns to Home, not the tab whose tree is stale
   // This used to spell the list out as `morning|afternoon|evening`. `getGreeting` has **four**
   // periods — `night` from 21:00 — so the assertion was red for three hours of every day and green
   // for the other twenty-one, which is the hour-dependent trap CLAUDE.md's date rule names and
-  // that `app/session-select/greeting.ts` warns about in its own comment. It first bit on
+  // that `packages/shared/src/greeting.ts` warns about in its own comment. It first bit on
   // 2026-09-18, when CI ran at 12:34 UTC: 22:34 in the seed user's Brisbane.
   //
   // Matched by SHAPE rather than re-transcribed with a fourth alternative. Listing the periods puts

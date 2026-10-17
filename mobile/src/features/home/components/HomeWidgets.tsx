@@ -1,6 +1,7 @@
 import { useRecordedIntake } from '../../nutrition/data/useRecordedIntake';
 import { HrDayCard } from '../../health/components/HrDayCard';
 import { verdictSpec } from '../../health/data/checkin';
+import { verdictCopy } from '../../health/data/sleep-verdict-copy';
 import { acwrBandByKey } from '@trainingai/shared/ai-periodization/acwr';
 import { recoveryBand } from '@trainingai/shared/health/recovery-band';
 import { nativeColor } from '../../../shared/ui';
@@ -560,12 +561,12 @@ function HomeWidgetBody({
       <Pressable
         onPress={openReadiness}
         accessibilityRole="button"
-        accessibilityLabel="Edit exercise energy"
+        accessibilityLabel="Edit exercise readiness"
       >
         <Card accent={accent}>
           <Stack direction="row" align="center" justify="space-between">
             <Stack gap="xs" style={{ flex: 1 }}>
-              {title('Exercise Energy')}
+              {title('Exercise Readiness')}
               {home.mood ? (
                 <Stack direction="row" align="center">
                   <Icon
@@ -726,21 +727,16 @@ function HomeSleepFeedback({ onCorrect }: { onCorrect: () => void }) {
   const health = useHealthData();
   const state = useWorkoutResource(verdictSpec(health.today));
   const verdict = state.data?.verdict;
-  if (
-    health.sleep.some((night) => night.date === health.today && night.localOnly) ||
-    !verdict ||
-    verdict.verdict === 'normal' ||
-    verdict.responseState !== 'none'
-  ) {
+  if (health.sleep.some((night) => night.date === health.today && night.localOnly) || !verdict) {
     return null;
   }
+  const { line, prominent } = verdictCopy(verdict);
   return (
-    <Stack>
-      <AppText variant="micro" tone="muted">
-        Last night was {verdict.verdict === 'good' ? 'better' : 'below'} your usual sleep
-        baseline.
+    <Stack gap="xxs">
+      <AppText variant={prominent ? 'caption' : 'micro'} tone={prominent ? undefined : 'muted'}>
+        {line}
       </AppText>
-      <AppButton title="Doesn’t match how you slept?" variant="ghost" onPress={onCorrect} />
+      <AppButton title="That’s wrong" variant="ghost" onPress={onCorrect} />
     </Stack>
   );
 }
