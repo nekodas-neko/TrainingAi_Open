@@ -43,6 +43,7 @@ import { HomeMetricTiles, HomeWidget } from '../components/HomeWidgets';
 import { HomeTimeline } from '../components/HomeTimeline';
 import { ExerciseReadinessSheet } from '../components/ExerciseReadinessSheet';
 import { HomeLayoutSheet } from '../components/HomeLayoutSheet';
+import { useAdminPending } from '../data/admin-pending';
 import { HomeBanners } from '../components/HomeBanners';
 import { useAppleImport } from '../../health/HealthProvider';
 import { CoachFab } from '../../coach/components/CoachFab';
@@ -160,28 +161,16 @@ export function HomeScreen(navigation: HomeNavigation) {
   const sections = homeSections(home.preferences).filter(
     (key) => !home.preferences.homeHiddenSections?.includes(key),
   );
+  const showHome = workout.signedIn && !health.denied && !home.denied;
+  const { signups: adminSignups } = useAdminPending();
   return (
     <PageLayout
       landing
       title="Home"
       floatingAction={<CoachFab onPress={navigation.openCoach} />}
-      header={
-        <HomeHeader
-          today={health.today}
-          timezone={health.timezone}
-          user={profile.data?.user}
-          avatar={profile.data?.user.avatar}
-          error={error}
-          pending={!!allPending}
-          refreshing={manual || workout.refreshingManually}
-          onRefresh={() => void refresh()}
-          onLayout={() => setEditing((value) => !value)}
-          editing={editing}
-          onProfile={navigation.openMore}
-        />
-      }
+      hideHeader={showHome}
     >
-      {!workout.signedIn || health.denied || home.denied ? (
+      {!showHome ? (
         <View style={{ padding: theme.spacing.lg }}>
           <StateCard
             title="Connect your account"
@@ -199,6 +188,20 @@ export function HomeScreen(navigation: HomeNavigation) {
             }}
             gap="md"
           >
+            <HomeHeader
+              today={health.today}
+              timezone={health.timezone}
+              user={profile.data?.user}
+              avatar={profile.data?.user.avatar}
+              error={error}
+              pending={!!allPending}
+              refreshing={manual || workout.refreshingManually}
+              onRefresh={() => void refresh()}
+              onLayout={() => setEditing((value) => !value)}
+              editing={editing}
+              onProfile={navigation.openMore}
+              badge={adminSignups}
+            />
             <HomeScores onOpen={navigation.openHealthDetail} />
             {scores?.illnessAdvisory && scores.illnessFlag === 'watch' && (
               <AppText variant="micro" tone="muted">

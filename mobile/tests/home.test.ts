@@ -8,6 +8,10 @@ import {
   trainingDays,
   trainingWeek,
 } from '../src/features/home/data/models.ts';
+import {
+  adminPendingTotal,
+  adminSignupCount,
+} from '../src/features/home/data/admin-pending-counts.ts';
 import { shiftDateStr } from '@trainingai/shared/date-utils';
 import { ApiError } from '../src/features/account/api/client.ts';
 import { homeGreeting, profileDisplayName } from '@trainingai/shared/greeting';
@@ -24,6 +28,7 @@ import {
   timelineDestinationDate,
   timelineMetrics,
   timelineSummary,
+  timelineTimeLabel,
   timelineTitle,
 } from '../src/features/home/data/timeline-presentation.ts';
 import { timelineEventSchema } from '../src/features/home/data/timeline.ts';
@@ -58,9 +63,22 @@ test('the timeline summary does not repeat the start time the row already shows'
     timeMs: 0,
     day: 'today',
   });
-  assert.equal(timelineSummary(event), 'until 7:25 am');
-  assert.ok(!timelineSummary(event).includes(event.time));
+  assert.equal(timelineSummary(event), '');
   assert.equal(timelineSummary({ ...event, endTime: undefined }), '');
+});
+
+test('a timeline row prints its span above the title, and a wake-up its start only', () => {
+  const event = timelineEventSchema.parse({
+    type: 'workout',
+    title: 'Push',
+    time: '6:30 am',
+    endTime: '7:25 am',
+    timeMs: Date.parse('2026-10-18T20:30:00Z'),
+    day: 'today',
+  });
+  assert.equal(timelineTimeLabel(event, 'Australia/Brisbane'), '6:30 am – 7:25 am');
+  assert.equal(timelineTimeLabel({ ...event, endTime: undefined }, 'Australia/Brisbane'), '6:30 am');
+  assert.equal(timelineTimeLabel({ ...event, type: 'wakeup' }, 'Australia/Brisbane'), '6:30 am');
 });
 
 test('each updates-strip icon is tinted by its type, not its position', () => {
@@ -682,5 +700,15 @@ test('wake-up rows carry both scores and activities carry their time range', () 
     day: 'today',
     durationMin: 38,
   });
-  assert.equal(timelineSummary(walk), 'until 1:05pm · 38m');
+  assert.equal(timelineSummary(walk), '38m');
+});
+
+test('the avatar badge counts signups only, the More-tab dot signups plus feedback', () => {
+  const data = { count: 2, feedbackCount: 3 };
+  assert.equal(adminSignupCount(data), 2);
+  assert.equal(adminPendingTotal(data), 5);
+  assert.equal(adminSignupCount({ feedbackCount: 4 }), 0);
+  assert.equal(adminPendingTotal({ feedbackCount: 4 }), 4);
+  assert.equal(adminSignupCount(null), 0);
+  assert.equal(adminPendingTotal(undefined), 0);
 });
