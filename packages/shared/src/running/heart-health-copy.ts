@@ -69,8 +69,3 @@ export const OUTCOME_LABEL: Record<HeartHealthDayOutcome, string> = {
   'nothing-logged': 'Nothing logged',
   today: 'Today',
 }
-
-export const OUTCOME_COLOR: Partial<Record<HeartHealthDayOutcome, string>> = {
-  counted: 'var(--accent-green)',
-  'not-counted': 'var(--accent-amber)',
-}

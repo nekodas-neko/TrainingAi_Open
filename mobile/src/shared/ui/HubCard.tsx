@@ -59,7 +59,7 @@ export function HubCard({
                       paddingHorizontal: theme.spacing.xs,
                     }}
                   >
-                    <AppText variant="micro" style={{ color: palette.foreground }}>
+                    <AppText variant="micro" style={{ color: theme.colors.text }}>
                       {badge.toUpperCase()}
                     </AppText>
                   </View>

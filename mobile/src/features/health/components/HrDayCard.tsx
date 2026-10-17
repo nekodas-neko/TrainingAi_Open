@@ -1,4 +1,4 @@
-import { bucketAverage } from '@trainingai/shared/health/hr-smoothing';
+import { bucketAverage, hrChartDomain } from '@trainingai/shared/health/hr-smoothing';
 import { dateStrMidnightInTz, formatMinutesOfDay } from '@trainingai/shared/date-utils';
 import { bedtimeToMinuteWindow } from '@trainingai/shared/health/hr-sleep-band';
 import { HealthResourceHeader } from './HealthResourceHeader';
@@ -87,10 +87,7 @@ export function HrDayCard({
       : []),
   ];
   // Fitted to the day with 10 bpm of headroom either side, as the current app's chart is.
-  const values = buckets.map((p) => p.y);
-  const domain = values.length
-    ? ([Math.max(0, Math.min(...values) - 10), Math.max(...values) + 10] as const)
-    : undefined;
+  const domain = hrChartDomain(buckets.map((p) => p.y));
   return (
     <Card
       padded={!embedded}

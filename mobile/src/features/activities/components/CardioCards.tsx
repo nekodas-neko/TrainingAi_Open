@@ -4,6 +4,7 @@ import { getProtocol } from '@trainingai/shared/fitness-tests/protocols';
 import { HR_ZONE_META } from '@trainingai/shared/health/hr-zones';
 import {
   maxHrSourceNote,
+  noHrDataCopy,
   restingHrSourceNote,
 } from '@trainingai/shared/health/hr-source-copy';
 import { formatDateDisplay } from '@trainingai/shared/date-utils';
@@ -73,7 +74,7 @@ export function HeartProfileCard({
             // Up is red and down is green, as in the current app.
             caption={delta ? `${delta > 0 ? '+' : ''}${delta}` : undefined}
             captionColor={
-              delta ? (delta > 0 ? theme.colors.danger : theme.anatomy.main) : undefined
+              delta ? (delta > 0 ? theme.colors.danger : theme.progress.trendUp) : undefined
             }
           />
         ))}
@@ -89,9 +90,7 @@ export function HeartProfileCard({
       ))}
       {!heart.isReliable && standIns.length === 0 && (
         <AppText variant="micro" tone="muted">
-          {hasSource === false
-            ? `No heart-rate data yet. Connect ${deviceHealthName} to build your range.`
-            : 'Still learning your range — it sharpens with a few more days of heart-rate data.'}
+          {noHrDataCopy(hasSource, 'range')}
         </AppText>
       )}
     </Card>
@@ -170,7 +169,7 @@ export function ZoneQuotaCard({ data }: { data: CardioWeek }) {
                 variant="micro"
                 style={{
                   color:
-                    passive.status === 'complete' ? theme.anatomy.main : passiveMeta?.color,
+                    passive.status === 'complete' ? theme.progress.trendUp : passiveMeta?.color,
                 }}
               >
                 Z1 {passiveMeta?.name}{' '}
@@ -279,9 +278,9 @@ export function WeekList({ days, today }: { days: readonly HeartHealthDay[]; tod
         const sub = countedMinutesLine(day.activities, day.countedMin);
         const color =
           outcome === 'counted'
-            ? theme.anatomy.main
+            ? theme.progress.trendUp
             : outcome === 'not-counted'
-              ? theme.anatomy.secondary
+              ? theme.tones.checkin.foreground
               : theme.colors.muted;
         return (
           <Card key={day.runId} style={{ padding: theme.spacing.sm }}>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { bucketAverage, rollingMedian, isPlausibleHrSample } from '../hr-smoothing'
+import { bucketAverage, rollingMedian, isPlausibleHrSample, hrChartDomain } from '../hr-smoothing'
 import { median } from '@trainingai/shared/stats'
 
 describe('bucketAverage', () => {
@@ -79,5 +79,23 @@ describe('isPlausibleHrSample', () => {
 
   it('accepts anything while the buffer is still warming up (<3 samples)', () => {
     expect(isPlausibleHrSample(150, [90])).toBe(true)
+  })
+})
+
+describe('hrChartDomain', () => {
+  // The web chart used to inline these two expressions; the output must not move.
+  const inlined = (ys: number[]) =>
+    ys.length > 0 ? [Math.max(0, Math.min(...ys) - 10), Math.max(...ys) + 10] : undefined
+
+  it('is the readings plus or minus 10 bpm, as the web chart computed inline', () => {
+    for (const ys of [[62, 71, 140], [55], [3, 8], [90, 90, 90]]) {
+      expect(hrChartDomain(ys)).toEqual(inlined(ys))
+    }
+    expect(hrChartDomain([62, 71, 140])).toEqual([52, 150])
+  })
+
+  it('never goes below zero and leaves an empty day to the chart', () => {
+    expect(hrChartDomain([4])?.[0]).toBe(0)
+    expect(hrChartDomain([])).toBeUndefined()
   })
 })

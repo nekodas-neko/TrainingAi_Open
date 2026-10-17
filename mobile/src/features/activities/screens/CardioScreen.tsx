@@ -80,7 +80,8 @@ export function CardioScreen({
     plan = running.data;
   useMeasuredRunCompletion(plan?.heartHealth?.days);
   const day = plan?.heartHealth?.days.find((day) => day.date.replace(/\//g, '-') === today);
-  const target = day?.targetMin ?? plan?.run?.durationMin;
+  const runMin = plan?.run?.durationMin;
+  const target = day?.targetMin ?? (runMin != null && runMin > 0 ? Math.round(runMin) : undefined);
   const met = !!day?.met || plan?.run?.status === 'completed';
   const credited = day ? shownActivity(day.activities, day.creditedId) : null;
   const others = day ? day.activities.length - (credited ? 1 : 0) : 0;
@@ -169,7 +170,6 @@ export function CardioScreen({
                 <HeartProfileCard heart={data.heart} hasSource={data.quota.hasHrSource} />
                 <TouchSurface
                   accessibilityRole="button"
-                  accessibilityLabel="Cardio Baselines, Fitness Baselines"
                   onPress={openBaselines}
                 >
                   <Card tone="recovery">
@@ -239,7 +239,7 @@ export function CardioScreen({
                       <AppText
                         variant="caption"
                         tone={met ? undefined : 'muted'}
-                        style={met ? { color: theme.anatomy.main } : undefined}
+                        style={met ? { color: theme.progress.trendUp } : undefined}
                       >
                         {progressFigure(day?.countedMin ?? 0, target ?? null)}
                         {met ? ' · Counted ✓' : ''}

@@ -366,7 +366,7 @@ export function HealthDetailScreen({
               {
                 key: 'hrr1Bpm',
                 title: 'HR Recovery (60s drop)',
-                color: theme.anatomy.main,
+                color: theme.progress.trendUp,
                 empty: TREND_EMPTY.hrr1Bpm,
               },
             ] as const

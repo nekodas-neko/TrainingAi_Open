@@ -19,7 +19,7 @@ import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { hrProfileSpec, readinessSpec, metricValue } from '../data/models';
 import { weekdayAxis } from '../data/body-view';
 import { HealthMetricCard } from './HealthMetricCard';
-import { useCueColor } from './RangeBar';
+import { useReadableCueColor } from './RangeBar';
 import type { z } from 'zod';
 
 export function HeartHeroValue({ bpm }: { bpm: number | null }) {
@@ -116,7 +116,7 @@ const trendLook: Record<
 };
 function ProgressLine({ marker }: { marker: MarkerAssessment }) {
   const { theme } = useTheme();
-  const cueColor = useCueColor();
+  const cueColor = useReadableCueColor();
   const look = trendLook[marker.trend];
   return (
     <Stack
@@ -156,7 +156,7 @@ export function HeartTrendCard({
   color: string;
   emptyText: string;
 }) {
-  const cueColor = useCueColor();
+  const cueColor = useReadableCueColor();
   const shown = trimLeadingGaps(days, (day) => day.value);
   if (!shown) {
     return (
