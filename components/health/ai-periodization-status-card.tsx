@@ -12,6 +12,7 @@ import { TTL_LONG, TTL_MEDIUM } from '@trainingai/shared/cache-ttl';
 import { useCachedValue } from '@/lib/hooks/use-cached-value';
 import { baselineProgress, baselineProgressLabel } from '@/components/health/periodization/baseline-progress';
 import type { SessionPeriodization } from "@trainingai/shared/types/ai-periodization";
+import { PHASE_LABELS, lastTrainedLabel } from "@trainingai/shared/ai-periodization/status-labels";
 
 /**
  * The exercise list per session, for LA-92's denominator.
@@ -50,24 +51,6 @@ const PHASE_COLORS: Record<string, string> = {
   realisation: "text-purple-500",
   deload: "text-cyan-500",
 };
-
-const PHASE_LABELS: Record<string, string> = {
-  baseline: "Baseline",
-  accumulation: "Accum.",
-  intensification: "Intens.",
-  realisation: "Realise",
-  deload: "Deload",
-};
-
-// Every ai_dynamic session either has a prescription driving it or doesn't — there's no
-// per-session "auto" state worth calling out, so the right-hand slot shows recency instead
-// (and doubles as the signal that would have surfaced the 7-day-stale prescription bug).
-function lastTrainedLabel(daysAgo: number | null): string {
-  if (daysAgo == null) return "Never trained";
-  if (daysAgo <= 0) return "Trained today";
-  if (daysAgo === 1) return "Yesterday";
-  return `${daysAgo}d ago`;
-}
 
 export const AiPeriodizationStatusCard = memo(function AiPeriodizationStatusCard() {
   const [sessions, setSessions] = useState<SessionOverview[] | null>(null);

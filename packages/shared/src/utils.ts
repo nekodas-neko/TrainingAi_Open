@@ -6,12 +6,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/** Strip parenthetical muscle annotations and cap length for legend display.
- *  "Push A (Chest/Shoulders/Triceps)" → "Push A" */
-export function shortSessionName(name: string): string {
-  const stripped = name.replace(/\s*\([^)]*\)\s*/g, '').trim()
-  return stripped.length > 14 ? stripped.slice(0, 13).trimEnd() + '…' : stripped
-}
+export { shortSessionName } from "./session-palette";
 
 export function localDateString() {
   const n = new Date();

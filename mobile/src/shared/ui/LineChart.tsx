@@ -41,6 +41,7 @@ export function LineChart({
   interactive = false,
   axisLabels,
   color: accent,
+  fillColor,
   readable = false,
   gridlines = false,
   yAxis = false,
@@ -66,6 +67,7 @@ export function LineChart({
   interactive?: boolean;
   axisLabels?: readonly string[];
   color?: string;
+  fillColor?: string;
   readable?: boolean;
   gridlines?: boolean;
   yAxis?: boolean;
@@ -168,84 +170,89 @@ export function LineChart({
       onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
       accessibilityLabel={`${label}: ${valid.map((point) => `${point.label}: ${point.value}`).join('; ')}${guides ? guideSummary(min, max, target) : ''}`}
     >
-      <Svg
-        viewBox="0 0 320 90"
-        width={yAxis ? plotWidth : '100%'}
-        height={plotHeight}
-        style={leftInset ? { marginLeft: leftInset } : undefined}
-        pointerEvents="none"
-      >
-        {bands.map((band, index) => (
-          <Rect
-            key={`band${index}`}
-            x={xx(Math.max(xMin, band.from))}
-            y={0}
-            width={Math.max(0, xx(Math.min(xMax, band.to)) - xx(Math.max(xMin, band.from)))}
-            height={90}
-            fill={band.color}
-            opacity={0.15}
-          />
-        ))}
-        {markers.map((marker, index) => (
-          <Line
-            key={`marker${index}`}
-            x1={xx(marker.x)}
-            x2={xx(marker.x)}
-            y1={0}
-            y2={90}
-            stroke={marker.color}
-            strokeDasharray="3 3"
-          />
-        ))}
-        {series.flatMap((s, index) => {
-          const segments: { x: number; y: number }[][] = [[]];
-          for (const p of s.points) {
-            if (p.value != null && Number.isFinite(p.value)) {
-              segments.at(-1)!.push({ x: xx(p.x), y: yy(p.value, s.domain) });
-            } else if (segments.at(-1)!.length) {
-              segments.push([]);
-            }
-          }
-          return segments
-            .filter((segment) => segment.length > 1)
-            .map((segment, j) => (
-              <Polyline
-                key={`series${index}-${j}`}
-                points={segment.map((p) => `${p.x},${p.y}`).join(' ')}
-                fill="none"
-                stroke={s.color}
-                strokeWidth={1.5}
-                strokeDasharray={s.dashed ? '4 3' : undefined}
-              />
-            ));
-        })}
-        {segments
-          .filter((segment) => segment.length > 1)
-          .map((segment, index) =>
-            fill ? (
-              <Polygon
-                key={'fill' + index}
-                points={`${segment[0].x},90 ${segment.map((point) => `${point.x},${point.y}`).join(' ')} ${segment.at(-1)!.x},90`}
-                fill={theme.tones[tone].background}
-              />
-            ) : null,
-          )}
-        {segments
-          .filter((segment) => segment.length > 1)
-          .map((segment, index) => (
-            <Polyline
-              key={index}
-              points={segment.map((point) => `${point.x},${point.y}`).join(' ')}
-              fill="none"
-              stroke={color}
-              strokeWidth={2}
+      {yAxis && width <= 1 ? (
+        // Held until measured: before layout the plot would be 1 px wide.
+        <View style={{ height: plotHeight }} />
+      ) : (
+        <Svg
+          viewBox="0 0 320 90"
+          width={yAxis ? plotWidth : '100%'}
+          height={plotHeight}
+          style={leftInset ? { marginLeft: leftInset } : undefined}
+          pointerEvents="none"
+        >
+          {bands.map((band, index) => (
+            <Rect
+              key={`band${index}`}
+              x={xx(Math.max(xMin, band.from))}
+              y={0}
+              width={Math.max(0, xx(Math.min(xMax, band.to)) - xx(Math.max(xMin, band.from)))}
+              height={90}
+              fill={band.color}
+              opacity={0.15}
             />
           ))}
-        {coords.map(
-          (point, index) =>
-            point && <Circle key={index} cx={point.x} cy={point.y} r={3} fill={color} />,
-        )}
-      </Svg>
+          {markers.map((marker, index) => (
+            <Line
+              key={`marker${index}`}
+              x1={xx(marker.x)}
+              x2={xx(marker.x)}
+              y1={0}
+              y2={90}
+              stroke={marker.color}
+              strokeDasharray="3 3"
+            />
+          ))}
+          {series.flatMap((s, index) => {
+            const segments: { x: number; y: number }[][] = [[]];
+            for (const p of s.points) {
+              if (p.value != null && Number.isFinite(p.value)) {
+                segments.at(-1)!.push({ x: xx(p.x), y: yy(p.value, s.domain) });
+              } else if (segments.at(-1)!.length) {
+                segments.push([]);
+              }
+            }
+            return segments
+              .filter((segment) => segment.length > 1)
+              .map((segment, j) => (
+                <Polyline
+                  key={`series${index}-${j}`}
+                  points={segment.map((p) => `${p.x},${p.y}`).join(' ')}
+                  fill="none"
+                  stroke={s.color}
+                  strokeWidth={1.5}
+                  strokeDasharray={s.dashed ? '4 3' : undefined}
+                />
+              ));
+          })}
+          {segments
+            .filter((segment) => segment.length > 1)
+            .map((segment, index) =>
+              fill ? (
+                <Polygon
+                  key={'fill' + index}
+                  points={`${segment[0].x},90 ${segment.map((point) => `${point.x},${point.y}`).join(' ')} ${segment.at(-1)!.x},90`}
+                  fill={fillColor ?? theme.tones[tone].background}
+                />
+              ) : null,
+            )}
+          {segments
+            .filter((segment) => segment.length > 1)
+            .map((segment, index) => (
+              <Polyline
+                key={index}
+                points={segment.map((point) => `${point.x},${point.y}`).join(' ')}
+                fill="none"
+                stroke={color}
+                strokeWidth={2}
+              />
+            ))}
+          {coords.map(
+            (point, index) =>
+              point && <Circle key={index} cx={point.x} cy={point.y} r={3} fill={color} />,
+          )}
+        </Svg>
+      )}
       {guides && width > 1 && (
         <>
           <ChartGuides
@@ -270,8 +277,7 @@ export function LineChart({
             {selection === null
               ? 'Tap the chart to inspect a reading'
               : (() => {
-                  const p =
-                    valid.find((p) => (p.x ?? points.indexOf(p)) === selection) ?? valid[0];
+                  const p = valid.find((p) => (p.x ?? points.indexOf(p)) === selection) ?? valid[0];
                   return `${p.label}: ${p.value} · ${bands
                     .filter((b) => selection >= b.from && selection <= b.to)
                     .map((b) => b.label)

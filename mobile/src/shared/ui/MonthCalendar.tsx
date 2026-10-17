@@ -11,6 +11,7 @@ export function MonthCalendar({
   today,
   selected,
   markers,
+  dots,
   onMonthChange,
   onSelect,
   status,
@@ -20,6 +21,9 @@ export function MonthCalendar({
   today: string;
   selected?: string;
   markers: Record<string, readonly string[]>;
+  // Coloured dots per date, in draw order. When given they replace the filled circle and the
+  // single dot a marked day gets.
+  dots?: Record<string, readonly string[]>;
   onMonthChange: (month: string) => void;
   onSelect: (date: string) => void;
   status?: ReactNode;
@@ -29,11 +33,10 @@ export function MonthCalendar({
   const [year, number] = month.split('-').map(Number);
   const first = (new Date(Date.UTC(year, number - 1, 1)).getUTCDay() + 6) % 7;
   const count = new Date(Date.UTC(year, number, 0)).getUTCDate();
+  const cells = Math.ceil((first + count) / 7) * 7;
   function move(offset: number) {
     const date = new Date(Date.UTC(year, number - 1 + offset, 1));
-    onMonthChange(
-      `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`,
-    );
+    onMonthChange(`${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`);
   }
   return (
     <Stack>
@@ -72,7 +75,7 @@ export function MonthCalendar({
         ))}
       </Stack>
       <Stack direction="row" wrap style={{ gap: 0 }}>
-        {Array.from({ length: 42 }, (_, index) => {
+        {Array.from({ length: cells }, (_, index) => {
           const day = index - first + 1;
           if (day < 1 || day > count) {
             return (
@@ -81,6 +84,7 @@ export function MonthCalendar({
           }
           const date = `${month}-${String(day).padStart(2, '0')}`;
           const names = markers[date] ?? markers[date.replace(/-/g, '/')] ?? [];
+          const colors = dots ? (dots[date] ?? dots[date.replace(/-/g, '/')] ?? []) : [];
           return (
             <View key={date} style={{ width: `${100 / 7}%`, height: theme.sizes.button }}>
               {nativeStyle ? (
@@ -106,7 +110,7 @@ export function MonthCalendar({
                       backgroundColor:
                         date === selected
                           ? theme.colors.brand
-                          : names.length
+                          : names.length && !dots
                             ? theme.colors.brandSurface
                             : 'transparent',
                       borderWidth: date === today ? 1 : 0,
@@ -146,7 +150,31 @@ export function MonthCalendar({
                   style={{ height: '100%', paddingHorizontal: 0, paddingVertical: 0 }}
                 />
               )}
-              {names.length > 0 && (
+              {colors.length > 0 && (
+                <Stack
+                  direction="row"
+                  gap="xxs"
+                  pointerEvents="none"
+                  style={{
+                    position: 'absolute',
+                    bottom: theme.spacing.xs,
+                    alignSelf: 'center',
+                  }}
+                >
+                  {colors.slice(0, 4).map((color, at) => (
+                    <View
+                      key={at}
+                      style={{
+                        width: theme.spacing.xs,
+                        height: theme.spacing.xs,
+                        borderRadius: theme.radii.pill,
+                        backgroundColor: color,
+                      }}
+                    />
+                  ))}
+                </Stack>
+              )}
+              {!dots && names.length > 0 && (
                 <View
                   pointerEvents="none"
                   style={{

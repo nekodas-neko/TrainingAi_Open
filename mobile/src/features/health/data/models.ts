@@ -591,6 +591,8 @@ export const overviewSpec = {
               .object({
                 phase: z.string().optional(),
                 currentPhase: z.string().optional(),
+                sessionsInPhase: n,
+                baselineComplete: z.boolean().nullish(),
                 cycle: n,
               })
               .passthrough()

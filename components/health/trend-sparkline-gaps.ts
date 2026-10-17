@@ -14,36 +14,10 @@
  * here: `ble` heart-rate sessions carry 7.1 readings per set against the chest strap's 111.8.
  */
 
-export interface SeriesShape {
-  /** Per point: draw its own dot, because no neighbouring value can form a segment with it. */
-  isolated: boolean[]
-  /** Days carrying a value, of the days drawn. */
-  present: number
-  drawn: number
-  /**
-   * `null` when nothing is missing — a caveat that prints on every chart stops being read on the
-   * one that needs it.
-   *
-   * Phrased as the count MISSING rather than "11 of 14", because the series drawn is not the
-   * window named: leading nulls are trimmed, so the denominator would disagree with the card's own
-   * "— 14 days" label and leave the reader doing arithmetic to find out which number is wrong.
-   */
-  coverage: string | null
-}
+import { seriesShape, type SeriesShape } from '@trainingai/shared/health/series-gaps'
 
-export function seriesShape(values: (number | null | undefined)[]): SeriesShape {
-  const has = values.map(v => v != null)
-  const isolated = has.map((present, i) => present && !has[i - 1] && !has[i + 1])
-  const present = has.filter(Boolean).length
-  const drawn = values.length
-  const missing = drawn - present
-  return {
-    isolated,
-    present,
-    drawn,
-    coverage: missing === 0 ? null : `${missing} day${missing === 1 ? '' : 's'} missing`,
-  }
-}
+// `seriesShape` (what is missing, and the "N days missing" note) is shared with the native app.
+export { seriesShape, type SeriesShape }
 
 /** Radius for a point the line cannot show on its own, and for the latest reading. */
 export const VISIBLE_POINT_RADIUS = 3

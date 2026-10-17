@@ -19,3 +19,27 @@ export const SESSION_PALETTE: PaletteEntry[] = [
 export function getPaletteEntry(position: number): PaletteEntry {
   return SESSION_PALETTE[position % SESSION_PALETTE.length]
 }
+
+/**
+ * The palette position of a session by name: the program's own position when the name is one of
+ * its sessions, else a stable hash so an old ad-hoc session keeps one colour. The calendar, the
+ * weekly load bars and the legends all read this, so a session is one colour on every screen.
+ */
+export function sessionPaletteIndex(
+  name: string,
+  sessions: readonly { name: string; position: number }[],
+): number {
+  const lower = name.toLowerCase()
+  const known = sessions.find((s) => s.name.toLowerCase() === lower)
+  if (known) return known.position
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0
+  return h
+}
+
+/** Strip parenthetical muscle annotations and cap length for legend display.
+ *  "Push A (Chest/Shoulders/Triceps)" → "Push A" */
+export function shortSessionName(name: string): string {
+  const stripped = name.replace(/\s*\([^)]*\)\s*/g, '').trim()
+  return stripped.length > 14 ? stripped.slice(0, 13).trimEnd() + '…' : stripped
+}

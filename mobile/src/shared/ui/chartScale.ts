@@ -4,8 +4,8 @@
 
 /** Round-number gridline values spanning [lo, hi], about three of them. */
 export function niceTicks(lo: number, hi: number): number[] {
-  if (hi - lo < 1e-9) return [lo];
-  const span = Math.max(hi - lo, 1e-6);
+  if (hi - lo < 1e-6) return [lo];
+  const span = hi - lo;
   const raw = span / 3;
   const mag = 10 ** Math.floor(Math.log10(raw));
   const step = ([1, 2, 5, 10].find((m) => m * mag >= raw) ?? 10) * mag;
