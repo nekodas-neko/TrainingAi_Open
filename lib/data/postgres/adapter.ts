@@ -2824,8 +2824,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       const oldName = existing.name
       await tx.update(s.sessionExercises).set({ exerciseName: newName }).where(eq(s.sessionExercises.exerciseName, oldName))
       // Issue 2939: a rename is a server-decided edit of the log, so it stamps like the lbs-to-kg fix does;
-      // without it a stale phone replay puts the old name back, and without `updatedAt` phones never pull the new one.
-      await tx.update(s.exerciseLogs).set({ exerciseName: newName, updatedAt: sql`now()`, clientEditedAt: sql`now()` }).where(eq(s.exerciseLogs.exerciseName, oldName))
+      // without `clientEditedAt` a stale phone replay puts the old name back. GREATEST never moves a newer
+      // stamp backwards. `updatedAt` is also set by `trg_set_updated_at`; the explicit set is kept for clarity.
+      await tx.update(s.exerciseLogs).set({ exerciseName: newName, updatedAt: sql`now()`, clientEditedAt: sql`GREATEST(client_edited_at, now())` }).where(eq(s.exerciseLogs.exerciseName, oldName))
       await tx.update(s.personalRecords).set({ exerciseName: newName }).where(eq(s.personalRecords.exerciseName, oldName))
       const [row] = await tx.update(s.exerciseLibrary).set({ name: newName }).where(eq(s.exerciseLibrary.id, id)).returning()
       return { id: row.id, name: row.name, muscles: row.muscles as MuscleAssignment[], equipment: row.equipment ?? [], instructions: row.instructions ?? undefined, createdBy: row.createdBy ?? undefined, exerciseType: (row.exerciseType as ExerciseType) ?? 'weighted' }
@@ -2847,8 +2848,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
         await tx.update(s.sessionExercises).set({ exerciseName: newName }).where(eq(s.sessionExercises.exerciseName, oldName))
         // Issue 2939: a rename is a server-decided edit of the log, so it stamps like the lbs-to-kg fix does;
-      // without it a stale phone replay puts the old name back, and without `updatedAt` phones never pull the new one.
-      await tx.update(s.exerciseLogs).set({ exerciseName: newName, updatedAt: sql`now()`, clientEditedAt: sql`now()` }).where(eq(s.exerciseLogs.exerciseName, oldName))
+        // without `clientEditedAt` a stale phone replay puts the old name back. GREATEST never moves a newer
+        // stamp backwards. `updatedAt` is also set by `trg_set_updated_at`; the explicit set is kept for clarity.
+        await tx.update(s.exerciseLogs).set({ exerciseName: newName, updatedAt: sql`now()`, clientEditedAt: sql`GREATEST(client_edited_at, now())` }).where(eq(s.exerciseLogs.exerciseName, oldName))
         await tx.update(s.personalRecords).set({ exerciseName: newName }).where(eq(s.personalRecords.exerciseName, oldName))
         // Old name's cached GIF is now orphaned — the route re-sets or clears the cache for
         // the new name based on the submitted gifUrl.

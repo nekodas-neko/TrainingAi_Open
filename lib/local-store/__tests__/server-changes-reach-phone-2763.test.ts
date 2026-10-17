@@ -154,6 +154,27 @@ describe('a best re-dated into the past reaches the phone (#2763)', () => {
     expect(bests().map(b => b.exercise_name)).toEqual(['Bench', 'Deadlift'])
   })
 
+  it('keeps a pending best the server has never heard of when it prunes', async () => {
+    // Absent from the server's set, so only the `sync_status = 'synced'` guard in the prune protects it.
+    db.current!.exec(`INSERT INTO personal_records VALUES ('Press', NULL, 70, '2026-10-17T01:00:00.000Z', '2026-10-17T01:00:00.000Z', 'pending')`)
+    serveDelta({
+      personalRecordsComplete: true,
+      personalRecords: [best('Squat', 150, '2026-10-16T01:00:00.000Z'), best('Bench', 100, '2026-10-10T01:00:00.000Z')],
+    })
+
+    await pullDelta(USER, true)
+
+    expect(bests().map(b => b.exercise_name)).toEqual(['Bench', 'Press', 'Squat'])
+  })
+
+  it('prunes nothing when the reply carries the flag but no array', async () => {
+    serveDelta({ personalRecordsComplete: true, personalRecords: undefined })
+
+    await pullDelta(USER, true)
+
+    expect(bests().map(b => b.exercise_name)).toEqual(['Bench', 'Squat'])
+  })
+
   it('treats a delta without the flag as a window and prunes nothing', async () => {
     serveDelta({ personalRecords: [best('Bench', 105, '2026-10-17T01:00:00.000Z')] })
 

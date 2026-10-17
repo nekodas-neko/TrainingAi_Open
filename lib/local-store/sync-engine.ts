@@ -270,14 +270,21 @@ export async function pullDelta(userId: string, force = false, fullResync = fals
   // Issue 2763: the server sends every best (the table has no `updated_at` to cursor on), so only
   // the ones that differ from the local copy count as changes, or every pull would read as news.
   // `personalRecordsComplete` also means a best missing from the set is gone on the server.
-  const bestsComplete = raw.personalRecordsComplete === true;
+  // A reply that carries the flag but no array is malformed, and must not read as "the server has none".
+  const bestsComplete = raw.personalRecordsComplete === true && Array.isArray(raw.personalRecords);
   let personalRecords = serverBests;
   if (bestsComplete) {
-    const local = new Map((await store!.getPersonalRecords()).map(b => [b.exerciseName, b]));
-    personalRecords = serverBests.filter(b => {
-      const have = local.get(b.exerciseName);
-      return !have || have.estimated1rm !== b.estimated1rm || have.achievedAt !== b.achievedAt || have.exerciseId !== b.exerciseId;
-    });
+    try {
+      const local = new Map((await store!.getPersonalRecords()).map(b => [b.exerciseName, b]));
+      personalRecords = serverBests.filter(b => {
+        const have = local.get(b.exerciseName);
+        return !have || have.estimated1rm !== b.estimated1rm || have.achievedAt !== b.achievedAt || have.exerciseId !== b.exerciseId;
+      });
+    } catch (err) {
+      // Same as the applyDelta failure below: a broken local schema throws here, so report a failed page.
+      console.error('[pullDelta] reading local bests failed — local store may be out of schema:', err);
+      return null;
+    }
   }
 
   const ouraDaily = ((raw.ouraDaily ?? []) as Record<string, unknown>[]).map(r => ({

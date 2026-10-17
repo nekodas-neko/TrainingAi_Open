@@ -1403,8 +1403,8 @@ export class SQLiteLocalStore implements LocalStore {
     );
   }
 
-  // RV-174 — see the interface. The mirror is read-only (nothing on the device creates a program or a
-  // style), so there is no pending local row a prune could destroy.
+  // Issue 2763 — see the interface. Only 'synced' rows go: a best logged on the phone and not yet pushed
+  // is absent from the server's set by definition.
   async prunePersonalRecords(keep: string[]): Promise<number> {
     const have = new Set(keep)
     const stale = (await querySQL<{ exercise_name: string }>(
@@ -1419,6 +1419,8 @@ export class SQLiteLocalStore implements LocalStore {
     return stale.length
   }
 
+  // RV-174 — see the interface. The mirror is read-only (nothing on the device creates a program or a
+  // style), so there is no pending local row a prune could destroy.
   async pruneProgramStructure(programIds?: string[], styleIds?: string[]): Promise<number> {
     let removed = 0
     if (programIds) {
