@@ -1,3 +1,4 @@
+import { plural } from '@trainingai/shared/format/plural';
 import {
   AppText,
   Card,
@@ -14,10 +15,20 @@ import { digestSpec, monthWindowSpec, metricValue } from '../data/models';
 import { HealthViewReady } from '../components/HealthViewReady';
 import { HealthMetricCard } from '../components/HealthMetricCard';
 import { HealthResourceHeader } from '../components/HealthResourceHeader';
+import { MuscleVolumeFigure } from '../components/MuscleVolumeFigure';
+import { useCueColor } from '../components/RangeBar';
+import {
+  fixedValue,
+  weekDelta,
+  weekdayInitial,
+  weekMuscleRows,
+  weekRangeLabel,
+} from '../data/week-view';
 export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () => void }) {
   const { theme } = useTheme();
   const state = useWorkoutResource(digestSpec(week));
   const m = state.data?.metrics;
+  const cueColor = useCueColor();
   return (
     <WorkoutLayout
       title="Week in review"
@@ -33,7 +44,7 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
       }
     >
       <AppText variant="caption" tone="muted" style={{ textAlign: 'center' }}>
-        {m ? `${m.weekStart} → ${m.weekEnd}` : week}
+        {m ? weekRangeLabel(m.weekStart, m.weekEnd) : weekRangeLabel(week, undefined)}
       </AppText>
       <HealthViewReady view="week" requests={[digestSpec(week), monthWindowSpec(week)]}>
         {state.data?.digest && (
@@ -50,21 +61,20 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
               <AppText variant="heading">Training</AppText>
               <AppText variant="title">{metricValue(m.training.volumeKg, 'kg')}</AppText>
               <AppText variant="caption" tone="muted">
-                Over {m.training.sessions} sessions
+                Over {plural(m.training.sessions, 'session', 'sessions')}
               </AppText>
               <AppText variant="micro" tone="muted">
                 {m.training.volumeChangePct == null
                   ? 'First week of data — nothing to compare it against yet'
-                  : `${m.training.volumeChangePct >= 0 ? '+' : ''}${Math.round(m.training.volumeChangePct)}% on ${metricValue(m.training.priorVolumeKg, 'kg')} (${metricValue(m.training.priorSessions)} sessions)`}
+                  : `${m.training.volumeChangePct >= 0 ? '+' : ''}${Math.round(m.training.volumeChangePct)}% on ${metricValue(m.training.priorVolumeKg, 'kg')} (${plural(m.training.priorSessions ?? 0, 'session', 'sessions')})`}
               </AppText>
               <BarChart
                 label="Weekly training volume"
                 height={theme.sizes.weekVolumeChart}
+                readable
+                yAxis
                 bars={m.training.byDay.map((d) => ({
-                  label: new Date(d.date + 'T12:00:00Z').toLocaleDateString(undefined, {
-                    weekday: 'short',
-                    timeZone: 'UTC',
-                  }),
+                  label: weekdayInitial(d.date),
                   value: d.volumeKg,
                   colors: [theme.colors.brand],
                 }))}
@@ -84,10 +94,12 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
                       : key === 'stressHighMinutes'
                         ? 'min'
                         : '';
-                const difference =
-                  metric.week != null && metric.priorWeek != null
-                    ? metric.week - metric.priorWeek
-                    : null;
+                const decimals = key === 'sleepHours' ? 1 : 0;
+                const delta = weekDelta(metric.week, metric.priorWeek, {
+                  unit,
+                  decimals,
+                  higherIsBetter: key !== 'stressHighMinutes',
+                });
                 return (
                   <HealthMetricCard
                     key={key}
@@ -103,14 +115,21 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
                     }
                     value={metric.week}
                     unit={unit}
-                    decimals={key === 'sleepHours' ? 1 : 0}
-                    caption={
-                      difference == null
-                        ? 'No previous-week reading'
-                        : `${difference > 0 ? '+' : ''}${metricValue(difference, unit, key === 'sleepHours' ? 1 : 0)} vs previous week${key === 'stressHighMinutes' ? ' · Lower is better' : ''}`
-                    }
+                    valueText={fixedValue(metric.week, decimals)}
                     points={metric.byDay.map((d) => ({ label: d.date, value: d.value }))}
+                    chart={{ color: theme.colors.brand, dots: 'isolated' }}
                   >
+                    <AppText
+                      variant="caption"
+                      tone={delta.cue === 'good' || delta.cue === 'bad' ? undefined : 'muted'}
+                      style={
+                        delta.cue === 'good' || delta.cue === 'bad'
+                          ? { color: cueColor(delta.cue) }
+                          : undefined
+                      }
+                    >
+                      {delta.text}
+                    </AppText>
                     {key === 'hrv' && metric.source === 'body-metrics' && (
                       <AppText variant="micro" tone="muted">
                         From daytime readings
@@ -138,14 +157,7 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
             {!!m.muscleSets.length && (
               <Card>
                 <AppText variant="heading">Muscle volume this week</AppText>
-                {m.muscleSets.map((row) => (
-                  <Stack key={row.muscle} direction="row" justify="space-between">
-                    <AppText variant="caption">{row.muscle}</AppText>
-                    <AppText variant="caption" tone="muted">
-                      {row.sets} sets
-                    </AppText>
-                  </Stack>
-                ))}
+                <MuscleVolumeFigure muscles={weekMuscleRows(m.muscleSets)} />
               </Card>
             )}
             <WeekTrends week={m.weekStart} />
@@ -156,6 +168,7 @@ export function HealthWeekScreen({ week, onBack }: { week: string; onBack: () =>
   );
 }
 function WeekTrends({ week }: { week: string }) {
+  const { theme } = useTheme();
   const state = useWorkoutResource(monthWindowSpec(week));
   const data = state.data;
   return (
@@ -197,6 +210,7 @@ function WeekTrends({ week }: { week: string }) {
                       : `${metricValue(Math.abs(difference), unit, key === 'weightKg' ? 1 : 0)} ${difference > 0 ? 'above' : 'below'} the last 4 weeks`
                 }
                 points={data.weeks.map((w) => ({ label: w.weekStart, value: w[key] }))}
+                chart={{ color: theme.colors.brand, dots: 'isolated' }}
               />,
             ];
           },

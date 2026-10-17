@@ -1,7 +1,7 @@
 'use client'
 
 import { CircleDotIcon, ZapIcon, ThermometerIcon, HistoryIcon, InfoIcon } from 'lucide-react'
-import type { ReadinessInputKey } from '@/lib/health/score-availability'
+import { limitedInputsNote } from '@trainingai/shared/health/readiness-input-labels'
 import { cn } from '@trainingai/shared/utils'
 import { scoreBand } from '@trainingai/shared/health/score-band'
 import { READINESS_WEIGHTS } from '@trainingai/shared/health/readiness-composite'
@@ -87,14 +87,6 @@ export function ReadinessBreakdown({ readiness }: { readiness: ReadinessScoreRes
   return <CompositeBreakdown readiness={readiness} />
 }
 
-const INPUT_LABELS: Record<ReadinessInputKey, string> = {
-  sleep: 'sleep stages',
-  hrv: 'overnight HRV',
-  restingHeartRate: 'resting heart rate',
-  temperature: 'body temperature',
-  activity: 'daily activity',
-}
-
 /**
  * Says which inputs today's score is missing, so a partial score reads as partial instead of as a
  * confident number. Text + icon, never colour alone — and it names the missing signals rather than
@@ -102,14 +94,12 @@ const INPUT_LABELS: Record<ReadinessInputKey, string> = {
  */
 function LimitedInputsNote({ readiness }: { readiness: ReadinessScoreResponse }) {
   if (!readiness.limited) return null
-  const missing = readiness.inputsMissing
-  if (missing.length === 0) return null
-  const names = missing.map(k => INPUT_LABELS[k])
-  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+  const note = limitedInputsNote(readiness.inputsMissing)
+  if (!note) return null
   return (
     <p className="flex items-start gap-1.5 text-[11px] leading-snug text-muted-foreground">
       <InfoIcon className="mt-[1px] h-3 w-3 shrink-0" aria-hidden />
-      <span>Based on part of the usual picture — no {list} today, so those factors sit at neutral.</span>
+      <span>{note}</span>
     </p>
   )
 }
