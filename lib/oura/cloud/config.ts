@@ -18,6 +18,19 @@ export const OURA_API_BASE = 'https://api.ouraring.com'
  * are left out: nothing in #2808 reads them.
  */
 export const OURA_SCOPES = ['personal', 'daily', 'heartrate', 'workout', 'session', 'spo2Daily'] as const
+export type OuraScope = (typeof OURA_SCOPES)[number]
+
+/**
+ * The scopes a stored grant covers, from `oura_tokens.scope`: Oura answers a space-separated list
+ * with an `extapi:` prefix on each name (`extapi:personal extapi:daily`). The user can untick any
+ * scope on Oura's consent page, so this is often less than `OURA_SCOPES` (#2974). `null` when the
+ * grant carries no scope string (a legacy row, or a token answer without one): the caller then
+ * cannot tell and tries everything.
+ */
+export function grantedOuraScopes(scope: string | null | undefined): ReadonlySet<string> | null {
+  if (!scope || !scope.trim()) return null
+  return new Set(scope.trim().split(/\s+/).map(s => s.replace(/^extapi:/, '')))
+}
 
 /** Every request to Oura gives up after this long; a hung Oura must not hold a route open. */
 export const OURA_REQUEST_TIMEOUT_MS = 10_000

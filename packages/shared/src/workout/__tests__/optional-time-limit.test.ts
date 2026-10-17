@@ -47,7 +47,7 @@ describe('optional session time limit', () => {
     expect(durationDirection(30, 'short')).toBe(-1);
     expect(durationDirection(60, 0)).toBe(0);
     expect(durationDirection(0, 30)).toBe(-1);
-    expect(sessionTimeLimitOptions(0)).toEqual([0, 30, 45, 60, 90]);
+    expect(sessionTimeLimitOptions(0)).toEqual([30, 45, 60, 90, 0]);
     expect(warmupGoalSecFor(0, 'standard')).toBeNull();
     expect(warmupGoalSecFor(0, 30)).toBe(warmupGoalSecFor(30, 'standard'));
   });

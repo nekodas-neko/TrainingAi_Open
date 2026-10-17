@@ -7,6 +7,7 @@ import { Stack } from './Stack';
 
 export function TimelineRow({
   time,
+  timeInline = false,
   title,
   summary,
   icon,
@@ -18,6 +19,8 @@ export function TimelineRow({
   onPress,
 }: {
   time: string;
+  /** The current app's wake-up row prints the time bold beside the title, not on a line above it. */
+  timeInline?: boolean;
   title: string;
   summary?: string;
   icon: IconName;
@@ -46,15 +49,6 @@ export function TimelineRow({
         opacity: pressed ? 0.65 : 1,
       })}
     >
-      <AppText
-        variant="caption"
-        tone="muted"
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        style={{ width: theme.sizes.timelineTime, fontVariant: ['tabular-nums'] }}
-      >
-        {time}
-      </AppText>
       <View
         style={{
           width: marker,
@@ -103,10 +97,20 @@ export function TimelineRow({
         </View>
       </View>
       <Stack gap="xxs" style={{ flex: 1, minWidth: 0, paddingVertical: theme.spacing.sm }}>
+        {!timeInline && (
+          <AppText variant="micro" tone="muted" style={{ fontVariant: ['tabular-nums'] }}>
+            {time}
+          </AppText>
+        )}
         <Stack direction="row" align="center" gap="xs">
           <AppText variant="label" numberOfLines={2} style={{ flexShrink: 1 }}>
             {title}
           </AppText>
+          {timeInline && (
+            <AppText variant="label" style={{ fontVariant: ['tabular-nums'] }}>
+              {time}
+            </AppText>
+          )}
           {savedLocally && (
             <Icon
               name="history"
@@ -121,7 +125,6 @@ export function TimelineRow({
           </AppText>
         )}
       </Stack>
-      <Icon name="forward" size={theme.sizes.iconSmall} tone="muted" />
     </Pressable>
   );
 }
