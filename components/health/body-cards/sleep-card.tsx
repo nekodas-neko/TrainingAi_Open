@@ -5,11 +5,11 @@ import { formatTimeOfDay } from '@trainingai/shared/date-utils';
 import { useUserTimezone } from '@/components/shell/user-timezone-provider';
 import { accentCardStyle } from "@trainingai/shared/utils";
 import { useTransitionRouter } from "@/lib/view-transition";
-import { actualSleepWindow } from "@/lib/sleep/actual-window";
+import { actualSleepWindow } from "@trainingai/shared/health/actual-sleep-window";
 import type { SleepRow } from "@/app/health/health-sections";
 import { ProvisionalBadge } from "@/components/health/provisional-badge";
 import type { SleepScoreCoverage } from "@trainingai/shared/health/sleep-score";
-import { sleepCoverageNote } from "./sleep-coverage-note";
+import { sleepCoverageNote } from "@trainingai/shared/health/sleep-coverage-note";
 
 interface Props {
   recentSleep: SleepRow | null;

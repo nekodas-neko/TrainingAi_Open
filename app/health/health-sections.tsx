@@ -4,7 +4,7 @@ import React from "react";
 import dynamic from "next/dynamic";
 import { InfoIcon } from "lucide-react";
 import { accentCardStyle } from "@trainingai/shared/utils";
-import { evaluateWeightRateVsGoalBand } from "@trainingai/shared/health/long-term-goal-progress";
+import { evaluateWeightRateVsGoalBand, goalRemaining } from "@trainingai/shared/health/long-term-goal-progress";
 import { scoreBand } from "@trainingai/shared/health/score-band";
 import { bodyComposition } from "@trainingai/shared/health/body-composition";
 import { displayBodyFat, type BodyFatCalibrationMeta } from "@/components/health/body-fat-display";
@@ -230,10 +230,10 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
             {latestWeightIsStale && latestWeightDate ? `Last logged ${latestWeightDate}` : "Last 7 days"}
           </p>
           {targetWeightKg != null && latestWeight != null && (() => {
-            const diff = parseFloat((latestWeight - targetWeightKg).toFixed(1))
+            const { diff, reached } = goalRemaining(latestWeight, targetWeightKg)
             return (
-              <p className="text-xs font-semibold mt-1" style={{ color: diff <= 0 ? 'var(--accent-green)' : '#f97316' }}>
-                {diff <= 0 ? '✓ Goal reached' : `↓ ${diff} kg to go`}
+              <p className="text-xs font-semibold mt-1" style={{ color: reached ? 'var(--accent-green)' : '#f97316' }}>
+                {reached ? '✓ Goal reached' : `↓ ${diff} kg to go`}
               </p>
             )
           })()}

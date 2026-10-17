@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { stripComments } from '../../scripts/lib/strip-comments.js'
-import { sleepCoverageNote } from '@/components/health/body-cards/sleep-coverage-note'
+import { sleepCoverageNote } from '@trainingai/shared/health/sleep-coverage-note'
 import { qualifierPhrase } from '@/components/health/score-qualifier'
 
 /**

@@ -4,7 +4,8 @@ import { useEffect } from "react";
 import { accentCardStyle } from "@trainingai/shared/utils";
 import { useTransitionRouter } from "@/lib/view-transition";
 import { formatDayShort } from "@trainingai/shared/date-utils";
-import { MetricScale, rangeStats } from "@/components/health/metric-scale";
+import { MetricScale } from "@/components/health/metric-scale";
+import { rangeStats } from "@trainingai/shared/health/range-stats";
 import type { BodyMetaRow } from "@/app/api/body-metadata/route";
 
 interface Props {

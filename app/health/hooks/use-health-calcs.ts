@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { computeWeightRateKgPerWeek, type WeightPoint } from "@trainingai/shared/health/long-term-goal-progress";
+import { bmiClassification } from "@trainingai/shared/health/bmi";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { todayInTz } from "@trainingai/shared/date-utils";
 import { ENERGY_BALANCE_TTL } from "@trainingai/shared/cache-ttl";
@@ -14,18 +15,10 @@ export function useBmiClassification(
   latestBf: number | null,
   sexProp: string | null | undefined,
 ) {
-  return useMemo(() => {
-    const bmi = latestWeight != null && heightCm != null
-      ? latestWeight / Math.pow(heightCm / 100, 2)
-      : null;
-    const bmiUsesBf = latestBf != null;
-    const bmiLabel = bmi == null ? null : latestBf != null
-      ? (sexProp === 'female'
-          ? latestBf < 14 ? 'Essential fat' : latestBf < 21 ? 'Athletic' : latestBf < 25 ? 'Fitness' : latestBf < 32 ? 'Average' : 'High fat'
-          : latestBf < 6  ? 'Essential fat' : latestBf < 14 ? 'Athletic' : latestBf < 18 ? 'Fitness' : latestBf < 25 ? 'Average' : 'High fat')
-      : bmi < 18.5 ? 'Underweight' : bmi < 25 ? 'Normal' : bmi < 30 ? 'Overweight' : 'Obese';
-    return { bmi, bmiUsesBf, bmiLabel };
-  }, [latestWeight, heightCm, latestBf, sexProp]);
+  return useMemo(
+    () => bmiClassification({ weightKg: latestWeight, heightCm, bodyFatPct: latestBf, sex: sexProp }),
+    [latestWeight, heightCm, latestBf, sexProp],
+  );
 }
 
 /** Points are the body-metadata `weightTrend` (30 local days, #2480), or `recent` as a fallback. */
