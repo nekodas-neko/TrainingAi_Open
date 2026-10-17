@@ -54,7 +54,7 @@ export function timelineSummary(event: TimelineEvent) {
             ? `${metric.value} exercises`
             : metric.value,
   );
-  if (event.endTime && event.type !== 'wakeup') values.unshift(`${event.time} – ${event.endTime}`);
+  if (event.endTime && event.type !== 'wakeup') values.unshift(`until ${event.endTime}`);
   if (event.subtitle && event.subtitle !== 'Saved on this phone') values.push(event.subtitle);
   return values.join(' · ');
 }

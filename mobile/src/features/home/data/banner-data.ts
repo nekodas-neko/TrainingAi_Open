@@ -63,3 +63,15 @@ export function recapHasData(metrics: Record<string, unknown> | undefined) {
     ['resilience', 'illness', 'ots'].some((key) => metrics[key] != null)
   );
 }
+
+/**
+ * The tint of each updates-strip icon, by type, as the current app's `home-banner-strip.tsx` draws
+ * it: goals cyan, day amber, week purple. Keyed on the entry's type, never its position, so a
+ * dismissed row cannot hand its colour to the next.
+ */
+export type BannerType = 'goals' | 'day' | 'week';
+export const bannerTone = {
+  goals: 'activity',
+  day: 'checkin',
+  week: 'sleep',
+} as const satisfies Record<BannerType, string>;

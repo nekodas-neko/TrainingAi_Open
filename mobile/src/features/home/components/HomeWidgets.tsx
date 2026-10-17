@@ -423,7 +423,7 @@ function HomeWidgetBody({
                 </AppText>
                 {night?.sleepStart && night.sleepEnd && (
                   <AppText variant="caption" tone="muted">
-                    {formatTimeOfDay(night.sleepStart, health.timezone)} –{' '}
+                    {formatTimeOfDay(night.sleepStart, health.timezone)} →{' '}
                     {formatTimeOfDay(night.sleepEnd, health.timezone)}
                   </AppText>
                 )}
@@ -736,7 +736,16 @@ function HomeSleepFeedback({ onCorrect }: { onCorrect: () => void }) {
       <AppText variant={prominent ? 'caption' : 'micro'} tone={prominent ? undefined : 'muted'}>
         {line}
       </AppText>
-      <AppButton title="That’s wrong" variant="ghost" onPress={onCorrect} />
+      <AppButton
+        title="That’s wrong"
+        variant="ghost"
+        onPress={() => {
+          // Record the disagreement first and never let a failed record stop the sheet opening;
+          // the correction that matters is the value the check-in saves.
+          void health.store?.respondToVerdict(health.today, 'corrected').catch(() => {});
+          onCorrect();
+        }}
+      />
     </Stack>
   );
 }

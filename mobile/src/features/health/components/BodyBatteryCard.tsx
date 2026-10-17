@@ -63,8 +63,8 @@ export function BodyBatteryCard() {
               />
               <AppText variant="caption" tone="muted">
                 Started at {data.anchor} from{' '}
-                {data.anchorSource === 'readiness' ? 'energy' : data.anchorSource}
-                {data.anchorProvisional ? ' · provisional until energy arrives' : ''}
+                {data.anchorSource}
+                {data.anchorProvisional ? ' · provisional until readiness arrives' : ''}
               </AppText>
               <Grid columns={2}>
                 <MetricTile label="Charged" value={`+${data.charged}`} />

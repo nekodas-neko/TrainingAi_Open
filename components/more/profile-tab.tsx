@@ -28,6 +28,7 @@ import { StatsGrid } from './stats-grid'
 import { FeedbackSection } from './feedback-section'
 import { DeleteAccountSheet } from './delete-account-sheet'
 import { MoreRow, MoreRowGroup } from './more-row'
+import { profileDisplayName } from '@trainingai/shared/greeting'
 import { initialsOf } from '@/lib/initials'
 
 const AchievementsSection = dynamic(
@@ -181,7 +182,7 @@ export function ProfileTab({ user, profileFailed, seasons, equippedTitle, friend
   }
 
   const displayAvatar = avatarOverride ?? user?.avatar ?? null
-  const displayName = user?.displayName ?? user?.name ?? null
+  const displayName = profileDisplayName(user)
   const initials = initialsOf(displayName ?? user?.email)
   const title = equippedTitle ? TITLES[equippedTitle] : null
 
