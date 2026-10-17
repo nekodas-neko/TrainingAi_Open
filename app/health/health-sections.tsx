@@ -118,6 +118,7 @@ export interface HealthSectionsCtx {
   setMetricSheet: (v: MetricSheetKind) => void;
   setWaterLogOpen: (v: boolean) => void;
   recentSleep: SleepRow | null;
+  sleepNightLabel: string;
   lastSleep: SleepRow | null;
   readiness: ReadinessScoreResponse | null;
   todayWaterMl: number | null;
@@ -166,7 +167,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
   const {
     metaLoading, metaToday, metaRecent, latestWeight, latestWeightIsStale, latestWeightDate, latestBf, latestSteps,
     latestDistanceKm, targetWeightKg, targetBfPct, openInfo, toggleInfo, openLog,
-    setMetricSheet, setWaterLogOpen, recentSleep, lastSleep, readiness,
+    setMetricSheet, setWaterLogOpen, recentSleep, sleepNightLabel, lastSleep, readiness,
     todayWaterMl, waterGoalMl, activeEnergyKcalToday, bmi, bmiLabel, bmiUsesBf, latestBfIsCorrected,
     weightTrendKgPerWeek, energyBalance, trainingLoad, sleepCorr, injuries,
     setInjuries, userId, recoveryMuscles, handleDayClick, weeklyStats, weeklyStatsError, retryWeeklyStats,
@@ -405,6 +406,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
         <SleepCard
           key="sleep"
           recentSleep={recentSleep}
+          nightLabel={sleepNightLabel}
           lastSleep={lastSleep}
           computedSleepScore={readiness?.sleepScore ?? null}
           sleepScoreCoverage={readiness?.sleepScoreCoverage ?? null}

@@ -44,9 +44,10 @@ describe('stale-surface-subscribe — each surface subscribes the key it reads',
   for (const c of CASES) {
     it(`${c.id}: ${c.why}`, () => {
       const file = src(c.file);
-      expect(file, `${c.file} does not subscribe to anything`).toMatch(/useInvalidationRefetch\(/);
+      // `useCachedValue` carries its own invalidation subscription; the HR card moved to it in #2906.
+      expect(file, `${c.file} does not subscribe to anything`).toMatch(/useInvalidationRefetch\(|useCachedValue</);
       for (const key of c.keys) {
-        expect(file, `${c.id} reads ${key} but does not name it in its subscription`).toContain(`'${key}'`);
+        expect(file, `${c.id} reads ${key} but does not name it in its subscription`).toMatch(new RegExp(`['\`]${key}`));
         // A subscription to a key no write clears is a no-op dressed as a fix.
         expect(groups, `${key} is subscribed but no cache group clears it`)
           .toMatch(new RegExp(`invalidateCache\\('${key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'\\)`));
@@ -59,7 +60,7 @@ describe('stale-surface-subscribe — each surface subscribes the key it reads',
     // for error handling — the same shape RV-103 found behind a silent failure. Asserted as
     // "every cachedFetch is voided" rather than "no empty catch anywhere": the local-store promise
     // in the activity card keeps its catch, because `store.getActivityLogs` genuinely can reject.
-    for (const rel of ['components/health/hr-day-card.tsx', 'components/health/activity-history-card.tsx']) {
+    for (const rel of ['components/health/activity-history-card.tsx']) {
       const calls = src(rel).match(/^.*\bcachedFetch</gm) ?? [];
       expect(calls.length, `no cachedFetch found in ${rel} — has it moved?`).toBeGreaterThan(0);
       for (const line of calls) {

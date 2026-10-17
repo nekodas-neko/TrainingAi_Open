@@ -11,6 +11,7 @@ import { useTabVisibility } from "@/components/shell/tab-visibility";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { ScreenHeader } from "@/components/shell/screen-header";
 import { todayInTz, shiftDateStr } from "@trainingai/shared/date-utils";
+import { pickSleepCardNight } from "@trainingai/shared/health/sleep-card-night";
 import { weightTrendWindowStart } from "@trainingai/shared/health/long-term-goal-progress";
 import { getLocalStore } from "@/lib/local-store";
 import { localSleepRowsAsNights } from "@/lib/sleep/merge-sessions";
@@ -577,8 +578,8 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   // Only treat sleep as "recent" if it's from last night or today — prevents
   // stale data from days ago showing on the card as if it's current.
   const todayStr = todayInTz(tz)
-  const yesterdayStr = shiftDateStr(todayStr, -1)
-  const recentSleep = lastSleep && lastSleep.date >= yesterdayStr ? lastSleep : null
+  // Which night the card shows, and its date label, are one shared rule (issue 2906).
+  const { night: recentSleep, label: sleepNightLabel } = pickSleepCardNight(sleepRows, todayStr)
 
   const openLog = (field: LogField, label: string, unit: string, step: number) => {
     let current: number | null | undefined = metaToday?.[field];
@@ -619,7 +620,7 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   const { isSectionVisible, renderBodySection, renderTrainingSection, renderProgressSection } = getHealthSections({
     metaLoading, metaToday, metaRecent, latestWeight, latestWeightIsStale, latestWeightDate: latestWeightMeta.date, latestBf, latestSteps,
     latestDistanceKm, targetWeightKg, targetBfPct, openInfo, toggleInfo, openLog,
-    setMetricSheet, setWaterLogOpen, recentSleep, lastSleep, readiness,
+    setMetricSheet, setWaterLogOpen, recentSleep, sleepNightLabel, lastSleep, readiness,
     todayWaterMl, waterGoalMl, activeEnergyKcalToday, bmi, bmiLabel, bmiUsesBf, latestBfIsCorrected,
     weightTrendKgPerWeek, energyBalance, trainingLoad, sleepCorr, injuries,
     setInjuries, userId, recoveryMuscles, handleDayClick, weeklyStats, weeklyStatsError,
