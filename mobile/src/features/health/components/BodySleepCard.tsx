@@ -7,12 +7,14 @@ import { readinessSpec } from '../data/models';
 import { sleepChips, sleepTimeRange } from '../data/body-view';
 import type { HealthDetail } from '../screens/HealthDetailScreen';
 import { HealthMetricCard } from './HealthMetricCard';
+import { useCueColor } from './RangeBar';
 
 /**
  * Health > Body > Sleep: duration and bed-to-wake range, the score badge, the stage chips and the
  * efficiency, onset, overnight HRV, lowest heart rate and breathing chips, as the current app's card.
  */
 export function BodySleepCard({ openDetail }: { openDetail: (detail: HealthDetail) => void }) {
+  const cueColor = useCueColor();
   const health = useHealthData();
   const readiness = useWorkoutResource(readinessSpec(health.today));
   const lastNight = health.sleep.find((row) => row.date === health.today);
@@ -55,7 +57,11 @@ export function BodySleepCard({ openDetail }: { openDetail: (detail: HealthDetai
         </Stack>
       </Stack>
       {note && (
-        <AppText variant="caption" tone={note.strong ? 'danger' : 'muted'}>
+        <AppText
+          variant="caption"
+          tone="muted"
+          style={note.strong ? { color: cueColor('watch') } : undefined}
+        >
           {note.text}
         </AppText>
       )}

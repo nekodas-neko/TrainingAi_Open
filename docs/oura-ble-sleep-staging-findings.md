@@ -180,7 +180,7 @@ it hasn't been confirmed past 14–15%.
      (≥ `MIN_BOUT` epochs) is being folded when it shouldn't, that's the bug to chase — sustained
      bouts must never fold.
    - **Header time doesn't match the stage totals below it** → already fixed in #377
-     (`lib/sleep/actual-window.ts` — only the *start* trims to onset; the *end* is always the raw
+     (`packages/shared/src/health/actual-sleep-window.ts` — only the *start* trims to onset; the *end* is always the raw
      window's natural end). If this recurs, check that whatever renders the header and whatever sums
      the stage minutes are reading the *same* window.
 4. **Ship the same way each time**: change the constant with an inline comment (old value → new,
@@ -202,7 +202,7 @@ it hasn't been confirmed past 14–15%.
 |---|---|
 | `lib/health/sleep-staging.ts` | The stager itself — all tunable constants live here with inline history comments |
 | `lib/data/postgres/adapter.ts` (`aggregateOuraRawSamples`) | Bins raw samples into epochs, calls the stager, writes `sleep_sessions`, captures the `debugNight` diagnostic |
-| `lib/sleep/actual-window.ts` | Derives the displayed asleep→woke window from the hypnogram (start trims to onset, end is the raw window's natural end) |
+| `packages/shared/src/health/actual-sleep-window.ts` | Derives the displayed asleep→woke window from the hypnogram (start trims to onset, end is the raw window's natural end) |
 | `lib/sleep/merge-sessions.ts` | Drops distant nap/rest fragments so they don't distort a night's bedtime/wake-time |
 | `components/health-metric-sheet.tsx` | Sleep detail sheet UI — Time Asleep, Sleep Latency tile, hypnogram ribbon |
 | `components/oura-ble/oura-ble-debug.tsx` | The tester — "Sleep epochs (debug)" button is the per-epoch diagnostic |

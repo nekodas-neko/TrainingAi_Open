@@ -150,7 +150,7 @@ export function EnergyBalanceCard() {
                   : provenance.chain
                     ? provenance.chain.totalFloored
                       ? `${provenance.total.toLocaleString()} minimum budget, never below your resting rate.`
-                      : `${provenance.chain.rmr.toLocaleString()} resting rate ${provenance.chain.deficit >= 0 ? '−' : '+'} ${Math.abs(provenance.chain.deficit).toLocaleString()} for your goal ${provenance.chain.dailyLiving < 0 ? '−' : '+'} ${Math.abs(provenance.chain.dailyLiving).toLocaleString()} daily living + ${provenance.chain.movement.toLocaleString()} movement = ${provenance.total.toLocaleString()} kcal.`
+                      : `${provenance.chain.rmr.toLocaleString()} resting rate${provenance.chain.deficit === 0 ? '' : ` ${provenance.chain.deficit > 0 ? '−' : '+'} ${Math.abs(provenance.chain.deficit).toLocaleString()} for your goal`} ${provenance.chain.dailyLiving < 0 ? '−' : '+'} ${Math.abs(provenance.chain.dailyLiving).toLocaleString()} daily living + ${provenance.chain.movement.toLocaleString()} movement = ${provenance.total.toLocaleString()} kcal.`
                     : `${provenance.base.toLocaleString()} base + ${provenance.earned.toLocaleString()} movement = ${provenance.total.toLocaleString()} kcal.`}
               </AppText>
             )}
@@ -300,6 +300,15 @@ export function RingCards({ openDetail }: { openDetail: (detail: HealthDetail) =
   const stats = useWorkoutResource(ouraStatsSpec(today));
   const battery = useWorkoutResource(ringBatterySpec);
   const trendsState = useWorkoutResource(trendsSpec(today));
+  if (stats.error && !stats.data) {
+    return (
+      <Card>
+        <AppText variant="caption" tone="muted">
+          Couldn't load your ring data
+        </AppText>
+      </Card>
+    );
+  }
   if (!stats.data?.connected) return null;
   const level = battery.data?.latest?.percent ?? null;
   const worn = wornSeconds(

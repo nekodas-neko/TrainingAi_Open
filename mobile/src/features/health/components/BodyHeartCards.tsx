@@ -7,6 +7,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { ResourceStatus } from '../../workouts/components/ResourceStatus';
 import { loadSpec, metricValue, readinessSpec, type BodyRow } from '../data/models';
+import { hrvBaselineDeviationPct } from '@trainingai/shared/health/hrv-baseline';
 import { acwrZoneLabel, hrvBaselineBand, latestReading, type Cue } from '../data/body-view';
 import { useHealthData } from '../data/HealthDataProvider';
 import { HealthMetricCard } from './HealthMetricCard';
@@ -131,7 +132,7 @@ export function HrvBaselineCard() {
   const baseline = readiness.data?.baselineHrv ?? null;
   const recent = readiness.data?.recentHrv ?? null;
   if (baseline === null || baseline <= 0 || recent === null) return null;
-  const deviation = Math.round(((recent - baseline) / baseline) * 100);
+  const deviation = hrvBaselineDeviationPct(recent, baseline);
   const band = hrvBaselineBand(deviation);
   const color = cueColor(band.cue);
   return (
@@ -273,7 +274,11 @@ export function TrainingLoadCard() {
         <AppText variant="heading">Baselining new routine</AppText>
       ) : insufficient ? (
         <AppText variant="heading">
-          {load.error && !load.data ? "Couldn't load your training load" : 'Not enough data yet'}
+          {load.error && !load.data
+            ? "Couldn't load your training load"
+            : load.loading && !load.data
+              ? 'Loading…'
+              : 'Not enough data yet'}
         </AppText>
       ) : (
         <Stack direction="row" align="baseline" gap="md" wrap>

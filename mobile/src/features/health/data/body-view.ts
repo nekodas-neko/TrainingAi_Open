@@ -2,7 +2,7 @@ import { formatDateDisplay, formatTimeOfDay } from '@trainingai/shared/date-util
 import { formatHoursMinutes } from '@trainingai/shared/format/units';
 import { actualSleepWindow } from '@trainingai/shared/health/actual-sleep-window';
 import { evaluateWeightRateVsGoalBand } from '@trainingai/shared/health/long-term-goal-progress';
-import { scoreBand } from '@trainingai/shared/health/score-band';
+import { hrvBaselineBand as sharedHrvBand } from '@trainingai/shared/health/hrv-baseline';
 import type { Tone } from '../../../shared/theme/theme';
 import type { BodyRow, SleepRow } from './models';
 
@@ -101,7 +101,7 @@ export function weightPaceLine(
 
 /** The HRV card cue: the band of the 7-day deviation from the 28-day baseline, as the current app maps it. */
 export function hrvBaselineBand(deviationPct: number): { label: string; cue: Cue } {
-  const band = scoreBand(70 + 2 * deviationPct);
+  const band = sharedHrvBand(deviationPct);
   return {
     label: band.label,
     cue: band.label === 'High' ? 'good' : band.label === 'Moderate' ? 'watch' : 'bad',
@@ -136,13 +136,12 @@ export function latestReading(
     : null;
 }
 
-/** Weekday names for chart axes, from dates oldest first, thinned to at most `max` labels that end on the newest day. */
+/** One axis label per date, oldest first: the weekday on every `step`th day counting back from the newest, '' elsewhere. LineChart centres each non-blank label under its own point. */
 export function weekdayAxis(dates: readonly string[], max = 7): string[] {
-  if (dates.length === 0) return [];
   const step = Math.ceil(dates.length / max);
-  const picked: string[] = [];
-  for (let i = dates.length - 1; i >= 0; i -= step) picked.unshift(dates[i]);
-  return picked.map((date) => formatDateDisplay(date, 'weekday'));
+  return dates.map((date, i) =>
+    (dates.length - 1 - i) % step === 0 ? formatDateDisplay(date, 'weekday') : '',
+  );
 }
 
 /** Seconds the ring has been worn so far today: the elapsed day minus non-wear time, never negative. */

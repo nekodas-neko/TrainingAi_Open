@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { latestDisplayedBodyFat } from '@trainingai/shared/health/body-fat-display';
 import { bmiClassification } from '@trainingai/shared/health/bmi';
 import { computeWeightRateKgPerWeek } from '@trainingai/shared/health/long-term-goal-progress';
 import { toAestDay } from '@trainingai/shared/date-utils';
@@ -6,7 +7,7 @@ import { AppText, Card, Disclosure, FeatureRow, Grid } from '../../../shared/ui'
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useHealthData } from '../data/HealthDataProvider';
-import { displayFat, goalsSpec, latestMetric, profileSpec, progressSpec } from '../data/models';
+import { goalsSpec, latestMetric, profileSpec, progressSpec } from '../data/models';
 import { HealthMetricCard } from './HealthMetricCard';
 import { MuscleStatusCard } from './MuscleStatusCard';
 import { MetricLogSheet, type LogMetric } from './MetricLogSheet';
@@ -41,8 +42,7 @@ export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) =
   const today = health.body?.today;
   const weight = health.body?.latestWeightKg ?? latestMetric(rows, 'weightKg')?.weightKg ?? null;
   const weightDate = health.body?.latestWeightDate ?? latestMetric(rows, 'weightKg')?.date;
-  const fatRow = rows.find((row) => displayFat(row) !== null);
-  const fat = displayFat(fatRow);
+  const { value: fat, corrected: fatCorrected } = latestDisplayedBodyFat(rows);
   const { bmi, bmiLabel } = bmiClassification({
     weightKg: weight,
     heightCm: profile.data?.user.heightCm,
@@ -105,14 +105,14 @@ export function BodyPanel({ openDetail }: { openDetail: (detail: HealthDetail) =
             <AppText variant="caption" tone="muted">
               {bmiLabel}
               {fat != null
-                ? ` · via body fat %${fatRow?.bodyFatIsCorrected ? ' (DEXA-calibrated)' : ''}`
+                ? ` · via body fat %${fatCorrected ? ' (DEXA-calibrated)' : ''}`
                 : ''}
             </AppText>
           )}
           <Disclosure title="About BMI">
             <AppText variant="caption" tone="muted">
               {fat != null
-                ? `Category is based on your body fat %, which is more accurate for muscular builds. Standard BMI categories assume average body composition and classify muscle as excess weight.${fatRow?.bodyFatIsCorrected ? ' That reading is your scale’s, corrected to your DEXA scan before the category is chosen.' : ''}`
+                ? `Category is based on your body fat %, which is more accurate for muscular builds. Standard BMI categories assume average body composition and classify muscle as excess weight.${fatCorrected ? ' That reading is your scale’s, corrected to your DEXA scan before the category is chosen.' : ''}`
                 : 'Weight ÷ height². Standard categories assume average body composition. Log body fat % to get a category adjusted for muscle mass.'}
             </AppText>
           </Disclosure>

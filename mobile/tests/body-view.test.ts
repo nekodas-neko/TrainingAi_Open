@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import { test } from 'node:test';
 import {
   acwrZoneLabel,
@@ -121,13 +122,18 @@ test('a heart tile shows the newest reading and a date only when it is not today
   assert.equal(latestReading(rows, 'spo2Pct', '2026-10-17'), null);
 });
 
-test('the weekday axis ends on the newest day and thins long windows', () => {
+test('the weekday axis is one label per date, blank between the thinned ones, ending on the newest day', () => {
   const dates = Array.from({ length: 14 }, (_, i) => `2026-10-${String(4 + i).padStart(2, '0')}`);
   const axis = weekdayAxis(dates);
-  assert.equal(axis.length, 7);
+  assert.equal(axis.length, dates.length);
+  assert.equal(axis.filter((label) => label !== '').length, 7);
   // 17 October 2026 is a Saturday.
   assert.match(axis.at(-1)!, /Sat/);
-  assert.equal(weekdayAxis(dates.slice(0, 7)).length, 7);
+  // Every second day from the newest back: the label sits on the date it names.
+  dates.forEach((date, i) => {
+    assert.equal(axis[i], (13 - i) % 2 === 0 ? formatDateDisplay(date, 'weekday') : '');
+  });
+  assert.equal(weekdayAxis(dates.slice(0, 7)).filter((label) => label !== '').length, 7);
   assert.deepEqual(weekdayAxis([]), []);
 });
 

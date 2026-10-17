@@ -76,3 +76,24 @@ export function meetBox(width: number, height: number, vbWidth: number, vbHeight
     offsetY: (height - vbHeight * scale) / 2,
   };
 }
+
+/** True when `axisLabels` has one entry per point and some are blank: the caller has thinned the axis
+ *  and each remaining label belongs under its own point, not spread across the row. */
+export function isPointAlignedAxis(labelCount: number, pointCount: number, labels: readonly string[]) {
+  return labelCount === pointCount && pointCount > 1 && labels.some((label) => label === '');
+}
+
+/** Pixel centre, from the left of the chart view, of the point at `x`. Mirrors LineChart's own
+ *  viewBox maths (12..308 of 320, fitted by `meetBox`) so a label lands under its point. */
+export function pointCentreX(
+  x: number,
+  xMin: number,
+  xMax: number,
+  plotWidth: number,
+  plotHeight: number,
+  leftInset = 0,
+) {
+  const box = meetBox(plotWidth, plotHeight, 320, 90);
+  const vb = xMin === xMax ? 160 : 12 + ((x - xMin) / (xMax - xMin)) * 296;
+  return leftInset + box.offsetX + box.scale * vb;
+}
