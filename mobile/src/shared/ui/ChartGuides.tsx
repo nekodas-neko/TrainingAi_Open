@@ -1,30 +1,43 @@
-import { View } from "react-native";
-import Svg, { Line } from "react-native-svg";
-import { AppText } from "./AppText";
-import { useTheme } from "../theme/ThemeProvider";
+import { PixelRatio, View } from 'react-native';
+import Svg, { Line } from 'react-native-svg';
+import { AppText } from './AppText';
+import { yAxisWidth } from './chartScale';
+import { useTheme } from '../theme/ThemeProvider';
 
 // Overlay pieces shared by the chart components' opt-in axes, gridlines and target line. They take
 // pixel y positions (0 = top of the plot), so each chart maps its own scale and these stay dumb.
+// They are decoration: hidden from screen readers (each chart's own label carries the target and
+// range) and transparent to touches.
+const decorative = {
+  pointerEvents: 'none',
+  accessibilityElementsHidden: true,
+  importantForAccessibility: 'no-hide-descendants',
+} as const;
 
-/** Width reserved left of the plot when a chart shows y-axis labels. */
-export const Y_AXIS_WIDTH = 32;
+/** Width of the y-axis column for these labels, grown with the system font scale. */
+export function yAxisColumnWidth(texts: readonly string[]): number {
+  return yAxisWidth(texts, PixelRatio.getFontScale());
+}
 
 /** Faint horizontal gridlines and a dashed target line with its label, drawn over the plot. */
 export function ChartGuides({
   height,
   gridYs = [],
   target,
+  left = 0,
 }: {
   height: number;
   gridYs?: readonly number[];
   target?: { y: number; label: string };
+  left?: number;
 }) {
   const { theme } = useTheme();
+  const lineHeight = theme.typography.caption.lineHeight!;
+  // Above the line, unless the line is so near the top that the label would be cut off or struck
+  // through; then below it.
+  const labelTop = target && target.y < lineHeight ? target.y + 2 : (target?.y ?? 0) - lineHeight;
   return (
-    <View
-      pointerEvents="none"
-      style={{ position: "absolute", left: 0, right: 0, top: 0, height }}
-    >
+    <View style={{ position: 'absolute', left, right: 0, top: 0, height }} {...decorative}>
       <Svg width="100%" height={height}>
         {gridYs.map((y, index) => (
           <Line
@@ -53,9 +66,11 @@ export function ChartGuides({
         <AppText
           variant="caption"
           style={{
-            position: "absolute",
+            position: 'absolute',
             right: 0,
-            top: Math.max(0, target.y - theme.typography.caption.lineHeight!),
+            top: labelTop,
+            paddingHorizontal: 2,
+            backgroundColor: theme.colors.surface,
             color: theme.colors.brandText,
           }}
         >
@@ -77,14 +92,17 @@ export function YAxisLabels({
   const { theme } = useTheme();
   const half = theme.typography.caption.lineHeight! / 2;
   return (
-    <View style={{ width: Y_AXIS_WIDTH, height }}>
-      {items.map((item) => (
+    <View
+      style={{ width: yAxisColumnWidth(items.map((item) => item.text)), height }}
+      {...decorative}
+    >
+      {items.map((item, index) => (
         <AppText
-          key={item.text}
+          key={index}
           variant="caption"
           numberOfLines={1}
           style={{
-            position: "absolute",
+            position: 'absolute',
             right: 4,
             top: Math.min(height - 2 * half, Math.max(0, item.y - half)),
           }}
