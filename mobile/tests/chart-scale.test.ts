@@ -9,6 +9,8 @@ import {
   drawableTarget,
   guideSummary,
   yPixel,
+  isPointAlignedAxis,
+  pointCentreX,
 } from "../src/shared/ui/chartScale.ts";
 import { niceTicks as nutritionNiceTicks } from "../src/features/nutrition/data/heart-response-view.ts";
 
@@ -99,4 +101,24 @@ test("meetBox centres the viewBox on the limiting axis", () => {
   assert.equal(narrow.scale, 0.5);
   assert.equal(narrow.offsetX, 0);
   assert.equal(narrow.offsetY, 25.5);
+});
+
+test("a thinned axis puts each label under its own point", () => {
+  // 14 points with a label on every second one: label i must sit at point i's x, not spread evenly.
+  const labels = Array.from({ length: 14 }, (_, i) => ((13 - i) % 2 === 0 ? `L${i}` : ""));
+  assert.ok(isPointAlignedAxis(labels.length, 14, labels));
+  const width = 320;
+  const height = 90;
+  const centres = labels.map((l, i) => (l ? pointCentreX(i, 0, 13, width, height) : null));
+  labels.forEach((l, i) => {
+    if (!l) return;
+    // The point at index i is drawn at 12 + i/13*296 of 320 (scale 1 here).
+    assert.ok(Math.abs(centres[i]! - (12 + (i / 13) * 296)) < 1e-9);
+  });
+  // Not where an even spread of the 7 labels would put them (0, 1/6, ... of the row).
+  const shown = centres.filter((c): c is number => c !== null);
+  assert.ok(Math.abs(shown[1] - 320 / 6) > 5);
+  // Leaves every other caller alone: full or short label lists keep the old spread.
+  assert.equal(isPointAlignedAxis(3, 14, ["a", "b", "c"]), false);
+  assert.equal(isPointAlignedAxis(3, 3, ["a", "b", "c"]), false);
 });

@@ -20,6 +20,7 @@ import { ResourceStatus } from '../../workouts/components/ResourceStatus';
 import { useWorkoutAction } from '../../workouts/data/useWorkoutAction';
 import { useHealthData } from '../data/HealthDataProvider';
 import { recoverySpec } from '../data/models';
+import { titleCaseWords } from '../data/body-view';
 import { TrainingSyncNotice } from '../../workouts/components/TrainingSyncNotice';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 
@@ -115,8 +116,8 @@ export function MuscleStatusCard() {
         {active.map((injury) => (
           <ListRow
             key={injury.id}
-            title={injury.muscleName}
-            subtitle={`${injury.severity} · Day ${daysBetweenDateStrs(injury.startedDate, today) + 1}${injury.notes ? ` · ${injury.notes}` : ''}`}
+            title={titleCaseWords(injury.muscleName)}
+            subtitle={`${titleCaseWords(injury.severity)} · Day ${daysBetweenDateStrs(injury.startedDate, today) + 1}${injury.notes ? ` · ${injury.notes}` : ''}`}
             onPress={() => {
               setEditing(injury);
               setRemove(false);
@@ -127,7 +128,7 @@ export function MuscleStatusCard() {
           <Disclosure title={`Resolved (${resolved.length})`}>
             {resolved.map((injury) => (
               <AppText key={injury.id} variant="caption" tone="muted">
-                {injury.muscleName} · Resolved {injury.resolvedDate}
+                {titleCaseWords(injury.muscleName)} · Resolved {injury.resolvedDate}
               </AppText>
             ))}
           </Disclosure>

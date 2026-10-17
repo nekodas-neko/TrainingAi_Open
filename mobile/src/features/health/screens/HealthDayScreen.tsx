@@ -206,7 +206,7 @@ export function DayReadThrough({
           ['distanceKm', 'Distance', 'km'],
         ] as const
       ).flatMap(([key, label, unit]) => {
-        const value = key === 'bodyFatCorrected' ? displayFat({ ...body, date }) : body[key];
+        const value = key === 'bodyFatCorrected' ? displayFat(body) : body[key];
         return value != null
           ? [
               {

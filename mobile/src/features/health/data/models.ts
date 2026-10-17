@@ -702,9 +702,8 @@ export const doseVitalsSpec = {
     ),
   }),
 };
-export function displayFat(row: BodyRow | null | undefined) {
-  return row?.bodyFatCorrected ?? row?.bodyFat ?? null;
-}
+// The screens' body-fat rule lives in packages/shared; this is the same function under the local name.
+export { displayBodyFat as displayFat } from '@trainingai/shared/health/body-fat-display';
 export function latestMetric(rows: BodyRow[], field: keyof BodyRow) {
   return (
     [...rows]
