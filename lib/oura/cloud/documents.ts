@@ -11,6 +11,7 @@ import type { OuraDailyRow, OuraSleepUpsertRow } from '@/lib/data/repository'
 import type { BodyMetrics } from '@trainingai/shared/types/body'
 import { MAX_PLAUSIBLE_BPM, MIN_PLAUSIBLE_BPM } from '@trainingai/shared/validation/plausibility'
 import { isCalendarDate } from '@trainingai/shared/date-utils'
+import type { OuraScope } from './config'
 
 /** Spec `ISODate`. A real calendar day; stored in the dash form our date columns and keys use. */
 const Day = z.string().refine(isCalendarDate, 'not a calendar day').transform(d => d.replace(/\//g, '-'))
@@ -179,6 +180,32 @@ export const OURA_DOCUMENT_TYPES = {
 
 export type OuraDocumentType = keyof typeof OURA_DOCUMENT_TYPES
 export const OURA_DOCUMENT_TYPE_NAMES = Object.keys(OURA_DOCUMENT_TYPES) as OuraDocumentType[]
+
+/**
+ * The OAuth scope each collection, and the heart-rate series, needs (#2974). Oura answers 401 for a
+ * collection whose scope the user did not grant, the same status as a dead token, so the callers
+ * check the grant first. The spec maps no route to a scope; these follow its scope descriptions.
+ * It names no scope for stress, resilience, cardiovascular age or VO2 max: we assume `daily`, as
+ * the oura-api skill does.
+ */
+export const OURA_SCOPE_FOR: Record<OuraDocumentType | 'heartrate', OuraScope> = {
+  daily_readiness: 'daily',
+  daily_sleep: 'daily',
+  daily_activity: 'daily',
+  daily_spo2: 'spo2Daily',
+  daily_stress: 'daily',
+  daily_resilience: 'daily',
+  daily_cardiovascular_age: 'daily',
+  vo2_max: 'daily',
+  sleep: 'daily',
+  workout: 'workout',
+  heartrate: 'heartrate',
+}
+
+/** True when the grant covers `type`. A `null` grant (no scope string stored) covers everything. */
+export function isOuraTypeShared(granted: ReadonlySet<string> | null, type: OuraDocumentType | 'heartrate'): boolean {
+  return granted === null || granted.has(OURA_SCOPE_FOR[type])
+}
 
 export type OuraDocument =
   | { type: 'daily_readiness'; doc: DailyReadinessDoc }

@@ -104,7 +104,8 @@ describe('handleOuraWebhookEvent (#2859)', () => {
       userId: USER,
       accessToken: encryptOuraToken('acc', USER, 'access_token'),
       refreshToken: encryptOuraToken('ref', USER, 'refresh_token'),
-      expiresAt: new Date(Date.now() + 86_400_000), scope: 'daily', ouraUserId: OURA_USER, updatedAt: new Date(),
+      expiresAt: new Date(Date.now() + 86_400_000), scope: 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2Daily',
+      ouraUserId: OURA_USER, updatedAt: new Date(),
     }
     writes.daily = 0; writes.sleep = 0; writes.tombstoned = []
     heartRate.mockReset()
@@ -138,6 +139,27 @@ describe('handleOuraWebhookEvent (#2859)', () => {
   it('ignores a data type we do not store, without a lookup or a fetch', async () => {
     expect(await handleOuraWebhookEvent(deps(), event({ data_type: 'tag' }))).toMatchObject({ result: 'ignored' })
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  // #2974: Oura answers 401 for a type the user did not share; that is not a reason to reconnect.
+  it('ignores an event for a type the grant does not cover, without a fetch', async () => {
+    row = { ...row!, scope: 'extapi:personal extapi:daily extapi:heartrate extapi:workout' }
+    expect(await handleOuraWebhookEvent(deps(), event({ data_type: 'daily_spo2', object_id: 'sp-1' })))
+      .toEqual({ result: 'ignored', reason: 'daily_spo2 is not shared' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('reads any type when the grant has no scope string (a legacy row)', async () => {
+    row = { ...row!, scope: null }
+    fetchMock.mockResolvedValueOnce(jsonResponse(FIXTURES.daily_spo2))
+    expect(await handleOuraWebhookEvent(deps(), event({ data_type: 'daily_spo2', object_id: 'sp-1' }))).toMatchObject({ result: 'written' })
+  })
+
+  it('does not start a heart-rate catch-up when heartrate is not shared', async () => {
+    row = { ...row!, scope: 'extapi:daily' }
+    fetchMock.mockResolvedValueOnce(jsonResponse(FIXTURES.sleep))
+    expect(await handleOuraWebhookEvent(deps(), event({ data_type: 'sleep', object_id: 'sl-1' }))).toMatchObject({ result: 'written' })
+    expect(heartRate).not.toHaveBeenCalled()
   })
 
   it('answers unknown_user for an Oura account nobody here holds', async () => {
