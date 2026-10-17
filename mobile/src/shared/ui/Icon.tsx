@@ -42,6 +42,7 @@ import ArrowDown from 'lucide-react-native/icons/arrow-down';
 import Pencil from 'lucide-react-native/icons/pencil';
 import Trash from 'lucide-react-native/icons/trash';
 import Plus from 'lucide-react-native/icons/plus';
+import Search from 'lucide-react-native/icons/search';
 import Minus from 'lucide-react-native/icons/minus';
 import Settings from 'lucide-react-native/icons/settings';
 import Info from 'lucide-react-native/icons/info';
@@ -115,6 +116,7 @@ const icons = {
   edit: Pencil,
   delete: Trash,
   plus: Plus,
+  search: Search,
   minus: Minus,
   settings: Settings,
   info: Info,

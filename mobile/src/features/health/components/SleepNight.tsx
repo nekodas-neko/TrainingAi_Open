@@ -1,6 +1,7 @@
 import Svg, { Rect } from 'react-native-svg';
 import { formatTimeOfDay } from '@trainingai/shared/date-utils';
 import { formatHoursMinutes } from '@trainingai/shared/format/units';
+import { stageValue } from '../data/stage-value';
 import {
   hypnogramSegments,
   STAGE_LEVEL,
@@ -132,7 +133,7 @@ export function SleepNight({
             .filter(([field]) => night[field] != null)
             .map(([field, label, unit]) => ({
               label,
-              value: metricValue(night[field], unit, 1),
+              value: stageValue(night[field], unit),
             }))}
         />
       ) : (
@@ -155,7 +156,7 @@ export function SleepNight({
               <MetricTile
                 key={field}
                 label={label}
-                value={metricValue(night[field], unit, 1)}
+                value={stageValue(night[field], unit)}
                 tone="sleep"
               />
             ))}
