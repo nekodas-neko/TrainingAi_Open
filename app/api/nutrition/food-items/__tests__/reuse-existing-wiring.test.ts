@@ -44,4 +44,12 @@ describe('POST /api/nutrition/food-items', () => {
     const [, data] = createFoodItem.mock.calls[0]
     expect(data.calories).not.toBe(9999)
   })
+
+  it('#2876: a hand-entered 50 kcal food with no macros is stored at 50, not repaired to 0', async () => {
+    // Reverting this call site to the scan's unconditional repair reads the untouched macros as 0 g
+    // and saves 0 kcal. The pure function is tested elsewhere; this pins that the route passes the source.
+    const res = await post({ name: 'Hand-typed snack', servingSizeG: 30, calories: 50, proteinG: 0, carbsG: 0, fatG: 0, source: 'manual' })
+    expect(res.status).toBe(201)
+    expect(createFoodItem.mock.calls[0][1].calories).toBe(50)
+  })
 })

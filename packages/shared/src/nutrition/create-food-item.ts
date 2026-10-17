@@ -1,5 +1,5 @@
 import type { FoodItem } from '@trainingai/shared/types/nutrition'
-import { sanitiseNutrition } from '@trainingai/shared/nutrition/scan-totals'
+import { sanitiseFoodItemNutrition } from '@trainingai/shared/nutrition/scan-totals'
 import { findDuplicateFoodItem } from '@trainingai/shared/nutrition/food-item-identity'
 import { rejectMealImage, FOOD_ITEM_IMAGE_MAX_BYTES } from '@trainingai/shared/nutrition/meal-image'
 import { todayInTz } from '@trainingai/shared/date-utils'
@@ -21,7 +21,7 @@ import { invalidateFoodItems } from '@/lib/cache-groups'
  * queue the mutation — so this is that shape extracted rather than a fourth invention.
  *
  * **The sanitiser runs here on purpose.** `POST /api/nutrition/food-items` applies
- * `sanitiseNutrition` server-side, so a client that stored its own unsanitised copy would hold
+ * `sanitiseFoodItemNutrition` server-side, so a client that stored its own unsanitised copy would hold
  * different numbers from the server for the same id until the next pull. Running the same shared
  * function first means the two agree by construction.
  */
@@ -56,11 +56,11 @@ export interface NewFoodItem {
 }
 
 export async function createFoodItem(input: NewFoodItem, userId?: string): Promise<FoodItem> {
-  const s = sanitiseNutrition({
+  const s = sanitiseFoodItemNutrition({
     calories: input.calories, proteinG: input.proteinG, carbsG: input.carbsG, fatG: input.fatG,
     servingSizeG: input.servingSizeG, fiberG: input.fiberG, sugarG: input.sugarG,
     sodiumMg: input.sodiumMg, satFatG: input.satFatG,
-  })
+  }, input.source)
 
   const item: FoodItem = {
     id: crypto.randomUUID(),

@@ -126,14 +126,10 @@ export interface CountedEstimateInput {
   loggedMealTypeIds: ReadonlySet<string | null | undefined>
 }
 
-export function countedEstimateKcal(input: CountedEstimateInput): number {
-  return Math.round(countedEstimates(input).reduce((sum, e) => sum + e.kcal, 0))
-}
-
 /**
- * #2072. The same rule as `countedEstimateKcal`, one row per counted estimate, so a surface can say
- * WHICH meals were assumed ("incl. 480 estimated · lunch"). The sum of `kcal` is that function's
- * answer before rounding; it is built on this, so the two cannot disagree.
+ * #2072. One row per counted estimate, so a surface can say WHICH meals were assumed
+ * ("incl. 480 estimated · lunch"). Summed by `countedIntakeKcal` / `countedEstimateTotal`
+ * (`counted-intake.ts`), the one place a day's intake is added up (#2863).
  */
 export function countedEstimates(input: CountedEstimateInput): { planMealId: string; mealTypeId: string; kcal: number }[] {
   const mealById = new Map(input.planMeals.map(m => [m.id, m]))

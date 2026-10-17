@@ -120,3 +120,34 @@ export interface SupplementWithStatus extends Supplement {
    */
   loggedAmount?: SupplementDayAmount | null
 }
+
+/** One live contribution to a supplement's day, as the by-date read reports it. */
+export interface SupplementDayContributionRow {
+  /** The `supplement_logs` row id. */
+  id: string
+  amount: number | null
+  unit: string | null
+  doseText: string | null
+  takenAt: Date | null
+  /** The `food_logs` row a food-derived contribution came from; always null on the manual one. */
+  sourceRef: string | null
+}
+
+/**
+ * One supplement on one local date, with the manual tick kept apart from food-derived doses.
+ *
+ * `manual` is exactly what the supplements page's tick writes and removes, so a native client that
+ * unticks a dose verifies it by `manual === null` — a meal's dose still on the day is in
+ * `foodDerived` and `total`, and is not a deleted tick.
+ */
+export interface SupplementDayLog {
+  supplementId: string
+  /** The local date asked for, `YYYY-MM-DD`. */
+  date: string
+  /** True when the supplement definition itself has been deleted (its tombstone is `deleted_at`). */
+  supplementDeleted: boolean
+  manual: SupplementDayContributionRow | null
+  foodDerived: SupplementDayContributionRow[]
+  /** Summed across every live contribution; null when the day has none. */
+  total: SupplementDayAmount | null
+}

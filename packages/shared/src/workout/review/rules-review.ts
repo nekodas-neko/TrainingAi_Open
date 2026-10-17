@@ -10,12 +10,57 @@ import {
   type BudgetStageExercise,
 } from '@trainingai/shared/ai-periodization/budget-stage'
 import type { PrescriptionSignals } from '@trainingai/shared/ai-periodization/signals'
-import type { ReviewModelExercise } from '@trainingai/shared/workout/review/reconcile'
+import type { ReviewModelExercise, ReviewProposal, ReviewProposalExercise } from '@trainingai/shared/workout/review/reconcile'
 
+
+/**
+ * The sheet's summary line. One writer for the text, so the allocator's draft and the final,
+ * reconciled proposal cannot word the same outcome two ways.
+ */
+function summarizeReview(params: {
+  budgetMin: number
+  droppedNames: string[]
+  adjustedCount: number
+  /** Exercises the allocator dropped but a guard in `reconcileReview` kept. */
+  protectedNames: string[]
+}): string {
+  const { budgetMin, droppedNames, adjustedCount, protectedNames } = params
+  const parts: string[] = []
+  if (droppedNames.length > 0) {
+    parts.push(`${droppedNames.join(', ')} ${droppedNames.length === 1 ? 'is' : 'are'} dropped for today to fit the ${budgetMin}-min working budget: whole exercises go before any sets are cut.`)
+  }
+  if (adjustedCount > 0) {
+    parts.push(budgetMin === 0
+      ? 'Set counts adjusted to match exercise roles; no time limit applied.'
+      : `${adjustedCount} ${adjustedCount === 1 ? 'exercise has its' : 'exercises have their'} set count trimmed to fit the ${budgetMin}-min working budget.`)
+  }
+  if (protectedNames.length > 0) {
+    parts.push(`${protectedNames.join(', ')} ${protectedNames.length === 1 ? 'stays' : 'stay'} in despite the budget, to protect your training.`)
+  }
+  if (parts.length === 0) {
+    parts.push(budgetMin === 0 ? 'No time limit is set; all exercises are kept.' : `This session already fits its ${budgetMin}-min working budget, so nothing is changed.`)
+  }
+  return parts.join(' ')
+}
+
+/**
+ * The summary for what the user is actually shown. `buildRulesReview` only knows what the
+ * allocator wanted; `reconcileReview` may keep some of those drops (last primary, last cover of an
+ * under-target muscle). Written from the reconciled proposal, the line and the rows agree.
+ */
+export function summarizeReconciledReview(proposal: ReviewProposal): string {
+  const names = (pick: (e: ReviewProposalExercise) => boolean) => proposal.exercises.filter(pick).map(e => e.name)
+  return summarizeReview({
+    budgetMin: proposal.budgetMin,
+    droppedNames: names(e => e.action === 'drop'),
+    adjustedCount: proposal.exercises.filter(e => e.action === 'adjust').length,
+    protectedNames: names(e => e.action === 'keep' && e.guardAdjusted),
+  })
+}
 
 export interface RulesReviewResult {
   modelExercises: ReviewModelExercise[]
-  /** Deterministic prose for the sheet's summary line, in place of the model's `reasoning`. */
+  /** The allocator's own draft of the summary. The route replaces it with `summarizeReconciledReview` once the guards have run. */
   reasoning: string
 }
 
@@ -67,22 +112,12 @@ export function buildRulesReview(params: {
     })
   }
 
-  const adjusted = modelExercises.filter(m => m.action === 'adjust').length
-  const dropCount = droppedIds.size
-  const parts: string[] = []
-  if (dropCount > 0) {
-    const names = exercises
-      .filter(ex => droppedIds.has(ex.sessionExerciseId)).map(ex => ex.name).join(', ')
-    parts.push(`${names} ${dropCount === 1 ? 'is' : 'are'} dropped for today to fit the ${budgetMin}-min working budget: whole exercises go before any sets are cut.`)
-  }
-  if (adjusted > 0) {
-    parts.push(budgetMin === 0
-      ? 'Set counts adjusted to match exercise roles; no time limit applied.'
-      : `${adjusted} ${adjusted === 1 ? 'exercise has its' : 'exercises have their'} set count trimmed to fit the ${budgetMin}-min working budget.`)
-  }
-  if (parts.length === 0) {
-    parts.push(budgetMin === 0 ? 'No time limit is set; all exercises are kept.' : `This session already fits its ${budgetMin}-min working budget, so nothing is changed.`)
-  }
+  const reasoning = summarizeReview({
+    budgetMin,
+    droppedNames: exercises.filter(ex => droppedIds.has(ex.sessionExerciseId)).map(ex => ex.name),
+    adjustedCount: modelExercises.filter(m => m.action === 'adjust').length,
+    protectedNames: [],
+  })
 
-  return { modelExercises, reasoning: parts.join(' ') }
+  return { modelExercises, reasoning }
 }

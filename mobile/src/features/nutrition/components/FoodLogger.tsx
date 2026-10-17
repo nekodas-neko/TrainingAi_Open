@@ -33,6 +33,7 @@ import {
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useNutrition } from '../data/NutritionProvider';
 import { foodValidationMessage, normaliseFood } from '../data/food-values';
+import { countedIntakeKcal, readEstimateRows } from '@trainingai/shared/nutrition/counted-intake';
 import {
   FoodItemPushSchema,
   foodSchema,
@@ -789,23 +790,27 @@ export function FoodLogger({
             <AppText variant="caption" tone="muted">
               {date}
             </AppText>
-            {date === n.today && n.view.totals && energy.data?.balance?.budgetKcal != null && (
-              <Card>
-                <AppText variant="caption">Today after logging</AppText>
-                <AppText>
-                  {Math.round(
+            {date === n.today &&
+              n.view.totals &&
+              energy.data?.balance?.budgetKcal != null &&
+              (() => {
+                // #2863: the shared counted intake, with this food superseding its meal's estimate.
+                const after = countedIntakeKcal({
+                  loggedKcal:
                     n.view.totals.calories + Number(d.fields.calories) * Number(d.quantity),
-                  )}{' '}
-                  / {Math.round(energy.data.balance.budgetKcal)} kcal
-                </AppText>
-                <ProgressBar
-                  value={
-                    (n.view.totals.calories + Number(d.fields.calories) * Number(d.quantity)) /
-                    energy.data.balance.budgetKcal
-                  }
-                />
-              </Card>
-            )}
+                  estimates: readEstimateRows(energy.data.balance.estimatedMeals),
+                  loggedMealTypeIds: [...n.view.logs.map((x) => x.mealTypeId), d.mealTypeId],
+                });
+                return (
+                  <Card>
+                    <AppText variant="caption">Today after logging</AppText>
+                    <AppText>
+                      {after} / {Math.round(energy.data.balance.budgetKcal)} kcal
+                    </AppText>
+                    <ProgressBar value={after / energy.data.balance.budgetKcal} />
+                  </Card>
+                );
+              })()}
             <MacroLine
               value={{
                 calories: Number(d.fields.calories) || 0,

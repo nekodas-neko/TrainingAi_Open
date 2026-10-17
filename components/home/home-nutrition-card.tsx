@@ -5,6 +5,7 @@ import { navigateWithTransition } from '@/lib/navigate-with-transition'
 import { cn, accentCardStyle } from '@trainingai/shared/utils'
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
 import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
+import { countedIntakeKcal, readEstimateRows } from '@trainingai/shared/nutrition/counted-intake'
 import { ColorSwatchPicker } from '@/components/ui/color-swatch-picker'
 import { HomeNutritionZoneBar } from '@/components/home/home-nutrition-zone-bar'
 import { useEnergyBalanceToday } from '@/app/health/hooks/use-health-calcs'
@@ -19,6 +20,27 @@ interface Props {
   nutrProtein: number | null
   nutrCarbs: number | null
   nutrFat: number | null
+}
+
+/**
+ * The card's calorie figures, from one place (#2863).
+ *
+ * With the energy-balance payload the day is `countedIntakeKcal` over its logged half and its
+ * per-meal estimates, which is the ring's figure. Without it (still loading) the only number is
+ * body-metadata's `today.calories`, already the counted total, and there is no estimate to stripe.
+ * Exported so a test can pin it to the ring on the seeded day.
+ */
+export function homeCardCalories(
+  balance: { loggedIntakeKcal: number; estimatedMeals?: unknown } | null,
+  bodyMetadataCalories: number | null,
+): { eatenKcal: number; loggedKcal: number; estimated: number } {
+  if (!balance) {
+    const eaten = bodyMetadataCalories ?? 0
+    return { eatenKcal: eaten, loggedKcal: eaten, estimated: 0 }
+  }
+  const estimates = readEstimateRows(balance.estimatedMeals)
+  const eatenKcal = countedIntakeKcal({ loggedKcal: balance.loggedIntakeKcal, estimates })
+  return { eatenKcal, loggedKcal: Math.round(balance.loggedIntakeKcal), estimated: eatenKcal - Math.round(balance.loggedIntakeKcal) }
 }
 
 /**
@@ -50,16 +72,17 @@ export function HomeNutritionCard({
   const dailyBudget = balance ? budgetProvenance(balance).total : null
   // Issue 2622. The Daily/Weekly switch is retired: the budget is a day's, so the header and the
   // ring both read today.
-  // #2072. The server's intake counts assumed plan meals; `nutrCalories` is logged food. The ring and
-  // "left" add the same estimate the bar below already includes, so the card says one number.
-  const estimated = balance?.estimatedKcal ?? 0
-  const eatenKcal = (nutrCalories ?? 0) + estimated
+  // #2072 / #2863. `nutrCalories` is `/api/body-metadata` `today.calories`, which is now logged food
+  // PLUS the counted estimates — adding `balance.estimatedKcal` to it counted the estimate twice
+  // (1,900 on the seeded 600 + 650 day). The total comes from the one shared sum, over the same
+  // payload as the budget; the bar keeps the logged-only share so it can stripe the rest.
+  const { eatenKcal, loggedKcal, estimated } = homeCardCalories(balance, nutrCalories)
   const overUnder = dailyBudget != null ? dailyBudget - eatenKcal : null
   const eatenPct = dailyBudget != null && dailyBudget > 0
     ? Math.min(100, Math.round((eatenKcal / dailyBudget) * 100))
     : 0
   const loggedPct = dailyBudget != null && dailyBudget > 0
-    ? Math.min(eatenPct, Math.round(((nutrCalories ?? 0) / dailyBudget) * 100))
+    ? Math.min(eatenPct, Math.round((loggedKcal / dailyBudget) * 100))
     : 0
   // Over budget takes the zone's OWN colour from the payload rather than a local red: it is the
   // same colour the bar and the "Well over"/"Over" label use, so the ring cannot disagree with

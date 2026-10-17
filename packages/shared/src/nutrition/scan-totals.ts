@@ -186,3 +186,57 @@ export function sanitiseNutrition(r: RawNutrition): RawNutrition {
     confidence,
   }
 }
+
+/**
+ * #2876. A food the user typed in, kept as typed. Only the shape is normalised: negatives and junk
+ * become 0, a missing serving becomes the routes' 100 g default, calories round to the integer column
+ * and grams to 0.1 (the precision `food-item-identity.ts` compares at). The schema has already rejected the impossible (`FoodItemFieldsSchema`).
+ *
+ * `sanitiseNutrition` is the wrong tool here. It repairs a SCAN, where the model can invent either
+ * figure, so it reads untouched macro fields as "0 g" and a 50 kcal entry with them as a 100%
+ * deviation, then trusts the macros: the food was saved at 0 kcal. A person who knows the calories
+ * but not the macros is the common case for a hand-entered food.
+ *
+ * The one gap filled is the opposite case: calories left at 0 with macros typed. A food with 20 g
+ * of protein is not 0 kcal, and a 0 there is the field's default, not a measurement. So calories come
+ * from the macros (Atwater) only when the user gave none.
+ */
+export function normaliseHandEnteredNutrition(r: RawNutrition): RawNutrition {
+  const protein = pos(r.proteinG)
+  const carbs   = pos(r.carbsG)
+  const fat     = pos(r.fatG)
+  const typed   = pos(r.calories)
+  const calories = typed > 0
+    ? typed
+    : protein * KCAL_PER_G.protein + carbs * KCAL_PER_G.carbs + fat * KCAL_PER_G.fat
+  return {
+    ...r,
+    // To 0.1 g, not the scan's whole grams: the column is a double, and 100.5 g typed is 100.5 g.
+    servingSizeG: Math.round((pos(r.servingSizeG) || 100) * 10) / 10,
+    calories:     Math.round(calories),
+    proteinG:     Math.round(protein * 10) / 10,
+    carbsG:       Math.round(carbs   * 10) / 10,
+    fatG:         Math.round(fat     * 10) / 10,
+    fiberG:       Math.round(pos(r.fiberG)  * 10) / 10,
+    sugarG:       Math.round(pos(r.sugarG)  * 10) / 10,
+    satFatG:      Math.round(pos(r.satFatG) * 10) / 10,
+    sodiumMg:     Math.round(pos(r.sodiumMg)),
+  }
+}
+
+/**
+ * #2876. The one choice every food-item write makes: a hand-entered food keeps its values
+ * (`normaliseHandEnteredNutrition`); anything a scan, lookup or model produced gets the
+ * hallucination repair (`sanitiseNutrition`). `source` is the `food_items.source` value, and an
+ * absent one means hand-entered, matching the routes' `source ?? 'manual'` default and
+ * `scanOriginToSource`. Called by the web route, the offline push branch, the device's
+ * `createFoodItem` and the native app, so the two rules cannot be applied differently on the way in.
+ */
+export function sanitiseFoodItemNutrition(
+  r: RawNutrition,
+  // `string`, not the column's union: the native app's models type it loosely, and anything that is
+  // not 'manual' is treated as a scan — the repair is the safe default for an unknown origin.
+  source: string | null | undefined,
+): RawNutrition {
+  return source == null || source === 'manual' ? normaliseHandEnteredNutrition(r) : sanitiseNutrition(r)
+}

@@ -1,5 +1,6 @@
 import { randomUUID } from 'expo-crypto';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { View } from 'react-native';
 import { z } from 'zod';
 import {
   AppButton,
@@ -7,6 +8,7 @@ import {
   Card,
   ConfirmationCard,
   Grid,
+  Icon,
   IconButton,
   ListRow,
   NumericStepper,
@@ -16,11 +18,13 @@ import {
   SwitchRow,
   TextField,
 } from '../../../shared/ui';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useNutrition } from '../data/NutritionProvider';
 import { SupplementCreateSchema, type Supplement } from '../data/models';
 import { VialSheet } from './VialSheet';
+import { isMilligramDosed } from '../data/vial-plan';
 import { NutritionReminders } from '../../platform/components/NutritionReminders';
 const formSchema = z.object({
   name: z.string(),
@@ -55,12 +59,23 @@ export function SupplementsSection({ date }: { date: string }) {
       (!s.startedOn || s.startedOn <= date) &&
       (!s.stoppedOn || s.stoppedOn >= date),
   );
+  // Per supplement, like the current app's `toggling` set: a second tap before the first write
+  // lands would read the same `loggedToday` and queue a second dose.
+  const inFlight = useRef(new Set<string>());
+  const [toggling, setToggling] = useState<ReadonlySet<string>>(() => new Set());
   async function toggle(s: Supplement, dose?: number) {
+    if (inFlight.current.has(s.id)) return;
+    inFlight.current.add(s.id);
+    setToggling(new Set(inFlight.current));
     try {
       await n.store?.logSupplement(s, date, dose);
       setPrompt(null);
+      setError(null);
     } catch {
       setError('Could not save the dose.');
+    } finally {
+      inFlight.current.delete(s.id);
+      setToggling(new Set(inFlight.current));
     }
   }
   return (
@@ -75,25 +90,31 @@ export function SupplementsSection({ date }: { date: string }) {
       {active.length ? (
         active.map((s) => (
           <Stack key={s.id} direction="row" align="center">
-            <ListRow
-              title={`${s.loggedToday ? '✓ ' : ''}${s.name}`}
-              subtitle={
-                s.loggedAmount?.mixedUnits
-                  ? 'Taken · multiple units; total unavailable'
-                  : s.loggedAmount?.amount != null
-                    ? `${s.loggedAmount.amount} ${s.loggedAmount.unit ?? ''} today${s.loggedAmount.contributions > 1 ? ' · ' + s.loggedAmount.contributions + ' doses' : ''}`
-                    : `${s.defaultAmount ?? s.dose ?? ''} ${s.unit ?? ''}`
-              }
-              onPress={() => {
-                if (s.dosePrompt && !s.loggedToday) {
-                  setPrompt(s);
-                  setAmount(s.defaultAmount == null ? '' : String(s.defaultAmount));
-                } else {
-                  void toggle(s);
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <ListRow
+                title={s.name}
+                checked={s.loggedToday}
+                leading={<Tick done={s.loggedToday} busy={toggling.has(s.id)} />}
+                trailing={false}
+                subtitle={
+                  s.loggedAmount?.mixedUnits
+                    ? 'Taken · multiple units; total unavailable'
+                    : s.loggedAmount?.amount != null
+                      ? `${s.loggedAmount.amount} ${s.loggedAmount.unit ?? ''} today${s.loggedAmount.contributions > 1 ? ' · ' + s.loggedAmount.contributions + ' doses' : ''}`
+                      : `${s.defaultAmount ?? s.dose ?? ''} ${s.unit ?? ''}`
                 }
-              }}
-            />
-            {s.unit?.toLowerCase() === 'mg' && (
+                onPress={() => {
+                  if (toggling.has(s.id)) return;
+                  if (s.dosePrompt && !s.loggedToday) {
+                    setPrompt(s);
+                    setAmount(s.defaultAmount == null ? '' : String(s.defaultAmount));
+                  } else {
+                    void toggle(s);
+                  }
+                }}
+              />
+            </View>
+            {isMilligramDosed(s) && (
               <IconButton
                 icon="calculator"
                 label={`Vial and dose calculator for ${s.name}`}
@@ -136,6 +157,27 @@ export function SupplementsSection({ date }: { date: string }) {
       </Sheet>
       {vial && <VialSheet supplement={vial} onClose={() => setVial(null)} />}
     </>
+  );
+}
+// The current app's one-tap tick: the row itself logs or un-logs the day's dose.
+function Tick({ done, busy }: { done: boolean; busy: boolean }) {
+  const { theme } = useTheme();
+  return (
+    <View
+      style={{
+        width: theme.sizes.iconSmall,
+        height: theme.sizes.iconSmall,
+        borderRadius: theme.radii.pill,
+        borderWidth: 2,
+        borderColor: done ? theme.colors.brand : theme.colors.muted,
+        backgroundColor: done ? theme.colors.brand : 'transparent',
+        alignItems: 'center',
+        justifyContent: 'center',
+        opacity: busy ? 0.5 : 1,
+      }}
+    >
+      {done && <Icon name="check" color={theme.colors.onBrand} size={theme.sizes.iconSmall - 8} />}
+    </View>
   );
 }
 function SupplementManager({ date, onClose }: { date: string; onClose: () => void }) {
