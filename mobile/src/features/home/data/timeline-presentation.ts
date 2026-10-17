@@ -33,9 +33,9 @@ export function timelineMetrics(event: TimelineEvent, compact = false) {
   if (event.sleepDurationH != null && (!compact || !bedtime)) {
     values.push({ label: 'Time asleep', value: formatHoursMinutes(event.sleepDurationH * 60) });
   }
-  if (!compact && event.readinessScore != null)
-    values.push({ label: 'Energy', value: String(event.readinessScore) });
-  if (!compact && event.sleepScore != null)
+  if ((!compact || event.type === 'wakeup') && event.readinessScore != null)
+    values.push({ label: 'Readiness', value: String(event.readinessScore) });
+  if ((!compact || event.type === 'wakeup') && event.sleepScore != null)
     values.push({ label: 'Sleep score', value: String(event.sleepScore) });
   if (!compact && event.latencyMin != null)
     values.push({ label: 'Time to fall asleep', value: formatHoursMinutes(event.latencyMin) });
@@ -44,12 +44,17 @@ export function timelineMetrics(event: TimelineEvent, compact = false) {
 
 export function timelineSummary(event: TimelineEvent) {
   const values = timelineMetrics(event, true).map((metric) =>
-    metric.label === 'Sets'
-      ? `${metric.value} sets`
-      : metric.label === 'Exercises'
-        ? `${metric.value} exercises`
-        : metric.value,
+    metric.label === 'Readiness'
+      ? `Readiness ${metric.value}`
+      : metric.label === 'Sleep score'
+        ? `Sleep ${metric.value}`
+        : metric.label === 'Sets'
+          ? `${metric.value} sets`
+          : metric.label === 'Exercises'
+            ? `${metric.value} exercises`
+            : metric.value,
   );
+  if (event.endTime && event.type !== 'wakeup') values.unshift(`${event.time} – ${event.endTime}`);
   if (event.subtitle && event.subtitle !== 'Saved on this phone') values.push(event.subtitle);
   return values.join(' · ');
 }

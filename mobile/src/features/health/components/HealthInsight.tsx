@@ -4,7 +4,6 @@ import { AppText, Card, StatusIndicator, Stack, StableContent } from '../../../s
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { useHealthData } from '../data/HealthDataProvider';
-import { healthCopy } from '../data/display-copy';
 const savedInsight = z.object({ insight: z.string(), savedAt: z.number() });
 export function HealthInsight({
   section,
@@ -94,7 +93,7 @@ export function HealthInsight({
       >
         <AppText>
           {insight
-            ? healthCopy(insight)
+            ? insight
             : operations.length
               ? 'Insight will update after your changes upload.'
               : 'No insight available yet.'}

@@ -483,6 +483,7 @@ export const profileSpec = {
           heightCm: n,
           sex: text,
           name: text,
+          displayName: text,
           avatar: text,
           activityLevel: text,
           fitnessGoal: text,
