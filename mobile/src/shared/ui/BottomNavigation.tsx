@@ -13,6 +13,8 @@ export function BottomNavigation<T extends string>({
     key: T;
     label: string;
     emphasized?: boolean;
+    /** A small red dot on the icon, for something waiting on that tab. */
+    badge?: boolean;
     renderIcon: (color: string, size: number) => ReactNode;
   }[];
   selected: T;
@@ -72,7 +74,23 @@ export function BottomNavigation<T extends string>({
                   {item.renderIcon(theme.colors.onBrand, theme.sizes.emphasizedIcon)}
                 </View>
               ) : (
-                item.renderIcon(color, theme.sizes.iconSmall)
+                <View>
+                  {item.renderIcon(color, theme.sizes.iconSmall)}
+                  {item.badge && (
+                    <View
+                      accessibilityLabel="Needs attention"
+                      style={{
+                        position: 'absolute',
+                        top: -theme.spacing.xxs,
+                        right: -theme.spacing.xxs,
+                        width: theme.spacing.sm,
+                        height: theme.spacing.sm,
+                        borderRadius: theme.radii.pill,
+                        backgroundColor: theme.colors.danger,
+                      }}
+                    />
+                  )}
+                </View>
               )}
               <AppText variant="tab" style={{ color }}>
                 {item.label}

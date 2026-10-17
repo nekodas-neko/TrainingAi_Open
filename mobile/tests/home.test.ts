@@ -24,6 +24,7 @@ import {
   timelineDestinationDate,
   timelineMetrics,
   timelineSummary,
+  timelineTimeLabel,
   timelineTitle,
 } from '../src/features/home/data/timeline-presentation.ts';
 import { timelineEventSchema } from '../src/features/home/data/timeline.ts';
@@ -58,9 +59,22 @@ test('the timeline summary does not repeat the start time the row already shows'
     timeMs: 0,
     day: 'today',
   });
-  assert.equal(timelineSummary(event), 'until 7:25 am');
-  assert.ok(!timelineSummary(event).includes(event.time));
+  assert.equal(timelineSummary(event), '');
   assert.equal(timelineSummary({ ...event, endTime: undefined }), '');
+});
+
+test('a timeline row prints its span above the title, and a wake-up its start only', () => {
+  const event = timelineEventSchema.parse({
+    type: 'workout',
+    title: 'Push',
+    time: '6:30 am',
+    endTime: '7:25 am',
+    timeMs: Date.parse('2026-10-18T20:30:00Z'),
+    day: 'today',
+  });
+  assert.equal(timelineTimeLabel(event, 'Australia/Brisbane'), '6:30 am – 7:25 am');
+  assert.equal(timelineTimeLabel({ ...event, endTime: undefined }, 'Australia/Brisbane'), '6:30 am');
+  assert.equal(timelineTimeLabel({ ...event, type: 'wakeup' }, 'Australia/Brisbane'), '6:30 am');
 });
 
 test('each updates-strip icon is tinted by its type, not its position', () => {
@@ -682,5 +696,5 @@ test('wake-up rows carry both scores and activities carry their time range', () 
     day: 'today',
     durationMin: 38,
   });
-  assert.equal(timelineSummary(walk), 'until 1:05pm · 38m');
+  assert.equal(timelineSummary(walk), '38m');
 });

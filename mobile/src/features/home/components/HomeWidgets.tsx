@@ -40,6 +40,8 @@ import { metricLabels } from '../data/models';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { shiftDateStr, formatTimeOfDay } from '@trainingai/shared/date-utils';
 
+const DEFAULT_SLEEP_GOAL_HOURS = 8;
+
 export function HomeMetricTiles({
   openBody,
   openNutrition,
@@ -57,6 +59,8 @@ export function HomeMetricTiles({
   const energy = useWorkoutResource(energySpec(health.today));
   const resolved = useRecordedIntake(health.today, energy.data?.balance);
   const nutrition = n.view.totals;
+  // Nothing logged is "—", not "0 g": the totals of an empty day are zeros, but no macro was recorded.
+  const logged = n.view.logs.length > 0;
   const values: Record<
     string,
     {
@@ -82,19 +86,19 @@ export function HomeMetricTiles({
     },
     distanceKm: { value: today?.distanceKm ?? null, unit: 'km', icon: 'legs' },
     protein: {
-      value: nutrition?.proteinG ?? today?.protein ?? null,
+      value: (logged ? nutrition?.proteinG : null) ?? today?.protein ?? null,
       unit: 'g',
       icon: 'nutrition',
       nutrition: true,
     },
     carb: {
-      value: nutrition?.carbsG ?? today?.carb ?? null,
+      value: (logged ? nutrition?.carbsG : null) ?? today?.carb ?? null,
       unit: 'g',
       icon: 'nutrition',
       nutrition: true,
     },
     fat: {
-      value: nutrition?.fatG ?? today?.fat ?? null,
+      value: (logged ? nutrition?.fatG : null) ?? today?.fat ?? null,
       unit: 'g',
       icon: 'nutrition',
       nutrition: true,
@@ -289,7 +293,17 @@ function HomeWidgetBody({
                   <AppText variant="micro" tone="muted" style={{ flex: 1 }}>
                     {['Protein', 'Carbs', 'Fat'][index]}
                   </AppText>
-                  <AppText variant="micro">{metricValue(total?.[key], 'g', 1)}</AppText>
+                  <AppText variant="micro">
+                    {metricValue(
+                      n.view.logs.length > 0
+                        ? total?.[key]
+                        : today?.[
+                            ({ proteinG: 'protein', carbsG: 'carb', fatG: 'fat' } as const)[key]
+                          ],
+                      'g',
+                      1,
+                    )}
+                  </AppText>
                 </Stack>
               ))}
             </Stack>
@@ -387,7 +401,8 @@ function HomeWidgetBody({
     const night = health.sleep.find(
       (row) => row.date === health.today || row.date === shiftDateStr(health.today, -1),
     );
-    const goal = goals?.data?.sleepGoalHours ?? null;
+    // The current app starts at 8 h until a goal is saved, so the goal text and bar are always there.
+    const goal = goals?.data?.sleepGoalHours ?? DEFAULT_SLEEP_GOAL_HOURS;
     const stages = night
       ? [
           { label: 'Deep', hours: night.deepSleepHours, color: theme.sleepStages.deep },
@@ -414,7 +429,7 @@ function HomeWidgetBody({
                 {title('Sleep')}
                 <AppText variant="hero">
                   {night?.durationHours == null ? '—' : night.durationHours.toFixed(1) + 'h'}
-                  {goal !== null && (
+                  {night?.durationHours != null && (
                     <AppText variant="caption" tone="muted">
                       {' '}
                       / {goal}h goal
@@ -430,10 +445,9 @@ function HomeWidgetBody({
               </Stack>
               <Icon name="moon" color={theme.scores.sleep} />
             </Stack>
-            <ProgressBar
-              value={night?.durationHours && goal ? night.durationHours / goal : 0}
-              color={theme.scores.sleep}
-            />
+            {night?.durationHours != null && (
+              <ProgressBar value={night.durationHours / goal} color={theme.scores.sleep} />
+            )}
             {known > 0 && (
               <>
                 <Stack direction="row" gap="xxs">

@@ -7,6 +7,7 @@ import { Stack } from './Stack';
 
 export function TimelineRow({
   time,
+  showTime = true,
   title,
   summary,
   icon,
@@ -18,6 +19,8 @@ export function TimelineRow({
   onPress,
 }: {
   time: string;
+  /** The current app prints no time on a wake-up row; the time still reaches screen readers. */
+  showTime?: boolean;
   title: string;
   summary?: string;
   icon: IconName;
@@ -46,15 +49,6 @@ export function TimelineRow({
         opacity: pressed ? 0.65 : 1,
       })}
     >
-      <AppText
-        variant="caption"
-        tone="muted"
-        numberOfLines={1}
-        adjustsFontSizeToFit
-        style={{ width: theme.sizes.timelineTime, fontVariant: ['tabular-nums'] }}
-      >
-        {time}
-      </AppText>
       <View
         style={{
           width: marker,
@@ -103,6 +97,11 @@ export function TimelineRow({
         </View>
       </View>
       <Stack gap="xxs" style={{ flex: 1, minWidth: 0, paddingVertical: theme.spacing.sm }}>
+        {showTime && (
+          <AppText variant="micro" tone="muted" style={{ fontVariant: ['tabular-nums'] }}>
+            {time}
+          </AppText>
+        )}
         <Stack direction="row" align="center" gap="xs">
           <AppText variant="label" numberOfLines={2} style={{ flexShrink: 1 }}>
             {title}
@@ -121,7 +120,6 @@ export function TimelineRow({
           </AppText>
         )}
       </Stack>
-      <Icon name="forward" size={theme.sizes.iconSmall} tone="muted" />
     </Pressable>
   );
 }

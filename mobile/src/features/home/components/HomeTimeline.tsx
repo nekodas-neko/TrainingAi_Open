@@ -23,6 +23,7 @@ import {
   timelineDestinationDate,
   timelineSleepNight,
   timelineSummary,
+  timelineTimeLabel,
   timelineTitle,
 } from '../data/timeline-presentation';
 import { TimelineEventDetails } from './TimelineEventDetails';
@@ -206,7 +207,8 @@ export function HomeTimeline({
               {rows.map((event, index) => (
                 <TimelineRow
                   key={event.type + ':' + event.timeMs + ':' + index}
-                  time={formatTimeOfDay(event.timeMs, health.timezone)}
+                  time={timelineTimeLabel(event, health.timezone)}
+                  showTime={event.type !== 'wakeup'}
                   title={timelineTitle(event)}
                   summary={timelineSummary(event)}
                   savedLocally={event.subtitle === 'Saved on this phone'}
