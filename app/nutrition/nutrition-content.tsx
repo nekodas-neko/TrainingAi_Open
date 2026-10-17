@@ -42,7 +42,7 @@ import { getLocalStore } from "@/lib/local-store";
 import { pushThenRevalidate } from "@/lib/local-store/push-then-revalidate";
 import { EnergyCard } from "@/components/nutrition/energy-card";
 import { ActivePlanCard } from "@/components/nutrition/active-plan-card";
-import { useEstimatedMeals, useCountedEstimateRows } from "./use-estimated-meals";
+import { useEstimatedMeals, notifyPlanMealAnswersChanged } from "./use-estimated-meals";
 import { MealPlanReviewCard } from "@/components/nutrition/meal-plan-review-card";
 import { MealPlanSheets } from "@/components/nutrition/meal-plan-sheets";
 import { NutritionSettingsSheet } from "@/components/nutrition/nutrition-settings-sheet";
@@ -461,13 +461,14 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   // #2072. The assumed plan meals the day's totals include, local-first through the same rule as the
   // server's `intakeKcal`, so the ring's centre and its "left" are one total.
   const estimatedMeals = useEstimatedMeals({
-    userId, date: selectedDate, mealPlan, mealTypes, logs,
-    serverEstimatedKcal: balanceForDate?.balance?.estimatedKcal,
+    userId, date: selectedDate, mealTypes, logs,
+    serverRows: balanceForDate?.balance?.estimatedMeals,
   });
-  // #2921. The same rows as rows, for the Active Plan card's calories.
-  const countedEstimates = useCountedEstimateRows({
-    userId, date: selectedDate, serverRows: balanceForDate?.balance?.estimatedMeals,
-  });
+  // #2921, #2960. The same rows, for the Active Plan card's calories.
+  const countedEstimates = estimatedMeals.rows;
+  // The estimate reads the plan from the local store; a plan switch or edit changes `mealPlan` here,
+  // so tell it to re-read rather than waiting for the next answer.
+  useEffect(() => { notifyPlanMealAnswersChanged(); }, [mealPlan]);
   const planCardRef = useRef<HTMLDivElement>(null);
   const goToPlanCard = useCallback(() => planCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), []);
   const earnedForSelectedDate = budget?.earned ?? null;
