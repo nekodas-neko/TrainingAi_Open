@@ -22,7 +22,11 @@ export function CardioTrends() {
   const paceValues = efficiency.map((p) => p.avgPaceSecPerKm);
   const maxPace = Math.max(1, ...paceValues),
     minPace = Math.min(...paceValues);
-  const hrPoints = efficiency.map((p, i) => ({ x: i, label: p.date.slice(5), value: p.avgHr }));
+  const hrPoints = efficiency.map((p, i) => ({
+    x: i,
+    label: p.date.slice(5),
+    value: p.avgHr,
+  }));
   return (
     <Card>
       <AppText variant="eyebrow" tone="muted">
@@ -39,7 +43,7 @@ export function CardioTrends() {
         ]}
       />
       <StableContent
-        frameHeight={theme.sizes.chartHeight + theme.sizes.touchTarget}
+        minHeight={theme.sizes.chartHeight + theme.sizes.touchTarget}
         loading={!data && state.loading}
       >
         {!data ? (
@@ -59,6 +63,8 @@ export function CardioTrends() {
             <StackedBarChart
               label="Weekly zone minutes"
               unit="min"
+              gridlines
+              yAxis
               bars={data.weeklyZoneStacks.map((week) => ({
                 label: week.weekStart.slice(5),
                 segments: week.seconds.map((sec, index) => ({
@@ -78,6 +84,10 @@ export function CardioTrends() {
                 label="Average heart rate and pace"
                 points={hrPoints}
                 interactive
+                readable
+                gridlines
+                yAxis
+                fill
                 color={theme.tones.heart.foreground}
                 series={[
                   {
@@ -104,6 +114,10 @@ export function CardioTrends() {
               value: row.cadenceSpm,
             }))}
             interactive
+            readable
+            gridlines
+            yAxis
+            fill
           />
         ) : (
           <AppText tone="muted">No cadence readings yet.</AppText>

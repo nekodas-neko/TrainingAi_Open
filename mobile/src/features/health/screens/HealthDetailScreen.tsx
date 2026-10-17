@@ -29,7 +29,14 @@ import { ActivitySignalsCard } from '../components/ActivitySignalsCard';
 import { RememberedBedtimeCard } from '../components/RememberedBedtimeCard';
 import { SleepTrendsCard } from '../components/SleepTrendsCard';
 import { HealthViewReady } from '../components/HealthViewReady';
-import { HeartFactors, HeartProgress, HeartHeroValue } from '../components/HeartDetails';
+import {
+  HeartFactors,
+  HeartProgress,
+  HeartHeroValue,
+  HeartTrendCard,
+} from '../components/HeartDetails';
+import { TREND_EMPTY } from '@trainingai/shared/health/trend-empty-copy';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { DoseVitalsCard } from '../components/DoseVitalsCard';
 import { resilienceAsOfLine, resilienceShortfallLine } from '../data/resilience-copy';
 
@@ -42,6 +49,7 @@ export function HealthDetailScreen({
   onBack: () => void;
 }) {
   const health = useHealthData();
+  const { theme } = useTheme();
   const state = useWorkoutResource(readinessSpec(health.today));
   const trends = useWorkoutResource(trendsSpec(health.today));
   useEffect(() => {
@@ -273,7 +281,10 @@ export function HealthDetailScreen({
                     </AppText>
                     <KeyValueGrid
                       rows={[
-                        { label: 'Baseline', value: metricValue(state.data.ouraScore) },
+                        {
+                          label: 'Baseline',
+                          value: metricValue(state.data.ouraScore),
+                        },
                         {
                           label:
                             state.data.source === 'oura+acwr'
@@ -337,24 +348,52 @@ export function HealthDetailScreen({
           </>
         )}
         {trends.data &&
-          (detail === 'heart-rate'
-            ? (['rhrBpm', 'hrvMs', 'hrr1Bpm'] as const)
-            : ([trendField] as const)
-          ).map((key) => (
+          detail === 'heart-rate' &&
+          (
+            [
+              {
+                key: 'rhrBpm',
+                title: 'Resting Heart Rate',
+                color: theme.scores.heart,
+                empty: TREND_EMPTY.rhrBpm,
+              },
+              {
+                key: 'hrvMs',
+                title: 'HRV (overnight)',
+                color: theme.scores.sleep,
+                empty: TREND_EMPTY.hrvMs,
+              },
+              {
+                key: 'hrr1Bpm',
+                title: 'HR Recovery (60s drop)',
+                color: theme.anatomy.main,
+                empty: TREND_EMPTY.hrr1Bpm,
+              },
+            ] as const
+          ).map((card) => (
+            <HeartTrendCard
+              key={card.key}
+              title={card.title}
+              color={card.color}
+              emptyText={card.empty}
+              days={trends.data!.trends.map((day) => ({
+                date: day.date,
+                value: day[card.key],
+              }))}
+            />
+          ))}
+        {trends.data &&
+          detail !== 'heart-rate' &&
+          ([trendField] as const).map((key) => (
             <HealthMetricCard
               key={key}
-              title={
-                key === 'rhrBpm'
-                  ? 'Resting Heart Rate'
-                  : key === 'hrvMs'
-                    ? 'HRV (overnight)'
-                    : key === 'hrr1Bpm'
-                      ? 'HR Recovery (60s drop)'
-                      : `${title} Score`
-              }
+              title={`${title} Score`}
               tone={tone}
               caption="Last 14 days · gaps mean not recorded"
-              points={trends.data!.trends.map((day) => ({ label: day.date, value: day[key] }))}
+              points={trends.data!.trends.map((day) => ({
+                label: day.date,
+                value: day[key],
+              }))}
             />
           ))}
         {detail === 'heart-rate' &&

@@ -133,7 +133,10 @@ export const batterySpec = (date: string) => ({
         .object({ sufficient: z.boolean(), sampleCount: n, samplesPerHour: n })
         .passthrough()
         .optional(),
-      stress: z.object({ current: n, highMinutes: n, extraDrained: n }).passthrough().nullish(),
+      stress: z
+        .object({ current: n, highMinutes: n, extraDrained: n })
+        .passthrough()
+        .nullish(),
     })
     .passthrough(),
 });
@@ -287,7 +290,9 @@ export const hrSpec = (date: string) => ({
       readings: z
         .array(z.object({ timestamp: z.string(), bpm: z.number().finite(), source: text }))
         .default([]),
-      sleep: z.object({ startMin: z.number().finite(), endMin: z.number().finite() }).nullish(),
+      sleep: z
+        .object({ startMin: z.number().finite(), endMin: z.number().finite() })
+        .nullish(),
     })
     .passthrough(),
 });
@@ -481,7 +486,16 @@ export const hrProfileSpec = {
       estimatedMax: n,
       workingMax: n,
       workingMaxSource: z.string(),
-      observed: z.object({ max: n, min: n, avg: n, isReliable: z.boolean() }).passthrough(),
+      observed: z
+        .object({
+          max: n,
+          min: n,
+          avg: n,
+          isReliable: z.boolean(),
+          highestPlausible: n,
+          outOfBandRejected: n,
+        })
+        .passthrough(),
     })
     .passthrough(),
 };

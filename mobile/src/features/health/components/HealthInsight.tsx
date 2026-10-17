@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { z } from 'zod';
-import { AppText, Card, StatusIndicator, Stack, StableContent } from '../../../shared/ui';
+import { AppText, Card, Icon, IconButton, Stack, StableContent } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { useHealthData } from '../data/HealthDataProvider';
@@ -49,7 +49,10 @@ export function HealthInsight({
           setError(false);
         }
         if (!result.degraded) {
-          await resources.saveDraft(key, { insight: result.insight, savedAt: Date.now() });
+          await resources.saveDraft(key, {
+            insight: result.insight,
+            savedAt: Date.now(),
+          });
         }
       } catch {
         if (active) {
@@ -71,20 +74,18 @@ export function HealthInsight({
   return (
     <Card>
       <Stack direction="row" justify="space-between" align="center">
-        <AppText variant="eyebrow" tone="muted">
-          AI Insight
-        </AppText>
-        <StatusIndicator
-          label="AI insight"
+        <Stack direction="row" align="center" gap="xs">
+          <Icon name="coach" size={theme.sizes.iconSmall} color={theme.scores.sleep} />
+          <AppText variant="eyebrow" tone="muted">
+            AI Insight
+          </AppText>
+        </Stack>
+        <IconButton
+          icon="refresh"
+          label="Refresh insight"
           busy={busy}
-          error={error ? 'Could not refresh this insight. Try again when connected.' : null}
-          message={
-            operations.length
-              ? 'Waiting for saved health changes to upload.'
-              : 'Based on your saved health readings.'
-          }
-          onRetry={() => setRevision((value) => value + 1)}
-          actionLabel="Refresh insight"
+          disabled={operations.length > 0}
+          onPress={() => setRevision((value) => value + 1)}
         />
       </Stack>
       <StableContent
@@ -94,11 +95,18 @@ export function HealthInsight({
         <AppText>
           {insight
             ? insight
-            : operations.length
-              ? 'Insight will update after your changes upload.'
-              : 'No insight available yet.'}
+            : error
+              ? 'Could not refresh this insight. Try again when connected.'
+              : operations.length
+                ? 'Insight will update after your changes upload.'
+                : 'No insight available yet.'}
         </AppText>
       </StableContent>
+      {error && insight && (
+        <AppText variant="micro" tone="muted">
+          Could not refresh this insight. Try again when connected.
+        </AppText>
+      )}
     </Card>
   );
 }

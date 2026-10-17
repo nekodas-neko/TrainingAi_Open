@@ -2,7 +2,7 @@ import { bucketAverage } from '@trainingai/shared/health/hr-smoothing';
 import { dateStrMidnightInTz, formatMinutesOfDay } from '@trainingai/shared/date-utils';
 import { bedtimeToMinuteWindow } from '@trainingai/shared/health/hr-sleep-band';
 import { HealthResourceHeader } from './HealthResourceHeader';
-import { AppText, Badge, Card, LineChart, Stack } from '../../../shared/ui';
+import { AppText, Card, Legend, LineChart } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { daySpec } from '../../workouts/data/models';
@@ -74,6 +74,23 @@ export function HrDayCard({
       : []),
     { x: minute(p.t) / 60000, value: p.level },
   ]);
+  const lineColor = color === 'transparent' ? undefined : color;
+  const hrColor = lineColor ?? theme.tones.heart.foreground;
+  const hasWorkout = bands.some((b) => b.label === 'Workout');
+  // The legend names what the chart draws, as the current app's does; it carries no source chips.
+  const legend = [
+    ...(sleepWindow ? [{ label: 'Sleep', color: theme.tones.sleep.foreground }] : []),
+    ...(hasWorkout ? [{ label: 'Workout', color: theme.tones.activity.foreground }] : []),
+    { label: 'Heart rate', color: hrColor },
+    ...(stressPoints.length
+      ? [{ label: 'Stress (−1 to +1)', color: theme.tones.recovery.foreground }]
+      : []),
+  ];
+  // Fitted to the day with 10 bpm of headroom either side, as the current app's chart is.
+  const values = buckets.map((p) => p.y);
+  const domain = values.length
+    ? ([Math.max(0, Math.min(...values) - 10), Math.max(...values) + 10] as const)
+    : undefined;
   return (
     <Card
       padded={!embedded}
@@ -87,10 +104,15 @@ export function HrDayCard({
         />
       )}
       <LineChart
-        color={color === 'transparent' ? undefined : color}
+        color={lineColor}
         points={points}
         xDomain={[0, 1440]}
-        axisLabels={['00:00', '12:00', '24:00']}
+        domain={domain}
+        axisLabels={['12am', '6am', '12pm', '6pm', '12am']}
+        readable
+        gridlines
+        yAxis
+        dots="isolated"
         label="24h heart rate in bpm"
         tone="heart"
         bands={bands}
@@ -108,18 +130,9 @@ export function HrDayCard({
             : []
         }
       />
-      <Stack direction="row" wrap>
-        {[...new Set(readings.map((r) => r.source).filter(Boolean))].map((source) => (
-          <Badge key={source} label={source!} />
-        ))}
-        {sleepWindow && <Badge label="Sleep" tone="sleep" />}
-        {bands.some((b) => b.label === 'Workout') && <Badge label="Workout" tone="activity" />}
-        {stressPoints.length > 0 && (
-          <Badge label="Measured stress · −1 to +1" tone="recovery" />
-        )}
-      </Stack>
+      <Legend items={legend} />
       <AppText variant="micro" tone="muted">
-        00:00 → 24:00 · Heart rate is averaged in 10-minute buckets. Gaps mean no recording.
+        Averaged in 10-minute buckets. Gaps mean no recording.
       </AppText>
     </Card>
   );

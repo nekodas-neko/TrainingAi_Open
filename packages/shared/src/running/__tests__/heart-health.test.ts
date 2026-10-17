@@ -53,7 +53,7 @@ describe('issue 2746 — one floor, one source', () => {
     'packages/shared/src/running/heart-health.ts',
     'lib/health/heart-health-service.ts',
     'app/api/admin/backfill-heart-health/route.ts',
-    'components/cardio/todays-cardio-copy.ts',
+    'packages/shared/src/running/heart-health-copy.ts',
     'components/cardio/todays-cardio-card.tsx',
     'lib/activity/heart-health-completion.ts',
   ])('%s carries no zone-2 floor and no hand-written reserve fraction', (rel) => {

@@ -163,6 +163,10 @@ export const runningPlanSpec = (today: string) => ({
               countedMin: number,
               met: z.boolean(),
               targetMin: number.nullish(),
+              // Absent on a payload cached before the server sent it.
+              outcome: z
+                .enum(['counted', 'not-counted', 'nothing-logged', 'today'])
+                .optional(),
             })
             .passthrough(),
         ),
@@ -201,7 +205,11 @@ export function activityIcon(icon: string): IconName {
 // hides a figure the server already holds (#2905).
 export function overlayCalories(
   payload: { caloriesBurned?: number; durationMin?: number; distanceKm?: number },
-  server?: { caloriesBurned: number | null; durationMin: number | null; distanceKm: number | null },
+  server?: {
+    caloriesBurned: number | null;
+    durationMin: number | null;
+    distanceKm: number | null;
+  },
 ): number | null {
   if (payload.caloriesBurned != null) {
     return payload.caloriesBurned;

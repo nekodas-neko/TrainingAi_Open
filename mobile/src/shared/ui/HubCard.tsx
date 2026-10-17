@@ -12,12 +12,15 @@ export function HubCard({
   subtitle,
   icon,
   tone = 'brand',
+  badge,
   onPress,
 }: {
   title: string;
   subtitle: string;
   icon: IconName;
   tone?: Tone;
+  /** A small label beside the title, e.g. PROGRAM. */
+  badge?: string;
   onPress?: () => void;
 }) {
   const { theme } = useTheme();
@@ -46,7 +49,22 @@ export function HubCard({
           </View>
           <View style={{ flex: 1 }}>
             <Stack direction="row" align="center" justify="space-between">
-              <AppText variant="heading">{title}</AppText>
+              <Stack direction="row" align="center" gap="xs" style={{ flexShrink: 1 }}>
+                <AppText variant="heading">{title}</AppText>
+                {badge && (
+                  <View
+                    style={{
+                      borderRadius: theme.radii.small,
+                      backgroundColor: palette.border,
+                      paddingHorizontal: theme.spacing.xs,
+                    }}
+                  >
+                    <AppText variant="micro" style={{ color: palette.foreground }}>
+                      {badge.toUpperCase()}
+                    </AppText>
+                  </View>
+                )}
+              </Stack>
               {!onPress && (
                 <AppText variant="micro" tone="muted">
                   Coming soon

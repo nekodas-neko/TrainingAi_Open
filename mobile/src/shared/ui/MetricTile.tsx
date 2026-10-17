@@ -13,6 +13,7 @@ export function MetricTile({
   compact = false,
   icon,
   color,
+  captionColor,
 }: {
   label: string;
   value: string | null;
@@ -22,6 +23,7 @@ export function MetricTile({
   compact?: boolean;
   icon?: IconName;
   color?: string;
+  captionColor?: string;
 }) {
   const { theme } = useTheme();
   if (compact) {
@@ -59,7 +61,11 @@ export function MetricTile({
           {unit ? ` · ${unit}` : ''}
         </AppText>
         {caption && (
-          <AppText variant="micro" tone="muted">
+          <AppText
+            variant="micro"
+            tone="muted"
+            style={captionColor ? { color: captionColor } : undefined}
+          >
             {caption}
           </AppText>
         )}
