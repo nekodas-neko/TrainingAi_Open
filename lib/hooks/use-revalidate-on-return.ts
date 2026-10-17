@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTabVisibility } from '@/components/shell/tab-visibility'
 
 /** The slice of `document` the resume listener needs; a plain object stands in for it in tests. */
@@ -31,10 +31,14 @@ export function subscribeToAppResume(doc: ResumeSource, onResume: () => void): (
  * repeat visit does not flash a skeleton.
  */
 export function useRevalidateOnReturn(): number {
-  const { epoch } = useTabVisibility()
+  const { epoch, visible } = useTabVisibility()
   const [resumes, setResumes] = useState(0)
+  // A resume while the shell is showing another tab is not counted: the card is unseen, and the
+  // epoch bump when the tab is re-shown revalidates it then.
+  const visibleRef = useRef(visible)
+  visibleRef.current = visible
   useEffect(
-    () => subscribeToAppResume(document, () => setResumes(n => n + 1)),
+    () => subscribeToAppResume(document, () => { if (visibleRef.current) setResumes(n => n + 1) }),
     [],
   )
   return epoch + resumes

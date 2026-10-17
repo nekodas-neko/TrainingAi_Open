@@ -579,7 +579,7 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   // stale data from days ago showing on the card as if it's current.
   const todayStr = todayInTz(tz)
   // Which night the card shows, and its date label, are one shared rule (issue 2906).
-  const { night: recentSleep, label: sleepNightLabel } = pickSleepCardNight(sleepRows, todayStr)
+  const { night: recentSleep, label: sleepNightLabel } = pickSleepCardNight(sleepRows, todayStr, tz)
 
   const openLog = (field: LogField, label: string, unit: string, step: number) => {
     let current: number | null | undefined = metaToday?.[field];

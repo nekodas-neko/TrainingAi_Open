@@ -1,11 +1,22 @@
-import { describe, it, expect } from 'vitest'
-import fs from 'node:fs'
-import path from 'node:path'
-import { subscribeToAppResume, type ResumeSource } from '../use-revalidate-on-return'
-import { stripComments } from '../../../scripts/lib/strip-comments.js'
+// @vitest-environment jsdom
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { act, createElement } from 'react'
+import { createRoot, type Root } from 'react-dom/client'
+const fetched: string[] = []
+vi.mock('@/lib/sqlite/cache', () => ({
+  cachedFetch: (key: string) => { fetched.push(key); return Promise.resolve(null) },
+  cachedFetchToday: (key: string) => { fetched.push(key); return Promise.resolve(null) },
+  readCacheSync: () => null,
+  readTodayCacheSync: () => null,
+  subscribeToInvalidation: () => () => {},
+}))
+vi.mock('@/components/shell/local-day-provider', () => ({ useLocalDay: () => '2026-10-18' }))
+vi.mock('@/components/shell/user-timezone-provider', () => ({ useUserTimezone: () => 'Australia/Brisbane' }))
+vi.mock('@/components/health/hr-day-chart', () => ({ HrDayChart: () => null }))
 
-const root = path.resolve(__dirname, '../../..')
-const src = (rel: string) => stripComments(fs.readFileSync(path.join(root, rel), 'utf8'))
+import { HrDayCard } from '@/components/health/hr-day-card'
+import { TabVisibilityProvider } from '@/components/shell/tab-visibility'
+import { subscribeToAppResume, type ResumeSource } from '../use-revalidate-on-return'
 
 function fakeDoc(): ResumeSource & { fire(state: string): void; listeners: number } {
   const set = new Set<() => void>()
@@ -43,26 +54,85 @@ describe('subscribeToAppResume (issue 2906: the HR card revalidates when the app
   })
 })
 
-describe('the heart-rate card wiring', () => {
-  const card = src('components/health/hr-day-card.tsx')
+;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
 
-  it('reads through useCachedValue and revalidates on return, behind the cached value', () => {
-    expect(card).toMatch(/useRevalidateOnReturn\(\)/)
-    expect(card).toMatch(/reloadToken/)
-    // Seeded from the cache by the hook; no bare fetch and no skeleton state of its own.
-    expect(card).not.toMatch(/\bcachedFetch\b/)
-    expect(card).not.toMatch(/animate-pulse|Skeleton/)
+describe('the real heart-rate card revalidates on return (issue 2906)', () => {
+  let root: Root | null = null
+  let host: HTMLDivElement | null = null
+  const count = (key: string) => fetched.filter(k => k === key).length
+  const HR = 'oura-hr-day:2026-10-18'
+  const WS = 'workout-sessions-day:2026-10-18'
+  const STRESS = 'stress-day:2026-10-18'
+
+  const card = (epoch: number) =>
+    createElement(TabVisibilityProvider, { visible: true, epoch }, createElement(HrDayCard))
+  async function mount(epoch = 0) {
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+    await act(async () => { root!.render(card(epoch)) })
+  }
+  async function setVisibility(state: 'visible' | 'hidden') {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state })
+    await act(async () => { document.dispatchEvent(new Event('visibilitychange')) })
+  }
+  afterEach(async () => {
+    await act(async () => { root?.unmount() })
+    host?.remove()
+    root = null
+    host = null
+    fetched.length = 0
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'visible' })
   })
 
-  it('takes "today" from the local-day provider and keys the body by it, so a rollover refetches', () => {
-    expect(card).toMatch(/useLocalDay\(\)/)
-    expect(card).toMatch(/<HrDayCardBody key=\{today\}/)
+  it('fetches each key once on mount, with no extra request from the revalidation hook', async () => {
+    await mount()
+    expect(count(HR)).toBe(1)
+    expect(count(WS)).toBe(1)
+    expect(count(STRESS)).toBe(1)
   })
 
-  it('the revalidation signal follows the app resume and the shell re-showing the tab', () => {
-    const hook = src('lib/hooks/use-revalidate-on-return.ts')
-    expect(hook).toMatch(/useTabVisibility\(\)/)
-    expect(hook).toMatch(/subscribeToAppResume\(document/)
-    expect(hook).toMatch(/return epoch \+ resumes/)
+  it('refetches every key once when the app becomes visible, and not when it goes hidden', async () => {
+    await mount()
+    await setVisibility('hidden')
+    expect(count(HR)).toBe(1)
+    expect(count(WS)).toBe(1)
+    expect(count(STRESS)).toBe(1)
+    await setVisibility('visible')
+    expect(count(HR)).toBe(2)
+    expect(count(WS)).toBe(2)
+    expect(count(STRESS)).toBe(2)
+  })
+
+  it('refetches every key once when the shell re-shows the tab', async () => {
+    await mount()
+    await act(async () => { root!.render(card(1)) })
+    expect(count(HR)).toBe(2)
+    expect(count(WS)).toBe(2)
+    expect(count(STRESS)).toBe(2)
+  })
+
+  it('does not count an app resume while the shell is showing another tab', async () => {
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+    const away = createElement(TabVisibilityProvider, { visible: false, epoch: 0 }, createElement(HrDayCard))
+    await act(async () => { root!.render(away) })
+    await setVisibility('visible')
+    expect(count(HR)).toBe(1)
+  })
+
+  it('removes its listener on unmount', async () => {
+    const added: EventListenerOrEventListenerObject[] = []
+    const removed: EventListenerOrEventListenerObject[] = []
+    const add = vi.spyOn(document, 'addEventListener').mockImplementation((t, cb) => { if (t === 'visibilitychange') added.push(cb as EventListener) })
+    const rem = vi.spyOn(document, 'removeEventListener').mockImplementation((t, cb) => { if (t === 'visibilitychange') removed.push(cb as EventListener) })
+    await mount()
+    expect(added).toHaveLength(1)
+    await act(async () => { root!.unmount() })
+    root = null
+    expect(removed).toEqual(added)
+    add.mockRestore()
+    rem.mockRestore()
   })
 })

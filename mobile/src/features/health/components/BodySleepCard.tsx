@@ -18,9 +18,9 @@ export function BodySleepCard({ openDetail }: { openDetail: (detail: HealthDetai
   const cueColor = useCueColor();
   const health = useHealthData();
   const readiness = useWorkoutResource(readinessSpec(health.today));
-  // Same rule and caption as the current app's card (issue 2906): newest night dated today or
-  // yesterday, with its date named.
-  const { night: lastNight, label: nightLabel } = pickSleepCardNight(health.sleep, health.today);
+  // Same rule and caption as the current app's card (issue 2906): the canonical latest night when
+  // dated today or yesterday, with its date named.
+  const { night: lastNight, label: nightLabel } = pickSleepCardNight(health.sleep, health.today, health.timezone);
   const newest = health.sleep[0];
   // The computed score is the number Home shows; the stored one is only a fallback.
   const computed = readiness.data?.sleepScore ?? null;

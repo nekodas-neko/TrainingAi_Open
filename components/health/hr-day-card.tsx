@@ -38,7 +38,7 @@ function HrDayCardBody({ today }: { today: string }) {
   const reloadToken = useRevalidateOnReturn()
   // TN-3b — the owner wants stress readable against heart rate on the same clock. Same key the
   // standalone strip uses, so `cachedFetch` de-dupes and this costs no extra request.
-  const { data: stress } = useStressDay(today)
+  const { data: stress } = useStressDay(today, reloadToken)
 
   // LB-176. Without `onError` the card explained an absence that did not happen — *"the ring
   // records periodically while worn"* is a fact about the ring, printed because a request failed.

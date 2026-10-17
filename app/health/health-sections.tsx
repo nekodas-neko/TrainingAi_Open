@@ -406,8 +406,8 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
         <SleepCard
           key="sleep"
           recentSleep={recentSleep}
-          nightLabel={sleepNightLabel}
           lastSleep={lastSleep}
+          nightLabel={sleepNightLabel}
           computedSleepScore={readiness?.sleepScore ?? null}
           sleepScoreCoverage={readiness?.sleepScoreCoverage ?? null}
           metaLoading={metaLoading}

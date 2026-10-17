@@ -48,7 +48,7 @@ export function SleepCard({ recentSleep, lastSleep, nightLabel, computedSleepSco
       <div className="flex items-start justify-between mb-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#8b5cf6" }}>Sleep</p>
-          <p className="text-[10px] text-muted-foreground" data-testid="sleep-night-label">{nightLabel}</p>
+          {!metaLoading && <p className="text-[10px] text-muted-foreground" data-testid="sleep-night-label">{nightLabel}</p>}
           <div className="flex items-baseline gap-2 mt-0.5">
             {metaLoading ? (
               <div className="h-8 w-20 animate-pulse rounded-lg bg-muted" />
@@ -111,8 +111,6 @@ export function SleepCard({ recentSleep, lastSleep, nightLabel, computedSleepSco
             {recentSleep.respiratoryRate != null && <span className="text-[9px] rounded bg-sky-500/20 text-sky-400 px-1.5 py-0.5">{recentSleep.respiratoryRate.toFixed(1)} br/m</span>}
           </div>
         </div>
-      ) : lastSleep ? (
-        <p className="text-[9px] text-muted-foreground opacity-60">Last: {lastSleep.date}</p>
       ) : null}
       <button
         onClick={e => { e.stopPropagation(); router.push('/health/sleep'); }}
