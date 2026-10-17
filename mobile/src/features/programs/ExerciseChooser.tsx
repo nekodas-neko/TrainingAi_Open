@@ -1,3 +1,4 @@
+import { capitalize } from '@trainingai/shared/format/capitalize';
 import { FlatList } from 'react-native';
 import { useState } from 'react';
 import {
@@ -94,7 +95,7 @@ export function ExerciseChooser({
           </Stack>
           <Stack direction="row" wrap>
             {preview.equipment.map((x) => (
-              <Badge key={x} label={x[0].toUpperCase() + x.slice(1)} />
+              <Badge key={x} label={capitalize(x)} />
             ))}
           </Stack>
           <AppText variant="eyebrow" tone="muted">
@@ -134,7 +135,7 @@ export function ExerciseChooser({
             value={equipment || null}
             options={exerciseEquipment
               .filter((x) => library.some((y) => y.equipment.includes(x)))
-              .map((x) => ({ value: x, label: x[0].toUpperCase() + x.slice(1) }))}
+              .map((x) => ({ value: x, label: capitalize(x) }))}
             onChange={(value) => setEquipment(value ?? '')}
           />
           <ChipPicker

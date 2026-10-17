@@ -1,3 +1,4 @@
+import { capitalize } from '@trainingai/shared/format/capitalize';
 import type { SleepComponent, SleepVerdict } from '@trainingai/shared/health/sleep-verdict';
 import { formatMinutesOfDay } from '@trainingai/shared/date-utils';
 export interface StoredSleepVerdict {
@@ -86,7 +87,6 @@ export interface VerdictCopy {
   line: string;
   prominent: boolean;
 }
-const CAPITALISE = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 export function verdictCopy(v: StoredSleepVerdict): VerdictCopy {
   if (v.verdict === 'normal') {
     return { line: 'Sleep looks normal — filled in for you.', prominent: false };
@@ -108,7 +108,7 @@ export function verdictCopy(v: StoredSleepVerdict): VerdictCopy {
             : p.delta!,
         );
   const word = v.verdict === 'poor' ? 'poor' : 'good';
-  const evidence = clauses.length > 0 ? `${CAPITALISE(clauses.join(', '))}. ` : '';
+  const evidence = clauses.length > 0 ? `${capitalize(clauses.join(', '))}. ` : '';
   return { line: `${evidence}Marked this a ${word} night.`, prominent: true };
 }
 export function verdictToStoredFeel(verdict: SleepVerdict): number {

@@ -1,3 +1,4 @@
+import { capitalize } from '@trainingai/shared/format/capitalize';
 import { activeInjuredMuscles } from "@trainingai/shared/workout/injury-context";
 import type { Injury } from "@trainingai/shared/types/injury";
 
@@ -23,11 +24,10 @@ export function injuredMusclesFor(
   return [...new Set(muscles.filter(m => injured.has(m.toLowerCase())))];
 }
 
-const titleCase = (m: string) => m.charAt(0).toUpperCase() + m.slice(1);
 
 /** `Lower back` · `Lower back, Glutes` — the muscles, as the user reads them. */
 export function injuryLabel(muscles: string[]): string {
-  return muscles.map(titleCase).join(", ");
+  return muscles.map(capitalize).join(", ");
 }
 
 /**
@@ -39,6 +39,6 @@ export function injuryLabel(muscles: string[]): string {
  */
 export function injuryChipLabel(muscles: string[]): string {
   if (muscles.length === 0) return "";
-  const first = titleCase(muscles[0]);
+  const first = capitalize(muscles[0]);
   return muscles.length > 1 ? `${first} +${muscles.length - 1}` : first;
 }

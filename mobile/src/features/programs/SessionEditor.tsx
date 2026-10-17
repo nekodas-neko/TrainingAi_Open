@@ -1,3 +1,4 @@
+import { capitalize } from '@trainingai/shared/format/capitalize';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ExerciseChooser } from './ExerciseChooser';
 import { randomUUID } from 'expo-crypto';
@@ -105,7 +106,7 @@ export function SessionEditor({
           value={item.exerciseRole ?? 'accessory'}
           options={['primary', 'secondary', 'accessory'].map((role) => ({
             value: role,
-            label: role[0].toUpperCase() + role.slice(1),
+            label: capitalize(role),
           }))}
           onChange={(role) =>
             exercise(at, {

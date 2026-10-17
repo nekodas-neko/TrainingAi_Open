@@ -1,3 +1,4 @@
+import { capitalize } from '@trainingai/shared/format/capitalize'
 /**
  * Cat names for the collection. Pure and deterministic: a cat's name is a function of its identity,
  * so the replay names the same cat the same thing on every read, on every device, forever.
@@ -44,5 +45,5 @@ export function blendName(oldest: string, newest: string): string {
   let s = head(oldest) + tail(newest).toLowerCase()
   if (s.length < 3) s += 'bo'
   if (s.toLowerCase() === oldest.toLowerCase() || s.toLowerCase() === newest.toLowerCase()) s += 'o'
-  return s[0].toUpperCase() + s.slice(1)
+  return capitalize(s)
 }

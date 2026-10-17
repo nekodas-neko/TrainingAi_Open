@@ -6,6 +6,7 @@ import {
 import { DEFAULT_WATER_GOAL_ML } from '@trainingai/shared/nutrition/goal-recommendation';
 import { secondsSinceLocalMidnight } from '@trainingai/shared/date-utils';
 import { formatHoursMinutes } from '@trainingai/shared/format/units';
+import { trimLeadingGaps } from '@trainingai/shared/health/series-gaps';
 import { weekOverWeekChange } from '@trainingai/shared/health/trend-delta';
 import {
   AppButton,
@@ -238,8 +239,7 @@ export function ActivityTrendCharts() {
       {defs
         .filter((def) => trends.some((day) => day[def.key] !== null))
         .map((def) => {
-          const first = trends.findIndex((day) => day[def.key] !== null);
-          const shown = trends.slice(first);
+          const shown = trimLeadingGaps(trends, (day) => day[def.key]) ?? [];
           const change = weekOverWeekChange(trends.map((day) => day[def.key]));
           return (
             <HealthMetricCard
@@ -316,8 +316,7 @@ export function RingCards({ openDetail }: { openDetail: (detail: HealthDetail) =
     secondsSinceLocalMidnight(timezone),
   );
   const days = trendsState.data?.trends ?? [];
-  const first = days.findIndex((day) => day.wornHours !== null);
-  const shown = first < 0 ? [] : days.slice(first);
+  const shown = trimLeadingGaps(days, (day) => day.wornHours) ?? [];
   const change = weekOverWeekChange(days.map((day) => day.wornHours));
   return (
     <>

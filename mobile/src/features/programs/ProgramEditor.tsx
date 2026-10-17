@@ -1,3 +1,4 @@
+import { capitalize } from '@trainingai/shared/format/capitalize';
 import { randomUUID } from 'expo-crypto';
 import { useState } from 'react';
 import {
@@ -172,7 +173,7 @@ export function ProgramEditor({
                   'hypertrophy',
                   'power',
                   'endurance',
-                ].map((goal) => ({ value: goal, label: goal[0].toUpperCase() + goal.slice(1) }))}
+                ].map((goal) => ({ value: goal, label: capitalize(goal) }))}
                 onChange={(trainingGoal) => draft.setValue({ ...value, trainingGoal })}
               />
               <SwitchRow

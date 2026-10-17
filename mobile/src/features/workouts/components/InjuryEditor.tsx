@@ -1,3 +1,4 @@
+import { capitalize } from '@trainingai/shared/format/capitalize';
 import { z } from 'zod';
 import { useState } from 'react';
 import { randomUUID } from 'expo-crypto';
@@ -112,7 +113,7 @@ export function InjuryEditor({
             value={draft.value.severity}
             options={['mild', 'moderate', 'severe'].map((value) => ({
               value,
-              label: value[0].toUpperCase() + value.slice(1),
+              label: capitalize(value),
             }))}
             onChange={(severity) =>
               draft.setValue({

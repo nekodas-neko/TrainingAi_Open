@@ -1,3 +1,4 @@
+import { capitalize } from '@trainingai/shared/format/capitalize';
 import type { StyleSet, ProgressionStyle } from "@trainingai/shared/types/progression";
 import type { ProgramPhase, ProgramSession, ExerciseLibraryEntry, ExerciseType } from "@trainingai/shared/types/program";
 import type { ExerciseLog } from "@trainingai/shared/types/log";
@@ -55,7 +56,7 @@ export function aiDynamicFallbackPhaseStatus(
   return {
     phase: {
       id: '', phaseSetId: '', position: 0,
-      name: state.phase.charAt(0).toUpperCase() + state.phase.slice(1),
+      name: capitalize(state.phase),
       durationCycles: 1,
       phaseType: isDeload ? 'deload' : 'normal',
     } as ProgramPhase,
