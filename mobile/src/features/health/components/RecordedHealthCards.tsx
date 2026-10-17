@@ -2,6 +2,8 @@ import { HealthResourceHeader } from './HealthResourceHeader';
 import { useState } from 'react';
 import { formatDateDisplay, shiftDateStr } from '@trainingai/shared/date-utils';
 import { computeHrZones } from '@trainingai/shared/health/hr-zones';
+import { maxHrSourceNote } from '@trainingai/shared/health/hr-source-copy';
+import { plural } from '@trainingai/shared/format/plural';
 import {
   AppText,
   Card,
@@ -17,12 +19,7 @@ import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { ResourceStatus } from '../../workouts/components/ResourceStatus';
 import { useHealthData } from '../data/HealthDataProvider';
-import {
-  zoneSpec,
-  sleepCorrelationSpec,
-  hrProfileSpec,
-  metricValue,
-} from '../data/models';
+import { zoneSpec, sleepCorrelationSpec, hrProfileSpec, metricValue } from '../data/models';
 import { HealthMetricCard } from './HealthMetricCard';
 
 export function TimeInZoneCard() {
@@ -138,37 +135,82 @@ export function SleepPerformanceCard() {
 }
 export function ObservedHeartCard() {
   const state = useWorkoutResource(hrProfileSpec);
+  const { theme } = useTheme();
+  const profile = state.data;
+  const observed = profile?.observed;
+  // Stand-in notices are amber in the current app: a number worth a second look, not an error.
+  const warning = { color: theme.tones.checkin.foreground };
+  const maxNote = maxHrSourceNote(
+    profile?.workingMaxSource as Parameters<typeof maxHrSourceNote>[0],
+  );
+  const rejected = observed?.outOfBandRejected ?? 0;
   return (
     <Card>
       <HealthResourceHeader
-        title={'Observed Heart Rate · Last 90 days'}
+        title={'Heart-rate profile · Last 90 days'}
         state={state}
         refresh={state.refresh}
       />
 
-      {state.data && (
+      {profile && observed && (
         <>
           <Grid columns={3}>
-            {(['max', 'avg', 'min'] as const).map((key) => (
-              <MetricTile
-                key={key}
-                label={key}
-                value={metricValue(state.data!.observed[key], 'bpm')}
-                tone="heart"
-              />
-            ))}
+            <MetricTile
+              label="Max recorded"
+              value={metricValue(observed.max)}
+              unit="bpm"
+              tone="neutral"
+            />
+            <MetricTile
+              label="Average"
+              value={metricValue(observed.avg)}
+              unit="bpm"
+              tone="neutral"
+            />
+            <MetricTile
+              label="Min"
+              value={metricValue(observed.min)}
+              unit="bpm"
+              tone="neutral"
+            />
           </Grid>
-          <AppText variant="caption" tone="muted">
-            Working max {metricValue(state.data.workingMax, 'bpm')} ·{' '}
-            {state.data.workingMaxSource === 'cooper-blend'
-              ? 'from your Cooper test and age'
-              : state.data.workingMaxSource.replace(/-/g, ' ')}
-          </AppText>
-          {!state.data.observed.isReliable && (
+          <Stack gap="xs">
             <AppText variant="caption" tone="muted">
-              Not enough recorded heart-rate data for a confident observed maximum.
+              Working max{' '}
+              <AppText variant="caption">{metricValue(profile.workingMax, 'bpm')}</AppText> (
+              {maxNote.label}). Age estimate {metricValue(profile.estimatedMax)} · resting{' '}
+              {metricValue(profile.restingHr)}.
             </AppText>
-          )}
+            {maxNote.detail && (
+              <AppText variant="caption" style={warning}>
+                {maxNote.detail}
+              </AppText>
+            )}
+            {!observed.isReliable && !maxNote.standIn && (
+              <AppText variant="caption" style={warning}>
+                Not enough monitored heart-rate data yet for a confident max — a few harder
+                sessions with heart rate recorded will sharpen it. Using the age estimate for
+                now.
+              </AppText>
+            )}
+            {observed.isReliable &&
+              observed.highestPlausible != null &&
+              observed.max != null && (
+                <AppText variant="caption" tone="muted">
+                  Your max is a level you’ve reached repeatedly, not a one-off blip
+                  {observed.highestPlausible > observed.max
+                    ? ` — the single highest reading was ${observed.highestPlausible} bpm`
+                    : ''}
+                  .
+                </AppText>
+              )}
+            {rejected > 0 && (
+              <AppText variant="caption" style={warning}>
+                {plural(rejected, 'reading was', 'readings were')} discarded as impossible
+                (outside 30–220 bpm) — worth a look if that count keeps climbing.
+              </AppText>
+            )}
+          </Stack>
         </>
       )}
     </Card>

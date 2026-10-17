@@ -17,7 +17,7 @@ import {
 } from 'chart.js'
 import { useHeroColorScheme } from './detail-hero'
 import { stressOverlay } from './hr-stress-overlay'
-import { bucketAverage } from '@trainingai/shared/health/hr-smoothing'
+import { bucketAverage, hrChartDomain } from '@trainingai/shared/health/hr-smoothing'
 import { withGapBreaks, interpolateGaps } from './hr-day-chart-gaps'
 import {
   hrDayChartPropsEqual,
@@ -116,6 +116,7 @@ function HrDayChartBase({ readings, date, workoutSessions = [], compact = false,
   const midnightMs = dateStrMidnightInTz(date, tz).getTime()
 
   const smoothed     = toBuckets(readings, midnightMs, bucketMinutes)
+  const yDomain      = hrChartDomain(smoothed.map(p => p.y))
   const backfill     = showBackfill ? interpolateGaps(smoothed) : []
   // Prefer the real sleep-session interval (one contiguous overnight block, present
   // whenever the ring recorded sleep). Fall back to the per-reading `source` heuristic
@@ -212,8 +213,8 @@ function HrDayChartBase({ readings, date, workoutSessions = [], compact = false,
         grid: { color: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.04)' },
       },
       y: {
-        min: smoothed.length > 0 ? Math.max(0, Math.min(...smoothed.map(p => p.y)) - 10) : undefined,
-        max: smoothed.length > 0 ? Math.max(...smoothed.map(p => p.y)) + 10 : undefined,
+        min: yDomain?.[0],
+        max: yDomain?.[1],
         ticks: { color: isLight ? 'rgb(107 114 128)' : 'rgb(156 163 175)', font: { size: 9 }, maxTicksLimit: 4 },
         grid:  { color: isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.04)' },
       },

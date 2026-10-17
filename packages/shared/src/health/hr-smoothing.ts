@@ -59,3 +59,15 @@ export function rollingMedian(values: number[], window = 5): number[] {
     return median(slice) ?? v
   })
 }
+
+/** Bpm of room kept above and below the day's readings so the line never touches the frame. */
+export const HR_CHART_HEADROOM_BPM = 10
+
+/**
+ * The y-range for a day's heart-rate chart: fitted to the readings with 10 bpm of headroom either
+ * side, never below zero. `undefined` for an empty day, where the chart picks its own range.
+ */
+export function hrChartDomain(values: readonly number[]): readonly [min: number, max: number] | undefined {
+  if (values.length === 0) return undefined
+  return [Math.max(0, Math.min(...values) - HR_CHART_HEADROOM_BPM), Math.max(...values) + HR_CHART_HEADROOM_BPM]
+}

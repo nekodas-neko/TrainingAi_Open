@@ -1,14 +1,21 @@
 import { useState } from 'react';
-import { getProtocol } from '@trainingai/shared/fitness-tests/protocols';
+import {
+  zoneLabel,
+  ANY_ACTIVITY,
+  CARD_TITLE,
+  PROGRESS_LABEL,
+  RATIONALE,
+  criterionLine,
+  progressFigure,
+  shownActivity,
+} from '@trainingai/shared/running/heart-health-copy';
 import { recommendSession } from '@trainingai/shared/health/session-picker';
 import {
   AppButton,
   AppText,
   Card,
   ChoiceTiles,
-  Grid,
   HubCard,
-  MetricTile,
   Icon,
   Badge,
   PageLayout,
@@ -18,10 +25,11 @@ import {
   Stack,
   StateCard,
   StatusIndicator,
-  IconButton,
+  TouchSurface,
 } from '../../../shared/ui';
 import { useActivities, useMeasuredRunCompletion } from '../data/ActivityProvider';
 import { useHealthData } from '../../health/data/HealthDataProvider';
+import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import {
   baselinesSpec,
@@ -30,7 +38,15 @@ import {
   type ActivityType,
 } from '../data/models';
 import { ActivityPicker } from '../components/ActivityPicker';
-import { HeartProfileCard, StepsQuotaCard, ZoneQuotaCard } from '../components/CardioCards';
+import {
+  BaselinesRow,
+  HeartProfileCard,
+  LazyDayCreditCard,
+  StepsQuotaCard,
+  WeekList,
+  ZoneQuotaCard,
+} from '../components/CardioCards';
+import { latestBaselines } from '../data/cardio-view';
 import { CardioTrends } from '../components/CardioTrends';
 
 export function CardioScreen({
@@ -49,6 +65,7 @@ export function CardioScreen({
   openBaselines: () => void;
 }) {
   const { today } = useHealthData();
+  const { theme } = useTheme();
   const week = useWorkoutResource(cardioWeekSpec(today)),
     running = useWorkoutResource(runningPlanSpec(today));
   const baselines = useWorkoutResource(baselinesSpec);
@@ -63,18 +80,17 @@ export function CardioScreen({
     plan = running.data;
   useMeasuredRunCompletion(plan?.heartHealth?.days);
   const day = plan?.heartHealth?.days.find((day) => day.date.replace(/\//g, '-') === today);
-  const target = day?.targetMin ?? plan?.run?.durationMin;
-  const baselineRows = [...(baselines.data?.fitnessTests ?? [])].sort((a, b) =>
-    a.date.localeCompare(b.date),
-  );
-  const latest = Object.values(
-    Object.fromEntries(
-      [...baselineRows, ...activity.tests.map((row) => row.payload)].map((row) => [
-        row.testType,
-        row,
-      ]),
-    ),
-  );
+  const runMin = plan?.run?.durationMin;
+  const target = day?.targetMin ?? (runMin != null && runMin > 0 ? Math.round(runMin) : undefined);
+  const met = !!day?.met || plan?.run?.status === 'completed';
+  const credited = day ? shownActivity(day.activities, day.creditedId) : null;
+  const others = day ? day.activities.length - (credited ? 1 : 0) : 0;
+  const unmeasured =
+    !!day && day.activities.length > 0 && day.activities.every((row) => row.effortMin == null);
+  const latest = latestBaselines([
+    ...(baselines.data?.fitnessTests ?? []),
+    ...activity.tests.map((row) => row.payload),
+  ]);
   const recommendation = data
     ? recommendSession({
         minutesAvailable: minutes,
@@ -152,88 +168,101 @@ export function CardioScreen({
             {data ? (
               <>
                 <HeartProfileCard heart={data.heart} hasSource={data.quota.hasHrSource} />
-                <Card tone="recovery">
-                  <Stack direction="row" align="center" justify="space-between">
-                    <Icon name="activity" tone="brand" />
-                    <AppText variant="eyebrow" tone="brand">
-                      Cardio Baselines
-                    </AppText>
-                    <IconButton
-                      icon="forward"
-                      label="Fitness Baselines"
-                      onPress={openBaselines}
-                    />
-                  </Stack>
-                  <StableContent minHeight={32} loading={baselines.loading && !baselines.data}>
-                    {!latest.length && (
-                      <AppText variant="caption" tone="muted">
-                        Take a fitness test to set your baseline
-                      </AppText>
-                    )}
-                    {latest.length > 0 && (
-                      <Grid>
-                        {latest.map((row) => {
-                          const protocol = getProtocol(row.testType);
-                          return (
-                            <MetricTile
-                              key={row.id}
-                              label={protocol?.shortName ?? row.testType}
-                              value={
-                                (protocol?.vo2Equation
-                                  ? row.vo2maxEst
-                                  : row.hrr1Bpm
-                                )?.toString() ?? null
-                              }
-                              unit={protocol?.vo2Equation ? 'VO₂max' : 'HRR'}
-                              tone="recovery"
-                            />
-                          );
-                        })}
-                      </Grid>
-                    )}
-                    {baselines.error && (
-                      <AppText variant="micro" tone="muted">
-                        Saved baselines could not be refreshed.
-                      </AppText>
-                    )}
-                  </StableContent>
-                </Card>
+                <TouchSurface
+                  accessibilityRole="button"
+                  onPress={openBaselines}
+                >
+                  <Card tone="recovery">
+                    <Stack direction="row" align="center" justify="space-between">
+                      <Stack direction="row" align="center" gap="xs">
+                        <Icon
+                          name="activity"
+                          size={theme.sizes.iconSmall}
+                          color={theme.tones.recovery.foreground}
+                        />
+                        <AppText
+                          variant="eyebrow"
+                          style={{ color: theme.tones.recovery.foreground }}
+                        >
+                          Cardio Baselines
+                        </AppText>
+                      </Stack>
+                      <Icon name="forward" tone="muted" size={theme.sizes.iconSmall} />
+                    </Stack>
+                    <StableContent
+                      minHeight={32}
+                      loading={baselines.loading && !baselines.data}
+                    >
+                      {!latest.length && (
+                        <AppText variant="caption" tone="muted">
+                          Take a fitness test to set your baseline
+                        </AppText>
+                      )}
+                      {latest.length > 0 && <BaselinesRow tests={latest} />}
+                      {baselines.error && (
+                        <AppText variant="micro" tone="muted">
+                          Saved baselines could not be refreshed.
+                        </AppText>
+                      )}
+                    </StableContent>
+                  </Card>
+                </TouchSurface>
                 <ZoneQuotaCard data={data} />
-                {!data.trainedToday &&
-                  (data.dayQuota.zones.find((row) => row.zoneId === 1)?.doneMin ?? 0) > 0 && (
-                    <Card>
-                      <AppText variant="caption">
-                        No dedicated workout today —{' '}
-                        {data.dayQuota.zones.find((row) => row.zoneId === 1)?.doneMin} min moved
-                        (Zone 1).
-                      </AppText>
-                      <AppText variant="micro" tone="muted">
-                        Doesn’t count toward your training quota, but it’s still credit for
-                        staying active.
-                      </AppText>
-                    </Card>
-                  )}
+                {!data.trainedToday && (
+                  <LazyDayCreditCard
+                    zone1Min={
+                      data.dayQuota.zones.find((row) => row.zoneId === 1)?.doneMin ?? 0
+                    }
+                  />
+                )}
                 <StepsQuotaCard steps={data.steps} />
                 {plan?.run && (
                   <Card>
-                    <AppText variant="heading">Today’s cardio</AppText>
+                    <Stack direction="row" align="center">
+                      <Icon name="cardio" tone="brand" />
+                      <AppText variant="heading" style={{ flex: 1 }}>
+                        {CARD_TITLE}
+                      </AppText>
+                      {zoneLabel(plan.run.targetZoneIds ?? []) && (
+                        <Badge
+                          tone="recovery"
+                          label={zoneLabel(plan.run.targetZoneIds ?? [])!}
+                        />
+                      )}
+                    </Stack>
                     <AppText variant="caption" tone="muted">
-                      {target != null
-                        ? `${target} min at moderate effort or above`
-                        : 'Moderate effort or above'}{' '}
-                      · Any activity counts
+                      {criterionLine(target ?? null)} · {ANY_ACTIVITY}
                     </AppText>
+                    <AppText>{RATIONALE}</AppText>
                     <Stack direction="row" justify="space-between">
-                      <AppText variant="caption">Counted minutes</AppText>
-                      <AppText variant="caption">
-                        {day?.countedMin ?? 0}
-                        {target ? ` / ${target} min` : ' min'}
-                        {day?.met || plan.run.status === 'completed' ? ' · Counted ✓' : ''}
+                      <AppText variant="caption">{PROGRESS_LABEL}</AppText>
+                      <AppText
+                        variant="caption"
+                        tone={met ? undefined : 'muted'}
+                        style={met ? { color: theme.progress.trendUp } : undefined}
+                      >
+                        {progressFigure(day?.countedMin ?? 0, target ?? null)}
+                        {met ? ' · Counted ✓' : ''}
                       </AppText>
                     </Stack>
                     <ProgressBar
-                      value={day?.met ? 1 : target ? (day?.countedMin ?? 0) / target : 0}
+                      value={met ? 1 : target ? (day?.countedMin ?? 0) / target : 0}
+                      complete={met}
                     />
+                    {credited && (
+                      <AppText variant="caption" tone="muted">
+                        from <AppText variant="caption">{credited.title}</AppText>
+                        {credited.durationMin
+                          ? ` · ${Math.round(credited.durationMin)} min`
+                          : ''}
+                        {others > 0 ? ` and ${others} more` : ''}
+                      </AppText>
+                    )}
+                    {unmeasured && (
+                      <AppText variant="micro" tone="muted">
+                        No heart rate recorded during it, so it has no counted minutes yet.
+                      </AppText>
+                    )}
                     {!day?.met && plan.run.status !== 'completed' && (
                       <AppButton
                         title={choose ? 'Back' : 'Start an activity'}
@@ -310,6 +339,7 @@ export function CardioScreen({
                     )}
                   </Card>
                 )}
+                <WeekList days={plan?.heartHealth?.days ?? []} today={today} />
               </>
             ) : (
               <StateCard
@@ -334,6 +364,7 @@ export function CardioScreen({
           <HubCard
             title="Run"
             subtitle={data?.hasRunningPlan ? 'Your running plan' : 'Set up a running plan'}
+            badge={data?.hasRunningPlan ? 'Program' : undefined}
             icon="legs"
             tone="recovery"
             onPress={openRunning}

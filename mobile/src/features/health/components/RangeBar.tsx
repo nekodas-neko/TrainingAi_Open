@@ -20,6 +20,20 @@ export function useCueColor() {
         : theme.anatomy.injured;
 }
 
+/**
+ * Text and icon colours for the same cues. The anatomy greens, ambers and reds are one value in
+ * both themes and fall under 4.5:1 on a white card; these have a light and a dark step.
+ */
+export function useReadableCueColor() {
+  const { theme } = useTheme();
+  return (cue: Cue) =>
+    cue === 'good'
+      ? theme.progress.trendUp
+      : cue === 'watch'
+        ? theme.tones.checkin.foreground
+        : theme.colors.danger;
+}
+
 const bandCue: Record<RangeZoneBand, Cue> = { bad: 'bad', warn: 'watch', good: 'good' };
 
 /**
