@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { ActionMenu, AppText, Card, Disclosure, IconButton, Stack } from '../../shared/ui';
+import { AppText, Card, Disclosure, IconButton, Stack } from '../../shared/ui';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import type { SavedProgram } from '../workouts/data/models';
 
@@ -21,7 +20,6 @@ export function ProgramCard({
   onReview: (sessionId: string) => void;
 }) {
   const { theme } = useTheme();
-  const [menu, setMenu] = useState(false);
   const approach =
     program.phaseMode === 'ai_dynamic'
       ? 'AI training'
@@ -43,17 +41,27 @@ export function ProgramCard({
           .join(' · ')}
         trailing={
           <Stack direction="row" gap="xs">
+            {!program.isActive && (
+              <IconButton
+                icon="check"
+                label={`Set ${program.name} as active`}
+                disabled={busy}
+                onPress={onActivate}
+              />
+            )}
             <IconButton
               icon="edit"
               label={`Edit ${program.name}`}
               disabled={busy}
               onPress={onEdit}
             />
+            {/* The delete is behind a confirmation in ProgramsScreen; this only asks for it. */}
             <IconButton
-              icon="more"
-              label={`Options for ${program.name}`}
+              icon="delete"
+              label={`Delete ${program.name}`}
+              tone="danger"
               disabled={busy}
-              onPress={() => setMenu(true)}
+              onPress={onDelete}
             />
           </Stack>
         }
@@ -81,18 +89,6 @@ export function ProgramCard({
           ))}
         </Stack>
       </Disclosure>
-      <ActionMenu
-        visible={menu}
-        title={program.name}
-        onClose={() => setMenu(false)}
-        actions={[
-          { title: 'Edit program', icon: 'edit', run: onEdit },
-          ...(!program.isActive
-            ? [{ title: 'Set as active', icon: 'check' as const, run: onActivate }]
-            : []),
-          { title: 'Delete program', icon: 'delete', danger: true, run: onDelete },
-        ]}
-      />
     </Card>
   );
 }

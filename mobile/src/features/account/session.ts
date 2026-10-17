@@ -344,7 +344,7 @@ export class AccountSession {
       this.pending = null;
       this.publish(
         'signedOut',
-        'Could not read secure sign-in storage. Try again on an unlocked iPhone with the latest development build.',
+        'Could not read secure sign-in storage. Try again on an unlocked phone with the latest development build.',
       );
     }
   }
@@ -615,7 +615,7 @@ export class AccountSession {
       if (generation === this.generation) {
         this.publish(
           'storageError',
-          'Could not clear the interrupted sign-in. Retry on an unlocked iPhone.',
+          'Could not clear the interrupted sign-in. Retry on an unlocked phone.',
         );
       }
     }

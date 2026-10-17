@@ -1,11 +1,12 @@
 import { useNutrition } from '../../nutrition/data/NutritionProvider';
 import { useEffect, useRef, useState } from 'react';
 import { z } from 'zod';
-import { ACTIVITY_LEVELS, FITNESS_GOALS } from '@trainingai/shared/types/user';
+import { latestDisplayedBodyFat } from '@trainingai/shared/health/body-fat-display';
+import { formatDateDisplay } from '@trainingai/shared/date-utils';
 import {
+  AppButton,
   AppText,
   Card,
-  KeyValueGrid,
   PageLayout,
   Picker,
   Skeleton,
@@ -19,7 +20,14 @@ import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { profileSpec, metricValue, bodyOverviewSpec } from '../../health/data/models';
 import { useHealthData } from '../../health/data/HealthDataProvider';
 import { ProfileOverview } from '../components/ProfileOverview';
-import { profilePatch, timezoneOptions } from '../data/profile';
+import { birthYearOf, profilePatch, timezoneOptions } from '../data/profile';
+// Name, birth year, height, sex and timezone are what the current app's Edit profile sheet and
+// Profile details hold. Activity level and Fitness goal are on the Goals screen there, and here.
+const FIELD_KEYS = ['displayName', 'heightCm', 'birthYear', 'sex', 'timezone'];
+function fieldValue(user: Record<string, unknown>, key: string) {
+  if (key === 'birthYear') return birthYearOf(user.dateOfBirth);
+  return user[key] == null ? '' : String(user[key]);
+}
 const schema = z.object({
   fields: z.record(z.string(), z.string()),
   dirty: z.array(z.string()),
@@ -28,10 +36,12 @@ export function ProfileDetailsScreen({
   onBack,
   openClinical,
   openBaselines,
+  openHealthBody,
 }: {
   onBack: () => void;
   openClinical: () => void;
   openBaselines: () => void;
+  openHealthBody: () => void;
 }) {
   const state = useWorkoutResource(profileSpec);
   return (
@@ -56,6 +66,7 @@ export function ProfileDetailsScreen({
           user={state.data.user}
           openClinical={openClinical}
           openBaselines={openBaselines}
+          openHealthBody={openHealthBody}
         />
       ) : (
         <Skeleton style={{ flex: 1 }} />
@@ -67,25 +78,19 @@ function ProfileDetailsForm({
   user,
   openClinical,
   openBaselines,
+  openHealthBody,
 }: {
   user: z.infer<typeof profileSpec.schema>['user'];
   openClinical: () => void;
   openBaselines: () => void;
+  openHealthBody: () => void;
 }) {
   const nutrition = useNutrition();
   const health = useHealthData(),
     account = useAccountContext();
   const draft = useWorkoutDraft('profile-details', schema, {
     fields: Object.fromEntries(
-      [
-        'displayName',
-        'heightCm',
-        'dateOfBirth',
-        'sex',
-        'activityLevel',
-        'fitnessGoal',
-        'timezone',
-      ].map((key) => [key, user[key] == null ? '' : String(user[key])]),
+      FIELD_KEYS.map((key) => [key, fieldValue(user, key)]),
     ),
     dirty: [],
   });
@@ -102,7 +107,7 @@ function ProfileDetailsForm({
       const fields = { ...value.fields };
       for (const key of Object.keys(fields))
         if (!value.dirty.includes(key))
-          fields[key] = user[key] == null ? '' : String(user[key]);
+          fields[key] = fieldValue(user, key);
       return JSON.stringify(fields) === JSON.stringify(value.fields)
         ? value
         : { ...value, fields };
@@ -123,10 +128,10 @@ function ProfileDetailsForm({
     if (!draft.ready || !draft.resources || !keys.length) return;
     let body;
     try {
-      body = profilePatch(fields, keys);
+      body = profilePatch(fields, keys, user.dateOfBirth);
     } catch {
       setError(
-        'Check the edited fields. Height must be 50–300 cm, and dates and timezones must be valid.',
+        'Check the edited fields. Height must be 50–300 cm, birth year four digits, and the timezone valid.',
       );
       return;
     }
@@ -162,7 +167,8 @@ function ProfileDetailsForm({
   const byDate = new Map((overview.data?.measuredOverview ?? []).map((x) => [x.date, x]));
   for (const row of health.body?.recent ?? []) byDate.set(row.date, row);
   const rows = [...byDate.values()].sort((a, b) => b.date.localeCompare(a.date));
-  const fat = rows.find((x) => x.bodyFatCorrected != null || x.bodyFat != null);
+  const { value: fat } = latestDisplayedBodyFat(rows);
+  const fatDate = rows.find((x) => latestDisplayedBodyFat([x]).value != null)?.date;
   const weight =
     health.body?.latestWeightKg ??
     overview.data?.latestWeightKg ??
@@ -188,60 +194,64 @@ function ProfileDetailsForm({
           }
           onRetry={() => void save()}
         />
-        {[
-          ['displayName', 'Display name'],
-          ['heightCm', 'Height (cm)'],
-          ['dateOfBirth', 'Date of birth (YYYY-MM-DD)'],
-        ].map(([key, label]) => (
-          <TextField
-            key={key}
-            label={label}
-            editable={draft.ready}
-            value={f[key]}
-            keyboardType={key === 'heightCm' ? 'decimal-pad' : 'default'}
-            maxLength={key === 'displayName' ? 100 : undefined}
-            onChangeText={(value) => change(key, value)}
-            onBlur={() => void save([key])}
-          />
-        ))}
-        <KeyValueGrid
-          rows={[
-            {
-              label: 'Weight',
-              value: `${metricValue(weight, 'kg', 1)}${weightDate ? ` · ${weightDate}` : ''}`,
-            },
-            {
-              label: 'Body fat',
-              value: `${metricValue(fat?.bodyFatCorrected ?? fat?.bodyFat, '%', 1)}${fat ? ` · ${fat.date}` : ''}`,
-            },
-          ]}
+        <TextField
+          label="Display name"
+          editable={draft.ready}
+          value={f.displayName}
+          maxLength={100}
+          onChangeText={(value) => change('displayName', value)}
+          onBlur={() => void save(['displayName'])}
         />
         <Picker
-          label="Sex"
+          label="Biological sex"
           value={f.sex}
           options={[
             { value: '', label: 'Not set' },
-            ...['male', 'female', 'other'].map((value) => ({ value, label: value })),
+            ...[
+              ['male', 'Male'],
+              ['female', 'Female'],
+              ['other', 'Other'],
+            ].map(([value, label]) => ({ value, label })),
           ]}
           onChange={(value) => change('sex', value, true)}
         />
-        <Picker
-          label="Activity level"
-          value={f.activityLevel}
-          options={[
-            { value: '', label: 'Not set' },
-            ...ACTIVITY_LEVELS.map((value) => ({ value, label: value.replaceAll('_', ' ') })),
-          ]}
-          onChange={(value) => change('activityLevel', value, true)}
+        <AppText variant="caption" tone="muted">
+          Used for BMI and energy balance estimates
+        </AppText>
+        <TextField
+          label="Birth year"
+          editable={draft.ready}
+          value={f.birthYear}
+          placeholder="1990"
+          keyboardType="number-pad"
+          maxLength={4}
+          onChangeText={(value) => change('birthYear', value)}
+          onBlur={() => void save(['birthYear'])}
         />
-        <Picker
-          label="Fitness goal"
-          value={f.fitnessGoal}
-          options={[
-            { value: '', label: 'Not set' },
-            ...FITNESS_GOALS.map((value) => ({ value, label: value.replaceAll('_', ' ') })),
-          ]}
-          onChange={(value) => change('fitnessGoal', value, true)}
+        <TextField
+          label="Height (cm)"
+          editable={draft.ready}
+          value={f.heightCm}
+          placeholder="175"
+          keyboardType="decimal-pad"
+          onChangeText={(value) => change('heightCm', value)}
+          onBlur={() => void save(['heightCm'])}
+        />
+        <MeasurementRow
+          label="Weight"
+          value={weight == null ? null : metricValue(weight, 'kg', 1)}
+          when={weightDate ? dayLabel(weightDate, health.today) : null}
+          emptyLabel="No weigh-ins yet"
+          action="Log a weigh-in"
+          onAction={openHealthBody}
+        />
+        <MeasurementRow
+          label="Body fat %"
+          value={fat == null ? null : metricValue(fat, '%', 1)}
+          when={fatDate ? dayLabel(fatDate, health.today) : null}
+          emptyLabel="Not logged"
+          action="Log body fat %"
+          onAction={openHealthBody}
         />
         <Picker
           label="Timezone"
@@ -264,6 +274,40 @@ function ProfileDetailsForm({
         />
       </Card>
       <ProfileOverview openClinical={openClinical} openBaselines={openBaselines} />
+    </Stack>
+  );
+}
+
+function dayLabel(date: string, today: string) {
+  return date === today ? 'Today' : formatDateDisplay(date);
+}
+/** A measured value with the day it was taken, and the way to log another: never an input. */
+function MeasurementRow({
+  label,
+  value,
+  when,
+  emptyLabel,
+  action,
+  onAction,
+}: {
+  label: string;
+  value: string | null;
+  when: string | null;
+  emptyLabel: string;
+  action: string;
+  onAction: () => void;
+}) {
+  return (
+    <Stack gap="xs">
+      <AppText variant="caption" tone="muted">
+        {label}
+      </AppText>
+      <Stack direction="row" align="center" justify="space-between">
+        <AppText tone={value == null ? 'muted' : undefined} style={{ flex: 1 }}>
+          {value == null ? emptyLabel : `${value}${when ? ` · ${when}` : ''}`}
+        </AppText>
+        <AppButton title={action} variant="surface" onPress={onAction} />
+      </Stack>
     </Stack>
   );
 }

@@ -1,4 +1,4 @@
-import { plural } from '@trainingai/shared/format/plural';
+import { timeAgo } from '@trainingai/shared/format/time-ago';
 import { useState } from 'react';
 import { Pressable } from 'react-native';
 import {
@@ -29,19 +29,12 @@ import {
   type Period,
 } from '../data/models';
 import { ManageFriendsSheet } from './ManageFriendsSheet';
+// The current app's colours for these two glyphs: a gold trophy, a purple trending arrow (Tailwind
+// yellow-400 and purple-400, which `components/more/friend-feed.tsx` and the leaderboard medal use).
+const GOLD = '#facc15';
+const PURPLE = '#c084fc';
 function relative(iso: string) {
-  const at = Date.parse(iso);
-  if (!Number.isFinite(at)) {
-    return 'Date unavailable';
-  }
-  const minutes = Math.floor(Math.max(0, Date.now() - at) / 60000);
-  return minutes < 1
-    ? 'just now'
-    : minutes < 60
-      ? `${minutes} min ago`
-      : minutes < 1440
-        ? `${Math.floor(minutes / 60)} hr ago`
-        : `${plural(Math.floor(minutes / 1440), 'day', 'days')} ago`;
+  return timeAgo(iso) ?? 'Date unavailable';
 }
 export function FriendsPanel({ openProfile }: { openProfile: (id: string) => void }) {
   const { theme } = useTheme();
@@ -165,7 +158,10 @@ export function FriendsPanel({ openProfile }: { openProfile: (id: string) => voi
                           )}
                         </Stack>
                         <Stack direction="row" align="center">
-                          <Icon name={event.type === 'pr' ? 'upper' : 'award'} tone="brand" />
+                          <Icon
+                            name={event.type === 'pr' ? 'upper' : 'award'}
+                            color={event.type === 'pr' ? PURPLE : GOLD}
+                          />
                           <AppText variant="caption" style={{ flex: 1 }}>
                             {feedText(event)}
                           </AppText>
@@ -223,7 +219,7 @@ export function FriendsPanel({ openProfile }: { openProfile: (id: string) => voi
                           )}
                         </Stack>
                         <AppText variant="caption">{rankLabel(value, period, metric)}</AppText>
-                        {index === 0 && <Icon name="award" tone="brand" />}
+                        {index === 0 && <Icon name="award" color={GOLD} />}
                       </Stack>
                     </Card>
                   </Pressable>

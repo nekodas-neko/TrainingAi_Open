@@ -1,5 +1,6 @@
 import { deviceHealthName } from '../../../integrations/device-health/platform';
 import { useEffect } from 'react';
+import { displayBodyFat } from '@trainingai/shared/health/body-fat-display';
 import {
   shiftDateStr,
   formatDateDisplay,
@@ -81,7 +82,7 @@ export function ProfileOverview({
       .filter((x) => x.date >= shiftDateStr(health.today, -366))
       .map((x) => ({
         ...x,
-        bodyFatPct: x.bodyFatCorrected ?? x.bodyFat,
+        bodyFatPct: displayBodyFat(x),
       })) as unknown as MetricRow[],
   );
   const hrv = apple.completed?.hrv;

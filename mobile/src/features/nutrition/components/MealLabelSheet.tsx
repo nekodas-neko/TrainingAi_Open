@@ -67,7 +67,7 @@ export function MealLabelSheet({ meal, onClose }: { meal: SavedMeal; onClose: ()
       setError(null);
     } catch {
       setError(
-        'Could not save the label image. Use Print/PDF, or retry in the latest iPhone build.',
+        'Could not save the label image. Use Print/PDF, or retry in the latest build.',
       );
     } finally {
       setBusy(false);

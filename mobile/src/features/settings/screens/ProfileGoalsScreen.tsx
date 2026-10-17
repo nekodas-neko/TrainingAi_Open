@@ -1,4 +1,4 @@
-import { FITNESS_GOALS } from '@trainingai/shared/types/user';
+import { ACTIVITY_LEVELS, FITNESS_GOALS } from '@trainingai/shared/types/user';
 import { goalBoundSchema } from '@trainingai/shared/validation/goal-bounds';
 import { useState } from 'react';
 import { z } from 'zod';
@@ -203,7 +203,13 @@ function ProfileGoalsForm({
       await resources!.write(
         'PATCH',
         '/api/user/profile',
-        { fitnessGoal: f.profile.fitnessGoal || null },
+        {
+          fitnessGoal: f.profile.fitnessGoal || null,
+          // Only when it was edited here, so a stale draft cannot overwrite a newer value.
+          ...((f.profile.activityLevel ?? '') !== (user.activityLevel ?? '')
+            ? { activityLevel: f.profile.activityLevel || null }
+            : {}),
+        },
         ['/api/user/profile', '/api/nutrition'],
       );
       await resources!.clearDraft('profile-goals');
@@ -224,7 +230,7 @@ function ProfileGoalsForm({
           <AppText variant="heading">{user.displayName ?? 'Your profile'}</AppText>
           <ListRow
             title="Edit profile"
-            subtitle="Height, date of birth, sex and activity level"
+            subtitle="Name, birth year, height, sex and timezone"
             onPress={openProfile}
           />
         </Card>
@@ -241,6 +247,15 @@ function ProfileGoalsForm({
               ...FITNESS_GOALS.map((v) => ({ value: v, label: v.replaceAll('_', ' ') })),
             ]}
             onChange={(value) => setProfile('fitnessGoal', value)}
+          />
+          <Picker
+            label="Activity level"
+            value={f.profile.activityLevel}
+            options={[
+              { value: '', label: 'Not set' },
+              ...ACTIVITY_LEVELS.map((v) => ({ value: v, label: v.replaceAll('_', ' ') })),
+            ]}
+            onChange={(value) => setProfile('activityLevel', value)}
           />
           {[
             ['stepsGoal', 'Steps'],
