@@ -49,10 +49,7 @@ export function HealthInsight({
           setError(false);
         }
         if (!result.degraded) {
-          await resources.saveDraft(key, {
-            insight: result.insight,
-            savedAt: Date.now(),
-          });
+          await resources.saveDraft(key, { insight: result.insight, savedAt: Date.now() });
         }
       } catch {
         if (active) {

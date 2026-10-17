@@ -130,9 +130,7 @@ function fixture() {
         return moods.get(query!.date) ?? null;
       }
       if (path === '/api/log-rest-day') {
-        return {
-          dates: [...rests].filter((date) => date >= query!.from && date <= query!.to),
-        };
+        return { dates: [...rests].filter((date) => date >= query!.from && date <= query!.to) };
       }
       return { ...preferences };
     },
@@ -236,11 +234,7 @@ test('a lost readiness reply retries one mutation identity and retains the local
   const store = f.make();
   await store.initialize();
   f.lost();
-  await store.saveMood(day, {
-    energyLevel: 'low',
-    soreMuscles: [],
-    bodyState: [],
-  });
+  await store.saveMood(day, { energyLevel: 'low', soreMuscles: [], bodyState: [] });
   await store.sync();
   assert.equal(store.getSnapshot().operations.length, 1);
   await store.sync();
@@ -442,6 +436,10 @@ test('layout moves stored keys across hidden slots, and greetings follow the acc
     ),
     'Good afternoon, Josh B.',
   );
+  assert.equal(
+    homeGreeting({ displayName: '   ', name: 'Alex' }, 'Australia/Brisbane', new Date('2026-10-11T22:00:00Z')),
+    'Good morning, Alex.',
+  );
 });
 test('dismissals survive reopening per day/week and offline goal postponement retains its upload', async () => {
   const f = fixture();
@@ -476,22 +474,14 @@ test('banner eligibility uses the recap week and the profile review timestamp', 
   );
   assert.equal(
     goalsReviewDue(
-      {
-        activityLevel: 'moderate',
-        fitnessGoal: 'maintenance',
-        lastGoalReviewAt: null,
-      },
+      { activityLevel: 'moderate', fitnessGoal: 'maintenance', lastGoalReviewAt: null },
       now,
     ),
     true,
   );
   assert.equal(
     goalsReviewDue(
-      {
-        activityLevel: null,
-        fitnessGoal: 'maintenance',
-        lastGoalReviewAt: null,
-      },
+      { activityLevel: null, fitnessGoal: 'maintenance', lastGoalReviewAt: null },
       now,
     ),
     false,

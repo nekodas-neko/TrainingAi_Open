@@ -273,10 +273,7 @@ export function HealthDetailScreen({
                     </AppText>
                     <KeyValueGrid
                       rows={[
-                        {
-                          label: 'Baseline',
-                          value: metricValue(state.data.ouraScore),
-                        },
+                        { label: 'Baseline', value: metricValue(state.data.ouraScore) },
                         {
                           label:
                             state.data.source === 'oura+acwr'
@@ -357,10 +354,7 @@ export function HealthDetailScreen({
               }
               tone={tone}
               caption="Last 14 days · gaps mean not recorded"
-              points={trends.data!.trends.map((day) => ({
-                label: day.date,
-                value: day[key],
-              }))}
+              points={trends.data!.trends.map((day) => ({ label: day.date, value: day[key] }))}
             />
           ))}
         {detail === 'heart-rate' &&

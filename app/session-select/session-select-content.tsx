@@ -5,7 +5,7 @@ import { savePreference } from '@/lib/user/preferences-sync'
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { calendarMonthInTz, previousCalendarMonth } from "@/lib/calendar-month";
 import { useDayRolloverRefresh, useLocalDay } from '@/components/shell/local-day-provider';
-import { getGreeting, profileDisplayName } from '@trainingai/shared/greeting';
+import { homeGreeting, profileDisplayName } from '@trainingai/shared/greeting';
 import { isMorningCheckinPromptDone, markMorningCheckinPromptDone } from '@/app/session-select/morning-checkin-marker';
 import { warmPrescription } from '@/app/session-select/warm-prescription';
 import { useTransitionRouter } from "@/lib/view-transition";
@@ -1070,7 +1070,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
           <div className="flex-1 min-w-0">
             <HeaderMetaRow tz={tz} />
             <h1 className="text-xl font-bold leading-tight line-clamp-2">
-              {displayName ? getGreeting(displayName, tz) : "TrainingAI"}
+              {homeGreeting({ displayName }, tz)}
             </h1>
           </div>
           <div className="flex items-center gap-2 flex-none">

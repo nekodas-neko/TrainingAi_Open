@@ -19,41 +19,26 @@ export function timelineMetrics(event: TimelineEvent, compact = false) {
   const values: { label: string; value: string }[] = [];
   const bedtime = ['sleep', 'bedtime'].includes(event.type);
   if (event.durationMin != null && (!compact || !bedtime))
-    values.push({
-      label: 'Duration',
-      value: formatHoursMinutes(event.durationMin),
-    });
+    values.push({ label: 'Duration', value: formatHoursMinutes(event.durationMin) });
   if (event.sets != null) values.push({ label: 'Sets', value: event.sets.toLocaleString() });
   if (event.exerciseCount != null)
-    values.push({
-      label: 'Exercises',
-      value: event.exerciseCount.toLocaleString(),
-    });
+    values.push({ label: 'Exercises', value: event.exerciseCount.toLocaleString() });
   if (event.distanceKm != null)
-    values.push({
-      label: 'Distance',
-      value: `${event.distanceKm.toFixed(2)} km`,
-    });
+    values.push({ label: 'Distance', value: `${event.distanceKm.toFixed(2)} km` });
   if (event.calories != null)
     values.push({
       label: 'Calories',
       value: `${Math.round(event.calories).toLocaleString()} kcal`,
     });
   if (event.sleepDurationH != null && (!compact || !bedtime)) {
-    values.push({
-      label: 'Time asleep',
-      value: formatHoursMinutes(event.sleepDurationH * 60),
-    });
+    values.push({ label: 'Time asleep', value: formatHoursMinutes(event.sleepDurationH * 60) });
   }
   if ((!compact || event.type === 'wakeup') && event.readinessScore != null)
     values.push({ label: 'Readiness', value: String(event.readinessScore) });
   if ((!compact || event.type === 'wakeup') && event.sleepScore != null)
     values.push({ label: 'Sleep score', value: String(event.sleepScore) });
   if (!compact && event.latencyMin != null)
-    values.push({
-      label: 'Time to fall asleep',
-      value: formatHoursMinutes(event.latencyMin),
-    });
+    values.push({ label: 'Time to fall asleep', value: formatHoursMinutes(event.latencyMin) });
   return values;
 }
 

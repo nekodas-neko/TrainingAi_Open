@@ -24,10 +24,7 @@ import type { MoodFields } from '@trainingai/shared/validation/mood-log';
 import { SessionLengthControl } from '../../workouts/components/SessionLengthControl';
 
 const groups = [
-  {
-    label: 'Upper',
-    muscles: ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps'],
-  },
+  { label: 'Upper', muscles: ['Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps'] },
   { label: 'Lower', muscles: ['Quads', 'Hamstrings', 'Glutes', 'Calves'] },
   { label: 'Core', muscles: ['Core'] },
 ];

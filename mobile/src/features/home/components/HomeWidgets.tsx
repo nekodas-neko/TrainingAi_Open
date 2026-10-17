@@ -73,12 +73,7 @@ export function HomeMetricTiles({
       icon: 'scale',
       field: 'weightKg',
     },
-    steps: {
-      value: today?.steps ?? null,
-      unit: '',
-      icon: 'legs',
-      field: 'steps',
-    },
+    steps: { value: today?.steps ?? null, unit: '', icon: 'legs', field: 'steps' },
     calories: {
       value: resolved.intake ?? today?.calories ?? null,
       unit: 'kcal',
@@ -104,12 +99,7 @@ export function HomeMetricTiles({
       icon: 'nutrition',
       nutrition: true,
     },
-    waterIntake: {
-      value: today?.waterMl ?? null,
-      unit: 'ml',
-      icon: 'water',
-      field: 'waterMl',
-    },
+    waterIntake: { value: today?.waterMl ?? null, unit: 'ml', icon: 'water', field: 'waterMl' },
   };
   return (
     <Grid columns={3}>
@@ -400,26 +390,10 @@ function HomeWidgetBody({
     const goal = goals?.data?.sleepGoalHours ?? null;
     const stages = night
       ? [
-          {
-            label: 'Deep',
-            hours: night.deepSleepHours,
-            color: theme.sleepStages.deep,
-          },
-          {
-            label: 'REM',
-            hours: night.remSleepHours,
-            color: theme.sleepStages.rem,
-          },
-          {
-            label: 'Light',
-            hours: night.lightSleepHours,
-            color: theme.sleepStages.light,
-          },
-          {
-            label: 'Awake',
-            hours: night.awakHours,
-            color: theme.sleepStages.awake,
-          },
+          { label: 'Deep', hours: night.deepSleepHours, color: theme.sleepStages.deep },
+          { label: 'REM', hours: night.remSleepHours, color: theme.sleepStages.rem },
+          { label: 'Light', hours: night.lightSleepHours, color: theme.sleepStages.light },
+          { label: 'Awake', hours: night.awakHours, color: theme.sleepStages.awake },
         ]
       : [];
     const known = stages.reduce((sum, row) => sum + (row.hours ?? 0), 0);
@@ -587,12 +561,12 @@ function HomeWidgetBody({
       <Pressable
         onPress={openReadiness}
         accessibilityRole="button"
-        accessibilityLabel="Edit exercise energy"
+        accessibilityLabel="Edit exercise readiness"
       >
         <Card accent={accent}>
           <Stack direction="row" align="center" justify="space-between">
             <Stack gap="xs" style={{ flex: 1 }}>
-              {title('Exercise Energy')}
+              {title('Exercise Readiness')}
               {home.mood ? (
                 <Stack direction="row" align="center">
                   <Icon

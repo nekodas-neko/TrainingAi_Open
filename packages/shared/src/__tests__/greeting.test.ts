@@ -45,6 +45,7 @@ describe('homeGreeting', () => {
   it('falls back to the sign-in name, then to the app name', () => {
     expect(homeGreeting({ displayName: null, name: 'Delan' }, TZ, now)).toBe('Good evening, Delan.');
     expect(homeGreeting({ name: '  ' }, TZ, now)).toBe('TrainingAI');
+    expect(homeGreeting({ displayName: '   ', name: 'Delan' }, TZ, now)).toBe('Good evening, Delan.');
     expect(homeGreeting(undefined, TZ, now)).toBe('TrainingAI');
   });
 });

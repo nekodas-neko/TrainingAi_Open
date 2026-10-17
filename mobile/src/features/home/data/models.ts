@@ -103,12 +103,7 @@ export function moveHomeSection(order: string[], key: string, direction: -1 | 1)
 }
 export function trainingDays(
   calendars: (Record<string, string[]> | undefined)[],
-  workouts: readonly {
-    date: string;
-    sessionName: string;
-    status: string;
-    id: string;
-  }[],
+  workouts: readonly { date: string; sessionName: string; status: string; id: string }[],
   removedIds: ReadonlySet<string> = new Set(),
 ) {
   const days: Record<string, string[]> = {};

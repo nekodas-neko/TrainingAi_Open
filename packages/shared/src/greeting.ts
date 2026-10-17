@@ -17,7 +17,7 @@ export function getGreeting(name: string, tz: string, now: Date = new Date()): s
 export function profileDisplayName(
   user: { displayName?: string | null; name?: string | null } | null | undefined,
 ): string | null {
-  return user?.displayName ?? user?.name ?? null;
+  return user?.displayName?.trim() || user?.name?.trim() || null;
 }
 
 /** The Home heading for a profile user; the app name until a profile has loaded. */
