@@ -20,6 +20,7 @@ export function foodScanError(error: unknown) {
     return 'No food was identified. Try another photo or describe what you ate.';
   }
   if (error instanceof ApiError) {
+    if (error.notice) return error.notice;
     if (error.status === 401 || error.status === 403) {
       return 'Your account could not authorise this analysis. Check your sign-in in Settings.';
     }

@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from 'react';
-import { ApiError } from '../../account/api/client';
+import { ApiError, aiFailureText } from '../../account/api/client';
 
 export function useWorkoutAction() {
   const [busy, setBusy] = useState(false);
@@ -27,7 +27,10 @@ export function useWorkoutAction() {
               ? 'Please wait a moment before trying again.'
               : error.status === 404
                 ? 'This item is no longer available. Refresh and retry.'
-                : 'Could not save this change. Your draft is kept on this phone; retry when connected.'
+                : aiFailureText(
+                    error,
+                    'Could not save this change. Your draft is kept on this phone; retry when connected.',
+                  )
           : error instanceof Error
             ? error.message
             : 'Could not complete this action.',

@@ -14,6 +14,7 @@ import {
 import { useWorkoutResources } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useNutrition } from '../data/NutritionProvider';
+import { goalReviewError } from '../data/goal-recommendation-error';
 const recSchema = z.object({
   id: z.string(),
   current: z
@@ -89,10 +90,8 @@ export function GoalRecommendation({
       });
       setError(null);
       onGenerated?.();
-    } catch {
-      setError(
-        'Could not review goals. Check your height, weight, sex, date of birth and fitness goal in Profile.',
-      );
+    } catch (cause) {
+      setError(goalReviewError(cause));
     } finally {
       setBusy(false);
     }

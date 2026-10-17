@@ -21,6 +21,7 @@ import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useNutrition } from '../data/NutritionProvider';
 import { scanSchema } from '../data/models';
 import { MealLoggingStatus } from './MealLoggingStatus';
+import { aiFailureText } from '../../account/api/client';
 const values = z.object({
   restingHeartRate: z.number().nullable(),
   steps: z.number().nullable(),
@@ -141,8 +142,10 @@ export function MealBackfill({
       await n.store!.logFoods(entries, date, id, { name: scan.name });
       draft.setValue({ ...draft.value, [id]: '' });
       setError(null);
-    } catch {
-      setError('Could not identify or save the food. Your description is preserved.');
+    } catch (cause) {
+      setError(
+        aiFailureText(cause, 'Could not identify or save the food. Your description is preserved.'),
+      );
     } finally {
       setBusy(null);
     }
