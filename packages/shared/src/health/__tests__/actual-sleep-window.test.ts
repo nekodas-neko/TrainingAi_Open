@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { actualSleepWindow } from '@/lib/sleep/actual-window'
+import { actualSleepWindow } from '../actual-sleep-window'
 
 describe('actualSleepWindow', () => {
   it('trims leading awake into onset but keeps the ring\'s recorded wake time', () => {

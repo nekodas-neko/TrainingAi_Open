@@ -3,6 +3,7 @@
 import { accentCardStyle } from "@trainingai/shared/utils";
 import { Sparkline } from "@/components/ui/sparkline";
 import type { BodyMetaRow } from "@/app/api/body-metadata/route";
+import { goalRemaining } from "@trainingai/shared/health/long-term-goal-progress";
 import { displayBodyFat, correctedSpan, type BodyFatCalibrationMeta } from "./body-fat-display";
 
 const BF_COLOR = "#f43f5e";
@@ -98,10 +99,10 @@ export function BodyFatCard({
         </p>
       )}
       {targetBfPct != null && (() => {
-        const diff = parseFloat((latest - targetBfPct).toFixed(1));
+        const { diff, reached } = goalRemaining(latest, targetBfPct);
         return (
-          <p className="text-xs font-semibold mt-1" style={{ color: diff <= 0 ? "var(--accent-green)" : BF_COLOR }}>
-            {diff <= 0 ? "✓ Goal reached" : `↓ ${diff}% to go`}
+          <p className="text-xs font-semibold mt-1" style={{ color: reached ? "var(--accent-green)" : BF_COLOR }}>
+            {reached ? "✓ Goal reached" : `↓ ${diff}% to go`}
           </p>
         );
       })()}

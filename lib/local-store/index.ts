@@ -186,6 +186,9 @@ export interface LocalStore {
   /** Push-confirm for `exercise_log_edit` / `exercise_log_delete`: the log and its sets back to
    *  `synced`, unless another queued mutation still names the log. */
   markExerciseLogSynced(exerciseLogId: string, confirmingIds?: string[]): Promise<void>;
+  /** Issue 2721: after confirming a push the server superseded, drop the log's sets that never
+   *  came from the server, so a set added by the stale edit does not outlive it. */
+  dropUnpulledSetsOfSupersededLog(exerciseLogId: string): Promise<void>;
   /** Push-confirm for `workout_session_delete`: the session, its logs and their sets. */
   markWorkoutSessionTreeSynced(workoutSessionId: string, confirmingIds?: string[]): Promise<void>;
 

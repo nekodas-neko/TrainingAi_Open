@@ -247,3 +247,12 @@ describe('weightTrendWindowStart (#2480)', () => {
     expect(weightTrendWindowStart('2027-01-10')).toBe('2026-12-12')
   })
 })
+
+describe('goalRemaining', () => {
+  it('rounds to one decimal and flags a reached goal', async () => {
+    const { goalRemaining } = await import('../long-term-goal-progress')
+    expect(goalRemaining(82.34, 80)).toEqual({ diff: 2.3, reached: false })
+    expect(goalRemaining(80, 80)).toEqual({ diff: 0, reached: true })
+    expect(goalRemaining(79, 80)).toEqual({ diff: -1, reached: true })
+  })
+})

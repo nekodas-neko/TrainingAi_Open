@@ -9,8 +9,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { ChevronLeft } from "lucide-react";
 import { Hypnogram, STAGE_COLOR } from "@/components/health/hypnogram";
 import { EmptyState } from "@/components/ui/empty-state";
-import { actualSleepWindow } from "@/lib/sleep/actual-window";
-import { MetricScale, rangeStats } from "@/components/health/metric-scale";
+import { actualSleepWindow } from "@trainingai/shared/health/actual-sleep-window";
+import { MetricScale } from "@/components/health/metric-scale";
+import { rangeStats } from "@trainingai/shared/health/range-stats";
 import { settledNights } from "@/components/health/sleep/settled-nights";
 
 export interface HealthReading {

@@ -28,7 +28,7 @@ vi.mock('@/components/health/health-score-detail', () => ({
 }))
 vi.mock('@/components/health/sleep/manual-bedtime-card', () => ({ ManualBedtimeCard: () => createElement('div', { 'data-testid': 'bedtime-card' }) }))
 vi.mock('@/components/health/provisional-badge', () => ({ ProvisionalBadge: () => null }))
-vi.mock('@/components/health/body-cards/sleep-coverage-note', () => ({ sleepCoverageNote: () => null }))
+vi.mock('@trainingai/shared/health/sleep-coverage-note', () => ({ sleepCoverageNote: () => null }))
 vi.mock('@/components/health/hypnogram', () => ({ Hypnogram: () => null }))
 vi.mock('@/components/health/trend-sparkline-lazy', () => ({ TrendSparkline: () => null }))
 vi.mock('@/components/health/sleep-trend-toggle-card-lazy', () => ({ SleepTrendToggleCard: () => null }))

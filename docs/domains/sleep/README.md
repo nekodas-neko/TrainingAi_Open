@@ -289,7 +289,7 @@ curve). **Before writing anything that treats one row as one night, call the hel
   **25 of 82**, so a per-night score is a partial series whichever source you pick. (Was backlog
   entry Q-156, removed from the queue 2026-09-02 because nothing was owed.)
 - **The displayed sleep window's END is the end of the RECORDED session, not the moment you woke.**
-  `lib/sleep/actual-window.ts` trims leading awake blocks off the start but deliberately does not
+  `packages/shared/src/health/actual-sleep-window.ts` trims leading awake blocks off the start but deliberately does not
   trim the trailing ones — a stretch of lying in bed after waking is still part of the session, and
   the stage totals and ribbon axis both span the full window. Trimming only the header caused the
   07-08 "lost 15 minutes" bug. Expect the shown wake time to sit later than when the user says they

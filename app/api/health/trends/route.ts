@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { DEFAULT_TZ, todayInTz, todayMidnightUtc, toAestDay, secondsSinceLocalMidnight } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ, todayInTz, toAestDay, secondsSinceLocalMidnight, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { rateLimit } from '@/lib/rate-limit'
 import { wornHours } from '@trainingai/shared/health/wear-confidence'
 import { aggregateWorkoutDay, type DaySession } from '@trainingai/shared/health/workout-density'
@@ -39,9 +39,9 @@ export async function GET() {
   const repo = await getRepository()
   const tz = session.user?.timezone ?? DEFAULT_TZ
   const todayIso = todayInTz(tz)
-  const todayMid = todayMidnightUtc(tz)
-  const from14dDate = new Date(todayMid.getTime() - 14 * 86_400_000)
-  const from14dIso = toAestDay(from14dDate, tz)
+  // Step by calendar date, not by 24 h: a DST-change day is 23 or 25 h long.
+  const from14dIso = shiftDateStr(todayIso, -14)
+  const from14dDate = dateStrMidnightInTz(from14dIso, tz)
 
   const [ouraRows, derivedRows, bodyRows, workoutSessions] = await Promise.all([
     repo.getOuraDaily(userId, from14dIso, todayIso),
@@ -88,7 +88,7 @@ export async function GET() {
 
   const trends: HealthTrendDay[] = []
   for (let i = 13; i >= 0; i--) {
-    const d = toAestDay(new Date(todayMid.getTime() - i * 86_400_000), tz)
+    const d = shiftDateStr(todayIso, -i)
     const oura = ouraByDate.get(d)
     const derived = derivedByDate.get(d)
     const body = bodyByDate.get(d)

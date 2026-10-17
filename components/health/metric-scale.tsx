@@ -1,5 +1,9 @@
 'use client'
 
+import { rangePositions, rangeZones, type RangeOptimal } from '@trainingai/shared/health/range-stats'
+
+const ZONE_COLOR = { bad: '#ef4444', warn: '#f59e0b', good: '#22c55e' } as const
+
 /**
  * A horizontal scale showing where a single value sits within a recent range (min…max),
  * with an optional average tick. Reusable across sleep-night detail (#6) and the Heart &
@@ -30,14 +34,12 @@ export function MetricScale({
   // good, matching the golden-zone gauges elsewhere. 'high' = up is better (HRV, SpO₂, efficiency),
   // 'low' = down is better (resting/lowest HR), 'mid' = a middle sweet spot (sleep duration).
   // Omit for a plain neutral track.
-  optimal?: 'low' | 'high' | 'mid'
+  optimal?: RangeOptimal
 }) {
   if (value == null || min == null || max == null) return null
-  const lo = Math.min(min, value)
-  const hi = Math.max(max, value)
-  const span = hi - lo
-  const pos = span > 0 ? ((value - lo) / span) * 100 : 50
-  const avgPos = avg != null && span > 0 ? ((avg - lo) / span) * 100 : null
+  const placed = rangePositions(value, min, max, avg)
+  if (!placed) return null
+  const { pos, avgPos } = placed
 
   return (
     <div className="space-y-1">
@@ -49,13 +51,8 @@ export function MetricScale({
         {/* golden-zone colouring: green toward the healthy end (or the middle for 'mid') */}
         {optimal && (
           <div className="absolute inset-0 flex">
-            {(optimal === 'high'
-              ? [[50, '#ef4444'], [20, '#f59e0b'], [30, '#22c55e']]
-              : optimal === 'low'
-                ? [[30, '#22c55e'], [20, '#f59e0b'], [50, '#ef4444']]
-                : [[22, '#ef4444'], [13, '#f59e0b'], [30, '#22c55e'], [13, '#f59e0b'], [22, '#ef4444']]
-            ).map(([w, c], i) => (
-              <div key={i} style={{ width: `${w}%`, background: `color-mix(in oklch, ${c} 30%, transparent)` }} />
+            {rangeZones(optimal).map(({ widthPct, band }, i) => (
+              <div key={i} style={{ width: `${widthPct}%`, background: `color-mix(in oklch, ${ZONE_COLOR[band]} 30%, transparent)` }} />
             ))}
           </div>
         )}
@@ -82,12 +79,3 @@ export function MetricScale({
   )
 }
 
-/** Convenience: compute {min, avg, max} over a list of nullable numbers, or nulls if empty. */
-export function rangeStats(values: (number | null | undefined)[]): { min: number | null; avg: number | null; max: number | null } {
-  const nums = values.filter((v): v is number => v != null && Number.isFinite(v))
-  if (nums.length === 0) return { min: null, avg: null, max: null }
-  const min = Math.min(...nums)
-  const max = Math.max(...nums)
-  const avg = nums.reduce((s, v) => s + v, 0) / nums.length
-  return { min, avg, max }
-}

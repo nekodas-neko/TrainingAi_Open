@@ -4,6 +4,7 @@ import { resolveFailedOutboxIds, serverBackoffMs, buildWorkoutLogPayload } from 
 import type { SyncDelta } from '@/lib/data/repository';
 import { UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role';
 import { asRpeSource } from '@trainingai/shared/workout/rpe-source';
+import { SUPERSEDED_WARNING } from '@trainingai/shared/sync/edited-at';
 import type {
   LocalBodyMetric, LocalMoodLog, LocalSleepSession,
   LocalWorkoutSession, LocalActivityLog, LocalFitnessTest, LocalPrescribedRun, LocalProgram, LocalProgressionStyle,
@@ -1021,6 +1022,8 @@ async function pushMutationsOnce(userId: string): Promise<PushResult> {
   // saturate the DB connection pool. Bounding each request keeps load flat.
   const PUSH_CHUNK_SIZE = 5;
   const confirmed: typeof pending = [];
+  // Issue 2721: confirmed mutations the server skipped because it already held a newer copy.
+  const superseded = new Set<string>();
   let anyRequestOk = false;
 
   for (let i = 0; i < pending.length; i += PUSH_CHUNK_SIZE) {
@@ -1060,11 +1063,15 @@ async function pushMutationsOnce(userId: string): Promise<PushResult> {
     const result = await res.json() as {
       processed: number;
       errors: Array<{ id?: string; domain: string; date: string; error?: string; retryable?: boolean }>;
+      warnings?: Array<{ id?: string; warning?: string }>;
     };
     // Confirm by outbox id. Failed rows stay queued; resolveFailedOutboxIds
     // degrades to domain:date matching against pre-id servers.
     const failed = resolveFailedOutboxIds(chunk, result.errors);
     confirmed.push(...chunk.filter(m => !failed.has(m.id)));
+    for (const w of result.warnings ?? []) {
+      if (w.id && w.warning === SUPERSEDED_WARNING && !failed.has(w.id)) superseded.add(w.id);
+    }
 
     // Q-475: a database that cannot write reaches us as HTTP 200 with per-item errors, because
     // pushMutations catches per mutation — which is what makes the poison-pill rule work, and is
@@ -1214,6 +1221,7 @@ async function pushMutationsOnce(userId: string): Promise<PushResult> {
       const wsId = m.payload.workoutSessionId as string | undefined;
       const exerciseLogId = m.payload.exerciseLogId as string | undefined;
       if (wsId && exerciseLogId) await store.markWorkoutSynced(wsId, exerciseLogId);
+      if (exerciseLogId && superseded.has(m.id)) await store.dropUnpulledSetsOfSupersededLog(exerciseLogId);
     } else if (m.domain === 'session_rpe' || m.domain === 'complete_workout') {
       const wsId = m.payload.workoutSessionId as string | undefined;
       if (wsId) await store.markSessionSynced(wsId, batchIds);
@@ -1221,6 +1229,9 @@ async function pushMutationsOnce(userId: string): Promise<PushResult> {
       // LA-165. The local write marked the log and its sets 'pending' so a pull could not revert it.
       const exerciseLogId = m.payload.exerciseLogId as string | undefined;
       if (exerciseLogId) await store.markExerciseLogSynced(exerciseLogId, batchIds);
+      // Issue 2721: the server kept a newer copy. Its sets come down on the next pull; a set this
+      // stale edit added locally never will, so it goes now.
+      if (exerciseLogId && superseded.has(m.id)) await store.dropUnpulledSetsOfSupersededLog(exerciseLogId);
     } else if (m.domain === 'workout_session_delete') {
       const wsId = m.payload.workoutSessionId as string | undefined;
       if (wsId) await store.markWorkoutSessionTreeSynced(wsId, batchIds);

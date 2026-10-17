@@ -4,9 +4,16 @@ import { BatteryMediumIcon } from 'lucide-react'
 import type { NutritionTargets } from '@trainingai/shared/types/nutrition'
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
 import { bodyBatteryColor, type BodyBatteryLabel } from '@trainingai/shared/health/body-battery-band'
+import { countedIntakeKcal, countedEstimateTotal, type CountedEstimateRow } from '@trainingai/shared/nutrition/counted-intake'
+import { EstimatedKcalLine, ESTIMATE_STRIPES } from '../estimated-kcal'
 
 interface Props {
   totals: { calories: number; proteinG: number; carbsG: number; fatG: number }
+  /** #2925. The day's counted estimates (`useCountedEstimateRows`) and the meal types that have food
+   *  logged, so a superseded estimate drops out. Calories printed here are `countedIntakeKcal`, as on
+   *  the ring; `totals.calories` stays the logged half. */
+  estimates: readonly CountedEstimateRow[]
+  loggedMealTypeIds: readonly string[]
   targets: NutritionTargets | null
   /** #2071. The day's calorie budget, or null. `targets.calories` is the typed goal and is never
    *  printed as the day's budget. */
@@ -14,13 +21,17 @@ interface Props {
   battery: { current: number; label: BodyBatteryLabel; trend: string; drained: number } | null
 }
 
-export function DaySummaryCard({ totals, targets, dayBudgetKcal, battery }: Props) {
+export function DaySummaryCard({ totals, estimates, loggedMealTypeIds, targets, dayBudgetKcal, battery }: Props) {
   // Null rather than a stand-in (BF-175): a denominator nobody set is not the day's budget, and
   // `2000` printed as one read exactly like a target the user had chosen. #2071 took the typed goal
   // out for the same reason: it is a number the user set once, not the day's budget.
   const calTarget = dayBudgetKcal
-  const remaining = calTarget != null ? Math.max(0, calTarget - totals.calories) : null
-  const calPct = calTarget != null ? Math.min(100, Math.round((totals.calories / calTarget) * 100)) : 0
+  const eaten = countedIntakeKcal({ loggedKcal: totals.calories, estimates, loggedMealTypeIds })
+  const estimatedKcal = countedEstimateTotal(estimates, loggedMealTypeIds)
+  const remaining = calTarget != null ? Math.max(0, Math.round(calTarget - eaten)) : null
+  const calPct = calTarget != null && calTarget > 0 ? Math.min(100, (eaten / calTarget) * 100) : 0
+  // The logged part's own length on the same scale, so the stripe starts where the fill used to end.
+  const loggedPct = calTarget != null && calTarget > 0 ? Math.min(calPct, ((eaten - estimatedKcal) / calTarget) * 100) : 0
 
   return (
     <div className="rounded-2xl bg-muted/40 border border-border px-4 py-4 flex flex-col gap-3.5">
@@ -28,7 +39,7 @@ export function DaySummaryCard({ totals, targets, dayBudgetKcal, battery }: Prop
       <div className="flex flex-col gap-1.5">
         <div className="flex items-baseline justify-between">
           <span className="text-sm font-semibold tabular-nums">
-            {Math.round(totals.calories)}
+            {eaten}
             {calTarget != null && <span className="text-muted-foreground font-normal"> / {Math.round(calTarget)} kcal</span>}
             {calTarget == null && <span className="text-muted-foreground font-normal"> kcal</span>}
           </span>
@@ -39,13 +50,22 @@ export function DaySummaryCard({ totals, targets, dayBudgetKcal, battery }: Prop
           )}
         </div>
         {calTarget != null && (
-          <div className="h-2.5 rounded-full bg-muted/60 overflow-hidden">
+          <div className="relative h-2.5 rounded-full bg-muted/60 overflow-hidden">
             <div
               className="h-full w-full rounded-full origin-left transition-transform duration-300 motion-reduce:transition-none"
-              style={{ transform: `scaleX(${calPct / 100})`, background: 'var(--color-brand)' }}
+              style={{ transform: `scaleX(${loggedPct / 100})`, background: 'var(--color-brand)' }}
             />
+            {/* The assumed share: stripes from where the logged fill ends to where the total ends. */}
+            {calPct > loggedPct && (
+              <div
+                className="absolute inset-y-0 opacity-85"
+                data-estimated-stripe
+                style={{ left: `${loggedPct}%`, width: `${calPct - loggedPct}%`, backgroundImage: ESTIMATE_STRIPES }}
+              />
+            )}
           </div>
         )}
+        <EstimatedKcalLine estimatedKcal={estimatedKcal} />
       </div>
 
       {/* Macro totals */}

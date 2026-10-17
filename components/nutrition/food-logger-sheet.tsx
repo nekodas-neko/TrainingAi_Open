@@ -14,7 +14,7 @@ import { saveSharedMealToLibrary, sharedMealTotals } from './save-shared-meal'
 import { todayInTz, secondsSinceLocalMidnight } from '@trainingai/shared/date-utils'
 import { mealTypeForHour } from '@trainingai/shared/nutrition/log-plan-meal'
 import { logMealItems } from '@trainingai/shared/nutrition/log-meal'
-import { scanOriginToSource, logFoodEntries, ingredientsToEntries, type NewFoodEntry } from '@trainingai/shared/nutrition/log-food'
+import { scanOriginToSource, sourceAfterEdit, logFoodEntries, ingredientsToEntries, type NewFoodEntry } from '@trainingai/shared/nutrition/log-food'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { TTL_LONG, TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { getLocalStore } from '@/lib/local-store'
@@ -183,7 +183,7 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
           servingSizeG: form.servingSizeG, calories: form.calories,
           proteinG: form.proteinG, carbsG: form.carbsG, fatG: form.fatG,
           fiberG: form.fiberG, sugarG: form.sugarG, sodiumMg: form.sodiumMg, satFatG: form.satFatG,
-          source: scanOriginToSource(scanResult?.origin),
+          source: sourceAfterEdit(scanOriginToSource(scanResult?.origin), scanResult ? scanToEditable(scanResult) : null, form),
           quantityMultiplier: quantity,
           // LB-158. Read off the scan result rather than the form, because the form is the
           // editable macros and a code is not one of them. Absent on every path but a barcode.

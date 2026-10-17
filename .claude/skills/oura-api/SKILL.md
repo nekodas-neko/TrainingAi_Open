@@ -22,14 +22,14 @@ Full spec: `.claude/skills/oura-api/references/openapi-v1.34.json`
 |---|---|
 | `email` | User email |
 | `personal` | Age, weight, height, sex |
-| `daily` | Daily readiness, sleep, activity, stress, resilience, cardiovascular age, VO2 max |
-| `heartrate` | Heart rate time series |
+| `daily` | Daily summaries of sleep, activity and readiness. The spec does not name stress, resilience, cardiovascular age or VO2 max under any scope; we assume `daily` for them |
+| `heartrate` | Time series heart rate for Gen 3 users |
 | `workout` | Workout summaries |
 | `tag` | User tags |
-| `session` | Guided/unguided sessions |
-| `spo2Daily` | SpO2 average during sleep |
+| `session` | Guided and unguided sessions in the Oura app |
+| `spo2Daily` | SpO2 average recorded during sleep |
 
-Our app requests: `personal daily heartrate workout session spo2Daily` (`lib/oura/cloud/config.ts` → `OURA_SCOPES`). The SpO2 scope is `spo2Daily`; `spo2` is not a scope in the spec.
+Our app requests: `personal daily heartrate workout session spo2Daily` (`lib/oura/cloud/config.ts` → `OURA_SCOPES`). The SpO2 scope is `spo2Daily`; `spo2` is not a scope in the spec. The spec maps no route to a scope (every operation just lists `OAuth2`), so the per-route scopes below are inferred from the scope descriptions.
 
 ## Base URL
 
@@ -127,11 +127,24 @@ Filter for main sleep: `type === 'long_sleep' || type === 'sleep'`
 | latency | integer\|null | seconds to fall asleep (= onset_latency) |
 | average_heart_rate | number\|null | bpm (30-sec samples average) |
 | lowest_heart_rate | integer\|null | bpm (best RHR proxy) |
-| average_hrv | integer\|null | ms rMSSD |
+| average_hrv | integer\|null | unit and method not in the spec ("Average heart rate variability during sleep") |
 | average_breath | number\|null | breaths/min (respiratory rate) |
 | restless_periods | integer\|null | count |
 | low_battery_alert | boolean | ring was low battery during sleep |
 | sleep_algorithm_version | string\|null | |
+| sleep_analysis_reason | string\|null | why this version of the sleep was created or updated |
+| period | integer | eCore sleep period identifier |
+| ring_id | string\|null | encrypted ring identifier |
+| heart_rate | PublicSample\|null | overnight HR series (`interval`, `items[]`, `timestamp`); interval not in spec |
+| hrv | PublicSample\|null | overnight HRV series; items may be null; interval and unit not in spec |
+| sleep_phase_5_min | string\|null | 1 char per 5 min: `1` deep, `2` light, `3` REM, `4` awake |
+| sleep_phase_30_sec | string\|null | 1 char per 30 s, same codes |
+| app_sleep_phase_5_min | string\|null | hypnogram as the app shows it; spec says it "will be removed in the future" |
+| movement_30_sec | string\|null | 1 char per 30 s: `1` no motion, `2` restless, `3` tossing and turning, `4` active |
+| readiness | object\|null | `score`, `contributors`, `temperature_deviation`, `temperature_trend_deviation` for this sleep period |
+| readiness_score_delta, sleep_score_delta | integer\|null | effect of this period on the readiness / sleep score |
+
+`PublicSample` = `{ interval: number (seconds between items), items: (number\|null)[], timestamp }`. The spec has no response examples, so the interval of the sleep HR and HRV series is **not known** — one sandbox call (`/v2/sandbox/usercollection/...`) would settle it.
 
 ---
 
@@ -155,6 +168,10 @@ Auth: Bearer · Scope: `daily` · Params: `start_date`, `end_date`
 | non_wear_time | integer | seconds |
 | inactivity_alerts | integer | count |
 | average_met_minutes | number | |
+| sedentary_met_minutes | integer | |
+| met | PublicSample | MET series for the day; interval not in spec (settle with a sandbox call before relying on it as per-minute) |
+| class_5_min | string\|null | 1 char per 5 min: `0` non-wear, `1` rest, `2` inactive, `3` low, `4` medium, `5` high |
+| meters_to_target | integer | metres remaining to target |
 | high_activity_met_minutes | integer | |
 | medium_activity_met_minutes | integer | |
 | low_activity_met_minutes | integer | |
@@ -235,19 +252,20 @@ Auth: Bearer · Scope: `daily` · Params: `start_date`, `end_date`
 | id | string | |
 | day | string | YYYY-MM-DD |
 | timestamp | string | ISO 8601 |
-| vo2_max | integer | ml/kg/min (Ring 4+ only) |
+| vo2_max | integer | unit not in the spec; the ring-generation requirement is not in the spec either |
 
 ---
 
 ### GET /v2/usercollection/heartrate
-Time-series, one sample per minute.
-Auth: Bearer · Scope: `heartrate` · Params: `start_datetime`, `end_datetime`
+Time-series, provided at **5-minute increments** (spec, Heart Rate Routes). It is not per-minute.
+Auth: Bearer · Scope: `heartrate` · Params: `start_datetime`, `end_datetime`, `latest`
 
 | Field | Type | Notes |
 |---|---|---|
-| bpm | number | |
-| source | string | `'awake' \| 'sleep' \| 'workout' \| 'rest' \| 'session'` |
-| timestamp | string | ISO 8601 |
+| bpm | integer | |
+| source | string | `'awake' \| 'workout' \| 'rest' \| 'sleep' \| 'live' \| 'session'` |
+| timestamp | string | ISO 8601 UTC |
+| timestamp_unix | integer | ms |
 
 ---
 
@@ -269,7 +287,7 @@ To get latest: `?latest=true` with a wide time range. Response may be `{ items: 
 ### GET /v2/usercollection/ring_configuration
 Auth: Bearer · Returns list
 
-`color` enum: `'brushed_silver' | 'glossy_black' | 'glossy_gold' | 'glossy_white' | 'rose' | 'silver' | 'stealth_black' | 'titanium' | 'cloud' | 'petal' | 'midnight' | 'tide'` (Ring 5 adds cloud/petal/midnight/tide)
+`color` enum: `'brushed_silver' | 'glossy_black' | 'glossy_gold' | 'glossy_white' | 'rose' | 'silver' | 'stealth_black' | 'titanium' | 'cloud' | 'petal' | 'midnight' | 'tide'` 
 `design` enum: `'heritage' | 'balance' | 'balance_diamond' | 'horizon' | 'ceramic'`
 
 | Field | Type | Notes |
@@ -278,7 +296,7 @@ Auth: Bearer · Returns list
 | color | string\|null | see enum |
 | design | string\|null | see enum |
 | firmware_version | string\|null | |
-| hardware_type | string\|null | |
+| hardware_type | string\|null | enum `gen1 \| gen2 \| gen2m \| gen3 \| gen4` — **no Ring 5 value** in v1.34; the owner wears a Ring 5, so parse leniently |
 | size | integer\|null | US ring size |
 | set_up_at | string\|null | ISO 8601 UTC |
 
@@ -298,7 +316,56 @@ Auth: Bearer · Scope: `workout` · Params: `start_date`, `end_date`
 | distance | number\|null | metres |
 | intensity | string | `'easy' \| 'moderate' \| 'hard'` |
 | label | string\|null | user-defined |
-| source | string | auto-detected or user-entered |
+| source | string | `'manual' \| 'autodetected' \| 'confirmed' \| 'workout_heart_rate'` |
+
+---
+
+### GET /v2/usercollection/session
+Guided and unguided sessions. Auth: Bearer · Scope: `session` · Params: `start_date`, `end_date`
+
+`type` enum: `'breathing' | 'meditation' | 'nap' | 'relaxation' | 'rest' | 'body_status'`
+`mood` enum: `'bad' | 'worse' | 'same' | 'good' | 'great'` (user-selected)
+
+| Field | Type | Notes |
+|---|---|---|
+| id | string | |
+| day | string | YYYY-MM-DD |
+| start_datetime, end_datetime | string | ISO 8601 |
+| type | string | see enum above |
+| mood | string\|null | see enum above |
+| heart_rate | PublicSample\|null | interval not in spec |
+| heart_rate_variability | PublicSample\|null | interval and unit not in spec |
+| motion_count | PublicSample\|null | |
+
+---
+
+### GET /v2/usercollection/enhanced_tag
+Lifestyle tags. Auth: Bearer · Scope: `tag` (inferred) · Params: `start_date`, `end_date`. Replaces the deprecated `tag` route.
+
+| Field | Type | Notes |
+|---|---|---|
+| id | string | |
+| tag_type_code | string\|null | `null` for text-only tags, `custom` for custom types; the codes are not listed in the spec |
+| custom_name | string\|null | name when `tag_type_code` is `custom` |
+| start_time | string | tag time, or start of a tag with duration |
+| end_time | string\|null | `null` when there is no duration |
+| start_day | string | YYYY-MM-DD |
+| end_day | string\|null | |
+| comment | string\|null | free text |
+
+---
+
+### GET /v2/usercollection/rest_mode_period
+Rest mode the user turned on. Auth: Bearer · Scope: not stated in the spec · Params: `start_date`, `end_date`
+
+| Field | Type | Notes |
+|---|---|---|
+| id | string | |
+| start_day | string | YYYY-MM-DD |
+| start_time | string\|null | |
+| end_day | string\|null | |
+| end_time | string\|null | |
+| episodes | array | each `{ tags: string[], timestamp }` |
 
 ---
 
