@@ -11,6 +11,8 @@ import { usePlanMealLogging } from '@/app/nutrition/use-plan-meal-logging'
 import { usePlanMealSaving } from '@/app/nutrition/use-plan-meal-saving'
 import { MealPlanSection } from './meal-plan-section'
 import { hourFromTzDatetime } from './plan-day-fill'
+import type { CountedEstimateRow } from '@trainingai/shared/nutrition/counted-intake'
+import { planCardEatenKcal } from './plan-card-kcal'
 
 /**
  * The active meal plan card, with the two hooks that drive it.
@@ -23,7 +25,7 @@ import { hourFromTzDatetime } from './plan-day-fill'
  */
 export function ActivePlanCard({
   plan, onPlanChanged, loading, mealTypes, logs, userId, tz, logDate, today, dateRef,
-  eaten, onLogged, onCreate, onStepByStep, onViewPlan,
+  eaten, estimates, onLogged, onCreate, onStepByStep, onViewPlan,
 }: {
   plan: MealPlan | null
   onPlanChanged: (plan: MealPlan | null) => void
@@ -37,6 +39,9 @@ export function ActivePlanCard({
   /** Read at call time, not render time — the user can change day mid-request. */
   dateRef: { current: string }
   eaten?: { calories: number; proteinG: number; carbsG: number; fatG: number }
+  /** #2921. The day's counted estimates (`useCountedEstimateRows`), so the calories printed here agree
+   *  with the ring. The macro bars stay logged-only: an estimate has no trustworthy macros. */
+  estimates: readonly CountedEstimateRow[]
   onLogged: (log: FoodLogWithItem) => void
   onCreate: () => void
   onStepByStep: () => void
@@ -77,11 +82,18 @@ export function ActivePlanCard({
     logMeal, logMeals, bulkLogging, loggingPosition, loggedPositions, declinedMealIds, setDeclined,
   } = usePlanMealLogging({ mealPlan: plan, mealTypes, logs, userId, dateRef, onLogged, isTrainingDay })
 
+  // #2921. A meal type with food logged supersedes its estimate, so it is passed here as the ring's
+  // own rule does. A day with only an estimate has no `eaten` but still has a counted figure.
+  const eatenKcal = planCardEatenKcal({
+    loggedKcal: eaten?.calories, estimates, loggedMealTypeIds: logs.map(l => l.mealTypeId),
+  })
+
   return (
     <MealPlanSection
       plan={plan}
       loading={loading}
       eaten={eaten}
+      eatenKcal={eatenKcal}
       isTrainingDay={isTrainingDay}
       onLogMeal={mealTypes.length > 0 ? logMeal : undefined}
       loggingPosition={loggingPosition}

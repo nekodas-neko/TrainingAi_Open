@@ -16,6 +16,14 @@ interface Props {
   loading?: boolean
   /** What has actually been eaten today. Absent on a day with no logs, which is not the same as zero. */
   eaten?: { calories: number; proteinG: number; carbsG: number; fatG: number }
+  /**
+   * #2921. The calories printed beside the target: logged food plus the counted estimates
+   * (`countedIntakeKcal`), the figure the ring above reads. Absent only when nothing is logged AND no
+   * estimate counts. `eaten` stays the logged half: the macro bars read it, and the re-scale below
+   * must too, since an estimated meal is still in its remaining list and counting it in both places
+   * would take its calories out of the budget twice.
+   */
+  eatenKcal?: number
   /** Whether today is a training day, from the user's schedule — never re-derived here. */
   isTrainingDay?: boolean
   onCreate: () => void
@@ -90,7 +98,7 @@ const brandCardStyle: CSSProperties = {
  * food, not reading a plan. "View plan" is the escape hatch to the full screen.
  */
 export const MealPlanSection = memo(function MealPlanSection({
-  plan, loading, eaten, isTrainingDay, onCreate, onStepByStep, onViewPlan,
+  plan, loading, eaten, eatenKcal, isTrainingDay, onCreate, onStepByStep, onViewPlan,
   onLogMeal, loggingPosition, loggedPositions, declinedMealIds, onSetDeclined,
   onLogAll, mealTypes, logDate, today, nowHour, bulkLogging,
   onSaveMeal, onSaveAllMeals, savingPositions,
@@ -189,8 +197,8 @@ export const MealPlanSection = memo(function MealPlanSection({
 
       <div className="mt-3 flex items-baseline gap-2">
         <span className="text-2xl font-bold tabular-nums leading-none">
-          {eaten
-            ? `${Math.round(eaten.calories).toLocaleString()} / ${variant.targetCalories.toLocaleString()}`
+          {eatenKcal != null
+            ? `${Math.round(eatenKcal).toLocaleString()} / ${variant.targetCalories.toLocaleString()}`
             : variant.targetCalories.toLocaleString()}
         </span>
         <span className="text-xs text-muted-foreground">
