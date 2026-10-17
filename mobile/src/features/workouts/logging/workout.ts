@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { DEFAULT_TZ, toAestDay, isCalendarDate } from '@trainingai/shared/date-utils';
 import { LogExercisePayloadSchema } from '@trainingai/shared/workout/log-payload';
 import { CompleteWorkoutPayloadSchema } from '@trainingai/shared/workout/complete-payload';
+import { EditedAtSchema } from '@trainingai/shared/sync/edited-at';
 import type { PendingWrite } from '../../../core/sync/pushMutation.ts';
 import type { CatalogIdentity, SessionPreview } from '../catalog.ts';
 import { measuredExerciseTiming } from './timing.ts';
@@ -410,6 +411,10 @@ export function mutationFor(
     exerciseDeloaded: exercise.deloaded,
     intensityMode: workout.intensityMode,
     wasOverride: workout.wasOverride,
+    // A finished workout's sets no longer change, so finishing is its edit time (issue 2721).
+    ...(EditedAtSchema.safeParse(workout.completedAt).success
+      ? { editedAt: workout.completedAt! }
+      : {}),
   });
   return { id: item.id, domain: item.domain, date: workout.date, payload };
 }

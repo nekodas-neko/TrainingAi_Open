@@ -195,6 +195,7 @@ test('offline history edits replay ordered stable identities and preserve pendin
     connection,
     () => `20000000-0000-4000-8000-${String(sequence++).padStart(12, '0')}`,
     () => {},
+    () => 1_760_000_000_000,
   );
   await queue.initialize();
   const id = '10000000-0000-4000-8000-000000000003';
@@ -215,6 +216,7 @@ test('offline history edits replay ordered stable identities and preserve pendin
   await restored.initialize();
   await restored.sync();
   const pending = restored.getSnapshot().operations;
+  assert.equal(pending[0].payload.editedAt, 1_760_000_000_000);
   assert.deepEqual(
     overlayHistory(
       [{ exerciseLogId: id, workoutSessionId: 'session', setWeights: [60], reps: [6] }],
@@ -233,6 +235,37 @@ test('offline history edits replay ordered stable identities and preserve pendin
       reps: [8],
     }),
   );
+});
+
+test('a history edit made with the phone clock out of range is queued without a stamp, not refused (issue 2721)', async (t) => {
+  const db = sqliteFixture();
+  t.after(() => db.connection.close());
+  const storage = await createLocalStorage(db.database);
+  const scope = storage.account('https://example.com', 'one');
+  const pushed: Record<string, unknown>[] = [];
+  const connection = {
+    origin: 'https://example.com',
+    userId: 'one',
+    timezone: null,
+    get: async () => null,
+    post: async (_path: string, body: unknown) => {
+      pushed.push((body as { mutations: { payload: Record<string, unknown> }[] }).mutations[0].payload);
+      return { processed: 1, errors: [] };
+    },
+  };
+  // A clock reset to 1970, below the stamp's range.
+  const queue = new HistoryOutbox(scope, connection, () => '20000000-0000-4000-8000-000000000099', () => {}, () => 0);
+  await queue.initialize();
+  await queue.enqueue('exercise_log_edit', '2026-10-11', {
+    exerciseLogId: '10000000-0000-4000-8000-000000000004',
+    weights: [70],
+    reps: [8],
+  });
+  await queue.sync();
+  assert.equal(pushed.length, 1);
+  assert.equal('editedAt' in pushed[0], false);
+  assert.equal(queue.getSnapshot().operations.length, 0);
+  queue.cancel();
 });
 
 test('full and per-exercise overrides restore server-provided styles without altering the cached prescription', () => {
