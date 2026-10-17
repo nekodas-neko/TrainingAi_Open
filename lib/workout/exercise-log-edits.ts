@@ -3,6 +3,7 @@ import { getPool } from '@/lib/data/postgres/client'
 import { getRepository } from '@/lib/data'
 import { estimateOneRm, isDeloadedForEstimate, BW_REF, withPrescribedBars, type OneRmSetInput } from '@trainingai/shared/1rm'
 import { computeSetAggregates, computeIntensityPct } from '@trainingai/shared/workout/set-aggregates'
+import { PushedEditedAtSchema, isSupersededEdit, type EditStamp } from '@trainingai/shared/sync/edited-at'
 
 /**
  * Editing and deleting a logged exercise — the ONE implementation both write paths call (RV-175).
@@ -19,10 +20,17 @@ export const ExerciseLogEditSchema = z.object({
   exerciseLogId: z.string().uuid(),
   weights:       z.array(z.number().min(-100).max(500)).min(1).max(20),
   reps:          z.array(z.number().int().min(0).max(100)).min(1).max(20),
+  // Issue 2721: when the phone made this edit (epoch ms). Optional: a client that predates it, or a
+  // stamp from a broken clock, is applied as before. The web PATCH never sends it; a live write is stamped with server time.
+  editedAt:      PushedEditedAtSchema,
 }).strict()
 export type ExerciseLogEdit = z.infer<typeof ExerciseLogEditSchema>
 
-export const ExerciseLogDeleteSchema = z.object({ exerciseLogId: z.string().uuid() }).strict()
+export const ExerciseLogDeleteSchema = z.object({
+  exerciseLogId: z.string().uuid(),
+  // Issue 2721: accepted so a stamped client is not rejected by `.strict()`; a delete always applies.
+  editedAt:      PushedEditedAtSchema,
+}).strict()
 
 async function ownsExerciseLog(userId: string, exerciseLogId: string): Promise<boolean> {
   const { rows } = await getPool().query(
@@ -34,10 +42,21 @@ async function ownsExerciseLog(userId: string, exerciseLogId: string): Promise<b
   return rows.length > 0
 }
 
-/** `false` when the log is absent, deleted, or not this user's. Throws on a database failure. */
-export async function editExerciseLog(userId: string, edit: ExerciseLogEdit): Promise<boolean> {
+/**
+ * `found: false` when the log is absent, deleted, or not this user's. Throws on a database failure.
+ *
+ * `superseded: true` (issue 2721) when `stamp` is a phone's edit time older than the row's
+ * `client_edited_at` — a stale offline edit arriving after a server-side fix. Nothing is written
+ * except `updated_at` on the log and its sets, so the pull carries the newer copy back to the phone.
+ * A live web PATCH passes no stamp and is stamped with server time.
+ */
+export async function editExerciseLog(
+  userId: string,
+  edit: ExerciseLogEdit,
+  stamp: EditStamp = { kind: 'server' },
+): Promise<{ found: boolean; superseded: boolean }> {
   const { exerciseLogId, weights, reps } = edit
-  if (!(await ownsExerciseLog(userId, exerciseLogId))) return false
+  if (!(await ownsExerciseLog(userId, exerciseLogId))) return { found: false, superseded: false }
 
   const db = getPool()
   const { rows: ctxRows } = await db.query<{
@@ -90,13 +109,46 @@ export async function editExerciseLog(userId: string, edit: ExerciseLogEdit): Pr
   try {
     await client.query('BEGIN')
 
+    // Issue 2721: read the row's stamp under a lock, so a fix landing between this check and the
+    // writes below cannot be overwritten either. Scoped to this user's log on this connection, not
+    // left to `ownsExerciseLog`'s read on another one.
+    const { rows: stampRows } = await client.query<{ client_edited_at: Date | null }>(
+      `SELECT client_edited_at FROM exercise_logs
+       WHERE id = $1 AND workout_session_id IN (SELECT id FROM workout_sessions WHERE user_id = $2)
+       FOR UPDATE`,
+      [exerciseLogId, userId],
+    )
+    if (stampRows.length === 0) {
+      await client.query('ROLLBACK')
+      return { found: false, superseded: false }
+    }
+    if (isSupersededEdit(stampRows[0].client_edited_at, stamp)) {
+      // The same two statements as `touchExerciseLogTree` in the Postgres adapter.
+      await client.query(
+        `UPDATE exercise_logs SET updated_at = now()
+         WHERE id = $1 AND workout_session_id IN (SELECT id FROM workout_sessions WHERE user_id = $2)`,
+        [exerciseLogId, userId],
+      )
+      await client.query(
+        `UPDATE set_logs SET updated_at = now()
+         WHERE exercise_log_id IN (
+           SELECT el.id FROM exercise_logs el JOIN workout_sessions ws ON ws.id = el.workout_session_id
+           WHERE el.id = $1 AND ws.user_id = $2
+         )`,
+        [exerciseLogId, userId],
+      )
+      await client.query('COMMIT')
+      return { found: true, superseded: true }
+    }
+    const clientEditedAt = stamp.kind === 'client' ? stamp.at : stamp.kind === 'server' ? new Date() : null
+
     const { volume, avgReps } = computeSetAggregates(weights, reps)
 
     await client.query(
       `UPDATE exercise_logs
-       SET estimated_1rm = $1, target_80 = $2, volume = $3, avg_reps = $4
+       SET estimated_1rm = $1, target_80 = $2, volume = $3, avg_reps = $4, client_edited_at = $6
        WHERE id = $5`,
-      [estimated1rm, target80, volume, avgReps, exerciseLogId],
+      [estimated1rm, target80, volume, avgReps, exerciseLogId, clientEditedAt],
     )
 
     // Upsert set_logs in place by (exercise_log_id, set_number) so timing/RPE data
@@ -136,12 +188,18 @@ export async function editExerciseLog(userId: string, edit: ExerciseLogEdit): Pr
   }
   await repo.reconcilePersonalRecord(userId, exerciseName)
   await repo.deleteAiHealthInsight(userId, `session-recap:${workoutSessionId}`)
-  return true
+  return { found: true, superseded: false }
 }
 
 /**
  * `found: false` when the log is absent, already deleted, or not this user's — a replayed delete
  * whose confirmation never landed reads that way, and the row is gone either way.
+ *
+ * Issue 2721: a delete is never superseded, even when a server-side fix is newer. A fix corrects a
+ * log's numbers, and deleting the log is the user's decision about the log itself, which the fix
+ * does not contradict. Skipping it would also strand the phone: its local row is already
+ * tombstoned, and the pull's upsert never clears a local `deleted_at`, so the two copies would
+ * disagree for good.
  */
 export async function deleteExerciseLog(
   userId: string,

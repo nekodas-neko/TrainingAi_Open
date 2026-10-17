@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { MutationSchema } from '@trainingai/shared/sync/mutation-schema';
+import { EditedAtSchema, withEditedAt } from '@trainingai/shared/sync/edited-at';
 import type { ScopedStorage } from '../../../core/storage/LocalStorage.ts';
 import type { AccountConnection } from '../../account/session.ts';
 
@@ -21,10 +22,11 @@ const operation = MutationSchema.extend({
               exerciseLogId: z.uuid(),
               weights: z.array(z.number().min(-100).max(500)).min(1).max(20),
               reps: z.array(z.number().int().min(0).max(100)).min(1).max(20),
+              editedAt: EditedAtSchema.optional(),
             })
             .strict()
         : change.domain === 'exercise_log_delete'
-          ? z.object({ exerciseLogId: z.uuid() }).strict()
+          ? z.object({ exerciseLogId: z.uuid(), editedAt: EditedAtSchema.optional() }).strict()
           : z.object({ workoutSessionId: z.uuid() }).strict();
   if (!schema.safeParse(change.payload).success) {
     context.addIssue({ code: 'custom', message: 'Invalid history change.', path: ['payload'] });
@@ -60,6 +62,7 @@ export class HistoryOutbox {
     private connection: AccountConnection,
     private uuid: () => string,
     private invalidate: (change?: HistoryOperation) => void,
+    private now: () => number = Date.now,
   ) {}
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -128,7 +131,15 @@ export class HistoryOutbox {
     if (!this.current.ready) {
       throw new Error('Open saved history changes before editing.');
     }
-    const change = operation.parse({ id: this.uuid(), domain, date, payload });
+    // Edit time lets the server keep a newer copy over this one (issue 2721). A phone clock outside
+    // the stamp's range sends no stamp: the edit still goes up, applied as an unstamped push.
+    const now = this.now();
+    const change = operation.parse({
+      id: this.uuid(),
+      domain,
+      date,
+      payload: EditedAtSchema.safeParse(now).success ? withEditedAt(domain, payload, now) : payload,
+    });
     await this.write((operations) => [...operations, change]);
     this.invalidate(change);
     void this.sync();

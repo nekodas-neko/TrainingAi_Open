@@ -523,7 +523,8 @@ SELECT
   t.deleted_at,
   t.exercise_deloaded,
   t.prep_time_sec,
-  t.unit_fix_applied_at
+  t.unit_fix_applied_at,
+  t.client_edited_at
 FROM public.exercise_logs t
 WHERE EXISTS (SELECT 1 FROM public.workout_sessions p WHERE p.id = t.workout_session_id AND p.user_id = current_setting('app.claude_ro_owner', true)::uuid);
 

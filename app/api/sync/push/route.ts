@@ -6,6 +6,7 @@ import { MutationSchema } from '@trainingai/shared/sync/mutation-schema';
 import { rateLimit } from '@/lib/rate-limit';
 import { reportServerError } from '@/lib/observability';
 import { readJsonLimited } from '@trainingai/shared/http/request-guards';
+import { SUPERSEDED_WARNING, UNSTAMPED_WARNING } from '@trainingai/shared/sync/edited-at';
 
 /**
  * The envelope caps the batch at 100 mutations, and the largest bounded domain — `workout_log`,
@@ -120,9 +121,31 @@ export async function POST(req: NextRequest) {
     // Q-485: a discarded field is not a fault, so it does not go through the retryable path above —
     // but it IS a silent data loss on the canonical runtime, refused with a clear message on web and
     // dropped without one here. One row per push, same bound as the retryable report.
-    if (result.warnings?.length) {
+    //
+    // Issue 2721 adds two warnings that are not a discarded value, so each gets its own row (still at
+    // most one per kind per push) rather than being miscounted as one: `superseded` (a stale copy the
+    // server kept its newer one over — worth seeing, since it is a phone's edit that did not land) and
+    // `unstamped` (a workout write from a client that predates `editedAt` — the tally that says when
+    // the last-writer-wins fallback can become a refusal).
+    const allWarnings = result.warnings ?? [];
+    const superseded = allWarnings.filter(w => w.warning === SUPERSEDED_WARNING);
+    const unstamped = allWarnings.filter(w => w.warning === UNSTAMPED_WARNING);
+    const discarded = allWarnings.filter(w => w.warning !== SUPERSEDED_WARNING && w.warning !== UNSTAMPED_WARNING);
+    if (discarded.length) {
       reportServerError(
-        new Error(`sync/push: ${result.warnings.length} mutation(s) had a value discarded — first: ${result.warnings[0].warning}`),
+        new Error(`sync/push: ${discarded.length} mutation(s) had a value discarded — first: ${discarded[0].warning}`),
+        { userId, url: req.nextUrl.pathname },
+      );
+    }
+    if (superseded.length) {
+      reportServerError(
+        new Error(`sync/push: ${superseded.length} workout write(s) superseded by a newer server copy [${[...new Set(superseded.map(w => w.domain))].sort().join(', ')}]`),
+        { userId, url: req.nextUrl.pathname },
+      );
+    }
+    if (unstamped.length) {
+      reportServerError(
+        new Error(`sync/push: ${unstamped.length} workout write(s) pushed without editedAt [${[...new Set(unstamped.map(w => w.domain))].sort().join(', ')}]`),
         { userId, url: req.nextUrl.pathname },
       );
     }
