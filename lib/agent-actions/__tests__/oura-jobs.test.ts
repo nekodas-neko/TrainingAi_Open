@@ -14,7 +14,7 @@ import { AgentActionRequest, agentJobLosesData, runAgentJob, type AgentJobContex
 const OWNER = '00000000-0000-4000-8000-000000002859'
 const ctx = { repo: {} as AgentJobContext['repo'], userId: OWNER, tz: 'Australia/Brisbane' }
 const req = (job: string, params: unknown) => ({ job, actor: 'orchestrator', targetUserId: OWNER, params })
-const report = { dryRun: true, from: '2026-10-01', to: '2026-10-12', documents: {}, dropped: 0, forbidden: [], notShared: [], stoppedEarly: null,
+const report = { dryRun: true, from: '2026-10-01', to: '2026-10-12', documents: {}, dropped: 0, forbidden: [], notShared: [], refusedDespiteGrant: [], stoppedEarly: null,
   counts: { dailyRows: 12, bodyRows: 12, sleepWritten: 12, sleepSkippedOverlap: 0, sleepTombstoned: 0, workouts: 2, heartRatePoints: 3000 } }
 
 describe('oura-cloud-backfill (#2859)', () => {

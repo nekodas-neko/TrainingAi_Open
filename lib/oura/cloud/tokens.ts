@@ -164,18 +164,21 @@ export async function getOuraAccessToken(
 
   const running = inFlight.get(userId)
   if (running) return running
-  const refresh = refreshNow(store, config, userId, refreshToken, row.updatedAt, now)
+  const refresh = refreshNow(store, config, userId, refreshToken, row.updatedAt, row.scope, now)
     .finally(() => inFlight.delete(userId))
   inFlight.set(userId, refresh)
   return refresh
 }
 
 async function refreshNow(
-  store: OuraTokenStore, config: OuraOAuthConfig, userId: string, refreshToken: string, readAt: Date, now: () => number,
+  store: OuraTokenStore, config: OuraOAuthConfig, userId: string, refreshToken: string, readAt: Date, storedScope: string | null,
+  now: () => number,
 ): Promise<string> {
   try {
     const grant = await refreshAccessToken(config, refreshToken, now())
-    await store.saveOuraCloudTokens(userId, { ...encrypted(userId, grant), expiresAt: grant.expiresAt, scope: grant.scope })
+    // A refresh answer may leave `scope` out. Writing that `null` would make the grant read as
+    // "covers everything" and bring back the 401 stop on an unshared type (#2974), so keep the stored list.
+    await store.saveOuraCloudTokens(userId, { ...encrypted(userId, grant), expiresAt: grant.expiresAt, scope: grant.scope ?? storedScope })
     return grant.accessToken
   } catch (err) {
     if (!(err instanceof OuraGrantRejectedError) || err.oauthError !== 'invalid_grant') throw err
