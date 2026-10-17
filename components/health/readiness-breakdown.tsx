@@ -1,25 +1,14 @@
 'use client'
 
 import { CircleDotIcon, ZapIcon, ThermometerIcon, HistoryIcon, InfoIcon } from 'lucide-react'
-import type { ReadinessInputKey } from '@/lib/health/score-availability'
+import { labelFor } from '@trainingai/shared/health/contributor-labels'
+import { limitedInputsNote } from '@trainingai/shared/health/readiness-input-labels'
 import { cn } from '@trainingai/shared/utils'
 import { scoreBand } from '@trainingai/shared/health/score-band'
 import { READINESS_WEIGHTS } from '@trainingai/shared/health/readiness-composite'
 import { FactorBar } from '@/components/health/contributor-chart'
 import { ContributorDetails } from '@/components/health/contributor-details'
 import type { ReadinessScoreResponse } from '@/app/api/readiness-score/route'
-
-// Human labels for the composite weight keys (camelCase, distinct from Oura's snake_case).
-const WEIGHT_LABELS: Record<keyof typeof READINESS_WEIGHTS, string> = {
-  restingHeartRate: 'Resting heart rate',
-  previousNight: 'Previous night',
-  hrvBalance: 'HRV balance',
-  temperature: 'Body temperature',
-  sleepBalance: 'Sleep balance',
-  prevDayActivity: 'Previous day activity',
-  recoveryIndex: 'Recovery index',
-  activityBalance: 'Activity balance',
-}
 
 /**
  * "What the score is built on." Two shapes:
@@ -87,14 +76,6 @@ export function ReadinessBreakdown({ readiness }: { readiness: ReadinessScoreRes
   return <CompositeBreakdown readiness={readiness} />
 }
 
-const INPUT_LABELS: Record<ReadinessInputKey, string> = {
-  sleep: 'sleep stages',
-  hrv: 'overnight HRV',
-  restingHeartRate: 'resting heart rate',
-  temperature: 'body temperature',
-  activity: 'daily activity',
-}
-
 /**
  * Says which inputs today's score is missing, so a partial score reads as partial instead of as a
  * confident number. Text + icon, never colour alone — and it names the missing signals rather than
@@ -102,14 +83,12 @@ const INPUT_LABELS: Record<ReadinessInputKey, string> = {
  */
 function LimitedInputsNote({ readiness }: { readiness: ReadinessScoreResponse }) {
   if (!readiness.limited) return null
-  const missing = readiness.inputsMissing
-  if (missing.length === 0) return null
-  const names = missing.map(k => INPUT_LABELS[k])
-  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`
+  const note = limitedInputsNote(readiness.inputsMissing)
+  if (!note) return null
   return (
     <p className="flex items-start gap-1.5 text-[11px] leading-snug text-muted-foreground">
       <InfoIcon className="mt-[1px] h-3 w-3 shrink-0" aria-hidden />
-      <span>Based on part of the usual picture — no {list} today, so those factors sit at neutral.</span>
+      <span>{note}</span>
     </p>
   )
 }
@@ -164,7 +143,7 @@ function CompositeBreakdown({ readiness }: { readiness: ReadinessScoreResponse }
               <FactorBar
                 key={key}
                 contributorKey={key}
-                label={WEIGHT_LABELS[key]}
+                label={labelFor(key)}
                 value={scored ? score : weightPct}
                 valueLabel={scored ? undefined : `${weightPct}%`}
                 muted={!scored}
@@ -186,7 +165,7 @@ function CompositeBreakdown({ readiness }: { readiness: ReadinessScoreResponse }
           const c = contributors?.[key] ?? null
           return {
             key,
-            label: WEIGHT_LABELS[key],
+            label: labelFor(key),
             score: c?.score ?? null,
             provisional: c?.provisional ?? false,
             extra: extraFor(key, readiness),

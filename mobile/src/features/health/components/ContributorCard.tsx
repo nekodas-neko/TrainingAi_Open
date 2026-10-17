@@ -2,9 +2,11 @@ import { useRef } from 'react';
 import { Pressable, View } from 'react-native';
 import { guideFor } from '@trainingai/shared/health/contributor-guide';
 import { scoreBand } from '@trainingai/shared/health/score-band';
-import { AppText, Badge, Card, ProgressBar, Stack, ZoneGauge } from '../../../shared/ui';
+import { AppText, Badge, Card, Icon, Legend, ProgressBar, Stack, ZoneGauge } from '../../../shared/ui';
 import { useHealthAnchor } from '../../../shared/ui/HealthDetailLayout';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
+import { labelFor } from '../data/factor-label';
+import { weakestFactor } from '../data/week-view';
 type Factor = {
   key: string;
   label: string;
@@ -14,26 +16,6 @@ type Factor = {
   weight?: number;
   gauge?: number;
 };
-const names: Record<string, string> = {
-  hrvBalance: 'HRV balance',
-  prevDayActivity: 'Previous day activity',
-  temperature: 'Body temperature',
-  hrv: 'HRV',
-  hr: 'Heart rate',
-  schedule: 'Sleep schedule',
-  strengthFreq: 'Training frequency (7d)',
-  strengthVolume: 'Training volume (7d)',
-  moveHours: 'Move every hour',
-};
-function labelFor(key: string) {
-  return (
-    names[key] ??
-    key
-      .replace(/_/g, ' ')
-      .replace(/([a-z])([A-Z])/g, '$1 $2')
-      .replace(/^./, (x) => x.toUpperCase())
-  );
-}
 export function ContributorDetails({
   factors,
   title = 'What each factor means',
@@ -130,7 +112,10 @@ export function ContributorCard({
   provisional = [],
   extras,
   temperature,
+  note,
 }: {
+  /** An info line about missing inputs, shown under the intro (composite readiness only). */
+  note?: string | null;
   title: string;
   contributors: Record<string, number | null> | null | undefined;
   weights?: Record<string, number>;
@@ -175,12 +160,41 @@ export function ContributorCard({
   if (!factors.length) {
     return null;
   }
+  const weakest = weights ? null : weakestFactor(factors);
+  const anyLearning = !!weights && factors.some((f) => f.provisional);
+  const bandColors: Record<string, string> = {
+    High: theme.anatomy.main,
+    Moderate: theme.anatomy.secondary,
+    Low: theme.anatomy.injured,
+  };
   return (
     <>
       <Card>
-        <AppText variant="eyebrow" tone="muted">
-          {title}
-        </AppText>
+        <Stack direction="row" justify="space-between" align="center">
+          <AppText variant="eyebrow" tone="muted" style={{ flexShrink: 1 }}>
+            {title}
+          </AppText>
+          {weakest && (
+            <AppText variant="micro" tone="muted">
+              Weakest: <AppText variant="micro">{weakest}</AppText>
+            </AppText>
+          )}
+        </Stack>
+        {weights && (
+          <AppText variant="caption" tone="muted">
+            {factors.some((f) => f.score != null && !f.provisional)
+              ? 'Each factor scored against your own baselines. Tap one to jump to what it means and how to move it.'
+              : 'Computed from your own baselines, weighted by how much each factor moves recovery. Scroll down for what each one means.'}
+          </AppText>
+        )}
+        {!!note && (
+          <Stack direction="row" gap="xs" align="flex-start">
+            <Icon name="info" size={14} tone="muted" />
+            <AppText variant="micro" tone="muted" style={{ flex: 1 }}>
+              {note}
+            </AppText>
+          </Stack>
+        )}
         {factors.map((f) => (
           <Pressable
             key={f.key}
@@ -194,7 +208,10 @@ export function ContributorCard({
             }}
           >
             <Stack direction="row" justify="space-between">
-              <AppText variant="caption">{f.label}</AppText>
+              <Stack direction="row" align="center" gap="xs" style={{ flex: 1 }}>
+                <AppText variant="caption">{f.label}</AppText>
+                {guideFor(f.key) && <Icon name="forward" size={14} tone="muted" />}
+              </Stack>
               <AppText variant="label">
                 {f.provisional
                   ? weights?.[f.key] != null
@@ -208,15 +225,25 @@ export function ContributorCard({
               color={
                 f.provisional
                   ? undefined
-                  : scoreBand(f.score!).label === 'High'
-                    ? theme.anatomy.main
-                    : scoreBand(f.score!).label === 'Moderate'
-                      ? theme.anatomy.secondary
-                      : theme.anatomy.injured
+                  : bandColors[scoreBand(f.score!).label]
               }
             />
           </Pressable>
         ))}
+        {!weights && (
+          <Legend
+            items={[
+              { label: 'High 70+', color: bandColors.High },
+              { label: 'Moderate 50+', color: bandColors.Moderate },
+              { label: 'Low', color: bandColors.Low },
+            ]}
+          />
+        )}
+        {anyLearning && (
+          <AppText variant="micro" tone="muted">
+            Factors still learning your baseline show how much they count (%) instead of a score.
+          </AppText>
+        )}
       </Card>
       <ContributorDetails factors={factors} nodes={nodes.current} />
     </>

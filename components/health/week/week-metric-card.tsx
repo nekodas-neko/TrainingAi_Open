@@ -13,6 +13,7 @@ import {
   type ChartOptions,
 } from 'chart.js'
 import { resolveColor } from '@trainingai/shared/chart-colors'
+import { weekDelta } from '@trainingai/shared/health/week-delta'
 import type { WeekOverWeek } from '@trainingai/shared/health/weekly-digest-metrics'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip)
@@ -82,10 +83,7 @@ export function WeekMetricCard({ label, metric, unit = '', decimals = 0, higherI
   }), [points, unit])
 
   const { week, priorWeek } = metric
-  const delta = week != null && priorWeek != null ? week - priorWeek : null
-  const rose = delta != null && delta > 0
-  const flat = delta != null && Math.abs(delta) < Number.EPSILON
-  const good = delta == null || flat ? null : rose === higherIsBetter
+  const delta = weekDelta(week, priorWeek, { unit, decimals, higherIsBetter })
 
   return (
     <div className="rounded-2xl border border-border bg-card p-3">
@@ -95,17 +93,11 @@ export function WeekMetricCard({ label, metric, unit = '', decimals = 0, higherI
         {fmt(week, decimals)}
         {week != null && unit && <span className="ml-0.5 text-xs font-normal text-muted-foreground">{unit}</span>}
       </p>
-      {delta == null ? (
-        <p className="text-[11px] text-muted-foreground">
-          {priorWeek == null ? 'No week before this one' : 'Not measured this week'}
-        </p>
-      ) : (
-        <p
-          className={`text-[11px] tabular-nums ${good === null ? 'text-muted-foreground' : good ? 'text-green-500' : 'text-amber-500'}`}
-        >
-          {flat ? 'Level with' : `${rose ? '↑' : '↓'} ${Math.abs(delta).toFixed(decimals)}${unit} on`} {fmt(priorWeek, decimals)}
-        </p>
-      )}
+      <p
+        className={`text-[11px] tabular-nums ${delta.cue === 'good' ? 'text-green-500' : delta.cue === 'bad' ? 'text-amber-500' : 'text-muted-foreground'}`}
+      >
+        {delta.text}
+      </p>
       {hasAny && (
         <div className="mt-2 h-10 w-full">
           <Line data={data} options={options} />

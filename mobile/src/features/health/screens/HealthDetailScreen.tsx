@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { scoreBand } from '@trainingai/shared/health/score-band';
+import { knownInputKeys, limitedInputsNote } from '@trainingai/shared/health/readiness-input-labels';
 import { READINESS_WEIGHTS } from '@trainingai/shared/health/readiness-composite';
 import {
   AppText,
@@ -181,7 +182,9 @@ export function HealthDetailScreen({
                 yesterday. It does not move as you use energy — that is Body Battery.
               </AppText>
             )}
-            {state.data?.limited && <Badge label="Limited inputs" tone={tone} />}
+            {state.data?.limited && detail !== 'readiness' && (
+              <Badge label="Limited inputs" tone={tone} />
+            )}
             {detail === 'readiness' && score != null && averageReadiness != null && (
               <Badge
                 label={`${score - averageReadiness >= 0 ? '+' : ''}${Math.round(score - averageReadiness)} vs your ${priorReadiness.length}-day average (${averageReadiness})`}
@@ -255,6 +258,7 @@ export function HealthDetailScreen({
                       }
                     : {}),
                 }}
+                note={state.data.limited ? limitedInputsNote(knownInputKeys(state.data.inputsMissing ?? [])) : null}
                 contributors={Object.fromEntries(
                   Object.entries(state.data.readinessCompositeContributors).map(
                     ([key, value]) => [key, value.score],

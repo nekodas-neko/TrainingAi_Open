@@ -42,6 +42,8 @@ export function BarChart({
   target?: ChartTarget;
   bars: readonly {
     label: string;
+    /** What a screen reader says for this bar when the visible label is not enough ("M" → "Monday"). */
+    accessibleLabel?: string;
     value: number;
     colors: string[];
     reduced?: boolean;
@@ -81,7 +83,7 @@ export function BarChart({
           <View
             key={index}
             style={{ flex: 1, minWidth: 0 }}
-            accessibilityLabel={`${bar.label}: ${Math.round(bar.value)} ${unit}${bar.annotation ? ', ' + bar.annotation : ''}`}
+            accessibilityLabel={`${bar.accessibleLabel ?? bar.label}: ${Math.round(bar.value)} ${unit}${bar.annotation ? ', ' + bar.annotation : ''}`}
           >
             <Svg
               viewBox={`0 0 40 ${drawn}`}
