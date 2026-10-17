@@ -28,7 +28,7 @@ function makeStore(answerKcal: number) {
   return {
     getPlanMealAnswers: async () => [{ planMealId: 'pm-d', answer: 'estimated', estCalories: answerKcal, deletedAt: null }],
     getActiveMealPlan: async () => ({ variants: [{ meals: [{ id: 'pm-d', mealTypeId: DINNER, suggestedTime: '18:30' }] }] }),
-    getMealTypes: async () => mealTypes.map(t => ({ id: t.id, name: t.name, startHour: t.startHour, endHour: t.endHour })),
+    getMealTypes: async () => (mealTypes as unknown as { id: string; name: string; startHour: number; endHour: number }[]).map(t => ({ id: t.id, name: t.name, startHour: t.startHour, endHour: t.endHour })),
   }
 }
 
