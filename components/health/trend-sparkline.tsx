@@ -14,6 +14,7 @@ import { gapDataset } from "./trend-sparkline-gaps";
 import { trendSparklinePropsEqual } from "./trend-sparkline-equal";
 import { EmptyState } from "@/components/ui/empty-state";
 import { weekOverWeekChange } from "@trainingai/shared/health/trend-delta";
+import { trimLeadingGaps } from "@trainingai/shared/health/series-gaps";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Filler);
 
@@ -55,9 +56,9 @@ function TrendSparklineBase({ trends, field, label, color, unit, emptyText }: Tr
   const isLight = useHeroColorScheme() === "light";
   if (trends.length === 0) return null;
 
-  const allValues = trends.map(t => t[field] as number | null);
-  const firstIdx = allValues.findIndex(v => v != null);
-  if (firstIdx === -1) {
+  // Trim leading nulls so chart starts at the first real data point
+  const trimmed = trimLeadingGaps(trends, t => t[field] as number | null);
+  if (!trimmed) {
     if (!emptyText) return null;
     return (
       <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-2">
@@ -67,8 +68,6 @@ function TrendSparklineBase({ trends, field, label, color, unit, emptyText }: Tr
     );
   }
 
-  // Trim leading nulls so chart starts at the first real data point
-  const trimmed = trends.slice(firstIdx);
   const values = trimmed.map(t => t[field] as number | null);
 
   const labels = trimmed.map(t => {

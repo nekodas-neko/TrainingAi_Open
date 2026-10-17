@@ -47,6 +47,7 @@ export { NumberWheel } from './NumberWheel';
 export { RepCounter } from './RepCounter';
 export { LineChart } from './LineChart';
 export { BarChart } from './BarChart';
+export { SeriesBarChart } from './SeriesBarChart';
 export { PageDots } from './PageDots';
 export { Picker } from './Picker';
 export { TabPanel } from './TabPanel';

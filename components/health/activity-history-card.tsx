@@ -6,11 +6,12 @@ import { useInvalidationRefetch } from '@/lib/hooks/use-invalidation-refetch'
 import { TTL_MEDIUM, TTL_LONG } from '@trainingai/shared/cache-ttl'
 import { getActivityIcon } from '@trainingai/shared/constants/activity-icons'
 import dynamic from 'next/dynamic'
-import { formatDateDisplay, formatTime12h, startOfWeekInTz } from '@trainingai/shared/date-utils'
+import { startOfWeekInTz } from '@trainingai/shared/date-utils'
 import { getLocalStore } from '@/lib/local-store'
 import type { LocalActivityLog } from '@/lib/local-store/types'
 import type { ActivityLog, ActivityType } from '@trainingai/shared/types'
 import { formatActivityTitle } from '@trainingai/shared/format/activity-title'
+import { activityRowText } from '@trainingai/shared/format/activity-row'
 
 // Dynamic, matching how health-content.tsx imports the same sheet. The static import here was
 // the chain Q-127 identified as defeating that wrapper. No `loading:` skeleton — the sheet
@@ -141,6 +142,7 @@ export const ActivityHistoryCard = memo(function ActivityHistoryCard({ userId }:
         <div className="divide-y divide-border/50">
           {weekLogs.map(log => {
             const Icon = getActivityIcon(iconByType.get(log.activityType) ?? 'DotsThreeCircle')
+            const { subtitle, facts } = activityRowText(log)
             return (
               <button
                 key={log.id}
@@ -152,15 +154,10 @@ export const ActivityHistoryCard = memo(function ActivityHistoryCard({ userId }:
                   <Icon size={20} className="flex-none text-muted-foreground" />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate">{formatActivityTitle(log.title)}</p>
-                    <p className="text-[10px] text-muted-foreground">
-                      {formatDateDisplay(log.date)}
-                      {log.startTime ? ` · ${formatTime12h(log.startTime)}` : ''}
-                      {log.durationMin ? ` · ${Math.round(log.durationMin)} min` : ''}
-                    </p>
+                    <p className="text-[10px] text-muted-foreground">{subtitle}</p>
                   </div>
                   <div className="text-right text-xs text-muted-foreground flex-none">
-                    {log.distanceKm != null && <div>{Number(log.distanceKm).toFixed(2)} km</div>}
-                    {log.caloriesBurned != null && <div>{Math.round(log.caloriesBurned)} kcal</div>}
+                    {facts.map(fact => <div key={fact}>{fact}</div>)}
                   </div>
                 </div>
               </button>

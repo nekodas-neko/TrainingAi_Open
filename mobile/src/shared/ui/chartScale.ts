@@ -1,3 +1,5 @@
+import { standaloneOrLatest } from '@trainingai/shared/health/series-gaps';
+
 // Pure geometry for the chart components' opt-in axes, gridlines and target line. Kept free of
 // React so it can be unit-tested. `niceTicks` used to live in the nutrition feature; it is here
 // now and re-exported from there.
@@ -96,4 +98,14 @@ export function pointCentreX(
   const box = meetBox(plotWidth, plotHeight, 320, 90);
   const vb = xMin === xMax ? 160 : 12 + ((x - xMin) / (xMax - xMin)) * 296;
   return leftInset + box.offsetX + box.scale * vb;
+}
+
+/**
+ * Which points of a line get a dot. 'all' dots every reading; 'isolated' dots only the latest one
+ * and a reading with no neighbour either side (a line needs two points, so it would not show at
+ * all), as the current app's sparklines do.
+ */
+export function dotMask(values: readonly (number | null)[], mode: 'all' | 'isolated'): boolean[] {
+  const standalone = standaloneOrLatest([...values]);
+  return values.map((value, index) => value !== null && (mode === 'all' || standalone[index]));
 }

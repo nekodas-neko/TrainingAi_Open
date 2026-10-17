@@ -32,3 +32,22 @@ export function seriesShape(values: (number | null | undefined)[]): SeriesShape 
   }
 }
 
+
+/**
+ * Which points a chart must dot: the latest one, and any reading with no neighbour either side (a
+ * line needs two points, so it would not show at all). The web sparklines (`gapDataset`) and the
+ * native `LineChart` (`dotMask`) both read this, so they cannot disagree.
+ */
+export function standaloneOrLatest(values: (number | null | undefined)[]): boolean[] {
+  const { isolated } = seriesShape(values)
+  return values.map((_, i) => i === values.length - 1 || isolated[i])
+}
+
+/**
+ * A day-by-day series with its leading empty days dropped, so a chart starts at the first real
+ * reading rather than at a run of nothing. `null` when no day has a reading at all.
+ */
+export function trimLeadingGaps<T>(rows: readonly T[], read: (row: T) => number | null | undefined): T[] | null {
+  const first = rows.findIndex(row => read(row) != null)
+  return first === -1 ? null : rows.slice(first)
+}

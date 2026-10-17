@@ -4,6 +4,7 @@ import { AppButton } from './AppButton';
 import { AppText } from './AppText';
 import { IconButton } from './IconButton';
 import { Stack } from './Stack';
+import { monthGrid } from './monthGrid';
 import { useTheme } from '../theme/ThemeProvider';
 
 export function MonthCalendar({
@@ -16,6 +17,8 @@ export function MonthCalendar({
   onSelect,
   status,
   nativeStyle = false,
+  restLabel = false,
+  topAligned = false,
 }: {
   month: string;
   today: string;
@@ -28,12 +31,16 @@ export function MonthCalendar({
   onSelect: (date: string) => void;
   status?: ReactNode;
   nativeStyle?: boolean;
+  // Name a past day with nothing on it "rest" where its dots would be (native style only), so a
+  // rest day reads differently from a day that was never recorded. Pass it once the month has loaded.
+  restLabel?: boolean;
+  /** Date at the top of its cell, leaving the bottom for the "rest" label. Fixed for the host's
+   *  lifetime (not tied to loading) so dates never move when data lands. */
+  topAligned?: boolean;
 }) {
   const { theme } = useTheme();
   const [year, number] = month.split('-').map(Number);
-  const first = (new Date(Date.UTC(year, number - 1, 1)).getUTCDay() + 6) % 7;
-  const count = new Date(Date.UTC(year, number, 0)).getUTCDate();
-  const cells = Math.ceil((first + count) / 7) * 7;
+  const { first, count, cells } = monthGrid(month);
   function move(offset: number) {
     const date = new Date(Date.UTC(year, number - 1 + offset, 1));
     onMonthChange(`${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`);
@@ -85,18 +92,22 @@ export function MonthCalendar({
           const date = `${month}-${String(day).padStart(2, '0')}`;
           const names = markers[date] ?? markers[date.replace(/-/g, '/')] ?? [];
           const colors = dots ? (dots[date] ?? dots[date.replace(/-/g, '/')] ?? []) : [];
+          const rest =
+            nativeStyle && restLabel && date <= today && !names.length && !colors.length;
           return (
             <View key={date} style={{ width: `${100 / 7}%`, height: theme.sizes.button }}>
               {nativeStyle ? (
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`${date}${names.length ? ', ' + names.join(', ') : ''}`}
+                  accessibilityLabel={`${date}${names.length ? ', ' + names.join(', ') : ''}${rest ? ', rest' : ''}`}
                   accessibilityState={{ selected: date === selected }}
                   onPress={() => onSelect(date)}
                   style={({ pressed }) => ({
                     flex: 1,
                     alignItems: 'center',
-                    justifyContent: 'center',
+                    // The rest label sits under the date, so the date moves up to make room.
+                    justifyContent: topAligned ? 'flex-start' : 'center',
+                    paddingTop: topAligned ? theme.spacing.xxs : 0,
                     opacity: pressed ? 0.6 : 1,
                   })}
                 >
@@ -149,6 +160,16 @@ export function MonthCalendar({
                   onPress={() => onSelect(date)}
                   style={{ height: '100%', paddingHorizontal: 0, paddingVertical: 0 }}
                 />
+              )}
+              {rest && (
+                <View
+                  pointerEvents="none"
+                  style={{ position: 'absolute', bottom: 0, alignSelf: 'center' }}
+                >
+                  <AppText variant="micro" tone="muted" style={{ textTransform: 'uppercase' }}>
+                    rest
+                  </AppText>
+                </View>
               )}
               {colors.length > 0 && (
                 <Stack

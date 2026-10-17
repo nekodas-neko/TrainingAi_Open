@@ -1,9 +1,13 @@
-import { GENERIC_TARGET, muscleVolumeColor } from '@trainingai/shared/health/volume-band';
+import { capitalize } from '@trainingai/shared/format/capitalize';
+import {
+  GENERIC_LEGEND,
+  GENERIC_TARGET,
+  MAX_TARGET,
+  muscleVolumeColor,
+} from '@trainingai/shared/health/volume-band';
 import { AppText, Legend, MuscleMap, ProgressBar, Stack } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
-import { capitalize, muscleSetsLabel } from '../data/training-view';
-
-const MAX_TARGET = 20;
+import { muscleSetsLabel } from '../data/training-view';
 
 // The week's muscle volume as the current app draws it: a front and back body map and one bar per
 // muscle, both coloured by the same rule (shared `muscleVolumeColor`) so the map cannot disagree
@@ -62,12 +66,7 @@ export function MuscleVolumeFigure({
                 { label: '60% or more', color: palette.warn },
                 { label: 'Under 60%', color: palette.bad },
               ]
-            : [
-                { label: '15+ sets', color: palette.brand },
-                { label: '10–14 sets', color: palette.good },
-                { label: '6–9 sets', color: palette.warn },
-                { label: 'Under 6', color: palette.bad },
-              ]
+            : GENERIC_LEGEND.map((item) => ({ label: item.label, color: palette[item.tone] }))
         }
       />
       <AppText variant="caption" tone="muted">

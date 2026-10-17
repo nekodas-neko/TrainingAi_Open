@@ -9,6 +9,7 @@ import { ResourceStatus } from '../../workouts/components/ResourceStatus';
 import { useSessionColors } from '../../workouts/useSessionColors';
 import { useActivities } from '../../activities/data/ActivityProvider';
 import { useHealthData } from '../data/HealthDataProvider';
+import { calendarMarks } from '../data/training-view';
 
 // The training calendar: a dot per session in the session's colour (two dots on a two-session day),
 // a cyan dot for a logged activity, and a legend that names them.
@@ -22,35 +23,16 @@ export function TrainingCalendarCard({ openDay }: { openDay: (date: string) => v
   const state = useWorkoutResource(calendarSpec(year, number));
   const journal = useWorkoutJournal();
   const activities = useActivities();
-  const trained: Record<string, string[]> = {};
-  const active: Record<string, string[]> = {};
-  const add = (into: Record<string, string[]>, date: string, names: readonly string[]) => {
-    const day = date.replace(/\//g, '-');
-    into[day] = [...new Set([...(into[day] ?? []), ...names])];
-  };
-  for (const [date, names] of Object.entries(state.data?.trainedDays ?? {})) {
-    add(trained, date, names);
-  }
-  for (const [date, names] of Object.entries(state.data?.activityDays ?? {})) {
-    add(active, date, names);
-  }
-  for (const row of activities.rows) {
-    if (row.payload.date.startsWith(month)) {
-      add(active, row.payload.date, [row.payload.title]);
-    }
-  }
-  for (const workout of journal.data.workouts) {
-    if (workout.status === 'completed' && workout.date.startsWith(month)) {
-      add(trained, workout.date, [workout.sessionName]);
-    }
-  }
-  const activityColor = theme.tones.recovery.foreground;
-  const markers: Record<string, string[]> = {};
-  const dots: Record<string, string[]> = {};
-  for (const date of new Set([...Object.keys(trained), ...Object.keys(active)])) {
-    markers[date] = [...(trained[date] ?? []), ...(active[date] ?? [])];
-    dots[date] = [...(trained[date] ?? []).map(color), ...(active[date] ? [activityColor] : [])];
-  }
+  const activityColor = theme.training.activity;
+  const { markers, dots } = calendarMarks({
+    month,
+    trainedDays: state.data?.trainedDays ?? {},
+    activityDays: state.data?.activityDays ?? {},
+    activities: activities.rows.map((row) => row.payload),
+    workouts: journal.data.workouts,
+    sessionColor: color,
+    activityColor,
+  });
   return (
     <Card>
       <AppText variant="heading" accessibilityRole="header">
@@ -65,6 +47,8 @@ export function TrainingCalendarCard({ openDay }: { openDay: (date: string) => v
         month={month}
         markers={markers}
         dots={dots}
+        topAligned
+        restLabel={state.data !== null}
         selected={selected ?? undefined}
         onMonthChange={setMonth}
         onSelect={(date) => {

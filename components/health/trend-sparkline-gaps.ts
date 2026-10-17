@@ -14,7 +14,7 @@
  * here: `ble` heart-rate sessions carry 7.1 readings per set against the chest strap's 111.8.
  */
 
-import { seriesShape, type SeriesShape } from '@trainingai/shared/health/series-gaps'
+import { seriesShape, standaloneOrLatest, type SeriesShape } from '@trainingai/shared/health/series-gaps'
 
 // `seriesShape` (what is missing, and the "N days missing" note) is shared with the native app.
 export { seriesShape, type SeriesShape }
@@ -37,8 +37,7 @@ export interface GapDataset {
 export function gapDataset(values: (number | null | undefined)[]): GapDataset {
   const shape = seriesShape(values)
   return {
-    pointRadius: values.map((_, i) =>
-      i === values.length - 1 || shape.isolated[i] ? VISIBLE_POINT_RADIUS : 0),
+    pointRadius: standaloneOrLatest(values).map(dot => (dot ? VISIBLE_POINT_RADIUS : 0)),
     spanGaps: false,
     coverage: shape.coverage,
   }

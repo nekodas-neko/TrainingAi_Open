@@ -27,6 +27,21 @@ const PURPLE = '#bf5fff'
 const GREEN = '#22c55e'
 const RED = '#f87171'
 
+/** The colour of a better / worse change beside a bar. `same` has no entry: it prints nothing. */
+export const TREND_COLOR = { up: GREEN, down: RED } as const
+
+/**
+ * "+3 reps" for a bodyweight exercise, "-2.5 kg" for a loaded one; null when nothing changed or
+ * there is no previous reading to change from. The unit follows `deltaUnit`, so a bodyweight 1RM
+ * never reads as kilograms (Q-12).
+ */
+export function strengthDeltaText(metric: Pick<BarMetric, 'trend' | 'delta' | 'deltaUnit'>): string | null {
+  if (metric.trend == null || metric.trend === 'same' || metric.delta == null) return null
+  const sign = metric.trend === 'up' ? '+' : '-'
+  const unit = metric.deltaUnit === 'RM' ? (metric.delta === 1 ? 'rep' : 'reps') : 'kg'
+  return `${sign}${metric.delta} ${unit}`
+}
+
 function trendColor(trend: 'up' | 'down' | 'same' | null, pct: number): string {
   if (pct >= 99.5) return GOLD
   if (trend === 'up') return GREEN
@@ -95,4 +110,23 @@ export function computeBarMetric(ex: StrengthReading, mode: StrengthMode): BarMe
   const pct = max1rm > 0 ? Math.min((ex.weight / max1rm) * 100, 100) : 100
   const label = max1rm > 0 ? `${Math.round(max1rm)} kg` : `${ex.weight} kg`
   return { pct, label, color: trendColor(trend, pct), trend, delta, deltaUnit }
+}
+
+/**
+ * Strength rows grouped by session in order of first appearance: only exercises with a 1RM, and a
+ * session with no row left under `mode` is dropped rather than shown as a bare header. The web card
+ * and the native Progress panel both group through this.
+ */
+export function strengthGroups<T extends StrengthReading & { sessionName: string }>(
+  exercises: readonly T[],
+  mode: StrengthMode,
+): { session: string; rows: { exercise: T; metric: BarMetric }[] }[] {
+  const groups = new Map<string, { exercise: T; metric: BarMetric }[]>()
+  for (const exercise of exercises) {
+    if (exercise.estimated1rm == null) continue
+    const metric = computeBarMetric(exercise, mode)
+    if (!metric) continue
+    groups.set(exercise.sessionName, [...(groups.get(exercise.sessionName) ?? []), { exercise, metric }])
+  }
+  return [...groups].map(([session, rows]) => ({ session, rows }))
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeBarMetric } from '../strength-progress'
+import { computeBarMetric, strengthDeltaText, strengthGroups, TREND_COLOR } from '../strength-progress'
 import type { ExerciseSummary } from '@/app/api/weights-summary/route'
 
 function makeExercise(overrides: Partial<ExerciseSummary> = {}): ExerciseSummary {
@@ -137,5 +137,84 @@ describe('computeBarMetric — mode "working", bodyweight exercises', () => {
   it('returns null when maxReps is null', () => {
     const ex = makeExercise({ exerciseType: 'bodyweight', lastReps: 10, maxReps: null })
     expect(computeBarMetric(ex, 'working')).toBeNull()
+  })
+})
+
+// The delta beside a bar is one helper for both apps. `legacyDelta` is the inline formatting the
+// web card used before it moved, kept here so the move is shown to change nothing.
+describe('strengthDeltaText', () => {
+  const legacyDelta = (m: { trend: 'up' | 'down' | 'same' | null; delta: number | null; deltaUnit: 'RM' | 'kg' }) =>
+    m.trend != null && m.trend !== 'same' && m.delta != null
+      ? `${m.trend === 'up' ? '+' : '-'}${m.delta}${m.deltaUnit === 'RM' ? ' rep' + (m.delta === 1 ? '' : 's') : ' kg'}`
+      : null
+
+  it('reads reps for a bodyweight exercise and kilograms for a loaded one', () => {
+    expect(strengthDeltaText({ trend: 'up', delta: 3, deltaUnit: 'RM' })).toBe('+3 reps')
+    expect(strengthDeltaText({ trend: 'down', delta: 1, deltaUnit: 'RM' })).toBe('-1 rep')
+    expect(strengthDeltaText({ trend: 'down', delta: 2.5, deltaUnit: 'kg' })).toBe('-2.5 kg')
+  })
+
+  it('is null when nothing changed or there is nothing to compare', () => {
+    expect(strengthDeltaText({ trend: 'same', delta: 0, deltaUnit: 'kg' })).toBeNull()
+    expect(strengthDeltaText({ trend: null, delta: null, deltaUnit: 'kg' })).toBeNull()
+    expect(strengthDeltaText({ trend: 'up', delta: null, deltaUnit: 'kg' })).toBeNull()
+  })
+
+  it('matches the web card\'s old inline text for every trend, unit and size', () => {
+    for (const trend of ['up', 'down', 'same', null] as const)
+      for (const deltaUnit of ['RM', 'kg'] as const)
+        for (const delta of [null, 0, 0.5, 1, 1.5, 2, 10]) {
+          expect(strengthDeltaText({ trend, delta, deltaUnit })).toBe(legacyDelta({ trend, delta, deltaUnit }))
+        }
+  })
+
+  it('keeps the two trend colours the web card used', () => {
+    expect(TREND_COLOR).toEqual({ up: '#22c55e', down: '#f87171' })
+  })
+})
+
+describe('strengthGroups', () => {
+  const lift = (exercise: string, sessionName: string, extra = {}) => ({
+    exercise,
+    sessionName,
+    estimated1rm: 100 as number | null,
+    previousEstimated1rm: 90 as number | null,
+    personalRecord1rm: 100 as number | null,
+    weight: 80 as number | null,
+    exerciseType: 'weighted' as const,
+    lastReps: null,
+    maxReps: null,
+    ...extra,
+  })
+  const exercises = [
+    lift('Squat', 'Legs', { estimated1rm: null }),
+    lift('Bench', 'Push'),
+    lift('Press', 'Push', { weight: null }),
+    lift('Row', 'Pull', { weight: null }),
+  ]
+
+  it('drops rows without a 1RM and sessions left with no row', () => {
+    const names = (mode: 'working' | 'latest') =>
+      strengthGroups(exercises, mode).map(g => [g.session, g.rows.map(r => r.exercise.exercise)])
+    expect(names('working')).toEqual([['Push', ['Bench']]])
+    expect(names('latest')).toEqual([['Push', ['Bench', 'Press']], ['Pull', ['Row']]])
+  })
+
+  // The web card used to group inline; this is that loop, kept to show its output is unchanged.
+  it('matches the web card\'s former inline grouping', () => {
+    for (const mode of ['working', 'latest'] as const) {
+      const withData = exercises.filter(e => e.estimated1rm != null)
+      const order: string[] = []
+      const by = new Map<string, typeof withData>()
+      for (const e of withData) {
+        if (!by.has(e.sessionName)) { by.set(e.sessionName, []); order.push(e.sessionName) }
+        by.get(e.sessionName)!.push(e)
+      }
+      const old = order
+        .map(s => [s, by.get(s)!.flatMap(e => { const m = computeBarMetric(e, mode); return m ? [{ exercise: e, metric: m }] : [] })] as const)
+        .filter(([, rows]) => rows.length > 0)
+        .map(([session, rows]) => ({ session, rows }))
+      expect(strengthGroups(withData, mode)).toEqual(old)
+    }
   })
 })

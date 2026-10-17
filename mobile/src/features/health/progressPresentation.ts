@@ -1,12 +1,14 @@
-import type { BarMetric } from '@trainingai/shared/health/strength-progress';
-import { plural } from '@trainingai/shared/format/plural';
+import {
+  strengthDeltaText,
+  strengthGroups,
+  type BarMetric,
+} from '@trainingai/shared/health/strength-progress';
 
 // Colours and wording for Health > Progress, matching the current app's Strength Progress and
 // Goals cards (components/health/strength-progress-card.tsx, goals-progress-card.tsx).
 
-export const STRENGTH_ACCENT = '#bf5fff';
-// Same two values the current app uses for a better / worse change.
-const TREND_COLOR = { up: '#22c55e', down: '#f87171' } as const;
+/** Width of one strength bar. */
+export const STRENGTH_BAR_WIDTH = 112;
 
 /** Where the dashed 60 / 70 / 80 guides sit on a strength bar. */
 export const STRENGTH_BAR_MARKERS = [60, 70, 80] as const;
@@ -18,13 +20,17 @@ export function strengthFillPct(pct: number): number {
   return Math.max(pct, STRENGTH_BAR_MIN_PCT);
 }
 
-/** "+3 reps" for a bodyweight exercise, "-2.5 kg" for a loaded one; null when nothing changed. */
-export function strengthDelta(metric: BarMetric): { text: string; color: string } | null {
-  if (metric.trend == null || metric.trend === 'same' || metric.delta == null) return null;
-  const sign = metric.trend === 'up' ? '+' : '-';
-  const amount =
-    metric.deltaUnit === 'RM' ? plural(metric.delta, 'rep', 'reps') : `${metric.delta} kg`;
-  return { text: `${sign}${amount}`, color: TREND_COLOR[metric.trend] };
+// The session grouping is shared with the web card: re-exported here for the Progress panel.
+export { strengthGroups };
+
+/** The delta text beside a bar (shared with the current app) in the theme's better / worse colour. */
+export function strengthDelta(
+  metric: BarMetric,
+  colors: { trendUp: string; trendDown: string },
+): { text: string; color: string } | null {
+  const text = strengthDeltaText(metric);
+  if (text === null) return null;
+  return { text, color: metric.trend === 'up' ? colors.trendUp : colors.trendDown };
 }
 
 /** The session of the most recently trained exercise that has a reading, as the current app marks it. */
@@ -43,27 +49,14 @@ export function lastTrainedSession(
   return name;
 }
 
-export const GOAL_COLORS = {
-  Steps: '#22c55e',
-  Calories: '#f97316',
-  Water: '#38bdf8',
-  Sleep: '#a78bfa',
-  Workouts: '#fbbf24',
-} as const;
-export type GoalKey = keyof typeof GOAL_COLORS;
+export type GoalKey = 'Steps' | 'Calories' | 'Water' | 'Sleep' | 'Workouts';
 
-function formatCount(n: number): string {
-  return (Math.round(n * 10) / 10).toLocaleString('en-US');
-}
+const roundCount = (n: number) => Math.round(n * 10) / 10;
+const formatCount = (n: number) => roundCount(n).toLocaleString('en-US');
 
-/** "3,200 / 8,000", "This week: 3 / 4 workouts", with a tick once the goal is met. */
-export function goalCountText(
-  key: GoalKey,
-  value: number,
-  goal: number,
-  weekly: boolean,
-): string {
+/** "3,200 / 8,000", "This week: 3 / 4", with a tick once the goal is met. */
+export function goalCountText(value: number, goal: number, weekly: boolean): string {
+  // The raw values, as the current app's GoalProgressBar does: 7.96 of 8 prints "8 / 8" without a tick.
   const done = goal > 0 && value >= goal;
-  const goalText = key === 'Workouts' ? plural(goal, 'workout', 'workouts') : formatCount(goal);
-  return `${weekly ? 'This week: ' : ''}${formatCount(value)} / ${goalText}${done ? ' ✓' : ''}`;
+  return `${weekly ? 'This week: ' : ''}${formatCount(value)} / ${formatCount(goal)}${done ? ' ✓' : ''}`;
 }

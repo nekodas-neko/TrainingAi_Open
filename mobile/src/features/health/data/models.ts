@@ -397,9 +397,17 @@ export const correlationSpec = (view: string) => ({
       insight: z.string(),
       hasSufficientData: z.boolean(),
       buckets: z.array(z.object({ label: z.string(), avg: n, count: z.number().finite() })),
-      // Session effort is a per-session line, not buckets.
+      // Session effort is a bar per session (effort x minutes), not buckets.
       series: z
-        .array(z.object({ date: z.string(), sessionRpe: z.number().finite() }).passthrough())
+        .array(
+          z
+            .object({
+              date: z.string(),
+              sessionRpe: z.number().finite(),
+              sessionLoad: z.number().finite(),
+            })
+            .passthrough(),
+        )
         .optional(),
     })
     .passthrough(),

@@ -8,6 +8,7 @@ import {
   drawableTarget,
   guideSummary,
   includeTarget,
+  dotMask,
   isPointAlignedAxis,
   meetBox,
   pointCentreX,
@@ -46,6 +47,8 @@ export function LineChart({
   gridlines = false,
   yAxis = false,
   target: targetProp,
+  dots = 'all',
+  compactAxisLabels = false,
 }: {
   points: readonly { label: string; value: number | null; x?: number }[];
   label: string;
@@ -72,12 +75,16 @@ export function LineChart({
   gridlines?: boolean;
   yAxis?: boolean;
   target?: ChartTarget;
+  dots?: 'all' | 'isolated';
+  compactAxisLabels?: boolean;
 }) {
   const { theme } = useTheme();
   const [selection, setSelection] = useState<number | null>(null);
   const [width, setWidth] = useState(1);
   const labelVariant = readable ? 'caption' : 'micro';
   const labelTone = readable ? 'text' : 'muted';
+  // Three-letter weekdays do not fit 14 columns at the readable size, so the x axis can drop to 10 px.
+  const axisVariant = compactAxisLabels ? 'micro' : labelVariant;
   const plotHeight = height ?? theme.sizes.chartHeight;
   const target = drawableTarget(targetProp);
   const guides = gridlines || yAxis || target !== undefined;
@@ -136,6 +143,10 @@ export function LineChart({
     }
   }
   const color = accent ?? theme.tones[tone].foreground;
+  const showDot = dotMask(
+    coords.map((point) => (point ? 1 : null)),
+    dots,
+  );
   const ticks = gridlines || yAxis ? niceTicks(min, max) : [];
   const tickTexts = tickLabels(ticks);
   // The plot sits right of the y-axis column; overlays are absolute so the Svg and the touch
@@ -249,7 +260,8 @@ export function LineChart({
             ))}
           {coords.map(
             (point, index) =>
-              point && <Circle key={index} cx={point.x} cy={point.y} r={3} fill={color} />,
+              point &&
+              showDot[index] && <Circle key={index} cx={point.x} cy={point.y} r={3} fill={color} />,
           )}
         </Svg>
       )}
@@ -288,7 +300,7 @@ export function LineChart({
       )}
       {showLabels &&
         (axisLabels && isPointAlignedAxis(axisLabels.length, points.length, axisLabels) ? (
-          <View style={{ height: theme.typography[labelVariant].lineHeight, width: '100%' }}>
+          <View style={{ height: theme.typography[axisVariant].lineHeight, width: '100%' }}>
             {axisLabels.map((text, index) =>
               text === '' ? null : (
                 <View
@@ -303,7 +315,7 @@ export function LineChart({
                       AXIS_LABEL_WIDTH / 2,
                   }}
                 >
-                  <AppText variant={labelVariant} tone={labelTone} numberOfLines={1}>
+                  <AppText variant={axisVariant} tone={labelTone} numberOfLines={1}>
                     {text}
                   </AppText>
                 </View>
@@ -317,7 +329,7 @@ export function LineChart({
             style={leftInset ? { paddingLeft: leftInset } : undefined}
           >
             {(axisLabels ?? [valid[0].label, valid.at(-1)!.label]).map((label, index) => (
-              <AppText key={index} variant={labelVariant} tone={labelTone}>
+              <AppText key={index} variant={axisVariant} tone={labelTone}>
                 {label}
               </AppText>
             ))}
