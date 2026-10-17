@@ -424,6 +424,19 @@ you set the key; agents never do.
 
 How an agent calls it and the job list: [`admin-actions.md`](admin-actions.md#12-the-agent-key-issue-2381).
 
+### Changing a Railway variable: cancel the build it starts
+
+After you add or change a variable, Railway shows a banner with a **Deploy** button. That button
+rebuilds the latest `main`, not the release that is running, so it would ship unreleased code and
+migrations with no backup and no approval.
+
+- Cancel that build straight away: **Deployments** → the one that says Building → **⋯** → **Cancel**.
+  Then tell the Orchestrator.
+- The Orchestrator puts the new value live by running **Release** with `rollback_to` set to the
+  current tag, which redeploys the running release's own commit, or by shipping the next release.
+
+Found on 17 Oct 2026: adding `OURA_TOKEN_KEY` started a build of `main`, which the owner cancelled.
+
 ### A secret has leaked
 
 Revoke it at its source first (Railway, Google, AWS), then replace it in Railway and in the

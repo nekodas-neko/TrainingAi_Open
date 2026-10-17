@@ -6,6 +6,8 @@ everyday feature work. Moved out of `CLAUDE.md` on 2026-09-02 to keep that file 
 every session needs; nothing here changed in the move.
 
 
+**Changing a Railway variable:** the banner's **Deploy** button rebuilds the latest `main`, not the running release. Cancel that build straight away and tell the Orchestrator, who applies the value with **Release** `rollback_to` = the current tag ([owner manual](owner-manual.md#changing-a-railway-variable-cancel-the-build-it-starts); found 17 Oct 2026 adding `OURA_TOKEN_KEY`).
+
 Required in Railway:
 - `DATABASE_URL` — PostgreSQL connection string
 - `AUTH_SECRET` — NextAuth session-cookie signing (`auth.config.ts`'s `secret`); without it the credentials callback returns `?error=Configuration` and nobody can log in. **It was missing from this list until Q-311 (2026-08-30) while ~~`SESSION_SECRET`~~ — read by nothing — sat in it**: `SESSION_SECRET` was `auth.config.ts`'s fallback until that fallback was deleted, and it outlived the deletion here, in the README, and in two CI workflow env blocks, where it read as a credential in a public repo. Safe to remove from Railway; `grep -rn SESSION_SECRET` now finds only prose.

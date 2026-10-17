@@ -6,6 +6,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.491.0",
+    date: "2026-10-18",
+    changes: [
+      "Every calorie total now counts estimated plan meals the same way as the ring: Home's card, the end-of-day card, the Active Plan card and the logger's \"today after logging\". Calories you type stay as typed.",
+      "Workout history stays right across devices: an older edit from the phone can no longer overwrite a newer one, and re-dated bests, exercise renames (including on program screens) and deleted sets now reach the phone.",
+      "The lifts from 13 Aug that were really a deload are marked as one, and the Skull Crusher and Preacher Curl bests they hid are back.",
+      "While AI is paused, screens say so (\"AI features are paused right now\u2026\") instead of \"try again\" or blaming your input. The Coach says it too if it fails mid-reply.",
+      "Today's session length can now be \"No limit\". In the program editor the time limit is an On/Off switch with 5-minute steps.",
+      "Workout Review: the summary matches its rows, a budget drop no longer says \"AI\", and the exercise list stays on screen while Accept refreshes it.",
+      "Home no longer paints its tiles and then swaps them for a loading skeleton.",
+      "Health trends show the right dates around daylight-saving changes, and zone minutes you already have are kept past the heart-rate retention window.",
+      "The app no longer opens a picture-in-picture window when you leave the Workout tab with no workout running. This is fully fixed with this release's APK.",
+      "Behind the scenes: Oura accounts can now be connected through Oura's own sign-in, ready for the move from the ring's Bluetooth to the Oura service. The server also supports TrainingAi Preview, the native app.",
+      "Behind the scenes: every release now takes an encrypted, restore-checked database backup first, and old ring sleep nights that a device pulled are cleaned up.",
+    ],
+  },
+  {
     version: "1.490.1",
     date: "2026-10-14",
     changes: [
