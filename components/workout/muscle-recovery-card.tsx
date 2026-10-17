@@ -2,12 +2,12 @@
 
 import type { MuscleRecoveryEntry } from "@/app/api/muscle-recovery/route";
 import { recoveryBand } from "@trainingai/shared/health/recovery-band";
+import { capitalize } from "@trainingai/shared/format/capitalize";
 
 interface MuscleRecoveryCardProps {
   muscles: MuscleRecoveryEntry[];
 }
 
-function capitalize(s: string) { return s.charAt(0).toUpperCase() + s.slice(1) }
 
 function Chip({ muscle, pct }: { muscle: string; pct: number }) {
   const color = recoveryBand(pct).color;

@@ -19,17 +19,20 @@ const code = (src: string) =>
   stripComments(src)
 
 describe('RV-91 — a date string reaches the screen through the shared formatter', () => {
+  // The history card's row text comes from the shared row formatter (also the native app's), which
+  // is where the date reaches `formatDateDisplay`.
   const SITES = [
-    'components/health/activity-history-card.tsx',
-    'components/activity/activity-detail-sheet.tsx',
-  ]
-  for (const file of SITES) {
+    ['components/health/activity-history-card.tsx', /activityRowText\(\s*log\s*\)/],
+    ['packages/shared/src/format/activity-row.ts', /formatDateDisplay\(\s*log\.date/],
+    ['components/activity/activity-detail-sheet.tsx', /formatDateDisplay\(\s*log\.date/],
+  ] as const
+  for (const [file, through] of SITES) {
     it(`${file} does not render a raw date`, () => {
       const src = code(read(file))
       expect(src, 'a raw YYYY-MM-DD reaches the screen — the shape RV-91 found twice')
         .not.toMatch(/\{\s*log\.date\s*\}/)
       expect(src, 'and it is the shared formatter it goes through, not a fifth option bag')
-        .toMatch(/formatDateDisplay\(\s*log\.date/)
+        .toMatch(through)
     })
   }
 

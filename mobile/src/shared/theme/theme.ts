@@ -19,6 +19,8 @@ import {
   weatherColors,
   homeCardColors,
   effortColors,
+  progressColors,
+  trainingColors,
   type TextVariant,
 } from './tokens.ts';
 
@@ -63,6 +65,10 @@ export type Theme = {
   effort: Record<number, string>;
   sleepStages: typeof STAGE_COLOR;
   hrZoneColors: string[];
+  progress: typeof progressColors.light;
+  training: Omit<typeof trainingColors.light, 'phases'> & {
+    phases: Record<'baseline' | keyof typeof trainingColors.light.phases, string>;
+  };
 };
 export type ThemeOverrides = {
   backgrounds?: Partial<BackgroundTheme>;
@@ -84,6 +90,12 @@ export type ThemeOverrides = {
   effort?: Record<number, string>;
   sleepStages?: Partial<typeof STAGE_COLOR>;
   hrZoneColors?: string[];
+  progress?: Partial<Omit<typeof progressColors.light, 'goals'>> & {
+    goals?: Partial<typeof progressColors.light.goals>;
+  };
+  training?: Partial<Omit<typeof trainingColors.light, 'phases'>> & {
+    phases?: Partial<Theme['training']['phases']>;
+  };
 };
 
 export function createTheme(
@@ -137,6 +149,20 @@ export function createTheme(
     effort: { ...effortColors, ...overrides.effort },
     sleepStages: { ...STAGE_COLOR, ...overrides.sleepStages },
     hrZoneColors: overrides.hrZoneColors ?? HR_ZONE_META.map((zone) => zone.color),
+    progress: {
+      ...progressColors[mode],
+      ...overrides.progress,
+      goals: { ...progressColors[mode].goals, ...overrides.progress?.goals },
+    },
+    training: {
+      ...trainingColors[mode],
+      ...overrides.training,
+      phases: {
+        baseline: colors.muted,
+        ...trainingColors[mode].phases,
+        ...overrides.training?.phases,
+      },
+    },
     sessions:
       overrides.sessions ??
       sessionTones[mode].map((foreground, index) => ({

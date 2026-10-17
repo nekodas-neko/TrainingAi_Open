@@ -1,18 +1,15 @@
 import { HealthResourceHeader } from './HealthResourceHeader';
 import { useState } from 'react';
 import { View } from 'react-native';
-import {
-  computeBarMetric,
-  type StrengthMode,
-} from '@trainingai/shared/health/strength-progress';
+import type { StrengthMode } from '@trainingai/shared/health/strength-progress';
 import {
   AppText,
   Card,
   ChipPicker,
   Icon,
-  LineChart,
   ProgressBar,
   SegmentedControl,
+  SeriesBarChart,
   Stack,
   StableContent,
 } from '../../../shared/ui';
@@ -29,13 +26,13 @@ import {
 import { HealthMetricCard } from './HealthMetricCard';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import {
-  GOAL_COLORS,
-  STRENGTH_ACCENT,
   STRENGTH_BAR_MARKERS,
+  STRENGTH_BAR_WIDTH,
   goalCountText,
   lastTrainedSession,
   strengthDelta,
   strengthFillPct,
+  strengthGroups,
   type GoalKey,
 } from '../progressPresentation';
 
@@ -89,12 +86,13 @@ function TrendsCard() {
               {data.insight}
             </AppText>
             {series.length > 0 ? (
-              <LineChart
+              <SeriesBarChart
                 label={label}
-                readable
-                gridlines
-                showLabels={false}
-                points={series.map((point) => ({ label: point.date, value: point.sessionRpe }))}
+                bars={series.map((point) => ({
+                  label: point.date.slice(5),
+                  value: point.sessionLoad,
+                  description: `${point.date}: RPE ${point.sessionRpe}/10, effort load ${point.sessionLoad}`,
+                }))}
               />
             ) : (
               <HealthMetricCard
@@ -175,16 +173,15 @@ function StrengthBar({ pct, color }: { pct: number; color: string }) {
     </View>
   );
 }
-const STRENGTH_BAR_WIDTH = 112;
 function StrengthWorkingCard() {
   const { theme } = useTheme();
   const [mode, setMode] = useState<StrengthMode>('working');
   const state = useWorkoutResource(weightsSpec);
   const exercises = state.data?.exercises ?? [];
-  const sessions = [...new Set(exercises.map((exercise) => exercise.sessionName))];
+  const groups = strengthGroups(exercises, mode);
   const lastSession = lastTrainedSession(exercises);
   return (
-    <Card accent={STRENGTH_ACCENT}>
+    <Card accent={theme.progress.strength}>
       <HealthResourceHeader title={'Strength Progress'} state={state} refresh={state.refresh} />
       <SegmentedControl
         animated
@@ -200,7 +197,7 @@ function StrengthWorkingCard() {
       {(state.data?.phaseName || lastSession) && (
         <Stack direction="row" align="center" wrap>
           {state.data?.phaseName && (
-            <AppText variant="micro" style={{ color: STRENGTH_ACCENT }}>
+            <AppText variant="micro" style={{ color: theme.progress.strength }}>
               {state.data.phaseName}
               {state.data.cycleLabel ? ` · ${state.data.cycleLabel}` : ''}
             </AppText>
@@ -212,42 +209,41 @@ function StrengthWorkingCard() {
           )}
         </Stack>
       )}
-      {sessions.map((session) => (
+      {groups.map(({ session, rows }) => (
         <Stack key={session}>
           <AppText
             variant="micro"
-            style={{ color: STRENGTH_ACCENT, textTransform: 'uppercase', letterSpacing: 0.6 }}
+            style={{ color: theme.progress.strength, textTransform: 'uppercase', letterSpacing: 0.6 }}
           >
             {session}
           </AppText>
-          {exercises
-            .filter((exercise) => exercise.sessionName === session)
-            .map((exercise) => {
-              const metric = computeBarMetric(exercise, mode);
-              if (!metric) return null;
-              const delta = strengthDelta(metric);
-              return (
-                <Stack key={exercise.exercise} direction="row" align="center">
-                  <AppText variant="caption" numberOfLines={1} style={{ flex: 1 }}>
-                    {exercise.exercise}
+          {rows.map(({ exercise, metric }) => {
+            const delta = strengthDelta(metric, {
+              trendUp: theme.progress.trendUp,
+              trendDown: theme.progress.trendDown,
+            });
+            return (
+              <Stack key={exercise.exercise} direction="row" align="center">
+                <AppText variant="caption" numberOfLines={1} style={{ flex: 1 }}>
+                  {exercise.exercise}
+                </AppText>
+                <StrengthBar pct={metric.pct} color={metric.color} />
+                <View style={{ width: theme.sizes.touchTarget + theme.spacing.lg, alignItems: 'flex-end' }}>
+                  <AppText variant="label" style={{ fontVariant: ['tabular-nums'] }}>
+                    {metric.label}
                   </AppText>
-                  <StrengthBar pct={metric.pct} color={metric.color} />
-                  <View style={{ width: theme.sizes.touchTarget + theme.spacing.lg, alignItems: 'flex-end' }}>
-                    <AppText variant="label" style={{ fontVariant: ['tabular-nums'] }}>
-                      {metric.label}
+                  {delta && (
+                    <AppText variant="micro" style={{ color: delta.color }}>
+                      {delta.text}
                     </AppText>
-                    {delta && (
-                      <AppText variant="micro" style={{ color: delta.color }}>
-                        {delta.text}
-                      </AppText>
-                    )}
-                  </View>
-                </Stack>
-              );
-            })}
+                  )}
+                </View>
+              </Stack>
+            );
+          })}
         </Stack>
       ))}
-      {state.data && !exercises.some((exercise) => exercise.estimated1rm !== null) && (
+      {state.data && !groups.length && (
         <AppText variant="caption" tone="muted">
           No strength readings yet
         </AppText>
@@ -256,6 +252,7 @@ function StrengthWorkingCard() {
   );
 }
 function GoalsCard() {
+  const { theme } = useTheme();
   const health = useHealthData();
   const goals = useWorkoutResource(goalsSpec);
   const progress = useWorkoutResource(progressSpec);
@@ -306,7 +303,7 @@ function GoalsCard() {
   ];
   const visible = rows.filter((row) => row.value != null && row.goal != null && row.goal > 0);
   return (
-    <Card accent={GOAL_COLORS.Steps}>
+    <Card accent={theme.progress.goals.Steps}>
       <HealthResourceHeader
         title="Goals"
         state={{
@@ -335,12 +332,12 @@ function GoalsCard() {
       {visible.map((row) => (
         <Stack key={row.label} gap="xs">
           <Stack direction="row" align="center" gap="sm">
-            <Icon name={row.icon} size={14} color={GOAL_COLORS[row.label]} />
+            <Icon name={row.icon} size={14} color={theme.progress.goals[row.label]} />
             <AppText variant="label">{row.label}</AppText>
           </Stack>
-          <ProgressBar value={row.value! / row.goal!} color={GOAL_COLORS[row.label]} />
+          <ProgressBar value={row.value! / row.goal!} color={theme.progress.goals[row.label]} />
           <AppText variant="micro" tone="muted" style={{ fontVariant: ['tabular-nums'] }}>
-            {goalCountText(row.label, row.value!, row.goal!, weekly)}
+            {goalCountText(row.value!, row.goal!, weekly)}
           </AppText>
         </Stack>
       ))}

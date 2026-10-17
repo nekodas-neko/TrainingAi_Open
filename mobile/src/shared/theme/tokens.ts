@@ -1,4 +1,5 @@
 import type { TextStyle } from 'react-native';
+import { TREND_COLOR } from '@trainingai/shared/health/strength-progress';
 
 export const spacing = {
   none: 0,
@@ -182,6 +183,59 @@ export const domainTones = {
       foreground: '#06b6d4',
       background: '#0e3533',
       border: '#0c555c',
+    },
+  },
+};
+// Health > Progress. Dark values are the current app's; the light ones are darker steps that keep
+// 10 px text and thin fills readable on a white card (each at least 4.5:1 on #ffffff).
+export const progressColors = {
+  light: {
+    strength: '#7e22ce',
+    trendUp: '#15803d',
+    trendDown: '#b91c1c',
+    goals: {
+      Steps: '#15803d',
+      Calories: '#c2410c',
+      Water: '#0369a1',
+      Sleep: '#6d28d9',
+      Workouts: '#a16207',
+    },
+  },
+  dark: {
+    strength: '#bf5fff',
+    trendUp: TREND_COLOR.up,
+    trendDown: TREND_COLOR.down,
+    goals: {
+      Steps: '#22c55e',
+      Calories: '#f97316',
+      Water: '#38bdf8',
+      Sleep: '#a78bfa',
+      Workouts: '#fbbf24',
+    },
+  },
+};
+// Health > Training. A phase is a category, not a state, so these are their own tokens: reordering
+// the session palette must not recolour a phase, and no phase takes the green, amber or red of a
+// status. `baseline` is the absence of a phase and follows the muted text colour in the theme.
+export const trainingColors = {
+  light: {
+    activity: '#047c90',
+    movement: '#047c90',
+    phases: {
+      accumulation: '#1d4ed8',
+      intensification: '#4338ca',
+      realisation: '#7e22ce',
+      deload: '#047c90',
+    },
+  },
+  dark: {
+    activity: '#06b6d4',
+    movement: '#06b6d4',
+    phases: {
+      accumulation: '#60a5fa',
+      intensification: '#818cf8',
+      realisation: '#c084fc',
+      deload: '#06b6d4',
     },
   },
 };

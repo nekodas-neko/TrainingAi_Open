@@ -42,7 +42,23 @@ export function volumeVerdict(trainingGoal: string, muscle: string, sets: number
 /** The generic band's target when nothing supplies one: its 10-set minimum. */
 export const GENERIC_TARGET = 10
 /** Sets at which the generic band (no target, no goal) turns `brand`. */
-const GENERIC_HIGH = 15
+export const GENERIC_HIGH = 15
+/** The top of the generic band's printed range, and the least a muscle bar's scale reaches. */
+export const MAX_TARGET = 20
+
+/** Sets from which `targetBand` calls a week "approaching" the generic target (60%, rounded up). */
+const GENERIC_APPROACHING = Math.ceil((GENERIC_TARGET * 3) / 5)
+
+/**
+ * The generic band's legend, top to bottom, in words. Derived from the same constants the colours
+ * use so a retuned threshold cannot leave a caption describing the old one.
+ */
+export const GENERIC_LEGEND: readonly { tone: VolumeTone; label: string }[] = [
+  { tone: 'brand', label: `${GENERIC_HIGH}+ sets` },
+  { tone: 'good', label: `${GENERIC_TARGET}–${GENERIC_HIGH - 1} sets` },
+  { tone: 'warn', label: `${GENERIC_APPROACHING}–${GENERIC_TARGET - 1} sets` },
+  { tone: 'bad', label: `Under ${GENERIC_APPROACHING}` },
+]
 
 export type TargetBand = 'untrained' | 'under' | 'approaching' | 'at'
 

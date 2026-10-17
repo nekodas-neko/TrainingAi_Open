@@ -51,10 +51,16 @@ function MovementCard() {
         Last 60 days · weighted sets
       </AppText>
 
+      {state.data && balance.total === 0 && (
+        <AppText variant="caption" tone="muted">
+          No sets logged in the last 60 days
+        </AppText>
+      )}
       {state.data &&
+        balance.total > 0 &&
         balance.rows.map((row) => {
           // One accent for the three patterns (they are categories, not a scale); "other" stays muted.
-          const color = row.key === 'other' ? theme.colors.muted : theme.tones.recovery.foreground;
+          const color = row.key === 'other' ? theme.colors.muted : theme.training.movement;
           return (
             <Stack key={row.key} gap="xs">
               <Stack direction="row" justify="space-between">
@@ -75,8 +81,9 @@ function MovementCard() {
   );
 }
 
-// Duration and density over the last 14 days. The value axis, weekday letters and the "N days
-// missing" note are on, so a gap reads as a gap and the line reads against round values.
+// Duration and density over the last 14 days. The value axis, weekday names and the "N days
+// missing" note are on, so a gap reads as a gap and the line reads against round values; only a
+// reading with no neighbour gets a dot, as in the current app.
 function TrendChartCard({
   title,
   unit,
@@ -110,6 +117,8 @@ function TrendChartCard({
         fill
         readable
         yAxis
+        dots="isolated"
+        compactAxisLabels
       />
     </Card>
   );
@@ -141,14 +150,7 @@ export function TrainingPanel({
   const trends = useWorkoutResource(trendsSpec(today));
   const duration = trendSeries(trends.data?.trends, (day) => day.sessionDurationMin);
   const density = trendSeries(trends.data?.trends, (day) => day.workoutDensity);
-  // A phase is a category, not a state: a cool ramp, never the green, amber or red of a status.
-  const phaseColors: Record<string, string> = {
-    baseline: theme.colors.muted,
-    accumulation: theme.sessions[3].foreground,
-    intensification: theme.sessions[2].foreground,
-    realisation: theme.sessions[4].foreground,
-    deload: theme.tones.recovery.foreground,
-  };
+  const phaseColors: Record<string, string> = theme.training.phases;
   const trendStatus = (
     <ResourceStatus inline label="Workout trends" state={trends} refresh={trends.refresh} />
   );

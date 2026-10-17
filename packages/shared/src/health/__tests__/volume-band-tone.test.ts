@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { muscleVolumeColor, targetBand, volumeVerdict } from '../volume-band'
+import {
+  GENERIC_HIGH,
+  GENERIC_LEGEND,
+  GENERIC_TARGET,
+  MAX_TARGET,
+  muscleVolumeColor,
+  targetBand,
+  volumeVerdict,
+} from '../volume-band'
 
 const palette = { good: 'G', warn: 'A', bad: 'R', none: 'N', brand: 'B' } as const
 
@@ -29,5 +37,30 @@ describe('muscleVolumeColor (shared rule, caller palette)', () => {
     expect(verdict.band).toBe('over')
     expect(verdict.tone).toBe('bad')
     expect(verdict.label).toBe('above MRV')
+  })
+})
+
+// The legend words and the colours come from the same thresholds, so they cannot drift (#2948).
+describe('the generic band legend', () => {
+  it('names each band in the words both apps print', () => {
+    expect(GENERIC_LEGEND).toEqual([
+      { tone: 'brand', label: '15+ sets' },
+      { tone: 'good', label: '10–14 sets' },
+      { tone: 'warn', label: '6–9 sets' },
+      { tone: 'bad', label: 'Under 6' },
+    ])
+    expect(MAX_TARGET).toBe(20)
+  })
+
+  it('agrees with the colour the band gives at every edge it names', () => {
+    const colour = (sets: number) => muscleVolumeColor(sets, null, null, palette)
+    const toneOf = (label: string) => GENERIC_LEGEND.find(item => item.label === label)!.tone
+    const expected = { brand: 'B', good: 'G', warn: 'A', bad: 'R', none: 'N' } as const
+    expect(colour(GENERIC_HIGH)).toBe(expected[toneOf('15+ sets')])
+    expect(colour(GENERIC_HIGH - 1)).toBe(expected[toneOf('10–14 sets')])
+    expect(colour(GENERIC_TARGET)).toBe(expected[toneOf('10–14 sets')])
+    expect(colour(GENERIC_TARGET - 1)).toBe(expected[toneOf('6–9 sets')])
+    expect(colour(6)).toBe(expected[toneOf('6–9 sets')])
+    expect(colour(5)).toBe(expected[toneOf('Under 6')])
   })
 })

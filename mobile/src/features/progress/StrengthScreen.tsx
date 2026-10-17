@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View } from 'react-native';
+import { View, useWindowDimensions } from 'react-native';
 import { displayOneRm, displayOneRmSeries, oneRmLabel } from '@trainingai/shared/1rm';
 import { toAestDay } from '@trainingai/shared/date-utils';
 import { isRmPlateau, projectRm } from '@trainingai/shared/health/strength-projection';
@@ -14,6 +14,7 @@ import {
   Sheet,
   Stack,
 } from '../../shared/ui';
+import { useTheme } from '../../shared/theme/ThemeProvider';
 import { useWorkoutContext } from '../workouts/WorkoutProvider';
 import { WorkoutLayout } from '../workouts/components/WorkoutLayout';
 import { ResourceStatus } from '../workouts/components/ResourceStatus';
@@ -32,6 +33,8 @@ export function StrengthScreen({
   section?: 'all' | 'trend' | 'records';
 }) {
   const { timezone } = useWorkoutContext();
+  const { theme } = useTheme();
+  const { width: windowWidth } = useWindowDimensions();
   const strength = useWorkoutResource(strengthSpec);
   const weekly = useWorkoutResource(weeklySpec, section === 'all');
   const records = useWorkoutResource(recordsSpec, section !== 'trend');
@@ -39,9 +42,13 @@ export function StrengthScreen({
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   // The chart keeps a 320:90 aspect inside its box, so a fixed 64 px height left it about 230 px
-  // wide. Sizing the height from the card's measured width makes it fill the card.
-  const [chartWidth, setChartWidth] = useState(0);
-  const chartHeight = chartWidth > 0 ? Math.max(64, Math.round((chartWidth * 90) / 320)) : 64;
+  // wide. Sizing the height from the card's width makes it fill the card; the first paint uses the
+  // width the screen and card padding leave (the measured one then corrects it), so the chart does
+  // not grow when it is measured.
+  const [chartWidth, setChartWidth] = useState(
+    Math.min(windowWidth, theme.sizes.contentWidth) - 4 * theme.spacing.lg - 2,
+  );
+  const chartHeight = Math.max(64, Math.round((chartWidth * 90) / 320));
   const exercises = strength.data?.exercises ?? [];
   const currentIndex = Math.min(index, Math.max(0, exercises.length - 1));
   const exercise = exercises[currentIndex];

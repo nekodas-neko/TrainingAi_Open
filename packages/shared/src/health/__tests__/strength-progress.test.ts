@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeBarMetric } from '../strength-progress'
+import { computeBarMetric, strengthDeltaText, TREND_COLOR } from '../strength-progress'
 import type { ExerciseSummary } from '@/app/api/weights-summary/route'
 
 function makeExercise(overrides: Partial<ExerciseSummary> = {}): ExerciseSummary {
@@ -137,5 +137,38 @@ describe('computeBarMetric — mode "working", bodyweight exercises', () => {
   it('returns null when maxReps is null', () => {
     const ex = makeExercise({ exerciseType: 'bodyweight', lastReps: 10, maxReps: null })
     expect(computeBarMetric(ex, 'working')).toBeNull()
+  })
+})
+
+// The delta beside a bar is one helper for both apps. `legacyDelta` is the inline formatting the
+// web card used before it moved, kept here so the move is shown to change nothing.
+describe('strengthDeltaText', () => {
+  const legacyDelta = (m: { trend: 'up' | 'down' | 'same' | null; delta: number | null; deltaUnit: 'RM' | 'kg' }) =>
+    m.trend != null && m.trend !== 'same' && m.delta != null
+      ? `${m.trend === 'up' ? '+' : '-'}${m.delta}${m.deltaUnit === 'RM' ? ' rep' + (m.delta === 1 ? '' : 's') : ' kg'}`
+      : null
+
+  it('reads reps for a bodyweight exercise and kilograms for a loaded one', () => {
+    expect(strengthDeltaText({ trend: 'up', delta: 3, deltaUnit: 'RM' })).toBe('+3 reps')
+    expect(strengthDeltaText({ trend: 'down', delta: 1, deltaUnit: 'RM' })).toBe('-1 rep')
+    expect(strengthDeltaText({ trend: 'down', delta: 2.5, deltaUnit: 'kg' })).toBe('-2.5 kg')
+  })
+
+  it('is null when nothing changed or there is nothing to compare', () => {
+    expect(strengthDeltaText({ trend: 'same', delta: 0, deltaUnit: 'kg' })).toBeNull()
+    expect(strengthDeltaText({ trend: null, delta: null, deltaUnit: 'kg' })).toBeNull()
+    expect(strengthDeltaText({ trend: 'up', delta: null, deltaUnit: 'kg' })).toBeNull()
+  })
+
+  it('matches the web card\'s old inline text for every trend, unit and size', () => {
+    for (const trend of ['up', 'down', 'same', null] as const)
+      for (const deltaUnit of ['RM', 'kg'] as const)
+        for (const delta of [null, 0, 0.5, 1, 1.5, 2, 10]) {
+          expect(strengthDeltaText({ trend, delta, deltaUnit })).toBe(legacyDelta({ trend, delta, deltaUnit }))
+        }
+  })
+
+  it('keeps the two trend colours the web card used', () => {
+    expect(TREND_COLOR).toEqual({ up: '#22c55e', down: '#f87171' })
   })
 })

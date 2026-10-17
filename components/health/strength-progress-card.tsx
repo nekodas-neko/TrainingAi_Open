@@ -5,7 +5,7 @@ import { Dumbbell, TriangleAlert } from 'lucide-react'
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { accentCardStyle } from '@trainingai/shared/utils'
-import { computeBarMetric, type BarMetric, type StrengthMode } from '@trainingai/shared/health/strength-progress'
+import { computeBarMetric, strengthDeltaText, TREND_COLOR, type BarMetric, type StrengthMode } from '@trainingai/shared/health/strength-progress'
 import type { ExerciseSummary } from '@/app/api/weights-summary/route'
 
 interface SummaryData {
@@ -15,13 +15,6 @@ interface SummaryData {
 }
 
 const PCT_MARKERS = [60, 70, 80]
-
-// 'same' is deliberately absent — the render guards `trend !== 'same'`, so an entry here would be
-// dead, and the one that used to sit here was a white literal invisible on a light background.
-const TREND_COLOR: Record<string, string> = {
-  up: '#22c55e',
-  down: '#f87171',
-}
 
 export const StrengthProgressCard = memo(function StrengthProgressCard() {
   const [mode, setMode] = useState<StrengthMode>('working')
@@ -120,7 +113,9 @@ export const StrengthProgressCard = memo(function StrengthProgressCard() {
                 {sessionName}
               </h3>
               <div className="space-y-4">
-                {rows.map(({ ex, metric }) => (
+                {rows.map(({ ex, metric }) => {
+                  const delta = strengthDeltaText(metric)
+                  return (
                   <div key={ex.exercise} className="flex items-center gap-3">
                     <p className="text-xs flex-1 truncate">{ex.exercise}</p>
 
@@ -167,17 +162,18 @@ export const StrengthProgressCard = memo(function StrengthProgressCard() {
                     {/* 1RM value + trend delta */}
                     <div className="flex-none w-16 text-right">
                       <p className="text-xs font-bold tabular-nums leading-tight">{metric.label}</p>
-                      {metric.trend != null && metric.trend !== 'same' && metric.delta != null && (
+                      {delta && (
                         <p
                           className="text-[9px] font-semibold tabular-nums leading-tight"
-                          style={{ color: TREND_COLOR[metric.trend] }}
+                          style={{ color: TREND_COLOR[metric.trend as 'up' | 'down'] }}
                         >
-                          {metric.trend === 'up' ? '+' : '-'}{metric.delta}{metric.deltaUnit === 'RM' ? ' rep' + (metric.delta === 1 ? '' : 's') : ' kg'}
+                          {delta}
                         </p>
                       )}
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )

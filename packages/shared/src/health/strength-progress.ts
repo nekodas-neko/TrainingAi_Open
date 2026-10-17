@@ -27,6 +27,21 @@ const PURPLE = '#bf5fff'
 const GREEN = '#22c55e'
 const RED = '#f87171'
 
+/** The colour of a better / worse change beside a bar. `same` has no entry: it prints nothing. */
+export const TREND_COLOR = { up: GREEN, down: RED } as const
+
+/**
+ * "+3 reps" for a bodyweight exercise, "-2.5 kg" for a loaded one; null when nothing changed or
+ * there is no previous reading to change from. The unit follows `deltaUnit`, so a bodyweight 1RM
+ * never reads as kilograms (Q-12).
+ */
+export function strengthDeltaText(metric: Pick<BarMetric, 'trend' | 'delta' | 'deltaUnit'>): string | null {
+  if (metric.trend == null || metric.trend === 'same' || metric.delta == null) return null
+  const sign = metric.trend === 'up' ? '+' : '-'
+  const unit = metric.deltaUnit === 'RM' ? (metric.delta === 1 ? 'rep' : 'reps') : 'kg'
+  return `${sign}${metric.delta} ${unit}`
+}
+
 function trendColor(trend: 'up' | 'down' | 'same' | null, pct: number): string {
   if (pct >= 99.5) return GOLD
   if (trend === 'up') return GREEN

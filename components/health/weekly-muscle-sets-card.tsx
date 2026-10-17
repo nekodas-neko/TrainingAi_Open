@@ -8,16 +8,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Sparkline } from "@/components/ui/sparkline";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
-import { muscleVolumeColor, volumeVerdict } from "@/components/health/volume-band";
+import { GENERIC_TARGET, muscleVolumeColor, volumeVerdict } from "@/components/health/volume-band";
 import { TTL_LONG } from "@trainingai/shared/cache-ttl";
 import { ProgressFill } from '@/components/ui/progress-fill'
+import { GENERIC_HIGH, MAX_TARGET } from "@trainingai/shared/health/volume-band";
+import { capitalize } from "@trainingai/shared/format/capitalize";
 
-const MIN_TARGET = 10;
-const MAX_TARGET = 20;
-
-function capitalize(s: string) {
-  return s.charAt(0).toUpperCase() + s.slice(1);
-}
+const MIN_TARGET = GENERIC_TARGET;
 
 interface Props {
   muscles: MuscleSetsEntry[];
@@ -192,7 +189,7 @@ export const WeeklyMuscleSetsCard = memo(function WeeklyMuscleSetsCard({ muscles
             // minimum while the bars were coloured against per-muscle, goal-scaled landmarks —
             // a caption that disagrees with the chart above it is worse than no caption.
             ? "Lines = MEV (minimum effective) and MRV (maximum recoverable), scaled to your training goal."
-            : `Vertical line = ${MIN_TARGET}-set minimum. Green = ${MIN_TARGET}–14 sets · Blue = 15+ sets.`}
+            : `Vertical line = ${MIN_TARGET}-set minimum. Green = ${MIN_TARGET}–${GENERIC_HIGH - 1} sets · Blue = ${GENERIC_HIGH}+ sets.`}
       </p>
     </div>
   );

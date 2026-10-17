@@ -1,16 +1,13 @@
-import { formatDateDisplay, formatTime12h } from '@trainingai/shared/date-utils';
+import { formatDateDisplay } from '@trainingai/shared/date-utils';
+import { activityRowText } from '@trainingai/shared/format/activity-row';
 import { formatActivityTitle } from '@trainingai/shared/format/activity-title';
 import { plural } from '@trainingai/shared/format/plural';
 import { phaseLabel, lastTrainedLabel } from '@trainingai/shared/ai-periodization/status-labels';
 import { PATTERN_LABEL, movementBalance } from '@trainingai/shared/health/movement-balance';
-import { seriesShape } from '@trainingai/shared/health/series-gaps';
+import { seriesShape, trimLeadingGaps } from '@trainingai/shared/health/series-gaps';
 
 // What the Health Training cards print, kept out of the components so each rule is tested once.
 // The wording follows the current app's cards (components/health/*).
-
-export function capitalize(text: string) {
-  return text.charAt(0).toUpperCase() + text.slice(1);
-}
 
 type ActivityRowInput = {
   id: string;
@@ -28,24 +25,11 @@ export function weekActivities<T extends { date: string }>(logs: readonly T[], w
   return logs.filter((log) => log.date.replace(/\//g, '-') >= weekStart);
 }
 
-// Date, clock time and minutes on the left; distance and kcal on the right, each only when present
-// (never a placeholder dash for a figure the activity does not have).
+// The figures come from the shared formatter the current app's history card uses.
 export function activityRow(log: ActivityRowInput) {
-  const subtitle = [
-    formatDateDisplay(log.date),
-    log.startTime ? formatTime12h(log.startTime) : '',
-    log.durationMin ? `${Math.round(log.durationMin)} min` : '',
-  ]
-    .filter(Boolean)
-    .join(' · ');
-  const facts = [
-    log.distanceKm != null ? `${Number(log.distanceKm).toFixed(2)} km` : '',
-    log.caloriesBurned != null ? `${Math.round(log.caloriesBurned)} kcal` : '',
-  ].filter(Boolean);
   return {
     title: formatActivityTitle(log.title ?? log.activityType),
-    subtitle,
-    facts,
+    ...activityRowText(log),
   };
 }
 
@@ -96,21 +80,62 @@ export function movementRows(muscles: { muscle: string; sets: number }[]) {
   };
 }
 
-// A 14-day trend as a chart wants it: leading empty days trimmed, a one-letter weekday per day, and
-// the "3 days missing" note when some of the days drawn have no reading.
+// A 14-day trend as a chart wants it: leading empty days trimmed, a three-letter weekday per day,
+// and the "3 days missing" note when some of the days drawn have no reading.
 export function trendSeries<T extends { date: string }>(
   days: readonly T[] | undefined,
   read: (day: T) => number | null,
 ) {
   const rows = (days ?? []).map((day) => ({ date: day.date, value: read(day) }));
-  const first = rows.findIndex((row) => row.value !== null);
-  if (first === -1) {
+  const shown = trimLeadingGaps(rows, (row) => row.value);
+  if (!shown) {
     return null;
   }
-  const shown = rows.slice(first);
   return {
     points: shown.map((row) => ({ label: row.date, value: row.value })),
-    axisLabels: shown.map((row) => formatDateDisplay(row.date, 'weekday').charAt(0)),
+    axisLabels: shown.map((row) => formatDateDisplay(row.date, 'weekday')),
     missing: seriesShape(shown.map((row) => row.value)).coverage,
   };
+}
+
+type CalendarDays = Record<string, readonly string[]>;
+
+// The month's training calendar: for each date the names it holds (for a screen reader) and a dot
+// per trained session in that session's colour, then one dot in the activity colour for any logged
+// activity. Server days and on-device logs merge, whichever date separator they came with.
+export function calendarMarks(input: {
+  month: string;
+  trainedDays: CalendarDays;
+  activityDays: CalendarDays;
+  activities: readonly { date: string; title: string }[];
+  workouts: readonly { date: string; status: string; sessionName: string }[];
+  sessionColor: (name: string) => string;
+  activityColor: string;
+}) {
+  const trained: Record<string, string[]> = {};
+  const active: Record<string, string[]> = {};
+  const add = (into: Record<string, string[]>, date: string, names: readonly string[]) => {
+    const day = date.replace(/\//g, '-');
+    into[day] = [...new Set([...(into[day] ?? []), ...names])];
+  };
+  for (const [date, names] of Object.entries(input.trainedDays)) add(trained, date, names);
+  for (const [date, names] of Object.entries(input.activityDays)) add(active, date, names);
+  for (const row of input.activities) {
+    if (row.date.startsWith(input.month)) add(active, row.date, [row.title]);
+  }
+  for (const workout of input.workouts) {
+    if (workout.status === 'completed' && workout.date.startsWith(input.month)) {
+      add(trained, workout.date, [workout.sessionName]);
+    }
+  }
+  const markers: Record<string, string[]> = {};
+  const dots: Record<string, string[]> = {};
+  for (const date of new Set([...Object.keys(trained), ...Object.keys(active)])) {
+    markers[date] = [...(trained[date] ?? []), ...(active[date] ?? [])];
+    dots[date] = [
+      ...(trained[date] ?? []).map(input.sessionColor),
+      ...(active[date] ? [input.activityColor] : []),
+    ];
+  }
+  return { markers, dots };
 }

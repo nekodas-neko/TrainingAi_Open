@@ -11,6 +11,7 @@ import {
   yPixel,
   isPointAlignedAxis,
   pointCentreX,
+  dotMask,
 } from '../src/shared/ui/chartScale.ts';
 import { niceTicks as nutritionNiceTicks } from '../src/features/nutrition/data/heart-response-view.ts';
 
@@ -121,4 +122,12 @@ test("a thinned axis puts each label under its own point", () => {
   // Leaves every other caller alone: full or short label lists keep the old spread.
   assert.equal(isPointAlignedAxis(3, 14, ["a", "b", "c"]), false);
   assert.equal(isPointAlignedAxis(3, 3, ["a", "b", "c"]), false);
+});
+
+test('dotMask dots every reading, or only the latest and the ones with no neighbour', () => {
+  const values = [1, null, 2, 3, null, 4, null, 5];
+  assert.deepEqual(dotMask(values, 'all'), [true, false, true, true, false, true, false, true]);
+  assert.deepEqual(dotMask(values, 'isolated'), [true, false, false, false, false, true, false, true]);
+  assert.deepEqual(dotMask([1, 2, 3], 'isolated'), [false, false, true]);
+  assert.deepEqual(dotMask([1, 2, null], 'isolated'), [false, false, false]);
 });
