@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.491.1",
+    date: "2026-10-18",
+    changes: [
+      "Behind the scenes: connecting Oura now imports everything you share, even when one data type isn't offered.",
+    ],
+  },
+  {
     version: "1.491.0",
     date: "2026-10-18",
     changes: [

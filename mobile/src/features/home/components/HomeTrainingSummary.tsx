@@ -3,7 +3,6 @@ import {
   AppText,
   Card,
   Grid,
-  Icon,
   ProgressBar,
   Stack,
   TouchSurface,
@@ -56,7 +55,6 @@ export function HomeTrainingSummary({
             <AppText variant="eyebrow" tone="muted">
               Streak
             </AppText>
-            <Icon name="forward" size={theme.sizes.iconSmall} tone="muted" />
           </Stack>
           <AppText variant="hero" tone="brand">
             {streakLoaded && streak > 0 ? streak : '—'}{' '}
@@ -101,7 +99,6 @@ export function HomeTrainingSummary({
             <AppText variant="eyebrow" tone="muted">
               This Week
             </AppText>
-            <Icon name="forward" size={theme.sizes.iconSmall} tone="muted" />
           </Stack>
           <AppText variant="hero">
             {loaded ? count : '—'}
