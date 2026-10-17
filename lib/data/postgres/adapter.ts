@@ -272,6 +272,26 @@ async function touchExerciseLogTree(tx: SqlTx, userId: string, exerciseLogId: st
   `)
 }
 
+/**
+ * Issue 2952: rewrite a renamed exercise in every program that uses it, and move `updated_at` on
+ * each of those programs in the same statement. The delta re-sends a program's whole subtree only
+ * when the program's own `updated_at` moved (LB-66), so without the bump a phone's program mirror
+ * kept the old name until the program was next edited. The bump covers exactly the programs whose
+ * rows this rewrite changed, whoever owns them, because the rewrite itself is by name across the
+ * shared exercise library; a program that does not use the exercise is left alone.
+ */
+async function renameSessionExercises(tx: SqlTx, oldName: string, newName: string): Promise<void> {
+  await tx.execute(sql`
+    WITH renamed AS (
+      UPDATE session_exercises SET exercise_name = ${newName}
+      WHERE exercise_name = ${oldName}
+      RETURNING session_id
+    )
+    UPDATE programs SET updated_at = now()
+    WHERE id IN (SELECT ps.program_id FROM program_sessions ps JOIN renamed r ON r.session_id = ps.id)
+  `)
+}
+
 // Pure computation shared by preview and apply — converts each affected set's
 // weight from lbs (mistakenly stored as kg) to true kg, rounds to the nearest
 // 0.5kg dumbbell increment, and rescales the derived estimated1rm/target80/
@@ -2822,7 +2842,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       if (!existing) throw new NotFoundError('Exercise')
       if (existing.createdBy !== userId) throw new UserFacingError('Not authorized to rename this exercise', 403)
       const oldName = existing.name
-      await tx.update(s.sessionExercises).set({ exerciseName: newName }).where(eq(s.sessionExercises.exerciseName, oldName))
+      await renameSessionExercises(tx, oldName, newName)
       // Issue 2939: a rename is a server-decided edit of the log, so it stamps like the lbs-to-kg fix does;
       // without `clientEditedAt` a stale phone replay puts the old name back. GREATEST never moves a newer
       // stamp backwards. `updatedAt` is also set by `trg_set_updated_at`; the explicit set is kept for clarity.
@@ -2846,7 +2866,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           .where(and(eq(s.exerciseLibrary.name, newName), ne(s.exerciseLibrary.id, entry.id)))
         if (conflict) throw new UserFacingError(`An exercise named "${newName}" already exists`, 409)
 
-        await tx.update(s.sessionExercises).set({ exerciseName: newName }).where(eq(s.sessionExercises.exerciseName, oldName))
+        await renameSessionExercises(tx, oldName, newName)
         // Issue 2939: a rename is a server-decided edit of the log, so it stamps like the lbs-to-kg fix does;
         // without `clientEditedAt` a stale phone replay puts the old name back. GREATEST never moves a newer
         // stamp backwards. `updatedAt` is also set by `trg_set_updated_at`; the explicit set is kept for clarity.
