@@ -18,6 +18,7 @@ import { useHistoryQueue } from '../../workouts/data/HistoryQueueProvider';
 import { healthReadPaths } from '../../../core/sync/health-invalidation';
 import { ActivityStore, emptyActivity, sameActivityField } from './ActivityStore';
 import { activityHistorySpec } from '../../health/data/models';
+import { overlayCalories } from './models';
 import type { HealthActivity } from '../../health/components/ActivityDetails';
 
 const Context = createContext<ActivityStore | null>(null);
@@ -144,7 +145,7 @@ export function useActivityLogs(remote: HealthActivity[], from: string, to: stri
         title: p.title,
         distanceKm: p.distanceKm ?? null,
         durationMin: p.durationMin ?? null,
-        caloriesBurned: null,
+        caloriesBurned: overlayCalories(p, rows.get(p.id)),
         source: 'manual',
       }),
     );

@@ -6,7 +6,12 @@ import { muscleGeometry } from '../assets/muscleGeometry';
 import { useTheme } from '../theme/ThemeProvider';
 import { Skeleton } from './Skeleton';
 
-export type MuscleActivation = { muscle: string; role: 'main' | 'secondary' | 'injured' };
+// `color` paints the muscle that exact colour instead of its role's (a volume reading, not a status).
+export type MuscleActivation = {
+  muscle: string;
+  role: 'main' | 'secondary' | 'injured';
+  color?: string;
+};
 const slugs: Record<string, string> = {
   chest: 'chest',
   shoulders: 'deltoids',
@@ -99,9 +104,7 @@ function MuscleFigure({
           >
             <Skeleton style={{ width: '22%', height: '12%', borderRadius: theme.radii.pill }} />
             <Skeleton style={{ width: '65%', height: '40%' }} />
-            <View
-              style={{ width: '50%', flex: 1, flexDirection: 'row', gap: theme.spacing.sm }}
-            >
+            <View style={{ width: '50%', flex: 1, flexDirection: 'row', gap: theme.spacing.sm }}>
               <Skeleton style={{ flex: 1 }} />
               <Skeleton style={{ flex: 1 }} />
             </View>
@@ -125,7 +128,7 @@ export const MuscleMap = memo(
     for (const assignment of assignments) {
       const slug = slugs[normalizeMuscle(assignment.muscle)];
       if (slug && (assignment.role !== 'secondary' || !colors.has(slug))) {
-        colors.set(slug, theme.anatomy[assignment.role]);
+        colors.set(slug, assignment.color ?? theme.anatomy[assignment.role]);
       }
     }
     return (
@@ -146,6 +149,7 @@ export const MuscleMap = memo(
     previous.assignments.every(
       (item, index) =>
         item.muscle === next.assignments[index].muscle &&
-        item.role === next.assignments[index].role,
+        item.role === next.assignments[index].role &&
+        item.color === next.assignments[index].color,
     ),
 );

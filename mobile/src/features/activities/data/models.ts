@@ -194,3 +194,24 @@ export function activityIcon(icon: string): IconName {
   }
   return 'activity';
 }
+
+// The calories an on-device activity shows while it is still pending or unreconciled: the figure the
+// user typed, else the server's estimate for the same activity. An edit that changed the duration or
+// distance drops the stale estimate (the server re-estimates when it lands). Never a bare null that
+// hides a figure the server already holds (#2905).
+export function overlayCalories(
+  payload: { caloriesBurned?: number; durationMin?: number; distanceKm?: number },
+  server?: { caloriesBurned: number | null; durationMin: number | null; distanceKm: number | null },
+): number | null {
+  if (payload.caloriesBurned != null) {
+    return payload.caloriesBurned;
+  }
+  if (
+    server &&
+    server.durationMin === (payload.durationMin ?? null) &&
+    server.distanceKm === (payload.distanceKm ?? null)
+  ) {
+    return server.caloriesBurned;
+  }
+  return null;
+}

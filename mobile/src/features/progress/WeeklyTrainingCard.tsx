@@ -1,27 +1,26 @@
 import type { z } from 'zod';
 import type { ReactNode } from 'react';
 import { todayInTz } from '@trainingai/shared/date-utils';
-import { AppText, Badge, BarChart, Card, Stack } from '../../shared/ui';
+import { shortSessionName } from '@trainingai/shared/session-palette';
+import { AppText, BarChart, Card, Legend, Stack } from '../../shared/ui';
 import { useTheme } from '../../shared/theme/ThemeProvider';
 import { useWorkoutContext } from '../workouts/WorkoutProvider';
+import { useSessionColors } from '../workouts/useSessionColors';
 import { weeklySpec } from '../workouts/data/models';
 
 export function WeeklyTrainingCard({
   data,
   status,
+  readable = false,
 }: {
   data: z.infer<typeof weeklySpec.schema>;
   status?: ReactNode;
+  // Larger bar labels and a value axis (Health Training).
+  readable?: boolean;
 }) {
   const { theme } = useTheme();
-  const { timezone, catalog } = useWorkoutContext();
-  const sessions = catalog?.program?.sessions ?? [];
-  function color(name: string) {
-    const position =
-      sessions.find((session) => session.name.toLowerCase() === name.toLowerCase())?.position ??
-      [...name].reduce((value, char) => (value * 31 + char.charCodeAt(0)) >>> 0, 0);
-    return theme.sessions[position % theme.sessions.length].foreground;
-  }
+  const { timezone } = useWorkoutContext();
+  const { sessions, color } = useSessionColors();
   const today = todayInTz(timezone).replace(/-/g, '/');
   const stats = [
     { label: 'Sessions', value: String(data.totalSessions), unit: 'this week' },
@@ -47,27 +46,24 @@ export function WeeklyTrainingCard({
       </Stack>
       <BarChart
         label="This week's training load"
+        readable={readable}
+        yAxis={readable}
         bars={data.days.map((day) => ({
           label: day.label,
           value: day.volume > 0 ? day.volume : day.deloadVolume,
           colors: day.sessions.map(color),
           reduced: day.volume === 0 && day.deloadVolume > 0,
-          annotation: [day.isDeload ? 'D' : '', day.isTesting ? 'T' : '']
-            .filter(Boolean)
-            .join('·'),
+          annotation: [day.isDeload ? 'D' : '', day.isTesting ? 'T' : ''].filter(Boolean).join('·'),
           selected: day.dateKey.replace(/-/g, '/') === today,
         }))}
       />
       {!!sessions.length && (
-        <Stack direction="row" wrap>
-          {sessions.map((session) => (
-            <Badge
-              key={session.id}
-              label={session.name}
-              style={{ borderColor: color(session.name) }}
-            />
-          ))}
-        </Stack>
+        <Legend
+          items={sessions.map((session) => ({
+            label: shortSessionName(session.name),
+            color: color(session.name),
+          }))}
+        />
       )}
       <Stack
         direction="row"
@@ -86,7 +82,7 @@ export function WeeklyTrainingCard({
             <AppText variant="micro" tone="muted" style={{ textAlign: 'center' }}>
               {stat.label}
             </AppText>
-            <AppText variant="micro" tone="muted" style={{ textAlign: 'center' }}>
+            <AppText variant="caption" tone="muted" style={{ textAlign: 'center' }}>
               {stat.unit}
             </AppText>
           </Stack>
