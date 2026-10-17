@@ -13,19 +13,21 @@
  * that happens at most once a day; every later read on either route hits the stored row.
  */
 import { getRepository } from '@/lib/data'
+import { reportServerError } from '@/lib/observability'
 import type { OuraDailyDerivedPatch } from '@/lib/data/repository'
-import { todayInTz, todayMidnightUtc, toAestDay, ageFromDob, shiftDateStr } from '@trainingai/shared/date-utils'
+import { todayInTz, todayMidnightUtc, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { recentDoses, withDoseContext, DOSE_EFFECT_LOOKBACK_DAYS, type RecentDose } from '@trainingai/shared/health/dose-context'
 import { getCurrentPhase } from '@trainingai/shared/phase-engine'
-import { computeVolumeAcwr, ACWR_THRESHOLDS, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
+import { ACWR_THRESHOLDS } from '@trainingai/shared/ai-periodization/acwr'
 import { scoreBand } from '@trainingai/shared/health/score-band'
 import { computeSleepScore, sleepComponentsToContributors, sleepScoreBaselines } from '@trainingai/shared/health/sleep-score'
 import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
-import { getDailyGoals, type DailyGoals } from '@trainingai/shared/health/daily-goals'
-import { hrMaxFromAge } from '@trainingai/shared/health/hr-zones'
+import { scoreActivityForDay, restingHrBaseline, activityFinalisedAt, finalisedPreTaper } from '@trainingai/shared/health/activity-day'
+import { staleFinishedDays } from '@trainingai/shared/health/finished-day-recheck'
+import { scoreFinishedActivityDay, storeFinishedActivityDay, activityFinalGrace, ACTIVITY_FINALISE_DAYS } from '@/lib/health/activity-finalise'
+import { type DailyGoals } from '@trainingai/shared/health/daily-goals'
 import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
-import { intradayHrContributors } from '@trainingai/shared/health/intraday-hr-contributors'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { baselineZ } from '@trainingai/shared/health/personal-baseline'
 import { computeReadinessComposite, READINESS_MODEL_VERSION, type ReadinessCompositeResult } from '@trainingai/shared/health/readiness-composite'
@@ -366,9 +368,12 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
 
   const todayIso    = todayInTz(tz)
   const todayMid    = todayMidnightUtc(tz)
-  const from28dDate = new Date(todayMid.getTime() - 28 * 86_400_000)
-  const from28dIso  = toAestDay(from28dDate, tz)
-  const from7dIso   = toAestDay(new Date(todayMid.getTime() - 7 * 86_400_000), tz)
+  // Calendar-day arithmetic, not `todayMid - N×86_400_000`: across a DST change a local day is 23 or
+  // 25 hours, and the millisecond form lands on the wrong date (#2435 finalises and reads these).
+  const from28dIso  = shiftDateStr(todayIso, -28)
+  const from28dDate = dateStrMidnightInTz(from28dIso, tz)
+  const from7dIso   = shiftDateStr(todayIso, -7)
+  const tomorrowMid = dateStrMidnightInTz(shiftDateStr(todayIso, 1), tz)
 
   // Issue 2613: a failed lookup leaves the field out (unknown), never false.
   const connectedSourcesP = (async () => {
@@ -387,7 +392,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     repo.getWorkoutSessionsFrom(userId, from28dDate),
     repo.getOuraDaily(userId, from28dIso, todayIso),
     repo.getActiveProgram(userId),
-    repo.getHrForWindow(userId, todayMid, new Date(todayMid.getTime() + 86_400_000)),
+    repo.getHrForWindow(userId, todayMid, tomorrowMid),
     repo.getOuraDailySummary(userId, from28dIso, todayIso),
     repo.getOuraDailyDerived(userId, from7dIso, todayIso),
     repo.getLatestOuraCloudVitals(userId),
@@ -460,11 +465,8 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     ? Math.max(0, Math.min(30, Math.round(30 * (recentHrv / baselineHrv))))
     : 0
 
-  const rhrRows       = excludeLowWearDays(bodyMetrics.filter(m => m.restingHeartRate != null && m.restingHeartRate > 0), ouraByDate)
   const recentRhrRows = bodyMetrics.filter(m => m.date >= from7dIso && m.restingHeartRate != null && m.restingHeartRate > 0)
-  const baselineRhr   = rhrRows.length >= 5
-    ? rhrRows.reduce((s, m) => s + m.restingHeartRate!, 0) / rhrRows.length
-    : null
+  const baselineRhr   = restingHrBaseline(bodyMetrics, ouraByDate)
   const recentRhr = recentRhrRows.length
     ? recentRhrRows.reduce((s, m) => s + m.restingHeartRate!, 0) / recentRhrRows.length
     : null
@@ -475,76 +477,36 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // TN-13 — the latest single night, which is a different question from the 7-day mean above.
   const lastNightRhrRow = latestRestingHrRow(recentRhrRows)
 
-  const load = computeVolumeAcwr(
-    recentSessions.map(ws => ({ startedAt: ws.startedAt, volumeKg: ws.exercises.reduce((s2, ex) => s2 + (ex.volume ?? 0), 0) })),
-    todayMid,
-    { tz },
-  )
-  const todayWorkoutVolumeKg = load.todayVolumeKg
-
-  // Skip ACWR for the first 28 days of a new program — chronic load baseline not yet valid.
-  // Resolved here (ahead of the activity score) so the over-exertion taper can read it.
-  const acwr = acwrBaselineDaysRemaining(program, todayMid) > 0 ? null : load.acwr
-
-  // Goal-anchored Activity score (W-B) — scored against the user's personalised daily goals
-  // (single source: getDailyGoals) rather than their own trailing average. Two lanes: today's
-  // movement (steps/active-energy vs goals) + a rolling 7-day strength lane (so a rest day still
-  // scores off recent training). Over-exertion past the ACWR optimal band tapers the *displayed*
-  // score; readiness reads the PRE-taper goal-completion so load-fatigue isn't double-counted.
-  const latestWeightKg = [...bodyMetrics].reverse().find(m => m.weightKg != null && m.weightKg > 0)?.weightKg ?? null
-  const ageYears = ageFromDob(userProfile?.dateOfBirth, todayMid)
-  const goals = getDailyGoals({
-    weightKg: latestWeightKg,
-    heightCm: userProfile?.heightCm ?? null,
-    ageYears,
-    sex: userProfile?.sex ?? null,
-    activityLevel: userProfile?.activityLevel ?? null,
+  // Goal-anchored Activity score (W-B), live for the day in progress. Scored by the same function
+  // that finalises a finished day (#2435), so today's ring and tomorrow's stored value can't drift.
+  // Over-exertion past the ACWR optimal band tapers the *displayed* score.
+  const hrProfile = await hrProfileP
+  const activityToday = scoreActivityForDay({
+    date: todayIso,
+    tz,
+    bodyMetrics,
+    restingHrBaseline: baselineRhr,
+    hrRows: todayHrRows,
+    maxHr: hrProfile?.maxHr ?? null,
+    sessions: recentSessions,
+    program,
+    user: userProfile,
     stepsGoal: userGoals?.stepsGoal ?? null,
   })
-  // Rolling 7-day strength window (inclusive of today).
-  const sessions7dRows = recentSessions.filter(ws => new Date(ws.startedAt).getTime() >= todayMid.getTime() - 7 * 86_400_000)
-  const sessions7d = sessions7dRows.length
-  const strengthSessionToday = recentSessions.some(ws => new Date(ws.startedAt).getTime() >= todayMid.getTime())
-  const volume7dKg = sessions7dRows.reduce((s, ws) => s + ws.exercises.reduce((s2, ex) => s2 + (ex.volume ?? 0), 0), 0)
+  const { result: activityResult, goals, load, acwr } = activityToday
+  const { sessions7d, volume7dKg } = activityToday.signals
+  const todayWorkoutVolumeKg = load.todayVolumeKg
   const recentDoseList = recentDoses(doseEvents, todayIso)
-  const todayMetrics = bodyMetrics.find(m => m.date === todayIso) ?? null
-
-  // Zone-minutes + move-every-hour, from the SAME intraday HR series already fetched above for
-  // hrCurrent/hrMin/hrMax/hrAvg (todayHrRows) — this doesn't need any new data pipeline, only a
-  // resting-HR + max-HR profile to derive zones from (same Karvonen basis Body Battery already uses).
-  // #2437: a sparse Health Connect hour is missing, not low (`intradayHrContributors`).
-  let zoneMinutesToday: number | null = null
-  let movedHoursToday: number | null = null
-  let moveGoalToday: number | null = null
-  if (baselineRhr != null && todayHrRows.length > 0) {
-    const maxHr = (await hrProfileP)?.maxHr ?? hrMaxFromAge(ageYears)
-    const c = intradayHrContributors({ hrRows: todayHrRows, maxHr, restingHr: baselineRhr, tz, dateIso: todayIso })
-    zoneMinutesToday = c.zoneMinutes
-    movedHoursToday = c.moveHours
-    moveGoalToday = c.moveHoursGoal
-  }
-
-  const activityResult = computeActivityScore({
-    steps: todayMetrics?.steps ?? null,
-    activeCalories: todayMetrics?.activeCalories ?? null,
-    zoneMinutes: zoneMinutesToday,
-    moveHours: movedHoursToday,
-    moveHoursGoal: moveGoalToday,
-    strengthSessionToday,
-    sessions7d,
-    volume7dKg,
-    goals,
-    acwr,
-  })
-  const ownActivityScore = activityResult?.preTaperScore ?? null // pre-taper → readiness composite (no double-count)
+  const ownActivityScore = activityResult?.preTaperScore ?? null // pre-taper: today's, for availability
   const activityDisplayScore = activityResult?.score ?? null      // tapered → the card / display
 
   // Yesterday's own activity score — feeds the A4 composite's "Prev-Day Activity" contributor.
-  const yesterdayIso = toAestDay(new Date(todayMid.getTime() - 86_400_000), tz)
+  const yesterdayIso = shiftDateStr(todayIso, -1)
+  const yesterdayMid = dateStrMidnightInTz(yesterdayIso, tz)
   const yesterdayMetrics = bodyMetrics.find(m => m.date === yesterdayIso) ?? null
   // TN-77(a): yesterday's contributor gets YESTERDAY's strength window. It used to be handed
   // today's, so on a training day the "previous day" score reacted to this morning's session.
-  const prevWindow = strengthWindowEndingAt(recentSessions, todayMid.getTime() - 86_400_000)
+  const prevWindow = strengthWindowEndingAt(recentSessions, yesterdayMid.getTime())
   const prevDayActivityScore = (yesterdayMetrics || prevWindow.sessions7d > 0) ? (computeActivityScore({
     steps: yesterdayMetrics?.steps ?? null,
     activeCalories: yesterdayMetrics?.activeCalories ?? null,
@@ -552,6 +514,43 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     volume7dKg: prevWindow.volume7dKg,
     goals,
   })?.preTaperScore ?? null) : null
+
+  // #2435: readiness's activity-balance input is the previous COMPLETED day's Activity score, read
+  // pre-taper so load fatigue isn't counted twice. It used to read today's partial score, so a
+  // morning readiness saw a near-empty day's movement. A finished day is scored once over the whole
+  // day and stamped final; yesterday is finalised here first if no read has done it yet, and any
+  // older day in the look-back still holding a partial value is finalised behind the read.
+  const nowDate = new Date()
+  const activityStamps = new Map(derivedTodayRows.map(r => [r.day, activityFinalisedAt(r.activityContributors)]))
+  const staleActivityDays = staleFinishedDays(todayIso, tz, activityStamps, ACTIVITY_FINALISE_DAYS, activityFinalGrace(nowDate))
+  const maxHrOption = { maxHr: hrProfile?.maxHr ?? null }
+  const reportFinalise = (day: string, stage: 'scoring' | 'storing') => (err: unknown) =>
+    reportServerError(new Error(`[readiness-score] ${stage} activity for ${day} failed — read still served`, { cause: err }), { userId })
+  // Yesterday with no stamp at all has no usable stored value (a pre-#2435 row is a partial day), so
+  // the read waits for it. Yesterday inside its grace has a stored value: the read uses it and the
+  // re-score runs behind it. Scoring and storing are separate steps, so a failed write still hands
+  // readiness the value that was scored.
+  let prevCompletedDayActivityScore = finalisedPreTaper(derivedTodayRows.find(r => r.day === yesterdayIso)?.activityContributors)
+  let backgroundActivityDays = staleActivityDays
+  if (activityStamps.get(yesterdayIso) == null) {
+    backgroundActivityDays = staleActivityDays.filter(d => d !== yesterdayIso)
+    const scored = await scoreFinishedActivityDay(repo, userId, tz, yesterdayIso, nowDate, maxHrOption)
+      .catch(err => { reportFinalise(yesterdayIso, 'scoring')(err); return null })
+    if (scored) {
+      prevCompletedDayActivityScore = scored.result?.preTaperScore ?? null
+      await storeFinishedActivityDay(repo, userId, yesterdayIso, scored, nowDate).catch(reportFinalise(yesterdayIso, 'storing'))
+    }
+  }
+  if (backgroundActivityDays.length > 0) {
+    // One at a time and fire-and-forget, like the training-load re-check (#2400): the read never
+    // waits on it and a first visit after a week away does not open seven at once.
+    void (async () => {
+      for (const day of backgroundActivityDays) {
+        const scored = await scoreFinishedActivityDay(repo, userId, tz, day, nowDate, maxHrOption).catch(reportFinalise(day, 'scoring'))
+        if (scored) await storeFinishedActivityDay(repo, userId, day, scored, nowDate).catch(reportFinalise(day, 'storing'))
+      }
+    })()
+  }
 
   // Q-284 — our own Activity Score, always. `blendActivityScore` used to adjust an Oura Cloud
   // activity score on the days one existed; it is deleted, because no such day can occur again.
@@ -641,7 +640,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
         sleepBalanceZ: trailingBaselineZ(genericSleepMinSeries),
         previousNightScore: sleepScore100,
         prevDayActivityScore,
-        activityBalanceScore: ownActivityScore,
+        activityBalanceScore: prevCompletedDayActivityScore,
         nHistory: genericNHistory,
       })
     : null
@@ -654,7 +653,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
       ? baselineZ(priorSummary.sleepBaseline, Math.round(latestSummary.sleepDurationHours * 60)) : null,
     previousNightScore: sleepScore100,
     prevDayActivityScore,
-    activityBalanceScore: ownActivityScore,
+    activityBalanceScore: prevCompletedDayActivityScore,
     nHistory: latestSummary.nHistory,
     recoveryIndexHours: latestSummary.recoveryIndexHours,
   }) : genericComposite
@@ -840,53 +839,10 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     } })
   }
 
-  // Persist the Activity Score (Q-7). It was computed here on every call and then discarded, while
-  // /api/health/trends fell back to oura_daily.activity_score — NULL every day since the 2026-07-07
-  // re-key, because the Cloud stopped scoring. So Activity Score v2 shipped with zero history.
-  //
-  // Written server-side rather than left for the device: the value is already computed here, and
-  // oura_daily_derived.activity_score is a COALESCE column, so the on-device rollup's own push (when
-  // that lands — Phase-1 Task 5 → Phase-2 Task A2) fills or overwrites the same field without
-  // conflict. Persisting now costs no future device work and stops discarding a number we compute.
-  //
-  // Same posture as the two blocks above: today's date key (matching how the trends route reads it),
-  // only the activity_* columns — never the shared source/model_versions, which the upsert replaces
-  // wholesale — and best-effort, so a persist failure never fails the read.
-  if (activityBlend.final != null) {
-    derivedPersists.push({ day: todayIso, pillar: 'activity', patch: {
-      activityScore: Math.round(activityBlend.final),
-      // Q-526 — the six component sub-scores go in beside the blend wrapper, because the wrapper
-      // alone cannot answer what the score was made of.
-      //
-      // `components` is already in memory on this request (the same object is served to the client
-      // as `activityContributors`); it was simply never written. Without it, asking "what did
-      // strengthFreq score on 2026-08-02?" means rebuilding every contributor from raw inputs at
-      // TODAY's goals — and `strengthFreqGoal` went 3 → 5 and the volume target changed basis on
-      // 2026-08-11, so the answer is not recoverable. Sleep, readiness and illness all store their
-      // breakdown; activity was the only score that did not. Measured 2026-08-26: all 30 rows
-      // carrying this column hold `{base, adjustment, trained}` and not one component key.
-      //
-      // The wrapper stays — the entry asks for a merge, not a replacement, and `trained` is the one
-      // bit the components cannot re-derive. Worth knowing what the other two are currently worth:
-      // on all 30 rows `adjustment` is 0 and `base` equals `activity_score`, because the blend only
-      // adjusts an Oura *Cloud* activity score and no such row has existed since the BLE re-key.
-      // They are kept for the pre-re-key shape and for any reader, not because they carry anything
-      // today.
-      //
-      // `preTaper` and `acwr` are what make the stored score re-derivable rather than merely
-      // itemised: the components reproduce `preTaper` under the model's weights renormalised over
-      // whichever keys are present, and `acwr` is the taper's only input, so
-      // `score = round(preTaper × (1 − taper(acwr)))` closes the loop from the row alone.
-      activityContributors: {
-        ...(activityResult?.components ?? {}),
-        preTaper: activityResult?.preTaperScore ?? null,
-        acwr: acwr ?? null,
-        base: activityBlend.base,
-        adjustment: activityBlend.adjustment,
-        trained: activityBlend.trained ? 1 : 0,
-      },
-    } })
-  }
+  // The Activity score is NOT persisted here (#2435). Q-7 stored it on every read keyed on today,
+  // so each day's stored score was its in-progress value at the last app open (moveHours 0, 7, 0 on
+  // three consecutive days). Today's value is live-only; a day is stored once it has ended, by
+  // `scoreFinishedActivityDay` and `storeFinishedActivityDay` above, with the same contributor breakdown Q-526 added.
 
   // Best-effort exactly as before: a persist failure must never fail the read, and each day's group
   // is independent of the others. The log names the pillars in the group rather than a single
@@ -974,11 +930,11 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     // as sleepContributors above) — this is what powers the Activity detail screen's contributor
     // chart + "how to improve" guide, which was silently empty while Oura's field stayed null.
     activityContributors:    ouraToday?.activityContributors ?? activityResult?.components ?? null,
-    activityGoals:           activityResult ? { ...goals, moveHoursGoal: moveGoalToday } : null,
+    activityGoals:           activityResult ? { ...goals, moveHoursGoal: activityToday.signals.moveHoursGoal } : null,
     activitySignals:         activityResult
       ? {
-          steps: todayMetrics?.steps ?? null, activeCalories: todayMetrics?.activeCalories ?? null,
-          zoneMinutes: zoneMinutesToday, moveHours: movedHoursToday,
+          steps: activityToday.signals.steps, activeCalories: activityToday.signals.activeCalories,
+          zoneMinutes: activityToday.signals.zoneMinutes, moveHours: activityToday.signals.moveHours,
           sessions7d, volume7dKg,
         }
       : null,

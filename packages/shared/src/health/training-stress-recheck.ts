@@ -1,4 +1,4 @@
-import { dateStrMidnightInTz, shiftDateStr } from '../date-utils'
+import { staleFinishedDays } from './finished-day-recheck'
 
 /** How many finished days back a read of today looks for a verdict still taken mid-day. */
 export const TRAINING_STRESS_RECHECK_DAYS = 7
@@ -16,12 +16,5 @@ export function staleTrainingStressDays(
   tz: string,
   evaluatedAtByDay: ReadonlyMap<string, Date | null>,
 ): string[] {
-  const stale: string[] = []
-  for (let back = TRAINING_STRESS_RECHECK_DAYS; back >= 1; back--) {
-    const day = shiftDateStr(today, -back)
-    const dayEnd = dateStrMidnightInTz(shiftDateStr(day, 1), tz)
-    const evaluatedAt = evaluatedAtByDay.get(day) ?? null
-    if (evaluatedAt == null || evaluatedAt < dayEnd) stale.push(day)
-  }
-  return stale
+  return staleFinishedDays(today, tz, evaluatedAtByDay, TRAINING_STRESS_RECHECK_DAYS)
 }

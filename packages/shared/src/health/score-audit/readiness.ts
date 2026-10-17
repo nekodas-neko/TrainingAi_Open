@@ -19,8 +19,9 @@ export interface ReadinessAuditInput {
   priorSummary: OuraDailySummaryRow | null
   /** Our own sleep score for the night ending on `date`. */
   sleepScore: number | null
-  /** Our own PRE-taper activity score for `date` and for the day before. */
+  /** The activity-balance input: the previous completed day's finalised PRE-taper score (#2435). */
   activityScore: number | null
+  /** The prev-day contributor: the day before, scored on steps, energy and its strength window. */
   prevDayActivityScore: number | null
   ouraDaily: OuraDailyRow | null
   derived: OuraDailyDerivedRow | null
@@ -153,10 +154,10 @@ export function buildReadinessAudit(input: ReadinessAuditInput): PillarAudit {
       excludedReason: 'no overnight HR series → neutral 50',
     },
     {
-      key: 'activityBalance', label: "Today's activity (pre-taper)",
-      input: { value: activityScore, unit: '0-100', source: 'computeActivityScore pre-taper (see the Activity pillar)' },
+      key: 'activityBalance', label: "Previous completed day's activity (pre-taper)",
+      input: { value: activityScore, unit: '0-100', source: "the previous day's finalised Activity score, pre-taper (#2435)" },
       subScore: c.activityBalance.score, provisional: c.activityBalance.provisional,
-      excludedReason: 'nothing scoreable for today → neutral 50',
+      excludedReason: 'nothing scoreable for the previous day → neutral 50',
     },
   ] satisfies (ContributorSpec & { subScore: number; provisional: boolean })[]) : []
 
