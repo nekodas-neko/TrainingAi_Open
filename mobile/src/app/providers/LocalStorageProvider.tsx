@@ -74,7 +74,7 @@ export function LocalStorageProvider({ children }: PropsWithChildren) {
               ? reason.message
               : reason instanceof Error &&
                   /Cannot find native module.*ExpoSQLite/.test(reason.message)
-                ? 'Install the latest iPhone development build to enable local storage.'
+                ? 'Install the latest development build to enable local storage.'
                 : 'Your saved data could not be opened. Retry after unlocking your phone. Existing data has not been cleared.';
           setError(message);
         },

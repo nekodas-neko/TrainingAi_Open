@@ -186,6 +186,13 @@ export const domainTones = {
     },
   },
 };
+// Friends feed and leaderboard glyphs: a gold trophy and a purple trending arrow. Dark values are
+// the current app's (Tailwind yellow-400, purple-400); the light ones are darker steps, each at
+// least 4.5:1 on #ffffff.
+export const friendColors = {
+  light: { gold: '#a16207', purple: '#7e22ce' },
+  dark: { gold: '#facc15', purple: '#c084fc' },
+};
 // Health > Progress. Dark values are the current app's; the light ones are darker steps that keep
 // 10 px text and thin fills readable on a white card (each at least 4.5:1 on #ffffff).
 export const progressColors = {

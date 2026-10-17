@@ -45,6 +45,7 @@ const stats = z
   .passthrough();
 export function MoreScreen({
   openSettings,
+  openAccount,
   openPrograms,
   openClinical,
   openGoals,
@@ -57,6 +58,7 @@ export function MoreScreen({
   openFriendProfile,
 }: {
   openSettings: () => void;
+  openAccount: () => void;
   openPrograms: () => void;
   openClinical: () => void;
   openGoals: () => void;
@@ -292,21 +294,12 @@ export function MoreScreen({
                   />
                 )}
               </Stack>
-              <Section title="Feedback">
-                <ListRow
-                  density="compact"
-                  title="Feedback & requests"
-                  leading={<Icon name="coach" />}
-                  onPress={() => setModal('feedback')}
-                  divider={false}
-                />
-              </Section>
               <Section title="Account">
                 <ListRow
                   density="compact"
                   title="Account & sign-in settings"
                   leading={<Icon name="users" />}
-                  onPress={openSettings}
+                  onPress={openAccount}
                 />
                 <ListRow
                   density="compact"

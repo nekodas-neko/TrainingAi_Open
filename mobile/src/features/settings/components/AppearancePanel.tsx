@@ -60,7 +60,7 @@ export function AppearancePanel() {
         <AppText variant="caption" tone="muted" accessibilityLiveRegion="polite">
           {saveStatus === 'saving'
             ? 'Saving preferences…'
-            : 'Preferences are saved on this iPhone.'}
+            : 'Preferences are saved on this phone.'}
         </AppText>
       )}
     </Card>

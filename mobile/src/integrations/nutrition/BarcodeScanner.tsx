@@ -18,7 +18,7 @@ export function BarcodeScanner({ onCode }: { onCode: (code: string) => void }) {
     >
       {Platform.OS === 'web' ? (
         <AppText tone="muted">
-          Use camera scanning on the iPhone, or enter a barcode below.
+          Use camera scanning on the phone, or enter a barcode below.
         </AppText>
       ) : permission?.granted ? (
         <CameraView

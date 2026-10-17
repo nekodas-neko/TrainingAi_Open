@@ -130,6 +130,8 @@ test('progress and training colours stay readable on the card in both themes', (
       theme.progress.trendUp,
       theme.progress.trendDown,
       ...Object.values(theme.progress.goals),
+      theme.friends.gold,
+      theme.friends.purple,
       theme.training.activity,
       theme.training.movement,
       ...Object.values(theme.training.phases),

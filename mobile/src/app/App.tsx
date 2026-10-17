@@ -45,6 +45,7 @@ import { ClinicalScreen } from '../features/health/screens/ClinicalScreen';
 import { HealthDayScreen } from '../features/health/screens/HealthDayScreen';
 import { HealthWeekScreen } from '../features/health/screens/HealthWeekScreen';
 import { DataSyncScreen } from '../features/settings/screens/DataSyncScreen';
+import { AccountScreen } from '../features/settings/screens/AccountScreen';
 import { AboutScreen } from '../features/settings/screens/AboutScreen';
 import { OuraScreen, takeInitialOuraReturn } from '../features/devices/screens/OuraScreen';
 import { YearReviewScreen } from '../features/settings/screens/YearReviewScreen';
@@ -304,6 +305,7 @@ function AppShell() {
             setDetail('friend-profile');
           }}
           openSettings={() => setDetail('settings')}
+          openAccount={() => setDetail('more-account')}
           openPrograms={() => setDetail('programs')}
           openClinical={() => {
             setProfileReturn(false);
@@ -383,6 +385,8 @@ function AppShell() {
         <DataSyncScreen onBack={() => setDetail(null)} />
       ) : detail === 'more-about' ? (
         <AboutScreen onBack={() => setDetail(null)} />
+      ) : detail === 'more-account' ? (
+        <AccountScreen onBack={() => setDetail(null)} />
       ) : detail === 'more-devices' ? (
         <OuraScreen initialReturn={ouraReturn} onBack={() => setDetail(null)} />
       ) : detail === 'year-review' ? (
@@ -446,6 +450,10 @@ function AppShell() {
           openBaselines={() => {
             setProfileReturn(true);
             setDetail('fitness-baselines');
+          }}
+          openHealthBody={() => {
+            selectTab('Health');
+            setHealthPanel('body');
           }}
         />
       ) : detail === 'clinical' ? (

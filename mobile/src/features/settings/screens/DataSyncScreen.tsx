@@ -17,13 +17,16 @@ import { useAppleImport } from '../../health/HealthProvider';
 import { shareAccountExport } from '../../../integrations/sharing/account-export';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { deviceHealthName } from '../../../integrations/device-health/platform';
+// The shortest "how far back" choice is the current app's 30-day import window
+// (`HISTORY_WINDOW_DAYS` in `lib/health-connect-history-import.ts`).
+const HISTORY_WINDOW_DAYS = 30;
 export function DataSyncScreen({ onBack }: { onBack: () => void }) {
   const actions = useNativeDataActions(),
     account = useAccountContext(),
     health = useAppleImport(),
     { theme } = useTheme();
   const [restore, setRestore] = useState(false),
-    [days, setDays] = useState('35'),
+    [days, setDays] = useState('30'),
     [busy, setBusy] = useState(false),
     [error, setError] = useState<string | null>(null);
   async function exportData() {
@@ -56,7 +59,10 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
       <TabPanel>
         <Stack style={{ paddingHorizontal: theme.spacing.lg }}>
           <Card>
-            <AppText variant="heading">Saved on this phone</AppText>
+            <AppText variant="heading">Sync now</AppText>
+            <AppText variant="caption" tone="muted">
+              Pull latest data from server
+            </AppText>
             <AppText>
               {actions.pending
                 ? `${plural(actions.pending, 'change', 'changes')} waiting to upload`
@@ -72,8 +78,8 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
           <Card>
             <AppText variant="heading">Restore from cloud</AppText>
             <AppText variant="caption" tone="muted">
-              Refresh saved account records without removing unfinished workouts or pending
-              edits. Older history loads when opened.
+              Older history loads when opened. Your unsent changes and unfinished workouts
+              are kept.
             </AppText>
             <AppButton
               title="Restore from cloud"
@@ -96,12 +102,15 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
             />
           )}
           <Card>
-            <AppText variant="heading">Import more {deviceHealthName} history</AppText>
+            <AppText variant="heading">Import more history</AppText>
+            <AppText variant="caption" tone="muted">
+              Pull older {deviceHealthName} data. Choose how far back to read
+            </AppText>
             <Picker
-              label="History to read"
+              label="How far back to read"
               value={days}
               options={[
-                { value: '35', label: '35 days' },
+                { value: '30', label: `${HISTORY_WINDOW_DAYS} days` },
                 { value: '90', label: '90 days' },
                 { value: '180', label: '180 days' },
               ]}
@@ -131,8 +140,7 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
           <Card>
             <AppText variant="heading">Export my data</AppText>
             <AppText variant="caption" tone="muted">
-              Download your server records as a complete NDJSON file and choose where to save
-              it.
+              Download everything as a single file, and choose where to save it.
             </AppText>
             <AppButton
               title="Export my data"

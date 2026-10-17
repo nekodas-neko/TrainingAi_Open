@@ -20,6 +20,7 @@ import {
   homeCardColors,
   effortColors,
   progressColors,
+  friendColors,
   trainingColors,
   type TextVariant,
 } from './tokens.ts';
@@ -66,6 +67,7 @@ export type Theme = {
   sleepStages: typeof STAGE_COLOR;
   hrZoneColors: string[];
   progress: typeof progressColors.light;
+  friends: typeof friendColors.light;
   training: Omit<typeof trainingColors.light, 'phases'> & {
     phases: Record<'baseline' | keyof typeof trainingColors.light.phases, string>;
   };
@@ -149,6 +151,7 @@ export function createTheme(
     effort: { ...effortColors, ...overrides.effort },
     sleepStages: { ...STAGE_COLOR, ...overrides.sleepStages },
     hrZoneColors: overrides.hrZoneColors ?? HR_ZONE_META.map((zone) => zone.color),
+    friends: friendColors[mode],
     progress: {
       ...progressColors[mode],
       ...overrides.progress,

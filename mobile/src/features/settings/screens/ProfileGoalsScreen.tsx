@@ -1,4 +1,4 @@
-import { FITNESS_GOALS } from '@trainingai/shared/types/user';
+import { ACTIVITY_LEVELS, FITNESS_GOALS } from '@trainingai/shared/types/user';
 import { goalBoundSchema } from '@trainingai/shared/validation/goal-bounds';
 import { useState } from 'react';
 import { z } from 'zod';
@@ -203,8 +203,22 @@ function ProfileGoalsForm({
       await resources!.write(
         'PATCH',
         '/api/user/profile',
-        { fitnessGoal: f.profile.fitnessGoal || null },
-        ['/api/user/profile', '/api/nutrition'],
+        {
+          fitnessGoal: f.profile.fitnessGoal || null,
+          // Sent only when it differs from the server's current value, so an unchanged field is
+          // not re-sent. A draft that differs from a newer server value is still sent.
+          ...((f.profile.activityLevel ?? '') !== (user.activityLevel ?? '')
+            ? { activityLevel: f.profile.activityLevel || null }
+            : {}),
+        },
+        [
+          '/api/user/profile',
+          '/api/nutrition',
+          // Activity level feeds the readiness payload's daily goals, as on Profile details.
+          ...((f.profile.activityLevel ?? '') !== (user.activityLevel ?? '')
+            ? ['/api/hr-profile', '/api/readiness', '/api/body-battery']
+            : []),
+        ],
       );
       await resources!.clearDraft('profile-goals');
       setError(null);
@@ -224,7 +238,7 @@ function ProfileGoalsForm({
           <AppText variant="heading">{user.displayName ?? 'Your profile'}</AppText>
           <ListRow
             title="Edit profile"
-            subtitle="Height, date of birth, sex and activity level"
+            subtitle="Name, birth year, height, sex and timezone"
             onPress={openProfile}
           />
         </Card>
@@ -241,6 +255,15 @@ function ProfileGoalsForm({
               ...FITNESS_GOALS.map((v) => ({ value: v, label: v.replaceAll('_', ' ') })),
             ]}
             onChange={(value) => setProfile('fitnessGoal', value)}
+          />
+          <Picker
+            label="Activity level"
+            value={f.profile.activityLevel}
+            options={[
+              { value: '', label: 'Not set' },
+              ...ACTIVITY_LEVELS.map((v) => ({ value: v, label: v.replaceAll('_', ' ') })),
+            ]}
+            onChange={(value) => setProfile('activityLevel', value)}
           />
           {[
             ['stepsGoal', 'Steps'],
