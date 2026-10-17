@@ -3,7 +3,7 @@ import { google } from '@ai-sdk/google'
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { COACH_MODEL_ID, coachModel, loggedStreamText } from '@/lib/ai/instrument'
-import { aiPausedResponse } from '@/lib/ai/provider-paused'
+import { aiPausedResponse, aiStreamErrorText } from '@/lib/ai/provider-paused'
 import { PROSE_GUARDS } from '@/lib/ai/prompt-guards'
 import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
@@ -296,7 +296,10 @@ export async function POST(req: Request) {
       },
     )
 
-    return result.toUIMessageStreamResponse()
+    // Issue 2890: the SDK masks a mid-stream error part, so a depleted balance would read as a generic
+    // failure. `streamText` does not throw, so there is no 503 to answer: the provider is first called
+    // after the response has opened.
+    return result.toUIMessageStreamResponse({ onError: aiStreamErrorText })
   } catch (error) {
     errorLog(error, 'API /coach')
     return aiPausedResponse(error) ?? NextResponse.json({ error: 'Coach failed' }, { status: 500 })

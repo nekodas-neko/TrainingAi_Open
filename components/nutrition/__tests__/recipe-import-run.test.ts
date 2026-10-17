@@ -120,3 +120,18 @@ describe('runRecipeImport', () => {
     expect(body).toEqual({ image: 'b64', mimeType: 'image/png', imageKind: 'recipe' })
   })
 })
+
+describe('runRecipeImport when the AI balance is empty (issue 2890)', () => {
+  it('returns the server sentence instead of reading as an empty import', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(
+      JSON.stringify({ error: 'AI features are paused right now.', code: 'ai_paused' }), { status: 503 }))))
+    const out = await runRecipeImport({ url: 'https://x.test/r' }, 'x.test')
+    expect(out).toEqual({ kind: 'paused', message: 'AI features are paused right now.' })
+  })
+
+  it('keeps an ordinary 503 as an empty import', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response('{"error":"down"}', { status: 503 }))))
+    expect((await runRecipeImport({ text: 'x' }, 'x')).kind).toBe('empty')
+  })
+})
+

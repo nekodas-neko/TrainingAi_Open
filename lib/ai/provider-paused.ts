@@ -53,7 +53,10 @@ export function isAiBillingError(err: unknown): boolean {
         if (BILLING_TEXT.test(`${e.message} ${e.responseBody}`)) return true
       }
     }
-    cur = (cur as { cause?: unknown }).cause
+    // The SDK's retry wrapper (`AI_RetryError`) keeps the provider error in `lastError`, not `cause`.
+    // A stream that exhausted its retries on a billing refusal reaches `onError` in that wrapper.
+    const wrapped = cur as { cause?: unknown; lastError?: unknown }
+    cur = wrapped.cause ?? wrapped.lastError
   }
   return false
 }
@@ -68,6 +71,16 @@ export function isAiBillingError(err: unknown): boolean {
 export function aiPausedResponse(err: unknown): NextResponse | null {
   if (!isAiBillingError(err)) return null
   return NextResponse.json({ error: AI_PAUSED_MESSAGE, code: AI_PAUSED_CODE }, { status: 503 })
+}
+
+/**
+ * The text of a stream's error part, for `toUIMessageStreamResponse({ onError })`. The SDK masks it
+ * by default, so a billing refusal after the stream opened read as "Something went wrong". Only the
+ * fixed paused sentence or the SDK's own generic line goes out, never the provider's message, which
+ * can carry account detail.
+ */
+export function aiStreamErrorText(err: unknown): string {
+  return isAiBillingError(err) ? AI_PAUSED_MESSAGE : 'An error occurred.'
 }
 
 export const AI_PAUSED_SIGNAL_PREFIX = 'ai_provider_paused'

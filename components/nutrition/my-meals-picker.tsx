@@ -9,6 +9,7 @@ import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { perServing, sumIngredients } from '@trainingai/shared/nutrition/scan-totals'
 import { asHttpsUrl, hostOf } from './recipe-url'
+import { lookupTypedMeal } from './my-meals-lookup'
 import type { SavedMeal, NutritionIngredient } from '@trainingai/shared/types/nutrition'
 
 /**
@@ -81,6 +82,7 @@ export function MyMealsPicker({
 }: Props) {
   const [meals, setMeals] = useState<SavedMeal[] | null>(null)
   const [draftText, setDraftText] = useState('')
+  const [pausedNotice, setPausedNotice] = useState<string | null>(null)
 
   useEffect(() => {
     // Cache-seeded so a repeat visit paints the library immediately rather than flashing a spinner.
@@ -126,28 +128,9 @@ export function MyMealsPicker({
 
     // The food scan's text mode, reused rather than duplicated — it already returns the exact
     // ingredient shape the plan's portion scaler works in.
-    let resolved: TypedMeal
-    try {
-      const res = await fetch('/api/nutrition/scan', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(url ? { url } : { text }),
-      })
-      const body = res.ok ? await res.json() : null
-      const ingredients: NutritionIngredient[] = Array.isArray(body?.ingredients) ? body.ingredients : []
-      resolved = ingredients.length > 0
-        ? {
-            text, name: body.name || pending.name, ingredients, looking: false, failed: false,
-            // A recipe with no stated yield is the whole batch, so it cannot be kept until the user
-            // says how many it serves — keeping it would put a tray in one meal slot.
-            keep: !atLimit && !(url && body.recipeYield == null),
-            sourceUrl: body.sourceUrl ?? url ?? undefined,
-            recipeYield: url ? (body.recipeYield ?? null) : undefined,
-          }
-        : { ...pending, looking: false, failed: true }
-    } catch {
-      resolved = { ...pending, looking: false, failed: true }
-    }
+    const { meal: resolved, paused } = await lookupTypedMeal(pending, url, atLimit)
+    // One sentence for the batch, not one per row; a later lookup that works clears it.
+    setPausedNotice(paused)
     // Rebuilt from the caller's latest list rather than `next` — the user may have added or removed
     // another row while this was in flight.
     onChangeTyped(replaceByText(next, text, resolved))
@@ -246,6 +229,12 @@ export function MyMealsPicker({
             <span className="sr-only">Add this meal</span>
           </Button>
         </div>
+
+        {pausedNotice && (
+          <p role="alert" className="mt-2 rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-[11.5px] leading-snug text-destructive">
+            {pausedNotice}
+          </p>
+        )}
 
         {typedMeals.length > 0 && (
           <ul className="mt-2 space-y-2">
