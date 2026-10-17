@@ -1,7 +1,7 @@
 import { formatDateDisplay, formatTime12h } from '@trainingai/shared/date-utils';
 import { formatActivityTitle } from '@trainingai/shared/format/activity-title';
 import { plural } from '@trainingai/shared/format/plural';
-import { PHASE_LABELS, lastTrainedLabel } from '@trainingai/shared/ai-periodization/status-labels';
+import { phaseLabel, lastTrainedLabel } from '@trainingai/shared/ai-periodization/status-labels';
 import { PATTERN_LABEL, movementBalance } from '@trainingai/shared/health/movement-balance';
 import { seriesShape } from '@trainingai/shared/health/series-gaps';
 
@@ -71,7 +71,7 @@ export function periodizationRow(session: {
     ? 'No data'
     : phase === 'baseline' && !state.baselineComplete
       ? 'Baseline needed'
-      : `${PHASE_LABELS[phase] ?? phase} · ${plural(state.sessionsInPhase ?? 0, 'session', 'sessions')}`;
+      : `${phaseLabel(phase)} · ${plural(state.sessionsInPhase ?? 0, 'session', 'sessions')}`;
   return {
     phase,
     label,

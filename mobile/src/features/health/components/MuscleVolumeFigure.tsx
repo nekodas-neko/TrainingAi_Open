@@ -30,7 +30,7 @@ export function MuscleVolumeFigure({
   // MuscleMap compares its assignments by content, so a fresh array does not repaint the figure.
   const assignments = rows
     .filter((row) => row.sets > 0)
-    .map((row) => ({ muscle: row.muscle, role: 'main' as const, color: row.color }));
+    .map((row) => ({ muscle: row.muscle, color: row.color }));
   return (
     <>
       <AppText variant="caption" tone="muted" style={{ textAlign: 'right' }}>

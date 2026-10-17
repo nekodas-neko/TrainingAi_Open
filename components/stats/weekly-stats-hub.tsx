@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import type { WeeklyStatsResponse } from "@/app/api/weekly-stats/route";
 import { formatMinutes } from '@trainingai/shared/format/units'
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
-import { getPaletteEntry } from "@trainingai/shared/session-palette";
+import { getPaletteEntry, sessionPaletteIndex } from "@trainingai/shared/session-palette";
 import type { ProgramSession } from "@trainingai/shared/types/program";
 import { shortSessionName } from "@trainingai/shared/utils";
 import { todayInTz } from "@trainingai/shared/date-utils";
@@ -61,8 +61,6 @@ export function WeeklyStatsHub({ data, loading, sessions = [], error, onRetry }:
 
   if (!data) return null;
 
-  // name (lowercase) → palette position
-  const nameToPos = new Map(sessions.map(s => [s.name.toLowerCase(), s.position]));
   const todayKey = todayInTz(tz).replace(/-/g, "/");
 
   // Deload days now draw from `deloadVolume`, so they have to scale against it too — otherwise a
@@ -114,10 +112,7 @@ export function WeeklyStatsHub({ data, loading, sessions = [], error, onRetry }:
                     <div className="w-full h-full bg-muted-foreground/20" />
                   ) : (
                     day.sessions.map((name) => {
-                      const pos = nameToPos.has(name.toLowerCase())
-                        ? nameToPos.get(name.toLowerCase())!
-                        : name.split("").reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 0);
-                      const { dotClass } = getPaletteEntry(pos);
+                      const { dotClass } = getPaletteEntry(sessionPaletteIndex(name, sessions));
                       return (
                         <div
                           key={name}

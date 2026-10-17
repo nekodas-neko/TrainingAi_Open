@@ -6,10 +6,11 @@ import { muscleGeometry } from '../assets/muscleGeometry';
 import { useTheme } from '../theme/ThemeProvider';
 import { Skeleton } from './Skeleton';
 
-// `color` paints the muscle that exact colour instead of its role's (a volume reading, not a status).
+// `color` paints the muscle that exact colour instead of its role's (a volume reading, not a status);
+// such an assignment carries no `role`, so a screen reader is not told one.
 export type MuscleActivation = {
   muscle: string;
-  role: 'main' | 'secondary' | 'injured';
+  role?: 'main' | 'secondary' | 'injured';
   color?: string;
 };
 const slugs: Record<string, string> = {
@@ -128,13 +129,13 @@ export const MuscleMap = memo(
     for (const assignment of assignments) {
       const slug = slugs[normalizeMuscle(assignment.muscle)];
       if (slug && (assignment.role !== 'secondary' || !colors.has(slug))) {
-        colors.set(slug, assignment.color ?? theme.anatomy[assignment.role]);
+        colors.set(slug, assignment.color ?? theme.anatomy[assignment.role ?? 'main']);
       }
     }
     return (
       <View
         accessible
-        accessibilityLabel={`Session muscles: ${assignments.map((item) => `${item.muscle}, ${item.role}`).join('; ') || 'unavailable'}`}
+        accessibilityLabel={`Session muscles: ${assignments.map((item) => (item.role ? `${item.muscle}, ${item.role}` : item.muscle)).join('; ') || 'unavailable'}`}
         style={{ flex: 1, minHeight: 0, flexDirection: 'row', gap: theme.spacing.lg }}
       >
         {(['front', 'back'] as const).map((side) => (

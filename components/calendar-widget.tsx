@@ -5,7 +5,7 @@ import { useDrag } from "@use-gesture/react";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { cn, shortSessionName } from "@trainingai/shared/utils";
 import { todayInTz } from "@trainingai/shared/date-utils";
-import { getPaletteEntry } from "@trainingai/shared/session-palette";
+import { getPaletteEntry, sessionPaletteIndex } from "@trainingai/shared/session-palette";
 import type { ProgramSession } from "@trainingai/shared/types/program";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { readLocalCalendarOverlay, mergeCalendarOverlay, EMPTY_OVERLAY, type CalendarData } from "@/lib/calendar/local-overlay";
@@ -17,13 +17,6 @@ const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
 
 // Module-level so the no-program fallback keeps one identity across renders.
 const EMPTY_SESSIONS: ProgramSession[] = [];
-
-// Stable color index for sessions not found in the active program (e.g. old ad-hoc entries)
-function stableIndex(name: string): number {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  return h;
-}
 
 interface CalendarWidgetProps {
   onDayClick?: (date: string, sessions: string[]) => void;
@@ -76,10 +69,7 @@ export function CalendarWidget({ onDayClick, userId }: CalendarWidgetProps) {
   );
 
   function getDotClass(sessionName: string): string {
-    const pos = nameToPos.has(sessionName.toLowerCase())
-      ? nameToPos.get(sessionName.toLowerCase())!
-      : stableIndex(sessionName);
-    return getPaletteEntry(pos).dotClass;
+    return getPaletteEntry(sessionPaletteIndex(sessionName, programSessions)).dotClass;
   }
 
   const goBack = () => {
