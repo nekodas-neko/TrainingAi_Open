@@ -123,7 +123,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   // disappear. Pending rows can't be in that payload by definition, so they merge at read time
   // and survive every refetch without weakening deletion propagation.
   const [pendingDays, setPendingDays] = useState<Record<string, string[]>>({});
-  const [refreshing, setRefreshing] = useState(false);
+  const [refreshing, setRefreshing] = useState(true); // true: a cold first frame is the skeleton, not sections an effect swaps for it (#2930)
   // Bumped after the `workout-data:all` batch seeds each `workout-card:<id>` cache entry — those
   // seeds are a side effect (setCached) outside React state, so RecommendationCard (memo'd) would
   // otherwise never re-render to pick up a "Last: —" card whose first paint landed before the
