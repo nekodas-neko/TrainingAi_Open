@@ -27,17 +27,22 @@ import { scoreFuel, type FuelParts, type ShadowContext, type ShadowScoreInput, t
 export interface ShadowRawHistory {
   tz: string
   ageYears: number | null
-  sleepSessions: readonly (AggregatableSleep & { date: string })[]
+  /** #2984: `durationSource`/`respiratoryRateSource` name the device, so each normal is per device. */
+  sleepSessions: readonly (AggregatableSleep & { date: string; durationSource?: string | null; respiratoryRateSource?: string | null })[]
   bodyMetrics: readonly {
     date: string
     hrvMs?: number | null
     restingHeartRate?: number | null
     steps?: number | null
     spo2Pct?: number | null
+    /** #2984: the device behind `hrvMs` / `restingHeartRate` (`source_map`). */
+    hrvSource?: string | null
+    restingHeartRateSource?: string | null
   }[]
   dailySummaries: readonly { date: string; recoveryIndexHours: number | null; tempDevC: number | null; breathAvgRpm: number | null }[]
-  /** `oura_daily` rows: wear, for low-wear exclusion, and Oura's `stress_high` (seconds). */
-  wear: readonly { date: string; nonWearTimeSec?: number | null; stressHigh?: number | null }[]
+  /** `oura_daily` rows: wear time for low-wear exclusion, Oura's own temperature deviation (#2984)
+   *  and its `stress_high` in seconds (#2985). */
+  wear: readonly { date: string; nonWearTimeSec?: number | null; temperatureDeviation?: number | null; stressHigh?: number | null }[]
   derived: readonly { day: string; stressHighMinutes: number | null }[]
   /** The local day the user switched to the Oura API (`getOuraCloudSwitchDay`), or null. */
   ouraCloudFrom?: string | null
@@ -78,6 +83,10 @@ export function deepRemSharePct(n: Pick<AggregatableSleep, 'deepSleepHours' | 'r
   return pct > 100 ? null : pct
 }
 
+/** The ring summary's label. Kept as the table name it has always carried, so the ring's existing
+ *  normals do not restart; only a different device's values get a different label. */
+const RING_SUMMARY_SRC = 'oura_daily_summary'
+
 function obs(date: string, value: number | null | undefined, source: string, rung: UnitObservation['rung'] = null): UnitObservation | null {
   return value == null || !Number.isFinite(value) ? null : { date, value, source, rung }
 }
@@ -94,7 +103,10 @@ function nightlySeries(
   route: 'night_hrv' | 'night_rhr',
   wearByDate: Map<string, { nonWearTimeSec?: number | null }>,
 ): UnitObservation[] {
-  const cands = nightlyCandidates(rows.map(r => ({ date: r.date, value: r[field] ?? null })), route, wearByDate, 'body_metrics')
+  // #2984: each value carries its device, so the scorer's per-source normal (edge case #11) splits
+  // an `oura_cloud` night from the ring's. A row from before provenance keeps the table label.
+  const sourceField = field === 'hrvMs' ? 'hrvSource' : 'restingHeartRateSource'
+  const cands = nightlyCandidates(rows.map(r => ({ date: r.date, value: r[field] ?? null, source: r[sourceField] ?? null })), route, wearByDate, 'body_metrics')
   const out: UnitObservation[] = []
   for (const r of resolveSlots(input, cands).values()) {
     if (r.missing) continue
@@ -116,13 +128,16 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
     if (n) nightByDate.set(d, n)
   }
   const nightList = [...nightByDate.entries()].sort(([a], [b]) => a.localeCompare(b))
-  const sleepSrc = 'sleep_sessions'
+  // #2984: a night is labelled by the device that measured it, so a switch of device restarts the
+  // sleep normals instead of mixing two devices' nights. A night from before provenance keeps the
+  // table label.
+  const sleepSrc = (n: { durationSource?: string | null }) => n.durationSource ?? 'sleep_sessions'
 
-  const duration = compact(nightList.map(([d, n]) => obs(d, n.durationHours, sleepSrc)))
+  const duration = compact(nightList.map(([d, n]) => obs(d, n.durationHours, sleepSrc(n))))
   const durationByDate = new Map(duration.map(o => [o.date, o.value]))
-  const balance = compact(nightList.map(([d]) => {
+  const balance = compact(nightList.map(([d, n]) => {
     const week = Array.from({ length: 7 }, (_, i) => durationByDate.get(shiftDateStr(d, -i))).filter((v): v is number => v != null)
-    return week.length >= 4 ? obs(d, week.reduce((a, b) => a + b, 0) / week.length, sleepSrc) : null
+    return week.length >= 4 ? obs(d, week.reduce((a, b) => a + b, 0) / week.length, sleepSrc(n)) : null
   }))
 
   // HRR60: one value per training day, the median of that day's sets with enough HR around them.
@@ -171,24 +186,38 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
   const summaries = [...raw.dailySummaries].sort((a, b) => a.date.localeCompare(b.date))
   const metrics = [...raw.bodyMetrics].sort((a, b) => a.date.localeCompare(b.date))
 
+  // #2984, per input: the ring summary's value where it has one for the night, else Oura's own value
+  // for the same night (taken as Oura calculated it), labelled with its device so it learns its own
+  // normal. Oura's temperature is a deviation from Oura's baseline, so it is scored the same way the
+  // ring's deviation is: steady, against the person's normal of that device's deviations.
+  const summaryByDate = new Map(summaries.map(s => [s.date, s]))
+  const perInput = (ring: (date: string) => number | null | undefined, fallback: Map<string, UnitObservation>) => {
+    const dates = [...new Set([...summaryByDate.keys(), ...fallback.keys()])].sort()
+    return compact(dates.map(d => obs(d, ring(d), RING_SUMMARY_SRC) ?? fallback.get(d) ?? null))
+  }
+  const ouraTemperature = new Map(compact(raw.wear.map(w => obs(w.date, w.temperatureDeviation, 'oura_cloud'))).map(o => [o.date, o]))
+  const nightBreathing = new Map(compact(nightList.map(([d, n]) => obs(d, n.respiratoryRate, n.respiratoryRateSource ?? 'sleep_sessions'))).map(o => [o.date, o]))
+
   const series: PreparedShadowHistory['series'] = {
     'sleep.duration': duration,
-    'sleep.efficiency': compact(nightList.map(([d, n]) => obs(d, n.efficiency, sleepSrc))),
-    'sleep.deep_rem_share': compact(nightList.map(([d, n]) => obs(d, deepRemSharePct(n), sleepSrc))),
-    'sleep.latency': compact(nightList.map(([d, n]) => obs(d, n.onsetLatencySec == null ? null : n.onsetLatencySec / 60, sleepSrc))),
+    'sleep.efficiency': compact(nightList.map(([d, n]) => obs(d, n.efficiency, sleepSrc(n)))),
+    'sleep.deep_rem_share': compact(nightList.map(([d, n]) => obs(d, deepRemSharePct(n), sleepSrc(n)))),
+    'sleep.latency': compact(nightList.map(([d, n]) => obs(d, n.onsetLatencySec == null ? null : n.onsetLatencySec / 60, sleepSrc(n)))),
     'sleep.timing': compact(nightList.map(([d, n]) =>
-      obs(d, minutesFromNoon(new Date((n.sleepStart.getTime() + n.sleepEnd.getTime()) / 2).toISOString(), tz), sleepSrc))),
+      obs(d, minutesFromNoon(new Date((n.sleepStart.getTime() + n.sleepEnd.getTime()) / 2).toISOString(), tz), sleepSrc(n)))),
     'sleep.balance': balance,
     'heart.overnight_hrv': nightlySeries(raw.bodyMetrics, 'hrvMs', 'HRV/night', 'night_hrv', wearByDate),
     'heart.overnight_rhr': nightlySeries(raw.bodyMetrics, 'restingHeartRate', 'RHR/night', 'night_rhr', wearByDate),
-    'heart.overnight_settling': compact(summaries.map(s => obs(s.date, s.recoveryIndexHours, 'oura_daily_summary'))),
+    // Hours only: Oura's recovery-index contributor is a 0–100 sub-score, not hours, so it is not
+    // mixed into this unit's hours normal. The live composite takes it where no hours exist.
+    'heart.overnight_settling': compact(summaries.map(s => obs(s.date, s.recoveryIndexHours, RING_SUMMARY_SRC))),
     'heart.hr_recovery': [...hrrByDay.entries()].sort(([a], [b]) => a.localeCompare(b))
       .map(([d, e]) => ({ date: d, value: median(e.values)!, source: e.source, rung: 'derived' as const })),
     'activity.yesterday_movement': compact(metrics.map(m => obs(m.date, m.steps, 'body_metrics'))),
     'activity.zone_minutes_week': zoneWeek,
     'activity.training_load': trainingLoad,
-    'body.temperature': compact(summaries.map(s => obs(s.date, s.tempDevC, 'oura_daily_summary'))),
-    'body.breathing_rate': compact(summaries.map(s => obs(s.date, s.breathAvgRpm, 'oura_daily_summary'))),
+    'body.temperature': perInput(d => summaryByDate.get(d)?.tempDevC, ouraTemperature),
+    'body.breathing_rate': perInput(d => summaryByDate.get(d)?.breathAvgRpm, nightBreathing),
     'body.spo2': compact(metrics.map(m => obs(m.date, m.spo2Pct, 'body_metrics'))),
     'body.daytime_stress': daytimeStressSeries(raw),
     'body.weight_vs_plan': [...raw.weightVsPlan.entries()].map(([d, v]) => ({ date: d, value: v, source: 'energy_balance', rung: null })),

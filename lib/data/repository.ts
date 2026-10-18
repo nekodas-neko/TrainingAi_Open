@@ -1633,6 +1633,13 @@ export interface WorkoutRepository {
   // night in place without the full delete+reinsert (which would wipe history on every push).
   upsertOuraDailySummary(userId: string, rows: OuraDailySummaryRow[]): Promise<void>
   getOuraDailySummary(userId: string, from: string, to: string): Promise<OuraDailySummaryRow[]>
+  /**
+   * #2984. Oura's own readiness contributors per day (`oura_cloud_daily.readiness_contributors`),
+   * each 0–100, oldest first. Read for the one readiness input Oura sends no underlying value for,
+   * the recovery index (rule 4 on #2860). Never Oura's readiness score itself: that is the tuning
+   * reference, not an input.
+   */
+  getOuraCloudReadinessContributors(userId: string, from: string, to: string): Promise<{ date: string; readinessContributors: Record<string, number | null> | null }[]>
 
   // Completed-form derived metrics (Oura on-device-models program, Sub-plan A). Idempotent
   // per-day upsert: only the fields present in `patch` are written, via COALESCE so a partial

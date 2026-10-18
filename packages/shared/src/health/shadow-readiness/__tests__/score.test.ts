@@ -454,3 +454,39 @@ function emptyRaw(tz: string): ShadowRawHistory {
     setHr: [], zoneSeconds: null, unwellDates: new Set(), fuel: new Map(), weightVsPlan: new Map(),
   }
 }
+
+describe('#2984: inputs carry their device, and temperature and breathing fall back per input', () => {
+  const ringThenOura = () => {
+    const raw = emptyRaw('Australia/Brisbane')
+    raw.bodyMetrics = [
+      ...Array.from({ length: 20 }, (_, i) => ({ date: shiftDateStr(D, -(i + 1)), hrvMs: 50 + (i % 4), hrvSource: 'oura_ble' })),
+      { date: D, hrvMs: 47, hrvSource: 'oura_cloud' },
+    ]
+    raw.dailySummaries = Array.from({ length: 20 }, (_, i) => ({ date: shiftDateStr(D, -(i + 1)), recoveryIndexHours: 5, tempDevC: (i % 3 - 1) * 0.1, breathAvgRpm: 14 }))
+    raw.wear = [{ date: D, temperatureDeviation: 0.3 }]
+    return raw
+  }
+
+  it('labels a nightly value with its device, so an Oura night restarts the HRV normal', () => {
+    const input = assembleShadowInputs(prepareShadowHistory(ringThenOura()), D)
+    const hrv = input.units['heart.overnight_hrv']!
+    expect(hrv.today).toMatchObject({ value: 47, source: 'oura_cloud' })
+    expect(new Set(hrv.history.map(o => o.source))).toEqual(new Set(['oura_ble']))
+    const r = unit('heart.overnight_hrv', hrv)
+    expect(r.flags).toContain('source_changed')
+    expect(r.stage).toBe('provisional')
+  })
+
+  it('takes Oura\'s temperature deviation where the ring summary has none for the night', () => {
+    const input = assembleShadowInputs(prepareShadowHistory(ringThenOura()), D)
+    expect(input.units['body.temperature']!.today).toMatchObject({ date: D, value: 0.3, source: 'oura_cloud' })
+    expect(input.units['body.temperature']!.history.every(o => o.source === 'oura_daily_summary')).toBe(true)
+  })
+
+  it('keeps the ring summary\'s value where it has one', () => {
+    const raw = ringThenOura()
+    raw.dailySummaries = [...raw.dailySummaries, { date: D, recoveryIndexHours: 5, tempDevC: 0.1, breathAvgRpm: 14 }]
+    const input = assembleShadowInputs(prepareShadowHistory(raw), D)
+    expect(input.units['body.temperature']!.today).toMatchObject({ value: 0.1, source: 'oura_daily_summary' })
+  })
+})

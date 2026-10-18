@@ -2296,6 +2296,15 @@ export async function getLatestOuraDailySummaryBefore(db: Db, userId: string, da
   }
 }
 
+export async function getOuraCloudReadinessContributors(db: Db, userId: string, from: string, to: string) {
+  const rows = await db
+    .select({ date: s.ouraCloudDaily.date, readinessContributors: s.ouraCloudDaily.readinessContributors })
+    .from(s.ouraCloudDaily)
+    .where(and(eq(s.ouraCloudDaily.userId, userId), gte(s.ouraCloudDaily.date, from), lte(s.ouraCloudDaily.date, to)))
+    .orderBy(asc(s.ouraCloudDaily.date))
+  return rows.map(r => ({ date: r.date, readinessContributors: r.readinessContributors ?? null }))
+}
+
 export async function getOuraDailySummary(db: Db, userId: string, from: string, to: string): Promise<OuraDailySummaryRow[]> {
   const rows = await db
     .select()
