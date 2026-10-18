@@ -1,7 +1,7 @@
 // Oura Cloud documents → our rows (#2859): every field the spec provides lands, nothing else does.
 import { describe, expect, it } from 'vitest'
 import { mapHeartRateRows, mapOuraDocuments, parseOuraDocument, OURA_DOCUMENT_TYPE_NAMES, type OuraDocument } from '../documents'
-import { DAY, FIXTURES, heartRateRows, sleepPeriod } from './fixtures'
+import { DAY, FIXTURES, heartRateRows, sleepPeriod, dailyActivity } from './fixtures'
 
 const all = (): OuraDocument[] => OURA_DOCUMENT_TYPE_NAMES.map(t => {
   const doc = parseOuraDocument(t, FIXTURES[t])
@@ -38,11 +38,67 @@ describe('Oura Cloud document mapping (#2859)', () => {
   })
 
   // #2895 review, item 7: until #2860 these would replace our own on the Sleep and Activity screens.
-  it('holds back Oura\'s readiness, sleep and activity contributors and the stress day summary', () => {
-    const [row] = mapOuraDocuments(all()).daily
+  // #2982 keeps them, in `oura_cloud_daily`, which no screen reads.
+  it('keeps Oura\'s contributors and the stress day summary out of oura_daily, in oura_cloud_daily', () => {
+    const { daily, cloudDaily } = mapOuraDocuments(all())
     for (const k of ['readinessContributors', 'sleepContributors', 'activityContributors', 'daySummary'] as const) {
-      expect(row[k], k).toBeUndefined()
+      expect(daily[0][k], k).toBeUndefined()
     }
+    expect(cloudDaily).toHaveLength(1)
+    expect(cloudDaily[0]).toMatchObject({
+      date: DAY,
+      readinessContributors: FIXTURES.daily_readiness.contributors,
+      sleepContributors: FIXTURES.daily_sleep.contributors,
+      activityContributors: FIXTURES.daily_activity.contributors,
+      daySummary: 'normal',
+    })
+  })
+
+  // #2982: every field this batch reads lands non-null from a spec-shaped document.
+  it('maps every new daily_activity field, with the MET series\' own interval', () => {
+    const [row] = mapOuraDocuments(all()).cloudDaily
+    for (const k of ['met', 'class5Min', 'inactivityAlerts', 'sedentaryMetMinutes', 'targetCalories', 'targetMeters', 'metersToTarget'] as const) {
+      expect(row[k], k).not.toBeNull()
+      expect(row[k], k).not.toBeUndefined()
+    }
+    expect(row.met).toEqual({ interval: 60, items: [1.2, null, 3.5], timestamp: `${DAY}T04:00:00+10:00` })
+    expect(row).toMatchObject({ class5Min: '0123345', inactivityAlerts: 1, sedentaryMetMinutes: 10, targetCalories: 500, targetMeters: 10000, metersToTarget: 1200 })
+  })
+
+  it('maps every new sleep-period field, reading each series\' own interval', () => {
+    const { sleepPeriods } = mapOuraDocuments(all())
+    expect(sleepPeriods).toHaveLength(1)
+    const p = sleepPeriods[0]
+    for (const k of Object.keys(p) as (keyof typeof p)[]) expect(p[k], k).not.toBeNull()
+    expect(p).toMatchObject({
+      ouraId: 'sl-1', day: DAY, sleepType: 'long_sleep', sleepPhase30Sec: '4422113', movement30Sec: '1121341',
+      sleepAlgorithmVersion: 'v2', lowBatteryAlert: false, sleepAnalysisReason: 'foreground_sleep_analysis', period: 0, ringId: 'ring-enc-1',
+    })
+    expect(p.heartRate?.interval).toBe(300)
+    expect(p.hrv?.interval).toBe(600)
+    expect(p.heartRate?.items).toEqual([58, null, 52.5])
+  })
+
+  it('maps a session with its series and mood', () => {
+    const { sessions } = mapOuraDocuments(all())
+    expect(sessions).toEqual([{
+      ouraId: 'se-1', day: DAY, sessionType: 'breathing', mood: 'good',
+      startDatetime: new Date('2026-10-10T02:00:00.000Z'), endDatetime: new Date('2026-10-10T02:10:00.000Z'),
+      heartRate: FIXTURES.session.heart_rate, heartRateVariability: FIXTURES.session.heart_rate_variability, motionCount: FIXTURES.session.motion_count,
+    }])
+  })
+
+  it('reads an off-spec value in a new field as null, without dropping a document that parsed before', () => {
+    const sleep = parseOuraDocument('sleep', {
+      ...sleepPeriod, heart_rate: { interval: 'five minutes', items: [] }, sleep_phase_30_sec: '4x', sleep_algorithm_version: 'v9',
+    })
+    expect(sleep).not.toBeNull()
+    const { sleep: nights, sleepPeriods } = mapOuraDocuments([sleep!])
+    expect(nights).toHaveLength(1)
+    expect(sleepPeriods[0]).toMatchObject({ heartRate: null, sleepPhase30Sec: null, sleepAlgorithmVersion: null, hrv: sleepPeriod.hrv })
+    const activity = parseOuraDocument('daily_activity', { ...dailyActivity, met: null, class_5_min: '9', inactivity_alerts: 'one' })
+    expect(activity).not.toBeNull()
+    expect(mapOuraDocuments([activity!]).cloudDaily[0]).toMatchObject({ met: null, class5Min: null, inactivityAlerts: null })
   })
 
   it('writes body metrics from activity, SpO2 and the main sleep', () => {
@@ -75,6 +131,7 @@ describe('Oura Cloud document mapping (#2859)', () => {
     const { workouts } = mapOuraDocuments(all())
     expect(workouts).toEqual([{
       id: 'wo-1', day: DAY, activity: 'running', calories: 420.5, distanceM: 6012.3, intensity: 'moderate', source: 'autodetected',
+      label: 'Morning run',
       startDatetime: new Date('2026-10-09T21:00:00.000Z'), endDatetime: new Date('2026-10-09T21:40:00.000Z'),
     }])
   })
@@ -85,6 +142,8 @@ describe('Oura Cloud document mapping (#2859)', () => {
     const out = mapOuraDocuments([deleted, rest])
     expect(out.deletedSleepIds).toEqual(['gone'])
     expect(out.sleep).toEqual([])
+    // Both keep their period detail, with the type that says what they are (#2982).
+    expect(out.sleepPeriods.map(p => [p.ouraId, p.sleepType])).toEqual([['gone', 'deleted'], ['rest', 'rest']])
   })
 
   it('takes the longest long_sleep of a day for HRV and resting HR, never a nap', () => {
@@ -112,11 +171,11 @@ describe('Oura Cloud document mapping (#2859)', () => {
     expect(daily[0].temperatureDeviation).toBeNull()
   })
 
-  it('maps heart-rate rows and drops implausible bpm', () => {
+  it('maps heart-rate rows with Oura\'s label as context, and drops implausible bpm', () => {
     const rows = [...heartRateRows, { timestamp: '2026-10-10T00:10:00+00:00', timestamp_unix: 0, bpm: 0, source: 'awake' as const }]
     expect(mapHeartRateRows(rows.map(r => ({ ...r, source: r.source as 'awake' })))).toEqual([
-      { timestamp: new Date('2026-10-10T00:00:00Z'), bpm: 61 },
-      { timestamp: new Date('2026-10-10T00:05:00Z'), bpm: 64 },
+      { timestamp: new Date('2026-10-10T00:00:00Z'), bpm: 61, context: 'awake' },
+      { timestamp: new Date('2026-10-10T00:05:00Z'), bpm: 64, context: 'awake' },
     ])
   })
 })

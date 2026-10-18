@@ -19,6 +19,7 @@ function fakeOura(): typeof fetch {
     daily_readiness: FIXTURES.daily_readiness, daily_sleep: FIXTURES.daily_sleep, daily_activity: FIXTURES.daily_activity,
     daily_spo2: FIXTURES.daily_spo2, daily_stress: FIXTURES.daily_stress, daily_resilience: FIXTURES.daily_resilience,
     daily_cardiovascular_age: FIXTURES.daily_cardiovascular_age, vO2_max: FIXTURES.vo2_max, sleep: FIXTURES.sleep, workout: FIXTURES.workout,
+    session: FIXTURES.session,
   }
   return (async (input: RequestInfo | URL) => {
     const url = new URL(String(input))
@@ -54,7 +55,8 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
   })
 
   beforeEach(async () => {
-    for (const t of ['oura_daily', 'body_metrics', 'sleep_sessions', 'oura_workouts', 'oura_heartrate', 'oura_tokens']) {
+    for (const t of ['oura_daily', 'body_metrics', 'sleep_sessions', 'oura_workouts', 'oura_heartrate', 'oura_tokens',
+      'oura_cloud_sleep_periods', 'oura_cloud_daily', 'oura_sessions']) {
       await pool.query(`DELETE FROM ${t} WHERE user_id = $1`, [USER])
     }
     await repo.saveOuraCloudTokens(USER, {
@@ -121,9 +123,49 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
     expect(sleep.deleted_at).toBeNull()
 
     const workout = await one(`SELECT * FROM oura_workouts WHERE user_id = $1`)
-    expect(workout).toMatchObject({ id: 'wo-1', activity: 'running', calories: 420.5, distance_m: 6012.3, intensity: 'moderate', source: 'autodetected', reviewed: false })
+    expect(workout).toMatchObject({ id: 'wo-1', activity: 'running', calories: 420.5, distance_m: 6012.3, intensity: 'moderate', source: 'autodetected', reviewed: false, label: 'Morning run' })
 
     expect(await rawArchiveCount()).toBe(before)
+  })
+
+  // #2982: every field this batch reads lands non-null in its column, from spec-shaped documents.
+  it('lands every new field non-null in the tables no screen reads', async () => {
+    await webhookAll()
+    const period = await one(`SELECT * FROM oura_cloud_sleep_periods WHERE user_id = $1`)
+    for (const [c, v] of Object.entries(period)) expect(v, c).not.toBeNull()
+    expect(period).toMatchObject({
+      oura_id: 'sl-1', sleep_type: 'long_sleep', sleep_phase_30_sec: '4422113', movement_30_sec: '1121341',
+      sleep_algorithm_version: 'v2', low_battery_alert: false, sleep_analysis_reason: 'foreground_sleep_analysis', period: 0, ring_id: 'ring-enc-1',
+    })
+    expect(period.heart_rate).toEqual(sleepPeriod.heart_rate)
+    expect(period.hrv).toEqual(sleepPeriod.hrv)
+    expect(period.bedtime_start.toISOString()).toBe('2026-10-09T12:30:00.000Z')
+    // It joins to the night on Oura's id.
+    expect((await one(`SELECT count(*) AS n FROM sleep_sessions s JOIN oura_cloud_sleep_periods p ON p.user_id = s.user_id AND p.oura_id = s.oura_id WHERE s.user_id = $1`)).n).toBe('1')
+
+    const day = await one(`SELECT * FROM oura_cloud_daily WHERE user_id = $1`)
+    for (const [c, v] of Object.entries(day)) expect(v, c).not.toBeNull()
+    expect(day).toMatchObject({
+      class_5_min: '0123345', inactivity_alerts: 1, sedentary_met_minutes: 10, target_calories: 500, target_meters: 10000, meters_to_target: 1200,
+      readiness_contributors: FIXTURES.daily_readiness.contributors, sleep_contributors: FIXTURES.daily_sleep.contributors,
+      activity_contributors: FIXTURES.daily_activity.contributors, day_summary: 'normal',
+    })
+    expect(day.met).toEqual(FIXTURES.daily_activity.met)
+
+    const session = await one(`SELECT * FROM oura_sessions WHERE user_id = $1`)
+    for (const [c, v] of Object.entries(session)) expect(v, c).not.toBeNull()
+    expect(session).toMatchObject({ oura_id: 'se-1', session_type: 'breathing', mood: 'good', motion_count: FIXTURES.session.motion_count })
+
+    // Oura's contributors and stress label never reach the columns the screens read.
+    const daily = await one(`SELECT readiness_contributors, sleep_contributors, activity_contributors, day_summary FROM oura_daily WHERE user_id = $1`)
+    expect(daily).toEqual({ readiness_contributors: null, sleep_contributors: null, activity_contributors: null, day_summary: null })
+  })
+
+  it('sets only the fields each document carries on oura_cloud_daily, so separate events do not erase each other', async () => {
+    await webhookAll()
+    await repo.upsertOuraCloudDaily(USER, [{ date: DAY, daySummary: 'stressful' }])
+    const day = await one(`SELECT day_summary, class_5_min, readiness_contributors FROM oura_cloud_daily WHERE user_id = $1`)
+    expect(day).toEqual({ day_summary: 'stressful', class_5_min: '0123345', readiness_contributors: FIXTURES.daily_readiness.contributors })
   })
 
   it('is idempotent: the same events twice leave the same rows', async () => {
@@ -133,6 +175,9 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
       body: (await pool.query(`SELECT * FROM body_metrics WHERE user_id = $1`, [USER])).rows.map(r => ({ ...r, updated_at: null })),
       sleep: (await pool.query(`SELECT * FROM sleep_sessions WHERE user_id = $1`, [USER])).rows.map(r => ({ ...r, updated_at: null })),
       workouts: (await pool.query(`SELECT * FROM oura_workouts WHERE user_id = $1`, [USER])).rows,
+      periods: (await pool.query(`SELECT * FROM oura_cloud_sleep_periods WHERE user_id = $1`, [USER])).rows.map(r => ({ ...r, updated_at: null })),
+      cloudDaily: (await pool.query(`SELECT * FROM oura_cloud_daily WHERE user_id = $1`, [USER])).rows.map(r => ({ ...r, updated_at: null })),
+      sessions: (await pool.query(`SELECT * FROM oura_sessions WHERE user_id = $1`, [USER])).rows.map(r => ({ ...r, updated_at: null })),
     })
     const first = await snap()
     await webhookAll()
@@ -187,11 +232,14 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
     expect(same.sleep_end.toISOString()).toBe('2026-10-09T20:50:00.000Z')
     expect(same.date).toBe('2026-10-10')
 
+    await repo.upsertOuraCloudSleepPeriods(USER, mapOuraDocuments([{ type: 'sleep', doc: SleepDoc.parse(sleepPeriod) }]).sleepPeriods)
     const { handleOuraWebhookEvent } = await import('@/lib/oura/cloud/webhook')
     expect(await handleOuraWebhookEvent({ repo, config: CONFIG, heartRate: () => {} }, { event_type: 'delete', data_type: 'sleep', object_id: 'sl-1', user_id: OURA_USER }))
       .toEqual({ result: 'deleted', tombstoned: 1 })
     const gone = await one(`SELECT deleted_at FROM sleep_sessions WHERE user_id = $1`)
     expect(gone.deleted_at).not.toBeNull()
+    // The period's detail stays, marked deleted (#2982).
+    expect(await one(`SELECT sleep_type, heart_rate IS NOT NULL AS kept FROM oura_cloud_sleep_periods WHERE user_id = $1`)).toEqual({ sleep_type: 'deleted', kept: true })
   })
 
   it('keeps a workout\'s reviewed flag when Oura re-sends it', async () => {
@@ -208,10 +256,19 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
     const { catchUpOuraCloudHeartRate } = await import('@/lib/oura/cloud/webhook')
     const now = Date.parse('2026-10-12T00:00:00Z')
     expect(await catchUpOuraCloudHeartRate({ repo, config: CONFIG }, USER, now)).toBe(2)
-    const rows = (await pool.query(`SELECT bpm, source FROM oura_heartrate WHERE user_id = $1 ORDER BY timestamp`, [USER])).rows
-    expect(rows).toEqual([{ bpm: 61, source: 'oura_cloud' }, { bpm: 64, source: 'oura_cloud' }])
+    const rows = (await pool.query(`SELECT bpm, source, context FROM oura_heartrate WHERE user_id = $1 ORDER BY timestamp`, [USER])).rows
+    // #2982: provenance stays `oura_cloud`; Oura's own label is kept beside it.
+    expect(rows).toEqual([{ bpm: 61, source: 'oura_cloud', context: 'awake' }, { bpm: 64, source: 'oura_cloud', context: 'awake' }])
     expect((await repo.getLatestOuraCloudHeartrateAt(USER, new Date(now - 7 * 86_400_000)))?.toISOString()).toBe('2026-10-10T00:05:00.000Z')
     expect(await repo.getLatestOuraCloudHeartrateAt(USER, new Date('2026-10-11T00:00:00Z'))).toBeNull()
+  })
+
+  // #2982: a point stored before labels were kept gets its label when Oura's series is read again.
+  it('fills the label on a Cloud point stored without one', async () => {
+    await repo.upsertOuraCloudHeartrate(USER, [{ timestamp: new Date('2026-10-10T00:00:00Z'), bpm: 61 }], 'Australia/Brisbane')
+    expect((await one(`SELECT context FROM oura_heartrate WHERE user_id = $1`)).context).toBeNull()
+    await repo.upsertOuraCloudHeartrate(USER, [{ timestamp: new Date('2026-10-10T00:00:00Z'), bpm: 61, context: 'rest' }], 'Australia/Brisbane')
+    expect(await one(`SELECT bpm, source, context FROM oura_heartrate WHERE user_id = $1`)).toEqual({ bpm: 61, source: 'oura_cloud', context: 'rest' })
   })
 
   it('writes Cloud heart rate only where no ring or strap row covers it', async () => {
@@ -236,12 +293,16 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
     expect(Number((await one(`SELECT count(*) AS n FROM oura_daily WHERE user_id = $1`)).n)).toBe(0)
     expect(Number((await one(`SELECT count(*) AS n FROM oura_heartrate WHERE user_id = $1`)).n)).toBe(0)
 
-    const count = async () => Object.fromEntries(await Promise.all(['oura_daily', 'body_metrics', 'sleep_sessions', 'oura_workouts', 'oura_heartrate']
+    const count = async () => Object.fromEntries(await Promise.all(['oura_daily', 'body_metrics', 'sleep_sessions', 'oura_workouts', 'oura_heartrate',
+      'oura_cloud_sleep_periods', 'oura_cloud_daily', 'oura_sessions']
       .map(async t => [t, Number((await pool.query(`SELECT count(*) AS n FROM ${t} WHERE user_id = $1`, [USER])).rows[0].n)])))
     const first = await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...opts, dryRun: false })
     expect(first.ok && first.report.stoppedEarly).toBeNull()
     const after1 = await count()
-    expect(after1).toEqual({ oura_daily: 1, body_metrics: 1, sleep_sessions: 1, oura_workouts: 1, oura_heartrate: 2 })
+    expect(after1).toEqual({
+      oura_daily: 1, body_metrics: 1, sleep_sessions: 1, oura_workouts: 1, oura_heartrate: 2,
+      oura_cloud_sleep_periods: 1, oura_cloud_daily: 1, oura_sessions: 1,
+    })
     await backfillOuraCloud({ repo, config: CONFIG }, USER, { ...opts, dryRun: false })
     expect(await count()).toEqual(after1)
   })

@@ -161,7 +161,11 @@ export async function handleOuraWebhookEvent(deps: OuraWebhookDeps, event: OuraW
     const doc = await fetchOuraDocument(token, event.data_type, event.object_id)
     if (!doc) return { result: 'not_found' }
     const counts = await writeOuraCloudData(deps.repo, userId, mapOuraDocuments([doc]))
-    if (HEART_RATE_TRIGGERS.has(event.data_type) && isOuraTypeShared(granted, 'heartrate')) (deps.heartRate ?? (u => startOuraCloudHeartRateCatchUp(deps, u)))(userId)
+    if (HEART_RATE_TRIGGERS.has(event.data_type)) {
+      if (isOuraTypeShared(granted, 'heartrate')) (deps.heartRate ?? (u => startOuraCloudHeartRateCatchUp(deps, u)))(userId)
+      // The user's choice on Oura's consent page, not a failure: logged, never reported (as the backfill does).
+      else console.info('[oura] heart-rate catch-up skipped: the user did not share heart rate')
+    }
     return { result: 'written', counts }
   } catch (err) {
     if (err instanceof OuraReauthRequiredError || err instanceof OuraUnauthorizedError) return { result: 'reauth' }
@@ -189,6 +193,11 @@ export const HEART_RATE_TRIGGERS: ReadonlySet<string> = new Set(['sleep', 'daily
 /** The furthest back one catch-up reads; the connect backfill and the agent job cover older gaps. */
 export const HEART_RATE_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000
 export const HEART_RATE_MIN_INTERVAL_MS = 5 * 60 * 1000
+/**
+ * A catch-up over at least this long that Oura answers with no heart rate is reported (#2982). A
+ * shorter one can be empty for real: the user's previous sync landed minutes ago.
+ */
+export const HEART_RATE_EMPTY_REPORT_MS = 60 * 60 * 1000
 
 export type OuraHeartRateReader = Pick<WorkoutRepository, 'getLatestOuraCloudHeartrateAt' | 'getUserById'>
 
@@ -196,6 +205,10 @@ export type OuraHeartRateReader = Pick<WorkoutRepository, 'getLatestOuraCloudHea
  * Reads the user's heart rate from the newest stored `oura_cloud` point (at most a week back) to now,
  * and writes it through `upsertOuraCloudHeartrate` with the user's timezone. Returns points written,
  * or `null` when the user has no usable connection.
+ *
+ * A read that lands nothing is reported, never silent (#2982: no Oura heart rate had landed and
+ * nothing said why): an empty answer over an hour or more, rows that failed the spec's shape, and
+ * rows that were read but none written. Reports carry counts and durations, never a reading.
  */
 export async function catchUpOuraCloudHeartRate(
   deps: Pick<OuraWebhookDeps, 'repo' | 'config'>, userId: string, now = Date.now(),
@@ -208,9 +221,20 @@ export async function catchUpOuraCloudHeartRate(
   const tz = user?.timezone ?? DEFAULT_TZ
   // From the newest point itself: re-reading it is an idempotent upsert, and a strictly-later start
   // could drop a point Oura stamped at that same second.
-  const got = await fetchOuraHeartRate(token, newest ?? floor, new Date(now))
+  const from = newest ?? floor
+  const got = await fetchOuraHeartRate(token, from, new Date(now))
   const points = mapHeartRateRows(got.rows)
-  return points.length === 0 ? 0 : deps.repo.upsertOuraCloudHeartrate(userId, points, tz)
+  const written = points.length === 0 ? 0 : await deps.repo.upsertOuraCloudHeartrate(userId, points, tz)
+  const hours = Math.round((now - from.getTime()) / 3_600_000)
+  if (got.dropped > 0) {
+    reportOuraCloudIssue('webhook-heartrate:dropped', `${got.dropped} of ${got.rows.length + got.dropped} rows did not match the spec`, { userId })
+  }
+  if (got.rows.length === 0 && got.dropped === 0 && now - from.getTime() >= HEART_RATE_EMPTY_REPORT_MS) {
+    reportOuraCloudIssue('webhook-heartrate:empty', `Oura answered no heart rate for the last ${hours} h (${newest ? 'after a stored point' : 'none stored this week'})`, { userId })
+  } else if (got.rows.length > 0 && written === 0) {
+    reportOuraCloudIssue('webhook-heartrate:none-written', `${got.rows.length} rows read, ${points.length} plausible, 0 written (all covered by device rows or implausible)`, { userId })
+  }
+  return written
 }
 
 const heartRateLastRun = new Map<string, number>()
@@ -221,7 +245,16 @@ export function startOuraCloudHeartRateCatchUp(deps: Pick<OuraWebhookDeps, 'repo
   if (last !== undefined && now - last < HEART_RATE_MIN_INTERVAL_MS) return
   heartRateLastRun.set(userId, now)
   catchUpOuraCloudHeartRate(deps, userId, now).catch(err => {
-    if (err instanceof OuraReauthRequiredError || err instanceof OuraUnauthorizedError || err instanceof OuraForbiddenError) return
+    // A refusal is final for this read, but it is why no heart rate lands, so it is reported (#2982).
+    const refused = err instanceof OuraUnauthorizedError ? 'Oura answered 401'
+      : err instanceof OuraForbiddenError ? 'Oura answered 403'
+      : err instanceof OuraReauthRequiredError ? 'the connection needs the user to connect again'
+      : null
+    if (refused) {
+      console.warn(`[oura] heart-rate catch-up refused: ${refused}`)
+      reportOuraCloudIssue('webhook-heartrate:refused', `the heart-rate read was refused: ${refused}`, { userId })
+      return
+    }
     const message = err instanceof Error ? err.message : 'unknown'
     console.warn(`[oura] heart-rate catch-up failed: ${message}`)
     reportOuraCloudIssue('webhook-heartrate:failed', message, { userId })

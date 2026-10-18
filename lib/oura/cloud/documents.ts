@@ -5,9 +5,15 @@
 // spec gives it, and a document that does not match its schema is dropped whole: half a document is
 // worse than none, because the per-field merge would keep its gaps as "measured nothing".
 //
+// The fields #2982 added (series, hypnograms, flags, goals, labels) are the exception, through
+// `added`: a value that does not match the spec is stored as nothing rather than dropping a document
+// that parsed before they were read. They land in tables no screen reads, so a gap there is a gap,
+// never a "measured nothing" on a screen.
+//
 // Pure: no fetch, no database. `data.ts` fetches, `ingest.ts` writes.
 import { z } from 'zod'
 import type { OuraDailyRow, OuraSleepUpsertRow } from '@/lib/data/repository'
+import type { OuraCloudDailyRow, OuraCloudSleepPeriodRow, OuraSessionRow } from '@/lib/data/postgres/slices/oura'
 import type { BodyMetrics } from '@trainingai/shared/types/body'
 import { MAX_PLAUSIBLE_BPM, MIN_PLAUSIBLE_BPM } from '@trainingai/shared/validation/plausibility'
 import { isCalendarDate } from '@trainingai/shared/date-utils'
@@ -22,6 +28,28 @@ const NullableInt = Int.nullable().optional()
 const NullableNum = z.number().finite().nullable().optional()
 /** A contributors object: every member is `integer | null` in [1, 100] (spec `Public*Contributors`). */
 const Contributors = z.record(z.string(), z.number().nullable())
+
+/**
+ * A field #2982 added. Absent, `null`, or not the spec's shape all read as `null`: the value is never
+ * stored unparsed, and the document it sits in is never dropped for it.
+ */
+function added<T extends z.ZodType>(schema: T) {
+  return schema.nullable().optional().catch(null)
+}
+
+/**
+ * Spec `PublicSample`: `items` taken every `interval` seconds from `timestamp`. The interval is read
+ * from each series, never assumed: the spec states none, and it differs between series.
+ */
+export const OuraSample = z.object({
+  interval: z.number().finite().positive(),
+  items: z.array(z.number().finite().nullable()),
+  timestamp: Instant,
+})
+export type OuraSample = z.infer<typeof OuraSample>
+
+/** A per-character class string (`sleep_phase_30_sec`, `movement_30_sec`, `class_5_min`). */
+const ClassString = (chars: RegExp) => z.string().regex(chars)
 
 // ── The documents (spec model names in the comments) ──────────────────────────────────────────
 
@@ -63,6 +91,14 @@ export const DailyActivityDoc = z.object({
   medium_activity_met_minutes: Int,
   low_activity_met_minutes: Int,
   contributors: Contributors,
+  // #2982. Required by the spec, read through `added` (see the top of this file).
+  met: added(OuraSample),
+  class_5_min: added(ClassString(/^[0-5]*$/)),
+  inactivity_alerts: added(Int),
+  sedentary_met_minutes: added(Int),
+  target_calories: added(Int),
+  target_meters: added(Int),
+  meters_to_target: added(Int),
 })
 
 /** `PublicDailySpO2` */
@@ -126,6 +162,16 @@ export const SleepDoc = z.object({
   average_breath: NullableNum,
   restless_periods: NullableInt,
   sleep_phase_5_min: z.string().nullable().optional(),
+  // #2982 (`low_battery_alert` and `period` are required by the spec; read through `added` all the same).
+  heart_rate: added(OuraSample),
+  hrv: added(OuraSample),
+  sleep_phase_30_sec: added(ClassString(/^[1-4]*$/)),
+  movement_30_sec: added(ClassString(/^[1-4]*$/)),
+  sleep_algorithm_version: added(z.enum(['v1', 'v2'])),
+  low_battery_alert: added(z.boolean()),
+  sleep_analysis_reason: added(z.enum(['foreground_sleep_analysis', 'bedtime_edit'])),
+  period: added(Int),
+  ring_id: added(z.string().min(1)),
 })
 
 /** `PublicWorkout` */
@@ -139,13 +185,31 @@ export const WorkoutDoc = z.object({
   distance: NullableNum,
   intensity: z.enum(['easy', 'moderate', 'hard']),
   source: z.enum(['manual', 'autodetected', 'confirmed', 'workout_heart_rate']),
+  label: added(z.string()),
 })
 
-/** `PublicHeartRateRow` */
+/** `PublicSession`: a breathing, meditation, nap … session in the Oura app (#2982). */
+export const SessionDoc = z.object({
+  id: z.string().min(1),
+  day: Day,
+  start_datetime: Instant,
+  end_datetime: Instant,
+  type: z.enum(['breathing', 'meditation', 'nap', 'relaxation', 'rest', 'body_status']),
+  mood: added(z.enum(['bad', 'worse', 'same', 'good', 'great'])),
+  heart_rate: added(OuraSample),
+  heart_rate_variability: added(OuraSample),
+  motion_count: added(OuraSample),
+})
+
+/**
+ * `PublicHeartRateRow`. `source` is Oura's label for the sample, kept as `oura_heartrate.context`
+ * (#2982). It is read through `added`: a label Oura adds later must not drop a reading whose
+ * timestamp and bpm are fine, which is how a whole heart-rate page could land as nothing.
+ */
 export const HeartRateRow = z.object({
   timestamp: Instant,
   bpm: z.number().finite(),
-  source: z.enum(['awake', 'workout', 'rest', 'sleep', 'live', 'session']),
+  source: added(z.enum(['awake', 'workout', 'rest', 'sleep', 'live', 'session'])),
 })
 
 export type DailyReadinessDoc = z.infer<typeof DailyReadinessDoc>
@@ -158,6 +222,7 @@ export type DailyCardiovascularAgeDoc = z.infer<typeof DailyCardiovascularAgeDoc
 export type Vo2MaxDoc = z.infer<typeof Vo2MaxDoc>
 export type SleepDoc = z.infer<typeof SleepDoc>
 export type WorkoutDoc = z.infer<typeof WorkoutDoc>
+export type SessionDoc = z.infer<typeof SessionDoc>
 export type HeartRateRow = z.infer<typeof HeartRateRow>
 
 /**
@@ -176,6 +241,7 @@ export const OURA_DOCUMENT_TYPES = {
   vo2_max: { path: 'vO2_max', schema: Vo2MaxDoc },
   sleep: { path: 'sleep', schema: SleepDoc },
   workout: { path: 'workout', schema: WorkoutDoc },
+  session: { path: 'session', schema: SessionDoc },
 } as const
 
 export type OuraDocumentType = keyof typeof OURA_DOCUMENT_TYPES
@@ -199,6 +265,7 @@ export const OURA_SCOPE_FOR: Record<OuraDocumentType | 'heartrate', OuraScope> =
   vo2_max: 'daily',
   sleep: 'daily',
   workout: 'workout',
+  session: 'session',
   heartrate: 'heartrate',
 }
 
@@ -218,6 +285,7 @@ export type OuraDocument =
   | { type: 'vo2_max'; doc: Vo2MaxDoc }
   | { type: 'sleep'; doc: SleepDoc }
   | { type: 'workout'; doc: WorkoutDoc }
+  | { type: 'session'; doc: SessionDoc }
 
 /** Parses one document of `type`; `null` when it does not match the spec's shape. */
 export function parseOuraDocument(type: OuraDocumentType, raw: unknown): OuraDocument | null {
@@ -239,6 +307,7 @@ export interface OuraWorkoutRow {
   distanceM: number | null
   intensity: string
   source: string
+  label: string | null
 }
 
 /** Everything one batch of documents writes, already merged so each conflict key appears once. */
@@ -249,6 +318,11 @@ export interface OuraCloudWrites {
   /** Oura ids of sleep periods Oura now reports as `deleted`. */
   deletedSleepIds: string[]
   workouts: OuraWorkoutRow[]
+  /** #2982: every sleep period as Oura sent it, `rest` and `deleted` included. */
+  sleepPeriods: OuraCloudSleepPeriodRow[]
+  /** #2982: per day, only the fields a document provided; merged so each day appears once. */
+  cloudDaily: OuraCloudDailyRow[]
+  sessions: OuraSessionRow[]
 }
 
 /** Sleep types that are sleep. `rest` is a rest period and `deleted` is a removed one. */
@@ -257,12 +331,12 @@ const SLEEP_TYPES = new Set(['sleep', 'long_sleep', 'late_nap'])
 const hours = (sec: number | null | undefined) => (sec == null ? null : sec / 3600)
 
 /**
- * **Held back until #2860: Oura's readiness, sleep and activity contributors and the stress
- * `day_summary`.** They are parsed (the spec requires them) but not written. Stored in `oura_daily`,
- * they would win over our own on the Sleep and Activity screens: `readiness-payload.ts` prefers
- * Oura's contributors when present, and the device's local store syncs the same columns and reads
- * them directly. That is a visible change to a scoring surface, which needs the owner's yes.
- * Choosing per field between Oura's and ours is #2860's job; it adds them back.
+ * **Oura's readiness, sleep and activity contributors and the stress `day_summary` go to
+ * `oura_cloud_daily` (#2982), never to `oura_daily`.** Stored in `oura_daily`, they would win over
+ * our own on the Sleep and Activity screens: `readiness-payload.ts` prefers Oura's contributors when
+ * present, the device's local store syncs the same columns and reads them directly, and the
+ * Readiness screen and the AI planner read `day_summary`. That is a visible change to a scoring
+ * surface, which needs the owner's yes; choosing per field between Oura's and ours is #2860's job.
  *
  * Turns documents into rows. Several documents for one day (readiness, sleep score, activity …)
  * become one `oura_daily` row and one `body_metrics` row, because the upsert cannot touch a row twice
@@ -275,7 +349,15 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
   const sleep = new Map<string, OuraSleepUpsertRow>()
   const deletedSleepIds: string[] = []
   const workouts = new Map<string, OuraWorkoutRow>()
+  const sleepPeriods = new Map<string, OuraCloudSleepPeriodRow>()
+  const cloudDaily = new Map<string, OuraCloudDailyRow>()
+  const sessions = new Map<string, OuraSessionRow>()
 
+  const cloudDay = (d: string) => {
+    let row = cloudDaily.get(d)
+    if (!row) { row = { date: d }; cloudDaily.set(d, row) }
+    return row
+  }
   const day = (d: string) => {
     let row = daily.get(d)
     if (!row) { row = { date: d }; daily.set(d, row) }
@@ -297,10 +379,12 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
           temperatureDeviation: doc.temperature_deviation ?? null,
           temperatureTrendDeviation: doc.temperature_trend_deviation ?? null,
         })
+        cloudDay(doc.day).readinessContributors = doc.contributors
         break
       }
       case 'daily_sleep':
         day(doc.day).sleepScore = doc.score ?? null
+        cloudDay(doc.day).sleepContributors = doc.contributors
         break
       case 'daily_activity':
         Object.assign(day(doc.day), {
@@ -320,6 +404,16 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
           lowActivityMetMinutes: doc.low_activity_met_minutes,
         })
         Object.assign(bodyDay(doc.day), { steps: doc.steps, activeCalories: doc.active_calories })
+        Object.assign(cloudDay(doc.day), {
+          activityContributors: doc.contributors,
+          met: doc.met ?? null,
+          class5Min: doc.class_5_min ?? null,
+          inactivityAlerts: doc.inactivity_alerts ?? null,
+          sedentaryMetMinutes: doc.sedentary_met_minutes ?? null,
+          targetCalories: doc.target_calories ?? null,
+          targetMeters: doc.target_meters ?? null,
+          metersToTarget: doc.meters_to_target ?? null,
+        })
         break
       case 'daily_spo2':
         day(doc.day).breathingDisturbanceIndex = doc.breathing_disturbance_index ?? null
@@ -330,6 +424,7 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
           stressHigh: doc.stress_high ?? null,
           recoveryHigh: doc.recovery_high ?? null,
         })
+        cloudDay(doc.day).daySummary = doc.day_summary ?? null
         break
       case 'daily_resilience':
         Object.assign(day(doc.day), { resilienceLevel: doc.level, resilienceContributors: doc.contributors })
@@ -341,6 +436,22 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
         day(doc.day).vo2Max = doc.vo2_max
         break
       case 'sleep': {
+        sleepPeriods.set(doc.id, {
+          ouraId: doc.id,
+          day: doc.day,
+          bedtimeStart: new Date(doc.bedtime_start),
+          bedtimeEnd: new Date(doc.bedtime_end),
+          sleepType: doc.type ?? null,
+          heartRate: doc.heart_rate ?? null,
+          hrv: doc.hrv ?? null,
+          sleepPhase30Sec: doc.sleep_phase_30_sec ?? null,
+          movement30Sec: doc.movement_30_sec ?? null,
+          sleepAlgorithmVersion: doc.sleep_algorithm_version ?? null,
+          lowBatteryAlert: doc.low_battery_alert ?? null,
+          sleepAnalysisReason: doc.sleep_analysis_reason ?? null,
+          period: doc.period ?? null,
+          ringId: doc.ring_id ?? null,
+        })
         if (doc.type === 'deleted') { deletedSleepIds.push(doc.id); break }
         if (doc.type != null && !SLEEP_TYPES.has(doc.type)) break
         const start = new Date(doc.bedtime_start)
@@ -381,6 +492,20 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
         workouts.set(doc.id, {
           id: doc.id, day: doc.day, activity: doc.activity, startDatetime: start, endDatetime: end,
           calories: doc.calories ?? null, distanceM: doc.distance ?? null, intensity: doc.intensity, source: doc.source,
+          label: doc.label ?? null,
+        })
+        break
+      }
+      case 'session': {
+        const start = new Date(doc.start_datetime)
+        const end = new Date(doc.end_datetime)
+        if (!(end.getTime() >= start.getTime())) break
+        sessions.set(doc.id, {
+          ouraId: doc.id, day: doc.day, sessionType: doc.type, startDatetime: start, endDatetime: end,
+          mood: doc.mood ?? null,
+          heartRate: doc.heart_rate ?? null,
+          heartRateVariability: doc.heart_rate_variability ?? null,
+          motionCount: doc.motion_count ?? null,
         })
         break
       }
@@ -394,18 +519,24 @@ export function mapOuraDocuments(docs: readonly OuraDocument[]): OuraCloudWrites
     sleep: [...sleep.values()],
     deletedSleepIds,
     workouts: [...workouts.values()],
+    sleepPeriods: [...sleepPeriods.values()],
+    cloudDaily: [...cloudDaily.values()],
+    sessions: [...sessions.values()],
   }
 }
 
+export interface OuraHeartRatePoint { timestamp: Date; bpm: number; context: string | null }
+
 /**
- * Heart-rate rows as `oura_heartrate` points. Oura's `source` (awake, sleep …) is not ours to keep,
- * and a bpm outside the plausible band is a fault, not a reading, so it is dropped (never clamped).
+ * Heart-rate rows as `oura_heartrate` points. Oura's `source` (awake, sleep …) is its label, not our
+ * provenance, so it becomes the point's `context` (#2982); the row's `source` stays `oura_cloud`. A
+ * bpm outside the plausible band is a fault, not a reading, so it is dropped (never clamped).
  */
-export function mapHeartRateRows(rows: readonly HeartRateRow[]): { timestamp: Date; bpm: number }[] {
-  const out: { timestamp: Date; bpm: number }[] = []
+export function mapHeartRateRows(rows: readonly HeartRateRow[]): OuraHeartRatePoint[] {
+  const out: OuraHeartRatePoint[] = []
   for (const r of rows) {
     const bpm = Math.round(r.bpm)
-    if (bpm >= MIN_PLAUSIBLE_BPM && bpm <= MAX_PLAUSIBLE_BPM) out.push({ timestamp: new Date(r.timestamp), bpm })
+    if (bpm >= MIN_PLAUSIBLE_BPM && bpm <= MAX_PLAUSIBLE_BPM) out.push({ timestamp: new Date(r.timestamp), bpm, context: r.source ?? null })
   }
   return out
 }

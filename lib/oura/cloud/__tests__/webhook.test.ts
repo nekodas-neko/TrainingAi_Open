@@ -11,7 +11,11 @@ import {
   resetOuraCloudHeartRateThrottle, startOuraCloudHeartRateCatchUp, verifyOuraSignature, type OuraWebhookDeps,
 } from '../webhook'
 import type { User } from '@trainingai/shared/types'
+import { resetOuraCloudReportThrottle } from '../report'
 import { FIXTURES, jsonResponse, OURA_USER } from './fixtures'
+
+const reportServerError = vi.fn()
+vi.mock('@/lib/observability', () => ({ reportServerError: (...a: unknown[]) => reportServerError(...a) }))
 
 const USER = '11111111-1111-4111-8111-111111111111'
 const SECRET = 'csecret'
@@ -74,7 +78,7 @@ describe('handleOuraWebhookEvent (#2859)', () => {
   const fetchMock = vi.fn<typeof fetch>()
   const savedKey = process.env.OURA_TOKEN_KEY
   let row: OuraCloudTokenRow | null
-  const writes = { daily: 0, sleep: 0, tombstoned: [] as string[] }
+  const writes = { daily: 0, sleep: 0, sessions: 0, tombstoned: [] as string[] }
   const heartRate = vi.fn()
 
   function deps(): OuraWebhookDeps {
@@ -92,6 +96,9 @@ describe('handleOuraWebhookEvent (#2859)', () => {
         tombstoneOuraCloudSleep: async (_u, ids) => { writes.tombstoned.push(...ids); return ids.length },
         upsertOuraWorkouts: async (_u, rows) => rows.length,
         upsertOuraCloudHeartrate: async (_u, rows) => rows.length,
+        upsertOuraCloudSleepPeriods: async (_u, rows) => rows.length,
+        upsertOuraCloudDaily: async (_u, rows) => rows.length,
+        upsertOuraSessions: async (_u, rows) => { writes.sessions += rows.length; return rows.length },
         getLatestOuraCloudHeartrateAt: async () => null,
         getUserById: async () => ({ id: USER, timezone: 'Australia/Brisbane' }) as User,
       },
@@ -107,7 +114,7 @@ describe('handleOuraWebhookEvent (#2859)', () => {
       expiresAt: new Date(Date.now() + 86_400_000), scope: 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2Daily',
       ouraUserId: OURA_USER, updatedAt: new Date(),
     }
-    writes.daily = 0; writes.sleep = 0; writes.tombstoned = []
+    writes.daily = 0; writes.sleep = 0; writes.sessions = 0; writes.tombstoned = []
     heartRate.mockReset()
     fetchMock.mockReset()
     vi.stubGlobal('fetch', fetchMock)
@@ -123,11 +130,21 @@ describe('handleOuraWebhookEvent (#2859)', () => {
   it('fetches the named document with the user\'s token and writes it', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(FIXTURES.daily_readiness))
     const out = await handleOuraWebhookEvent(deps(), event())
-    expect(out).toEqual({ result: 'written', counts: { ...NO_WRITES, dailyRows: 1 } })
+    expect(out).toEqual({ result: 'written', counts: { ...NO_WRITES, dailyRows: 1, cloudDays: 1 } })
     const [url, init] = fetchMock.mock.calls[0]
     expect(String(url)).toBe(`${OURA_API_BASE}/v2/usercollection/daily_readiness/rd-1`)
     expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer acc')
     expect(writes.daily).toBe(1)
+  })
+
+  // #2982: sessions are a newly read type; the `session` scope is already granted.
+  it('reads a session event from the session path and writes it', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(FIXTURES.session))
+    const out = await handleOuraWebhookEvent(deps(), event({ data_type: 'session', object_id: 'se-1' }))
+    expect(out).toEqual({ result: 'written', counts: { ...NO_WRITES, sessions: 1 } })
+    expect(String(fetchMock.mock.calls[0][0])).toBe(`${OURA_API_BASE}/v2/usercollection/session/se-1`)
+    expect(writes.sessions).toBe(1)
+    expect(heartRate).not.toHaveBeenCalled()
   })
 
   it('reads vo2_max events from the vO2_max path', async () => {
@@ -226,6 +243,9 @@ describe('catchUpOuraCloudHeartRate (#2895)', () => {
   let newest: Date | null
   let since: Date | null
   const upserts: { points: number; tz: string }[] = []
+  const contexts: (string | null)[] = []
+  /** What the fake upsert answers; `null` = every point it is given. */
+  let written: number | null
 
   const deps = (timezone: string | null = 'Australia/Brisbane'): Pick<OuraWebhookDeps, 'repo' | 'config'> => ({
     config: CONFIG,
@@ -244,7 +264,13 @@ describe('catchUpOuraCloudHeartRate (#2895)', () => {
       upsertOuraCloudSleep: async () => ({ written: 0, skippedOverlap: 0 }),
       tombstoneOuraCloudSleep: async () => 0,
       upsertOuraWorkouts: async () => 0,
-      upsertOuraCloudHeartrate: async (_u, rows, tz) => { upserts.push({ points: rows.length, tz }); return rows.length },
+      upsertOuraCloudHeartrate: async (_u, rows, tz) => {
+        upserts.push({ points: rows.length, tz }); contexts.push(...rows.map(r => r.context ?? null))
+        return written ?? rows.length
+      },
+      upsertOuraCloudSleepPeriods: async () => 0,
+      upsertOuraCloudDaily: async () => 0,
+      upsertOuraSessions: async () => 0,
       getLatestOuraCloudHeartrateAt: async (_u, from) => { since = from; return newest },
       getUserById: async () => ({ id: USER, timezone }) as User,
     },
@@ -252,8 +278,11 @@ describe('catchUpOuraCloudHeartRate (#2895)', () => {
 
   beforeEach(() => {
     process.env.OURA_TOKEN_KEY = 'k'.repeat(48)
-    newest = null; since = null; upserts.length = 0
+    newest = null; since = null; upserts.length = 0; contexts.length = 0; written = null
     resetOuraCloudHeartRateThrottle()
+    resetOuraCloudReportThrottle()
+    reportServerError.mockReset()
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
     fetchMock.mockReset()
     fetchMock.mockImplementation(async () => jsonResponse({
       data: [
@@ -267,7 +296,10 @@ describe('catchUpOuraCloudHeartRate (#2895)', () => {
   afterEach(() => {
     process.env.OURA_TOKEN_KEY = savedKey
     vi.unstubAllGlobals()
+    vi.restoreAllMocks()
   })
+
+  const reported = () => reportServerError.mock.calls.map(c => (c[0] as Error).message)
 
   it('reads from the newest oura_cloud point to now and writes in the user\'s timezone', async () => {
     newest = new Date('2026-10-13T22:30:00Z')
@@ -295,5 +327,69 @@ describe('catchUpOuraCloudHeartRate (#2895)', () => {
     startOuraCloudHeartRateCatchUp(deps(), USER, now + 6 * 60_000)
     await vi.waitFor(() => expect(upserts).toHaveLength(2))
     expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  // #2982: no Oura heart rate had landed. A normal page must land rows, with Oura's labels kept.
+  it('lands a normal heart-rate page, keeping each sample\'s label as its context, and reports nothing', async () => {
+    fetchMock.mockImplementation(async () => jsonResponse({
+      data: [
+        { timestamp: '2026-10-14T00:00:00+00:00', timestamp_unix: 1791936000000, bpm: 58, source: 'rest' },
+        { timestamp: '2026-10-14T00:05:00+00:00', timestamp_unix: 1791936300000, bpm: 54, source: 'sleep' },
+        { timestamp: '2026-10-14T00:10:00+00:00', timestamp_unix: 1791936600000, bpm: 121, source: 'workout' },
+      ],
+      next_token: null,
+    }))
+    expect(await catchUpOuraCloudHeartRate(deps(), USER, now)).toBe(3)
+    expect(contexts).toEqual(['rest', 'sleep', 'workout'])
+    expect(reportServerError).not.toHaveBeenCalled()
+  })
+
+  it('keeps a reading whose label Oura added after the pinned spec, with no context', async () => {
+    fetchMock.mockImplementation(async () => jsonResponse({
+      data: [{ timestamp: '2026-10-14T00:00:00+00:00', timestamp_unix: 1791936000000, bpm: 58, source: 'nap' }],
+      next_token: null,
+    }))
+    expect(await catchUpOuraCloudHeartRate(deps(), USER, now)).toBe(1)
+    expect(contexts).toEqual([null])
+  })
+
+  it('reports a refused heart-rate catch-up (401 or 403) instead of swallowing it', async () => {
+    fetchMock.mockImplementation(async () => new Response('', { status: 401 }))
+    startOuraCloudHeartRateCatchUp(deps(), USER, now)
+    await vi.waitFor(() => expect(reportServerError).toHaveBeenCalledTimes(1))
+    expect(reported()[0]).toMatch(/webhook-heartrate:refused: the heart-rate read was refused: Oura answered 401/)
+
+    resetOuraCloudHeartRateThrottle(); resetOuraCloudReportThrottle(); reportServerError.mockReset()
+    fetchMock.mockImplementation(async () => new Response('', { status: 403 }))
+    startOuraCloudHeartRateCatchUp(deps(), USER, now)
+    await vi.waitFor(() => expect(reportServerError).toHaveBeenCalledTimes(1))
+    expect(reported()[0]).toMatch(/Oura answered 403/)
+    expect(upserts).toEqual([])
+  })
+
+  it('reports an empty answer over an hour or more, and not a short one', async () => {
+    fetchMock.mockImplementation(async () => jsonResponse({ data: [], next_token: null }))
+    expect(await catchUpOuraCloudHeartRate(deps(), USER, now)).toBe(0)
+    expect(reported()).toEqual([expect.stringMatching(/webhook-heartrate:empty: Oura answered no heart rate for the last 168 h \(none stored this week\)/)])
+
+    resetOuraCloudReportThrottle(); reportServerError.mockReset()
+    newest = new Date(now - 10 * 60_000)
+    expect(await catchUpOuraCloudHeartRate(deps(), USER, now)).toBe(0)
+    expect(reportServerError).not.toHaveBeenCalled()
+  })
+
+  it('reports rows that failed the spec\'s shape, and rows read but none written', async () => {
+    fetchMock.mockImplementation(async () => jsonResponse({
+      data: [{ timestamp: 'not a time', bpm: 60, source: 'awake' }, { timestamp: '2026-10-14T01:00:00+00:00', bpm: 61, source: 'awake' }],
+      next_token: null,
+    }))
+    written = 0
+    expect(await catchUpOuraCloudHeartRate(deps(), USER, now)).toBe(0)
+    expect(reported()).toEqual([
+      expect.stringMatching(/webhook-heartrate:dropped: 1 of 2 rows did not match the spec/),
+      expect.stringMatching(/webhook-heartrate:none-written: 1 rows read, 1 plausible, 0 written/),
+    ])
+    // Counts only: never a reading.
+    expect(reported().join(' ')).not.toMatch(/\b61\b/)
   })
 })

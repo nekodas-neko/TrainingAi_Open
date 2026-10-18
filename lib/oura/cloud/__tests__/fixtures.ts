@@ -22,11 +22,11 @@ export const dailySleep = {
 
 export const dailyActivity = {
   id: 'da-1', day: DAY, score: 74, timestamp: `${DAY}T04:00:00+10:00`,
-  active_calories: 512, average_met_minutes: 1.6, class_5_min: null,
+  active_calories: 512, average_met_minutes: 1.6, class_5_min: '0123345',
   contributors: { meet_daily_targets: 60, move_every_hour: 95, recovery_time: 100, stay_active: 70, training_frequency: 80, training_volume: 90 },
   equivalent_walking_distance: 9800, high_activity_met_minutes: 30, high_activity_time: 1200, inactivity_alerts: 1,
   low_activity_met_minutes: 210, low_activity_time: 14400, medium_activity_met_minutes: 120, medium_activity_time: 2700,
-  met: { interval: 60, items: [1.2], timestamp: `${DAY}T04:00:00+10:00` }, meters_to_target: 1200, non_wear_time: 1800,
+  met: { interval: 60, items: [1.2, null, 3.5], timestamp: `${DAY}T04:00:00+10:00` }, meters_to_target: 1200, non_wear_time: 1800,
   resting_time: 28800, sedentary_met_minutes: 10, sedentary_time: 30000, steps: 9123, target_calories: 500,
   target_meters: 10000, total_calories: 2650,
 }
@@ -49,14 +49,26 @@ export const sleepPeriod = {
   time_in_bed: 28800, total_sleep_duration: 26100, awake_time: 2700, light_sleep_duration: 13500,
   deep_sleep_duration: 5400, rem_sleep_duration: 7200, efficiency: 91, latency: 600,
   average_heart_rate: 54.3, lowest_heart_rate: 47, average_hrv: 62, average_breath: 14.6, restless_periods: 180,
-  sleep_phase_5_min: '4422113', heart_rate: null, hrv: null, movement_30_sec: null, readiness: null,
-  readiness_score_delta: null, sleep_algorithm_version: 'v2', sleep_analysis_reason: null, sleep_phase_30_sec: null,
-  sleep_score_delta: null, ring_id: null, app_sleep_phase_5_min: null,
+  sleep_phase_5_min: '4422113',
+  // Each series carries its own interval; these differ on purpose.
+  heart_rate: { interval: 300, items: [58, null, 52.5], timestamp: '2026-10-09T22:30:00+10:00' },
+  hrv: { interval: 600, items: [48, 61], timestamp: '2026-10-09T22:30:00+10:00' },
+  movement_30_sec: '1121341', readiness: null, readiness_score_delta: null, sleep_algorithm_version: 'v2',
+  sleep_analysis_reason: 'foreground_sleep_analysis', sleep_phase_30_sec: '4422113', sleep_score_delta: null,
+  ring_id: 'ring-enc-1', app_sleep_phase_5_min: null,
 }
 
 export const workout = {
   id: 'wo-1', day: DAY, activity: 'running', calories: 420.5, distance: 6012.3, intensity: 'moderate',
-  label: null, source: 'autodetected', start_datetime: '2026-10-10T07:00:00+10:00', end_datetime: '2026-10-10T07:40:00+10:00',
+  label: 'Morning run', source: 'autodetected', start_datetime: '2026-10-10T07:00:00+10:00', end_datetime: '2026-10-10T07:40:00+10:00',
+}
+
+export const session = {
+  id: 'se-1', day: DAY, type: 'breathing', mood: 'good',
+  start_datetime: '2026-10-10T12:00:00+10:00', end_datetime: '2026-10-10T12:10:00+10:00',
+  heart_rate: { interval: 5, items: [66, 64, null], timestamp: '2026-10-10T12:00:00+10:00' },
+  heart_rate_variability: { interval: 5, items: [40, 44], timestamp: '2026-10-10T12:00:00+10:00' },
+  motion_count: { interval: 5, items: [0, 1], timestamp: '2026-10-10T12:00:00+10:00' },
 }
 
 export const heartRateRows = [
@@ -76,6 +88,7 @@ export const FIXTURES = {
   vo2_max: vo2Max,
   sleep: sleepPeriod,
   workout,
+  session,
 } as const
 
 export function jsonResponse(body: unknown, status = 200) {

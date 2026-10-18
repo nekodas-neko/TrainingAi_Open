@@ -206,6 +206,25 @@ export async function backfillOuraCloud(deps: OuraBackfillDeps, userId: string, 
 
 // ── After a connect ───────────────────────────────────────────────────────────────────────────
 
+/**
+ * What a finished connect backfill reports besides a stop (#2982): types Oura refused with a 403,
+ * documents or rows that failed the spec's shape, and a heart-rate pass that read nothing although
+ * the grant covers it. Each is otherwise visible only in a report nobody reads.
+ */
+export function reportBackfillGaps(userId: string, report: OuraBackfillReport): void {
+  if (report.forbidden.length > 0) {
+    reportOuraCloudIssue('connect-backfill:forbidden', `Oura refused ${report.forbidden.join(', ')} (403)`, { userId })
+  }
+  if (report.dropped > 0) {
+    reportOuraCloudIssue('connect-backfill:dropped', `${report.dropped} documents or rows did not match the spec`, { userId })
+  }
+  const heartRateSkipped = report.stoppedEarly != null || report.notShared.includes('heartrate') ||
+    report.forbidden.includes('heartrate') || report.refusedDespiteGrant.includes('heartrate')
+  if (!report.dryRun && !heartRateSkipped && (report.documents.heartrate ?? 0) === 0) {
+    reportOuraCloudIssue('connect-backfill:heartrate-empty', `Oura answered no heart rate for ${report.from}..${report.to}`, { userId })
+  }
+}
+
 const running = new Set<string>()
 
 /**
@@ -237,6 +256,7 @@ export function startOuraConnectBackfill(userId: string): void {
         console.warn(`[oura] connect backfill stopped early: ${result.report.stoppedEarly}`)
         reportOuraCloudIssue('connect-backfill:stopped-early', result.report.stoppedEarly, { userId })
       }
+      if (result.ok) reportBackfillGaps(userId, result.report)
       // The user's choice on Oura's consent page, not a failure: logged, never reported.
       if (result.ok && result.report.notShared.length > 0) {
         console.info(`[oura] connect backfill skipped what the user did not share with us: ${result.report.notShared.join(', ')}`)

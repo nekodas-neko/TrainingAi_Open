@@ -1532,7 +1532,13 @@ export interface WorkoutRepository {
   /** #2859: Oura Cloud workouts, keyed by Oura's id; `reviewed` is kept. Returns rows written. */
   upsertOuraWorkouts(userId: string, rows: import('./postgres/slices/oura').OuraWorkoutUpsertRow[]): Promise<number>
   /** #2859: Oura Cloud's HR series (`oura_cloud`). Never displaces or duplicates a ring or strap row. */
-  upsertOuraCloudHeartrate(userId: string, rows: { timestamp: Date; bpm: number }[], tz: string): Promise<number>
+  upsertOuraCloudHeartrate(userId: string, rows: { timestamp: Date; bpm: number; context?: string | null }[], tz: string): Promise<number>
+  /** #2982: Oura's sleep periods as sent (series, hypnograms, flags); read by no screen. Returns rows written. */
+  upsertOuraCloudSleepPeriods(userId: string, rows: import('./postgres/slices/oura').OuraCloudSleepPeriodRow[]): Promise<number>
+  /** #2982: Oura's per-day series, goals, contributors and stress label; sets only the fields each row carries. */
+  upsertOuraCloudDaily(userId: string, rows: import('./postgres/slices/oura').OuraCloudDailyRow[]): Promise<number>
+  /** #2982: Oura's sessions (breathing, meditation …) with their series and mood. */
+  upsertOuraSessions(userId: string, rows: import('./postgres/slices/oura').OuraSessionRow[]): Promise<number>
   /** #2895: the newest `oura_cloud` HR point at or after `since`; where the next Cloud HR read starts. */
   getLatestOuraCloudHeartrateAt(userId: string, since: Date): Promise<Date | null>
   upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]): Promise<void>
