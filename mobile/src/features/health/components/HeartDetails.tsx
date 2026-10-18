@@ -183,6 +183,7 @@ export function HeartTrendCard({
         gridlines: true,
         yAxis: true,
         fill: true,
+        dots: 'isolated',
         color,
         axisLabels: weekdayAxis(shown.map((day) => day.date)),
       }}

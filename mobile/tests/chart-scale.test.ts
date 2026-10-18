@@ -12,6 +12,8 @@ import {
   isPointAlignedAxis,
   pointCentreX,
   dotMask,
+  lineSegments,
+  lastReadingIndex,
 } from '../src/shared/ui/chartScale.ts';
 import { niceTicks as nutritionNiceTicks } from '../src/features/nutrition/data/heart-response-view.ts';
 
@@ -130,4 +132,31 @@ test('dotMask dots every reading, or only the latest and the ones with no neighb
   assert.deepEqual(dotMask(values, 'isolated'), [true, false, false, false, false, true, false, true]);
   assert.deepEqual(dotMask([1, 2, 3], 'isolated'), [false, false, true]);
   assert.deepEqual(dotMask([1, 2, null], 'isolated'), [false, false, false]);
+});
+
+// A body reading every few days is a series with empty days between: a broken line leaves each
+// reading alone, which is the "floating dots" of #3020.
+test('lineSegments breaks at an empty day by default, so sparse readings are separate runs', () => {
+  const sparse = [{ v: 1 }, null, null, { v: 2 }, null, { v: 3 }];
+  assert.deepEqual(
+    lineSegments(sparse, 'break').map((run) => run.length),
+    [1, 1, 1],
+  );
+});
+
+test('lineSegments connect draws one run through every reading, across empty days', () => {
+  const sparse = [{ v: 1 }, null, null, { v: 2 }, null, { v: 3 }];
+  assert.deepEqual(lineSegments(sparse, 'connect'), [[{ v: 1 }, { v: 2 }, { v: 3 }]]);
+  assert.deepEqual(lineSegments([null, null], 'connect'), [[]]);
+});
+
+test('lineSegments keeps a gap in a 14-day series that breaks', () => {
+  const run = lineSegments([1, 2, null, 4, 5], 'break');
+  assert.deepEqual(run, [[1, 2], [4, 5]]);
+});
+
+test('lastReadingIndex finds the newest reading, skipping trailing empty days', () => {
+  assert.equal(lastReadingIndex([1, null, 3, null]), 2);
+  assert.equal(lastReadingIndex([null, null]), -1);
+  assert.equal(lastReadingIndex([]), -1);
 });

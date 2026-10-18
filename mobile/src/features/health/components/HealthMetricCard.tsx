@@ -8,7 +8,7 @@ import { metricValue } from '../data/models';
 // line). Everything is off unless a card asks, so the other screens keep their charts unchanged.
 export type CardChartOptions = Pick<
   ComponentProps<typeof LineChart>,
-  'readable' | 'gridlines' | 'yAxis' | 'target' | 'axisLabels' | 'fill' | 'domain' | 'color' | 'dots'
+  'readable' | 'gridlines' | 'yAxis' | 'target' | 'axisLabels' | 'fill' | 'domain' | 'color' | 'dots' | 'gaps'
 >;
 export function HealthMetricCard({
   title,

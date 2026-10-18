@@ -9,7 +9,10 @@ import {
   guideSummary,
   includeTarget,
   dotMask,
+  lastReadingIndex,
+  lineSegments,
   isPointAlignedAxis,
+  type GapMode,
   meetBox,
   pointCentreX,
   niceTicks,
@@ -48,6 +51,7 @@ export function LineChart({
   yAxis = false,
   target: targetProp,
   dots = 'all',
+  gaps = 'break',
   compactAxisLabels = false,
 }: {
   points: readonly { label: string; value: number | null; x?: number }[];
@@ -76,6 +80,8 @@ export function LineChart({
   yAxis?: boolean;
   target?: ChartTarget;
   dots?: 'all' | 'isolated';
+  /** 'break' (default) leaves a gap where a day has no reading; 'connect' draws the line across it. */
+  gaps?: GapMode;
   compactAxisLabels?: boolean;
 }) {
   const { theme } = useTheme();
@@ -134,19 +140,12 @@ export function LineChart({
           y: max === min ? 45 : 78 - ((point.value - min) / (max - min)) * 66,
         },
   );
-  const segments: { x: number; y: number }[][] = [[]];
-  for (const point of coords) {
-    if (point) {
-      segments.at(-1)!.push(point);
-    } else if (segments.at(-1)!.length) {
-      segments.push([]);
-    }
-  }
+  const segments = lineSegments(coords, gaps);
   const color = accent ?? theme.tones[tone].foreground;
-  const showDot = dotMask(
-    coords.map((point) => (point ? 1 : null)),
-    dots,
-  );
+  const readings = coords.map((point) => (point ? 1 : null));
+  const showDot = dotMask(readings, dots);
+  // A connected line has no gaps to explain, so its newest reading is the one dot made larger.
+  const endIndex = gaps === 'connect' ? lastReadingIndex(readings) : -1;
   const ticks = gridlines || yAxis ? niceTicks(min, max) : [];
   const tickTexts = tickLabels(ticks);
   // The plot sits right of the y-axis column; overlays are absolute so the Svg and the touch
@@ -261,7 +260,13 @@ export function LineChart({
           {coords.map(
             (point, index) =>
               point &&
-              showDot[index] && <Circle key={index} cx={point.x} cy={point.y} r={3} fill={color} />,
+              showDot[index] && <Circle
+                  key={index}
+                  cx={point.x}
+                  cy={point.y}
+                  r={index === endIndex ? 4.5 : 3}
+                  fill={color}
+                />,
           )}
         </Svg>
       )}
