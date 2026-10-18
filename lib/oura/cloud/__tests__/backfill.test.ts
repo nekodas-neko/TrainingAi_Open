@@ -144,7 +144,7 @@ describe('backfillOuraCloud (#2859)', () => {
     expect(out.report.refusedDespiteGrant).toEqual([])
     expect(out.report.stoppedEarly).toBeNull()
     expect(out.report.documents).toMatchObject({ daily_readiness: 1, daily_stress: 1, sleep: 1, workout: 1, heartrate: 4 })
-    for (const type of ['daily_spo2', 'daily_resilience', 'daily_cardiovascular_age', 'vo2_max']) {
+    for (const type of ['daily_spo2', 'daily_resilience', 'daily_cardiovascular_age', 'vo2_max'] as const) {
       expect(out.report.documents[type]).toBeUndefined()
     }
     expect(fetchMock.mock.calls.some(c => ungranted.some(p => String(c[0]).includes(`/${p}`)))).toBe(false)
