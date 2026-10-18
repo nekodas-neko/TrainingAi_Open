@@ -52,6 +52,10 @@ export interface BodyMetrics {
    */
   hrvSource?: string
   restingHeartRateSource?: string
+  /** #2825. READ-ONLY provenance for `steps` and `spo2Pct` (`source_map->>'steps'`,
+   *  `source_map->>'spo2_pct'`), for the same per-device normal. Never written. */
+  stepsSource?: string
+  spo2Source?: string
 }
 
 export interface ActivityLog {

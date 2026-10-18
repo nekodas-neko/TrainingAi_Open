@@ -477,6 +477,34 @@ describe('#2984: inputs carry their device, and temperature and breathing fall b
     expect(r.stage).toBe('provisional')
   })
 
+  it('#2825: an Oura Cloud day restarts the steps and SpO2 normals', () => {
+    const raw = emptyRaw('Australia/Brisbane')
+    // Both are daytime units, so day D scores D − 1.
+    raw.bodyMetrics = [
+      ...Array.from({ length: 20 }, (_, i) => ({
+        date: shiftDateStr(D, -(i + 2)), steps: 9000 + (i % 4) * 100, spo2Pct: 96 + (i % 2), stepsSource: 'oura_ble', spo2Source: 'oura_ble',
+      })),
+      { date: shiftDateStr(D, -1), steps: 8000, spo2Pct: 95, stepsSource: 'oura_cloud', spo2Source: 'oura_cloud' },
+    ]
+    const input = assembleShadowInputs(prepareShadowHistory(raw), D)
+    for (const [id, value] of [['activity.yesterday_movement', 8000], ['body.spo2', 95]] as const) {
+      const u = input.units[id]!
+      expect(u.today).toMatchObject({ value, source: 'oura_cloud' })
+      expect(new Set(u.history.map(o => o.source))).toEqual(new Set(['oura_ble']))
+      const r = unit(id, u)
+      expect(r.flags).toContain('source_changed')
+      expect(r.stage).toBe('provisional')
+    }
+  })
+
+  it('#2825: a steps or SpO2 row from before provenance keeps the table label', () => {
+    const raw = emptyRaw('Australia/Brisbane')
+    raw.bodyMetrics = [{ date: shiftDateStr(D, -1), steps: 8000, spo2Pct: 95 }]
+    const input = assembleShadowInputs(prepareShadowHistory(raw), D)
+    expect(input.units['activity.yesterday_movement']!.today).toMatchObject({ source: 'body_metrics' })
+    expect(input.units['body.spo2']!.today).toMatchObject({ source: 'body_metrics' })
+  })
+
   it('takes Oura\'s temperature deviation where the ring summary has none for the night', () => {
     const input = assembleShadowInputs(prepareShadowHistory(ringThenOura()), D)
     expect(input.units['body.temperature']!.today).toMatchObject({ date: D, value: 0.3, source: 'oura_cloud' })

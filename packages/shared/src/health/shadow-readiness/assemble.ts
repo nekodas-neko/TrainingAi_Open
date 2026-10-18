@@ -38,6 +38,9 @@ export interface ShadowRawHistory {
     /** #2984: the device behind `hrvMs` / `restingHeartRate` (`source_map`). */
     hrvSource?: string | null
     restingHeartRateSource?: string | null
+    /** #2825: the device behind `steps` / `spo2Pct` (`source_map`). */
+    stepsSource?: string | null
+    spo2Source?: string | null
   }[]
   dailySummaries: readonly { date: string; recoveryIndexHours: number | null; tempDevC: number | null; breathAvgRpm: number | null }[]
   /** `oura_daily` rows: wear time for low-wear exclusion, Oura's own temperature deviation (#2984)
@@ -213,12 +216,14 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
     'heart.overnight_settling': compact(summaries.map(s => obs(s.date, s.recoveryIndexHours, RING_SUMMARY_SRC))),
     'heart.hr_recovery': [...hrrByDay.entries()].sort(([a], [b]) => a.localeCompare(b))
       .map(([d, e]) => ({ date: d, value: median(e.values)!, source: e.source, rung: 'derived' as const })),
-    'activity.yesterday_movement': compact(metrics.map(m => obs(m.date, m.steps, 'body_metrics'))),
+    // #2825: steps and SpO2 carry their device (`source_map`) too; a row from before provenance
+    // keeps the table label.
+    'activity.yesterday_movement': compact(metrics.map(m => obs(m.date, m.steps, m.stepsSource ?? 'body_metrics'))),
     'activity.zone_minutes_week': zoneWeek,
     'activity.training_load': trainingLoad,
     'body.temperature': perInput(d => summaryByDate.get(d)?.tempDevC, ouraTemperature),
     'body.breathing_rate': perInput(d => summaryByDate.get(d)?.breathAvgRpm, nightBreathing),
-    'body.spo2': compact(metrics.map(m => obs(m.date, m.spo2Pct, 'body_metrics'))),
+    'body.spo2': compact(metrics.map(m => obs(m.date, m.spo2Pct, m.spo2Source ?? 'body_metrics'))),
     'body.daytime_stress': daytimeStressSeries(raw),
     'body.weight_vs_plan': [...raw.weightVsPlan.entries()].map(([d, v]) => ({ date: d, value: v, source: 'energy_balance', rung: null })),
   }
