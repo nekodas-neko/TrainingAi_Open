@@ -256,7 +256,11 @@ export function startOuraConnectBackfill(userId: string): void {
         console.warn(`[oura] connect backfill stopped early: ${result.report.stoppedEarly}`)
         reportOuraCloudIssue('connect-backfill:stopped-early', result.report.stoppedEarly, { userId })
       }
-      if (result.ok) reportBackfillGaps(userId, result.report)
+      if (result.ok) {
+        reportBackfillGaps(userId, result.report)
+        const { documents, counts } = result.report
+        console.info(`[oura] connect backfill heart rate: ${documents.heartrate ?? 0} read, ${counts.heartRatePoints} written`)
+      }
       // The user's choice on Oura's consent page, not a failure: logged, never reported.
       if (result.ok && result.report.notShared.length > 0) {
         console.info(`[oura] connect backfill skipped what the user did not share with us: ${result.report.notShared.join(', ')}`)

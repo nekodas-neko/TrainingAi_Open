@@ -226,6 +226,9 @@ export async function catchUpOuraCloudHeartRate(
   const points = mapHeartRateRows(got.rows)
   const written = points.length === 0 ? 0 : await deps.repo.upsertOuraCloudHeartrate(userId, points, tz)
   const hours = Math.round((now - from.getTime()) / 3_600_000)
+  // Every read says what happened to it, so a partial loss to the device-row cover filter (plausible
+  // points not written) shows in the logs too, not only a total one.
+  console.info(`[oura] heart-rate catch-up from ${from.toISOString()}: ${got.rows.length} read, ${points.length} plausible, ${written} written, ${points.length - written} covered by device rows`)
   if (got.dropped > 0) {
     reportOuraCloudIssue('webhook-heartrate:dropped', `${got.dropped} of ${got.rows.length + got.dropped} rows did not match the spec`, { userId })
   }

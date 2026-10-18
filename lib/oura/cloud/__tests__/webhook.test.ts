@@ -344,6 +344,22 @@ describe('catchUpOuraCloudHeartRate (#2895)', () => {
     expect(reportServerError).not.toHaveBeenCalled()
   })
 
+  // #2982 evidence: Cloud points did land, so a partial loss to the cover filter must show as well.
+  it('logs how many plausible points the device-row cover filter kept out', async () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    fetchMock.mockImplementation(async () => jsonResponse({
+      data: [
+        { timestamp: '2026-10-14T00:00:00+00:00', bpm: 58, source: 'rest' },
+        { timestamp: '2026-10-14T00:05:00+00:00', bpm: 54, source: 'rest' },
+      ],
+      next_token: null,
+    }))
+    written = 1
+    expect(await catchUpOuraCloudHeartRate(deps(), USER, now)).toBe(1)
+    expect(info).toHaveBeenCalledWith(expect.stringMatching(/2 read, 2 plausible, 1 written, 1 covered by device rows$/))
+    expect(reportServerError).not.toHaveBeenCalled()
+  })
+
   it('keeps a reading whose label Oura added after the pinned spec, with no context', async () => {
     fetchMock.mockImplementation(async () => jsonResponse({
       data: [{ timestamp: '2026-10-14T00:00:00+00:00', timestamp_unix: 1791936000000, bpm: 58, source: 'nap' }],
