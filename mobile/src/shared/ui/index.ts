@@ -4,6 +4,7 @@ export { ChatComposer } from './ChatComposer';
 export { GroupedBarChart } from './GroupedBarChart';
 export { AppButton } from './AppButton';
 export { Avatar } from './Avatar';
+export { AttentionDot } from './AttentionDot';
 export { Badge } from './Badge';
 export { Card } from './Card';
 export { ExpandableCard } from './ExpandableCard';

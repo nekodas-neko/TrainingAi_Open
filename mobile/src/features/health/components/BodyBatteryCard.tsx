@@ -37,6 +37,7 @@ export function BodyBatteryCard() {
     {
       colors: theme.colors,
       tones: theme.tones,
+      status: theme.status,
     },
   );
   return (
