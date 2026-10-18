@@ -20,6 +20,7 @@ vi.mock('@/lib/data', () => ({
     getOuraDailySummary: async () => [{ nHistory: 60 }],
     listBodyMetrics: async () => [{ date: '2026-09-20', weightKg: 70 }, { date: DAY, restingHeartRate: 55 }],
     getUserById: async () => ({ dateOfBirth: '1993-06-15', sex: 'male' }),
+    getOuraCloudActivitySeries: async () => [],
     getOuraDaytimeSignals: async () => ({
       temp: [],
       // One 0x50 event of three bins ending 12:02.

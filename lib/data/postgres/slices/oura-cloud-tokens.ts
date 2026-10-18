@@ -7,7 +7,8 @@
 // **This slice never sees a plaintext token.** `access_token` and `refresh_token` go in and come out
 // as `EncryptedOuraToken`, which only `lib/oura/cloud/token-cipher.ts` can make or open. Every method
 // is scoped to the caller's user.
-import { eq, sql } from 'drizzle-orm'
+import { desc, eq, sql } from 'drizzle-orm'
+import { toAestDay } from '@trainingai/shared/date-utils'
 import type { getDb } from '../client'
 import * as s from '../schema'
 import type { EncryptedOuraToken } from '@/lib/oura/cloud/token-cipher'
@@ -79,4 +80,39 @@ export async function deleteOuraCloudTokens(db: Db, userId: string): Promise<boo
 export async function getUserIdByOuraUserId(db: Db, ouraUserId: string): Promise<string | null> {
   const [row] = await db.select({ userId: t.userId }).from(t).where(eq(t.ouraUserId, ouraUserId)).limit(1)
   return row?.userId ?? null
+}
+
+/**
+ * #2985: the local day the user switched to the Oura API, or null when they never did.
+ *
+ * It has to survive a disconnect and reconnect (the Oura screen offers only "Disconnect", so
+ * re-running the import means connecting again, which recreates the `oura_tokens` row), so it is
+ * not the connection's creation:
+ *   - with an Oura Cloud connection, it is the day of the user's newest raw Bluetooth frame (by
+ *     ring time; `recorded_at`, when the server received it). The raw archive is never pruned or
+ *     mutated, and packing keeps the newest frames unpacked, so this is the day the ring stopped
+ *     sending. If the ring goes back on Bluetooth, the day moves forward with it;
+ *   - with no Bluetooth history at all, it is the day the connection was created;
+ *   - without a connection, there is no switch.
+ * Days are in the user's timezone.
+ *
+ * A row still holding a personal access token predates the OAuth connector (#2858), so it reads as
+ * no connection.
+ */
+export async function getOuraCloudSwitchDay(db: Db, userId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ createdAt: t.createdAt, pat: t.personalAccessToken, access: t.accessToken, timezone: s.users.timezone })
+    .from(t)
+    .innerJoin(s.users, eq(s.users.id, t.userId))
+    .where(eq(t.userId, userId))
+    .limit(1)
+  if (!row || row.pat != null || row.access == null) return null
+  // The newest frame by ring time: a backward scan of the (user_id, ring_timestamp_ds, …) unique index.
+  const [lastFrame] = await db
+    .select({ recordedAt: s.ouraRawSamples.recordedAt })
+    .from(s.ouraRawSamples)
+    .where(eq(s.ouraRawSamples.userId, userId))
+    .orderBy(desc(s.ouraRawSamples.ringTimestampDs))
+    .limit(1)
+  return toAestDay(lastFrame?.recordedAt ?? row.createdAt, row.timezone)
 }

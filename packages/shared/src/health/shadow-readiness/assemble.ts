@@ -40,9 +40,12 @@ export interface ShadowRawHistory {
     restingHeartRateSource?: string | null
   }[]
   dailySummaries: readonly { date: string; recoveryIndexHours: number | null; tempDevC: number | null; breathAvgRpm: number | null }[]
-  /** `oura_daily` rows: wear time for low-wear exclusion, and Oura's own temperature deviation (#2984). */
-  wear: readonly { date: string; nonWearTimeSec?: number | null; temperatureDeviation?: number | null }[]
+  /** `oura_daily` rows: wear time for low-wear exclusion, Oura's own temperature deviation (#2984)
+   *  and its `stress_high` in seconds (#2985). */
+  wear: readonly { date: string; nonWearTimeSec?: number | null; temperatureDeviation?: number | null; stressHigh?: number | null }[]
   derived: readonly { day: string; stressHighMinutes: number | null }[]
+  /** The local day the user switched to the Oura API (`getOuraCloudSwitchDay`), or null. */
+  ouraCloudFrom?: string | null
   /** Strength sessions with their total volume. */
   workouts: readonly { startedAt: Date; volumeKg: number }[]
   /** The active program, for the ACWR baselining rule (OR-210). Null = no program to judge. */
@@ -216,7 +219,7 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
     'body.temperature': perInput(d => summaryByDate.get(d)?.tempDevC, ouraTemperature),
     'body.breathing_rate': perInput(d => summaryByDate.get(d)?.breathAvgRpm, nightBreathing),
     'body.spo2': compact(metrics.map(m => obs(m.date, m.spo2Pct, 'body_metrics'))),
-    'body.daytime_stress': compact([...raw.derived].sort((a, b) => a.day.localeCompare(b.day)).map(r => obs(r.day, r.stressHighMinutes, 'oura_daily_derived'))),
+    'body.daytime_stress': daytimeStressSeries(raw),
     'body.weight_vs_plan': [...raw.weightVsPlan.entries()].map(([d, v]) => ({ date: d, value: v, source: 'energy_balance', rung: null })),
   }
 
@@ -226,6 +229,30 @@ export function prepareShadowHistory(raw: ShadowRawHistory): PreparedShadowHisto
   for (const d of raw.unwellDates) excluded.set(d, 'unwell')
 
   return { raw, series, excluded }
+}
+
+/**
+ * Minutes of high daytime stress per day. Before the switch to the Oura API it is our own, from the
+ * ring's daytime HRV (`oura_daily_derived`). From the switch day on it is Oura's `stress_high`, taken
+ * as Oura calculated it (#2985), under source `oura_cloud`, so it learns its own normal (the scorer
+ * keeps baselines per source) rather than joining ours. A day before the switch never reads
+ * Oura's, so the older Cloud columns do not move a scored day.
+ */
+function daytimeStressSeries(raw: ShadowRawHistory): UnitObservation[] {
+  const from = raw.ouraCloudFrom ?? null
+  const byDay = new Map<string, UnitObservation>()
+  for (const r of raw.derived) {
+    const o = obs(r.day, r.stressHighMinutes, 'oura_daily_derived')
+    if (o) byDay.set(r.day, o)
+  }
+  if (from != null) {
+    for (const w of raw.wear) {
+      if (w.date < from) continue
+      const o = obs(w.date, w.stressHigh == null ? null : w.stressHigh / 60, 'oura_cloud')
+      if (o) byDay.set(w.date, o)
+    }
+  }
+  return [...byDay.values()].sort((a, b) => a.date.localeCompare(b.date))
 }
 
 /** Units whose value for day `D` is the night keyed to `D`. Everything else reads `D − 1`. */

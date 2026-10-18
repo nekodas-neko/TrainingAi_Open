@@ -115,7 +115,9 @@ const STRESS_DRAIN_RATE = 0.020 // battery points per minute at a full (100%) be
 // constants would still not be comparable.
 // v7 (issue 2235): the charge ceiling is resting HR + WAKING_REST_OFFSET_BPM, not 0.05 of reserve.
 // `rest+9bpm` replaces `rest0.05` so a reader can tell the two boundary forms apart from the stamp.
-export const BODY_BATTERY_MODEL_VERSION = `v7:rest+${WAKING_REST_OFFSET_BPM}bpm:chg${CHARGE_RATE}:drn${DRAIN_RATE}:str${STRESS_DRAIN_RATE}:hrmax-observed:oura-rule`
+// `oura-stress` (#2985): the stress drain can come from Oura's `stress_high`, and Oura's scores no
+// longer anchor the day.
+export const BODY_BATTERY_MODEL_VERSION = `v7:rest+${WAKING_REST_OFFSET_BPM}bpm:chg${CHARGE_RATE}:drn${DRAIN_RATE}:str${STRESS_DRAIN_RATE}:hrmax-observed:oura-rule:oura-stress`
 
 function labelFor(v: number): BodyBatteryResponse['label'] {
   if (v >= 75) return 'Charged'
@@ -152,7 +154,7 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
   const from28dIso = shiftDateStr(date, -28)
   const fromPeakWindowIso = shiftDateStr(date, -HR_PEAK_WINDOW_DAYS)
 
-  const [ouraRows, derivedRows, bodyMetrics, sleepSessions, hrRows, user, daytimeSignals, snapshotHistory] = await Promise.all([
+  const [ouraRows, derivedRows, bodyMetrics, sleepSessions, hrRows, user, daytimeSignals, snapshotHistory, ouraCloudFrom] = await Promise.all([
     repo.getOuraDaily(userId, date, date),
     repo.getOuraDailyDerived(userId, date, date),
     repo.listBodyMetrics(userId, from28dIso, date),
@@ -163,6 +165,7 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
     // Widened from today-only to the peak window: the same rows carry today's persisted anchor
     // AND the daily HR peaks the reserve is now resolved from.
     repo.getBodyBatteryHistory(userId, fromPeakWindowIso, date),
+    repo.getOuraCloudSwitchDay(userId),
   ])
 
   const ouraDay = ouraRows[0] ?? null
@@ -207,8 +210,8 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
   const wakeTime = rawWakeTime > now.getTime() ? (firstHrTime ?? dayMid.getTime()) : rawWakeTime
 
   // Anchor precedence (S2 — data-efficiency review §3.2): our own persisted composite
-  // readiness for today, then our own sleep score computed from last night's session, then
-  // the frozen Cloud columns (null for every post-re-key day — legacy arms only), then 50.
+  // readiness for today, then our own sleep score computed from last night's session, then 50.
+  // Oura's readiness and sleep scores are never an anchor (#2985).
   // The derived readiness row only exists once /api/readiness-score has run today, which is
   // exactly why the sleep-score fallback matters in the early morning.
   // Baselines from the prior nights only — same derivation the readiness route uses, so this
@@ -260,9 +263,6 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
       : null,
     derivedReadiness,
     ownSleepScore,
-    cloud: ouraDay
-      ? { readinessScore: ouraDay.readinessScore ?? null, sleepScore: ouraDay.sleepScore ?? null }
-      : null,
   })
 
   // ── Daytime stress series (dHRV) → extra drain ────────────────────────────
@@ -272,7 +272,11 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
   // daytime signal → empty series → no modifier (battery behaves exactly as before).
   const hrvRows = bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0)
   const dhrvBaseline = hrvRows.length ? hrvRows.reduce((s, m) => s + m.hrvMs!, 0) / hrvRows.length : null
-  const tempBaseline = daytimeSignals.temp.length
+  // #2985: the Oura API has no per-minute skin temperature, so after the switch the only temperatures
+  // are the ring's last minutes before it, overnight. A baseline needs at least one reading from the
+  // waking day; without one it is "not enough data" and the dHRV series is not built, never built
+  // on a night-time mean.
+  const tempBaseline = daytimeSignals.temp.some(t => t.tsMs >= wakeTime)
     ? daytimeSignals.temp.reduce((s, t) => s + t.valueC, 0) / daytimeSignals.temp.length
     : null
   // D5 — own daytime-HRV: a persisted-model lookup + closed-form eval, no ONNX inference and no
@@ -322,8 +326,22 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
       reportServerError(err, { userId, url: '/api/body-battery#stress' })
     }
   }
+  // #2985: where the dHRV series is absent, Oura's `stress_high` for the day drives the stress drain,
+  // from the day the user switched to the Oura API (an older day keeps what it had). It is a day's
+  // total with no times, so it is spread evenly over the waking span: the level is the share of the
+  // span Oura counted as high stress, and a full-deviation minute drains at STRESS_DRAIN_RATE,
+  // so the day's stress drain comes to about STRESS_DRAIN_RATE per high-stress minute.
+  const ouraStressHighMin = stressSeries.length === 0 && ouraCloudFrom != null && date >= ouraCloudFrom
+    && ouraDay?.stressHigh != null && ouraDay.stressHigh >= 0
+    ? Math.round(ouraDay.stressHigh / 60)
+    : null
+  const wakingSpanMin = Math.max(0, (now.getTime() - wakeTime) / 60_000)
+  const ouraStressLevel = ouraStressHighMin != null && wakingSpanMin > 0
+    ? -Math.min(1, ouraStressHighMin / wakingSpanMin)
+    : null
   // Step lookup: stressLevel (∈[−1,1]) of the most recent bucket at/under a time (30-min, held forward).
   const stressAt = (ms: number): number | null => {
+    if (ouraStressLevel != null) return ouraStressLevel
     let v: number | null = null
     for (const p of stressSeries) { if (p.t <= ms) v = p.stressLevel; else break }
     return v
@@ -425,7 +443,16 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
       observedPeak: hrMaxResolved.observedPeak,
       peakDays: hrMaxResolved.peakDays,
     },
-    stress: stressSeries.length
+    stress: ouraStressHighMin != null
+      ? {
+          // Oura's figure is a day's total: no moment-to-moment level, so no current reading or curve.
+          current: null,
+          draining: false,
+          extraDrained: Math.round(stressDrained * 10) / 10,
+          series: [],
+          highMinutes: ouraStressHighMin,
+        }
+      : stressSeries.length
       ? {
           current: Math.round(stressSeries[stressSeries.length - 1].stressLevel * 100) / 100,
           draining: (stressAt(now.getTime()) ?? 0) < 0,
@@ -434,7 +461,7 @@ export async function computeBodyBatteryDay(input: BodyBatteryDayInput): Promise
           highMinutes: stressSummary?.stressHighMinutes ?? null,
         }
       : null,
-    availability: [metricAvailability('daytimeStress', stressSeries.length > 0 ? stressSeries.length : null)],
+    availability: [metricAvailability('daytimeStress', stressSeries.length > 0 ? stressSeries.length : ouraStressHighMin)],
   }
 
   return { response, snapshot, hadPersistedAnchor: daySnapshot != null }

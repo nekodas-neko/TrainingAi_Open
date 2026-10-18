@@ -2,7 +2,9 @@
 //
 // Each table's own upsert decides what lands, so the ladder in `source-rank.ts` holds unchanged:
 //   - `oura_daily` and `body_metrics` merge per field. The ring's BLE values (`oura_ble`) and a manual
-//     entry outrank `oura_cloud`, so a Cloud value fills a field only where nothing better is stored.
+//     entry outrank `oura_cloud`, so a Cloud value fills a field only where nothing better is stored,
+//     except from the day the user switched to the Oura API: there a ring value is a partial left
+//     from the switch, and Oura's replaces it (`mergeSet`, #2985). A re-import rewrites such a day.
 //   - `sleep_sessions` and `oura_heartrate` are keyed by instant, not by day, so a Cloud period or
 //     point that a ring, strap or manual row already covers is skipped instead of duplicated.
 //   - `oura_workouts` holds only Oura's workouts, keyed by Oura's id.

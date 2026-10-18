@@ -11,6 +11,7 @@ import { collapseOnConflict, keepLatestNonNull } from '../collapse-conflicts'
 import { bodyCompSnapshot } from '@trainingai/shared/health/body-composition'
 import { correctBodyFatPct, type BodyFatCalibration } from '@trainingai/shared/health/body-fat-calibration'
 import { mergeSet, initialSourceMap, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
+import { getOuraCloudSwitchDay } from './oura-cloud-tokens'
 import { resolveDsToMs, LAG_PERCENTILE, type ClockAnchor, type ClockOffsets } from '@/lib/oura-ble/clock'
 import { CORROBORATION, MIN_RELIABLE_SAMPLES, PLAUSIBLE_MIN_BPM, PLAUSIBLE_MAX_BPM, type ObservedHrProfile } from '@trainingai/shared/health/observed-hr'
 import { redecodeJobKind, canFollowRunningRedecode } from '@/lib/oura-ble/redecode-job-kind'
@@ -76,6 +77,8 @@ export function recordPruneFailure(db: Db, table: string, err: unknown): void {
 
 export async function upsertOuraDaily(db: Db, userId: string, rows: OuraDailyRow[], source: HealthSource): Promise<void> {
   if (rows.length === 0) return
+  // #2985: the Oura writers merge across the switch to the Oura API by day (`mergeSet`).
+  const ouraCloudFrom = source === 'oura_cloud' || source === 'oura_ble' ? await getOuraCloudSwitchDay(db, userId) : null
   await db
     .insert(s.ouraDaily)
     .values(rows.map(r => {
@@ -122,7 +125,7 @@ export async function upsertOuraDaily(db: Db, userId: string, rows: OuraDailyRow
     .onConflictDoUpdate({
       target: [s.ouraDaily.userId, s.ouraDaily.date],
       set: {
-        ...mergeSet('oura_daily', OURA_DAILY_SOURCE_COLS, source),
+        ...mergeSet('oura_daily', OURA_DAILY_SOURCE_COLS, source, { ouraCloudFrom }),
         syncedAt: sql`NOW()`,
       },
     })
@@ -835,6 +838,20 @@ export async function upsertOuraCloudDaily(db: Db, userId: string, rows: OuraClo
   return written
 }
 
+/**
+ * #2985: Oura's per-minute MET series and 5-minute activity class for the days in `[from, to]`, as
+ * stored. Oura's activity day starts at 4 a.m. local, so a local-midnight window needs the day
+ * before it too; `ouraCloudMetGrid` places every item by its own timestamp.
+ */
+export async function getOuraCloudActivitySeries(db: Db, userId: string, from: string, to: string): Promise<OuraCloudActivitySeries[]> {
+  const t = s.ouraCloudDaily
+  return db.select({ date: t.date, met: t.met, class5Min: t.class5Min }).from(t)
+    .where(and(eq(t.userId, userId), gte(t.date, from), lte(t.date, to)))
+    .orderBy(asc(t.date))
+}
+
+export interface OuraCloudActivitySeries { date: string; met: s.OuraSampleSeries | null; class5Min: string | null }
+
 /** One `oura_sessions` row: a session exactly as Oura last sent it. */
 export interface OuraSessionRow {
   ouraId: string
@@ -1473,15 +1490,17 @@ export async function getObservedHrProfile(
 export interface DayZoneSeconds { day: string; seconds: [number, number, number, number, number] }
 
 /** Compute one local day's zone-seconds from stored HR, using the caller's zone profile. Pure DB
- *  read → primitive; no persistence here. */
+ *  read → primitive; no persistence here. Null when the day has no usable heart rate: missing, never
+ *  a day of zero zone minutes (#2985). */
 export async function computeDayZoneSeconds(
   db: Db, userId: string, day: string, tz: string,
   profile: { maxHr: number; restingHr: number },
-): Promise<[number, number, number, number, number]> {
+): Promise<[number, number, number, number, number] | null> {
   const from = fromZonedTime(`${day}T00:00:00`, tz)
   const to = fromZonedTime(`${day}T23:59:59`, tz)
   // #2437: a sparse Health Connect hour is missing, the same rule the Activity score applies.
   const rows = dropSparseHrHours(await getHrForWindow(db, userId, from, to), tz).rows
+  if (rows.length === 0) return null
   const readings: HrReading[] = rows.map(r => ({
     timestamp: (r.timestamp instanceof Date ? r.timestamp : new Date(r.timestamp)).getTime(),
     bpm: r.bpm,
@@ -1558,15 +1577,22 @@ export async function getZoneMinutesRange(
 
   const days = eachDay(fromDay, toDay)
   // Resolve each day concurrently (the cold path was a serial round-trip per day — C-5 perf face).
-  const out = await Promise.all(days.map(async (day): Promise<DayZoneSeconds> => {
+  const out = await Promise.all(days.map(async (day): Promise<DayZoneSeconds | null> => {
     const row = byDay.get(day)
     if (row && day !== today) {
-      // Trust the cache unless the profile drifted AND the day is still recomputable from HR.
-      if (profileMatches(row) || day < retentionCutoff) {
-        return { day, seconds: [row.zone1Sec, row.zone2Sec, row.zone3Sec, row.zone4Sec, row.zone5Sec] }
+      const cachedSeconds: DayZoneSeconds['seconds'] = [row.zone1Sec, row.zone2Sec, row.zone3Sec, row.zone4Sec, row.zone5Sec]
+      // Trust the cache unless the profile drifted AND the day is still recomputable from HR. An
+      // all-zero row may be one cached before a day without heart rate read as missing (#2985), so
+      // it is checked again while the HR is still there.
+      const recheckEmpty = cachedSeconds.every(v => v === 0) && day >= retentionCutoff
+      if ((profileMatches(row) || day < retentionCutoff) && !recheckEmpty) {
+        return { day, seconds: cachedSeconds }
       }
     }
     const seconds = await computeDayZoneSeconds(db, userId, day, tz, profile)
+    // No heart rate: the day is left out, so a reader sees it missing (a week needing all seven
+    // days drops out). Not cached, so HR that lands later is read on the next call.
+    if (seconds == null) return null
     if (day !== today) {
       // Cache past days only (today is partial and re-derived each read). Stamp the profile so a
       // later read under a drifted profile recomputes instead of trusting stale bands.
@@ -1582,7 +1608,7 @@ export async function getZoneMinutesRange(
     }
     return { day, seconds }
   }))
-  return out
+  return out.filter((d): d is DayZoneSeconds => d != null)
 }
 
 // Throttled retention prune (review H-1/G-6, Design-notes Lever R) — the only prior gap where a

@@ -37,3 +37,15 @@ describe('mergeSet', () => {
     expect(Object.keys(set).sort()).toEqual(['sourceMap', 'steps', 'weightKg'])
   })
 })
+
+describe('mergeSet across the switch to the Oura API (#2985)', () => {
+  it('refuses a switch day that is not a calendar day, since it reaches raw SQL', () => {
+    expect(() => mergeSet('body_metrics', COLS, 'oura_cloud', { ouraCloudFrom: "2026-10-18'; --" })).toThrow()
+  })
+  it('leaves every other source\'s merge alone', () => {
+    const plain = mergeSet('body_metrics', COLS, 'manual')
+    const withDay = mergeSet('body_metrics', COLS, 'manual', { ouraCloudFrom: '2026-10-18' })
+    expect(Object.keys(withDay)).toEqual(Object.keys(plain))
+    expect(() => mergeSet('body_metrics', COLS, 'health_connect', { ouraCloudFrom: 'not a day' })).not.toThrow()
+  })
+})

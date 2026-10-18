@@ -877,6 +877,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async saveOuraCloudTokens(userId: string, input: ouraCloudTokens.SaveOuraCloudTokensInput) { return ouraCloudTokens.saveOuraCloudTokens(this.db, userId, input) }
   async deleteOuraCloudTokens(userId: string) { return ouraCloudTokens.deleteOuraCloudTokens(this.db, userId) }
   async getUserIdByOuraUserId(ouraUserId: string) { return ouraCloudTokens.getUserIdByOuraUserId(this.db, ouraUserId) }
+  async getOuraCloudSwitchDay(userId: string) { return ouraCloudTokens.getOuraCloudSwitchDay(this.db, userId) }
 
   async getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null> {
     // lower(), not eq: it matches a row stored before LA-61's backfill (or one a collision kept it
@@ -2279,6 +2280,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   // ── Body & Activity ────────────────────────────────────────────────────────
   async upsertBodyMetrics(userId: string, metrics: Omit<BodyMetrics, 'id' | 'userId' | 'createdAt'>[], source: HealthSource): Promise<void> {
     if (metrics.length === 0) return
+    // #2985: the Oura writers merge across the switch to the Oura API by day (`mergeSet`).
+    const ouraCloudFrom = source === 'oura_cloud' || source === 'oura_ble' ? await this.getOuraCloudSwitchDay(userId) : null
     await this.db.insert(s.bodyMetrics)
       // Health Connect ingest and the sync push both send batches keyed only by `date`; one repeat
       // rejects every metric in the batch (21000). The rank arm keeps a stored value when the
@@ -2305,7 +2308,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       }))
       .onConflictDoUpdate({
         target: [s.bodyMetrics.userId, s.bodyMetrics.date],
-        set: mergeSet('body_metrics', BODY_METRICS_SOURCE_COLS, source),
+        set: mergeSet('body_metrics', BODY_METRICS_SOURCE_COLS, source, { ouraCloudFrom }),
       })
   }
 
@@ -8167,6 +8170,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async upsertOuraCloudSleepPeriods(userId: string, rows: oura.OuraCloudSleepPeriodRow[]) { return oura.upsertOuraCloudSleepPeriods(this.db, userId, rows) }
   async upsertOuraCloudDaily(userId: string, rows: oura.OuraCloudDailyRow[]) { return oura.upsertOuraCloudDaily(this.db, userId, rows) }
   async upsertOuraSessions(userId: string, rows: oura.OuraSessionRow[]) { return oura.upsertOuraSessions(this.db, userId, rows) }
+  async getOuraCloudActivitySeries(userId: string, from: string, to: string) { return oura.getOuraCloudActivitySeries(this.db, userId, from, to) }
   async getLatestOuraCloudHeartrateAt(userId: string, since: Date) { return oura.getLatestOuraCloudHeartrateAt(this.db, userId, since) }
   async upsertOuraHeartrate(userId: string, rows: { timestamp: Date; bpm: number; source: string | null }[]) { return oura.upsertOuraHeartrate(this.db, userId, rows) }
   async upsertAggregatorHeartrate(userId: string, rows: { timestamp: Date; bpm: number }[], source: HealthSource, tz: string) { return oura.upsertAggregatorHeartrate(this.db, userId, rows, source, tz) }

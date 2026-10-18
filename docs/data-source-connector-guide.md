@@ -482,6 +482,13 @@ not per row, not per source globally. A higher-or-equal rank overwrites a field;
 only fill a `NULL`. This is why `body_metrics.source_map` exists: on a single day, the scale can win
 `weightKg` while the ring wins `steps`, independently.
 
+**One exception, by day (#2985).** From the local day a user switched from the ring's direct
+Bluetooth to the Oura API (`getOuraCloudSwitchDay`: while they have an Oura connection, the day of
+their newest raw Bluetooth frame, else the day the connection was created; a reconnect does not move it), an
+`oura_cloud` value replaces a leftover `oura_ble` one and a later ring write cannot take the field
+back. Before that day the ladder holds. The two Oura writers pass the day as `mergeSet`'s
+`ouraCloudFrom`.
+
 **Adding a new source's rank is a one-line change** in `source-rank.ts` (it's shared/driver-free
 specifically so a device port can reuse it). Two decisions to make before you do:
 

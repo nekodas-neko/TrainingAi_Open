@@ -51,9 +51,9 @@ describe.skipIf(!canRun)('getZoneMinutesRange — dash-form iteration + cache co
   it('iterates every day in a dash-form range (J-8) and computes non-zero seconds for the HR day', async () => {
     const profile = { maxHr: 190, restingHr: 60 }
     const days = await repo.getZoneMinutesRange(TEST_USER_ID, from, to, TZ, profile)
-    // The J-8 bug returned [] here; dash-form iteration must yield one entry per calendar day.
-    expect(days.map(d => d.day)).toContain(day)
-    expect(days.length).toBe(4) // from..to inclusive = 4 days
+    // The J-8 bug returned [] here; dash-form iteration must reach every calendar day. The three
+    // without heart rate are missing, not days of zeros (#2985), so only the HR day comes back.
+    expect(days.map(d => d.day)).toEqual([day])
     const hrDay = days.find(d => d.day === day)!
     expect(hrDay.seconds.reduce((a, b) => a + b, 0)).toBeGreaterThan(0)
   })
