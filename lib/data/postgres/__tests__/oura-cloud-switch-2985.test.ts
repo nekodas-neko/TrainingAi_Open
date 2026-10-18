@@ -1,6 +1,7 @@
 // #2985: after the user's switch to the Oura API, an `oura_cloud` value beats a leftover `oura_ble`
 // partial per field, and a later ring write cannot take the field back; before the switch day the
-// ladder is untouched. The switch day is read from the stored connection, per user. Also: a day with
+// ladder is untouched. The switch day is the day the ring stopped sending over Bluetooth, read from
+// the raw archive while an Oura connection exists, so a reconnect does not move it. Also: a day with
 // no heart rate is missing from the zone-minutes read, never a day of zeros.
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 
@@ -14,13 +15,19 @@ describe.skipIf(!canRun)('Oura per-day switch rule (#2985)', () => {
   let repo: import('@/lib/data/repository').WorkoutRepository
 
   const clear = async () => {
-    for (const t of ['body_metrics', 'oura_daily', 'oura_tokens', 'oura_heartrate', 'daily_zone_minutes']) {
+    // Only this fixture user's rows, in the local test database.
+    for (const t of ['body_metrics', 'oura_daily', 'oura_tokens', 'oura_heartrate', 'daily_zone_minutes', 'oura_raw_samples']) {
       await pool.query(`DELETE FROM ${t} WHERE user_id = $1`, [USER])
     }
   }
   const connect = (createdAt = CONNECTED_AT, pat: string | null = null) => pool.query(
     `INSERT INTO oura_tokens (user_id, access_token, refresh_token, personal_access_token, created_at)
      VALUES ($1, 'enc', 'enc', $2, $3)`, [USER, pat, createdAt])
+  const disconnect = () => pool.query(`DELETE FROM oura_tokens WHERE user_id = $1`, [USER])
+  // One raw Bluetooth frame, received by the server at `recordedAt`.
+  const bleFrame = (ds: number, recordedAt: string) => pool.query(
+    `INSERT INTO oura_raw_samples (user_id, ring_timestamp_ds, tag, event_name, body_hex, recorded_at)
+     VALUES ($1, $2, 80, 'activity_information', '0014', $3)`, [USER, ds, recordedAt])
   const body = async (date: string) => (await pool.query(
     `SELECT steps, hrv_ms, source_map FROM body_metrics WHERE user_id = $1 AND date = $2`, [USER, date])).rows[0]
   const daily = async (date: string) => (await pool.query(
@@ -45,6 +52,39 @@ describe.skipIf(!canRun)('Oura per-day switch rule (#2985)', () => {
     expect(await repo.getOuraCloudSwitchDay(USER)).toBeNull()
     await connect()
     expect(await repo.getOuraCloudSwitchDay(USER)).toBe('2026-10-18')
+  })
+
+  it('with Bluetooth history, it is the day the ring last sent, not the day of the connection', async () => {
+    // The ring's last frames reach the server at 00:14 on 18 Oct, Brisbane; an older frame, by ring
+    // time, arrives later in a re-drain and does not count as newer.
+    await bleFrame(1_000_000, '2026-10-16T09:00:00Z')
+    await bleFrame(1_200_000, '2026-10-17T14:14:00Z')
+    await bleFrame(900_000, '2026-10-17T14:15:00Z')
+    expect(await repo.getOuraCloudSwitchDay(USER)).toBeNull()
+    await connect('2026-10-19T03:00:00Z')
+    expect(await repo.getOuraCloudSwitchDay(USER)).toBe('2026-10-18')
+  })
+
+  it('a disconnect and a reconnect a day later leave the switch day where it was', async () => {
+    await bleFrame(1_200_000, '2026-10-17T14:14:00Z')
+    await connect()
+    expect(await repo.getOuraCloudSwitchDay(USER)).toBe('2026-10-18')
+    await disconnect()
+    expect(await repo.getOuraCloudSwitchDay(USER)).toBeNull()
+    await connect('2026-10-19T00:30:00Z') // 10:30 on the 19th, Brisbane
+    expect(await repo.getOuraCloudSwitchDay(USER)).toBe('2026-10-18')
+  })
+
+  it('a user with no Bluetooth history uses the day of the connection', async () => {
+    await connect('2026-10-19T00:30:00Z')
+    expect(await repo.getOuraCloudSwitchDay(USER)).toBe('2026-10-19')
+  })
+
+  it('if the ring goes back on Bluetooth, the switch day moves forward with it', async () => {
+    await bleFrame(1_200_000, '2026-10-17T14:14:00Z')
+    await connect()
+    await bleFrame(1_300_000, '2026-10-21T02:00:00Z')
+    expect(await repo.getOuraCloudSwitchDay(USER)).toBe('2026-10-21')
   })
 
   it('a row still holding a personal access token predates the connector, so it is no switch', async () => {

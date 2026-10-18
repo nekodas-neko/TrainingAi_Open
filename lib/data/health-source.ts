@@ -45,7 +45,7 @@ function storedRankSql(table: string, col: string): string {
 
 /**
  * #2985: the stored rank as the per-day switch rule sees it. From the user's switch to the Oura API
- * (`ouraCloudFrom`, the local day the connection was made), the ring no longer sends data, so a
+ * (`ouraCloudFrom`, `getOuraCloudSwitchDay`), the ring no longer sends data, so a
  * ring value on such a day is a partial left from the switch's first minutes, and Oura's full-day
  * value replaces it: an `oura_cloud` write ranks a stored `oura_ble` field as its equal, and an
  * `oura_ble` write ranks a stored `oura_cloud` field above itself. Before that day the ladder is

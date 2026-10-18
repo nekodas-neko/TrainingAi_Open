@@ -687,7 +687,8 @@ export interface WorkoutRepository {
   deleteOuraCloudTokens(userId: string): Promise<boolean>
   /** #2859: the user an Oura account is connected to, for routing a webhook event. Null if none. */
   getUserIdByOuraUserId(ouraUserId: string): Promise<string | null>
-  /** #2985: the local day the user switched to the Oura API (their connection's creation), or null. */
+  /** #2985: the local day the user switched to the Oura API, or null without a connection: the day of
+   *  their newest raw Bluetooth frame, else the connection's creation. Survives a reconnect. */
   getOuraCloudSwitchDay(userId: string): Promise<string | null>
   getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null>
   updateUserProfile(userId: string, profile: Partial<Pick<User, 'displayName' | 'heightCm' | 'dateOfBirth' | 'weightGoalKg' | 'timezone' | 'sex' | 'activityLevel' | 'fitnessGoal'>>): Promise<User>

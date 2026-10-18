@@ -483,7 +483,8 @@ only fill a `NULL`. This is why `body_metrics.source_map` exists: on a single da
 `weightKg` while the ring wins `steps`, independently.
 
 **One exception, by day (#2985).** From the local day a user switched from the ring's direct
-Bluetooth to the Oura API (the creation of their `oura_tokens` row, `getOuraCloudSwitchDay`), an
+Bluetooth to the Oura API (`getOuraCloudSwitchDay`: while they have an Oura connection, the day of
+their newest raw Bluetooth frame, else the day the connection was created; a reconnect does not move it), an
 `oura_cloud` value replaces a leftover `oura_ble` one and a later ring write cannot take the field
 back. Before that day the ladder holds. The two Oura writers pass the day as `mergeSet`'s
 `ouraCloudFrom`.
