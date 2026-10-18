@@ -103,7 +103,7 @@ describe('fitAgainst', () => {
   })
 
   it('leaves out an input missing on most days and counts the days it drops', () => {
-    const r = rows(20).map((row, i) => ({ ...row, features: { ...row.features!, c: i < 5 ? 70 : null } }))
+    const r: FitRow[] = rows(20).map((row, i) => ({ ...row, features: { ...row.features!, c: i < 5 ? 70 : null } }))
     r[3] = { ...r[3], features: { ...r[3].features!, b: null } }
     r[4] = { ...r[4], target: null }
     const fit = fitAgainst('x', r, { a: 3, b: 1, c: 1 })
