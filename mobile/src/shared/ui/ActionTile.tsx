@@ -43,8 +43,8 @@ export function ActionTile({
             opacity: disabled ? 0.5 : 1,
           }}
         >
-          <Icon name={icon} tone="muted" size={theme.sizes.iconSmall} />
-          <AppText variant="label" style={{ flex: 1 }} numberOfLines={1}>
+          <Icon name={icon} tone="muted" size={theme.sizes.iconCompact} />
+          <AppText variant="subheading" style={{ flex: 1 }} numberOfLines={1}>
             {title}
           </AppText>
           {caption && (

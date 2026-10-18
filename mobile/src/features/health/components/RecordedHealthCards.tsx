@@ -157,21 +157,22 @@ export function ObservedHeartCard() {
           <Grid columns={3}>
             <MetricTile
               label="Max recorded"
+              emphasize
               value={metricValue(observed.max)}
               unit="bpm"
-              tone="neutral"
+              stat
             />
             <MetricTile
               label="Average"
               value={metricValue(observed.avg)}
               unit="bpm"
-              tone="neutral"
+              stat
             />
             <MetricTile
               label="Min"
               value={metricValue(observed.min)}
               unit="bpm"
-              tone="neutral"
+              stat
             />
           </Grid>
           <Stack gap="xs">

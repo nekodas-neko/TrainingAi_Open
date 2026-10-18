@@ -34,6 +34,10 @@ export const sizes = {
   scoreChip: 114,
   recommendationCard: 200,
   weekDay: 32,
+  // calendar-widget.tsx: the day digit sits in an h-7 w-7 circle.
+  calendarDay: 28,
+  // nutrition-action-row.tsx: w-4 h-4 icons.
+  iconCompact: 16,
   weightSparkline: 110,
   stepsSparkline: 40,
   nutritionRing: 104,
@@ -107,6 +111,21 @@ export const typography = {
   pageTitle: { fontSize: 20, lineHeight: 28, fontWeight: '700' },
   // nutrition-content.tsx: the Nutrition tab's own title, text-[26px] font-semibold leading-none.
   nutritionTitle: { fontSize: 26, lineHeight: 26, fontWeight: '600', letterSpacing: -0.52 },
+  // calendar-widget.tsx: text-xs font-medium, the day digits and the month name.
+  calendarDay: { fontSize: 12, lineHeight: 16, fontWeight: '500' },
+  // calendar-widget.tsx: text-[10px] font-medium, the weekday row.
+  calendarWeekday: { fontSize: 10, lineHeight: 15, fontWeight: '500' },
+  // observed-hr-card.tsx Stat: text-[9px] uppercase tracking-wider over text-xl font-semibold
+  // (text-2xl font-bold when emphasised) over a text-[9px] unit.
+  statLabel: {
+    fontSize: 9,
+    lineHeight: 13.5,
+    letterSpacing: 0.45,
+    textTransform: 'uppercase',
+  },
+  statValue: { fontSize: 20, lineHeight: 28, fontWeight: '600' },
+  statValueStrong: { fontSize: 24, lineHeight: 32, fontWeight: '700' },
+  statUnit: { fontSize: 9, lineHeight: 13.5 },
   micro: { fontSize: 10, lineHeight: 14, fontWeight: '600' },
   display: { fontSize: 48, lineHeight: 56, fontWeight: '800' },
   wheelValue: { fontSize: 32, lineHeight: 40, fontWeight: '700' },

@@ -54,7 +54,11 @@ export function MonthCalendar({
           onPress={year > 2000 || number > 1 ? () => move(-1) : undefined}
         />
         <Stack direction="row" align="center" gap="none" style={{ flex: 1, minWidth: 0 }}>
-          <AppText variant="label" numberOfLines={2} style={{ flex: 1, textAlign: 'center' }}>
+          <AppText
+            variant="calendarDay"
+            numberOfLines={2}
+            style={{ flex: 1, textAlign: 'center', fontVariant: ['tabular-nums'] }}
+          >
             {new Intl.DateTimeFormat('en-AU', {
               month: 'long',
               year: 'numeric',
@@ -73,7 +77,7 @@ export function MonthCalendar({
         {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
           <AppText
             key={index}
-            variant="micro"
+            variant="calendarWeekday"
             tone="muted"
             style={{ width: `${100 / 7}%`, textAlign: 'center' }}
           >
@@ -113,8 +117,8 @@ export function MonthCalendar({
                 >
                   <View
                     style={{
-                      width: theme.sizes.weekDay,
-                      height: theme.sizes.weekDay,
+                      width: theme.sizes.calendarDay,
+                      height: theme.sizes.calendarDay,
                       borderRadius: theme.radii.pill,
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -129,8 +133,10 @@ export function MonthCalendar({
                     }}
                   >
                     <AppText
-                      variant="label"
+                      variant="calendarDay"
                       style={{
+                        // The current app draws today's digit bold.
+                        fontWeight: date === today ? '700' : undefined,
                         color:
                           date === selected
                             ? theme.colors.onBrand
