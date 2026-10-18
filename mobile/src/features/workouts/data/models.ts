@@ -1,6 +1,17 @@
 import { z } from 'zod';
 import { ProgramWriteSchema } from '@trainingai/shared/validation/program-write';
 import { normalizeMuscle } from '@trainingai/shared/muscles';
+import {
+  DAY_LOG_TTL,
+  EXERCISE_HISTORY_TTL,
+  NEXT_SESSION_PRESCRIPTION_TTL,
+  TRAINING_STRESS_TTL,
+  TTL_LONG,
+  TTL_MEDIUM,
+  WORKOUT_ENERGY_TTL,
+  WORKOUT_RECAP_TTL,
+  WORKOUT_TIMING_TTL,
+} from '@trainingai/shared/cache-ttl';
 import type { ResourceSpec } from './WorkoutResources';
 
 const finite = z.number().finite();
@@ -24,7 +35,7 @@ export type LibraryExercise = z.infer<typeof LibraryExerciseSchema>;
 export const librarySpec = {
   path: '/api/exercise-library',
   schema: z.object({ exercises: z.array(LibraryExerciseSchema) }),
-  ttl: 86_400_000,
+  ttl: TTL_LONG * 1000,
 };
 export const programSpec = {
   path: '/api/workout-templates',
@@ -37,7 +48,7 @@ export const programSpec = {
       }),
     ),
   }),
-  ttl: 300_000,
+  ttl: TTL_LONG * 1000,
 };
 export type SavedProgram = z.infer<typeof programSpec.schema>['programs'][number];
 export const stylesSpec = {
@@ -64,7 +75,7 @@ export const stylesSpec = {
         .passthrough(),
     ),
   }),
-  ttl: 86_400_000,
+  ttl: TTL_LONG * 1000,
 };
 export type SavedStyle = z.infer<typeof stylesSpec.schema>['styles'][number];
 export const phaseSetsSpec = {
@@ -102,7 +113,7 @@ export const phaseSetsSpec = {
         .passthrough(),
     ),
   }),
-  ttl: 86_400_000,
+  ttl: TTL_LONG * 1000,
 };
 export type SavedPhaseSet = z.infer<typeof phaseSetsSpec.schema>['phaseSets'][number];
 export const injurySpec = {
@@ -120,7 +131,7 @@ export const injurySpec = {
       updatedAt: text,
     }),
   ),
-  ttl: 300_000,
+  ttl: TTL_MEDIUM * 1000,
 };
 export const historySchema = z.object({
   exerciseType: z.enum(['weighted', 'bodyweight']),
@@ -142,13 +153,13 @@ export const exerciseHistorySpec = (name: string) => ({
   path: '/api/exercise-history',
   query: { name },
   schema: historySchema,
-  ttl: 300_000,
+  ttl: EXERCISE_HISTORY_TTL * 1000,
 });
 export const mediaSpec = (name: string) => ({
   path: '/api/exercise-gif',
   query: { name },
   schema: z.object({ gifUrl: text.nullable(), imageUrl: text.nullable() }),
-  ttl: 86_400_000,
+  ttl: TTL_LONG * 1000,
 });
 export const strengthSpec = {
   path: '/api/strength-trend',
@@ -165,7 +176,7 @@ export const strengthSpec = {
       }),
     ),
   }),
-  ttl: 300_000,
+  ttl: TTL_MEDIUM * 1000,
 };
 export const recordsSpec = {
   path: '/api/personal-records',
@@ -174,7 +185,7 @@ export const recordsSpec = {
       z.object({ exerciseName: text, estimated1rm: finite, achievedAt: text }),
     ),
   }),
-  ttl: 300_000,
+  ttl: TTL_LONG * 1000,
 };
 export const weeklySpec = {
   path: '/api/weekly-stats',
@@ -196,7 +207,7 @@ export const weeklySpec = {
     avgIntensityPct: finite.nullable(),
     avgDurationMin: finite.nullable(),
   }),
-  ttl: 300_000,
+  ttl: TTL_MEDIUM * 1000,
 };
 export const calendarSpec = (year: number, month: number) => ({
   path: '/api/calendar-data',
@@ -205,14 +216,14 @@ export const calendarSpec = (year: number, month: number) => ({
     trainedDays: z.record(text, z.array(text)),
     activityDays: z.record(text, z.array(text)),
   }),
-  ttl: 300_000,
+  ttl: TTL_MEDIUM * 1000,
 });
 // The streak walks STREAK_LOOKBACK_DAYS back; two calendar months cannot feed it, and a shorter
 // feed makes the count describe the window edge (BF-176). Same route the web Home reads.
 export const streakDataSpec = {
   path: '/api/streak-data',
   schema: z.object({ trainedDays: z.record(text, z.array(text)) }),
-  ttl: 300_000,
+  ttl: TTL_LONG * 1000,
 };
 export const dayExerciseSchema = z.object({
   name: text,
@@ -240,12 +251,12 @@ export const daySpec = (date: string) => ({
         .optional(),
     })
     .passthrough(),
-  ttl: 300_000,
+  ttl: DAY_LOG_TTL * 1000,
 });
 export const recapSpec = (id: string) => ({
   path: `/api/workout-sessions/${id}/recap`,
   schema: z.object({ recap: text.optional(), degraded: z.boolean().optional() }),
-  ttl: 86_400_000,
+  ttl: WORKOUT_RECAP_TTL * 1000,
   cache: (data: { degraded?: boolean }) => !data.degraded,
 });
 const timingValues = {
@@ -264,7 +275,7 @@ export const timingSpec = (id: string) => ({
     totals: z.object(timingValues),
     sources: z.object({ setup: text, work: text, rest: text }),
   }),
-  ttl: 86_400_000,
+  ttl: WORKOUT_TIMING_TTL * 1000,
 });
 export const workoutHrSpec = (id: string) => ({
   path: '/api/oura/hr-data',
@@ -322,7 +333,7 @@ export const nextPrescriptionSpec = {
       )
       .optional(),
   }),
-  ttl: 300_000,
+  ttl: NEXT_SESSION_PRESCRIPTION_TTL * 1000,
 };
 export const energySpec = (id: string, durationMinutes: number, activityId: number) => ({
   path: `/api/workout-sessions/${id}/energy`,
@@ -333,7 +344,7 @@ export const energySpec = (id: string, durationMinutes: number, activityId: numb
     source: z.enum(['hr', 'met']).optional(),
     reason: text.optional(),
   }),
-  ttl: 300_000,
+  ttl: WORKOUT_ENERGY_TTL * 1000,
 });
 export const trainingStressSpec = (date: string) => ({
   path: '/api/training-stress',
@@ -352,7 +363,7 @@ export const trainingStressSpec = (date: string) => ({
       residualShare: finite.min(0).max(1).optional(),
     }),
   ]),
-  ttl: 300_000,
+  ttl: TRAINING_STRESS_TTL * 1000,
 });
 const aiExercise = z
   .object({

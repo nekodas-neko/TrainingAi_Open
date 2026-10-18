@@ -10,6 +10,7 @@ import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { getLocalStore } from "@/lib/local-store";
 import type { ReadinessScoreResponse } from "@/app/api/readiness-score/route";
 import { scoreGapText } from "@/components/health/score-gap-copy";
+import { scoreAverageChip } from "@trainingai/shared/health/score-average-chip";
 import type { HealthTrendsResponse, HealthTrendDay } from "@/app/api/health/trends/route";
 import { DetailHero, usePageGradient, useHeroColorScheme, type ColorScheme } from "@/components/health/detail-hero";
 import { TrendSparkline } from "@/components/health/trend-sparkline-lazy";
@@ -123,20 +124,6 @@ export interface HealthScoreDetailProps {
   hideContributors?: boolean;
 }
 
-// Today's score vs the trailing average of the trend window (excludes today), for the
-// "informational" previous/average context the readiness screen wants.
-function averageChip(trends: HealthTrendDay[] | undefined, field: HealthScoreDetailProps["trendField"]) {
-  if (!trends || trends.length < 2) return null;
-  const values = trends.map(t => t[field]).filter((v): v is number => v != null);
-  if (values.length < 2) return null;
-  const today = values[values.length - 1];
-  const prior = values.slice(0, -1);
-  const avg = Math.round(prior.reduce((s, v) => s + v, 0) / prior.length);
-  const diff = today - avg;
-  const sign = diff > 0 ? "+" : diff < 0 ? "−" : "±";
-  return { avg, today, text: `${sign}${Math.abs(diff)} vs your ${prior.length}-day average (${avg})` };
-}
-
 export function HealthScoreDetail({
   userId, theme, title, subtitle, aiSection, scoreField, trendField, contributorsField, sparklineColor, contributorsTitle, extraCards, leadCard,
   breakdown, contributorChart, averageContext, hideContributors,
@@ -225,7 +212,10 @@ export function HealthScoreDetail({
   const scheme = useHeroColorScheme();
   const color = bandColor(score, scheme);
   const pageGradient = usePageGradient(theme);
-  const avg = averageContext ? averageChip(trends?.trends, trendField) : null;
+  // Live score against the trend days before today, through the helper Preview shares (#3006).
+  const avg = averageContext
+    ? scoreAverageChip(score, (trends?.trends ?? []).filter(t => t.date < today).map(t => t[trendField]))
+    : null;
   // Q-278: the reason behind the em dash. Keyed on `aiSection`, which already carries exactly the
   // three metric names the route reports availability for — no new prop for a value the component
   // is holding.

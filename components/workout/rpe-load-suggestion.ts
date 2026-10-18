@@ -1,4 +1,4 @@
-import { computeRpeAdjustment } from '@trainingai/shared/ai-periodization/autoregulation'
+import { computeRpeAdjustment, loadCutPhase } from '@trainingai/shared/ai-periodization/autoregulation'
 import { expectedRpe } from '@trainingai/shared/ai-periodization/expected-rpe'
 import { mroundStep, weightStepFor } from './utils'
 
@@ -77,7 +77,7 @@ export function rpeLoadSuggestion(
       // `computeRpeAdjustment` returns no adjustment at all in these two phases, which is the
       // behaviour to inherit rather than re-decide: a deload's loads are deliberately light and a
       // baseline week is measuring, so neither wants a cut offered mid-session.
-      phase: ctx.isBaseline ? 'baseline' : ctx.isDeload ? 'deload' : 'normal',
+      phase: loadCutPhase(ctx),
       // Back-off reads neither of these; they belong to the rep-push branch, which cannot fire on a
       // `'flat'` trend with the reps short. Passed as the set's own values so nothing is invented.
       currentReps: prev.prescribedReps,

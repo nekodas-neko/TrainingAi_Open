@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { scoreBand } from '@trainingai/shared/health/score-band';
 import { knownInputKeys, limitedInputsNote } from '@trainingai/shared/health/readiness-input-labels';
 import { READINESS_WEIGHTS } from '@trainingai/shared/health/readiness-composite';
+import { scoreGapText } from '@trainingai/shared/health/score-gap-copy';
+import { scoreAverageChip } from '@trainingai/shared/health/score-average-chip';
 import {
   AppText,
   Badge,
@@ -83,6 +85,7 @@ export function HealthDetailScreen({
         : // Readiness's own breakdown is `readinessCompositeContributors` below. The payload's
           // `readinessContributors` was Oura's and is never shown as ours (#3000).
           null;
+  const gapText = scoreGapText(state.data?.availability, detail);
   const currentNight = health.sleep[0];
   const trendField =
     detail === 'sleep'
@@ -90,13 +93,15 @@ export function HealthDetailScreen({
       : detail === 'activity'
         ? 'activityScore'
         : 'readinessScore';
-  const priorReadiness =
-    trends.data?.trends
-      .filter((day) => day.date < health.today)
-      .flatMap((day) => (day.readinessScore == null ? [] : [day.readinessScore])) ?? [];
-  const averageReadiness = priorReadiness.length
-    ? Math.round(priorReadiness.reduce((sum, value) => sum + value, 0) / priorReadiness.length)
-    : null;
+  const averageChip =
+    detail === 'readiness'
+      ? scoreAverageChip(
+          score,
+          trends.data?.trends
+            .filter((day) => day.date < health.today)
+            .map((day) => day.readinessScore) ?? [],
+        )
+      : null;
   return (
     <HealthDetailLayout
       title={title}
@@ -193,23 +198,15 @@ export function HealthDetailScreen({
             {state.data?.limited && detail !== 'readiness' && (
               <Badge label="Limited inputs" tone={tone} />
             )}
-            {detail === 'readiness' && score != null && averageReadiness != null && (
-              <Badge
-                label={`${score - averageReadiness >= 0 ? '+' : ''}${Math.round(score - averageReadiness)} vs your ${priorReadiness.length}-day average (${averageReadiness})`}
-                tone="recovery"
-              />
-            )}
+            {averageChip && <Badge label={averageChip.text} tone="recovery" />}
             {state.data && score !== null && (
               <AppText variant="caption" tone="muted">
                 Computed by the app from your health and training data.
               </AppText>
             )}
-            {score === null && state.data && (
+            {score === null && gapText && (
               <AppText variant="caption" tone="muted">
-                {state.data.availability?.find((entry) => entry.metric === detail)?.gap ===
-                'awaiting_baseline'
-                  ? 'Not enough history to score this yet'
-                  : `No ${title.toLowerCase()} score available for today.`}
+                {gapText}
               </AppText>
             )}
             {detail === 'sleep' && (
