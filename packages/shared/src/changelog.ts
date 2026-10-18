@@ -6,6 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.493.0",
+    date: "2026-10-19",
+    changes: [
+      "The readiness breakdown shows each factor's real score. The recovery index shows its score and says it comes from your ring's own recovery reading, and only factors still learning your baseline say \u201cLearning\u201d.",
+      "The Activity insight quotes the same score and session count as the Activity page.",
+      "From the switch to Oura on, Oura's night replaces a partial ring night for the same day, and the next-session card agrees with the workout when an AI plan is still being prepared.",
+      "Oura workouts recorded with live heart rate are kept instead of dropped. Reconnect Oura once to also share SpO\u2082 and heart-health data.",
+      "Behind the scenes: one bad Health Connect or Apple Health record no longer blocks every later upload, and TrainingAi Preview now shares this app's formulas and wording rather than keeping its own copies.",
+    ],
+  },
+  {
     version: "1.492.0",
     date: "2026-10-18",
     changes: [
