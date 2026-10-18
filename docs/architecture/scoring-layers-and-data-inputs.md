@@ -69,6 +69,18 @@ the owner chooses final ones (#2809).
 4. A raw shape can feed several formatted values (beat-to-beat intervals feed HRV, breathing rate
    and the sleep stager), and a formatted value can be filled by several raw shapes; the best one
    available wins (section 5).
+5. **A vendor's numbers are generic formatted values; a vendor's scores are never ours** (owner,
+   2026-10-18, #2860). Oura's readiness is not our readiness, and its sleep score is not our Sleep
+   pillar.
+   - A vendor's values are taken as the vendor calculated them, each under its own name and
+     source: HRV, resting HR, temperature deviation, breathing rate, stage durations, efficiency,
+     latency, MET, stress minutes. We don't recompute them from the vendor's series.
+   - A vendor's sub-scores are inputs only where the vendor sends no underlying value. Oura's
+     recovery index is the main case.
+   - A vendor's top-level scores (Oura's readiness, sleep, activity and resilience) are never
+     inputs. For now they are the tuning reference: our pillars are compared with them daily and
+     fitted to show what the vendor weights (#2986). A weight change that comes out of that is a
+     `type: tuning` proposal like any other.
 
 The 2026-10-11 version of this doc used five layers (root, score, unit, metric, source). Raw is new,
 "metric" became formatted, "unit" became scoring, weighting is now its own layer, "score" became
@@ -313,9 +325,11 @@ is ranked), and [`ingest-and-scoring.md`](ingest-and-scoring.md) describes a con
 Researched 2026-10-12, from the pinned Oura OpenAPI spec (`.claude/skills/oura-api/references/openapi-v1.34.json`),
 the pinned Health Connect plugin and SDK (`@devmaxime/capacitor-health-connect` 1.1.0 on
 `connect-client` 1.1.0-alpha11), and Apple's HealthKit documentation. Nothing was run on a device,
-so sample densities are what the vendors document, not measured. **Vendor scores are never inputs**:
-Oura's readiness, sleep and activity scores, resilience and cardiovascular age, and Apple's
-Readiness and Sleep Score are shown for comparison at most. We compute our own.
+so sample densities are what the vendors document, not measured. **Vendor top-level scores are
+never inputs** (rule 5 in section 1): Oura's readiness, sleep and activity scores, resilience and
+cardiovascular age, and Apple's Readiness and Sleep Score are a comparison and tuning reference.
+We compute our own. A vendor's calculated values, and its sub-scores where it sends no underlying
+value, are generic inputs.
 
 ### 6.1 Which formatted values each source can fill
 
