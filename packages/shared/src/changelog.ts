@@ -6,6 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.492.0",
+    date: "2026-10-18",
+    changes: [
+      "Readiness now takes Oura's overnight resting heart rate, HRV, temperature and sleep one by one, instead of waiting on old ring data. Those four show as learning until about 31 Oct, while your normal on Oura data builds.",
+      "Training load, walk detection and Body Battery work again from Oura's data, and Oura's full-day steps replace the ring's partial reading for 18 Oct.",
+      "Oura's own readiness, sleep and activity scores no longer appear as ours anywhere. The readiness breakdown always shows how our score is built, and VO\u2082 max and vascular age are labelled as Oura's estimates.",
+      "The heart-rate card refreshes when you come back to it, and the sleep card shows the same night as TrainingAi Preview.",
+      "Behind the scenes: every useful Oura field is now stored, Oura heart rate lands and reports when it can't, and readiness stays visible to the coach and weekly digest after the switch to Oura.",
+    ],
+  },
+  {
     version: "1.491.1",
     date: "2026-10-18",
     changes: [
