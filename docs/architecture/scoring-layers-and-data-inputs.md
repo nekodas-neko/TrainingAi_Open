@@ -113,10 +113,11 @@ it is scored on a fixed band around the plan's pace, with no Level.
   30 on settled. A new score counts at half weight until it settles.
 - **A lasting change** rebuilds the normal: the last 7 valid days all sit on one side of the old
   median, their own median is at least 1.5 steps away from it, and the window holds at least 14 days.
-- **Per-source normals are designed but not wired.** The scorer can restart a normal when the
-  source changes, but the model tags most series with the table they came from, not the device, so
-  today a ring night and a Health Connect night share one normal. Only HR recovery carries its device
-  (#2825).
+- **Normals are per device (#2984).** The scorer restarts a normal when the source changes, and
+  since #2984 the nightly HRV, resting HR and sleep series carry the device that measured them, and
+  temperature and breathing take Oura's own value where the ring summary has none for the night. An
+  `oura_cloud` night is judged against `oura_cloud` nights, never the ring's. Live readiness follows
+  the same rule (`lib/health/readiness-night-inputs.ts`).
 
 ### 2.3 Worked examples
 

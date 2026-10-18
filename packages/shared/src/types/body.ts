@@ -44,6 +44,14 @@ export interface BodyMetrics {
    * value set here is ignored rather than persisted.
    */
   bodyFatSource?: string
+  /**
+   * #2984. READ-ONLY provenance for `hrvMs` and `restingHeartRate` (`source_map->>'hrv_ms'`,
+   * `source_map->>'resting_heart_rate'`), so readiness can learn a normal per device: an
+   * `oura_cloud` night is judged against `oura_cloud` nights, never the ring's. Never written, for
+   * the same reason as `bodyFatSource`.
+   */
+  hrvSource?: string
+  restingHeartRateSource?: string
 }
 
 export interface ActivityLog {
@@ -219,6 +227,13 @@ export interface SleepSession {
   respiratoryRate?: number | null    // breaths/min
   sleepPhase5Min?: string | null     // 5-min stage codes: 1=deep 2=light 3=REM 4=awake
   timeInBedHours?: number | null     // migration 112
+  /**
+   * #2984. READ-ONLY provenance for `durationHours` and `respiratoryRate` (`source_map->>'…'`, or
+   * `manual` for a night the user entered), so readiness learns its sleep and breathing normals per
+   * device. Never written: the sleep upserts take provenance from their own `source` argument.
+   */
+  durationSource?: string
+  respiratoryRateSource?: string
   /**
    * Q-519 — a bedtime the user remembers for a night the ring did not observe.
    *
