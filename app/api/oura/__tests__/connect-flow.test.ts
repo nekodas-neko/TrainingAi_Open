@@ -119,7 +119,7 @@ describe('Oura connect routes (#2858)', () => {
     expect(opened.status).toBe(302)
     const to = new URL(opened.headers.get('location')!)
     expect(`${to.origin}${to.pathname}`).toBe(OURA_AUTHORIZE_URL)
-    expect(to.searchParams.get('scope')).toBe('personal daily heartrate workout session spo2Daily')
+    expect(to.searchParams.get('scope')).toBe('personal daily heartrate workout session spo2 heart_health')
     expect(to.searchParams.get('redirect_uri')).toBe(ENV.OURA_REDIRECT_URI)
     expect(to.searchParams.get('state')).toBe(url.searchParams.get('ticket'))
     expect(cookie).toMatch(/^[A-Za-z0-9_-]{43}$/)

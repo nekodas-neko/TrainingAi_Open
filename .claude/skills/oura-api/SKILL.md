@@ -1,12 +1,12 @@
 ---
 name: Oura Ring v2 API
-description: Use when working on any Oura Ring integration — API endpoints, data types, webhook setup, OAuth2 flow, or DB schema. Covers the full Oura v2 API spec (openapi v1.34).
+description: Use when working on any Oura Ring integration — API endpoints, data types, webhook setup, OAuth2 flow, or DB schema. Covers the full Oura v2 API spec (openapi v1.42).
 version: 1.0.0
 ---
 
 # Oura Ring v2 API Reference
 
-Full spec: `.claude/skills/oura-api/references/openapi-v1.34.json`
+Full spec: `.claude/skills/oura-api/references/openapi-v1.42.json` (the version Oura's docs page loaded on 18 Oct 2026). The previous pin, `openapi-v1.34.json`, is kept beside it for diffs.
 
 ## Auth
 
@@ -22,14 +22,15 @@ Full spec: `.claude/skills/oura-api/references/openapi-v1.34.json`
 |---|---|
 | `email` | User email |
 | `personal` | Age, weight, height, sex |
-| `daily` | Daily summaries of sleep, activity and readiness. The spec does not name stress, resilience, cardiovascular age or VO2 max under any scope; we assume `daily` for them |
+| `daily` | Daily summaries of sleep, activity and readiness. Stress is not named under any scope; Oura accepts it under `daily` |
 | `heartrate` | Time series heart rate for Gen 3 users |
 | `workout` | Workout summaries |
 | `tag` | User tags |
 | `session` | Guided and unguided sessions in the Oura app |
-| `spo2Daily` | SpO2 average recorded during sleep |
+| `spo2` | SpO2 average recorded during sleep (v1.34 spelled it `spo2Daily`; Oura drops that name silently) |
+| `heart_health` | "Heart health data": cardiovascular age and VO2 max. New in v1.42 |
 
-Our app requests: `personal daily heartrate workout session spo2Daily` (`lib/oura/cloud/config.ts` → `OURA_SCOPES`). The SpO2 scope is `spo2Daily`; `spo2` is not a scope in the spec. The spec maps no route to a scope (every operation just lists `OAuth2`), so the per-route scopes below are inferred from the scope descriptions.
+Our app requests: `personal daily heartrate workout session spo2 heart_health` (`lib/oura/cloud/config.ts` → `OURA_SCOPES`). A grant stored under the old name says `spo2Daily`; `grantedOuraScopes` reads it as `spo2`. The spec maps no route to a scope (every operation just lists `OAuth2`), so the per-route scopes below are inferred from the scope descriptions and from what Oura refused (#3026): Oura refused resilience, cardiovascular age and VO2 max under `daily`. Resilience under `heart_health` is a guess, since no other scope is left for it.
 
 ## Base URL
 
@@ -106,7 +107,7 @@ Individual sleep sessions (multiple per day possible: naps, main sleep, rest per
 Auth: Bearer · Scope: `daily` · Params: `start_date`, `end_date`
 
 `type` enum: `'deleted' | 'sleep' | 'long_sleep' | 'late_nap' | 'rest'`
-(**Note**: `short_sleep` is NOT a valid type per spec v1.34)
+(**Note**: `short_sleep` is NOT a valid type per spec v1.34 or v1.42)
 
 Filter for main sleep: `type === 'long_sleep' || type === 'sleep'`
 
@@ -188,7 +189,7 @@ Auth: Bearer · Scope: `daily` · Params: `start_date`, `end_date`
 
 ### GET /v2/usercollection/daily_spo2
 (**NOT** `spo2_daily` — that path does not exist)
-Auth: Bearer · Scope: `spo2Daily` · Params: `start_date`, `end_date`
+Auth: Bearer · Scope: `spo2` · Params: `start_date`, `end_date`
 
 | Field | Type | Notes |
 |---|---|---|
@@ -216,7 +217,7 @@ Auth: Bearer · Scope: `daily` · Params: `start_date`, `end_date`
 ---
 
 ### GET /v2/usercollection/daily_resilience
-Auth: Bearer · Scope: `daily` · Params: `start_date`, `end_date`
+Auth: Bearer · Scope: `heart_health` (a guess, #3026) · Params: `start_date`, `end_date`
 
 `level` enum: `'limited' | 'adequate' | 'solid' | 'strong' | 'exceptional'`
 
@@ -232,7 +233,7 @@ Auth: Bearer · Scope: `daily` · Params: `start_date`, `end_date`
 ---
 
 ### GET /v2/usercollection/daily_cardiovascular_age
-Auth: Bearer · Scope: `daily` · Params: `start_date`, `end_date`
+Auth: Bearer · Scope: `heart_health` · Params: `start_date`, `end_date`
 
 | Field | Type | Notes |
 |---|---|---|
@@ -245,7 +246,7 @@ Auth: Bearer · Scope: `daily` · Params: `start_date`, `end_date`
 
 ### GET /v2/usercollection/vO2_max
 (**Note**: capital O — path is `vO2_max` not `vo2_max`)
-Auth: Bearer · Scope: `daily` · Params: `start_date`, `end_date`
+Auth: Bearer · Scope: `heart_health` · Params: `start_date`, `end_date`
 
 | Field | Type | Notes |
 |---|---|---|
@@ -296,7 +297,7 @@ Auth: Bearer · Returns list
 | color | string\|null | see enum |
 | design | string\|null | see enum |
 | firmware_version | string\|null | |
-| hardware_type | string\|null | enum `gen1 \| gen2 \| gen2m \| gen3 \| gen4` — **no Ring 5 value** in v1.34; the owner wears a Ring 5, so parse leniently |
+| hardware_type | string\|null | enum `gen1 \| gen2 \| gen2m \| gen3 \| gen4 \| or5` — v1.42 added `or5` (Ring 5; v1.34 had no value for it); still parse leniently |
 | size | integer\|null | US ring size |
 | set_up_at | string\|null | ISO 8601 UTC |
 
@@ -316,7 +317,7 @@ Auth: Bearer · Scope: `workout` · Params: `start_date`, `end_date`
 | distance | number\|null | metres |
 | intensity | string | `'easy' \| 'moderate' \| 'hard'` |
 | label | string\|null | user-defined |
-| source | string | `'manual' \| 'autodetected' \| 'confirmed' \| 'workout_heart_rate'` |
+| source | string | `'manual' \| 'autodetected' \| 'confirmed' \| 'workout_heart_rate' \| 'live_third_party_heart_rate' \| 'live_oura_heart_rate'` (the last two new in v1.42) |
 
 ---
 

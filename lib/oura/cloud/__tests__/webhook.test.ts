@@ -111,7 +111,7 @@ describe('handleOuraWebhookEvent (#2859)', () => {
       userId: USER,
       accessToken: encryptOuraToken('acc', USER, 'access_token'),
       refreshToken: encryptOuraToken('ref', USER, 'refresh_token'),
-      expiresAt: new Date(Date.now() + 86_400_000), scope: 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2Daily',
+      expiresAt: new Date(Date.now() + 86_400_000), scope: 'extapi:personal extapi:daily extapi:heartrate extapi:workout extapi:session extapi:spo2 extapi:heart_health',
       ouraUserId: OURA_USER, updatedAt: new Date(),
     }
     writes.daily = 0; writes.sleep = 0; writes.sessions = 0; writes.tombstoned = []
