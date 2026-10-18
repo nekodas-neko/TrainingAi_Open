@@ -9,6 +9,7 @@ import type { HealthConnectPlugin } from '@devmaxime/capacitor-health-connect';
 import { intervalsToPhase5Min, type SleepStage, type StageInterval } from '@trainingai/shared/health/hypnogram';
 import { msToHHMMInTz, toAestDay, shiftDateStr, dateStrMidnightInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
+import { capitalize } from '@trainingai/shared/format/capitalize';
 
 // Verified against the pinned plugin source (RecordConverter.kt:390-400, v1.1.0) — those seven
 // strings are the complete set it can emit. SLEEPING and UNKNOWN are deliberately absent: they
@@ -110,7 +111,7 @@ export function mapExerciseTypeToActivityType(exerciseType: string): string {
 export function exerciseTypeLabel(exerciseType: string | undefined): string {
   const words = (exerciseType ?? '').replace(/^EXERCISE_TYPE_/, '').toLowerCase().replace(/_/g, ' ').trim();
   if (!words || words === 'other workout' || words === 'unknown exercise type') return 'Workout';
-  return words[0].toUpperCase() + words.slice(1);
+  return capitalize(words);
 }
 
 interface SleepRecord {
