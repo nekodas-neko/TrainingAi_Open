@@ -1,6 +1,8 @@
-// S1 (data-efficiency review 2026-07-16 §3.1): /api/health/trends must coalesce
-// oura_daily_derived scores over the frozen-Cloud oura_daily columns per day, so
-// post-re-key days stop rendering null in the 14-day sparklines.
+// S1 (data-efficiency review 2026-07-16 §3.1): /api/health/trends reads its score series from
+// oura_daily_derived, so post-re-key days stop rendering null in the 14-day sparklines.
+//
+// #3000 (scoring doc rule 5): Oura's own readiness, sleep and activity scores in oura_daily are
+// never ours. A day with only Oura's scores is a gap, and a day with both shows ours alone.
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 
 const canRun = !!process.env.DATABASE_URL
@@ -21,8 +23,8 @@ describe.skipIf(!canRun)('health/trends — derived-over-Cloud coalesce (S1)', (
     pool = getPool()
     const today = todayInTz('Australia/Brisbane')
     dDerivedOnly = shiftDateStr(today, -3)  // BLE era: derived row only
-    dCloudOnly   = shiftDateStr(today, -5)  // Cloud era: oura_daily only
-    dBoth        = shiftDateStr(today, -7)  // both → derived must win
+    dCloudOnly   = shiftDateStr(today, -5)  // Oura's scores only → a gap
+    dBoth        = shiftDateStr(today, -7)  // both → ours only, per score
 
     await pool.query(
       `INSERT INTO users (id, email, password_hash, timezone) VALUES ($1, $2, 'x', 'Australia/Brisbane')
@@ -44,7 +46,7 @@ describe.skipIf(!canRun)('health/trends — derived-over-Cloud coalesce (S1)', (
     await pool.query(`DELETE FROM users WHERE id = $1`, [TEST_USER_ID])
   })
 
-  it('fills BLE-era days from derived, keeps Cloud-era days, and prefers derived when both exist', async () => {
+  it("fills days from derived and never from Oura's own scores", async () => {
     const { GET } = await import('../route')
     const res = await GET()
     expect(res.status).toBe(200)
@@ -56,13 +58,14 @@ describe.skipIf(!canRun)('health/trends — derived-over-Cloud coalesce (S1)', (
     expect(byDate.get(dDerivedOnly)?.sleepScore).toBe(72)
     expect(byDate.get(dDerivedOnly)?.activityScore).toBeNull() // derived activity never written yet — honest null
 
-    // Cloud-only day: unchanged.
-    expect(byDate.get(dCloudOnly)?.readinessScore).toBe(61)
-    expect(byDate.get(dCloudOnly)?.activityScore).toBe(63)
+    // Oura-only day: Oura's scores exist and ours don't → nothing, never Oura's (#3000).
+    expect(byDate.get(dCloudOnly)?.readinessScore).toBeNull()
+    expect(byDate.get(dCloudOnly)?.sleepScore).toBeNull()
+    expect(byDate.get(dCloudOnly)?.activityScore).toBeNull()
 
-    // Both: derived wins per score; Cloud still backfills the scores derived lacks.
+    // Both: ours per score, and Oura's never backfills one we lack.
     expect(byDate.get(dBoth)?.readinessScore).toBe(91)
     expect(byDate.get(dBoth)?.sleepScore).toBe(92)
-    expect(byDate.get(dBoth)?.activityScore).toBe(43)
+    expect(byDate.get(dBoth)?.activityScore).toBeNull()
   })
 })

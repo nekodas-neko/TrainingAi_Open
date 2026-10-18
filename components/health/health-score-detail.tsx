@@ -15,6 +15,7 @@ import { DetailHero, usePageGradient, useHeroColorScheme, type ColorScheme } fro
 import { TrendSparkline } from "@/components/health/trend-sparkline-lazy";
 import { scoreTrendEmpty } from "@/components/health/trend-empty-copy";
 import { scoreBand } from "@trainingai/shared/health/score-band";
+import { liveReadinessForDay } from "@trainingai/shared/health/live-readiness";
 import { useCountUp } from "@/lib/hooks/use-count-up";
 import { Activity } from "lucide-react";
 import { labelFor } from "@/lib/oura/contributors";
@@ -25,7 +26,7 @@ import { ResilienceTile } from "./resilience-tile";
 
 const AiInsightCard = dynamic(() => import("@/components/health/ai-insight-card").then(m => ({ default: m.AiInsightCard })), { ssr: false });
 
-type ScoreField = "ouraScore" | "readinessDisplayScore" | "sleepScore" | "activityScore";
+type ScoreField = "readinessDisplayScore" | "sleepScore" | "activityScore";
 type ContributorsField = "readinessContributors" | "sleepContributors" | "activityContributors";
 
 function bandColor(score: number | null, scheme: ColorScheme) {
@@ -101,7 +102,7 @@ export interface HealthScoreDetailProps {
   aiSection: "readiness" | "sleep" | "activity";
   scoreField: ScoreField;
   // HealthTrendsResponse names the readiness trend field "readinessScore", distinct
-  // from ReadinessScoreResponse's "ouraScore" — kept as a separate prop rather than
+  // from ReadinessScoreResponse's "readinessDisplayScore" — kept as a separate prop rather than
   // conflating the two APIs' naming.
   trendField: "readinessScore" | "sleepScore" | "activityScore";
   contributorsField: ContributorsField;
@@ -152,33 +153,35 @@ export function HealthScoreDetail({
     const cd = readTodayCacheSync<ReadinessScoreResponse>("readiness-score"); if (cd) setData(cd);
     const ct = readTodayCacheSync<HealthTrendsResponse>("health-trends-summary"); if (ct) setTrends(ct);
 
+    // Cold open with no cached payload: seed from our own scores mirrored on the device
+    // (`oura_daily_derived`), never from the `oura_daily` mirror, whose scores are Oura's (#3000).
     const store = userId ? getLocalStore(userId) : null;
     if (store && !cd) {
-      store.getOuraDaily(today).then(rows => {
-        const row = rows.find(r => r.day === today) ?? rows[rows.length - 1];
+      store.getOuraDailyDerived(today, today).then(rows => {
+        const row = rows.find(r => r.day === today);
         if (!row) return;
-        const score = scoreField === "ouraScore" || scoreField === "readinessDisplayScore" ? row.readinessScore
+        const readiness = liveReadinessForDay(today, rows);
+        const score = scoreField === "readinessDisplayScore" ? readiness
           : scoreField === "sleepScore" ? row.sleepScore
           : row.activityScore;
+        if (score == null) return;
         setData(prev => prev ?? ({
-          score: score ?? 0,
-          label: scoreBand(score ?? 0).label,
+          score,
+          label: scoreBand(score).label,
           components: { sleep: 0, hrv: 0, rhr: 0, load: 0 },
-          hasSufficientData: score != null,
+          hasSufficientData: true,
           earlyDeloadRecommended: false,
           earlyDeload: null,
-          source: 'oura',
+          source: 'custom',
           // Offline seed from the local mirror — it carries the score, not the inputs behind it,
           // so it claims nothing about availability and never renders the limited qualifier.
           inputsAvailable: [], inputsMissing: [], scoreConfidence: 'full', limited: false,
-          ouraScore: row.readinessScore,
-          readinessDisplayScore: row.readinessScore ?? null,
-          temperatureDeviation: row.day === today ? row.temperatureDeviation : null,
-          temperatureDeviationSource: row.day === today && row.temperatureDeviation != null ? 'cloud' : null,
-          daySummary: null,
+          readinessDisplayScore: readiness,
+          temperatureDeviation: null,
+          temperatureDeviationSource: null,
           sleepScore: row.sleepScore, sleepScoreCoverage: null, activityScore: row.activityScore,
           activityBlend: { base: row.activityScore, adjustment: 0, final: row.activityScore, trained: false },
-          readinessContributors: row.contributors as Record<string, number | null> | null,
+          readinessContributors: null,
           readinessCompositeContributors: null,
           sleepContributors: null, activityContributors: null,
           activityGoals: null, activitySignals: null, activityTaperApplied: false,
@@ -260,7 +263,7 @@ export function HealthScoreDetail({
             </span>
           </div>
         )}
-        {data && data.ouraScore == null && score != null && (
+        {data && score != null && (
           <p className="text-[11px] leading-snug text-muted-foreground">
             Computed by the app from your health and training data.
           </p>

@@ -332,11 +332,11 @@ const hours = (sec: number | null | undefined) => (sec == null ? null : sec / 36
 
 /**
  * **Oura's readiness, sleep and activity contributors and the stress `day_summary` go to
- * `oura_cloud_daily` (#2982), never to `oura_daily`.** Stored in `oura_daily`, they would win over
- * our own on the Sleep and Activity screens: `readiness-payload.ts` prefers Oura's contributors when
- * present, the device's local store syncs the same columns and reads them directly, and the
- * Readiness screen and the AI planner read `day_summary`. That is a visible change to a scoring
- * surface, which needs the owner's yes; choosing per field between Oura's and ours is #2860's job.
+ * `oura_cloud_daily` (#2982), never to `oura_daily`.** They are Oura's, kept as a reference. The
+ * device's local store syncs `oura_daily`'s contributor columns, so keeping them there keeps Oura's
+ * contributors off the device. Oura's top-level readiness, sleep and activity scores do land in
+ * `oura_daily`, as Oura's own scores: no screen or AI surface shows or sends them as ours (scoring
+ * doc rule 5, #3000). They are the tuning reference (#2986).
  *
  * Turns documents into rows. Several documents for one day (readiness, sleep score, activity …)
  * become one `oura_daily` row and one `body_metrics` row, because the upsert cannot touch a row twice

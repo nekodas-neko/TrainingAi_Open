@@ -24,13 +24,8 @@ export function ReadinessContent({ userId }: { userId?: string }) {
       breakdown={(data) => <ReadinessBreakdown readiness={data} />}
       contributorChart
       averageContext
-      extraCards={(data) => (
+      extraCards={() => (
         <>
-          {data.daySummary && (
-            <div className="rounded-xl border border-border bg-muted/20 p-4">
-              <p className="text-sm text-muted-foreground">{data.daySummary}</p>
-            </div>
-          )}
           {/* TN-46. Here rather than on its own screen: resting HR and HRV are readiness inputs, so
               the overlay sits beside the score they feed. It renders itself away when no vial-dosed
               log falls in the window, which is most of the time. */}

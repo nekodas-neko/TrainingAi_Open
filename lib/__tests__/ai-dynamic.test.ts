@@ -50,7 +50,6 @@ const baseInput: AiDynamicInput = {
   soreMuscles: [],
   readinessScore: 80,
   temperatureDeviation: null,
-  daySummary: null,
   timezone: 'Australia/Brisbane',
   reminderEnabled: false,
   reminderTime: null,
@@ -159,18 +158,11 @@ describe('computeAiDynamicNextSession', () => {
 
   // And the OTHER deload reasons are untouched: the suspension is one condition on one alert, not
   // a mute on the banner.
-  it('still deloads on a stressful day while temperature is suspended', () => {
+  it('still deloads on an elevated illness radar while temperature is suspended', () => {
     const history = makeHistory(['Push'], [1])
-    const result = computeAiDynamicNextSession({ ...baseInput, history, temperatureDeviation: 0.7, temperatureBaselineDays: 30, temperatureTrusted: false, daySummary: 'very_stressful' })
+    const result = computeAiDynamicNextSession({ ...baseInput, history, temperatureDeviation: 0.7, temperatureBaselineDays: 30, temperatureTrusted: false, illnessFlag: 'elevated' })
     expect(result.deloadOrRestRecommended).toBe(true)
     expect(result.temperatureAlert).toBe(false)
-  })
-
-  it('flags recommended deload on very_stressful day summary', () => {
-    const history = makeHistory(['Push'], [1])
-    const result = computeAiDynamicNextSession({ ...baseInput, history, daySummary: 'very_stressful' })
-    expect(result.deloadOrRestRecommended).toBe(true)
-    expect(result.deloadStrength).toBe('recommended')
   })
 
   it('sets streakWarning on 2 consecutive rest days', () => {
@@ -371,22 +363,6 @@ describe('computeAiDynamicNextSession', () => {
     expect(extreme.deloadOrRestRecommended).toBe(false)
   })
 
-  it('the frozen very_stressful summary still fires, and derived stress no longer suppresses it', () => {
-    const history = makeHistory(['Push'], [1])
-    const result = computeAiDynamicNextSession({
-      ...baseInput, history, stressHighMinutes: 30, daySummary: 'very_stressful',
-    })
-    expect(result.deloadOrRestRecommended).toBe(true)
-    expect(result.deloadStrength).toBe('recommended')
-  })
-
-  it('very_stressful fires with no derived stress at all', () => {
-    const history = makeHistory(['Push'], [1])
-    const result = computeAiDynamicNextSession({
-      ...baseInput, history, stressHighMinutes: null, daySummary: 'very_stressful',
-    })
-    expect(result.deloadOrRestRecommended).toBe(true)
-  })
 })
 
 describe('countConsecutiveTrainingDays', () => {

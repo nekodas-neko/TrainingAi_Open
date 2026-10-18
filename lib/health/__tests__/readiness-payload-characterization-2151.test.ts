@@ -103,7 +103,6 @@ const pin = (out: Awaited<ReturnType<typeof buildReadinessPayload>>) => ({
   earlyDeloadRecommended: out.earlyDeloadRecommended,
   earlyDeload: out.earlyDeload,
   source: out.source,
-  ouraScore: out.ouraScore,
   inputsAvailable: out.inputsAvailable,
   inputsMissing: out.inputsMissing,
   scoreConfidence: out.scoreConfidence,

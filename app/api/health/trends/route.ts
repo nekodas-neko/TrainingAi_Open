@@ -51,8 +51,8 @@ export async function GET() {
   ])
 
   const ouraByDate = new Map(ouraRows.map(r => [r.date, r]))
-  // Our own persisted daily scores (oura_daily_derived) — the live writer post-re-key.
-  // Coalesced over the frozen Cloud columns per day/per score below (S1).
+  // Our own persisted daily scores (oura_daily_derived). The only source for the three score series:
+  // Oura's own readiness, sleep and activity scores are never ours (scoring doc rule 5, #3000).
   const derivedByDate = new Map(derivedRows.map(r => [r.day, r]))
   const bodyByDate = new Map(bodyRows.map(r => [r.date, r]))
   const latestWeightKg = bodyRows.find(r => r.weightKg != null)?.weightKg ?? null  // bodyRows is date-descending
@@ -95,9 +95,9 @@ export async function GET() {
     const { sessionDurationMin, workoutDensity } = aggregateWorkoutDay(sessionsByDate.get(d) ?? [])
     trends.push({
       date: d,
-      readinessScore: derived?.readinessScore ?? oura?.readinessScore ?? null,
-      sleepScore: derived?.sleepScore ?? oura?.sleepScore ?? null,
-      activityScore: derived?.activityScore ?? oura?.activityScore ?? null,
+      readinessScore: derived?.readinessScore ?? null,
+      sleepScore: derived?.sleepScore ?? null,
+      activityScore: derived?.activityScore ?? null,
       hrvMs: body?.hrvMs ?? null,
       rhrBpm: body?.restingHeartRate ?? null,
       hrr1Bpm: hrrByDay.get(d) ?? null,

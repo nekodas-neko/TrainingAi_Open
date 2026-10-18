@@ -45,7 +45,6 @@ const base: AiDynamicInput = {
   soreMuscles: [],
   readinessScore: 80,
   temperatureDeviation: null,
-  daySummary: null,
   timezone: 'Australia/Brisbane',
   reminderEnabled: false,
   reminderTime: null,

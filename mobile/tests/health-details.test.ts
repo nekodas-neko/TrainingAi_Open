@@ -269,3 +269,18 @@ test('activity deletion remains queued through failed or mismatched readback and
   assert.equal(queue.getSnapshot().operations.length, 0);
   assert.equal(new Set(uploaded).size, 1);
 });
+
+// #3000: the readiness payload no longer carries Oura's readiness (`ouraScore`) or `daySummary`, and
+// its `readinessContributors` is always null. The decoder accepts the new shape, and a payload cached
+// before the change still decodes (the schema passes unknown keys through; no screen reads them).
+test('readiness decoder accepts the payload without Oura fields, and a legacy cached one (#3000)', async () => {
+  const { readinessSpec } = await import('../src/features/health/data/models.ts');
+  const schema = readinessSpec(date).schema;
+  const fresh = schema.parse({ readinessDisplayScore: 55, sleepScore: null, readinessContributors: null });
+  assert.equal(fresh.readinessDisplayScore, 55);
+  assert.equal(fresh.sleepScore, null);
+  assert.equal(fresh.readinessContributors, null);
+  assert.equal('ouraScore' in fresh, false);
+  const legacy = schema.parse({ readinessDisplayScore: 60, ouraScore: 91, daySummary: 'stressful' });
+  assert.equal(legacy.readinessDisplayScore, 60);
+});

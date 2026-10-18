@@ -1,9 +1,8 @@
 'use client'
 
-import { CircleDotIcon, ZapIcon, ThermometerIcon, HistoryIcon, InfoIcon } from 'lucide-react'
+import { InfoIcon } from 'lucide-react'
 import { labelFor } from '@trainingai/shared/health/contributor-labels'
 import { limitedInputsNote } from '@trainingai/shared/health/readiness-input-labels'
-import { cn } from '@trainingai/shared/utils'
 import { scoreBand } from '@trainingai/shared/health/score-band'
 import { READINESS_WEIGHTS } from '@trainingai/shared/health/readiness-composite'
 import { FactorBar } from '@/components/health/contributor-chart'
@@ -11,68 +10,15 @@ import { ContributorDetails } from '@/components/health/contributor-details'
 import type { ReadinessScoreResponse } from '@/app/api/readiness-score/route'
 
 /**
- * "What the score is built on." Two shapes:
- * - Oura path (ouraScore != null): the base → load(ACWR) → temp → final adjustment chain.
- * - Composite path (ouraScore == null): the weighted factors the app's own readiness composite
- *   is built from, since Oura's Cloud score is frozen post-BLE-re-key.
- * Shared by the Readiness detail screen and the Home readiness card.
+ * "What goes into this score": the weighted factors of the app's own readiness composite. Shared by
+ * the Readiness detail screen and the Home readiness card.
+ *
+ * This used to have a second shape keyed on `ouraScore`, which showed Oura's readiness as the
+ * "Baseline" and ours as an adjustment on top of it. Oura's top-level scores are never ours (scoring
+ * doc rule 5, #3000), so the composite is the only shape.
  */
 export function ReadinessBreakdown({ readiness }: { readiness: ReadinessScoreResponse }) {
-  const displayScore = readiness.readinessDisplayScore
-  if (displayScore == null) return null
-  // Q-281: the band's WORD ships with its colour. `scoreBand()` colour without `scoreBand()`'s
-  // label is a CLAUDE.md violation outright, and this row is the one place the composite branch
-  // does not cover with a legend — a bare amber 62 says nothing to anyone who cannot see amber.
-  const { color, label: bandLabel } = scoreBand(displayScore)
-
-  if (readiness.ouraScore != null) {
-    const adj = displayScore - readiness.ouraScore
-    const tempDev = readiness.temperatureDeviation
-    return (
-      <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-2">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          How this score is built
-        </p>
-        <div className="space-y-0.5">
-          <Row icon={<CircleDotIcon className="h-3.5 w-3.5" />} label="Baseline">
-            <span className="font-semibold tabular-nums">{readiness.ouraScore}</span>
-          </Row>
-          {adj !== 0 && (
-            <Row
-              icon={<ZapIcon className="h-3.5 w-3.5" />}
-              label={readiness.source === 'oura+acwr' ? 'Training load (ACWR)' : 'Adjustment'}
-            >
-              <span className={cn('font-semibold tabular-nums', adj < 0 ? 'text-amber-500 dark:text-amber-400' : 'text-green-600 dark:text-green-400')}>
-                {adj > 0 ? '+' : ''}{adj}
-              </span>
-            </Row>
-          )}
-          {tempDev != null && Math.abs(tempDev) > 0.3 && (
-            <Row
-              icon={<ThermometerIcon className="h-3.5 w-3.5" />}
-              label="Body-temperature penalty"
-              badge={readiness.temperatureDeviationSource === 'cloud' ? 'Pre-re-key' : undefined}
-            >
-              <span className="font-semibold tabular-nums text-amber-500 dark:text-amber-400">
-                {tempDev > 0 ? '+' : ''}{tempDev.toFixed(1)}°C
-              </span>
-            </Row>
-          )}
-          <div className="flex items-center justify-between text-sm border-t border-border/50 pt-1.5 mt-1">
-            <span className="text-muted-foreground font-medium">Final readiness</span>
-            <span className="flex items-baseline gap-1.5">
-              <span className="text-[11px] text-muted-foreground">{bandLabel}</span>
-              <span className="font-bold tabular-nums" style={{ color }}>{displayScore}</span>
-            </span>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // Composite path — Oura's Cloud score is unavailable, so show the app's own baseline-relative
-  // composite. Each factor shows its actual sub-score (when the composite has produced one) and
-  // its weight, and taps open a deep-dive (what it measures / against / means / how to improve).
+  if (readiness.readinessDisplayScore == null) return null
   return <CompositeBreakdown readiness={readiness} />
 }
 
@@ -218,25 +164,4 @@ function extraFor(key: keyof typeof READINESS_WEIGHTS, r: ReadinessScoreResponse
     )
   }
   return null
-}
-
-function Row({ icon, label, badge, children }: { icon: React.ReactNode; label: string; badge?: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between text-sm">
-      <div className="flex items-center gap-1.5 text-muted-foreground min-w-0">
-        <span className="flex-none">{icon}</span>
-        <span className="truncate">{label}</span>
-        {badge && (
-          <span
-            className="flex items-center gap-0.5 text-[9px] text-muted-foreground/70 flex-none"
-            title="Frozen Cloud value from before the direct-BLE re-key — not last night's reading"
-          >
-            <HistoryIcon className="h-2.5 w-2.5" />
-            {badge}
-          </span>
-        )}
-      </div>
-      {children}
-    </div>
-  )
 }

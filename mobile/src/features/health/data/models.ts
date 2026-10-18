@@ -158,7 +158,6 @@ export const readinessSpec = (date: string) => ({
     .object({
       ...numericFields([
         'readinessDisplayScore',
-        'ouraScore',
         'sleepScore',
         'activityScore',
         'baselineHrv',
@@ -193,7 +192,6 @@ export const readinessSpec = (date: string) => ({
       limited: z.boolean().optional(),
       isLowWearToday: z.boolean().optional(),
       inputsMissing: z.array(z.string()).optional(),
-      daySummary: text,
       illnessAdvisory: text,
       illnessFlag: text,
       illnessSuppression: n,

@@ -9,7 +9,6 @@ import {
   MIN_DISTANCE_M, MIN_AVG_SPEED_KMH, MIN_DURATION_SEC, MAX_DURATION_SEC,
 } from '@/lib/activity/detection-thresholds'
 import type { SleepSession } from '@trainingai/shared/types/body'
-import type { OuraDailyRow } from '@/lib/data/repository'
 import { pickPrimarySleep } from '@/lib/sleep/primary-sleep'
 
 export type TimelineEventType = 'wakeup' | 'sleep' | 'workout' | 'meal' | 'walk' | 'bedtime' | 'tag'
@@ -82,24 +81,21 @@ export async function GET(req: Request) {
 
   const repo = await getRepository()
 
-  const [sleepRows, ySleepRows, workoutSessions, foodLogs, mealTypes, ouraWorkouts, ouraDaily, activityLogs, ouraTags, derivedRows] = await Promise.all([
+  const [sleepRows, ySleepRows, workoutSessions, foodLogs, mealTypes, ouraWorkouts, activityLogs, ouraTags, derivedRows] = await Promise.all([
     repo.listSleepSessions(userId, date, date),
     repo.listSleepSessions(userId, yesterday, yesterday),
     repo.getWorkoutSessionsFrom(userId, yDayStart),
     repo.listFoodLogs(userId, date),
     repo.listMealTypes(userId),
     repo.getOuraWorkouts(userId, { from: yesterday, to: date }),
-    repo.getOuraDaily(userId, yesterday, date),
     repo.listActivityLogs(userId, yesterday, date),
     repo.listOuraTags(userId, yesterday, date),
     repo.getOuraDailyDerived(userId, yesterday, date),
   ])
 
   const events: TimelineEvent[] = []
-  const ouraByDate = new Map<string, OuraDailyRow>(ouraDaily.map(d => [d.date, d]))
-  // Our own persisted readiness, preferred over the Cloud column — the same derived-first order
-  // /api/health/trends uses. Without this the wake-up event's readiness was Cloud-only, so it was
-  // null for every user who isn't on Oura Cloud (Q-43) and for the owner since the BLE re-key.
+  // Our own persisted scores, the only source for the wake-up event's readiness and sleep score —
+  // the same order /api/health/trends uses. Oura's own scores are never ours (#3000).
   const derivedByDate = new Map(derivedRows.map(r => [r.day, r]))
 
   // ── Wakeups (today + yesterday) ──────────────────────────────────────────
@@ -109,7 +105,7 @@ export async function GET(req: Request) {
 
   function pushWakeup(sleep: SleepSession | null, dayStr: string) {
     if (!sleep?.sleepEnd) return
-    const oura = ouraByDate.get(dayStr) ?? null
+    // Our scores only, never Oura's readiness or sleep score (#3000).
     events.push({
       type: 'wakeup',
       time: fmtTime(new Date(sleep.sleepEnd), tz),
@@ -119,8 +115,8 @@ export async function GET(req: Request) {
       day: 'today',  // recomputed below from timeMs
       date: dayStr,
       sleepDurationH: sleep.durationHours ?? undefined,
-      readinessScore: derivedByDate.get(dayStr)?.readinessScore ?? oura?.readinessScore ?? undefined,
-      sleepScore: sleep.sleepScore ?? derivedByDate.get(dayStr)?.sleepScore ?? oura?.sleepScore ?? undefined,
+      readinessScore: derivedByDate.get(dayStr)?.readinessScore ?? undefined,
+      sleepScore: sleep.sleepScore ?? derivedByDate.get(dayStr)?.sleepScore ?? undefined,
     })
   }
   pushWakeup(todaySleep, date)

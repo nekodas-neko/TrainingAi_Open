@@ -177,22 +177,23 @@ export interface ReadinessScoreResponse {
    * lacks it, and so does one built while the source lookup failed. Never read absent as `false`.
    */
   connectedSources?: ConnectedSources
-  // Oura fields — null when no Oura data available
-  ouraScore: number | null
   // Temperature deviation vs personal baseline (°C). BLE-derived (oura_daily_summary.temp_dev_c,
   // last rolled-up night) when available; frozen Cloud value only as an annotated fallback.
   temperatureDeviation: number | null
   temperatureDeviationSource: 'ble' | 'cloud' | null
-  daySummary: string | null
-  // Readiness value for display: Oura's score when present, else our own composite (null when
-  // there isn't enough data to compute one). The chip/detail read this, not the Oura-only ouraScore.
+  // Readiness value for display: our own composite, null when there isn't enough data to compute
+  // one. Oura's readiness is never shown in its place (scoring doc rule 5, #3000).
   readinessDisplayScore: number | null
   sleepScore: number | null
-  /** OR-204: how complete today's OWN sleep score is. Null when the score is not ours (Oura fallback) or absent. */
+  /** OR-204: how complete today's own sleep score is. Null when there is no score. */
   sleepScoreCoverage: import('@trainingai/shared/health/sleep-score').SleepScoreCoverage | null
   activityScore: number | null      // Oura activity score blended with logged training load
   activityBlend: ActivityBlendResult
-  readinessContributors: Record<string, number | null> | null
+  /**
+   * Always null. It carried Oura's readiness contributors; ours are `readinessCompositeContributors`.
+   * Kept in the shape so a client built against it still decodes the payload (#3000).
+   */
+  readinessContributors: null
   sleepContributors: Record<string, number | null> | null
   activityContributors: Record<string, number | null> | null
   // Activity Score v2 (2026-07-22) — the goal-anchored inputs/targets behind today's activity score,
@@ -926,26 +927,21 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
       metricAvailability('resilience', latestResilience?.resilienceLevel ?? null),
     ],
     ...(connectedSourcesSummary ? { connectedSources: connectedSourcesSummary } : {}),
-    ouraScore:               ouraToday?.readinessScore             ?? null,
     temperatureDeviation,
     temperatureDeviationSource,
-    daySummary:              cloudDailyLive ? ouraToday.daySummary ?? null : null,
     readinessDisplayScore,
-    // Prefer our own freshly-computed sleep score over the Oura Cloud value: since the BLE
-    // re-key the Cloud score is frozen (it reads e.g. 31 next to a real 7h45m / 90%-efficiency
-    // night), whereas sleepScore100 comes from computeSleepScore(lastSleep) off the same fresh
-    // BLE sleep session. Matches the derived-first order the /api/health/trends route already uses.
-    sleepScore:              sleepScore100 ?? ouraToday?.sleepScore ?? null,
+    // Ours only: computeSleepScore(lastSleep). Oura's sleep score is never ours, so a night we
+    // could not score shows no score rather than Oura's (scoring doc rule 5, #3000).
+    sleepScore:              sleepScore100,
     sleepScoreCoverage:      sleepScoreResult?.coverage ?? null,
     activityScore:           activityBlend.final,
     activityBlend,
-    readinessContributors:   ouraToday?.readinessContributors       ?? null,
+    readinessContributors:   null,
     readinessCompositeContributors: ownComposite?.contributors ?? null,
-    sleepContributors:       ouraToday?.sleepContributors ?? ownSleepContributors,
-    // Prefer our own goal-anchored components over the frozen Oura contributors (same precedence
-    // as sleepContributors above) — this is what powers the Activity detail screen's contributor
-    // chart + "how to improve" guide, which was silently empty while Oura's field stayed null.
-    activityContributors:    ouraToday?.activityContributors ?? activityResult?.components ?? null,
+    // Ours only, never Oura's contributors (#3000). The activity components power the Activity
+    // detail screen's contributor chart and "how to improve" guide.
+    sleepContributors:       ownSleepContributors,
+    activityContributors:    activityResult?.components ?? null,
     activityGoals:           activityResult ? { ...goals, moveHoursGoal: moveGoalToday } : null,
     activitySignals:         activityResult
       ? {
