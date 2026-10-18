@@ -25,9 +25,9 @@ import {
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useNutrition } from '../data/NutritionProvider';
 import { confirmedCreate, UnconfirmedCreate } from '../data/confirmed-create';
-import { heartCardView } from '../data/heart-response-view';
+import { heartCardView } from '@trainingai/shared/nutrition/heart-response-view';
 import { type Supplement } from '../data/models';
-import { openedOnProblem } from '../data/vial-date';
+import { openedOnProblem } from '@trainingai/shared/nutrition/vial-date';
 import { concentrationWorking, doseWorking, planDose } from '@trainingai/shared/nutrition/vial-plan';
 import { formatRange, recoveryResponse, weightResponse } from '@trainingai/shared/nutrition/weight-response';
 const vialSchema = z

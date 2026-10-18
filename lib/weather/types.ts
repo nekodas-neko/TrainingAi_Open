@@ -1,4 +1,6 @@
-export type WeatherCondition = 'clear' | 'cloudy' | 'rain' | 'fog' | 'snow' | 'thunderstorm'
+import type { WeatherCondition } from '@trainingai/shared/weather/weather-condition'
+
+export type { WeatherCondition }
 
 export interface LocationCoords {
   lat: number

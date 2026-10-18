@@ -5,7 +5,7 @@ import { todayInTz } from "@trainingai/shared/date-utils";
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import {
   resilienceAsOfLine, resilienceShortfallLine, type ResilienceCoverage,
-} from "./resilience-copy";
+} from "@trainingai/shared/health/resilience-copy";
 
 interface ResilienceTileProps {
   /** null when the model has published nothing — the tile then states what was observed. */

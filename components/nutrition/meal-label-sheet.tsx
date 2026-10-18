@@ -16,7 +16,7 @@ import { renderMealLabel, type RenderedMealLabel } from './meal-label-render'
 import {
   MEAL_LABEL_STYLES, DEFAULT_MEAL_LABEL_STYLE, mealLabelStyleSpec, labelPrintDpi,
   type MealLabelStyle,
-} from './meal-label-geometry'
+} from '@trainingai/shared/nutrition/meal-label-geometry'
 
 /** One key, no schema — see the note on style persistence below. */
 const LABEL_STYLE_KEY = 'ta_meal_label_style'

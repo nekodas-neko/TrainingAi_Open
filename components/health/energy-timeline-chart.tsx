@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useMemo } from 'react'
-import { buildEnergyTimeline, type HrBucket, type IntakeEvent } from './energy-timeline'
+import { buildEnergyTimeline, type HrBucket, type IntakeEvent } from '@trainingai/shared/health/energy-timeline'
 import type { CountedEstimateRow } from '@trainingai/shared/nutrition/counted-intake'
 
 /**

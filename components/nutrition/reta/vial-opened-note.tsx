@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { invalidateSupplements } from "@/lib/cache-groups";
 import { formatDateDisplay } from "@trainingai/shared/date-utils";
-import { openedOnBounds, openedOnProblem } from "./vial-date";
+import { openedOnBounds, openedOnProblem } from "@trainingai/shared/nutrition/vial-date";
 
 /**
  * The stored vial's opened date, shown and correctable (BF-136).

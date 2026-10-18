@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { saveSleepValue } from '@/components/checkin/save-sleep-value'
-import { verdictToStoredFeel } from '@/components/health/sleep/sleep-verdict-copy'
+import { saveSleepValue } from '@trainingai/shared/checkin/save-sleep-value'
+import { verdictToStoredFeel } from '@trainingai/shared/health/sleep-verdict-copy'
 import { dayCheckinHasAnswers } from '@trainingai/shared/validation/day-checkin'
 import { answeredMorningScales } from '@trainingai/shared/health/self-report'
-import type { StoredSleepVerdict } from '@/components/health/sleep/sleep-verdict-copy'
+import type { StoredSleepVerdict } from '@trainingai/shared/health/sleep-verdict-copy'
 import type { SleepVerdict } from '@trainingai/shared/health/sleep-verdict'
 
 const announced = (verdict: SleepVerdict) => ({ verdict } as StoredSleepVerdict)

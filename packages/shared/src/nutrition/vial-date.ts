@@ -1,4 +1,4 @@
-import { shiftDateStr } from '@trainingai/shared/date-utils'
+import { normalizeDateParamIso, shiftDateStr } from '@trainingai/shared/date-utils'
 
 /**
  * The bounds on a vial's reconstitution date (BF-136).
@@ -29,9 +29,18 @@ export function openedOnBounds(today: string): { min: string; max: string } {
  * Compared as strings, deliberately: `YYYY-MM-DD` sorts lexicographically in date order, so this
  * needs no `Date` at all — and a `new Date('2026-09-10')` here would parse as UTC midnight and shift
  * the day west of UTC, which is the trap `formatDateDisplay` carries a comment about.
+ *
+ * Only a dashed real day passes: `<input type="date">` never emits slashes, so this stays stricter
+ * than the routes (which accept `localDateString()`'s slashes). `normalizeDateParamIso` returns the
+ * dash form of a real day, so it equals the input only for a dashed real day. That also refuses an
+ * impossible day (`2026-09-31`), which the old shape-only regex let through (#3041).
  */
+function isPlainDay(value: string): boolean {
+  return normalizeDateParamIso(value) === value
+}
+
 export function isOpenedOnValid(value: string, today: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  if (!isPlainDay(value)) return false
   const { min, max } = openedOnBounds(today)
   return value >= min && value <= max
 }
@@ -39,7 +48,7 @@ export function isOpenedOnValid(value: string, today: string): boolean {
 /** Why a date was rejected, for the line under the field. Null when it is fine. */
 export function openedOnProblem(value: string, today: string): string | null {
   if (isOpenedOnValid(value, today)) return null
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return 'Pick the day you mixed this vial.'
+  if (!isPlainDay(value)) return 'Pick the day you mixed this vial.'
   return value > today
     ? 'A vial cannot be opened in the future.'
     : `That is more than ${MAX_OPENED_DAYS_BACK} days ago — check the year.`

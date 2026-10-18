@@ -1,10 +1,6 @@
 import { z } from 'zod';
-import {
-  placeSchema,
-  weatherCondition,
-  type WeatherPlace,
-  type WeatherSnapshot,
-} from './models.ts';
+import { weatherCondition } from '@trainingai/shared/weather/weather-condition';
+import { placeSchema, type WeatherPlace, type WeatherSnapshot } from './models.ts';
 
 const forecastSchema = z.object({
   current: z.object({

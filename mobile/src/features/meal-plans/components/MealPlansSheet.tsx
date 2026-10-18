@@ -31,12 +31,12 @@ import {
 import { MacroComparison, MacroLine } from '../../nutrition/components/NutritionElements';
 import { useNutrition } from '../../nutrition/data/NutritionProvider';
 import { confirmedCreate, UnconfirmedCreate } from '../../nutrition/data/confirmed-create';
-import { libraryMealForSlot, usedSavedMealIds } from '../../nutrition/data/library-swap';
+import { libraryMealForSlot, usedSavedMealIds } from '@trainingai/shared/nutrition/library-swap';
 import {
   applyReduction,
   reductionNeeded,
   type Pin,
-} from '../../nutrition/data/meal-count-reduction';
+} from '@trainingai/shared/nutrition/meal-count-reduction';
 import {
   draftPlanSchema,
   planSpec,

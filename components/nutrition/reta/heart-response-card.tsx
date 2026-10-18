@@ -9,7 +9,7 @@ import { TTL_MEDIUM } from "@trainingai/shared/cache-ttl";
 import { CATEGORICAL_PALETTE } from "@trainingai/shared/chart-colors";
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { recoveryResponse, type RecoveryDose, type RecoveryNight } from "@trainingai/shared/nutrition/weight-response";
-import { heartCardView, niceTicks, type HeartCardView, type HeartChart } from "./heart-response-view";
+import { heartCardView, niceTicks, type HeartCardView, type HeartChart } from "@trainingai/shared/nutrition/heart-response-view";
 
 /**
  * "Heart after a dose" (issue 2152, mockup `docs/design/2026-10-08-reta-heart-response-card.html`).

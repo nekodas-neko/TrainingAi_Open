@@ -15,7 +15,7 @@ const read = (p: string) => readFileSync(join(root, p), 'utf8')
 const CONSUMERS = [
   'packages/shared/src/nutrition/calorie-balance.ts',
   'packages/shared/src/nutrition/goal-recommendation.ts',
-  'components/nutrition/macro-energy.ts',
+  'packages/shared/src/nutrition/macro-energy.ts',
 ]
 
 describe('the Atwater factors live in one place (LB-9)', () => {

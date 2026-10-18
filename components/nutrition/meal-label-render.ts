@@ -9,7 +9,7 @@ import {
   SPECS, mealLabelCarriesRecipe, mealLabelShareBudget, centredStackOffset,
   SHEET, SQUARE_MARGIN, SQUARE_W, USABLE_W, USABLE_H, STACK_LINE_H, DEFAULT_RENDER_SCALE,
   type StyleSpec, type MealLabelStyle,
-} from './meal-label-geometry'
+} from '@trainingai/shared/nutrition/meal-label-geometry'
 
 /**
  * Resolve a `next/font` CSS variable to the family list canvas needs.

@@ -15,7 +15,7 @@ import { sameRestrictions } from './restrictions-diff'
 import { MealPlanReviewStep } from './meal-plan-review-step'
 import { MyMealsPicker, type TypedMeal } from './my-meals-picker'
 import { MealCountReductionPrompt } from './meal-count-reduction-prompt'
-import { reductionNeeded, applyReduction, type Pin, type ReductionDecision } from './meal-count-reduction'
+import { reductionNeeded, applyReduction, type Pin, type ReductionDecision } from '@trainingai/shared/nutrition/meal-count-reduction'
 import type { Draft } from './meal-plan-draft'
 import { MEAL_COUNT_MIN, MEAL_COUNT_MAX } from '@trainingai/shared/nutrition/meal-split'
 import {

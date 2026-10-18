@@ -16,7 +16,7 @@ import {
   mealLabelStyleSpec,
   SHEET,
   STACK_LINE_H,
-} from './meal-label-geometry';
+} from '@trainingai/shared/nutrition/meal-label-geometry';
 import type { SavedMeal } from './models';
 import { asSharedMeal } from './recipes';
 const escape = (value: string) =>

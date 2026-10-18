@@ -22,7 +22,7 @@ import {
 import { energySpec } from '../../health/data/models';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useNutrition } from '../data/NutritionProvider';
-import { macroShares } from '../data/macro-energy';
+import { macroShares } from '@trainingai/shared/nutrition/macro-energy';
 export function NutritionEnergyCard({ date, onGoals }: { date: string; onGoals: () => void }) {
   const n = useNutrition(date);
   const [info, setInfo] = useState(false);

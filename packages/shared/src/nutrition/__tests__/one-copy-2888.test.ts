@@ -4,8 +4,9 @@ import path from 'node:path'
 
 /**
  * #2888: weight response, the dose-vitals series and the vial plan each lived twice, once per app,
- * with their own `DEFAULT_BAND_PCT_PER_WEEK`. They live once in this package now. This fails if either
- * app grows its own definition of one of these exports again.
+ * with their own `DEFAULT_BAND_PCT_PER_WEEK`. They live once in this package now. #3041 did the same
+ * for the rest of Preview's copies, and added the helpers earlier work had already shared. This fails
+ * if either app grows its own definition of one of these exports again.
  */
 const ROOT = path.resolve(__dirname, '../../../../..')
 const SHARED_EXPORTS = [
@@ -16,6 +17,36 @@ const SHARED_EXPORTS = [
   'buildDoseVitalsSeries',
   'planDose',
   'isMilligramDosed',
+  // #3041
+  'buildEnergyTimeline',
+  'resilienceShortfallLine',
+  'resilienceAsOfLine',
+  'verdictCopy',
+  'verdictToStoredFeel',
+  'componentClause',
+  'saveSleepValue',
+  'heartCardView',
+  'niceTicks',
+  'libraryMealForSlot',
+  'usedSavedMealIds',
+  'macroKcal',
+  'macroShares',
+  'reductionNeeded',
+  'applyReduction',
+  'mealLabelCodeMetrics',
+  'mealLabelStyleSpec',
+  'centredStackOffset',
+  'visibleReviewSteps',
+  'hasUnloggedMeal',
+  'openedOnBounds',
+  'openedOnProblem',
+  'isOpenedOnValid',
+  'weatherCondition',
+  'mapWeatherCode',
+  // shared before #3041; listed so they stay that way
+  'rangeStats',
+  'actualSleepWindow',
+  'pickSleepCardNight',
 ]
 const DEFINES = new RegExp(`\\b(?:const|function|let|var)\\s+(${SHARED_EXPORTS.join('|')})\\b`)
 
