@@ -8,7 +8,7 @@ import { shiftDateStr, todayInTz } from "@trainingai/shared/date-utils";
 import { TTL_MEDIUM } from "@trainingai/shared/cache-ttl";
 import { CATEGORICAL_PALETTE } from "@trainingai/shared/chart-colors";
 import { useUserTimezone } from "@/components/shell/user-timezone-provider";
-import { recoveryResponse, type RecoveryDose, type RecoveryNight } from "./weight-response";
+import { recoveryResponse, type RecoveryDose, type RecoveryNight } from "@trainingai/shared/nutrition/weight-response";
 import { heartCardView, niceTicks, type HeartCardView, type HeartChart } from "./heart-response-view";
 
 /**

@@ -15,7 +15,7 @@ import { resolveColor } from "@trainingai/shared/chart-colors";
 import {
   METRIC_LABEL, METRIC_UNIT, hasAnyReading,
   type DoseMetric, type DoseVitalsPoint,
-} from "./dose-vitals-series";
+} from "@trainingai/shared/health/dose-vitals-series";
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip);
 

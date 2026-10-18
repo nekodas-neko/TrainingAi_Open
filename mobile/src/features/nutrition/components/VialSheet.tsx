@@ -28,8 +28,8 @@ import { confirmedCreate, UnconfirmedCreate } from '../data/confirmed-create';
 import { heartCardView } from '../data/heart-response-view';
 import { type Supplement } from '../data/models';
 import { openedOnProblem } from '../data/vial-date';
-import { concentrationWorking, doseWorking, planDose } from '../data/vial-plan';
-import { formatRange, recoveryResponse, weightResponse } from '../data/weight-response';
+import { concentrationWorking, doseWorking, planDose } from '@trainingai/shared/nutrition/vial-plan';
+import { formatRange, recoveryResponse, weightResponse } from '@trainingai/shared/nutrition/weight-response';
 const vialSchema = z
   .object({
     id: z.string(),

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { planDose, concentrationWorking, doseWorking, DEFAULT_BARREL_UNITS } from '../vial-plan'
+import { planDose, concentrationWorking, doseWorking, isMilligramDosed, DEFAULT_BARREL_UNITS } from '../vial-plan'
 
 // The owner's own vial, and the figures OR-102b verified against their third-party calculator.
 const VIAL = { strengthMg: 10, waterMl: 3, syringeUnitsPerMl: 100 }
@@ -68,5 +68,22 @@ describe('the working is shown, not just the result — OR-102b', () => {
   it('says nothing rather than something wrong when the vial is unusable', () => {
     expect(concentrationWorking({ ...VIAL, strengthMg: 0 })).toBeNull()
     expect(doseWorking(0.5, { ...VIAL, waterMl: -1 })).toBeNull()
+  })
+})
+
+// #2888: Preview once had its own unit check that skipped the trim, which is the suspected reason
+// the vial control did not show in #2898. One copy now; these pin what it accepts.
+describe('isMilligramDosed', () => {
+  it('accepts mg however the unit was typed', () => {
+    expect(isMilligramDosed({ unit: 'mg' })).toBe(true)
+    expect(isMilligramDosed({ unit: 'MG' })).toBe(true)
+    expect(isMilligramDosed({ unit: ' mg ' })).toBe(true)
+  })
+
+  it('rejects other units and a missing one', () => {
+    expect(isMilligramDosed({ unit: 'mcg' })).toBe(false)
+    expect(isMilligramDosed({ unit: 'mL' })).toBe(false)
+    expect(isMilligramDosed({ unit: null })).toBe(false)
+    expect(isMilligramDosed({})).toBe(false)
   })
 })

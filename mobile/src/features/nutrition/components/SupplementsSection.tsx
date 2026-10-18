@@ -27,7 +27,7 @@ import { deleteSupplement } from '../data/supplement-delete';
 import { useNutrition } from '../data/NutritionProvider';
 import { SupplementCreateSchema, type Supplement } from '../data/models';
 import { VialSheet } from './VialSheet';
-import { isMilligramDosed } from '../data/vial-plan';
+import { isMilligramDosed } from '@trainingai/shared/nutrition/vial-plan';
 import { NutritionReminders } from '../../platform/components/NutritionReminders';
 const formSchema = z.object({
   name: z.string(),

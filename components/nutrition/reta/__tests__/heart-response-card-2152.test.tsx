@@ -14,7 +14,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { shiftDateStr } from '@trainingai/shared/date-utils'
 import { CATEGORICAL_PALETTE } from '@trainingai/shared/chart-colors'
-import { recoveryResponse, metricPattern, type RecoveryDose, type RecoveryNight } from '../weight-response'
+import { recoveryResponse, metricPattern, type RecoveryDose, type RecoveryNight } from '@trainingai/shared/nutrition/weight-response'
 import { heartCardView, levelLabel } from '../heart-response-view'
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true

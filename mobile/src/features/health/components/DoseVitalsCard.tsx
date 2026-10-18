@@ -9,7 +9,7 @@ import {
   latestDoses,
   METRIC_LABEL,
   type DoseMetric,
-} from '../data/dose-vitals-series';
+} from '@trainingai/shared/health/dose-vitals-series';
 import { HealthResourceHeader } from './HealthResourceHeader';
 export function DoseVitalsCard() {
   const state = useWorkoutResource(doseVitalsSpec);

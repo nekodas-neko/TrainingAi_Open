@@ -5,7 +5,7 @@ import { getLocalStore } from "@/lib/local-store";
 import { cachedFetch } from "@/lib/sqlite/cache";
 import { TTL_MEDIUM } from "@trainingai/shared/cache-ttl";
 import type { WeightPoint } from "@trainingai/shared/health/long-term-goal-progress";
-import { weightResponse, formatRange, responseState, type ResponseVerdict } from "./weight-response";
+import { weightResponse, formatRange, responseState, type ResponseVerdict } from "@trainingai/shared/nutrition/weight-response";
 
 /**
  * Weight response over the current vial (OR-102b ④).
