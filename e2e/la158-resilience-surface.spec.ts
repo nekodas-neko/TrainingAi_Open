@@ -126,12 +126,12 @@ test('no level, no coverage observation, but a reason: the tile says why (issue 
 
   await expect(page.getByText('Resilience').first()).toBeVisible({ timeout: 120_000 })
   await expect(page.getByText(/Not published yet/)).toBeVisible()
-  const reason = page.getByText('Nothing recorded for today', { exact: true })
-  await expect(reason).toBeVisible()
-  // The score's own reason line (if any) is the readiness one; this is the tile's, inside its box.
+  // Scoped to the tile: a contributor with no input prints the same sentence in its own block (#3016).
   const tile = page.locator('div.rounded-xl').filter({ hasText: 'Not published yet' }).last()
+  const reason = tile.getByText('Nothing recorded for today', { exact: true })
+  await expect(reason).toBeVisible()
   const t = (await tile.boundingBox())!
-  const r = (await reason.last().boundingBox())!
+  const r = (await reason.boundingBox())!
   expect(r.x).toBeGreaterThanOrEqual(t.x)
   expect(r.x + r.width).toBeLessThanOrEqual(t.x + t.width + 1)
 })
