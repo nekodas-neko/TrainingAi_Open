@@ -41,7 +41,7 @@ export function ProgressBar({
       style={{
         height: theme.spacing.sm,
         borderRadius: theme.radii.pill,
-        backgroundColor: theme.colors.brandSurface,
+        backgroundColor: theme.colors.track,
         overflow: 'hidden',
       }}
     >

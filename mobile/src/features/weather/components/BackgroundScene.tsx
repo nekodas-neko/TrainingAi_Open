@@ -39,7 +39,7 @@ export function BackgroundScene({
   const scrim = theme.backgrounds.scrim;
   const scrimTop = sky ? scrim.top : theme.mode === 'dark' ? 0.2 : 0.1;
   const scrimBottom = sky ? scrim.bottom : theme.mode === 'dark' ? 0.6 : 0.4;
-  const scrimColor = sky ? scrim.color : '#000000';
+  const scrimColor = sky ? scrim.color : theme.mode === 'dark' ? '#000000' : '#ffffff';
   const rgb = (color: readonly number[]) => `rgb(${color.map(Math.round).join(',')})`;
   const celestialOpacity = condition === 'clear' ? 0.55 : condition === 'cloudy' ? 0.15 : 0;
   const radius = Math.min(64, width * 0.18);

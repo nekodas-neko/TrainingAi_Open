@@ -55,7 +55,7 @@ export function GroupedBarChart({
   const labelTone = readable ? 'text' : 'muted';
   const svg = (
     <Svg width="100%" height={theme.sizes.weekVolumeChart} viewBox="0 0 320 108">
-      <Line x1="0" x2="320" y1={y(0)} y2={y(0)} stroke={theme.colors.border} />
+      <Line x1="0" x2="320" y1={y(0)} y2={y(0)} stroke={theme.colors.grid} />
       {series.flatMap((s, si) =>
         s.values.map((value, i) => (
           <Rect

@@ -23,7 +23,7 @@ export function MuscleVolumeFigure({
     warn: theme.anatomy.secondary,
     bad: theme.anatomy.injured,
     none: theme.colors.muted,
-    brand: theme.colors.brand,
+    brand: theme.anatomy.high,
   };
   const hasTargets = muscles.some((row) => row.target !== null);
   const scale = Math.max(...muscles.map((row) => Math.max(row.sets, row.target ?? 0)), MAX_TARGET);
