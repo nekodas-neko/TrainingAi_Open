@@ -53,7 +53,6 @@ export const sizes = {
   compactMetricWidth: 104,
   actionTile: 112,
   weekVolumeChart: 128,
-  timelineTime: 56,
   timelineMarker: 28,
   timelineRow: 72,
 };

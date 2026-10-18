@@ -51,11 +51,9 @@ export function HomeTrainingSummary({
           style={{ flex: 1 }}
           accent={preferences.cardColors?.streakLeft ?? theme.homeCards.streakLeft}
         >
-          <Stack direction="row" align="center" justify="space-between">
-            <AppText variant="eyebrow" tone="muted">
-              Streak
-            </AppText>
-          </Stack>
+          <AppText variant="eyebrow" tone="muted">
+            Streak
+          </AppText>
           <AppText variant="hero" tone="brand">
             {streakLoaded && streak > 0 ? streak : '—'}{' '}
             <AppText variant="caption" tone="muted">
@@ -95,11 +93,9 @@ export function HomeTrainingSummary({
           style={{ flex: 1 }}
           accent={preferences.cardColors?.streakRight ?? theme.homeCards.streakRight}
         >
-          <Stack direction="row" align="center" justify="space-between">
-            <AppText variant="eyebrow" tone="muted">
-              This Week
-            </AppText>
-          </Stack>
+          <AppText variant="eyebrow" tone="muted">
+            This Week
+          </AppText>
           <AppText variant="hero">
             {loaded ? count : '—'}
             {!ai && target !== null && (

@@ -91,8 +91,8 @@ test("the Body Battery pill takes theme colours, never CSS variables", () => {
     colors: { danger: "#d00" },
     tones: {
       checkin: { foreground: "#fa0" },
-      activity: { foreground: "#0a0" },
     },
+    status: { success: "#0a0" },
   };
   assert.equal(batteryColor("Drained", theme), "#d00");
   assert.equal(batteryColor("Low", theme), "#fa0");

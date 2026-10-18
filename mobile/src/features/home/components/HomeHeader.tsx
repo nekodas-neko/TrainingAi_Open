@@ -1,5 +1,5 @@
 import { Pressable, Image, View } from 'react-native';
-import { AppText, IconButton, Stack, StatusIndicator } from '../../../shared/ui';
+import { AppText, AttentionDot, IconButton, Stack, StatusIndicator } from '../../../shared/ui';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { homeGreeting, profileDisplayName } from '@trainingai/shared/greeting';
 import { WeatherChip } from '../../weather/components/WeatherChip';
@@ -111,27 +111,7 @@ export function HomeHeader({
               </AppText>
             )}
           </Pressable>
-          {badge > 0 && (
-            <View
-              pointerEvents="none"
-              style={{
-                position: 'absolute',
-                top: -theme.spacing.xxs,
-                right: -theme.spacing.xxs,
-                minWidth: theme.spacing.lg,
-                height: theme.spacing.lg,
-                paddingHorizontal: theme.spacing.xxs,
-                borderRadius: theme.radii.pill,
-                backgroundColor: theme.colors.danger,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <AppText variant="micro" style={{ color: theme.colors.background }}>
-                {badge}
-              </AppText>
-            </View>
-          )}
+          {badge > 0 && <AttentionDot count={badge} />}
         </View>
       </Stack>
     </Stack>

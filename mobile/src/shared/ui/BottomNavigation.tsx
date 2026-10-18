@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AppText } from './AppText';
+import { AttentionDot } from './AttentionDot';
 import { useTheme } from '../theme/ThemeProvider';
 
 export function BottomNavigation<T extends string>({
@@ -76,21 +77,7 @@ export function BottomNavigation<T extends string>({
               ) : (
                 <View>
                   {item.renderIcon(color, theme.sizes.iconSmall)}
-                  {item.badge && (
-                    <View
-                      // The tab's own label says it ("More, needs attention"); a Pressable hides its children from TalkBack.
-                      accessible={false}
-                      style={{
-                        position: 'absolute',
-                        top: -theme.spacing.xxs,
-                        right: -theme.spacing.xxs,
-                        width: theme.spacing.sm,
-                        height: theme.spacing.sm,
-                        borderRadius: theme.radii.pill,
-                        backgroundColor: theme.colors.danger,
-                      }}
-                    />
-                  )}
+                  {item.badge && <AttentionDot />}
                 </View>
               )}
               <AppText variant="tab" style={{ color }}>

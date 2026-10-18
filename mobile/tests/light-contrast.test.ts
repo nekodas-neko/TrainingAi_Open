@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createTheme } from '../src/shared/theme/theme';
+import { batteryColor } from '../src/shared/battery-color';
 import { palettes, type Brand } from '../src/shared/theme/palettes';
 
 function luminance(hex: string) {
@@ -113,5 +114,27 @@ test('dark theme colour tokens are unchanged', () => {
     const dark = createTheme('dark', brand);
     assert.equal(dark.colors.track, palettes[brand].dark.brandSurface);
     assert.equal(dark.anatomy.high, palettes[brand].dark.brand);
+  }
+});
+
+// #2976: the Body Battery bar's "good" band is the success status colour, so it must read in both themes.
+test('the Body Battery good colour reaches 4.5:1 on every card colour in both themes', () => {
+  for (const mode of ['light', 'dark'] as const) {
+    for (const brand of brands) {
+      const theme = createTheme(mode, brand);
+      const color = batteryColor('Good', theme);
+      assert.equal(batteryColor('Charged', theme), color);
+      const backgrounds = [
+        theme.colors.background,
+        theme.colors.surface,
+        theme.colors.raised,
+        theme.colors.brandSurface,
+        ...Object.values(theme.tones).map((tone) => tone.background),
+      ];
+      for (const background of backgrounds) {
+        const ratio = contrast(color, background);
+        assert.ok(ratio >= 4.5, `${mode} ${brand} ${color} on ${background}: ${ratio.toFixed(2)}:1`);
+      }
+    }
   }
 });
