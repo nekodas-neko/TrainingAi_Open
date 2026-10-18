@@ -957,6 +957,45 @@ SELECT
 FROM public.oura_bucket t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
+CREATE VIEW claude_ro.oura_cloud_daily AS
+SELECT
+  t.user_id,
+  t.date,
+  t.met,
+  t.class_5_min,
+  t.inactivity_alerts,
+  t.sedentary_met_minutes,
+  t.target_calories,
+  t.target_meters,
+  t.meters_to_target,
+  t.readiness_contributors,
+  t.sleep_contributors,
+  t.activity_contributors,
+  t.updated_at
+FROM public.oura_cloud_daily t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
+CREATE VIEW claude_ro.oura_cloud_sleep_periods AS
+SELECT
+  t.user_id,
+  t.oura_id,
+  t.day,
+  t.bedtime_start,
+  t.bedtime_end,
+  t.sleep_type,
+  t.heart_rate,
+  t.hrv,
+  t.sleep_phase_30_sec,
+  t.movement_30_sec,
+  t.sleep_algorithm_version,
+  t.low_battery_alert,
+  t.sleep_analysis_reason,
+  t.period,
+  t.ring_id,
+  t.updated_at
+FROM public.oura_cloud_sleep_periods t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.oura_daily AS
 SELECT
   t.id,
@@ -1114,7 +1153,8 @@ SELECT
   t.timestamp,
   t.bpm,
   t.source,
-  t.updated_at
+  t.updated_at,
+  t.context
 FROM public.oura_heartrate t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
@@ -1170,6 +1210,22 @@ SELECT
 FROM public.oura_rollup_state t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 
+CREATE VIEW claude_ro.oura_sessions AS
+SELECT
+  t.user_id,
+  t.oura_id,
+  t.day,
+  t.session_type,
+  t.start_datetime,
+  t.end_datetime,
+  t.mood,
+  t.heart_rate,
+  t.heart_rate_variability,
+  t.motion_count,
+  t.updated_at
+FROM public.oura_sessions t
+WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
+
 CREATE VIEW claude_ro.oura_tags AS
 SELECT
   t.id,
@@ -1217,7 +1273,8 @@ SELECT
   t.intensity,
   t.source,
   t.reviewed,
-  t.created_at
+  t.created_at,
+  t.label
 FROM public.oura_workouts t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;
 

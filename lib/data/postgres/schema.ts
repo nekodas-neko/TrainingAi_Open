@@ -1610,6 +1610,10 @@ export const ouraHeartrate = pgTable('oura_heartrate', {
   timestamp: timestamp('timestamp', { withTimezone: true }).notNull(),
   bpm:       integer('bpm').notNull(),
   source:    text('source'),
+  // #2982 (migration 202610180038) — Oura Cloud's own label for the sample (`awake`, `rest`, `sleep`,
+  // `workout`, `live`, `session`; spec `PublicHeartRateSource`). `source` above stays our provenance,
+  // which the source ladder ranks on.
+  context:   text('context'),
   // migration 130 (Phase-2 B1) — cursor for the dedicated Track-B timeseries backup sync.
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [primaryKey({ name: 'oura_heartrate_pkey', columns: [t.userId, t.timestamp] })])
@@ -2095,6 +2099,7 @@ export const ouraWorkouts = pgTable('oura_workouts', {
   distanceM:      doublePrecision('distance_m'),
   intensity:      text('intensity'),
   source:         text('source'),
+  label:          text('label'),     // the user's own name for it (spec `PublicWorkout.label`), migration 202610180038
   reviewed:       boolean('reviewed').notNull().default(false),
   createdAt:      timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
@@ -2116,6 +2121,73 @@ export const ouraTags = pgTable('oura_tags', {
   endTime:    timestamp('end_time', { withTimezone: true }),
   syncedAt:   timestamp('synced_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+/** Oura's `PublicSample`: `items` taken every `interval` seconds from `timestamp`. Stored as sent. */
+export interface OuraSampleSeries { interval: number; items: (number | null)[]; timestamp: string }
+
+// #2982 (migration 202610180038) — what Oura Cloud sends and no screen reads. Storage for #2860's
+// later batches: nothing reads these tables yet. Kept out of `sleep_sessions` and `oura_daily`
+// because both are read whole by routes and the device pull, and their `*_contributors` columns are
+// ours. Field names are the pinned spec's.
+
+/** One Oura sleep period (`PublicModifiedSleepModel`), every type including `rest`. `ouraId` is the
+ *  id a Cloud night's `sleep_sessions.oura_id` holds. */
+export const ouraCloudSleepPeriods = pgTable('oura_cloud_sleep_periods', {
+  userId:                uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  ouraId:                text('oura_id').notNull(),
+  day:                   date('day', { mode: 'string' }).notNull(),
+  bedtimeStart:          timestamp('bedtime_start', { withTimezone: true }),
+  bedtimeEnd:            timestamp('bedtime_end', { withTimezone: true }),
+  sleepType:             text('sleep_type'),               // 'long_sleep'|'sleep'|'late_nap'|'rest'
+  heartRate:             jsonb('heart_rate').$type<OuraSampleSeries>(),
+  hrv:                   jsonb('hrv').$type<OuraSampleSeries>(),
+  sleepPhase30Sec:       text('sleep_phase_30_sec'),       // 1=deep 2=light 3=REM 4=awake
+  movement30Sec:         text('movement_30_sec'),          // 1=no motion … 4=active
+  sleepAlgorithmVersion: text('sleep_algorithm_version'),  // 'v1'|'v2'
+  lowBatteryAlert:       boolean('low_battery_alert'),
+  sleepAnalysisReason:   text('sleep_analysis_reason'),    // 'foreground_sleep_analysis'|'bedtime_edit'
+  period:                integer('period'),
+  ringId:                text('ring_id'),
+  updatedAt:             timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  primaryKey({ columns: [t.userId, t.ouraId] }),
+  index('oura_cloud_sleep_periods_user_day_idx').on(t.userId, t.day),
+])
+
+/** Per day: `PublicDailyActivity`'s series and goals, and Oura's own contributors (never ours). */
+export const ouraCloudDaily = pgTable('oura_cloud_daily', {
+  userId:                uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  date:                  date('date', { mode: 'string' }).notNull(),
+  met:                   jsonb('met').$type<OuraSampleSeries>(),
+  class5Min:             text('class_5_min'),              // 0=non-wear 1=rest 2=inactive 3=low 4=medium 5=high
+  inactivityAlerts:      integer('inactivity_alerts'),
+  sedentaryMetMinutes:   integer('sedentary_met_minutes'),
+  targetCalories:        integer('target_calories'),
+  targetMeters:          integer('target_meters'),
+  metersToTarget:        integer('meters_to_target'),
+  readinessContributors: jsonb('readiness_contributors').$type<Record<string, number | null>>(),
+  sleepContributors:     jsonb('sleep_contributors').$type<Record<string, number | null>>(),
+  activityContributors:  jsonb('activity_contributors').$type<Record<string, number | null>>(),
+  updatedAt:             timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.userId, t.date] })])
+
+/** One Oura session (`PublicSession`: breathing, meditation, nap …) with its series and mood. */
+export const ouraSessions = pgTable('oura_sessions', {
+  userId:               uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  ouraId:               text('oura_id').notNull(),
+  day:                  date('day', { mode: 'string' }).notNull(),
+  sessionType:          text('session_type'),
+  startDatetime:        timestamp('start_datetime', { withTimezone: true }),
+  endDatetime:          timestamp('end_datetime', { withTimezone: true }),
+  mood:                 text('mood'),
+  heartRate:            jsonb('heart_rate').$type<OuraSampleSeries>(),
+  heartRateVariability: jsonb('heart_rate_variability').$type<OuraSampleSeries>(),
+  motionCount:          jsonb('motion_count').$type<OuraSampleSeries>(),
+  updatedAt:            timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [
+  primaryKey({ columns: [t.userId, t.ouraId] }),
+  index('oura_sessions_user_day_idx').on(t.userId, t.day),
+])
 
 export const bodyBatteryDaily = pgTable('body_battery_daily', {
   id:            uuid('id').primaryKey().defaultRandom(),
