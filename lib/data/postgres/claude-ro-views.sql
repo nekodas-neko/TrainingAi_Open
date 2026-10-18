@@ -971,6 +971,7 @@ SELECT
   t.readiness_contributors,
   t.sleep_contributors,
   t.activity_contributors,
+  t.day_summary,
   t.updated_at
 FROM public.oura_cloud_daily t
 WHERE t.user_id = current_setting('app.claude_ro_owner', true)::uuid;

@@ -2154,7 +2154,7 @@ export const ouraCloudSleepPeriods = pgTable('oura_cloud_sleep_periods', {
   index('oura_cloud_sleep_periods_user_day_idx').on(t.userId, t.day),
 ])
 
-/** Per day: `PublicDailyActivity`'s series and goals, and Oura's own contributors (never ours). */
+/** Per day: `PublicDailyActivity`'s series and goals, Oura's own contributors (never ours) and its stress label. */
 export const ouraCloudDaily = pgTable('oura_cloud_daily', {
   userId:                uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   date:                  date('date', { mode: 'string' }).notNull(),
@@ -2168,6 +2168,9 @@ export const ouraCloudDaily = pgTable('oura_cloud_daily', {
   readinessContributors: jsonb('readiness_contributors').$type<Record<string, number | null>>(),
   sleepContributors:     jsonb('sleep_contributors').$type<Record<string, number | null>>(),
   activityContributors:  jsonb('activity_contributors').$type<Record<string, number | null>>(),
+  // `daily_stress.day_summary`. Not `oura_daily.day_summary`: the Readiness screen and the AI
+  // planner read that one.
+  daySummary:            text('day_summary'),              // 'restored'|'normal'|'stressful'
   updatedAt:             timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [primaryKey({ columns: [t.userId, t.date] })])
 

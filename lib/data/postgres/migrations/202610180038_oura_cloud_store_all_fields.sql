@@ -14,8 +14,10 @@
 --      `sleep_analysis_reason`, `period` and `ring_id`.
 --   2. CREATE TABLE oura_cloud_daily — one row per (user_id, date) for `PublicDailyActivity`'s `met`
 --      series, `class_5_min`, `inactivity_alerts`, `sedentary_met_minutes` and Oura's own goals
---      (`target_calories`, `target_meters`, `meters_to_target`), and Oura's readiness, sleep and
---      activity contributors.
+--      (`target_calories`, `target_meters`, `meters_to_target`), Oura's readiness, sleep and
+--      activity contributors, and `daily_stress.day_summary`. `oura_daily.day_summary` exists, but
+--      the Readiness screen shows it and the AI planner's context reads it, so writing Oura's label
+--      there would change both; it lands here until #2860 decides.
 --   3. CREATE TABLE oura_sessions — one row per Oura session (`PublicSession`: breathing, meditation,
 --      nap …) with its heart-rate, HRV and motion series and mood. The `session` scope is already
 --      granted.
@@ -83,6 +85,7 @@ CREATE TABLE IF NOT EXISTS oura_cloud_daily (
   readiness_contributors jsonb,
   sleep_contributors     jsonb,
   activity_contributors  jsonb,
+  day_summary            text,
   updated_at             timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, date)
 );
