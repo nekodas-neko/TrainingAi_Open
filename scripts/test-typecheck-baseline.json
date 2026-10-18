@@ -29,7 +29,6 @@
   "lib/__tests__/training-stress-warmed.test.ts": 1,
   "lib/ai-chat/__tests__/tools-hr-recovery-profile.test.ts": 2,
   "lib/ai-chat/__tests__/tools-hr-trend.test.ts": 8,
-  "lib/ai-chat/__tests__/tools-recovery.test.ts": 1,
   "lib/ai/__tests__/instrument.test.ts": 6,
   "lib/data/postgres/__tests__/app-load-report.test.ts": 4,
   "lib/data/postgres/__tests__/blood-panel-storage.test.ts": 4,
