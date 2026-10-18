@@ -57,7 +57,27 @@ export interface ReadinessCompositeInputs {
   /** Recovery Index — hours between the overnight HR minimum and wake
    *  (lib/health/recovery-index.ts). More hours = HR settled earlier in the night = better. */
   recoveryIndexHours?: number | null
+  /**
+   * #2984. Oura's own `recovery_index` readiness contributor (0–100), used only when there are no
+   * Recovery-Index hours. Oura sends no underlying value for it, so its sub-score is the input
+   * (rule 4 on #2860) and it is scored on its own scale, not through the hours curve.
+   */
+  recoveryIndexContributor?: number | null
+  /**
+   * #2984. The nights in the normal each baseline-relative input was judged against, for an input
+   * that HAS a value tonight. Normals are learned per device, so one night's inputs can sit on
+   * normals of different ages: a ring HRV on 60 nights beside an Oura temperature on 2. A key listed
+   * here with fewer than `BASELINE_MIN_NIGHTS` reads `awaiting_baseline` even when its z is null,
+   * because the value exists and only the normal is missing. Unlisted keys fall back to `nHistory`.
+   */
+  baselineNights?: Partial<Record<BaselineContributorKey, number>>
+  /** #2984. Which device each contributor's input came from (`oura_ble`, `oura_cloud`, …), stored
+   *  on the contributor so a persisted row says what it was computed from. */
+  sources?: Partial<Record<keyof typeof READINESS_WEIGHTS, string>>
 }
+
+/** The contributors scored against a personal normal. */
+export type BaselineContributorKey = 'restingHeartRate' | 'hrvBalance' | 'temperature' | 'sleepBalance'
 
 /** Why a contributor could not be scored. See {@link ReadinessContributor.gap}. */
 export type ContributorGap = 'no_input' | 'awaiting_baseline'
@@ -98,6 +118,14 @@ export interface ReadinessContributor {
    * apart. An enum with more members would have to invent the difference.
    */
   gap: ContributorGap | null
+  /** #2984. The device the input came from, when the caller knows it. Absent on rows written before. */
+  source?: string
+  /**
+   * #2984. Set only when the input is on someone else's scale rather than ours: `oura_contributor`
+   * is Oura's 0–100 recovery-index contributor, passed through. Re-derivation reads it, because the
+   * same key's hours input goes through a curve and a 0–100 value must not.
+   */
+  scale?: 'oura_contributor'
 }
 
 export interface ReadinessCompositeResult {
@@ -187,9 +215,12 @@ function zToScore(
   z: number | null,
   direction: 'higher-better' | 'lower-better' | 'closer-better',
   nHistory: number,
+  /** #2984: a value exists tonight, so a cold normal is `awaiting_baseline` even without a z. */
+  valuePresent = false,
 ): ReadinessContributor {
-  if (z == null) return NEUTRAL
+  if (z == null && !valuePresent) return NEUTRAL
   if (nHistory < BASELINE_MIN_NIGHTS) return AWAITING_BASELINE
+  if (z == null) return NEUTRAL
   const raw = direction === 'closer-better'
     ? 100 - Math.abs(z) * (2 * Z_POINTS_PER_UNIT)
     : 50 + (direction === 'higher-better' ? z : -z) * Z_POINTS_PER_UNIT
@@ -214,8 +245,12 @@ function plainScore(v: number | null): ReadinessContributor {
  *  which changes every z built from a young baseline. A mature ring baseline scores identically.
  *  v7: a temperature at baseline scores 100, not 90 (#2359) — the closer-better contributor no longer
  *  compresses its good end, which lifts every day with |tempZ| under 0.3 (raw above the 80 knee) by up to
- *  ~1.1 points on the 0-100 scale. */
-export const READINESS_MODEL_VERSION = 'v7:temp-100-at-baseline:2026-10-07'
+ *  ~1.1 points on the 0-100 scale.
+ *  v8: each night input is chosen per field (the ring's summary where it has the field, else the
+ *  generic value for the same night) and judged against a normal learned from its own device; the
+ *  recovery index takes Oura's own contributor where no hours exist (#2984). A full ring night with
+ *  no Oura data scores as v7. */
+export const READINESS_MODEL_VERSION = 'v8:per-input-per-device:2026-10-18'
 
 /** Recovery Index hours at which this contributor scores 100. `hoursToSettle` is measured from the
  *  overnight HR minimum to wake, so MORE hours = the heart settled earlier = better.
@@ -257,6 +292,13 @@ function recoveryIndexScore(hours: number | null | undefined): ReadinessContribu
   return { score, provisional: true, input: hours, gap: null }
 }
 
+/** #2984. Oura's 0–100 `recovery_index` contributor, passed through on its own scale. Provisional for
+ *  the same reason the hours curve is: it is not scored against the person's own normal. */
+function recoveryIndexContributorScore(v: number | null | undefined): ReadinessContributor {
+  if (v == null || !Number.isFinite(v)) return NEUTRAL
+  return { score: Math.max(0, Math.min(100, Math.round(v))), provisional: true, input: v, gap: null, scale: 'oura_contributor' }
+}
+
 /**
  * The readiness composite model in serialisable form — weights, the z→score slope, the baseline
  * maturity gate and each contributor's direction. Exported so tooling (the admin day-review audit)
@@ -283,18 +325,27 @@ export const READINESS_MODEL = {
 } as const
 
 export function computeReadinessComposite(input: ReadinessCompositeInputs): ReadinessCompositeResult {
+  const nights = input.baselineNights ?? {}
+  const baseline = (key: BaselineContributorKey, z: number | null, direction: 'higher-better' | 'lower-better' | 'closer-better') =>
+    nights[key] != null ? zToScore(z, direction, nights[key]!, true) : zToScore(z, direction, input.nHistory)
   const contributors: ReadinessCompositeResult['contributors'] = {
-    restingHeartRate: zToScore(input.rhrZ, 'lower-better', input.nHistory),
-    hrvBalance:        zToScore(input.hrvZ, 'higher-better', input.nHistory),
-    temperature:       zToScore(input.tempZ, 'closer-better', input.nHistory),
-    sleepBalance:      zToScore(input.sleepBalanceZ, 'higher-better', input.nHistory),
+    restingHeartRate: baseline('restingHeartRate', input.rhrZ, 'lower-better'),
+    hrvBalance:        baseline('hrvBalance', input.hrvZ, 'higher-better'),
+    temperature:       baseline('temperature', input.tempZ, 'closer-better'),
+    sleepBalance:      baseline('sleepBalance', input.sleepBalanceZ, 'higher-better'),
     previousNight:     plainScore(input.previousNightScore),
     prevDayActivity:   plainScore(input.prevDayActivityScore),
     // Calibrated from Recovery-Index hours (anchored on Oura's public "≥6 h = good recovery"),
     // replacing the former dead NEUTRAL that made 10% of readiness a frozen 50. Flagged provisional
     // (approximation) and falls back to neutral when there's no overnight HR series.
-    recoveryIndex:     recoveryIndexScore(input.recoveryIndexHours),
+    // #2984: Oura's own contributor stands in only where there are no hours to put through the curve.
+    recoveryIndex:     input.recoveryIndexHours != null && Number.isFinite(input.recoveryIndexHours)
+      ? recoveryIndexScore(input.recoveryIndexHours)
+      : recoveryIndexContributorScore(input.recoveryIndexContributor),
     activityBalance:   plainScore(input.activityBalanceScore),
+  }
+  for (const [key, source] of Object.entries(input.sources ?? {}) as [keyof typeof READINESS_WEIGHTS, string | undefined][]) {
+    if (source && contributors[key].gap !== 'no_input') contributors[key] = { ...contributors[key], source }
   }
 
   const score = Math.round(
@@ -311,6 +362,7 @@ export interface StoredReadinessContributor {
   score: number
   provisional: boolean
   input?: number | null
+  scale?: string
 }
 
 export interface ReadinessRederivation {
@@ -358,6 +410,7 @@ function rederiveContributor(
   if (value == null) return NEUTRAL.score      // no input → the model's neutral, by definition
   const direction = READINESS_MODEL.directions[key]
   if (direction === 'passthrough') return plainScore(value).score
+  if (stored.scale === 'oura_contributor') return recoveryIndexContributorScore(value).score
   if (direction === 'hours-curve') return recoveryIndexScore(value).score
   // A z contributor that stored an input was not baseline-cold at write time — a cold one falls back
   // to NEUTRAL, whose input is null and which returned above. So the maturity gate is satisfied.

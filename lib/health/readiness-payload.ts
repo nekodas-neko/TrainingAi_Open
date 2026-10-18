@@ -20,20 +20,20 @@ import { getCurrentPhase } from '@trainingai/shared/phase-engine'
 import { computeVolumeAcwr, ACWR_THRESHOLDS, acwrBaselineDaysRemaining } from '@trainingai/shared/ai-periodization/acwr'
 import { scoreBand } from '@trainingai/shared/health/score-band'
 import { computeSleepScore, sleepComponentsToContributors, sleepScoreBaselines } from '@trainingai/shared/health/sleep-score'
-import { nightSessions, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
+import { nightSessions, canonicalLatestNight, canonicalNightForDate } from '@trainingai/shared/health/sleep-night'
 import { computeActivityScore, strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
 import { getDailyGoals, type DailyGoals } from '@trainingai/shared/health/daily-goals'
 import { hrMaxFromAge } from '@trainingai/shared/health/hr-zones'
 import { resolveHrProfile } from '@trainingai/shared/health/hr-profile'
 import { intradayHrContributors } from '@trainingai/shared/health/intraday-hr-contributors'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
-import { baselineZ } from '@trainingai/shared/health/personal-baseline'
 import { computeReadinessComposite, READINESS_MODEL_VERSION, type ReadinessCompositeResult } from '@trainingai/shared/health/readiness-composite'
 import { resilienceLevelToBand, observeResilienceCoverage } from '@/lib/health/stress-resilience'
-import { computeIllnessRadar, illnessAdvisory, illnessZScores, type IllnessFlag, type IllnessBiomarker, type IllnessBiomarkerKey } from '@trainingai/shared/health/illness-radar'
+import { computeIllnessRadar, illnessAdvisory, type IllnessFlag, type IllnessBiomarker, type IllnessBiomarkerKey } from '@trainingai/shared/health/illness-radar'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
-import { scoreAvailability, metricAvailability, trailingBaselineZ, type ReadinessInputKey, type ScoreAvailability, type MetricAvailability } from '@/lib/health/score-availability'
+import { scoreAvailability, metricAvailability, type ReadinessInputKey, type ScoreAvailability, type MetricAvailability } from '@/lib/health/score-availability'
 import { connectedSources, CONNECTED_SOURCE_WINDOW_DAYS, type ConnectedSources } from '@trainingai/shared/health/connected-sources'
+import { resolveReadinessNightInputs, compositeNightFields, illnessNightFields } from '@/lib/health/readiness-night-inputs'
 
 /**
  * Early-deload trigger: a low readiness score *and* an elevated acute:chronic load ratio.
@@ -381,7 +381,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
 
   // #2182: the zone ceiling is the HR profile's — one max for the zone bar and Activity's zone minutes.
   const hrProfileP = resolveHrProfile(repo, userId, tz).catch(() => null)
-  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary] = await Promise.all([
+  const [bodyMetrics, sleepSessions, recentSessions, ouraRows, program, todayHrRows, dailySummaries, derivedTodayRows, cloudVitals, userProfile, userGoals, doseEvents, connectedSourcesSummary, ouraCloudContributors] = await Promise.all([
     repo.listBodyMetrics(userId, from28dIso, todayIso),
     repo.listSleepSessions(userId, from28dIso, todayIso),
     repo.getWorkoutSessionsFrom(userId, from28dDate),
@@ -397,6 +397,9 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     // TN-46: context for a flagged day, never an input to the score. A failure costs the context only.
     (async () => repo.listDoseEvents(userId, shiftDateStr(todayIso, -DOSE_EFFECT_LOOKBACK_DAYS), todayIso))().catch(() => []),
     connectedSourcesP,
+    // #2984: Oura's recovery-index contributor, the one input Oura sends no value for. A failure
+    // leaves that input missing, which is what it is without the read.
+    (async () => repo.getOuraCloudReadinessContributors(userId, from28dIso, todayIso))().catch(() => []),
   ])
 
   const derivedToday = derivedTodayRows.find(r => r.day === todayIso) ?? null
@@ -579,17 +582,30 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // z-scores compare tonight's value against the PRIOR night's baseline (the state
   // before tonight was folded in) — the same pre-update relationship
   // oura_daily_summary.temp_dev_c already captures for temperature.
+  //
+  // #2984: the night's inputs are chosen PER INPUT, not per row. This used to run the ring path
+  // whenever any `oura_daily_summary` row sat in the window, so after the 17 Oct switch to the Oura
+  // Cloud API a partial ring row held five of eight inputs at a neutral 50 while Oura's values for
+  // the same night went unread. `resolveReadinessNightInputs` takes each input from tonight's ring
+  // summary where it can score it, else from the generic value for the same night against a normal
+  // of that device's own nights. The composite and the illness radar both read that one result, so
+  // they cannot disagree about a night (PS-42).
   const latestSummary = dailySummaries.length > 0 ? dailySummaries[dailySummaries.length - 1] : null
-  const priorSummary = dailySummaries.length > 1 ? dailySummaries[dailySummaries.length - 2] : null
+  const nightByDate = [...new Set(nights.map(n => n.date))]
+    .map(d => canonicalNightForDate(nights, d, tz))
+    .filter((n): n is NonNullable<typeof n> => n != null)
+  const night = resolveReadinessNightInputs({
+    today: todayIso,
+    summaries: dailySummaries,
+    bodyMetrics,
+    nights: nightByDate,
+    ouraDaily: ouraRows,
+    ouraCloudContributors,
+  })
 
-  // Temp deviation, BLE-first: the rollup already persists last night's deviation vs the
-  // prior night's baseline (daily-summary.ts → oura_daily_summary.temp_dev_c). The Cloud
-  // field froze at the re-key — it survives only as an explicitly-tagged fallback.
-  const bleTempDevC = latestSummary?.tempDevC ?? null
-  const cloudTempDevC = ouraToday?.temperatureDeviation ?? null
-  const temperatureDeviation = bleTempDevC ?? cloudTempDevC
-  const temperatureDeviationSource: 'ble' | 'cloud' | null =
-    bleTempDevC != null ? 'ble' : cloudTempDevC != null ? 'cloud' : null
+  // Temp deviation for display: tonight's ring value, else Oura's own for the same night.
+  const temperatureDeviation = night.temperatureDeviation?.value ?? null
+  const temperatureDeviationSource: 'ble' | 'cloud' | null = night.temperatureDeviation?.source ?? null
 
   // Cloud-only daily products (day summary, bedtime window) are only emitted when the backing
   // row post-dates the re-key. Structurally always-null today (the wear-time writer is the only
@@ -598,91 +614,41 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // Cloud below, and only the Cloud fallback is gated.
   const cloudDailyLive = ouraToday != null && !isPreRekey(ouraToday.date)
 
-  // Baseline-z scores shared by the readiness composite and the illness radar — tonight's value
-  // vs the PRIOR night's baseline (the pre-update relationship). Same helper the rollup uses to
-  // persist illness, so the live and stored values can't diverge.
-  const { rhrZ, hrvZ, tempZ, breathZ } = latestSummary
-    ? illnessZScores(priorSummary, latestSummary)
-    : { rhrZ: null, hrvZ: null, tempZ: null, breathZ: null }
-  // Generic-source fallback (Q-43): a user without a ring has no oura_daily_summary, so the
-  // composite above never ran and every readiness surface rendered blank. Health Connect and
-  // manual logs do supply HRV, resting HR and sleep duration in the generic tables — enough for
-  // the SAME composite, with the contributors it has no input for falling back to the composite's
-  // own neutral. Baselines are folded from the 28-day window with the same seedOrUpdateBaseline the
-  // ring's rollup uses, so the two paths score on one scale. Temperature and the recovery index
-  // have no generic source and stay null rather than being approximated.
-  const asc = <T extends { date: string }>(rows: T[]) => [...rows].sort((a, b) => a.date.localeCompare(b.date))
-  const genericHrvSeries = asc(bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0)).map(m => m.hrvMs!)
-  const genericRhrSeries = asc(bodyMetrics.filter(m => m.restingHeartRate != null && m.restingHeartRate > 0)).map(m => m.restingHeartRate!)
-  const genericSleepMinSeries = nights.filter(n => n.durationHours != null).map(n => n.durationHours! * 60)
-  // Days carrying any recovery signal at all — the generic stand-in for the rollup's night count.
-  // The composite gates its baseline-relative contributors on this reaching BASELINE_MIN_NIGHTS,
-  // so a cold user gets a neutral, explicitly-limited score instead of a confident wrong one.
+  // Generic-source fallback (Q-43): a user without a ring has no oura_daily_summary. Health Connect
+  // and manual logs supply HRV, resting HR and sleep duration in the generic tables — enough for the
+  // SAME composite, with the contributors it has no input for falling back to its own neutral. The
+  // per-input choice above now covers both cases; this only decides whether there is anything to
+  // score at all, exactly as before.
+  const genericHrvCount = bodyMetrics.filter(m => m.hrvMs != null && m.hrvMs > 0).length
+  const genericRhrCount = bodyMetrics.filter(m => m.restingHeartRate != null && m.restingHeartRate > 0).length
+  const hasGenericRecoverySignal = sleepScore100 != null || genericHrvCount >= 2 || genericRhrCount >= 2
+  // Days carrying any recovery signal at all — the night count for an input with no per-device count.
   const genericHistoryDays = new Set([
     ...bodyMetrics.filter(m => (m.hrvMs != null && m.hrvMs > 0) || (m.restingHeartRate != null && m.restingHeartRate > 0)).map(m => m.date),
     ...nights.map(n => n.date),
   ]).size
-  const hasGenericRecoverySignal =
-    sleepScore100 != null || genericHrvSeries.length >= 2 || genericRhrSeries.length >= 2
+  const nHistory = latestSummary?.nHistory ?? Math.max(0, genericHistoryDays - 1)
 
-  // Hoisted out of the composite call because the illness radar below reads the SAME two z-scores
-  // (PS-42). Computing them twice is how the readiness a user sees and the illness flag beside it
-  // would come to disagree about the same night.
-  const genericRhrZ = trailingBaselineZ(genericRhrSeries)
-  const genericHrvZ = trailingBaselineZ(genericHrvSeries)
-  // The generic stand-in for the rollup's night count, shared for the same reason.
-  const genericNHistory = Math.max(0, genericHistoryDays - 1)
-
-  const genericComposite: ReadinessCompositeResult | null = (!latestSummary && hasGenericRecoverySignal)
+  const ownComposite: ReadinessCompositeResult | null = (latestSummary || hasGenericRecoverySignal)
     ? computeReadinessComposite({
-        rhrZ: genericRhrZ,
-        hrvZ: genericHrvZ,
-        tempZ: null,
-        sleepBalanceZ: trailingBaselineZ(genericSleepMinSeries),
+        ...compositeNightFields(night),
         previousNightScore: sleepScore100,
         prevDayActivityScore,
         activityBalanceScore: ownActivityScore,
-        nHistory: genericNHistory,
+        nHistory,
       })
     : null
-
-  const ownComposite: ReadinessCompositeResult | null = latestSummary ? computeReadinessComposite({
-    rhrZ,
-    hrvZ,
-    tempZ,
-    sleepBalanceZ: priorSummary?.sleepBaseline && latestSummary.sleepDurationHours != null
-      ? baselineZ(priorSummary.sleepBaseline, Math.round(latestSummary.sleepDurationHours * 60)) : null,
-    previousNightScore: sleepScore100,
-    prevDayActivityScore,
-    activityBalanceScore: ownActivityScore,
-    nHistory: latestSummary.nHistory,
-    recoveryIndexHours: latestSummary.recoveryIndexHours,
-  }) : genericComposite
 
   // Illness radar (Sub-plan E §5.5) — a rule-based vs-baseline deviation flag over the same
   // temp/RHR/HRV z-scores. Surfaced as a bounded readiness suppression + advisory, never a new
   // weighted contributor (those biomarkers are already composite contributors — that would
   // double-count). Stays "learning" until the baseline is mature, so a cold user is never flagged.
   //
-  // **PS-42: the generic path gets one too.** This used to be `latestSummary ? … : null`, so a user
-  // without a ring got NO illness computation — not even a degraded one — although the formula is
-  // built for exactly that: it renormalizes over whichever signals are present and returns
-  // `learning` while the baseline is cold. Temperature and breathing have no generic source and
-  // stay null, the same way the generic readiness composite leaves its temperature contributor
-  // null rather than approximating it. The z-scores and the history count are the composite's own,
-  // not recomputed.
-  //
-  // `nHistory` is passed and is currently unreachable as a discriminator here, which is worth
-  // stating rather than discovering: `trailingBaselineZ` needs BASELINE_MIN_NIGHTS prior samples
-  // before it returns anything, so a non-null z on this path already implies a mature baseline and
-  // the radar's own cold-start gate can never be the one that fires. It stays because that coupling
-  // is an accident of the current minimum — lower `trailingBaselineZ`'s threshold and the gate
-  // becomes load-bearing the same day.
-  const illness = latestSummary
-    ? computeIllnessRadar({ tempZ, rhrZ, hrvZ, breathZ, nHistory: latestSummary.nHistory })
-    : genericComposite
-      ? computeIllnessRadar({ tempZ: null, breathZ: null, rhrZ: genericRhrZ, hrvZ: genericHrvZ, nHistory: genericNHistory })
-      : null
+  // PS-42 / #2984: the radar runs whenever the composite does, on the SAME per-input z-scores
+  // (`illnessNightFields`), and renormalizes over whichever signals are present. Its maturity gate is
+  // the youngest normal among the inputs carrying a z, so an input on a fresh device's normal can
+  // never flag before that normal has `BASELINE_MIN_NIGHTS` nights.
+  const illness = ownComposite ? computeIllnessRadar(illnessNightFields(night)) : null
 
   // ── Score + source ──────────────────────────────────────────────────────────
 
@@ -794,7 +760,7 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // the day the trend surfaces read, and it is what stops a Health Connect user's readiness trend
   // from being empty every day (Q-43). It only ever back-fills forward: days before this shipped
   // stay null, since nothing recorded them at the time.
-  if (ownComposite && (latestSummary || genericComposite)) {
+  if (ownComposite) {
     // `model_versions` is one shared JSONB across every pillar on this row, and the upsert writes a
     // provided column wholesale — so it is MERGED with what is already stored rather than replaced.
     // Writing `{ readiness: ... }` alone would drop bodyBattery's stamp and any other pillar's.
@@ -807,9 +773,14 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     // the statement, so this no longer has to read the row and spread it back. That read-merge was
     // a two-statement race against any other pillar stamping the same day, and it read a value
     // that could already be stale (Q-273).
-    derivedPersists.push({ day: latestSummary?.date ?? todayIso, pillar: 'readiness', patch: {
+    // #2984: keyed on the night the inputs are for. With a current ring summary that is the same
+    // day as before; it differs only when the summary lags the night (or there is none).
+    derivedPersists.push({ day: night.nightDate ?? todayIso, pillar: 'readiness', patch: {
       readinessScore: ownComposite.score,
       readinessContributors: ownComposite.contributors,
+      // Unchanged rule on purpose: AI surfaces read only 'ble-derived' (`liveReadinessByDay`) and the
+      // Health Connect recompute clears only 'generic-derived'. Where each input came from is now on
+      // the contributors themselves (`source`).
       readinessSource: latestSummary ? 'ble-derived' : 'generic-derived',
       modelVersions: { readiness: READINESS_MODEL_VERSION },
       // TN-64(a): the OTHER half of the early-deload gate. The score has always been stored and
@@ -916,9 +887,10 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
 
   const availability: ScoreAvailability = scoreAvailability({
     sleep: sleepScore100 != null,
-    hrv: baselineHrv != null || hrvZ != null,
-    restingHeartRate: baselineRhr != null || rhrZ != null,
-    temperature: temperatureDeviation != null || tempZ != null,
+    // #2984: an input with a value tonight is available, whichever device's normal it is judged on.
+    hrv: baselineHrv != null || night.inputs.hrvBalance != null,
+    restingHeartRate: baselineRhr != null || night.inputs.restingHeartRate != null,
+    temperature: temperatureDeviation != null || night.inputs.temperature != null,
     activity: ownActivityScore != null,
   })
 

@@ -2426,6 +2426,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       steps: r.steps ?? undefined, distanceKm: r.distanceKm ?? undefined,
       restingHeartRate: r.restingHeartRate ?? undefined,
       hrvMs: r.hrvMs ?? undefined,
+      hrvSource: r.sourceMap?.hrv_ms ?? undefined,
+      restingHeartRateSource: r.sourceMap?.resting_heart_rate ?? undefined,
       spo2Pct: r.spo2Pct ?? undefined,
       waterMl: r.waterMl ?? undefined,
       activeCalories: r.activeCalories ?? undefined,
@@ -3368,6 +3370,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       timeInBedHours:  r.timeInBedHours  ?? undefined,
       manualSleepStart: r.manualSleepStart ?? null,
       manualEntry:     r.manualEntry,
+      durationSource:  r.manualEntry ? 'manual' : r.sourceMap?.duration_hours ?? undefined,
+      respiratoryRateSource: r.manualEntry ? 'manual' : r.sourceMap?.respiratory_rate ?? undefined,
     }))
   }
 
@@ -8203,6 +8207,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async replaceOuraDailySummary(userId: string, rows: import('../repository').OuraDailySummaryRow[]) { return oura.replaceOuraDailySummary(this.db, userId, rows) }
   async upsertOuraDailySummary(userId: string, rows: import('../repository').OuraDailySummaryRow[]) { return oura.upsertOuraDailySummary(this.db, userId, rows) }
   async getOuraDailySummary(userId: string, from: string, to: string) { return oura.getOuraDailySummary(this.db, userId, from, to) }
+  async getOuraCloudReadinessContributors(userId: string, from: string, to: string) { return oura.getOuraCloudReadinessContributors(this.db, userId, from, to) }
   async upsertOuraDailyDerived(userId: string, day: string, patch: import('../repository').OuraDailyDerivedPatch) { return oura.upsertOuraDailyDerived(this.db, userId, day, patch) }
   async getOuraStorageStats() { return oura.getOuraStorageStats(this.db) }
   async nullHistoricalDecoded(userId: string, maxRows?: number) { return oura.nullHistoricalDecoded(this.db, userId, maxRows) }

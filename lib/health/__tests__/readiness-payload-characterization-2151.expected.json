@@ -451,7 +451,7 @@
         "degradedInputs": [
           {
             "key": "temperature",
-            "gap": "no_input"
+            "gap": "awaiting_baseline"
           },
           {
             "key": "sleepBalance",
