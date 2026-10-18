@@ -76,6 +76,13 @@ describe.skipIf(!canRun)('body-battery — a stress-model failure must not 500 t
     const { getPool } = await import('@/lib/data/postgres/client')
     const { todayInTz, todayMidnightUtc, shiftDateStr } = await import('@trainingai/shared/date-utils')
     pool = getPool()
+    // Pin the clock to today's local midday (#3046). The daytime signals below sit in the three
+    // hours before "now" and the route reads them back for the user's local today, so between local
+    // midnight and the last of those samples crossing it (14:00 to about 14:15 UTC for Brisbane)
+    // every sample fell on yesterday, the stress branch was never entered, and no row was written.
+    // Only `Date` is faked; timers, the pool and the report flush run on the real clock.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(todayMidnightUtc(TZ).getTime() + 12 * 3_600_000))
     today = todayInTz(TZ)
     mid = todayMidnightUtc(TZ)
 
@@ -127,6 +134,7 @@ describe.skipIf(!canRun)('body-battery — a stress-model failure must not 500 t
 
   afterAll(async () => {
     if (!canRun) return
+    vi.useRealTimers()
     await pool.query(`DELETE FROM users WHERE id = $1`, [TEST_USER_ID])
   })
 
