@@ -9,6 +9,13 @@ import {
 import { motion, AnimatePresence } from 'motion/react'
 import { fmtAest } from '@trainingai/shared/date-utils'
 import { bodyBatteryColor, type BodyBatteryLabel } from '@trainingai/shared/health/body-battery-band'
+import {
+  BODY_BATTERY_EXPLAINER,
+  BODY_BATTERY_PROVISIONAL_SUFFIX,
+  BODY_BATTERY_SPARSE_DAY,
+  BODY_BATTERY_TREND_LABEL,
+  bodyBatteryAnchorSuffix,
+} from '@trainingai/shared/health/body-battery-copy'
 import { StressStrip } from '@/components/body-battery/stress-strip'
 import { scoreGapText } from '@/components/health/score-gap-copy'
 import { StressDayChart } from '@/components/body-battery/stress-day-chart'
@@ -29,9 +36,9 @@ function BatteryIcon({ label }: { label: BodyBatteryLabel }): React.ReactElement
 
 function TrendBadge({ trend }: { trend: BodyBatteryResponse['trend'] }) {
   const map = {
-    charging: { Icon: ArrowUp, color: '#22c55e', text: 'Charging' },
-    draining: { Icon: ArrowDown, color: '#ef4444', text: 'Draining' },
-    steady:   { Icon: Minus, color: 'var(--color-muted-foreground)', text: 'Steady' },
+    charging: { Icon: ArrowUp, color: '#22c55e', text: BODY_BATTERY_TREND_LABEL.charging },
+    draining: { Icon: ArrowDown, color: '#ef4444', text: BODY_BATTERY_TREND_LABEL.draining },
+    steady:   { Icon: Minus, color: 'var(--color-muted-foreground)', text: BODY_BATTERY_TREND_LABEL.steady },
   }[trend]
   const { Icon } = map
   return (
@@ -165,7 +172,7 @@ export function BodyBatteryCard({ battery }: { battery: BodyBatteryResponse }) {
             other on Home, so a reader takes them for the same thing. The owner settled it: they are
             different questions, and this line is why the distinction is on screen every day. */}
         <p className="mb-2 text-[10px] leading-snug text-muted-foreground">
-          Energy left right now — opens at your readiness and drains as you use it.
+          {BODY_BATTERY_EXPLAINER}
         </p>
 
         {/* progress bar — fill anchored right so the tank empties from the left.
@@ -194,11 +201,10 @@ export function BodyBatteryCard({ battery }: { battery: BodyBatteryResponse }) {
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-muted-foreground">
                       Started at <span className="font-semibold text-foreground tabular-nums">{battery.anchor}</span>
-                      {battery.anchorSource === 'readiness' && ' from readiness'}
-                      {battery.anchorSource === 'sleep' && ' from sleep'}
+                      {bodyBatteryAnchorSuffix(battery.anchorSource)}
                       {/* The level legitimately moves once today's readiness lands. Saying so is
                           the difference between an explained change and an unexplained one. */}
-                      {battery.anchorProvisional && ' · provisional until readiness lands'}
+                      {battery.anchorProvisional && BODY_BATTERY_PROVISIONAL_SUFFIX}
                     </span>
                     <span className="flex items-center gap-3 tabular-nums">
                       <span className="text-green-400 font-semibold">+{battery.charged} charged</span>
@@ -208,10 +214,7 @@ export function BodyBatteryCard({ battery }: { battery: BodyBatteryResponse }) {
                   {lowData && (
                     <p className="rounded-lg border border-border bg-muted/40 p-2 text-[11px] leading-relaxed text-muted-foreground">
                       <SignalLow className="mr-1 inline h-3 w-3 align-[-2px]" />
-                      Your ring recorded only <span className="font-semibold text-foreground tabular-nums">{conf?.sampleCount}</span> heart-rate
-                      readings since you woke — about <span className="tabular-nums">{conf?.samplesPerHour}</span> an hour. The ring stops
-                      sampling when you are still, so today&apos;s line is mostly gaps held flat rather than a
-                      measured calm. Treat the number as a rough guide.
+                      {BODY_BATTERY_SPARSE_DAY[0]}<span className="font-semibold text-foreground tabular-nums">{conf?.sampleCount}</span>{BODY_BATTERY_SPARSE_DAY[1]}<span className="tabular-nums">{conf?.samplesPerHour}</span>{BODY_BATTERY_SPARSE_DAY[2]}
                     </p>
                   )}
                   {battery.stress && (
