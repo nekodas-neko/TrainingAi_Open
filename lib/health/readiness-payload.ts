@@ -505,11 +505,10 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
     activityLevel: userProfile?.activityLevel ?? null,
     stepsGoal: userGoals?.stepsGoal ?? null,
   })
-  // Rolling 7-day strength window (inclusive of today).
-  const sessions7dRows = recentSessions.filter(ws => new Date(ws.startedAt).getTime() >= todayMid.getTime() - 7 * 86_400_000)
-  const sessions7d = sessions7dRows.length
+  // Rolling 7-day strength window (inclusive of today), from local midnight. The shared helper is
+  // also what the Activity insight reads for a past day (#2865), so the window is defined once.
+  const { sessions7d, volume7dKg } = strengthWindowEndingAt(recentSessions, todayMid.getTime())
   const strengthSessionToday = recentSessions.some(ws => new Date(ws.startedAt).getTime() >= todayMid.getTime())
-  const volume7dKg = sessions7dRows.reduce((s, ws) => s + ws.exercises.reduce((s2, ex) => s2 + (ex.volume ?? 0), 0), 0)
   const recentDoseList = recentDoses(doseEvents, todayIso)
   const todayMetrics = bodyMetrics.find(m => m.date === todayIso) ?? null
 

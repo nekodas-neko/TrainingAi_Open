@@ -2,14 +2,13 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { liveReadinessByDay } from '@trainingai/shared/health/live-readiness'
-import { DEFAULT_TZ, todayInTz, ageFromDob, normalizeDateParamIso } from '@trainingai/shared/date-utils'
-import { subDays } from 'date-fns'
-import { formatInTimeZone } from 'date-fns-tz'
+import { DEFAULT_TZ, todayInTz, ageFromDob, normalizeDateParamIso, shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { z } from 'zod'
 import { formatContributors, weakestContributor } from '@/lib/oura/contributors'
 import { scoreBand } from '@trainingai/shared/health/score-band'
 import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-radar'
-import { computeActivityScore } from '@trainingai/shared/health/activity-score'
+import { strengthWindowEndingAt } from '@trainingai/shared/health/activity-score'
+import { buildReadinessPayload } from '@/lib/health/readiness-payload'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
 import { nightSessions, canonicalNightForDate, canonicalLatestNight } from '@trainingai/shared/health/sleep-night'
 import { metric, splitMeasured, type MetricLine } from './metrics'
@@ -69,24 +68,20 @@ export async function POST(req: Request) {
   // afternoon. It now runs against a hash of the assembled prompt, which means paying for the
   // deterministic reads below on every request. They are cheap next to the model call they avoid.
 
-  // The health metrics below are a 7-day read; the workout list is 28 (see Q-512 at the fetch).
-  // 28 days, and it is still load-bearing although this route no longer computes ACWR.
-  // **Q-512 widened it for `computeVolumeAcwr`, which LA-154 removed from here** along with the
-  // last dead input it fed — but the width must stay: the 7-day filter below is anchored on the
-  // REQUESTED `date`, which the body may set to any past day, while this fetch counts back from
-  // now. A 7-day fetch would silently drop sessions for any date older than today.
-  // (Q-512's own finding still governs `readiness-payload.ts`, where ACWR really is computed:
-  // the helper measures its span from the earliest session handed to it, so a short list can
-  // never clear its 21-day gate, and the gate must not be lowered to rescue a mis-wired caller.)
-  const SESSION_FETCH_WINDOW_DAYS = 28
-  const since7 = formatInTimeZone(subDays(new Date(), 7), tz, 'yyyy-MM-dd')
+  // Every window here is anchored on the REQUESTED `date` at the user's local midnight, never on
+  // now (#2865). `since7` used to count back from the clock, so any `date` more than a week old
+  // read an empty range; the workout fetch counted 28 days back from now for the same reason.
+  // The workout list only feeds a past day's 7-day strength window (`strengthWindowEndingAt`), so
+  // it starts a day before that window — the slack covers a DST day in the 7 × 24 h span.
+  const since7 = shiftDateStr(date, -7)
+  const sessionsFrom = dateStrMidnightInTz(shiftDateStr(date, -8), tz)
   const [ouraRows, sleepRows, bodyMetrics, derivedRows, summaries, recentSessions, userProfile, userGoals] = await Promise.all([
     repo.getOuraDaily(userId, since7, date),
     repo.listSleepSessions(userId, since7, date),
     repo.listBodyMetrics(userId, since7, date),
     repo.getOuraDailyDerived(userId, since7, date),
     repo.getOuraDailySummary(userId, since7, date),
-    repo.getWorkoutSessionsFrom(userId, subDays(new Date(), SESSION_FETCH_WINDOW_DAYS)),
+    repo.getWorkoutSessionsFrom(userId, sessionsFrom),
     repo.getUserById(userId),
     repo.getUserGoals(userId).catch(() => null),
   ])
@@ -182,42 +177,72 @@ export async function POST(req: Request) {
       metric('Overnight HRV (daily record, same metric as above)', todayBm?.hrvMs != null ? `${todayBm.hrvMs} ms` : null),
     ]
   } else {
-    // The Oura Cloud activity fields are frozen since the 2026-07-07 re-key (always null), so this
-    // reads our own goal-anchored Activity Score v2 (lib/health/activity-score.ts) — the same
-    // computation /api/readiness-score uses — rather than always reporting "no data".
+    // #2865: the Activity page's own numbers, never a second computation. This used to build its
+    // own strength window from UTC midnight (so in Brisbane a session before 10 am, seven days ago,
+    // counted on the page and not here) and to score without the zone-minute, move-hour and ACWR
+    // lanes — the card said 73 and 3 sessions while the page said 79 and 4.
+    //
+    // Today is the page's day: read `buildReadinessPayload`, the function behind
+    // /api/readiness-score that the page renders. A past day has no live payload, so it reads the
+    // score that payload stored for that day (`oura_daily_derived.activity_score`, what the trends
+    // and day views show) and the same shared strength window, at that day's local midnight.
     const todayBmForActivity = bodyMetrics.find(r => r.date === date) ?? null
-    const goals = getDailyGoals({
+    const fallbackGoals = () => getDailyGoals({
       weightKg: [...bodyMetrics].reverse().find(m => m.weightKg != null && m.weightKg > 0)?.weightKg ?? null,
       heightCm: userProfile?.heightCm ?? null,
-      ageYears: ageFromDob(userProfile?.dateOfBirth, new Date(`${date}T00:00:00.000Z`)),
+      ageYears: ageFromDob(userProfile?.dateOfBirth, dateStrMidnightInTz(date, tz)),
       sex: userProfile?.sex ?? null,
       activityLevel: userProfile?.activityLevel ?? null,
       stepsGoal: userGoals?.stepsGoal ?? null,
     })
-    // `recentSessions` spans 28 days (see the fetch), so these two — which feed the activity
-    // score's 7-day lanes — filter back down rather than silently becoming 28-day figures.
-    const from7dMs = new Date(`${date}T00:00:00.000Z`).getTime() - 7 * 86_400_000
-    const sessions7dRows = recentSessions.filter(ws => ws.startedAt.getTime() >= from7dMs)
-    const sessions7d = sessions7dRows.length
-    const volume7dKg = sessions7dRows.reduce((s, ws) => s + ws.exercises.reduce((s2, ex) => s2 + (ex.volume ?? 0), 0), 0)
-    const activityResult = computeActivityScore({
-      steps: todayBmForActivity?.steps ?? null,
-      activeCalories: todayBmForActivity?.activeCalories ?? null,
-      sessions7d,
-      volume7dKg,
-      goals,
-    })
-    if (activityResult?.score != null) {
-      headline = { label: 'Activity', value: `${activityResult.score}/100`, band: bandLabel(activityResult.score) }
+    let activity: {
+      score: number | null
+      steps: number | null
+      activeCalories: number | null
+      sessions7d: number
+      volume7dKg: number
+      taperApplied: boolean
+      goals: ReturnType<typeof getDailyGoals>
+    }
+    if (date === todayInTz(tz)) {
+      const page = await buildReadinessPayload(userId, tz)
+      // `activitySignals` is null only when the page had nothing at all to score, which includes
+      // no session in the window — so the zero below is the page's own count, not a default.
+      activity = {
+        score: page.activityScore,
+        steps: page.activitySignals?.steps ?? null,
+        activeCalories: page.activitySignals?.activeCalories ?? null,
+        sessions7d: page.activitySignals?.sessions7d ?? 0,
+        volume7dKg: page.activitySignals?.volume7dKg ?? 0,
+        taperApplied: page.activityTaperApplied,
+        goals: page.activityGoals ?? fallbackGoals(),
+      }
+    } else {
+      const window = strengthWindowEndingAt(recentSessions, dateStrMidnightInTz(date, tz).getTime())
+      activity = {
+        score: derivedRows.find(r => r.day === date)?.activityScore ?? null,
+        steps: todayBmForActivity?.steps ?? null,
+        activeCalories: todayBmForActivity?.activeCalories ?? null,
+        sessions7d: window.sessions7d,
+        volume7dKg: window.volume7dKg,
+        // The stored row does not say whether the taper applied, and recomputing it would be the
+        // second formula this replaces.
+        taperApplied: false,
+        goals: fallbackGoals(),
+      }
+    }
+    const { goals } = activity
+    if (activity.score != null) {
+      headline = { label: 'Activity', value: `${activity.score}/100`, band: bandLabel(activity.score) }
     }
     entries = [
-      ...(activityResult?.score == null ? [metric('Activity score', null)] : []),
-      metric('Steps', todayBmForActivity?.steps != null ? `${todayBmForActivity.steps} (goal ${goals.stepGoal})` : null),
-      metric('Active calories', todayBmForActivity?.activeCalories != null ? `${todayBmForActivity.activeCalories} kcal (goal ${goals.activeEnergyGoal} kcal)` : null),
+      ...(activity.score == null ? [metric('Activity score', null)] : []),
+      metric('Steps', activity.steps != null ? `${activity.steps} (goal ${goals.stepGoal})` : null),
+      metric('Active calories', activity.activeCalories != null ? `${activity.activeCalories} kcal (goal ${goals.activeEnergyGoal} kcal)` : null),
       // Session count is a real count from our own history — zero sessions IS a measurement, not an
       // absent reading, so it stays a line rather than becoming "not measured".
-      `Strength training this week: ${sessions7d} session(s) (goal ${goals.strengthFreqGoal}/week), ${Math.round(volume7dKg)} kg total volume`,
-      ...(activityResult?.taperApplied ? ['Note: score is eased back today — recent training load is above the optimal range (over-exertion taper).'] : []),
+      `Strength training this week: ${activity.sessions7d} session(s) (goal ${goals.strengthFreqGoal}/week), ${Math.round(activity.volume7dKg)} kg total volume`,
+      ...(activity.taperApplied ? ['Note: score is eased back today — recent training load is above the optimal range (over-exertion taper).'] : []),
     ]
   }
 
