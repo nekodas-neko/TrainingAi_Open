@@ -114,6 +114,8 @@ function CompositeBreakdown({ readiness }: { readiness: ReadinessScoreResponse }
             label: labelFor(key),
             score: c?.score ?? null,
             provisional: c?.provisional ?? false,
+            gap: c?.gap,
+            scale: c?.scale,
             extra: extraFor(key, readiness),
             // Body temperature is a true golden-zone metric — at baseline is ideal, and both a rise
             // and a drop are worse. Drive a centered gauge from the actual °C deviation (±1.5°C span)

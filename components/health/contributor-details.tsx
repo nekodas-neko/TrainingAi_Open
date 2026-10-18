@@ -11,6 +11,8 @@ export interface ContributorFactor {
   label: string
   score?: number | null
   provisional?: boolean
+  gap?: unknown
+  scale?: unknown
   extra?: ReactNode
   footer?: ReactNode
   // A "golden zone in the middle" gauge for metrics where both ends are bad (e.g. body-temperature
@@ -58,7 +60,7 @@ export function ContributorDetails({ factors, title = 'What each factor means' }
               : f.score != null && !f.provisional
                 ? <ZoneGauge variant="toward-high" pct={f.score} />
                 : null}
-            <ContributorDetail contributorKey={f.key} score={f.score} provisional={f.provisional} extra={f.extra} hideScoreBadge />
+            <ContributorDetail contributorKey={f.key} score={f.score} provisional={f.provisional} gap={f.gap} scale={f.scale} extra={f.extra} hideScoreBadge />
             {f.footer}
           </div>
         )

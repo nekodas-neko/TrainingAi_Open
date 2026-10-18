@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import { guideFor } from '@trainingai/shared/health/contributor-guide'
 import { scoreBand } from '@trainingai/shared/health/score-band'
-import { PROVISIONAL_BASELINE_NOTE } from '@trainingai/shared/health/score-gap-copy'
+import { contributorNote } from '@trainingai/shared/health/score-gap-copy'
 
 /**
  * The tap-to-expand deep-dive shown under a contributor bar: what it measures, what it's
@@ -15,12 +15,16 @@ export function ContributorDetail({
   contributorKey,
   score,
   provisional,
+  gap,
+  scale,
   extra,
   hideScoreBadge,
 }: {
   contributorKey: string
   score?: number | null
   provisional?: boolean
+  gap?: unknown
+  scale?: unknown
   extra?: ReactNode
   /** Suppress the inline band badge (the caller already shows the score in its header). */
   hideScoreBadge?: boolean
@@ -54,9 +58,7 @@ export function ContributorDetail({
             </p>
           )}
           <p className="mt-1 text-muted-foreground">
-            {provisional
-              ? PROVISIONAL_BASELINE_NOTE
-              : meaning}
+            {(provisional ? contributorNote({ provisional, gap, scale }) : null) ?? meaning}
           </p>
         </div>
       )}

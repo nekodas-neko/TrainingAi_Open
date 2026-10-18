@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { scoreGapText, PROVISIONAL_BASELINE_NOTE } from '../score-gap-copy'
+import { scoreGapText, contributorNote, PROVISIONAL_BASELINE_NOTE, SCORE_GAP_TEXT } from '../score-gap-copy'
 import { scoreAverageChip } from '../score-average-chip'
 
 describe('scoreGapText', () => {
@@ -27,5 +27,26 @@ describe('scoreAverageChip', () => {
     expect(scoreAverageChip(null, [70])).toBeNull()
     expect(scoreAverageChip(70, [null])).toBeNull()
     expect(scoreAverageChip(70, [])).toBeNull()
+  })
+})
+
+describe('contributorNote (#3016)', () => {
+  it('keeps the baseline note only for a contributor really learning its baseline', () => {
+    expect(contributorNote({ provisional: true, gap: 'awaiting_baseline' })).toBe(PROVISIONAL_BASELINE_NOTE)
+  })
+  it('uses the gap text when nothing was recorded', () => {
+    expect(contributorNote({ provisional: true, gap: 'no_input' })).toBe(SCORE_GAP_TEXT.no_input)
+  })
+  it("explains Oura's own recovery reading", () => {
+    const note = contributorNote({ provisional: true, gap: null, scale: 'oura_contributor' })
+    expect(note).toMatch(/^From your ring's own recovery reading/)
+  })
+  it('explains the overnight-HR estimate', () => {
+    const note = contributorNote({ provisional: true, gap: null })
+    expect(note).toMatch(/^Estimated from your overnight heart rate/)
+  })
+  it('stays silent for a scored contributor and falls back for a payload without gap', () => {
+    expect(contributorNote({ provisional: false, gap: null })).toBeNull()
+    expect(contributorNote({ provisional: true })).toBe(PROVISIONAL_BASELINE_NOTE)
   })
 })

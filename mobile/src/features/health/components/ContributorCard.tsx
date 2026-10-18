@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { Pressable, View } from 'react-native';
 import { guideFor } from '@trainingai/shared/health/contributor-guide';
 import { scoreBand } from '@trainingai/shared/health/score-band';
-import { PROVISIONAL_BASELINE_NOTE } from '@trainingai/shared/health/score-gap-copy';
+import { contributorNote } from '@trainingai/shared/health/score-gap-copy';
 import { AppText, Badge, Card, Icon, Legend, ProgressBar, Stack, ZoneGauge } from '../../../shared/ui';
 import { useHealthAnchor } from '../../../shared/ui/HealthDetailLayout';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
@@ -13,6 +13,8 @@ type Factor = {
   label: string;
   score?: number | null;
   provisional?: boolean;
+  gap?: unknown;
+  scale?: unknown;
   extra?: string;
   weight?: number;
   gauge?: number;
@@ -72,11 +74,8 @@ export function ContributorDetails({
                   What your score means
                 </AppText>
                 <AppText variant="caption">
-                  {f.provisional
-                    ? PROVISIONAL_BASELINE_NOTE
-                    : f.score != null && f.score < 50
-                      ? guide.low
-                      : guide.high}
+                  {(f.provisional ? contributorNote(f) : null) ??
+                    (f.score != null && f.score < 50 ? guide.low : guide.high)}
                 </AppText>
                 {f.extra && (
                   <>
@@ -111,6 +110,7 @@ export function ContributorCard({
   contributors,
   weights,
   provisional = [],
+  cases,
   extras,
   temperature,
   note,
@@ -121,6 +121,8 @@ export function ContributorCard({
   contributors: Record<string, number | null> | null | undefined;
   weights?: Record<string, number>;
   provisional?: string[];
+  /** Per-factor `gap` and `scale`, which pick the note a provisional factor shows. */
+  cases?: Record<string, { gap?: unknown; scale?: unknown }>;
   extras?: Record<string, string>;
   temperature?: number | null;
 }) {
@@ -151,6 +153,8 @@ export function ContributorCard({
       score,
       label: labelFor(key),
       provisional: score == null || provisional.includes(key),
+      gap: cases?.[key]?.gap,
+      scale: cases?.[key]?.scale,
       weight: weights?.[key],
       extra: extras?.[key],
       gauge:

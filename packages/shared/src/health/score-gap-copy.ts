@@ -34,3 +34,34 @@ export function scoreGapText(
   const gap = entry.gap
   return gap === 'no_input' || gap === 'awaiting_baseline' ? SCORE_GAP_TEXT[gap] : null
 }
+
+/** The ring's own recovery reading, used as the input because there is no raw measurement to score. */
+export const OURA_CONTRIBUTOR_NOTE =
+  "From your ring's own recovery reading. There's no raw measurement behind this one for us to score ourselves."
+
+/** A real score from an approximate curve (the overnight-HR recovery estimate), flagged provisional. */
+export const APPROXIMATE_CURVE_NOTE =
+  'Estimated from your overnight heart rate, so it can shift a little as more of the night comes in.'
+
+/** The fields of a readiness contributor that decide which note it gets. */
+export interface ContributorNoteInput {
+  provisional?: boolean
+  gap?: unknown
+  scale?: unknown
+}
+
+/**
+ * What to print in place of a contributor's meaning, or `null` when it is an ordinary scored
+ * contributor and its meaning should show. `provisional` has three senses (see
+ * `readiness-composite.ts`), so the note follows the case, never `provisional` alone.
+ *
+ * A payload from before `gap` existed has it `undefined`, not `null`; that keeps the old baseline
+ * note rather than guessing a case.
+ */
+export function contributorNote(c: ContributorNoteInput): string | null {
+  if (c.gap === 'no_input') return SCORE_GAP_TEXT.no_input
+  if (c.gap === 'awaiting_baseline') return PROVISIONAL_BASELINE_NOTE
+  if (c.scale === 'oura_contributor') return OURA_CONTRIBUTOR_NOTE
+  if (!c.provisional) return null
+  return c.gap === null ? APPROXIMATE_CURVE_NOTE : PROVISIONAL_BASELINE_NOTE
+}
