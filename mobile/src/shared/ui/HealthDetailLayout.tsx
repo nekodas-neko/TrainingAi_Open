@@ -8,6 +8,7 @@ import {
 import { ScrollView, RefreshControl, View } from 'react-native';
 import { useTheme } from '../theme/ThemeProvider';
 import { HealthHero, type HealthHeroKind } from './HealthHero';
+import { useAndroidBack } from './useAndroidBack';
 const AnchorContext = createContext<(node: View | null) => void>(() => {});
 export function useHealthAnchor() {
   return useContext(AnchorContext);
@@ -33,6 +34,7 @@ export function HealthDetailLayout({
   const { theme } = useTheme();
   const scroll = useRef<ScrollView>(null);
   const content = useRef<View>(null);
+  useAndroidBack(onBack);
   return (
     <AnchorContext.Provider
       value={(node) => {

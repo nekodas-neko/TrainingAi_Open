@@ -71,6 +71,7 @@ export function HealthDayScreen({
   return (
     <PageLayout
       title={formatDateDisplay(date, 'long')}
+      onBack={onBack}
       header={
         <Stack direction="row" align="center">
           <IconButton icon="back" label="Back to Health" onPress={onBack} />

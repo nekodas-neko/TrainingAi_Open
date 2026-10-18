@@ -83,6 +83,7 @@ export function ProfileGoalsScreen({
   return (
     <PageLayout
       title="My goals"
+      onBack={onBack}
       header={
         <Stack direction="row" align="center">
           <IconButton icon="back" label="Back to More" onPress={onBack} />
