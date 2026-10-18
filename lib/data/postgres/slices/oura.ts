@@ -657,16 +657,34 @@ export async function upsertOuraSleep(
  *    Health Connect may already hold that night at a slightly different start; a second row would be
  *    read as a second fragment of the same night (`sleep-night.ts`). The ladder ranks those sources
  *    at or above the Cloud feed, so the stored night stays. Choosing per field is #2860.
+ *  - **Except a ring night from the switch day on** (#2998). Once the user has moved to the Oura API
+ *    (`getOuraCloudSwitchDay`), the ring has stopped sending, so a ring night dated that day or later
+ *    is at best the partial night the last frames made. It yields: it is tombstoned, never deleted,
+ *    and Oura's period is written. Before the switch day nothing changes, and a manual or Health
+ *    Connect night still blocks the period on any day. `dropBleNightsOuraCloudHolds` keeps a later
+ *    ring re-roll from taking the night back.
  */
 export async function upsertOuraCloudSleep(
   db: Db, userId: string, rows: OuraSleepUpsertRow[],
 ): Promise<{ written: number; skippedOverlap: number }> {
   const kept: OuraSleepUpsertRow[] = []
   let skippedOverlap = 0
+  const switchDay = rows.length > 0 ? await getOuraCloudSwitchDay(db, userId) : null
   for (const r of rows) {
     if (!r.ouraId) continue
     const start = r.sleepStart.toISOString()
     const end = r.sleepEnd.toISOString()
+    if (switchDay) {
+      // Ring nights the switch makes yield (#2998). Only live rollup rows (`ble:`, not manual) dated
+      // on or after the switch day; the raw BLE archive is not touched.
+      await db.execute(sql`
+        UPDATE sleep_sessions o
+           SET deleted_at = NOW(), updated_at = NOW()
+         WHERE o.user_id = ${userId} AND o.deleted_at IS NULL
+           AND o.oura_id LIKE 'ble:%' AND NOT o.manual_entry
+           AND o.date >= ${switchDay}::date
+           AND o.sleep_start < ${end}::timestamptz AND o.sleep_end > ${start}::timestamptz`)
+    }
     await db.execute(sql`
       UPDATE sleep_sessions h
          SET sleep_start = ${start}::timestamptz, updated_at = NOW()
@@ -909,6 +927,33 @@ export async function reseatBleSleepOuraIds(db: Db, userId: string, rows: OuraSl
        WHERE h.user_id = ${userId} AND h.oura_id = ${r.ouraId} AND NOT h.manual_entry
          AND h.sleep_start <> ${start}::timestamptz`)
   }
+}
+
+/**
+ * #2998. The ring nights a rollup pass must not write: dated on or after the user's switch to the
+ * Oura API and overlapping a live night Oura sent (`duration_hours` sourced `oura_cloud`). That night
+ * took over from the ring's partial one (`upsertOuraCloudSleep`), and the rollup's upsert revives a
+ * tombstoned row at the same start, so without this a Redecode of the last frames would put the
+ * partial night back beside Oura's. With no switch, every row is kept.
+ */
+export async function dropBleNightsOuraCloudHolds(
+  db: Db, userId: string, rows: OuraSleepUpsertRow[],
+): Promise<OuraSleepUpsertRow[]> {
+  if (rows.length === 0) return rows
+  const switchDay = await getOuraCloudSwitchDay(db, userId)
+  if (!switchDay) return rows
+  const kept: OuraSleepUpsertRow[] = []
+  for (const r of rows) {
+    if (r.date < switchDay) { kept.push(r); continue }
+    const held = await db.execute(sql`
+      SELECT 1 FROM sleep_sessions o
+       WHERE o.user_id = ${userId} AND o.deleted_at IS NULL AND NOT o.manual_entry
+         AND o.source_map->>'duration_hours' = 'oura_cloud'
+         AND o.sleep_start < ${r.sleepEnd.toISOString()}::timestamptz AND o.sleep_end > ${r.sleepStart.toISOString()}::timestamptz
+       LIMIT 1`)
+    if (held.rows.length === 0) kept.push(r)
+  }
+  return kept
 }
 
 /**

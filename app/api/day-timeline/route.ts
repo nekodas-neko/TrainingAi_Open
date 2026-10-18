@@ -105,7 +105,8 @@ export async function GET(req: Request) {
 
   function pushWakeup(sleep: SleepSession | null, dayStr: string) {
     if (!sleep?.sleepEnd) return
-    // Our scores only, never Oura's readiness or sleep score (#3000).
+    // Our scores only, never Oura's readiness or sleep score (#3000), and never the session's own
+    // `sleep_score` column, which nothing of ours writes (#3011).
     events.push({
       type: 'wakeup',
       time: fmtTime(new Date(sleep.sleepEnd), tz),
@@ -116,7 +117,7 @@ export async function GET(req: Request) {
       date: dayStr,
       sleepDurationH: sleep.durationHours ?? undefined,
       readinessScore: derivedByDate.get(dayStr)?.readinessScore ?? undefined,
-      sleepScore: sleep.sleepScore ?? derivedByDate.get(dayStr)?.sleepScore ?? undefined,
+      sleepScore: derivedByDate.get(dayStr)?.sleepScore ?? undefined,
     })
   }
   pushWakeup(todaySleep, date)

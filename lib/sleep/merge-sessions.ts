@@ -17,7 +17,7 @@ export type SleepRow = {
   avgHeartRate: number | null;
   lowestHeartRate: number | null;
   restlessPeriods: number | null;
-  sleepScore: number | null;
+  // No `sleepScore` (#3011): a session's own score could only be Oura's. Ours is `oura_daily_derived`.
   respiratoryRate: number | null;
   sleepPhase5Min: string | null;
   sleepStart: string | null;
@@ -143,7 +143,6 @@ export function mergeByDate(rows: SleepRow[]) {
       merged.avgHeartRate    = merged.avgHeartRate    ?? r.avgHeartRate;
       merged.lowestHeartRate = merged.lowestHeartRate ?? r.lowestHeartRate;
       merged.restlessPeriods = merged.restlessPeriods ?? r.restlessPeriods;
-      merged.sleepScore      = merged.sleepScore      ?? r.sleepScore;
       merged.respiratoryRate = merged.respiratoryRate ?? r.respiratoryRate;
       // Track which row's phase string ends up kept, so the ribbon can be
       // positioned against that row's own bedtime window (see above).
@@ -188,7 +187,7 @@ export function localSleepRowsAsNights(local: readonly LocalSleepSession[]): Sle
       remSleepHours: l.remSleepHours, lightSleepHours: l.lightSleepHours, awakHours: l.awakHours,
       efficiency: l.efficiency, onsetLatencySec: l.onsetLatencySec, averageHrvMs: l.averageHrvMs,
       avgHeartRate: l.avgHeartRate, lowestHeartRate: l.lowestHeartRate,
-      restlessPeriods: l.restlessPeriods, sleepScore: l.sleepScore,
+      restlessPeriods: l.restlessPeriods,
       respiratoryRate: l.respiratoryRate, sleepPhase5Min: l.sleepPhase5Min,
       sleepStart: l.sleepStart, sleepEnd: l.sleepEnd,
       sleepTimeRecommendation: null,

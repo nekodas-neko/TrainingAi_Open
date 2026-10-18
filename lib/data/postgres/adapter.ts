@@ -3365,7 +3365,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       avgHeartRate:    r.avgHeartRate    ?? undefined,
       lowestHeartRate: r.lowestHeartRate ?? undefined,
       restlessPeriods: r.restlessPeriods ?? undefined,
-      sleepScore:      r.sleepScore      ?? undefined,
+      // `sleep_score` is not read (#3011): nothing of ours writes it, so a value there could only
+      // be Oura's sleep score, and Oura's scores are never ours (scoring doc, rule 5).
       respiratoryRate: r.respiratoryRate ?? undefined,
       sleepPhase5Min:  r.sleepPhase5Min  ?? undefined,
       timeInBedHours:  r.timeInBedHours  ?? undefined,
@@ -6146,7 +6147,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             avgHeartRate:    num(p.avgHeartRate),
             lowestHeartRate: num(p.lowestHeartRate),
             restlessPeriods: int(p.restlessPeriods),
-            sleepScore:      int(p.sleepScore),
+            // No `sleepScore` (#3011): our sleep score lives in `oura_daily_derived`, and a device
+            // value for the session column is never ours to store.
             respiratoryRate: num(p.respiratoryRate),
             sleepPhase5Min:  str(p.sleepPhase5Min),
             timeInBedHours:  num(p.timeInBedHours),

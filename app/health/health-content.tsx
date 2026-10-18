@@ -75,7 +75,6 @@ interface SleepRow {
   avgHeartRate: number | null;
   lowestHeartRate: number | null;
   restlessPeriods: number | null;
-  sleepScore: number | null;
   respiratoryRate: number | null;
   sleepPhase5Min: string | null;
   sleepStart: string | null;
@@ -574,7 +573,6 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
     router.push(`/health/day?date=${encodeURIComponent(date)}`);
   }, [router]);
 
-  const lastSleep = sleepRows[0] ?? null;
   // Only treat sleep as "recent" if it's from last night or today — prevents
   // stale data from days ago showing on the card as if it's current.
   const todayStr = todayInTz(tz)
@@ -620,7 +618,7 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   const { isSectionVisible, renderBodySection, renderTrainingSection, renderProgressSection } = getHealthSections({
     metaLoading, metaToday, metaRecent, latestWeight, latestWeightIsStale, latestWeightDate: latestWeightMeta.date, latestBf, latestSteps,
     latestDistanceKm, targetWeightKg, targetBfPct, openInfo, toggleInfo, openLog,
-    setMetricSheet, setWaterLogOpen, recentSleep, sleepNightLabel, lastSleep, readiness,
+    setMetricSheet, setWaterLogOpen, recentSleep, sleepNightLabel, readiness,
     todayWaterMl, waterGoalMl, activeEnergyKcalToday, bmi, bmiLabel, bmiUsesBf, latestBfIsCorrected,
     weightTrendKgPerWeek, energyBalance, trainingLoad, sleepCorr, injuries,
     setInjuries, userId, recoveryMuscles, handleDayClick, weeklyStats, weeklyStatsError,

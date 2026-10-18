@@ -310,6 +310,7 @@ export const nextPrescriptionSpec = {
     isRestDay: z.boolean(),
     sessionName: text.optional(),
     source: z.enum(['driving', 'static', 'pending']).optional(),
+    prescriptionSource: z.enum(['model', 'rules']).optional(),
     exercises: z
       .array(
         z.object({

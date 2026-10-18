@@ -45,7 +45,9 @@ export function createPostgresRollupIO(deps: PostgresRollupIODeps): RollupIO {
     tombstoneBleSleepSessionsExcept: async (dates, keepStarts) => {
       await oura.tombstoneBleSleepNightsExcept(db, userId, dates, keepStarts)
     },
-    upsertSleepSessions: async rows => {
+    upsertSleepSessions: async all => {
+      // #2998: from the switch to the Oura API, a night Oura sent is never handed back to the ring.
+      const rows = await oura.dropBleNightsOuraCloudHolds(db, userId, all)
       await oura.reseatBleSleepOuraIds(db, userId, rows)
       await oura.upsertOuraSleep(db, userId, rows, 'oura_ble', { replaceOwnBle: true })
     },

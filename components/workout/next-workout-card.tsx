@@ -62,7 +62,12 @@ export function NextWorkoutCard() {
             <p className="text-sm font-semibold">{data.sessionName}</p>
             {data.source === 'pending' && (
               <p className="text-[10px] text-muted-foreground">
-                Your next prescription is still being generated — it&apos;ll be ready when you start.
+                Your next plan is made when you start.
+              </p>
+            )}
+            {data.source === 'driving' && data.prescriptionSource === 'rules' && (
+              <p className="text-2xs text-muted-foreground">
+                From your program as written: the AI coach couldn&apos;t be reached.
               </p>
             )}
             <div className="space-y-1.5">
