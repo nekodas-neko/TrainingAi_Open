@@ -26,6 +26,9 @@ import {
   type WorkoutSet,
 } from './workout.ts';
 
+export const PROGRAM_AS_WRITTEN =
+  'Your AI coach could not prepare this session, so it starts from your program as written.';
+
 export type JournalState = {
   data: WorkoutJournal;
   ready: boolean;
@@ -94,7 +97,6 @@ export class WorkoutJournalStore {
   private generation = 0;
   private loading: Promise<void> | null = null;
   private syncing: Promise<void> | null = null;
-  private waitingSession: { id: string; requestedAt: number } | null = null;
   private onSynced: () => void;
 
   constructor(
@@ -211,6 +213,44 @@ export class WorkoutJournalStore {
     }
   };
 
+  /**
+   * A fresh AI prescription is still to be made. The current app asks for it itself, because
+   * `/api/workout-data`'s own background request to `/prescribe` silently never arrives in
+   * production; when the model fails the server stores the program as written (RV-202), so the
+   * re-read usually has numbers. If it still has none, start from the program as written, which is
+   * what the current app shows once its polls run out, rather than refusing to start at all.
+   */
+  private async settlePending(
+    pending: SessionPreview,
+    programId: string,
+    options: SessionStartOptions,
+  ): Promise<SessionPreview> {
+    try {
+      await this.connection.post(
+        `/api/ai-periodization/session/${pending.id}/prescribe`,
+        {},
+      );
+      const again = readSessionResponse(
+        await this.connection.get('/api/workout-data', {
+          tab: pending.id,
+          poll: '1',
+          ...(options.aiDeload ? { aiDeload: '1' } : {}),
+        }),
+        this.connection,
+        programId,
+        pending.id,
+      );
+      if (!again.prescriptionPending) {
+        return again;
+      }
+      pending = again;
+    } catch {
+      // A refused or failed generation falls through to the program as written.
+    }
+    this.publish({ message: PROGRAM_AS_WRITTEN });
+    return { ...pending, prescriptionPending: false };
+  }
+
   start = async (
     session: SessionPreview,
     programId: string,
@@ -231,15 +271,11 @@ export class WorkoutJournalStore {
     try {
       let selected = session;
       if (!useSaved) {
-        const polling =
-          this.waitingSession?.id === session.id &&
-          this.now() - this.waitingSession.requestedAt < 60_000;
         let response: unknown;
         try {
           response = await this.connection.get('/api/workout-data', {
             tab: session.id,
             ...(options.aiDeload ? { aiDeload: '1' } : {}),
-            ...(polling ? { poll: '1' } : {}),
           });
         } catch (error) {
           const fallback =
@@ -257,12 +293,7 @@ export class WorkoutJournalStore {
         }
         selected = readSessionResponse(response, this.connection, programId, session.id);
         if (selected.prescriptionPending) {
-          if (!polling) {
-            this.waitingSession = { id: session.id, requestedAt: this.now() };
-          }
-          throw new Error(
-            'The backend is preparing this session’s prescription. Check again shortly.',
-          );
+          selected = await this.settlePending(selected, programId, options);
         }
       }
       if (generation !== this.generation) {
@@ -293,7 +324,6 @@ export class WorkoutJournalStore {
       if (generation !== this.generation) {
         return null;
       }
-      this.waitingSession = null;
       return workout.id;
     } catch (error) {
       if (generation === this.generation) {

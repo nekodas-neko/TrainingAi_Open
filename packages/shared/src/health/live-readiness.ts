@@ -8,6 +8,19 @@ import type { OuraDailyDerivedRow, OuraDailyRow, WorkoutRepository } from '@/lib
 // through here so it never narrates a stale pre-re-key Cloud number the Health screen contradicts.
 
 type DerivedReadiness = Pick<OuraDailyDerivedRow, 'day' | 'readinessScore' | 'readinessSource'>
+
+/**
+ * #2992: the `readiness_source` labels the app's own composite writes. Both are ours whatever device
+ * fed the inputs; where each input came from lives on the contributors (`source`, since #2984).
+ * `generic-derived` is every Oura Cloud day once no ring summary is in the window. Anything else is
+ * not our composite and stays excluded.
+ */
+export const OWN_READINESS_SOURCES: ReadonlySet<string> = new Set(['ble-derived', 'generic-derived'])
+
+/** True when a derived row's readiness is the app's own composite. */
+export function isOwnReadinessSource(source: string | null | undefined): boolean {
+  return source != null && OWN_READINESS_SOURCES.has(source)
+}
 type CloudReadiness = Pick<OuraDailyRow, 'date' | 'readinessScore'>
 
 /** Live readiness per day: the own BLE-derived composite when present; else the frozen Cloud value
@@ -16,7 +29,7 @@ type CloudReadiness = Pick<OuraDailyRow, 'date' | 'readinessScore'>
 export function liveReadinessByDay(derived: DerivedReadiness[], cloud: CloudReadiness[] = []): Map<string, number> {
   const out = new Map<string, number>()
   for (const d of derived) {
-    if (d.readinessSource === 'ble-derived' && d.readinessScore != null) out.set(d.day, d.readinessScore)
+    if (isOwnReadinessSource(d.readinessSource) && d.readinessScore != null) out.set(d.day, d.readinessScore)
   }
   // Pre-re-key Cloud only fills days the composite doesn't cover (post-re-key Cloud is frozen).
   for (const c of cloud) {

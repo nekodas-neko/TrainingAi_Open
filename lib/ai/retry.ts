@@ -1,8 +1,12 @@
 import { APICallError, NoObjectGeneratedError } from 'ai'
 import { reportServerError } from '@/lib/observability'
+import { isAiBillingError } from '@/lib/ai/provider-paused'
 
-// Retryable = transient provider failures: rate limit or server error.
+// Retryable = transient provider failures: rate limit or server error. A 429 that says the quota or
+// balance is spent is neither, and retrying it only sends Google a second request that fails the same
+// way (issue 2995: every scan made two during the October outage).
 export function isRetryableAiError(err: unknown): boolean {
+  if (isAiBillingError(err)) return false
   if (APICallError.isInstance(err)) {
     const status = err.statusCode
     return status === 429 || (status != null && status >= 500)

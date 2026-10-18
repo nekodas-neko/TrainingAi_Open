@@ -4,9 +4,9 @@ import { withAiRetry, isRetryableAiError, isRetryableObjectError } from '@/lib/a
 
 const noSleep = () => Promise.resolve()
 
-function apiError(statusCode: number) {
+function apiError(statusCode: number, message = `status ${statusCode}`) {
   return new APICallError({
-    message: `status ${statusCode}`,
+    message,
     url: 'https://example.test',
     requestBodyValues: {},
     statusCode,
@@ -31,6 +31,10 @@ describe('isRetryableAiError', () => {
   it('is false for 4xx (non-429) and plain errors', () => {
     expect(isRetryableAiError(apiError(400))).toBe(false)
     expect(isRetryableAiError(new Error('boom'))).toBe(false)
+  })
+  it('is false for a 429 that says the balance or quota is spent (issue 2995)', () => {
+    expect(isRetryableAiError(apiError(429, 'Your prepayment credits are depleted.'))).toBe(false)
+    expect(isRetryableAiError(apiError(429, 'You exceeded your current quota.'))).toBe(false)
   })
 })
 

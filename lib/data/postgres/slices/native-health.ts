@@ -271,6 +271,14 @@ export async function rebuildNativeHealth(
               eq(s.ouraDailyDerived.userId, userId),
               inArray(s.ouraDailyDerived.day, recoverable),
               eq(s.ouraDailyDerived.readinessSource, 'generic-derived'),
+              // #2992: only a day this import fed. Since #2984 each contributor names its device, so
+              // an Oura Cloud day (also `generic-derived` once no ring row is in the window) keeps
+              // its scores; nulling it would leave the day empty, because the readiness read only
+              // rewrites the current night. A row with no contributor sources predates that and is
+              // cleared as before.
+              sql`(${s.ouraDailyDerived.readinessContributors} IS NULL
+                OR NOT jsonb_path_exists(${s.ouraDailyDerived.readinessContributors}, '$.*.source')
+                OR jsonb_path_exists(${s.ouraDailyDerived.readinessContributors}, '$.* ? (@.source == $src)', jsonb_build_object('src', ${source}::text)))`,
             ),
           );
       }

@@ -49,7 +49,19 @@ import {
 import { qtyFromInput, type QtyUnit } from '../data/quantities';
 import { ingredientItems, sharedMealIngredients } from '../data/recipes';
 import { useSearchTerm } from './IngredientPicker';
-import { foodScanError, readFoodScan } from '../data/scan-response';
+import {
+  barcodeError,
+  foodScanError,
+  ingredientEntries,
+  lookupBarcodeScan,
+  photoRetryAllowed,
+  readFoodScan,
+  savedBarcodeFood,
+  savedSource,
+  scanBasis,
+  scanSource,
+  type ScanBasis,
+} from '../data/scan-response';
 import { photoDraftSchema } from '../data/photo-draft';
 import { MacroLine, NutritionFieldsForm, foodFields, macroKeys } from './NutritionElements';
 const draftSchema = z.object({
@@ -68,6 +80,18 @@ const draftSchema = z.object({
   url: z.string(),
   tab: z.enum(['recent', 'meals', 'search']),
   scanCandidates: z.array(scanSchema).default([]),
+  // What the scan said and returned, so an edited scan saves as hand-entered (#2925).
+  scanSource: z.string().nullable().default(null),
+  scanBasis: z
+    .object({
+      calories: z.number(),
+      proteinG: z.number(),
+      carbsG: z.number(),
+      fatG: z.number(),
+      servingSizeG: z.number(),
+    })
+    .nullable()
+    .default(null),
 });
 const initial: z.infer<typeof draftSchema> = {
   recipeServings: 1,
@@ -85,6 +109,8 @@ const initial: z.infer<typeof draftSchema> = {
   url: '',
   tab: 'recent',
   scanCandidates: [],
+  scanSource: null,
+  scanBasis: null,
 };
 export function FoodLogger({
   date,
@@ -203,6 +229,8 @@ export function FoodLogger({
       imageDataUri: food.imageDataUri ?? null,
       ingredients: [],
       quantity: '1',
+      scanSource: null,
+      scanBasis: null,
       step: 'assign',
     });
   }
@@ -225,6 +253,8 @@ export function FoodLogger({
       imageDataUri: thumbnail ?? scan.imageDataUri ?? d.imageDataUri,
       ingredients: scan.ingredients ?? [],
       scanCandidates: [],
+      scanSource: scanSource(scan),
+      scanBasis: scanBasis(scan),
       step: 'review' as const,
     };
     draft.setValue(next);
@@ -235,7 +265,10 @@ export function FoodLogger({
     thumbnail?: string | null,
     capturing = false,
   ) {
-    if (!resources || !draft.ready || !photoReady || (busy && !capturing)) {
+    // A description or a refine needs no photo, so a saved photo that could not be read must not
+    // block them (the error line already tells the person how to get the photo back).
+    const needsPhoto = typeof input.image === 'string';
+    if (!resources || !draft.ready || (needsPhoto && !photoReady) || (busy && !capturing)) {
       return;
     }
     setBusy(true);
@@ -283,9 +316,11 @@ export function FoodLogger({
         savingResult
           ? 'Analysis finished, but the result could not be saved on this phone. Retry to save it without analysing the photo again.'
           : foodScanError(error),
-        typeof input.image === 'string' && !!capturedPhoto.current,
+        typeof input.image === 'string' && !!capturedPhoto.current && photoRetryAllowed(error),
       );
-      setPhotoRetry(typeof input.image === 'string' && !!capturedPhoto.current);
+      setPhotoRetry(
+        typeof input.image === 'string' && !!capturedPhoto.current && photoRetryAllowed(error),
+      );
     } finally {
       setBusy(false);
       setCaptureStage(null);
@@ -315,21 +350,24 @@ export function FoodLogger({
         itemId: null,
         ingredients,
         source: 'text',
+        scanSource: null,
+        scanBasis: null,
         shared: true,
         recipeServings: label.meal.servings,
       });
       return;
     }
+    const saved = savedBarcodeFood(n.view.foods, code);
+    if (saved) {
+      pick(saved);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      review(
-        scanSchema.parse(
-          await resources.connection.get('/api/nutrition/barcode', { barcode: code }),
-        ),
-      );
-    } catch {
-      setError('The barcode could not be found. Try a photo, description or manual entry.');
+      review(await lookupBarcodeScan(resources.connection, code));
+    } catch (cause) {
+      setError(barcodeError(cause));
     } finally {
       setBusy(false);
     }
@@ -363,13 +401,22 @@ export function FoodLogger({
       setCaptureStage(null);
     }
   }
+  function formBasis(): ScanBasis {
+    return {
+      calories: Number(d.fields.calories),
+      proteinG: Number(d.fields.proteinG),
+      carbsG: Number(d.fields.carbsG),
+      fatG: Number(d.fields.fatG),
+      servingSizeG: Number(d.fields.servingSizeG),
+    };
+  }
   function value() {
     const food = {
       id: '10000000-0000-4000-8000-000000000001',
       name: d.fields.name?.trim(),
       brand: d.fields.brand?.trim() || undefined,
       servingSizeG: Number(d.fields.servingSizeG),
-      source: d.source,
+      source: savedSource(d.scanSource, d.scanBasis, formBasis(), d.source),
       barcode: d.barcode ?? undefined,
       imageDataUri: d.imageDataUri,
     };
@@ -402,21 +449,12 @@ export function FoodLogger({
       const food = value();
       const entries =
         d.ingredients.length > 1
-          ? d.ingredients.map((ingredient) => ({
-              name: ingredient.name,
-              servingSizeG: 100,
-              calories: ingredient.caloriesPer100g,
-              proteinG: ingredient.proteinPer100g,
-              carbsG: ingredient.carbsPer100g,
-              fatG: ingredient.fatPer100g,
-              source: d.source,
-              quantityMultiplier: (ingredient.weightG / 100) * Number(d.quantity),
-            }))
+          ? ingredientEntries(d.ingredients, Number(d.quantity), d.scanSource ?? d.source)
           : [
               {
                 ...food,
                 id: d.itemId ?? undefined,
-                source: d.source,
+                source: food.source ?? d.source,
                 servingSizeG: food.servingSizeG ?? 100,
                 proteinG: food.proteinG ?? 0,
                 carbsG: food.carbsG ?? 0,
@@ -504,7 +542,22 @@ export function FoodLogger({
                   if (d.step === 'review') {
                     try {
                       const valid = value();
-                      update({ step: 'assign', fields: foodFields(valid) });
+                      update({
+                        step: 'assign',
+                        fields: foodFields(valid),
+                        // An untouched scan shows its repaired figures from here on; keep them
+                        // counted as untouched, so the save still stores the scan's source.
+                        scanBasis:
+                          d.scanBasis && valid.source === d.scanSource
+                            ? {
+                                calories: valid.calories,
+                                proteinG: valid.proteinG ?? 0,
+                                carbsG: valid.carbsG ?? 0,
+                                fatG: valid.fatG ?? 0,
+                                servingSizeG: valid.servingSizeG ?? 100,
+                              }
+                            : d.scanBasis,
+                      });
                       setError(null);
                     } catch (cause) {
                       setError(
@@ -568,6 +621,8 @@ export function FoodLogger({
                     barcode: null,
                     imageDataUri: null,
                     scanCandidates: [],
+                    scanSource: null,
+                    scanBasis: null,
                     shared: false,
                   });
                 }}
@@ -919,10 +974,7 @@ export function FoodLogger({
           <ListRow
             key={index}
             title={scan.name}
-            onPress={() => {
-              review(scan);
-              setCandidates([]);
-            }}
+            onPress={() => review(scan)}
           />
         ))}
       </Sheet>
