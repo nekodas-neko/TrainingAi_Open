@@ -184,7 +184,7 @@ export function HomeBanners({
       {readiness.data?.earlyDeloadRecommended && !home.markers[`deload:${health.today}`] && (
         <Card tone="checkin">
           <Stack direction="row" align="center" justify="space-between">
-            <AppText variant="heading">Fatigue detected</AppText>
+            <AppText variant="subheading">Fatigue detected</AppText>
             <StatusIndicator label="Fatigue advice" error={error} />
           </Stack>
           <AppText variant="caption" tone="muted">

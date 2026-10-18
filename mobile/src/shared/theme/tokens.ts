@@ -15,7 +15,8 @@ export const spacing = {
 export const radii = { small: 8, control: 12, card: 16, pill: 999 };
 export const icons = { strokeWidth: 2 };
 export const sizes = {
-  touchTarget: 44,
+  // The current app floors every button at 48 px (app/globals.css, "Minimum tap target size").
+  touchTarget: 48,
   button: 48,
   icon: 24,
   iconSmall: 20,
@@ -52,20 +53,60 @@ export const sizes = {
   timelineMarker: 28,
   timelineRow: 72,
 };
+// Sizes are the current app's CSS px at its 384 px width, which is 384 dp on the S25 Ultra, so they
+// carry across one for one. Each comment names the class the current app uses for that role, and
+// tests/type-scale.test.ts pins them to it (#2994).
 export const typography = {
   score: { fontSize: 32, lineHeight: 38, fontWeight: '800', letterSpacing: -1 },
+  // A large value inside a card. A page's own title is pageTitle, never this.
   title: { fontSize: 28, lineHeight: 34, fontWeight: '700' },
   hero: { fontSize: 24, lineHeight: 30, fontWeight: '700' },
-  heading: { fontSize: 17, lineHeight: 24, fontWeight: '600' },
-  body: { fontSize: 15, lineHeight: 22 },
-  // Typed text: the current app floors every input at 16 px (globals.css, mobile usability).
-  input: { fontSize: 16, lineHeight: 22 },
-  label: { fontSize: 14, lineHeight: 20, fontWeight: '600' },
-  caption: { fontSize: 12, lineHeight: 18 },
-  eyebrow: { fontSize: 11, lineHeight: 16, fontWeight: '600', letterSpacing: 0.8 },
+  // text-base font-semibold: empty-state, sheet and dialog titles.
+  heading: { fontSize: 16, lineHeight: 24, fontWeight: '600' },
+  // text-sm font-semibold: a heading inside a card or a sheet.
+  subheading: { fontSize: 14, lineHeight: 20, fontWeight: '600' },
+  // text-xs font-semibold uppercase tracking-widest, muted: the title a card carries at its top.
+  cardTitle: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  // text-xs font-semibold uppercase tracking-wide, muted: a heading over a group of cards
+  // (health/section-header.tsx) and the calendar card's title.
+  groupTitle: {
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+  },
+  // text-sm: body copy and descriptions.
+  body: { fontSize: 14, lineHeight: 20 },
+  // Typed text: the current app forces 16 px on every input (globals.css) so focusing never zooms.
+  input: { fontSize: 16, lineHeight: 24 },
+  // text-sm: a row or list label, at regular weight as the current app draws it.
+  label: { fontSize: 14, lineHeight: 20, fontWeight: '400' },
+  // text-sm font-medium: the current app's Button.
+  button: { fontSize: 14, lineHeight: 20, fontWeight: '500' },
+  // text-xs.
+  caption: { fontSize: 12, lineHeight: 16 },
+  // text-[10px] font-semibold uppercase tracking-widest: a small label over a group or a value.
+  eyebrow: {
+    fontSize: 10,
+    lineHeight: 15,
+    fontWeight: '600',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
   metric: { fontSize: 24, lineHeight: 30, fontWeight: '700' },
-  tab: { fontSize: 10, lineHeight: 14, fontWeight: '500' },
-  pageTitle: { fontSize: 20, lineHeight: 26, fontWeight: '700' },
+  // bottom-nav.tsx: text-[10px] font-medium.
+  tab: { fontSize: 10, lineHeight: 15, fontWeight: '500' },
+  // screen-header.tsx: text-xl font-bold, the title of every tab page.
+  pageTitle: { fontSize: 20, lineHeight: 28, fontWeight: '700' },
+  // nutrition-content.tsx: the Nutrition tab's own title, text-[26px] font-semibold leading-none.
+  nutritionTitle: { fontSize: 26, lineHeight: 26, fontWeight: '600', letterSpacing: -0.52 },
   micro: { fontSize: 10, lineHeight: 14, fontWeight: '600' },
   display: { fontSize: 48, lineHeight: 56, fontWeight: '800' },
   wheelValue: { fontSize: 32, lineHeight: 40, fontWeight: '700' },

@@ -47,7 +47,7 @@ export function DayReviewTrends({ date }: { date: string }) {
   return (
     <Card>
       <Stack direction="row" justify="space-between">
-        <AppText variant="heading">Against the last week</AppText>
+        <AppText variant="subheading">Against the last week</AppText>
         <StatusIndicator
           label="Day comparisons"
           busy={state.loading}

@@ -86,8 +86,8 @@ export function StrengthScreen({
             <Card>
               <Stack direction="row" justify="space-between">
                 <AppText
-                  variant={embedded ? 'heading' : 'eyebrow'}
-                  tone={embedded ? 'text' : 'muted'}
+                  variant="cardTitle"
+                  tone="muted"
                 >
                   Strength Trend
                 </AppText>
@@ -195,7 +195,9 @@ export function StrengthScreen({
           ) : embedded ? (
             <Card>
               <Stack direction="row" align="center" justify="space-between">
-                <AppText variant="heading">Strength Trend</AppText>
+                <AppText variant="cardTitle" tone="muted">
+                  Strength Trend
+                </AppText>
                 <ResourceStatus
                   inline
                   label="Strength trend"

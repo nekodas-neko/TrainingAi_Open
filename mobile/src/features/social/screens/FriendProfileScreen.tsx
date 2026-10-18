@@ -146,7 +146,9 @@ function Profile({ userId, onBack }: { userId: string; onBack: () => void }) {
               ))}
             </Grid>
             <Card>
-              <AppText variant="heading">Trophy Case</AppText>
+              <AppText variant="eyebrow" tone="muted">
+                Trophy Case
+              </AppText>
               {trophies.length ? (
                 <Grid columns={3} gap="sm">
                   {trophies.map((row) => (

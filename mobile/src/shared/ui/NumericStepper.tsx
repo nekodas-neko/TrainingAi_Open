@@ -97,7 +97,8 @@ export function NumericStepper({
         keyboardType={step === 1 && min === 0 ? 'number-pad' : 'numbers-and-punctuation'}
         returnKeyType="done"
         selectTextOnFocus
-        style={{ ...theme.typography.metric, textAlign: 'center' }}
+        variant="metric"
+        style={{ textAlign: 'center' }}
       />
       <Stack direction="row" gap="sm">
         <AppButton

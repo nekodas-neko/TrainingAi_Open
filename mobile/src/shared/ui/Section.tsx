@@ -11,7 +11,9 @@ export function Section({
 }: PropsWithChildren<{ title: string; tone?: Tone }>) {
   return (
     <Stack gap="md">
-      <AppText variant="heading">{title}</AppText>
+      <AppText variant="eyebrow" tone="muted" accessibilityRole="header">
+        {title}
+      </AppText>
       <Card padded={false} tone={tone}>
         {children}
       </Card>

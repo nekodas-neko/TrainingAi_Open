@@ -236,7 +236,7 @@ export function VialSheet({
           />
         )}
         <Card>
-          <AppText variant="heading">Work out the units</AppText>
+          <AppText variant="subheading">Work out the units</AppText>
           <TextField
             label="Try a dose (mg)"
             value={d.mg}
@@ -386,7 +386,7 @@ function VialResponses({
   return (
     <>
       <Card>
-        <AppText variant="heading">Weight response</AppText>
+        <AppText variant="subheading">Weight response</AppText>
         <AppText variant="caption" tone="muted">
           Since this vial
         </AppText>
@@ -419,7 +419,7 @@ function VialResponses({
       </Card>
       <Card>
         <Stack direction="row" justify="space-between">
-          <AppText variant="heading">Heart after a dose</AppText>
+          <AppText variant="subheading">Heart after a dose</AppText>
           <StatusIndicator
             label="Heart after a dose"
             busy={heart.loading}

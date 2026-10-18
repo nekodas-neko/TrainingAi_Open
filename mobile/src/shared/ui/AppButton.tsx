@@ -12,7 +12,7 @@ export function AppButton({
   icon,
   iconSize,
   disabled = false,
-  textVariant = 'label',
+  textVariant = 'button',
   style,
   ...props
 }: Omit<PressableProps, 'children'> & {

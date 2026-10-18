@@ -52,8 +52,8 @@ export function RepCounter({
           selectTextOnFocus
           editable={!disabled}
           containerStyle={{ width: '100%' }}
+          variant="display"
           style={{
-            ...theme.typography.display,
             height: row,
             minHeight: row,
             padding: 0,

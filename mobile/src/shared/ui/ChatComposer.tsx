@@ -2,6 +2,7 @@ import { TextInput } from 'react-native';
 import { Stack } from './Stack';
 import { IconButton } from './IconButton';
 import { useTheme } from '../theme/ThemeProvider';
+import { MAX_TEXT_SCALE } from '../theme/text-scale';
 export function ChatComposer({
   value,
   onChange,
@@ -22,6 +23,7 @@ export function ChatComposer({
     <Stack direction="row" align="center">
       <TextInput
         allowFontScaling={allowFontScaling}
+        maxFontSizeMultiplier={MAX_TEXT_SCALE}
         accessibilityLabel="Message Coach"
         placeholder="Tell me what you want to change…"
         placeholderTextColor={theme.colors.muted}

@@ -59,7 +59,7 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
       <TabPanel>
         <Stack style={{ paddingHorizontal: theme.spacing.lg }}>
           <Card>
-            <AppText variant="heading">Sync now</AppText>
+            <AppText variant="subheading">Sync now</AppText>
             <AppText variant="caption" tone="muted">
               Pull latest data from server
             </AppText>
@@ -76,7 +76,7 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
             />
           </Card>
           <Card>
-            <AppText variant="heading">Restore from cloud</AppText>
+            <AppText variant="subheading">Restore from cloud</AppText>
             <AppText variant="caption" tone="muted">
               Older history loads when opened. Your unsent changes and unfinished workouts
               are kept.
@@ -102,7 +102,7 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
             />
           )}
           <Card>
-            <AppText variant="heading">Import more history</AppText>
+            <AppText variant="subheading">Import more history</AppText>
             <AppText variant="caption" tone="muted">
               Pull older {deviceHealthName} data. Choose how far back to read
             </AppText>
@@ -138,7 +138,7 @@ export function DataSyncScreen({ onBack }: { onBack: () => void }) {
             />
           </Card>
           <Card>
-            <AppText variant="heading">Export my data</AppText>
+            <AppText variant="subheading">Export my data</AppText>
             <AppText variant="caption" tone="muted">
               Download everything as a single file, and choose where to save it.
             </AppText>

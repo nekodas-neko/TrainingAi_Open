@@ -30,6 +30,7 @@ export function PageLayout({
   landing = false,
   reorderable = false,
   fillBottom = false,
+  titleVariant = 'pageTitle',
 }: PropsWithChildren<{
   title: string;
   subtitle?: string;
@@ -44,6 +45,8 @@ export function PageLayout({
   landing?: boolean;
   reorderable?: boolean;
   fillBottom?: boolean;
+  /** The current app draws every tab page's title at text-xl; Nutrition has its own larger one. */
+  titleVariant?: 'pageTitle' | 'nutritionTitle';
 }>) {
   const { theme } = useTheme();
   const nestedScroll = useNestedScrollBoundary();
@@ -85,11 +88,11 @@ export function PageLayout({
         >
           {onBack && <IconButton icon="back" label="Back" onPress={onBack} />}
           <View style={{ flex: 1 }}>
-            <AppText variant={landing ? 'title' : 'pageTitle'} accessibilityRole="header">
+            <AppText variant={titleVariant} accessibilityRole="header">
               {title}
             </AppText>
             {subtitle && (
-              <AppText variant="caption" tone="muted">
+              <AppText variant="body" tone="muted">
                 {subtitle}
               </AppText>
             )}

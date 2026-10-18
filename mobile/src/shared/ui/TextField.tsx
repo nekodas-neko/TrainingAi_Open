@@ -4,6 +4,8 @@ import { AppText } from './AppText';
 import { Icon, type IconName } from './Icon';
 import { Stack } from './Stack';
 import { useTheme } from '../theme/ThemeProvider';
+import { MAX_TEXT_SCALE } from '../theme/text-scale';
+import type { TextVariant } from '../theme/tokens';
 
 export function TextField({
   label,
@@ -13,6 +15,7 @@ export function TextField({
   containerStyle,
   hideLabel = false,
   leadingIcon,
+  variant = 'input',
   ...props
 }: TextInputProps & {
   label: string;
@@ -22,6 +25,8 @@ export function TextField({
   hideLabel?: boolean;
   /** A glyph inside the field's left edge, e.g. 'search'. */
   leadingIcon?: IconName;
+  /** The type token for the entered text, so it scales like every other text (text-scale.ts). */
+  variant?: TextVariant;
 }) {
   const { theme, allowFontScaling } = useTheme();
   const id = useId();
@@ -35,6 +40,7 @@ export function TextField({
       <View>
         <TextInput
           allowFontScaling={allowFontScaling}
+          maxFontSizeMultiplier={MAX_TEXT_SCALE}
           {...props}
           accessibilityLabel={props.accessibilityLabel ?? label}
           accessibilityLabelledBy={hideLabel || props.accessibilityLabel ? undefined : id}
@@ -50,7 +56,7 @@ export function TextField({
               backgroundColor: theme.colors.raised,
               paddingHorizontal: theme.spacing.md,
               paddingVertical: theme.spacing.sm,
-              ...theme.typography.input,
+              ...theme.typography[variant],
               ...(leadingIcon ? { paddingLeft: theme.spacing.md + theme.sizes.iconSmall + theme.spacing.sm } : {}),
             },
             style,

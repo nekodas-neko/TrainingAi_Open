@@ -25,7 +25,7 @@ import { ActivityTrendCharts, EnergyBalanceCard, RingCards, WaterCard } from './
 function GroupTitle({ children }: { children: string }) {
   const { theme } = useTheme();
   return (
-    <AppText variant="heading" accessibilityRole="header" style={{ marginTop: theme.spacing.sm }}>
+    <AppText variant="groupTitle" tone="muted" accessibilityRole="header" style={{ marginTop: theme.spacing.sm }}>
       {children}
     </AppText>
   );
