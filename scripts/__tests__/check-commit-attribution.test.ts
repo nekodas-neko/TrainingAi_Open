@@ -25,6 +25,15 @@ function commit(message: string, file = 'f.txt') {
   git('commit', '-q', '-F', msgFile)
 }
 
+/** A commit whose AUTHOR is `name <email>`, whatever the repo's own identity is. */
+function commitAs(name: string, email: string, message: string, file = 'a.txt') {
+  writeFileSync(path.join(repo, file), `${Math.random()}\n`)
+  git('add', '.')
+  const msgFile = path.join(scratch, 'msg.txt')
+  writeFileSync(msgFile, message)
+  git('-c', `user.name=${name}`, '-c', `user.email=${email}`, 'commit', '-q', '-F', msgFile)
+}
+
 function run() {
   const env = { ...process.env }
   delete env.PR_NUMBER
@@ -87,6 +96,67 @@ describe('check-commit-attribution', () => {
   })
 })
 
+// issue 2978 — the author is attribution too. A cloud session commits as Claude <noreply@anthropic.com>
+// and the PR is opened by the owner's account, so GitHub's squash adds `Co-authored-by: Claude` to
+// main although no commit message has it.
+describe('the commit author', () => {
+  const ACCOUNT = '279847013+nekodas-neko@users.noreply.github.com'
+  const reset = () => { git('update-ref', 'refs/remotes/origin/main', 'HEAD') }
+
+  it.each([
+    ['Anthropic noreply commit author', 'Claude', 'noreply@anthropic.com'],
+    ['Anthropic noreply commit author', 'Some Bot', 'noreply@anthropic.com'],
+    ['commit author named Claude', 'Claude', 'bot@example.com'],
+    ['commit author named Claude', 'Claude Code', 'bot@example.com'],
+  ])('fails %s (%s <%s>) with a clean message, naming the fix', (pattern, name, email) => {
+    reset()
+    commitAs(name, email, 'A perfectly clean message\n\nWith a body.\n')
+    const sha = git('rev-parse', 'HEAD').slice(0, 10)
+    const res = run()
+    git('reset', '-q', '--hard', 'HEAD~1')
+    expect(res.status).toBe(1)
+    expect(res.stderr).toContain(sha)
+    expect(res.stderr).toContain(pattern)
+    expect(res.stderr).toContain(`${name} <${email}>`)
+    expect(res.stderr).toContain('git config user.email')
+    // a pushed commit cannot be amended without a force-push, which the repo forbids
+    expect(res.stderr).toContain('do not force-push')
+    expect(res.stderr).toContain('git cherry-pick -n')
+    // and it does not print the message-only advice for an author-only problem
+    expect(res.stderr).not.toContain('delete those lines from the commit message')
+  })
+
+  it('passes the account\'s noreply identity, a person, and a name that only starts with Claude', () => {
+    reset()
+    commitAs('nekodas-neko', ACCOUNT, 'Fix\n')
+    commitAs('Delan Dasanayake', 'delan@example.com', 'Pair\n', 'b.txt')
+    commitAs('Claudette Martin', 'claudette@example.com', 'Fix\n', 'c.txt')
+    const res = run()
+    git('reset', '-q', '--hard', 'origin/main')
+    expect(res.status).toBe(0)
+  })
+
+  it('gives both pieces of advice when a commit is wrong in both ways', () => {
+    reset()
+    commitAs('Claude', 'noreply@anthropic.com', 'Fix\n\nClaude-Session: https://claude.ai/code/session_x\n')
+    const res = run()
+    git('reset', '-q', '--hard', 'origin/main')
+    expect(res.status).toBe(1)
+    expect(res.stderr).toContain('delete those lines from the commit message')
+    expect(res.stderr).toContain('git config user.email')
+  })
+
+  it('ignores the author of history it does not own: only origin/main..HEAD is read', () => {
+    // the base commit in beforeAll is authored by T; make main itself a Claude-authored commit
+    commitAs('Claude', 'noreply@anthropic.com', 'Agent change (#1)\n', 'm.txt')
+    reset()
+    commitAs('nekodas-neko', ACCOUNT, 'Mine\n', 'n.txt')
+    const res = run()
+    expect(res.status).toBe(0)
+    expect(res.stdout).toContain('1 commit(s)')
+  })
+})
+
 describe('a branch that merged main', () => {
   it('reads only its own commits, not the main commits the merge brought in (#2508)', () => {
     // main moves on with an agent's squash commit, which carries the co-author line GitHub adds;
@@ -135,6 +205,25 @@ describe('in CI: the commit list GitHub has for the PR', () => {
     const { fetchImpl } = stub([[entry('c'.repeat(40), 'Fix\n\nClaude-Session: https://claude.ai/code/session_x\n')]])
     const got = await collectCommits('/nonexistent', env, fetchImpl)
     expect(findViolations(got.commits).map((v: { pattern: string }) => v.pattern)).toEqual(['Claude session URL'])
+  })
+
+  it('reads each commit\'s author from GitHub and fails the Claude identity (issue 2978)', async () => {
+    const withAuthor = (sha: string, name: string, email: string) =>
+      ({ sha, commit: { message: 'Clean\n', author: { name, email } } })
+    const { fetchImpl } = stub([[
+      withAuthor('e'.repeat(40), 'nekodas-neko', '279847013+nekodas-neko@users.noreply.github.com'),
+      withAuthor('f'.repeat(40), 'Claude', 'noreply@anthropic.com'),
+    ]])
+    const got = await collectCommits('/nonexistent', env, fetchImpl)
+    const v = findViolations(got.commits)
+    expect(v.map((x: { sha: string }) => x.sha[0])).toEqual(['f', 'f'])
+    expect(v.map((x: { pattern: string }) => x.pattern)).toEqual(['Anthropic noreply commit author', 'commit author named Claude'])
+  })
+
+  it('judges a listed commit with no author object by its message alone', async () => {
+    const { fetchImpl } = stub([[entry('9'.repeat(40), 'Clean\n')]])
+    const got = await collectCommits('/nonexistent', env, fetchImpl)
+    expect(findViolations(got.commits)).toEqual([])
   })
 
   it('follows a full page to the next, and stops at a short one', async () => {
