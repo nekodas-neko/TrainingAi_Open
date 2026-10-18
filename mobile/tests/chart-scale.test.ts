@@ -15,7 +15,7 @@ import {
   lineSegments,
   lastReadingIndex,
 } from '../src/shared/ui/chartScale.ts';
-import { niceTicks as nutritionNiceTicks } from '../src/features/nutrition/data/heart-response-view.ts';
+import { niceTicks as nutritionNiceTicks } from '@trainingai/shared/nutrition/heart-response-view';
 
 test('niceTicks gives round values inside the range', () => {
   assert.deepEqual(niceTicks(0, 100), [0, 50, 100]);

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
-import { verdictCopy, type StoredSleepVerdict } from '@/components/health/sleep/sleep-verdict-copy'
+import { verdictCopy, type StoredSleepVerdict } from '@trainingai/shared/health/sleep-verdict-copy'
 
 interface VerdictResponse {
   verdict: StoredSleepVerdict | null

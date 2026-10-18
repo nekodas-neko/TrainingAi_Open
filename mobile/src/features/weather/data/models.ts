@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { WEATHER_CONDITIONS } from '@trainingai/shared/weather/weather-condition';
 
 export const placeSchema = z.object({
   lat: z.number().finite().min(-90).max(90),
@@ -28,7 +29,7 @@ export const snapshotSchema = z.object({
   place: placeSchema,
   temperatureC: z.number().finite(),
   uvIndex: z.number().finite().min(0).nullable(),
-  condition: z.enum(['clear', 'cloudy', 'rain', 'fog', 'snow', 'thunderstorm']),
+  condition: z.enum(WEATHER_CONDITIONS),
   isDay: z.boolean(),
   daylight: z.array(z.object({ rise: z.number().finite(), set: z.number().finite() })).max(3),
   fetchedAt: z.number().finite(),
@@ -45,14 +46,6 @@ export function weatherNeeded(settings: WeatherSettings) {
 }
 export function placeKey(place: WeatherPlace) {
   return `${place.lat.toFixed(2)},${place.lon.toFixed(2)}`;
-}
-export function weatherCondition(code: number): WeatherSnapshot['condition'] {
-  if (code === 0) return 'clear';
-  if (code === 45 || code === 48) return 'fog';
-  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82)) return 'rain';
-  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return 'snow';
-  if (code >= 95 && code <= 99) return 'thunderstorm';
-  return 'cloudy';
 }
 export function isWeatherDay(snapshot: WeatherSnapshot, now = Date.now()) {
   return snapshot.daylight.length

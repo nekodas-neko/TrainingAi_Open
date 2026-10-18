@@ -112,15 +112,5 @@ export function heartCardView(level: DoseLevelRecovery): HeartCardView {
   return { state: 'clear', levelLabel: label, subtitle, chip: 'Clear pattern', sentence, charts }
 }
 
-/**
- * Round tick values for a chart axis: about three ticks, on a 1/2/5 step.
- */
-export function niceTicks(lo: number, hi: number): number[] {
-  const span = Math.max(hi - lo, 1e-6)
-  const raw = span / 3
-  const mag = 10 ** Math.floor(Math.log10(raw))
-  const step = ([1, 2, 5, 10].find(m => m * mag >= raw) ?? 10) * mag
-  const out: number[] = []
-  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(Math.round(v * 1e6) / 1e6)
-  return out
-}
+// The chart's ticks live with the other chart maths; re-exported so the card keeps one import.
+export { niceTicks } from '@trainingai/shared/ui/nice-ticks'

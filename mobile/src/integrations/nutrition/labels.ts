@@ -2,7 +2,7 @@ import { withPngDensity } from '@trainingai/shared/nutrition/png-density';
 import { randomUUID } from 'expo-crypto';
 import { Platform,Share } from 'react-native';
 import { mealLabelArtwork } from '../../features/nutrition/data/meal-label';
-import { labelPrintDpi } from '../../features/nutrition/data/meal-label-geometry';
+import { labelPrintDpi } from '@trainingai/shared/nutrition/meal-label-geometry';
 import type { SavedMeal } from '../../features/nutrition/data/models';
 export async function shareLabelImage(base64: string, name: string) {
   const bytes = Uint8Array.from(atob(base64.replace(/^data:image\/png;base64,/, '')), (c) =>

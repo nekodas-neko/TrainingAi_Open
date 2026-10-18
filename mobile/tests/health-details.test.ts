@@ -4,7 +4,7 @@ import { HealthStore, overlaySleep } from '../src/features/health/data/HealthSto
 import { bodySpec } from '../src/features/health/data/models.ts';
 import { morningSchema, checkinSchema } from '../src/features/health/data/checkin.ts';
 import { clinicalPayload } from '../src/features/health/data/clinical.ts';
-import { saveSleepValue } from '../src/features/health/data/save-sleep-value.ts';
+import { saveSleepValue } from '@trainingai/shared/checkin/save-sleep-value';
 const date = '2026-10-11';
 const payload = morningSchema.parse({
   phase: 'morning',

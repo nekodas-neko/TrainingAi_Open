@@ -1,21 +1,10 @@
 import { standaloneOrLatest } from '@trainingai/shared/health/series-gaps';
 
 // Pure geometry for the chart components' opt-in axes, gridlines and target line. Kept free of
-// React so it can be unit-tested. `niceTicks` used to live in the nutrition feature; it is here
-// now and re-exported from there.
+// React so it can be unit-tested. `niceTicks` itself lives in `@trainingai/shared/ui/nice-ticks`.
 
-/** Round-number gridline values spanning [lo, hi], about three of them. */
-export function niceTicks(lo: number, hi: number): number[] {
-  if (hi - lo < 1e-6) return [lo];
-  const span = hi - lo;
-  const raw = span / 3;
-  const mag = 10 ** Math.floor(Math.log10(raw));
-  const step = ([1, 2, 5, 10].find((m) => m * mag >= raw) ?? 10) * mag;
-  const out: number[] = [];
-  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step)
-    out.push(Math.round(v * 1e6) / 1e6);
-  return out;
-}
+/** Round-number gridline values spanning [lo, hi], about three of them. Shared with the current app (#3041). */
+export { niceTicks } from '@trainingai/shared/ui/nice-ticks';
 
 /** A reference line a chart can draw, e.g. a daily goal. */
 export type ChartTarget = { value: number; label: string };

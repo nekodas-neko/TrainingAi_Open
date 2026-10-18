@@ -16,7 +16,7 @@ import { concentrationWorking, doseWorking, planDose, DEFAULT_BARREL_UNITS } fro
 import { WeightResponseCard } from "./weight-response-card";
 import { HeartResponseCard } from "./heart-response-card";
 import { VialOpenedNote } from "./vial-opened-note";
-import { openedOnBounds, openedOnProblem } from "./vial-date";
+import { openedOnBounds, openedOnProblem } from "@trainingai/shared/nutrition/vial-date";
 
 /**
  * The vial's key is `supplements-vials:<id>` on purpose, and it depends on prefix semantics:

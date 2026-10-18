@@ -39,7 +39,7 @@ import {
 import { TREND_EMPTY } from '@trainingai/shared/health/trend-empty-copy';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { DoseVitalsCard } from '../components/DoseVitalsCard';
-import { resilienceAsOfLine, resilienceShortfallLine } from '../data/resilience-copy';
+import { resilienceAsOfLine, resilienceShortfallLine } from '@trainingai/shared/health/resilience-copy';
 
 export type HealthDetail = 'sleep' | 'readiness' | 'activity' | 'heart-rate';
 export function HealthDetailScreen({

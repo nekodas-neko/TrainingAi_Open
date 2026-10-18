@@ -18,8 +18,8 @@ import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useHealthData } from '../data/HealthDataProvider';
 import { checkinSpec, verdictSpec } from '../data/checkin';
-import { verdictCopy, type StoredSleepVerdict } from '../data/sleep-verdict-copy';
-import { saveSleepValue } from '../data/save-sleep-value';
+import { verdictCopy, type StoredSleepVerdict } from '@trainingai/shared/health/sleep-verdict-copy';
+import { saveSleepValue } from '@trainingai/shared/checkin/save-sleep-value';
 import { formatHoursMinutes } from '@trainingai/shared/format/units';
 const draftSchema = z.object({
   correction: z.number().int().min(1).max(5).nullable(),

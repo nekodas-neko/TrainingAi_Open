@@ -15,7 +15,7 @@ import {
 } from '../../../shared/ui';
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { mealLabelArtwork } from '../data/meal-label';
-import { MEAL_LABEL_STYLES } from '../data/meal-label-geometry';
+import { MEAL_LABEL_STYLES } from '@trainingai/shared/nutrition/meal-label-geometry';
 import type { SavedMeal } from '../data/models';
 const styles = MEAL_LABEL_STYLES;
 export function MealLabelSheet({ meal, onClose }: { meal: SavedMeal; onClose: () => void }) {

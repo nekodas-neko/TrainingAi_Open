@@ -7,7 +7,7 @@ import { AppText, Card, Grid, KeyValueGrid, MetricTile, Stack } from '../../../s
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import { energySpec, foodTimelineSpec, hrProfileSpec, metricValue } from '../data/models';
 import { signedKcal } from '../../nutrition/data/display';
-import { buildEnergyTimeline } from '../data/energy-timeline';
+import { buildEnergyTimeline } from '@trainingai/shared/health/energy-timeline';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { useHealthData } from '../data/HealthDataProvider';
 import { HealthResourceHeader } from './HealthResourceHeader';

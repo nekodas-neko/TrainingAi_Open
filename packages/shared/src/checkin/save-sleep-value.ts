@@ -1,4 +1,4 @@
-import { verdictToStoredFeel, type StoredSleepVerdict } from '@/components/health/sleep/sleep-verdict-copy'
+import { verdictToStoredFeel, type StoredSleepVerdict } from '@trainingai/shared/health/sleep-verdict-copy'
 
 /**
  * TN-82 — the sheet no longer ASKS for sleep quality or recovery; it announces what it filled.

@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { libraryMealForSlot, usedSavedMealIds } from '../library-swap'
-import type { DraftMeal } from '../meal-plan-draft'
+import { libraryMealForSlot, usedSavedMealIds, type LibrarySwapSlot } from '../library-swap'
 import type { SavedMeal } from '@trainingai/shared/types/nutrition'
 
 const DINNER = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
@@ -39,10 +38,9 @@ function meal(id: string, name: string, mealTypeIds: string[]): SavedMeal {
   } as unknown as SavedMeal
 }
 
-function slot(overrides: Partial<DraftMeal> = {}): DraftMeal {
+function slot(overrides: Partial<LibrarySwapSlot> = {}): LibrarySwapSlot {
   return {
-    position: 2, name: 'Meal 3', notes: null, ingredients: [], actual: null,
-    suggestedTime: '18:30', timingRole: null,
+    position: 2, suggestedTime: '18:30',
     targetCalories: 700, targetProteinG: 50, targetCarbsG: 70, targetFatG: 20,
     ...overrides,
   }

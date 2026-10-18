@@ -79,7 +79,7 @@ vi.mock('@/lib/data', () => ({ getRepository: async () => fakeRepo }))
 import { NextRequest } from 'next/server'
 import { computeEnergyBalance } from '@/lib/health/energy-balance-service'
 import { GET as bodyMetadata } from '@/app/api/body-metadata/route'
-import { buildEnergyTimeline } from '@/components/health/energy-timeline'
+import { buildEnergyTimeline } from '@trainingai/shared/health/energy-timeline'
 import { homeCardCalories } from '@/components/home/home-nutrition-card'
 
 const repoArg = fakeRepo as unknown as Parameters<typeof computeEnergyBalance>[0]
@@ -204,7 +204,7 @@ describe('the surfaces read the shared sum, not a sum of their own', () => {
     'components/nutrition/assign-step.tsx',
     'components/nutrition/energy-card.tsx',
     'components/home/home-nutrition-card.tsx',
-    'components/health/energy-timeline.ts',
+    'packages/shared/src/health/energy-timeline.ts',
     'app/api/body-metadata/route.ts',
     'lib/health/energy-balance-service.ts',
     'mobile/src/features/nutrition/data/recorded-intake.ts',

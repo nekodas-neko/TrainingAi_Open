@@ -2,7 +2,7 @@
 
 import { Check } from 'lucide-react'
 import { storedOrderLabels } from '@trainingai/shared/types/day-checkin'
-import { verdictCopy, type StoredSleepVerdict } from '@/components/health/sleep/sleep-verdict-copy'
+import { verdictCopy, type StoredSleepVerdict } from '@trainingai/shared/health/sleep-verdict-copy'
 
 interface Props {
   verdict: StoredSleepVerdict

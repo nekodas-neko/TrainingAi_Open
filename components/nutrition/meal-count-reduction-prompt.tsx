@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@trainingai/shared/utils'
-import type { Pin, ReductionDecision } from './meal-count-reduction'
+import type { Pin, ReductionDecision } from '@trainingai/shared/nutrition/meal-count-reduction'
 
 interface Props {
   mealCount: number

@@ -34,7 +34,7 @@ import {
 } from '../../workouts/data/WorkoutDataProvider';
 import { useWorkoutDraft } from '../../workouts/data/useWorkoutDraft';
 import { useNutrition } from '../data/NutritionProvider';
-import { STEP_TITLES, visibleReviewSteps } from '../data/review-steps';
+import { STEP_TITLES, visibleReviewSteps } from '@trainingai/shared/nutrition/review-steps';
 import { DayReviewTrends, MealBackfill } from './DayReviewDetails';
 import { FoodLogger } from './FoodLogger';
 import { DayTotals } from './DayTotals';

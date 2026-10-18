@@ -26,7 +26,7 @@ import { measuredBattery, type EndOfDayBattery } from './measured-battery'
 import { DayDigestCard } from './day-digest-card'
 import { DayReadThroughSection } from './day-read-through-section'
 import { DayTrendsSection } from './day-trends-section'
-import { visibleReviewSteps, STEP_TITLES } from './review-steps'
+import { visibleReviewSteps, STEP_TITLES } from '@trainingai/shared/nutrition/review-steps'
 
 type BodyBattery = EndOfDayBattery
 

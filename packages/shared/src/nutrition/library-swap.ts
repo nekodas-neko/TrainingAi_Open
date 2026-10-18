@@ -2,7 +2,20 @@ import { selectLibraryMeals, type MealTypeWindow } from '@trainingai/shared/nutr
 import { savedMealToIngredients } from '@trainingai/shared/nutrition/saved-meal-ingredients'
 import { parseTimeToMinutes } from '@trainingai/shared/nutrition/meal-split'
 import type { SavedMeal } from '@trainingai/shared/types/nutrition'
-import type { DraftMeal } from './meal-plan-draft'
+
+/**
+ * The fields of a draft meal slot this reads. Structural, so the current app's and Preview's own
+ * `DraftMeal` types both fit without either moving here (#3041).
+ */
+export interface LibrarySwapSlot {
+  position: number
+  suggestedTime: string
+  savedMealId?: string | null
+  targetCalories: number
+  targetProteinG: number
+  targetCarbsG: number
+  targetFatG: number
+}
 
 export interface LibrarySwap {
   meal: SavedMeal
@@ -20,7 +33,7 @@ export interface LibrarySwap {
  * Returns `null` when nothing fits, which is the honest answer and the reason the AI option stays.
  */
 export function libraryMealForSlot(
-  slot: DraftMeal,
+  slot: LibrarySwapSlot,
   library: SavedMeal[],
   mealTypes: MealTypeWindow[],
   /** Saved-meal ids already used elsewhere in the plan — a meal must not appear twice in a day. */
@@ -57,6 +70,6 @@ export function libraryMealForSlot(
 }
 
 /** Every saved meal the draft is already using, so a swap cannot duplicate one. */
-export function usedSavedMealIds(meals: DraftMeal[]): string[] {
+export function usedSavedMealIds(meals: Pick<LibrarySwapSlot, 'savedMealId'>[]): string[] {
   return meals.map(m => m.savedMealId).filter((id): id is string => id != null)
 }

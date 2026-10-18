@@ -1,7 +1,7 @@
 import { useRecordedIntake } from '../../nutrition/data/useRecordedIntake';
 import { HrDayCard } from '../../health/components/HrDayCard';
 import { verdictSpec } from '../../health/data/checkin';
-import { verdictCopy } from '../../health/data/sleep-verdict-copy';
+import { verdictCopy } from '@trainingai/shared/health/sleep-verdict-copy';
 import { acwrBandByKey } from '@trainingai/shared/ai-periodization/acwr';
 import { recoveryBand } from '@trainingai/shared/health/recovery-band';
 import { nativeColor } from '../../../shared/ui';
