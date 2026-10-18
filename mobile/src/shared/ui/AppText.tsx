@@ -8,10 +8,11 @@ export function AppText({
   style,
   ...props
 }: TextProps & { variant?: TextVariant; tone?: 'text' | 'muted' | 'brand' | 'danger' }) {
-  const { theme } = useTheme();
+  const { theme, allowFontScaling } = useTheme();
   return (
     <Text
       selectable={false}
+      allowFontScaling={allowFontScaling}
       accessibilityRole={variant === 'title' || variant === 'heading' ? 'header' : undefined}
       {...props}
       style={[
