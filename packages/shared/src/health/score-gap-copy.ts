@@ -65,3 +65,16 @@ export function contributorNote(c: ContributorNoteInput): string | null {
   if (!c.provisional) return null
   return c.gap === null ? APPROXIMATE_CURVE_NOTE : PROVISIONAL_BASELINE_NOTE
 }
+
+/**
+ * True when a contributor has no score of its own to show: it is still learning its baseline, or
+ * nothing was recorded. A provisional contributor with `gap: null` (Oura's recovery index, the
+ * overnight-HR estimate) has a real score that counts in readiness, so it is not learning (#3029).
+ *
+ * `gap` is `undefined` on a payload from before it existed; there `provisional` keeps meaning what it
+ * always did.
+ */
+export function isLearningContributor(c: ContributorNoteInput): boolean {
+  if (c.gap === 'awaiting_baseline' || c.gap === 'no_input') return true
+  return c.gap === undefined && !!c.provisional
+}

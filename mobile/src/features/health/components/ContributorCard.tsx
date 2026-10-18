@@ -6,25 +6,14 @@ import { contributorNote } from '@trainingai/shared/health/score-gap-copy';
 import { AppText, Badge, Card, Icon, Legend, ProgressBar, Stack, ZoneGauge } from '../../../shared/ui';
 import { useHealthAnchor } from '../../../shared/ui/HealthDetailLayout';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
-import { labelFor } from '../data/factor-label';
+import { contributorFactors, type ContributorFactor } from '../data/contributor-factors';
 import { weakestFactor } from '../data/week-view';
-type Factor = {
-  key: string;
-  label: string;
-  score?: number | null;
-  provisional?: boolean;
-  gap?: unknown;
-  scale?: unknown;
-  extra?: string;
-  weight?: number;
-  gauge?: number;
-};
 export function ContributorDetails({
   factors,
   title = 'What each factor means',
   nodes,
 }: {
-  factors: Factor[];
+  factors: (Pick<ContributorFactor, 'key' | 'label'> & Partial<ContributorFactor>)[];
   title?: string;
   nodes?: Map<string, View>;
 }) {
@@ -37,7 +26,7 @@ export function ContributorDetails({
         .filter((f) => guideFor(f.key))
         .map((f) => {
           const guide = guideFor(f.key)!;
-          const band = f.score != null && !f.provisional ? scoreBand(f.score) : null;
+          const band = f.score != null && !f.learning ? scoreBand(f.score) : null;
           return (
             <View
               key={f.key}
@@ -129,44 +118,12 @@ export function ContributorCard({
   const nodes = useRef(new Map<string, View>());
   const jump = useHealthAnchor();
   const { theme } = useTheme();
-  const factors = Object.entries(
-    weights
-      ? Object.fromEntries(
-          Object.keys(weights).map((key) => [key, contributors?.[key] ?? null]),
-        )
-      : (contributors ?? {}),
-  )
-    .filter(([, v]) => weights || v !== null)
-    .sort((a, b) => {
-      const aa = provisional.includes(a[0]) ? null : a[1];
-      const bb = provisional.includes(b[0]) ? null : b[1];
-      return aa != null && bb != null
-        ? aa - bb
-        : aa != null
-          ? -1
-          : bb != null
-            ? 1
-            : (weights?.[b[0]] ?? 0) - (weights?.[a[0]] ?? 0);
-    })
-    .map(([key, score]) => ({
-      key,
-      score,
-      label: labelFor(key),
-      provisional: score == null || provisional.includes(key),
-      gap: cases?.[key]?.gap,
-      scale: cases?.[key]?.scale,
-      weight: weights?.[key],
-      extra: extras?.[key],
-      gauge:
-        key === 'temperature' && temperature != null
-          ? Math.max(0, Math.min(100, ((temperature + 1.5) / 3) * 100))
-          : undefined,
-    }));
+  const factors = contributorFactors({ contributors, weights, provisional, cases, extras, temperature });
   if (!factors.length) {
     return null;
   }
   const weakest = weights ? null : weakestFactor(factors);
-  const anyLearning = !!weights && factors.some((f) => f.provisional);
+  const anyLearning = !!weights && factors.some((f) => f.learning);
   const bandColors: Record<string, string> = {
     High: theme.anatomy.main,
     Moderate: theme.anatomy.secondary,
@@ -187,7 +144,7 @@ export function ContributorCard({
         </Stack>
         {weights && (
           <AppText variant="caption" tone="muted">
-            {factors.some((f) => f.score != null && !f.provisional)
+            {factors.some((f) => f.score != null && !f.learning)
               ? 'Each factor scored against your own baselines. Tap one to jump to what it means and how to move it.'
               : 'Computed from your own baselines, weighted by how much each factor moves recovery. Scroll down for what each one means.'}
           </AppText>
@@ -218,7 +175,7 @@ export function ContributorCard({
                 {guideFor(f.key) && <Icon name="forward" size={14} tone="muted" />}
               </Stack>
               <AppText variant="label">
-                {f.provisional
+                {f.learning
                   ? weights?.[f.key] != null
                     ? `${Math.round(weights[f.key] * 100)}% weight`
                     : 'Building baseline'
@@ -226,9 +183,9 @@ export function ContributorCard({
               </AppText>
             </Stack>
             <ProgressBar
-              value={f.provisional ? (f.weight ?? 0) : f.score! / 100}
+              value={f.learning ? (f.weight ?? 0) : f.score! / 100}
               color={
-                f.provisional
+                f.learning
                   ? undefined
                   : bandColors[scoreBand(f.score!).label]
               }

@@ -8,6 +8,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { act, createElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { ContributorDetail } from '../contributor-detail'
+import { ContributorDetails } from '../contributor-details'
 import { PROVISIONAL_BASELINE_NOTE, OURA_CONTRIBUTOR_NOTE, APPROXIMATE_CURVE_NOTE, SCORE_GAP_TEXT } from '@trainingai/shared/health/score-gap-copy'
 
 let root: Root | null = null
@@ -37,5 +38,24 @@ describe('ContributorDetail note by case', () => {
     const curve = text({ score: 64, provisional: true, gap: null })
     expect(curve).toContain(APPROXIMATE_CURVE_NOTE)
     expect(curve).not.toContain(PROVISIONAL_BASELINE_NOTE)
+  })
+})
+
+describe('ContributorDetails scores a real provisional factor (issue 3029)', () => {
+  function render(factor: { score: number; provisional: boolean; gap: unknown; scale?: unknown }) {
+    const el = document.createElement('div')
+    root = createRoot(el)
+    ;(globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true
+    act(() => root!.render(createElement(ContributorDetails, { factors: [{ key: 'hrvBalance', label: 'HRV', ...factor }] })))
+    return el.textContent ?? ''
+  }
+  it("shows the score and band for Oura's own reading, with its note", () => {
+    const out = render({ score: 72, provisional: true, gap: null, scale: 'oura_contributor' })
+    expect(out).toMatch(/· 72/)
+    expect(out).toContain(OURA_CONTRIBUTOR_NOTE)
+    expect(out).not.toContain('Learning')
+  })
+  it('shows no score while learning', () => {
+    expect(render({ score: 50, provisional: true, gap: 'awaiting_baseline' })).not.toMatch(/· 50/)
   })
 })

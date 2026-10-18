@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { scoreGapText, contributorNote, PROVISIONAL_BASELINE_NOTE, SCORE_GAP_TEXT } from '../score-gap-copy'
+import { scoreGapText, contributorNote, isLearningContributor, PROVISIONAL_BASELINE_NOTE, SCORE_GAP_TEXT } from '../score-gap-copy'
 import { scoreAverageChip } from '../score-average-chip'
 
 describe('scoreGapText', () => {
@@ -48,5 +48,22 @@ describe('contributorNote (#3016)', () => {
   it('stays silent for a scored contributor and falls back for a payload without gap', () => {
     expect(contributorNote({ provisional: false, gap: null })).toBeNull()
     expect(contributorNote({ provisional: true })).toBe(PROVISIONAL_BASELINE_NOTE)
+  })
+})
+
+describe('isLearningContributor (#3029)', () => {
+  it('is true while learning the baseline or with nothing recorded', () => {
+    expect(isLearningContributor({ provisional: true, gap: 'awaiting_baseline' })).toBe(true)
+    expect(isLearningContributor({ provisional: true, gap: 'no_input' })).toBe(true)
+  })
+  it('is false for a real score, provisional or not', () => {
+    expect(isLearningContributor({ provisional: false, gap: null })).toBe(false)
+    expect(isLearningContributor({ provisional: true, gap: null })).toBe(false)
+    expect(isLearningContributor({ provisional: true, gap: null, scale: 'oura_contributor' })).toBe(false)
+  })
+  it('keeps provisional\'s old meaning on a payload without gap', () => {
+    expect(isLearningContributor({ provisional: true })).toBe(true)
+    expect(isLearningContributor({ provisional: false })).toBe(false)
+    expect(isLearningContributor({})).toBe(false)
   })
 })

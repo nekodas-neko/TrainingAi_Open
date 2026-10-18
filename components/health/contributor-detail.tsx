@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react'
 import { guideFor } from '@trainingai/shared/health/contributor-guide'
 import { scoreBand } from '@trainingai/shared/health/score-band'
-import { contributorNote } from '@trainingai/shared/health/score-gap-copy'
+import { contributorNote, isLearningContributor } from '@trainingai/shared/health/score-gap-copy'
 
 /**
  * The tap-to-expand deep-dive shown under a contributor bar: what it measures, what it's
@@ -33,6 +33,7 @@ export function ContributorDetail({
   if (!guide) return null
 
   const band = score != null ? scoreBand(score) : null
+  const learning = isLearningContributor({ provisional, gap })
   const meaning = score != null && score < 50 ? guide.low : guide.high
 
   return (
@@ -53,7 +54,7 @@ export function ContributorDetail({
                 className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide"
                 style={{ background: `${band.color}22`, color: band.color }}
               >
-                {provisional ? 'Learning' : `${band.label} · ${score}/100`}
+                {learning ? 'Learning' : `${band.label} · ${score}/100`}
               </span>
             </p>
           )}
