@@ -134,7 +134,7 @@ export function SessionScreen({
           {session.prescriptionPending && (
             <Notice
               title="Preparing your workout"
-              message="The current prescription is still being prepared. Starting checks the backend again."
+              message="Your AI workout is still being prepared. Starting asks for it, and uses your program as written if it can't be made."
             />
           )}
           <Stack direction="row" justify="space-between">

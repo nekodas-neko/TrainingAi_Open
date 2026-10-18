@@ -3,31 +3,33 @@ import {
   expectedRpe as expectedSetRpe,
 } from '@trainingai/shared/ai-periodization/expected-rpe';
 import { computeRpeAdjustment } from '@trainingai/shared/ai-periodization/autoregulation';
+import {
+  MAX_BAR_KG,
+  barIsCapped,
+  initialSetWeight,
+  mroundStep,
+  mroundStepUp,
+  prescribedBar,
+  weightStepFor,
+} from '@trainingai/shared/workout/load-rounding';
 import type { ExercisePreview, SetPreview } from '../catalog';
 import type { WorkoutExercise, WorkoutRecord, WorkoutSet } from './workout';
 import { displayLoad } from './preferences';
 
 export function weightStep(equipment: string[] = []) {
-  return equipment.includes('barbell') ? 2.5 : 1.25;
+  return weightStepFor(equipment);
 }
 
 export function roundLoad(value: number, step: number, up = false) {
-  return Math.max(
-    5,
-    Math.min(250, (up ? Math.ceil(value / step) : Math.round(value / step)) * step),
-  );
+  return up ? mroundStepUp(value, step) : mroundStep(value, step);
 }
 
 export function prescribedWeight(
   exercise: Pick<ExercisePreview, 'exerciseType' | 'estimated1rm' | 'equipment'>,
   planned: SetPreview | null,
 ) {
-  return exercise.exerciseType === 'weighted' && exercise.estimated1rm && planned
-    ? roundLoad(
-        (exercise.estimated1rm * planned.percent) / 100,
-        weightStep(exercise.equipment),
-        true,
-      )
+  return exercise.exerciseType === 'weighted' && planned
+    ? prescribedBar(exercise.estimated1rm, planned.percent, exercise.equipment)
     : null;
 }
 
@@ -38,21 +40,7 @@ export function initialWeight(
   >,
   planned: SetPreview | null,
 ) {
-  if (exercise.exerciseType === 'bodyweight') {
-    return 0;
-  }
-  const prescribed = prescribedWeight(exercise, planned);
-  const step = weightStep(exercise.equipment);
-  if (prescribed !== null) {
-    return prescribed;
-  }
-  if (exercise.target80 !== null) {
-    return roundLoad(exercise.target80, step, true);
-  }
-  if (exercise.estimated1rm) {
-    return roundLoad(exercise.estimated1rm * 0.8, step, true);
-  }
-  return exercise.latestWeight === null ? 60 : roundLoad(exercise.latestWeight, step);
+  return initialSetWeight(exercise, prescribedWeight(exercise, planned));
 }
 
 export function expectedRpe(percent?: number, reps?: number) {
@@ -133,9 +121,9 @@ export function cappedTarget(
 ) {
   if (exercise.exerciseType === 'bodyweight' || !exercise.estimated1rm || !set.planned)
     return null;
-  const target = (exercise.estimated1rm * set.planned.percent) / 100;
-  const load = roundLoad(target, weightStep(exercise.equipment), true);
-  return target > load ? load : null;
+  return barIsCapped((exercise.estimated1rm * set.planned.percent) / 100)
+    ? MAX_BAR_KG
+    : null;
 }
 
 export function loadBasis(exercise: WorkoutExercise, set: WorkoutSet) {
