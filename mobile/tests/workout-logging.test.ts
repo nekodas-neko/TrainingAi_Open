@@ -16,7 +16,10 @@ import {
   mutationFor,
   readJournal,
 } from '../src/features/workouts/logging/workout.ts';
-import { WorkoutJournalStore } from '../src/features/workouts/logging/WorkoutJournalStore.ts';
+import {
+  PROGRAM_AS_WRITTEN,
+  WorkoutJournalStore,
+} from '../src/features/workouts/logging/WorkoutJournalStore.ts';
 import { workoutFlow } from '../src/features/workouts/logging/flow.ts';
 import {
   formatSetLoad,
@@ -486,27 +489,39 @@ test('workout day is pinned to account timezone across midnight and an offline c
   );
 });
 
-test('pending prescriptions poll briefly, then allow a fresh request after generation stalls', async (t) => {
+test('a pending prescription is requested, then read back before the workout starts', async (t) => {
   const f = await setup(t);
   const queries: unknown[] = [];
+  const posts: string[] = [];
   let pending = true;
   f.connection.get = async (_path, query) => {
     queries.push(query);
     return { ...f.response, aiPrescriptionPending: pending };
   };
-  assert.equal(await f.controller.start(f.session, programId), null);
-  f.clock(5_000);
-  assert.equal(await f.controller.start(f.session, programId), null);
-  f.clock(60_000);
-  assert.equal(await f.controller.start(f.session, programId), null);
-  pending = false;
+  f.connection.post = async (path) => {
+    posts.push(path);
+    // The server stores the program as written when the model fails (RV-202).
+    pending = false;
+    return {};
+  };
   assert.ok(await f.controller.start(f.session, programId));
-  assert.deepEqual(queries, [
-    { tab: f.session.id },
-    { tab: f.session.id, poll: '1' },
-    { tab: f.session.id },
-    { tab: f.session.id, poll: '1' },
-  ]);
+  assert.deepEqual(posts, [`/api/ai-periodization/session/${f.session.id}/prescribe`]);
+  assert.deepEqual(queries, [{ tab: f.session.id }, { tab: f.session.id, poll: '1' }]);
+  assert.equal(f.controller.getSnapshot().message, null);
+});
+
+test('a prescription that cannot be made starts from the program as written', async (t) => {
+  const f = await setup(t);
+  f.connection.get = async () => ({ ...f.response, aiPrescriptionPending: true });
+  f.connection.post = async () => {
+    throw new ApiError(429);
+  };
+  const id = await f.controller.start(f.session, programId);
+  assert.ok(id);
+  assert.equal(f.controller.getSnapshot().message, PROGRAM_AS_WRITTEN);
+  const workout = f.controller.getSnapshot().data.workouts.find((w) => w.id === id)!;
+  assert.equal(workout.fromSavedPlan, false);
+  assert.ok(workout.exercises.length > 0);
 });
 
 test('upload confirmation merges concurrent new-workout edits without losing local progress', async (t) => {

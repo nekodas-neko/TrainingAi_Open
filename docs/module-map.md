@@ -82,7 +82,7 @@ scheduled on the device.
 
 ---
 
-Shared profile summaries use `packages/shared/src/profile/measured-overview.ts` and `performance-overview.ts`; plate loading uses `packages/shared/src/workout/plate-loading.ts`. Both clients import these helpers.
+Shared profile summaries use `packages/shared/src/profile/measured-overview.ts` and `performance-overview.ts`; plate loading uses `packages/shared/src/workout/plate-loading.ts`; plate rounding (`weightStepFor`, `mroundStep`, `mroundStepUp`, `barIsCapped`) and a set's starting weight (`prescribedBar`, `initialSetWeight`) use `packages/shared/src/workout/load-rounding.ts` (#2995; `components/workout/utils.ts` re-exports them). Food `source` rules (`scanOriginToSource`, `sourceAfterEdit`, `lookupHitSource`) and the per-ingredient split (`ingredientsToEntries`) live in `packages/shared/src/nutrition/food-source.ts`, re-exported by `log-food.ts`. Both clients import these helpers.
 
 ## 1. Dates & timezones — `packages/shared/src/date-utils.ts`
 
