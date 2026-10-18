@@ -359,6 +359,8 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/handoffs/handoff-2026-10-18-app-shell-preview-device-review.md`](../../handoffs/handoff-2026-10-18-app-shell-preview-device-review.md)** — 2026-10-18, the Preview-against-the-current-app device review (#2882) over three days: every parity PR that shipped, the phone checks still owed, the runbook for a sitting and the traps (the floating Workout button swallowing taps, the current app's picture-in-picture window, a Back key that left the app).
+
 - **[`docs/handoffs/handoff-2026-09-26-app-shell-cat-collection-art.md`](../../handoffs/handoff-2026-09-26-app-shell-cat-collection-art.md)** — 2026-09-26, the drawn collection cats (BF-126) and the v2 rules plan (PS-48/49/50); pickup prompt for the Orchestrator and Lane A.
 
 - **[`2026-08-30-apk-banner-tap-target`](../../overview/history-2026-09-10-folded-3.md#2026-08-30-apk-banner-tap-target)**
