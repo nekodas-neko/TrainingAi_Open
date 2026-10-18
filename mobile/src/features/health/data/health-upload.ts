@@ -21,13 +21,15 @@ export function acknowledgedUpload<T extends Batch>(batch: T, reply: unknown): T
       accepted: z.number(),
       deleted: z.number(),
       deferred: z.array(z.string()).default([]),
+      // #2828 N3: records the server refused one by one. They are settled, not retried.
+      rejected: z.array(z.object({ id: z.string().nullable() })).default([]),
     })
     .parse(reply);
   const rows = 'samples' in batch ? batch.samples : batch.records;
   if (
     new Set(ack.deferred).size !== ack.deferred.length ||
     ack.deferred.some((id) => !rows.some((row) => row.id === id)) ||
-    ack.accepted + ack.deferred.length !== rows.length ||
+    ack.accepted + ack.deferred.length + ack.rejected.length !== rows.length ||
     ack.deleted !== batch.deleted.length
   )
     throw new Error('Health records were not confirmed');

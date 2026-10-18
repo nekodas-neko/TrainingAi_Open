@@ -1,4 +1,5 @@
 import { acknowledgedUpload, isDeferredUpload } from './health-upload';
+import { ApiError } from '../../account/api/client.ts';
 import { z } from 'zod';
 import {
   healthConnectBatch,
@@ -261,6 +262,17 @@ export class HealthConnectImportStore {
       try {
         reply = await this.connection.post('/api/health-connect/sync', item);
       } catch (error) {
+        // #2828 N3: a 400 is the server refusing this batch's shape, and it refuses it the same way
+        // every time. Left at the head of the queue it blocked every later upload for good, so it is
+        // dropped and counted as skipped. Any other failure keeps it for retry.
+        if (!('rebuild' in item) && error instanceof ApiError && error.status === 400) {
+          await this.write({
+            ...this.disk,
+            queue: this.disk.queue.slice(1),
+            skipped: this.disk.skipped + item.records.length + item.deleted.length,
+          });
+          continue;
+        }
         if (!('rebuild' in item)) throw error;
         await this.write({ ...this.disk, queue: [...this.disk.queue.slice(1), item] });
         this.publish({ error: 'Health records are saved. Summaries need another sync.' });
@@ -275,9 +287,12 @@ export class HealthConnectImportStore {
             : null
           : acknowledgedUpload(item, reply);
       if ('rebuild' in item) completed = completedSchema.parse(reply);
+      const refused =
+        'rebuild' in item ? 0 : ((reply as { rejected?: unknown[] }).rejected?.length ?? 0);
       await this.write({
         ...this.disk,
         queue: [...this.disk.queue.slice(1), ...(retry ? [retry] : [])],
+        skipped: this.disk.skipped + refused,
         completed,
         needsRebuild:
           this.disk.needsRebuild ||

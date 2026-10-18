@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { HealthConnectImportStore } from '../src/features/health/data/HealthConnectImportStore.ts';
+import { ApiError } from '../src/features/account/api/client.ts';
 import {
   healthConnectBatch,
+  splitHealthConnectBatch,
   type HealthConnectRecord,
 } from '@trainingai/shared/validation/health-connect-import';
 import { projectHealthConnect } from '@trainingai/shared/health/health-connect-projection';
@@ -338,4 +340,73 @@ test('a canceled import cannot write or upload a late native history result', as
   await pending;
   assert.equal(f.saved.get('health-connect-import.v1'), saved);
   assert.equal(f.uploads.length, 0);
+});
+
+test('#2828 N3: records the server refuses one by one are settled, and the good ones land', async () => {
+  const f = fixture();
+  const bad = { ...record, id: 'steps-bad', value: 150 };
+  f.rows([record, bad]);
+  const post = f.connection.post;
+  // The server of the day refuses what the phone's bundle still accepts (schema drift).
+  f.connection.post = async (path: string, body: unknown) => {
+    if ((body as { rebuild?: boolean }).rebuild) return post(path, body);
+    f.uploads.push(body);
+    const split = splitHealthConnectBatch(body)!;
+    const records = split.batch.records.filter((row) => row.value !== 150);
+    for (const row of records) f.remote.set(row.id, row);
+    return {
+      accepted: records.length,
+      deleted: split.batch.deleted.length,
+      deferred: [],
+      rejected: split.batch.records
+        .filter((row) => row.value === 150)
+        .map((row) => ({ id: row.id, reason: 'Invalid Health Connect measurement' })),
+    };
+  };
+  const store = f.make();
+  await store.setEnabled(true);
+  await store.run(true);
+  assert.equal(f.remote.get(record.id)?.value, 1200);
+  assert.equal(f.remote.has(bad.id), false);
+  assert.equal(store.getSnapshot().pending, 0);
+  assert.equal(store.getSnapshot().skipped, 1);
+});
+test('#2828 N3: a batch the server refuses with a 400 is dropped instead of blocking every later upload', async () => {
+  const f = fixture();
+  const post = f.connection.post;
+  let refuse = true;
+  f.connection.post = async (path: string, body: unknown) => {
+    if (refuse && !(body as { rebuild?: boolean }).rebuild) {
+      f.uploads.push(body);
+      throw new ApiError(400);
+    }
+    return post(path, body);
+  };
+  const store = f.make();
+  await store.setEnabled(true);
+  await store.run(true);
+  assert.equal(store.getSnapshot().pending, 0);
+  assert.equal(store.getSnapshot().skipped, 1);
+  assert.equal(JSON.parse(f.saved.get('health-connect-import.v1')!).queue.length, 0);
+  // A later reading still uploads: nothing is left wedged at the head of the queue.
+  refuse = false;
+  f.rows([{ ...record, id: 'steps-two' }]);
+  f.expire();
+  await store.run(true);
+  await store.run(true);
+  assert.equal(f.remote.get('steps-two')?.value, 1200);
+});
+test('a server failure other than a 400 keeps the batch for retry', async () => {
+  const f = fixture();
+  f.connection.post = async () => {
+    throw new ApiError(500);
+  };
+  const store = f.make();
+  await store.setEnabled(true);
+  await store.run(true);
+  assert.ok(store.getSnapshot().pending);
+  assert.equal(
+    JSON.parse(f.saved.get('health-connect-import.v1')!).queue[0].records[0].id,
+    record.id,
+  );
 });

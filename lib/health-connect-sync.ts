@@ -9,6 +9,7 @@ import type { HealthConnectPlugin } from '@devmaxime/capacitor-health-connect';
 import { intervalsToPhase5Min, type SleepStage, type StageInterval } from '@trainingai/shared/health/hypnogram';
 import { msToHHMMInTz, toAestDay, shiftDateStr, dateStrMidnightInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
+import { capitalize } from '@trainingai/shared/format/capitalize';
 
 // Verified against the pinned plugin source (RecordConverter.kt:390-400, v1.1.0) — those seven
 // strings are the complete set it can emit. SLEEPING and UNKNOWN are deliberately absent: they
@@ -89,10 +90,28 @@ const EXERCISE_TYPE_TO_ACTIVITY_TYPE: Record<string, string> = {
   EXERCISE_TYPE_YOGA: 'yoga',
   EXERCISE_TYPE_STRETCHING: 'stretch',
   EXERCISE_TYPE_HIGH_INTENSITY_INTERVAL_TRAINING: 'hiit',
+  // #2828 N6. A watch's gym session, which as 'other' was costed at the generic 6.0 MET cardio rate
+  // rather than strength training's. The `strength` row in `activity_types` comes with its own
+  // migration; until it lands `/api/sync-health` stores these as 'other', exactly as before.
+  EXERCISE_TYPE_STRENGTH_TRAINING: 'strength',
+  EXERCISE_TYPE_WEIGHTLIFTING: 'strength',
+  EXERCISE_TYPE_CALISTHENICS: 'strength',
 };
 
 export function mapExerciseTypeToActivityType(exerciseType: string): string {
   return EXERCISE_TYPE_TO_ACTIVITY_TYPE[exerciseType] ?? 'other';
+}
+
+/**
+ * #2828 N5. What an untitled session is called: the plugin's exercise-type constant in words, so
+ * `EXERCISE_TYPE_STRENGTH_TRAINING` reads "Strength training". The constants are the pinned
+ * converter's (`RecordConverter.kt`, `convertExerciseType`), whose fallbacks are
+ * `EXERCISE_TYPE_OTHER_WORKOUT` and `UNKNOWN_EXERCISE_TYPE`; both read "Workout".
+ */
+export function exerciseTypeLabel(exerciseType: string | undefined): string {
+  const words = (exerciseType ?? '').replace(/^EXERCISE_TYPE_/, '').toLowerCase().replace(/_/g, ' ').trim();
+  if (!words || words === 'other workout' || words === 'unknown exercise type') return 'Workout';
+  return capitalize(words);
 }
 
 interface SleepRecord {
@@ -511,8 +530,12 @@ export async function syncWindow(
       const { aggregates } = await HealthConnect.aggregateRecords({
         start: startIso, end: endIso, type: 'Distance', groupBy: 'day',
       });
-      for (const a of aggregates)
-        bucket(toLocalDate(a.startTime, tz)).distanceKm = Math.round((a.value / 1000) * 10) / 10;
+      // #2828 N7. The plugin reports a day with no records as 0 (`?: 0.0`), so a 0 is "nothing
+      // recorded" and writes nothing, as steps already did. Otherwise every day stamps 0 km.
+      for (const a of aggregates) {
+        const km = Math.round((a.value / 1000) * 10) / 10;
+        if (km > 0) bucket(toLocalDate(a.startTime, tz)).distanceKm = km;
+      }
     } catch { /* ignore */ }
   }
 
@@ -522,7 +545,11 @@ export async function syncWindow(
       const { aggregates } = await HealthConnect.aggregateRecords({
         start: startIso, end: endIso, type: 'TotalCaloriesBurned', groupBy: 'day',
       });
-      for (const a of aggregates) bucket(toLocalDate(a.startTime, tz)).caloriesBurned = Math.round(a.value);
+      // #2828 N7, as for distance.
+      for (const a of aggregates) {
+        const kcal = Math.round(a.value);
+        if (kcal > 0) bucket(toLocalDate(a.startTime, tz)).caloriesBurned = kcal;
+      }
     } catch { /* ignore */ }
   }
 
@@ -621,7 +648,7 @@ export async function syncWindow(
         const metrics = await getSessionMetrics(HealthConnect, canRead, r.startTime, r.endTime);
         exerciseSessions.push({
           date:         toLocalDate(r.startTime, tz),
-          title:        r.title || r.exerciseType || 'Workout',
+          title:        r.title?.trim() || exerciseTypeLabel(r.exerciseType),
           activityType: mapExerciseTypeToActivityType(r.exerciseType),
           ...sessionClockTimes(r.startTime, r.endTime, tz),
           durationMin:  Math.round(durationMin * 10) / 10,
@@ -718,6 +745,7 @@ export async function syncWindow(
   }
 
   let enrichmentCandidates: EnrichmentCandidate[] | undefined;
+  let dailyNote: string | undefined;
   let requests = 0;
   if (hasDaily) {
     requests += 1;
@@ -727,8 +755,18 @@ export async function syncWindow(
       body: JSON.stringify({ dailyMetrics, exerciseSessions, sleepRecords, ...(historyFrom ? { historyFrom } : {}) } satisfies SyncPayload),
     });
 
-    if (!res.ok) throw new Error(`sync-health ${res.status}: ${await res.text()}`);
-    ({ enrichmentCandidates } = await res.json() as { enrichmentCandidates?: EnrichmentCandidate[] });
+    if (res.ok) {
+      ({ enrichmentCandidates } = await res.json() as { enrichmentCandidates?: EnrichmentCandidate[] });
+    } else if (res.status === 400 || res.status === 413) {
+      // #2828 N3. The server refuses this payload the same way every time, so throwing here (before
+      // `onPosted`) re-sent it on every sync until its records aged out of the window, and skipped the
+      // heart-rate and interval uploads below each time. Bad records are now refused one by one, so
+      // only a payload whose shape is wrong gets here; it is noted and the sync moves on.
+      dailyNote = `daily payload refused (sync-health ${res.status})`;
+      console.warn(`[health-connect] ${dailyNote}: ${await res.text()}`);
+    } else {
+      throw new Error(`sync-health ${res.status}: ${await res.text()}`);
+    }
   }
 
   onPosted?.();
@@ -736,7 +774,7 @@ export async function syncWindow(
   const heartRate = await uploadSeries('heartRateSamples', heartRateSamples, HR_UPLOAD_CHUNK, HR_UPLOAD_MAX_CHUNKS, 'heart rate', 'samples', historyFrom);
   const intervals = await uploadSeries('activityIntervals', activityIntervals, INTERVAL_UPLOAD_CHUNK, INTERVAL_UPLOAD_MAX_CHUNKS, 'intervals', 'rows', historyFrom);
   requests += heartRate.requests + intervals.requests;
-  const note = [heartRate.note, intervals.note].filter(Boolean).join('; ');
+  const note = [dailyNote, heartRate.note, intervals.note].filter(Boolean).join('; ');
 
   if (enrichmentCandidates?.length) {
     // `tz`, not the default — this call is INSIDE `syncHealthConnect`, so the timezone the caller

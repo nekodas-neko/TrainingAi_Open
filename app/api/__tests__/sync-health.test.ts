@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const mockRepo = vi.hoisted(() => ({
   activityTypes: [] as { id: string }[],
   saveActivityLog: vi.fn(),
+  saveSleepSession: vi.fn(),
   upsertBodyMetrics: vi.fn(),
   upsertAggregatorHeartrate: vi.fn(),
   upsertHealthConnectIntervals: vi.fn(async (_u: string, rows: unknown[]) => rows.length),
@@ -19,7 +20,7 @@ vi.mock('@/lib/data', () => ({
     upsertAggregatorHeartrate: mockRepo.upsertAggregatorHeartrate,
     upsertHealthConnectIntervals: mockRepo.upsertHealthConnectIntervals,
     saveActivityLog: mockRepo.saveActivityLog,
-    saveSleepSession: vi.fn(),
+    saveSleepSession: mockRepo.saveSleepSession,
     listActivityLogs: vi.fn(async () => []),
     listActivityTypes: vi.fn(async () => mockRepo.activityTypes),
   })),
@@ -33,9 +34,15 @@ const post = (body: unknown) => POST(new NextRequest('http://x/api/sync-health',
 }))
 
 describe('POST /api/sync-health validation', () => {
-  it('400s when a daily metric has a non-numeric weight', async () => {
-    const res = await post({ dailyMetrics: [{ date: '2026-07-01', weightKg: 'heavy' }] })
-    expect(res.status).toBe(400)
+  // #2828 N3: field bounds are per record. A bad optional field is dropped and reported; the rest of
+  // the day still lands.
+  it('drops a non-numeric weight and keeps the rest of the day', async () => {
+    mockRepo.upsertBodyMetrics.mockClear()
+    const res = await post({ dailyMetrics: [{ date: '2026-07-01', weightKg: 'heavy', steps: 5000 }] })
+    expect(res.status).toBe(200)
+    expect((await res.json()).rejected).toEqual(['metrics 2026-07-01: dropped weightKg'])
+    const [rows] = mockRepo.upsertBodyMetrics.mock.calls[0].slice(1) as [Array<Record<string, unknown>>]
+    expect(rows[0]).toMatchObject({ date: '2026-07-01', steps: 5000, weightKg: undefined })
   })
 
   it('400s when the dailyMetrics array exceeds the item cap', async () => {
@@ -43,14 +50,27 @@ describe('POST /api/sync-health validation', () => {
     expect(res.status).toBe(400)
   })
 
-  it('400s on an out-of-range value (weight > 500)', async () => {
+  it('drops an out-of-range value (weight > 500) rather than failing the batch', async () => {
     const res = await post({ dailyMetrics: [{ date: '2026-07-01', weightKg: 9000 }] })
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(200)
+    expect((await res.json()).rejected).toEqual(['metrics 2026-07-01: dropped weightKg'])
   })
 
-  it('400s on an unknown extra field (strict)', async () => {
+  it('drops an unknown extra field (strict) and keeps the known ones', async () => {
     const res = await post({ dailyMetrics: [{ date: '2026-07-01', weightKg: 80, bogus: 1 }] })
-    expect(res.status).toBe(400)
+    expect(res.status).toBe(200)
+    expect((await res.json()).rejected).toEqual(['metrics 2026-07-01: dropped bogus'])
+  })
+
+  it('drops a record that is not an object, or has a bad date, and keeps its siblings', async () => {
+    mockRepo.upsertBodyMetrics.mockClear()
+    const res = await post({ dailyMetrics: ['junk', { date: 'soon', steps: 1 }, { date: '2026-07-02', steps: 2 }] })
+    expect(res.status).toBe(200)
+    const { rejected } = await res.json()
+    expect(rejected).toHaveLength(2)
+    expect(rejected[1]).toMatch(/^metrics soon: date /)
+    const [rows] = mockRepo.upsertBodyMetrics.mock.calls[0].slice(1) as [Array<Record<string, unknown>>]
+    expect(rows.map(r => r.date)).toEqual(['2026-07-02'])
   })
 
   it('400s on a non-JSON / null body (fail closed)', async () => {
@@ -348,5 +368,66 @@ describe('POST /api/sync-health — activityIntervals', () => {
     const res = await post({ activityIntervals: Array.from({ length: INTERVAL_UPLOAD_CHUNK + 1 }, (_, i) =>
       ({ kind: 'cadence_spm', startMs: t - i, endMs: t - i, value: 100, recordId: 'r' })) })
     expect(res.status).toBe(400)
+  })
+})
+
+// #2828 N3. Each trigger the audit named used to 400 the whole flush, and the phone re-sends the same
+// window on every sync, so one record blocked every later Health Connect write.
+describe('POST /api/sync-health — one bad record never sinks the batch (#2828 N3)', () => {
+  const good = { date: '2026-07-01', title: 'Walk', activityType: 'walk', startTime: '07:00', endTime: '07:30', durationMin: 30 }
+  const night = {
+    date: '2026-07-02', sleepStart: '2026-07-01T12:00:00.000Z', sleepEnd: '2026-07-01T20:00:00.000Z',
+    durationHours: 8, deepSleepHours: 1.5,
+  }
+  beforeEach(() => {
+    mockRepo.activityTypes = [{ id: 'walk' }, { id: 'other' }]
+    mockRepo.saveActivityLog.mockClear()
+    mockRepo.saveSleepSession.mockClear()
+  })
+
+  it('cuts a title over 200 characters to fit instead of refusing the session', async () => {
+    const res = await post({ exerciseSessions: [{ ...good, title: 'x'.repeat(260) }] })
+    expect(res.status).toBe(200)
+    expect(mockRepo.saveActivityLog.mock.calls[0][1].title).toHaveLength(200)
+  })
+
+  it('drops a session over 1,440 minutes and stores the good one beside it', async () => {
+    const res = await post({ exerciseSessions: [{ ...good, startTime: '09:00', durationMin: 2000 }, good] })
+    expect(res.status).toBe(200)
+    expect((await res.json()).rejected).toEqual([expect.stringMatching(/^exercise 2026-07-01: durationMin /)])
+    expect(mockRepo.saveActivityLog).toHaveBeenCalledTimes(1)
+    expect(mockRepo.saveActivityLog.mock.calls[0][1]).toMatchObject({ startTime: '07:00' })
+  })
+
+  it('drops a night over 24 h and stores the good one beside it', async () => {
+    const res = await post({ sleepRecords: [{ ...night, date: '2026-07-01', durationHours: 30 }, night] })
+    expect(res.status).toBe(200)
+    expect((await res.json()).rejected).toEqual([expect.stringMatching(/^sleep 2026-07-01: durationHours /)])
+    expect(mockRepo.saveSleepSession).toHaveBeenCalledTimes(1)
+    expect(mockRepo.saveSleepSession.mock.calls[0][1]).toMatchObject({ date: '2026-07-02' })
+  })
+
+  it('drops a hypnogram over 288 characters and keeps the night it belongs to', async () => {
+    const res = await post({ sleepRecords: [{ ...night, sleepPhase5Min: '2'.repeat(300) }] })
+    expect(res.status).toBe(200)
+    expect((await res.json()).rejected).toEqual(['sleep 2026-07-02: dropped sleepPhase5Min'])
+    expect(mockRepo.saveSleepSession.mock.calls[0][1]).toMatchObject({ durationHours: 8, sleepPhase5Min: undefined })
+  })
+
+  it('lands every good record across all three arrays when each has a bad sibling', async () => {
+    mockRepo.upsertBodyMetrics.mockClear()
+    const res = await post({
+      dailyMetrics: [{ date: '2026-07-01', steps: 300_000 }, { date: '2026-07-02', steps: 4000 }],
+      exerciseSessions: [{ ...good, durationMin: -1 }, good],
+      sleepRecords: [{ ...night, sleepEnd: '' }, night],
+    })
+    expect(res.status).toBe(200)
+    expect((await res.json()).rejected).toHaveLength(3)
+    expect(mockRepo.upsertBodyMetrics.mock.calls[0][1]).toEqual([
+      expect.objectContaining({ date: '2026-07-01', steps: undefined }),
+      expect.objectContaining({ date: '2026-07-02', steps: 4000 }),
+    ])
+    expect(mockRepo.saveActivityLog).toHaveBeenCalledTimes(1)
+    expect(mockRepo.saveSleepSession).toHaveBeenCalledTimes(1)
   })
 })

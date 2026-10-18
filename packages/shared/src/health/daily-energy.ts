@@ -24,12 +24,16 @@ import { estSessionKcal, estWorkoutKcal, MAX_PLAUSIBLE_SESSION_MIN, type Intensi
 // client component — BF-87 took the Nutrition tab to a 500 importing it for a line of copy.
 export { SEDENTARY_MULTIPLIER, STEP_BASE_CREDIT, WALKING_CADENCE_SPM, STEPS_PER_KM } from './energy-baseline'
 import { WALKING_CADENCE_SPM, STEPS_PER_KM } from './energy-baseline'
+import { DEFAULT_ACTIVITY_ID } from './workout-activities'
 
 
 // App activityType string → Oura MET-table id (`energy-expenditure-features.json` activity_type_dict).
 const ACTIVITY_TYPE_TO_OURA_ID: Record<string, number> = {
   walk: 14, run: 12, treadmill: 14, hike: 21, cycle: 5, swim: 13,
   row: 11, elliptical: 7, hiit: 30, yoga: 15, stretch: 49,
+  // #2828 N6: a Health Connect strength session, costed as strength training rather than the
+  // generic cardio fallback.
+  strength: DEFAULT_ACTIVITY_ID,
 }
 const DEFAULT_ACTIVITY_OURA_ID = 79 // "cardiovascular exercise" (MET 6.0) — generic fallback
 
