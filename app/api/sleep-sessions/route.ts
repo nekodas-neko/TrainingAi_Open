@@ -41,7 +41,6 @@ export async function GET() {
     avgHeartRate:    r.avgHeartRate    ?? null,
     lowestHeartRate: r.lowestHeartRate ?? null,
     restlessPeriods: r.restlessPeriods ?? null,
-    sleepScore:      r.sleepScore      ?? null,
     respiratoryRate: r.respiratoryRate ?? null,
     sleepPhase5Min:  r.sleepPhase5Min  ?? null,
     sleepStart:      r.sleepStart.toISOString(),

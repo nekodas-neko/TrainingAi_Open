@@ -13,7 +13,12 @@ export function NextPrescription() {
             <AppText variant="label">{data.sessionName}</AppText>
             {data.source === 'pending' && (
               <AppText variant="micro" tone="muted">
-                Your next prescription is still being prepared.
+                Your next plan is made when you start.
+              </AppText>
+            )}
+            {data.source === 'driving' && data.prescriptionSource === 'rules' && (
+              <AppText variant="micro" tone="muted">
+                From your program as written: the AI coach couldn't be reached.
               </AppText>
             )}
             {data.exercises?.map((exercise) => (

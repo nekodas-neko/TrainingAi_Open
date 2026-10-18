@@ -61,7 +61,8 @@ describe.skipIf(!canRun)('sleep_session push offline-sync (A3 server)', () => {
     const row = await sleepRow()
     expect(row?.oura_id).toBe(OURA_ID)
     expect(Number(row?.average_hrv_ms)).toBeCloseTo(44)
-    expect(row?.sleep_score).toBe(84)
+    // #3011: a pushed session score is not stored; ours lives in oura_daily_derived.
+    expect(row?.sleep_score).toBeNull()
     expect(row?.source_map?.average_hrv_ms).toBe('oura_ble')
   })
 

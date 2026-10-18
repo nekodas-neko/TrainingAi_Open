@@ -281,6 +281,7 @@ export async function GET(req: NextRequest) {
   const sleepRow = nights.length
     ? nights.reduce((best, n) => ((n.durationHours ?? 0) > (best.durationHours ?? 0) ? n : best))
     : undefined;
+  const derived = scoresRes.status === "fulfilled" ? scoresRes.value : null;
   const sleep: DaySleep | null = sleepRow
     ? {
         durationHours:   sleepRow.durationHours   ?? null,
@@ -293,14 +294,15 @@ export async function GET(req: NextRequest) {
         averageHrvMs:    sleepRow.averageHrvMs    ?? null,
         avgHeartRate:    sleepRow.avgHeartRate    ?? null,
         lowestHeartRate: sleepRow.lowestHeartRate ?? null,
-        sleepScore:      sleepRow.sleepScore      ?? null,
+        // Our score for the day (`oura_daily_derived`), never `sleep_sessions.sleep_score`, which
+        // can only ever hold Oura's (#3011).
+        sleepScore:      derived?.sleepScore      ?? null,
         sleepStart:      sleepRow.sleepStart ? sleepRow.sleepStart.toISOString() : null,
         sleepEnd:        sleepRow.sleepEnd   ? sleepRow.sleepEnd.toISOString()   : null,
         sleepPhase5Min:  sleepRow.sleepPhase5Min  ?? null,
       }
     : null;
 
-  const derived = scoresRes.status === "fulfilled" ? scoresRes.value : null;
   const scores: DayScores | null = derived
     ? { readiness: derived.readinessScore, sleep: derived.sleepScore, activity: derived.activityScore }
     : null;

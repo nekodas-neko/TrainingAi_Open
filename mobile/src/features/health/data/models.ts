@@ -94,8 +94,8 @@ export const sleepSchema = z
       'avgHeartRate',
       'lowestHeartRate',
       'respiratoryRate',
-      'sleepScore',
     ] as const),
+    // No `sleepScore` (#3011): a night's stored score could only be Oura's.
     sleepPhase5Min: text,
     manualEntry: z.boolean().optional(),
     provisional: z.boolean().optional(),

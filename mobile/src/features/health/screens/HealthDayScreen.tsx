@@ -123,7 +123,7 @@ export function HealthDayScreen({
             },
             {
               label: 'Sleep',
-              value: data?.scores?.sleep ?? data?.sleep?.sleepScore,
+              value: data?.scores?.sleep,
               color: theme.tones.sleep.foreground,
             },
             {

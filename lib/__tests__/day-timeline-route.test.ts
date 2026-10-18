@@ -162,10 +162,13 @@ describe('/api/day-timeline — sleep', () => {
   })
 
   // The session's own score outranks both — it is the row the night was scored on.
-  it('lets the session\'s own sleep score win over either', async () => {
+  // #3011: a session's own `sleep_score` could only be Oura's, so ours wins and it is never a fallback.
+  it('shows our sleep score, never the session\'s own', async () => {
     listSleepSessions.mockResolvedValue([sleep({ sleepScore: 91 })])
     getOuraDailyDerived.mockResolvedValue([{ day: DAY, readinessScore: 82, sleepScore: 79 }])
-    expect((await eventsOf('wakeup'))[0].sleepScore).toBe(91)
+    expect((await eventsOf('wakeup'))[0].sleepScore).toBe(79)
+    getOuraDailyDerived.mockResolvedValue([])
+    expect((await eventsOf('wakeup'))[0].sleepScore).toBeUndefined()
   })
 
   it('reports the onset latency in minutes on the fell-asleep event', async () => {

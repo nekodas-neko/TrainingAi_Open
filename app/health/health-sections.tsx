@@ -88,7 +88,6 @@ export interface SleepRow {
   avgHeartRate: number | null;
   lowestHeartRate: number | null;
   restlessPeriods: number | null;
-  sleepScore: number | null;
   respiratoryRate: number | null;
   sleepPhase5Min: string | null;
   sleepStart: string | null;
@@ -119,7 +118,6 @@ export interface HealthSectionsCtx {
   setWaterLogOpen: (v: boolean) => void;
   recentSleep: SleepRow | null;
   sleepNightLabel: string;
-  lastSleep: SleepRow | null;
   readiness: ReadinessScoreResponse | null;
   todayWaterMl: number | null;
   waterGoalMl: number;
@@ -167,7 +165,7 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
   const {
     metaLoading, metaToday, metaRecent, latestWeight, latestWeightIsStale, latestWeightDate, latestBf, latestSteps,
     latestDistanceKm, targetWeightKg, targetBfPct, openInfo, toggleInfo, openLog,
-    setMetricSheet, setWaterLogOpen, recentSleep, sleepNightLabel, lastSleep, readiness,
+    setMetricSheet, setWaterLogOpen, recentSleep, sleepNightLabel, readiness,
     todayWaterMl, waterGoalMl, activeEnergyKcalToday, bmi, bmiLabel, bmiUsesBf, latestBfIsCorrected,
     weightTrendKgPerWeek, energyBalance, trainingLoad, sleepCorr, injuries,
     setInjuries, userId, recoveryMuscles, handleDayClick, weeklyStats, weeklyStatsError, retryWeeklyStats,
@@ -406,7 +404,6 @@ export function getHealthSections(ctx: HealthSectionsCtx) {
         <SleepCard
           key="sleep"
           recentSleep={recentSleep}
-          lastSleep={lastSleep}
           nightLabel={sleepNightLabel}
           computedSleepScore={readiness?.sleepScore ?? null}
           sleepScoreCoverage={readiness?.sleepScoreCoverage ?? null}

@@ -4,6 +4,7 @@ import { getRepository } from "@/lib/data";
 import { DEFAULT_TZ } from "@trainingai/shared/date-utils";
 import { prescriptionDrivesLoad, prescriptionStyleForExercise } from "@trainingai/shared/ai-periodization/apply-prescription";
 import { normalizeStoredPrescription } from "@trainingai/shared/ai-periodization/reconcile-prescription";
+import { isAiPrescriptionPending } from "@trainingai/shared/ai-periodization/prescription-pending";
 import { resolveBodyweightStyle, resolveWorkingBasis } from "@trainingai/shared/1rm";
 import { mroundStepUp, weightStepFor } from "@/components/workout/utils";
 import { rateLimit } from "@/lib/rate-limit";
@@ -26,9 +27,13 @@ export interface NextSessionPrescriptionResponse {
   isRestDay: boolean;
   sessionName?: string;
   // 'driving' = a stored AI prescription is in effect; 'static' = the exercise's base
-  // progression style; 'pending' = an ai_dynamic program with no usable stored
-  // prescription yet.
+  // progression style; 'pending' = an ai_dynamic program whose next plan is made when the
+  // session is opened: none is stored yet, or the stored one was consumed
+  // (`isAiPrescriptionPending`, the same test /api/workout-data uses, #3007).
   source?: 'driving' | 'static' | 'pending';
+  // While driving: where the stored plan's numbers came from, as /api/workout-data's
+  // `prescriptionSource`. 'rules' = the model failed and the program as written was stored (RV-202).
+  prescriptionSource?: 'model' | 'rules';
   exercises?: NextSessionExercisePreview[];
 }
 
@@ -92,9 +97,12 @@ export async function GET() {
   const drives = isAiDynamic && prescription != null && periodization != null
     && prescriptionDrivesLoad(prescription.phaseAction, periodization.prescriptionStatus);
 
+  // An ai_dynamic program has no phase rows, so its baseline is this pair alone (workout-data).
+  const isBaselinePhase = periodization?.phase === 'baseline' && !periodization.baselineComplete;
+  const pending = prescription == null || isAiPrescriptionPending(periodization, { isAiDynamic, isBaselinePhase });
   const source: NextSessionPrescriptionResponse['source'] = !isAiDynamic
     ? 'static'
-    : drives ? 'driving' : (prescription == null ? 'pending' : 'static');
+    : drives ? 'driving' : (pending ? 'pending' : 'static');
 
   const droppedThisCycle = new Set(drives ? (prescription!.droppedExerciseIds ?? []) : []);
 
@@ -149,6 +157,7 @@ export async function GET() {
     isRestDay: false,
     sessionName: programSession.name,
     source,
+    ...(drives && prescription!.source ? { prescriptionSource: prescription!.source } : {}),
     exercises,
   } satisfies NextSessionPrescriptionResponse, { headers: CACHE_HEADERS });
 }

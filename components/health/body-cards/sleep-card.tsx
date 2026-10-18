@@ -13,12 +13,10 @@ import { sleepCoverageNote } from "@trainingai/shared/health/sleep-coverage-note
 
 interface Props {
   recentSleep: SleepRow | null;
-  lastSleep: SleepRow | null;
   /** Which night the card shows (`pickSleepCardNight` label), so the date is never a guess. */
   nightLabel: string;
   /** Today's computed sleep score from /api/readiness-score — the same number the
-   *  Home chip shows. The stored sleep_sessions.sleep_score is Cloud-only (NULL on
-   *  BLE nights) and is kept only as a fallback. */
+   *  Home chip shows, and the only score the card shows (#3011). */
   computedSleepScore: number | null;
   /** OR-204: how complete the computed score's inputs were; null for a fallback score. */
   sleepScoreCoverage?: SleepScoreCoverage | null;
@@ -28,7 +26,7 @@ interface Props {
 
 // The Body tab's Sleep card — extracted from health-sections.tsx (Task 4.4) as a
 // pure move, no behaviour change.
-export function SleepCard({ recentSleep, lastSleep, nightLabel, computedSleepScore, sleepScoreCoverage, metaLoading, onOpenSheet }: Props) {
+export function SleepCard({ recentSleep, nightLabel, computedSleepScore, sleepScoreCoverage, metaLoading, onOpenSheet }: Props) {
   const userTz = useUserTimezone();
   const router = useTransitionRouter();
   // Warm the detail route before it's tapped — see oura-score-chip-row.
@@ -77,7 +75,7 @@ export function SleepCard({ recentSleep, lastSleep, nightLabel, computedSleepSco
               same thing six times. */}
           {recentSleep?.provisional && <ProvisionalBadge />}
           {(() => {
-            const badgeScore = computedSleepScore ?? lastSleep?.sleepScore ?? null;
+            const badgeScore = computedSleepScore;
             return badgeScore != null ? (
               <span className="text-sm font-bold px-2 py-0.5 rounded-full" style={{ background: 'rgba(139,92,246,0.2)', color: '#8b5cf6' }}>
                 {badgeScore}

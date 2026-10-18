@@ -35,7 +35,7 @@ test('Apple sleep uses one measured night across overlapping sources and exclude
   assert.equal(night.lightSleepHours, 4);
   assert.equal(night.remSleepHours, 1.5);
   assert.equal(night.awakHours, 0.5);
-  assert.equal(night.sleepScore, null);
+  assert.equal((night as Record<string, unknown>).sleepScore ?? null, null);
   assert.equal(night.localOnly, true);
   assert.equal(night.sources?.length, 2);
   assert.equal(night.sleepPhase5Min?.slice(0, 24), '1'.repeat(24));
@@ -54,7 +54,7 @@ test('generic sleep has no fabricated stage values or score, and daytime shift s
   assert.equal(night.remSleepHours, null);
   assert.equal(night.lightSleepHours, null);
   assert.equal(night.sleepPhase5Min, null);
-  assert.equal(night.sleepScore, null);
+  assert.equal((night as Record<string, unknown>).sleepScore ?? null, null);
   const daytime = appleSleepNights([row(12, 18)], 'Australia/Brisbane', start + 20 * 3_600_000);
   assert.equal(daytime[0].durationHours, 6);
 });

@@ -21,11 +21,10 @@ export function BodySleepCard({ openDetail }: { openDetail: (detail: HealthDetai
   // Same rule and caption as the current app's card (issue 2906): the canonical latest night when
   // dated today or yesterday, with its date named.
   const { night: lastNight, label: nightLabel } = pickSleepCardNight(health.sleep, health.today, health.timezone);
-  const newest = health.sleep[0];
-  // The computed score is the number Home shows; the stored one is only a fallback.
-  const computed = readiness.data?.sleepScore ?? null;
-  const score = computed ?? lastNight?.sleepScore ?? newest?.sleepScore ?? null;
-  const note = computed !== null ? sleepCoverageNote(readiness.data?.sleepScoreCoverage) : null;
+  // Our computed score, the number Home shows, and nothing else: a night's stored `sleepScore` could
+  // only be Oura's (#3011).
+  const score = readiness.data?.sleepScore ?? null;
+  const note = score !== null ? sleepCoverageNote(readiness.data?.sleepScoreCoverage) : null;
   const range = sleepTimeRange(lastNight ?? undefined, health.timezone);
   const chips = lastNight ? sleepChips(lastNight) : null;
   return (

@@ -6,7 +6,7 @@ const row = (o: Partial<SleepRow> & { date: string; sleepStart: string; sleepEnd
   ouraId: null, durationHours: null, deepSleepHours: null, remSleepHours: null,
   lightSleepHours: null, awakHours: null, efficiency: null, onsetLatencySec: null,
   averageHrvMs: null, avgHeartRate: null, lowestHeartRate: null, restlessPeriods: null,
-  sleepScore: null, respiratoryRate: null, sleepPhase5Min: null, sleepTimeRecommendation: null,
+  respiratoryRate: null, sleepPhase5Min: null, sleepTimeRecommendation: null,
   ...o,
 })
 

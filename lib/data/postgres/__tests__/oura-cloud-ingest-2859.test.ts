@@ -56,7 +56,7 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
 
   beforeEach(async () => {
     for (const t of ['oura_daily', 'body_metrics', 'sleep_sessions', 'oura_workouts', 'oura_heartrate', 'oura_tokens',
-      'oura_cloud_sleep_periods', 'oura_cloud_daily', 'oura_sessions']) {
+      'oura_cloud_sleep_periods', 'oura_cloud_daily', 'oura_sessions', 'oura_raw_samples']) {
       await pool.query(`DELETE FROM ${t} WHERE user_id = $1`, [USER])
     }
     await repo.saveOuraCloudTokens(USER, {
@@ -208,6 +208,62 @@ describe.skipIf(!canRun)('Oura Cloud ingest into Postgres (#2859)', () => {
     expect(out).toEqual({ written: 0, skippedOverlap: 1 })
     const rows = (await pool.query(`SELECT oura_id, duration_hours FROM sleep_sessions WHERE user_id = $1 AND deleted_at IS NULL`, [USER])).rows
     expect(rows).toEqual([{ oura_id: 'ble:1', duration_hours: 7.1 }])
+  })
+
+  // #2998. The ring's last frame sets the switch day (`getOuraCloudSwitchDay`): one frame received at
+  // local midday on `day`. The frame is test-only; the assertions only count the archive.
+  const lastRingFrameOn = (day: string) => pool.query(
+    `INSERT INTO oura_raw_samples (user_id, ring_timestamp_ds, tag, event_name, body_hex, epoch, recorded_at)
+     VALUES ($1, 1, 1, 'test', '00', 0, ($2::date + time '12:00') AT TIME ZONE 'Australia/Brisbane')`, [USER, day])
+  // The ring's partial night on the switch day: it stopped sending at 00:15, mid-night.
+  const partialRingNight = { ouraId: 'ble:partial', date: DAY, sleepStart: new Date('2026-10-09T12:34:00Z'), sleepEnd: new Date('2026-10-09T14:15:00Z'), durationHours: 1.6 }
+  const cloudSleep = async () => {
+    const { mapOuraDocuments, SleepDoc } = await import('@/lib/oura/cloud/documents')
+    return mapOuraDocuments([{ type: 'sleep', doc: SleepDoc.parse(sleepPeriod) }]).sleep
+  }
+  const nights = async () => (await pool.query(
+    `SELECT oura_id, deleted_at IS NOT NULL AS gone FROM sleep_sessions WHERE user_id = $1 ORDER BY oura_id`, [USER])).rows
+
+  it('lets Oura\'s night replace a partial ring night on the switch day, and the ring cannot take it back (#2998)', async () => {
+    await lastRingFrameOn(DAY)
+    const before = await rawArchiveCount()
+    await repo.upsertOuraSleep(USER, [partialRingNight], 'oura_ble')
+
+    expect(await repo.upsertOuraCloudSleep(USER, await cloudSleep())).toEqual({ written: 1, skippedOverlap: 0 })
+    // The ring's night is tombstoned, not deleted, so a device that holds it learns it is gone.
+    expect(await nights()).toEqual([{ oura_id: 'ble:partial', gone: true }, { oura_id: 'sl-1', gone: false }])
+
+    // A Redecode re-rolls the same frames: the ring's night stays down beside Oura's.
+    const client = await import('@/lib/data/postgres/client')
+    const { createPostgresRollupIO } = await import('@/lib/data/postgres/rollup-io')
+    const io = createPostgresRollupIO({
+      db: client.getDb(), userId: USER,
+      getOuraClockAnchor: async () => null, getOuraClockAnchors: async () => [], upsertBodyMetrics: async () => {},
+      getBodyFatCalibration: async () => null, refitDaytimeHrvModel: async () => {}, listSleepSessions: async () => [],
+    })
+    await io.upsertSleepSessions([partialRingNight])
+    await io.tombstoneBleSleepSessionsExcept([DAY], [partialRingNight.sleepStart])
+    expect(await nights()).toEqual([{ oura_id: 'ble:partial', gone: true }, { oura_id: 'sl-1', gone: false }])
+
+    // Oura re-sending the night changes nothing.
+    expect(await repo.upsertOuraCloudSleep(USER, await cloudSleep())).toEqual({ written: 1, skippedOverlap: 0 })
+    expect(await nights()).toEqual([{ oura_id: 'ble:partial', gone: true }, { oura_id: 'sl-1', gone: false }])
+    expect(await rawArchiveCount()).toBe(before)
+  })
+
+  it('keeps the ring\'s night before the switch day (#2998)', async () => {
+    await lastRingFrameOn('2026-10-11')
+    await repo.upsertOuraSleep(USER, [partialRingNight], 'oura_ble')
+    expect(await repo.upsertOuraCloudSleep(USER, await cloudSleep())).toEqual({ written: 0, skippedOverlap: 1 })
+    expect(await nights()).toEqual([{ oura_id: 'ble:partial', gone: false }])
+  })
+
+  it('still lets a manual night block Oura\'s on the switch day (#2998)', async () => {
+    await lastRingFrameOn(DAY)
+    await pool.query(
+      `INSERT INTO sleep_sessions (user_id, date, sleep_start, sleep_end, duration_hours, manual_entry)
+       VALUES ($1, $2, '2026-10-09T12:00:00Z', '2026-10-09T20:00:00Z', 8, true)`, [USER, DAY])
+    expect(await repo.upsertOuraCloudSleep(USER, await cloudSleep())).toEqual({ written: 0, skippedOverlap: 1 })
   })
 
   it('follows a period Oura moved to a new start, and tombstones one Oura deleted', async () => {

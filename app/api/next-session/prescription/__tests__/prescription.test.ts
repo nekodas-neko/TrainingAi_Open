@@ -14,7 +14,7 @@ const getLastRealOneRmBatch = vi.fn(async () => new Map<string, { estimated1rm: 
 const listPersonalRecords = vi.fn(async () => new Map())
 // Q-5: the route resolves the working basis from logs + PRs + user-entered estimates.
 const getExerciseEstimates = vi.fn(async () => [] as { exerciseName: string; estimated1rm: number }[])
-const getSessionPeriodization = vi.fn(async () => null)
+const getSessionPeriodization = vi.fn(async (): Promise<Record<string, unknown> | null> => null)
 
 // Repo methods that mutate state — the endpoint must be a pure read, so none of
 // these should ever be invoked.
@@ -106,6 +106,44 @@ describe('GET /api/next-session/prescription', () => {
     const res = await GET()
     const body = await res.json()
     expect(body.source).toBe('pending')
+  })
+
+  // #3007: an ordinary completion leaves the old plan stored with status 'consumed'; /api/workout-data
+  // calls that pending (isAiPrescriptionPending), so this preview must too.
+  it('returns source "pending" when a completed session consumed the stored prescription', async () => {
+    const sess = session('sess-1', 'Push', [{ id: 'ex-1', exerciseName: 'Bench Press' }])
+    const prog = { id: 'prog-1', phaseMode: 'ai_dynamic', sessions: [sess] }
+    getNextSession.mockResolvedValue({ isRestDay: false, session: sess, reason: '', program: prog })
+    getSessionPeriodization.mockResolvedValue({
+      phase: 'accumulation', baselineComplete: true,
+      prescriptionStatus: 'consumed', prescriptionGeneratedAt: new Date(), prescriptionExpiresAt: null,
+      prescription: {
+        phase: 'accumulation', phaseAction: 'stay', deload: false, reasoning: '', confidence: 1,
+        estimatedSessionDurationMin: 45, weeklyVolumeContribution: {},
+        exercises: [{ sessionExerciseId: 'ex-1', name: 'Bench Press', sets: 3, reps: 5, pct: 85, restSec: 120 }],
+      },
+    })
+    const body = await (await GET()).json()
+    expect(body.source).toBe('pending')
+    expect(body.prescriptionSource).toBeUndefined()
+  })
+
+  it('says a driving plan came from the program as written when the model failed (RV-202)', async () => {
+    const sess = session('sess-1', 'Push', [{ id: 'ex-1', exerciseName: 'Bench Press' }])
+    const prog = { id: 'prog-1', phaseMode: 'ai_dynamic', sessions: [sess] }
+    getNextSession.mockResolvedValue({ isRestDay: false, session: sess, reason: '', program: prog })
+    getSessionPeriodization.mockResolvedValue({
+      phase: 'accumulation', baselineComplete: true,
+      prescriptionStatus: 'pending', prescriptionGeneratedAt: new Date(), prescriptionExpiresAt: null,
+      prescription: {
+        phase: 'accumulation', phaseAction: 'stay', deload: false, reasoning: '', confidence: 1, source: 'rules',
+        estimatedSessionDurationMin: 45, weeklyVolumeContribution: {},
+        exercises: [{ sessionExerciseId: 'ex-1', name: 'Bench Press', sets: 3, reps: 5, pct: 85, restSec: 120 }],
+      },
+    })
+    const body = await (await GET()).json()
+    expect(body.source).toBe('driving')
+    expect(body.prescriptionSource).toBe('rules')
   })
 
   it('returns source "driving" and applies the stored prescription\'s pct/reps/rest', async () => {

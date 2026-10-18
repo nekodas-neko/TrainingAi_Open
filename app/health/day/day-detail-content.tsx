@@ -218,7 +218,7 @@ export function DayDetailContent({ initialDate, tz, userId }: { initialDate: str
         <div className="flex">
           <ScoreCell Icon={Zap} label="Ready" value={s?.readiness ?? null} accent="#60a5fa" first />
           <ScoreCell Icon={HeartPulse} label="HR" value={data?.bodyMeta?.restingHeartRate ?? null} accent="#f87171" first={false} />
-          <ScoreCell Icon={Moon} label="Sleep" value={s?.sleep ?? data?.sleep?.sleepScore ?? null} accent="#a78bfa" first={false} />
+          <ScoreCell Icon={Moon} label="Sleep" value={s?.sleep ?? null} accent="#a78bfa" first={false} />
           <ScoreCell Icon={Flame} label="Move" value={s?.activity ?? null} accent="#f97316" first={false} />
         </div>
       </div>
