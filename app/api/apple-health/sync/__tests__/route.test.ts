@@ -52,3 +52,73 @@ it('projects with the account timezone and keeps database failure details out of
   expect(await response.text()).not.toContain('private connection');
   expect(mocks.report).toHaveBeenCalledOnce();
 });
+
+// #3045: one bad sample is refused with its reason and the good ones still land; only a body that is
+// not a batch at all is a 400.
+it('#3045: one out-of-range sample is refused with its reason and the good ones still land', async () => {
+  const id = (n: number) => `50000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
+  const good = {
+    id: id(1),
+    start: '2026-01-01T00:00:00Z',
+    end: '2026-01-01T01:00:00Z',
+    value: 4000,
+    sourceName: 'Watch',
+    sourceBundleId: 'com.apple.health',
+  };
+  const tooMany = { ...good, id: id(2), value: 250_000 };
+  const overCap = { ...good, id: id(3), value: 900 }; // a valid sample, over a weight's 500 kg ceiling
+  const noId = { ...good, id: 'not-a-uuid' };
+  mocks.apply.mockResolvedValue({ accepted: 1, deleted: 1 });
+  const response = await POST(
+    request({
+      type: 'HKQuantityTypeIdentifierStepCount',
+      samples: [tooMany, good, noId, good],
+      deleted: [id(9)],
+    }),
+  );
+  expect(response.status).toBe(200);
+  const json = await response.json();
+  expect(json).toMatchObject({ accepted: 1, deleted: 1, deferred: [] });
+  expect(json.rejected.map((row: { id: string | null }) => row.id)).toEqual([id(2), null, id(1)]);
+  expect(json.rejected[2].reason).toBe('Duplicate record identity');
+  expect(mocks.apply).toHaveBeenCalledWith(
+    userId,
+    { type: 'HKQuantityTypeIdentifierStepCount', samples: [good], deleted: [id(9)] },
+    'Australia/Brisbane',
+  );
+  mocks.apply.mockClear();
+
+  // The per-type ceiling, which lived in the batch refinement, is now judged per sample.
+  const weight = await POST(
+    request({ type: 'HKQuantityTypeIdentifierBodyMass', samples: [overCap], deleted: [] }),
+  );
+  expect((await weight.json()).rejected).toEqual([
+    { id: id(3), reason: 'Invalid measurement value' },
+  ]);
+  const sleep = await POST(
+    request({
+      type: 'HKCategoryTypeIdentifierSleepAnalysis',
+      samples: [{ ...good, value: 2.5 }],
+      deleted: [],
+    }),
+  );
+  expect((await sleep.json()).rejected).toEqual([
+    { id: id(1), reason: 'Invalid measurement value' },
+  ]);
+});
+
+it('#3045: a body that is not a batch is still a 400', async () => {
+  for (const body of [
+    { type: 'HKQuantityTypeIdentifierStepCount', samples: 'x', deleted: [] },
+    { type: 'HKQuantityTypeIdentifierStepCount', samples: [], deleted: ['nope'] },
+    { type: 'HKQuantityTypeIdentifierStepCount', samples: [], deleted: [], extra: 1 },
+  ]) {
+    expect((await POST(request(body))).status).toBe(400);
+  }
+  const twice = '50000000-0000-4000-8000-000000000009';
+  expect(
+    (await POST(request({ type: 'HKQuantityTypeIdentifierStepCount', samples: [], deleted: [twice, twice] })))
+      .status,
+  ).toBe(400);
+  expect(mocks.apply).not.toHaveBeenCalled();
+});
