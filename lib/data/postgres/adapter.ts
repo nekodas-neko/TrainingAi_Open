@@ -2135,7 +2135,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // null since the 2026-07-07 re-key. Computed once and reused for BOTH the scoring engine and
       // the signals block below, so the "Why this?" explain page shows the same number the
       // recommendation was actually computed from (W3 §3.2 — the signals read the dead column).
-      const liveReadiness = liveReadinessForDay(todayIso, derivedRows)
+      const liveReadiness = liveReadinessForDay(todayIso, derivedRows, ouraRows)
 
       // Live temp deviation (from the derived summary), never the frozen Cloud columns (dead
       // since the 2026-07-07 re-key). Cloud stays an explicit pre-re-key fallback only. Computed

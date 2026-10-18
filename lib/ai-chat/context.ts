@@ -123,7 +123,7 @@ export function buildRecoverySummary(
   const lines: string[] = ['## Recovery & Wellness']
 
   // Readiness is the own BLE-derived composite; the frozen Cloud readinessScore is never narrated.
-  const readinessMap = liveReadinessByDay(derived)
+  const readinessMap = liveReadinessByDay(derived, ouraRows)
   const ouraToday = ouraRows.find(r => r.date === todayIso) ?? null
   const todayReadiness = readinessMap.get(todayIso) ?? null
   // BLE-first temp deviation, appended even when today has no Oura row. The frozen Cloud value

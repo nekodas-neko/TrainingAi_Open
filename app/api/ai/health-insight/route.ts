@@ -109,7 +109,7 @@ export async function POST(req: Request) {
     const latestIllness = latestIllnessFromDerived(derivedRows)
     // Readiness is the own BLE-derived composite (contributors still come from the derived row),
     // never the frozen Cloud score the Health screen no longer shows (F8).
-    const readinessMap = liveReadinessByDay(derivedRows)
+    const readinessMap = liveReadinessByDay(derivedRows, ouraRows)
     const todayReadiness = readinessMap.get(date) ?? (todayOura ? readinessMap.get(todayOura.date) ?? null : null)
     const todayDerived = derivedRows.find(r => r.day === date) ?? derivedRows[derivedRows.length - 1] ?? null
     // No cast. The derived row's contributors are `{score, input, gap, provisional}` objects and

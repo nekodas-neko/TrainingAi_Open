@@ -26,7 +26,7 @@ import {
   staleTrainingStressDays,
   TRAINING_STRESS_RECHECK_DAYS,
 } from '@trainingai/shared/health/training-stress-recheck';
-import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite';
+import { BASELINE_MIN_NIGHTS, storedReadinessLearning } from '@trainingai/shared/health/readiness-composite';
 import { isOwnReadinessSource } from '@trainingai/shared/health/live-readiness';
 import { resolveDayMetPerMinute } from '@trainingai/shared/health/met-input';
 import { ouraIdForActivityType } from '@trainingai/shared/health/daily-energy';
@@ -144,7 +144,11 @@ async function evaluateTrainingStressDay(
   const derived = derivedRows[0] ?? null;
   // Readiness must be our own composite, whatever device fed it (#2992), never Oura's own score.
   const readiness = isOwnReadinessSource(derived?.readinessSource) ? derived!.readinessScore : null;
-  const readinessProvisional = (summaryRows[0]?.nHistory ?? 0) < BASELINE_MIN_NIGHTS;
+  // #2992: learning is read from our stored composite's own contributors, so an Oura Cloud day (no
+  // ring summary) is judged on its own normals. Rows that cannot say keep the ring-summary rule.
+  const readinessProvisional =
+    storedReadinessLearning(derived?.readinessContributors) ??
+    (summaryRows[0]?.nHistory ?? 0) < BASELINE_MIN_NIGHTS;
 
   // Weight stays the day's own; only the resting heart rate borrows from earlier days (#2401).
   const latestBm = bodyMetrics.filter((m) => m.date === date).at(-1) ?? null;

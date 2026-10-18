@@ -52,10 +52,11 @@ export async function computeWeeklyDigestMetrics(
   const priorWeekEndIso = formatInTimeZone(new Date(recapWeekStart.getTime() - 1), tz, 'yyyy-MM-dd')
   const from14dIso = formatInTimeZone(priorWeekStart, tz, 'yyyy-MM-dd')
 
-  const [sessions, bodyMetrics, sleepSessions, weekPrs, derivedRows, exerciseLibrary] = await Promise.all([
+  const [sessions, bodyMetrics, sleepSessions, ouraRows, weekPrs, derivedRows, exerciseLibrary] = await Promise.all([
     repo.getWorkoutSessionsFrom(userId, priorWeekStart),
     repo.listBodyMetrics(userId, from14dIso, recapWeekEndIso),
     repo.listSleepSessions(userId, from14dIso, recapWeekEndIso),
+    repo.getOuraDaily(userId, from14dIso, recapWeekEndIso),
     repo.listRecentPersonalRecords(userId, recapWeekStart, recapWeekEnd),
     repo.getOuraDailyDerived(userId, from14dIso, recapWeekEndIso),
     repo.listExerciseLibrary(),
@@ -152,7 +153,7 @@ export async function computeWeeklyDigestMetrics(
   // Readiness: the app's own BLE-derived composite (the frozen Cloud column is dead since the
   // 2026-07-07 re-key, so the digest's readiness line silently vanished — F8). Recap-week avg vs
   // the week before.
-  const readinessByDay = liveReadinessByDay(derivedRows)
+  const readinessByDay = liveReadinessByDay(derivedRows, ouraRows)
   const readinessEntries = [...readinessByDay.entries()]
   const readinessOf = (from: string, to: string) =>
     meanOrNull(readinessEntries.filter(([d]) => d >= from && d <= to).map(([, v]) => v))
