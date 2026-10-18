@@ -4,7 +4,7 @@ import { auth } from '@/auth';
 import { getRepository } from '@/lib/data';
 import { rateLimit } from '@/lib/rate-limit';
 import { readJsonLimited } from '@trainingai/shared/http/request-guards';
-import { healthConnectBatch } from '@trainingai/shared/validation/health-connect-import';
+import { splitHealthConnectBatch } from '@trainingai/shared/validation/health-connect-import';
 import { reportServerError } from '@/lib/observability';
 export async function POST(request: NextRequest) {
   const session = await auth();
@@ -23,11 +23,13 @@ export async function POST(request: NextRequest) {
     typeof body.body === 'object' &&
     Object.keys(body.body).length === 1 &&
     (body.body as { rebuild?: unknown }).rebuild === true;
-  const batch = rebuild ? null : healthConnectBatch.safeParse(body.body);
-  if (!rebuild && !batch?.success)
+  // #2828 N3: records are judged one at a time, so a bad one is refused with its reason and the rest
+  // still land. Only a body that is not a batch at all is a 400.
+  const batch = rebuild ? null : splitHealthConnectBatch(body.body);
+  if (!rebuild && !batch)
     return NextResponse.json({ error: 'Invalid health records' }, { status: 400 });
-  const deferred = batch?.success
-    ? batch.data.records
+  const deferred = batch
+    ? batch.batch.records
         .filter(
           (row) =>
             Date.parse(row.end) > Date.now() + 300000 ||
@@ -35,15 +37,15 @@ export async function POST(request: NextRequest) {
         )
         .map((row) => row.id)
     : [];
-  const valid = batch?.success
-    ? { ...batch.data, records: batch.data.records.filter((row) => !deferred.includes(row.id)) }
+  const valid = batch
+    ? { ...batch.batch, records: batch.batch.records.filter((row) => !deferred.includes(row.id)) }
     : null;
   try {
     const repo = await getRepository();
     const result = rebuild
       ? await repo.rebuildHealthConnect(userId, session.user.timezone ?? DEFAULT_TZ)
       : await repo.applyHealthConnectBatch(userId, valid!, session.user.timezone ?? DEFAULT_TZ);
-    return NextResponse.json(rebuild ? result : { ...result, deferred });
+    return NextResponse.json(rebuild ? result : { ...result, deferred, rejected: batch!.rejected });
   } catch (error) {
     reportServerError(error, { userId, url: '/api/health-connect/sync' });
     return NextResponse.json({ error: 'Could not sync health records' }, { status: 500 });

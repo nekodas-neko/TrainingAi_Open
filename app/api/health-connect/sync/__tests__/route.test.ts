@@ -79,7 +79,46 @@ it('defers future records without losing valid uploads and rejects malformed bat
     end: '2026-01-01T00:00:00Z',
     modifiedAt: '2026-01-01T00:00:00Z',
   };
-  expect((await POST(request({ records: [past, past], deleted: [] }))).status).toBe(400);
+  // #2828 N3: a duplicate keeps its first copy and refuses the second, rather than failing both.
+  const duplicate = await POST(request({ records: [past, past], deleted: [] }));
+  expect(duplicate.status).toBe(200);
+  expect((await duplicate.json()).rejected).toEqual([
+    { id: past.id, reason: 'Duplicate health record identity' },
+  ]);
+  expect(mocks.apply).toHaveBeenCalledWith(
+    userId,
+    { records: [past], deleted: [] },
+    'Australia/Brisbane',
+  );
+  mocks.apply.mockClear();
+  expect((await POST(request({ records: [], deleted: ['a', 'a'] }))).status).toBe(400);
+  expect((await POST(request({ records: 'nope', deleted: [] }))).status).toBe(400);
   expect((await POST(request({ junk: 'x'.repeat(2 * 1024 * 1024) }))).status).toBe(413);
   expect(mocks.apply).not.toHaveBeenCalled();
+});
+
+it('#2828 N3: one out-of-range record is refused with its reason and the good ones still land', async () => {
+  const good = {
+    id: 'weight-ok',
+    type: 'Weight',
+    value: 70,
+    sourcePackage: 'com.test.scale',
+    recordingMethod: 2,
+    start: '2026-01-01T00:00:00Z',
+    end: '2026-01-01T00:00:00Z',
+    modifiedAt: '2026-01-01T00:00:00Z',
+  };
+  const heavy = { ...good, id: 'weight-bad', value: 900 };
+  const noId = { ...good, id: '' };
+  mocks.apply.mockResolvedValue({ accepted: 1, deleted: 1 });
+  const response = await POST(request({ records: [heavy, good, noId], deleted: ['gone'] }));
+  expect(response.status).toBe(200);
+  const json = await response.json();
+  expect(json).toMatchObject({ accepted: 1, deleted: 1, deferred: [] });
+  expect(json.rejected.map((row: { id: string | null }) => row.id)).toEqual(['weight-bad', null]);
+  expect(mocks.apply).toHaveBeenCalledWith(
+    userId,
+    { records: [good], deleted: ['gone'] },
+    'Australia/Brisbane',
+  );
 });

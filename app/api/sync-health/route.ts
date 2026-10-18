@@ -47,49 +47,99 @@ const HHMM_RE = /^\d{2}:\d{2}$/;
 // SyncPayload TS shape (`number | undefined`), so downstream mappers are unchanged.
 const num = (max: number, min = 0) => z.number().min(min).max(max).optional();
 const int = (max: number, min: number) => z.number().int().min(min).max(max).optional();
+// #2828 N3. The three record arrays are judged one record at a time (`usableRecords`), so these
+// schemas are applied per row, never to the batch.
+const DailyMetricSchema = z.object({
+  date:             z.string().regex(DATE_RE),
+  steps:            int(200_000, 0),
+  distanceKm:       num(500),
+  caloriesBurned:   num(20_000),
+  activeCalories:   num(20_000),
+  weightKg:         num(500),
+  bodyFatPct:       num(100),
+  calories:         num(20_000),
+  proteinG:         num(2_000),
+  carbsG:           num(2_000),
+  fatG:             num(2_000),
+  restingHeartRate: int(300, 20),
+  hrvMs:            num(1_000),
+  spo2Pct:          num(100),
+}).strict();
+const MAX_TITLE_LEN = 200;
+const ExerciseSessionSchema = z.object({
+  date:           z.string().regex(DATE_RE),
+  // A Health Connect title is free text from whichever app wrote it, so a long one is cut to fit
+  // the column rather than costing the session.
+  title:          z.string().trim().min(1).transform(t => t.slice(0, MAX_TITLE_LEN)),
+  activityType:   z.string().min(1).max(100),
+  startTime:      z.string().regex(HHMM_RE),
+  endTime:        z.string().regex(HHMM_RE),
+  durationMin:    z.number().min(0).max(1_440),
+  distanceKm:     num(500),
+  caloriesBurned: num(20_000),
+  avgHr:          int(300, 20),
+  maxHr:          int(300, 20),
+}).strict();
+const SleepRecordSchema = z.object({
+  date:            z.string().regex(DATE_RE),
+  sleepStart:      z.string().min(1),
+  sleepEnd:        z.string().min(1),
+  durationHours:   z.number().min(0).max(24),
+  deepSleepHours:  num(24),
+  remSleepHours:   num(24),
+  lightSleepHours: num(24),
+  awakHours:       num(24),
+  // 5-min stage codes, one char per bucket. 288 chars = 24 h, the plausibility ceiling for a
+  // single session — anything longer is malformed, not a long night.
+  sleepPhase5Min:  z.string().regex(/^[1-4]+$/).max(288).optional(),
+}).strict();
+
+/**
+ * #2828 N3. The rows of one record array that can be stored. A row the schema refuses used to fail
+ * the whole request with a 400, and since the phone re-sends the same window on every sync, one bad
+ * record blocked every Health Connect write until it aged out of the window. Now a bad optional
+ * field is dropped and the rest of its row kept; a bad required field drops that row only. Either
+ * way the reason goes into `rejected`.
+ */
+function usableRecords<S extends z.ZodObject>(
+  rows: unknown[] | undefined, schema: S, label: string, rejected: string[],
+): z.output<S>[] {
+  const out: z.output<S>[] = [];
+  for (const raw of rows ?? []) {
+    const date = (raw as { date?: unknown } | null)?.date;
+    const name = `${label} ${typeof date === 'string' ? date.slice(0, 10) : 'with no date'}`;
+    let parsed = schema.safeParse(raw);
+    if (!parsed.success && raw && typeof raw === 'object' && !Array.isArray(raw)) {
+      const fields = new Set<string>();
+      let wholeRow = false;
+      for (const issue of parsed.error.issues) {
+        if (issue.code === 'unrecognized_keys') issue.keys.forEach(k => fields.add(k));
+        else if (typeof issue.path[0] === 'string') fields.add(issue.path[0]);
+        else wholeRow = true;
+      }
+      // Unknown keys and optional fields can go; a required one takes the row with it.
+      const shape = schema.shape as Record<string, z.ZodType>;
+      const droppable = !wholeRow && fields.size > 0
+        && [...fields].every(k => !(k in shape) || shape[k].safeParse(undefined).success);
+      if (droppable) {
+        const trimmed = { ...(raw as Record<string, unknown>) };
+        for (const k of fields) delete trimmed[k];
+        const retry = schema.safeParse(trimmed);
+        if (retry.success) rejected.push(`${name}: dropped ${[...fields].join(', ')}`);
+        parsed = retry;
+      }
+    }
+    if (parsed.success) out.push(parsed.data);
+    else rejected.push(`${name}: ${parsed.error.issues.map(i => `${i.path.join('.') || 'record'} ${i.message}`).join('; ')}`);
+  }
+  return out;
+}
+
 const SyncHealthSchema = z.object({
   source: z.enum(['health_connect', 'apple_health']).default('health_connect'),
-  dailyMetrics: z.array(z.object({
-    date:             z.string().regex(DATE_RE),
-    steps:            int(200_000, 0),
-    distanceKm:       num(500),
-    caloriesBurned:   num(20_000),
-    activeCalories:   num(20_000),
-    weightKg:         num(500),
-    bodyFatPct:       num(100),
-    calories:         num(20_000),
-    proteinG:         num(2_000),
-    carbsG:           num(2_000),
-    fatG:             num(2_000),
-    restingHeartRate: int(300, 20),
-    hrvMs:            num(1_000),
-    spo2Pct:          num(100),
-  }).strict()).max(MAX_ITEMS).optional(),
-  exerciseSessions: z.array(z.object({
-    date:           z.string().regex(DATE_RE),
-    title:          z.string().min(1).max(200),
-    activityType:   z.string().min(1).max(100),
-    startTime:      z.string().regex(HHMM_RE),
-    endTime:        z.string().regex(HHMM_RE),
-    durationMin:    z.number().min(0).max(1_440),
-    distanceKm:     num(500),
-    caloriesBurned: num(20_000),
-    avgHr:          int(300, 20),
-    maxHr:          int(300, 20),
-  }).strict()).max(MAX_ITEMS).optional(),
-  sleepRecords: z.array(z.object({
-    date:            z.string().regex(DATE_RE),
-    sleepStart:      z.string().min(1),
-    sleepEnd:        z.string().min(1),
-    durationHours:   z.number().min(0).max(24),
-    deepSleepHours:  num(24),
-    remSleepHours:   num(24),
-    lightSleepHours: num(24),
-    awakHours:       num(24),
-    // 5-min stage codes, one char per bucket. 288 chars = 24 h, the plausibility ceiling for a
-    // single session — anything longer is malformed, not a long night.
-    sleepPhase5Min:  z.string().regex(/^[1-4]+$/).max(288).optional(),
-  }).strict()).max(MAX_ITEMS).optional(),
+  dailyMetrics:     z.array(z.unknown()).max(MAX_ITEMS).optional(),
+  exerciseSessions: z.array(z.unknown()).max(MAX_ITEMS).optional(),
+  sleepRecords:     z.array(z.unknown()).max(MAX_ITEMS).optional(),
   // Intraday HR, one entry per sample at the source's own resolution (never resampled). Structural
   // bounds only: `at` is capped so `new Date(at)` cannot go Invalid at the driver; range and clock
   // are filtered per sample below.
@@ -190,7 +240,7 @@ export async function POST(req: NextRequest) {
   const pastFloorMs = (now: number) => Math.min(now - HR_PAST_TOLERANCE_MS, importFloorMs ?? Infinity);
 
   // ── Body metrics (weight, body fat, steps, distance, calories, macros) ────
-  const usableMetrics = (body.dailyMetrics ?? []).filter(d => {
+  const usableMetrics = usableRecords(body.dailyMetrics, DailyMetricSchema, 'metrics', rejected).filter(d => {
     const reason = unusableDay(d.date);
     if (reason) rejected.push(`metrics ${d.date}: ${reason}`);
     return !reason;
@@ -218,7 +268,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Exercise sessions (deduplicate on date+startTime) ─────────────────────
-  const usableSessions = (body.exerciseSessions ?? []).filter(s => {
+  const usableSessions = usableRecords(body.exerciseSessions, ExerciseSessionSchema, 'exercise', rejected).filter(s => {
     const reason = unusableDay(s.date);
     if (reason) rejected.push(`exercise ${s.date} ${s.startTime}: ${reason}`);
     return !reason;
@@ -262,8 +312,9 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Sleep sessions (dedup handled by UNIQUE(user_id, sleep_start)) ────────
-  if (body.sleepRecords?.length) {
-    for (const s of body.sleepRecords) {
+  const sleepRecords = usableRecords(body.sleepRecords, SleepRecordSchema, 'sleep', rejected);
+  if (sleepRecords.length) {
+    for (const s of sleepRecords) {
       const dayReason = unusableDay(s.date);
       if (dayReason) { rejected.push(`sleep ${s.date}: ${dayReason}`); continue; }
       const sleepStart = new Date(s.sleepStart);

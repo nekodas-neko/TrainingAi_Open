@@ -93,3 +93,47 @@ export const healthConnectBatch = z
   });
 export type HealthConnectRecord = z.infer<typeof healthConnectRecord>;
 export type HealthConnectBatch = z.infer<typeof healthConnectBatch>;
+
+/** The outer shape of a native batch, with each record left to be judged on its own. */
+const healthConnectEnvelope = z
+  .object({ records: z.array(z.unknown()).max(100), deleted: z.array(id).max(500) })
+  .strict();
+export type HealthConnectRejection = { id: string | null; reason: string };
+
+/**
+ * #2828 N3. Splits a `/api/health-connect/sync` body into the records that can be stored and the ones
+ * that cannot, with a reason each. Judging the batch as a whole meant one record the server's schema
+ * refused (a newer server than the phone's bundle, say) failed all of it with a 400, and the phone
+ * retried that same head-of-queue batch forever. Only a body that is not a batch at all is `null`.
+ * A duplicate id keeps its first copy, and a record also listed in `deleted` is refused, so what
+ * comes back always passes `healthConnectBatch`.
+ */
+export function splitHealthConnectBatch(
+  body: unknown,
+): { batch: HealthConnectBatch; rejected: HealthConnectRejection[] } | null {
+  const envelope = healthConnectEnvelope.safeParse(body);
+  if (!envelope.success || new Set(envelope.data.deleted).size !== envelope.data.deleted.length)
+    return null;
+  const deleted = new Set(envelope.data.deleted);
+  const seen = new Set<string>();
+  const records: HealthConnectRecord[] = [];
+  const rejected: HealthConnectRejection[] = [];
+  for (const raw of envelope.data.records) {
+    const parsed = healthConnectRecord.safeParse(raw);
+    if (!parsed.success) {
+      const rawId = (raw as { id?: unknown } | null)?.id;
+      rejected.push({
+        id: typeof rawId === 'string' && id.safeParse(rawId).success ? rawId : null,
+        reason: parsed.error.issues[0]?.message ?? 'Invalid Health Connect measurement',
+      });
+    } else if (seen.has(parsed.data.id)) {
+      rejected.push({ id: parsed.data.id, reason: 'Duplicate health record identity' });
+    } else if (deleted.has(parsed.data.id)) {
+      rejected.push({ id: parsed.data.id, reason: 'Record is also deleted in this batch' });
+    } else {
+      seen.add(parsed.data.id);
+      records.push(parsed.data);
+    }
+  }
+  return { batch: { records, deleted: envelope.data.deleted }, rejected };
+}

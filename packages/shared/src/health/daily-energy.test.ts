@@ -27,6 +27,10 @@ describe('daily-energy', () => {
     expect(ouraIdForActivityType(null)).toBe(79)
   })
 
+  it('#2828 N6: costs a strength activity as strength training, not the cardio fallback', () => {
+    expect(ouraIdForActivityType('strength')).toBe(8)
+  })
+
   it('returns zeros when the profile is incomplete (never fabricates)', () => {
     const r = computeActiveEnergy({
       profile: { ageYears: null, weightKg: 82.5, sex: 'male' },

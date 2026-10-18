@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mapExerciseTypeToActivityType, HC_SYNC_READ_TYPES, HC_ENRICH_READ_TYPES, toLocalDate, hourInTz, localDateTimeToIso, syncWindowIso, sessionClockTimes } from '../health-connect-sync'
+import { mapExerciseTypeToActivityType, exerciseTypeLabel, HC_SYNC_READ_TYPES, HC_ENRICH_READ_TYPES, toLocalDate, hourInTz, localDateTimeToIso, syncWindowIso, sessionClockTimes } from '../health-connect-sync'
 
 describe('mapExerciseTypeToActivityType', () => {
   it('maps known Health Connect exercise types to activity_types slugs', () => {
@@ -14,6 +14,12 @@ describe('mapExerciseTypeToActivityType', () => {
     expect(mapExerciseTypeToActivityType('EXERCISE_TYPE_YOGA')).toBe('yoga')
     expect(mapExerciseTypeToActivityType('EXERCISE_TYPE_STRETCHING')).toBe('stretch')
     expect(mapExerciseTypeToActivityType('EXERCISE_TYPE_HIGH_INTENSITY_INTERVAL_TRAINING')).toBe('hiit')
+  })
+
+  it('#2828 N6: maps a watch\'s strength, weightlifting and calisthenics sessions to strength', () => {
+    expect(mapExerciseTypeToActivityType('EXERCISE_TYPE_STRENGTH_TRAINING')).toBe('strength')
+    expect(mapExerciseTypeToActivityType('EXERCISE_TYPE_WEIGHTLIFTING')).toBe('strength')
+    expect(mapExerciseTypeToActivityType('EXERCISE_TYPE_CALISTHENICS')).toBe('strength')
   })
 
   it('falls back to "other" for unrecognized exercise types', () => {
@@ -159,5 +165,19 @@ describe('#2438 — Health Connect builds and formats instants in the USER\'s ti
     const { startTime } = sessionClockTimes('2026-03-01T21:30:00.000Z', '2026-03-01T22:15:00.000Z', NEW_YORK)
     const date = toLocalDate('2026-03-01T21:30:00.000Z', NEW_YORK)
     expect(localDateTimeToIso(date, startTime, NEW_YORK)).toBe('2026-03-01T21:30:00.000Z')
+  })
+})
+
+describe('#2828 N5 — an untitled session gets a readable name', () => {
+  it('turns the plugin constant into words', () => {
+    expect(exerciseTypeLabel('EXERCISE_TYPE_STRENGTH_TRAINING')).toBe('Strength training')
+    expect(exerciseTypeLabel('EXERCISE_TYPE_RUNNING_TREADMILL')).toBe('Running treadmill')
+  })
+
+  it('calls the converter\'s fallbacks, and nothing at all, a workout', () => {
+    expect(exerciseTypeLabel('EXERCISE_TYPE_OTHER_WORKOUT')).toBe('Workout')
+    expect(exerciseTypeLabel('UNKNOWN_EXERCISE_TYPE')).toBe('Workout')
+    expect(exerciseTypeLabel('')).toBe('Workout')
+    expect(exerciseTypeLabel(undefined)).toBe('Workout')
   })
 })
