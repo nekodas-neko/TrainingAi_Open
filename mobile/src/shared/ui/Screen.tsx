@@ -61,7 +61,7 @@ export function Screen({
             </AppText>
           )}
           <AppText
-            variant={compact ? 'heading' : 'title'}
+            variant={compact ? 'heading' : 'pageTitle'}
             numberOfLines={compact ? 1 : undefined}
             style={compact ? { flexShrink: 1 } : undefined}
           >

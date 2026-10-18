@@ -35,7 +35,7 @@ export function TrainingCalendarCard({ openDay }: { openDay: (date: string) => v
   });
   return (
     <Card>
-      <AppText variant="heading" accessibilityRole="header">
+      <AppText variant="groupTitle" tone="muted" accessibilityRole="header">
         Training Calendar
       </AppText>
       <MonthCalendar

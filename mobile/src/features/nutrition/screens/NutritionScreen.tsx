@@ -224,6 +224,7 @@ export function NutritionScreen({
     <PageLayout
       landing
       title="Nutrition"
+      titleVariant="nutritionTitle"
       actions={
         <>
           <NutritionStatus date={date} />

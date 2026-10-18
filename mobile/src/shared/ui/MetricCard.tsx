@@ -70,7 +70,7 @@ export function MetricCard({
       >
         {icon && <Icon name={icon} color={color} size={theme.sizes.iconSmall} />}
         <AppText
-          variant="caption"
+          variant="cardTitle"
           style={{ color, flexShrink: 1, textAlign: centered ? 'center' : 'left' }}
           numberOfLines={2}
         >

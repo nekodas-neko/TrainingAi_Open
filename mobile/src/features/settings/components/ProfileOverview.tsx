@@ -116,7 +116,7 @@ export function ProfileOverview({
   });
   return (
     <>
-      <AppText variant="heading">What the app has measured</AppText>
+      <AppText variant="subheading">What the app has measured</AppText>
       <AppText variant="caption" tone="muted">
         The latest reading of each metric and when it was taken.
       </AppText>
@@ -168,7 +168,7 @@ export function ProfileOverview({
             ))}
         </Card>
       )}
-      <AppText variant="heading">Tests and scans</AppText>
+      <AppText variant="subheading">Tests and scans</AppText>
       <StatusIndicator
         label="Tests and scans"
         busy={rmr.refreshing || dexa.refreshing || tests.refreshing}
@@ -186,7 +186,7 @@ export function ProfileOverview({
       {openBaselines && (
         <AppButton title="Fitness baselines" variant="ghost" onPress={openBaselines} />
       )}
-      <AppText variant="heading">Lifting</AppText>
+      <AppText variant="subheading">Lifting</AppText>
       <StrengthScreen embedded section="records" onBack={() => {}} />
     </>
   );

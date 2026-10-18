@@ -100,7 +100,7 @@ function TrendChartCard({
   return (
     <Card>
       <Stack direction="row" justify="space-between" align="center">
-        <AppText variant="heading" accessibilityRole="header" style={{ flex: 1 }}>
+        <AppText variant="eyebrow" tone="muted" accessibilityRole="header" style={{ flex: 1 }}>
           {title}
         </AppText>
         {status}

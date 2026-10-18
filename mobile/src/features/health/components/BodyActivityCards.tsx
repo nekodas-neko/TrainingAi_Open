@@ -321,7 +321,7 @@ export function RingCards({ openDetail }: { openDetail: (detail: HealthDetail) =
   const change = weekOverWeekChange(days.map((day) => day.wornHours));
   return (
     <>
-      <AppText variant="heading" accessibilityRole="header" style={{ marginTop: theme.spacing.sm }}>
+      <AppText variant="groupTitle" tone="muted" accessibilityRole="header" style={{ marginTop: theme.spacing.sm }}>
         Ring
       </AppText>
       <Card>

@@ -104,7 +104,7 @@ export function FoodLoggingComplete({
           <AppText variant="caption" tone="muted">
             <AppText
               variant="caption"
-              style={{ fontWeight: theme.typography.label.fontWeight }}
+              style={{ fontWeight: theme.typography.subheading.fontWeight }}
             >
               {progress.count}
             </AppText>{' '}

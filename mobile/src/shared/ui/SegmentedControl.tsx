@@ -105,7 +105,7 @@ export function SegmentedControl<T extends string>({
               !animated && value === option.value ? theme.colors.brandSurface : 'transparent',
           }}
         >
-          <AppText variant="label" tone={value === option.value ? 'brand' : 'muted'}>
+          <AppText variant="subheading" tone={value === option.value ? 'brand' : 'muted'}>
             {option.label}
           </AppText>
         </Pressable>
