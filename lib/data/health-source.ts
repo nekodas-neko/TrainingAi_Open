@@ -15,6 +15,7 @@
 
 import { sql, type SQL } from 'drizzle-orm'
 import { HEALTH_SOURCES, SOURCE_RANK, sourceRank, type HealthSource } from '@trainingai/shared/health/source-rank'
+import { isCalendarDate } from '@trainingai/shared/date-utils'
 
 // The ladder itself lives in `@trainingai/shared/health/source-rank` — driver-free, because the
 // Oura rollup reads it and has to be able to run outside Node. Re-exported here so the six existing
@@ -43,27 +44,55 @@ function storedRankSql(table: string, col: string): string {
 }
 
 /**
+ * #2985: the stored rank as the per-day switch rule sees it. From the user's switch to the Oura API
+ * (`ouraCloudFrom`, the local day the connection was made), the ring no longer sends data, so a
+ * ring value on such a day is a partial left from the switch's first minutes, and Oura's full-day
+ * value replaces it: an `oura_cloud` write ranks a stored `oura_ble` field as its equal, and an
+ * `oura_ble` write ranks a stored `oura_cloud` field above itself. Before that day the ladder is
+ * untouched, and every other source keeps its rank on every day.
+ */
+function switchAwareRankSql(table: string, col: string, src: HealthSource, ouraCloudFrom: string | null | undefined): string {
+  const base = storedRankSql(table, col)
+  if (!ouraCloudFrom || (src !== 'oura_cloud' && src !== 'oura_ble')) return base
+  // The day reaches raw SQL, so anything but a calendar day is refused rather than inlined.
+  if (!isCalendarDate(ouraCloudFrom)) throw new Error(`mergeSet: ouraCloudFrom is not a calendar day`)
+  const other = src === 'oura_cloud' ? 'oura_ble' : 'oura_cloud'
+  const rank = src === 'oura_cloud' ? sourceRank(src) : sourceRank(src) + 1
+  return `CASE WHEN ${table}.date >= DATE '${ouraCloudFrom}' AND ${table}.source_map->>'${col}' = '${other}' ` +
+    `THEN ${rank} ELSE (${base}) END`
+}
+
+export interface MergeOptions {
+  /**
+   * The local day the user switched to the Oura API (`getOuraCloudSwitchDay`), or null when they
+   * never did. Only `oura_cloud` and `oura_ble` writes read it; the table needs a `date` column.
+   */
+  ouraCloudFrom?: string | null
+}
+
+/**
  * Build the `set` object for an `onConflictDoUpdate` that merges each column against its own
  * stored source, plus the `sourceMap` update. `src`'s rank is inlined as a constant (it is a
  * closed-enum value known at build time). Merge rule per column:
  *   - incoming value NULL           → keep the stored value
  *   - rank(src) >= stored field rank → take the incoming value (equal rank = newer wins)
  *   - otherwise (stored is higher)   → keep the stored value
+ * The stored rank is the ladder's, except across the switch to the Oura API (`MergeOptions`).
  * `sourceMap` re-stamps only the columns this write actually won (jsonb_strip_nulls drops the
  * rest, so `existing || {…}` preserves every field the write did not touch).
  */
-export function mergeSet(table: string, cols: SourceColumn[], src: HealthSource): Record<string, SQL> {
+export function mergeSet(table: string, cols: SourceColumn[], src: HealthSource, opts: MergeOptions = {}): Record<string, SQL> {
   const n = sourceRank(src)
   const set: Record<string, SQL> = {}
   for (const { prop, col } of cols) {
     set[prop] = sql.raw(
       `CASE WHEN EXCLUDED.${col} IS NULL THEN ${table}.${col} ` +
-      `WHEN (${storedRankSql(table, col)}) <= ${n} THEN EXCLUDED.${col} ` +
+      `WHEN (${switchAwareRankSql(table, col, src, opts.ouraCloudFrom)}) <= ${n} THEN EXCLUDED.${col} ` +
       `ELSE ${table}.${col} END`,
     )
   }
   const mapParts = cols.map(({ col }) =>
-    `'${col}', CASE WHEN EXCLUDED.${col} IS NOT NULL AND (${storedRankSql(table, col)}) <= ${n} THEN '${src}' END`,
+    `'${col}', CASE WHEN EXCLUDED.${col} IS NOT NULL AND (${switchAwareRankSql(table, col, src, opts.ouraCloudFrom)}) <= ${n} THEN '${src}' END`,
   ).join(', ')
   set['sourceMap'] = sql.raw(
     `COALESCE(${table}.source_map, '{}'::jsonb) || jsonb_strip_nulls(jsonb_build_object(${mapParts}))`,

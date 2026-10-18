@@ -16,6 +16,7 @@ vi.mock('@/lib/data', () => ({
     listBodyMetrics: (...a: unknown[]) => listBodyMetrics(...a),
     getUserById: async () => ({ dateOfBirth: '1990-01-01', sex: 'male' }),
     getOuraDaytimeSignals: async () => ({ met: [], temp: [], still: [], motion: [] }),
+    getOuraCloudActivitySeries: async () => [],
     listSleepSessions: async () => [],
     listActivityLogs: async () => [],
     getHealthConnectIntervals: async () => [],

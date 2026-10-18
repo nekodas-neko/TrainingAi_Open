@@ -7,6 +7,9 @@
  * every pre-re-key row's stored `source_map` still names it, and a live BLE write has to out-rank
  * those rows rather than tie them.
  *
+ * One exception, by day: from the day a user switched to the Oura API, `oura_cloud` beats a leftover
+ * `oura_ble` value and a ring write cannot take the field back (`mergeSet`'s `ouraCloudFrom`, #2985).
+ *
  * It lives here rather than in `lib/data/health-source.ts` because the rank is also read by the
  * Oura rollup, which is runtime-agnostic (`lib/oura-ble/rollup/run.ts`) — importing it from the
  * `lib/data` module dragged `drizzle-orm` into a graph that must be able to run in a WebView.

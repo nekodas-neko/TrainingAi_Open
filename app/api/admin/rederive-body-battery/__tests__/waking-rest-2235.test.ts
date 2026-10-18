@@ -73,6 +73,7 @@ function buildRepo(dates: string[]) {
     },
     getUserById: async () => null,
     getOuraDaytimeSignals: async () => ({ temp: [], met: [] }),
+    getOuraCloudSwitchDay: async () => null,
     getBodyBatteryHistory: async (_u: string, from: string, to: string) =>
       [...stored.values()].filter(r => r.date >= from && r.date <= to).sort((a, b) => a.date.localeCompare(b.date)),
     getDaytimeHrvModel: async () => null,
@@ -103,7 +104,7 @@ describe('Body Battery waking-rest offset and its re-derive (issue 2235)', () =>
   it('stamps v7 with the 9 bpm offset in the model version', async () => {
     const { BODY_BATTERY_MODEL_VERSION, WAKING_REST_OFFSET_BPM } = await import('@/lib/health/body-battery-day')
     expect(WAKING_REST_OFFSET_BPM).toBe(9)
-    expect(BODY_BATTERY_MODEL_VERSION).toBe('v7:rest+9bpm:chg0.12:drn0.08:str0.02:hrmax-observed:oura-rule')
+    expect(BODY_BATTERY_MODEL_VERSION).toBe('v7:rest+9bpm:chg0.12:drn0.08:str0.02:hrmax-observed:oura-rule:oura-stress')
   })
 
   it('moves exactly the days the offset reaches, by the pinned amounts', async () => {

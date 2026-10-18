@@ -8,6 +8,7 @@
 // as `EncryptedOuraToken`, which only `lib/oura/cloud/token-cipher.ts` can make or open. Every method
 // is scoped to the caller's user.
 import { eq, sql } from 'drizzle-orm'
+import { toAestDay } from '@trainingai/shared/date-utils'
 import type { getDb } from '../client'
 import * as s from '../schema'
 import type { EncryptedOuraToken } from '@/lib/oura/cloud/token-cipher'
@@ -79,4 +80,23 @@ export async function deleteOuraCloudTokens(db: Db, userId: string): Promise<boo
 export async function getUserIdByOuraUserId(db: Db, ouraUserId: string): Promise<string | null> {
   const [row] = await db.select({ userId: t.userId }).from(t).where(eq(t.ouraUserId, ouraUserId)).limit(1)
   return row?.userId ?? null
+}
+
+/**
+ * #2985: the local day the user switched to the Oura API, or null when they never did. It is the
+ * day the connection row was created (`oura_tokens.created_at`) in the user's timezone; a refresh
+ * leaves `created_at` alone, and a disconnect deletes the row, so a reconnect moves it later.
+ *
+ * A row still holding a personal access token predates the OAuth connector (#2858), so its
+ * `created_at` is not a switch moment and it reads as no switch.
+ */
+export async function getOuraCloudSwitchDay(db: Db, userId: string): Promise<string | null> {
+  const [row] = await db
+    .select({ createdAt: t.createdAt, pat: t.personalAccessToken, access: t.accessToken, timezone: s.users.timezone })
+    .from(t)
+    .innerJoin(s.users, eq(s.users.id, t.userId))
+    .where(eq(t.userId, userId))
+    .limit(1)
+  if (!row || row.pat != null || row.access == null) return null
+  return toAestDay(row.createdAt, row.timezone)
 }

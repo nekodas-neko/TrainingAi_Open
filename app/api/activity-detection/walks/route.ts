@@ -9,12 +9,14 @@ import {
 } from '@trainingai/shared/date-utils'
 import { metGridFromDaytimeSamples } from '@trainingai/shared/health/training-stress'
 import { detectWalksFromMet } from '@trainingai/shared/health/walk-detection'
+import { deviceMetGrid } from '@trainingai/shared/health/met-input'
+import { ouraCloudMetGrid } from '@trainingai/shared/health/oura-cloud-met'
 
-// #2471 (owner direction 2026-10-06): the walks in one day's ring MET that the user has not logged,
+// #2471 (owner direction 2026-10-06): the walks in one day's MET (the ring's, then Oura's, #2985) that the user has not logged,
 // for the phone to offer as "Looks like you walked 9:10–9:32. Save it?". Called after every ring
 // sync the app sees settle (`ta:oura-ble-synced`, which the app-open drain also fires).
 //
-// Computed on read, never stored: the ring's MET is already on the server, so a candidate is a
+// Computed on read, never stored: the MET is already on the server, so a candidate is a
 // function of it and of what the user has logged, and a saved walk drops out by being logged. The
 // phone remembers what it dismissed (`auto-detection-store`). The rule is `detectWalksFromMet`.
 const QuerySchema = z.object({
@@ -43,8 +45,10 @@ export async function GET(req: NextRequest) {
     const repo = await getRepositoryAsync()
     const dayStart = dateStrMidnightInTz(date, tz)
     const dayEnd = dateStrMidnightInTz(shiftDateStr(date, 1), tz)
-    const [daytime, sleepRows, lifting, activities] = await Promise.all([
+    const [daytime, cloudActivity, sleepRows, lifting, activities] = await Promise.all([
       repo.getOuraDaytimeSignals(userId, dayStart, dayEnd),
+      // #2985: Oura's MET series where the ring has none. Its day starts at 4 a.m., hence the day before.
+      repo.getOuraCloudActivitySeries(userId, shiftDateStr(date, -1), date),
       // The night ending this morning is dated today; the one starting tonight, tomorrow.
       repo.listSleepSessions(userId, date, shiftDateStr(date, 1)),
       // This one takes the date slash-separated.
@@ -66,7 +70,11 @@ export async function GET(req: NextRequest) {
       }),
     ]
 
-    const grid = metGridFromDaytimeSamples(daytime.met)
+    const grid = deviceMetGrid(
+      metGridFromDaytimeSamples(daytime.met),
+      ouraCloudMetGrid(cloudActivity, dayStart.getTime(), dayEnd.getTime()),
+      dayStart.getTime(), dayEnd.getTime(),
+    )
     const walks = detectWalksFromMet(grid, exclusions)
       .filter(w => w.startMs >= dayStart.getTime() && w.startMs < dayEnd.getTime())
 

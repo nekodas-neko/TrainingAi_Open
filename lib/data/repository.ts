@@ -687,6 +687,8 @@ export interface WorkoutRepository {
   deleteOuraCloudTokens(userId: string): Promise<boolean>
   /** #2859: the user an Oura account is connected to, for routing a webhook event. Null if none. */
   getUserIdByOuraUserId(ouraUserId: string): Promise<string | null>
+  /** #2985: the local day the user switched to the Oura API (their connection's creation), or null. */
+  getOuraCloudSwitchDay(userId: string): Promise<string | null>
   getUserByEmail(email: string): Promise<(User & { passwordHash?: string }) | null>
   updateUserProfile(userId: string, profile: Partial<Pick<User, 'displayName' | 'heightCm' | 'dateOfBirth' | 'weightGoalKg' | 'timezone' | 'sex' | 'activityLevel' | 'fitnessGoal'>>): Promise<User>
   touchLastGoalReviewAt(userId: string): Promise<void>
@@ -1537,6 +1539,8 @@ export interface WorkoutRepository {
   upsertOuraCloudSleepPeriods(userId: string, rows: import('./postgres/slices/oura').OuraCloudSleepPeriodRow[]): Promise<number>
   /** #2982: Oura's per-day series, goals, contributors and stress label; sets only the fields each row carries. */
   upsertOuraCloudDaily(userId: string, rows: import('./postgres/slices/oura').OuraCloudDailyRow[]): Promise<number>
+  /** #2985: Oura's stored MET series and 5-minute activity class per day, for the MET cascade. */
+  getOuraCloudActivitySeries(userId: string, from: string, to: string): Promise<import('./postgres/slices/oura').OuraCloudActivitySeries[]>
   /** #2982: Oura's sessions (breathing, meditation …) with their series and mood. */
   upsertOuraSessions(userId: string, rows: import('./postgres/slices/oura').OuraSessionRow[]): Promise<number>
   /** #2895: the newest `oura_cloud` HR point at or after `since`; where the next Cloud HR read starts. */

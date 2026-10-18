@@ -33,8 +33,9 @@ function stubRepo(withModelInputs: boolean) {
     listSleepSessions: async () => [],
     getHrForWindow: async () => hr,
     getUserById: async () => null,
+    getOuraCloudSwitchDay: async () => null,
     getOuraDaytimeSignals: async () => ({
-      temp: withModelInputs ? [{ valueC: 33, ts: t0 }] : [], met: [],
+      temp: withModelInputs ? [{ valueC: 33, tsMs: t0.getTime() }] : [], met: [],
     }),
     getBodyBatteryHistory: async () => [],
     getDaytimeHrvModel: async () => (withModelInputs ? { fitted: true } : null),

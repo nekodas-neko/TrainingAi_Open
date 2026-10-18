@@ -28,6 +28,7 @@ import {
 } from '@trainingai/shared/health/training-stress-recheck';
 import { BASELINE_MIN_NIGHTS } from '@trainingai/shared/health/readiness-composite';
 import { resolveDayMetPerMinute } from '@trainingai/shared/health/met-input';
+import { ouraCloudMetGrid } from '@trainingai/shared/health/oura-cloud-met';
 import { ouraIdForActivityType } from '@trainingai/shared/health/daily-energy';
 import { metForActivity, intensityFromRpe } from '@trainingai/shared/health/workout-energy';
 import type { ActivityLog } from '@trainingai/shared/types/body';
@@ -41,7 +42,7 @@ const KCAL_MET_WEIGHT_WINDOW_DAYS = 30;
 export type TrainingStressResponse = TrainingStressResult & { rhrFromDay?: string };
 
 // GET /api/training-stress?date=YYYY-MM-DD — assembles the day's OTS from our own derived
-// readiness + derived VO₂max + the ring's MET stream, persists it (best-effort) to
+// readiness + derived VO₂max + the day's MET (the ring's, then Oura's), persists it (best-effort) to
 // oura_daily_derived, and returns it. Gated (200 with status:'gated') when readiness is still
 // learning / absent, the profile is incomplete, or there isn't enough MET signal.
 export async function GET(req: Request) {
@@ -123,6 +124,7 @@ async function evaluateTrainingStressDay(
     activityRows,
     kcalRows,
     stepRows,
+    cloudActivity,
   ] = await Promise.all([
     repo.getOuraDailyDerived(userId, date, date),
     repo.getOuraDailySummary(userId, date, date),
@@ -138,6 +140,8 @@ async function evaluateTrainingStressDay(
     repo.listActivityLogs(userId, date, date),
     movementIntervals(repo, userId, 'active_kcal', intervalsFrom, dayEnd),
     movementIntervals(repo, userId, 'steps', intervalsFrom, dayEnd),
+    // #2985: Oura's activity day starts at 4 a.m., so the day before holds this day's first hours.
+    repo.getOuraCloudActivitySeries(userId, shiftDateStr(date, -1), date),
   ]);
 
   const derived = derivedRows[0] ?? null;
@@ -155,12 +159,14 @@ async function evaluateTrainingStressDay(
 
   // #2115 v4: the day's `MET/min`, minute by minute from local midnight to the end of the day (or
   // now, for today), each minute from the best route that has it. The ring's own grid is rung 1 (J-6:
-  // keyed on each bin's wall-clock minute, so charger gaps stay gaps); a minute nothing fills stays
-  // null, and `computeTrainingStress` caps and renormalises over those.
+  // keyed on each bin's wall-clock minute, so charger gaps stay gaps), then Oura's MET series where
+  // the ring has no minute (#2985); a minute nothing fills stays null, and `computeTrainingStress`
+  // caps and renormalises over those.
   const grid = metGridFromDaytimeSamples(daytime.met);
   const met = resolveDayMetPerMinute(
     {
       ringGrid: grid,
+      cloudGrid: ouraCloudMetGrid(cloudActivity, dayStart.getTime(), dayEnd.getTime()),
       ringMotion: daytime.motion ?? [],
       ringStillFramesMs: daytime.still ?? [],
       sleepSessions: sleepRows.map((r) => ({

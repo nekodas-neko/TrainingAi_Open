@@ -13,6 +13,7 @@ const MIN = 60_000
 const met = Array.from({ length: 60 }, (_, i) => ({ tsMs: T0 + i * MIN, value: i >= 10 && i < 32 ? 3.0 : 1.2 }))
 const repo = {
   getOuraDaytimeSignals: vi.fn(async () => ({ temp: [], met, still: [], motion: [] })),
+  getOuraCloudActivitySeries: vi.fn(async () => []),
   listSleepSessions: vi.fn(async () => [] as { sleepStart: Date; sleepEnd: Date }[]),
   getDaySessionSummaries: vi.fn(async () => [] as { startedAt: Date; completedAt?: Date }[]),
   listActivityLogs: vi.fn(async () => [] as { date: string; startTime?: string; endTime?: string; durationMin?: number }[]),
