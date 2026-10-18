@@ -2,6 +2,7 @@ import { PixelRatio, View } from 'react-native';
 import Svg, { Line } from 'react-native-svg';
 import { AppText } from './AppText';
 import { yAxisWidth } from './chartScale';
+import { textScale } from '../theme/text-scale';
 import { useTheme } from '../theme/ThemeProvider';
 
 // Overlay pieces shared by the chart components' opt-in axes, gridlines and target line. They take
@@ -14,9 +15,9 @@ const decorative = {
   importantForAccessibility: 'no-hide-descendants',
 } as const;
 
-/** Width of the y-axis column for these labels, grown with the system font scale. */
+/** Width of the y-axis column for these labels, grown with the scale text is drawn at. */
 export function yAxisColumnWidth(texts: readonly string[]): number {
-  return yAxisWidth(texts, PixelRatio.getFontScale());
+  return yAxisWidth(texts, textScale(PixelRatio.getFontScale()));
 }
 
 /** Faint horizontal gridlines and a dashed target line with its label, drawn over the plot. */

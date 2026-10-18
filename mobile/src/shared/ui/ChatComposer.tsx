@@ -17,10 +17,11 @@ export function ChatComposer({
   onStop: () => void;
   disabled: boolean;
 }) {
-  const { theme } = useTheme();
+  const { theme, allowFontScaling } = useTheme();
   return (
     <Stack direction="row" align="center">
       <TextInput
+        allowFontScaling={allowFontScaling}
         accessibilityLabel="Message Coach"
         placeholder="Tell me what you want to change…"
         placeholderTextColor={theme.colors.muted}
@@ -37,7 +38,7 @@ export function ChatComposer({
           borderRadius: theme.radii.control,
           backgroundColor: theme.colors.raised,
           color: theme.colors.text,
-          ...theme.typography.body,
+          ...theme.typography.input,
         }}
       />
       <IconButton

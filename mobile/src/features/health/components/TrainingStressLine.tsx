@@ -3,13 +3,12 @@ import { AppText, Stack, StatusIndicator } from '../../../shared/ui';
 import { useWorkoutResource } from '../../workouts/data/WorkoutDataProvider';
 import { trainingStressSpec } from '../../workouts/data/models';
 import { useHealthData } from '../data/HealthDataProvider';
-import { View, useWindowDimensions } from 'react-native';
+import { View } from 'react-native';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 
 export function TrainingStressLine() {
   const { today } = useHealthData();
-  const { theme } = useTheme();
-  const { fontScale } = useWindowDimensions();
+  const { theme, textScale } = useTheme();
   const state = useWorkoutResource({
     ...trainingStressSpec(today),
     query: undefined,
@@ -25,7 +24,7 @@ export function TrainingStressLine() {
         (data.rhrFromDay ? ` · resting HR from ${formatDayShort(data.rhrFromDay)}` : '')
       : 'Training stress · no score available yet';
   return (
-    <View style={{ height: theme.sizes.touchTarget * fontScale, justifyContent: 'center' }}>
+    <View style={{ height: theme.sizes.touchTarget * textScale, justifyContent: 'center' }}>
       <Stack direction="row" align="center">
         <AppText
           variant="caption"

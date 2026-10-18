@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { liveReadinessForDay, liveReadinessByDay } from '@trainingai/shared/health/live-readiness'
+import { liveReadinessForDay, liveReadinessByDay, isOwnReadinessSource } from '@trainingai/shared/health/live-readiness'
 
 // F8/E2-1/E2-12, #3000: readiness comes from our own composite only. Oura's readiness is never ours,
 // for any day — the functions take no Oura rows at all.
@@ -16,7 +16,20 @@ describe('liveReadinessForDay', () => {
     expect(liveReadinessForDay('2026-07-01', [])).toBeNull() // pre-re-key days too (#3000)
   })
 
-  it('ignores a derived row that is NOT ble-derived (e.g. a Cloud-sourced derived row)', () => {
+  it('#2992: an Oura-only day stored as generic-derived reaches the AI surfaces', () => {
+    // Once no ring summary is in the window (~16 Nov), every Oura Cloud day is `generic-derived`.
+    expect(liveReadinessForDay('2026-11-20', [derived('2026-11-20', 67, 'generic-derived')])).toBe(67)
+    expect(liveReadinessByDay([derived('2026-11-20', 67, 'generic-derived')]).get('2026-11-20')).toBe(67)
+  })
+
+  it('#2992: own-readiness labels are exactly the two the composite writes', () => {
+    expect(isOwnReadinessSource('ble-derived')).toBe(true)
+    expect(isOwnReadinessSource('generic-derived')).toBe(true)
+    expect(isOwnReadinessSource('oura-cloud')).toBe(false)
+    expect(isOwnReadinessSource(null)).toBe(false)
+  })
+
+  it('ignores a derived row that is not our composite (e.g. a Cloud-sourced derived row)', () => {
     expect(liveReadinessForDay('2026-07-15', [derived('2026-07-15', 70, 'oura-cloud')])).toBeNull()
   })
 

@@ -412,6 +412,16 @@ export const correlationSpec = (view: string) => ({
             .passthrough(),
         )
         .optional(),
+      // Rest discipline only: each logged set's prescribed and taken rest, for the plan-vs-actual
+      // summary under the bars.
+      restSets: z
+        .array(
+          z.object({
+            plannedRestSec: z.number().finite().nullable(),
+            restTimeSec: z.number().finite().nullable(),
+          }),
+        )
+        .optional(),
     })
     .passthrough(),
 });

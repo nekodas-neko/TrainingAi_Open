@@ -24,6 +24,7 @@ import {
   weightsSpec,
 } from '../data/models';
 import { HealthMetricCard } from './HealthMetricCard';
+import { RestPrescriptionSummary } from './RestPrescriptionSummary';
 import { useTheme } from '../../../shared/theme/ThemeProvider';
 import {
   STRENGTH_BAR_MARKERS,
@@ -103,6 +104,7 @@ function TrendsCard() {
                 }))}
               />
             )}
+            {view === 'rest-adherence' && <RestPrescriptionSummary sets={data.restSets} />}
           </>
         )}
       </StableContent>

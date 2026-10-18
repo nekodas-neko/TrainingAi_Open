@@ -9,6 +9,7 @@ import { formatDateDisplay } from "@trainingai/shared/date-utils";
 import { categoricalColor } from "@trainingai/shared/chart-colors";
 import { prescriptionDrivesLoad } from "@trainingai/shared/ai-periodization/apply-prescription";
 import { withPrescribedBars, type RMStyleSet } from "@trainingai/shared/1rm";
+import { initialSetWeight, prescribedBar } from "@trainingai/shared/workout/load-rounding";
 
 export const DEFAULT_SETS = 3;
 export const DEFAULT_REPS = 8;
@@ -57,33 +58,10 @@ export function mround125Up(value: number): number {
   return Math.max(5, Math.min(250, Math.ceil(value / 1.25) * 1.25));
 }
 
-// Barbell plates come in pairs, so the smallest real change on a bar is two
-// plates — 2.5 kg with a 1.25 kg pair. Other equipment (dumbbells, cable
-// stacks, machines) keeps the finer 1.25 kg default.
-export const BARBELL_WEIGHT_STEP_KG = 2.5;
-export const DEFAULT_WEIGHT_STEP_KG = 1.25;
-
-export function weightStepFor(equipment?: string[] | null): number {
-  return equipment?.includes("barbell") ? BARBELL_WEIGHT_STEP_KG : DEFAULT_WEIGHT_STEP_KG;
-}
-
-/** The bar range every plate-rounded weight is clamped to. */
-export const MIN_BAR_KG = 5;
-export const MAX_BAR_KG = 250;
-
-export function mroundStep(value: number, step: number): number {
-  return Math.max(MIN_BAR_KG, Math.min(MAX_BAR_KG, Math.round(value / step) * step));
-}
-
-export function mroundStepUp(value: number, step: number): number {
-  return Math.max(MIN_BAR_KG, Math.min(MAX_BAR_KG, Math.ceil(value / step) * step));
-}
-
-/** #2762: true when `mroundStepUp` would cut this prescription down to MAX_BAR_KG, so the screen
- *  can say the bar is capped instead of showing 250 as if it were the real figure. */
-export function barIsCapped(value: number | null | undefined): boolean {
-  return value != null && value > MAX_BAR_KG;
-}
+export {
+  BARBELL_WEIGHT_STEP_KG, DEFAULT_WEIGHT_STEP_KG, MIN_BAR_KG, MAX_BAR_KG,
+  weightStepFor, mroundStep, mroundStepUp, barIsCapped,
+} from "@trainingai/shared/workout/load-rounding";
 
 type BarInputs = Pick<WorkoutExercise, "exerciseType" | "progressionStyle" | "estimated1rm" | "equipment">;
 
@@ -95,30 +73,16 @@ export function prescribedBarWeights(ex: BarInputs | undefined, sets: number): (
   const style = ex?.progressionStyle;
   const basis = ex?.estimated1rm;
   if (ex?.exerciseType === "bodyweight" || !style || !basis) return Array.from({ length: sets }, () => null);
-  const step = weightStepFor(ex.equipment);
-  return Array.from({ length: sets }, (_, i) => (style[i] ? mroundStepUp(basis * style[i].pct / 100, step) : null));
+  return Array.from({ length: sets }, (_, i) => (style[i] ? prescribedBar(basis, style[i].pct, ex.equipment) : null));
 }
 
 // Shared per-set weight derivation — used at init (launchExercise, the per-set-weights
 // effect) and after an injury swap, so all three paths agree on how a set's target
-// weight is picked. One Formula, One Place.
+// weight is picked. One Formula, One Place: the order itself is `initialSetWeight`, which the
+// native app uses too.
 export function computeInitialWeights(ex: WorkoutExercise | undefined, sets: number): number[] {
-  if (ex?.exerciseType === "bodyweight") {
-    return Array.from({ length: sets }, () => 0);
-  }
-  const step = weightStepFor(ex?.equipment);
   const prescribed = prescribedBarWeights(ex, sets);
-  return Array.from({ length: sets }, (_, i) => {
-    const bar = prescribed[i];
-    if (bar != null) return bar;
-    // #2762: up, like the card's "Target weight" and every other prescription, so the field opens
-    // on the bar the lifter is shown.
-    if (ex?.target80 != null) return mroundStepUp(ex.target80, step);
-    // Fallback for old logs that predate the target_80 column: derive from 1RM or last weight
-    if (ex?.estimated1rm) return mroundStepUp(ex.estimated1rm * 0.8, step);
-    if (ex?.latestWeight != null) return mroundStep(ex.latestWeight, step);
-    return 60;
-  });
+  return Array.from({ length: sets }, (_, i) => initialSetWeight(ex, prescribed[i]));
 }
 
 /** `plannedWeights` for the log payload: omitted when no set had a prescribed bar, so a freeform

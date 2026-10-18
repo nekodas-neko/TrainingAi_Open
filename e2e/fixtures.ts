@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import { expect, type Locator, type Page, type Route } from '@playwright/test'
+import { tapOnceItLands } from './tap-retry'
 
 /** Seeded by `scripts/local-db/seed.sql`. Idempotent — `pnpm db:local` will not re-seed. */
 export const SEED_EMAIL = 'test@local.dev'
@@ -436,18 +437,30 @@ export async function tapInView(page: Page, target: Locator): Promise<void> {
  */
 export async function tapHitTested(page: Page, target: Locator): Promise<void> {
   await expect(target).toBeVisible({ timeout: 30_000 })
-  await target.evaluate((el) => el.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior }))
-  const box = await stableBox(target)
-  const x = box.x + box.width / 2
-  const y = box.y + box.height / 2
-  const hit = await target.evaluate((el, [px, py]) => {
-    const at = document.elementFromPoint(px as number, py as number)
-    return { inside: !!at && (at === el || el.contains(at)), tag: at ? `${at.tagName}.${at.className}` : 'null' }
-  }, [x, y])
-  if (!hit.inside) {
-    throw new Error(`the tap at (${Math.round(x)}, ${Math.round(y)}) would land on ${hit.tag}, not the target`)
-  }
-  await page.touchscreen.tap(x, y)
+  // Retried (issue 2980): content that mounts after the first paint moves the target between the
+  // stability read and the probe, so one probe reports a neighbour that is only passing through.
+  await tapOnceItLands({
+    attempt: async () => {
+      await target.evaluate((el) => el.scrollIntoView({ block: 'center', behavior: 'instant' as ScrollBehavior }))
+      const box = await stableBox(target)
+      const x = box.x + box.width / 2
+      const y = box.y + box.height / 2
+      const probe = () => target.evaluate((el, [px, py]) => {
+        const at = document.elementFromPoint(px as number, py as number)
+        return { inside: !!at && (at === el || el.contains(at)), tag: at ? `${at.tagName}.${at.className}` : 'null' }
+      }, [x, y])
+      const hit = await probe()
+      // A hit has to survive two frames: a layout that has not finished can land on the target for
+      // one frame on its way past.
+      if (hit.inside) {
+        await page.evaluate(() => new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r()))))
+        return { x, y, hit: await probe() }
+      }
+      return { x, y, hit }
+    },
+    tap: (x, y) => page.touchscreen.tap(x, y),
+    pause: () => page.waitForTimeout(100),
+  })
 }
 
 /**

@@ -1,7 +1,8 @@
 import { createContext, useContext, useMemo, useState, type PropsWithChildren } from 'react';
-import { useColorScheme } from 'react-native';
+import { useColorScheme, useWindowDimensions } from 'react-native';
 import { createTheme, type ThemeMode, type ThemeOverrides } from './theme';
 import { customAccent } from './custom-accent';
+import { scalesText, textScale } from './text-scale';
 import type { Brand } from './palettes';
 
 type ThemeOptions = {
@@ -28,6 +29,7 @@ function useThemeController({
   onCustomHueChange,
 }: ThemeOptions) {
   const system = useColorScheme();
+  const { fontScale } = useWindowDimensions();
   const [localMode, setLocalMode] = useState(initialMode);
   const [localBrand, setLocalBrand] = useState(initialBrand);
   const mode = controlledMode ?? localMode;
@@ -66,6 +68,10 @@ function useThemeController({
     setBrand,
     setCustomHue,
     previewCustomHue: setPreviewHue,
+    /** The factor text is drawn at; for sizes that must track text, such as a row fitting a label. */
+    textScale: textScale(fontScale),
+    /** Pass to every Text and TextInput so none shrinks below its token size (text-scale.ts). */
+    allowFontScaling: scalesText(fontScale),
   };
 }
 const Context = createContext<ReturnType<typeof useThemeController> | null>(null);

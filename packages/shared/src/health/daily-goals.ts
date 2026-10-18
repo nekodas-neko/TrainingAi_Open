@@ -14,6 +14,8 @@ import type { ActivityLevel } from '@trainingai/shared/types/user'
 /** Fallbacks used when the profile lacks the field needed to personalise a goal. */
 export const DEFAULT_STEP_GOAL = 8000
 export const DEFAULT_ACTIVE_ENERGY_GOAL = 400 // kcal
+/** Hours of sleep a night until the user saves a goal of their own. Home's sleep card in both apps. */
+export const DEFAULT_SLEEP_GOAL_HOURS = 8
 /** Active-energy goal as a fraction of BMR (≈ a WHO-guideline day of deliberate movement). */
 export const ACTIVE_ENERGY_BMR_FRACTION = 0.24
 /** WHO ≥150 min/wk moderate ⇒ this many minutes/day of zone-2+ (vigorous counts double upstream). */

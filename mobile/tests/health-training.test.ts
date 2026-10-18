@@ -10,6 +10,7 @@ import {
   weekActivities,
 } from '../src/features/health/data/training-view.ts';
 import { overlayCalories } from '../src/features/activities/data/models.ts';
+import { correlationSpec } from '../src/features/health/data/models.ts';
 import { monthGrid } from '../src/shared/ui/monthGrid.ts';
 
 const walk = {
@@ -165,4 +166,14 @@ test('a month grid takes 4, 5 or 6 Monday-first rows', () => {
   assert.equal(monthGrid('2021-02').rows, 4);
   assert.equal(monthGrid('2026-04').rows, 5);
   assert.equal(monthGrid('2026-08').rows, 6);
+});
+
+test('the Rest discipline trend keeps the per-set rest pairs for the plan-vs-actual summary', () => {
+  const parsed = correlationSpec('rest-adherence').schema.parse({
+    insight: 'x',
+    hasSufficientData: true,
+    buckets: [],
+    restSets: [{ plannedRestSec: 90, restTimeSec: 65 }],
+  });
+  assert.deepEqual(parsed.restSets, [{ plannedRestSec: 90, restTimeSec: 65 }]);
 });

@@ -1,5 +1,6 @@
 import { Scale, Footprints, Flame, Route, Beef, Wheat, Droplets, type LucideIcon } from "lucide-react";
 import type { CardSectionKey } from "@/components/home/home-card-widget";
+import { DEFAULT_SLEEP_GOAL_HOURS } from "@trainingai/shared/health/daily-goals";
 
 export type MetaKey = "weightKg" | "steps" | "calories" | "protein" | "carb" | "fat" | "distanceKm" | "waterIntake";
 /**
@@ -214,8 +215,8 @@ export function loadSleepGoal(): number {
   try {
     const raw = typeof window !== "undefined" ? localStorage.getItem(SLEEP_GOAL_KEY) : null;
     const n = raw ? parseFloat(raw) : NaN;
-    return isNaN(n) ? 8 : n;
-  } catch { return 8; }
+    return isNaN(n) ? DEFAULT_SLEEP_GOAL_HOURS : n;
+  } catch { return DEFAULT_SLEEP_GOAL_HOURS; }
 }
 
 export function loadWaterGoal(): number | null {

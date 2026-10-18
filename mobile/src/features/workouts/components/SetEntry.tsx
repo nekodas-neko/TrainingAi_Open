@@ -1,6 +1,6 @@
 import { feedback } from '../../../integrations/feedback/haptics';
 import { useCallback, useState } from 'react';
-import { View, useWindowDimensions } from 'react-native';
+import { View } from 'react-native';
 import {
   AppButton,
   Disclosure,
@@ -30,13 +30,12 @@ export function SetEntry({
   fill?: boolean;
 }) {
   const journal = useWorkoutJournal();
-  const { theme } = useTheme();
-  const { fontScale } = useWindowDimensions();
+  const { theme, textScale } = useTheme();
   const [controlsLayout, setControlsLayout] = useState({ width: 0, height: 0 });
   const [assistanceHeight, setAssistanceHeight] = useState(0);
   const minimumRow = Math.max(
     theme.sizes.wheelRow,
-    theme.typography.display.lineHeight! * fontScale + theme.spacing.sm,
+    theme.typography.display.lineHeight! * textScale + theme.spacing.sm,
   );
   const bodyweight = exercise.exerciseType === 'bodyweight';
   const expanded = fill;
@@ -53,7 +52,7 @@ export function SetEntry({
     theme.spacing.sm +
     (bodyweight ? assistanceHeight : theme.sizes.touchTarget + theme.spacing.xs * 2) +
     theme.sizes.loggingControl +
-    theme.typography.caption.lineHeight! * fontScale +
+    theme.typography.caption.lineHeight! * textScale +
     theme.spacing.sm +
     theme.spacing.md * 2;
   const columnStyle =

@@ -87,9 +87,9 @@ import { chooseRestDay, withRestDayOverride } from "@/lib/home/rest-day";
 import { fetchWithRetry } from "@trainingai/shared/fetch-with-retry";
 import { computeStreak, type StreakSchedule } from "./compute-streak";
 import type { SleepRow } from "@/app/health/health-sections";
+import { DEFAULT_SLEEP_GOAL_HOURS } from "@trainingai/shared/health/daily-goals";
 import type { HrSleepWindow } from "@trainingai/shared/health/hr-sleep-band";
 import { useBodyBattery } from "@/lib/hooks/use-body-battery";
-
 // Derived from the canonical shape rather than restated as a sixth local copy: the fields Home
 // needs, plus `provisional`, which the local-store seed below cannot supply and which the Home
 // score chip reads. A `Pick` keeps the seed's narrow object literal assignable.
@@ -149,7 +149,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const [readinessFailed, setReadinessFailed] = useState(false);
   const [stepsGoal, setStepsGoal] = useState(10000);
   const [stepsGoalType, setStepsGoalType] = useState<"daily" | "weekly">("daily");
-  const [sleepGoal, setSleepGoal] = useState(8);
+  const [sleepGoal, setSleepGoal] = useState<number>(DEFAULT_SLEEP_GOAL_HOURS);
   const [waterGoal, setWaterGoal] = useState<number | null>(null);
   const [waterGoalType, setWaterGoalType] = useState<"daily" | "weekly">("daily");
   const [weekToDate, setWeekToDate] = useState<{ steps: number; calories: number; waterMl: number } | null>(null);

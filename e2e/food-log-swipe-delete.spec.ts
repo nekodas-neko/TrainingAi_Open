@@ -296,14 +296,14 @@ test('the tray is hit-testable the moment the row moves, not only once it rests 
     // Read the row's own transform first. Without this a failure below is ambiguous between "the
     // tray is under the row" and "the drag never happened", and the first version of this test hit
     // the second while reporting the first.
-    moved = await row.evaluate((el) => {
+    const readTransform = () => row.evaluate((el) => {
       const surface = el.closest('[data-swipe-actions]')?.lastElementChild as HTMLElement | null
       return surface ? getComputedStyle(surface).transform : 'no surface'
     })
 
     // 52 px into the tray, the same point the timing test uses: the row uncovers the tray's right
     // edge first, so a point deep in it is the one that stays covered.
-    hit = await page.evaluate(([px, py]) => {
+    const probe = () => page.evaluate(([px, py]) => {
       const el = document.elementFromPoint(px as number, py as number)
       const button = el?.closest('button')
       return {
@@ -311,6 +311,20 @@ test('the tray is hit-testable the moment the row moves, not only once it rests 
         tag: el ? `${el.tagName}${el.className ? '.' + String(el.className).slice(0, 44) : ''}` : 'null',
       }
     }, [box.x + box.width - 52, y])
+
+    // Issue 2980: poll, rather than read once 16 ms after the last move. The row follows the finger
+    // a frame or two behind (it read 33 px of a 36 px drag when this failed), and the tray is lifted
+    // above it by the commit that follows, so a single read raced that commit and reported the row's
+    // own button. The finger stays DOWN throughout, so the state under test is unchanged, and the
+    // regression this guards (the tray left underneath until the row rests open) never lifts it at
+    // all, so it still fails, after the budget.
+    const deadline = Date.now() + 2_000
+    for (;;) {
+      moved = await readTransform()
+      hit = await probe()
+      if ((hit.onTray && moved !== 'none') || Date.now() >= deadline) break
+      await page.waitForTimeout(16)
+    }
   } finally {
     await touch('touchEnd', 0)
     await cdp.detach()
